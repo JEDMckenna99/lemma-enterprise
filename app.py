@@ -409,6 +409,13 @@ def create_app():
     except Exception as e:
         logger.error(f"❌ Failed to register Agent Credentials API: {e}")
 
+    try:
+        from api.site_management_api import site_management_bp
+        app.register_blueprint(site_management_bp)
+        logger.info("✅ Site Management API registered (users, permissions, keys)")
+    except Exception as e:
+        logger.error(f"❌ Failed to register Site Management API: {e}")
+
     # Health Monitoring
     try:
         from api.health_check import get_health_status
@@ -899,22 +906,32 @@ def create_app():
     
     @app.route('/developer/sites/<site_id>/keys')
     def developer_site_keys(site_id):
-        """Developer Platform - Site API keys"""
-        return render_template('developer/sites/detail.html',
+        """Developer Platform - Site API keys management"""
+        logger.info(f"🔑 Serving API keys page: {site_id}")
+        return render_template('developer/site_keys.html',
             site_id=site_id,
-            tab='keys',
             user_email=request.headers.get('X-User-Email'),
-            is_admin=False
+            is_admin=request.headers.get('X-Permission-ID', '').lower() in ['super_admin', 'admin_access']
         )
     
     @app.route('/developer/sites/<site_id>/users')
     def developer_site_users(site_id):
-        """Developer Platform - Site users"""
-        return render_template('developer/sites/detail.html',
+        """Developer Platform - Site users (PPIDs) management"""
+        logger.info(f"👥 Serving site users page: {site_id}")
+        return render_template('developer/site_users.html',
             site_id=site_id,
-            tab='users',
             user_email=request.headers.get('X-User-Email'),
-            is_admin=False
+            is_admin=request.headers.get('X-Permission-ID', '').lower() in ['super_admin', 'admin_access']
+        )
+    
+    @app.route('/developer/sites/<site_id>/permissions')
+    def developer_site_permissions(site_id):
+        """Developer Platform - Permission types management"""
+        logger.info(f"🎫 Serving permissions page: {site_id}")
+        return render_template('developer/site_permissions.html',
+            site_id=site_id,
+            user_email=request.headers.get('X-User-Email'),
+            is_admin=request.headers.get('X-Permission-ID', '').lower() in ['super_admin', 'admin_access']
         )
     
     @app.route('/developer/sites/<site_id>/settings')

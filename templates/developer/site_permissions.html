@@ -1,0 +1,392 @@
+{% extends "developer/layout.html" %}
+{% set active_page = 'sites' %}
+
+{% block dev_content %}
+<div class="dev-header">
+    <div class="dev-header-row">
+        <div>
+            <nav class="admin-breadcrumb" style="margin-bottom: 8px;">
+                <a href="/developer/sites" style="color: var(--dev-text-muted);">Sites</a>
+                <span class="breadcrumb-separator">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 14px; height: 14px;">
+                        <polyline points="9 18 15 12 9 6"></polyline>
+                    </svg>
+                </span>
+                <span>{{ site_id }}</span>
+                <span class="breadcrumb-separator">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 14px; height: 14px;">
+                        <polyline points="9 18 15 12 9 6"></polyline>
+                    </svg>
+                </span>
+                <span style="color: var(--dev-text);">Permissions</span>
+            </nav>
+            <h1 class="dev-title">Permission Types</h1>
+            <p class="dev-subtitle">Define the permission types available on your site</p>
+        </div>
+        <button class="dev-btn dev-btn-primary" data-action="show-create-modal">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 6px;">
+                <line x1="12" y1="5" x2="12" y2="19"></line>
+                <line x1="5" y1="12" x2="19" y2="12"></line>
+            </svg>
+            Create Permission
+        </button>
+    </div>
+</div>
+
+<!-- Stats -->
+<div class="dev-stats">
+    <div class="dev-stat-card">
+        <div class="dev-stat-label">Permission Types</div>
+        <div class="dev-stat-value" id="stat-types">-</div>
+    </div>
+    <div class="dev-stat-card">
+        <div class="dev-stat-label">Active Grants</div>
+        <div class="dev-stat-value" id="stat-grants">-</div>
+    </div>
+    <div class="dev-stat-card">
+        <div class="dev-stat-label">Users With Permissions</div>
+        <div class="dev-stat-value" id="stat-users">-</div>
+    </div>
+</div>
+
+<!-- Permissions Table -->
+<div class="dev-card card-gradient-hover">
+    <div class="dev-card-header">
+        <h2 class="dev-card-title">All Permission Types</h2>
+    </div>
+    <div class="dev-card-body" style="padding: 0;">
+        <table class="table-enhanced" style="width: 100%;">
+            <thead>
+                <tr>
+                    <th style="padding: 12px 16px;">Permission ID</th>
+                    <th>Display Name</th>
+                    <th>Description</th>
+                    <th class="sortable">Users</th>
+                    <th class="sortable">Created</th>
+                    <th style="width: 120px;">Actions</th>
+                </tr>
+            </thead>
+            <tbody id="permissions-table-body">
+                <tr>
+                    <td colspan="6" style="text-align: center; padding: 60px;">
+                        <div class="skeleton" style="width: 200px; height: 20px; margin: 0 auto;"></div>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Create/Edit Permission Modal -->
+<div class="panel-overlay" id="permission-modal-overlay" style="display: none;"></div>
+<div class="slide-panel" id="permission-panel" style="width: 400px;">
+    <div class="panel-header">
+        <h3 class="panel-title" id="panel-title">Create Permission</h3>
+        <button class="panel-close">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+        </button>
+    </div>
+    <div class="panel-body">
+        <form id="permission-form">
+            <div class="panel-field" style="margin-bottom: 20px;">
+                <label class="panel-field-label" for="permission-id">Permission ID *</label>
+                <input type="text" id="permission-id" class="focus-ring" placeholder="e.g. admin, moderator, premium" 
+                       style="width: 100%; padding: 10px 12px; border: 1px solid #e2e8f0; border-radius: 6px; font-family: monospace;">
+                <div style="font-size: 12px; color: var(--dev-text-muted); margin-top: 4px;">Lowercase, no spaces (use underscores)</div>
+            </div>
+            
+            <div class="panel-field" style="margin-bottom: 20px;">
+                <label class="panel-field-label" for="display-name">Display Name</label>
+                <input type="text" id="display-name" class="focus-ring" placeholder="e.g. Administrator, Premium User"
+                       style="width: 100%; padding: 10px 12px; border: 1px solid #e2e8f0; border-radius: 6px;">
+            </div>
+            
+            <div class="panel-field" style="margin-bottom: 20px;">
+                <label class="panel-field-label" for="description">Description</label>
+                <textarea id="description" class="focus-ring" placeholder="What does this permission grant access to?"
+                          style="width: 100%; padding: 10px 12px; border: 1px solid #e2e8f0; border-radius: 6px; min-height: 80px; resize: vertical;"></textarea>
+            </div>
+            
+            <div class="panel-field" style="margin-bottom: 20px;">
+                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                    <input type="checkbox" id="delegation-allowed" style="width: 18px; height: 18px;">
+                    <span>Allow delegation</span>
+                </label>
+                <div style="font-size: 12px; color: var(--dev-text-muted); margin-top: 4px; margin-left: 26px;">
+                    Users with this permission can grant it to others
+                </div>
+            </div>
+        </form>
+    </div>
+    <div class="panel-footer">
+        <button class="dev-btn dev-btn-secondary" data-action="cancel-permission">Cancel</button>
+        <button class="dev-btn dev-btn-primary" data-action="save-permission" id="save-btn">Create</button>
+    </div>
+</div>
+
+<script nonce="{{ csp_nonce }}">
+const SITE_ID = '{{ site_id }}';
+let editingPermission = null;
+
+document.addEventListener('DOMContentLoaded', () => {
+    loadPermissions();
+    loadStats();
+    
+    // Auto-generate display name from ID
+    document.getElementById('permission-id').addEventListener('input', function() {
+        if (!editingPermission && !document.getElementById('display-name').value) {
+            const displayName = this.value.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+            document.getElementById('display-name').placeholder = displayName || 'e.g. Administrator';
+        }
+    });
+});
+
+async function getAuthHeaders() {
+    return { 'Content-Type': 'application/json' };
+}
+
+async function loadStats() {
+    try {
+        const response = await fetch(`/api/developer/sites/${SITE_ID}/stats`, { headers: await getAuthHeaders() });
+        const data = await response.json();
+        
+        if (data.success && data.stats) {
+            document.getElementById('stat-types').textContent = data.stats.permission_types || 0;
+            document.getElementById('stat-grants').textContent = data.stats.active_permission_grants || 0;
+            document.getElementById('stat-users').textContent = data.stats.active_users || 0;
+        }
+    } catch (e) {
+        console.warn('Failed to load stats:', e);
+    }
+}
+
+async function loadPermissions() {
+    const tbody = document.getElementById('permissions-table-body');
+    
+    try {
+        const response = await fetch(`/api/developer/sites/${SITE_ID}/permissions`, { headers: await getAuthHeaders() });
+        const data = await response.json();
+        
+        if (!data.success) throw new Error(data.error);
+        
+        if (data.permissions.length === 0) {
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="6" style="text-align: center; padding: 60px;">
+                        <div class="dev-empty">
+                            <div class="dev-empty-icon">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                    <rect x="2" y="5" width="20" height="14" rx="2"></rect>
+                                    <path d="M2 10h20"></path>
+                                </svg>
+                            </div>
+                            <div class="dev-empty-title">No permission types yet</div>
+                            <div class="dev-empty-description">Create permission types to control access on your site</div>
+                            <button class="dev-btn dev-btn-primary" data-action="show-create-modal" style="margin-top: 16px;">Create Permission</button>
+                        </div>
+                    </td>
+                </tr>
+            `;
+            return;
+        }
+        
+        tbody.innerHTML = data.permissions.map(p => `
+            <tr class="highlight-new">
+                <td style="padding: 16px;">
+                    <code style="font-size: 13px; background: #f1f5f9; padding: 4px 10px; border-radius: 4px;">
+                        ${escapeHtml(p.permission_id)}
+                    </code>
+                </td>
+                <td style="font-weight: 500;">${escapeHtml(p.display_name)}</td>
+                <td style="color: #64748b; max-width: 300px;">
+                    ${escapeHtml(p.scope?.description || '-')}
+                </td>
+                <td>
+                    ${p.user_count > 0 
+                        ? `<span class="status-badge info">${p.user_count}</span>`
+                        : '<span style="color: #94a3b8;">0</span>'
+                    }
+                </td>
+                <td style="color: #64748b; font-size: 13px;">${formatDate(p.created_at)}</td>
+                <td>
+                    <div class="row-actions" style="opacity: 1;">
+                        <button class="row-action-btn" data-action="edit-permission" data-permission='${JSON.stringify(p).replace(/'/g, "&#39;")}' data-tooltip="Edit">
+                            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                            </svg>
+                        </button>
+                        <button class="row-action-btn danger" data-action="delete-permission" data-permission-id="${escapeHtml(p.permission_id)}" data-user-count="${p.user_count}" data-tooltip="Delete">
+                            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="3 6 5 6 21 6"></polyline>
+                                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                            </svg>
+                        </button>
+                    </div>
+                </td>
+            </tr>
+        `).join('');
+        
+    } catch (e) {
+        console.error('Failed to load permissions:', e);
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="6" style="text-align: center; padding: 60px; color: var(--dev-danger);">
+                    Failed to load permissions
+                </td>
+            </tr>
+        `;
+    }
+}
+
+function showCreateModal() {
+    editingPermission = null;
+    document.getElementById('panel-title').textContent = 'Create Permission';
+    document.getElementById('save-btn').textContent = 'Create';
+    document.getElementById('permission-id').disabled = false;
+    
+    // Clear form
+    document.getElementById('permission-id').value = '';
+    document.getElementById('display-name').value = '';
+    document.getElementById('description').value = '';
+    document.getElementById('delegation-allowed').checked = false;
+    
+    openPanel('permission-panel');
+}
+
+function showEditModal(permission) {
+    editingPermission = permission;
+    document.getElementById('panel-title').textContent = 'Edit Permission';
+    document.getElementById('save-btn').textContent = 'Save';
+    document.getElementById('permission-id').disabled = true;
+    
+    // Fill form
+    document.getElementById('permission-id').value = permission.permission_id;
+    document.getElementById('display-name').value = permission.display_name;
+    document.getElementById('description').value = permission.scope?.description || '';
+    document.getElementById('delegation-allowed').checked = permission.delegation_allowed;
+    
+    openPanel('permission-panel');
+}
+
+async function savePermission() {
+    const permissionId = document.getElementById('permission-id').value.trim().toLowerCase().replace(/\s+/g, '_');
+    const displayName = document.getElementById('display-name').value.trim() || permissionId.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+    const description = document.getElementById('description').value.trim();
+    const delegationAllowed = document.getElementById('delegation-allowed').checked;
+    
+    if (!permissionId) {
+        if (window.showToast) showToast('error', 'Error', 'Permission ID is required');
+        return;
+    }
+    
+    try {
+        const url = editingPermission 
+            ? `/api/developer/sites/${SITE_ID}/permissions/${encodeURIComponent(editingPermission.permission_id)}`
+            : `/api/developer/sites/${SITE_ID}/permissions`;
+        
+        const response = await fetch(url, {
+            method: editingPermission ? 'PUT' : 'POST',
+            headers: await getAuthHeaders(),
+            body: JSON.stringify({
+                permission_id: permissionId,
+                display_name: displayName,
+                description: description,
+                delegation_allowed: delegationAllowed
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (!data.success) throw new Error(data.error);
+        
+        if (window.showToast) showToast('success', editingPermission ? 'Updated' : 'Created', `Permission "${displayName}" ${editingPermission ? 'updated' : 'created'}`);
+        closePanel();
+        loadPermissions();
+        loadStats();
+        
+    } catch (e) {
+        console.error('Failed to save permission:', e);
+        if (window.showToast) showToast('error', 'Error', e.message || 'Failed to save permission');
+    }
+}
+
+async function deletePermission(permissionId, userCount) {
+    if (userCount > 0) {
+        alert(`Cannot delete: ${userCount} user(s) have this permission. Remove it from all users first.`);
+        return;
+    }
+    
+    if (!confirm(`Are you sure you want to delete "${permissionId}"? This cannot be undone.`)) return;
+    
+    try {
+        const response = await fetch(`/api/developer/sites/${SITE_ID}/permissions/${encodeURIComponent(permissionId)}`, {
+            method: 'DELETE',
+            headers: await getAuthHeaders()
+        });
+        
+        const data = await response.json();
+        
+        if (!data.success) throw new Error(data.error);
+        
+        if (window.showToast) showToast('success', 'Deleted', 'Permission deleted');
+        loadPermissions();
+        loadStats();
+        
+    } catch (e) {
+        console.error('Failed to delete permission:', e);
+        if (window.showToast) showToast('error', 'Error', e.message || 'Failed to delete permission');
+    }
+}
+
+// Event delegation
+document.addEventListener('click', function(e) {
+    const target = e.target.closest('[data-action]');
+    if (!target) return;
+    
+    const action = target.dataset.action;
+    
+    switch (action) {
+        case 'show-create-modal':
+            showCreateModal();
+            break;
+        case 'edit-permission':
+            try {
+                const permission = JSON.parse(target.dataset.permission);
+                showEditModal(permission);
+            } catch (err) {
+                console.error('Failed to parse permission:', err);
+            }
+            break;
+        case 'delete-permission':
+            deletePermission(target.dataset.permissionId, parseInt(target.dataset.userCount) || 0);
+            break;
+        case 'cancel-permission':
+            closePanel();
+            break;
+        case 'save-permission':
+            savePermission();
+            break;
+    }
+});
+
+function formatDate(dateStr) {
+    if (!dateStr) return '-';
+    try {
+        return new Date(dateStr).toLocaleDateString();
+    } catch {
+        return '-';
+    }
+}
+
+function escapeHtml(text) {
+    if (!text) return '';
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+</script>
+{% endblock %}

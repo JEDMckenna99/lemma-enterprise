@@ -1,0 +1,575 @@
+{% extends "developer/layout.html" %}
+{% set active_page = 'sites' %}
+
+{% block dev_content %}
+<div class="dev-header">
+    <div class="dev-header-row">
+        <div>
+            <nav class="admin-breadcrumb" style="margin-bottom: 8px;">
+                <a href="/developer/sites" style="color: var(--dev-text-muted);">Sites</a>
+                <span class="breadcrumb-separator">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 14px; height: 14px;">
+                        <polyline points="9 18 15 12 9 6"></polyline>
+                    </svg>
+                </span>
+                <span id="site-domain">{{ site_id }}</span>
+                <span class="breadcrumb-separator">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 14px; height: 14px;">
+                        <polyline points="9 18 15 12 9 6"></polyline>
+                    </svg>
+                </span>
+                <span style="color: var(--dev-text);">Users</span>
+            </nav>
+            <h1 class="dev-title">Site Users</h1>
+            <p class="dev-subtitle">Manage users by their PPID (Pairwise Pseudonymous Identifier)</p>
+        </div>
+        <div style="display: flex; gap: 12px;">
+            <button class="dev-btn dev-btn-secondary" id="export-btn">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 6px;">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                    <polyline points="7 10 12 15 17 10"></polyline>
+                    <line x1="12" y1="15" x2="12" y2="3"></line>
+                </svg>
+                Export CSV
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Stats -->
+<div class="dev-stats">
+    <div class="dev-stat-card">
+        <div class="dev-stat-label">Total Users</div>
+        <div class="dev-stat-value" id="stat-total">-</div>
+    </div>
+    <div class="dev-stat-card">
+        <div class="dev-stat-label">Active</div>
+        <div class="dev-stat-value" id="stat-active">-</div>
+    </div>
+    <div class="dev-stat-card">
+        <div class="dev-stat-label">Revoked</div>
+        <div class="dev-stat-value" id="stat-revoked">-</div>
+    </div>
+    <div class="dev-stat-card">
+        <div class="dev-stat-label">With Permissions</div>
+        <div class="dev-stat-value" id="stat-with-perms">-</div>
+    </div>
+</div>
+
+<!-- Users Table -->
+<div class="dev-card card-gradient-hover">
+    <div class="dev-card-header">
+        <h2 class="dev-card-title">All Users</h2>
+        <div style="display: flex; gap: 12px; align-items: center;">
+            <select id="status-filter" class="dev-select" style="padding: 8px 12px; border-radius: 6px;">
+                <option value="all">All Status</option>
+                <option value="active">Active</option>
+                <option value="revoked">Revoked</option>
+            </select>
+            <div style="position: relative;">
+                <svg style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); width: 16px; height: 16px; stroke: #94a3b8;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="11" cy="11" r="8"></circle>
+                    <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                </svg>
+                <input type="text" id="search-input" placeholder="Search by PPID..." class="focus-ring"
+                       style="padding: 8px 12px 8px 36px; border: 1px solid #e2e8f0; border-radius: 6px; width: 200px;">
+            </div>
+        </div>
+    </div>
+    <div class="dev-card-body" style="padding: 0; overflow-x: auto;">
+        <table class="table-enhanced" style="width: 100%;">
+            <thead>
+                <tr>
+                    <th class="sortable" style="padding: 12px 16px;">PPID</th>
+                    <th class="sortable">Display Name</th>
+                    <th>Status</th>
+                    <th class="sortable">Permissions</th>
+                    <th class="sortable">Last Seen</th>
+                    <th class="sortable">Added</th>
+                    <th style="width: 100px;">Actions</th>
+                </tr>
+            </thead>
+            <tbody id="users-table-body">
+                <tr>
+                    <td colspan="7" style="text-align: center; padding: 60px;">
+                        <div class="skeleton" style="width: 200px; height: 20px; margin: 0 auto;"></div>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+    <div class="table-pagination" id="pagination">
+        <div class="pagination-info">
+            Showing <span id="pagination-start">0</span>-<span id="pagination-end">0</span> of <span id="pagination-total">0</span>
+        </div>
+        <div class="pagination-controls">
+            <select id="page-size" class="page-size-select">
+                <option value="25">25 per page</option>
+                <option value="50">50 per page</option>
+                <option value="100">100 per page</option>
+            </select>
+            <button class="pagination-btn" id="prev-page" disabled>Prev</button>
+            <button class="pagination-btn" id="next-page">Next</button>
+        </div>
+    </div>
+</div>
+
+<!-- User Detail Panel -->
+<div class="slide-panel" id="user-detail-panel">
+    <div class="panel-header">
+        <h3 class="panel-title">User Details</h3>
+        <button class="panel-close">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+        </button>
+    </div>
+    <div class="panel-body">
+        <div class="panel-section">
+            <div class="panel-section-title">Identity</div>
+            <div class="panel-field">
+                <div class="panel-field-label">PPID</div>
+                <div class="panel-field-value mono" id="panel-ppid" style="font-size: 12px; word-break: break-all;">-</div>
+            </div>
+            <div class="panel-field">
+                <div class="panel-field-label">Display Name</div>
+                <div class="panel-field-value" id="panel-display-name">-</div>
+            </div>
+            <div class="panel-field">
+                <div class="panel-field-label">Status</div>
+                <div id="panel-status">-</div>
+            </div>
+        </div>
+        
+        <div class="panel-section">
+            <div class="panel-section-title">Activity</div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                <div class="panel-field">
+                    <div class="panel-field-label">Last Seen</div>
+                    <div class="panel-field-value" id="panel-last-seen">-</div>
+                </div>
+                <div class="panel-field">
+                    <div class="panel-field-label">Added</div>
+                    <div class="panel-field-value" id="panel-added">-</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="panel-section">
+            <div class="panel-section-title" style="display: flex; justify-content: space-between; align-items: center;">
+                <span>Permissions</span>
+                <button class="dev-btn dev-btn-sm dev-btn-secondary" data-action="add-permission">+ Add</button>
+            </div>
+            <div id="panel-permissions" style="margin-top: 12px;">
+                <div style="color: var(--dev-text-muted); font-size: 14px;">No permissions</div>
+            </div>
+        </div>
+    </div>
+    <div class="panel-footer">
+        <button class="dev-btn dev-btn-danger ripple" data-action="revoke-user">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 6px;">
+                <circle cx="12" cy="12" r="10"></circle>
+                <path d="M4.93 4.93l14.14 14.14"></path>
+            </svg>
+            Revoke Access
+        </button>
+    </div>
+</div>
+
+<!-- Add Permission Modal -->
+<div class="panel-overlay" id="permission-modal-overlay" style="display: none;">
+    <div style="position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 24px; border-radius: 12px; width: 400px; max-width: 90vw; z-index: 1002;">
+        <h3 style="margin: 0 0 20px; font-size: 18px;">Add Permission</h3>
+        <div style="margin-bottom: 16px;">
+            <label style="display: block; font-size: 14px; color: var(--dev-text-muted); margin-bottom: 6px;">Permission</label>
+            <select id="add-permission-select" class="dev-select" style="width: 100%; padding: 10px 12px; border-radius: 6px;"></select>
+        </div>
+        <div style="display: flex; gap: 12px; justify-content: flex-end;">
+            <button class="dev-btn dev-btn-secondary" data-action="cancel-add-permission">Cancel</button>
+            <button class="dev-btn dev-btn-primary" data-action="confirm-add-permission">Add Permission</button>
+        </div>
+    </div>
+</div>
+
+<script nonce="{{ csp_nonce }}">
+const SITE_ID = '{{ site_id }}';
+let currentPage = 1;
+let perPage = 25;
+let currentUser = null;
+let allPermissionTypes = [];
+
+document.addEventListener('DOMContentLoaded', async () => {
+    loadStats();
+    loadUsers();
+    loadPermissionTypes();
+    
+    // Event listeners
+    document.getElementById('search-input').addEventListener('input', debounce(loadUsers, 300));
+    document.getElementById('status-filter').addEventListener('change', () => { currentPage = 1; loadUsers(); });
+    document.getElementById('page-size').addEventListener('change', (e) => { perPage = parseInt(e.target.value); currentPage = 1; loadUsers(); });
+    document.getElementById('prev-page').addEventListener('click', () => { currentPage--; loadUsers(); });
+    document.getElementById('next-page').addEventListener('click', () => { currentPage++; loadUsers(); });
+    document.getElementById('export-btn').addEventListener('click', exportUsers);
+});
+
+async function getAuthHeaders() {
+    return {
+        'Content-Type': 'application/json'
+    };
+}
+
+async function loadStats() {
+    try {
+        const response = await fetch(`/api/developer/sites/${SITE_ID}/stats`, { headers: await getAuthHeaders() });
+        const data = await response.json();
+        
+        if (data.success && data.stats) {
+            document.getElementById('stat-total').textContent = data.stats.total_users || 0;
+            document.getElementById('stat-active').textContent = data.stats.active_users || 0;
+            document.getElementById('stat-revoked').textContent = data.stats.revoked_users || 0;
+            document.getElementById('stat-with-perms').textContent = data.stats.active_permission_grants || 0;
+        }
+    } catch (e) {
+        console.warn('Failed to load stats:', e);
+    }
+}
+
+async function loadUsers() {
+    const tbody = document.getElementById('users-table-body');
+    const search = document.getElementById('search-input').value;
+    const status = document.getElementById('status-filter').value;
+    
+    tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 40px;"><div class="skeleton" style="width: 200px; height: 20px; margin: 0 auto;"></div></td></tr>';
+    
+    try {
+        const params = new URLSearchParams({
+            page: currentPage,
+            per_page: perPage,
+            search: search,
+            status: status
+        });
+        
+        const response = await fetch(`/api/developer/sites/${SITE_ID}/users?${params}`, { headers: await getAuthHeaders() });
+        const data = await response.json();
+        
+        if (!data.success) throw new Error(data.error);
+        
+        renderUsers(data.users);
+        updatePagination(data);
+        
+    } catch (e) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="7" style="text-align: center; padding: 60px;">
+                    <div class="dev-empty">
+                        <div class="dev-empty-icon">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                                <circle cx="9" cy="7" r="4"></circle>
+                            </svg>
+                        </div>
+                        <div class="dev-empty-title">No users yet</div>
+                        <div class="dev-empty-description">Users will appear here when they authenticate on your site</div>
+                    </div>
+                </td>
+            </tr>
+        `;
+    }
+}
+
+function renderUsers(users) {
+    const tbody = document.getElementById('users-table-body');
+    
+    if (users.length === 0) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="7" style="text-align: center; padding: 60px;">
+                    <div class="dev-empty">
+                        <div class="dev-empty-icon">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                                <circle cx="9" cy="7" r="4"></circle>
+                            </svg>
+                        </div>
+                        <div class="dev-empty-title">No users found</div>
+                    </div>
+                </td>
+            </tr>
+        `;
+        return;
+    }
+    
+    tbody.innerHTML = users.map(user => `
+        <tr class="highlight-new">
+            <td style="padding: 16px;">
+                <code style="font-size: 12px; background: #f1f5f9; padding: 4px 8px; border-radius: 4px;">
+                    ${escapeHtml(user.ppid.substring(0, 20))}...
+                </code>
+                <button class="copy-btn row-action-btn" data-copy="${escapeHtml(user.ppid)}" data-tooltip="Copy PPID" style="margin-left: 8px;">
+                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                    </svg>
+                </button>
+            </td>
+            <td>${escapeHtml(user.display_name || '-')}</td>
+            <td>
+                <span class="status-badge ${user.status === 'active' ? 'active' : 'revoked'}">
+                    <span class="status-dot"></span>
+                    ${escapeHtml(user.status)}
+                </span>
+            </td>
+            <td>
+                ${user.permission_count > 0 
+                    ? `<span class="status-badge info">${user.permission_count} permission${user.permission_count > 1 ? 's' : ''}</span>`
+                    : '<span style="color: #94a3b8;">-</span>'
+                }
+            </td>
+            <td style="color: #64748b; font-size: 13px;">${formatDate(user.last_seen)}</td>
+            <td style="color: #64748b; font-size: 13px;">${formatDate(user.added_at)}</td>
+            <td>
+                <div class="row-actions" style="opacity: 1;">
+                    <button class="row-action-btn" data-action="view-user" data-ppid="${escapeHtml(user.ppid)}" data-tooltip="View">
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                            <circle cx="12" cy="12" r="3"></circle>
+                        </svg>
+                    </button>
+                    ${user.status === 'active' ? `
+                    <button class="row-action-btn danger" data-action="quick-revoke" data-ppid="${escapeHtml(user.ppid)}" data-tooltip="Revoke">
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="10"></circle>
+                            <path d="M4.93 4.93l14.14 14.14"></path>
+                        </svg>
+                    </button>
+                    ` : ''}
+                </div>
+            </td>
+        </tr>
+    `).join('');
+}
+
+function updatePagination(data) {
+    const start = (data.page - 1) * data.per_page + 1;
+    const end = Math.min(data.page * data.per_page, data.total);
+    
+    document.getElementById('pagination-start').textContent = data.total > 0 ? start : 0;
+    document.getElementById('pagination-end').textContent = end;
+    document.getElementById('pagination-total').textContent = data.total;
+    
+    document.getElementById('prev-page').disabled = data.page <= 1;
+    document.getElementById('next-page').disabled = data.page >= data.total_pages;
+}
+
+async function loadPermissionTypes() {
+    try {
+        const response = await fetch(`/api/developer/sites/${SITE_ID}/permissions`, { headers: await getAuthHeaders() });
+        const data = await response.json();
+        
+        if (data.success) {
+            allPermissionTypes = data.permissions;
+            
+            // Populate add permission dropdown
+            const select = document.getElementById('add-permission-select');
+            select.innerHTML = allPermissionTypes.map(p => 
+                `<option value="${escapeHtml(p.permission_id)}">${escapeHtml(p.display_name)}</option>`
+            ).join('');
+        }
+    } catch (e) {
+        console.warn('Failed to load permission types:', e);
+    }
+}
+
+async function viewUser(ppid) {
+    try {
+        const response = await fetch(`/api/developer/sites/${SITE_ID}/users/${encodeURIComponent(ppid)}`, { headers: await getAuthHeaders() });
+        const data = await response.json();
+        
+        if (!data.success) throw new Error(data.error);
+        
+        currentUser = data.user;
+        
+        document.getElementById('panel-ppid').textContent = data.user.ppid;
+        document.getElementById('panel-display-name').textContent = data.user.display_name || '-';
+        document.getElementById('panel-last-seen').textContent = formatDate(data.user.last_seen);
+        document.getElementById('panel-added').textContent = formatDate(data.user.added_at);
+        
+        const statusEl = document.getElementById('panel-status');
+        statusEl.innerHTML = `<span class="status-badge ${data.user.status === 'active' ? 'active' : 'revoked'}"><span class="status-dot"></span>${data.user.status}</span>`;
+        
+        // Permissions
+        const permsEl = document.getElementById('panel-permissions');
+        if (data.user.permissions && data.user.permissions.length > 0) {
+            permsEl.innerHTML = data.user.permissions.map(p => `
+                <div style="display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; background: #f8fafc; border-radius: 6px; margin-bottom: 8px;">
+                    <span style="font-weight: 500;">${escapeHtml(p.display_name || p.permission_id)}</span>
+                    <button class="row-action-btn danger" data-action="remove-permission" data-permission-id="${escapeHtml(p.permission_id)}" data-tooltip="Remove">
+                        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="18" y1="6" x2="6" y2="18"></line>
+                            <line x1="6" y1="6" x2="18" y2="18"></line>
+                        </svg>
+                    </button>
+                </div>
+            `).join('');
+        } else {
+            permsEl.innerHTML = '<div style="color: var(--dev-text-muted); font-size: 14px;">No permissions assigned</div>';
+        }
+        
+        openPanel('user-detail-panel');
+        
+    } catch (e) {
+        console.error('Failed to load user:', e);
+        if (window.showToast) showToast('error', 'Error', 'Failed to load user details');
+    }
+}
+
+async function revokeUser(ppid) {
+    if (!confirm('Are you sure you want to revoke this user? They will lose access to your site.')) return;
+    
+    try {
+        const response = await fetch(`/api/developer/sites/${SITE_ID}/users/${encodeURIComponent(ppid)}/revoke`, {
+            method: 'POST',
+            headers: await getAuthHeaders()
+        });
+        
+        const data = await response.json();
+        
+        if (!data.success) throw new Error(data.error);
+        
+        if (window.showToast) showToast('success', 'User Revoked', 'User access has been revoked');
+        closePanel();
+        loadUsers();
+        loadStats();
+        
+    } catch (e) {
+        console.error('Failed to revoke user:', e);
+        if (window.showToast) showToast('error', 'Error', 'Failed to revoke user');
+    }
+}
+
+async function addPermission() {
+    const permissionId = document.getElementById('add-permission-select').value;
+    if (!currentUser || !permissionId) return;
+    
+    try {
+        const response = await fetch(`/api/developer/sites/${SITE_ID}/users/${encodeURIComponent(currentUser.ppid)}/permissions`, {
+            method: 'POST',
+            headers: await getAuthHeaders(),
+            body: JSON.stringify({ permission_id: permissionId })
+        });
+        
+        const data = await response.json();
+        
+        if (!data.success) throw new Error(data.error);
+        
+        if (window.showToast) showToast('success', 'Permission Added', `Added ${permissionId} to user`);
+        document.getElementById('permission-modal-overlay').style.display = 'none';
+        viewUser(currentUser.ppid);  // Refresh panel
+        loadStats();
+        
+    } catch (e) {
+        console.error('Failed to add permission:', e);
+        if (window.showToast) showToast('error', 'Error', e.message || 'Failed to add permission');
+    }
+}
+
+async function removePermission(permissionId) {
+    if (!currentUser) return;
+    
+    try {
+        const response = await fetch(`/api/developer/sites/${SITE_ID}/users/${encodeURIComponent(currentUser.ppid)}/permissions/${encodeURIComponent(permissionId)}`, {
+            method: 'DELETE',
+            headers: await getAuthHeaders()
+        });
+        
+        const data = await response.json();
+        
+        if (!data.success) throw new Error(data.error);
+        
+        if (window.showToast) showToast('success', 'Permission Removed', `Removed ${permissionId}`);
+        viewUser(currentUser.ppid);  // Refresh panel
+        loadStats();
+        
+    } catch (e) {
+        console.error('Failed to remove permission:', e);
+        if (window.showToast) showToast('error', 'Error', 'Failed to remove permission');
+    }
+}
+
+function exportUsers() {
+    window.location.href = `/api/developer/sites/${SITE_ID}/users/export`;
+}
+
+// Event delegation
+document.addEventListener('click', function(e) {
+    const target = e.target.closest('[data-action]');
+    if (!target) return;
+    
+    const action = target.dataset.action;
+    
+    switch (action) {
+        case 'view-user':
+            viewUser(target.dataset.ppid);
+            break;
+        case 'quick-revoke':
+            revokeUser(target.dataset.ppid);
+            break;
+        case 'revoke-user':
+            if (currentUser) revokeUser(currentUser.ppid);
+            break;
+        case 'add-permission':
+            document.getElementById('permission-modal-overlay').style.display = 'block';
+            break;
+        case 'cancel-add-permission':
+            document.getElementById('permission-modal-overlay').style.display = 'none';
+            break;
+        case 'confirm-add-permission':
+            addPermission();
+            break;
+        case 'remove-permission':
+            removePermission(target.dataset.permissionId);
+            break;
+    }
+    
+    // Copy buttons
+    if (target.dataset.copy) {
+        copyToClipboard(target.dataset.copy, target);
+    }
+});
+
+// Utilities
+function formatDate(dateStr) {
+    if (!dateStr) return '-';
+    try {
+        const date = new Date(dateStr);
+        const now = new Date();
+        const diff = now - date;
+        
+        if (diff < 60000) return 'Just now';
+        if (diff < 3600000) return Math.floor(diff / 60000) + 'm ago';
+        if (diff < 86400000) return Math.floor(diff / 3600000) + 'h ago';
+        if (diff < 604800000) return Math.floor(diff / 86400000) + 'd ago';
+        
+        return date.toLocaleDateString();
+    } catch {
+        return '-';
+    }
+}
+
+function escapeHtml(text) {
+    if (!text) return '';
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+function debounce(func, wait) {
+    let timeout;
+    return function(...args) {
+        clearTimeout(timeout);
+        timeout = setTimeout(() => func.apply(this, args), wait);
+    };
+}
+</script>
+{% endblock %}
