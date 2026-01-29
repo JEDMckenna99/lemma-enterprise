@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "lemma": {
+      "command": "node",
+      "args": ["C:/Users/jedmc/lemma-enterprise/lemma-rebuild/mcp-server/index.js"],
+      "env": {
+        "LEMMA_AGENT_TOKEN": "lm_agent_gwN3-M7-Bf4Ubn1TZOB8fPGq2yGl1RRY0AgvZUjBnBI",
+        "LEMMA_URL": "https://lemma.id"
+      }
+    }
+  }
+}
