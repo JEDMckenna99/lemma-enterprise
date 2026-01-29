@@ -543,6 +543,32 @@ class CustomerAccountManager:
     def get_customer_by_id(self, customer_id: str) -> Optional[Customer]:
         """Compatibility helper for modules expecting get_customer_by_id"""
         return self.get_customer(customer_id)
+    
+    def get_all_customers(self, limit: int = 100, offset: int = 0) -> List[Customer]:
+        """Get all customers from database (for admin dashboard)"""
+        customers = []
+        
+        if self.db_available:
+            try:
+                db = get_db()
+                db_customers = db.query(DBCustomer).order_by(
+                    DBCustomer.created_at.desc()
+                ).limit(limit).offset(offset).all()
+                db.close()
+                
+                for db_customer in db_customers:
+                    customer = self._hydrate_customer(db_customer)
+                    if customer:
+                        customers.append(customer)
+                        
+            except Exception as e:
+                logger.error(f"Error getting all customers: {e}")
+        
+        # Fallback to in-memory customers if DB not available
+        if not customers and self.customers:
+            customers = list(self.customers.values())[offset:offset+limit]
+        
+        return customers
         
     def generate_api_key(self, prefix: str = "lemma") -> str:
         """Generate a secure API key
