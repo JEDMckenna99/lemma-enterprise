@@ -214,34 +214,51 @@ def get_all_sites():
     """
     try:
         # Admin auth verified by @require_site_admin decorator
-
-        # Mock site data
-        sites = [
-            {
-                'site_id': 'site_abc123',
-                'site_domain': 'example.com',
-                'company_name': 'Example Corp',
-                'service_type': 'both',
-                'plan': 'professional',
-                'status': 'active',
-                'monthly_active_users': 1247,
-                'created_at': '2024-01-15T10:00:00Z'
-            },
-            {
-                'site_id': 'site_def456',
-                'site_domain': 'testsite.org',
-                'company_name': 'Test Organization',
-                'service_type': 'iam',
-                'plan': 'starter',
-                'status': 'active',
-                'monthly_active_users': 456,
-                'created_at': '2024-02-01T14:30:00Z'
-            }
-        ]
+        sites = []
+        
+        database_url = os.environ.get('DATABASE_URL')
+        if database_url:
+            import psycopg2
+            conn = psycopg2.connect(database_url)
+            cur = conn.cursor()
+            
+            # Get sites from customers table (sites are stored in JSON field)
+            cur.execute("""
+                SELECT customer_id, email, name, company, sites, created_at, status
+                FROM customers 
+                WHERE sites IS NOT NULL AND sites::text != '[]' AND sites::text != 'null'
+                ORDER BY created_at DESC
+            """)
+            
+            for row in cur.fetchall():
+                customer_sites = row[4] if isinstance(row[4], list) else []
+                for site in customer_sites:
+                    if isinstance(site, dict):
+                        sites.append({
+                            'site_id': site.get('site_id', ''),
+                            'site_domain': site.get('site_domain', site.get('site_id', '')),
+                            'company_name': row[3] or row[2] or 'Unknown',
+                            'owner_email': row[1],
+                            'owner_ppid': row[0],
+                            'service_type': site.get('service_type', 'both'),
+                            'plan': site.get('plan', 'free'),
+                            'status': site.get('status', 'active'),
+                            'verification_count': site.get('verification_count', 0),
+                            'user_count': site.get('user_count', 0),
+                            'created_at': row[5].isoformat() if row[5] else None
+                        })
+            
+            cur.close()
+            conn.close()
+        
+        # If no sites found from DB, return empty list
+        if not sites:
+            logger.info("No registered sites found in database")
 
         return jsonify({
             'success': True,
-            'sites': sites
+            'sites': sites,
+            'total': len(sites)
         })
 
     except Exception as e:
