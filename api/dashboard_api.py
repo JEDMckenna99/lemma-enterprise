@@ -586,7 +586,7 @@ def get_admin_users():
             
             cur.execute("""
                 SELECT DISTINCT admin_email, site_domain, created_at, status
-                FROM registered_sites 
+                FROM sites 
                 WHERE admin_email IS NOT NULL
                 ORDER BY created_at DESC
                 LIMIT 100
