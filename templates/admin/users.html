@@ -13,21 +13,37 @@
 <div class="admin-stats">
     <div class="stat-card stat-card--info">
         <div class="stat-label">Total Users</div>
-        <div class="stat-value" id="stat-total">-</div>
+        <div class="stat-value stat-loading" id="stat-total"><span class="stat-skeleton"></span></div>
     </div>
     <div class="stat-card stat-card--success">
         <div class="stat-label">Active Today</div>
-        <div class="stat-value" id="stat-active">-</div>
+        <div class="stat-value stat-loading" id="stat-active"><span class="stat-skeleton"></span></div>
     </div>
     <div class="stat-card stat-card--warning">
         <div class="stat-label">Developers</div>
-        <div class="stat-value" id="stat-developers">-</div>
+        <div class="stat-value stat-loading" id="stat-developers"><span class="stat-skeleton"></span></div>
     </div>
     <div class="stat-card stat-card--danger">
         <div class="stat-label">Admins</div>
-        <div class="stat-value" id="stat-admins">-</div>
+        <div class="stat-value stat-loading" id="stat-admins"><span class="stat-skeleton"></span></div>
     </div>
 </div>
+
+<style>
+.stat-loading .stat-skeleton {
+    display: inline-block;
+    width: 50px;
+    height: 28px;
+    background: linear-gradient(90deg, var(--admin-bg-tertiary) 25%, var(--admin-bg-secondary) 50%, var(--admin-bg-tertiary) 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite;
+    border-radius: 4px;
+}
+@keyframes shimmer {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+}
+</style>
 
 <!-- Users Table -->
 <div class="admin-card">
@@ -126,16 +142,25 @@ async function loadUserStats() {
         if (!response.ok) throw new Error('Failed');
         const data = await response.json();
         
-        document.getElementById('stat-total').textContent = data.total || '0';
-        document.getElementById('stat-active').textContent = data.active_today || '0';
-        document.getElementById('stat-developers').textContent = data.developers || '0';
-        document.getElementById('stat-admins').textContent = data.admins || '0';
+        // Use stats object from response
+        const stats = data.stats || data;
+        updateStatValue('stat-total', stats.total_users || stats.total || 0);
+        updateStatValue('stat-active', stats.active_today || stats.new_this_week || 0);
+        updateStatValue('stat-developers', stats.developers || stats.active_sites || 0);
+        updateStatValue('stat-admins', stats.admins || 1);
     } catch (e) {
-        // Use defaults
-        document.getElementById('stat-total').textContent = '0';
-        document.getElementById('stat-active').textContent = '0';
-        document.getElementById('stat-developers').textContent = '0';
-        document.getElementById('stat-admins').textContent = '0';
+        updateStatValue('stat-total', '-');
+        updateStatValue('stat-active', '-');
+        updateStatValue('stat-developers', '-');
+        updateStatValue('stat-admins', '-');
+    }
+}
+
+function updateStatValue(id, value) {
+    const el = document.getElementById(id);
+    if (el) {
+        el.classList.remove('stat-loading');
+        el.textContent = typeof value === 'number' ? value.toLocaleString() : value;
     }
 }
 

@@ -13,21 +13,37 @@
 <div class="admin-stats">
     <div class="stat-card stat-card--info">
         <div class="stat-label">Total Sites</div>
-        <div class="stat-value" id="stat-total">-</div>
+        <div class="stat-value stat-loading" id="stat-total"><span class="stat-skeleton"></span></div>
     </div>
     <div class="stat-card stat-card--success">
         <div class="stat-label">Active</div>
-        <div class="stat-value" id="stat-active">-</div>
+        <div class="stat-value stat-loading" id="stat-active"><span class="stat-skeleton"></span></div>
     </div>
     <div class="stat-card stat-card--warning">
         <div class="stat-label">Development</div>
-        <div class="stat-value" id="stat-dev">-</div>
+        <div class="stat-value stat-loading" id="stat-dev"><span class="stat-skeleton"></span></div>
     </div>
     <div class="stat-card stat-card--danger">
         <div class="stat-label">Production</div>
-        <div class="stat-value" id="stat-prod">-</div>
+        <div class="stat-value stat-loading" id="stat-prod"><span class="stat-skeleton"></span></div>
     </div>
 </div>
+
+<style>
+.stat-loading .stat-skeleton {
+    display: inline-block;
+    width: 50px;
+    height: 28px;
+    background: linear-gradient(90deg, var(--admin-bg-tertiary) 25%, var(--admin-bg-secondary) 50%, var(--admin-bg-tertiary) 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite;
+    border-radius: 4px;
+}
+@keyframes shimmer {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+}
+</style>
 
 <!-- Sites Table -->
 <div class="admin-card">
@@ -127,15 +143,23 @@ async function loadSiteStats() {
         if (!response.ok) throw new Error('Failed');
         const data = await response.json();
         
-        document.getElementById('stat-total').textContent = data.total || '0';
-        document.getElementById('stat-active').textContent = data.active || '0';
-        document.getElementById('stat-dev').textContent = data.development || '0';
-        document.getElementById('stat-prod').textContent = data.production || '0';
+        updateStatValue('stat-total', data.total || 0);
+        updateStatValue('stat-active', data.active || 0);
+        updateStatValue('stat-dev', data.development || 0);
+        updateStatValue('stat-prod', data.production || 0);
     } catch (e) {
-        document.getElementById('stat-total').textContent = '0';
-        document.getElementById('stat-active').textContent = '0';
-        document.getElementById('stat-dev').textContent = '0';
-        document.getElementById('stat-prod').textContent = '0';
+        updateStatValue('stat-total', '-');
+        updateStatValue('stat-active', '-');
+        updateStatValue('stat-dev', '-');
+        updateStatValue('stat-prod', '-');
+    }
+}
+
+function updateStatValue(id, value) {
+    const el = document.getElementById(id);
+    if (el) {
+        el.classList.remove('stat-loading');
+        el.textContent = typeof value === 'number' ? value.toLocaleString() : value;
     }
 }
 
