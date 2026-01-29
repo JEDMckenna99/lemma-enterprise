@@ -22,7 +22,7 @@ import json
 import secrets
 import hashlib
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from functools import wraps
 from flask import Blueprint, request, jsonify, g, session
 from flask_cors import cross_origin
@@ -437,7 +437,7 @@ def list_agent_credentials():
                 'description': row[8],
                 'last_used_at': row[9].isoformat() + 'Z' if row[9] else None,
                 'use_count': row[10],
-                'status': 'revoked' if row[5] else ('expired' if row[4] and row[4] < datetime.utcnow() else 'active')
+                'status': 'revoked' if row[5] else ('expired' if row[4] and row[4] < datetime.now(timezone.utc) else 'active')
             })
         
         return jsonify({
