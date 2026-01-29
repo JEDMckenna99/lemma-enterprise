@@ -159,7 +159,7 @@ function renderUsers(users) {
             <td>${formatDate(user.created_at)}</td>
             <td>${formatDate(user.last_active)}</td>
             <td>
-                <button class="admin-btn admin-btn--secondary admin-btn--sm" onclick="viewUser('${user.id || user.ppid}')">
+                <button class="admin-btn admin-btn--secondary admin-btn--sm" data-action="view-user" data-user-id="${escapeHtml(user.id || user.ppid)}">
                     View
                 </button>
             </td>
@@ -214,5 +214,15 @@ function debounce(func, wait) {
         timeout = setTimeout(() => func.apply(this, args), wait);
     };
 }
+
+// Event delegation for CSP compliance
+document.addEventListener('click', function(e) {
+    const target = e.target.closest('[data-action]');
+    if (!target) return;
+    
+    if (target.dataset.action === 'view-user') {
+        viewUser(target.dataset.userId);
+    }
+});
 </script>
 {% endblock %}

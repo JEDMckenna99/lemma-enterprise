@@ -153,7 +153,7 @@ function renderSites(sites) {
             <td>${formatNumber(site.user_count || 0)}</td>
             <td>${formatDate(site.created_at)}</td>
             <td>
-                <button class="admin-btn admin-btn--secondary admin-btn--sm" onclick="viewSite('${site.site_id}')">
+                <button class="admin-btn admin-btn--secondary admin-btn--sm" data-action="view-site" data-site-id="${escapeHtml(site.site_id)}">
                     View
                 </button>
             </td>
@@ -215,5 +215,15 @@ function debounce(func, wait) {
         timeout = setTimeout(() => func.apply(this, args), wait);
     };
 }
+
+// Event delegation for CSP compliance
+document.addEventListener('click', function(e) {
+    const target = e.target.closest('[data-action]');
+    if (!target) return;
+    
+    if (target.dataset.action === 'view-site') {
+        viewSite(target.dataset.siteId);
+    }
+});
 </script>
 {% endblock %}
