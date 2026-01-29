@@ -6,6 +6,26 @@ Session-free architecture - all auth via credentials + smart caching
 from functools import wraps
 from flask import request, jsonify, g, make_response
 from typing import Optional
+import logging
+
+logger = logging.getLogger(__name__)
+
+
+def validate_agent_token(token):
+    """
+    Validate an agent token and return the credential info if valid.
+    Returns: (is_valid, credential_info) tuple
+    """
+    if not token or not token.startswith('lm_agent_'):
+        return False, None
+    
+    try:
+        from api.agent_credentials import validate_agent_token_internal
+        is_valid, info = validate_agent_token_internal(token)
+        return is_valid, info
+    except Exception as e:
+        logger.warning(f"Agent token validation error: {e}")
+        return False, None
 
 def require_api_key(f):
     """
@@ -42,6 +62,25 @@ def require_site_admin(f):
     """
     @wraps(f)
     def decorated_function(*args, **kwargs):
+        # METHOD 0: Agent token with admin scope
+        agent_token = request.headers.get('X-Agent-Token')
+        if agent_token:
+            is_valid, credential_info = validate_agent_token(agent_token)
+            if is_valid:
+                scope = credential_info.get('scope', [])
+                if 'admin' in scope:
+                    g.is_admin = True
+                    g.admin_email = credential_info.get('authorized_by_email', 'agent@lemma.id')
+                    g.auth_method = 'agent_token'
+                    g.agent_credential = credential_info
+                    g.ppid = credential_info.get('authorized_by_ppid')
+                    return f(*args, **kwargs)
+                else:
+                    return jsonify({
+                        'error': 'Agent token lacks admin scope',
+                        'message': 'Token was issued without admin scope. Request a new token with admin scope.'
+                    }), 403
+        
         # METHOD 1: Client-side verified credential (edge verification)
         credential_id = request.headers.get('X-Credential-ID')
         permission_id = request.headers.get('X-Permission-ID')
@@ -61,6 +100,7 @@ def require_site_admin(f):
                 g.admin_email = user_email or 'admin@lemma.id'
                 g.credential_id = credential_id
                 g.permission_id = permission_id
+                g.auth_method = 'credential'
                 return f(*args, **kwargs)
             else:
                 return jsonify({'error': f'Admin permission required, got: {permission_id}'}), 403
@@ -73,10 +113,11 @@ def require_site_admin(f):
             g.api_key = api_key
             g.is_admin = True
             g.admin_email = 'api@lemma.id'
+            g.auth_method = 'api_key'
             return f(*args, **kwargs)
         
         # No valid auth found
-        return jsonify({'error': 'Admin authentication required (credential ID or API key)'}), 401
+        return jsonify({'error': 'Admin authentication required (credential ID, API key, or agent token with admin scope)'}), 401
     
     return decorated_function
 
@@ -134,11 +175,30 @@ def cors_headers(f):
 
 def require_admin(f):
     """
-    Decorator to require admin privileges via credential or API key.
+    Decorator to require admin privileges via credential, API key, or agent token.
     Uses the same pattern as require_site_admin for consistency.
     """
     @wraps(f)
     def decorated_function(*args, **kwargs):
+        # Method 0: Agent token with admin scope
+        agent_token = request.headers.get('X-Agent-Token')
+        if agent_token:
+            is_valid, credential_info = validate_agent_token(agent_token)
+            if is_valid:
+                scope = credential_info.get('scope', [])
+                if 'admin' in scope:
+                    g.is_admin = True
+                    g.admin_email = credential_info.get('authorized_by_email', 'agent@lemma.id')
+                    g.auth_method = 'agent_token'
+                    g.agent_credential = credential_info
+                    g.ppid = credential_info.get('authorized_by_ppid')
+                    return f(*args, **kwargs)
+                else:
+                    return jsonify({
+                        'error': 'Agent token lacks admin scope',
+                        'message': 'Token was issued without admin scope. Request a new token with admin scope.'
+                    }), 403
+        
         # Method 1: Client-side verified credential (edge verification)
         credential_id = request.headers.get('X-Credential-ID')
         permission_id = request.headers.get('X-Permission-ID')
@@ -155,6 +215,7 @@ def require_admin(f):
                 g.is_admin = True
                 g.credential_id = credential_id
                 g.permission_id = permission_id
+                g.auth_method = 'credential'
                 return f(*args, **kwargs)
             else:
                 return jsonify({'error': f'Admin permission required, got: {permission_id}'}), 403
@@ -164,9 +225,10 @@ def require_admin(f):
         if api_key and len(api_key) >= 10:
             g.api_key = api_key
             g.is_admin = True
+            g.auth_method = 'api_key'
             return f(*args, **kwargs)
         
-        return jsonify({'error': 'Admin authentication required (credential or API key)'}), 401
+        return jsonify({'error': 'Admin authentication required (credential, API key, or agent token with admin scope)'}), 401
     
     return decorated_function
 
@@ -299,14 +361,26 @@ def require_wallet_ppid(f):
     Decorator requiring authenticated wallet (via PPID).
     
     Accepts:
-    1. X-Lemma-PPID header (from SDK after wallet auth)
-    2. PPID in request body (for API calls)
-    3. API key fallback (X-API-Key)
+    1. X-Agent-Token header (AI agent with delegated access)
+    2. X-Lemma-PPID header (from SDK after wallet auth)
+    3. PPID in request body (for API calls)
+    4. API key fallback (X-API-Key)
     
     Sets g.ppid and g.authenticated on success.
     """
     @wraps(f)
     def decorated_function(*args, **kwargs):
+        # Method 0: Agent token (delegated access from human)
+        agent_token = request.headers.get('X-Agent-Token')
+        if agent_token:
+            is_valid, credential_info = validate_agent_token(agent_token)
+            if is_valid:
+                g.ppid = credential_info.get('authorized_by_ppid')
+                g.authenticated = True
+                g.auth_method = 'agent_token'
+                g.agent_credential = credential_info
+                return f(*args, **kwargs)
+        
         # Method 1: PPID from header (SDK sends this after wallet auth)
         ppid = request.headers.get('X-Lemma-PPID')
         
@@ -318,6 +392,7 @@ def require_wallet_ppid(f):
         if ppid and ppid.startswith('did:lemma:ppid_'):
             g.ppid = ppid
             g.authenticated = True
+            g.auth_method = 'ppid'
             return f(*args, **kwargs)
         
         # Method 3: API key fallback (for programmatic access)
@@ -325,13 +400,14 @@ def require_wallet_ppid(f):
         if api_key and len(api_key) >= 10:
             g.api_key = api_key
             g.authenticated = True
+            g.auth_method = 'api_key'
             g.ppid = None  # No PPID for API key auth
             return f(*args, **kwargs)
         
         return jsonify({
             'success': False,
             'error': 'Authentication required',
-            'message': 'Provide X-Lemma-PPID header or X-API-Key'
+            'message': 'Provide X-Agent-Token, X-Lemma-PPID, or X-API-Key'
         }), 401
     
     return decorated_function
@@ -342,10 +418,24 @@ def require_customer_or_admin(f):
     Decorator allowing either customer (PPID) or admin (credential) access.
     
     For endpoints that both customers and admins can access.
+    Also supports agent tokens.
     """
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        # Try admin auth first (credential headers)
+        # Try agent token first
+        agent_token = request.headers.get('X-Agent-Token')
+        if agent_token:
+            is_valid, credential_info = validate_agent_token(agent_token)
+            if is_valid:
+                scope = credential_info.get('scope', [])
+                g.ppid = credential_info.get('authorized_by_ppid')
+                g.authenticated = True
+                g.auth_method = 'agent_token'
+                g.agent_credential = credential_info
+                g.is_admin = 'admin' in scope
+                return f(*args, **kwargs)
+        
+        # Try admin auth (credential headers)
         credential_id = request.headers.get('X-Credential-ID')
         permission_id = request.headers.get('X-Permission-ID')
         
@@ -357,6 +447,7 @@ def require_customer_or_admin(f):
                     g.is_admin = True
                     g.credential_id = credential_id
                     g.permission_id = permission_id
+                    g.auth_method = 'credential'
                     return f(*args, **kwargs)
         
         # Try PPID auth
@@ -369,6 +460,7 @@ def require_customer_or_admin(f):
             g.ppid = ppid
             g.is_admin = False
             g.authenticated = True
+            g.auth_method = 'ppid'
             return f(*args, **kwargs)
         
         # API key fallback
@@ -376,6 +468,7 @@ def require_customer_or_admin(f):
         if api_key and len(api_key) >= 10:
             g.api_key = api_key
             g.authenticated = True
+            g.auth_method = 'api_key'
             return f(*args, **kwargs)
         
         return jsonify({

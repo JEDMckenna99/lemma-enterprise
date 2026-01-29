@@ -202,6 +202,19 @@ def issue_agent_credential():
 # CREDENTIAL VALIDATION (Used by Decorator)
 # ============================================
 
+def validate_agent_token_internal(token):
+    """
+    Validate an agent token for use by auth decorators.
+    
+    Returns:
+        (is_valid, credential_info) tuple
+    """
+    result = validate_agent_token(token)
+    if result:
+        return True, result
+    return False, None
+
+
 def validate_agent_token(token):
     """
     Validate an agent token and return credential info if valid.
