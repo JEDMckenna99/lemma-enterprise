@@ -618,16 +618,17 @@ def get_admin_user_stats():
             conn = psycopg2.connect(database_url)
             cur = conn.cursor()
             
-            cur.execute("SELECT COUNT(DISTINCT admin_email) FROM registered_sites WHERE admin_email IS NOT NULL")
+            # Query customers table
+            cur.execute("SELECT COUNT(*) FROM customers WHERE status = 'active' OR status IS NULL")
             total_users = cur.fetchone()[0] or 0
             
-            cur.execute("SELECT COUNT(*) FROM registered_sites WHERE status = 'active' OR status IS NULL")
+            # Count sites from customers.sites JSON column (estimate based on customers with sites)
+            cur.execute("SELECT COUNT(*) FROM customers WHERE sites IS NOT NULL AND sites::text != '[]'")
             active_sites = cur.fetchone()[0] or 0
             
             cur.execute("""
-                SELECT COUNT(DISTINCT admin_email) FROM registered_sites 
-                WHERE admin_email IS NOT NULL 
-                AND created_at > NOW() - INTERVAL '7 days'
+                SELECT COUNT(*) FROM customers 
+                WHERE created_at > NOW() - INTERVAL '7 days'
             """)
             new_this_week = cur.fetchone()[0] or 0
             
@@ -675,9 +676,10 @@ def get_admin_recent_activity():
             conn = psycopg2.connect(database_url)
             cur = conn.cursor()
             
+            # Get recent customer registrations
             cur.execute("""
-                SELECT admin_email, site_domain, created_at
-                FROM registered_sites 
+                SELECT email, name, customer_did, created_at
+                FROM customers 
                 WHERE created_at IS NOT NULL
                 ORDER BY created_at DESC
                 LIMIT 10
@@ -685,20 +687,42 @@ def get_admin_recent_activity():
             
             for row in cur.fetchall():
                 activities.append({
+                    'user': row[0] or row[2][:30] or 'Unknown',
+                    'action': 'Registered account',
+                    'target': row[1] or 'Wallet User',
+                    'timestamp': row[3].isoformat() if row[3] else None,
+                    'type': 'account_registered'
+                })
+            
+            # Also get recent agent credentials issued
+            cur.execute("""
+                SELECT authorized_by_email, agent_name, issued_at
+                FROM agent_credentials
+                WHERE issued_at IS NOT NULL
+                ORDER BY issued_at DESC
+                LIMIT 5
+            """)
+            
+            for row in cur.fetchall():
+                activities.append({
                     'user': row[0] or 'Unknown',
-                    'action': 'Registered site',
+                    'action': 'Issued agent credential',
                     'target': row[1],
                     'timestamp': row[2].isoformat() if row[2] else None,
-                    'type': 'site_registered'
+                    'type': 'agent_credential_issued'
                 })
             
             cur.close()
             conn.close()
+            
+            # Sort all activities by timestamp
+            activities.sort(key=lambda x: x['timestamp'] or '', reverse=True)
+            activities = activities[:10]  # Keep only 10 most recent
         else:
             from datetime import datetime
             now = datetime.utcnow()
             activities = [
-                {'user': 'dev@example.com', 'action': 'Registered site', 'target': 'example.com', 'timestamp': now.isoformat(), 'type': 'site_registered'},
+                {'user': 'dev@example.com', 'action': 'Registered account', 'target': 'Example Corp', 'timestamp': now.isoformat(), 'type': 'account_registered'},
             ]
         
         return jsonify({
