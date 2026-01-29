@@ -723,6 +723,86 @@ def auto_issue_agent_credential():
         }), 500
 
 
+@agent_credentials_bp.route('/api/agent/session', methods=['GET', 'POST'])
+@cross_origin(supports_credentials=True)
+def create_agent_session():
+    """
+    Create a browser session from an agent token.
+    
+    This enables AI agents with browser tools to navigate the platform
+    as an authenticated user. The agent token is converted into a
+    session cookie that works with normal page navigation.
+    
+    GET/POST /api/agent/session
+    Headers:
+        X-Agent-Token: lm_agent_xxx
+    OR Query Parameter:
+        ?token=lm_agent_xxx
+    
+    Returns:
+        - Sets session cookie
+        - Returns session info for the browser
+        - Optionally redirects to a target page
+    """
+    # Accept token from header or query parameter
+    token = request.headers.get('X-Agent-Token') or request.args.get('token')
+    
+    if not token:
+        return jsonify({
+            'success': False,
+            'error': 'X-Agent-Token header required'
+        }), 400
+    
+    credential_info = validate_agent_token(token)
+    
+    if not credential_info:
+        return jsonify({
+            'success': False,
+            'error': 'Invalid, expired, or revoked agent token'
+        }), 401
+    
+    # Create session from agent token
+    session['agent_authenticated'] = True
+    session['agent_token_id'] = credential_info['token_id']
+    session['agent_ppid'] = credential_info['authorized_by_ppid']
+    session['agent_scope'] = credential_info['scope']
+    session['customer_id'] = credential_info.get('authorized_by_ppid', '').replace('did:lemma:', '')
+    session['auth_method'] = 'agent_token'
+    
+    # Set admin flag if scope includes admin
+    if 'admin' in credential_info['scope']:
+        session['is_admin'] = True
+    
+    logger.info(f"Agent session created: {credential_info['token_id']} -> browser session")
+    
+    # Check for redirect parameter
+    redirect_to = request.args.get('redirect')
+    if redirect_to:
+        # Validate redirect is to our domain
+        from urllib.parse import urlparse
+        parsed = urlparse(redirect_to)
+        if parsed.netloc in ['', 'lemma.id', 'www.lemma.id'] or redirect_to.startswith('/'):
+            from flask import redirect
+            return redirect(redirect_to)
+    
+    response = jsonify({
+        'success': True,
+        'session_created': True,
+        'token_id': credential_info['token_id'],
+        'scope': credential_info['scope'],
+        'ppid': credential_info['authorized_by_ppid'],
+        'is_admin': 'admin' in credential_info['scope'],
+        'message': 'Browser session created. You can now navigate authenticated pages.',
+        'next_steps': [
+            'Navigate to /admin for admin dashboard',
+            'Navigate to /developer for developer dashboard',
+            'Or use ?redirect=/admin to auto-redirect'
+        ]
+    })
+    
+    return response
+
+
 @agent_credentials_bp.route('/api/agent/validate', methods=['GET', 'POST'])
 @cross_origin()
 def validate_agent_token_endpoint():

@@ -152,6 +152,27 @@ document.addEventListener('DOMContentLoaded', async () => {
 });
 
 async function checkAdminAuth() {
+    // First check if we have an agent session (set via /api/agent/session)
+    // Agent sessions are server-side, so API calls will automatically work
+    try {
+        const sessionCheck = await fetch('/api/agent/validate', {
+            headers: { 'X-Agent-Token': getAgentTokenFromUrl() || '' }
+        });
+        if (sessionCheck.ok) {
+            const data = await sessionCheck.json();
+            if (data.valid && data.scope?.includes('admin')) {
+                console.log('Agent admin session active:', data.token_id);
+                // For agent sessions, we set a flag but don't need credential headers
+                // The session cookie handles auth
+                window.agentSessionActive = true;
+                return;
+            }
+        }
+    } catch (e) {
+        // Not an agent session, try wallet auth
+    }
+    
+    // Check for wallet-based auth
     if (typeof LemmaWallet === 'undefined') {
         console.warn('LemmaWallet not loaded');
         return;
@@ -177,6 +198,11 @@ async function checkAdminAuth() {
     } catch (e) {
         console.warn('Admin auth check failed:', e);
     }
+}
+
+function getAgentTokenFromUrl() {
+    const params = new URLSearchParams(window.location.search);
+    return params.get('agent_token');
 }
 
 function getAuthHeaders() {
