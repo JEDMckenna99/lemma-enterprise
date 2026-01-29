@@ -496,7 +496,7 @@ function showAgentNeedsAuth(reason) {
         <div class="agent-auth-needed">
             <p>Sign in with your wallet to generate AI agent tokens.</p>
             <p class="agent-desc">Agent tokens allow AI coding assistants (like Cursor) to test authenticated features on your behalf.</p>
-            <button onclick="signInForAgentToken()" class="dev-btn dev-btn-primary">
+            <button class="dev-btn dev-btn-primary" data-action="sign-in-agent">
                 Sign In with Wallet
             </button>
         </div>
@@ -560,7 +560,7 @@ async function loadAgentCredentials(ppid) {
                             <label><input type="checkbox" id="scope-admin"> Admin</label>
                         </div>
                     </div>
-                    <button onclick="generateAgentToken('${ppid}')" class="dev-btn dev-btn-primary" id="generate-btn">
+                    <button class="dev-btn dev-btn-primary" id="generate-btn" data-action="generate-token" data-ppid="${ppid}">
                         Generate Token
                     </button>
                 </div>
@@ -578,7 +578,7 @@ async function loadAgentCredentials(ppid) {
                                     <span>Expires: ${new Date(c.expires_at).toLocaleString()}</span>
                                     <span>Used: ${c.use_count} times</span>
                                 </div>
-                                <button onclick="revokeAgentToken('${c.token_id}', '${ppid}')" class="dev-btn dev-btn-sm dev-btn-danger">
+                                <button class="dev-btn dev-btn-sm dev-btn-danger" data-action="revoke-token" data-token-id="${c.token_id}" data-ppid="${ppid}">
                                     Revoke
                                 </button>
                             </div>
@@ -593,7 +593,7 @@ async function loadAgentCredentials(ppid) {
         container.innerHTML = `
             <div class="agent-error">
                 <p>Could not load agent credentials.</p>
-                <button onclick="checkAgentTokenStatus()" class="dev-btn dev-btn-secondary">Retry</button>
+                <button class="dev-btn dev-btn-secondary" data-action="retry-agent-check">Retry</button>
             </div>
         `;
     }
@@ -656,7 +656,7 @@ function showGeneratedToken(credential, ppid) {
             <div class="agent-token-display">
                 <div class="agent-token-label">Your Agent Token (copy this - shown only once!):</div>
                 <div class="agent-token-value" id="token-value">${credential.token}</div>
-                <button onclick="copyAgentToken()" class="dev-btn dev-btn-primary" id="copy-btn">
+                <button class="dev-btn dev-btn-primary" id="copy-btn" data-action="copy-token">
                     Copy to Clipboard
                 </button>
             </div>
@@ -672,7 +672,7 @@ function showGeneratedToken(credential, ppid) {
                 <code class="agent-usage-code">X-Agent-Token: ${credential.token}</code>
             </div>
             
-            <button onclick="loadAgentCredentials('${ppid}')" class="dev-btn dev-btn-secondary">
+            <button class="dev-btn dev-btn-secondary" data-action="back-to-tokens" data-ppid="${ppid}">
                 Done - Back to Token Management
             </button>
         </div>
@@ -860,5 +860,43 @@ function escapeHtml(str) {
         "'": '&#39;'
     })[char]);
 }
+
+// ============================================
+// EVENT DELEGATION (CSP-compliant click handling)
+// ============================================
+document.addEventListener('click', async function(e) {
+    const target = e.target.closest('[data-action]');
+    if (!target) return;
+    
+    const action = target.dataset.action;
+    const ppid = target.dataset.ppid;
+    const tokenId = target.dataset.tokenId;
+    
+    switch (action) {
+        case 'sign-in-agent':
+            await signInForAgentToken();
+            break;
+            
+        case 'generate-token':
+            await generateAgentToken(ppid);
+            break;
+            
+        case 'revoke-token':
+            await revokeAgentToken(tokenId, ppid);
+            break;
+            
+        case 'retry-agent-check':
+            await checkAgentTokenStatus();
+            break;
+            
+        case 'copy-token':
+            copyAgentToken();
+            break;
+            
+        case 'back-to-tokens':
+            await loadAgentCredentials(ppid);
+            break;
+    }
+});
 </script>
 {% endblock %}
