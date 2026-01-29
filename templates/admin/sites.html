@@ -46,38 +46,152 @@
 </style>
 
 <!-- Sites Table -->
-<div class="admin-card">
+<div class="admin-card card-gradient-hover">
     <div class="admin-card-header">
         <h2 class="admin-card-title">All Sites</h2>
-        <div style="display: flex; gap: 12px;">
-            <input type="text" id="site-search" placeholder="Search sites..." 
-                   style="padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 0.9rem;">
-            <button class="admin-btn admin-btn--secondary admin-btn--sm" id="refresh-sites-btn">
+        <div style="display: flex; gap: 12px; align-items: center;">
+            <div style="position: relative;">
+                <svg style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); width: 16px; height: 16px; stroke: #94a3b8;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="11" cy="11" r="8"></circle>
+                    <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                </svg>
+                <input type="text" id="site-search" placeholder="Search sites..." class="focus-ring"
+                       style="padding: 8px 12px 8px 36px; border: 1px solid #e2e8f0; border-radius: 6px; font-size: 0.9rem; width: 220px; transition: border-color 0.2s, box-shadow 0.2s;">
+            </div>
+            <button class="admin-btn admin-btn--secondary admin-btn--sm ripple" id="refresh-sites-btn">
+                <svg style="width: 14px; height: 14px; margin-right: 6px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M23 4v6h-6"></path>
+                    <path d="M1 20v-6h6"></path>
+                    <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+                </svg>
                 Refresh
             </button>
         </div>
     </div>
-    <div class="admin-card-body" style="padding: 0;">
-        <table class="admin-table">
+    <div class="admin-card-body" style="padding: 0; overflow-x: auto;">
+        <table class="admin-table table-enhanced">
             <thead>
                 <tr>
-                    <th>Site</th>
-                    <th>Owner</th>
+                    <th style="width: 40px;"><input type="checkbox" class="row-checkbox"></th>
+                    <th class="sortable">Site</th>
+                    <th class="sortable">Owner</th>
                     <th>Status</th>
-                    <th>Verifications</th>
-                    <th>Users</th>
-                    <th>Created</th>
-                    <th>Actions</th>
+                    <th class="sortable">Verifications</th>
+                    <th class="sortable">Users</th>
+                    <th class="sortable">Created</th>
+                    <th style="width: 100px;">Actions</th>
                 </tr>
             </thead>
             <tbody id="sites-table-body">
                 <tr>
-                    <td colspan="7" style="text-align: center; padding: 40px;">
-                        Loading sites...
+                    <td colspan="8" style="text-align: center; padding: 40px;">
+                        <div class="skeleton" style="width: 200px; height: 20px; margin: 0 auto;"></div>
                     </td>
                 </tr>
             </tbody>
         </table>
+    </div>
+    <div class="table-pagination" id="sites-pagination" style="display: none;">
+        <div class="pagination-info">
+            Showing <span id="pagination-start">1</span>-<span id="pagination-end">10</span> of <span id="pagination-total">0</span> sites
+        </div>
+        <div class="pagination-controls">
+            <select class="page-size-select" id="page-size">
+                <option value="10">10 per page</option>
+                <option value="25">25 per page</option>
+                <option value="50">50 per page</option>
+            </select>
+            <button class="pagination-btn" id="prev-page" disabled>
+                <svg style="width: 16px; height: 16px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="15 18 9 12 15 6"></polyline>
+                </svg>
+            </button>
+            <button class="pagination-btn" id="next-page">
+                <svg style="width: 16px; height: 16px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="9 18 15 12 9 6"></polyline>
+                </svg>
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Site Detail Panel -->
+<div class="slide-panel" id="site-detail-panel">
+    <div class="panel-header">
+        <h3 class="panel-title">Site Details</h3>
+        <button class="panel-close">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+        </button>
+    </div>
+    <div class="panel-body">
+        <div class="panel-section">
+            <div class="panel-section-title">Basic Information</div>
+            <div class="panel-field">
+                <div class="panel-field-label">Domain</div>
+                <div class="panel-field-value" id="panel-domain">-</div>
+            </div>
+            <div class="panel-field">
+                <div class="panel-field-label">Owner</div>
+                <div class="panel-field-value" id="panel-owner">-</div>
+            </div>
+            <div class="panel-field">
+                <div class="panel-field-label">Status</div>
+                <div id="panel-status">-</div>
+            </div>
+            <div class="panel-field">
+                <div class="panel-field-label">Created</div>
+                <div class="panel-field-value" id="panel-created">-</div>
+            </div>
+        </div>
+        
+        <div class="panel-section">
+            <div class="panel-section-title">Statistics</div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                <div class="panel-field">
+                    <div class="panel-field-label">Total Verifications</div>
+                    <div class="panel-field-value" id="panel-verifications" style="font-size: 24px; font-weight: 700;">-</div>
+                </div>
+                <div class="panel-field">
+                    <div class="panel-field-label">Active Users</div>
+                    <div class="panel-field-value" id="panel-users" style="font-size: 24px; font-weight: 700;">-</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="panel-section">
+            <div class="panel-section-title">API Key</div>
+            <div class="panel-field">
+                <div class="panel-field-label">Site ID</div>
+                <div class="panel-field-value mono" id="panel-site-id" style="display: flex; align-items: center; gap: 8px;">
+                    <span style="flex: 1; overflow: hidden; text-overflow: ellipsis;">-</span>
+                    <button class="copy-btn row-action-btn" data-copy style="opacity: 1;">
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="panel-footer">
+        <button class="admin-btn admin-btn--secondary ripple" data-action="edit-site">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 6px;">
+                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+            </svg>
+            Edit
+        </button>
+        <button class="admin-btn admin-btn--danger ripple" data-action="revoke-site">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 6px;">
+                <circle cx="12" cy="12" r="10"></circle>
+                <path d="M4.93 4.93l14.14 14.14"></path>
+            </svg>
+            Revoke
+        </button>
     </div>
 </div>
 
@@ -165,7 +279,12 @@ function updateStatValue(id, value) {
 
 async function loadSites() {
     const tbody = document.getElementById('sites-table-body');
-    tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 40px;">Loading sites...</td></tr>';
+    tbody.innerHTML = `<tr><td colspan="8" style="text-align: center; padding: 40px;">
+        <div style="display: flex; flex-direction: column; align-items: center; gap: 12px;">
+            <div class="skeleton" style="width: 300px; height: 20px;"></div>
+            <div class="skeleton" style="width: 200px; height: 16px;"></div>
+        </div>
+    </td></tr>`;
     
     try {
         const response = await fetch('/api/admin/sites', { headers: getAuthHeaders() });
@@ -177,11 +296,17 @@ async function loadSites() {
     } catch (e) {
         tbody.innerHTML = `
             <tr>
-                <td colspan="7" style="text-align: center; padding: 40px;">
+                <td colspan="8" style="text-align: center; padding: 60px;">
                     <div class="admin-empty">
-                        <div class="admin-empty-icon">🌐</div>
+                        <div class="admin-empty-icon">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                <circle cx="12" cy="12" r="10"></circle>
+                                <path d="M2 12h20"></path>
+                                <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
+                            </svg>
+                        </div>
                         <div class="admin-empty-title">No sites registered</div>
-                        <p>Sites will appear here as developers integrate Lemma</p>
+                        <div class="admin-empty-description">Sites will appear here as developers integrate Lemma</div>
                     </div>
                 </td>
             </tr>
@@ -191,43 +316,101 @@ async function loadSites() {
 
 function renderSites(sites) {
     const tbody = document.getElementById('sites-table-body');
+    const pagination = document.getElementById('sites-pagination');
     
     if (sites.length === 0) {
         tbody.innerHTML = `
             <tr>
-                <td colspan="7" style="text-align: center; padding: 40px;">
+                <td colspan="8" style="text-align: center; padding: 60px;">
                     <div class="admin-empty">
-                        <div class="admin-empty-icon">🌐</div>
+                        <div class="admin-empty-icon">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                <circle cx="12" cy="12" r="10"></circle>
+                                <path d="M2 12h20"></path>
+                                <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
+                            </svg>
+                        </div>
                         <div class="admin-empty-title">No sites found</div>
+                        <div class="admin-empty-description">Sites will appear here as developers integrate Lemma</div>
                     </div>
                 </td>
             </tr>
         `;
+        pagination.style.display = 'none';
         return;
     }
     
-    tbody.innerHTML = sites.map(site => `
-        <tr>
+    // Show pagination
+    pagination.style.display = 'flex';
+    document.getElementById('pagination-total').textContent = sites.length;
+    document.getElementById('pagination-start').textContent = '1';
+    document.getElementById('pagination-end').textContent = Math.min(10, sites.length);
+    
+    tbody.innerHTML = sites.map((site, index) => `
+        <tr class="highlight-new" style="animation-delay: ${index * 50}ms;">
+            <td><input type="checkbox" class="row-checkbox"></td>
             <td>
-                <div>
-                    <div style="font-weight: 500;">${escapeHtml(site.name || site.site_id)}</div>
-                    <div style="font-size: 0.75rem; color: #6b7280;">${escapeHtml(site.domain || site.site_id)}</div>
+                <div style="display: flex; align-items: center; gap: 12px;">
+                    <div style="width: 36px; height: 36px; border-radius: 8px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); display: flex; align-items: center; justify-content: center;">
+                        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="white" stroke-width="2">
+                            <circle cx="12" cy="12" r="10"></circle>
+                            <path d="M2 12h20"></path>
+                        </svg>
+                    </div>
+                    <div>
+                        <div style="font-weight: 600; color: #1e293b;">${escapeHtml(site.name || site.site_id)}</div>
+                        <div style="font-size: 12px; color: #64748b; font-family: var(--font-mono, monospace);">${escapeHtml(site.domain || site.site_id)}</div>
+                    </div>
                 </div>
             </td>
-            <td>${escapeHtml(site.owner_email || site.owner_ppid?.substring(0, 12) + '...' || '-')}</td>
             <td>
-                <span class="badge ${getStatusBadge(site.status)}">${escapeHtml(site.status || 'Active')}</span>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <div style="width: 28px; height: 28px; border-radius: 50%; background: #f1f5f9; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 600; color: #64748b;">
+                        ${(site.owner_email || 'U')[0].toUpperCase()}
+                    </div>
+                    <span class="truncate" style="max-width: 120px;">${escapeHtml(site.owner_email || site.owner_ppid?.substring(0, 12) + '...' || '-')}</span>
+                </div>
             </td>
-            <td>${formatNumber(site.verification_count || 0)}</td>
-            <td>${formatNumber(site.user_count || 0)}</td>
-            <td>${formatDate(site.created_at)}</td>
             <td>
-                <button class="admin-btn admin-btn--secondary admin-btn--sm" data-action="view-site" data-site-id="${escapeHtml(site.site_id)}">
-                    View
-                </button>
+                <span class="status-badge ${getStatusClass(site.status)}">
+                    <span class="status-dot"></span>
+                    ${escapeHtml(site.status || 'Active')}
+                </span>
+            </td>
+            <td>
+                <span class="animate-number">${formatNumber(site.verification_count || 0)}</span>
+            </td>
+            <td>
+                <span class="animate-number">${formatNumber(site.user_count || 0)}</span>
+            </td>
+            <td style="color: #64748b; font-size: 13px;">${formatDate(site.created_at)}</td>
+            <td>
+                <div class="row-actions" style="opacity: 1;">
+                    <button class="row-action-btn" data-action="view-site-panel" data-site='${JSON.stringify(site).replace(/'/g, "&#39;")}' data-tooltip="View details">
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                            <circle cx="12" cy="12" r="3"></circle>
+                        </svg>
+                    </button>
+                    <button class="row-action-btn" data-action="copy-site-id" data-copy="${escapeHtml(site.site_id)}" data-tooltip="Copy site ID">
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                        </svg>
+                    </button>
+                    <button class="row-action-btn danger" data-action="revoke-site-prompt" data-site-id="${escapeHtml(site.site_id)}" data-tooltip="Revoke">
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="10"></circle>
+                            <path d="M4.93 4.93l14.14 14.14"></path>
+                        </svg>
+                    </button>
+                </div>
             </td>
         </tr>
     `).join('');
+    
+    // Reinitialize row selection after render
+    if (window.initRowSelection) initRowSelection();
 }
 
 function filterSites() {
@@ -240,18 +423,47 @@ function filterSites() {
     renderSites(filtered);
 }
 
-function getStatusBadge(status) {
-    const badges = {
-        'active': 'badge--success',
-        'inactive': 'badge--neutral',
-        'suspended': 'badge--danger',
-        'pending': 'badge--warning'
+function getStatusClass(status) {
+    const classes = {
+        'active': 'active',
+        'inactive': 'inactive',
+        'suspended': 'revoked',
+        'revoked': 'revoked',
+        'pending': 'pending'
     };
-    return badges[status?.toLowerCase()] || 'badge--success';
+    return classes[status?.toLowerCase()] || 'active';
 }
 
 function viewSite(siteId) {
     window.location.href = '/developer/sites/' + siteId;
+}
+
+function openSitePanel(site) {
+    // Populate panel fields
+    document.getElementById('panel-domain').textContent = site.domain || site.site_id || '-';
+    document.getElementById('panel-owner').textContent = site.owner_email || site.owner_ppid?.substring(0, 20) + '...' || '-';
+    document.getElementById('panel-created').textContent = formatDate(site.created_at);
+    document.getElementById('panel-verifications').textContent = formatNumber(site.verification_count || 0);
+    document.getElementById('panel-users').textContent = formatNumber(site.user_count || 0);
+    
+    // Status badge
+    const statusEl = document.getElementById('panel-status');
+    const status = site.status || 'Active';
+    statusEl.innerHTML = `<span class="status-badge ${getStatusClass(status)}"><span class="status-dot"></span>${status}</span>`;
+    
+    // Site ID with copy
+    const siteIdEl = document.getElementById('panel-site-id');
+    const siteIdSpan = siteIdEl.querySelector('span');
+    const copyBtn = siteIdEl.querySelector('.copy-btn');
+    siteIdSpan.textContent = site.site_id || '-';
+    copyBtn.dataset.copy = site.site_id || '';
+    copyBtn.onclick = () => copyToClipboard(site.site_id, copyBtn);
+    
+    // Store current site for actions
+    window.currentPanelSite = site;
+    
+    // Open panel
+    openPanel('site-detail-panel');
 }
 
 function formatNumber(num) {
@@ -290,9 +502,73 @@ document.addEventListener('click', function(e) {
     const target = e.target.closest('[data-action]');
     if (!target) return;
     
-    if (target.dataset.action === 'view-site') {
-        viewSite(target.dataset.siteId);
+    const action = target.dataset.action;
+    
+    switch (action) {
+        case 'view-site':
+            viewSite(target.dataset.siteId);
+            break;
+            
+        case 'view-site-panel':
+            try {
+                const site = JSON.parse(target.dataset.site);
+                openSitePanel(site);
+            } catch (err) {
+                console.error('Failed to parse site data:', err);
+            }
+            break;
+            
+        case 'copy-site-id':
+            const siteId = target.dataset.copy;
+            if (siteId && window.copyToClipboard) {
+                copyToClipboard(siteId, target);
+                if (window.showToast) {
+                    showToast('success', 'Copied!', 'Site ID copied to clipboard');
+                }
+            }
+            break;
+            
+        case 'revoke-site-prompt':
+            if (confirm('Are you sure you want to revoke this site? This action cannot be undone.')) {
+                revokeSite(target.dataset.siteId);
+            }
+            break;
+            
+        case 'edit-site':
+            if (window.currentPanelSite) {
+                window.location.href = '/developer/sites/' + window.currentPanelSite.site_id + '/edit';
+            }
+            break;
+            
+        case 'revoke-site':
+            if (window.currentPanelSite && confirm('Are you sure you want to revoke this site?')) {
+                revokeSite(window.currentPanelSite.site_id);
+            }
+            break;
     }
 });
+
+async function revokeSite(siteId) {
+    try {
+        const response = await fetch(`/api/admin/sites/${siteId}/revoke`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                ...getAuthHeaders()
+            }
+        });
+        
+        if (response.ok) {
+            if (window.showToast) showToast('success', 'Site Revoked', 'The site has been successfully revoked');
+            closePanel();
+            loadSites();
+        } else {
+            if (window.showToast) showToast('error', 'Failed', 'Could not revoke site');
+        }
+    } catch (err) {
+        console.error('Revoke failed:', err);
+        if (window.showToast) showToast('error', 'Error', 'An error occurred');
+    }
+}
 </script>
 {% endblock %}

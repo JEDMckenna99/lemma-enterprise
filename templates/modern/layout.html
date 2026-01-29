@@ -36,10 +36,15 @@ h1{color:#1e293b;font-weight:600;line-height:1.25;margin-bottom:16px;font-size:4
     
     <!-- Full CSS - async load with CSP-compliant approach -->
     <link rel="stylesheet" href="{{ url_for('static', filename='css/lemma.css') }}?v=20250121" media="print" id="main-css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/polish.css') }}?v=20250129" media="print" id="polish-css">
     <script nonce="{{ csp_nonce }}">
         document.getElementById('main-css').onload = function() { this.media = 'all'; };
+        document.getElementById('polish-css').onload = function() { this.media = 'all'; };
     </script>
-    <noscript><link rel="stylesheet" href="{{ url_for('static', filename='css/lemma.css') }}?v=20250121"></noscript>
+    <noscript>
+        <link rel="stylesheet" href="{{ url_for('static', filename='css/lemma.css') }}?v=20250121">
+        <link rel="stylesheet" href="{{ url_for('static', filename='css/polish.css') }}?v=20250129">
+    </noscript>
     
     {% block head %}{% endblock %}
 </head>
@@ -511,6 +516,217 @@ h1{color:#1e293b;font-weight:600;line-height:1.25;margin-bottom:16px;font-size:4
                 window.location.href = '/';
             }
         }
+        
+        // ============================================
+        // POLISH INTERACTION HELPERS
+        // ============================================
+        
+        // Copy to clipboard with feedback
+        window.copyToClipboard = async function(text, button) {
+            try {
+                await navigator.clipboard.writeText(text);
+                if (button) {
+                    button.classList.add('copied');
+                    setTimeout(() => button.classList.remove('copied'), 2000);
+                }
+                return true;
+            } catch (err) {
+                console.error('Failed to copy:', err);
+                // Fallback for older browsers
+                const textarea = document.createElement('textarea');
+                textarea.value = text;
+                textarea.style.position = 'fixed';
+                textarea.style.opacity = '0';
+                document.body.appendChild(textarea);
+                textarea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textarea);
+                if (button) {
+                    button.classList.add('copied');
+                    setTimeout(() => button.classList.remove('copied'), 2000);
+                }
+                return true;
+            }
+        };
+        
+        // Toggle switch handler
+        window.initToggleSwitches = function() {
+            document.querySelectorAll('.toggle-switch').forEach(toggle => {
+                toggle.addEventListener('click', function() {
+                    this.classList.toggle('active');
+                    const event = new CustomEvent('toggle', { 
+                        detail: { active: this.classList.contains('active') } 
+                    });
+                    this.dispatchEvent(event);
+                });
+            });
+        };
+        
+        // Slide panel system
+        window.openPanel = function(panelId) {
+            const panel = document.getElementById(panelId);
+            const overlay = document.getElementById('panel-overlay') || createPanelOverlay();
+            if (panel) {
+                overlay.classList.add('active');
+                panel.classList.add('active');
+                document.body.style.overflow = 'hidden';
+            }
+        };
+        
+        window.closePanel = function(panelId) {
+            const panel = panelId ? document.getElementById(panelId) : document.querySelector('.slide-panel.active');
+            const overlay = document.getElementById('panel-overlay');
+            if (panel) {
+                panel.classList.remove('active');
+            }
+            if (overlay) {
+                overlay.classList.remove('active');
+            }
+            document.body.style.overflow = '';
+        };
+        
+        function createPanelOverlay() {
+            const overlay = document.createElement('div');
+            overlay.id = 'panel-overlay';
+            overlay.className = 'panel-overlay';
+            overlay.addEventListener('click', () => closePanel());
+            document.body.appendChild(overlay);
+            return overlay;
+        }
+        
+        // Table sorting
+        window.initSortableTables = function() {
+            document.querySelectorAll('.table-enhanced th.sortable').forEach(header => {
+                header.addEventListener('click', function() {
+                    const table = this.closest('table');
+                    const tbody = table.querySelector('tbody');
+                    const columnIndex = Array.from(this.parentNode.children).indexOf(this);
+                    const rows = Array.from(tbody.querySelectorAll('tr'));
+                    const isAsc = this.classList.contains('asc');
+                    
+                    // Reset all headers
+                    table.querySelectorAll('th.sortable').forEach(th => {
+                        th.classList.remove('asc', 'desc');
+                    });
+                    
+                    // Sort rows
+                    rows.sort((a, b) => {
+                        const aVal = a.cells[columnIndex]?.textContent.trim() || '';
+                        const bVal = b.cells[columnIndex]?.textContent.trim() || '';
+                        
+                        // Try numeric sort first
+                        const aNum = parseFloat(aVal.replace(/[^0-9.-]/g, ''));
+                        const bNum = parseFloat(bVal.replace(/[^0-9.-]/g, ''));
+                        
+                        if (!isNaN(aNum) && !isNaN(bNum)) {
+                            return isAsc ? bNum - aNum : aNum - bNum;
+                        }
+                        
+                        // Fall back to string sort
+                        return isAsc ? bVal.localeCompare(aVal) : aVal.localeCompare(bVal);
+                    });
+                    
+                    // Update DOM
+                    rows.forEach(row => tbody.appendChild(row));
+                    this.classList.add(isAsc ? 'desc' : 'asc');
+                });
+            });
+        };
+        
+        // Row selection
+        window.initRowSelection = function() {
+            document.querySelectorAll('.table-enhanced .row-checkbox').forEach(checkbox => {
+                checkbox.addEventListener('change', function() {
+                    const row = this.closest('tr');
+                    if (this.checked) {
+                        row.classList.add('selected');
+                    } else {
+                        row.classList.remove('selected');
+                    }
+                    
+                    // Update select all checkbox
+                    const table = this.closest('table');
+                    const allCheckboxes = table.querySelectorAll('tbody .row-checkbox');
+                    const selectAll = table.querySelector('thead .row-checkbox');
+                    if (selectAll) {
+                        const allChecked = Array.from(allCheckboxes).every(cb => cb.checked);
+                        const someChecked = Array.from(allCheckboxes).some(cb => cb.checked);
+                        selectAll.checked = allChecked;
+                        selectAll.indeterminate = someChecked && !allChecked;
+                    }
+                });
+            });
+            
+            // Select all handler
+            document.querySelectorAll('.table-enhanced thead .row-checkbox').forEach(selectAll => {
+                selectAll.addEventListener('change', function() {
+                    const table = this.closest('table');
+                    const checkboxes = table.querySelectorAll('tbody .row-checkbox');
+                    checkboxes.forEach(cb => {
+                        cb.checked = this.checked;
+                        const row = cb.closest('tr');
+                        if (this.checked) {
+                            row.classList.add('selected');
+                        } else {
+                            row.classList.remove('selected');
+                        }
+                    });
+                });
+            });
+        };
+        
+        // Expandable cards
+        window.initExpandableCards = function() {
+            document.querySelectorAll('.expandable-card .card-header').forEach(header => {
+                header.addEventListener('click', function() {
+                    const card = this.closest('.expandable-card');
+                    card.classList.toggle('expanded');
+                });
+            });
+        };
+        
+        // Number animation
+        window.animateNumber = function(element, target, duration = 1000) {
+            const start = parseInt(element.textContent) || 0;
+            const increment = (target - start) / (duration / 16);
+            let current = start;
+            
+            const timer = setInterval(() => {
+                current += increment;
+                if ((increment > 0 && current >= target) || (increment < 0 && current <= target)) {
+                    element.textContent = target.toLocaleString();
+                    clearInterval(timer);
+                } else {
+                    element.textContent = Math.round(current).toLocaleString();
+                }
+            }, 16);
+        };
+        
+        // Initialize all polish features on DOM ready
+        document.addEventListener('DOMContentLoaded', function() {
+            initToggleSwitches();
+            initSortableTables();
+            initRowSelection();
+            initExpandableCards();
+            
+            // Initialize copy buttons
+            document.querySelectorAll('[data-copy]').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const text = this.dataset.copy || this.closest('[data-copy-text]')?.dataset.copyText;
+                    if (text) copyToClipboard(text, this);
+                });
+            });
+            
+            // Initialize panel close buttons
+            document.querySelectorAll('.panel-close').forEach(btn => {
+                btn.addEventListener('click', () => closePanel());
+            });
+            
+            // Close panel on Escape key
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape') closePanel();
+            });
+        });
     </script>
     {% endblock %}
 </body>
