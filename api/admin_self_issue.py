@@ -164,7 +164,7 @@ def admin_self_issue():
         if not user_did or not user_did.startswith('did:lemma:ppid_'):
             # Fall back to email-based derivation (legacy)
             logger.warning(f"No wallet PPID provided, falling back to email-derived DID")
-            user_did = derive_ppid_did(user_email, site_domain)
+        user_did = derive_ppid_did(user_email, site_domain)
         
         # Issue permission lemma with REAL Ed25519 signature
         import time

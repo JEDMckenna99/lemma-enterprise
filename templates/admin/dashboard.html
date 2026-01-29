@@ -221,10 +221,12 @@ async function loadDashboardStats() {
         if (!response.ok) throw new Error('Failed to load stats');
         const data = await response.json();
         
-        document.getElementById('stat-users').textContent = data.total_users || '0';
-        document.getElementById('stat-sites').textContent = data.total_sites || '0';
-        document.getElementById('stat-credentials').textContent = data.total_credentials || '0';
-        document.getElementById('stat-revocations').textContent = data.total_revocations || '0';
+        // Stats are nested under data.stats
+        const stats = data.stats || data;
+        document.getElementById('stat-users').textContent = stats.total_customers || stats.total_users || '0';
+        document.getElementById('stat-sites').textContent = stats.active_sites || stats.total_sites || '0';
+        document.getElementById('stat-credentials').textContent = stats.iam_system?.total_permission_lemmas || stats.total_credentials || '0';
+        document.getElementById('stat-revocations').textContent = stats.total_revocations || '0';
     } catch (e) {
         console.warn('Could not load stats:', e);
         document.getElementById('stat-users').textContent = '-';
