@@ -1,0 +1,196 @@
+{% extends "admin/layout.html" %}
+{% set active_page = 'debug' %}
+
+{% block title %}Debug Dashboard - lemma.id Admin{% endblock %}
+
+{% block admin_content %}
+<div class="admin-header">
+    <h1 class="admin-title">Agent Debug Dashboard</h1>
+    <p class="admin-subtitle">Real-time API health check for agent debugging</p>
+</div>
+
+<!-- Auth Status -->
+<div class="admin-card" style="margin-bottom: 20px;">
+    <div class="admin-card-header">
+        <h2 class="admin-card-title">Authentication Status</h2>
+        <button class="admin-btn admin-btn--primary admin-btn--sm" id="refresh-all-btn">Refresh All</button>
+    </div>
+    <div class="admin-card-body">
+        <div id="auth-status" style="font-family: monospace; background: #1a1a2e; color: #4ade80; padding: 16px; border-radius: 8px;">
+            Checking authentication...
+        </div>
+    </div>
+</div>
+
+<!-- API Endpoint Tests -->
+<div class="admin-grid" style="grid-template-columns: repeat(2, 1fr); gap: 20px;">
+    <div class="admin-card">
+        <div class="admin-card-header">
+            <h2 class="admin-card-title">/api/admin/platform-stats</h2>
+        </div>
+        <div class="admin-card-body">
+            <pre id="result-platform-stats" style="background: #f3f4f6; padding: 12px; border-radius: 6px; overflow: auto; max-height: 300px; font-size: 12px;">Loading...</pre>
+        </div>
+    </div>
+    
+    <div class="admin-card">
+        <div class="admin-card-header">
+            <h2 class="admin-card-title">/api/admin/sites</h2>
+        </div>
+        <div class="admin-card-body">
+            <pre id="result-admin-sites" style="background: #f3f4f6; padding: 12px; border-radius: 6px; overflow: auto; max-height: 300px; font-size: 12px;">Loading...</pre>
+        </div>
+    </div>
+    
+    <div class="admin-card">
+        <div class="admin-card-header">
+            <h2 class="admin-card-title">/api/admin/customers</h2>
+        </div>
+        <div class="admin-card-body">
+            <pre id="result-admin-customers" style="background: #f3f4f6; padding: 12px; border-radius: 6px; overflow: auto; max-height: 300px; font-size: 12px;">Loading...</pre>
+        </div>
+    </div>
+    
+    <div class="admin-card">
+        <div class="admin-card-header">
+            <h2 class="admin-card-title">/api/admin/user-stats</h2>
+        </div>
+        <div class="admin-card-body">
+            <pre id="result-user-stats" style="background: #f3f4f6; padding: 12px; border-radius: 6px; overflow: auto; max-height: 300px; font-size: 12px;">Loading...</pre>
+        </div>
+    </div>
+    
+    <div class="admin-card">
+        <div class="admin-card-header">
+            <h2 class="admin-card-title">/api/admin/recent-activity</h2>
+        </div>
+        <div class="admin-card-body">
+            <pre id="result-recent-activity" style="background: #f3f4f6; padding: 12px; border-radius: 6px; overflow: auto; max-height: 300px; font-size: 12px;">Loading...</pre>
+        </div>
+    </div>
+    
+    <div class="admin-card">
+        <div class="admin-card-header">
+            <h2 class="admin-card-title">/api/health/detailed</h2>
+        </div>
+        <div class="admin-card-body">
+            <pre id="result-health" style="background: #f3f4f6; padding: 12px; border-radius: 6px; overflow: auto; max-height: 300px; font-size: 12px;">Loading...</pre>
+        </div>
+    </div>
+</div>
+
+<script nonce="{{ csp_nonce }}">
+document.addEventListener('DOMContentLoaded', () => {
+    runAllTests();
+    document.getElementById('refresh-all-btn').addEventListener('click', runAllTests);
+});
+
+async function runAllTests() {
+    // Check auth
+    await checkAuth();
+    
+    // Test all endpoints
+    await testEndpoint('/api/admin/platform-stats', 'result-platform-stats');
+    await testEndpoint('/api/admin/sites', 'result-admin-sites');
+    await testEndpoint('/api/admin/customers', 'result-admin-customers');
+    await testEndpoint('/api/admin/user-stats', 'result-user-stats');
+    await testEndpoint('/api/admin/recent-activity', 'result-recent-activity');
+    await testEndpoint('/api/health/detailed', 'result-health');
+}
+
+async function checkAuth() {
+    const statusEl = document.getElementById('auth-status');
+    let status = [];
+    
+    // Check agent session
+    const agentToken = new URLSearchParams(window.location.search).get('agent_token');
+    if (agentToken) {
+        status.push('Agent Token in URL: ' + agentToken.substring(0, 20) + '...');
+    }
+    
+    // Check wallet
+    if (typeof LemmaWallet !== 'undefined') {
+        try {
+            const wallet = new LemmaWallet();
+            const auth = await wallet.autoAuthenticate();
+            status.push('Wallet Status: ' + (auth.authenticated ? 'Authenticated' : 'Not authenticated'));
+            
+            if (auth.authenticated) {
+                const creds = await wallet.getCredentials({ siteId: 'lemma.id' });
+                const adminCred = creds.find(c => c.normalized?.permissionId === 'admin_access');
+                status.push('Admin Credential: ' + (adminCred ? 'Found (' + adminCred.id.substring(0, 20) + '...)' : 'Not found'));
+            }
+        } catch (e) {
+            status.push('Wallet Error: ' + e.message);
+        }
+    } else {
+        status.push('Wallet SDK: Not loaded');
+    }
+    
+    // Check session via agent validate
+    try {
+        const headers = agentToken ? { 'X-Agent-Token': agentToken } : {};
+        const resp = await fetch('/api/agent/validate', { 
+            method: 'POST',
+            headers: { ...headers, 'Content-Type': 'application/json' },
+            body: '{}'
+        });
+        const data = await resp.json();
+        if (data.valid) {
+            status.push('Agent Token Valid: Yes');
+            status.push('Agent Scope: ' + (data.scope || []).join(', '));
+            status.push('Token ID: ' + data.token_id);
+        } else {
+            status.push('Agent Token Valid: No (' + (data.error || 'invalid') + ')');
+        }
+    } catch (e) {
+        status.push('Agent Validate: Error - ' + e.message);
+    }
+    
+    statusEl.textContent = status.join('\n');
+}
+
+async function testEndpoint(url, resultId) {
+    const resultEl = document.getElementById(resultId);
+    resultEl.textContent = 'Testing...';
+    
+    try {
+        const agentToken = new URLSearchParams(window.location.search).get('agent_token');
+        const headers = {};
+        
+        if (agentToken) {
+            headers['X-Agent-Token'] = agentToken;
+        }
+        
+        // Also try wallet credential if available
+        if (typeof LemmaWallet !== 'undefined') {
+            try {
+                const wallet = new LemmaWallet();
+                const auth = await wallet.autoAuthenticate();
+                if (auth.authenticated) {
+                    const creds = await wallet.getCredentials({ siteId: 'lemma.id' });
+                    const adminCred = creds.find(c => c.normalized?.permissionId === 'admin_access' || c.normalized?.accountType === 'admin');
+                    if (adminCred) {
+                        headers['X-Credential-ID'] = adminCred.id;
+                        headers['X-Permission-ID'] = adminCred.normalized?.permissionId || 'admin_access';
+                        headers['X-Site-ID'] = 'lemma.id';
+                    }
+                }
+            } catch (e) {}
+        }
+        
+        const startTime = performance.now();
+        const response = await fetch(url, { headers });
+        const endTime = performance.now();
+        
+        const data = await response.json();
+        
+        resultEl.textContent = `Status: ${response.status} (${Math.round(endTime - startTime)}ms)\n\n${JSON.stringify(data, null, 2)}`;
+        resultEl.style.color = response.ok ? '#059669' : '#dc2626';
+    } catch (e) {
+        resultEl.textContent = 'Error: ' + e.message;
+        resultEl.style.color = '#dc2626';
+    }
+}
+</script>
+{% endblock %}

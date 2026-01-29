@@ -1013,6 +1013,12 @@ def create_app():
         logger.info("📜 Serving admin audit")
         return render_template('admin/audit.html')
 
+    @app.route('/admin/debug')
+    def admin_debug():
+        """Admin Debug - API endpoint testing for agent debugging"""
+        logger.info("🔧 Serving admin debug dashboard")
+        return render_template('admin/debug.html')
+
     @app.route('/admin/bootstrap')
     def admin_bootstrap():
         """Admin credential bootstrap page"""
