@@ -67,7 +67,12 @@
 </div>
 
 <script nonce="{{ csp_nonce }}">
-document.addEventListener('DOMContentLoaded', () => {
+// Admin auth state
+let adminCredential = null;
+
+document.addEventListener('DOMContentLoaded', async () => {
+    await checkAdminAuth();
+    
     loadUsers();
     loadUserStats();
     
@@ -75,11 +80,49 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('user-search').addEventListener('input', debounce(filterUsers, 300));
 });
 
+async function checkAdminAuth() {
+    if (typeof LemmaWallet === 'undefined') {
+        console.warn('LemmaWallet not loaded');
+        return;
+    }
+    
+    try {
+        const wallet = new LemmaWallet();
+        const authResult = await wallet.autoAuthenticate();
+        
+        if (authResult.authenticated) {
+            const credentials = await wallet.getCredentials({ siteId: 'lemma.id' });
+            adminCredential = credentials.find(c => {
+                const normalized = c.normalized || {};
+                return normalized.permissionId === 'admin_access' || 
+                       normalized.accountType === 'admin' ||
+                       (normalized.type && normalized.type.includes('admin'));
+            });
+            
+            if (adminCredential) {
+                console.log('Admin credential found:', adminCredential.id);
+            }
+        }
+    } catch (e) {
+        console.warn('Admin auth check failed:', e);
+    }
+}
+
+function getAuthHeaders() {
+    const headers = {};
+    if (adminCredential) {
+        headers['X-Credential-ID'] = adminCredential.id;
+        headers['X-Permission-ID'] = adminCredential.normalized?.permissionId || 'admin_access';
+        headers['X-Site-ID'] = 'lemma.id';
+    }
+    return headers;
+}
+
 let allUsers = [];
 
 async function loadUserStats() {
     try {
-        const response = await fetch('/api/admin/user-stats');
+        const response = await fetch('/api/admin/user-stats', { headers: getAuthHeaders() });
         if (!response.ok) throw new Error('Failed');
         const data = await response.json();
         
@@ -101,7 +144,7 @@ async function loadUsers() {
     tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 40px;">Loading users...</td></tr>';
     
     try {
-        const response = await fetch('/api/admin/users');
+        const response = await fetch('/api/admin/users', { headers: getAuthHeaders() });
         if (!response.ok) throw new Error('Failed to load users');
         const data = await response.json();
         

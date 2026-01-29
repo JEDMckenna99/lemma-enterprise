@@ -66,7 +66,13 @@
 </div>
 
 <script nonce="{{ csp_nonce }}">
-document.addEventListener('DOMContentLoaded', () => {
+// Admin auth state
+let adminCredential = null;
+
+document.addEventListener('DOMContentLoaded', async () => {
+    // Check for admin credential in wallet
+    await checkAdminAuth();
+    
     loadSites();
     loadSiteStats();
     
@@ -74,11 +80,50 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('site-search').addEventListener('input', debounce(filterSites, 300));
 });
 
+async function checkAdminAuth() {
+    if (typeof LemmaWallet === 'undefined') {
+        console.warn('LemmaWallet not loaded');
+        return;
+    }
+    
+    try {
+        const wallet = new LemmaWallet();
+        const authResult = await wallet.autoAuthenticate();
+        
+        if (authResult.authenticated) {
+            // Look for admin credential
+            const credentials = await wallet.getCredentials({ siteId: 'lemma.id' });
+            adminCredential = credentials.find(c => {
+                const normalized = c.normalized || {};
+                return normalized.permissionId === 'admin_access' || 
+                       normalized.accountType === 'admin' ||
+                       (normalized.type && normalized.type.includes('admin'));
+            });
+            
+            if (adminCredential) {
+                console.log('Admin credential found:', adminCredential.id);
+            }
+        }
+    } catch (e) {
+        console.warn('Admin auth check failed:', e);
+    }
+}
+
+function getAuthHeaders() {
+    const headers = {};
+    if (adminCredential) {
+        headers['X-Credential-ID'] = adminCredential.id;
+        headers['X-Permission-ID'] = adminCredential.normalized?.permissionId || 'admin_access';
+        headers['X-Site-ID'] = 'lemma.id';
+    }
+    return headers;
+}
+
 let allSites = [];
 
 async function loadSiteStats() {
     try {
-        const response = await fetch('/api/admin/site-stats');
+        const response = await fetch('/api/admin/site-stats', { headers: getAuthHeaders() });
         if (!response.ok) throw new Error('Failed');
         const data = await response.json();
         
@@ -99,7 +144,7 @@ async function loadSites() {
     tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 40px;">Loading sites...</td></tr>';
     
     try {
-        const response = await fetch('/api/admin/sites');
+        const response = await fetch('/api/admin/sites', { headers: getAuthHeaders() });
         if (!response.ok) throw new Error('Failed to load sites');
         const data = await response.json();
         

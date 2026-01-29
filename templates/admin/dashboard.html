@@ -138,7 +138,12 @@
 </div>
 
 <script nonce="{{ csp_nonce }}">
-document.addEventListener('DOMContentLoaded', () => {
+// Admin auth state
+let adminCredential = null;
+
+document.addEventListener('DOMContentLoaded', async () => {
+    await checkAdminAuth();
+    
     loadDashboardStats();
     loadHealthStatus();
     loadRecentActivity();
@@ -146,9 +151,47 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('refresh-health-btn').addEventListener('click', loadHealthStatus);
 });
 
+async function checkAdminAuth() {
+    if (typeof LemmaWallet === 'undefined') {
+        console.warn('LemmaWallet not loaded');
+        return;
+    }
+    
+    try {
+        const wallet = new LemmaWallet();
+        const authResult = await wallet.autoAuthenticate();
+        
+        if (authResult.authenticated) {
+            const credentials = await wallet.getCredentials({ siteId: 'lemma.id' });
+            adminCredential = credentials.find(c => {
+                const normalized = c.normalized || {};
+                return normalized.permissionId === 'admin_access' || 
+                       normalized.accountType === 'admin' ||
+                       (normalized.type && normalized.type.includes('admin'));
+            });
+            
+            if (adminCredential) {
+                console.log('Admin credential found:', adminCredential.id);
+            }
+        }
+    } catch (e) {
+        console.warn('Admin auth check failed:', e);
+    }
+}
+
+function getAuthHeaders() {
+    const headers = {};
+    if (adminCredential) {
+        headers['X-Credential-ID'] = adminCredential.id;
+        headers['X-Permission-ID'] = adminCredential.normalized?.permissionId || 'admin_access';
+        headers['X-Site-ID'] = 'lemma.id';
+    }
+    return headers;
+}
+
 async function loadDashboardStats() {
     try {
-        const response = await fetch('/api/admin/platform-stats');
+        const response = await fetch('/api/admin/platform-stats', { headers: getAuthHeaders() });
         if (!response.ok) throw new Error('Failed to load stats');
         const data = await response.json();
         
@@ -167,7 +210,7 @@ async function loadDashboardStats() {
 
 async function loadHealthStatus() {
     try {
-        const response = await fetch('/api/health/detailed');
+        const response = await fetch('/api/health/detailed', { headers: getAuthHeaders() });
         const data = await response.json();
         
         // Handle both nested and flat response formats
@@ -218,7 +261,7 @@ async function loadRecentActivity() {
     const list = document.getElementById('activity-list');
     
     try {
-        const response = await fetch('/api/admin/recent-activity');
+        const response = await fetch('/api/admin/recent-activity', { headers: getAuthHeaders() });
         if (!response.ok) throw new Error('Failed to load activity');
         const data = await response.json();
         
