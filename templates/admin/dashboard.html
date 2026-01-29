@@ -152,24 +152,24 @@ document.addEventListener('DOMContentLoaded', async () => {
 });
 
 async function checkAdminAuth() {
-    // First check if we have an agent session (set via /api/agent/session)
-    // Agent sessions are server-side, so API calls will automatically work
+    // Check for agent session or token
+    // Agent sessions work via Flask session cookie (set by /api/agent/session)
+    // Agent tokens can be passed in URL for initial setup
     try {
-        const sessionCheck = await fetch('/api/agent/validate', {
-            headers: { 'X-Agent-Token': getAgentTokenFromUrl() || '' }
-        });
-        if (sessionCheck.ok) {
-            const data = await sessionCheck.json();
-            if (data.valid && data.scope?.includes('admin')) {
-                console.log('Agent admin session active:', data.token_id);
-                // For agent sessions, we set a flag but don't need credential headers
-                // The session cookie handles auth
-                window.agentSessionActive = true;
-                return;
-            }
+        const agentToken = getAgentTokenFromUrl();
+        const headers = agentToken ? { 'X-Agent-Token': agentToken } : {};
+        
+        const sessionCheck = await fetch('/api/agent/validate', { headers });
+        const data = await sessionCheck.json();
+        
+        if (data.valid && data.scope?.includes('admin')) {
+            console.log('Agent admin auth active:', data.auth_method, data.token_id);
+            window.agentSessionActive = true;
+            return;
         }
     } catch (e) {
         // Not an agent session, try wallet auth
+        console.debug('Agent auth check:', e.message);
     }
     
     // Check for wallet-based auth

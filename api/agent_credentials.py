@@ -807,30 +807,46 @@ def create_agent_session():
 @cross_origin()
 def validate_agent_token_endpoint():
     """
-    Quick endpoint to test if an agent token is valid.
-    Useful for agents to verify their credentials are working.
+    Quick endpoint to test if an agent token or session is valid.
+    Checks both X-Agent-Token header and Flask session (from /api/agent/session).
+    
+    Returns 200 with valid: true/false (never 400 for missing token)
     """
+    # First check for token in header
     token = request.headers.get('X-Agent-Token')
     
-    if not token:
+    if token:
+        credential_info = validate_agent_token(token)
+        
+        if credential_info:
+            return jsonify({
+                'valid': True,
+                'auth_method': 'token',
+                'token_id': credential_info['token_id'],
+                'scope': credential_info['scope'],
+                'expires_at': credential_info['expires_at'].isoformat() + 'Z' if credential_info['expires_at'] else None,
+                'agent_name': credential_info['agent_name'],
+                'authorized_by': credential_info['authorized_by_email'] or credential_info['authorized_by_ppid']
+            })
+        else:
+            return jsonify({
+                'valid': False,
+                'error': 'Invalid, expired, or revoked token'
+            }), 401
+    
+    # Check for session-based agent auth (from /api/agent/session)
+    if session.get('agent_authenticated'):
         return jsonify({
-            'valid': False,
-            'error': 'No X-Agent-Token header provided'
-        }), 400
+            'valid': True,
+            'auth_method': 'session',
+            'token_id': session.get('agent_token_id'),
+            'scope': session.get('agent_scope', []),
+            'ppid': session.get('agent_ppid'),
+            'message': 'Authenticated via agent session cookie'
+        })
     
-    credential_info = validate_agent_token(token)
-    
-    if not credential_info:
-        return jsonify({
-            'valid': False,
-            'error': 'Invalid, expired, or revoked token'
-        }), 401
-    
+    # No auth found - return valid: false (not an error, just not authenticated)
     return jsonify({
-        'valid': True,
-        'token_id': credential_info['token_id'],
-        'scope': credential_info['scope'],
-        'expires_at': credential_info['expires_at'].isoformat() + 'Z' if credential_info['expires_at'] else None,
-        'agent_name': credential_info['agent_name'],
-        'authorized_by': credential_info['authorized_by_email'] or credential_info['authorized_by_ppid']
+        'valid': False,
+        'message': 'No agent token or session found'
     })
