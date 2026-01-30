@@ -82,9 +82,13 @@ def initiate_recovery():
                 })
             
             # Validate API key
-            # API key might be stored as hash or plaintext depending on implementation
+            # Check multiple sources:
+            # 1. sites.api_key column (legacy)
+            # 2. site_api_keys table
+            # 3. api_keys table (customer API keys)
             api_key_valid = False
             
+            # Method 1: Check sites.api_key column (legacy)
             if site.api_key:
                 # Direct comparison (if stored as plaintext)
                 if site.api_key == api_key:
@@ -93,7 +97,7 @@ def initiate_recovery():
                 elif hashlib.sha256(api_key.encode()).hexdigest() == site.api_key:
                     api_key_valid = True
             
-            # Also check site_api_keys table for additional keys
+            # Method 2: Check site_api_keys table
             if not api_key_valid:
                 from api.database import get_db_connection
                 try:
@@ -113,6 +117,28 @@ def initiate_recovery():
                     conn.close()
                 except Exception as e:
                     logger.debug(f"Error checking site_api_keys: {e}")
+            
+            # Method 3: Check api_keys table (customer API keys)
+            if not api_key_valid:
+                from api.database import get_db_connection
+                try:
+                    conn = get_db_connection(site_id)
+                    cursor = conn.cursor()
+                    
+                    key_hash = hashlib.sha256(api_key.encode()).hexdigest()
+                    cursor.execute("""
+                        SELECT id FROM api_keys 
+                        WHERE site_id = %s AND key_hash = %s AND status = 'active'
+                    """, (site_id, key_hash))
+                    
+                    if cursor.fetchone():
+                        api_key_valid = True
+                        logger.info(f"API key validated via api_keys table for site {site_id}")
+                    
+                    cursor.close()
+                    conn.close()
+                except Exception as e:
+                    logger.debug(f"Error checking api_keys: {e}")
             
             if not api_key_valid:
                 logger.warning(f"Recovery attempt with invalid API key for site: {site_id}")
