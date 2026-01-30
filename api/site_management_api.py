@@ -134,10 +134,13 @@ def get_site_users(site_id):
 @cross_origin()
 @require_agent_or_user_auth(required_scope='write')
 def add_site_user(site_id):
-    """Add or register a user to the site (auto-happens on login, but can be done manually)"""
+    """Add or register a user to the site (auto-happens on login, but can be done manually)
+    
+    NOTE: We do NOT accept internal_id - developers should store PPID -> internal_id
+    mapping in their own database to preserve privacy.
+    """
     try:
         from api.database import get_db_connection
-        import json
         
         data = request.get_json() or {}
         
@@ -146,40 +149,31 @@ def add_site_user(site_id):
             return jsonify({'success': False, 'error': 'PPID is required'}), 400
         
         display_name = data.get('display_name', '').strip() or None
-        internal_id = data.get('internal_id', '').strip() or None
         role = data.get('role', 'user')
         
         if role not in ['user', 'moderator', 'admin']:
             role = 'user'
-        
-        metadata = {}
-        if internal_id:
-            metadata['internal_id'] = internal_id
-        if data.get('metadata'):
-            metadata.update(data['metadata'])
         
         added_by = request.headers.get('X-Lemma-PPID', 'api')
         
         conn = get_db_connection(site_id)
         cursor = conn.cursor()
         
-        # Upsert user
+        # Upsert user - no metadata/internal_id stored
         cursor.execute("""
-            INSERT INTO site_users (site_id, user_ppid, display_name, role, status, added_by, metadata)
-            VALUES (%s, %s, %s, %s, 'active', %s, %s)
+            INSERT INTO site_users (site_id, user_ppid, display_name, role, status, added_by)
+            VALUES (%s, %s, %s, %s, 'active', %s)
             ON CONFLICT (site_id, user_ppid) 
             DO UPDATE SET 
                 display_name = COALESCE(EXCLUDED.display_name, site_users.display_name),
-                role = EXCLUDED.role,
-                metadata = site_users.metadata || EXCLUDED.metadata
-            RETURNING id, user_ppid, display_name, role, status, added_at, metadata
+                role = EXCLUDED.role
+            RETURNING id, user_ppid, display_name, role, status, added_at
         """, (
             site_id,
             user_ppid,
             display_name,
             role,
-            added_by,
-            json.dumps(metadata) if metadata else '{}'
+            added_by
         ))
         
         row = cursor.fetchone()
@@ -198,8 +192,7 @@ def add_site_user(site_id):
                 'display_name': row[2],
                 'role': row[3],
                 'status': row[4],
-                'added_at': row[5].isoformat() if row[5] else None,
-                'metadata': row[6] or {}
+                'added_at': row[5].isoformat() if row[5] else None
             }
         })
         
@@ -277,17 +270,21 @@ def get_site_user_detail(site_id, ppid):
 @cross_origin()
 @require_agent_or_user_auth(required_scope='write')
 def update_site_user(site_id, ppid):
-    """Update a user's display name, role, or metadata (internal identifier)"""
+    """Update a user's display name or role
+    
+    NOTE: We deliberately DO NOT store internal_id - that would let Lemma correlate
+    users across the developer's system, defeating PPID privacy. Developers should
+    store the PPID -> internal_id mapping in THEIR OWN database.
+    """
     try:
         from api.database import get_db_connection
-        import json
         
         data = request.get_json() or {}
         
         conn = get_db_connection(site_id)
         cursor = conn.cursor()
         
-        # Build update query dynamically
+        # Build update query - only allow display_name and role
         updates = []
         params = []
         
@@ -295,23 +292,14 @@ def update_site_user(site_id, ppid):
             updates.append("display_name = %s")
             params.append(data['display_name'])
         
-        if 'internal_id' in data:
-            # Store internal ID in metadata
-            updates.append("metadata = COALESCE(metadata, '{}'::jsonb) || %s::jsonb")
-            params.append(json.dumps({'internal_id': data['internal_id']}))
-        
         if 'role' in data and data['role'] in ['user', 'moderator', 'admin']:
             updates.append("role = %s")
             params.append(data['role'])
         
-        if 'metadata' in data and isinstance(data['metadata'], dict):
-            updates.append("metadata = COALESCE(metadata, '{}'::jsonb) || %s::jsonb")
-            params.append(json.dumps(data['metadata']))
-        
         if not updates:
             cursor.close()
             conn.close()
-            return jsonify({'success': False, 'error': 'No valid fields to update'}), 400
+            return jsonify({'success': False, 'error': 'No valid fields to update (only display_name and role allowed)'}), 400
         
         params.extend([site_id, ppid])
         
@@ -319,7 +307,7 @@ def update_site_user(site_id, ppid):
             UPDATE site_users
             SET {', '.join(updates)}
             WHERE site_id = %s AND user_ppid = %s
-            RETURNING id, display_name, role, metadata
+            RETURNING id, display_name, role
         """, params)
         
         result = cursor.fetchone()
@@ -340,8 +328,7 @@ def update_site_user(site_id, ppid):
             'user': {
                 'id': result[0],
                 'display_name': result[1],
-                'role': result[2],
-                'metadata': result[3] or {}
+                'role': result[2]
             }
         })
         
