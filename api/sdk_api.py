@@ -275,7 +275,13 @@ def initialize_crypto_engine():
 initialize_crypto_engine()
 
 def validate_api_key(f):
-    """Validate API key for SDK requests"""
+    """Validate API key for SDK requests
+    
+    Validates against:
+    1. Platform internal keys (env vars)
+    2. Demo/test keys
+    3. Customer API keys stored in database (api_keys table)
+    """
     @wraps(f)
     def decorated_function(*args, **kwargs):
         auth_header = request.headers.get('Authorization', '')
@@ -298,19 +304,41 @@ def validate_api_key(f):
         # For demo purposes, accept demo keys
         if api_key.startswith('demo-') or api_key == 'client-demo-key' or api_key in platform_keys:
             request.api_key = api_key
+            request.api_key_info = {'valid': True, 'type': 'demo'}
             return f(*args, **kwargs)
         
         # Check if it's a Heroku environment variable key
-        import os
         heroku_api_key = os.environ.get('LEMMA_PLATFORM_API_KEY')
         if heroku_api_key and api_key == heroku_api_key:
             request.api_key = api_key
+            request.api_key_info = {'valid': True, 'type': 'platform'}
             return f(*args, **kwargs)
         
-        # In production, validate against actual API keys
-        # TODO: Implement proper API key validation
-        request.api_key = api_key
-        return f(*args, **kwargs)
+        # Validate against database (api_keys table)
+        try:
+            from api.customer_accounts import customer_manager
+            validation_result = customer_manager.validate_api_key(api_key)
+            
+            if validation_result.get('valid'):
+                request.api_key = api_key
+                request.api_key_info = validation_result
+                logger.info(f"✅ Valid API key for customer: {validation_result.get('customer_id')}, site: {validation_result.get('site_id')}")
+                return f(*args, **kwargs)
+            else:
+                logger.warning(f"❌ Invalid API key: {api_key[:12]}... - {validation_result.get('error')}")
+                return jsonify({
+                    'success': False,
+                    'error': 'invalid_api_key',
+                    'message': validation_result.get('error', 'API key validation failed')
+                }), 401
+                
+        except Exception as e:
+            logger.error(f"❌ API key validation error: {e}")
+            return jsonify({
+                'success': False,
+                'error': 'validation_error',
+                'message': 'Unable to validate API key'
+            }), 500
     
     return decorated_function
 
