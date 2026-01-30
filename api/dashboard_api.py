@@ -220,15 +220,15 @@ def get_platform_stats():
                 'total_customers': total_users,
                 'active_sites': total_sites,
                 'total_verifications_today': total_credentials * 10,  # Estimate
-                'iam_system': {
+            'iam_system': {
                     'total_permission_lemmas': total_credentials,
                     'active_iam_sites': total_sites
-                },
-                'performance': {
-                    'uptime_percentage': 99.97,
-                    'cache_hit_rate': 96.2
-                }
+            },
+            'performance': {
+                'uptime_percentage': 99.97,
+                'cache_hit_rate': 96.2
             }
+        }
         })
 
     except Exception as e:
@@ -408,7 +408,7 @@ def issue_admin_lemma_endpoint():
         if not admin_did or not admin_did.startswith('did:lemma:ppid_'):
             # Fall back to username-based derivation (legacy)
             logger.warning(f"No wallet PPID provided, falling back to username-derived DID")
-            admin_did = derive_ppid_did(username, site_domain)
+        admin_did = derive_ppid_did(username, site_domain)
         else:
             logger.info(f"Using wallet-derived PPID: {admin_did[:50]}...")
         

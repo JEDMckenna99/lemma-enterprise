@@ -82,10 +82,10 @@
                 <tr>
                     <th class="sortable" style="padding: 12px 16px;">PPID</th>
                     <th class="sortable">Display Name</th>
+                    <th class="sortable">Your Internal ID</th>
+                    <th>Role</th>
                     <th>Status</th>
-                    <th class="sortable">Permissions</th>
                     <th class="sortable">Last Seen</th>
-                    <th class="sortable">Added</th>
                     <th style="width: 100px;">Actions</th>
                 </tr>
             </thead>
@@ -134,7 +134,37 @@
             </div>
             <div class="panel-field">
                 <div class="panel-field-label">Display Name</div>
-                <div class="panel-field-value" id="panel-display-name">-</div>
+                <div id="panel-display-name-container">
+                    <span id="panel-display-name">-</span>
+                    <button class="row-action-btn" data-action="edit-display-name" data-tooltip="Edit" style="margin-left: 8px;">
+                        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+            <div class="panel-field">
+                <div class="panel-field-label">Your Internal ID</div>
+                <div id="panel-internal-id-container">
+                    <span id="panel-internal-id" style="color: var(--dev-text-muted);">Not set</span>
+                    <button class="row-action-btn" data-action="edit-internal-id" data-tooltip="Edit" style="margin-left: 8px;">
+                        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+            <div class="panel-field">
+                <div class="panel-field-label">Role</div>
+                <div id="panel-role-container">
+                    <select id="panel-role-select" class="dev-select" style="padding: 6px 10px; border-radius: 6px; font-size: 13px;">
+                        <option value="user">User</option>
+                        <option value="moderator">Moderator</option>
+                        <option value="admin">Admin</option>
+                    </select>
+                </div>
             </div>
             <div class="panel-field">
                 <div class="panel-field-label">Status</div>
@@ -188,6 +218,22 @@
         <div style="display: flex; gap: 12px; justify-content: flex-end;">
             <button class="dev-btn dev-btn-secondary" data-action="cancel-add-permission">Cancel</button>
             <button class="dev-btn dev-btn-primary" data-action="confirm-add-permission">Add Permission</button>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Field Modal -->
+<div class="panel-overlay" id="edit-field-modal" style="display: none;">
+    <div style="position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 24px; border-radius: 12px; width: 400px; max-width: 90vw; z-index: 1002;">
+        <h3 id="edit-field-title" style="margin: 0 0 20px; font-size: 18px;">Edit Field</h3>
+        <div style="margin-bottom: 16px;">
+            <label id="edit-field-label" style="display: block; font-size: 14px; color: var(--dev-text-muted); margin-bottom: 6px;">Value</label>
+            <input type="text" id="edit-field-input" class="dev-input" style="width: 100%; padding: 10px 12px; border-radius: 6px; border: 1px solid #e2e8f0;">
+            <p id="edit-field-help" style="font-size: 12px; color: #64748b; margin: 8px 0 0;"></p>
+        </div>
+        <div style="display: flex; gap: 12px; justify-content: flex-end;">
+            <button class="dev-btn dev-btn-secondary" data-action="cancel-edit-field">Cancel</button>
+            <button class="dev-btn dev-btn-primary" data-action="save-edit-field">Save</button>
         </div>
     </div>
 </div>
@@ -314,20 +360,21 @@ function renderUsers(users) {
                 </button>
             </td>
             <td>${escapeHtml(user.display_name || '-')}</td>
+            <td style="color: ${user.metadata?.internal_id ? '#374151' : '#94a3b8'}; font-family: var(--font-mono, monospace); font-size: 13px;">
+                ${escapeHtml(user.metadata?.internal_id || '-')}
+            </td>
+            <td>
+                <span class="status-badge ${getRoleClass(user.role)}">
+                    ${escapeHtml((user.role || 'user').charAt(0).toUpperCase() + (user.role || 'user').slice(1))}
+                </span>
+            </td>
             <td>
                 <span class="status-badge ${user.status === 'active' ? 'active' : 'revoked'}">
                     <span class="status-dot"></span>
                     ${escapeHtml(user.status)}
                 </span>
             </td>
-            <td>
-                ${user.permission_count > 0 
-                    ? `<span class="status-badge info">${user.permission_count} permission${user.permission_count > 1 ? 's' : ''}</span>`
-                    : '<span style="color: #94a3b8;">-</span>'
-                }
-            </td>
             <td style="color: #64748b; font-size: 13px;">${formatDate(user.last_seen)}</td>
-            <td style="color: #64748b; font-size: 13px;">${formatDate(user.added_at)}</td>
             <td>
                 <div class="row-actions" style="opacity: 1;">
                     <button class="row-action-btn" data-action="view-user" data-ppid="${escapeHtml(user.ppid)}" data-tooltip="View">
@@ -348,6 +395,15 @@ function renderUsers(users) {
             </td>
         </tr>
     `).join('');
+}
+
+function getRoleClass(role) {
+    const classes = {
+        'admin': 'info',
+        'moderator': 'pending',
+        'user': 'inactive'
+    };
+    return classes[role?.toLowerCase()] || 'inactive';
 }
 
 function updatePagination(data) {
@@ -392,6 +448,9 @@ async function viewUser(ppid) {
         
         document.getElementById('panel-ppid').textContent = data.user.ppid;
         document.getElementById('panel-display-name').textContent = data.user.display_name || '-';
+        document.getElementById('panel-internal-id').textContent = data.user.metadata?.internal_id || 'Not set';
+        document.getElementById('panel-internal-id').style.color = data.user.metadata?.internal_id ? 'inherit' : 'var(--dev-text-muted)';
+        document.getElementById('panel-role-select').value = data.user.role || 'user';
         document.getElementById('panel-last-seen').textContent = formatDate(data.user.last_seen);
         document.getElementById('panel-added').textContent = formatDate(data.user.added_at);
         
@@ -421,6 +480,92 @@ async function viewUser(ppid) {
     } catch (e) {
         console.error('Failed to load user:', e);
         if (window.showToast) showToast('error', 'Error', 'Failed to load user details');
+    }
+}
+
+// Edit field modal state
+let currentEditField = null;
+
+function openEditFieldModal(field) {
+    currentEditField = field;
+    const modal = document.getElementById('edit-field-modal');
+    const input = document.getElementById('edit-field-input');
+    const title = document.getElementById('edit-field-title');
+    const label = document.getElementById('edit-field-label');
+    const help = document.getElementById('edit-field-help');
+    
+    if (field === 'display_name') {
+        title.textContent = 'Edit Display Name';
+        label.textContent = 'Display Name';
+        input.value = currentUser?.display_name || '';
+        help.textContent = 'A friendly name to identify this user in your dashboard';
+    } else if (field === 'internal_id') {
+        title.textContent = 'Set Internal ID';
+        label.textContent = 'Your Internal User ID';
+        input.value = currentUser?.metadata?.internal_id || '';
+        help.textContent = 'Map this PPID to your own user system ID for easy reference';
+    }
+    
+    modal.style.display = 'block';
+    input.focus();
+}
+
+async function saveEditField() {
+    if (!currentUser || !currentEditField) return;
+    
+    const value = document.getElementById('edit-field-input').value.trim();
+    const payload = {};
+    
+    if (currentEditField === 'display_name') {
+        payload.display_name = value || null;
+    } else if (currentEditField === 'internal_id') {
+        payload.internal_id = value || null;
+    }
+    
+    try {
+        const response = await fetch(`/api/developer/sites/${SITE_ID}/users/${encodeURIComponent(currentUser.ppid)}`, {
+            method: 'PUT',
+            headers: await getAuthHeaders(),
+            body: JSON.stringify(payload)
+        });
+        
+        const data = await response.json();
+        
+        if (!data.success) throw new Error(data.error);
+        
+        if (window.showToast) showToast('success', 'Saved', 'User updated successfully');
+        document.getElementById('edit-field-modal').style.display = 'none';
+        viewUser(currentUser.ppid);  // Refresh panel
+        loadUsers();  // Refresh table
+        
+    } catch (e) {
+        console.error('Failed to save:', e);
+        if (window.showToast) showToast('error', 'Error', e.message || 'Failed to save');
+    }
+}
+
+async function updateUserRole(role) {
+    if (!currentUser) return;
+    
+    try {
+        const response = await fetch(`/api/developer/sites/${SITE_ID}/users/${encodeURIComponent(currentUser.ppid)}`, {
+            method: 'PUT',
+            headers: await getAuthHeaders(),
+            body: JSON.stringify({ role: role })
+        });
+        
+        const data = await response.json();
+        
+        if (!data.success) throw new Error(data.error);
+        
+        currentUser.role = role;
+        if (window.showToast) showToast('success', 'Role Updated', `User role changed to ${role}`);
+        
+    } catch (e) {
+        console.error('Failed to update role:', e);
+        if (window.showToast) showToast('error', 'Error', 'Failed to update role');
+        // Revert select
+        document.getElementById('panel-role-select').value = currentUser.role || 'user';
     }
 }
 
@@ -530,12 +675,29 @@ document.addEventListener('click', function(e) {
         case 'remove-permission':
             removePermission(target.dataset.permissionId);
             break;
+        case 'edit-display-name':
+            openEditFieldModal('display_name');
+            break;
+        case 'edit-internal-id':
+            openEditFieldModal('internal_id');
+            break;
+        case 'cancel-edit-field':
+            document.getElementById('edit-field-modal').style.display = 'none';
+            break;
+        case 'save-edit-field':
+            saveEditField();
+            break;
     }
     
     // Copy buttons
     if (target.dataset.copy) {
         copyToClipboard(target.dataset.copy, target);
     }
+});
+
+// Role select change handler
+document.getElementById('panel-role-select')?.addEventListener('change', function(e) {
+    updateUserRole(e.target.value);
 });
 
 // Utilities

@@ -543,7 +543,7 @@ class CustomerAccountManager:
     def get_customer_by_id(self, customer_id: str) -> Optional[Customer]:
         """Compatibility helper for modules expecting get_customer_by_id"""
         return self.get_customer(customer_id)
-    
+        
     def get_all_customers(self, limit: int = 100, offset: int = 0) -> List[Customer]:
         """Get all customers from database (for admin dashboard)"""
         customers = []

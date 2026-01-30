@@ -130,6 +130,84 @@ def get_site_users(site_id):
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
+@site_management_bp.route('/api/developer/sites/<site_id>/users', methods=['POST'])
+@cross_origin()
+@require_agent_or_user_auth(required_scope='write')
+def add_site_user(site_id):
+    """Add or register a user to the site (auto-happens on login, but can be done manually)"""
+    try:
+        from api.database import get_db_connection
+        import json
+        
+        data = request.get_json() or {}
+        
+        user_ppid = data.get('ppid', '').strip()
+        if not user_ppid:
+            return jsonify({'success': False, 'error': 'PPID is required'}), 400
+        
+        display_name = data.get('display_name', '').strip() or None
+        internal_id = data.get('internal_id', '').strip() or None
+        role = data.get('role', 'user')
+        
+        if role not in ['user', 'moderator', 'admin']:
+            role = 'user'
+        
+        metadata = {}
+        if internal_id:
+            metadata['internal_id'] = internal_id
+        if data.get('metadata'):
+            metadata.update(data['metadata'])
+        
+        added_by = request.headers.get('X-Lemma-PPID', 'api')
+        
+        conn = get_db_connection(site_id)
+        cursor = conn.cursor()
+        
+        # Upsert user
+        cursor.execute("""
+            INSERT INTO site_users (site_id, user_ppid, display_name, role, status, added_by, metadata)
+            VALUES (%s, %s, %s, %s, 'active', %s, %s)
+            ON CONFLICT (site_id, user_ppid) 
+            DO UPDATE SET 
+                display_name = COALESCE(EXCLUDED.display_name, site_users.display_name),
+                role = EXCLUDED.role,
+                metadata = site_users.metadata || EXCLUDED.metadata
+            RETURNING id, user_ppid, display_name, role, status, added_at, metadata
+        """, (
+            site_id,
+            user_ppid,
+            display_name,
+            role,
+            added_by,
+            json.dumps(metadata) if metadata else '{}'
+        ))
+        
+        row = cursor.fetchone()
+        
+        conn.commit()
+        cursor.close()
+        conn.close()
+        
+        logger.info(f"Added/updated user {user_ppid[:20]}... on site {site_id}")
+        
+        return jsonify({
+            'success': True,
+            'user': {
+                'id': row[0],
+                'ppid': row[1],
+                'display_name': row[2],
+                'role': row[3],
+                'status': row[4],
+                'added_at': row[5].isoformat() if row[5] else None,
+                'metadata': row[6] or {}
+            }
+        })
+        
+    except Exception as e:
+        logger.error(f"Failed to add user: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
 @site_management_bp.route('/api/developer/sites/<site_id>/users/<ppid>', methods=['GET'])
 @cross_origin()
 @require_agent_or_user_auth(required_scope='read')
@@ -192,6 +270,83 @@ def get_site_user_detail(site_id, ppid):
         
     except Exception as e:
         logger.error(f"Failed to get user detail: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@site_management_bp.route('/api/developer/sites/<site_id>/users/<ppid>', methods=['PUT'])
+@cross_origin()
+@require_agent_or_user_auth(required_scope='write')
+def update_site_user(site_id, ppid):
+    """Update a user's display name, role, or metadata (internal identifier)"""
+    try:
+        from api.database import get_db_connection
+        import json
+        
+        data = request.get_json() or {}
+        
+        conn = get_db_connection(site_id)
+        cursor = conn.cursor()
+        
+        # Build update query dynamically
+        updates = []
+        params = []
+        
+        if 'display_name' in data:
+            updates.append("display_name = %s")
+            params.append(data['display_name'])
+        
+        if 'internal_id' in data:
+            # Store internal ID in metadata
+            updates.append("metadata = COALESCE(metadata, '{}'::jsonb) || %s::jsonb")
+            params.append(json.dumps({'internal_id': data['internal_id']}))
+        
+        if 'role' in data and data['role'] in ['user', 'moderator', 'admin']:
+            updates.append("role = %s")
+            params.append(data['role'])
+        
+        if 'metadata' in data and isinstance(data['metadata'], dict):
+            updates.append("metadata = COALESCE(metadata, '{}'::jsonb) || %s::jsonb")
+            params.append(json.dumps(data['metadata']))
+        
+        if not updates:
+            cursor.close()
+            conn.close()
+            return jsonify({'success': False, 'error': 'No valid fields to update'}), 400
+        
+        params.extend([site_id, ppid])
+        
+        cursor.execute(f"""
+            UPDATE site_users
+            SET {', '.join(updates)}
+            WHERE site_id = %s AND user_ppid = %s
+            RETURNING id, display_name, role, metadata
+        """, params)
+        
+        result = cursor.fetchone()
+        
+        if not result:
+            cursor.close()
+            conn.close()
+            return jsonify({'success': False, 'error': 'User not found'}), 404
+        
+        conn.commit()
+        cursor.close()
+        conn.close()
+        
+        logger.info(f"Updated user {ppid[:20]}... on site {site_id}")
+        
+        return jsonify({
+            'success': True,
+            'user': {
+                'id': result[0],
+                'display_name': result[1],
+                'role': result[2],
+                'metadata': result[3] or {}
+            }
+        })
+        
+    except Exception as e:
+        logger.error(f"Failed to update user: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
