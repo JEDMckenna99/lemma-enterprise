@@ -282,31 +282,25 @@ def get_all_sites():
             conn = psycopg2.connect(database_url)
             cur = conn.cursor()
             
-            # Get sites from customers table (sites are stored in JSON field)
+            # Get sites from the actual sites table
             cur.execute("""
-                SELECT customer_id, email, name, company, sites, created_at, status
-                FROM customers 
-                WHERE sites IS NOT NULL AND sites::text != '[]' AND sites::text != 'null'
+                SELECT site_id, site_domain, company_name, admin_email, plan, 
+                       created_at, key_status, issuer_did
+                FROM sites 
                 ORDER BY created_at DESC
             """)
             
             for row in cur.fetchall():
-                customer_sites = row[4] if isinstance(row[4], list) else []
-                for site in customer_sites:
-                    if isinstance(site, dict):
-                        sites.append({
-                            'site_id': site.get('site_id', ''),
-                            'site_domain': site.get('site_domain', site.get('site_id', '')),
-                            'company_name': row[3] or row[2] or 'Unknown',
-                            'owner_email': row[1],
-                            'owner_ppid': row[0],
-                            'service_type': site.get('service_type', 'both'),
-                            'plan': site.get('plan', 'free'),
-                            'status': site.get('status', 'active'),
-                            'verification_count': site.get('verification_count', 0),
-                            'user_count': site.get('user_count', 0),
-                            'created_at': row[5].isoformat() if row[5] else None
-                        })
+                sites.append({
+                    'site_id': row[0],
+                    'site_domain': row[1] or row[0],
+                    'company_name': row[2] or row[0],
+                    'admin_email': row[3],
+                    'plan': row[4] or 'starter',
+                    'created_at': row[5].isoformat() if row[5] else None,
+                    'status': row[6] or 'active',
+                    'issuer_did': row[7]
+                })
             
             cur.close()
             conn.close()
