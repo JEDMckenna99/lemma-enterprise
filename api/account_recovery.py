@@ -181,9 +181,9 @@ def initiate_recovery():
                 from api.email_service import send_email
                 
                 send_email(
-                    to_email=admin_email,
+                    to=admin_email,
                     subject="Lemma.id Account Recovery",
-                    html_content=f"""
+                    html=f"""
                     <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; padding: 40px 20px;">
                         <div style="text-align: center; margin-bottom: 32px;">
                             <h1 style="color: #1e293b; font-size: 24px; margin: 0;">Account Recovery</h1>
@@ -220,7 +220,7 @@ def initiate_recovery():
                         </p>
                     </div>
                     """,
-                    text_content=f"""
+                    text=f"""
 Account Recovery for {site_id}
 
 A recovery request was made for your Lemma.id account.
