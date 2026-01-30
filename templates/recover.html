@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Account Recovery - Lemma.id</title>
-    <link rel="stylesheet" href="/static/lemma.css">
     <style>
         body {
             min-height: 100vh;
@@ -195,13 +194,13 @@
         <form id="recovery-form">
             <div class="form-group">
                 <label for="site-id">Site ID</label>
-                <input type="text" id="site-id" name="site_id" placeholder="site_abc123" required>
+                <input type="text" id="site-id" name="site_id" placeholder="site_abc123" required autocomplete="username">
                 <div class="hint">The unique identifier for your site</div>
             </div>
             
             <div class="form-group">
                 <label for="api-key">API Key</label>
-                <input type="password" id="api-key" name="api_key" placeholder="sk_live_..." required>
+                <input type="password" id="api-key" name="api_key" placeholder="sk_live_..." required autocomplete="current-password">
                 <div class="hint">Your live or test API key</div>
             </div>
             
@@ -215,7 +214,7 @@
         </div>
     </div>
     
-    <script>
+    <script nonce="{{ csp_nonce }}">
         document.getElementById('recovery-form').addEventListener('submit', async function(e) {
             e.preventDefault();
             

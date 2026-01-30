@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Complete Recovery - Lemma.id</title>
-    <link rel="stylesheet" href="/static/lemma.css">
     <style>
         body {
             min-height: 100vh;
@@ -249,7 +248,7 @@
         </div>
     </div>
     
-    <script>
+    <script nonce="{{ csp_nonce }}">
         const token = '{{ token }}';
         
         const loadingState = document.getElementById('loading-state');
