@@ -34,7 +34,7 @@ def prepare_cdn_crypto_assets():
             "wasm_file": "/crypto/lemma-unified.wasm",
             "performance": "5-15μs",
             "systems": ["federated_identity", "iam_permissions"],
-            "capabilities": ["Ed25519", "OPRF", "Bloom", "ZKP"],
+            "capabilities": ["Ed25519", "Bloom", "ZKP"],
             "offline": True
         },
         "federated_identity": {

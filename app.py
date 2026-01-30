@@ -310,17 +310,6 @@ def create_app():
     except Exception as e:
         logger.error(f"❌ Failed to register Credential Auto-Refresh API: {e}")
 
-    # OPRF Key Management API
-    try:
-        from api.oprf_key_api import oprf_key_bp, init_oprf_key_manager
-        app.register_blueprint(oprf_key_bp)
-        logger.info("✅ OPRF Key Management API registered")
-        # Initialize key manager at startup
-        init_oprf_key_manager()
-        logger.info("🔑 OPRF Key Manager initialized")
-    except Exception as e:
-        logger.error(f"❌ Failed to register OPRF Key Management API: {e}")
-
     # Permission Verification with Nonce (Bot Defense)
     try:
         from api.permission_verification import permission_verification_bp
@@ -345,14 +334,6 @@ def create_app():
     except Exception as e:
         logger.error(f"❌ Failed to register Platform Statistics API: {e}")
     
-    # OPRF Evaluation API
-    try:
-        from api.oprf_evaluation import oprf_eval_bp
-        app.register_blueprint(oprf_eval_bp)
-        logger.info("✅ OPRF Evaluation API registered")
-    except Exception as e:
-        logger.error(f"❌ Failed to register OPRF Evaluation API: {e}")
-
     # SSE Revocation Events API (real-time revocation notifications)
     try:
         from api.revocation_events import revocation_events_bp

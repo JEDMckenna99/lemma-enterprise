@@ -1,6 +1,6 @@
 """
 Real IAM Manager using Rust Crypto Engine
-Replaces mock classes with actual Ed25519 + OPRF verification
+Replaces mock classes with actual Ed25519 + Bloom filter verification
 """
 
 import json
@@ -194,7 +194,7 @@ class RealIAMSubnetManager:
         start_time = time.perf_counter()
         
         try:
-            # Verify using Rust engine (Ed25519 + OPRF revocation)
+            # Verify using Rust engine (Ed25519 + Bloom filter revocation)
             credential_json = json.dumps(credential)
             result = self.verifier.verify_credential(credential_json)
             
@@ -336,7 +336,7 @@ class RealIAMSubnetManager:
     
     def revoke_permission(self, user_did: str, permission_id: str) -> str:
         """
-        Revoke permission lemma using OPRF + Bloom filter
+        Revoke permission lemma using Bloom filter
         
         Returns: revocation_key for bloom filter
         """
@@ -344,7 +344,7 @@ class RealIAMSubnetManager:
         revocation_data = f"{self.site_id}:{user_did}:{permission_id}:{int(time.time())}"
         revocation_key = hashlib.sha256(revocation_data.encode()).hexdigest()
         
-        # In production: Add to OPRF evaluation and bloom filter
+        # In production: Add to bloom filter
         # self.verifier.add_to_revocation_filter(revocation_key)
         
         logger.info(f"🚫 Revoked permission '{permission_id}' for user {user_did[:30]}...")

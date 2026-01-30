@@ -103,7 +103,6 @@ def _track_permission_in_db(site_id: str, permission_id: str, user_did: str,
 # Note: Site managers are now managed by real_iam_manager module
 # Each site gets:
 # - Unique Ed25519 keypair (site-specific DID)
-# - Unique OPRF key for revocation
 # - Unique Bloom filter for revoked credentials
 # NO SHARING between sites!
 
@@ -140,7 +139,6 @@ def register_site():
         
         # Create REAL IAM manager with Rust crypto engine
         # This creates a UNIQUE Ed25519 keypair for this site
-        # This creates a UNIQUE OPRF key for this site's revocation
         # This creates a UNIQUE Bloom filter for this site's revoked credentials
         # NO SHARING with other sites!
         manager = get_or_create_site_manager(site.site_id, site.site_domain)
@@ -151,7 +149,6 @@ def register_site():
         logger.info(f"✅ Registered site {site.site_domain} with REAL crypto engine")
         logger.info(f"🔐 Site-specific issuer DID: {manager.issuer_did[:50]}...")
         logger.info(f"🔐 Site has unique Ed25519 keypair (NOT shared)")
-        logger.info(f"🔐 Site has unique OPRF key for revocation (NOT shared)")
         logger.info(f"🔐 Site has unique Bloom filter (NOT shared)")
         
         return jsonify({
@@ -161,7 +158,7 @@ def register_site():
             'oauth_client_id': site.oauth_client_id,
             'oauth_client_secret': site.oauth_client_secret,
             'issuer_did': manager.issuer_did,
-            'crypto_engine': 'rust_ed25519_oprf',
+            'crypto_engine': 'rust_ed25519_bloom',
             'site_isolation': 'unique_keys_and_revocation_per_site',
             'integration_guide': f"https://docs.lemma.id/integration/{site.site_id}",
             'dashboard_url': f"https://lemma.id/dashboard/{site.site_id}"
@@ -235,7 +232,7 @@ def create_permission(site_id):
             'permission_id': permission_id,
             'display_name': display_name,
             'scope': scope,
-            'crypto_engine': 'rust_ed25519_oprf',
+            'crypto_engine': 'rust_ed25519_bloom',
             'site_specific': True,
             'message': f'Permission "{display_name}" created successfully'
         }), 201
@@ -323,7 +320,7 @@ def grant_user_permission(site_id, user_did):
             'permission_id': permission_id,
             'user_did': user_did,
             'issue_time_us': round(issue_time_us, 2),
-            'crypto_engine': 'rust_ed25519_oprf',
+            'crypto_engine': 'rust_ed25519_bloom',
             'issuer_did': manager.issuer_did,
             'site_specific': True,
             'site_isolation': 'unique_key_per_site',
@@ -666,7 +663,7 @@ def verify_access():
     """
     Verify user access for a resource using REAL Rust crypto engine
     PERFORMANCE TARGET: 31-94µs verification time
-    Uses site-specific Ed25519 + OPRF verification (NOT shared keys)
+    Uses site-specific Ed25519 + Bloom filter verification (NOT shared keys)
     
     POST /api/v1/auth/verify
     {
@@ -711,9 +708,9 @@ def verify_access():
             'session_id': data.get('session_id')
         }
         
-        # Verify access using REAL Rust crypto (Ed25519 + OPRF)
+        # Verify access using REAL Rust crypto (Ed25519 + Bloom filter)
         # This verifies credentials using the site's UNIQUE Ed25519 public key
-        # This checks revocation using the site's UNIQUE OPRF key and Bloom filter
+        # This checks revocation using the site's UNIQUE Bloom filter
         start_time = time.perf_counter()
         has_access, verification_details = manager.check_access(access_request, user_lemmas)
         total_time_us = (time.perf_counter() - start_time) * 1_000_000
@@ -731,7 +728,7 @@ def verify_access():
             'has_access': has_access,
             'verification_time_us': round(total_time_us, 2),
             'verification_details': verification_details,
-            'crypto_engine': 'rust_ed25519_oprf',
+            'crypto_engine': 'rust_ed25519_bloom',
             'site_specific': True,
             'site_isolation': 'unique_key_and_revocation_per_site',
             'user_did': user_did,

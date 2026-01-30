@@ -167,17 +167,14 @@ def await_network_revocation(credential_id: str, reason: str) -> bool:
     try:
         # Import the network revocation function
         from api.sdk_api import distribute_revocation_to_network
-        
-        # For PoH lemmas, we need OPRF evaluation and bloom hash
-        # Simulate these for now (in production, use real crypto)
         import hashlib
-        oprf_evaluation = f"oprf_{hashlib.sha256(credential_id.encode()).hexdigest()}"
-        bloom_hash = f"bloom_{hashlib.sha256((credential_id + 'bloom').encode()).hexdigest()}"
+        
+        # SHA256 hash for bloom filter
+        bloom_hash = hashlib.sha256(credential_id.encode()).hexdigest()
         
         # Distribute to network
         success = distribute_revocation_to_network(
             credential_id=credential_id,
-            oprf_evaluation=oprf_evaluation,
             bloom_hash=bloom_hash,
             reason=reason
         )
@@ -261,7 +258,7 @@ def get_revocation_status():
             # In production, this would check:
             # 1. Network revocation lists (for PoH lemmas)
             # 2. Site revocation lists (for permission lemmas)
-            # 3. OPRF bloom filter (for privacy-preserving checks)
+            # 3. Bloom filter (for efficient revocation checks)
             
             statuses[cred_id] = {
                 'revoked': False,  # Placeholder

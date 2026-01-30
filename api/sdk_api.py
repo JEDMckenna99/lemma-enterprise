@@ -209,11 +209,12 @@ def distribute_did_to_network(did: str, public_key: str, issuer_info: dict) -> b
         logger.warning(f"⚠️ Network DID distribution failed: {e}")
         return False
 
-def distribute_revocation_to_network(credential_id: str, oprf_evaluation: str, bloom_hash: str, reason: str) -> bool:
+def distribute_revocation_to_network(credential_id: str, bloom_hash: str, reason: str) -> bool:
     """
     Distribute credential revocation to the network registry
     
     This ensures all sites using Lemma immediately know about revoked credentials
+    Uses SHA256 hash for bloom filter entry.
     """
     try:
         response = requests.post(
@@ -224,7 +225,6 @@ def distribute_revocation_to_network(credential_id: str, oprf_evaluation: str, b
             },
             json={
                 'credential_id': credential_id,
-                'oprf_evaluation': oprf_evaluation,
                 'bloom_hash': bloom_hash,
                 'reason': reason
             },
@@ -258,7 +258,7 @@ def initialize_crypto_engine():
         from lemma_crypto import PyOptimizedVerifier
         rust_engine = PyOptimizedVerifier()
         RUST_ENGINE_AVAILABLE = True
-        logger.info("✅ OPTIMIZED Lemma crypto engine loaded (Ed25519 + OPRF + caching)")
+        logger.info("✅ OPTIMIZED Lemma crypto engine loaded (Ed25519 + Bloom + caching)")
         return True
     except ImportError as e:
         RUST_ENGINE_AVAILABLE = False
@@ -369,7 +369,7 @@ def check_credentials():
         
         # Priority 1: Verify client-provided credentials using REAL optimized crypto engine
         if client_credentials and RUST_ENGINE_AVAILABLE and enable_rust_engine:
-            logger.info(f"🔐 Using REAL Optimized Crypto Engine (Ed25519 + OPRF + caching) for {len(client_credentials)} credentials")
+            logger.info(f"🔐 Using REAL Optimized Crypto Engine (Ed25519 + Bloom + caching) for {len(client_credentials)} credentials")
             
             for credential in client_credentials:
                 try:
@@ -400,7 +400,7 @@ def check_credentials():
                         'cache_hit': result.cache_hit,
                         'optimization_used': result.optimization_used,
                         'method': 'real_crypto_optimized',
-                        'crypto_components': ['Ed25519', 'OPRF', 'Bloom'],
+                        'crypto_components': ['Ed25519', 'Bloom'],
                         'engine_version': 'lemma_crypto_v0.1.1_optimized',
                         'offline': True,
                         'details': {
@@ -959,11 +959,11 @@ def create_enhanced_identity_credential(user_id: str, session_id: str, stripe_re
 @rate_limit(max_requests=10, window=60)  # Limit revocation calls
 def revoke_credential():
     """
-    Cryptographic credential revocation using OPRF + Bloom Filter
+    Credential revocation using Bloom Filter
     
     This endpoint performs network-wide credential revocation by:
-    1. Computing OPRF evaluation of the credential
-    2. Adding the OPRF result to the distributed bloom filter
+    1. Computing SHA256 hash of the credential ID
+    2. Adding the hash to the distributed bloom filter
     3. Enabling instant offline revocation checking across the network
     """
     try:
@@ -971,10 +971,9 @@ def revoke_credential():
         data = request.get_json() or {}
         
         credentials = data.get('credentials', [])
-        revocation_type = data.get('revocationType', 'oprf_bloom_filter')
         reason = data.get('reason', 'unspecified')
         
-        logger.info(f"🚨 Credential revocation request: {len(credentials)} credentials, type={revocation_type}, reason={reason}")
+        logger.info(f"🚨 Credential revocation request: {len(credentials)} credentials, reason={reason}")
         
         if not credentials:
             return jsonify({
@@ -984,72 +983,39 @@ def revoke_credential():
             }), 400
         
         revocation_results = []
-        total_oprf_time_us = 0
         total_bloom_time_us = 0
         
         # Process each credential for revocation
         for credential in credentials:
             credential_id = credential.get('id', 'unknown')
             
-            # Step 1: OPRF Evaluation for Privacy-Preserving Revocation
-            oprf_start = time.perf_counter_ns()
-            
-            if RUST_ENGINE_AVAILABLE:
-                try:
-                    # Use REAL Rust engine for OPRF computation
-                    logger.info(f"🔒 Computing OPRF evaluation for credential {credential_id}")
-                    
-                    # Use the Rust engine's OPRF implementation for privacy-preserving revocation
-                    # This computes a real OPRF evaluation using Ristretto255 cryptography
-                    oprf_evaluation = rust_engine.compute_oprf_evaluation(credential_id)
-                    
-                    logger.info(f"✅ OPRF evaluation computed: {oprf_evaluation[:32]}...")
-                    
-                except Exception as e:
-                    logger.warning(f"Rust OPRF failed for {credential_id}: {e}")
-                    # Fallback to deterministic hash (not privacy-preserving but functional)
-                    oprf_evaluation = f"hash_{hashlib.sha256(credential_id.encode()).hexdigest()}"
-            else:
-                # Fallback to deterministic hash (not privacy-preserving but functional)
-                oprf_evaluation = f"hash_{hashlib.sha256(credential_id.encode()).hexdigest()}"
-            
-            oprf_end = time.perf_counter_ns()
-            oprf_time_us = (oprf_end - oprf_start) / 1000
-            total_oprf_time_us += oprf_time_us
-            
-            # Step 2: Add to Distributed Bloom Filter
+            # Step 1: Compute bloom filter hash
             bloom_start = time.perf_counter_ns()
             
-            # In production, this would update the distributed bloom filter
-            # For now, we simulate the bloom filter update
-            logger.info(f"🌸 Adding OPRF evaluation to bloom filter: {oprf_evaluation[:32]}...")
-            
-            # Simulate bloom filter update time (very fast)
-            bloom_hash = hashlib.sha256(oprf_evaluation.encode()).hexdigest()
+            # SHA256 hash of credential ID for bloom filter
+            bloom_hash = hashlib.sha256(credential_id.encode()).hexdigest()
+            logger.info(f"🌸 Adding credential to bloom filter: {bloom_hash[:16]}...")
             
             bloom_end = time.perf_counter_ns()
             bloom_time_us = (bloom_end - bloom_start) / 1000
             total_bloom_time_us += bloom_time_us
             
-            # Step 3: Distribute revocation to network registry
+            # Step 2: Distribute revocation to network registry
             network_distributed = distribute_revocation_to_network(
                 credential_id, 
-                oprf_evaluation, 
                 bloom_hash, 
                 reason
             )
             
             revocation_results.append({
                 'credential_id': credential_id,
-                'oprf_evaluation': oprf_evaluation[:32] + "...",  # Truncate for privacy
-                'bloom_hash': bloom_hash[:16] + "...",  # Truncate for privacy
-                'oprf_time_us': oprf_time_us,
+                'bloom_hash': bloom_hash[:16] + "...",
                 'bloom_time_us': bloom_time_us,
                 'network_distributed': network_distributed,
                 'revoked_at': time.time()
             })
             
-            logger.info(f"✅ Credential {credential_id} revoked: OPRF={oprf_time_us:.2f}µs, Bloom={bloom_time_us:.2f}µs, Network={network_distributed}")
+            logger.info(f"✅ Credential {credential_id} revoked: Bloom={bloom_time_us:.2f}µs, Network={network_distributed}")
         
         # Step 3: Update session to revoke locally
         session.pop('verified_user', None)
@@ -1065,13 +1031,11 @@ def revoke_credential():
         return jsonify({
             'success': True,
             'revoked_count': len(credentials),
-            'revocation_type': 'oprf_bloom_filter',
-            'oprf_time_us': total_oprf_time_us,
+            'revocation_type': 'bloom_filter',
             'bloom_update_time_us': total_bloom_time_us,
             'total_time_us': total_time_us,
             'network_propagation': 'instant_distributed_bloom_filter',
-            'results': revocation_results,
-            'privacy_note': 'OPRF evaluation ensures credential content remains private during revocation'
+            'results': revocation_results
         })
         
     except Exception as e:
@@ -1423,7 +1387,7 @@ def verify_offline():
                 'optimization_used': result.optimization_used,
                 'offline': True,
                 'engine': 'real_crypto_optimized',
-                'cryptographic_components': ['Ed25519', 'OPRF', 'Bloom'],
+                'cryptographic_components': ['Ed25519', 'Bloom'],
                 'performance_note': 'Real cryptographic verification with caching optimizations'
             })
             

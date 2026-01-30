@@ -54,7 +54,7 @@ except Exception as e:
 _nonce_cache = {}
 _NONCE_EXPIRY_SECONDS = 300  # 5 minutes
 
-# Global verifier with OPRF + Bloom filter (singleton)
+# Global verifier with Bloom filter (singleton)
 _global_verifier = None
 
 def get_global_verifier():
@@ -70,7 +70,7 @@ def get_global_verifier():
     
     # Create verifier if needed
     if _global_verifier is None:
-        logger.info("🔐 Initializing global OptimizedVerifier with OPRF + Bloom filter...")
+        logger.info("🔐 Initializing global OptimizedVerifier with Bloom filter...")
         _global_verifier = PyOptimizedVerifier.new()
         
         # Do INITIAL sync of existing revocations
@@ -115,7 +115,7 @@ def sync_revocations_to_bloom():
                 logger.debug("No revocations to sync")
                 return
             
-            # Add each to Bloom filter via OPRF
+            # Add each to Bloom filter
             count = 0
             for revocation in revoked_list:
                 try:
@@ -124,7 +124,7 @@ def sync_revocations_to_bloom():
                 except Exception as e:
                     logger.warning(f"Failed to add {revocation.lemma_id} to Bloom filter: {e}")
             
-            logger.info(f"✅ Synced {count} revocations to OPRF + Bloom filter")
+            logger.info(f"✅ Synced {count} revocations to Bloom filter")
             
         finally:
             session.close()
@@ -282,7 +282,7 @@ def verify_permission_lemma():
                 'error': f'Site domain mismatch: {cred_site_domain} != {site_domain}'
             }), 403
         
-        # 6. Cryptographic verification with OPRF + Bloom filter revocation check
+        # 6. Cryptographic verification with Bloom filter revocation check
         start_time = time.perf_counter()
         
         try:
@@ -297,9 +297,8 @@ def verify_permission_lemma():
             
             # COMPLETE VERIFICATION (includes all security layers):
             # Layer 1: Ed25519 signature verification
-            # Layer 2: OPRF privacy-preserving evaluation
-            # Layer 3: Cascaded Bloom filter revocation check
-            # Layer 4: Nonce freshness (already checked above)
+            # Layer 2: Bloom filter revocation check
+            # Layer 3: Nonce freshness (already checked above)
             # Layer 5: Site domain binding (already checked above)
             
             is_valid = verifier.verify_credential_json(credential_json)
@@ -319,10 +318,9 @@ def verify_permission_lemma():
                     'verified': True,
                     'verification_time_us': int(verification_time_us),
                     'confidence': 1.0,
-                    'method': 'ed25519_oprf_bloom_nonce',
+                    'method': 'ed25519_bloom_nonce',
                     'security_layers': [
                         'ed25519_signature',
-                        'oprf_privacy',
                         'bloom_filter_revocation',
                         'nonce_replay_protection',
                         'site_domain_binding'

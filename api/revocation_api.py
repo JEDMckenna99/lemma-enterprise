@@ -114,7 +114,7 @@ def get_bloom_filter():
     """
     try:
         # GLOBAL BLOOM FILTER APPROACH
-        # All revocations in one filter, privacy preserved by OPRF blinding
+        # All revocations in one filter
         # Sites only check credentials they have (selective disclosure)
         
         # Query database for ALL revoked credentials (global)
@@ -127,7 +127,7 @@ def get_bloom_filter():
             # Get ALL revoked credential IDs across all sites
             # Privacy guaranteed by:
             # 1. Wallet selective disclosure: Sites only receive credentials for their domain
-            # 2. OPRF blinding: Credential IDs blinded before revocation check
+            # 2. SHA256 hashing: Credential IDs hashed before revocation check
             # 3. Zero-knowledge: Sites cannot correlate revocations to other sites
             # Note: Table uses both 'credential_id' and 'lemma_id' columns for compatibility
             cursor.execute("""

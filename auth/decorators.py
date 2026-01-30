@@ -59,7 +59,11 @@ def check_agent_session():
 
 def require_api_key(f):
     """
-    Decorator to require valid API key for endpoint access
+    Decorator to require valid API key for endpoint access.
+    
+    Validates against:
+    1. Platform API key (LEMMA_API_KEY or LEMMA_PLATFORM_API_KEY env var)
+    2. Customer API keys stored in database (via customer_manager)
     """
     @wraps(f)
     def decorated_function(*args, **kwargs):
@@ -68,13 +72,33 @@ def require_api_key(f):
         if not api_key:
             return jsonify({'error': 'API key required'}), 401
         
-        # TODO: Validate API key against database
-        # For now, accept any non-empty API key for testing
-        if len(api_key) < 10:
-            return jsonify({'error': 'Invalid API key'}), 401
+        # Check platform API key from environment
+        import os
+        platform_key = os.getenv('LEMMA_API_KEY') or os.getenv('LEMMA_PLATFORM_API_KEY')
+        if platform_key and api_key == platform_key:
+            g.api_key = api_key
+            g.api_key_info = {'valid': True, 'type': 'platform'}
+            return f(*args, **kwargs)
         
-        g.api_key = api_key
-        return f(*args, **kwargs)
+        # Validate against customer database
+        try:
+            from api.customer_accounts import customer_manager
+            validation_result = customer_manager.validate_api_key(api_key)
+            
+            if validation_result.get('valid'):
+                g.api_key = api_key
+                g.api_key_info = validation_result
+                return f(*args, **kwargs)
+            else:
+                return jsonify({
+                    'error': 'Invalid API key',
+                    'message': validation_result.get('error', 'API key validation failed')
+                }), 401
+                
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).error(f"API key validation error: {e}")
+            return jsonify({'error': 'Unable to validate API key'}), 500
     
     return decorated_function
 

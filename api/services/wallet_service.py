@@ -634,12 +634,10 @@ def await_network_revocation(credential_id: str, reason: str) -> bool:
     try:
         from api.sdk_api import distribute_revocation_to_network
         
-        oprf_evaluation = f"oprf_{hashlib.sha256(credential_id.encode()).hexdigest()}"
-        bloom_hash = f"bloom_{hashlib.sha256((credential_id + 'bloom').encode()).hexdigest()}"
+        bloom_hash = hashlib.sha256(credential_id.encode()).hexdigest()
         
         return distribute_revocation_to_network(
             credential_id=credential_id,
-            oprf_evaluation=oprf_evaluation,
             bloom_hash=bloom_hash,
             reason=reason
         )

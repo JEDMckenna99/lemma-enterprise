@@ -66,7 +66,7 @@ def initialize_shield():
     Initialize the Lemma Shield with REAL optimized crypto engine
     
     This sets up the identity network integration with:
-    - Real Ed25519 + OPRF verification (8-15μs with caching)
+    - Real Ed25519 + Bloom filter verification (8-15μs with caching)
     - Identity package registration for isHuman claims  
     - Background wallet integration
     - Bot shield optimization with real security
@@ -85,7 +85,7 @@ def initialize_shield():
             
             logger.info("✅ REAL optimized crypto engine initialized")
             logger.info("✅ Performance: 8-15μs with caching, 31μs baseline")
-            logger.info("✅ Security: Real Ed25519 + OPRF + Bloom filter")
+            logger.info("✅ Security: Real Ed25519 + Bloom filter")
             
             return True
             
@@ -594,7 +594,7 @@ def check_credential():
 @lemma_shield_bp.route('/lemma/revoke-credential', methods=['POST'])
 def revoke_credential():
     """
-    REVOCATION FLOW: Network-wide lemma credential revocation using OPRF+Bloom filters
+    REVOCATION FLOW: Network-wide lemma credential revocation using Bloom filters
     """
     try:
         # Get credential ID from session or request
@@ -617,20 +617,20 @@ def revoke_credential():
                 from lemma_crypto import PyLemmaCore
                 rust_engine = PyLemmaCore()
                 
-                # Perform network-wide revocation using OPRF+Bloom
+                # Perform network-wide revocation using Bloom filter
                 revocation_result = rust_engine.revoke_credentials_network_wide([credential_id])
                 
                 logger.info(f"🌐 Network-wide lemma credential revoked: {credential_id[:8]}...")
                 logger.info(f"⚡ Revocation time: {revocation_result['total_time_ns']}ns")
-                logger.info(f"🔐 Privacy preserved with OPRF evaluation")
+                logger.info(f"🔐 Revocation added to Bloom filter")
                 
                 return jsonify({
                     'success': True,
                     'message': 'Credential revoked across entire federated network',
-                    'revocation_type': 'network_wide_oprf_bloom',
+                    'revocation_type': 'network_wide_bloom',
                     'credential_id': credential_id[:8] + '...',
                     'network_scope': 'federated_network',
-                    'oprf_time_ns': revocation_result.get('oprf_time_ns', 0),
+                    'hash_time_ns': revocation_result.get('hash_time_ns', 0),
                     'bloom_time_ns': revocation_result.get('bloom_update_time_ns', 0),
                     'privacy_preserved': True
                 })

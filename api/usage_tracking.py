@@ -114,7 +114,7 @@ def get_tier_for_mau(mau: int) -> Dict[str, any]:
                 'Up to 1,000 MAU',
                 'Unlimited sites',
                 'Email authentication',
-                'Ed25519 + OPRF crypto',
+                'Ed25519 + Bloom filter crypto',
                 '30-day audit logs',
                 'Community support'
             ]
@@ -152,7 +152,7 @@ def get_tier_for_mau(mau: int) -> Dict[str, any]:
                 'Everything in Starter',
                 '1-year audit logs',
                 'Priority support',
-                'OPRF privacy',
+                'Privacy-preserving verification',
                 '99.9% uptime SLA'
             ]
         }
