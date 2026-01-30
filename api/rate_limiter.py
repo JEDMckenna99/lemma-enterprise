@@ -354,6 +354,38 @@ def record_violation(ip_address: str, violation_type: str):
         logger.error(f"Failed to record violation: {e}")
 
 
+# Simple rate limit check (non-decorator)
+
+def check_rate_limit(key: str, max_requests: int, window_seconds: int) -> bool:
+    """
+    Simple rate limit check - returns True if under limit, False if exceeded
+    
+    Args:
+        key: Unique key for this rate limit (e.g., "recovery:192.168.1.1")
+        max_requests: Maximum requests allowed in window
+        window_seconds: Time window in seconds
+    
+    Returns:
+        True if request is allowed, False if rate limit exceeded
+    """
+    if not REDIS_AVAILABLE:
+        # Fail open if Redis unavailable
+        return True
+    
+    try:
+        rate_key = f'rate_check:{key}'
+        current = redis_client.incr(rate_key)
+        
+        if current == 1:
+            redis_client.expire(rate_key, window_seconds)
+        
+        return current <= max_requests
+        
+    except Exception as e:
+        logger.error(f"Rate limit check failed: {e}")
+        return True  # Fail open
+
+
 # Helper function to get rate limit stats
 
 def get_rate_limit_stats() -> dict:

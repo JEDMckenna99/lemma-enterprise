@@ -393,6 +393,14 @@ def create_app():
     except Exception as e:
         logger.error(f"❌ Failed to register Developer Self-Issue API: {e}")
     
+    # Account Recovery
+    try:
+        from api.account_recovery import account_recovery_bp
+        app.register_blueprint(account_recovery_bp)
+        logger.info("✅ Account Recovery API registered")
+    except Exception as e:
+        logger.error(f"❌ Failed to register Account Recovery API: {e}")
+    
     # Developer Platform API (sites, stats, API keys)
     try:
         from api.developer_api import developer_api_bp
@@ -850,6 +858,21 @@ def create_app():
     def developer_platform_legacy():
         """Redirect legacy platform to developer dashboard"""
         return redirect('/developer')
+    
+    # ================================================================================
+    # ACCOUNT RECOVERY ROUTES
+    # ================================================================================
+    
+    @app.route('/recover')
+    def recover_account_page():
+        """Account recovery - enter API key and site ID"""
+        return render_template('recover.html')
+    
+    @app.route('/recover/complete')
+    def recover_complete_page():
+        """Account recovery - complete with passkey registration"""
+        token = request.args.get('token', '')
+        return render_template('recover_complete.html', token=token)
     
     # ================================================================================
     # DEVELOPER PLATFORM ROUTES
