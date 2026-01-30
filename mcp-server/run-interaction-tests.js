@@ -9,7 +9,7 @@ import puppeteer from 'puppeteer';
 import fetch from 'node-fetch';
 
 const LEMMA_BASE_URL = 'https://lemma.id';
-const AGENT_TOKEN = 'lm_agent_gwN3-M7-Bf4Ubn1TZOB8fPGq2yGl1RRY0AgvZUjBnBI';
+const AGENT_TOKEN = 'lm_agent_0OHnZ9X9G7FXYzC7MzAMCWuFKkz04oK8FPJzlePyiWU';
 
 let browser = null;
 let page = null;

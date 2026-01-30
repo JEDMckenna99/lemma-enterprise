@@ -1,7 +1,7 @@
 {% extends "modern/layout.html" %}
 
-{% block title %}Lemma - Passwordless Auth That Verifies Locally | No Server Calls | FREE Beta{% endblock %}
-{% block description %}Email-based authentication with client-side verification. Credentials stored in user's browser, verified locally without server calls. Passwordless, privacy-first, session-free. FREE during beta.{% endblock %}
+{% block title %}Lemma.id - One Identity. Every Site. Your Privacy.{% endblock %}
+{% block description %}Wallet-based authentication that syncs across all your devices. Sign in once, access every site on the network. Each site sees only a unique pseudonym - your activity is unlinkable across sites.{% endblock %}
 
 {% block head %}
     {{ super() }}
@@ -123,13 +123,43 @@
 {% endblock %}
 
 {% block content %}
+<style>
+/* Mobile responsive adjustments for hero and steps */
+@media (max-width: 768px) {
+    .hero h1 { font-size: 2rem !important; }
+    .hero h1 br { display: none; }
+    #how-it-works > div > div:nth-child(2) {
+        grid-template-columns: 1fr !important;
+        gap: 8px !important;
+    }
+    #how-it-works > div > div:nth-child(2) > div {
+        padding: 20px 16px !important;
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        text-align: left !important;
+    }
+    #how-it-works > div > div:nth-child(2) > div > div:first-child {
+        margin: 0 !important;
+        flex-shrink: 0;
+        width: 40px !important;
+        height: 40px !important;
+        font-size: 18px !important;
+    }
+    #how-it-works > div > div:nth-child(2) > div h3 {
+        margin-bottom: 4px !important;
+    }
+}
+</style>
+
 <!-- Hero Section -->
 <section class="hero">
     <div class="container" style="position: relative; z-index: 1;">
         <div style="max-width: 800px; margin: 0 auto; text-align: center;">
-            <h1>Authentication Without the Middleman</h1>
-            <p style="font-size: var(--font-size-xl); font-weight: 600; margin-bottom: var(--space-6);">Credentials verified locally, in the browser. No server calls. No passwords. No tracking.</p>
-            <p>Email-based login that issues cryptographic credentials stored in your users' browsers. Verification happens client-side - your servers never touch auth traffic.</p>
+            <p style="font-size: var(--font-size-sm); font-weight: 600; text-transform: uppercase; letter-spacing: 2px; color: var(--primary); margin-bottom: 16px;">Privacy-First Identity</p>
+            <h1 style="font-size: clamp(2.5rem, 5vw, 3.5rem); line-height: 1.1; margin-bottom: 24px;">One Identity.<br>Every Site.<br>Your Privacy.</h1>
+            <p style="font-size: var(--font-size-xl); font-weight: 500; margin-bottom: var(--space-4); color: var(--gray-700);">Sign in with your device. Sync across all your devices. No passwords. No tracking.</p>
+            <p style="font-size: var(--font-size-base); color: var(--gray-600); max-width: 600px; margin: 0 auto;">Sites on the Lemma network see only a unique pseudonym for you - your activity is unlinkable across sites. You own your identity, not the platforms.</p>
             
             <!-- Dynamic card: changes based on user's lemma status -->
             <!-- Fixed min-height prevents CLS when state changes -->
@@ -142,15 +172,15 @@
                 </div>
                 
                 <!-- No lemma state (shown by default, hidden when lemma found) -->
-                <div id="status-no-lemma" style="display: none; background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%); padding: 28px 40px; border-radius: 12px; box-shadow: 0 8px 20px rgba(59, 130, 246, 0.3); max-width: 360px; margin: 0 auto; text-align: center; min-height: 120px;">
+                <div id="status-no-lemma" style="display: none; background: var(--gray-900); padding: 28px 40px; border-radius: 12px; box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2); max-width: 360px; margin: 0 auto; text-align: center; min-height: 120px;">
                     <p style="margin: 0 0 10px 0; font-size: var(--font-size-xl); color: var(--white); font-weight: 700;">
-                        Join the Beta
+                        Create Your Identity
                     </p>
-                    <p style="margin: 0; font-size: var(--font-size-sm); color: var(--white);">
-                        Free access during beta
+                    <p style="margin: 0; font-size: var(--font-size-sm); color: var(--gray-400);">
+                        One wallet. Works everywhere.
                     </p>
-                    <p style="margin: 10px 0 0 0; font-size: var(--font-size-xs); color: rgba(255,255,255,0.8);">
-                        Passwordless - Privacy-first - Works offline
+                    <p style="margin: 10px 0 0 0; font-size: var(--font-size-xs); color: var(--gray-500);">
+                        Free during beta
                     </p>
                 </div>
                 
@@ -183,15 +213,41 @@
                     <!-- Footer message -->
                     <div id="signin-details" style="opacity: 0; transform: translateY(10px); transition: all 0.3s ease-out 0.3s;">
                         <p style="margin: 16px 0 0 0; font-size: var(--font-size-xs); color: rgba(255,255,255,0.7);">
-                            Verified locally - no password, no server call
+                            Synced across all your devices
                         </p>
                     </div>
                 </div>
             </div>
             
             <div id="hero-buttons" style="margin-top: 48px; display: flex; gap: 16px; justify-content: center; flex-wrap: wrap;">
-                <a href="/login" class="btn btn-primary" id="hero-primary-btn">Join Beta</a>
+                <a href="/login" class="btn btn-primary" id="hero-primary-btn">Get Started</a>
                 <a href="#how-it-works" class="btn btn-secondary">Learn More</a>
+                <a href="/developer" class="btn btn-secondary">For Developers</a>
+            </div>
+            
+            <!-- Trust indicators -->
+            <div style="margin-top: 48px; display: flex; gap: 32px; justify-content: center; flex-wrap: wrap; color: var(--gray-500); font-size: var(--font-size-sm);">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                    </svg>
+                    <span>Passkey secured</span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                        <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                    </svg>
+                    <span>End-to-end encrypted</span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"/>
+                        <line x1="2" y1="12" x2="22" y2="12"/>
+                        <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+                    </svg>
+                    <span>Works everywhere</span>
+                </div>
             </div>
         </div>
     </div>
@@ -314,39 +370,59 @@
 <section class="section" id="how-it-works">
     <div class="container">
         <div style="text-align: center; margin-bottom: 64px;">
-            <h2>How Lemma Works</h2>
-            <p class="text-gray" style="max-width: 700px; margin: 16px auto 0;">Cryptographic credentials issued via email, stored in the browser, verified without server calls. No sessions. No passwords. No tracking.</p>
+            <h2>How It Works</h2>
+            <p class="text-gray" style="max-width: 700px; margin: 16px auto 0;">Your identity lives in your wallet, syncs across devices, and gives each site only what they need to know - nothing more.</p>
         </div>
         
+        <!-- Step-by-step flow -->
+        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; max-width: 900px; margin: 0 auto 64px; text-align: center;">
+            <div style="padding: 32px 24px;">
+                <div style="width: 56px; height: 56px; border-radius: 50%; background: var(--primary); color: white; font-size: 24px; font-weight: 700; display: flex; align-items: center; justify-content: center; margin: 0 auto 20px;">1</div>
+                <h3 style="font-size: var(--font-size-lg); margin-bottom: 8px;">Create Once</h3>
+                <p style="color: var(--gray-600); font-size: var(--font-size-sm);">Set up your wallet with a passkey. No password needed - your device is the key.</p>
+            </div>
+            <div style="padding: 32px 24px;">
+                <div style="width: 56px; height: 56px; border-radius: 50%; background: var(--primary); color: white; font-size: 24px; font-weight: 700; display: flex; align-items: center; justify-content: center; margin: 0 auto 20px;">2</div>
+                <h3 style="font-size: var(--font-size-lg); margin-bottom: 8px;">Sync Everywhere</h3>
+                <p style="color: var(--gray-600); font-size: var(--font-size-sm);">Link any device. Your wallet syncs automatically - phone, laptop, tablet.</p>
+            </div>
+            <div style="padding: 32px 24px;">
+                <div style="width: 56px; height: 56px; border-radius: 50%; background: var(--primary); color: white; font-size: 24px; font-weight: 700; display: flex; align-items: center; justify-content: center; margin: 0 auto 20px;">3</div>
+                <h3 style="font-size: var(--font-size-lg); margin-bottom: 8px;">Sign In Anywhere</h3>
+                <p style="color: var(--gray-600); font-size: var(--font-size-sm);">One tap on any network site. Each sees a unique pseudonym - unlinkable.</p>
+            </div>
+        </div>
+        
+        <!-- Feature cards -->
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 32px;">
             <div class="card">
-                <h3 class="card-title">Privacy by Design</h3>
-                <p>Credentials encrypted in user's browser. Zero tracking. Zero data collection. Local verification means your users' activity stays private.</p>
+                <h3 class="card-title">Privacy-Preserving Login</h3>
+                <p>Each site sees a unique identifier for you (PPID). Sites cannot track you across the network or share your data with each other.</p>
             </div>
             
             <div class="card">
-                <h3 class="card-title">Zero Server Calls</h3>
-                <p>Authentication happens in the browser. No API latency. No session lookups. Ed25519 signature verification in sub-milliseconds.</p>
+                <h3 class="card-title">Cross-Device Sync</h3>
+                <p>Wallet data encrypted end-to-end and synced across all your devices. Lost your phone? Sign in on any linked device.</p>
             </div>
             
             <div class="card">
-                <h3 class="card-title">Passwordless</h3>
-                <p>Email confirmation creates cryptographic credential. No passwords to remember, reset, or leak. Auto-sign-in when valid.</p>
+                <h3 class="card-title">Passkey Security</h3>
+                <p>Biometric or device-based authentication. No passwords to remember, phish, or breach. Hardware-backed security.</p>
             </div>
             
             <div class="card">
-                <h3 class="card-title">Easy Integration</h3>
-                <p>Works alongside existing auth. SDK integration in 5 minutes. Enhance login without replacing your current system.</p>
+                <h3 class="card-title">Network Effect</h3>
+                <p>One identity works across all sites on the Lemma network. More sites join, more value for you - without more logins.</p>
             </div>
             
             <div class="card">
-                <h3 class="card-title">Built-In Bot Resistance</h3>
-                <p>Cryptographic nonces prevent replay attacks. No reCAPTCHA needed. Bots cannot reuse stolen credentials.</p>
+                <h3 class="card-title">Permission Control</h3>
+                <p>Grant and revoke access per site. See exactly what each site can access. You're in control, not them.</p>
             </div>
             
             <div class="card">
-                <h3 class="card-title">Session-Free</h3>
-                <p>Zero server sessions. Verification on user's device. Infinite scalability. No tracking.</p>
+                <h3 class="card-title">Instant Verification</h3>
+                <p>Credentials verified locally in your browser. No server calls, no latency. Works offline once signed in.</p>
             </div>
         </div>
     </div>
