@@ -422,23 +422,19 @@ def complete_recovery():
         site_id = token_data['site_id']
         admin_email = token_data['admin_email']
         
-        # If credential provided, register it as new passkey
-        if credential:
-            try:
-                from api.passkey_auth import store_passkey_credential
-                
-                # Store the new passkey credential for this user
-                store_passkey_credential(
-                    user_email=admin_email,
-                    site_id='lemma.id',  # This is for lemma.id platform auth
-                    credential_data=credential
-                )
-                
-                logger.info(f"Recovery complete - new passkey registered for {admin_email[:3]}*** (site: {site_id})")
-                
-            except Exception as e:
-                logger.error(f"Failed to store passkey during recovery: {e}")
-                return jsonify({'success': False, 'error': 'Failed to register passkey'}), 500
+        # For passkey registration during recovery, we redirect to proper flow
+        # The passkey_registered flag indicates the frontend should handle this
+        # since WebAuthn requires proper challenge/response
+        
+        # Store recovery context in session for passkey registration
+        from flask import session as flask_session
+        flask_session['recovery_complete'] = True
+        flask_session['recovery_site_id'] = site_id
+        flask_session['recovery_email'] = admin_email
+        flask_session['customer_id'] = admin_email  # For passkey registration
+        flask_session['customer_email'] = admin_email
+        
+        logger.info(f"Recovery complete - session restored for {admin_email[:3]}*** (site: {site_id})")
         
         # Log recovery completion
         logger.info(f"Account recovery completed for site {site_id}")

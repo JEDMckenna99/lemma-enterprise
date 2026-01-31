@@ -351,12 +351,9 @@
                         return true;
                     }
                     
-                    // Also try checkSession for a more thorough check
-                    const sessionResult = await wallet.checkSession();
-                    console.log('[Recovery] Session check result:', sessionResult);
-                    
-                    if (sessionResult.authenticated) {
-                        console.log('[Recovery] Wallet session authenticated');
+                    // Check if wallet has credentials stored
+                    if (wallet.session && wallet.session.isUnlocked) {
+                        console.log('[Recovery] Wallet session is unlocked');
                         return true;
                     }
                 }
@@ -457,37 +454,58 @@
                     throw new Error('Passkeys are not supported in this browser.');
                 }
                 
-                // Generate challenge
-                const challenge = new Uint8Array(32);
-                crypto.getRandomValues(challenge);
+                // Step 1: First complete recovery to establish session
+                const recoveryResponse = await fetch('/api/recovery/complete', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify({ token: token })
+                });
                 
-                // Create credential
+                const recoveryData = await recoveryResponse.json();
+                if (!recoveryData.success) {
+                    throw new Error(recoveryData.error || 'Recovery failed');
+                }
+                
+                // Step 2: Get passkey registration options from server (includes challenge)
+                const beginResponse = await fetch('/api/passkey/register/begin', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify({
+                        user_email: siteData.email,
+                        device_name: 'Recovery Passkey'
+                    })
+                });
+                
+                const beginData = await beginResponse.json();
+                if (!beginData.success) {
+                    throw new Error(beginData.error || 'Failed to start passkey registration');
+                }
+                
+                // Step 3: Create credential with server-provided options
+                const options = beginData.options;
+                
+                // Decode base64url challenge
+                const challenge = Uint8Array.from(atob(options.challenge.replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0));
+                const userId = Uint8Array.from(atob(options.user.id.replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0));
+                
                 const credential = await navigator.credentials.create({
                     publicKey: {
                         challenge: challenge,
-                        rp: {
-                            name: 'Lemma.id',
-                            id: window.location.hostname
-                        },
+                        rp: options.rp,
                         user: {
-                            id: new TextEncoder().encode(siteData.email),
-                            name: siteData.email,
-                            displayName: 'Lemma Developer Account'
+                            id: userId,
+                            name: options.user.name,
+                            displayName: options.user.displayName
                         },
-                        pubKeyCredParams: [
-                            { alg: -7, type: 'public-key' },   // ES256
-                            { alg: -257, type: 'public-key' }  // RS256
-                        ],
-                        authenticatorSelection: {
-                            authenticatorAttachment: 'platform',
-                            userVerification: 'preferred',
-                            residentKey: 'preferred'
-                        },
-                        timeout: 60000
+                        pubKeyCredParams: options.pubKeyCredParams,
+                        authenticatorSelection: options.authenticatorSelection,
+                        timeout: options.timeout || 60000
                     }
                 });
                 
-                // Encode credential for sending
+                // Step 4: Send credential to server for verification
                 const credentialData = {
                     id: credential.id,
                     rawId: btoa(String.fromCharCode(...new Uint8Array(credential.rawId))),
@@ -498,23 +516,23 @@
                     }
                 };
                 
-                // Complete recovery
-                const response = await fetch('/api/recovery/complete', {
+                const completeResponse = await fetch('/api/passkey/register/complete', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
                     body: JSON.stringify({
-                        token: token,
+                        user_id: siteData.email,
                         credential: credentialData
                     })
                 });
                 
-                const data = await response.json();
+                const completeData = await completeResponse.json();
                 
-                if (data.success) {
+                if (completeData.success) {
                     passkeyState.style.display = 'none';
                     successState.style.display = 'block';
                 } else {
-                    throw new Error(data.error || 'Failed to complete recovery.');
+                    throw new Error(completeData.error || 'Failed to complete passkey registration.');
                 }
                 
             } catch (err) {
