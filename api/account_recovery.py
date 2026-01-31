@@ -6,6 +6,8 @@ Allows developers to recover access using their API key + site_id
 import logging
 import secrets
 import hashlib
+import json
+import os
 from datetime import datetime, timezone, timedelta
 from flask import Blueprint, request, jsonify, render_template, redirect, url_for
 from flask_cors import cross_origin
@@ -14,17 +16,95 @@ logger = logging.getLogger(__name__)
 
 account_recovery_bp = Blueprint('account_recovery', __name__)
 
-# In-memory store for recovery tokens (in production, use Redis or database)
-# Format: {token_hash: {site_id, admin_email, expires_at, used}}
-recovery_tokens = {}
+# Redis client for distributed token storage
+redis_client = None
+try:
+    import redis
+    REDIS_URL = os.getenv('REDIS_URL')
+    if REDIS_URL:
+        redis_client = redis.from_url(
+            REDIS_URL,
+            decode_responses=True,
+            ssl_cert_reqs=None
+        )
+        redis_client.ping()
+        logger.info("✅ Redis recovery token storage initialized")
+    else:
+        logger.warning("⚠️ REDIS_URL not set - using in-memory fallback")
+except Exception as e:
+    logger.warning(f"⚠️ Redis connection failed for recovery: {e}")
+
+# In-memory fallback (for local dev only)
+recovery_tokens_memory = {}
+
+RECOVERY_TOKEN_PREFIX = "lemma:recovery:"
+RECOVERY_TOKEN_TTL = 900  # 15 minutes in seconds
+
+
+def store_recovery_token(token_hash: str, data: dict):
+    """Store recovery token in Redis (or memory fallback)"""
+    if redis_client:
+        try:
+            redis_client.setex(
+                f"{RECOVERY_TOKEN_PREFIX}{token_hash}",
+                RECOVERY_TOKEN_TTL,
+                json.dumps(data, default=str)
+            )
+            return True
+        except Exception as e:
+            logger.error(f"Redis store failed: {e}")
+    
+    # Memory fallback
+    recovery_tokens_memory[token_hash] = data
+    return True
+
+
+def get_recovery_token(token_hash: str) -> dict:
+    """Get recovery token from Redis (or memory fallback)"""
+    if redis_client:
+        try:
+            data = redis_client.get(f"{RECOVERY_TOKEN_PREFIX}{token_hash}")
+            if data:
+                token_data = json.loads(data)
+                # Parse datetime string back to datetime
+                if isinstance(token_data.get('expires_at'), str):
+                    token_data['expires_at'] = datetime.fromisoformat(token_data['expires_at'].replace('Z', '+00:00'))
+                return token_data
+        except Exception as e:
+            logger.error(f"Redis get failed: {e}")
+    
+    # Memory fallback
+    return recovery_tokens_memory.get(token_hash)
+
+
+def mark_token_used(token_hash: str):
+    """Mark token as used in Redis (or memory fallback)"""
+    token_data = get_recovery_token(token_hash)
+    if token_data:
+        token_data['used'] = True
+        if redis_client:
+            try:
+                # Get remaining TTL
+                ttl = redis_client.ttl(f"{RECOVERY_TOKEN_PREFIX}{token_hash}")
+                if ttl > 0:
+                    redis_client.setex(
+                        f"{RECOVERY_TOKEN_PREFIX}{token_hash}",
+                        ttl,
+                        json.dumps(token_data, default=str)
+                    )
+            except Exception as e:
+                logger.error(f"Redis mark used failed: {e}")
+        else:
+            recovery_tokens_memory[token_hash] = token_data
 
 
 def clean_expired_tokens():
-    """Remove expired tokens"""
-    now = datetime.now(timezone.utc)
-    expired = [k for k, v in recovery_tokens.items() if v['expires_at'] < now]
-    for k in expired:
-        del recovery_tokens[k]
+    """Remove expired tokens (only needed for memory fallback)"""
+    if not redis_client:
+        now = datetime.now(timezone.utc)
+        expired = [k for k, v in recovery_tokens_memory.items() if v['expires_at'] < now]
+        for k in expired:
+            del recovery_tokens_memory[k]
 
 
 @account_recovery_bp.route('/api/recovery/initiate', methods=['POST'])
@@ -162,17 +242,17 @@ def initiate_recovery():
             token = secrets.token_urlsafe(32)
             token_hash = hashlib.sha256(token.encode()).hexdigest()
             
-            # Clean up old tokens
+            # Clean up old tokens (memory fallback only)
             clean_expired_tokens()
             
-            # Store token (expires in 15 minutes)
-            recovery_tokens[token_hash] = {
+            # Store token in Redis (expires in 15 minutes)
+            store_recovery_token(token_hash, {
                 'site_id': site_id,
                 'admin_email': admin_email,
                 'expires_at': datetime.now(timezone.utc) + timedelta(minutes=15),
                 'used': False,
                 'created_ip': client_ip
-            }
+            })
             
             # Send recovery email
             recovery_url = f"https://lemma.id/recover/complete?token={token}"
@@ -270,22 +350,28 @@ def validate_recovery_token():
         
         token_hash = hashlib.sha256(token.encode()).hexdigest()
         
-        clean_expired_tokens()
-        
-        token_data = recovery_tokens.get(token_hash)
+        # Get token from Redis (or memory fallback)
+        token_data = get_recovery_token(token_hash)
         
         if not token_data:
+            logger.warning(f"Recovery token not found: {token_hash[:12]}...")
             return jsonify({'success': False, 'error': 'Invalid or expired token'}), 400
         
-        if token_data['used']:
+        if token_data.get('used'):
             return jsonify({'success': False, 'error': 'Token already used'}), 400
         
-        if token_data['expires_at'] < datetime.now(timezone.utc):
+        expires_at = token_data['expires_at']
+        if isinstance(expires_at, str):
+            expires_at = datetime.fromisoformat(expires_at.replace('Z', '+00:00'))
+        
+        if expires_at < datetime.now(timezone.utc):
             return jsonify({'success': False, 'error': 'Token expired'}), 400
         
         # Return site info (masked email)
         email = token_data['admin_email']
         masked_email = email[:3] + '***' + email[email.index('@'):] if '@' in email else '***'
+        
+        logger.info(f"Recovery token validated for site {token_data['site_id']}")
         
         return jsonify({
             'success': True,
@@ -314,21 +400,24 @@ def complete_recovery():
         
         token_hash = hashlib.sha256(token.encode()).hexdigest()
         
-        clean_expired_tokens()
-        
-        token_data = recovery_tokens.get(token_hash)
+        # Get token from Redis
+        token_data = get_recovery_token(token_hash)
         
         if not token_data:
             return jsonify({'success': False, 'error': 'Invalid or expired token'}), 400
         
-        if token_data['used']:
+        if token_data.get('used'):
             return jsonify({'success': False, 'error': 'Token already used'}), 400
         
-        if token_data['expires_at'] < datetime.now(timezone.utc):
+        expires_at = token_data['expires_at']
+        if isinstance(expires_at, str):
+            expires_at = datetime.fromisoformat(expires_at.replace('Z', '+00:00'))
+        
+        if expires_at < datetime.now(timezone.utc):
             return jsonify({'success': False, 'error': 'Token expired'}), 400
         
-        # Mark token as used
-        recovery_tokens[token_hash]['used'] = True
+        # Mark token as used in Redis
+        mark_token_used(token_hash)
         
         site_id = token_data['site_id']
         admin_email = token_data['admin_email']
@@ -397,21 +486,24 @@ def complete_recovery_wallet():
         
         token_hash = hashlib.sha256(token.encode()).hexdigest()
         
-        clean_expired_tokens()
-        
-        token_data = recovery_tokens.get(token_hash)
+        # Get token from Redis
+        token_data = get_recovery_token(token_hash)
         
         if not token_data:
             return jsonify({'success': False, 'error': 'Invalid or expired token'}), 400
         
-        if token_data['used']:
+        if token_data.get('used'):
             return jsonify({'success': False, 'error': 'Token already used'}), 400
         
-        if token_data['expires_at'] < datetime.now(timezone.utc):
+        expires_at = token_data['expires_at']
+        if isinstance(expires_at, str):
+            expires_at = datetime.fromisoformat(expires_at.replace('Z', '+00:00'))
+        
+        if expires_at < datetime.now(timezone.utc):
             return jsonify({'success': False, 'error': 'Token expired'}), 400
         
-        # Mark token as used
-        recovery_tokens[token_hash]['used'] = True
+        # Mark token as used in Redis
+        mark_token_used(token_hash)
         
         site_id = token_data['site_id']
         admin_email = token_data['admin_email']
