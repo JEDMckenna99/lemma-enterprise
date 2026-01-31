@@ -39,7 +39,7 @@ logger = logging.getLogger(__name__)
 
 # Import REAL working crypto engine
 try:
-    from lemma_crypto import PyOptimizedVerifier, PyMinimalIssuer, PyZKPVerifier
+    from lemma_crypto import PyOptimizedVerifier, PyMinimalIssuer
     RUST_ENGINE_AVAILABLE = True
     logger.info("✅ REAL optimized crypto engine imports successful")
 except ImportError as e:
