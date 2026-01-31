@@ -269,15 +269,15 @@
             <a href="#" class="secondary-btn" id="use-passkey-instead">Use passkey instead</a>
         </div>
         
-        <!-- Passkey Registration State -->
+        <!-- Passkey State - Sign in or Register -->
         <div id="passkey-state">
             <div class="status-icon loading">
                 <svg viewBox="0 0 24 24" fill="none" stroke="#667eea" stroke-width="2">
                     <path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"></path>
                 </svg>
             </div>
-            <h2 class="status-title">Register New Passkey</h2>
-            <p class="status-message">Create a new passkey to secure your account.</p>
+            <h2 class="status-title">Verify Your Identity</h2>
+            <p class="status-message">Use your existing passkey to restore access, or register a new one.</p>
             
             <div class="site-info">
                 <div class="site-info-row">
@@ -290,8 +290,12 @@
                 </div>
             </div>
             
-            <button class="action-btn" id="register-passkey-btn">
-                Register Passkey
+            <button class="action-btn" id="signin-passkey-btn" style="margin-bottom: 12px;">
+                Sign In with Existing Passkey
+            </button>
+            
+            <button class="action-btn" id="register-passkey-btn" style="background: var(--gray-600); margin-bottom: 12px;">
+                Register New Passkey
             </button>
             
             <a href="/recover" class="secondary-btn">Cancel recovery</a>
@@ -600,7 +604,108 @@
             }
         }
         
+        async function signInWithPasskey() {
+            const btn = document.getElementById('signin-passkey-btn');
+            btn.disabled = true;
+            btn.textContent = 'Signing in...';
+            
+            try {
+                // Step 1: Complete recovery to establish session context
+                const recoveryResponse = await fetch('/api/recovery/complete', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify({ token: token })
+                });
+                
+                const recoveryData = await recoveryResponse.json();
+                if (!recoveryData.success) {
+                    throw new Error(recoveryData.error || 'Recovery failed');
+                }
+                
+                // Step 2: Get authentication options from server
+                const authBeginResponse = await fetch('/api/passkey/authenticate/begin', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify({ user_email: siteData.email })
+                });
+                
+                const authBeginData = await authBeginResponse.json();
+                if (!authBeginData.success) {
+                    throw new Error(authBeginData.error || 'No existing passkey found. Please register a new one.');
+                }
+                
+                // Step 3: Get credential from browser
+                const options = authBeginData.options;
+                const challenge = Uint8Array.from(atob(options.challenge.replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0));
+                
+                const allowCredentials = (options.allowCredentials || []).map(cred => ({
+                    id: Uint8Array.from(atob(cred.id.replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0)),
+                    type: cred.type,
+                    transports: cred.transports
+                }));
+                
+                const credential = await navigator.credentials.get({
+                    publicKey: {
+                        challenge: challenge,
+                        rpId: options.rpId,
+                        allowCredentials: allowCredentials,
+                        userVerification: options.userVerification || 'preferred',
+                        timeout: options.timeout || 60000
+                    }
+                });
+                
+                // Step 4: Send credential to server for verification
+                const credentialData = {
+                    id: credential.id,
+                    rawId: btoa(String.fromCharCode(...new Uint8Array(credential.rawId))),
+                    type: credential.type,
+                    response: {
+                        clientDataJSON: btoa(String.fromCharCode(...new Uint8Array(credential.response.clientDataJSON))),
+                        authenticatorData: btoa(String.fromCharCode(...new Uint8Array(credential.response.authenticatorData))),
+                        signature: btoa(String.fromCharCode(...new Uint8Array(credential.response.signature))),
+                        userHandle: credential.response.userHandle ? btoa(String.fromCharCode(...new Uint8Array(credential.response.userHandle))) : null
+                    }
+                };
+                
+                const authCompleteResponse = await fetch('/api/passkey/authenticate/complete', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify({
+                        user_email: siteData.email,
+                        credential: credentialData
+                    })
+                });
+                
+                const authCompleteData = await authCompleteResponse.json();
+                
+                if (authCompleteData.success) {
+                    passkeyState.style.display = 'none';
+                    document.querySelector('#success-state .status-message').textContent = 
+                        'Successfully signed in with your passkey. Access restored.';
+                    successState.style.display = 'block';
+                } else {
+                    throw new Error(authCompleteData.error || 'Authentication failed');
+                }
+                
+            } catch (err) {
+                console.error('[Recovery] Sign-in error:', err);
+                
+                if (err.name === 'NotAllowedError') {
+                    alert('Sign-in was cancelled or timed out. Please try again.');
+                } else {
+                    alert(err.message || 'Failed to sign in. Try registering a new passkey.');
+                }
+                
+                btn.disabled = false;
+                btn.textContent = 'Sign In with Existing Passkey';
+            }
+        }
+        
         // Initialize
+        document.getElementById('signin-passkey-btn').addEventListener('click', signInWithPasskey);
         document.getElementById('register-passkey-btn').addEventListener('click', registerPasskey);
         document.getElementById('restore-wallet-btn').addEventListener('click', restoreToWallet);
         document.getElementById('use-passkey-instead').addEventListener('click', (e) => {
