@@ -364,3 +364,126 @@ def complete_recovery():
     except Exception as e:
         logger.error(f"Recovery completion failed: {e}")
         return jsonify({'success': False, 'error': 'Recovery failed'}), 500
+
+
+@account_recovery_bp.route('/api/recovery/complete-wallet', methods=['POST'])
+@cross_origin()
+def complete_recovery_wallet():
+    """
+    Complete account recovery by restoring to active wallet session
+    
+    This is used when the user's wallet is already unlocked via session sync,
+    allowing them to recover without registering a new passkey.
+    """
+    try:
+        from flask import session
+        
+        data = request.get_json() or {}
+        token = data.get('token', '').strip()
+        restore_method = data.get('restore_method', 'wallet_session')
+        
+        if not token:
+            return jsonify({'success': False, 'error': 'Token required'}), 400
+        
+        # Verify wallet session is active
+        wallet_id = session.get('wallet_id')
+        auth_method = session.get('auth_method')
+        
+        if not wallet_id:
+            return jsonify({
+                'success': False, 
+                'error': 'No active wallet session. Please use passkey recovery instead.'
+            }), 400
+        
+        token_hash = hashlib.sha256(token.encode()).hexdigest()
+        
+        clean_expired_tokens()
+        
+        token_data = recovery_tokens.get(token_hash)
+        
+        if not token_data:
+            return jsonify({'success': False, 'error': 'Invalid or expired token'}), 400
+        
+        if token_data['used']:
+            return jsonify({'success': False, 'error': 'Token already used'}), 400
+        
+        if token_data['expires_at'] < datetime.now(timezone.utc):
+            return jsonify({'success': False, 'error': 'Token expired'}), 400
+        
+        # Mark token as used
+        recovery_tokens[token_hash]['used'] = True
+        
+        site_id = token_data['site_id']
+        admin_email = token_data['admin_email']
+        
+        # Get existing developer credentials for this site
+        credentials_to_restore = []
+        
+        try:
+            from api.database import SessionLocal, Site
+            
+            db = SessionLocal()
+            try:
+                site = db.query(Site).filter(Site.site_id == site_id).first()
+                
+                if site:
+                    # Create a developer access credential
+                    from api.issuer_management import get_issuer_manager
+                    
+                    issuer_manager = get_issuer_manager()
+                    federated_issuer = issuer_manager.get_federated_issuer()
+                    
+                    # Generate developer access credential
+                    developer_claims = {
+                        "packageType": "developer_access",
+                        "role": "admin",
+                        "site_id": site_id,
+                        "recovered_at": str(int(datetime.now(timezone.utc).timestamp())),
+                        "recovery_method": restore_method
+                    }
+                    
+                    user_did = issuer_manager.generate_deterministic_user_did(admin_email)
+                    
+                    credential_json = federated_issuer.issue_credential(
+                        user_did,
+                        developer_claims
+                    )
+                    
+                    import json
+                    credential = json.loads(credential_json)
+                    
+                    # Normalize W3C credentialSubject to claims
+                    if 'credentialSubject' in credential and 'claims' not in credential:
+                        credential['claims'] = credential['credentialSubject']
+                    
+                    credentials_to_restore.append(credential)
+                    
+                    logger.info(f"Created developer access credential for wallet restore: {credential['id']}")
+                    
+            finally:
+                db.close()
+                
+        except Exception as e:
+            logger.error(f"Failed to create recovery credential: {e}")
+            # Continue without credential - session restore still works
+        
+        # Update session to grant developer access
+        session['customer_email'] = admin_email
+        session['recovered_site_id'] = site_id
+        session['recovery_complete'] = True
+        session['recovery_timestamp'] = datetime.now(timezone.utc).isoformat()
+        
+        logger.info(f"Wallet recovery complete for site {site_id} - restored to wallet {wallet_id}")
+        
+        return jsonify({
+            'success': True,
+            'message': 'Account restored to wallet successfully',
+            'site_id': site_id,
+            'wallet_id': wallet_id,
+            'credentials': credentials_to_restore,
+            'redirect': '/developer'
+        })
+        
+    except Exception as e:
+        logger.error(f"Wallet recovery failed: {e}")
+        return jsonify({'success': False, 'error': 'Wallet recovery failed'}), 500

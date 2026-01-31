@@ -164,8 +164,32 @@
         #loading-state,
         #error-state,
         #success-state,
-        #passkey-state {
+        #passkey-state,
+        #wallet-restore-state {
             display: none;
+        }
+        
+        .wallet-detected {
+            background: linear-gradient(135deg, rgba(16, 185, 129, 0.1), rgba(5, 150, 105, 0.1));
+            border: 1px solid rgba(16, 185, 129, 0.2);
+            border-radius: 10px;
+            padding: 16px;
+            margin-bottom: 24px;
+        }
+        
+        .wallet-detected-icon {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: #059669;
+            font-weight: 500;
+            margin-bottom: 8px;
+        }
+        
+        .wallet-detected-text {
+            color: #064e3b;
+            font-size: 14px;
+            line-height: 1.5;
         }
     </style>
 </head>
@@ -202,6 +226,47 @@
             <a href="/recover" class="action-btn" style="text-decoration: none; display: inline-block;">
                 Request New Link
             </a>
+        </div>
+        
+        <!-- Wallet Restore State (unlocked wallet detected) -->
+        <div id="wallet-restore-state">
+            <div class="status-icon loading" style="background: linear-gradient(135deg, rgba(16, 185, 129, 0.2), rgba(5, 150, 105, 0.2));">
+                <svg viewBox="0 0 24 24" fill="none" stroke="#059669" stroke-width="2">
+                    <rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect>
+                    <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path>
+                </svg>
+            </div>
+            <h2 class="status-title">Wallet Detected</h2>
+            <p class="status-message">Your wallet session is active. We can restore access directly.</p>
+            
+            <div class="wallet-detected">
+                <div class="wallet-detected-icon">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="20 6 9 17 4 12"></polyline>
+                    </svg>
+                    Wallet Session Synced
+                </div>
+                <div class="wallet-detected-text">
+                    Your credentials will be restored to your existing wallet without requiring a new passkey.
+                </div>
+            </div>
+            
+            <div class="site-info">
+                <div class="site-info-row">
+                    <span class="site-info-label">Site ID</span>
+                    <span class="site-info-value" id="wallet-site-id-display">-</span>
+                </div>
+                <div class="site-info-row">
+                    <span class="site-info-label">Admin Email</span>
+                    <span class="site-info-value" id="wallet-email-display">-</span>
+                </div>
+            </div>
+            
+            <button class="action-btn" id="restore-wallet-btn">
+                Restore to Wallet
+            </button>
+            
+            <a href="#" class="secondary-btn" id="use-passkey-instead">Use passkey instead</a>
         </div>
         
         <!-- Passkey Registration State -->
@@ -254,9 +319,46 @@
         const loadingState = document.getElementById('loading-state');
         const errorState = document.getElementById('error-state');
         const passkeyState = document.getElementById('passkey-state');
+        const walletRestoreState = document.getElementById('wallet-restore-state');
         const successState = document.getElementById('success-state');
         
         let siteData = null;
+        let walletUnlocked = false;
+        
+        // Check if wallet session is synced/unlocked
+        async function checkWalletSession() {
+            try {
+                // Check for wallet session via the existing wallet status API
+                const response = await fetch('/api/wallet/status', {
+                    method: 'GET',
+                    credentials: 'include'
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.authenticated === true) {
+                        return true;
+                    }
+                }
+            } catch (err) {
+                console.log('Wallet session check:', err.message);
+            }
+            
+            // Also check localStorage for wallet state
+            try {
+                const walletState = localStorage.getItem('lemma_wallet_state');
+                if (walletState) {
+                    const state = JSON.parse(walletState);
+                    if (state.unlocked && state.lastSync && (Date.now() - state.lastSync < 86400000)) {
+                        return true;
+                    }
+                }
+            } catch (err) {
+                console.log('Local wallet check:', err.message);
+            }
+            
+            return false;
+        }
         
         async function validateToken() {
             loadingState.style.display = 'block';
@@ -267,21 +369,34 @@
             }
             
             try {
-                const response = await fetch('/api/recovery/validate', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ token })
-                });
+                // Check wallet status in parallel with token validation
+                const [walletStatus, tokenResponse] = await Promise.all([
+                    checkWalletSession(),
+                    fetch('/api/recovery/validate', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ token })
+                    })
+                ]);
                 
-                const data = await response.json();
+                walletUnlocked = walletStatus;
+                const data = await tokenResponse.json();
                 
                 if (data.success) {
                     siteData = data;
-                    document.getElementById('site-id-display').textContent = data.site_id;
-                    document.getElementById('email-display').textContent = data.email;
-                    
                     loadingState.style.display = 'none';
-                    passkeyState.style.display = 'block';
+                    
+                    if (walletUnlocked) {
+                        // Wallet is unlocked - offer direct restore
+                        document.getElementById('wallet-site-id-display').textContent = data.site_id;
+                        document.getElementById('wallet-email-display').textContent = data.email;
+                        walletRestoreState.style.display = 'block';
+                    } else {
+                        // No wallet session - require passkey
+                        document.getElementById('site-id-display').textContent = data.site_id;
+                        document.getElementById('email-display').textContent = data.email;
+                        passkeyState.style.display = 'block';
+                    }
                 } else {
                     showError(data.error || 'Invalid or expired token.');
                 }
@@ -295,8 +410,16 @@
         function showError(message) {
             loadingState.style.display = 'none';
             passkeyState.style.display = 'none';
+            walletRestoreState.style.display = 'none';
             document.getElementById('error-message').textContent = message;
             errorState.style.display = 'block';
+        }
+        
+        function switchToPasskey() {
+            walletRestoreState.style.display = 'none';
+            document.getElementById('site-id-display').textContent = siteData.site_id;
+            document.getElementById('email-display').textContent = siteData.email;
+            passkeyState.style.display = 'block';
         }
         
         async function registerPasskey() {
@@ -384,8 +507,66 @@
             }
         }
         
+        async function restoreToWallet() {
+            const btn = document.getElementById('restore-wallet-btn');
+            btn.disabled = true;
+            btn.textContent = 'Restoring...';
+            
+            try {
+                // Complete recovery via wallet restore (no passkey needed)
+                const response = await fetch('/api/recovery/complete-wallet', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify({
+                        token: token,
+                        restore_method: 'wallet_session'
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    // Store credentials in local wallet
+                    if (data.credentials) {
+                        try {
+                            const existingCreds = JSON.parse(localStorage.getItem('lemma_credentials') || '[]');
+                            const newCreds = [...existingCreds, ...data.credentials];
+                            localStorage.setItem('lemma_credentials', JSON.stringify(newCreds));
+                            
+                            // Update wallet state
+                            const walletState = JSON.parse(localStorage.getItem('lemma_wallet_state') || '{}');
+                            walletState.lastSync = Date.now();
+                            walletState.credentialCount = newCreds.length;
+                            localStorage.setItem('lemma_wallet_state', JSON.stringify(walletState));
+                        } catch (e) {
+                            console.warn('Could not update local wallet:', e);
+                        }
+                    }
+                    
+                    walletRestoreState.style.display = 'none';
+                    document.querySelector('#success-state .status-message').textContent = 
+                        'Your credentials have been restored to your wallet.';
+                    successState.style.display = 'block';
+                } else {
+                    throw new Error(data.error || 'Failed to restore to wallet.');
+                }
+                
+            } catch (err) {
+                console.error('Wallet restore error:', err);
+                alert(err.message || 'Failed to restore to wallet. Try using passkey instead.');
+                btn.disabled = false;
+                btn.textContent = 'Restore to Wallet';
+            }
+        }
+        
         // Initialize
         document.getElementById('register-passkey-btn').addEventListener('click', registerPasskey);
+        document.getElementById('restore-wallet-btn').addEventListener('click', restoreToWallet);
+        document.getElementById('use-passkey-instead').addEventListener('click', (e) => {
+            e.preventDefault();
+            switchToPasskey();
+        });
         validateToken();
     </script>
 </body>
