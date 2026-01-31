@@ -313,6 +313,9 @@
         </div>
     </div>
     
+    <!-- Load Lemma Wallet SDK -->
+    <script src="/static/js/lemma-wallet.js" nonce="{{ csp_nonce }}"></script>
+    
     <script nonce="{{ csp_nonce }}">
         const token = '{{ token }}';
         
@@ -324,11 +327,45 @@
         
         let siteData = null;
         let walletUnlocked = false;
+        let wallet = null;
         
-        // Check if wallet session is synced/unlocked
+        // Check if wallet session is synced/unlocked using the SDK
         async function checkWalletSession() {
             try {
-                // Check for wallet session via the existing wallet status API
+                // Initialize the Lemma Wallet SDK
+                if (typeof LemmaWallet !== 'undefined') {
+                    wallet = new LemmaWallet({ 
+                        siteId: 'lemma.id',
+                        debug: false
+                    });
+                    
+                    // Initialize and check auth state
+                    await wallet.init();
+                    
+                    // Check if wallet is unlocked
+                    const authState = await wallet.getAuthState();
+                    console.log('[Recovery] Wallet auth state:', authState);
+                    
+                    if (authState.isUnlocked) {
+                        console.log('[Recovery] Wallet is unlocked via SDK');
+                        return true;
+                    }
+                    
+                    // Also try checkSession for a more thorough check
+                    const sessionResult = await wallet.checkSession();
+                    console.log('[Recovery] Session check result:', sessionResult);
+                    
+                    if (sessionResult.authenticated) {
+                        console.log('[Recovery] Wallet session authenticated');
+                        return true;
+                    }
+                }
+            } catch (err) {
+                console.log('[Recovery] Wallet SDK check error:', err.message);
+            }
+            
+            // Fallback: Check server-side session
+            try {
                 const response = await fetch('/api/wallet/status', {
                     method: 'GET',
                     credentials: 'include'
@@ -341,20 +378,7 @@
                     }
                 }
             } catch (err) {
-                console.log('Wallet session check:', err.message);
-            }
-            
-            // Also check localStorage for wallet state
-            try {
-                const walletState = localStorage.getItem('lemma_wallet_state');
-                if (walletState) {
-                    const state = JSON.parse(walletState);
-                    if (state.unlocked && state.lastSync && (Date.now() - state.lastSync < 86400000)) {
-                        return true;
-                    }
-                }
-            } catch (err) {
-                console.log('Local wallet check:', err.message);
+                console.log('[Recovery] Server wallet check:', err.message);
             }
             
             return false;
@@ -527,20 +551,18 @@
                 const data = await response.json();
                 
                 if (data.success) {
-                    // Store credentials in local wallet
-                    if (data.credentials) {
+                    // Store credentials using the SDK if available
+                    if (data.credentials && data.credentials.length > 0 && wallet) {
                         try {
-                            const existingCreds = JSON.parse(localStorage.getItem('lemma_credentials') || '[]');
-                            const newCreds = [...existingCreds, ...data.credentials];
-                            localStorage.setItem('lemma_credentials', JSON.stringify(newCreds));
-                            
-                            // Update wallet state
-                            const walletState = JSON.parse(localStorage.getItem('lemma_wallet_state') || '{}');
-                            walletState.lastSync = Date.now();
-                            walletState.credentialCount = newCreds.length;
-                            localStorage.setItem('lemma_wallet_state', JSON.stringify(walletState));
+                            for (const credential of data.credentials) {
+                                // Use SDK to store credential properly
+                                if (wallet.storeCredential) {
+                                    await wallet.storeCredential(credential);
+                                    console.log('[Recovery] Credential stored via SDK:', credential.id);
+                                }
+                            }
                         } catch (e) {
-                            console.warn('Could not update local wallet:', e);
+                            console.warn('[Recovery] SDK credential store failed:', e);
                         }
                     }
                     
@@ -553,7 +575,7 @@
                 }
                 
             } catch (err) {
-                console.error('Wallet restore error:', err);
+                console.error('[Recovery] Wallet restore error:', err);
                 alert(err.message || 'Failed to restore to wallet. Try using passkey instead.');
                 btn.disabled = false;
                 btn.textContent = 'Restore to Wallet';
