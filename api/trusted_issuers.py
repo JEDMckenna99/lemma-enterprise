@@ -166,11 +166,11 @@ def verify_credential_with_trust(credential: dict) -> dict:
             verifier = PyOptimizedVerifier()
             
             cred_json = json.dumps(credential) if isinstance(credential, dict) else credential
-            crypto_result = verifier.verify_credential(cred_json)
+            signature_valid = verifier.verify_credential_json(cred_json)  # Returns boolean
             
-            result['signature_valid'] = crypto_result.verified
+            result['signature_valid'] = signature_valid
             
-            if not crypto_result.verified:
+            if not signature_valid:
                 result['reason'] = 'invalid_signature'
                 return result
                 

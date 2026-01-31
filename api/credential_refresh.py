@@ -156,9 +156,7 @@ def verify_old_credential(credential: dict) -> bool:
         
         verifier = PyOptimizedVerifier()
         credential_json = json.dumps(credential)
-        result = verifier.verify_credential(credential_json)
-        
-        is_valid = result.verified if hasattr(result, 'verified') else result.get('verified', False)
+        is_valid = verifier.verify_credential_json(credential_json)  # Returns boolean
         
         if not is_valid:
             logger.warning("Old credential verification failed")

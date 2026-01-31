@@ -194,9 +194,9 @@ class RealIAMSubnetManager:
         start_time = time.perf_counter()
         
         try:
-            # Verify using Rust engine (Ed25519 + Bloom filter revocation)
+            # Verify using Rust engine (Ed25519 + Bloom filter revocation) - returns boolean
             credential_json = json.dumps(credential)
-            result = self.verifier.verify_credential(credential_json)
+            is_valid = self.verifier.verify_credential_json(credential_json)
             
             verification_time_us = (time.perf_counter() - start_time) * 1_000_000
             
@@ -208,8 +208,6 @@ class RealIAMSubnetManager:
             total = self.verification_stats['total_verifications']
             avg = self.verification_stats['avg_time_us']
             self.verification_stats['avg_time_us'] = (avg * (total - 1) + verification_time_us) / total
-            
-            is_valid = result.verified if hasattr(result, 'verified') else result.get('verified', False)
             
             return is_valid, verification_time_us
             

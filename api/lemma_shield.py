@@ -118,7 +118,7 @@ def test_performance():
         
         # Perform test verification with high-precision timing
         start_time = time.perf_counter_ns()
-        result = rust_engine.verify_credential(json.dumps(test_credential))
+        result = rust_engine.verify_credential_json(json.dumps(test_credential))
         end_time = time.perf_counter_ns()
         
         verification_time_us = (end_time - start_time) / 1000  # Convert nanoseconds to microseconds
@@ -257,7 +257,7 @@ def has_valid_lemma_credential(user_id: str = None) -> Dict[str, Any]:
                     
                     # Measure ONLY the Rust engine verification time with high precision
                     rust_start_time = time.perf_counter_ns()
-                    result = rust_engine.verify_credential(credential_json)
+                    verified = rust_engine.verify_credential_json(credential_json)  # Returns boolean
                     rust_end_time = time.perf_counter_ns()
                     rust_engine_used = True
                     
@@ -265,7 +265,7 @@ def has_valid_lemma_credential(user_id: str = None) -> Dict[str, Any]:
                     rust_verification_time_us = (rust_end_time - rust_start_time) / 1000
                     total_function_time = time.time_ns() - start_time
                     
-                    if result.verified:
+                    if verified:
                         logger.info(f"✅ Background wallet: Found valid isHuman credential - {rust_verification_time_us:.1f}µs (Rust engine) | Total: {total_function_time/1000000:.1f}ms")
                         
                         return {
@@ -277,7 +277,7 @@ def has_valid_lemma_credential(user_id: str = None) -> Dict[str, Any]:
                             'total_function_time_ns': total_function_time,
                             'background_wallet_hit': True,
                             'rust_engine_used': True,
-                            'confidence': result.confidence if hasattr(result, 'confidence') else 0.95,
+                            'confidence': 1.0,
                             'offline': True,
                             'claims_verified': {
                                 'isHuman': claims.get('isHuman', False),
@@ -808,13 +808,13 @@ def test_integration():
         if RUST_ENGINE_AVAILABLE and rust_engine and 'credential_creation' in test_results['tests'] and test_results['tests']['credential_creation']['passed']:
             try:
                 start_time = time.time_ns()
-                result = rust_engine.verify_credential(json.dumps(test_credential))
+                verified = rust_engine.verify_credential_json(json.dumps(test_credential))  # Returns boolean
                 end_time = time.time_ns()
                 
                 verification_time_us = (end_time - start_time) / 1000
                 
                 test_results['tests']['rust_engine_verification'] = {
-                    'passed': result.verified if hasattr(result, 'verified') else True,
+                    'passed': verified,
                     'verification_time_us': verification_time_us,
                     'performance_rating': 'excellent' if verification_time_us < 10 else ('good' if verification_time_us < 50 else 'acceptable'),
                     'target_met': verification_time_us < 50,  # Target: <50µs
