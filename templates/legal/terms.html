@@ -1,25 +1,27 @@
 {% extends "modern/layout.html" %}
 
-{% block title %}Terms of Service - lemma.id{% endblock %}
-{% block description %}Terms of Service for Lemma IAM - Identity and Access Management Platform{% endblock %}
+{% block title %}Terms of Service - Lemma.id{% endblock %}
+{% block description %}Terms of Service for Lemma.id - Cryptographic Credential Verification Platform{% endblock %}
 
 {% block content %}
 <div class="container" style="max-width: 900px; padding: 60px 20px;">
     <div style="background: var(--white); padding: 48px; border-radius: 12px; box-shadow: var(--shadow-lg);">
         <h1 style="color: var(--gray-900); margin-bottom: 8px;">Terms of Service</h1>
-        <p style="color: var(--gray-500); font-size: 14px; margin-bottom: 40px;">Last Updated: October 25, 2025</p>
+        <p style="color: var(--gray-500); font-size: 14px; margin-bottom: 40px;">Last Updated: January 31, 2026</p>
 
         <h2 style="margin-top: 40px;">1. Agreement to Terms</h2>
-        <p>By accessing or using Lemma IAM ("Service"), you agree to be bound by these Terms of Service ("Terms"). If you do not agree to these Terms, do not use the Service.</p>
+        <p>By accessing or using Lemma.id ("Service"), you agree to be bound by these Terms of Service ("Terms"). If you do not agree to these Terms, do not use the Service.</p>
 
         <h2>2. Description of Service</h2>
-        <p>Lemma IAM provides identity and access management services including:</p>
+        <p>Lemma.id provides cryptographic credential verification services including:</p>
         <ul style="margin-left: 20px; margin-bottom: 20px;">
-            <li>User authentication and authorization</li>
-            <li>Permission management (RBAC)</li>
-            <li>Cryptographic credential issuance and verification</li>
-            <li>Access control APIs for customer applications</li>
-            <li>Audit logging and compliance reporting</li>
+            <li><strong>Credential Issuance:</strong> Ed25519-signed digital lemmas for identity verification</li>
+            <li><strong>Local Verification:</strong> Sub-millisecond credential verification without API calls</li>
+            <li><strong>Revocation System:</strong> Privacy-preserving Bloom filter revocation lists</li>
+            <li><strong>Browser Wallet:</strong> Encrypted credential storage in user's browser</li>
+            <li><strong>Developer SDK:</strong> JavaScript SDK for credential verification integration</li>
+            <li><strong>Permission Management:</strong> Role-based access control (RBAC) with cryptographic proofs</li>
+            <li><strong>Audit Logging:</strong> Compliance reporting and security event tracking</li>
         </ul>
 
         <h2>3. Account Registration</h2>
@@ -43,24 +45,27 @@
         </ul>
 
         <h2>5. Pricing and Payment</h2>
-        <p><strong>Free Tier:</strong> Sites with fewer than 1,000 monthly active users may use the Service at no cost.</p>
+        <p><strong>Free Tier:</strong> First 1,000 monthly active users are free for 6 months (pilot program).</p>
         <p><strong>Paid Tiers:</strong></p>
         <ul style="margin-left: 20px; margin-bottom: 20px;">
-            <li>Starter (1K-5K MAU): $5/month</li>
-            <li>Growth (5K+ MAU): $0.023 per MAU (1/3 of Auth0 pricing)</li>
-            <li>Enterprise (100K+ MAU): Custom pricing</li>
+            <li><strong>Starter (1K-5K MAU):</strong> $5/month base + usage</li>
+            <li><strong>Growth (5K-50K MAU):</strong> $0.002 per MAU (95% cheaper than Auth0)</li>
+            <li><strong>Enterprise (50K+ MAU):</strong> Custom pricing with SLA</li>
         </ul>
         <p>Payment is processed through Stripe. You authorize us to charge your payment method for all applicable fees. If payment fails, we may suspend your account after 7 days.</p>
-        <p><strong>Automatic Upgrades:</strong> When your monthly active users exceed your current tier limit, you will be automatically upgraded to the appropriate tier and billed accordingly.</p>
+        <p><strong>Automatic Billing:</strong> Usage is tracked via monthly active users (MAU). When you exceed your tier, you will be billed for the difference automatically.</p>
+        <p><strong>Cost Savings:</strong> Because verification happens locally on your servers, you save on both our fees (no per-verification charges) and infrastructure costs (reduced latency, no external API calls).</p>
 
         <h2>6. Data and Privacy</h2>
         <p>We collect and process data as described in our <a href="/privacy" style="color: var(--primary);">Privacy Policy</a>. You retain ownership of your data. We use your data only to provide the Service.</p>
         <p>We implement industry-standard security measures including:</p>
         <ul style="margin-left: 20px; margin-bottom: 20px;">
-            <li>Ed25519 cryptographic signatures</li>
-            <li>OPRF privacy-preserving revocation</li>
-            <li>Encrypted credential storage</li>
-            <li>Audit logging of all security events</li>
+            <li><strong>Ed25519 Signatures:</strong> Cryptographic signatures for credential authenticity</li>
+            <li><strong>Bloom Filter Revocation:</strong> Privacy-preserving credential revocation</li>
+            <li><strong>Encrypted Browser Wallet:</strong> Client-side credential storage</li>
+            <li><strong>Passkey Authentication:</strong> WebAuthn/FIDO2 for developer accounts</li>
+            <li><strong>Zero-Knowledge Verification:</strong> Your servers verify locally without contacting us</li>
+            <li><strong>Audit Logging:</strong> Comprehensive security event tracking</li>
         </ul>
 
         <h2>7. Service Availability</h2>
