@@ -7,10 +7,10 @@
 <div class="container" style="max-width: 900px; padding: 60px 20px;">
     <div style="background: var(--white); padding: 48px; border-radius: 12px; box-shadow: var(--shadow-lg);">
         <h1 style="color: var(--gray-900); margin-bottom: 8px;">Privacy Policy</h1>
-        <p style="color: var(--gray-500); font-size: 14px; margin-bottom: 40px;">Last Updated: October 25, 2025</p>
+        <p style="color: var(--gray-500); font-size: 14px; margin-bottom: 40px;">Last Updated: January 31, 2026</p>
 
         <h2 style="margin-top: 40px;">1. Introduction</h2>
-        <p>Lemma IAM ("we," "our," or "us") is committed to protecting your privacy. This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use our identity and access management service.</p>
+        <p>Lemma.id ("we," "our," or "us") is committed to protecting your privacy. This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use our cryptographic credential verification service.</p>
 
         <h2>2. Information We Collect</h2>
         
@@ -31,9 +31,10 @@
 
         <h3 style="font-size: var(--font-size-lg); margin-top: 24px; color: var(--gray-800);">2.3 Cryptographic Data</h3>
         <ul style="margin-left: 20px; margin-bottom: 20px;">
-            <li><strong>Credentials:</strong> Stored in user's browser (we do not have access)</li>
-            <li><strong>Public Keys:</strong> Ed25519 public keys for verification</li>
-            <li><strong>Revocation Data:</strong> OPRF-blinded credential identifiers (privacy-preserving)</li>
+            <li><strong>Credentials:</strong> Stored in user's browser wallet (we do not have access to credential contents)</li>
+            <li><strong>Public Keys:</strong> Ed25519 public keys for verification (site-specific, stored on your servers)</li>
+            <li><strong>Revocation Data:</strong> Bloom filter hashes of credential IDs (cannot reveal original credentials)</li>
+            <li><strong>PPIDs:</strong> Pairwise Pseudonymous Identifiers unique per user per site (unlinkable across sites)</li>
         </ul>
 
         <h2>3. How We Use Your Information</h2>
@@ -49,11 +50,13 @@
         </ul>
 
         <h2>4. Privacy-Preserving Features</h2>
-        <p>Lemma IAM is designed with privacy as a core principle:</p>
+        <p>Lemma.id is designed with privacy as a core principle:</p>
         <ul style="margin-left: 20px; margin-bottom: 20px;">
-            <li><strong>OPRF Revocation:</strong> We cannot determine which credentials are being checked (privacy-preserving blind evaluation)</li>
-            <li><strong>Client-Side Verification:</strong> Credentials verified in user's browser, reducing server-side tracking</li>
-            <li><strong>Minimal Data Collection:</strong> We collect only what's necessary to provide the Service</li>
+            <li><strong>Local Verification:</strong> Credentials are verified locally using Ed25519 signatures in under 250 microseconds - no API calls to our servers</li>
+            <li><strong>Bloom Filter Revocation:</strong> Revocation lists use probabilistic Bloom filters that cannot reveal which specific credentials are revoked</li>
+            <li><strong>Pairwise Identifiers (PPIDs):</strong> Each user gets a unique identifier per site, making cross-site tracking impossible</li>
+            <li><strong>Client-Side Storage:</strong> Credentials stored in encrypted browser wallet - we never see or store your credential data</li>
+            <li><strong>Zero-Knowledge Architecture:</strong> Your server verifies credentials without contacting Lemma.id - we don't know when or where users authenticate</li>
             <li><strong>No Third-Party Tracking:</strong> We do not sell or share your data with advertisers</li>
         </ul>
 
@@ -74,10 +77,12 @@
         <h2>6. Data Security</h2>
         <p>We implement industry-standard security measures including:</p>
         <ul style="margin-left: 20px; margin-bottom: 20px;">
-            <li>Ed25519 cryptographic signatures</li>
-            <li>OPRF privacy-preserving revocation</li>
-            <li>Encrypted credential storage</li>
-            <li>Audit logging of all security events</li>
+            <li><strong>Ed25519 Signatures:</strong> Cryptographic signatures for credential verification (same algorithm used by SSH)</li>
+            <li><strong>Bloom Filter Revocation:</strong> Efficient, privacy-preserving revocation checking</li>
+            <li><strong>Encrypted Browser Wallet:</strong> Credentials encrypted at rest in user's browser</li>
+            <li><strong>Passkey Authentication:</strong> WebAuthn/FIDO2 passkeys for developer account security</li>
+            <li><strong>Rate Limiting:</strong> Protection against brute-force and abuse</li>
+            <li><strong>Audit Logging:</strong> Comprehensive logging of all security events</li>
         </ul>
 
         <h2>7. Data Retention</h2>
