@@ -588,6 +588,29 @@
                         }
                     }
                     
+                    // Set global wallet session for cross-device sync
+                    try {
+                        const walletState = await wallet?.getDebugState?.() || {};
+                        const walletId = walletState.walletId || data.user_id;
+                        
+                        if (walletId) {
+                            console.log('[Recovery] Setting global wallet session...');
+                            await fetch('/api/wallet/set-session', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                credentials: 'include',
+                                body: JSON.stringify({
+                                    wallet_id: walletId,
+                                    unlocked_at: Date.now(),
+                                    profile_id: 'default',
+                                    profile_name: 'Personal'
+                                })
+                            });
+                        }
+                    } catch (e) {
+                        console.warn('[Recovery] Failed to set global session:', e.message);
+                    }
+                    
                     walletRestoreState.style.display = 'none';
                     document.querySelector('#success-state .status-message').textContent = 
                         'Your credentials have been restored to your wallet.';
@@ -623,18 +646,21 @@
                     throw new Error(recoveryData.error || 'Recovery failed');
                 }
                 
-                // Step 2: Get authentication options from server
+                // Step 2: Get authentication options from server using user_id from recovery
                 const authBeginResponse = await fetch('/api/passkey/authenticate/begin', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     credentials: 'include',
-                    body: JSON.stringify({ user_email: siteData.email })
+                    body: JSON.stringify({ user_id: recoveryData.user_id })
                 });
                 
                 const authBeginData = await authBeginResponse.json();
                 if (!authBeginData.success) {
                     throw new Error(authBeginData.error || 'No existing passkey found. Please register a new one.');
                 }
+                
+                // Store challenge_key for complete step
+                const challengeKey = authBeginData.challenge_key;
                 
                 // Step 3: Get credential from browser
                 const options = authBeginData.options;
@@ -674,7 +700,7 @@
                     headers: { 'Content-Type': 'application/json' },
                     credentials: 'include',
                     body: JSON.stringify({
-                        user_email: siteData.email,
+                        challenge_key: challengeKey,
                         credential: credentialData
                     })
                 });
@@ -682,6 +708,41 @@
                 const authCompleteData = await authCompleteResponse.json();
                 
                 if (authCompleteData.success) {
+                    // Step 5: Set global wallet session for cross-device sync
+                    try {
+                        // Priority: auth response > recovery response > SDK local > user_id fallback
+                        let walletId = authCompleteData.wallet_id || recoveryData.wallet_id;
+                        
+                        if (!walletId && wallet) {
+                            // Try to get wallet_id from SDK's local storage
+                            const walletState = await wallet.getDebugState?.() || {};
+                            walletId = walletState.walletId;
+                        }
+                        
+                        walletId = walletId || authCompleteData.user_id;
+                        
+                        if (walletId) {
+                            console.log('[Recovery] Setting global wallet session for cross-device sync, wallet:', walletId?.substring(0, 12) + '...');
+                            const setSessionResponse = await fetch('/api/wallet/set-session', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                credentials: 'include',
+                                body: JSON.stringify({
+                                    wallet_id: walletId,
+                                    unlocked_at: Date.now(),
+                                    profile_id: 'default',
+                                    profile_name: 'Personal'
+                                })
+                            });
+                            
+                            const setSessionData = await setSessionResponse.json();
+                            console.log('[Recovery] Global session set:', setSessionData);
+                        }
+                    } catch (e) {
+                        console.warn('[Recovery] Failed to set global session:', e.message);
+                        // Continue anyway - local auth still succeeded
+                    }
+                    
                     passkeyState.style.display = 'none';
                     document.querySelector('#success-state .status-message').textContent = 
                         'Successfully signed in with your passkey. Access restored.';

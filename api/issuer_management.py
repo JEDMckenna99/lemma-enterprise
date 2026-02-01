@@ -3,6 +3,10 @@ Lemma Issuer Management
 Provides consistent issuers for proper crypto implementation
 
 ALL issuers use KMS-backed storage for FIPS 140-2 Level 2/3 compliance.
+
+SECURITY: This module enforces that ALL signing keys MUST be encrypted by AWS KMS.
+If KMS is unavailable, new key generation will FAIL rather than create unprotected keys.
+This ensures compliance with FIPS 140-2 Level 2/3 requirements.
 """
 
 import logging
@@ -10,6 +14,16 @@ import time
 from typing import Dict, Optional, Tuple
 
 logger = logging.getLogger(__name__)
+
+
+class KMSUnavailableError(RuntimeError):
+    """
+    SECURITY: Raised when KMS is unavailable and a new signing key would be created.
+    
+    This is a hard failure to prevent creating unencrypted signing keys that would
+    violate FIPS 140-2 compliance requirements.
+    """
+    pass
 
 class LemmaIssuerManager:
     """
@@ -200,43 +214,62 @@ class LemmaIssuerManager:
                     logger.error(f"❌ Failed to load KMS key for {site_id}: {e}")
                     # Fall through to create new key
             
-            # Generate NEW keypair and store with KMS encryption
-            issuer = PyMinimalIssuer()  # Generates NEW keypair!
+            # =================================================================
+            # SECURITY: Generate NEW keypair - REQUIRES KMS for encryption
+            # =================================================================
+            # CRITICAL: We must have KMS available to create new signing keys.
+            # Creating unencrypted keys would violate FIPS 140-2 compliance.
             
-            # Get signing key bytes for encryption
+            if not is_kms_available():
+                error_msg = (
+                    f"SECURITY FAILURE: Cannot create signing key for site '{site_id}' - "
+                    f"AWS KMS is unavailable. All signing keys MUST be encrypted by KMS "
+                    f"for FIPS 140-2 Level 2/3 compliance. Check AWS credentials and "
+                    f"LEMMA_KMS_KEY_ID environment variable."
+                )
+                logger.critical(f"🚨 {error_msg}")
+                raise KMSUnavailableError(error_msg)
+            
+            # Generate new keypair
+            issuer = PyMinimalIssuer()
             signing_key_bytes = bytes(issuer.signing_key_bytes())
             
-            if is_kms_available():
-                # ENCRYPT with AWS KMS
-                try:
-                    encrypted_key, kms_key_id = kms.encrypt_signing_key(
-                        signing_key_bytes,
-                        site_id
-                    )
-                    
-                    # Store encrypted key in database
-                    if site:
-                        site.kms_encrypted_signing_key = encrypted_key
-                        site.kms_key_id = kms_key_id
-                        site.public_key_hex = issuer.get_public_key_hex()
-                        site.issuer_did = issuer.get_did()
-                        site.key_created_at = datetime.utcnow()
-                        site.key_rotation_due = datetime.utcnow() + timedelta(days=365)
-                        site.key_status = 'active'
-                    else:
-                        logger.warning(f"⚠️ Site {site_id} not found in database - key not persisted")
-                    
+            # ENCRYPT with AWS KMS - this MUST succeed
+            try:
+                encrypted_key, kms_key_id = kms.encrypt_signing_key(
+                    signing_key_bytes,
+                    site_id
+                )
+                
+                # Store encrypted key in database
+                if site:
+                    site.kms_encrypted_signing_key = encrypted_key
+                    site.kms_key_id = kms_key_id
+                    site.public_key_hex = issuer.get_public_key_hex()
+                    site.issuer_did = issuer.get_did()
+                    site.key_created_at = datetime.utcnow()
+                    site.key_rotation_due = datetime.utcnow() + timedelta(days=365)
+                    site.key_status = 'active'
                     db.commit()
                     logger.info(f"✅ Created NEW KMS-backed issuer for {site_id}")
                     logger.info(f"🔐 Key encrypted with KMS: {kms_key_id[:50]}...")
-                    
-                except Exception as e:
-                    logger.error(f"❌ KMS encryption failed for {site_id}: {e}")
-                    logger.warning("⚠️ Falling back to memory-only storage (not persistent!)")
-            else:
-                logger.warning(f"⚠️ KMS not available - key for {site_id} stored in memory only (not persistent!)")
+                else:
+                    # Site doesn't exist - this is a configuration error
+                    logger.error(f"🚨 SECURITY: Site {site_id} not found in database - cannot persist KMS key!")
+                    raise RuntimeError(f"Site {site_id} not found - cannot create issuer without database record")
+                
+            except KMSUnavailableError:
+                raise  # Re-raise our custom error
+            except Exception as e:
+                # KMS encryption failed - this is a hard failure, NOT a fallback
+                error_msg = (
+                    f"SECURITY FAILURE: KMS encryption failed for site '{site_id}': {e}. "
+                    f"Cannot create signing key without KMS protection."
+                )
+                logger.critical(f"🚨 {error_msg}")
+                raise KMSUnavailableError(error_msg) from e
             
-            # Cache in memory
+            # Cache in memory (key is safely encrypted in database)
             self._issuers[issuer_key] = issuer
             self._issuer_metadata[issuer_key] = {
                 'type': 'iam_issuer',
@@ -246,7 +279,7 @@ class LemmaIssuerManager:
                 'public_key_hex': issuer.get_public_key_hex(),
                 'trust_score': 0.90,
                 'verified': True,
-                'storage': 'kms_backed' if is_kms_available() else 'memory_only'
+                'storage': 'kms_backed'  # Always KMS-backed now
             }
             self._creation_times[issuer_key] = time.time()
             

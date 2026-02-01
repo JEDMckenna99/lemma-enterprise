@@ -1,6 +1,8 @@
 """
 Developer Platform API
 Handles developer dashboard data: sites, stats, API keys, users
+
+SECURITY: All site-specific operations require ownership validation.
 """
 
 import logging
@@ -14,6 +16,110 @@ from api.agent_credentials import require_agent_or_user_auth
 logger = logging.getLogger(__name__)
 
 developer_api_bp = Blueprint('developer_api', __name__)
+
+
+# =============================================================================
+# SECURITY: Site Ownership Validation
+# =============================================================================
+
+def _get_authenticated_ppid() -> str:
+    """
+    Extract the authenticated user's PPID from request context.
+    Works with agent tokens, agent sessions, and direct PPID headers.
+    """
+    # Check g context first (set by auth decorators)
+    if hasattr(g, 'ppid') and g.ppid:
+        return g.ppid
+    
+    # Check agent credential context
+    if hasattr(g, 'agent_credential') and g.agent_credential:
+        return g.agent_credential.get('authorized_by_ppid')
+    
+    # Fallback to header
+    return request.headers.get('X-Lemma-PPID')
+
+
+def _verify_site_ownership(site_id: str, ppid: str) -> bool:
+    """
+    SECURITY: Verify the authenticated user has admin access to the site.
+    
+    This prevents unauthorized access to site resources like API keys.
+    
+    Args:
+        site_id: The site to check access for
+        ppid: The authenticated user's PPID
+        
+    Returns:
+        True if user has admin access, False otherwise
+    """
+    if not ppid or not site_id:
+        return False
+    
+    try:
+        from api.database import SessionLocal, SiteAdmin
+        
+        db = SessionLocal()
+        try:
+            # Check if user is an active admin for this site
+            admin_record = db.query(SiteAdmin).filter(
+                SiteAdmin.site_id == site_id,
+                SiteAdmin.admin_did == ppid,
+                SiteAdmin.is_active == True
+            ).first()
+            
+            if admin_record:
+                logger.debug(f"Site ownership verified: {ppid[:30]}... owns {site_id}")
+                return True
+            
+            logger.warning(f"SECURITY: Unauthorized site access attempt - user {ppid[:30]}... tried to access {site_id}")
+            return False
+            
+        finally:
+            db.close()
+            
+    except Exception as e:
+        logger.error(f"Site ownership check failed: {e}")
+        return False
+
+
+def _require_site_ownership(site_id: str):
+    """
+    SECURITY: Check site ownership and return error response if unauthorized.
+    
+    Returns:
+        None if authorized, or (response, status_code) tuple if unauthorized
+    """
+    ppid = _get_authenticated_ppid()
+    
+    # Allow API key auth to bypass (API key is already site-specific)
+    if hasattr(g, 'api_key') and g.api_key:
+        # Verify API key belongs to this site
+        try:
+            from api.database import SessionLocal, Site
+            db = SessionLocal()
+            site = db.query(Site).filter(Site.site_id == site_id).first()
+            db.close()
+            
+            if site and site.api_key == g.api_key:
+                return None  # Authorized via matching API key
+        except:
+            pass
+    
+    if not ppid:
+        return jsonify({
+            'success': False,
+            'error': 'Authentication required',
+            'code': 'AUTH_REQUIRED'
+        }), 401
+    
+    if not _verify_site_ownership(site_id, ppid):
+        return jsonify({
+            'success': False,
+            'error': 'You do not have access to this site',
+            'code': 'UNAUTHORIZED_SITE_ACCESS'
+        }), 403
+    
+    return None  # Authorized
 
 
 @developer_api_bp.route('/api/developer/stats', methods=['GET'])
@@ -281,7 +387,15 @@ def get_site_stats(site_id):
 @cross_origin()
 @require_agent_or_user_auth(required_scope='read')
 def get_site_keys(site_id):
-    """Get API keys for a site"""
+    """Get API keys for a site
+    
+    SECURITY: Requires site ownership verification before exposing key information.
+    """
+    # SECURITY: Verify site ownership before accessing keys
+    auth_error = _require_site_ownership(site_id)
+    if auth_error:
+        return auth_error
+    
     try:
         from api.database import SessionLocal, Site
         
@@ -291,8 +405,15 @@ def get_site_keys(site_id):
             db = SessionLocal()
             site = db.query(Site).filter(Site.site_id == site_id).first()
             
-            if site and site.api_key:
-                # Site has a primary API key
+            if not site:
+                db.close()
+                return jsonify({
+                    'success': False,
+                    'error': 'Site not found'
+                }), 404
+            
+            if site.api_key:
+                # Site has a primary API key - only show prefix for security
                 keys.append({
                     'key_id': 'primary',
                     'name': 'Primary API Key',
@@ -323,7 +444,16 @@ def get_site_keys(site_id):
 @cross_origin()
 @require_agent_or_user_auth(required_scope='write')
 def create_site_key(site_id):
-    """Create/regenerate API key for a site"""
+    """Create/regenerate API key for a site
+    
+    SECURITY: Requires site ownership verification before allowing key generation.
+    This is a sensitive operation - new key invalidates the old one.
+    """
+    # SECURITY: Verify site ownership before creating/regenerating keys
+    auth_error = _require_site_ownership(site_id)
+    if auth_error:
+        return auth_error
+    
     try:
         data = request.get_json() or {}
         name = data.get('name', 'API Key')
@@ -337,20 +467,32 @@ def create_site_key(site_id):
             db = SessionLocal()
             site = db.query(Site).filter(Site.site_id == site_id).first()
             
-            if site:
-                site.api_key = key
-                db.commit()
+            if not site:
+                db.close()
+                return jsonify({
+                    'success': False,
+                    'error': 'Site not found'
+                }), 404
             
+            site.api_key = key
+            db.commit()
             db.close()
             
+            logger.info(f"SECURITY: API key regenerated for site {site_id} by {_get_authenticated_ppid()[:30] if _get_authenticated_ppid() else 'api_key'}...")
+            
         except Exception as e:
-            logger.warning(f"Could not store API key: {e}")
+            logger.error(f"Could not store API key: {e}")
+            return jsonify({
+                'success': False,
+                'error': 'Failed to store API key'
+            }), 500
         
         return jsonify({
             'success': True,
             'key_id': 'primary',
-            'key': key,  # Only shown once
-            'name': name
+            'key': key,  # Only shown once - store it securely!
+            'name': name,
+            'warning': 'This key is shown only once. Store it securely.'
         })
         
     except Exception as e:
@@ -365,7 +507,16 @@ def create_site_key(site_id):
 @cross_origin()
 @require_agent_or_user_auth(required_scope='admin')
 def revoke_site_key(site_id, key_id):
-    """Revoke/regenerate an API key"""
+    """Revoke/regenerate an API key
+    
+    SECURITY: Requires site ownership verification before allowing key revocation.
+    This is a destructive operation - old key immediately becomes invalid.
+    """
+    # SECURITY: Verify site ownership before revoking keys
+    auth_error = _require_site_ownership(site_id)
+    if auth_error:
+        return auth_error
+    
     try:
         from api.database import SessionLocal, Site
         
@@ -373,20 +524,31 @@ def revoke_site_key(site_id, key_id):
             db = SessionLocal()
             site = db.query(Site).filter(Site.site_id == site_id).first()
             
-            if site:
-                # Generate new key (effectively revoking old one)
-                site.api_key = f"lm_{secrets.token_urlsafe(32)}"
-                db.commit()
+            if not site:
+                db.close()
+                return jsonify({
+                    'success': False,
+                    'error': 'Site not found'
+                }), 404
             
+            # Generate new key (effectively revoking old one)
+            site.api_key = f"lm_{secrets.token_urlsafe(32)}"
+            db.commit()
             db.close()
             
+            logger.info(f"SECURITY: API key revoked for site {site_id} by {_get_authenticated_ppid()[:30] if _get_authenticated_ppid() else 'api_key'}...")
+            
         except Exception as e:
-            logger.warning(f"Could not revoke API key: {e}")
+            logger.error(f"Could not revoke API key: {e}")
+            return jsonify({
+                'success': False,
+                'error': 'Failed to revoke API key'
+            }), 500
         
         return jsonify({
             'success': True,
             'revoked': True,
-            'message': 'API key regenerated. Old key is now invalid.'
+            'message': 'API key revoked. A new key has been generated - retrieve it via GET /keys.'
         })
         
     except Exception as e:

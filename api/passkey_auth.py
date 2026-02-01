@@ -402,14 +402,24 @@ def passkey_authenticate_complete():
         # Clean up challenge
         del _challenges[challenge_key]
         
-        # Get user info
+        # Get user info and stored wallet_id
         db = get_db()
+        wallet_id = None
         try:
             customer = db.query(Customer).filter(
                 Customer.customer_id == passkey.user_id
             ).first()
             user_email = customer.email if customer else None
             user_role = customer.role if customer else 'user'
+            wallet_id = customer.wallet_id if customer else None
+            
+            # Generate wallet_id if not set (for cross-device sync)
+            if not wallet_id and customer:
+                import secrets
+                wallet_id = f"wallet_{secrets.token_hex(16)}"
+                customer.wallet_id = wallet_id
+                db.commit()
+                logger.info(f"Generated wallet_id for user {passkey.user_id}")
         finally:
             db.close()
         
@@ -428,6 +438,7 @@ def passkey_authenticate_complete():
         session['user_email'] = user_email
         session['auth_method'] = 'passkey'
         session['passkey_verified'] = True
+        session['wallet_id'] = wallet_id  # Store for global session sync
         
         logger.info(f"✅ Passkey authentication successful for {user_email}")
         
@@ -436,6 +447,7 @@ def passkey_authenticate_complete():
             'user_id': passkey.user_id,
             'user_email': user_email,
             'auth_method': 'passkey',
+            'wallet_id': wallet_id,  # Include for cross-device sync
             'lemma': lemma_with_proof,
             'message': 'Authentication successful'
         })

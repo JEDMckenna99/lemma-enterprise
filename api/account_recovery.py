@@ -422,6 +422,19 @@ def complete_recovery():
         site_id = token_data['site_id']
         admin_email = token_data['admin_email']
         
+        # Get actual customer_id from database
+        db = SessionLocal()
+        customer_id = None
+        wallet_id = None
+        try:
+            from api.database import Customer
+            customer = db.query(Customer).filter(Customer.email == admin_email).first()
+            if customer:
+                customer_id = customer.customer_id
+                wallet_id = customer.wallet_id
+        finally:
+            db.close()
+        
         # For passkey registration during recovery, we redirect to proper flow
         # The passkey_registered flag indicates the frontend should handle this
         # since WebAuthn requires proper challenge/response
@@ -431,7 +444,7 @@ def complete_recovery():
         flask_session['recovery_complete'] = True
         flask_session['recovery_site_id'] = site_id
         flask_session['recovery_email'] = admin_email
-        flask_session['customer_id'] = admin_email  # For passkey registration
+        flask_session['customer_id'] = customer_id or admin_email  # For passkey registration
         flask_session['customer_email'] = admin_email
         
         logger.info(f"Recovery complete - session restored for {admin_email[:3]}*** (site: {site_id})")
@@ -443,6 +456,8 @@ def complete_recovery():
             'success': True,
             'message': 'Account recovered successfully',
             'site_id': site_id,
+            'user_id': customer_id,  # Include for passkey auth
+            'wallet_id': wallet_id,  # Include for cross-device sync
             'redirect': '/developer'
         })
         
