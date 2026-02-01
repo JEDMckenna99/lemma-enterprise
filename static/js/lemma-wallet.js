@@ -1328,9 +1328,29 @@ class LemmaWallet {
 
         await this._put('passkey', passkeyRecord);
 
-        // Generate wallet secret for PPID derivation (if not already exists)
+        // Get wallet secret for PPID derivation
+        // CRITICAL: Check multiple sources for the secret (profiles, secrets, session)
+        // This handles the case where secret was stored via device linking
         let walletSecret = await this._get('secrets', 'master');
-        if (!walletSecret) {
+        
+        // Fallback: Check profiles (device linking stores secret here)
+        if (!walletSecret?.secret) {
+            const activeProfileId = await this._get('passkey', 'activeProfile');
+            const profileId = activeProfileId?.value || DEFAULT_PROFILE_ID;
+            const profile = await this._get('profiles', profileId);
+            if (profile?.secret) {
+                console.log('[Lemma] Found wallet secret in profile (from device link)');
+                walletSecret = { id: 'master', secret: profile.secret, source: 'profile' };
+                // Sync to secrets/master for consistency
+                await this._put('secrets', { ...walletSecret, linkedFrom: profile.linkedFrom });
+            }
+        }
+        
+        // Only generate new secret if NONE found anywhere
+        if (!walletSecret?.secret) {
+            console.warn('[Lemma] No existing wallet secret found - generating new one');
+            console.warn('[Lemma] This should NOT happen if device was linked!');
+            
             // Generate 32-byte random secret
             const secretBytes = crypto.getRandomValues(new Uint8Array(32));
             const secretHex = Array.from(secretBytes)
@@ -1340,10 +1360,13 @@ class LemmaWallet {
             walletSecret = {
                 id: 'master',
                 secret: secretHex,
-                createdAt: Date.now()
+                createdAt: Date.now(),
+                source: 'generated'
             };
             await this._put('secrets', walletSecret);
-            console.log('🔐 Generated wallet secret for PPID derivation');
+            console.log('🔐 Generated NEW wallet secret for PPID derivation');
+        } else {
+            console.log('[Lemma] Using existing wallet secret (source:', walletSecret.source || 'stored', ')');
         }
 
         // Auto-unlock after registration (user just authenticated)
@@ -1509,10 +1532,27 @@ class LemmaWallet {
         const walletId = walletIdRecord.value;
 
         // Get wallet secret for PPID derivation
+        // CRITICAL: Check multiple sources (device linking stores in profiles)
         let walletSecretRecord = await this._get('secrets', 'master');
         
-        // Generate wallet secret if missing (for wallets created before v3)
-        if (!walletSecretRecord) {
+        // Fallback: Check profiles (device linking stores secret here)
+        if (!walletSecretRecord?.secret) {
+            const activeProfileId = await this._get('passkey', 'activeProfile');
+            const profileId = activeProfileId?.value || DEFAULT_PROFILE_ID;
+            const profile = await this._get('profiles', profileId);
+            if (profile?.secret) {
+                console.log('[Lemma] Found wallet secret in profile (from device link)');
+                walletSecretRecord = { id: 'master', secret: profile.secret, source: 'profile' };
+                // Sync to secrets/master for consistency
+                await this._put('secrets', { ...walletSecretRecord, linkedFrom: profile.linkedFrom });
+            }
+        }
+        
+        // Only generate wallet secret if NONE found (legacy wallets before v3)
+        if (!walletSecretRecord?.secret) {
+            console.warn('[Lemma] No wallet secret found - generating new one');
+            console.warn('[Lemma] If device was linked, this is a BUG - secret should exist!');
+            
             const secretBytes = crypto.getRandomValues(new Uint8Array(32));
             const secretHex = Array.from(secretBytes)
                 .map(b => b.toString(16).padStart(2, '0'))
@@ -1521,10 +1561,13 @@ class LemmaWallet {
             walletSecretRecord = {
                 id: 'master',
                 secret: secretHex,
-                createdAt: Date.now()
+                createdAt: Date.now(),
+                source: 'generated_legacy'
             };
             await this._put('secrets', walletSecretRecord);
             console.log('🔐 Generated wallet secret for legacy wallet');
+        } else {
+            console.log('[Lemma] Using existing wallet secret (source:', walletSecretRecord.source || 'stored', ')');
         }
 
         // Unlock the wallet
@@ -3345,11 +3388,23 @@ class LemmaWallet {
         const issuers = await this._getAll('issuers');
         const secretRecord = await this._get('secrets', 'master');
         const walletIdRecord = await this._get('passkey', 'walletId');
+        const activeProfileRecord = await this._get('passkey', 'activeProfile');
+        
+        // Also check profile for secret (device linking stores here)
+        let secretSource = secretRecord?.source || 'stored';
+        let profileSecret = null;
+        if (activeProfileRecord?.value) {
+            const profile = await this._get('profiles', activeProfileRecord.value);
+            profileSecret = profile?.secret;
+            if (profileSecret && !secretRecord?.secret) {
+                secretSource = 'profile_only';
+            }
+        }
         
         const hasPasskey = !!passkey;
-        const hasWalletSecret = !!secretRecord?.secret;
+        const hasWalletSecret = !!(secretRecord?.secret || profileSecret);
             
-            return {
+        return {
             hasPasskey,
             hasWalletSecret,
             // hasWallet: true if either passkey (native) or secret (linked device) exists
@@ -3359,7 +3414,54 @@ class LemmaWallet {
             walletId: walletIdRecord?.value || null,
             lemmaCount: lemmas.length,
             issuerCount: issuers.length,
-            passkeyCredentialId: passkey?.credentialId || null
+            passkeyCredentialId: passkey?.credentialId || null,
+            secretSource: secretSource,
+            linkedFrom: secretRecord?.linkedFrom || null
+        };
+    }
+    
+    /**
+     * Get debug info for cross-device troubleshooting.
+     * Returns fingerprints (hashes) of secrets for safe comparison without exposing actual values.
+     */
+    async getDebugState() {
+        await this.init();
+        
+        const secretRecord = await this._get('secrets', 'master');
+        const walletIdRecord = await this._get('passkey', 'walletId');
+        const activeProfileRecord = await this._get('passkey', 'activeProfile');
+        const profiles = await this._getAll('profiles');
+        
+        // Create fingerprints for safe comparison
+        const fingerprint = async (str) => {
+            if (!str) return null;
+            const data = new TextEncoder().encode(str);
+            const hash = await crypto.subtle.digest('SHA-256', data);
+            return Array.from(new Uint8Array(hash)).slice(0, 8)
+                .map(b => b.toString(16).padStart(2, '0')).join('');
+        };
+        
+        const secretFingerprint = await fingerprint(secretRecord?.secret);
+        const profileSecrets = {};
+        for (const profile of profiles) {
+            profileSecrets[profile.id] = {
+                name: profile.name,
+                fingerprint: await fingerprint(profile.secret),
+                linkedFrom: profile.linkedFrom,
+                linkedAt: profile.linkedAt
+            };
+        }
+        
+        return {
+            walletId: walletIdRecord?.value,
+            secretFingerprint: secretFingerprint,  // Compare this between devices!
+            secretSource: secretRecord?.source,
+            secretLinkedFrom: secretRecord?.linkedFrom,
+            secretLinkedAt: secretRecord?.linkedAt,
+            activeProfileId: activeProfileRecord?.value,
+            profiles: profileSecrets,
+            // If devices are properly linked, secretFingerprint should MATCH
+            debugNote: 'If secretFingerprint differs between devices, linking failed!'
         };
     }
 
