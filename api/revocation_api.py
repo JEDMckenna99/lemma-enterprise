@@ -117,7 +117,7 @@ def get_bloom_filter():
         # All revocations in one filter
         # Sites only check credentials they have (selective disclosure)
         
-        # Query database for ALL revoked credentials (global)
+        # Query database for ALL revoked credentials AND PPIDs (global)
         try:
             from api.database import get_db_connection
             
@@ -137,10 +137,27 @@ def get_bloom_filter():
             
             revoked_ids = [row[0] for row in cursor.fetchall()]
             
+            # ALSO get revoked PPIDs for user-level revocation (all devices)
+            # When a PPID is in the bloom filter, ALL credentials for that user are revoked
+            cursor.execute("""
+                SELECT DISTINCT ppid
+                FROM revocation_list
+                WHERE ppid IS NOT NULL AND revocation_type = 'user'
+            """)
+            
+            revoked_ppids = [row[0] for row in cursor.fetchall()]
+            
+            # Combine credential IDs and PPIDs in the bloom filter
+            # Client checks: is credential.id OR credential.claims.ppid in bloom?
+            all_revoked = revoked_ids + revoked_ppids
+            
             cursor.close()
             conn.close()
             
-            logger.info(f"📊 Global Bloom filter: {len(revoked_ids)} total revocations (all sites)")
+            logger.info(f"📊 Global Bloom filter: {len(revoked_ids)} credentials + {len(revoked_ppids)} PPIDs = {len(all_revoked)} total")
+            
+            # Replace revoked_ids with combined list for downstream processing
+            revoked_ids = all_revoked
             
         except Exception as e:
             logger.error(f"❌ Failed to query revocations: {e}")

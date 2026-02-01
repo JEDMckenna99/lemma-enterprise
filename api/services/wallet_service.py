@@ -1149,6 +1149,89 @@ def get_revocation_status():
     return jsonify({'success': True, 'statuses': statuses})
 
 
+@wallet_service_bp.route('/api/wallet/revoke-user', methods=['POST'])
+def revoke_user():
+    """
+    Revoke ALL credentials for a user (PPID) across ALL devices.
+    
+    This adds the user's PPID to the Bloom filter, which invalidates
+    ALL credentials for that user regardless of which device they're on.
+    
+    Use this when:
+    - User requests account deletion
+    - Admin bans a user
+    - Security incident requiring immediate full revocation
+    
+    Request body:
+        ppid: The user's PPID (site-specific identifier)
+        site_id: The site this PPID belongs to
+        reason: Reason for revocation
+    """
+    try:
+        data = request.get_json() or {}
+        ppid = data.get('ppid')
+        site_id = data.get('site_id')
+        reason = data.get('reason', 'user_revocation')
+        
+        if not ppid:
+            return jsonify({'success': False, 'error': 'ppid required'}), 400
+        
+        if not site_id:
+            return jsonify({'success': False, 'error': 'site_id required'}), 400
+        
+        # Add PPID to revocation list with revocation_type='user'
+        from api.database import get_db, RevocationList
+        from datetime import datetime
+        
+        db = get_db()
+        try:
+            # Check if already revoked
+            existing = db.query(RevocationList).filter(
+                RevocationList.ppid == ppid,
+                RevocationList.site_id == site_id
+            ).first()
+            
+            if existing:
+                return jsonify({
+                    'success': True,
+                    'already_revoked': True,
+                    'message': 'User already revoked for this site'
+                })
+            
+            # Create new revocation entry
+            revocation = RevocationList(
+                lemma_id=f"ppid:{ppid}",  # Use ppid: prefix to distinguish
+                credential_id=f"ppid:{ppid}",
+                ppid=ppid,
+                site_id=site_id,
+                revocation_type='user',  # User-level revocation
+                reason=reason,
+                revoked_at=datetime.utcnow(),
+                revoked_by='api'
+            )
+            
+            db.add(revocation)
+            db.commit()
+            
+            logger.info(f"🚫 User revoked: PPID {ppid[:12]}... for site {site_id}")
+            
+            return jsonify({
+                'success': True,
+                'ppid': ppid,
+                'site_id': site_id,
+                'revocation_type': 'user',
+                'message': 'User revoked across all devices. Bloom filter will sync within 1 hour.',
+                'note': 'All existing credentials for this PPID are now invalid.'
+            })
+            
+        finally:
+            db.close()
+            
+    except Exception as e:
+        logger.error(f"User revocation failed: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
 # ============================================================================
 # ROUTES: WALLET TRANSFER
 # ============================================================================

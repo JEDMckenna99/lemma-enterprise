@@ -2507,19 +2507,36 @@ class LemmaWallet {
     
     /**
      * Check if a credential is revoked (local check)
+     * 
+     * Checks TWO things:
+     * 1. Is the credential_id in the Bloom filter? (device-level revocation)
+     * 2. Is the PPID in the Bloom filter? (user-level revocation - ALL devices)
+     * 
+     * @param {string} credentialId - The credential ID to check
+     * @param {string} ppid - Optional PPID from credential claims (for user-level revocation)
      */
-    async isRevoked(credentialId) {
+    async isRevoked(credentialId, ppid = null) {
         const revocations = await this._get('revocations', 'current');
         if (!revocations || !revocations.listArray) {
             // No revocation data - assume not revoked but flag as unchecked
             return { revoked: false, unchecked: true };
         }
         
-        const isRevoked = revocations.listArray.includes(credentialId);
+        // Check credential-level revocation (one device)
+        const credentialRevoked = revocations.listArray.includes(credentialId);
+        
+        // Check user-level revocation (all devices with same PPID)
+        const ppidRevoked = ppid ? revocations.listArray.includes(ppid) : false;
+        
+        const isRevoked = credentialRevoked || ppidRevoked;
+        
         return {
-            revoked: isRevoked, 
+            revoked: isRevoked,
+            credentialRevoked: credentialRevoked,
+            ppidRevoked: ppidRevoked,
             unchecked: false,
-            lastSynced: revocations.lastSynced
+            lastSynced: revocations.lastSynced,
+            reason: isRevoked ? (ppidRevoked ? 'user_revoked' : 'credential_revoked') : null
         };
     }
     
@@ -2676,10 +2693,17 @@ class LemmaWallet {
         
         const startTime = performance.now();
         
-        // 1. Check revocation (local cache)
-        const revocationStatus = await this.isRevoked(lemma.id);
+        // Extract PPID for user-level revocation check
+        // W3C structure: subject is at top level, claims are in credentialSubject
+        const claims = lemma.claims || lemma.credentialSubject || {};
+        // Check top-level subject field first (W3C standard), then fallback to claims
+        const ppid = lemma.subject || claims.id || claims.ppid || claims.subject || claims.userPpid;
+        
+        // 1. Check revocation (local cache) - checks BOTH credential_id AND ppid
+        const revocationStatus = await this.isRevoked(lemma.id, ppid);
         if (revocationStatus.revoked) {
-            return { valid: false, reason: 'Revoked', quickVerify: true };
+            const reason = revocationStatus.ppidRevoked ? 'User revoked (all devices)' : 'Credential revoked';
+            return { valid: false, reason: reason, quickVerify: true, revocationDetails: revocationStatus };
         }
         
         // 2. Check expiration
@@ -2715,11 +2739,18 @@ class LemmaWallet {
         await this.init();
         
         const startTime = performance.now();
+        
+        // Extract PPID for user-level revocation check
+        // W3C structure: subject is at top level, claims are in credentialSubject
+        const claims = lemma.claims || lemma.credentialSubject || {};
+        // Check top-level subject field first (W3C standard), then fallback to claims
+        const ppid = lemma.subject || claims.id || claims.ppid || claims.subject || claims.userPpid;
 
-        // 1. Check revocation (local cache)
-        const revocationStatus = await this.isRevoked(lemma.id);
+        // 1. Check revocation (local cache) - checks BOTH credential_id AND ppid
+        const revocationStatus = await this.isRevoked(lemma.id, ppid);
         if (revocationStatus.revoked) {
-            return { valid: false, reason: 'Revoked' };
+            const reason = revocationStatus.ppidRevoked ? 'User revoked (all devices)' : 'Credential revoked';
+            return { valid: false, reason: reason, revocationDetails: revocationStatus };
         }
 
         // 2. Check expiration
@@ -4575,10 +4606,20 @@ class LemmaWallet {
         
         const verifyTime = ((performance.now() - startTime) * 1000).toFixed(1);
         
+        // Extract PPID from first verified permission (should be same across all)
+        let ppid = null;
+        if (verifiedPermissions.length > 0) {
+            const firstPerm = verifiedPermissions[0];
+            const firstClaims = firstPerm.claims || firstPerm.credentialSubject || {};
+            ppid = firstPerm.subject || firstClaims.id || firstClaims.ppid;
+        }
+        
         return {
             hasAccess: verifiedPermissions.length > 0,
             permissions: verifiedPermissions,
             claims: allClaims,
+            // User identity
+            ppid: ppid,  // The user's PPID for this site (for revocation purposes)
             // Common claim accessors
             role: allClaims.role || allClaims.accountType || 'user',
             scope: (allClaims.scope || '').split(',').filter(Boolean),
