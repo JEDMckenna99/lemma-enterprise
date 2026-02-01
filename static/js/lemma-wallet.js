@@ -4375,6 +4375,120 @@ class LemmaWallet {
     }
     
     /**
+     * Get verified permissions for a specific site.
+     * 
+     * IDEAL FLOW:
+     * 1. SDK detects wallet is unlocked
+     * 2. Read lemmas from IndexedDB
+     * 3. Verify each lemma's Ed25519 signature locally (no network)
+     * 4. Check revocation status (cached bloom filter)
+     * 5. Return verified claims the user has access to
+     * 
+     * @param {string} siteId - The site to check permissions for
+     * @returns {Promise<Object>} Verified permissions with claims
+     */
+    async getVerifiedPermissions(siteId) {
+        await this.init();
+        
+        const startTime = performance.now();
+        
+        // 1. Get all permission lemmas from IndexedDB
+        const permissions = await this.getCredentials('permission');
+        
+        // 2. Filter for requested site
+        const sitePermissions = permissions.filter(p => {
+            const claims = p.claims || p.credentialSubject || {};
+            const credSiteId = claims.siteId || claims.site || claims.site_id || '';
+            return credSiteId === siteId || 
+                   credSiteId.includes(siteId) || 
+                   siteId.includes(credSiteId);
+        });
+        
+        if (sitePermissions.length === 0) {
+            return {
+                hasAccess: false,
+                permissions: [],
+                claims: {},
+                reason: 'No permissions found for this site'
+            };
+        }
+        
+        // 3. Verify each permission locally (Ed25519 + revocation check)
+        const verifiedPermissions = [];
+        const allClaims = {};
+        
+        for (const perm of sitePermissions) {
+            try {
+                const verification = await this.verifyLemma(perm);
+                
+                if (verification.valid) {
+                    verifiedPermissions.push(perm);
+                    
+                    // Extract claims
+                    const claims = perm.claims || perm.credentialSubject || {};
+                    for (const [key, value] of Object.entries(claims)) {
+                        // Aggregate claims (later lemmas override earlier)
+                        allClaims[key] = value;
+                    }
+                } else {
+                    console.warn(`[Lemma] Permission ${perm.id} failed verification: ${verification.reason}`);
+                }
+            } catch (e) {
+                console.warn(`[Lemma] Permission ${perm.id} verification error:`, e.message);
+            }
+        }
+        
+        const verifyTime = ((performance.now() - startTime) * 1000).toFixed(1);
+        
+        return {
+            hasAccess: verifiedPermissions.length > 0,
+            permissions: verifiedPermissions,
+            claims: allClaims,
+            // Common claim accessors
+            role: allClaims.role || allClaims.accountType || 'user',
+            scope: (allClaims.scope || '').split(',').filter(Boolean),
+            permissionId: allClaims.permissionId,
+            // Performance metrics
+            verified: verifiedPermissions.length,
+            total: sitePermissions.length,
+            verifyTimeUs: verifyTime
+        };
+    }
+    
+    /**
+     * Check if user has a specific permission for a site.
+     * 
+     * @param {string} siteId - The site to check
+     * @param {string} requiredPermission - Permission to check (e.g., 'admin', 'write')
+     * @returns {Promise<boolean>} True if user has verified permission
+     */
+    async hasPermission(siteId, requiredPermission) {
+        const perms = await this.getVerifiedPermissions(siteId);
+        
+        if (!perms.hasAccess) return false;
+        
+        // Check scope array
+        if (perms.scope.includes(requiredPermission) || 
+            perms.scope.includes(`${requiredPermission}:*`) ||
+            perms.scope.includes('*')) {
+            return true;
+        }
+        
+        // Check role
+        if (perms.role === requiredPermission || perms.role === 'admin') {
+            return true;
+        }
+        
+        // Check permissionId
+        if (perms.permissionId === requiredPermission || 
+            perms.permissionId?.includes(requiredPermission)) {
+            return true;
+        }
+        
+        return false;
+    }
+    
+    /**
      * Get credentials from central lemma.id wallet via bridge
      */
     async _getFromCentralWallet(type = null) {

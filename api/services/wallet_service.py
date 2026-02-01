@@ -820,6 +820,122 @@ def verify_wallet_session():
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
+@wallet_service_bp.route('/api/wallet-auth/platform-login', methods=['POST'])
+def platform_login():
+    """
+    Platform developer login with wallet_id sync for cross-device support.
+    
+    This endpoint is specifically for lemma.id platform developers (not end-users).
+    It handles:
+    1. PPID derivation for the platform
+    2. Wallet_id sync (store or return canonical wallet_id)
+    3. Permission lemma issuance
+    4. Global session setup
+    """
+    try:
+        data = request.get_json() or {}
+        wallet_secret = data.get('wallet_secret')
+        passkey_credential_id = data.get('passkey_credential_id')
+        client_wallet_id = data.get('wallet_id')  # SDK's local wallet_id
+        
+        if not wallet_secret and not passkey_credential_id:
+            return jsonify({'success': False, 'error': 'Either wallet_secret or passkey_credential_id required'}), 400
+        
+        site_id = 'lemma.id'
+        ppid = derive_user_ppid(site_id, wallet_secret, passkey_credential_id)
+        
+        # Find or create Customer record for this developer
+        from api.database import get_db, Customer
+        import secrets
+        
+        db = get_db()
+        canonical_wallet_id = None
+        is_new_user = False
+        
+        try:
+            # Try to find customer by PPID or passkey
+            customer = None
+            if passkey_credential_id:
+                customer = db.query(Customer).filter(
+                    Customer.passkey_credential_id == passkey_credential_id
+                ).first()
+            
+            if not customer:
+                # Look by wallet_id if client provided one
+                if client_wallet_id:
+                    customer = db.query(Customer).filter(
+                        Customer.wallet_id == client_wallet_id
+                    ).first()
+            
+            if customer:
+                # Existing user - use stored wallet_id or store client's
+                if customer.wallet_id:
+                    canonical_wallet_id = customer.wallet_id
+                    logger.info(f"Platform login: using stored wallet_id {canonical_wallet_id[:12]}...")
+                elif client_wallet_id:
+                    customer.wallet_id = client_wallet_id
+                    canonical_wallet_id = client_wallet_id
+                    db.commit()
+                    logger.info(f"Platform login: stored client wallet_id {canonical_wallet_id[:12]}...")
+            else:
+                # New developer - create Customer record
+                is_new_user = True
+                canonical_wallet_id = client_wallet_id or f"wallet_{secrets.token_hex(16)}"
+                
+                customer = Customer(
+                    customer_id=f"dev_{secrets.token_hex(8)}",
+                    wallet_id=canonical_wallet_id,
+                    passkey_credential_id=passkey_credential_id,
+                    role='developer',
+                    created_at=datetime.utcnow()
+                )
+                db.add(customer)
+                db.commit()
+                logger.info(f"Platform login: created new developer {customer.customer_id}")
+                
+        finally:
+            db.close()
+        
+        # Issue permission lemma
+        permission_lemma = issue_permission_lemma(
+            subject_ppid=ppid,
+            site_id=site_id,
+            permissions=['read', 'write', 'access', 'developer'],
+            granted_by='platform_auth'
+        )
+        
+        # Store global session for cross-device sync
+        if canonical_wallet_id:
+            try:
+                from api.wallet_session_sync import _store_global_session
+                import time
+                _store_global_session(
+                    wallet_id=canonical_wallet_id,
+                    unlocked_at=int(time.time() * 1000),
+                    expires_at=int(time.time()) + 86400,  # 24h
+                    profile_id='default',
+                    profile_name='Developer'
+                )
+                logger.info(f"Platform login: set global session for {canonical_wallet_id[:12]}...")
+            except Exception as e:
+                logger.warning(f"Failed to set global session: {e}")
+        
+        return jsonify({
+            'success': True,
+            'ppid': ppid,
+            'site_id': site_id,
+            'is_new_user': is_new_user,
+            'permission_lemma': permission_lemma,
+            # CRITICAL: Return canonical wallet_id so client can sync
+            'wallet_id': canonical_wallet_id,
+            'wallet_id_synced': canonical_wallet_id != client_wallet_id if client_wallet_id else False
+        })
+        
+    except Exception as e:
+        logger.error(f"Platform login failed: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
 # ============================================================================
 # ROUTES: SESSION SYNC
 # ============================================================================

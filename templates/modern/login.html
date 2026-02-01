@@ -319,6 +319,20 @@
 
         async function checkExistingCredentials() {
             try {
+                // Use new getVerifiedPermissions for local Ed25519 verification
+                const perms = await wallet.getVerifiedPermissions('lemma.id');
+                
+                if (perms.hasAccess) {
+                    console.log('✅ Found verified lemma.id permission');
+                    console.log(`   Role: ${perms.role}, Scope: ${perms.scope.join(', ')}`);
+                    console.log(`   Verified ${perms.verified}/${perms.total} in ${perms.verifyTimeUs}µs`);
+                    
+                    updateStatus('success', '✅ Already signed in! Redirecting...');
+                    setTimeout(() => window.location.href = redirectUrl, 1000);
+                    return true;
+                }
+                
+                // Fallback: check for any lemma.id permission (unverified)
                 const permissions = await wallet.getCredentials('permission');
                 const lemmaPerms = permissions.filter(p => {
                     const claims = p.claims || p.credentialSubject || {};
@@ -327,11 +341,9 @@
                 });
                 
                 if (lemmaPerms.length > 0) {
-                    console.log('✅ Found existing lemma.id permission');
-                    updateStatus('success', '✅ Already signed in! Redirecting...');
-                    setTimeout(() => window.location.href = redirectUrl, 1000);
-                    return true;
+                    console.log('⚠️ Found unverified lemma.id permission - may need re-issue');
                 }
+                
                 return false;
             } catch (e) {
                 console.log('No existing credentials:', e.message);
@@ -397,6 +409,7 @@
                 // PPID = HMAC(wallet_secret, site_id) - site-specific identifier
                 let walletSecret = null;
                 let passkeyCredentialId = null;
+                let clientWalletId = null;
                 
                 try {
                     walletSecret = await wallet.getWalletSecret();
@@ -411,20 +424,28 @@
                     console.log('🔐 Using passkey credential ID for PPID derivation');
                 }
                 
+                // Get client's wallet_id for cross-device sync
+                try {
+                    const debugState = await wallet.getDebugState?.() || {};
+                    clientWalletId = debugState.walletId || walletInfo?.walletId;
+                    console.log('🔐 Client wallet_id:', clientWalletId?.substring(0, 12) + '...');
+                } catch (e) {
+                    console.warn('Could not get wallet_id:', e.message);
+                }
+                
                 if (!walletSecret && !passkeyCredentialId) {
                     throw new Error('No wallet secret or passkey available for authentication');
                 }
                 
-                // Request permission from server
-                // Server derives PPID from wallet_secret (preferred) or passkey_credential_id (fallback)
-                const response = await fetch('/api/wallet-auth/issue', {
+                // Request permission from server using platform-login endpoint
+                // This handles wallet_id sync for cross-device support
+                const response = await fetch('/api/wallet-auth/platform-login', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        site_id: targetSite,
-                        permission_level: targetPermission,
                         wallet_secret: walletSecret,
-                        passkey_credential_id: passkeyCredentialId
+                        passkey_credential_id: passkeyCredentialId,
+                        wallet_id: clientWalletId
                     })
                 });
                 
@@ -436,6 +457,34 @@
                 
                 console.log('📝 Permission issued with PPID:', result.ppid);
                 console.log('📝 Permission lemma:', result.permission_lemma);
+                
+                // CRITICAL: Sync wallet_id if server returned a different one (cross-device sync)
+                if (result.wallet_id && result.wallet_id !== clientWalletId) {
+                    console.log('🔄 Syncing wallet_id from server:', result.wallet_id?.substring(0, 12) + '...');
+                    try {
+                        // Update SDK's local wallet_id storage
+                        if (wallet._put) {
+                            await wallet._put('passkey', { id: 'walletId', value: result.wallet_id });
+                            console.log('✅ Wallet_id synced to local storage');
+                        }
+                        
+                        // Re-set session with correct wallet_id for cross-site auth
+                        await fetch('/api/wallet/set-session', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            credentials: 'include',
+                            body: JSON.stringify({
+                                wallet_id: result.wallet_id,
+                                unlocked_at: Date.now(),
+                                profile_id: 'default',
+                                profile_name: 'Developer'
+                            })
+                        });
+                        console.log('✅ Session cookie set with synced wallet_id');
+                    } catch (e) {
+                        console.warn('Wallet_id sync warning:', e.message);
+                    }
+                }
                 
                 // Store in wallet
                 await wallet.storeCredential(result.permission_lemma);
