@@ -4094,6 +4094,36 @@ class LemmaWallet {
         
         console.log(`[Lemma] Device linked successfully with profile: ${profileName}`);
         
+        // AUTO-ISSUE: Request lemma.id platform credential for linked device
+        // This ensures the new device has a valid signed credential, not just identity
+        let platformCredentialIssued = false;
+        try {
+            console.log('[Lemma] Requesting lemma.id platform credential for linked device...');
+            
+            const issueResponse = await fetch('https://lemma.id/api/wallet-auth/platform-login', {
+                method: 'POST',
+                credentials: 'include',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    wallet_secret: payload.walletSecret,
+                    wallet_id: payload.walletId
+                })
+            });
+            
+            if (issueResponse.ok) {
+                const issueData = await issueResponse.json();
+                if (issueData.success && issueData.permission_lemma) {
+                    // Store the issued credential
+                    await this.storeCredential(issueData.permission_lemma);
+                    platformCredentialIssued = true;
+                    console.log('[Lemma] ✅ Platform credential issued and stored for linked device');
+                }
+            }
+        } catch (e) {
+            console.warn('[Lemma] Could not auto-issue platform credential:', e.message);
+            // Non-fatal - user can request credential later
+        }
+        
         return {
             success: true,
             walletId: payload.walletId,
@@ -4101,7 +4131,10 @@ class LemmaWallet {
             profileName: profileName,
             needsPasskey: true,
             sessionSet: true,  // Indicates session cookie was set
-            message: `Wallet "${profileName}" linked! Create a passkey to secure it, or continue to use your wallet.`
+            credentialIssued: platformCredentialIssued,  // Indicates platform credential was auto-issued
+            message: platformCredentialIssued 
+                ? `Wallet "${profileName}" linked with platform access! Create a passkey to secure it.`
+                : `Wallet "${profileName}" linked! Create a passkey to secure it.`
         };
     }
     
