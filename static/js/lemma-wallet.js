@@ -1108,12 +1108,20 @@ class LemmaWallet {
                 }
                 
                 if (walletId) {
-                    const globalSession = await this._checkGlobalSession(walletId);
+                    // Only check global session if we GOT our session from global/bridge
+                    // Local passkey sessions don't require global validation
+                    const sessionSource = this.session.source;
+                    const requiresGlobalValidation = ['global_sync', 'bridge', 'server'].includes(sessionSource);
                     
-                    if (!globalSession.valid) {
-                        console.log('[Lemma] Wallet locked on another device');
-                        await this._clearSessionGracefully('wallet_locked', 'Your wallet was locked on another device.');
+                    if (requiresGlobalValidation) {
+                        const globalSession = await this._checkGlobalSession(walletId);
+                        
+                        if (!globalSession.valid) {
+                            console.log('[Lemma] Wallet locked on another device (source was:', sessionSource, ')');
+                            await this._clearSessionGracefully('wallet_locked', 'Your wallet was locked on another device.');
+                        }
                     }
+                    // Local passkey sessions are valid regardless of global state
                 }
             } catch (e) {
                 // Network issues shouldn't cause sign-out - fail silently
