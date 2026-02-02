@@ -47,6 +47,7 @@ SESSION_COOKIE_NAME = 'lemma_wallet_session'
 SESSION_DURATION = 24 * 60 * 60  # 24 hours in seconds
 SESSION_SECRET = os.environ.get('SESSION_SECRET', 'dev-secret-change-in-production')
 CSRF_COOKIE_NAME = 'lemma_wallet_csrf'
+UNLOCK_TOKEN_TTL = 5 * 60  # 5 minutes
 
 _ALLOWED_ORIGINS = {
     origin.strip().lower()
@@ -140,6 +141,45 @@ def generate_session_token(wallet_id: str, unlocked_at: int, profile_id: str = '
         hashlib.sha256
     ).hexdigest()[:32]
     return f"{payload}:{signature}"
+
+
+def generate_unlock_token(wallet_id: str, unlocked_at: int, expires_at: int) -> str:
+    """Generate a short-lived unlock token after verified passkey authentication."""
+    issued_at = int(time.time())
+    nonce = secrets.token_hex(8)
+    payload = f"{wallet_id}:{unlocked_at}:{expires_at}:{issued_at}:{nonce}"
+    signature = hmac.new(
+        SESSION_SECRET.encode(),
+        payload.encode(),
+        hashlib.sha256
+    ).hexdigest()[:32]
+    return f"{payload}:{signature}"
+
+
+def validate_unlock_token(token: str) -> dict | None:
+    """Validate an unlock token and return decoded fields."""
+    try:
+        wallet_id, unlocked_at, expires_at, issued_at, nonce, signature = token.split(':')
+        unlocked_at = int(unlocked_at)
+        expires_at = int(expires_at)
+        issued_at = int(issued_at)
+        payload = f"{wallet_id}:{unlocked_at}:{expires_at}:{issued_at}:{nonce}"
+        expected_sig = hmac.new(
+            SESSION_SECRET.encode(),
+            payload.encode(),
+            hashlib.sha256
+        ).hexdigest()[:32]
+        if not hmac.compare_digest(signature, expected_sig):
+            return None
+        if int(time.time()) - issued_at > UNLOCK_TOKEN_TTL:
+            return None
+        return {
+            'wallet_id': wallet_id,
+            'unlocked_at': unlocked_at,
+            'expires_at': expires_at
+        }
+    except Exception:
+        return None
 
 
 def validate_session_token(token: str) -> dict:
@@ -297,7 +337,7 @@ def set_session():
     
     data = request.get_json() or {}
     wallet_id = data.get('wallet_id')
-    unlocked_at = data.get('unlocked_at', int(time.time() * 1000))
+    unlock_token = data.get('unlock_token')
     profile_id = data.get('profile_id', 'default')
     profile_name = data.get('profile_name', 'Personal')
 
@@ -305,11 +345,21 @@ def set_session():
         response = jsonify({'success': False, 'error': 'wallet_id required'})
         response.headers.update(_cors_headers(origin))
         return response, 400
+    
+    # SECURITY: Require a short-lived unlock token from server-verified passkey auth
+    unlock_data = validate_unlock_token(unlock_token) if unlock_token else None
+    if not unlock_data or unlock_data['wallet_id'] != wallet_id:
+        response = jsonify({'success': False, 'error': 'unlock_token_required'})
+        response.headers.update(_cors_headers(origin))
+        return response, 403
+    
+    unlocked_at = unlock_data['unlocked_at']
+    expires_at = unlock_data['expires_at']
 
     # Generate session token + CSRF token (now includes profile info)
     token = generate_session_token(wallet_id, unlocked_at, profile_id, profile_name)
     csrf_token = secrets.token_urlsafe(32)
-    expires_at = int(time.time()) + SESSION_DURATION
+    expires_at = expires_at or (int(time.time()) + SESSION_DURATION)
     
     # Store in database for cross-device sync
     device_hint = request.headers.get('User-Agent', '')[:100]  # Truncate for storage

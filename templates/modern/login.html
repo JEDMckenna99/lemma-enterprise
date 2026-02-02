@@ -376,8 +376,8 @@
                 updateButton('Unlocking wallet...', false, true);
                 updateStatus('info', '👆 Please authenticate with your device');
                 
-                // Unlock with passkey
-                const unlocked = await wallet.unlock();
+                // Unlock with passkey (server-verified for cross-device SSO)
+                const unlocked = await wallet.unlock({ requireServerSession: true });
                 
                 if (!unlocked) {
                     throw new Error('Unlock failed');

@@ -518,6 +518,17 @@ def passkey_authenticate_complete():
                 'error': 'Authentication session expired'
             }), 400
         
+        # SECURITY: Verify challenge hasn't expired
+        expires_str = stored.get('expires')
+        if expires_str:
+            expires = datetime.fromisoformat(expires_str)
+            if datetime.utcnow() > expires:
+                del _challenges[challenge_key]
+                return jsonify({
+                    'success': False,
+                    'error': 'Authentication challenge expired - please start again'
+                }), 400
+        
         # Verify the authentication
         verification = verify_authentication_response(
             credential=credential,
@@ -575,15 +586,76 @@ def passkey_authenticate_complete():
         
         logger.info(f"✅ Passkey authentication successful for {user_email}")
         
-        return jsonify({
+        # Create a server-verified wallet session cookie for cross-device SSO
+        unlock_token = None
+        session_token = None
+        csrf_token = None
+        expires_at = None
+        unlocked_at_ms = int(datetime.utcnow().timestamp() * 1000)
+        try:
+            from api.wallet_session_sync import (
+                generate_session_token,
+                generate_unlock_token,
+                SESSION_COOKIE_NAME,
+                CSRF_COOKIE_NAME,
+                SESSION_DURATION,
+                _store_global_session,
+            )
+            csrf_token = secrets.token_urlsafe(32)
+            session_token = generate_session_token(wallet_id, unlocked_at_ms)
+            expires_at = int(datetime.utcnow().timestamp()) + SESSION_DURATION
+            _store_global_session(
+                wallet_id=wallet_id,
+                unlocked_at=unlocked_at_ms,
+                expires_at=expires_at,
+                profile_id='default',
+                profile_name='Personal'
+            )
+            unlock_token = generate_unlock_token(
+                wallet_id=wallet_id,
+                unlocked_at=unlocked_at_ms,
+                expires_at=expires_at
+            )
+        except Exception as e:
+            logger.warning(f"Failed to set wallet session cookie: {e}")
+        
+        response = make_response(jsonify({
             'success': True,
             'user_id': passkey.user_id,
             'user_email': user_email,
             'auth_method': 'passkey',
             'wallet_id': wallet_id,  # Include for cross-device sync
             'lemma': lemma_with_proof,
+            'wallet_session': {
+                'unlocked_at': unlocked_at_ms,
+                'expires_at': expires_at
+            },
+            'unlock_token': unlock_token,
             'message': 'Authentication successful'
-        })
+        }))
+        
+        if session_token:
+            response.set_cookie(
+                SESSION_COOKIE_NAME,
+                session_token,
+                max_age=SESSION_DURATION,
+                httponly=True,
+                secure=True,
+                samesite='None',
+                path='/'
+            )
+        if csrf_token:
+            response.set_cookie(
+                CSRF_COOKIE_NAME,
+                csrf_token,
+                max_age=SESSION_DURATION,
+                httponly=False,
+                secure=True,
+                samesite='None',
+                path='/'
+            )
+        
+        return response
         
     except Exception as e:
         logger.error(f"❌ Passkey authentication complete failed: {e}")
