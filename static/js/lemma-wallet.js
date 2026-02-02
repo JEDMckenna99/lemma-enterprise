@@ -4103,8 +4103,9 @@ class LemmaWallet {
             
             // Create a URL that opens the link page with the code pre-filled
             // This makes scanning work properly on mobile devices
-            const qrDataBase64 = btoa(qrData);
-            console.log('[Lemma] generateLinkCode: base64 encoded, length:', qrDataBase64.length);
+            // Use URL-safe base64 (replace + with -, / with _) to avoid URL encoding issues
+            const qrDataBase64 = btoa(qrData).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+            console.log('[Lemma] generateLinkCode: base64 encoded (URL-safe), length:', qrDataBase64.length);
             const qrUrl = `https://lemma.id/wallet/link#${qrDataBase64}`;
             console.log('[Lemma] generateLinkCode: qrUrl created, length:', qrUrl.length);
             

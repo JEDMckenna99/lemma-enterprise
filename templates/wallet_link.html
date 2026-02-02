@@ -119,20 +119,6 @@
     height: 100%;
     object-fit: cover;
 }
-.scanner-overlay {
-    position: absolute;
-    inset: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    pointer-events: none;
-}
-.scanner-frame {
-    width: 60%;
-    height: 60%;
-    border: 3px solid rgba(102, 126, 234, 0.8);
-    border-radius: 12px;
-}
 
 .hidden { display: none !important; }
 
@@ -172,13 +158,8 @@
             <strong>lemma.id/wallet/simple → Add Device</strong>
         </div>
 
-        <!-- QR Scanner -->
-        <div class="scanner-area" id="scanner-container">
-            <video id="scanner-video" autoplay playsinline></video>
-            <div class="scanner-overlay">
-                <div class="scanner-frame"></div>
-            </div>
-        </div>
+        <!-- QR Scanner - Html5Qrcode creates its own video element -->
+        <div class="scanner-area" id="scanner-container"></div>
         
         <button class="btn btn-primary" id="scan-btn" onclick="startScanner()">
             Scan QR Code
@@ -282,17 +263,21 @@ function setStep(step) {
 
 async function startScanner() {
     const scanBtn = document.getElementById('scan-btn');
-    const video = document.getElementById('scanner-video');
+    const container = document.getElementById('scanner-container');
     
     if (scannerActive) {
         // Stop scanner
         if (html5QrCode) {
-            await html5QrCode.stop();
+            try {
+                await html5QrCode.stop();
+            } catch (e) {
+                console.log('Scanner already stopped');
+            }
             html5QrCode = null;
         }
         scannerActive = false;
         scanBtn.textContent = 'Scan QR Code';
-        video.srcObject = null;
+        container.innerHTML = ''; // Clear scanner elements
         return;
     }
     
@@ -300,19 +285,24 @@ async function startScanner() {
         scanBtn.textContent = 'Stop Scanner';
         scannerActive = true;
         
+        // Clear any previous scanner elements
+        container.innerHTML = '';
+        
         html5QrCode = new Html5Qrcode("scanner-container");
         await html5QrCode.start(
             { facingMode: "environment" },
-            { fps: 10, qrbox: { width: 250, height: 250 } },
+            { fps: 10, qrbox: { width: 200, height: 200 } },
             onQrCodeScanned,
-            () => {} // ignore errors
+            () => {} // ignore errors during scanning
         );
     } catch (e) {
         console.error('Scanner error:', e);
-        document.getElementById('status').textContent = 'Camera access denied or not available';
-        document.getElementById('status').className = 'status-box error';
+        const status = document.getElementById('status');
+        status.innerHTML = 'Camera access denied or not available.<br><br>You can paste the link code manually below.';
+        status.className = 'status-box error';
         scanBtn.textContent = 'Scan QR Code';
         scannerActive = false;
+        container.innerHTML = '';
     }
 }
 
@@ -478,11 +468,16 @@ document.addEventListener('DOMContentLoaded', async () => {
             document.getElementById('status').className = 'status-box info';
         }
         
-        // Check for link code in URL hash (from QR scan)
+        // Check for link code in URL hash (from QR scan or pasted link)
         // URL format: https://lemma.id/wallet/link#BASE64_ENCODED_JSON
         if (window.location.hash && window.location.hash.length > 1) {
-            const hashData = window.location.hash.substring(1); // Remove the #
+            let hashData = window.location.hash.substring(1); // Remove the #
             try {
+                // Convert URL-safe base64 back to standard base64
+                // Replace - with +, _ with /, and add padding if needed
+                hashData = hashData.replace(/-/g, '+').replace(/_/g, '/');
+                while (hashData.length % 4) hashData += '=';
+                
                 // Decode base64 to get the JSON
                 const qrData = atob(hashData);
                 // Validate it's valid JSON
