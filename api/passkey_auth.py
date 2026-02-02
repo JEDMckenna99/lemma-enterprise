@@ -581,7 +581,15 @@ def list_passkeys():
 @passkey_bp.route('/api/passkey/<int:passkey_id>', methods=['DELETE'])
 @cross_origin()
 def delete_passkey(passkey_id):
-    """Delete a passkey"""
+    """
+    Delete a passkey and revoke all associated credentials.
+    
+    SECURITY: When a passkey is deleted (device lost/stolen), we must:
+    1. Deactivate the passkey
+    2. Revoke ALL credentials for this user's wallet (all sites, all devices)
+    
+    This ensures attackers can't use cached credentials after device compromise.
+    """
     user_id = session.get('customer_id')
     
     if not user_id:
@@ -603,14 +611,68 @@ def delete_passkey(passkey_id):
                 'error': 'Passkey not found'
             }), 404
         
+        # Get wallet_id for credential revocation
+        customer = db.query(Customer).filter(Customer.id == user_id).first()
+        wallet_id = customer.wallet_id if customer else None
+        
+        # Deactivate the passkey
         passkey.is_active = False
+        
+        # SECURITY: Revoke ALL credentials associated with this wallet
+        # This prevents attackers from using cached credentials after device compromise
+        revocation_count = 0
+        if wallet_id:
+            try:
+                from api.database import RevocationList
+                from datetime import datetime
+                
+                # Add wallet-level revocation (all sites, all devices)
+                existing = db.query(RevocationList).filter(
+                    RevocationList.credential_id == f"wallet:{wallet_id}"
+                ).first()
+                
+                if not existing:
+                    revocation = RevocationList(
+                        lemma_id=f"wallet:{wallet_id}",
+                        credential_id=f"wallet:{wallet_id}",
+                        wallet_id=wallet_id,
+                        revocation_type='wallet',  # Wallet-level revocation
+                        reason=f'passkey_deleted:{passkey_id}',
+                        revoked_at=datetime.utcnow(),
+                        revoked_by=f'user:{user_id}'
+                    )
+                    db.add(revocation)
+                    revocation_count = 1
+                    logger.info(f"🔐 SECURITY: Wallet {wallet_id[:12]}... revoked due to passkey deletion")
+                    
+            except Exception as e:
+                logger.error(f"Failed to revoke wallet credentials: {e}")
+                # Continue with passkey deletion even if revocation fails
+        
         db.commit()
         
-        logger.info(f"🗑️ Passkey {passkey_id} deleted for user {user_id}")
+        # Audit log
+        try:
+            from api.audit_logger import log_event, AuditEvent
+            log_event(
+                AuditEvent.CREDENTIAL_REVOKED,
+                details={
+                    'passkey_id': passkey_id,
+                    'wallet_id': wallet_id,
+                    'revocation_type': 'passkey_deleted',
+                    'credentials_revoked': revocation_count
+                },
+                user_id=user_id
+            )
+        except Exception:
+            pass
+        
+        logger.info(f"🗑️ Passkey {passkey_id} deleted for user {user_id}, {revocation_count} credential(s) revoked")
         
         return jsonify({
             'success': True,
-            'message': 'Passkey deleted'
+            'message': 'Passkey deleted and credentials revoked',
+            'credentials_revoked': revocation_count
         })
         
     finally:

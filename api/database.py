@@ -304,9 +304,10 @@ class BillingRecord(Base):
 class RevocationList(Base):
     """Revocation list for lemmas (both PoH and permissions)
     
-    Supports TWO types of revocation:
+    Supports THREE types of revocation:
     - credential: Revokes ONE specific credential (one device)
-    - user: Revokes ALL credentials for a PPID (all devices)
+    - user: Revokes ALL credentials for a PPID (all devices on one site)
+    - wallet: Revokes ALL credentials for a wallet_id (all sites, all devices)
     """
     __tablename__ = 'revocation_list'
     
@@ -316,8 +317,9 @@ class RevocationList(Base):
     lemma_type = Column(String, nullable=False, default='permission')  # 'poh', 'permission'
     site_id = Column(String)  # NULL for universal PoH revocations
     user_did = Column(String)  # User DID (optional for some revocation types)
-    ppid = Column(String, index=True)  # PPID for user-level revocation (all devices)
-    revocation_type = Column(String, default='credential')  # 'credential' or 'user'
+    ppid = Column(String, index=True)  # PPID for user-level revocation (all devices on one site)
+    wallet_id = Column(String, index=True)  # wallet_id for global revocation (all sites, all devices)
+    revocation_type = Column(String, default='credential')  # 'credential', 'user', or 'wallet'
     revoked_by = Column(String)  # Who revoked it
     revoked_at = Column(DateTime, default=datetime.utcnow)
     reason = Column(String)  # Reason for revocation

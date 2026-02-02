@@ -2508,9 +2508,10 @@ class LemmaWallet {
     /**
      * Check if a credential is revoked (local check)
      * 
-     * Checks TWO things:
+     * Checks THREE things:
      * 1. Is the credential_id in the Bloom filter? (device-level revocation)
-     * 2. Is the PPID in the Bloom filter? (user-level revocation - ALL devices)
+     * 2. Is the PPID in the Bloom filter? (user-level revocation - all devices, one site)
+     * 3. Is the wallet_id in the Bloom filter? (wallet-level revocation - all devices, ALL sites)
      * 
      * @param {string} credentialId - The credential ID to check
      * @param {string} ppid - Optional PPID from credential claims (for user-level revocation)
@@ -2525,19 +2526,49 @@ class LemmaWallet {
         // Check credential-level revocation (one device)
         const credentialRevoked = revocations.listArray.includes(credentialId);
         
-        // Check user-level revocation (all devices with same PPID)
+        // Check user-level revocation (all devices with same PPID on one site)
         const ppidRevoked = ppid ? revocations.listArray.includes(ppid) : false;
         
-        const isRevoked = credentialRevoked || ppidRevoked;
+        // Check wallet-level revocation (all devices, ALL sites)
+        // wallet_id is stored in this instance's config
+        const walletId = this.walletId || await this._getWalletId();
+        const walletRevoked = walletId ? revocations.listArray.includes(walletId) : false;
+        
+        const isRevoked = credentialRevoked || ppidRevoked || walletRevoked;
+        
+        // Determine revocation reason (most severe first)
+        let reason = null;
+        if (isRevoked) {
+            if (walletRevoked) {
+                reason = 'wallet_revoked';  // Most severe: ALL sites compromised
+            } else if (ppidRevoked) {
+                reason = 'user_revoked';    // Site-level: user banned from site
+            } else {
+                reason = 'credential_revoked';  // Device-level: one credential
+            }
+        }
         
         return {
             revoked: isRevoked,
             credentialRevoked: credentialRevoked,
             ppidRevoked: ppidRevoked,
+            walletRevoked: walletRevoked,
             unchecked: false,
             lastSynced: revocations.lastSynced,
-            reason: isRevoked ? (ppidRevoked ? 'user_revoked' : 'credential_revoked') : null
+            reason: reason
         };
+    }
+    
+    /**
+     * Get wallet ID from IndexedDB
+     */
+    async _getWalletId() {
+        try {
+            const secrets = await this._get('secrets', 'master');
+            return secrets?.walletId || null;
+        } catch (e) {
+            return null;
+        }
     }
     
     /**

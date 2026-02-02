@@ -137,7 +137,7 @@ def get_bloom_filter():
             
             revoked_ids = [row[0] for row in cursor.fetchall()]
             
-            # ALSO get revoked PPIDs for user-level revocation (all devices)
+            # ALSO get revoked PPIDs for user-level revocation (all devices on one site)
             # When a PPID is in the bloom filter, ALL credentials for that user are revoked
             cursor.execute("""
                 SELECT DISTINCT ppid
@@ -147,14 +147,24 @@ def get_bloom_filter():
             
             revoked_ppids = [row[0] for row in cursor.fetchall()]
             
-            # Combine credential IDs and PPIDs in the bloom filter
-            # Client checks: is credential.id OR credential.claims.ppid in bloom?
-            all_revoked = revoked_ids + revoked_ppids
+            # ALSO get revoked wallet_ids for global revocation (all sites, all devices)
+            # When a wallet_id is in the bloom filter, ALL credentials for that wallet are revoked
+            cursor.execute("""
+                SELECT DISTINCT wallet_id
+                FROM revocation_list
+                WHERE wallet_id IS NOT NULL AND revocation_type = 'wallet'
+            """)
+            
+            revoked_wallets = [row[0] for row in cursor.fetchall()]
+            
+            # Combine credential IDs, PPIDs, and wallet_ids in the bloom filter
+            # Client checks: is credential.id OR credential.subject(ppid) OR wallet_id in bloom?
+            all_revoked = revoked_ids + revoked_ppids + revoked_wallets
             
             cursor.close()
             conn.close()
             
-            logger.info(f"📊 Global Bloom filter: {len(revoked_ids)} credentials + {len(revoked_ppids)} PPIDs = {len(all_revoked)} total")
+            logger.info(f"📊 Global Bloom filter: {len(revoked_ids)} creds + {len(revoked_ppids)} PPIDs + {len(revoked_wallets)} wallets = {len(all_revoked)} total")
             
             # Replace revoked_ids with combined list for downstream processing
             revoked_ids = all_revoked

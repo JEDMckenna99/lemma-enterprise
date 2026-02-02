@@ -1152,15 +1152,16 @@ def get_revocation_status():
 @wallet_service_bp.route('/api/wallet/revoke-user', methods=['POST'])
 def revoke_user():
     """
-    Revoke ALL credentials for a user (PPID) across ALL devices.
+    Revoke ALL credentials for a user (PPID) on ONE SITE across ALL devices.
     
     This adds the user's PPID to the Bloom filter, which invalidates
-    ALL credentials for that user regardless of which device they're on.
+    ALL credentials for that user on that site regardless of which device they're on.
     
     Use this when:
-    - User requests account deletion
-    - Admin bans a user
-    - Security incident requiring immediate full revocation
+    - Site admin bans a user from their site
+    - User requests access removal from a specific site
+    
+    For global revocation (all sites), use /api/wallet/revoke-wallet instead.
     
     Request body:
         ppid: The user's PPID (site-specific identifier)
@@ -1229,6 +1230,121 @@ def revoke_user():
             
     except Exception as e:
         logger.error(f"User revocation failed: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@wallet_service_bp.route('/api/wallet/revoke-wallet', methods=['POST'])
+def revoke_wallet():
+    """
+    Revoke ALL credentials for a wallet across ALL sites and ALL devices.
+    
+    This is the nuclear option - use for:
+    - Account deletion requests
+    - Compromised wallet (device lost with passkey deleted)
+    - Security incidents requiring immediate full lockout
+    
+    This adds the wallet_id to the global Bloom filter, which invalidates
+    ALL credentials for that wallet on EVERY site.
+    
+    Request body:
+        wallet_id: The wallet identifier to revoke
+        reason: Reason for revocation
+        
+    Security: Requires authenticated session OR admin API key
+    """
+    try:
+        data = request.get_json() or {}
+        wallet_id = data.get('wallet_id')
+        reason = data.get('reason', 'wallet_revocation')
+        
+        if not wallet_id:
+            return jsonify({'success': False, 'error': 'wallet_id required'}), 400
+        
+        # Security: Verify caller is authorized (owns wallet or is admin)
+        session_wallet_id = None
+        try:
+            session_token = request.cookies.get(SESSION_COOKIE_NAME)
+            if session_token:
+                session_data = validate_session_token(session_token)
+                if session_data:
+                    session_wallet_id = session_data.get('wallet_id')
+        except:
+            pass
+        
+        is_admin = request.headers.get('X-API-Key', '').startswith('lemma_admin_')
+        is_owner = session_wallet_id == wallet_id
+        
+        if not is_admin and not is_owner:
+            logger.warning(f"🚫 Unauthorized wallet revocation attempt for {wallet_id[:12]}...")
+            return jsonify({
+                'success': False, 
+                'error': 'Unauthorized - must be wallet owner or admin'
+            }), 403
+        
+        # Add wallet_id to revocation list with revocation_type='wallet'
+        from api.database import get_db, RevocationList
+        from datetime import datetime
+        
+        db = get_db()
+        try:
+            # Check if already revoked
+            existing = db.query(RevocationList).filter(
+                RevocationList.wallet_id == wallet_id,
+                RevocationList.revocation_type == 'wallet'
+            ).first()
+            
+            if existing:
+                return jsonify({
+                    'success': True,
+                    'already_revoked': True,
+                    'message': 'Wallet already revoked globally'
+                })
+            
+            # Create new revocation entry
+            revocation = RevocationList(
+                lemma_id=f"wallet:{wallet_id}",
+                credential_id=f"wallet:{wallet_id}",
+                wallet_id=wallet_id,
+                revocation_type='wallet',  # Wallet-level revocation (all sites)
+                reason=reason,
+                revoked_at=datetime.utcnow(),
+                revoked_by='owner' if is_owner else 'admin'
+            )
+            
+            db.add(revocation)
+            db.commit()
+            
+            logger.info(f"🔐 GLOBAL REVOCATION: Wallet {wallet_id[:12]}... revoked across ALL sites")
+            
+            # Audit log
+            try:
+                from api.audit_logger import log_event, AuditEvent
+                log_event(
+                    AuditEvent.CREDENTIAL_REVOKED,
+                    details={
+                        'wallet_id': wallet_id,
+                        'revocation_type': 'wallet',
+                        'scope': 'global',
+                        'reason': reason
+                    }
+                )
+            except Exception:
+                pass
+            
+            return jsonify({
+                'success': True,
+                'wallet_id': wallet_id,
+                'revocation_type': 'wallet',
+                'scope': 'global',
+                'message': 'Wallet revoked globally. ALL credentials on ALL sites are now invalid.',
+                'note': 'Bloom filter will sync within 1 hour. Immediate effect on new verifications.'
+            })
+            
+        finally:
+            db.close()
+            
+    except Exception as e:
+        logger.error(f"Wallet revocation failed: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
 

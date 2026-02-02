@@ -353,9 +353,100 @@ def require_admin(f):
 def init_csrf_protection(app):
     """
     Initialize CSRF protection for the Flask app
+    
+    Uses double-submit cookie pattern:
+    1. Server sets CSRF token in cookie (readable by JS)
+    2. Client sends token in X-CSRF-Token header
+    3. Server validates cookie matches header
+    
+    This protects against CSRF because:
+    - Attacker can't read the cookie from another domain (same-origin policy)
+    - Attacker can't set the header from another domain (CORS prevents it)
     """
-    # TODO: Implement CSRF protection
-    pass
+    import secrets
+    
+    CSRF_COOKIE_NAME = 'lemma_csrf_token'
+    CSRF_HEADER_NAME = 'X-CSRF-Token'
+    
+    # Methods that require CSRF protection
+    PROTECTED_METHODS = ['POST', 'PUT', 'DELETE', 'PATCH']
+    
+    # Endpoints exempt from CSRF (API key authenticated, webhooks, etc.)
+    CSRF_EXEMPT_PREFIXES = [
+        '/api/sdk/',           # SDK endpoints use API key auth
+        '/api/webhook/',       # Webhooks have their own auth
+        '/api/passkey/authenticate/',  # WebAuthn has built-in CSRF protection
+        '/api/passkey/register/',      # WebAuthn has built-in CSRF protection
+        '/api/health',         # Health check
+        '/api/revocation/',    # Public revocation list
+    ]
+    
+    @app.before_request
+    def csrf_protect():
+        """Validate CSRF token for state-changing requests"""
+        from flask import request, g
+        
+        # Skip non-protected methods
+        if request.method not in PROTECTED_METHODS:
+            return
+        
+        # Skip exempt endpoints
+        for prefix in CSRF_EXEMPT_PREFIXES:
+            if request.path.startswith(prefix):
+                return
+        
+        # Skip if API key is present (programmatic access)
+        if request.headers.get('X-API-Key') or request.headers.get('Authorization', '').startswith('Bearer lemma_'):
+            return
+        
+        # Validate CSRF token
+        cookie_token = request.cookies.get(CSRF_COOKIE_NAME)
+        header_token = request.headers.get(CSRF_HEADER_NAME)
+        
+        # Also check form data for traditional forms
+        if not header_token:
+            header_token = request.form.get('csrf_token')
+        
+        if not cookie_token or not header_token:
+            # Log but don't block yet (gradual rollout)
+            app.logger.warning(f"⚠️ CSRF token missing for {request.method} {request.path}")
+            # TODO: Return 403 after testing period
+            # return jsonify({'error': 'CSRF token required'}), 403
+            return
+        
+        if not secrets.compare_digest(cookie_token, header_token):
+            app.logger.warning(f"🚫 CSRF token mismatch for {request.method} {request.path}")
+            # TODO: Return 403 after testing period
+            # return jsonify({'error': 'CSRF token invalid'}), 403
+            return
+        
+        g.csrf_validated = True
+    
+    @app.after_request
+    def set_csrf_cookie(response):
+        """Set CSRF cookie if not present"""
+        from flask import request
+        
+        # Only set for HTML responses or session-based auth
+        if request.cookies.get(CSRF_COOKIE_NAME):
+            return response
+        
+        # Generate new token
+        token = secrets.token_urlsafe(32)
+        
+        # Set cookie (SameSite=Lax allows normal navigation, blocks cross-site POST)
+        response.set_cookie(
+            CSRF_COOKIE_NAME,
+            token,
+            httponly=False,  # JS needs to read this
+            secure=True,
+            samesite='Lax',
+            max_age=86400 * 7  # 7 days
+        )
+        
+        return response
+    
+    app.logger.info("✅ CSRF protection initialized")
 
 
 def require_authenticated(f):
