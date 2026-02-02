@@ -1166,6 +1166,8 @@ class LemmaWallet {
                     unlockedAt: storedSession.unlockedAt,
                     expiresAt: storedSession.expiresAt,
                     walletId: storedSession.walletId,
+                    walletSecret: storedSession.walletSecret,
+                    serverUnlockToken: storedSession.serverUnlockToken,  // Preserve for cross-device SSO
                     source: storedSession.source || 'local'
                 };
                 
@@ -1370,18 +1372,21 @@ class LemmaWallet {
         }
 
         // Auto-unlock after registration (user just authenticated)
+        // IMPORTANT: Preserve serverUnlockToken if it was set during linking
+        const existingUnlockToken = this.session?.serverUnlockToken;
         const now = Date.now();
         this.session = {
             isUnlocked: true,
             unlockedAt: now,
             expiresAt: now + getSessionDurationMs(),
             walletId: walletId.value,
-            walletSecret: walletSecret.secret  // Include in session for easy access
+            walletSecret: walletSecret.secret,  // Include in session for easy access
+            serverUnlockToken: existingUnlockToken  // Preserve from linking
         };
         await this._put('session', { id: 'current', ...this.session });
         console.log('✅ Wallet auto-unlocked after passkey registration');
 
-        // Set server session cookie only if server verified this unlock
+        // Set server session cookie if we have an unlock token (from linking or server auth)
         if (this.session?.serverUnlockToken) {
             try {
                 const activeProfile = await this.getActiveProfile();
@@ -1582,13 +1587,16 @@ class LemmaWallet {
         }
 
         // Unlock the wallet
+        // IMPORTANT: Preserve serverUnlockToken if it was set during linking
+        const existingUnlockToken = this.session?.serverUnlockToken;
         const now = Date.now();
         this.session = {
             isUnlocked: true,
             unlockedAt: now,
             expiresAt: now + getSessionDurationMs(),
             walletId: walletId,
-            walletSecret: walletSecretRecord.secret
+            walletSecret: walletSecretRecord.secret,
+            serverUnlockToken: existingUnlockToken  // Preserve from linking
         };
 
         // Persist session locally
@@ -1599,7 +1607,7 @@ class LemmaWallet {
 
         console.log('✅ Wallet unlocked successfully');
 
-        // Set server session cookie only if server verified this unlock
+        // Set server session cookie if we have an unlock token (from linking or server auth)
         if (this.session?.serverUnlockToken) {
             try {
                 const activeProfile = await this.getActiveProfile();
@@ -4065,6 +4073,31 @@ class LemmaWallet {
             const walletId = await this._get('passkey', 'walletId');
             console.log('[Lemma] generateLinkCode: walletId:', walletId);
             
+            // Request link unlock token from server (if on lemma.id)
+            // The server will validate the session cookie
+            let linkUnlockToken = null;
+            if (this._isLemmaDomain()) {
+                try {
+                    console.log('[Lemma] generateLinkCode: requesting link unlock token from server...');
+                    const tokenResponse = await fetch('/api/wallet/link-unlock-token', {
+                        method: 'POST',
+                        credentials: 'include',
+                        headers: { 'Content-Type': 'application/json' }
+                    });
+                    if (tokenResponse.ok) {
+                        const tokenData = await tokenResponse.json();
+                        if (tokenData.success && tokenData.unlock_token) {
+                            linkUnlockToken = tokenData.unlock_token;
+                            console.log('[Lemma] generateLinkCode: got link unlock token (expires in', tokenData.expires_in, 's)');
+                        }
+                    } else {
+                        console.log('[Lemma] generateLinkCode: server returned', tokenResponse.status, '- linked device will need to create passkey');
+                    }
+                } catch (e) {
+                    console.warn('[Lemma] generateLinkCode: could not get link unlock token:', e.message);
+                }
+            }
+            
             // Generate a random encryption key (16 bytes = 128 bits)
             const encryptionKey = crypto.getRandomValues(new Uint8Array(16));
             const encryptionKeyHex = Array.from(encryptionKey)
@@ -4078,6 +4111,7 @@ class LemmaWallet {
                 walletId: walletId?.value || null,
                 profileId: profile.id,
                 profileName: profile.name,
+                linkUnlockToken: linkUnlockToken, // For cross-device session
                 createdAt: Date.now(),
                 expiresAt: Date.now() + 60000 // 60 seconds
             });
@@ -4246,7 +4280,15 @@ class LemmaWallet {
             });
         }
         
-        // Set server session cookie only if server verified this unlock
+        // If the link payload included an unlock token, use it to establish session
+        // This enables cross-device SSO even without a server-registered passkey
+        if (payload.linkUnlockToken) {
+            console.log('[Lemma] Link payload includes unlock token - storing for session');
+            this.session = this.session || {};
+            this.session.serverUnlockToken = payload.linkUnlockToken;
+        }
+        
+        // Set server session cookie only if we have an unlock token
         if (this.session?.serverUnlockToken) {
             try {
                 const now = Date.now();

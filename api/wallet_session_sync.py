@@ -312,6 +312,76 @@ def session_sync():
     return response
 
 
+@wallet_session_sync_bp.route('/api/wallet/link-unlock-token', methods=['POST', 'OPTIONS'])
+def get_link_unlock_token():
+    """
+    Get an unlock token for device linking.
+    
+    This endpoint is called by the SOURCE device (the one generating the QR code)
+    when it has a valid session. The token is included in the link QR code so the
+    DESTINATION device can establish its session without needing a server-registered passkey.
+    
+    Requires: Valid session cookie (user must be unlocked on lemma.id)
+    
+    Returns:
+        - unlock_token: A token valid for 5 minutes that can be used with set-session
+    """
+    # Handle CORS preflight
+    if request.method == 'OPTIONS':
+        response = make_response()
+        origin = request.headers.get('Origin')
+        response.headers.update(_cors_headers(origin))
+        if not _origin_allowed(origin):
+            return response, 403
+        response.headers['Access-Control-Max-Age'] = '86400'
+        return response
+    
+    origin = request.headers.get('Origin')
+    
+    # Verify existing session
+    session_token = request.cookies.get(SESSION_COOKIE_NAME)
+    if not session_token:
+        response = jsonify({
+            'success': False,
+            'error': 'no_session',
+            'message': 'Must have valid session to generate link unlock token'
+        })
+        response.headers.update(_cors_headers(origin))
+        return response, 401
+    
+    session_data = validate_session_token(session_token)
+    if not session_data:
+        response = jsonify({
+            'success': False,
+            'error': 'session_expired',
+            'message': 'Session expired - unlock wallet first'
+        })
+        response.headers.update(_cors_headers(origin))
+        return response, 401
+    
+    # Generate unlock token for the linking device
+    wallet_id = session_data['wallet_id']
+    unlocked_at = int(time.time() * 1000)  # Current time in ms
+    expires_at = int(time.time()) + SESSION_DURATION  # 24 hours from now
+    
+    unlock_token = generate_unlock_token(
+        wallet_id=wallet_id,
+        unlocked_at=unlocked_at,
+        expires_at=expires_at
+    )
+    
+    logger.info(f"✅ Link unlock token generated for wallet {wallet_id[:8]}...")
+    
+    response = jsonify({
+        'success': True,
+        'unlock_token': unlock_token,
+        'wallet_id': wallet_id,
+        'expires_in': UNLOCK_TOKEN_TTL
+    })
+    response.headers.update(_cors_headers(origin))
+    return response
+
+
 @wallet_session_sync_bp.route('/api/wallet/set-session', methods=['POST', 'OPTIONS'])
 def set_session():
     """
