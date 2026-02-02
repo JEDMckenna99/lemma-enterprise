@@ -1,6 +1,12 @@
 """
 Passkey (WebAuthn) Authentication for Lemma
 Enables hardware-backed authentication with embedded proofs in lemmas
+
+SECURITY NOTES:
+- All auth endpoints require cryptographic verification
+- CORS is restricted to allowed origins only
+- Challenge expiration is enforced
+- User verification is required
 """
 
 import os
@@ -9,7 +15,9 @@ import base64
 import secrets
 import logging
 from datetime import datetime, timedelta
-from flask import Blueprint, request, jsonify, session
+from functools import wraps
+from urllib.parse import urlparse
+from flask import Blueprint, request, jsonify, session, make_response
 from flask_cors import cross_origin
 
 from webauthn import (
@@ -25,6 +33,7 @@ from webauthn.helpers.structs import (
     ResidentKeyRequirement,
     PublicKeyCredentialDescriptor,
     AuthenticatorTransport,
+    AuthenticationCredential,
 )
 from webauthn.helpers.cose import COSEAlgorithmIdentifier
 
@@ -38,6 +47,84 @@ passkey_bp = Blueprint('passkey', __name__)
 RP_ID = os.getenv('PASSKEY_RP_ID', 'lemma.id')
 RP_NAME = os.getenv('PASSKEY_RP_NAME', 'Lemma')
 ORIGIN = os.getenv('PASSKEY_ORIGIN', 'https://lemma.id')
+EXPECTED_ORIGIN = os.getenv('PASSKEY_EXPECTED_ORIGIN', 'https://lemma.id')
+
+# SECURITY: Allowed CORS origins for auth endpoints
+ALLOWED_AUTH_ORIGINS = set(
+    o.strip().lower() for o in 
+    os.getenv('LEMMA_ALLOWED_ORIGINS', 'https://lemma.id,https://www.lemma.id').split(',')
+    if o.strip()
+)
+ALLOWED_ORIGIN_SUFFIXES = [
+    s.strip().lower() for s in
+    os.getenv('LEMMA_ALLOWED_ORIGIN_SUFFIXES', '.lemma.id,.herokuapp.com').split(',')
+    if s.strip()
+]
+
+
+def _is_origin_allowed(origin: str) -> bool:
+    """Check if origin is allowed for CORS"""
+    if not origin:
+        return False
+    
+    origin_lower = origin.lower()
+    
+    # Check exact match
+    if origin_lower in ALLOWED_AUTH_ORIGINS:
+        return True
+    
+    # Check suffix match
+    parsed = urlparse(origin)
+    hostname = parsed.hostname or ''
+    for suffix in ALLOWED_ORIGIN_SUFFIXES:
+        if hostname.endswith(suffix.lstrip('.')):
+            return True
+    
+    return False
+
+
+def secure_cors(f):
+    """
+    CORS decorator that restricts to allowed origins only.
+    
+    SECURITY: This is stricter than @cross_origin() which allows all origins.
+    Only origins in LEMMA_ALLOWED_ORIGINS or matching LEMMA_ALLOWED_ORIGIN_SUFFIXES
+    are allowed.
+    """
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        origin = request.headers.get('Origin')
+        
+        # Handle preflight
+        if request.method == 'OPTIONS':
+            response = make_response()
+            if _is_origin_allowed(origin):
+                response.headers['Access-Control-Allow-Origin'] = origin
+                response.headers['Access-Control-Allow-Credentials'] = 'true'
+                response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS'
+                response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization, X-CSRF-Token'
+            return response
+        
+        # Execute the function
+        result = f(*args, **kwargs)
+        
+        # Add CORS headers to response if origin is allowed
+        if _is_origin_allowed(origin):
+            if isinstance(result, tuple):
+                response = result[0] if hasattr(result[0], 'headers') else make_response(result[0])
+                status = result[1] if len(result) > 1 else 200
+            else:
+                response = result if hasattr(result, 'headers') else make_response(result)
+                status = 200
+            
+            response.headers['Access-Control-Allow-Origin'] = origin
+            response.headers['Access-Control-Allow-Credentials'] = 'true'
+            
+            return (response, status) if isinstance(result, tuple) else response
+        
+        return result
+    
+    return decorated_function
 
 # Challenge storage (use Redis in production)
 _challenges = {}  # In-memory for now, move to Redis
@@ -117,30 +204,45 @@ def update_passkey_sign_count(passkey_id: int, new_sign_count: int):
 # REGISTRATION ENDPOINTS
 # ============================================
 
-@passkey_bp.route('/api/passkey/register/begin', methods=['POST'])
-@cross_origin()
+@passkey_bp.route('/api/passkey/register/begin', methods=['POST', 'OPTIONS'])
+@secure_cors
 def passkey_register_begin():
     """
     Begin passkey registration - returns options for navigator.credentials.create()
     
+    SECURITY: User ID and email MUST come from authenticated session.
+    Request body can only provide device_name.
+    This prevents attackers from registering passkeys to arbitrary users.
+    
     POST /api/passkey/register/begin
     {
-        "user_id": "customer_abc123",
-        "user_email": "user@example.com",
         "device_name": "My iPhone"  // optional
     }
+    
+    Requires: Authenticated session with customer_id and user_email
     """
     try:
         data = request.get_json() or {}
-        user_id = data.get('user_id') or session.get('customer_id')
-        user_email = data.get('user_email') or session.get('user_email')
+        
+        # SECURITY: User identity MUST come from authenticated session only
+        # Do NOT accept user_id or user_email from request body
+        user_id = session.get('customer_id')
+        user_email = session.get('user_email')
         device_name = data.get('device_name', 'Passkey')
+        
+        # SECURITY: Reject if user_id/user_email provided in request (prevent spoofing)
+        if data.get('user_id') and data.get('user_id') != user_id:
+            logger.warning(f"🚫 SECURITY: Attempt to register passkey for different user_id: {data.get('user_id')}")
+            return jsonify({
+                'success': False,
+                'error': 'Cannot register passkey for different user - authentication required'
+            }), 403
         
         if not user_id or not user_email:
             return jsonify({
                 'success': False,
-                'error': 'user_id and user_email are required'
-            }), 400
+                'error': 'Authentication required - please sign in first'
+            }), 401
         
         # Get existing passkeys to exclude them
         existing_passkeys = get_user_passkeys(user_id)
@@ -196,27 +298,47 @@ def passkey_register_begin():
         }), 500
 
 
-@passkey_bp.route('/api/passkey/register/complete', methods=['POST'])
-@cross_origin()
+@passkey_bp.route('/api/passkey/register/complete', methods=['POST', 'OPTIONS'])
+@secure_cors
 def passkey_register_complete():
     """
     Complete passkey registration - verify and store the credential
     
+    SECURITY: User ID MUST come from authenticated session.
+    This prevents attackers from completing registration for arbitrary users.
+    
     POST /api/passkey/register/complete
     {
-        "user_id": "customer_abc123",
         "credential": { ... WebAuthn credential response ... }
     }
+    
+    Requires: Authenticated session with customer_id
     """
     try:
         data = request.get_json()
-        user_id = data.get('user_id') or session.get('customer_id')
+        
+        # SECURITY: User identity MUST come from authenticated session only
+        user_id = session.get('customer_id')
         credential = data.get('credential')
         
-        if not user_id or not credential:
+        # SECURITY: Reject if user_id provided in request and doesn't match session
+        if data.get('user_id') and data.get('user_id') != user_id:
+            logger.warning(f"🚫 SECURITY: Attempt to complete passkey reg for different user: {data.get('user_id')}")
             return jsonify({
                 'success': False,
-                'error': 'user_id and credential are required'
+                'error': 'Cannot register passkey for different user'
+            }), 403
+        
+        if not user_id:
+            return jsonify({
+                'success': False,
+                'error': 'Authentication required - please sign in first'
+            }), 401
+            
+        if not credential:
+            return jsonify({
+                'success': False,
+                'error': 'WebAuthn credential response is required'
             }), 400
         
         # Retrieve stored challenge
@@ -226,16 +348,27 @@ def passkey_register_complete():
         if not stored:
             return jsonify({
                 'success': False,
-                'error': 'Registration session expired'
+                'error': 'Registration session expired or not started'
             }), 400
         
-        # Verify the registration
+        # SECURITY: Verify challenge hasn't expired
+        expires_str = stored.get('expires')
+        if expires_str:
+            expires = datetime.fromisoformat(expires_str)
+            if datetime.utcnow() > expires:
+                del _challenges[challenge_key]
+                return jsonify({
+                    'success': False,
+                    'error': 'Registration challenge expired - please start again'
+                }), 400
+        
+        # Verify the registration with user verification REQUIRED
         verification = verify_registration_response(
             credential=credential,
             expected_challenge=base64.urlsafe_b64decode(stored['challenge']),
             expected_rp_id=RP_ID,
             expected_origin=ORIGIN,
-            require_user_verification=False,  # Be lenient for wider device support
+            require_user_verification=True,  # SECURITY: Require user verification
         )
         
         # Save the passkey
@@ -283,8 +416,8 @@ def passkey_register_complete():
 # AUTHENTICATION ENDPOINTS
 # ============================================
 
-@passkey_bp.route('/api/passkey/authenticate/begin', methods=['POST'])
-@cross_origin()
+@passkey_bp.route('/api/passkey/authenticate/begin', methods=['POST', 'OPTIONS'])
+@secure_cors
 def passkey_authenticate_begin():
     """
     Begin passkey authentication - returns options for navigator.credentials.get()
@@ -344,8 +477,8 @@ def passkey_authenticate_begin():
         }), 500
 
 
-@passkey_bp.route('/api/passkey/authenticate/complete', methods=['POST'])
-@cross_origin()
+@passkey_bp.route('/api/passkey/authenticate/complete', methods=['POST', 'OPTIONS'])
+@secure_cors
 def passkey_authenticate_complete():
     """
     Complete passkey authentication - verify and issue lemma with embedded proof
@@ -683,111 +816,176 @@ def delete_passkey(passkey_id):
 # WALLET-BASED AUTH (replaces email sessions)
 # ============================================
 
-@passkey_bp.route('/api/wallet/auth', methods=['POST'])
-@cross_origin()
+@passkey_bp.route('/api/wallet/auth', methods=['POST', 'OPTIONS'])
+@secure_cors
 def wallet_auth():
     """
-    Authenticate using wallet auth proof (replaces email-based auth)
+    SECURE wallet authentication via WebAuthn assertion.
     
-    The wallet being unlocked via passkey IS the authentication.
-    No email verification needed.
+    SECURITY: This endpoint requires a REAL WebAuthn authentication assertion
+    that is verified server-side against the stored public key. The client
+    cannot forge this - it requires physical possession of the authenticator.
+    
+    Flow:
+    1. Client calls /api/passkey/authenticate/begin to get a challenge
+    2. Client performs navigator.credentials.get() with the challenge
+    3. Client sends the assertion here for verification
+    4. Server verifies signature against stored public key
+    5. Only on success, session is granted
     
     POST /api/wallet/auth
     {
-        "authProof": {
-            "type": "wallet_auth",
-            "method": "passkey_unlock",
-            "walletId": "wallet_abc123",
-            "unlockedAt": 1734820000000,
-            "expiresAt": 1734848800000,
-            "timestamp": 1734820500000,
-            "passkeyCredentialId": "base64..."
+        "wallet_id": "wallet_abc123",
+        "challenge_key": "passkey_auth_xxx",  // From authenticate/begin
+        "credential": {
+            "id": "base64url...",
+            "rawId": "base64url...",
+            "response": {
+                "authenticatorData": "base64url...",
+                "clientDataJSON": "base64url...",
+                "signature": "base64url..."
+            },
+            "type": "public-key"
         }
     }
     """
     try:
         data = request.get_json()
-        auth_proof = data.get('authProof')
         
-        if not auth_proof:
+        if not data:
             return jsonify({
                 'success': False,
-                'error': 'authProof is required'
+                'error': 'Request body required'
             }), 400
         
-        # Validate proof structure
-        required_fields = ['type', 'method', 'walletId', 'unlockedAt', 'expiresAt', 'passkeyCredentialId']
-        for field in required_fields:
-            if field not in auth_proof:
-                return jsonify({
-                    'success': False,
-                    'error': f'Missing field: {field}'
-                }), 400
+        wallet_id = data.get('wallet_id')
+        challenge_key = data.get('challenge_key')
+        credential = data.get('credential')
         
-        # Validate proof type
-        if auth_proof['type'] != 'wallet_auth':
+        # SECURITY: Require all fields
+        if not wallet_id:
             return jsonify({
                 'success': False,
-                'error': 'Invalid auth proof type'
+                'error': 'wallet_id is required'
+            }), 400
+            
+        if not challenge_key:
+            return jsonify({
+                'success': False,
+                'error': 'challenge_key is required - call /api/passkey/authenticate/begin first'
+            }), 400
+            
+        if not credential:
+            return jsonify({
+                'success': False,
+                'error': 'WebAuthn credential assertion is required'
             }), 400
         
-        # Check expiration
-        if auth_proof['expiresAt'] < datetime.utcnow().timestamp() * 1000:
+        # SECURITY: Validate challenge exists and hasn't expired
+        challenge_data = _challenges.get(challenge_key)
+        if not challenge_data:
+            logger.warning(f"🚫 SECURITY: Invalid challenge_key attempted: {challenge_key}")
             return jsonify({
                 'success': False,
-                'error': 'Auth proof expired'
+                'error': 'Invalid or expired challenge - call /api/passkey/authenticate/begin first'
             }), 401
         
-        # Verify passkey exists (optional but recommended)
-        credential_id = auth_proof['passkeyCredentialId']
+        # SECURITY: Check challenge expiration
+        expires_str = challenge_data.get('expires')
+        if expires_str:
+            expires = datetime.fromisoformat(expires_str)
+            if datetime.utcnow() > expires:
+                # Clean up expired challenge
+                del _challenges[challenge_key]
+                logger.warning(f"🚫 SECURITY: Expired challenge attempted: {challenge_key}")
+                return jsonify({
+                    'success': False,
+                    'error': 'Challenge expired - call /api/passkey/authenticate/begin for a new one'
+                }), 401
+        
+        # Get credential_id from the assertion
+        credential_id_b64 = credential.get('id')
+        if not credential_id_b64:
+            return jsonify({
+                'success': False,
+                'error': 'credential.id is required'
+            }), 400
+        
+        # SECURITY: Look up the passkey to get the public key for verification
         db = get_db()
         try:
             passkey = db.query(Passkey).filter(
-                Passkey.credential_id == credential_id,
+                Passkey.credential_id == credential_id_b64,
                 Passkey.is_active == True
             ).first()
             
-            if passkey:
-                # Known passkey - get user info
-                user_id = passkey.user_id
+            if not passkey:
+                logger.warning(f"🚫 SECURITY: Unknown passkey in wallet auth: {credential_id_b64[:20]}...")
+                return jsonify({
+                    'success': False,
+                    'error': 'Unknown or inactive passkey'
+                }), 401
+            
+            # SECURITY: Verify the WebAuthn assertion server-side
+            try:
+                verification = verify_authentication_response(
+                    credential=AuthenticationCredential.parse_raw(json.dumps(credential)),
+                    expected_challenge=base64.urlsafe_b64decode(challenge_data['challenge']),
+                    expected_rp_id=RP_ID,
+                    expected_origin=EXPECTED_ORIGIN,
+                    credential_public_key=base64.urlsafe_b64decode(passkey.public_key),
+                    credential_current_sign_count=passkey.sign_count or 0,
+                    require_user_verification=True,  # SECURITY: Require UV
+                )
                 
-                # Update last used
+                # Update sign count to prevent replay attacks
+                passkey.sign_count = verification.new_sign_count
                 passkey.last_used_at = datetime.utcnow()
-                db.commit()
                 
-                # Set session (for backwards compatibility)
-                session['customer_id'] = user_id
-                session['auth_method'] = 'wallet_passkey'
-                session['wallet_id'] = auth_proof['walletId']
-                
-                logger.info(f"✅ Wallet auth successful for user {user_id}")
-                
+            except Exception as e:
+                logger.warning(f"🚫 SECURITY: WebAuthn verification failed: {e}")
                 return jsonify({
-                    'success': True,
-                    'authenticated': True,
-                    'user_id': user_id,
-                    'auth_method': 'wallet_passkey',
-                    'wallet_id': auth_proof['walletId'],
-                    'session_expires': auth_proof['expiresAt'],
-                    'message': 'Authenticated via wallet passkey'
-                })
-            else:
-                # Unknown passkey - still valid auth, but no user record
-                # This is fine for anonymous but verified access
-                session['auth_method'] = 'wallet_passkey_anonymous'
-                session['wallet_id'] = auth_proof['walletId']
-                
-                logger.info(f"✅ Anonymous wallet auth for wallet {auth_proof['walletId']}")
-                
-                return jsonify({
-                    'success': True,
-                    'authenticated': True,
-                    'user_id': None,
-                    'auth_method': 'wallet_passkey_anonymous',
-                    'wallet_id': auth_proof['walletId'],
-                    'session_expires': auth_proof['expiresAt'],
-                    'message': 'Authenticated via wallet (anonymous)'
-                })
+                    'success': False,
+                    'error': 'WebAuthn assertion verification failed'
+                }), 401
+            
+            # SECURITY: Delete used challenge to prevent replay
+            del _challenges[challenge_key]
+            
+            # Get user info
+            user_id = passkey.user_id
+            
+            # Store wallet_id with customer
+            customer = db.query(Customer).filter(Customer.id == user_id).first()
+            if customer:
+                customer.wallet_id = wallet_id
+            
+            db.commit()
+            
+            # Set session (cryptographically verified)
+            session['customer_id'] = user_id
+            session['auth_method'] = 'wallet_passkey_verified'
+            session['wallet_id'] = wallet_id
+            session['passkey_verified'] = True
+            
+            # Set global wallet session for cross-device sync
+            try:
+                from api.wallet_session_sync import _store_global_session, set_session_cookie
+                _store_global_session(wallet_id)
+            except Exception as e:
+                logger.warning(f"Could not set global wallet session: {e}")
+            
+            logger.info(f"✅ VERIFIED wallet auth for user {user_id}")
+            
+            return jsonify({
+                'success': True,
+                'authenticated': True,
+                'verified': True,
+                'user_id': user_id,
+                'auth_method': 'wallet_passkey_verified',
+                'wallet_id': wallet_id,
+                'message': 'Authenticated via cryptographically verified WebAuthn assertion'
+            })
                 
         finally:
             db.close()
