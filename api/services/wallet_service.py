@@ -1260,7 +1260,11 @@ def revoke_wallet():
         if not wallet_id:
             return jsonify({'success': False, 'error': 'wallet_id required'}), 400
         
-        # Security: Verify caller is authorized (owns wallet or is admin)
+        # Security: Verify caller is authorized
+        # Wallet-level bans are SERIOUS - only allow:
+        # 1. Wallet owner (self-revoke for account deletion)
+        # 2. Lemma.id platform admin (fraud/abuse cases)
+        
         session_wallet_id = None
         try:
             session_token = request.cookies.get(SESSION_COOKIE_NAME)
@@ -1271,15 +1275,24 @@ def revoke_wallet():
         except:
             pass
         
-        is_admin = request.headers.get('X-API-Key', '').startswith('lemma_admin_')
+        # Check for platform admin - requires LEMMA_ADMIN_KEY env var match
+        admin_key = os.environ.get('LEMMA_ADMIN_KEY', '')
+        provided_key = request.headers.get('X-Admin-Key', '')
+        is_admin = admin_key and provided_key and hmac.compare_digest(admin_key, provided_key)
+        
+        # Wallet owner can self-revoke (account deletion)
         is_owner = session_wallet_id == wallet_id
         
         if not is_admin and not is_owner:
             logger.warning(f"🚫 Unauthorized wallet revocation attempt for {wallet_id[:12]}...")
             return jsonify({
                 'success': False, 
-                'error': 'Unauthorized - must be wallet owner or admin'
+                'error': 'Unauthorized - wallet-level bans require owner session or platform admin'
             }), 403
+        
+        # Log who is doing the ban
+        if is_admin:
+            logger.warning(f"⚠️ ADMIN wallet ban initiated for {wallet_id[:12]}... Reason: {reason}")
         
         # Add wallet_id to revocation list with revocation_type='wallet'
         from api.database import get_db, RevocationList
