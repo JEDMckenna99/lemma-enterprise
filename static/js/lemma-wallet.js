@@ -377,6 +377,186 @@ class LemmaWallet {
     }
     
     /**
+     * Ensure the user has a credential for this site.
+     * 
+     * Call this after autoAuthenticate() to gracefully handle new devices.
+     * If the user is authenticated but has no credential for your site,
+     * this will call your issuer callback to request one.
+     * 
+     * @param {Object} options - Configuration options
+     * @param {string} options.siteId - Your site identifier (e.g., 'example.com')
+     * @param {string} options.issuerDid - Your issuer DID (e.g., 'did:web:example.com')
+     * @param {Function} options.onRequestCredential - Async callback to request credential from your backend
+     *   Called with: { ppid, walletId, siteId } - should return { credential } or throw
+     * @param {string[]} options.requiredTypes - Optional: credential types to look for (default: ['VerifiableCredential'])
+     * 
+     * @returns {Promise<Object>} { hasCredential, credential, issued, ppid }
+     * 
+     * @example
+     * const wallet = new LemmaWallet();
+     * const auth = await wallet.autoAuthenticate();
+     * 
+     * if (auth.authenticated) {
+     *     const result = await wallet.ensureCredential({
+     *         siteId: 'example.com',
+     *         issuerDid: 'did:web:example.com',
+     *         onRequestCredential: async ({ ppid }) => {
+     *             // Call YOUR backend to issue a credential
+     *             const resp = await fetch('/api/issue-credential', {
+     *                 method: 'POST',
+     *                 body: JSON.stringify({ ppid })
+     *             });
+     *             return await resp.json();
+     *         }
+     *     });
+     *     
+     *     if (result.hasCredential) {
+     *         console.log('User has credential:', result.credential);
+     *     }
+     * }
+     */
+    async ensureCredential(options = {}) {
+        await this.init();
+        
+        const {
+            siteId = window.location.hostname,
+            issuerDid = `did:web:${window.location.hostname}`,
+            onRequestCredential,
+            requiredTypes = ['VerifiableCredential']
+        } = options;
+        
+        const result = {
+            hasCredential: false,
+            credential: null,
+            issued: false,
+            ppid: null,
+            siteId: siteId
+        };
+        
+        // Must be authenticated
+        if (!this.isUnlocked()) {
+            console.warn('[Lemma] ensureCredential: wallet not unlocked');
+            return result;
+        }
+        
+        // Derive PPID for this site
+        try {
+            result.ppid = await this.derivePPID(siteId);
+        } catch (e) {
+            console.error('[Lemma] ensureCredential: could not derive PPID:', e.message);
+            return result;
+        }
+        
+        // Check for existing credential from this issuer
+        const credentials = await this.getCredentials();
+        const existingCred = credentials.find(c => {
+            // Match by issuer DID
+            if (c.issuer === issuerDid) return true;
+            // Match by site ID in claims
+            const claims = c.claims || c.credentialSubject || {};
+            if (claims.siteId === siteId || claims.site === siteId || claims.site_id === siteId) return true;
+            return false;
+        });
+        
+        if (existingCred) {
+            console.log('[Lemma] ensureCredential: found existing credential from', issuerDid);
+            result.hasCredential = true;
+            result.credential = existingCred;
+            return result;
+        }
+        
+        // No credential found - request one if callback provided
+        if (!onRequestCredential) {
+            console.log('[Lemma] ensureCredential: no credential found and no onRequestCredential callback');
+            return result;
+        }
+        
+        console.log('[Lemma] ensureCredential: requesting credential for new device...');
+        
+        try {
+            const issueResult = await onRequestCredential({
+                ppid: result.ppid,
+                walletId: this.session.walletId,
+                siteId: siteId
+            });
+            
+            if (issueResult && issueResult.credential) {
+                // Store the new credential
+                await this.storeCredential(issueResult.credential);
+                result.hasCredential = true;
+                result.credential = issueResult.credential;
+                result.issued = true;
+                console.log('[Lemma] ensureCredential: credential issued and stored');
+            } else if (issueResult && (issueResult.permission_lemma || issueResult.lemma)) {
+                // Handle alternative response formats
+                const cred = issueResult.permission_lemma || issueResult.lemma;
+                await this.storeCredential(cred);
+                result.hasCredential = true;
+                result.credential = cred;
+                result.issued = true;
+                console.log('[Lemma] ensureCredential: credential issued and stored (alt format)');
+            }
+        } catch (e) {
+            console.error('[Lemma] ensureCredential: failed to request credential:', e.message);
+        }
+        
+        return result;
+    }
+    
+    /**
+     * Convenience method: Authenticate and ensure credential in one call.
+     * 
+     * Combines autoAuthenticate() + ensureCredential() for simpler integration.
+     * 
+     * @param {Object} options - Same as ensureCredential options
+     * @returns {Promise<Object>} Combined result with auth and credential info
+     * 
+     * @example
+     * const wallet = new LemmaWallet();
+     * const result = await wallet.authenticateWithCredential({
+     *     siteId: 'example.com',
+     *     issuerDid: 'did:web:example.com',
+     *     onRequestCredential: async ({ ppid }) => {
+     *         const resp = await fetch('/api/issue-credential', { 
+     *             method: 'POST',
+     *             body: JSON.stringify({ ppid }) 
+     *         });
+     *         return await resp.json();
+     *     }
+     * });
+     * 
+     * if (result.authenticated && result.hasCredential) {
+     *     // User is authenticated AND has a credential for your site
+     *     console.log('Ready to go!', result.credential);
+     * } else if (result.authenticated) {
+     *     // Authenticated but credential issuance failed
+     *     console.log('Auth OK but no credential');
+     * } else {
+     *     // Not authenticated - show sign in
+     *     console.log('Please sign in');
+     * }
+     */
+    async authenticateWithCredential(options = {}) {
+        const authResult = await this.autoAuthenticate();
+        
+        if (!authResult.authenticated) {
+            return {
+                ...authResult,
+                hasCredential: false,
+                credential: null,
+                issued: false
+            };
+        }
+        
+        const credResult = await this.ensureCredential(options);
+        
+        return {
+            ...authResult,
+            ...credResult
+        };
+    }
+    
+    /**
      * Check if this wallet has an active session on any device (cross-device sync).
      * @private
      */
