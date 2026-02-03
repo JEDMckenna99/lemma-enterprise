@@ -95,6 +95,8 @@ def create_app():
                 "font-src 'self' https://fonts.gstatic.com; "
                 # Images: self + data URIs (for QR codes) + any HTTPS (logos, etc)
                 "img-src 'self' data: https:; "
+                # Media: blob for camera video streams (QR scanner)
+                "media-src 'self' blob:; "
                 # API connections
                 "connect-src 'self' https://lemma.id https://*.stripe.com https://api.stripe.com; "
                 # Iframes: only Stripe and Cloudflare
