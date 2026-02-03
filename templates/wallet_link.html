@@ -106,23 +106,23 @@
     background: #1e1e1e;
     border-radius: 12px;
     width: 100%;
-    min-height: 300px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: #9ca3af;
+    height: 300px;
     margin-bottom: 16px;
     overflow: hidden;
     position: relative;
 }
-/* Html5Qrcode creates nested elements - ensure video is visible */
+/* Html5Qrcode styles - ensure video is visible and properly positioned */
 .scanner-area video {
     width: 100% !important;
     height: 100% !important;
     object-fit: cover !important;
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
 }
-.scanner-area #qr-shaded-region {
-    border-width: 40px !important;
+.scanner-area > div {
+    width: 100% !important;
+    height: 100% !important;
 }
 
 .hidden { display: none !important; }
@@ -206,7 +206,7 @@
 </div>
 
 <script src="/static/js/lemma-wallet.js?v=2360" nonce="{{ csp_nonce }}"></script>
-<script src="https://unpkg.com/@nicolo-ribaudo/html5-qrcode@2.3.8/html5-qrcode.min.js" nonce="{{ csp_nonce }}"></script>
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js" nonce="{{ csp_nonce }}"></script>
 <script nonce="{{ csp_nonce }}">
 let wallet = null;
 let html5QrCode = null;
@@ -271,9 +271,9 @@ async function startScanner() {
         return;
     }
     
-    // Start scanner directly - let Html5Qrcode handle permissions
+    // Start scanner - simplified for mobile compatibility
     try {
-        console.log('[Scanner] Starting Html5Qrcode scanner...');
+        console.log('[Scanner] Starting scanner...');
         status.textContent = 'Starting camera...';
         status.className = 'status-box info';
         scanBtn.textContent = 'Stop Scanner';
@@ -282,42 +282,25 @@ async function startScanner() {
         // Clear any previous scanner elements
         container.innerHTML = '';
         
-        // Create scanner with verbose logging
-        html5QrCode = new Html5Qrcode("scanner-container", { verbose: true });
-        
-        // Get available cameras first
-        console.log('[Scanner] Getting cameras...');
-        const cameras = await Html5Qrcode.getCameras();
-        console.log('[Scanner] Available cameras:', cameras);
-        
-        if (!cameras || cameras.length === 0) {
-            throw { name: 'NotFoundError', message: 'No cameras found' };
-        }
+        // Create scanner instance
+        html5QrCode = new Html5Qrcode("scanner-container");
         
         // Calculate qrbox size based on container width
         const containerWidth = container.offsetWidth || 300;
-        const qrboxSize = Math.min(200, containerWidth - 40);
+        const qrboxSize = Math.min(200, containerWidth - 50);
         
         console.log('[Scanner] Container width:', containerWidth, 'QR box:', qrboxSize);
         
-        // Start with the back camera if available, otherwise use first camera
-        const cameraConfig = cameras.length > 1 
-            ? { facingMode: "environment" }
-            : cameras[0].id;
-        
-        console.log('[Scanner] Using camera config:', cameraConfig);
-        
+        // Start scanner with back camera - simpler config for mobile
+        // Using facingMode directly without camera enumeration (works better on mobile)
         await html5QrCode.start(
-            cameraConfig,
+            { facingMode: "environment" },
             { 
                 fps: 10, 
-                qrbox: { width: qrboxSize, height: qrboxSize },
-                aspectRatio: 1.0
+                qrbox: qrboxSize  // Use single number for square box
             },
             onQrCodeScanned,
-            (errorMessage) => {
-                // Ignore decoding errors - these happen constantly until a QR is found
-            }
+            () => {} // Ignore decode errors
         );
         
         scannerActive = true;
@@ -329,17 +312,39 @@ async function startScanner() {
     } catch (e) {
         console.error('[Scanner] Error:', e.name, e.message, e);
         
+        // Try fallback to front camera if back camera fails
+        if (e.name === 'OverconstrainedError' || e.name === 'NotReadableError') {
+            console.log('[Scanner] Trying front camera fallback...');
+            try {
+                html5QrCode = new Html5Qrcode("scanner-container");
+                await html5QrCode.start(
+                    { facingMode: "user" },
+                    { fps: 10, qrbox: 180 },
+                    onQrCodeScanned,
+                    () => {}
+                );
+                scannerActive = true;
+                scanBtn.disabled = false;
+                status.textContent = 'Using front camera - point at QR code';
+                status.className = 'status-box info';
+                console.log('[Scanner] Front camera started');
+                return;
+            } catch (e2) {
+                console.error('[Scanner] Front camera also failed:', e2);
+            }
+        }
+        
         let errorMsg = 'Camera access failed.';
         if (e.name === 'NotAllowedError') {
-            errorMsg = 'Camera permission denied. Please allow camera access in your browser settings and reload the page.';
+            errorMsg = 'Camera permission denied. Please allow camera access and reload the page.';
         } else if (e.name === 'NotFoundError') {
             errorMsg = 'No camera found on this device.';
         } else if (e.name === 'NotReadableError') {
-            errorMsg = 'Camera is in use by another app. Close other apps using the camera and try again.';
+            errorMsg = 'Camera is busy. Close other apps using the camera.';
         } else if (e.name === 'OverconstrainedError') {
-            errorMsg = 'Camera does not support required settings.';
+            errorMsg = 'Camera not compatible. Try a different browser.';
         } else if (e.message) {
-            errorMsg = e.message;
+            errorMsg = 'Error: ' + e.message;
         }
         
         status.innerHTML = errorMsg + '<br><br>You can paste the link code manually below.';
