@@ -182,25 +182,46 @@ async function syncGlobalSession(walletId) {
     }
 }
 
-// Set global session after local unlock
-async function setGlobalSession(walletId) {
-    if (!walletId) return;
+// Set global session after unlock (requires unlock_token from server-verified auth)
+async function setGlobalSession(walletId, unlockToken) {
+    if (!walletId) return false;
+    
+    // If no unlock_token provided, try to get from wallet's session
+    if (!unlockToken && wallet?.session?.serverUnlockToken) {
+        unlockToken = wallet.session.serverUnlockToken;
+    }
+    
+    if (!unlockToken) {
+        console.warn('Cannot set global session - no unlock_token available');
+        console.log('(User needs to use server-verified passkey auth)');
+        return false;
+    }
     
     try {
-        await fetch('/api/wallet/set-session', {
+        const response = await fetch('/api/wallet/set-session', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             credentials: 'include',
             body: JSON.stringify({
                 wallet_id: walletId,
+                unlock_token: unlockToken,
                 unlocked_at: Date.now()
             })
         });
-        hadGlobalSession = true;
-        localStorage.setItem('lemma_had_global_session', 'true');
-        console.log('Global session set');
+        
+        if (response.ok) {
+            hadGlobalSession = true;
+            localStorage.setItem('lemma_had_global_session', 'true');
+            console.log('Global session set with unlock_token');
+            return true;
+        } else {
+            const error = await response.json();
+            console.warn('set-session failed:', error.error);
+            return false;
+        }
     } catch (e) {
         console.warn('Failed to set global session:', e);
+        return false;
     }
 }
 
@@ -251,7 +272,12 @@ async function checkWalletState() {
             if (info.walletId) {
                 const globalSession = await syncGlobalSession(info.walletId);
                 if (!globalSession.valid && !globalSession.error) {
-                    await setGlobalSession(info.walletId);
+                    // Try to set global session if we have an unlock_token
+                    // This may fail if user used local-only unlock
+                    const success = await setGlobalSession(info.walletId);
+                    if (!success) {
+                        console.log('Note: Cross-device sync unavailable (local-only session)');
+                    }
                 }
             }
             
@@ -319,7 +345,7 @@ async function checkWalletState() {
     }
 }
 
-// Unlock wallet
+// Unlock wallet - use server-verified passkey to get unlock_token for cross-device SSO
 async function unlockWallet() {
     const btn = document.getElementById('unlock-btn');
     const origText = btn.textContent;
@@ -333,9 +359,28 @@ async function unlockWallet() {
         // Check if we need to create passkey (linked wallet without passkey)
         const info = await wallet.getWalletInfo();
         if (info.hasWalletSecret && !info.hasPasskey) {
+            // New device linked - create passkey with server verification
             await wallet.registerPasskey();
         } else {
-            await wallet.unlock();
+            // IMPORTANT: Use server-verified passkey unlock to get unlock_token
+            // This enables cross-device SSO via set-session
+            try {
+                const result = await wallet.unlockWithServerSession();
+                console.log('Server-verified unlock successful, walletId:', result.walletId);
+                
+                // Set global session immediately with the unlock_token
+                // result.unlockToken from return value, or wallet.session.serverUnlockToken
+                const token = result.unlockToken || wallet.session?.serverUnlockToken;
+                if (token) {
+                    await setGlobalSession(info.walletId || result.walletId, token);
+                } else {
+                    console.warn('No unlock_token received from server auth');
+                }
+            } catch (serverErr) {
+                console.warn('Server unlock failed, falling back to local:', serverErr.message);
+                // Fallback to local-only unlock (won't set global session)
+                await wallet.unlock();
+            }
         }
         
         // Check for redirect flow
@@ -618,19 +663,32 @@ async function handleRedirectReturn(returnUrl) {
     
     if (!walletSecret) return;
     
-    // Set global session
-    if (info.walletId) {
+    // Get unlock_token from current session (for set-session security)
+    // This endpoint validates the session cookie and returns a fresh unlock_token
+    let unlockToken = wallet?.session?.serverUnlockToken;
+    if (!unlockToken && info.walletId) {
         try {
-            await fetch('/api/wallet/set-session', {
+            // Request unlock token using our existing session cookie
+            const tokenResponse = await fetch('/api/wallet/link-unlock-token', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                credentials: 'include',
-                body: JSON.stringify({
-                    wallet_id: info.walletId,
-                    unlocked_at: Date.now()
-                })
+                credentials: 'include'
             });
-        } catch (e) {}
+            if (tokenResponse.ok) {
+                const tokenData = await tokenResponse.json();
+                if (tokenData.success && tokenData.unlock_token) {
+                    unlockToken = tokenData.unlock_token;
+                    console.log('Got unlock_token for redirect return');
+                }
+            }
+        } catch (e) {
+            console.warn('Could not get unlock_token:', e.message);
+        }
+    }
+    
+    // Set global session with unlock_token
+    if (info.walletId && unlockToken) {
+        await setGlobalSession(info.walletId, unlockToken);
     }
     
     const url = new URL(returnUrl);
