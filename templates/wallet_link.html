@@ -105,7 +105,8 @@
 .scanner-area {
     background: #1e1e1e;
     border-radius: 12px;
-    aspect-ratio: 1;
+    width: 100%;
+    min-height: 300px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -114,10 +115,14 @@
     overflow: hidden;
     position: relative;
 }
+/* Html5Qrcode creates nested elements - ensure video is visible */
 .scanner-area video {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
+    width: 100% !important;
+    height: 100% !important;
+    object-fit: cover !important;
+}
+.scanner-area #qr-shaded-region {
+    border-width: 40px !important;
 }
 
 .hidden { display: none !important; }
@@ -261,59 +266,89 @@ async function startScanner() {
         scannerActive = false;
         scanBtn.textContent = 'Scan QR Code';
         container.innerHTML = ''; // Clear scanner elements
+        status.textContent = 'Scanner stopped. Click to scan again.';
+        status.className = 'status-box info';
         return;
     }
     
-    // Check for camera permission first
+    // Start scanner directly - let Html5Qrcode handle permissions
     try {
-        console.log('[Scanner] Requesting camera permission...');
-        status.textContent = 'Requesting camera access...';
+        console.log('[Scanner] Starting Html5Qrcode scanner...');
+        status.textContent = 'Starting camera...';
         status.className = 'status-box info';
-        
-        // Request camera permission explicitly
-        const stream = await navigator.mediaDevices.getUserMedia({ 
-            video: { facingMode: 'environment' } 
-        });
-        // Stop the stream - we just needed to trigger permission
-        stream.getTracks().forEach(track => track.stop());
-        console.log('[Scanner] Camera permission granted');
-        
         scanBtn.textContent = 'Stop Scanner';
-        scannerActive = true;
+        scanBtn.disabled = true;
         
         // Clear any previous scanner elements
         container.innerHTML = '';
         
-        html5QrCode = new Html5Qrcode("scanner-container");
+        // Create scanner with verbose logging
+        html5QrCode = new Html5Qrcode("scanner-container", { verbose: true });
+        
+        // Get available cameras first
+        console.log('[Scanner] Getting cameras...');
+        const cameras = await Html5Qrcode.getCameras();
+        console.log('[Scanner] Available cameras:', cameras);
+        
+        if (!cameras || cameras.length === 0) {
+            throw { name: 'NotFoundError', message: 'No cameras found' };
+        }
+        
+        // Calculate qrbox size based on container width
+        const containerWidth = container.offsetWidth || 300;
+        const qrboxSize = Math.min(200, containerWidth - 40);
+        
+        console.log('[Scanner] Container width:', containerWidth, 'QR box:', qrboxSize);
+        
+        // Start with the back camera if available, otherwise use first camera
+        const cameraConfig = cameras.length > 1 
+            ? { facingMode: "environment" }
+            : cameras[0].id;
+        
+        console.log('[Scanner] Using camera config:', cameraConfig);
+        
         await html5QrCode.start(
-            { facingMode: "environment" },
-            { fps: 10, qrbox: { width: 200, height: 200 } },
+            cameraConfig,
+            { 
+                fps: 10, 
+                qrbox: { width: qrboxSize, height: qrboxSize },
+                aspectRatio: 1.0
+            },
             onQrCodeScanned,
-            () => {} // ignore errors during scanning
+            (errorMessage) => {
+                // Ignore decoding errors - these happen constantly until a QR is found
+            }
         );
         
+        scannerActive = true;
+        scanBtn.disabled = false;
         status.textContent = 'Point camera at QR code';
         status.className = 'status-box info';
+        console.log('[Scanner] Scanner started successfully');
         
     } catch (e) {
-        console.error('[Scanner] Error:', e.name, e.message);
+        console.error('[Scanner] Error:', e.name, e.message, e);
         
-        let errorMsg = 'Camera access denied or not available.';
+        let errorMsg = 'Camera access failed.';
         if (e.name === 'NotAllowedError') {
-            errorMsg = 'Camera permission denied. Please allow camera access in your browser settings.';
+            errorMsg = 'Camera permission denied. Please allow camera access in your browser settings and reload the page.';
         } else if (e.name === 'NotFoundError') {
             errorMsg = 'No camera found on this device.';
         } else if (e.name === 'NotReadableError') {
-            errorMsg = 'Camera is in use by another app.';
+            errorMsg = 'Camera is in use by another app. Close other apps using the camera and try again.';
         } else if (e.name === 'OverconstrainedError') {
             errorMsg = 'Camera does not support required settings.';
+        } else if (e.message) {
+            errorMsg = e.message;
         }
         
         status.innerHTML = errorMsg + '<br><br>You can paste the link code manually below.';
         status.className = 'status-box error';
         scanBtn.textContent = 'Scan QR Code';
+        scanBtn.disabled = false;
         scannerActive = false;
         container.innerHTML = '';
+        html5QrCode = null;
     }
 }
 
