@@ -1679,7 +1679,19 @@ class LemmaWallet {
                 }
             } catch (e) {
                 console.warn('[Lemma] Bridge check failed:', e.message);
-                console.log('[Lemma] Falling back to local passkey');
+                console.log('[Lemma] Falling back to local passkey or redirect');
+            }
+            
+            // On third-party sites, if bridge failed and no local passkey, use redirect
+            const localPasskey = await this._get('passkey', 'primary');
+            if (!localPasskey?.credentialId) {
+                console.log('[Lemma] No local passkey on third-party site - using redirect flow');
+                this.unlockWithRedirect();
+                return {
+                    success: false,
+                    redirecting: true,
+                    message: 'Redirecting to lemma.id for authentication...'
+                };
             }
         }
 
@@ -1695,6 +1707,8 @@ class LemmaWallet {
         // Get stored passkey
         const passkey = await this._get('passkey', 'primary');
         if (!passkey) {
+            // On lemma.id, throw error (user should create passkey)
+            // On third-party sites, this shouldn't happen (handled above)
             throw new Error('No passkey registered. Call registerPasskey() first.');
         }
 
