@@ -270,7 +270,7 @@ def session_sync():
             'success': False,
             'error': 'no_session',
             'message': 'No wallet session. User needs to unlock wallet on lemma.id',
-            'unlock_url': 'https://lemma.id/wallet/unlock'
+            'unlock_url': 'https://lemma.id/unlock'
         })
         response.headers.update(_cors_headers(origin))
         return response, 401
@@ -283,7 +283,7 @@ def session_sync():
             'success': False,
             'error': 'session_expired',
             'message': 'Wallet session expired. User needs to unlock again.',
-            'unlock_url': 'https://lemma.id/wallet/unlock'
+            'unlock_url': 'https://lemma.id/unlock'
         })
         response.headers.update(_cors_headers(origin))
         return response, 401

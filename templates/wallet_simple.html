@@ -1,7 +1,7 @@
 {% extends "modern/layout.html" %}
 
-{% block title %}Lemma Wallet{% endblock %}
-{% block description %}Manage your Lemma wallet and linked devices.{% endblock %}
+{% block title %}Lemma ID{% endblock %}
+{% block description %}Your secure identity across the web. One sign-in, everywhere.{% endblock %}
 
 {% block preload_scripts %}{% endblock %}
 
@@ -12,15 +12,15 @@
 {% block content %}
 <div class="wallet-container">
     <header class="wallet-header">
-        <h1>Lemma Wallet</h1>
-        <p>Your secure identity across the web</p>
+        <h1>Lemma ID</h1>
+        <p>One sign-in, everywhere</p>
     </header>
 
-    <!-- WALLET STATUS -->
+    <!-- STATUS -->
     <div id="wallet-status" class="wallet-status status-locked">
         <div class="status-icon">🔒</div>
         <div class="status-info">
-            <h3>Checking wallet...</h3>
+            <h3>Checking...</h3>
             <p>Please wait</p>
         </div>
     </div>
@@ -29,13 +29,13 @@
     <div id="locked-view">
         <div class="card" style="text-align: center;">
             <button id="unlock-btn" class="btn btn-primary btn-full" style="font-size: 1.1rem; padding: 16px;">
-                Unlock with Passkey
+                Sign In
             </button>
-            
+
             <div id="no-wallet-msg" class="hidden" style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #e5e7eb;">
-                <p style="color: #6b7280; font-size: 0.9rem; margin-bottom: 12px;">No wallet on this device?</p>
-                <button id="create-wallet-btn" class="btn btn-primary" style="margin-right: 8px;">Create Wallet</button>
-                <a href="/wallet/link" class="btn btn-secondary" style="text-decoration: none;">Link Device</a>
+                <p style="color: #6b7280; font-size: 0.9rem; margin-bottom: 12px;">New here?</p>
+                <button id="create-wallet-btn" class="btn btn-primary" style="margin-right: 8px;">Create Lemma ID</button>
+                <a href="/link" class="btn btn-secondary" style="text-decoration: none;">Add This Device</a>
             </div>
         </div>
     </div>
@@ -43,20 +43,20 @@
     <!-- UNLOCKED VIEW -->
     <div id="unlocked-view" class="hidden">
         
-        <!-- LOCK BUTTON -->
+        <!-- SIGN OUT BUTTON -->
         <div class="card">
             <button id="lock-btn" class="btn btn-danger btn-full">
-                Lock Wallet
+                Sign Out Everywhere
             </button>
             <p style="text-align: center; color: #6b7280; font-size: 0.8rem; margin: 12px 0 0;">
-                Locking signs you out of all sites on all devices
+                Signs you out on all sites and all devices
             </p>
         </div>
 
-        <!-- DEVICE LINKING -->
+        <!-- ADD DEVICE -->
         <div class="card">
-            <h2><span class="icon">📱</span> Link Another Device</h2>
-            
+            <h2><span class="icon">📱</span> Add Another Device</h2>
+
             <div class="link-tabs">
                 <button id="tab-send" class="link-tab active">Send to Device</button>
                 <button id="tab-receive" class="link-tab">Receive from Device</button>
@@ -65,7 +65,7 @@
             <!-- SEND TAB -->
             <div id="send-content">
                 <p style="color: #6b7280; font-size: 0.9rem; margin-bottom: 16px;">
-                    Show a QR code to link your wallet to another device.
+                    Scan this QR code on your other device to add it.
                 </p>
                 <button id="show-qr-btn" class="btn btn-primary btn-full">Generate QR Code</button>
                 
@@ -82,10 +82,10 @@
             <!-- RECEIVE TAB -->
             <div id="receive-content" class="hidden">
                 <p style="color: #6b7280; font-size: 0.9rem; margin-bottom: 16px;">
-                    Paste the code from your other device to link this one.
+                    Paste the code from your other device to add this one.
                 </p>
-                <textarea id="receive-code" class="link-input" placeholder="Paste transfer code here..."></textarea>
-                <button id="link-device-btn" class="btn btn-primary btn-full" style="margin-top: 12px;">Link This Device</button>
+                <textarea id="receive-code" class="link-input" placeholder="Paste code here..."></textarea>
+                <button id="link-device-btn" class="btn btn-primary btn-full" style="margin-top: 12px;">Add This Device</button>
                 <div id="receive-status" class="hidden" style="margin-top: 12px;"></div>
             </div>
         </div>
@@ -114,10 +114,10 @@
         <div class="card" style="border-color: #fecaca;">
             <h2 style="color: #dc2626;"><span class="icon">&#9888;</span> Danger Zone</h2>
             <button id="clear-wallet-btn" class="btn btn-secondary btn-full" style="color: #dc2626; border-color: #fecaca;">
-                Clear Wallet Data
+                Remove From This Device
             </button>
             <p style="text-align: center; color: #9ca3af; font-size: 0.75rem; margin: 8px 0 0;">
-                Removes all wallet data from this device only
+                Removes your Lemma ID from this device only
             </p>
         </div>
     </div>
@@ -281,7 +281,7 @@ async function checkWalletState() {
                 }
             }
             
-            updateStatusDisplay(true, 'Wallet Unlocked', 'You are signed in');
+            updateStatusDisplay(true, 'Signed In', 'Your Lemma ID is active');
             showUnlockedView();
             return true;
         }
@@ -313,25 +313,25 @@ async function checkWalletState() {
                 hadGlobalSession = true;
                 localStorage.setItem('lemma_had_global_session', 'true');
                 
-                updateStatusDisplay(true, 'Wallet Unlocked', 'Synced from another device');
+                updateStatusDisplay(true, 'Signed In', 'Synced from another device');
                 showUnlockedView();
                 return true;
             }
         }
         
-        // Not unlocked anywhere - show appropriate locked state
+        // Not signed in - show appropriate state
         if (info.hasPasskey) {
-            updateStatusDisplay(false, 'Wallet Locked', 'Unlock to access your wallet');
+            updateStatusDisplay(false, 'Signed Out', 'Sign in to continue');
             document.getElementById('no-wallet-msg').classList.add('hidden');
             document.getElementById('unlock-btn').classList.remove('hidden');
             showLockedView();
         } else if (info.hasWalletSecret) {
-            updateStatusDisplay(false, 'Wallet Linked', 'Create a passkey to secure it');
+            updateStatusDisplay(false, 'Device Added', 'Create a passkey to secure it');
             document.getElementById('unlock-btn').textContent = 'Create Passkey';
             document.getElementById('no-wallet-msg').classList.add('hidden');
             showLockedView();
         } else {
-            updateStatusDisplay(false, 'No Wallet', 'Create a new wallet or link from another device');
+            updateStatusDisplay(false, 'Welcome', 'Create your Lemma ID or add this device');
             document.getElementById('unlock-btn').classList.add('hidden');
             document.getElementById('no-wallet-msg').classList.remove('hidden');
             showLockedView();
@@ -573,22 +573,22 @@ async function linkDevice() {
     }
     
     try {
-        statusEl.innerHTML = '<div class="info-box">Linking wallet...</div>';
+        statusEl.innerHTML = '<div class="info-box">Adding device...</div>';
         statusEl.classList.remove('hidden');
-        
+
         await initWallet();
         const result = await wallet.linkDevice({ qrData: code });
-        
+
         if (result.success) {
-            statusEl.innerHTML = '<div class="info-box" style="background: #ecfdf5; border-color: #10b981; color: #065f46;">Wallet linked! Creating passkey...</div>';
-            
+            statusEl.innerHTML = '<div class="info-box" style="background: #ecfdf5; border-color: #10b981; color: #065f46;">Device added! Creating passkey...</div>';
+
             // Create passkey for this device
             await wallet.registerPasskey();
             await checkWalletState();
-            
-            statusEl.innerHTML = '<div class="info-box" style="background: #ecfdf5; border-color: #10b981; color: #065f46;">Device linked successfully!</div>';
+
+            statusEl.innerHTML = '<div class="info-box" style="background: #ecfdf5; border-color: #10b981; color: #065f46;">Device added successfully!</div>';
         } else if (result.conflict) {
-            statusEl.innerHTML = '<div class="info-box" style="background: #fef3c7; border-color: #f59e0b; color: #92400e;">A different wallet exists on this device. Clear it first to link a new one.</div>';
+            statusEl.innerHTML = '<div class="info-box" style="background: #fef3c7; border-color: #f59e0b; color: #92400e;">A different Lemma ID exists on this device. Remove it first to add a new one.</div>';
         } else {
             throw new Error(result.message || 'Link failed');
         }
@@ -598,9 +598,9 @@ async function linkDevice() {
     }
 }
 
-// Clear wallet data
+// Clear data from this device
 async function clearWallet() {
-    if (!confirm('Clear all wallet data from this device? This cannot be undone.')) {
+    if (!confirm('Remove your Lemma ID from this device? You can add it back later from another device.')) {
         return;
     }
     

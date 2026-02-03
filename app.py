@@ -487,8 +487,20 @@ def create_app():
 
     @app.route('/')
     def index():
-        """Homepage - Marketing page"""
-        logger.info("🏠 Serving homepage")
+        """Lemma ID - Main management page (type lemma.id to manage your identity)"""
+        logger.info("🏠 Serving Lemma ID")
+        # Force disable template caching
+        app.jinja_env.cache = {}
+        return render_template('wallet_simple.html'), 200, {
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            'Pragma': 'no-cache',
+            'Expires': '0'
+        }
+
+    @app.route('/about')
+    def about():
+        """About Lemma - Marketing page"""
+        logger.info("📄 Serving about page")
         return render_template('modern/index.html')
 
     @app.route('/lemma-sw.js')
@@ -499,21 +511,15 @@ def create_app():
 
     @app.route('/wallet')
     def wallet():
-        """Lemma Wallet - Main wallet management page"""
-        logger.info("🌐 Serving wallet")
-        # Force disable template caching
-        app.jinja_env.cache = {}
-        return render_template('wallet_simple.html'), 200, {
-            'Cache-Control': 'no-cache, no-store, must-revalidate',
-            'Pragma': 'no-cache',
-            'Expires': '0'
-        }
-    
+        """Legacy redirect: /wallet -> /"""
+        from flask import redirect
+        return redirect('/', code=301)
+
     @app.route('/wallet/simple')
     def wallet_simple():
-        """Redirect to main wallet page (legacy URL)"""
+        """Legacy redirect: /wallet/simple -> /"""
         from flask import redirect
-        return redirect('/wallet', code=301)
+        return redirect('/', code=301)
     
     @app.route('/wallet/popup')
     def wallet_popup():
@@ -525,11 +531,38 @@ def create_app():
             'Expires': '0'
         }
     
+    @app.route('/link')
+    def link_device():
+        """Add Device Page - Add this device to existing Lemma ID"""
+        logger.info("🔗 Serving add device page")
+        return render_template('wallet_link.html'), 200, {
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            'Pragma': 'no-cache',
+            'Expires': '0'
+        }
+
     @app.route('/wallet/link')
     def wallet_link():
-        """Device Linking Page - Link new device to existing wallet"""
-        logger.info("🔗 Serving device linking page")
-        return render_template('wallet_link.html'), 200, {
+        """Legacy redirect: /wallet/link -> /link"""
+        from flask import redirect
+        return redirect('/link', code=301)
+
+    @app.route('/unlock')
+    def unlock():
+        """
+        Sign-in page for redirect-based authentication.
+
+        FLOW (v2.32.0 - Redirect-only architecture):
+        1. Third-party SDK generates encryption key, redirects here with return_url + enc_key
+        2. User signs in via passkey (or uses existing session)
+        3. Wallet data encrypted client-side with enc_key (never touches server)
+        4. User redirected back to return_url with encrypted data in URL
+        5. SDK decrypts client-side, establishes session
+
+        This provides consistent UX across all platforms while preserving privacy.
+        """
+        logger.info("Serving sign-in page (redirect-based auth)")
+        return render_template('wallet_unlock.html'), 200, {
             'Cache-Control': 'no-cache, no-store, must-revalidate',
             'Pragma': 'no-cache',
             'Expires': '0'
@@ -537,24 +570,12 @@ def create_app():
 
     @app.route('/wallet/unlock')
     def wallet_unlock():
-        """
-        Streamlined wallet unlock page for redirect-based authentication.
-        
-        FLOW (v2.32.0 - Redirect-only architecture):
-        1. Third-party SDK generates encryption key, redirects here with return_url + enc_key
-        2. User unlocks wallet via passkey (or uses existing session)
-        3. Wallet data encrypted client-side with enc_key (never touches server)
-        4. User redirected back to return_url with encrypted data in URL
-        5. SDK decrypts client-side, establishes session
-        
-        This provides consistent UX across all platforms while preserving privacy.
-        """
-        logger.info("Serving unlock page (redirect-based auth)")
-        return render_template('wallet_unlock.html'), 200, {
-            'Cache-Control': 'no-cache, no-store, must-revalidate',
-            'Pragma': 'no-cache',
-            'Expires': '0'
-        }
+        """Legacy redirect: /wallet/unlock -> /unlock"""
+        from flask import redirect, request
+        # Preserve query params for redirect flow
+        if request.query_string:
+            return redirect(f'/unlock?{request.query_string.decode()}', code=302)
+        return redirect('/unlock', code=301)
 
     @app.route('/wallet/bridge')
     def wallet_bridge():

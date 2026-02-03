@@ -135,7 +135,7 @@ class LemmaWallet {
             suggestedButtonText: 'Create Passkey & Sign In',
             // Device linking info
             canLinkDevice: false,
-            linkDeviceUrl: 'https://lemma.id/wallet/link'
+            linkDeviceUrl: 'https://lemma.id/link'
         };
         
         // Check local session first
@@ -180,7 +180,7 @@ class LemmaWallet {
             // Third-party site with no valid session - offer redirect
             state.suggestedAction = 'redirect';
             state.suggestedButtonText = 'Sign In with Lemma';
-            state.unlockUrl = 'https://lemma.id/wallet/unlock';
+            state.unlockUrl = 'https://lemma.id/unlock';
             // User might have wallet on another device
             state.canLinkDevice = true;
             state.linkDeviceText = 'Already have a wallet? Link this device';
@@ -227,7 +227,7 @@ class LemmaWallet {
         const text = options.text || 'Already have a wallet on another device?';
         const linkText = options.linkText || 'Link this device';
         const className = options.className || 'lemma-link-device';
-        const url = state.linkDeviceUrl || 'https://lemma.id/wallet/link';
+        const url = state.linkDeviceUrl || 'https://lemma.id/link';
         
         return `<div class="${className}" style="margin-top: 12px; text-align: center; font-size: 0.85rem;">
     <span style="color: #6b7280;">${text}</span>
@@ -643,7 +643,7 @@ class LemmaWallet {
      * 
      * Flow:
      * 1. Saves current URL and state (including encryption key)
-     * 2. Redirects to lemma.id/wallet/unlock (clean, focused page)
+     * 2. Redirects to lemma.id/unlock (clean, focused page)
      * 3. User unlocks with passkey
      * 4. Wallet data encrypted client-side, returned in URL
      * 5. SDK detects return and completes auth
@@ -695,7 +695,7 @@ class LemmaWallet {
             params.set('state', btoa(JSON.stringify(state)));
         }
         
-        window.location.href = `https://lemma.id/wallet/unlock?${params.toString()}`;
+        window.location.href = `https://lemma.id/unlock?${params.toString()}`;
     }
     
     /**
@@ -2410,7 +2410,7 @@ class LemmaWallet {
      *     // User is authenticated! Show protected content
      *     console.log('Welcome back!', auth.walletId);
      * }
-     * // If not authenticated, user will be redirected to lemma.id/wallet/unlock
+     * // If not authenticated, user will be redirected to lemma.id/unlock
      */
     async ensureAuthenticated(options = {}) {
         const { 
@@ -2459,7 +2459,7 @@ class LemmaWallet {
             // No valid session - redirect to unlock
             if (autoRedirect) {
                 console.log('[Lemma] 🔓 Redirecting to unlock...');
-                const unlockUrl = `https://lemma.id/wallet/unlock?return=${encodeURIComponent(returnUrl)}`;
+                const unlockUrl = `https://lemma.id/unlock?return=${encodeURIComponent(returnUrl)}`;
                 window.location.href = unlockUrl;
                 return { authenticated: false, redirecting: true };
             }
@@ -2467,14 +2467,14 @@ class LemmaWallet {
             return { 
                 authenticated: false, 
                 needsUnlock: true,
-                unlockUrl: `https://lemma.id/wallet/unlock?return=${encodeURIComponent(returnUrl)}`
+                unlockUrl: `https://lemma.id/unlock?return=${encodeURIComponent(returnUrl)}`
             };
             
         } catch (e) {
             console.error('[Lemma] Bridge check failed:', e);
             
             if (autoRedirect) {
-                const unlockUrl = `https://lemma.id/wallet/unlock?return=${encodeURIComponent(returnUrl)}`;
+                const unlockUrl = `https://lemma.id/unlock?return=${encodeURIComponent(returnUrl)}`;
                 window.location.href = unlockUrl;
                 return { authenticated: false, redirecting: true };
             }
@@ -2489,7 +2489,7 @@ class LemmaWallet {
 
     /**
      * Check if user has unlocked today (URL param check)
-     * Use this after redirect back from lemma.id/wallet/unlock
+     * Use this after redirect back from lemma.id/unlock
      * 
      * @returns {boolean} True if lemma_unlocked=true is in URL
      */
@@ -4420,7 +4420,7 @@ class LemmaWallet {
             // Use URL-safe base64 (replace + with -, / with _) to avoid URL encoding issues
             const qrDataBase64 = btoa(qrData).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
             console.log('[Lemma] generateLinkCode: base64 encoded (URL-safe), length:', qrDataBase64.length);
-            const qrUrl = `https://lemma.id/wallet/link#${qrDataBase64}`;
+            const qrUrl = `https://lemma.id/link#${qrDataBase64}`;
             console.log('[Lemma] generateLinkCode: qrUrl created, length:', qrUrl.length);
             
             console.log(`[Lemma] Link code generated for profile "${profile.name}" - expires in 60 seconds`);

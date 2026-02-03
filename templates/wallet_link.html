@@ -1,7 +1,7 @@
 {% extends "modern/layout.html" %}
 
-{% block title %}Link Device - lemma.id Wallet{% endblock %}
-{% block description %}Link this device to your existing Lemma wallet.{% endblock %}
+{% block title %}Add Device - Lemma ID{% endblock %}
+{% block description %}Add this device to your existing Lemma ID.{% endblock %}
 
 {% block head %}
 <meta name="referrer" content="no-referrer">
@@ -143,8 +143,8 @@
 {% block content %}
 <div class="link-container">
     <header class="link-header">
-        <h1>Link Device</h1>
-        <p>Connect this device to your existing wallet</p>
+        <h1>Add Device</h1>
+        <p>Connect this device to your Lemma ID</p>
     </header>
 
     <!-- Step Indicator -->
@@ -159,7 +159,7 @@
         
         <div id="status" class="status-box info">
             Get a link code from your existing device at<br>
-            <strong>lemma.id/wallet/simple → Add Device</strong>
+            <strong>lemma.id → Add Another Device</strong>
         </div>
 
         <!-- QR Scanner - Html5Qrcode creates its own video element -->
@@ -190,16 +190,16 @@
     <!-- Step 2: Linking / Complete -->
     <div id="step2-content" class="card hidden">
         <div id="link-status" class="status-box info">
-            Linking wallet...
+            Adding device...
         </div>
-        
+
         <div id="complete-actions" class="hidden">
-            <button class="btn btn-primary" onclick="window.location.href='/wallet/simple'">
-                Go to Wallet
+            <button class="btn btn-primary" onclick="window.location.href='/'">
+                Go to Lemma ID
             </button>
-            
+
             <p style="text-align: center; color: #6b7280; font-size: 0.85rem; margin-top: 16px;">
-                Add a passkey later from wallet settings for faster sign-in.
+                Add a passkey from settings for faster sign-in.
             </p>
         </div>
     </div>
@@ -402,18 +402,18 @@ async function processLinkCode(qrData, replaceExisting = false) {
             return;
         }
         
-        // Handle already linked (same wallet)
+        // Handle already linked (same Lemma ID)
         if (result.alreadyLinked) {
-            linkStatus.innerHTML = 'This wallet is already linked to this device.<br><br>' +
-                '<a href="/wallet/simple" style="color: #10b981; font-weight: 600;">Go to Wallet</a>';
+            linkStatus.innerHTML = 'This device is already connected to your Lemma ID.<br><br>' +
+                '<a href="/" style="color: #10b981; font-weight: 600;">Go to Lemma ID</a>';
             linkStatus.className = 'status-box success';
             return;
         }
-        
+
         if (result.success) {
             // Show success and completion actions
-            linkStatus.innerHTML = '<strong style="font-size: 1.2rem;">Device Linked!</strong><br><br>' +
-                'Your wallet is now available on this device.';
+            linkStatus.innerHTML = '<strong style="font-size: 1.2rem;">Device Added!</strong><br><br>' +
+                'Your Lemma ID is now available on this device.';
             linkStatus.className = 'status-box success';
             
             // Mark step 2 as complete and show actions
@@ -439,20 +439,20 @@ function showConflictResolution(conflictResult) {
     const linkStatus = document.getElementById('link-status');
     linkStatus.className = 'status-box warning';
     linkStatus.innerHTML = `
-        <strong style="display: block; margin-bottom: 12px;">Wallet Already Exists</strong>
-        <p style="margin-bottom: 16px;">This device has a different wallet. What would you like to do?</p>
-        
+        <strong style="display: block; margin-bottom: 12px;">Different Lemma ID Exists</strong>
+        <p style="margin-bottom: 16px;">This device has a different Lemma ID. What would you like to do?</p>
+
         <div style="display: flex; flex-direction: column; gap: 12px;">
             <button class="btn btn-primary" onclick="replaceExistingWallet()" style="margin: 0;">
-                Replace with New Wallet
+                Replace with New Lemma ID
             </button>
             <button class="btn btn-secondary" onclick="keepExistingWallet()" style="margin: 0;">
-                Keep Current Wallet
+                Keep Current Lemma ID
             </button>
         </div>
-        
+
         <p style="font-size: 0.8rem; color: #92400e; margin-top: 16px;">
-            Note: Your current wallet data will be backed up locally before replacement.
+            Note: Your current data will be backed up locally before replacement.
         </p>
     `;
 }
@@ -462,11 +462,11 @@ async function replaceExistingWallet() {
         setStep(1);
         return;
     }
-    
+
     const linkStatus = document.getElementById('link-status');
-    linkStatus.textContent = 'Replacing wallet...';
+    linkStatus.textContent = 'Replacing Lemma ID...';
     linkStatus.className = 'status-box info';
-    
+
     // Re-process with replaceExisting flag
     await processLinkCode(pendingLinkData, true);
     pendingLinkData = null;
@@ -474,7 +474,7 @@ async function replaceExistingWallet() {
 
 function keepExistingWallet() {
     pendingLinkData = null;
-    window.location.href = '/wallet/simple';
+    window.location.href = '/';
 }
 
 // Initialize
@@ -482,21 +482,21 @@ document.addEventListener('DOMContentLoaded', async () => {
     try {
         await initWallet();
         
-        // Check if already has wallet - show info but allow linking (smart conflict resolution handles it)
+        // Check if already has Lemma ID - show info but allow linking (smart conflict resolution handles it)
         const info = await wallet.getWalletInfo();
         if (info.hasWalletSecret && info.hasPasskey) {
-            document.getElementById('status').innerHTML = 
-                'This device already has a wallet.<br>' +
-                'You can link a different wallet below, or <a href="/wallet/simple" style="color: #0ea5e9;">go to your current wallet</a>.';
+            document.getElementById('status').innerHTML =
+                'This device already has a Lemma ID.<br>' +
+                'You can add a different one below, or <a href="/" style="color: #0ea5e9;">go to your Lemma ID</a>.';
             document.getElementById('status').className = 'status-box warning';
         } else if (info.hasWalletSecret && !info.hasPasskey) {
-            document.getElementById('status').innerHTML = 
-                'Incomplete wallet setup detected. Link a wallet below to complete setup.';
+            document.getElementById('status').innerHTML =
+                'Incomplete setup detected. Add your Lemma ID below to complete setup.';
             document.getElementById('status').className = 'status-box info';
         }
         
         // Check for link code in URL hash (from QR scan or pasted link)
-        // URL format: https://lemma.id/wallet/link#BASE64_ENCODED_JSON
+        // URL format: https://lemma.id/link#BASE64_ENCODED_JSON
         if (window.location.hash && window.location.hash.length > 1) {
             let hashData = window.location.hash.substring(1); // Remove the #
             try {
