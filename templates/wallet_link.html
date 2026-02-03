@@ -140,13 +140,13 @@
             <strong>lemma.id → Add Another Device</strong>
         </div>
 
-        <!-- Hidden elements for QR scanning -->
+        <!-- QR scanning - label directly triggers file input (required for mobile) -->
         <input type="file" id="qr-input" accept="image/*" capture="environment" style="display:none" onchange="handleQrPhoto(this)">
         <div id="temp-scanner" style="display:none"></div>
         
-        <button class="btn btn-primary" id="scan-btn" onclick="document.getElementById('qr-input').click()">
+        <label for="qr-input" class="btn btn-primary" style="text-align:center; cursor:pointer; margin-bottom:12px;">
             Scan QR Code with Camera
-        </button>
+        </label>
 
         <div class="divider">or paste code manually</div>
 
