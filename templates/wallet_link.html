@@ -192,21 +192,26 @@
         </div>
     </div>
 
-    <!-- Step 3: Create Passkey -->
+    <!-- Step 3: Create Passkey (Optional) -->
     <div id="step3-content" class="card hidden">
-        <h2 style="margin: 0 0 16px; font-size: 1.1rem;">Step 3: Secure This Device</h2>
+        <h2 style="margin: 0 0 16px; font-size: 1.1rem;">Step 3: Secure This Device (Optional)</h2>
         
         <div id="passkey-status" class="status-box success">
             Wallet linked successfully!<br>
-            Now create a passkey to secure it on this device.
+            Create a passkey for faster sign-in on this device.
         </div>
 
         <button class="btn btn-success" onclick="createPasskey()">
             Create Passkey
         </button>
+        
+        <button class="btn btn-secondary" onclick="skipPasskey()" style="background: transparent; color: #6b7280; border: 1px solid #d1d5db;">
+            Skip for Now
+        </button>
 
         <p style="text-align: center; color: #6b7280; font-size: 0.85rem; margin-top: 12px;">
-            This passkey will protect your wallet on this device.
+            Without a passkey, you'll sign in via lemma.id redirect.<br>
+            You can add a passkey later from wallet settings.
         </p>
     </div>
 
@@ -461,6 +466,23 @@ async function replaceExistingWallet() {
 function keepExistingWallet() {
     pendingLinkData = null;
     window.location.href = '/wallet/simple';
+}
+
+function skipPasskey() {
+    // User chose to skip passkey creation - wallet is still linked
+    // They'll use redirect flow for authentication
+    console.log('[Passkey] User skipped passkey creation');
+    setStep(4);
+    
+    // Update completion message
+    document.querySelector('#complete-content .status-box').innerHTML = `
+        <strong style="font-size: 1.2rem;">Device Linked!</strong><br><br>
+        Your wallet is now available on this device.<br>
+        Sign-in will redirect through lemma.id.<br><br>
+        <span style="font-size: 0.85rem; color: #6b7280;">
+            Add a passkey later for faster access.
+        </span>
+    `;
 }
 
 async function createPasskey() {
