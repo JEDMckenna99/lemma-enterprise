@@ -146,12 +146,11 @@
     <div class="step-indicator">
         <div class="step active" id="step1">1</div>
         <div class="step pending" id="step2">2</div>
-        <div class="step pending" id="step3">3</div>
     </div>
 
-    <!-- Step 1: Input Link Code -->
+    <!-- Step 1: Enter Link Code -->
     <div id="step1-content" class="card">
-        <h2 style="margin: 0 0 16px; font-size: 1.1rem;">Step 1: Enter Link Code</h2>
+        <h2 style="margin: 0 0 16px; font-size: 1.1rem;">Enter Link Code</h2>
         
         <div id="status" class="status-box info">
             Get a link code from your existing device at<br>
@@ -183,49 +182,21 @@
         </div>
     </div>
 
-    <!-- Step 2: Linking -->
+    <!-- Step 2: Linking / Complete -->
     <div id="step2-content" class="card hidden">
-        <h2 style="margin: 0 0 16px; font-size: 1.1rem;">Step 2: Linking Wallet</h2>
-        
         <div id="link-status" class="status-box info">
             Linking wallet...
         </div>
-    </div>
-
-    <!-- Step 3: Create Passkey (Optional) -->
-    <div id="step3-content" class="card hidden">
-        <h2 style="margin: 0 0 16px; font-size: 1.1rem;">Step 3: Secure This Device (Optional)</h2>
         
-        <div id="passkey-status" class="status-box success">
-            Wallet linked successfully!<br>
-            Create a passkey for faster sign-in on this device.
+        <div id="complete-actions" class="hidden">
+            <button class="btn btn-primary" onclick="window.location.href='/wallet/simple'">
+                Go to Wallet
+            </button>
+            
+            <p style="text-align: center; color: #6b7280; font-size: 0.85rem; margin-top: 16px;">
+                Add a passkey later from wallet settings for faster sign-in.
+            </p>
         </div>
-
-        <button class="btn btn-success" onclick="createPasskey()">
-            Create Passkey
-        </button>
-        
-        <button class="btn btn-secondary" onclick="skipPasskey()" style="background: transparent; color: #6b7280; border: 1px solid #d1d5db;">
-            Skip for Now
-        </button>
-
-        <p style="text-align: center; color: #6b7280; font-size: 0.85rem; margin-top: 12px;">
-            Without a passkey, you'll sign in via lemma.id redirect.<br>
-            You can add a passkey later from wallet settings.
-        </p>
-    </div>
-
-    <!-- Step 4: Complete -->
-    <div id="complete-content" class="card hidden">
-        <div class="status-box success">
-            <strong style="font-size: 1.2rem;">Device Linked!</strong><br><br>
-            Your wallet is now available on this device.<br>
-            You can use it on any site that supports Lemma.
-        </div>
-
-        <button class="btn btn-primary" onclick="window.location.href='/wallet/simple'">
-            Go to Wallet
-        </button>
     </div>
 </div>
 
@@ -244,8 +215,8 @@ async function initWallet() {
 }
 
 function setStep(step) {
-    // Update step indicators
-    for (let i = 1; i <= 3; i++) {
+    // Update step indicators (only 2 steps now)
+    for (let i = 1; i <= 2; i++) {
         const stepEl = document.getElementById(`step${i}`);
         if (i < step) {
             stepEl.className = 'step completed';
@@ -262,8 +233,6 @@ function setStep(step) {
     // Show/hide content
     document.getElementById('step1-content').classList.toggle('hidden', step !== 1);
     document.getElementById('step2-content').classList.toggle('hidden', step !== 2);
-    document.getElementById('step3-content').classList.toggle('hidden', step !== 3);
-    document.getElementById('complete-content').classList.toggle('hidden', step !== 4);
 }
 
 async function startScanner() {
@@ -407,10 +376,15 @@ async function processLinkCode(qrData, replaceExisting = false) {
         }
         
         if (result.success) {
-            linkStatus.textContent = 'Wallet linked!';
+            // Show success and completion actions
+            linkStatus.innerHTML = '<strong style="font-size: 1.2rem;">Device Linked!</strong><br><br>' +
+                'Your wallet is now available on this device.';
             linkStatus.className = 'status-box success';
             
-            setTimeout(() => setStep(3), 1000);
+            // Mark step 2 as complete and show actions
+            document.getElementById('step2').className = 'step completed';
+            document.getElementById('step2').textContent = '✓';
+            document.getElementById('complete-actions').classList.remove('hidden');
         } else {
             throw new Error(result.message || 'Link failed');
         }
@@ -466,86 +440,6 @@ async function replaceExistingWallet() {
 function keepExistingWallet() {
     pendingLinkData = null;
     window.location.href = '/wallet/simple';
-}
-
-function skipPasskey() {
-    // User chose to skip passkey creation - wallet is still linked
-    // They'll use redirect flow for authentication
-    console.log('[Passkey] User skipped passkey creation');
-    setStep(4);
-    
-    // Update completion message
-    document.querySelector('#complete-content .status-box').innerHTML = `
-        <strong style="font-size: 1.2rem;">Device Linked!</strong><br><br>
-        Your wallet is now available on this device.<br>
-        Sign-in will redirect through lemma.id.<br><br>
-        <span style="font-size: 0.85rem; color: #6b7280;">
-            Add a passkey later for faster access.
-        </span>
-    `;
-}
-
-async function createPasskey() {
-    const passkeyStatus = document.getElementById('passkey-status');
-    passkeyStatus.textContent = 'Creating passkey...';
-    passkeyStatus.className = 'status-box info';
-    
-    try {
-        console.log('[Passkey] Starting passkey creation...');
-        await initWallet();
-        
-        // Check wallet state first
-        const info = await wallet.getWalletInfo();
-        console.log('[Passkey] Wallet info:', {
-            hasWalletSecret: info.hasWalletSecret,
-            hasPasskey: info.hasPasskey,
-            walletId: info.walletId?.substring(0, 8) + '...'
-        });
-        
-        // Check if passkeys are supported
-        if (!window.PublicKeyCredential) {
-            throw new Error('Passkeys not supported in this browser');
-        }
-        
-        // Check for platform authenticator
-        const available = await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable();
-        console.log('[Passkey] Platform authenticator available:', available);
-        
-        if (!available) {
-            throw new Error('No platform authenticator available (Face ID, Touch ID, Windows Hello)');
-        }
-        
-        console.log('[Passkey] Calling registerPasskey()...');
-        const result = await wallet.registerPasskey();
-        console.log('[Passkey] registerPasskey result:', result);
-        
-        if (result.success) {
-            passkeyStatus.textContent = 'Passkey created successfully!';
-            passkeyStatus.className = 'status-box success';
-            
-            setTimeout(() => setStep(4), 1000);
-        } else if (result.redirecting) {
-            // SDK is redirecting - this shouldn't happen on lemma.id
-            console.warn('[Passkey] Unexpected redirect - on lemma.id this should not happen');
-            passkeyStatus.textContent = 'Redirecting...';
-        } else {
-            throw new Error(result.message || 'Passkey creation returned without success');
-        }
-    } catch (e) {
-        console.error('[Passkey] Error:', e.name, e.message);
-        
-        let errorMsg = e.message;
-        if (e.name === 'NotAllowedError') {
-            errorMsg = 'Passkey creation was cancelled or timed out. Please try again.';
-        } else if (e.name === 'InvalidStateError') {
-            errorMsg = 'A passkey already exists. Try unlocking instead.';
-        } else if (e.name === 'NotSupportedError') {
-            errorMsg = 'Passkeys not supported on this device.';
-        }
-        
-        passkeyStatus.innerHTML = errorMsg + '<br><br><button class="btn btn-secondary" onclick="createPasskey()" style="margin-top: 12px;">Try Again</button>';
-        passkeyStatus.className = 'status-box error';
-    }
 }
 
 // Initialize
