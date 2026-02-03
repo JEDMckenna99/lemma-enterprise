@@ -2688,12 +2688,27 @@ class LemmaWallet {
         return { success: true };
     }
 
+    // In-memory cache for issuer public keys (avoids IndexedDB reads)
+    _issuerCache = new Map();
+    
     /**
-     * Get an issuer's info
+     * Get an issuer's info (cached for fast verification)
      */
     async getIssuer(issuerDid) {
+        // Check memory cache first (FAST PATH)
+        if (this._issuerCache.has(issuerDid)) {
+            return this._issuerCache.get(issuerDid);
+        }
+        
         await this.init();
-        return this._get('issuers', issuerDid);
+        const issuer = await this._get('issuers', issuerDid);
+        
+        // Cache for future lookups
+        if (issuer) {
+            this._issuerCache.set(issuerDid, issuer);
+        }
+        
+        return issuer;
     }
 
     /**
@@ -2793,23 +2808,33 @@ class LemmaWallet {
      * @param {string} credentialId - The credential ID to check
      * @param {string} ppid - Optional PPID from credential claims (for user-level revocation)
      */
+    // In-memory cache for revocation list (avoids IndexedDB reads)
+    _revocationCache = { set: null, lastSynced: null, walletId: null };
+    
     async isRevoked(credentialId, ppid = null) {
-        const revocations = await this._get('revocations', 'current');
-        if (!revocations || !revocations.listArray) {
-            // No revocation data - assume not revoked but flag as unchecked
-            return { revoked: false, unchecked: true };
+        // Use in-memory cache if available (FAST PATH - no IndexedDB)
+        if (!this._revocationCache.set) {
+            const revocations = await this._get('revocations', 'current');
+            if (!revocations || !revocations.listArray) {
+                return { revoked: false, unchecked: true };
+            }
+            // Convert array to Set for O(1) lookups
+            this._revocationCache.set = new Set(revocations.listArray);
+            this._revocationCache.lastSynced = revocations.lastSynced;
         }
         
-        // Check credential-level revocation (one device)
-        const credentialRevoked = revocations.listArray.includes(credentialId);
+        // Cache wallet ID (doesn't change during session)
+        if (!this._revocationCache.walletId) {
+            this._revocationCache.walletId = this.walletId || this.session?.walletId || await this._getWalletId();
+        }
         
-        // Check user-level revocation (all devices with same PPID on one site)
-        const ppidRevoked = ppid ? revocations.listArray.includes(ppid) : false;
+        const revokedSet = this._revocationCache.set;
         
-        // Check wallet-level revocation (all devices, ALL sites)
-        // wallet_id is stored in this instance's config
-        const walletId = this.walletId || await this._getWalletId();
-        const walletRevoked = walletId ? revocations.listArray.includes(walletId) : false;
+        // O(1) Set lookups instead of O(n) Array.includes()
+        const credentialRevoked = revokedSet.has(credentialId);
+        const ppidRevoked = ppid ? revokedSet.has(ppid) : false;
+        const walletId = this._revocationCache.walletId;
+        const walletRevoked = walletId ? revokedSet.has(walletId) : false;
         
         const isRevoked = credentialRevoked || ppidRevoked || walletRevoked;
         
@@ -2831,9 +2856,17 @@ class LemmaWallet {
             ppidRevoked: ppidRevoked,
             walletRevoked: walletRevoked,
             unchecked: false,
-            lastSynced: revocations.lastSynced,
+            lastSynced: this._revocationCache.lastSynced,
             reason: reason
         };
+    }
+    
+    /**
+     * Invalidate revocation cache (call when SSE pushes new revocation)
+     */
+    invalidateRevocationCache() {
+        this._revocationCache = { set: null, lastSynced: null, walletId: this._revocationCache.walletId };
+        console.log('[Lemma] Revocation cache invalidated');
     }
     
     /**
