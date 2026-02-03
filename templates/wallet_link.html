@@ -102,28 +102,6 @@
 .step.completed { background: #10b981; color: white; }
 .step.pending { background: #e5e7eb; color: #9ca3af; }
 
-.scanner-area {
-    background: #1e1e1e;
-    border-radius: 12px;
-    width: 100%;
-    height: 300px;
-    margin-bottom: 16px;
-    overflow: hidden;
-    position: relative;
-}
-/* Html5Qrcode styles - ensure video is visible and properly positioned */
-.scanner-area video {
-    width: 100% !important;
-    height: 100% !important;
-    object-fit: cover !important;
-    position: absolute !important;
-    top: 0 !important;
-    left: 0 !important;
-}
-.scanner-area > div {
-    width: 100% !important;
-    height: 100% !important;
-}
 
 .hidden { display: none !important; }
 
@@ -162,11 +140,12 @@
             <strong>lemma.id → Add Another Device</strong>
         </div>
 
-        <!-- QR Scanner - Html5Qrcode creates its own video element -->
-        <div class="scanner-area" id="scanner-container"></div>
+        <!-- Hidden elements for QR scanning -->
+        <input type="file" id="qr-input" accept="image/*" capture="environment" style="display:none" onchange="handleQrPhoto(this)">
+        <div id="temp-scanner" style="display:none"></div>
         
-        <button class="btn btn-primary" id="scan-btn" onclick="startScanner()">
-            Scan QR Code
+        <button class="btn btn-primary" id="scan-btn" onclick="document.getElementById('qr-input').click()">
+            Scan QR Code with Camera
         </button>
 
         <div class="divider">or paste code manually</div>
@@ -209,8 +188,6 @@
 <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js" nonce="{{ csp_nonce }}"></script>
 <script nonce="{{ csp_nonce }}">
 let wallet = null;
-let html5QrCode = null;
-let scannerActive = false;
 
 async function initWallet() {
     if (wallet) return wallet;
@@ -240,135 +217,37 @@ function setStep(step) {
     document.getElementById('step2-content').classList.toggle('hidden', step !== 2);
 }
 
-async function startScanner() {
-    const scanBtn = document.getElementById('scan-btn');
-    const container = document.getElementById('scanner-container');
+
+// Handle photo captured from camera
+async function handleQrPhoto(input) {
     const status = document.getElementById('status');
     
-    // Check if Html5Qrcode library is loaded
-    if (typeof Html5Qrcode === 'undefined') {
-        console.error('Html5Qrcode library not loaded!');
-        status.innerHTML = 'QR scanner library failed to load.<br><br>Please paste the link code manually below.';
-        status.className = 'status-box error';
+    if (!input.files || !input.files[0]) {
         return;
     }
     
-    if (scannerActive) {
-        // Stop scanner
-        if (html5QrCode) {
-            try {
-                await html5QrCode.stop();
-            } catch (e) {
-                console.log('Scanner already stopped');
-            }
-            html5QrCode = null;
-        }
-        scannerActive = false;
-        scanBtn.textContent = 'Scan QR Code';
-        container.innerHTML = ''; // Clear scanner elements
-        status.textContent = 'Scanner stopped. Click to scan again.';
-        status.className = 'status-box info';
-        return;
-    }
+    const file = input.files[0];
+    status.textContent = 'Reading QR code from photo...';
+    status.className = 'status-box info';
     
-    // Start scanner - simplified for mobile compatibility
     try {
-        console.log('[Scanner] Starting scanner...');
-        status.textContent = 'Starting camera...';
-        status.className = 'status-box info';
-        scanBtn.textContent = 'Stop Scanner';
-        scanBtn.disabled = true;
+        // Use Html5Qrcode to decode QR from image file
+        const html5QrCode = new Html5Qrcode("temp-scanner");
+        const decodedText = await html5QrCode.scanFile(file, true);
+        console.log('QR decoded from photo:', decodedText);
         
-        // Clear any previous scanner elements
-        container.innerHTML = '';
+        // Clear the input so same file can be selected again
+        input.value = '';
         
-        // Create scanner instance
-        html5QrCode = new Html5Qrcode("scanner-container");
-        
-        // Calculate qrbox size based on container width
-        const containerWidth = container.offsetWidth || 300;
-        const qrboxSize = Math.min(200, containerWidth - 50);
-        
-        console.log('[Scanner] Container width:', containerWidth, 'QR box:', qrboxSize);
-        
-        // Start scanner with back camera - simpler config for mobile
-        // Using facingMode directly without camera enumeration (works better on mobile)
-        await html5QrCode.start(
-            { facingMode: "environment" },
-            { 
-                fps: 10, 
-                qrbox: qrboxSize  // Use single number for square box
-            },
-            onQrCodeScanned,
-            () => {} // Ignore decode errors
-        );
-        
-        scannerActive = true;
-        scanBtn.disabled = false;
-        status.textContent = 'Point camera at QR code';
-        status.className = 'status-box info';
-        console.log('[Scanner] Scanner started successfully');
+        // Process the code
+        await processLinkCode(decodedText);
         
     } catch (e) {
-        console.error('[Scanner] Error:', e.name, e.message, e);
-        
-        // Try fallback to front camera if back camera fails
-        if (e.name === 'OverconstrainedError' || e.name === 'NotReadableError') {
-            console.log('[Scanner] Trying front camera fallback...');
-            try {
-                html5QrCode = new Html5Qrcode("scanner-container");
-                await html5QrCode.start(
-                    { facingMode: "user" },
-                    { fps: 10, qrbox: 180 },
-                    onQrCodeScanned,
-                    () => {}
-                );
-                scannerActive = true;
-                scanBtn.disabled = false;
-                status.textContent = 'Using front camera - point at QR code';
-                status.className = 'status-box info';
-                console.log('[Scanner] Front camera started');
-                return;
-            } catch (e2) {
-                console.error('[Scanner] Front camera also failed:', e2);
-            }
-        }
-        
-        let errorMsg = 'Camera access failed.';
-        if (e.name === 'NotAllowedError') {
-            errorMsg = 'Camera permission denied. Please allow camera access and reload the page.';
-        } else if (e.name === 'NotFoundError') {
-            errorMsg = 'No camera found on this device.';
-        } else if (e.name === 'NotReadableError') {
-            errorMsg = 'Camera is busy. Close other apps using the camera.';
-        } else if (e.name === 'OverconstrainedError') {
-            errorMsg = 'Camera not compatible. Try a different browser.';
-        } else if (e.message) {
-            errorMsg = 'Error: ' + e.message;
-        }
-        
-        status.innerHTML = errorMsg + '<br><br>You can paste the link code manually below.';
+        console.error('QR decode error:', e);
+        status.innerHTML = 'Could not read QR code from photo.<br>Make sure the QR code is clearly visible and try again, or paste the code manually below.';
         status.className = 'status-box error';
-        scanBtn.textContent = 'Scan QR Code';
-        scanBtn.disabled = false;
-        scannerActive = false;
-        container.innerHTML = '';
-        html5QrCode = null;
+        input.value = '';
     }
-}
-
-async function onQrCodeScanned(decodedText) {
-    console.log('QR scanned:', decodedText);
-    
-    // Stop scanner
-    if (html5QrCode) {
-        await html5QrCode.stop();
-        html5QrCode = null;
-    }
-    scannerActive = false;
-    
-    // Process the code
-    await processLinkCode(decodedText);
 }
 
 async function submitManualCode() {
