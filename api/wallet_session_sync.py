@@ -478,6 +478,125 @@ def set_session():
     return response
 
 
+@wallet_session_sync_bp.route('/api/wallet/init-first-session', methods=['POST', 'OPTIONS'])
+def init_first_session():
+    """
+    Initialize first session for a NEW wallet (no prior session exists).
+    
+    This is called after local passkey creation on lemma.id when there's no
+    existing server session. It creates the initial session and returns an
+    unlock_token for cross-device SSO.
+    
+    SECURITY:
+    - Only works if NO session exists for this wallet_id yet
+    - Only allowed from lemma.id origin
+    - Rate limited to prevent abuse
+    
+    Request body:
+        - wallet_id: The newly created wallet's ID
+    
+    Returns:
+        - unlock_token: Token for set-session calls
+        - success: true if session created
+    """
+    # Handle CORS preflight
+    if request.method == 'OPTIONS':
+        response = make_response()
+        origin = request.headers.get('Origin')
+        response.headers.update(_cors_headers(origin))
+        if not _origin_allowed(origin):
+            return response, 403
+        response.headers['Access-Control-Max-Age'] = '86400'
+        return response
+    
+    origin = request.headers.get('Origin')
+    
+    # SECURITY: Only allow from lemma.id
+    if origin and 'lemma.id' not in origin and 'localhost' not in origin:
+        response = jsonify({'success': False, 'error': 'origin_not_allowed'})
+        response.headers.update(_cors_headers(origin))
+        return response, 403
+    
+    data = request.get_json() or {}
+    wallet_id = data.get('wallet_id')
+    
+    if not wallet_id:
+        response = jsonify({'success': False, 'error': 'wallet_id required'})
+        response.headers.update(_cors_headers(origin))
+        return response, 400
+    
+    # SECURITY: Check if session already exists for this wallet
+    existing_session = _get_global_session(wallet_id)
+    if existing_session:
+        # Wallet already has a session - don't override
+        # User should use normal unlock flow
+        response = jsonify({
+            'success': False,
+            'error': 'session_exists',
+            'message': 'Wallet already has a session. Use normal unlock flow.'
+        })
+        response.headers.update(_cors_headers(origin))
+        return response, 409  # Conflict
+    
+    # Create new session for this wallet
+    unlocked_at = int(time.time() * 1000)
+    expires_at = int(time.time()) + SESSION_DURATION
+    
+    # Generate unlock_token
+    unlock_token = generate_unlock_token(
+        wallet_id=wallet_id,
+        unlocked_at=unlocked_at,
+        expires_at=expires_at
+    )
+    
+    # Store global session
+    global_stored = _store_global_session(
+        wallet_id=wallet_id,
+        unlocked_at=unlocked_at,
+        expires_at=expires_at,
+        profile_id='default',
+        profile_name='Personal'
+    )
+    
+    # Generate session token for cookie
+    session_token = generate_session_token(wallet_id, unlocked_at)
+    csrf_token = secrets.token_urlsafe(32)
+    
+    logger.info(f"✅ First session initialized for new wallet {wallet_id[:8]}...")
+    
+    response = jsonify({
+        'success': True,
+        'wallet_id': wallet_id,
+        'unlock_token': unlock_token,
+        'expires_at': expires_at,
+        'global_session_stored': global_stored
+    })
+    
+    response.headers.update(_cors_headers(origin))
+    
+    # Set session cookie
+    response.set_cookie(
+        SESSION_COOKIE_NAME,
+        session_token,
+        max_age=SESSION_DURATION,
+        httponly=True,
+        secure=True,
+        samesite='None',
+        path='/'
+    )
+    response.set_cookie(
+        CSRF_COOKIE_NAME,
+        csrf_token,
+        max_age=SESSION_DURATION,
+        httponly=False,
+        secure=True,
+        samesite='None',
+        path='/'
+    )
+    
+    return response
+
+
 @wallet_session_sync_bp.route('/api/wallet/clear-session', methods=['POST'])
 def clear_session():
     """Clear wallet session cookie AND global session (for cross-device lock detection)."""

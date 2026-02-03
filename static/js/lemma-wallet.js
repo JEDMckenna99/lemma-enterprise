@@ -1574,32 +1574,77 @@ class LemmaWallet {
         await this._put('session', { id: 'current', ...this.session });
         console.log('✅ Wallet auto-unlocked after passkey registration');
 
-        // Set server session cookie if we have an unlock token (from linking or server auth)
-        if (this.session?.serverUnlockToken) {
-            try {
-                const activeProfile = await this.getActiveProfile();
-                const setSessionResponse = await fetch('https://lemma.id/api/wallet/set-session', {
-                    method: 'POST',
-                    credentials: 'include',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        wallet_id: walletId.value,
-                        unlocked_at: this.session.unlockedAt,
-                        profile_id: activeProfile.id,
-                        profile_name: activeProfile.name,
-                        unlock_token: this.session.serverUnlockToken
-                    })
-                });
-                if (setSessionResponse.ok) {
-                    console.log(`[Lemma] Session cookie set - profile: ${activeProfile.name}`);
-                } else {
-                    console.warn('[Lemma] Could not set session cookie:', setSessionResponse.status);
+        // Set server session for cross-device SSO
+        if (this._isLemmaDomain()) {
+            // On lemma.id: Initialize first session if we don't have an unlock token
+            if (!this.session?.serverUnlockToken) {
+                try {
+                    console.log('[Lemma] Initializing first session for new wallet...');
+                    const initResponse = await fetch('/api/wallet/init-first-session', {
+                        method: 'POST',
+                        credentials: 'include',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            wallet_id: walletId.value
+                        })
+                    });
+                    
+                    if (initResponse.ok) {
+                        const initData = await initResponse.json();
+                        if (initData.success && initData.unlock_token) {
+                            this.session.serverUnlockToken = initData.unlock_token;
+                            await this._put('session', { id: 'current', ...this.session });
+                            console.log('[Lemma] ✅ First session initialized with unlock_token');
+                        }
+                    } else if (initResponse.status === 409) {
+                        // Session already exists - get unlock_token via link-unlock-token
+                        console.log('[Lemma] Session exists, getting unlock_token...');
+                        const tokenResponse = await fetch('/api/wallet/link-unlock-token', {
+                            method: 'POST',
+                            credentials: 'include',
+                            headers: { 'Content-Type': 'application/json' }
+                        });
+                        if (tokenResponse.ok) {
+                            const tokenData = await tokenResponse.json();
+                            if (tokenData.success && tokenData.unlock_token) {
+                                this.session.serverUnlockToken = tokenData.unlock_token;
+                                await this._put('session', { id: 'current', ...this.session });
+                                console.log('[Lemma] ✅ Got unlock_token from existing session');
+                            }
+                        }
+                    } else {
+                        console.warn('[Lemma] init-first-session failed:', initResponse.status);
+                    }
+                } catch (e) {
+                    console.warn('[Lemma] Could not initialize first session:', e.message);
                 }
-            } catch (e) {
-                console.warn('[Lemma] Could not set session cookie on lemma.id:', e.message);
             }
-        } else {
-            console.warn('[Lemma] Server session not set (no server unlock token)');
+            
+            // Now set the full session with profile info if we have unlock_token
+            if (this.session?.serverUnlockToken) {
+                try {
+                    const activeProfile = await this.getActiveProfile();
+                    const setSessionResponse = await fetch('/api/wallet/set-session', {
+                        method: 'POST',
+                        credentials: 'include',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            wallet_id: walletId.value,
+                            unlocked_at: this.session.unlockedAt,
+                            profile_id: activeProfile.id,
+                            profile_name: activeProfile.name,
+                            unlock_token: this.session.serverUnlockToken
+                        })
+                    });
+                    if (setSessionResponse.ok) {
+                        console.log(`[Lemma] ✅ Session cookie set - profile: ${activeProfile.name}`);
+                    } else {
+                        console.warn('[Lemma] Could not set session cookie:', setSessionResponse.status);
+                    }
+                } catch (e) {
+                    console.warn('[Lemma] Could not set session cookie:', e.message);
+                }
+            }
         }
 
         return {
