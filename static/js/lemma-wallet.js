@@ -776,9 +776,13 @@ class LemmaWallet {
                         source: 'redirect'
                         };
                         await this._put('session', { id: 'current', ...this.session });
-                        
+
+                    // IMPORTANT: Sync session to bridge so it can serve future requests
+                    // The bridge has a separate IndexedDB and needs the wallet_id for global-session checks
+                    await this._syncSessionToBridge(this.session, decrypted.wallet_secret);
+
                     this._autoStartHeartbeat();
-                    
+
                     return {
                         success: true,
                         authenticated: true,
@@ -808,9 +812,9 @@ class LemmaWallet {
                 
                 if (data.success && data.wallet_secret) {
                     console.log('[Lemma] ✅ Legacy token exchange successful');
-                    
+
                     await this._put('secrets', { id: 'master', secret: data.wallet_secret, source: 'redirect_token' });
-                    
+
                     this.session = {
                         isUnlocked: true,
                         unlockedAt: Date.now(),
@@ -820,9 +824,12 @@ class LemmaWallet {
                         source: 'redirect'
                     };
                     await this._put('session', { id: 'current', ...this.session });
-                    
+
+                    // Sync session to bridge
+                    await this._syncSessionToBridge(this.session, data.wallet_secret);
+
                     this._autoStartHeartbeat();
-                    
+
                     return {
                         success: true,
                         authenticated: true,
@@ -1740,9 +1747,11 @@ class LemmaWallet {
             }
         }
 
-        // Prefer server-verified unlock on lemma.id when cross-device SSO is needed
-        if (this._isLemmaDomain() && options.requireServerSession) {
+        // ALWAYS prefer server-verified unlock on lemma.id for cross-device SSO
+        // This ensures we get an unlock_token which is required for set-session
+        if (this._isLemmaDomain()) {
             try {
+                console.log('[Lemma] On lemma.id - using server-verified unlock for cross-device SSO');
                 return await this.unlockWithServerSession();
             } catch (e) {
                 console.warn('[Lemma] Server unlock failed, falling back to local:', e.message);
@@ -2523,9 +2532,9 @@ class LemmaWallet {
                     console.warn('[Lemma] Bridge ready timeout - continuing anyway');
                     resolve(); // Don't reject, try to continue
                 }, 2500);
-                
+
                 const handler = (event) => {
-                    if (event.origin === 'https://lemma.id' && 
+                    if (event.origin === 'https://lemma.id' &&
                         event.data?.type === 'WALLET_BRIDGE_READY') {
                         clearTimeout(timeoutId);
                         window.removeEventListener('message', handler);
@@ -2533,9 +2542,13 @@ class LemmaWallet {
                         resolve();
                     }
                 };
-                
+
                 window.addEventListener('message', handler);
             });
+
+            // Set up persistent listener for instant session invalidation (via BroadcastChannel)
+            // This enables instant lock detection when user locks wallet in another tab
+            this._setupSessionInvalidationListener();
         }
         
         return new Promise((resolve, reject) => {
@@ -2574,6 +2587,113 @@ class LemmaWallet {
                 reject(new Error('Bridge not ready'));
             }
         });
+    }
+
+    /**
+     * Set up persistent listener for session invalidation messages from bridge
+     * This enables instant lock detection via BroadcastChannel (same-device sync)
+     * @private
+     */
+    _setupSessionInvalidationListener() {
+        // Only set up once
+        if (this._sessionInvalidationListenerActive) return;
+        this._sessionInvalidationListenerActive = true;
+
+        const handler = (event) => {
+            // Only accept messages from lemma.id
+            if (!event.origin.includes('lemma.id')) return;
+
+            const { type, walletId, reason, instant } = event.data || {};
+
+            if (type === 'SESSION_INVALIDATED') {
+                console.log(`[Lemma] Session invalidated via bridge (instant: ${instant}, reason: ${reason})`);
+
+                // Clear local session immediately
+                if (this.session) {
+                    this.session.isUnlocked = false;
+                    this.session.expiresAt = 0;
+                }
+
+                // Emit event for app to handle (e.g., show login prompt, redirect)
+                this._emitSessionEvent('session_invalidated', {
+                    walletId,
+                    reason,
+                    instant: !!instant
+                });
+            } else if (type === 'SESSION_RESTORED') {
+                console.log(`[Lemma] Session restored via bridge (instant: ${instant})`);
+
+                // Emit event for app to refresh state
+                this._emitSessionEvent('session_restored', {
+                    walletId,
+                    instant: !!instant
+                });
+            }
+        };
+
+        window.addEventListener('message', handler);
+        console.log('[Lemma] Session invalidation listener active (instant lock detection enabled)');
+    }
+
+    /**
+     * Emit session-related events for apps to listen to
+     * @private
+     */
+    _emitSessionEvent(eventName, detail) {
+        // Dispatch custom event on window for apps to listen
+        const event = new CustomEvent(`lemma:${eventName}`, { detail });
+        window.dispatchEvent(event);
+
+        // Also call registered callback if any
+        if (this._sessionCallbacks && this._sessionCallbacks[eventName]) {
+            this._sessionCallbacks[eventName](detail);
+        }
+    }
+
+    /**
+     * Register callback for session events
+     * @param {string} eventName - 'session_invalidated' or 'session_restored'
+     * @param {Function} callback - Function to call when event occurs
+     */
+    onSessionEvent(eventName, callback) {
+        if (!this._sessionCallbacks) {
+            this._sessionCallbacks = {};
+        }
+        this._sessionCallbacks[eventName] = callback;
+    }
+
+    /**
+     * Sync session to the bridge iframe
+     * This is critical for cross-site unlock to work - the bridge has a separate
+     * IndexedDB (lemma.id origin) and needs the wallet_id to check global sessions.
+     * @private
+     */
+    async _syncSessionToBridge(session, walletSecret) {
+        if (this._isLemmaDomain()) {
+            // On lemma.id, bridge isn't needed
+            return;
+        }
+
+        try {
+            console.log('[Lemma] Syncing session to bridge...');
+            const result = await this._sendBridgeMessage('SET_LOCAL_SESSION', {
+                session: {
+                    isUnlocked: session.isUnlocked,
+                    unlockedAt: session.unlockedAt,
+                    expiresAt: session.expiresAt,
+                    walletId: session.walletId
+                },
+                walletSecret: walletSecret
+            }, 5000);
+
+            if (result?.success) {
+                console.log('[Lemma] ✅ Session synced to bridge');
+            } else {
+                console.warn('[Lemma] Bridge session sync failed:', result?.error);
+            }
+        } catch (e) {
+            console.warn('[Lemma] Bridge session sync error:', e.message);
+        }
     }
 
     // ========================================
