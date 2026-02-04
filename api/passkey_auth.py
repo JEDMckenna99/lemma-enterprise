@@ -502,9 +502,22 @@ def passkey_authenticate_complete():
         
         # Get credential ID and find the passkey
         credential_id_b64 = credential.get('id')
+        logger.info(f"🔐 Looking up passkey with credential_id: {credential_id_b64[:20] if credential_id_b64 else 'None'}...")
         passkey = get_passkey_by_credential_id(credential_id_b64)
         
         if not passkey:
+            logger.warning(f"❌ Passkey NOT FOUND for credential_id: {credential_id_b64[:30] if credential_id_b64 else 'None'}...")
+            # Debug: Check if passkey exists but is inactive
+            from api.database import get_db, Passkey as PasskeyModel
+            db = get_db()
+            try:
+                inactive = db.query(PasskeyModel).filter(PasskeyModel.credential_id == credential_id_b64).first()
+                if inactive:
+                    logger.warning(f"❌ Passkey EXISTS but is_active={inactive.is_active} for user {inactive.user_id}")
+                else:
+                    logger.warning(f"❌ No passkey with this credential_id exists in DB at all")
+            finally:
+                db.close()
             return jsonify({
                 'success': False,
                 'error': 'Passkey not found'
