@@ -325,7 +325,7 @@
     </div>
 
     <!-- Load SDK with cache-buster to ensure latest version -->
-    <script src="/static/js/lemma-wallet.js?v=2400" nonce="{{ csp_nonce }}"></script>
+    <script src="/static/js/lemma-wallet.js?v=2401" nonce="{{ csp_nonce }}"></script>
     <script nonce="{{ csp_nonce }}">
 // Initialize wallet SDK
 const wallet = new LemmaWallet();
@@ -449,20 +449,26 @@ async function handleRedirectReturn() {
         }
         
         // Set global session for cross-device sync
+        // IMPORTANT: Requires unlock_token from server-verified passkey auth
         try {
-            if (info.walletId) {
+            const unlockToken = wallet.session?.serverUnlockToken;
+            if (info.walletId && unlockToken) {
                 const activeProfile = await wallet.getActiveProfile();
-                await fetch('/api/wallet/set-session', {
+                const setSessionResp = await fetch('/api/wallet/set-session', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     credentials: 'include',
                     body: JSON.stringify({
                         wallet_id: info.walletId,
-                        unlocked_at: Date.now(),
+                        unlock_token: unlockToken,
                         profile_id: activeProfile.id,
                         profile_name: activeProfile.name
                     })
                 });
+                const setSessionData = await setSessionResp.json();
+                console.log('[Unlock] set-session result:', setSessionData);
+            } else {
+                console.warn('[Unlock] No unlock_token available for set-session');
             }
         } catch (e) {
             console.warn('Failed to set global session:', e);

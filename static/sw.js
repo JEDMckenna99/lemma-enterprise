@@ -1,7 +1,7 @@
 // Lemma Service Worker - Minimal Implementation
 // This prevents service worker errors and provides basic caching
 
-const CACHE_NAME = 'lemma-v3';  // Bumped for SDK v2.36.0 perf optimizations
+const CACHE_NAME = 'lemma-v4';  // Bumped for SDK v2.40.0 bridge session fix
 const STATIC_ASSETS = [
   '/static/css/lemma.css',
   '/static/js/lemma-wallet.js',

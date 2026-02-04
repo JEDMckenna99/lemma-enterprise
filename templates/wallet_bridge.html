@@ -298,12 +298,18 @@ async function checkSession(options = {}) {
                         console.log('📥 Local session restored from server');
                     }
                 } else if (session) {
-                    // Server says no session (401) but we have local - LOCK DETECTED
-                    console.log('⚠️ Server session invalid - wallet locked remotely!');
-                    console.log('⚠️ Clearing local session to match server state');
-                    // Clear local session to match server
-                    await wallet._delete('session', 'current');
-                    session = null;
+                    // Server returned 401 (no cookie) but we have local session
+                    // IMPORTANT: Do NOT clear local session here!
+                    // 401 can mean:
+                    //   1. Cookies blocked by browser (third-party cookie policy)
+                    //   2. Cookie expired/missing
+                    //   3. User actually locked wallet
+                    // We can't distinguish these cases, so TRUST the local session
+                    // if it hasn't expired. The local session has the wallet secret
+                    // which proves the user authenticated.
+                    console.log('ℹ️ Session-sync returned 401 but local session exists');
+                    console.log('ℹ️ Keeping local session (cookies may be blocked)');
+                    // Don't clear - trust the local session
                 } else {
                     console.log('ℹ️ No server session and no local session');
                 }
@@ -574,16 +580,16 @@ window.addEventListener('message', async (event) => {
                 break;
                 
             case 'SET_LOCAL_SESSION':
-                // Set session directly from popup (bypasses cookie partitioning)
-                // This is called after popup unlock succeeds
+                // Set session directly from SDK (bypasses cookie partitioning)
+                // This is called after redirect unlock succeeds on third-party sites
                 if (!wallet) await initWallet();
-                
+
                 const incomingSession = payload?.session;
                 const incomingSecret = payload?.walletSecret;
-                
+
                 if (incomingSession && incomingSession.isUnlocked) {
-                    console.log('📥 SET_LOCAL_SESSION: Receiving session from popup');
-                    
+                    console.log('📥 SET_LOCAL_SESSION: Receiving session from SDK');
+
                     // Store session in bridge's IndexedDB
                     const sessionToStore = {
                         id: 'current',
@@ -591,20 +597,27 @@ window.addEventListener('message', async (event) => {
                         unlockedAt: incomingSession.unlockedAt || Date.now(),
                         expiresAt: incomingSession.expiresAt,
                         walletId: incomingSession.walletId,
-                        source: 'popup_sync'
+                        source: 'sdk_sync'
                     };
                     await wallet._put('session', sessionToStore);
-                    
+
+                    // IMPORTANT: Store wallet_id separately for global-session lookups
+                    // This is critical for the global-session fallback when cookies are blocked
+                    if (incomingSession.walletId) {
+                        await wallet._put('passkey', { id: 'walletId', value: incomingSession.walletId });
+                        console.log('📥 Wallet ID stored for global-session lookups');
+                    }
+
                     // Store wallet secret if provided
                     if (incomingSecret) {
-                        await wallet._put('secrets', { id: 'master', secret: incomingSecret, source: 'popup_sync' });
-                        console.log('📥 Wallet secret stored from popup');
+                        await wallet._put('secrets', { id: 'master', secret: incomingSecret, source: 'sdk_sync' });
+                        console.log('📥 Wallet secret stored from SDK');
                     }
-                    
+
                     // Clear session cache so next check uses fresh data
                     cache.session = { value: null, ts: 0, promise: null };
-                    
-                    console.log('✅ Session synced from popup - bridge now has valid session');
+
+                    console.log('✅ Session synced from SDK - bridge now has valid session');
                     respond({ success: true, sessionSet: true });
                 } else {
                     respond({ success: false, error: 'Invalid session data' });
@@ -1346,72 +1359,167 @@ async function syncSessionFromServer() {
     try {
         console.log('🔄 Attempting session sync from server...');
 
+        // First try cookie-based session-sync
         const response = await fetch('https://lemma.id/api/wallet/session-sync', {
             method: 'POST',
             credentials: 'include',  // Include cookies
             headers: getSecureHeaders()
         });
-        
-        if (!response.ok) {
-            const error = await response.json();
-            console.log('⚠️ Session sync: No valid session on server');
-            return { success: false, error: error.error || 'sync_failed' };
-        }
-        
-        const data = await response.json();
-        
-        if (data.success && data.session) {
-            console.log('✅ Session synced from server!');
-            
-            // Store synced session in local (partitioned) IndexedDB
-            if (wallet) {
-                await wallet._put('session', {
-                    id: 'current',
-                    isUnlocked: true,
-                    unlockedAt: data.session.unlocked_at,
-                    expiresAt: data.session.expires_at * 1000, // Convert to ms
-                    walletId: data.session.wallet_id,
-                    syncedFromServer: true,
-                    syncedAt: Date.now()
-                });
-                updateSessionCache({
-                    valid: true,
-                    expiresAt: data.session.expires_at * 1000,
-                    timeRemaining: (data.session.expires_at * 1000) - Date.now(),
-                    unlockedAt: data.session.unlocked_at,
-                    extensionCount: 0,
-                    canExtend: true,
-                    shouldPromptExtend: false,
-                    walletExists: true
-                });
-                
-                // Store any synced credentials
-                if (data.credentials && data.credentials.length > 0) {
-                    for (const cred of data.credentials) {
-                        await wallet._put('lemmas', cred);
-                    }
-                    clearCredentialsCache();
-                    console.log(`   └─ Synced ${data.credentials.length} credentials`);
-                }
+
+        if (response.ok) {
+            const data = await response.json();
+            if (data.success && data.session) {
+                console.log('✅ Session synced from server (via cookie)!');
+                return await storeSessionFromServer(data.session, data.credentials);
             }
-            
-            return { 
-                success: true, 
-                session: data.session,
-                credentials: data.credentials || []
-            };
         }
-        
-        return { success: false, error: 'invalid_response' };
-        
+
+        // Cookie-based sync failed - try global-session fallback
+        // This works even when third-party cookies are blocked
+        console.log('⚠️ Cookie sync failed, trying global-session fallback...');
+
+        // Get wallet_id from local IndexedDB
+        let walletId = null;
+        if (wallet) {
+            const walletIdRecord = await wallet._get('passkey', 'walletId');
+            walletId = walletIdRecord?.value;
+        }
+
+        if (!walletId) {
+            console.log('⚠️ No wallet_id in local storage - cannot check global session');
+            return { success: false, error: 'no_wallet_id' };
+        }
+
+        // Try global-session endpoint (doesn't rely on cookies)
+        const globalResponse = await fetch('https://lemma.id/api/wallet/global-session', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ wallet_id: walletId })
+        });
+
+        if (globalResponse.ok) {
+            const globalData = await globalResponse.json();
+            if (globalData.success && globalData.valid && globalData.session) {
+                console.log('✅ Session synced from global-session (bypassed cookie blocking)!');
+                return await storeSessionFromServer(globalData.session, []);
+            }
+        }
+
+        console.log('⚠️ Session sync: No valid session on server');
+        return { success: false, error: 'no_session' };
+
     } catch (e) {
         console.warn('⚠️ Session sync error:', e.message);
         return { success: false, error: e.message };
     }
 }
 
+// Helper to store session data from server response
+async function storeSessionFromServer(session, credentials = []) {
+    if (!wallet) {
+        return { success: false, error: 'wallet_not_initialized' };
+    }
+
+    await wallet._put('session', {
+        id: 'current',
+        isUnlocked: true,
+        unlockedAt: session.unlocked_at,
+        expiresAt: session.expires_at * 1000, // Convert to ms
+        walletId: session.wallet_id,
+        syncedFromServer: true,
+        syncedAt: Date.now()
+    });
+
+    updateSessionCache({
+        valid: true,
+        expiresAt: session.expires_at * 1000,
+        timeRemaining: (session.expires_at * 1000) - Date.now(),
+        unlockedAt: session.unlocked_at,
+        extensionCount: 0,
+        canExtend: true,
+        shouldPromptExtend: false,
+        walletExists: true
+    });
+
+    // Store any synced credentials
+    if (credentials && credentials.length > 0) {
+        for (const cred of credentials) {
+            await wallet._put('lemmas', cred);
+        }
+        clearCredentialsCache();
+        console.log(`   └─ Synced ${credentials.length} credentials`);
+    }
+
+    return {
+        success: true,
+        session: session,
+        credentials: credentials || []
+    };
+}
+
 // ============================================
-// INITIALIZATION (v2.3 - optimized for speed)
+// BROADCASTCHANNEL - INSTANT SAME-DEVICE SYNC
+// ============================================
+
+/**
+ * BroadcastChannel enables instant session sync across tabs/windows
+ * on the SAME DEVICE (same-origin: lemma.id).
+ *
+ * When wallet_simple.html locks/unlocks, it broadcasts to this channel.
+ * The bridge receives it and forwards to the parent site via postMessage.
+ * This enables instant lock detection without polling (300ms vs 2-5s).
+ */
+let sessionChannel = null;
+try {
+    sessionChannel = new BroadcastChannel('lemma-session');
+    console.log('🔗 BroadcastChannel initialized for instant same-device sync');
+
+    sessionChannel.onmessage = async (event) => {
+        const { type, walletId, source } = event.data || {};
+
+        // Ignore messages from the bridge itself
+        if (source === 'bridge') return;
+
+        console.log(`📡 Bridge received ${type} via BroadcastChannel from ${source}`);
+
+        if (type === 'LOCK') {
+            // Wallet was locked in another tab - notify parent immediately
+            // This is the key optimization: instant notification, no polling
+            if (window.parent !== window) {
+                console.log('🔒 Forwarding LOCK to parent via postMessage');
+                window.parent.postMessage({
+                    type: 'SESSION_INVALIDATED',
+                    reason: 'lock',
+                    walletId: walletId,
+                    timestamp: Date.now(),
+                    instant: true  // Flag that this came via BroadcastChannel
+                }, '*');
+            }
+
+            // Also invalidate local session cache
+            cache.session = { value: null, ts: 0, promise: null };
+        } else if (type === 'UNLOCK') {
+            // Wallet was unlocked in another tab - notify parent to refresh
+            if (window.parent !== window) {
+                console.log('🔓 Forwarding UNLOCK to parent via postMessage');
+                window.parent.postMessage({
+                    type: 'SESSION_RESTORED',
+                    walletId: walletId,
+                    timestamp: Date.now(),
+                    instant: true
+                }, '*');
+            }
+
+            // Clear session cache to force fresh check
+            cache.session = { value: null, ts: 0, promise: null };
+        }
+    };
+} catch (e) {
+    console.warn('⚠️ BroadcastChannel not supported:', e.message);
+}
+
+// ============================================
+// INITIALIZATION (v2.4 - instant sync)
 // ============================================
 
 (async function() {
@@ -1452,11 +1560,12 @@ async function syncSessionFromServer() {
     
     const initTime = performance.now() - initStart;
     
-    console.log('🌉 Wallet bridge ready (v2.3 optimized)');
+    console.log('🌉 Wallet bridge ready (v2.4 instant sync)');
     console.log(`   ├─ Initialized in ${initTime.toFixed(0)}ms`);
     console.log(`   ├─ Storage: ${storageAccessGranted ? 'unpartitioned' : 'partitioned'}`);
     console.log(`   ├─ Session: ${session.valid ? 'active ✓' : 'none/expired'}`);
     console.log(`   ├─ Synced from server: ${session.syncedFromServer ? 'yes' : 'no'}`);
+    console.log(`   ├─ Instant sync: ${sessionChannel ? 'enabled ✓' : 'disabled'}`);
     console.log(`   └─ Network calls: ${networkCalls}`);
 
     // Notify parent that bridge is ready with session info
@@ -1464,7 +1573,7 @@ async function syncSessionFromServer() {
         window.parent.postMessage({
             type: 'WALLET_BRIDGE_READY',
             ready: ready,
-            version: '2.3',
+            version: '2.4',
             session: session,
             storageAccess: storageAccessGranted ? 'unpartitioned' : 'partitioned',
             initTimeMs: initTime.toFixed(2),
@@ -1479,7 +1588,8 @@ async function syncSessionFromServer() {
                 freshAuth: true,
                 authFreshnessCheck: true,
                 storageAccessAPI: !!document.hasStorageAccess,
-                sessionSync: true  // NEW: Server session sync capability
+                sessionSync: true,  // Server session sync capability
+                instantSync: !!sessionChannel  // BroadcastChannel for instant same-device sync
             },
             // If no session, include unlock URL for SDK to redirect
             unlockUrl: session.needsUnlock ? 'https://lemma.id/wallet/unlock' : null

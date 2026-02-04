@@ -1,7 +1,17 @@
 {
   "permissions": {
     "allow": [
-      "Bash(grep:*)"
+      "Bash(grep:*)",
+      "Bash(git add:*)",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nRebrand to Lemma ID - make lemma.id the main management page\n\n- Route changes: / now serves Lemma ID management \\(was /wallet\\)\n- Added /about for marketing page, /link for device linking, /unlock for auth\n- Legacy /wallet/* URLs redirect to new clean URLs\n- Rebranded all user-facing text from \"Wallet\" to \"Lemma ID\"\n- Updated SDK URLs to use new paths\n\nUsers can now type lemma.id to manage their identity.\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(git push:*)",
+      "WebFetch(domain:lemma.id)",
+      "Bash(curl:*)",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nSmart routing: marketing for new visitors, app for returning users\n\n- New visitors to lemma.id see marketing page \\(SEO optimized\\)\n- Returning users with session cookie see Lemma ID app\n- Added /app route for direct access to management page\n- Updated legacy /wallet redirects to go to /app\n- Updated CTA buttons to use /app\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(find:*)",
+      "Bash(git commit:*)",
+      "Bash(python:*)",
+      "Bash(node:*)"
     ]
   }
 }

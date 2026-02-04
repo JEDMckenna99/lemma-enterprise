@@ -123,11 +123,52 @@
     </div>
 </div>
 
-<script src="/static/js/lemma-wallet.js?v=2400" nonce="{{ csp_nonce }}"></script>
+<script src="/static/js/lemma-wallet.js?v=2401" nonce="{{ csp_nonce }}"></script>
 <script src="/static/js/qrcode.min.js" nonce="{{ csp_nonce }}"></script>
 <script nonce="{{ csp_nonce }}">
 let wallet = null;
 let qrTimerInterval = null;
+
+// BroadcastChannel for instant cross-tab session sync (same-device, same-origin)
+// This enables instant lock detection across tabs without polling
+let sessionChannel = null;
+try {
+    sessionChannel = new BroadcastChannel('lemma-session');
+    console.log('[Session] BroadcastChannel initialized for cross-tab sync');
+} catch (e) {
+    console.warn('[Session] BroadcastChannel not supported:', e.message);
+}
+
+// Broadcast session state change to other tabs/windows on same origin
+function broadcastSessionChange(type, walletId) {
+    if (sessionChannel) {
+        sessionChannel.postMessage({
+            type: type,
+            walletId: walletId,
+            timestamp: Date.now(),
+            source: 'wallet_simple'
+        });
+        console.log(`[Session] Broadcast ${type} to other tabs`);
+    }
+}
+
+// Listen for session changes from other tabs
+if (sessionChannel) {
+    sessionChannel.onmessage = (event) => {
+        const { type, walletId, source } = event.data || {};
+        console.log(`[Session] Received ${type} from ${source}`);
+
+        if (type === 'LOCK') {
+            // Another tab locked - refresh our state
+            console.log('[Session] Another tab locked the wallet, refreshing state...');
+            checkWalletState();
+        } else if (type === 'UNLOCK') {
+            // Another tab unlocked - refresh our state
+            console.log('[Session] Another tab unlocked the wallet, refreshing state...');
+            checkWalletState();
+        }
+    };
+}
 
 // Initialize wallet
 async function initWallet() {
@@ -389,9 +430,12 @@ async function unlockWallet() {
             await handleRedirectReturn(redirectParams.returnUrl);
             return;
         }
-        
+
         await checkWalletState();
-        
+
+        // Broadcast unlock to other tabs on same device (instant, no polling needed)
+        broadcastSessionChange('UNLOCK', info.walletId);
+
     } catch (e) {
         console.error('Unlock failed:', e);
         updateStatusDisplay(false, 'Unlock Failed', e.message);
@@ -413,6 +457,10 @@ async function lockWallet() {
         // Clear global session flag since we just locked
         hadGlobalSession = false;
         localStorage.removeItem('lemma_had_global_session');
+
+        // Broadcast lock to other tabs on same device (instant, no polling needed)
+        broadcastSessionChange('LOCK', info.walletId);
+
         await checkWalletState();
     } catch (e) {
         console.error('Lock failed:', e);
