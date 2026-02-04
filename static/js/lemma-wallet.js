@@ -1525,9 +1525,6 @@ class LemmaWallet {
             return await this.unlock();
         }
 
-        // Generate a local challenge
-        const challenge = crypto.getRandomValues(new Uint8Array(32));
-        
         // Get wallet ID (or create one)
         let walletId = await this._get('passkey', 'walletId');
         if (!walletId) {
@@ -1535,33 +1532,97 @@ class LemmaWallet {
             await this._put('passkey', walletId);
         }
 
-        // Create NEW credential (only if no existing passkey)
-        console.log('[Lemma] No existing passkey - creating new one');
-        const credential = await navigator.credentials.create({
-            publicKey: {
-                challenge: challenge,
-                rp: {
-                    name: 'Lemma Wallet',
-                    id: window.location.hostname
-                },
-                user: {
-                    id: new TextEncoder().encode(walletId.value),
-                    name: 'Wallet User',
-                    displayName: 'Lemma Wallet'
-                },
-                pubKeyCredParams: [
-                    { alg: -7, type: 'public-key' },   // ES256
-                    { alg: -257, type: 'public-key' }  // RS256
-                ],
-                authenticatorSelection: {
-                    userVerification: 'required',
-                    residentKey: 'preferred'
-                },
-                timeout: 60000
+        let credential;
+        let challengeKey = null;
+        
+        // On lemma.id: Use SERVER-VERIFIED registration so passkey is stored in DB
+        // This enables cross-device SSO with server-verified unlock
+        if (this._isLemmaDomain()) {
+            console.log('[Lemma] On lemma.id - using server-verified passkey registration');
+            
+            // Step 1: Get challenge from server
+            const beginResponse = await fetch('/api/passkey/register/begin', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify({
+                    wallet_id: walletId.value,
+                    user_email: 'wallet@lemma.id'  // Placeholder for wallet-based auth
+                })
+            });
+            
+            if (!beginResponse.ok) {
+                const errorData = await beginResponse.json().catch(() => ({}));
+                throw new Error(errorData.error || 'Failed to start passkey registration');
             }
-        });
+            
+            const beginData = await beginResponse.json();
+            challengeKey = beginData.challenge_key;
+            
+            // Step 2: Create credential with server challenge
+            console.log('[Lemma] Creating passkey with server challenge...');
+            credential = await navigator.credentials.create({
+                publicKey: beginData.options
+            });
+            
+            // Step 3: Register with server
+            console.log('[Lemma] Sending credential to server...');
+            const completeResponse = await fetch('/api/passkey/register/complete', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify({
+                    credential: {
+                        id: this._bufferToBase64url(credential.rawId),
+                        rawId: this._bufferToBase64url(credential.rawId),
+                        type: credential.type,
+                        response: {
+                            clientDataJSON: this._bufferToBase64url(credential.response.clientDataJSON),
+                            attestationObject: this._bufferToBase64url(credential.response.attestationObject)
+                        }
+                    },
+                    challenge_key: challengeKey
+                })
+            });
+            
+            if (!completeResponse.ok) {
+                const errorData = await completeResponse.json().catch(() => ({}));
+                throw new Error(errorData.error || 'Failed to complete passkey registration');
+            }
+            
+            const completeData = await completeResponse.json();
+            console.log('[Lemma] ✅ Passkey registered with server, credential_id:', completeData.credential_id?.substring(0, 20) + '...');
+        } else {
+            // On other domains: Use local-only passkey (for local verification)
+            console.log('[Lemma] Not on lemma.id - using local passkey registration');
+            const challenge = crypto.getRandomValues(new Uint8Array(32));
+            
+            credential = await navigator.credentials.create({
+                publicKey: {
+                    challenge: challenge,
+                    rp: {
+                        name: 'Lemma Wallet',
+                        id: window.location.hostname
+                    },
+                    user: {
+                        id: new TextEncoder().encode(walletId.value),
+                        name: 'Wallet User',
+                        displayName: 'Lemma Wallet'
+                    },
+                    pubKeyCredParams: [
+                        { alg: -7, type: 'public-key' },   // ES256
+                        { alg: -257, type: 'public-key' }  // RS256
+                    ],
+                    authenticatorSelection: {
+                        userVerification: 'required',
+                        residentKey: 'preferred'
+                    },
+                    timeout: 60000
+                }
+            });
+        }
 
-        // Extract and store public key
+        // Extract and store public key locally
         const publicKeyData = this._extractPublicKey(credential.response);
         
         const passkeyRecord = {
@@ -1569,7 +1630,8 @@ class LemmaWallet {
             credentialId: this._bufferToBase64url(credential.rawId),
             publicKey: publicKeyData.publicKey,
             algorithm: publicKeyData.algorithm,
-            createdAt: Date.now()
+            createdAt: Date.now(),
+            serverRegistered: this._isLemmaDomain()  // Track if registered with server
         };
 
         await this._put('passkey', passkeyRecord);
