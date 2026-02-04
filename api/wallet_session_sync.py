@@ -691,20 +691,25 @@ def _store_global_session(wallet_id: str, unlocked_at: int, expires_at: int,
 
 def _get_global_session(wallet_id: str):
     """Get global session for a wallet_id if valid."""
+    logger.debug(f"_get_global_session called for wallet: {wallet_id[:8] if wallet_id else 'None'}...")
     db_session, WalletSession = _get_db_session()
     if not db_session or not WalletSession:
+        logger.error(f"_get_global_session: DB not available")
         return None
     
     try:
         session = db_session.query(WalletSession).filter_by(wallet_id=wallet_id).first()
         
         if not session:
+            logger.info(f"_get_global_session: No session found for {wallet_id[:8]}...")
             return None
         
         # Check if expired
         if session.expires_at < datetime.utcnow():
+            logger.info(f"_get_global_session: Session EXPIRED for {wallet_id[:8]}... (expired at {session.expires_at})")
             return None
         
+        logger.info(f"_get_global_session: Found VALID session for {wallet_id[:8]}... (expires {session.expires_at})")
         return {
             'wallet_id': session.wallet_id,
             'unlocked_at': int(session.unlocked_at.timestamp() * 1000),

@@ -604,13 +604,14 @@ def passkey_authenticate_complete():
             csrf_token = secrets.token_urlsafe(32)
             session_token = generate_session_token(wallet_id, unlocked_at_ms)
             expires_at = int(datetime.utcnow().timestamp()) + SESSION_DURATION
-            _store_global_session(
+            global_stored = _store_global_session(
                 wallet_id=wallet_id,
                 unlocked_at=unlocked_at_ms,
                 expires_at=expires_at,
                 profile_id='default',
                 profile_name='Personal'
             )
+            logger.info(f"🔐 Global session stored={global_stored} for wallet {wallet_id[:8]}...")
             unlock_token = generate_unlock_token(
                 wallet_id=wallet_id,
                 unlocked_at=unlocked_at_ms,
