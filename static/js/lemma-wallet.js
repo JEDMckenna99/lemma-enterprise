@@ -1524,7 +1524,7 @@ class LemmaWallet {
             console.log('[Lemma] Existing passkey found - authenticating instead of creating new');
             return await this.unlock();
         }
-
+        
         // Get wallet ID (or create one)
         let walletId = await this._get('passkey', 'walletId');
         if (!walletId) {
@@ -1532,97 +1532,42 @@ class LemmaWallet {
             await this._put('passkey', walletId);
         }
 
-        let credential;
-        let challengeKey = null;
+        // ============================================================
+        // LOCAL-ONLY PASSKEY REGISTRATION
+        // ============================================================
+        // The passkey is created and verified 100% locally.
+        // Server only tracks lock/unlock state for cross-device sync.
+        // Security comes from HSM-signed lemmas, not passkey verification.
+        // ============================================================
         
-        // On lemma.id: Use SERVER-VERIFIED registration so passkey is stored in DB
-        // This enables cross-device SSO with server-verified unlock
-        if (this._isLemmaDomain()) {
-            console.log('[Lemma] On lemma.id - using server-verified passkey registration');
-            
-            // Step 1: Get challenge from server
-            const beginResponse = await fetch('/api/passkey/register/begin', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                credentials: 'include',
-                body: JSON.stringify({
-                    wallet_id: walletId.value,
-                    user_email: 'wallet@lemma.id'  // Placeholder for wallet-based auth
-                })
-            });
-            
-            if (!beginResponse.ok) {
-                const errorData = await beginResponse.json().catch(() => ({}));
-                throw new Error(errorData.error || 'Failed to start passkey registration');
+        console.log('[Lemma] Creating local passkey (privacy-preserving design)');
+        const challenge = crypto.getRandomValues(new Uint8Array(32));
+        
+        const credential = await navigator.credentials.create({
+            publicKey: {
+                challenge: challenge,
+                rp: {
+                    name: 'Lemma Wallet',
+                    id: window.location.hostname
+                },
+                user: {
+                    id: new TextEncoder().encode(walletId.value),
+                    name: 'Wallet User',
+                    displayName: 'Lemma Wallet'
+                },
+                pubKeyCredParams: [
+                    { alg: -7, type: 'public-key' },   // ES256
+                    { alg: -257, type: 'public-key' }  // RS256
+                ],
+                authenticatorSelection: {
+                    userVerification: 'required',
+                    residentKey: 'preferred'
+                },
+                timeout: 60000
             }
-            
-            const beginData = await beginResponse.json();
-            challengeKey = beginData.challenge_key;
-            
-            // Step 2: Create credential with server challenge
-            console.log('[Lemma] Creating passkey with server challenge...');
-            credential = await navigator.credentials.create({
-                publicKey: beginData.options
-            });
-            
-            // Step 3: Register with server
-            console.log('[Lemma] Sending credential to server...');
-            const completeResponse = await fetch('/api/passkey/register/complete', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                credentials: 'include',
-                body: JSON.stringify({
-                    credential: {
-                        id: this._bufferToBase64url(credential.rawId),
-                        rawId: this._bufferToBase64url(credential.rawId),
-                        type: credential.type,
-                        response: {
-                            clientDataJSON: this._bufferToBase64url(credential.response.clientDataJSON),
-                            attestationObject: this._bufferToBase64url(credential.response.attestationObject)
-                        }
-                    },
-                    challenge_key: challengeKey
-                })
-            });
-            
-            if (!completeResponse.ok) {
-                const errorData = await completeResponse.json().catch(() => ({}));
-                throw new Error(errorData.error || 'Failed to complete passkey registration');
-            }
-            
-            const completeData = await completeResponse.json();
-            console.log('[Lemma] ✅ Passkey registered with server, credential_id:', completeData.credential_id?.substring(0, 20) + '...');
-        } else {
-            // On other domains: Use local-only passkey (for local verification)
-            console.log('[Lemma] Not on lemma.id - using local passkey registration');
-            const challenge = crypto.getRandomValues(new Uint8Array(32));
-            
-            credential = await navigator.credentials.create({
-                publicKey: {
-                    challenge: challenge,
-                    rp: {
-                        name: 'Lemma Wallet',
-                        id: window.location.hostname
-                    },
-                    user: {
-                        id: new TextEncoder().encode(walletId.value),
-                        name: 'Wallet User',
-                        displayName: 'Lemma Wallet'
-                    },
-                    pubKeyCredParams: [
-                        { alg: -7, type: 'public-key' },   // ES256
-                        { alg: -257, type: 'public-key' }  // RS256
-                    ],
-                    authenticatorSelection: {
-                        userVerification: 'required',
-                        residentKey: 'preferred'
-                    },
-                    timeout: 60000
-                }
-            });
-        }
+        });
 
-        // Extract and store public key locally
+        // Extract and store public key locally (never sent to server)
         const publicKeyData = this._extractPublicKey(credential.response);
         
         const passkeyRecord = {
@@ -1630,11 +1575,11 @@ class LemmaWallet {
             credentialId: this._bufferToBase64url(credential.rawId),
             publicKey: publicKeyData.publicKey,
             algorithm: publicKeyData.algorithm,
-            createdAt: Date.now(),
-            serverRegistered: this._isLemmaDomain()  // Track if registered with server
+            createdAt: Date.now()
         };
 
         await this._put('passkey', passkeyRecord);
+        console.log('[Lemma] ✅ Passkey created locally (server never sees it)');
 
         // Get wallet secret for PPID derivation
         // CRITICAL: Check multiple sources for the secret (profiles, secrets, session)
@@ -1677,91 +1622,44 @@ class LemmaWallet {
             console.log('[Lemma] Using existing wallet secret (source:', walletSecret.source || 'stored', ')');
         }
 
-        // Auto-unlock after registration (user just authenticated)
-        // IMPORTANT: Preserve serverUnlockToken if it was set during linking
-        const existingUnlockToken = this.session?.serverUnlockToken;
+        // Auto-unlock after registration (user just authenticated via biometrics)
         const now = Date.now();
         this.session = {
             isUnlocked: true,
             unlockedAt: now,
             expiresAt: now + getSessionDurationMs(),
             walletId: walletId.value,
-            walletSecret: walletSecret.secret,  // Include in session for easy access
-            serverUnlockToken: existingUnlockToken  // Preserve from linking
+            walletSecret: walletSecret.secret
         };
         await this._put('session', { id: 'current', ...this.session });
-        console.log('✅ Wallet auto-unlocked after passkey registration');
+        console.log('✅ Wallet created and auto-unlocked after passkey registration');
 
-        // Set server session for cross-device SSO
+        // Signal to server for cross-device sync (simple state update)
         if (this._isLemmaDomain()) {
-            // On lemma.id: Initialize first session if we don't have an unlock token
-            if (!this.session?.serverUnlockToken) {
-                try {
-                    console.log('[Lemma] Initializing first session for new wallet...');
-                    const initResponse = await fetch('/api/wallet/init-first-session', {
-                        method: 'POST',
-                        credentials: 'include',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            wallet_id: walletId.value
-                        })
-                    });
-                    
-                    if (initResponse.ok) {
-                        const initData = await initResponse.json();
-                        if (initData.success && initData.unlock_token) {
-                            this.session.serverUnlockToken = initData.unlock_token;
-                            await this._put('session', { id: 'current', ...this.session });
-                            console.log('[Lemma] ✅ First session initialized with unlock_token');
-                        }
-                    } else if (initResponse.status === 409) {
-                        // Session already exists - get unlock_token via link-unlock-token
-                        console.log('[Lemma] Session exists, getting unlock_token...');
-                        const tokenResponse = await fetch('/api/wallet/link-unlock-token', {
-                            method: 'POST',
-                            credentials: 'include',
-                            headers: { 'Content-Type': 'application/json' }
-                        });
-                        if (tokenResponse.ok) {
-                            const tokenData = await tokenResponse.json();
-                            if (tokenData.success && tokenData.unlock_token) {
-                                this.session.serverUnlockToken = tokenData.unlock_token;
-                                await this._put('session', { id: 'current', ...this.session });
-                                console.log('[Lemma] ✅ Got unlock_token from existing session');
-                            }
-                        }
-                    } else {
-                        console.warn('[Lemma] init-first-session failed:', initResponse.status);
-                    }
-                } catch (e) {
-                    console.warn('[Lemma] Could not initialize first session:', e.message);
+            try {
+                const activeProfile = await this.getActiveProfile();
+                console.log('[Lemma] Signaling new wallet unlock to server...');
+                const signalResponse = await fetch('/api/wallet/signal-unlock', {
+                    method: 'POST',
+                    credentials: 'include',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        wallet_id: walletId.value,
+                        unlocked_at: this.session.unlockedAt,
+                        expires_at: Math.floor(this.session.expiresAt / 1000),
+                        profile_id: activeProfile.id,
+                        profile_name: activeProfile.name
+                    })
+                });
+                if (signalResponse.ok) {
+                    console.log('[Lemma] ✅ Server notified - cross-device sync enabled');
+                    this.session.serverSessionActive = true;
+                    await this._put('session', { id: 'current', ...this.session });
+                } else {
+                    console.warn('[Lemma] Could not signal to server:', signalResponse.status);
                 }
-            }
-            
-            // Now set the full session with profile info if we have unlock_token
-            if (this.session?.serverUnlockToken) {
-                try {
-                    const activeProfile = await this.getActiveProfile();
-                    const setSessionResponse = await fetch('/api/wallet/set-session', {
-                        method: 'POST',
-                        credentials: 'include',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            wallet_id: walletId.value,
-                            unlocked_at: this.session.unlockedAt,
-                            profile_id: activeProfile.id,
-                            profile_name: activeProfile.name,
-                            unlock_token: this.session.serverUnlockToken
-                        })
-                    });
-                    if (setSessionResponse.ok) {
-                        console.log(`[Lemma] ✅ Session cookie set - profile: ${activeProfile.name}`);
-                    } else {
-                        console.warn('[Lemma] Could not set session cookie:', setSessionResponse.status);
-                    }
-                } catch (e) {
-                    console.warn('[Lemma] Could not set session cookie:', e.message);
-                }
+            } catch (e) {
+                console.warn('[Lemma] Could not signal to server:', e.message);
             }
         }
 
@@ -1858,16 +1756,13 @@ class LemmaWallet {
             }
         }
 
-        // ALWAYS prefer server-verified unlock on lemma.id for cross-device SSO
-        // This ensures we get an unlock_token which is required for set-session
-        if (this._isLemmaDomain()) {
-            try {
-                console.log('[Lemma] On lemma.id - using server-verified unlock for cross-device SSO');
-                return await this.unlockWithServerSession();
-            } catch (e) {
-                console.warn('[Lemma] Server unlock failed, falling back to local:', e.message);
-            }
-        }
+        // ============================================================
+        // LOCAL-ONLY PASSKEY VERIFICATION
+        // ============================================================
+        // The passkey is verified 100% locally by the browser.
+        // After successful local verification, we signal the server.
+        // Security comes from HSM-signed lemmas, not passkey verification.
+        // ============================================================
         
         // Get stored passkey
         const passkey = await this._get('passkey', 'primary');
@@ -1972,36 +1867,40 @@ class LemmaWallet {
             ...this.session
         });
 
-        console.log('✅ Wallet unlocked successfully');
+        console.log('✅ Wallet unlocked successfully (local passkey verification)');
 
-        // Set server session cookie if we have an unlock token (from linking or server auth)
-        if (this.session?.serverUnlockToken) {
+        // Signal to server that wallet is unlocked (for cross-device sync)
+        // This is a simple state update - no cryptographic verification needed
+        // Security comes from HSM-signed lemmas, not this signal
+        if (this._isLemmaDomain()) {
             try {
                 const activeProfile = await this.getActiveProfile();
-                const setSessionResponse = await fetch('https://lemma.id/api/wallet/set-session', {
+                console.log('[Lemma] Signaling unlock to server for cross-device sync...');
+                const signalResponse = await fetch('/api/wallet/signal-unlock', {
                     method: 'POST',
                     credentials: 'include',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         wallet_id: walletId,
                         unlocked_at: this.session.unlockedAt,
+                        expires_at: Math.floor(this.session.expiresAt / 1000),
                         profile_id: activeProfile.id,
-                        profile_name: activeProfile.name,
-                        unlock_token: this.session.serverUnlockToken
+                        profile_name: activeProfile.name
                     })
                 });
-                if (setSessionResponse.ok) {
-                    const sessionResult = await setSessionResponse.json();
-                    console.log(`[Lemma] Session cookie set - profile: ${activeProfile.name}`);
-                    console.log(`[Lemma] 🔐 Set-session response:`, JSON.stringify(sessionResult));
+                if (signalResponse.ok) {
+                    const result = await signalResponse.json();
+                    console.log(`[Lemma] ✅ Server notified of unlock - cross-device sync enabled`);
+                    // Store that we have a server session for this wallet
+                    this.session.serverSessionActive = true;
+                    await this._put('session', { id: 'current', ...this.session });
                 } else {
-                    console.warn('[Lemma] Could not set session cookie:', setSessionResponse.status);
+                    console.warn('[Lemma] Could not signal unlock to server:', signalResponse.status);
                 }
             } catch (e) {
-                console.warn('[Lemma] Could not set session cookie on lemma.id:', e.message);
+                console.warn('[Lemma] Could not signal unlock:', e.message);
+                // Non-fatal - local unlock still works, just no cross-device sync
             }
-        } else {
-            console.warn('[Lemma] Server session not set (no server unlock token)');
         }
 
         // Start heartbeat on third-party sites

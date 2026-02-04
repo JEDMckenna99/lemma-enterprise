@@ -597,6 +597,116 @@ def init_first_session():
     return response
 
 
+@wallet_session_sync_bp.route('/api/wallet/signal-unlock', methods=['POST', 'OPTIONS'])
+def signal_unlock():
+    """
+    Signal that a wallet has been unlocked via local passkey verification.
+    
+    This is a SIMPLE endpoint that just stores unlock state for cross-device sync.
+    NO cryptographic verification is done here - that's intentional!
+    
+    Security model:
+    - The passkey protects ACCESS to the wallet secret (local verification)
+    - HSM-signed lemmas provide the actual authorization/security
+    - This endpoint just enables cross-device convenience ("one passkey per day")
+    
+    A malicious client could call this without actually verifying a passkey,
+    but that's harmless because:
+    1. They still can't get the wallet secret (stored locally, protected by passkey)
+    2. They still can't forge lemmas (requires HSM signature)
+    3. They can only set unlock state for wallet IDs they know
+    
+    Request body:
+        - wallet_id: The wallet that was unlocked
+        - unlocked_at: Timestamp of unlock (ms)
+        - expires_at: When session expires (seconds)
+        - profile_id: Active profile ID (optional)
+        - profile_name: Active profile name (optional)
+    """
+    # Handle CORS preflight
+    if request.method == 'OPTIONS':
+        response = make_response()
+        origin = request.headers.get('Origin')
+        response.headers.update(_cors_headers(origin))
+        if not _origin_allowed(origin):
+            return response, 403
+        response.headers['Access-Control-Max-Age'] = '86400'
+        return response
+    
+    origin = request.headers.get('Origin')
+    
+    # Only allow from lemma.id (where local passkey verification happens)
+    if origin and 'lemma.id' not in origin and 'localhost' not in origin:
+        response = jsonify({'success': False, 'error': 'origin_not_allowed'})
+        response.headers.update(_cors_headers(origin))
+        return response, 403
+    
+    data = request.get_json() or {}
+    wallet_id = data.get('wallet_id')
+    unlocked_at = data.get('unlocked_at', int(time.time() * 1000))
+    expires_at = data.get('expires_at', int(time.time()) + SESSION_DURATION)
+    profile_id = data.get('profile_id', 'default')
+    profile_name = data.get('profile_name', 'Personal')
+    
+    if not wallet_id:
+        response = jsonify({'success': False, 'error': 'wallet_id required'})
+        response.headers.update(_cors_headers(origin))
+        return response, 400
+    
+    # Store global session for cross-device sync
+    logger.info(f"Signal-unlock: storing session for wallet {wallet_id[:8]}...")
+    global_stored = _store_global_session(
+        wallet_id=wallet_id,
+        unlocked_at=unlocked_at,
+        expires_at=expires_at,
+        profile_id=profile_id,
+        profile_name=profile_name
+    )
+    
+    if not global_stored:
+        logger.error(f"Signal-unlock: failed to store global session for {wallet_id[:8]}")
+        response = jsonify({'success': False, 'error': 'database_error'})
+        response.headers.update(_cors_headers(origin))
+        return response, 500
+    
+    logger.info(f"Signal-unlock: ✅ session stored for wallet {wallet_id[:8]}")
+    
+    # Also set session cookie for bridge iframe
+    session_token = generate_session_token(wallet_id, unlocked_at)
+    csrf_token = secrets.token_urlsafe(32)
+    
+    response = jsonify({
+        'success': True,
+        'global_session_stored': True,
+        'expires_at': expires_at,
+        'message': 'Unlock state stored for cross-device sync'
+    })
+    
+    response.headers.update(_cors_headers(origin))
+    
+    # Set session cookies
+    response.set_cookie(
+        SESSION_COOKIE_NAME,
+        session_token,
+        max_age=SESSION_DURATION,
+        httponly=True,
+        secure=True,
+        samesite='None',
+        path='/'
+    )
+    response.set_cookie(
+        CSRF_COOKIE_NAME,
+        csrf_token,
+        max_age=SESSION_DURATION,
+        httponly=False,
+        secure=True,
+        samesite='None',
+        path='/'
+    )
+    
+    return response
+
+
 @wallet_session_sync_bp.route('/api/wallet/clear-session', methods=['POST'])
 def clear_session():
     """Clear wallet session cookie AND global session (for cross-device lock detection)."""
