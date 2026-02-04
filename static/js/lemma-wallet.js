@@ -365,6 +365,46 @@ class LemmaWallet {
             }
         }
         
+        // STEP 3.5: On third-party sites, try bridge session (cookie-based auth)
+        // The bridge iframe at lemma.id can access the server session cookie
+        // and provide the wallet secret even when global session check failed
+        if (!this._isLemmaDomain()) {
+            console.log('[Lemma] Trying bridge session (cookie-based auth)...');
+            try {
+                const bridgeResult = await this._sendBridgeMessage('GET_WALLET_SECRET', {});
+                if (bridgeResult.success && bridgeResult.walletSecret) {
+                    console.log('[Lemma] ✅ Got wallet secret from bridge');
+                    
+                    // Get wallet ID from local storage
+                    const walletIdRecord = await this._get('passkey', 'walletId');
+                    
+                    // Set up local session
+                    this.session = {
+                        isUnlocked: true,
+                        unlockedAt: Date.now(),
+                        expiresAt: Date.now() + getSessionDurationMs(),
+                        walletId: walletIdRecord?.value,
+                        walletSecret: bridgeResult.walletSecret,
+                        source: 'bridge'
+                    };
+                    await this._put('session', { id: 'current', ...this.session });
+                    
+                    result.walletSecret = bridgeResult.walletSecret;
+                    result.walletId = walletIdRecord?.value;
+                    result.authenticated = true;
+                    result.needsPasskey = false;
+                    result.message = 'Authenticated via bridge session';
+                    
+                    this._autoStartHeartbeat();
+                    return result;
+                } else {
+                    console.log('[Lemma] Bridge could not provide wallet secret:', bridgeResult.error || 'unknown');
+                }
+            } catch (e) {
+                console.warn('[Lemma] Bridge session check failed:', e.message);
+            }
+        }
+        
         // STEP 4: No valid session - recommend redirect
         // Redirect works on ALL platforms (mobile + desktop) and uses
         // client-side encryption for privacy.

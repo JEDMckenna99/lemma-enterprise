@@ -1042,8 +1042,17 @@ def wallet_auth():
             
             # Set global wallet session for cross-device sync
             try:
-                from api.wallet_session_sync import _store_global_session, set_session_cookie
-                _store_global_session(wallet_id)
+                from api.wallet_session_sync import _store_global_session, SESSION_DURATION
+                import time
+                unlocked_at_ms = int(time.time() * 1000)
+                expires_at = int(time.time()) + SESSION_DURATION
+                _store_global_session(
+                    wallet_id=wallet_id,
+                    unlocked_at=unlocked_at_ms,
+                    expires_at=expires_at,
+                    profile_id='default',
+                    profile_name='Personal'
+                )
             except Exception as e:
                 logger.warning(f"Could not set global wallet session: {e}")
             
