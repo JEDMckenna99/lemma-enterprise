@@ -13,11 +13,13 @@ WHY THIS IS SECURE:
 - Passkey = hardware-bound biometric proof of human presence
 - Time-limited = credentials auto-expire
 - Scoped = agents can only do what's explicitly allowed
-- Audited = every agent action is logged
+- Task-bound = agents can only access paths relevant to their task
+- Audited = every agent action is logged with deviation tracking
 - Revocable = human maintains kill switch
 """
 
 import os
+import re
 import json
 import secrets
 import hashlib
@@ -30,6 +32,76 @@ from flask_cors import cross_origin
 logger = logging.getLogger(__name__)
 
 agent_credentials_bp = Blueprint('agent_credentials', __name__)
+
+
+# ============================================
+# TASK-BOUND AUTHORIZATION HELPERS
+# ============================================
+
+def hash_task(task_description):
+    """Create a SHA256 hash of the task description for verification."""
+    if not task_description:
+        return None
+    return hashlib.sha256(task_description.strip().encode()).hexdigest()
+
+
+def path_matches_pattern(path, pattern):
+    """
+    Check if a request path matches an allowed pattern.
+
+    Patterns support:
+    - Exact match: "/api/sites" matches only "/api/sites"
+    - Wildcard segments: "/api/sites/*" matches "/api/sites/123"
+    - Double wildcard: "/api/sites/**" matches "/api/sites/123/files/foo"
+    - Glob patterns: "/api/*/credentials" matches "/api/agent/credentials"
+
+    Examples:
+        path_matches_pattern("/api/sites/123", "/api/sites/*") -> True
+        path_matches_pattern("/api/sites/123/files", "/api/sites/*") -> False
+        path_matches_pattern("/api/sites/123/files", "/api/sites/**") -> True
+    """
+    if not pattern:
+        return True  # No pattern = allow all
+
+    # Normalize paths
+    path = path.rstrip('/')
+    pattern = pattern.rstrip('/')
+
+    # Convert pattern to regex
+    # Escape special regex chars except *
+    regex_pattern = re.escape(pattern)
+    # Replace escaped ** with "match anything including /"
+    regex_pattern = regex_pattern.replace(r'\*\*', '.*')
+    # Replace escaped * with "match anything except /"
+    regex_pattern = regex_pattern.replace(r'\*', '[^/]*')
+    # Anchor the pattern
+    regex_pattern = f'^{regex_pattern}$'
+
+    return bool(re.match(regex_pattern, path))
+
+
+def check_path_allowed(path, allowed_paths):
+    """
+    Check if a path is allowed by any of the allowed patterns.
+
+    Args:
+        path: The request path (e.g., "/api/sites/123")
+        allowed_paths: List of allowed patterns, or None (allow all)
+
+    Returns:
+        (is_allowed, matching_pattern or None)
+    """
+    if allowed_paths is None:
+        return True, None
+
+    if not allowed_paths:
+        return False, None
+
+    for pattern in allowed_paths:
+        if path_matches_pattern(path, pattern):
+            return True, pattern
+
+    return False, None
 
 # ============================================
 # SECURITY: Token Generation and Hashing
@@ -64,24 +136,30 @@ def hash_token(plaintext_token):
 @cross_origin()
 def issue_agent_credential():
     """
-    Issue a new agent credential.
-    
+    Issue a new agent credential with optional task-bound authorization.
+
     SECURITY: This endpoint requires the user to be authenticated via passkey.
     The passkey proof must be fresh (within last 5 minutes) to issue credentials.
-    
+
     POST /api/agent/credentials/issue
     {
-        "agent_name": "Cursor AI",
+        "agent_name": "Claude Code",
         "scope": ["read", "write"],
         "ttl_hours": 4,
-        "allowed_sites": null,  // null = all sites user has access to
-        "description": "Development session"
+        "allowed_sites": null,
+        "description": "Development session",
+
+        // NEW: Task-bound authorization fields
+        "task": "Fix the login bug in auth.py",
+        "allowed_paths": ["/api/sites/*", "/api/git/**"],
+        "max_operations": 100
     }
-    
+
     Returns:
         - token: The plaintext token (SHOWN ONLY ONCE)
         - token_id: Identifier for managing the credential
         - expires_at: When the credential expires
+        - task_hash: SHA256 of task for verification (if task provided)
     """
     try:
         # SECURITY CHECK 1: User must be authenticated
@@ -90,7 +168,7 @@ def issue_agent_credential():
         passkey_verified = session.get('passkey_verified', False)
         customer_id = session.get('customer_id')
         user_email = session.get('user_email')
-        
+
         # Also check Authorization header for Bearer token with credential
         auth_header = request.headers.get('Authorization', '')
         if auth_header.startswith('Bearer ') and not ppid:
@@ -100,17 +178,17 @@ def issue_agent_credential():
                 ppid = cred_data.get('subject') or cred_data.get('credentialSubject', {}).get('id')
             except:
                 pass
-        
+
         if not ppid and not customer_id:
             return jsonify({
                 'success': False,
                 'error': 'Authentication required',
                 'message': 'You must be signed in with passkey to issue agent credentials'
             }), 401
-        
+
         # Use PPID as identifier, fall back to customer_id
         authorized_by = ppid or f"customer:{customer_id}"
-        
+
         # Parse request data
         data = request.get_json() or {}
         agent_name = data.get('agent_name', 'AI Agent')
@@ -118,31 +196,62 @@ def issue_agent_credential():
         ttl_hours = min(data.get('ttl_hours', 4), 24)  # Max 24 hours
         allowed_sites = data.get('allowed_sites')  # null = all user's sites
         description = data.get('description', '')
-        
+
+        # NEW: Task-bound authorization fields
+        task_description = data.get('task')
+        task_hash_value = hash_task(task_description)
+        allowed_paths = data.get('allowed_paths')  # List of path patterns
+        max_operations = data.get('max_operations')  # Max API calls
+
+        # Validate allowed_paths format
+        if allowed_paths is not None:
+            if not isinstance(allowed_paths, list):
+                return jsonify({
+                    'success': False,
+                    'error': 'allowed_paths must be a list of path patterns'
+                }), 400
+            # Validate each pattern is a string starting with /
+            for pattern in allowed_paths:
+                if not isinstance(pattern, str) or not pattern.startswith('/'):
+                    return jsonify({
+                        'success': False,
+                        'error': f'Invalid path pattern: {pattern}. Must start with /'
+                    }), 400
+
+        # Validate max_operations
+        if max_operations is not None:
+            max_operations = int(max_operations)
+            if max_operations < 1:
+                return jsonify({
+                    'success': False,
+                    'error': 'max_operations must be at least 1'
+                }), 400
+
         # Validate scope
         valid_scopes = ['read', 'write', 'admin', 'test']
         scope = [s for s in scope if s in valid_scopes]
         if not scope:
             scope = ['read']
-        
+
         # Generate token
         token_id, plaintext_token, token_hash = generate_agent_token()
-        
+
         # Calculate expiry
         expires_at = datetime.utcnow() + timedelta(hours=ttl_hours)
-        
+
         # Store in database
         try:
             from api.database import get_db_connection
-            
+
             conn = get_db_connection()
             cursor = conn.cursor()
-            
+
             cursor.execute("""
-                INSERT INTO agent_credentials 
+                INSERT INTO agent_credentials
                 (token_id, token_hash, authorized_by_ppid, authorized_by_email,
-                 scope, allowed_sites, expires_at, agent_name, description)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                 scope, allowed_sites, expires_at, agent_name, description,
+                 task_description, task_hash, allowed_paths, max_operations)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 RETURNING id
             """, (
                 token_id,
@@ -153,14 +262,18 @@ def issue_agent_credential():
                 json.dumps(allowed_sites) if allowed_sites else None,
                 expires_at,
                 agent_name,
-                description
+                description,
+                task_description,
+                task_hash_value,
+                json.dumps(allowed_paths) if allowed_paths else None,
+                max_operations
             ))
-            
+
             credential_id = cursor.fetchone()[0]
             conn.commit()
             cursor.close()
             conn.close()
-            
+
         except Exception as db_err:
             logger.error(f"Failed to store agent credential: {db_err}")
             return jsonify({
@@ -168,10 +281,10 @@ def issue_agent_credential():
                 'error': 'Database error',
                 'message': str(db_err)
             }), 500
-        
-        logger.info(f"Agent credential issued: {token_id} for {authorized_by} (scope: {scope}, expires: {expires_at})")
-        
-        return jsonify({
+
+        logger.info(f"Agent credential issued: {token_id} for {authorized_by} (scope: {scope}, task: {task_description[:50] if task_description else 'none'}, expires: {expires_at})")
+
+        response_data = {
             'success': True,
             'credential': {
                 'token': plaintext_token,  # SHOWN ONLY ONCE
@@ -186,8 +299,19 @@ def issue_agent_credential():
                 'example': f'X-Agent-Token: {plaintext_token}'
             },
             'message': 'Credential issued. Save the token - it will not be shown again.'
-        })
-        
+        }
+
+        # Add task-bound info if present
+        if task_description:
+            response_data['credential']['task'] = task_description
+            response_data['credential']['task_hash'] = task_hash_value
+        if allowed_paths:
+            response_data['credential']['allowed_paths'] = allowed_paths
+        if max_operations:
+            response_data['credential']['max_operations'] = max_operations
+
+        return jsonify(response_data)
+
     except Exception as e:
         logger.error(f"Failed to issue agent credential: {e}")
         import traceback
@@ -218,77 +342,112 @@ def validate_agent_token_internal(token):
 def validate_agent_token(token):
     """
     Validate an agent token and return credential info if valid.
-    
+
     Returns:
-        dict with credential info if valid
+        dict with credential info if valid (includes task-bound fields)
         None if invalid/expired/revoked
     """
     if not token or not token.startswith('lm_agent_'):
         return None
-    
+
     token_hash = hash_token(token)
-    
+
     try:
         from api.database import get_db_connection
-        
+
         conn = get_db_connection()
         cursor = conn.cursor()
-        
+
         cursor.execute("""
             SELECT id, token_id, authorized_by_ppid, authorized_by_email,
-                   scope, allowed_sites, expires_at, agent_name
+                   scope, allowed_sites, expires_at, agent_name,
+                   task_description, task_hash, allowed_paths, max_operations,
+                   use_count, task_deviation_count
             FROM agent_credentials
             WHERE token_hash = %s
               AND revoked = FALSE
               AND expires_at > NOW()
         """, (token_hash,))
-        
+
         row = cursor.fetchone()
-        
+
         if not row:
             cursor.close()
             conn.close()
             return None
-        
+
+        credential_id = row[0]
+        use_count = row[12] or 0
+        max_operations = row[11]
+
+        # Check max_operations limit BEFORE incrementing
+        if max_operations is not None and use_count >= max_operations:
+            cursor.close()
+            conn.close()
+            logger.warning(f"Agent credential {row[1]} exceeded max_operations ({max_operations})")
+            return None
+
         # Update usage stats
         cursor.execute("""
             UPDATE agent_credentials
             SET last_used_at = NOW(), use_count = use_count + 1
             WHERE id = %s
-        """, (row[0],))
-        
+        """, (credential_id,))
+
         conn.commit()
         cursor.close()
         conn.close()
-        
+
         return {
-            'credential_id': row[0],
+            'credential_id': credential_id,
             'token_id': row[1],
             'authorized_by_ppid': row[2],
             'authorized_by_email': row[3],
             'scope': row[4] if isinstance(row[4], list) else json.loads(row[4] or '["read"]'),
             'allowed_sites': row[5] if isinstance(row[5], list) else (json.loads(row[5]) if row[5] else None),
             'expires_at': row[6],
-            'agent_name': row[7]
+            'agent_name': row[7],
+            # Task-bound fields
+            'task_description': row[8],
+            'task_hash': row[9],
+            'allowed_paths': row[10] if isinstance(row[10], list) else (json.loads(row[10]) if row[10] else None),
+            'max_operations': row[11],
+            'use_count': use_count + 1,  # After increment
+            'task_deviation_count': row[13] or 0
         }
-        
+
     except Exception as e:
         logger.error(f"Token validation error: {e}")
         return None
 
 
-def log_agent_action(credential_info, action, resource=None, success=True, status_code=200):
-    """Log an agent action to the audit trail."""
+def log_agent_action(credential_info, action, resource=None, success=True, status_code=200,
+                     path_allowed=True, task_deviation=False, deviation_reason=None):
+    """
+    Log an agent action to the audit trail with task deviation tracking.
+
+    Args:
+        credential_info: Dict with credential details
+        action: The action being performed
+        resource: Optional resource identifier
+        success: Whether the action succeeded
+        status_code: HTTP status code
+        path_allowed: Whether the path was in allowed_paths
+        task_deviation: Whether this was flagged as a task deviation
+        deviation_reason: Why this was flagged as a deviation
+    """
     try:
         from api.database import get_db_connection
-        
+
         conn = get_db_connection()
         cursor = conn.cursor()
-        
+
+        # Insert audit log entry with deviation tracking
         cursor.execute("""
             INSERT INTO agent_audit_log
-            (credential_id, token_id, action, resource, method, path, status_code, success)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+            (credential_id, token_id, action, resource, method, path, status_code, success,
+             path_allowed, task_deviation, deviation_reason)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         """, (
             credential_info.get('credential_id'),
             credential_info.get('token_id'),
@@ -297,13 +456,24 @@ def log_agent_action(credential_info, action, resource=None, success=True, statu
             request.method,
             request.path,
             status_code,
-            success
+            success,
+            path_allowed,
+            task_deviation,
+            deviation_reason
         ))
-        
+
+        # If this is a task deviation, increment the deviation count on the credential
+        if task_deviation and credential_info.get('credential_id'):
+            cursor.execute("""
+                UPDATE agent_credentials
+                SET task_deviation_count = COALESCE(task_deviation_count, 0) + 1
+                WHERE id = %s
+            """, (credential_info.get('credential_id'),))
+
         conn.commit()
         cursor.close()
         conn.close()
-        
+
     except Exception as e:
         logger.warning(f"Failed to log agent action: {e}")
 
@@ -312,76 +482,127 @@ def log_agent_action(credential_info, action, resource=None, success=True, statu
 # DECORATOR: Require Agent or User Auth
 # ============================================
 
-def require_agent_or_user_auth(required_scope=None):
+def require_agent_or_user_auth(required_scope=None, enforce_task_bounds=True):
     """
     Decorator that allows either:
     1. Agent token (X-Agent-Token header)
     2. User auth (X-Lemma-PPID header or session)
-    
+
+    For agent tokens, also enforces task-bound authorization:
+    - Checks if the request path is in allowed_paths
+    - Logs task deviations when agent accesses paths outside their task
+    - Can optionally block requests outside allowed_paths
+
     Usage:
         @require_agent_or_user_auth(required_scope='write')
         def my_endpoint():
             # g.agent_credential is set if agent auth
             # g.ppid is set if user auth
+            # g.task_deviation is set if agent went outside allowed_paths
             pass
+
+    Args:
+        required_scope: Required scope (read, write, admin, test)
+        enforce_task_bounds: If True, block requests outside allowed_paths.
+                            If False, allow but log as deviation. Default True.
     """
     def decorator(f):
         @wraps(f)
         def decorated_function(*args, **kwargs):
             # Try agent token first
             agent_token = request.headers.get('X-Agent-Token')
-            
+
             if agent_token:
                 credential_info = validate_agent_token(agent_token)
-                
+
                 if not credential_info:
                     return jsonify({
                         'success': False,
-                        'error': 'Invalid or expired agent credential'
+                        'error': 'Invalid, expired, or max operations exceeded'
                     }), 401
-                
+
                 # Check scope if required
                 if required_scope:
                     if required_scope not in credential_info['scope']:
-                        log_agent_action(credential_info, f'scope_denied:{required_scope}', success=False, status_code=403)
+                        log_agent_action(credential_info, f'scope_denied:{required_scope}',
+                                        success=False, status_code=403)
                         return jsonify({
                             'success': False,
                             'error': f'Agent credential lacks required scope: {required_scope}'
                         }), 403
-                
+
+                # Check task-bound path restrictions
+                allowed_paths = credential_info.get('allowed_paths')
+                path_allowed, matching_pattern = check_path_allowed(request.path, allowed_paths)
+                task_deviation = False
+                deviation_reason = None
+
+                if not path_allowed and allowed_paths is not None:
+                    task_deviation = True
+                    deviation_reason = f"Path {request.path} not in allowed_paths: {allowed_paths}"
+
+                    if enforce_task_bounds:
+                        # Block the request
+                        log_agent_action(credential_info, f'path_denied:{request.path}',
+                                        success=False, status_code=403,
+                                        path_allowed=False, task_deviation=True,
+                                        deviation_reason=deviation_reason)
+                        return jsonify({
+                            'success': False,
+                            'error': 'Path not allowed for this task-bound credential',
+                            'path': request.path,
+                            'allowed_paths': allowed_paths,
+                            'task': credential_info.get('task_description'),
+                            'message': 'This agent credential is restricted to specific paths. Request a new credential with broader access or correct allowed_paths.'
+                        }), 403
+
                 # Set credential info in request context
                 g.agent_credential = credential_info
                 g.ppid = credential_info['authorized_by_ppid']  # Use authorizer's PPID
                 g.authenticated = True
                 g.auth_method = 'agent_token'
-                
-                # Log the action
-                log_agent_action(credential_info, f'{request.method}:{request.path}')
-                
+                g.task_deviation = task_deviation
+                g.task_info = {
+                    'task': credential_info.get('task_description'),
+                    'task_hash': credential_info.get('task_hash'),
+                    'allowed_paths': allowed_paths,
+                    'path_allowed': path_allowed,
+                    'matching_pattern': matching_pattern,
+                    'operations_remaining': (
+                        credential_info['max_operations'] - credential_info['use_count']
+                        if credential_info.get('max_operations') else None
+                    )
+                }
+
+                # Log the action (with deviation info if applicable)
+                log_agent_action(credential_info, f'{request.method}:{request.path}',
+                                path_allowed=path_allowed, task_deviation=task_deviation,
+                                deviation_reason=deviation_reason)
+
                 return f(*args, **kwargs)
-            
+
             # Fall back to user auth
             ppid = request.headers.get('X-Lemma-PPID')
             api_key = request.headers.get('X-API-Key')
-            
+
             if ppid and ppid.startswith('did:lemma:ppid_'):
                 g.ppid = ppid
                 g.authenticated = True
                 g.auth_method = 'ppid'
                 return f(*args, **kwargs)
-            
+
             if api_key and len(api_key) >= 10:
                 g.api_key = api_key
                 g.authenticated = True
                 g.auth_method = 'api_key'
                 return f(*args, **kwargs)
-            
+
             return jsonify({
                 'success': False,
                 'error': 'Authentication required',
                 'message': 'Provide X-Agent-Token, X-Lemma-PPID, or X-API-Key header'
             }), 401
-        
+
         return decorated_function
     return decorator
 
@@ -393,39 +614,40 @@ def require_agent_or_user_auth(required_scope=None):
 @agent_credentials_bp.route('/api/agent/credentials', methods=['GET'])
 @cross_origin()
 def list_agent_credentials():
-    """List all agent credentials for the authenticated user."""
+    """List all agent credentials for the authenticated user, including task-bound info."""
     ppid = request.headers.get('X-Lemma-PPID')
     customer_id = session.get('customer_id')
-    
+
     if not ppid and not customer_id:
         return jsonify({
             'success': False,
             'error': 'Authentication required'
         }), 401
-    
+
     authorized_by = ppid or f"customer:{customer_id}"
-    
+
     try:
         from api.database import get_db_connection
-        
+
         conn = get_db_connection()
         cursor = conn.cursor()
-        
+
         cursor.execute("""
             SELECT token_id, scope, allowed_sites, issued_at, expires_at,
-                   revoked, revoked_at, agent_name, description, last_used_at, use_count
+                   revoked, revoked_at, agent_name, description, last_used_at, use_count,
+                   task_description, task_hash, allowed_paths, max_operations, task_deviation_count
             FROM agent_credentials
             WHERE authorized_by_ppid = %s
             ORDER BY issued_at DESC
         """, (authorized_by,))
-        
+
         rows = cursor.fetchall()
         cursor.close()
         conn.close()
-        
+
         credentials = []
         for row in rows:
-            credentials.append({
+            cred = {
                 'token_id': row[0],
                 'scope': row[1] if isinstance(row[1], list) else json.loads(row[1] or '[]'),
                 'allowed_sites': row[2] if isinstance(row[2], list) else (json.loads(row[2]) if row[2] else None),
@@ -437,14 +659,22 @@ def list_agent_credentials():
                 'description': row[8],
                 'last_used_at': row[9].isoformat() + 'Z' if row[9] else None,
                 'use_count': row[10],
-                'status': 'revoked' if row[5] else ('expired' if row[4] and row[4] < datetime.now(timezone.utc) else 'active')
-            })
-        
+                'status': 'revoked' if row[5] else ('expired' if row[4] and row[4] < datetime.now(timezone.utc) else 'active'),
+                # Task-bound fields
+                'task_description': row[11],
+                'task_hash': row[12],
+                'allowed_paths': row[13] if isinstance(row[13], list) else (json.loads(row[13]) if row[13] else None),
+                'max_operations': row[14],
+                'task_deviation_count': row[15] or 0,
+                'is_task_bound': row[11] is not None or row[13] is not None
+            }
+            credentials.append(cred)
+
         return jsonify({
             'success': True,
             'credentials': credentials
         })
-        
+
     except Exception as e:
         logger.error(f"Failed to list agent credentials: {e}")
         return jsonify({
@@ -586,9 +816,151 @@ def get_agent_audit_log():
             'success': True,
             'audit_log': audit_log
         })
-        
+
     except Exception as e:
         logger.error(f"Failed to get audit log: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+# ============================================
+# TASK ADHERENCE REPORT
+# ============================================
+
+@agent_credentials_bp.route('/api/agent/credentials/<token_id>/task-report', methods=['GET'])
+@cross_origin()
+def get_task_adherence_report(token_id):
+    """
+    Get a task adherence report for a specific agent credential.
+
+    Shows:
+    - Task description and hash
+    - Allowed paths vs actual paths accessed
+    - Deviation count and details
+    - Operations used vs max allowed
+
+    This helps humans verify that agents stayed on-task.
+    """
+    ppid = request.headers.get('X-Lemma-PPID')
+    customer_id = session.get('customer_id')
+
+    if not ppid and not customer_id:
+        return jsonify({
+            'success': False,
+            'error': 'Authentication required'
+        }), 401
+
+    authorized_by = ppid or f"customer:{customer_id}"
+
+    try:
+        from api.database import get_db_connection
+
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        # Get credential info
+        cursor.execute("""
+            SELECT id, token_id, agent_name, task_description, task_hash,
+                   allowed_paths, max_operations, use_count, task_deviation_count,
+                   issued_at, expires_at, revoked
+            FROM agent_credentials
+            WHERE token_id = %s AND authorized_by_ppid = %s
+        """, (token_id, authorized_by))
+
+        cred_row = cursor.fetchone()
+
+        if not cred_row:
+            cursor.close()
+            conn.close()
+            return jsonify({
+                'success': False,
+                'error': 'Credential not found or not owned by you'
+            }), 404
+
+        credential_id = cred_row[0]
+        allowed_paths = cred_row[5] if isinstance(cred_row[5], list) else (json.loads(cred_row[5]) if cred_row[5] else None)
+        max_operations = cred_row[6]
+        use_count = cred_row[7] or 0
+        deviation_count = cred_row[8] or 0
+
+        # Get all unique paths accessed
+        cursor.execute("""
+            SELECT DISTINCT path, COUNT(*) as count
+            FROM agent_audit_log
+            WHERE credential_id = %s
+            GROUP BY path
+            ORDER BY count DESC
+        """, (credential_id,))
+
+        path_rows = cursor.fetchall()
+        paths_accessed = [{'path': row[0], 'count': row[1]} for row in path_rows]
+
+        # Get deviation details
+        cursor.execute("""
+            SELECT path, action, deviation_reason, timestamp
+            FROM agent_audit_log
+            WHERE credential_id = %s AND task_deviation = TRUE
+            ORDER BY timestamp DESC
+            LIMIT 50
+        """, (credential_id,))
+
+        deviation_rows = cursor.fetchall()
+        deviations = [{
+            'path': row[0],
+            'action': row[1],
+            'reason': row[2],
+            'timestamp': row[3].isoformat() + 'Z' if row[3] else None
+        } for row in deviation_rows]
+
+        # Calculate adherence score
+        if use_count > 0:
+            adherence_score = round((1 - (deviation_count / use_count)) * 100, 1)
+        else:
+            adherence_score = 100.0
+
+        cursor.close()
+        conn.close()
+
+        return jsonify({
+            'success': True,
+            'report': {
+                'token_id': cred_row[1],
+                'agent_name': cred_row[2],
+                'task': {
+                    'description': cred_row[3],
+                    'hash': cred_row[4],
+                    'is_task_bound': cred_row[3] is not None or allowed_paths is not None
+                },
+                'bounds': {
+                    'allowed_paths': allowed_paths,
+                    'max_operations': max_operations
+                },
+                'usage': {
+                    'operations_used': use_count,
+                    'operations_remaining': max_operations - use_count if max_operations else None,
+                    'deviation_count': deviation_count,
+                    'adherence_score': adherence_score,
+                    'adherence_grade': (
+                        'A' if adherence_score >= 95 else
+                        'B' if adherence_score >= 85 else
+                        'C' if adherence_score >= 70 else
+                        'D' if adherence_score >= 50 else 'F'
+                    )
+                },
+                'paths_accessed': paths_accessed,
+                'deviations': deviations,
+                'credential_status': {
+                    'issued_at': cred_row[9].isoformat() + 'Z' if cred_row[9] else None,
+                    'expires_at': cred_row[10].isoformat() + 'Z' if cred_row[10] else None,
+                    'revoked': cred_row[11]
+                }
+            }
+        })
+
+    except Exception as e:
+        logger.error(f"Failed to get task report: {e}")
         return jsonify({
             'success': False,
             'error': str(e)
@@ -599,37 +971,46 @@ def get_agent_audit_log():
 # QUICK VALIDATION ENDPOINT (For Testing)
 # ============================================
 
-@agent_credentials_bp.route('/api/agent/auto-issue', methods=['GET'])
+@agent_credentials_bp.route('/api/agent/auto-issue', methods=['GET', 'POST'])
 def auto_issue_agent_credential():
     """
     Auto-issue an agent credential if wallet session is active.
-    
+
     This endpoint checks the session cookie - if the user has an active
     wallet session with admin credentials, it automatically issues a token.
-    
+
     This allows AI agents to fetch tokens directly when the human has
     already authenticated via passkey.
-    
-    GET /api/agent/auto-issue?ttl=4&scope=read,write
-    
+
+    GET /api/agent/auto-issue?ttl=4&scope=read,write&task=Fix%20bug&paths=/api/sites/*
+
+    POST /api/agent/auto-issue
+    {
+        "ttl": 4,
+        "scope": "read,write",
+        "task": "Fix the login bug",
+        "allowed_paths": ["/api/sites/*", "/api/git/**"],
+        "max_operations": 100
+    }
+
     Returns: JSON with token if session is valid, error if not
     """
     try:
         from flask import session
-        
+
         # Check for active wallet session
         customer_id = session.get('customer_id')
         passkey_verified = session.get('passkey_verified', False)
         auth_method = session.get('auth_method')
         user_email = session.get('user_email')
         wallet_id = session.get('wallet_id')
-        
+
         # Also check for PPID in session or derived from wallet
         ppid = session.get('ppid')
-        
+
         # Debug: log what we found
         logger.info(f"Auto-issue check: customer_id={customer_id}, passkey_verified={passkey_verified}, auth_method={auth_method}, wallet_id={wallet_id}")
-        
+
         # Must have some form of authentication
         if not customer_id and not wallet_id and not ppid:
             return jsonify({
@@ -642,7 +1023,7 @@ def auto_issue_agent_credential():
                     'auth_method': auth_method
                 }
             }), 401
-        
+
         # Build authorized_by identifier
         if ppid:
             authorized_by = ppid
@@ -650,32 +1031,55 @@ def auto_issue_agent_credential():
             authorized_by = f"wallet:{wallet_id}"
         else:
             authorized_by = f"customer:{customer_id}"
-        
-        # Parse parameters
-        ttl_hours = min(int(request.args.get('ttl', 4)), 24)
-        scope_param = request.args.get('scope', 'read,write')
-        scope = [s.strip() for s in scope_param.split(',') if s.strip() in ['read', 'write', 'admin', 'test']]
+
+        # Parse parameters from GET query string or POST body
+        if request.method == 'POST':
+            data = request.get_json() or {}
+            ttl_hours = min(int(data.get('ttl', 4)), 24)
+            scope_param = data.get('scope', 'read,write')
+            agent_name = data.get('name', 'Auto-issued Agent Token')
+            task_description = data.get('task')
+            allowed_paths = data.get('allowed_paths')
+            max_operations = data.get('max_operations')
+        else:
+            ttl_hours = min(int(request.args.get('ttl', 4)), 24)
+            scope_param = request.args.get('scope', 'read,write')
+            agent_name = request.args.get('name', 'Auto-issued Agent Token')
+            task_description = request.args.get('task')
+            # Parse allowed_paths from comma-separated query param
+            paths_param = request.args.get('paths')
+            allowed_paths = paths_param.split(',') if paths_param else None
+            max_ops_param = request.args.get('max_ops')
+            max_operations = int(max_ops_param) if max_ops_param else None
+
+        # Parse scope
+        if isinstance(scope_param, list):
+            scope = [s for s in scope_param if s in ['read', 'write', 'admin', 'test']]
+        else:
+            scope = [s.strip() for s in scope_param.split(',') if s.strip() in ['read', 'write', 'admin', 'test']]
         if not scope:
             scope = ['read', 'write']
-        
-        agent_name = request.args.get('name', 'Auto-issued Agent Token')
-        
+
+        # Hash task if provided
+        task_hash_value = hash_task(task_description)
+
         # Generate token
         token_id, plaintext_token, token_hash = generate_agent_token()
         expires_at = datetime.utcnow() + timedelta(hours=ttl_hours)
-        
+
         # Store in database
         try:
             from api.database import get_db_connection
-            
+
             conn = get_db_connection()
             cursor = conn.cursor()
-            
+
             cursor.execute("""
-                INSERT INTO agent_credentials 
+                INSERT INTO agent_credentials
                 (token_id, token_hash, authorized_by_ppid, authorized_by_email,
-                 scope, expires_at, agent_name, description)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                 scope, expires_at, agent_name, description,
+                 task_description, task_hash, allowed_paths, max_operations)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 RETURNING id
             """, (
                 token_id,
@@ -685,13 +1089,17 @@ def auto_issue_agent_credential():
                 json.dumps(scope),
                 expires_at,
                 agent_name,
-                f'Auto-issued via active session (auth_method: {auth_method})'
+                f'Auto-issued via active session (auth_method: {auth_method})',
+                task_description,
+                task_hash_value,
+                json.dumps(allowed_paths) if allowed_paths else None,
+                max_operations
             ))
-            
+
             conn.commit()
             cursor.close()
             conn.close()
-            
+
         except Exception as db_err:
             logger.error(f"Failed to store auto-issued credential: {db_err}")
             return jsonify({
@@ -699,10 +1107,10 @@ def auto_issue_agent_credential():
                 'error': 'Database error',
                 'message': str(db_err)
             }), 500
-        
-        logger.info(f"Auto-issued agent credential: {token_id} for {authorized_by}")
-        
-        return jsonify({
+
+        logger.info(f"Auto-issued agent credential: {token_id} for {authorized_by} (task: {task_description[:50] if task_description else 'none'})")
+
+        response_data = {
             'success': True,
             'token': plaintext_token,
             'token_id': token_id,
@@ -711,8 +1119,19 @@ def auto_issue_agent_credential():
             'ttl_hours': ttl_hours,
             'authorized_by': authorized_by,
             'message': 'Token auto-issued based on active wallet session'
-        })
-        
+        }
+
+        # Add task-bound info if present
+        if task_description:
+            response_data['task'] = task_description
+            response_data['task_hash'] = task_hash_value
+        if allowed_paths:
+            response_data['allowed_paths'] = allowed_paths
+        if max_operations:
+            response_data['max_operations'] = max_operations
+
+        return jsonify(response_data)
+
     except Exception as e:
         logger.error(f"Auto-issue failed: {e}")
         import traceback
@@ -809,31 +1228,44 @@ def validate_agent_token_endpoint():
     """
     Quick endpoint to test if an agent token or session is valid.
     Checks both X-Agent-Token header and Flask session (from /api/agent/session).
-    
+
     Returns 200 with valid: true/false (never 400 for missing token)
+    Includes task-bound info if the credential has task restrictions.
     """
     # First check for token in header
     token = request.headers.get('X-Agent-Token')
-    
+
     if token:
         credential_info = validate_agent_token(token)
-        
+
         if credential_info:
-            return jsonify({
+            response = {
                 'valid': True,
                 'auth_method': 'token',
                 'token_id': credential_info['token_id'],
                 'scope': credential_info['scope'],
                 'expires_at': credential_info['expires_at'].isoformat() + 'Z' if credential_info['expires_at'] else None,
                 'agent_name': credential_info['agent_name'],
-                'authorized_by': credential_info['authorized_by_email'] or credential_info['authorized_by_ppid']
-            })
+                'authorized_by': credential_info['authorized_by_email'] or credential_info['authorized_by_ppid'],
+                # Task-bound info
+                'is_task_bound': credential_info.get('task_description') is not None or credential_info.get('allowed_paths') is not None,
+                'task': credential_info.get('task_description'),
+                'allowed_paths': credential_info.get('allowed_paths'),
+                'max_operations': credential_info.get('max_operations'),
+                'operations_used': credential_info.get('use_count', 0),
+                'operations_remaining': (
+                    credential_info['max_operations'] - credential_info.get('use_count', 0)
+                    if credential_info.get('max_operations') else None
+                ),
+                'task_deviation_count': credential_info.get('task_deviation_count', 0)
+            }
+            return jsonify(response)
         else:
             return jsonify({
                 'valid': False,
-                'error': 'Invalid, expired, or revoked token'
+                'error': 'Invalid, expired, revoked, or max operations exceeded'
             }), 401
-    
+
     # Check for session-based agent auth (from /api/agent/session)
     if session.get('agent_authenticated'):
         return jsonify({
@@ -844,7 +1276,7 @@ def validate_agent_token_endpoint():
             'ppid': session.get('agent_ppid'),
             'message': 'Authenticated via agent session cookie'
         })
-    
+
     # No auth found - return valid: false (not an error, just not authenticated)
     return jsonify({
         'valid': False,
