@@ -707,9 +707,18 @@ def signal_unlock():
     return response
 
 
-@wallet_session_sync_bp.route('/api/wallet/clear-session', methods=['POST'])
+@wallet_session_sync_bp.route('/api/wallet/clear-session', methods=['POST', 'OPTIONS'])
 def clear_session():
     """Clear wallet session cookie AND global session (for cross-device lock detection)."""
+    # Handle CORS preflight
+    if request.method == 'OPTIONS':
+        response = make_response()
+        origin = request.headers.get('Origin')
+        response.headers.update(_cors_headers(origin))
+        response.headers['Access-Control-Max-Age'] = '86400'
+        return response
+    
+    origin = request.headers.get('Origin')
     data = request.get_json() or {}
     wallet_id = data.get('wallet_id')
     
@@ -720,6 +729,7 @@ def clear_session():
         global_cleared = _clear_global_session(wallet_id)
         logger.info(f"Clear-session: global_cleared={global_cleared} for {wallet_id[:8]}...")
     else:
+        logger.warning("Clear-session: no wallet_id provided")
         global_cleared = False
     
     response = jsonify({
@@ -727,6 +737,7 @@ def clear_session():
         'session_cleared': True,
         'global_session_cleared': global_cleared
     })
+    response.headers.update(_cors_headers(origin))
     response.delete_cookie(SESSION_COOKIE_NAME, path='/')
     response.delete_cookie(CSRF_COOKIE_NAME, path='/')
     return response

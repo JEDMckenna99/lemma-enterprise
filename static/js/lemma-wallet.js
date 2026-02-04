@@ -1921,14 +1921,21 @@ class LemmaWallet {
      * Lock the wallet (clear session locally and on server)
      */
     async lock() {
+        console.log('[Lemma] Locking wallet...');
+        
         // Capture wallet_id before clearing session
         // Try session first, then IndexedDB as fallback
         let walletId = this.session.walletId;
+        console.log('[Lemma] Lock: wallet_id from session:', walletId);
+        
         if (!walletId) {
             try {
                 const walletIdRecord = await this._get('passkey', 'walletId');
                 walletId = walletIdRecord?.value;
-            } catch (e) {}
+                console.log('[Lemma] Lock: wallet_id from IndexedDB:', walletId);
+            } catch (e) {
+                console.warn('[Lemma] Lock: could not get wallet_id from IndexedDB:', e.message);
+            }
         }
         
         // Clear local session
@@ -1939,6 +1946,7 @@ class LemmaWallet {
             walletSecret: null
         };
         await this._delete('session', 'current');
+        console.log('[Lemma] Lock: local session cleared');
         
         // Stop heartbeat and visibility listeners
         if (this._heartbeatInterval) {
@@ -1955,8 +1963,12 @@ class LemmaWallet {
         }
         
         // Clear server session AND global session (for cross-device lock detection)
-        if (this._isLemmaDomain() && walletId) {
+        const isLemma = this._isLemmaDomain();
+        console.log('[Lemma] Lock: isLemmaDomain=', isLemma, 'walletId=', walletId);
+        
+        if (isLemma && walletId) {
             try {
+                console.log('[Lemma] Lock: calling /api/wallet/clear-session...');
                 const response = await fetch('/api/wallet/clear-session', {
                     method: 'POST',
                     credentials: 'include',
@@ -1968,13 +1980,17 @@ class LemmaWallet {
                 });
                 if (response.ok) {
                     const data = await response.json();
-                    console.log('[Lemma] Wallet locked, global session cleared:', data.global_session_cleared);
+                    console.log('[Lemma] ✅ Wallet locked, server notified. global_session_cleared:', data.global_session_cleared);
+                } else {
+                    console.warn('[Lemma] Lock: clear-session returned', response.status);
                 }
             } catch (e) {
                 console.warn('[Lemma] Failed to clear global session:', e.message);
             }
+        } else if (!isLemma) {
+            console.log('[Lemma] Wallet locked locally (not on lemma.id)');
         } else {
-            console.log('[Lemma] Wallet locked locally');
+            console.warn('[Lemma] Lock: no wallet_id available to clear global session');
         }
     }
 
