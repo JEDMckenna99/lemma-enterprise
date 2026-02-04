@@ -2664,13 +2664,15 @@ class LemmaWallet {
                     this.session.walletSecret = null;
                 }
 
-                // CRITICAL: Also clear IndexedDB session so it doesn't persist across reloads
+                // CRITICAL: Clear IndexedDB session so it doesn't persist across reloads
                 // This ensures the lock signal truly invalidates the cached session
+                // NOTE: We only clear the SESSION, not the secrets. The secrets remain
+                // so re-authentication is faster. The bridge will refuse to provide
+                // them anyway when locked, so this is safe.
                 (async () => {
                     try {
                         await this._delete('session', 'current');
-                        await this._delete('secrets', 'master');  // Clear cached secret too
-                        console.log('[Lemma] IndexedDB session and secrets cleared (lock propagated)');
+                        console.log('[Lemma] IndexedDB session cleared (lock propagated)');
                     } catch (e) {
                         console.warn('[Lemma] Failed to clear IndexedDB session:', e.message);
                     }
