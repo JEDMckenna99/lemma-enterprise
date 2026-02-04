@@ -321,20 +321,21 @@
                 updateButton('Unlocking wallet...', false, true);
                 updateStatus('info', '👆 Please authenticate with your device');
                 
-                // Unlock with passkey (server-verified for cross-device SSO)
-                const unlocked = await wallet.unlock({ requireServerSession: true });
+                // Unlock with local passkey first (no server requirement)
+                // Server session will be established via platform-login
+                const unlocked = await wallet.unlock();
                 
                 if (!unlocked) {
                     throw new Error('Unlock failed');
                 }
                 
-                console.log('✅ Wallet unlocked');
+                console.log('✅ Wallet unlocked locally');
                 
                 // Check for existing permission first
                 const hasExisting = await checkExistingCredentials();
                 if (hasExisting) return true;
                 
-                // Issue permission
+                // Issue permission (this establishes server session)
                 return await issuePermission();
                 
             } catch (e) {
