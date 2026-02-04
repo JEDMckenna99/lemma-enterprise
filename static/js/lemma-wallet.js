@@ -1497,7 +1497,6 @@ class LemmaWallet {
                     { alg: -257, type: 'public-key' }  // RS256
                 ],
                 authenticatorSelection: {
-                    authenticatorAttachment: 'platform',
                     userVerification: 'required',
                     residentKey: 'preferred'
                 },
