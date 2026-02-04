@@ -2657,11 +2657,24 @@ class LemmaWallet {
             if (type === 'SESSION_INVALIDATED') {
                 console.log(`[Lemma] Session invalidated via bridge (instant: ${instant}, reason: ${reason})`);
 
-                // Clear local session immediately
+                // Clear in-memory session immediately
                 if (this.session) {
                     this.session.isUnlocked = false;
                     this.session.expiresAt = 0;
+                    this.session.walletSecret = null;
                 }
+
+                // CRITICAL: Also clear IndexedDB session so it doesn't persist across reloads
+                // This ensures the lock signal truly invalidates the cached session
+                (async () => {
+                    try {
+                        await this._delete('session', 'current');
+                        await this._delete('secrets', 'master');  // Clear cached secret too
+                        console.log('[Lemma] IndexedDB session and secrets cleared (lock propagated)');
+                    } catch (e) {
+                        console.warn('[Lemma] Failed to clear IndexedDB session:', e.message);
+                    }
+                })();
 
                 // Emit event for app to handle (e.g., show login prompt, redirect)
                 this._emitSessionEvent('session_invalidated', {
