@@ -1343,16 +1343,21 @@ class LemmaWallet {
             // Check if returning from redirect-based unlock
             const urlParams = new URLSearchParams(window.location.search);
             if (urlParams.get('lemma_unlocked') === '1') {
-                console.log('[Lemma] Detected redirect return - will process in checkRedirectReturn()');
+                console.log('[Lemma] Detected redirect return - auto-processing...');
                 
-                // IMPORTANT: Do NOT clean URL or clear sessionStorage here!
-                // checkRedirectReturn() needs:
-                // - lemma_data and lemma_token from URL params
-                // - encryption key from sessionStorage (lemma_redirect_state)
-                // Let checkRedirectReturn() handle cleanup after decryption
-                
-                // Just set a flag that we're returning from redirect
-                this._justReturnedFromRedirect = true;
+                // AUTO-PROCESS redirect return to establish session immediately
+                // This ensures the session is set up without requiring explicit call
+                try {
+                    const redirectResult = await this.checkRedirectReturn();
+                    if (redirectResult?.authenticated) {
+                        console.log('[Lemma] ✅ Auto-processed redirect - session established');
+                        // Session is now set, continue to check stored session below
+                    } else {
+                        console.warn('[Lemma] Redirect processing did not authenticate:', redirectResult);
+                    }
+                } catch (e) {
+                    console.error('[Lemma] Failed to auto-process redirect:', e);
+                }
             }
             
             const storedSession = await this._get('session', 'current');
