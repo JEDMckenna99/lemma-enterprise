@@ -1108,14 +1108,15 @@ class LemmaWallet {
                 }
                 
                 if (walletId) {
-                    // Only check global session if we GOT our session from global/bridge
-                    // Local passkey sessions don't require global validation
+                    // Only check global session if we GOT our session from another device/source
+                    // Local passkey sessions ('local', 'passkey') don't require global validation
                     const sessionSource = this.session.source;
-                    const requiresGlobalValidation = ['global_sync', 'bridge', 'server'].includes(sessionSource);
-                    
+                    const localOnlySources = ['local', 'passkey', 'local_passkey'];
+                    const requiresGlobalValidation = !localOnlySources.includes(sessionSource);
+
                     if (requiresGlobalValidation) {
                         const globalSession = await this._checkGlobalSession(walletId);
-                        
+
                         if (!globalSession.valid) {
                             console.log('[Lemma] Wallet locked on another device (source was:', sessionSource, ')');
                             await this._clearSessionGracefully('wallet_locked', 'Your wallet was locked on another device.');
@@ -4567,10 +4568,14 @@ class LemmaWallet {
             this.session.serverUnlockToken = payload.linkUnlockToken;
         }
         
-        // Set server session cookie only if we have an unlock token
+        // Set server session cookie - try unlock token first, then global session fallback
+        let serverSessionSet = false;
+        let sessionError = null;
+        const now = Date.now();
+
         if (this.session?.serverUnlockToken) {
             try {
-                const now = Date.now();
+                console.log('[Lemma] Attempting to set session with unlock token...');
                 const setSessionResponse = await fetch('https://lemma.id/api/wallet/set-session', {
                     method: 'POST',
                     credentials: 'include',
@@ -4583,10 +4588,11 @@ class LemmaWallet {
                         unlock_token: this.session.serverUnlockToken
                     })
                 });
-                
+
                 if (setSessionResponse.ok) {
-                    console.log('[Lemma] Session cookie set after linking - cross-site auth enabled');
-                    
+                    console.log('[Lemma] ✅ Session cookie set after linking - cross-site auth enabled');
+                    serverSessionSet = true;
+
                     // Also set local session so isUnlocked() works
                     this.session = {
                         isUnlocked: true,
@@ -4597,12 +4603,55 @@ class LemmaWallet {
                         source: 'link'
                     };
                     await this._put('session', { id: 'current', ...this.session });
+                } else {
+                    const errorData = await setSessionResponse.json().catch(() => ({}));
+                    sessionError = errorData.error || `HTTP ${setSessionResponse.status}`;
+                    console.warn('[Lemma] ⚠️ set-session failed:', sessionError);
                 }
             } catch (e) {
-                console.warn('[Lemma] Could not set session cookie after linking:', e.message);
+                sessionError = e.message;
+                console.warn('[Lemma] ⚠️ set-session request failed:', e.message);
             }
-        } else {
-            console.warn('[Lemma] Server session not set after linking (no server unlock token)');
+        }
+
+        // FALLBACK: If unlock token failed/expired, check if there's a valid global session
+        // This handles the case where the QR was scanned after the unlock token expired
+        // but the source device still has a valid session
+        if (!serverSessionSet && payload.walletId) {
+            console.log('[Lemma] Trying global session fallback...');
+            try {
+                const globalSession = await this._checkGlobalSession(payload.walletId, { force: true });
+
+                if (globalSession?.valid && globalSession?.session) {
+                    console.log('[Lemma] ✅ Global session found! Wallet was unlocked on another device.');
+
+                    // We have a valid global session - set local session state
+                    // The user will still need to create a passkey on this device,
+                    // but they can use the wallet immediately
+                    this.session = {
+                        isUnlocked: true,
+                        unlockedAt: globalSession.session.unlocked_at,
+                        expiresAt: globalSession.session.expires_at * 1000,
+                        walletId: payload.walletId,
+                        walletSecret: payload.walletSecret,
+                        source: 'global_session'
+                    };
+                    await this._put('session', { id: 'current', ...this.session });
+
+                    // Note: serverSessionSet stays false because we don't have a cookie on this device
+                    // The user will need to create a passkey to get their own session cookie
+                    sessionError = null; // Clear error - we found a workaround
+                    console.log('[Lemma] Local session set from global session. User should create passkey for full cross-site auth.');
+                } else {
+                    console.log('[Lemma] No valid global session found.');
+                }
+            } catch (e) {
+                console.warn('[Lemma] Global session check failed:', e.message);
+            }
+        }
+
+        if (!serverSessionSet && !this.session?.isUnlocked) {
+            console.warn('[Lemma] ⚠️ Server session not set - user will need to create passkey for cross-site auth');
         }
         
         console.log(`[Lemma] Device linked successfully with profile: ${profileName}`);
@@ -4637,17 +4686,30 @@ class LemmaWallet {
             // Non-fatal - user can request credential later
         }
         
+        // Build appropriate message based on session state
+        let message;
+        if (serverSessionSet && platformCredentialIssued) {
+            message = `Wallet "${profileName}" linked with full access! Create a passkey to secure it.`;
+        } else if (serverSessionSet) {
+            message = `Wallet "${profileName}" linked! Create a passkey to secure it.`;
+        } else if (this.session?.isUnlocked) {
+            message = `Wallet "${profileName}" linked! Create a passkey on this device for full cross-site access.`;
+        } else {
+            message = `Wallet "${profileName}" linked locally. Create a passkey to enable cross-site authentication.`;
+        }
+
         return {
             success: true,
             walletId: payload.walletId,
             profileId: profileId,
             profileName: profileName,
             needsPasskey: true,
-            sessionSet: true,  // Indicates session cookie was set
-            credentialIssued: platformCredentialIssued,  // Indicates platform credential was auto-issued
-            message: platformCredentialIssued 
-                ? `Wallet "${profileName}" linked with platform access! Create a passkey to secure it.`
-                : `Wallet "${profileName}" linked! Create a passkey to secure it.`
+            sessionSet: serverSessionSet,  // FIXED: Accurately reflects if server session cookie was set
+            localSessionSet: this.session?.isUnlocked || false,  // Whether local session is active
+            sessionSource: this.session?.source || null,  // 'link' or 'global_session'
+            sessionError: sessionError,  // Error message if session setup failed
+            credentialIssued: platformCredentialIssued,
+            message: message
         };
     }
     
