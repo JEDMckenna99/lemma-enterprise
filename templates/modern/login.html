@@ -45,17 +45,9 @@
             margin-bottom: var(--space-10);
         }
 
-        .login-icon {
-            width: 80px;
-            height: 80px;
-            background: linear-gradient(135deg, #667eea, #764ba2);
-            border-radius: 24px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
+        .login-logo {
             margin: 0 auto var(--space-6);
-            font-size: 36px;
-            box-shadow: 0 8px 24px rgba(102, 126, 234, 0.3);
+            display: block;
         }
 
         .login-title {
@@ -69,17 +61,6 @@
             color: var(--gray-600);
             font-size: var(--font-size-lg);
             line-height: 1.6;
-        }
-
-        .beta-badge {
-            display: inline-block;
-            background: linear-gradient(135deg, #667eea, #764ba2);
-            color: white;
-            padding: var(--space-2) var(--space-4);
-            border-radius: 50px;
-            font-size: var(--font-size-sm);
-            font-weight: 700;
-            margin-bottom: var(--space-4);
         }
 
         .passkey-button {
@@ -145,25 +126,6 @@
             color: #1e40af;
         }
 
-        .info-box {
-            background: var(--gray-50);
-            border: 1px solid var(--gray-200);
-            border-radius: 12px;
-            padding: var(--space-5);
-            margin-top: var(--space-6);
-            font-size: var(--font-size-base);
-            color: var(--gray-600);
-        }
-
-        .info-box ul {
-            margin: var(--space-3) 0 0 var(--space-4);
-            padding: 0;
-        }
-
-        .info-box li {
-            margin-bottom: var(--space-2);
-        }
-
         .loading-spinner {
             display: inline-block;
             width: 24px;
@@ -207,11 +169,10 @@
     <div class="login-container">
         <div class="login-card">
             <div class="login-header">
-                <div class="beta-badge">Passkey Authentication</div>
-                <div class="login-icon">🔐</div>
-                <h1 class="login-title">Sign In with Passkey</h1>
+                <img src="{{ url_for('static', filename='img/lemma_logo.svg') }}" alt="Lemma.id" class="login-logo" width="80" height="80">
+                <h1 class="login-title">Sign In</h1>
                 <p class="login-subtitle">
-                    Authenticate with your device's biometrics. No passwords, no emails.
+                    Authenticate with your device's biometrics
                 </p>
             </div>
 
@@ -225,22 +186,6 @@
             </button>
 
             <div class="status-message" id="statusMessage"></div>
-
-            <div class="info-box">
-                <strong>🛡️ How Passkey Authentication Works:</strong>
-                <ul>
-                    <li><strong>No passwords</strong> - Use your fingerprint, face, or device PIN</li>
-                    <li><strong>No emails</strong> - Instant authentication, no waiting</li>
-                    <li><strong>Phishing-proof</strong> - Credentials are bound to this device</li>
-                    <li><strong>Your data, your wallet</strong> - Credentials stored locally in your browser</li>
-                </ul>
-            </div>
-
-            <div style="margin-top: var(--space-6); padding-top: var(--space-4); border-top: 1px solid var(--gray-200); text-align: center;">
-                <a href="/wallet" style="color: #667eea; text-decoration: none; font-weight: 600; font-size: var(--font-size-sm);">
-                    Manage your wallet →
-                </a>
-            </div>
         </div>
     </div>
 
