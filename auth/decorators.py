@@ -27,7 +27,7 @@ def validate_agent_token(token):
     """
     if not token or not token.startswith('lm_agent_'):
         return False, None
-    
+
     try:
         from api.agent_credentials import validate_agent_token_internal
         is_valid, info = validate_agent_token_internal(token)
@@ -35,6 +35,40 @@ def validate_agent_token(token):
     except Exception as e:
         logger.warning(f"Agent token validation error: {e}")
         return False, None
+
+
+def validate_api_key_secure(api_key: str, endpoint: str = None, method: str = None) -> tuple:
+    """
+    Securely validate an API key using the APIKeyManager.
+
+    SECURITY: This replaces the insecure len(api_key) >= 10 check with proper
+    hash-based validation against stored API keys.
+
+    Returns: (is_valid, api_key_obj, error_message)
+    """
+    if not api_key:
+        return False, None, "API key required"
+
+    # Quick format check before expensive validation
+    if not api_key.startswith('sk_live_') or len(api_key) < 32:
+        return False, None, "Invalid API key format"
+
+    try:
+        from auth.api_key_manager import get_api_key_manager
+        manager = get_api_key_manager()
+
+        # Get endpoint and method from request if not provided
+        if endpoint is None:
+            endpoint = request.path if request else '/'
+        if method is None:
+            method = request.method if request else 'GET'
+
+        client_ip = request.remote_addr if request else None
+
+        return manager.validate_api_key(api_key, endpoint, method, client_ip)
+    except Exception as e:
+        logger.error(f"API key validation error: {e}")
+        return False, None, "API key validation failed"
 
 
 def check_agent_session():
@@ -184,7 +218,8 @@ def require_site_admin(f):
         # METHOD 2: API key (programmatic access - still supported)
         api_key = request.headers.get('X-API-Key') or request.args.get('api_key')
         
-        if api_key and len(api_key) >= 10:
+        is_valid_key, key_obj, key_error = validate_api_key_secure(api_key)
+        if is_valid_key:
             # API keys bypass credential system
             g.api_key = api_key
             g.is_admin = True
@@ -247,7 +282,8 @@ def optional_auth(f):
         
         # Method 3: API key fallback
         api_key = request.headers.get('X-API-Key') or request.args.get('api_key')
-        if api_key and len(api_key) >= 10:
+        is_valid_key, key_obj, key_error = validate_api_key_secure(api_key)
+        if is_valid_key:
             g.api_key = api_key
             g.authenticated = True
         
@@ -339,7 +375,8 @@ def require_admin(f):
         
         # Method 2: API key fallback (programmatic access)
         api_key = request.headers.get('X-API-Key') or request.args.get('api_key')
-        if api_key and len(api_key) >= 10:
+        is_valid_key, key_obj, key_error = validate_api_key_secure(api_key)
+        if is_valid_key:
             g.api_key = api_key
             g.is_admin = True
             g.auth_method = 'api_key'
@@ -496,7 +533,8 @@ def require_authenticated(f):
         
         # Method 3: API key fallback
         api_key = request.headers.get('X-API-Key') or request.args.get('api_key')
-        if api_key and len(api_key) >= 10:
+        is_valid_key, key_obj, key_error = validate_api_key_secure(api_key)
+        if is_valid_key:
             g.api_key = api_key
             g.authenticated = True
             return f(*args, **kwargs)
@@ -640,7 +678,8 @@ def require_wallet_ppid(f):
         
         # Method 3: API key fallback (for programmatic access)
         api_key = request.headers.get('X-API-Key') or request.args.get('api_key')
-        if api_key and len(api_key) >= 10:
+        is_valid_key, key_obj, key_error = validate_api_key_secure(api_key)
+        if is_valid_key:
             g.api_key = api_key
             g.authenticated = True
             g.auth_method = 'api_key'
@@ -721,7 +760,8 @@ def require_customer_or_admin(f):
         
         # API key fallback
         api_key = request.headers.get('X-API-Key') or request.args.get('api_key')
-        if api_key and len(api_key) >= 10:
+        is_valid_key, key_obj, key_error = validate_api_key_secure(api_key)
+        if is_valid_key:
             g.api_key = api_key
             g.authenticated = True
             g.auth_method = 'api_key'

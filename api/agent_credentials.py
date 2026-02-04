@@ -186,6 +186,23 @@ def issue_agent_credential():
                 'message': 'You must be signed in with passkey to issue agent credentials'
             }), 401
 
+        # SECURITY: Validate PPID format if provided via header (prevent spoofing)
+        if ppid and not ppid.startswith('did:lemma:ppid_'):
+            return jsonify({
+                'success': False,
+                'error': 'Invalid PPID format',
+                'message': 'PPID must be a valid Lemma identifier'
+            }), 400
+
+        # SECURITY: For customer_id auth, require passkey verification
+        # This prevents session-only auth from issuing agent credentials
+        if customer_id and not ppid and not passkey_verified:
+            return jsonify({
+                'success': False,
+                'error': 'Passkey verification required',
+                'message': 'Agent credentials require passkey authentication, not just session'
+            }), 403
+
         # Use PPID as identifier, fall back to customer_id
         authorized_by = ppid or f"customer:{customer_id}"
 

@@ -1155,11 +1155,15 @@ class LemmaWallet {
                 }
                 
                 if (walletId) {
-                    // Only check global session if we GOT our session from another device/source
-                    // Local passkey sessions ('local', 'passkey') don't require global validation
+                    // Only check global session if we GOT our session from cross-device sync
+                    // These sources are authoritative and don't need global validation:
+                    // - 'local', 'passkey', 'local_passkey': User authenticated locally with passkey
+                    // - 'bridge': Bridge iframe validated the session (has the secret)
+                    // - 'redirect': User just authenticated via redirect from lemma.id
+                    // Only 'global_sync' needs validation (session from another device's unlock)
                     const sessionSource = this.session.source;
-                    const localOnlySources = ['local', 'passkey', 'local_passkey'];
-                    const requiresGlobalValidation = !localOnlySources.includes(sessionSource);
+                    const authoritativeSources = ['local', 'passkey', 'local_passkey', 'bridge', 'redirect'];
+                    const requiresGlobalValidation = !authoritativeSources.includes(sessionSource);
 
                     if (requiresGlobalValidation) {
                         const globalSession = await this._checkGlobalSession(walletId);
@@ -1169,7 +1173,7 @@ class LemmaWallet {
                             await this._clearSessionGracefully('wallet_locked', 'Your wallet was locked on another device.');
                         }
                     }
-                    // Local passkey sessions are valid regardless of global state
+                    // Authoritative sessions are valid regardless of global state
                 }
             } catch (e) {
                 // Network issues shouldn't cause sign-out - fail silently

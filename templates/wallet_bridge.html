@@ -66,22 +66,36 @@ const SESSION_CONFIG = {
  * This just does basic sanity checks (HTTPS required for production).
  */
 function isOriginAllowed(origin) {
-    // Allow Lemma infrastructure
-    if (origin === 'https://lemma.id' || 
+    // Allow Lemma infrastructure (exact match)
+    if (origin === 'https://lemma.id' ||
+        origin === 'https://www.lemma.id' ||
         origin === 'https://lemma-enterprise-0f6ba17076c1.herokuapp.com') {
         return true;
     }
-    
-    // Allow localhost for development
-    if (origin.includes('localhost') || origin.includes('127.0.0.1')) {
+
+    // Parse origin to validate properly
+    let parsedOrigin;
+    try {
+        parsedOrigin = new URL(origin);
+    } catch (e) {
+        console.warn(`🔒 Rejected invalid origin: ${origin}`);
+        return false;
+    }
+
+    // Allow localhost for development (strict hostname check, not substring match)
+    // SECURITY: Must check hostname exactly, not origin.includes() which matches evil-localhost.com
+    const hostname = parsedOrigin.hostname;
+    if (hostname === 'localhost' || hostname === '127.0.0.1') {
         return true;
     }
-    
+
     // Production: require HTTPS
-    if (origin.startsWith('https://')) {
+    // NOTE: Per-site credential filtering provides the real security - each site
+    // can only access its own credentials. This HTTPS check is defense-in-depth.
+    if (parsedOrigin.protocol === 'https:') {
         return true;
     }
-    
+
     console.warn(`🔒 Rejected non-HTTPS origin: ${origin}`);
     return false;
 }
