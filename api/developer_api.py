@@ -280,10 +280,20 @@ def create_developer_site():
                     'error': 'A site with this domain already exists'
                 }), 400
             
-            # Create site with IAM manager (generates Ed25519 keypair)
-            manager = get_or_create_site_manager(site_id, domain)
+            # STEP 1: Create the site record in database FIRST
+            # (KMS key storage requires site to exist)
+            new_site = Site(
+                site_id=site_id,
+                site_domain=domain,
+                company_name=name or domain,
+                environment=environment,
+                created_at=datetime.utcnow()
+            )
+            db.add(new_site)
+            db.commit()
+            logger.info(f"Created site record: {site_id}")
             
-            # Add creator as site admin
+            # STEP 2: Add creator as site admin
             if ppid:
                 from api.database import SiteAdmin
                 admin = SiteAdmin(
@@ -295,8 +305,13 @@ def create_developer_site():
                 )
                 db.add(admin)
                 db.commit()
+                logger.info(f"Added admin {ppid[:20]}... to site {site_id}")
             
             db.close()
+            
+            # STEP 3: Create IAM manager (generates Ed25519 keypair with KMS protection)
+            # This MUST happen AFTER site record exists
+            manager = get_or_create_site_manager(site_id, domain)
             
             logger.info(f"✅ Created site: {site_id} for {ppid}")
             
