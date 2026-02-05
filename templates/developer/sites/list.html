@@ -191,15 +191,36 @@ async function getWalletPpid() {
     
     try {
         const wallet = new LemmaWallet();
+        
+        // First check if already authenticated
         const authResult = await wallet.autoAuthenticate();
         
         if (authResult.authenticated) {
             const ppid = await wallet.derivePPID('lemma.id');
-            console.log('Developer authenticated, PPID:', ppid);
+            console.log('Developer authenticated via existing session, PPID:', ppid);
             return ppid;
-        } else {
-            console.warn('Wallet not authenticated - developer features require sign-in');
         }
+        
+        // Not authenticated via session - but we're on lemma.id
+        // If user has a passkey, automatically unlock (seamless flow)
+        console.log('No active session - attempting automatic passkey unlock...');
+        
+        try {
+            const unlockResult = await wallet.unlock();
+            
+            if (unlockResult.success) {
+                const ppid = await wallet.derivePPID('lemma.id');
+                console.log('Developer authenticated via passkey unlock, PPID:', ppid);
+                return ppid;
+            }
+        } catch (unlockError) {
+            // User cancelled passkey or no passkey exists - show manual sign-in
+            console.warn('Auto-unlock failed:', unlockError.message);
+        }
+        
+        console.warn('Wallet not authenticated - manual sign-in required');
+        return null;
+        
     } catch (e) {
         console.warn('Wallet auth check failed:', e);
     }
