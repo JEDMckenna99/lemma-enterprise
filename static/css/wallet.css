@@ -202,26 +202,37 @@
 /* QR Code Display */
 .qr-display {
     text-align: center;
-    padding: 24px;
-    background: #f9fafb;
-    border-radius: 12px;
     margin-top: 16px;
 }
 .qr-display .qr-box {
     background: white;
-    padding: 16px;
-    border-radius: 12px;
+    padding: 20px;
+    border-radius: 16px;
     display: inline-block;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+    position: relative;
+}
+.qr-display .qr-box #qr-container {
+    margin: 0 auto;
 }
 .qr-timer {
-    font-size: 1rem;
+    display: inline-block;
+    font-size: 0.85rem;
     font-weight: 600;
-    color: #f59e0b;
-    margin-top: 12px;
+    color: #92400e;
+    background: #fef3c7;
+    padding: 6px 14px;
+    border-radius: 20px;
+    margin-top: 16px;
 }
 .qr-timer.expiring { 
-    color: #ef4444; 
+    color: #991b1b;
+    background: #fee2e2;
+    animation: pulse-warning 1s ease-in-out infinite;
+}
+@keyframes pulse-warning {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.7; }
 }
 
 /* Link Methods */
@@ -239,6 +250,48 @@
     font-size: 0.8rem;
     margin-top: 0.25rem;
     margin-bottom: 0;
+}
+
+/* QR Instruction */
+.qr-instruction {
+    color: #6b7280;
+    font-size: 0.9rem;
+    margin: 16px 0 0;
+}
+
+/* Link Copy Section */
+.link-copy-section {
+    margin-top: 20px;
+    padding-top: 16px;
+    border-top: 1px solid #e5e7eb;
+}
+.link-copy-label {
+    color: #9ca3af;
+    font-size: 0.8rem;
+    margin: 0 0 8px;
+}
+.link-copy-row {
+    display: flex;
+    gap: 8px;
+}
+.link-url-input {
+    flex: 1;
+    padding: 10px 12px;
+    font-size: 0.75rem;
+    font-family: monospace;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    background: #f9fafb;
+    text-overflow: ellipsis;
+    min-width: 0;
+}
+.link-url-input:focus {
+    outline: none;
+    border-color: #4f46e5;
+}
+.btn-copy {
+    white-space: nowrap;
+    padding: 10px 16px !important;
 }
 
 /* Link Input */

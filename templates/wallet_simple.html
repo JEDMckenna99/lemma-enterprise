@@ -6,7 +6,7 @@
 {% block preload_scripts %}{% endblock %}
 
 {% block head %}
-<link rel="stylesheet" href="{{ url_for('static', filename='css/wallet.css') }}?v=1">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/wallet.css') }}?v=2">
 {% endblock %}
 
 {% block content %}
@@ -71,11 +71,11 @@
                 
                 <div id="qr-display" class="qr-display hidden">
                     <div class="qr-box">
-                        <div id="qr-container" style="width: 180px; height: 180px;"></div>
+                        <div id="qr-container"></div>
                     </div>
                     <div id="qr-timer" class="qr-timer">Expires in 60s</div>
-                    <div id="link-options" class="hidden" style="margin-top: 1rem; text-align: left;"></div>
-                    <button id="hide-qr-btn" class="btn btn-secondary" style="margin-top: 12px;">Close</button>
+                    <div id="link-options" class="hidden"></div>
+                    <button id="hide-qr-btn" class="btn btn-secondary" style="margin-top: 16px;">Close</button>
                 </div>
             </div>
 
@@ -526,8 +526,8 @@ async function showQR() {
         if (typeof QRCode !== 'undefined') {
             new QRCode(qrContainer, {
                 text: result.qrUrl,
-                width: 256,    // Larger for better scanning
-                height: 256,
+                width: 200,
+                height: 200,
                 colorDark: '#000000',
                 colorLight: '#ffffff',
                 correctLevel: QRCode.CorrectLevel ? QRCode.CorrectLevel.M : 0  // Medium error correction (15%)
@@ -540,18 +540,13 @@ async function showQR() {
         const linkOptionsEl = document.getElementById('link-options');
         if (linkOptionsEl) {
             linkOptionsEl.innerHTML = `
-                <div class="link-method">
-                    <strong>Scan QR Code</strong>
-                    <p class="text-muted">Point your other device's camera at the QR code above</p>
-                </div>
-                <div class="link-method" style="margin-top: 1rem;">
-                    <strong>Or copy link</strong>
-                    <div style="display: flex; gap: 0.5rem; margin-top: 0.5rem;">
-                        <input type="text" id="link-url" value="${result.qrUrl}" readonly 
-                               style="flex: 1; padding: 0.5rem; font-size: 0.75rem; border: 1px solid var(--border-color); border-radius: 4px; background: var(--bg-secondary); text-overflow: ellipsis;">
-                        <button onclick="copyLinkUrl()" class="btn btn-secondary" style="white-space: nowrap;">Copy</button>
+                <p class="qr-instruction">Scan with your other device's camera</p>
+                <div class="link-copy-section">
+                    <p class="link-copy-label">Or copy link:</p>
+                    <div class="link-copy-row">
+                        <input type="text" id="link-url" value="${result.qrUrl}" readonly class="link-url-input">
+                        <button onclick="copyLinkUrl()" class="btn btn-secondary btn-copy">Copy</button>
                     </div>
-                    <p class="text-muted">Paste in browser on other device (useful for phone→PC)</p>
                 </div>
             `;
             linkOptionsEl.classList.remove('hidden');
