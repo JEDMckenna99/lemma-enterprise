@@ -117,11 +117,14 @@ class LemmaWallet {
      * Get comprehensive auth state for UI decisions.
      * Call this to determine what button to show or whether to auto-sign-in.
      * 
+     * v2.45.0: On third-party sites, uses local lemma verification (no wallet_secret needed)
+     * 
      * @returns {Promise<Object>} Auth state with:
      *   - hasWallet: boolean - User has a wallet (passkey registered somewhere)
      *   - isUnlocked: boolean - Wallet is currently unlocked
-     *   - walletSecret: string|null - Secret for PPID derivation (if unlocked)
-     *   - suggestedAction: 'auto_sign_in' | 'create_account' | 'create_passkey'
+     *   - walletSecret: string|null - Secret for PPID derivation (only on lemma.id)
+     *   - ppid: string|null - PPID from local lemma (on third-party sites)
+     *   - suggestedAction: 'auto_sign_in' | 'create_account' | 'redirect'
      *   - suggestedButtonText: string - Text to show on sign-in button
      */
     async getAuthState() {
@@ -131,12 +134,46 @@ class LemmaWallet {
             hasWallet: false,
             isUnlocked: false,
             walletSecret: null,
-            suggestedAction: 'create_passkey',
-            suggestedButtonText: 'Create Passkey & Sign In',
+            ppid: null,
+            suggestedAction: 'redirect',
+            suggestedButtonText: 'Sign In with Lemma',
             // Device linking info
             canLinkDevice: false,
             linkDeviceUrl: 'https://lemma.id/link'
         };
+        
+        // ============================================================
+        // THIRD-PARTY SITES: Use local lemma verification (no network)
+        // ============================================================
+        if (!this._isLemmaDomain()) {
+            const authResult = await this.verifyLocalAuthorization();
+            
+            if (authResult.authorized) {
+                state.hasWallet = true;
+                state.isUnlocked = true;
+                state.ppid = authResult.ppid;
+                state.suggestedAction = 'auto_sign_in';
+                state.suggestedButtonText = 'Sign In';
+                return state;
+            }
+            
+            // Not authorized - determine why
+            if (authResult.reason === 'wallet_locked' || authResult.reason === 'session_expired') {
+                state.hasWallet = true;  // They have a wallet, just locked
+                state.suggestedAction = 'redirect';
+                state.suggestedButtonText = 'Unlock Wallet';
+            } else {
+                // No lemma for this site
+                state.suggestedAction = 'redirect';
+                state.suggestedButtonText = 'Sign In with Lemma';
+            }
+            
+            return state;
+        }
+        
+        // ============================================================
+        // LEMMA.ID: Full session with wallet_secret
+        // ============================================================
         
         // Check local session first
         if (this.session.isUnlocked) {
@@ -147,54 +184,33 @@ class LemmaWallet {
             } catch (e) {
                 console.warn('[Lemma] Could not get wallet secret:', e.message);
             }
-        }
-        
-        // On third-party sites, check bridge session
-        if (!state.isUnlocked && !this._isLemmaDomain()) {
-            try {
-                const bridgeSession = await this.checkBridgeSession();
-                if (bridgeSession.valid) {
-                    state.hasWallet = true;
-                    state.isUnlocked = true;
-                    
-                    // Get wallet secret from bridge
-                    const secretResult = await this._sendBridgeMessage('GET_WALLET_SECRET', {});
-                    if (secretResult.success && secretResult.walletSecret) {
-                        state.walletSecret = secretResult.walletSecret;
-                    }
-                }
-            } catch (e) {
-                console.warn('[Lemma] Bridge check failed:', e.message);
+            
+            if (state.walletSecret) {
+                state.suggestedAction = 'auto_sign_in';
+                state.suggestedButtonText = 'Sign In';
+                state.canLinkDevice = true;
+                state.canAddDevice = true;
+                return state;
             }
         }
         
-        // Determine suggested action based on state and domain
-        if (state.isUnlocked && state.walletSecret) {
-            // User has unlocked wallet - they can sign in or create account
-            state.suggestedAction = 'auto_sign_in';
-            state.suggestedButtonText = 'Sign In';
-            // User with wallet can add devices
-            state.canLinkDevice = true;
-            state.canAddDevice = true;
-        } else if (!this._isLemmaDomain()) {
-            // Third-party site with no valid session - offer redirect
-            state.suggestedAction = 'redirect';
-            state.suggestedButtonText = 'Sign In with Lemma';
-            state.unlockUrl = 'https://lemma.id/unlock';
-            // User might have wallet on another device
-            state.canLinkDevice = true;
-            state.linkDeviceText = 'Already have a wallet? Link this device';
-        } else if (state.hasWallet) {
-            // lemma.id with wallet but not unlocked
-            state.suggestedAction = 'unlock';
-            state.suggestedButtonText = 'Unlock Wallet';
-            state.canAddDevice = true;
-        } else {
-            // lemma.id with no wallet - offer create or link
-            state.suggestedAction = 'create_passkey';
-            state.suggestedButtonText = 'Create Passkey';
-            state.canLinkDevice = true;
-            state.linkDeviceText = 'Already have a wallet on another device?';
+        // Check if user has a wallet (even if locked)
+        try {
+            const walletIdRecord = await this._get('passkey', 'walletId');
+            if (walletIdRecord?.value) {
+                state.hasWallet = true;
+                state.suggestedAction = 'unlock';
+                state.suggestedButtonText = 'Unlock Wallet';
+                state.canAddDevice = true;
+            } else {
+                // No wallet - offer create or link
+                state.suggestedAction = 'create_passkey';
+                state.suggestedButtonText = 'Create Passkey';
+                state.canLinkDevice = true;
+                state.linkDeviceText = 'Already have a wallet on another device?';
+            }
+        } catch (e) {
+            console.warn('[Lemma] Could not check wallet status:', e.message);
         }
         
         return state;
@@ -1473,74 +1489,50 @@ class LemmaWallet {
     async registerPasskey() {
         await this.init();
 
-        // SMART CHECK: On third-party sites, check bridge session first
-        // If user already unlocked on lemma.id today, don't prompt for passkey
+        // ============================================================
+        // THIRD-PARTY SITES: Use local lemma verification (v2.45.0)
+        // ============================================================
         if (!window.location.hostname.includes('lemma.id') && 
             !window.location.hostname.includes('localhost')) {
-            console.log('[Lemma] Third-party site detected, checking bridge session for registerPasskey...');
-            try {
-                const bridgeSession = await this.checkBridgeSession();
-                console.log('[Lemma] Bridge session result:', bridgeSession);
+            console.log('[Lemma] Third-party site: checking local authorization...');
+            
+            // Try local lemma verification first (no network calls)
+            const authResult = await this.verifyLocalAuthorization();
+            
+            if (authResult.authorized) {
+                console.log(`[Lemma] ✅ Already authorized via local lemma in ${authResult.verifyTimeMs}ms`);
                 
-                if (bridgeSession.valid) {
-                    console.log('[Lemma] ✅ Already authenticated via bridge - skipping passkey registration');
-                    
-                    // CRITICAL: Set local session to match bridge session
-                    // This ensures getWalletSecret() and other methods work
-                    this.session = {
-                        isUnlocked: true,
-                        unlockedAt: bridgeSession.unlockedAt || Date.now(),
-                        expiresAt: bridgeSession.expiresAt,
-                        walletId: bridgeSession.walletId,
-                        source: 'bridge'
-                    };
-                    await this._put('session', { id: 'current', ...this.session });
-                    
-                    // Get wallet secret from bridge for PPID derivation
-                    let walletSecret = null;
-                    try {
-                        const secretResult = await this._sendBridgeMessage('GET_WALLET_SECRET', {});
-                        if (secretResult.success && secretResult.walletSecret) {
-                            walletSecret = secretResult.walletSecret;
-                            // Cache locally for this session
-                            await this._put('secrets', { id: 'master', secret: walletSecret, source: 'bridge' });
-                            this.session.walletSecret = walletSecret;
-                            console.log('[Lemma] ✅ Wallet secret synced from bridge');
-                        }
-                    } catch (e) {
-                        console.warn('[Lemma] Could not get wallet secret from bridge:', e.message);
-                    }
-                    
-                    // AUTO-START HEARTBEAT on third-party sites
-                    this._autoStartHeartbeat();
-                    
-                    return {
-                        success: true,
-                        method: 'bridge_session',
-                        walletId: bridgeSession.walletId,
-                        walletSecret: walletSecret,
-                        message: 'Authenticated via central wallet session'
-                    };
-                } else {
-                    // No valid session - use redirect flow (v2.32.0: redirect-only)
-                    console.log('[Lemma] Bridge session not valid - using redirect flow');
-                    this.unlockWithRedirect();
-                        return {
-                            success: false,
-                        redirecting: true,
-                        message: 'Redirecting to lemma.id for authentication...'
-                        };
-                }
-            } catch (e) {
-                console.warn('[Lemma] Bridge check failed in registerPasskey:', e.message);
-                // Use redirect flow on any error (v2.32.0)
-                this.unlockWithRedirect();
+                // Set local session
+                this.session = {
+                    isUnlocked: true,
+                    unlockedAt: Date.now(),
+                    expiresAt: Date.now() + getSessionDurationMs(),
+                    walletId: authResult.lemma?.walletId,
+                    source: 'local_lemma'
+                };
+                await this._put('session', { id: 'current', ...this.session });
+                
+                // Start listening for lock events
+                this._setupLockEventListener();
+                
                 return {
-                    success: false,
-                    redirecting: true,
-                    message: 'Redirecting to lemma.id for authentication...'
+                    success: true,
+                    method: 'local_lemma',
+                    ppid: authResult.ppid,
+                    lemma: authResult.lemma,
+                    message: 'Authorized via local lemma verification'
                 };
             }
+            
+            // Not authorized - redirect to lemma.id
+            console.log(`[Lemma] Not authorized (${authResult.reason}) - redirecting to lemma.id`);
+            this.unlockWithRedirect();
+            return {
+                success: false,
+                redirecting: true,
+                reason: authResult.reason,
+                message: 'Redirecting to lemma.id for authentication...'
+            };
         }
 
         if (!this._isPasskeySupported()) {
@@ -1720,70 +1712,46 @@ class LemmaWallet {
         // If user already unlocked on lemma.id today, don't prompt for passkey
         if (!window.location.hostname.includes('lemma.id') && 
             !window.location.hostname.includes('localhost')) {
-            console.log('[Lemma] Third-party site detected, checking bridge session...');
-            try {
-                const bridgeSession = await this.checkBridgeSession();
-                console.log('[Lemma] Bridge session result:', bridgeSession);
-                
-                if (bridgeSession.valid) {
-                    console.log('[Lemma] ✅ Already authenticated via bridge - skipping local unlock');
-
-                    // Update local session to match bridge
-                    this.session = {
-                        isUnlocked: true,
-                        unlockedAt: bridgeSession.unlockedAt || Date.now(),
-                        expiresAt: bridgeSession.expiresAt,
-                        walletId: bridgeSession.walletId,
-                        source: 'bridge'
-                    };
-                    // CRITICAL: Save session to IndexedDB so getWalletInfo() works
-                    await this._put('session', { id: 'current', ...this.session });
-
-                    // Get wallet secret from bridge for PPID derivation
-                    let walletSecret = null;
-                    try {
-                        const secretResult = await this._sendBridgeMessage('GET_WALLET_SECRET', {});
-                        if (secretResult.success && secretResult.walletSecret) {
-                            walletSecret = secretResult.walletSecret;
-                            // Cache locally for this session
-                            await this._put('secrets', { id: 'master', secret: walletSecret, source: 'bridge' });
-                            this.session.walletSecret = walletSecret;
-                            console.log('[Lemma] ✅ Wallet secret synced from bridge');
-                        }
-                    } catch (e) {
-                        console.warn('[Lemma] Could not get wallet secret from bridge:', e.message);
-                    }
-
-                    // Start session heartbeat to detect if wallet is locked remotely
-                    this.startSessionHeartbeat(300000); // 5 minute backup (primary is tab focus)
-
-                    return {
-                        success: true,
-                        method: 'bridge_session',
-                        walletId: bridgeSession.walletId,
-                        walletSecret: walletSecret,
-                        expiresAt: bridgeSession.expiresAt,
-                        message: 'Authenticated via central wallet session'
-                    };
-                } else {
-                    console.log('[Lemma] Bridge session not valid:', bridgeSession.reason || 'no valid session');
-                }
-            } catch (e) {
-                console.warn('[Lemma] Bridge check failed:', e.message);
-                console.log('[Lemma] Falling back to local passkey or redirect');
-            }
+            console.log('[Lemma] Third-party site: checking local authorization...');
             
-            // On third-party sites, if bridge failed and no local passkey, use redirect
-            const localPasskey = await this._get('passkey', 'primary');
-            if (!localPasskey?.credentialId) {
-                console.log('[Lemma] No local passkey on third-party site - using redirect flow');
-                this.unlockWithRedirect();
+            // Try local lemma verification first (no network calls)
+            const authResult = await this.verifyLocalAuthorization();
+            
+            if (authResult.authorized) {
+                console.log(`[Lemma] ✅ Already authorized via local lemma in ${authResult.verifyTimeMs}ms`);
+                
+                // Set local session
+                this.session = {
+                    isUnlocked: true,
+                    unlockedAt: Date.now(),
+                    expiresAt: Date.now() + getSessionDurationMs(),
+                    walletId: authResult.lemma?.walletId,
+                    source: 'local_lemma'
+                };
+                await this._put('session', { id: 'current', ...this.session });
+                
+                // Start listening for lock events
+                this._setupLockEventListener();
+                
                 return {
-                    success: false,
-                    redirecting: true,
-                    message: 'Redirecting to lemma.id for authentication...'
+                    success: true,
+                    method: 'local_lemma',
+                    ppid: authResult.ppid,
+                    lemma: authResult.lemma,
+                    expiresAt: this.session.expiresAt,
+                    message: 'Authorized via local lemma verification'
                 };
             }
+            
+            // Not authorized - redirect to lemma.id
+            console.log(`[Lemma] Not authorized (${authResult.reason}) - redirecting to lemma.id`);
+            this.unlockWithRedirect();
+            return {
+                success: false,
+                redirecting: true,
+                reason: authResult.reason,
+                message: 'Redirecting to lemma.id for authentication...'
+            };
         }
 
         // ============================================================
