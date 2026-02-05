@@ -186,10 +186,10 @@ class LemmaWallet {
             }
             
             if (state.walletSecret) {
-                state.suggestedAction = 'auto_sign_in';
-                state.suggestedButtonText = 'Sign In';
-                state.canLinkDevice = true;
-                state.canAddDevice = true;
+            state.suggestedAction = 'auto_sign_in';
+            state.suggestedButtonText = 'Sign In';
+            state.canLinkDevice = true;
+            state.canAddDevice = true;
                 return state;
             }
         }
@@ -199,15 +199,15 @@ class LemmaWallet {
             const walletIdRecord = await this._get('passkey', 'walletId');
             if (walletIdRecord?.value) {
                 state.hasWallet = true;
-                state.suggestedAction = 'unlock';
-                state.suggestedButtonText = 'Unlock Wallet';
-                state.canAddDevice = true;
-            } else {
+            state.suggestedAction = 'unlock';
+            state.suggestedButtonText = 'Unlock Wallet';
+            state.canAddDevice = true;
+        } else {
                 // No wallet - offer create or link
-                state.suggestedAction = 'create_passkey';
-                state.suggestedButtonText = 'Create Passkey';
-                state.canLinkDevice = true;
-                state.linkDeviceText = 'Already have a wallet on another device?';
+            state.suggestedAction = 'create_passkey';
+            state.suggestedButtonText = 'Create Passkey';
+            state.canLinkDevice = true;
+            state.linkDeviceText = 'Already have a wallet on another device?';
             }
         } catch (e) {
             console.warn('[Lemma] Could not check wallet status:', e.message);
@@ -293,7 +293,7 @@ class LemmaWallet {
         // ============================================================
         // On lemma.id: Check local session + wallet_secret
         // On third-party sites: Check local session + verify local lemmas
-        // 
+        //
         // Benefits:
         // - ~15ms verification (NO network calls on third-party sites!)
         // - More private (wallet_secret never leaves lemma.id)
@@ -472,15 +472,15 @@ class LemmaWallet {
                     
                     result.walletSecret = secretRecord.secret;
                     result.walletId = walletIdRecord.value;
-                    result.authenticated = true;
-                    result.needsPasskey = false;
+                        result.authenticated = true;
+                        result.needsPasskey = false;
                     result.crossDevice = true;
                     result.message = 'Authenticated via cross-device session sync';
-                    
-                    return result;
+                        
+                        return result;
+                    }
                 }
-            }
-        } catch (e) {
+            } catch (e) {
             console.warn('[Lemma] Global session check failed:', e.message);
         }
         
@@ -490,7 +490,7 @@ class LemmaWallet {
         result.needsPasskey = true;
         result.needsRedirect = false;
         result.message = 'Unlock wallet with passkey';
-        return result;
+                return result;
     }
     
     /**
@@ -1564,41 +1564,41 @@ class LemmaWallet {
             
             // Try local lemma verification first (no network calls)
             const authResult = await this.verifyLocalAuthorization();
-            
+                
             if (authResult.authorized) {
                 console.log(`[Lemma] ✅ Already authorized via local lemma in ${authResult.verifyTimeMs}ms`);
-                
+                    
                 // Set local session
-                this.session = {
-                    isUnlocked: true,
+                    this.session = {
+                        isUnlocked: true,
                     unlockedAt: Date.now(),
                     expiresAt: Date.now() + getSessionDurationMs(),
                     walletId: authResult.lemma?.walletId,
                     source: 'local_lemma'
-                };
-                await this._put('session', { id: 'current', ...this.session });
-                
+                    };
+                    await this._put('session', { id: 'current', ...this.session });
+                    
                 // Start listening for lock events
                 this._setupLockEventListener();
-                
-                return {
-                    success: true,
+                    
+                    return {
+                        success: true,
                     method: 'local_lemma',
                     ppid: authResult.ppid,
                     lemma: authResult.lemma,
                     message: 'Authorized via local lemma verification'
-                };
+                    };
             }
             
             // Not authorized - redirect to lemma.id
             console.log(`[Lemma] Not authorized (${authResult.reason}) - redirecting to lemma.id`);
-            this.unlockWithRedirect();
-            return {
-                success: false,
-                redirecting: true,
+                this.unlockWithRedirect();
+                return {
+                    success: false,
+                    redirecting: true,
                 reason: authResult.reason,
-                message: 'Redirecting to lemma.id for authentication...'
-            };
+                    message: 'Redirecting to lemma.id for authentication...'
+                };
         }
 
         if (!this._isPasskeySupported()) {
@@ -1724,29 +1724,29 @@ class LemmaWallet {
 
         // Signal to server for cross-device sync (simple state update)
         if (this._isLemmaDomain()) {
-            try {
-                const activeProfile = await this.getActiveProfile();
+                try {
+                    const activeProfile = await this.getActiveProfile();
                 console.log('[Lemma] Signaling new wallet unlock to server...');
                 const signalResponse = await fetch('/api/wallet/signal-unlock', {
-                    method: 'POST',
-                    credentials: 'include',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        wallet_id: walletId.value,
-                        unlocked_at: this.session.unlockedAt,
+                        method: 'POST',
+                        credentials: 'include',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            wallet_id: walletId.value,
+                            unlocked_at: this.session.unlockedAt,
                         expires_at: Math.floor(this.session.expiresAt / 1000),
-                        profile_id: activeProfile.id,
+                            profile_id: activeProfile.id,
                         profile_name: activeProfile.name
-                    })
-                });
+                        })
+                    });
                 if (signalResponse.ok) {
                     console.log('[Lemma] ✅ Server notified - cross-device sync enabled');
                     this.session.serverSessionActive = true;
                     await this._put('session', { id: 'current', ...this.session });
-                } else {
+                    } else {
                     console.warn('[Lemma] Could not signal to server:', signalResponse.status);
-                }
-            } catch (e) {
+                    }
+                } catch (e) {
                 console.warn('[Lemma] Could not signal to server:', e.message);
             }
         }
@@ -1779,28 +1779,28 @@ class LemmaWallet {
         if (!window.location.hostname.includes('lemma.id') && 
             !window.location.hostname.includes('localhost')) {
             console.log('[Lemma] Third-party site: checking local authorization...');
-            
+                
             // Try local lemma verification first (no network calls)
             const authResult = await this.verifyLocalAuthorization();
-            
+
             if (authResult.authorized) {
                 console.log(`[Lemma] ✅ Already authorized via local lemma in ${authResult.verifyTimeMs}ms`);
                 
                 // Set local session
-                this.session = {
-                    isUnlocked: true,
+                    this.session = {
+                        isUnlocked: true,
                     unlockedAt: Date.now(),
                     expiresAt: Date.now() + getSessionDurationMs(),
                     walletId: authResult.lemma?.walletId,
                     source: 'local_lemma'
-                };
-                await this._put('session', { id: 'current', ...this.session });
-                
+                    };
+                    await this._put('session', { id: 'current', ...this.session });
+
                 // Start listening for lock events
                 this._setupLockEventListener();
-                
-                return {
-                    success: true,
+
+                    return {
+                        success: true,
                     method: 'local_lemma',
                     ppid: authResult.ppid,
                     lemma: authResult.lemma,
@@ -1811,14 +1811,14 @@ class LemmaWallet {
             
             // Not authorized - redirect to lemma.id
             console.log(`[Lemma] Not authorized (${authResult.reason}) - redirecting to lemma.id`);
-            this.unlockWithRedirect();
-            return {
-                success: false,
-                redirecting: true,
+                this.unlockWithRedirect();
+                return {
+                    success: false,
+                    redirecting: true,
                 reason: authResult.reason,
-                message: 'Redirecting to lemma.id for authentication...'
-            };
-        }
+                    message: 'Redirecting to lemma.id for authentication...'
+                };
+            }
 
         // ============================================================
         // LOCAL-ONLY PASSKEY VERIFICATION
@@ -4762,8 +4762,8 @@ class LemmaWallet {
             console.log('[Lemma]    New wallet:', payload.walletId?.substring(0, 16) + '...');
             
             // Backup before clearing (stored in localStorage)
-            await this._backupWalletData();
-            await this._clearWalletData();
+                await this._backupWalletData();
+                await this._clearWalletData();
         }
         
         // Create or update profile with the linked wallet secret

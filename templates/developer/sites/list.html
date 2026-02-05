@@ -160,7 +160,14 @@
 </style>
 
 <script nonce="{{ csp_nonce }}">
-document.addEventListener('DOMContentLoaded', () => {
+// Global auth state
+let currentPpid = null;
+
+document.addEventListener('DOMContentLoaded', async () => {
+    // First authenticate to get PPID
+    currentPpid = await getWalletPpid();
+    
+    // Then load sites with auth
     loadSites();
     
     // Register button event listeners
@@ -176,11 +183,45 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 });
 
+async function getWalletPpid() {
+    if (typeof LemmaWallet === 'undefined') {
+        console.warn('LemmaWallet not available');
+        return null;
+    }
+    
+    try {
+        const wallet = new LemmaWallet();
+        const authResult = await wallet.autoAuthenticate();
+        
+        if (authResult.authenticated) {
+            const ppid = await wallet.derivePPID('lemma.id');
+            console.log('Developer authenticated, PPID:', ppid);
+            return ppid;
+        } else {
+            console.warn('Wallet not authenticated - developer features require sign-in');
+        }
+    } catch (e) {
+        console.warn('Wallet auth check failed:', e);
+    }
+    
+    return null;
+}
+
+function getAuthHeaders() {
+    const headers = { 'Content-Type': 'application/json' };
+    if (currentPpid) {
+        headers['X-Lemma-PPID'] = currentPpid;
+    }
+    return headers;
+}
+
 async function loadSites() {
     const container = document.getElementById('sites-container');
     
     try {
-        const response = await fetch('/api/developer/sites');
+        const response = await fetch('/api/developer/sites', {
+            headers: getAuthHeaders()
+        });
         if (!response.ok) throw new Error('Failed to load sites');
         
         const data = await response.json();
@@ -291,7 +332,7 @@ async function createSite(e) {
         
         const response = await fetch('/api/developer/sites', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: getAuthHeaders(),
             body: JSON.stringify({
                 name,
                 domain,
