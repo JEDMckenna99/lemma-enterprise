@@ -269,54 +269,58 @@ _reset_tokens = {}  # PIN reset tokens
 # WALLET AUTH DECORATORS
 # ============================================================================
 
+def _extract_unlock_token() -> str | None:
+    token = request.headers.get('X-Lemma-Unlock')
+    if token:
+        return token.strip()
+    auth_header = request.headers.get('Authorization', '')
+    if auth_header.startswith('Bearer '):
+        return auth_header.replace('Bearer ', '').strip()
+    return None
+
+
 def require_wallet_auth(f):
-    """Decorator that requires wallet-based authentication."""
+    """Decorator that requires server-signed wallet unlock state."""
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        auth_proof = None
+        # Prefer signed session cookie (server-issued) for unlock state
+        session_token = request.cookies.get(SESSION_COOKIE_NAME)
+        session_data = validate_session_token(session_token) if session_token else None
         
-        if 'X-Wallet-Auth' in request.headers:
-            try:
-                auth_proof = json.loads(request.headers.get('X-Wallet-Auth'))
-            except json.JSONDecodeError:
-                pass
-        
-        if not auth_proof and 'Authorization' in request.headers:
-            auth_header = request.headers.get('Authorization', '')
-            if auth_header.startswith('Bearer wallet_'):
+        # Fallback: short-lived unlock token (server-issued)
+        unlock_data = None
+        if not session_data:
+            unlock_token = _extract_unlock_token()
+            if unlock_token:
                 try:
-                    token = auth_header.replace('Bearer ', '')
-                    auth_proof = json.loads(base64.b64decode(token.encode()).decode())
+                    from api.wallet_session_sync import validate_unlock_token
+                    unlock_data = validate_unlock_token(unlock_token)
                 except Exception:
-                    pass
+                    unlock_data = None
         
-        if not auth_proof:
-            cookie = request.cookies.get('lemma_wallet_auth')
-            if cookie:
-                try:
-                    auth_proof = json.loads(base64.b64decode(cookie.encode()).decode())
-                except Exception:
-                    pass
-        
-        if not auth_proof:
+        if not session_data and not unlock_data:
             return jsonify({
                 'success': False,
                 'error': 'Authentication required',
                 'message': 'Unlock your wallet to access this resource'
             }), 401
         
-        validation = validate_wallet_auth_proof(auth_proof)
-        if not validation['valid']:
-            return jsonify({
-                'success': False,
-                'error': validation['error'],
-                'message': 'Wallet authentication failed'
-            }), 401
-        
-        g.user_id = validation['user_id']
-        g.wallet_id = validation['wallet_id']
+        wallet_id = (session_data or unlock_data).get('wallet_id')
+        g.user_id = wallet_id
+        g.wallet_id = wallet_id
         g.auth_method = 'wallet_passkey'
-        g.permissions = validation.get('permissions', [])
+        g.permissions = []
+        
+        # Optional: attach unverified client-provided permissions (local model)
+        auth_proof = request.headers.get('X-Wallet-Auth')
+        if auth_proof:
+            try:
+                parsed = json.loads(auth_proof)
+                validation = validate_wallet_auth_proof(parsed)
+                if validation['valid']:
+                    g.permissions = validation.get('permissions', [])
+            except Exception:
+                pass
         
         return f(*args, **kwargs)
     
