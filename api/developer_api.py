@@ -433,11 +433,15 @@ def get_site_keys(site_id):
             if site.api_key:
                 # Site has a primary API key - only show prefix for security
                 keys.append({
-                    'key_id': 'primary',
+                    'id': 0,  # Default key has ID 0
                     'name': 'Primary API Key',
-                    'prefix': site.api_key[:12] if site.api_key else 'lm_',
+                    'key_prefix': (site.api_key[:12] + '...') if site.api_key else 'lm_...',
+                    'type': 'live',
+                    'is_active': True,
                     'created_at': site.created_at.isoformat() if site.created_at else None,
-                    'last_used': None
+                    'last_used': None,
+                    'expires_at': None,
+                    'permissions': ['read', 'write']
                 })
             
             db.close()

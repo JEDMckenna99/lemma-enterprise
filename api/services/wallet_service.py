@@ -279,6 +279,59 @@ def _extract_unlock_token() -> str | None:
     return None
 
 
+def _get_wallet_lemmas() -> List[Dict]:
+    """Get wallet lemmas from headers or request body."""
+    lemmas = []
+    header_val = request.headers.get('X-Wallet-Lemmas')
+    if header_val:
+        try:
+            lemmas = json.loads(header_val)
+        except Exception:
+            lemmas = []
+    if not lemmas:
+        payload = request.get_json(silent=True) or {}
+        if isinstance(payload, dict):
+            lemmas = payload.get('wallet_lemmas') or payload.get('user_lemmas') or []
+    return lemmas if isinstance(lemmas, list) else []
+
+
+def _verify_lemmas_rust(lemmas: List[Dict]) -> List[Dict]:
+    """Verify lemmas using Rust engine and return valid ones."""
+    try:
+        from lemma_crypto import PyOptimizedVerifier
+    except Exception as e:
+        logger.error(f"Rust verifier not available: {e}")
+        raise RuntimeError("rust_verifier_unavailable")
+    
+    verifier = PyOptimizedVerifier()
+    valid = []
+    for lemma in lemmas:
+        try:
+            credential_json = json.dumps(lemma)
+            if verifier.verify_credential_json(credential_json):
+                valid.append(lemma)
+        except Exception:
+            continue
+    return valid
+
+
+def _extract_permissions_from_lemma(lemma: Dict) -> List[str]:
+    claims = lemma.get('claims') or lemma.get('credentialSubject', {})
+    if claims.get('packageType') and claims.get('packageType') != 'permission':
+        return []
+    permissions = []
+    if 'permission' in claims:
+        permissions.append(claims['permission'])
+    if 'role' in claims:
+        permissions.append(claims['role'])
+    if 'permissions' in claims:
+        if isinstance(claims['permissions'], list):
+            permissions.extend(claims['permissions'])
+        else:
+            permissions.append(claims['permissions'])
+    return [p for p in permissions if isinstance(p, str)]
+
+
 def require_wallet_auth(f):
     """Decorator that requires server-signed wallet unlock state."""
     @wraps(f)
@@ -311,17 +364,6 @@ def require_wallet_auth(f):
         g.auth_method = 'wallet_passkey'
         g.permissions = []
         
-        # Optional: attach unverified client-provided permissions (local model)
-        auth_proof = request.headers.get('X-Wallet-Auth')
-        if auth_proof:
-            try:
-                parsed = json.loads(auth_proof)
-                validation = validate_wallet_auth_proof(parsed)
-                if validation['valid']:
-                    g.permissions = validation.get('permissions', [])
-            except Exception:
-                pass
-        
         return f(*args, **kwargs)
     
     return decorated_function
@@ -333,6 +375,20 @@ def require_permission(permission_id: str):
         @wraps(f)
         @require_wallet_auth
         def decorated_function(*args, **kwargs):
+            try:
+                lemmas = _get_wallet_lemmas()
+                valid_lemmas = _verify_lemmas_rust(lemmas)
+                permissions = []
+                for lemma in valid_lemmas:
+                    permissions.extend(_extract_permissions_from_lemma(lemma))
+                g.permissions = permissions
+            except RuntimeError:
+                return jsonify({
+                    'success': False,
+                    'error': 'verification_unavailable',
+                    'message': 'Rust verifier required for permission checks'
+                }), 503
+            
             if permission_id not in g.permissions:
                 return jsonify({
                     'success': False,
