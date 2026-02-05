@@ -283,8 +283,53 @@ if (result.authenticated) {
 <script nonce="{{ csp_nonce }}">
 const siteId = '{{ site_id }}';
 const currentTab = '{{ tab }}';
+let currentPpid = null;
+
+// Get authenticated PPID from wallet
+async function getWalletPpid() {
+    if (typeof LemmaWallet === 'undefined') {
+        console.warn('LemmaWallet not available');
+        return null;
+    }
+    
+    try {
+        const wallet = new LemmaWallet();
+        await wallet.init();
+        
+        // Fast path: use existing session
+        if (wallet.session?.isUnlocked && wallet.session?.expiresAt > Date.now()) {
+            const ppid = await wallet.derivePPID('lemma.id');
+            console.log('[Detail] Using existing session, PPID:', ppid?.substring(0, 30) + '...');
+            return ppid;
+        }
+        
+        // Try autoAuthenticate
+        const authResult = await wallet.autoAuthenticate();
+        if (authResult.authenticated) {
+            const ppid = await wallet.derivePPID('lemma.id');
+            return ppid;
+        }
+        
+        console.warn('[Detail] Not authenticated');
+        return null;
+    } catch (e) {
+        console.warn('[Detail] Auth failed:', e);
+        return null;
+    }
+}
+
+function getAuthHeaders() {
+    const headers = { 'Content-Type': 'application/json' };
+    if (currentPpid) {
+        headers['X-Lemma-PPID'] = currentPpid;
+    }
+    return headers;
+}
 
 document.addEventListener('DOMContentLoaded', async () => {
+    // Get PPID first
+    currentPpid = await getWalletPpid();
+    
     await loadSiteDetails();
     
     if (currentTab === 'overview') {
@@ -300,7 +345,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 async function loadSiteDetails() {
     try {
-        const response = await fetch(`/api/developer/sites/${encodeURIComponent(siteId)}`);
+        const response = await fetch(`/api/developer/sites/${encodeURIComponent(siteId)}`, {
+            headers: getAuthHeaders()
+        });
         if (!response.ok) throw new Error('Site not found');
         
         const data = await response.json();
@@ -321,7 +368,9 @@ async function loadSiteDetails() {
 
 async function loadSiteStats() {
     try {
-        const response = await fetch(`/api/developer/sites/${encodeURIComponent(siteId)}/stats`);
+        const response = await fetch(`/api/developer/sites/${encodeURIComponent(siteId)}/stats`, {
+            headers: getAuthHeaders()
+        });
         const data = await response.json();
         
         document.getElementById('stat-verifications').textContent = formatNumber(data.verifications || 0);
@@ -336,7 +385,9 @@ async function loadSiteStats() {
 
 async function loadIssuerDid() {
     try {
-        const response = await fetch(`/api/developer/sites/${encodeURIComponent(siteId)}`);
+        const response = await fetch(`/api/developer/sites/${encodeURIComponent(siteId)}`, {
+            headers: getAuthHeaders()
+        });
         const data = await response.json();
         
         const issuerInput = document.getElementById('issuer-did-input');
@@ -352,7 +403,9 @@ async function loadApiKeys() {
     const container = document.getElementById('api-keys-container');
     
     try {
-        const response = await fetch(`/api/developer/sites/${encodeURIComponent(siteId)}/keys`);
+        const response = await fetch(`/api/developer/sites/${encodeURIComponent(siteId)}/keys`, {
+            headers: getAuthHeaders()
+        });
         const data = await response.json();
         const keys = data.keys || [];
         
@@ -396,7 +449,9 @@ async function loadUsers() {
     const container = document.getElementById('users-container');
     
     try {
-        const response = await fetch(`/api/developer/sites/${encodeURIComponent(siteId)}/users`);
+        const response = await fetch(`/api/developer/sites/${encodeURIComponent(siteId)}/users`, {
+            headers: getAuthHeaders()
+        });
         const data = await response.json();
         const users = data.users || [];
         
@@ -506,7 +561,7 @@ async function createApiKey(name) {
     try {
         const response = await fetch(`/api/developer/sites/${encodeURIComponent(siteId)}/keys`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: getAuthHeaders(),
             body: JSON.stringify({ name })
         });
         
@@ -526,7 +581,8 @@ async function revokeKey(keyId) {
     
     try {
         await fetch(`/api/developer/sites/${encodeURIComponent(siteId)}/keys/${keyId}`, {
-            method: 'DELETE'
+            method: 'DELETE',
+            headers: getAuthHeaders()
         });
         loadApiKeys();
     } catch (e) {
