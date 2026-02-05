@@ -218,6 +218,23 @@ function getAuthHeaders() {
 async function loadSites() {
     const container = document.getElementById('sites-container');
     
+    // Check if user is authenticated
+    if (!currentPpid) {
+        container.innerHTML = `
+            <div class="dev-card">
+                <div class="dev-card-body">
+                    <div class="dev-empty">
+                        <div class="dev-empty-icon">🔒</div>
+                        <div class="dev-empty-title">Sign in required</div>
+                        <div class="dev-empty-text">You need to unlock your Lemma wallet to access developer features.</div>
+                        <button class="dev-btn dev-btn-primary" onclick="signInAndRetry()">Sign In with Lemma</button>
+                    </div>
+                </div>
+            </div>
+        `;
+        return;
+    }
+    
     try {
         const response = await fetch('/api/developer/sites', {
             headers: getAuthHeaders()
@@ -263,6 +280,25 @@ async function loadSites() {
                 </div>
             </div>
         `;
+    }
+}
+
+async function signInAndRetry() {
+    try {
+        const wallet = new LemmaWallet();
+        const result = await wallet.unlock();
+        
+        if (result.success) {
+            // Re-authenticate and reload
+            currentPpid = await getWalletPpid();
+            loadSites();
+        } else {
+            // Redirect to sign in page
+            window.location.href = '/app?return_to=' + encodeURIComponent(window.location.href);
+        }
+    } catch (e) {
+        console.error('Sign in failed:', e);
+        window.location.href = '/app?return_to=' + encodeURIComponent(window.location.href);
     }
 }
 
