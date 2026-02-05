@@ -301,12 +301,42 @@ class LemmaWallet {
         // ============================================================
         
         // ============================================================
-        // THIRD-PARTY SITES: Local lemma verification only
+        // THIRD-PARTY SITES: Check session + lemmas
         // ============================================================
         if (!this._isLemmaDomain()) {
-            console.log('[Lemma] Third-party site: using local-only verification');
+            console.log('[Lemma] Third-party site: checking authorization...');
             
-            // Try local authorization (checks session + lemmas, NO network)
+            // CRITICAL: Check for redirect return FIRST
+            // User may be returning from lemma.id after unlock
+            const urlParams = new URLSearchParams(window.location.search);
+            if (urlParams.get('lemma_unlocked') === '1' || urlParams.get('lemma_token')) {
+                console.log('[Lemma] Detected redirect return - processing...');
+                try {
+                    const redirectResult = await this.checkRedirectReturn();
+                    if (redirectResult.success && redirectResult.authenticated) {
+                        console.log('[Lemma] ✅ Redirect processed - returning session');
+                        
+                        // Start listening for lock events
+                        this._setupLockEventListener();
+                        
+                        // Return the wallet_secret so site can issue lemma
+                        // This is needed for first-time visits (no lemma yet)
+                        return {
+                            authenticated: true,
+                            needsPasskey: false,
+                            needsRedirect: false,
+                            walletSecret: redirectResult.walletSecret,
+                            walletId: redirectResult.walletId,
+                            message: 'Authenticated via redirect',
+                            source: 'redirect'
+                        };
+                    }
+                } catch (e) {
+                    console.warn('[Lemma] Redirect processing failed:', e.message);
+                }
+            }
+            
+            // Try local authorization (checks session + lemmas)
             const authResult = await this.verifyLocalAuthorization();
             
             if (authResult.authorized) {
@@ -327,6 +357,44 @@ class LemmaWallet {
                 return result;
             }
             
+            // Not authorized via lemma - check if we have a valid session with wallet_secret
+            // This handles returning users who have unlocked but site hasn't issued lemma yet
+            if (this.session.isUnlocked && this.session.walletSecret) {
+                console.log('[Lemma] ✅ No lemma but have valid session - returning wallet_secret for lemma issuance');
+                
+                this._setupLockEventListener();
+                
+                return {
+                    authenticated: true,
+                    needsPasskey: false,
+                    needsRedirect: false,
+                    walletSecret: this.session.walletSecret,
+                    walletId: this.session.walletId,
+                    message: 'Session valid - issue lemma to complete authorization',
+                    source: 'session'
+                };
+            }
+            
+            // Check if we have wallet_secret in storage (from previous redirect)
+            try {
+                const secretRecord = await this._get('secrets', 'master');
+                if (secretRecord?.secret && this.session.isUnlocked) {
+                    console.log('[Lemma] ✅ Found stored wallet_secret - returning for lemma issuance');
+                    
+                    this._setupLockEventListener();
+                    
+                    return {
+                        authenticated: true,
+                        needsPasskey: false,
+                        needsRedirect: false,
+                        walletSecret: secretRecord.secret,
+                        walletId: this.session.walletId,
+                        message: 'Session valid - issue lemma to complete authorization',
+                        source: 'stored_secret'
+                    };
+                }
+            } catch (e) {}
+            
             // Not authorized - check why and recommend action
             if (authResult.reason === 'wallet_locked' || authResult.reason === 'session_expired') {
                 console.log('[Lemma] Wallet locked/expired - redirect to unlock');
@@ -337,7 +405,7 @@ class LemmaWallet {
             }
             
             if (authResult.reason === 'no_lemma') {
-                console.log('[Lemma] No lemma for this site - redirect to get one');
+                console.log('[Lemma] No lemma and no session - redirect to sign in');
                 result.needsRedirect = true;
                 result.needsPasskey = false;
                 result.message = 'Sign in with Lemma to access this site';
@@ -1321,10 +1389,10 @@ class LemmaWallet {
 
             request.onerror = () => reject(request.error);
             
-            request.onsuccess = () => {
+            request.onsuccess = async () => {
                 this.db = request.result;
                 this._initialized = true;
-                this._checkSessionState();
+                await this._checkSessionState();
                 resolve();
             };
 
