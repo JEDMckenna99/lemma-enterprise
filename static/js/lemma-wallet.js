@@ -1270,25 +1270,23 @@ class LemmaWallet {
                 }
                 
                 if (walletId) {
-                    // Only check global session if we GOT our session from cross-device sync
-                    // These sources are authoritative and don't need global validation:
-                    // - 'local', 'passkey', 'local_passkey': User authenticated locally with passkey
-                    // - 'bridge': Bridge iframe validated the session (has the secret)
-                    // - 'redirect': User just authenticated via redirect from lemma.id
-                    // Only 'global_sync' needs validation (session from another device's unlock)
+                    // Check global session to detect remote locks
+                    // Only skip for local passkey sessions on THIS device
+                    // (those are truly authoritative - user proved presence with biometrics)
                     const sessionSource = this.session.source;
-                    const authoritativeSources = ['local', 'passkey', 'local_passkey', 'bridge', 'redirect'];
-                    const requiresGlobalValidation = !authoritativeSources.includes(sessionSource);
+                    const localOnlySources = ['local', 'passkey', 'local_passkey'];
+                    const skipGlobalCheck = localOnlySources.includes(sessionSource);
 
-                    if (requiresGlobalValidation) {
+                    if (!skipGlobalCheck) {
+                        console.log('[Lemma] Checking global session for lock detection (source:', sessionSource, ')');
                         const globalSession = await this._checkGlobalSession(walletId);
 
                         if (!globalSession.valid) {
-                            console.log('[Lemma] Wallet locked on another device (source was:', sessionSource, ')');
+                            console.log('[Lemma] 🔒 Wallet locked remotely! Clearing local session.');
                             await this._clearSessionGracefully('wallet_locked', 'Your wallet was locked on another device.');
+                            return;
                         }
                     }
-                    // Authoritative sessions are valid regardless of global state
                 }
             } catch (e) {
                 // Network issues shouldn't cause sign-out - fail silently
