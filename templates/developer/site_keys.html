@@ -152,13 +152,51 @@
 <script nonce="{{ csp_nonce }}">
 const SITE_ID = '{{ site_id }}';
 let newKeyValue = '';
+let currentPpid = null;
 
-document.addEventListener('DOMContentLoaded', () => {
+// Get authenticated PPID from wallet
+async function initAuth() {
+    if (typeof LemmaWallet === 'undefined') {
+        console.warn('[Keys] LemmaWallet not available');
+        return;
+    }
+    
+    try {
+        const wallet = new LemmaWallet();
+        await wallet.init();
+        
+        // Fast path: use existing session
+        if (wallet.session?.isUnlocked && wallet.session?.expiresAt > Date.now()) {
+            currentPpid = await wallet.derivePPID('lemma.id');
+            console.log('[Keys] Using existing session, PPID:', currentPpid?.substring(0, 30) + '...');
+            return;
+        }
+        
+        // Try autoAuthenticate
+        const authResult = await wallet.autoAuthenticate();
+        if (authResult.authenticated) {
+            currentPpid = await wallet.derivePPID('lemma.id');
+            console.log('[Keys] Authenticated via autoAuthenticate');
+            return;
+        }
+        
+        console.warn('[Keys] Not authenticated');
+    } catch (e) {
+        console.warn('[Keys] Auth failed:', e);
+    }
+}
+
+document.addEventListener('DOMContentLoaded', async () => {
+    await initAuth();
     loadKeys();
 });
 
 async function getAuthHeaders() {
-    return { 'Content-Type': 'application/json' };
+    const headers = { 'Content-Type': 'application/json' };
+    if (currentPpid) {
+        headers['X-Lemma-PPID'] = currentPpid;
+    }
+    return headers;
 }
 
 async function loadKeys() {
