@@ -286,7 +286,10 @@ def create_developer_site():
                 site_id=site_id,
                 site_domain=domain,
                 company_name=name or domain,
-                environment=environment,
+                admin_email=ppid or '',  # Will be updated from wallet profile
+                api_key=f"lm_{secrets.token_urlsafe(32)}",  # Auto-generate API key
+                oauth_client_id=f"oc_{secrets.token_urlsafe(16)}",
+                oauth_client_secret=secrets.token_urlsafe(32),
                 created_at=datetime.utcnow()
             )
             db.add(new_site)
