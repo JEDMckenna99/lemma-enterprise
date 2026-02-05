@@ -191,38 +191,57 @@ async function getWalletPpid() {
     
     try {
         const wallet = new LemmaWallet();
+        await wallet.init();
         
-        // First check if already authenticated
+        // DEBUG: Check what's in the session after init
+        console.log('[Developer] Session state after init:', {
+            isUnlocked: wallet.session?.isUnlocked,
+            expiresAt: wallet.session?.expiresAt,
+            hasSecret: !!wallet.session?.walletSecret,
+            source: wallet.session?.source
+        });
+        
+        // FAST PATH: If session is already valid, use it directly
+        // This avoids calling autoAuthenticate which does extra checks
+        if (wallet.session?.isUnlocked && wallet.session?.expiresAt > Date.now()) {
+            console.log('[Developer] ✅ Using existing session (fast path)');
+            const ppid = await wallet.derivePPID('lemma.id');
+            console.log('[Developer] PPID:', ppid);
+            return ppid;
+        }
+        
+        // Session not loaded - try autoAuthenticate (checks global session too)
+        console.log('[Developer] No local session - trying autoAuthenticate...');
         const authResult = await wallet.autoAuthenticate();
         
         if (authResult.authenticated) {
             const ppid = await wallet.derivePPID('lemma.id');
-            console.log('Developer authenticated via existing session, PPID:', ppid);
+            console.log('[Developer] Authenticated via autoAuthenticate, PPID:', ppid);
             return ppid;
         }
         
-        // Not authenticated via session - but we're on lemma.id
-        // If user has a passkey, automatically unlock (seamless flow)
-        console.log('No active session - attempting automatic passkey unlock...');
+        // Still not authenticated - check if we have a passkey to unlock with
+        // This should only happen if session expired or was never created
+        console.log('[Developer] autoAuthenticate returned:', authResult);
+        console.log('[Developer] Checking if passkey exists for manual unlock...');
         
         try {
             const unlockResult = await wallet.unlock();
             
             if (unlockResult.success) {
                 const ppid = await wallet.derivePPID('lemma.id');
-                console.log('Developer authenticated via passkey unlock, PPID:', ppid);
+                console.log('[Developer] Authenticated via passkey unlock, PPID:', ppid);
                 return ppid;
             }
         } catch (unlockError) {
-            // User cancelled passkey or no passkey exists - show manual sign-in
-            console.warn('Auto-unlock failed:', unlockError.message);
+            console.warn('[Developer] Passkey unlock failed:', unlockError.message);
         }
         
-        console.warn('Wallet not authenticated - manual sign-in required');
+        console.warn('[Developer] Could not authenticate - no valid session or passkey');
         return null;
         
     } catch (e) {
-        console.warn('Wallet auth check failed:', e);
+        console.warn('[Developer] Auth failed:', e);
     }
     
     return null;

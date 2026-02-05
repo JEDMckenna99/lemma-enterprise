@@ -1,7 +1,7 @@
 // Lemma Service Worker - Minimal Implementation
 // This prevents service worker errors and provides basic caching
 
-const CACHE_NAME = 'lemma-v11';  // v2.45.0 - Simplified local-only verification for third-party sites
+const CACHE_NAME = 'lemma-v12';  // v2.46.0 - Session persistence debugging
 const STATIC_ASSETS = [
   '/static/css/lemma.css',
   '/static/js/lemma-wallet.js',

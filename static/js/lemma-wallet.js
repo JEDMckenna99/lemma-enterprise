@@ -1518,6 +1518,16 @@ class LemmaWallet {
             }
             
             const storedSession = await this._get('session', 'current');
+            
+            // DEBUG: Log what we found in IndexedDB
+            console.log('[Lemma] _checkSessionState: stored session:', storedSession ? {
+                isUnlocked: storedSession.isUnlocked,
+                expiresAt: storedSession.expiresAt,
+                expired: storedSession.expiresAt ? storedSession.expiresAt < Date.now() : 'no expiry',
+                hasSecret: !!storedSession.walletSecret,
+                source: storedSession.source
+            } : 'none');
+            
             if (storedSession && storedSession.expiresAt > Date.now()) {
                 this.session = {
                     isUnlocked: true,
@@ -1527,6 +1537,7 @@ class LemmaWallet {
                     walletSecret: storedSession.walletSecret,
                     source: storedSession.source || 'local'
                 };
+                console.log('[Lemma] ✅ Session restored from IndexedDB - isUnlocked:', this.session.isUnlocked);
                 
                 // AUTO-START HEARTBEAT on third-party sites with existing session
                 // This ensures lock detection works even after page refresh
@@ -1534,9 +1545,11 @@ class LemmaWallet {
                     console.log('[Lemma] Existing session found on third-party site - starting heartbeat');
                     this._autoStartHeartbeat();
                 }
+            } else if (storedSession && storedSession.expiresAt <= Date.now()) {
+                console.log('[Lemma] Session expired - was valid until:', new Date(storedSession.expiresAt).toISOString());
             }
         } catch (e) {
-            // No stored session, that's fine
+            console.warn('[Lemma] _checkSessionState error:', e);
         }
     }
 
