@@ -4741,13 +4741,12 @@ class LemmaWallet {
         
         // Check for existing wallet
         const existingSecret = await this._get('secrets', 'master');
-        const existingPasskey = await this._get('passkey', 'primary');
         const existingWalletId = await this._get('passkey', 'walletId');
         
         if (existingSecret?.secret) {
-            // Case 1: Same wallet - already linked
+            // Same wallet - already linked
             if (existingSecret.secret === payload.walletSecret) {
-                console.log('[Lemma] Wallet already linked to this device');
+                console.log('[Lemma] ✅ Wallet already linked to this device');
                 return {
                     success: true,
                     alreadyLinked: true,
@@ -4756,32 +4755,15 @@ class LemmaWallet {
                 };
             }
             
-            // Case 2: Orphaned wallet (has secret but no passkey) - safe to auto-replace
-            if (!existingPasskey?.credentialId) {
-                console.log('[Lemma] Replacing orphaned wallet (no passkey registered)');
-                await this._clearWalletData();
-                // Continue to link below
-            }
-            // Case 3: Different active wallet with passkey - need user confirmation
-            else if (!options.replaceExisting) {
-                console.log('[Lemma] Wallet conflict detected - different active wallet exists');
-                return {
-                    success: false,
-                    conflict: true,
-                    existingWalletId: existingWalletId?.value || 'unknown',
-                    existingHasPasskey: true,
-                    incomingWalletId: payload.walletId,
-                    message: 'This device has a different wallet. Choose to replace it or keep the existing one.',
-                    options: ['replace', 'cancel']
-                };
-            }
-            // Case 4: User explicitly chose to replace
-            else {
-                console.log('[Lemma] User chose to replace existing wallet');
-                // Backup before clearing (stored in localStorage for recovery)
-                await this._backupWalletData();
-                await this._clearWalletData();
-            }
+            // Different wallet - auto-replace with backup (simplest UX)
+            // User can recover old wallet from backup if needed
+            console.log('[Lemma] 🔄 Replacing existing wallet (backed up for recovery)');
+            console.log('[Lemma]    Old wallet:', existingWalletId?.value?.substring(0, 16) + '...');
+            console.log('[Lemma]    New wallet:', payload.walletId?.substring(0, 16) + '...');
+            
+            // Backup before clearing (stored in localStorage)
+            await this._backupWalletData();
+            await this._clearWalletData();
         }
         
         // Create or update profile with the linked wallet secret
