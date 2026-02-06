@@ -704,7 +704,20 @@ async function handleRedirectReturn(returnUrl) {
     const info = await wallet.getWalletInfo();
     let walletSecret = await wallet.getWalletSecret();
     
-    if (!walletSecret) return;
+    // Fallback: try to get secret from session or IndexedDB directly
+    if (!walletSecret) {
+        console.warn('[Redirect] getWalletSecret returned null, trying fallback...');
+        try {
+            walletSecret = wallet.session?.walletSecret;
+        } catch(e) {}
+    }
+    
+    if (!walletSecret) {
+        console.error('[Redirect] No wallet secret available - cannot complete redirect');
+        return;
+    }
+    
+    console.log('[Redirect] Completing redirect to:', returnUrl);
     
     // Get unlock_token from current session (for set-session security)
     // This endpoint validates the session cookie and returns a fresh unlock_token
@@ -790,8 +803,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     
     // If redirect flow and already unlocked, redirect immediately
     if (redirectParams && isUnlocked) {
+        console.log('[App] Wallet unlocked + redirect_flow detected - auto-redirecting back to:', redirectParams.returnUrl);
         await handleRedirectReturn(redirectParams.returnUrl);
         return;
+    } else if (redirectParams && !isUnlocked) {
+        console.log('[App] Redirect flow detected but wallet not unlocked yet - user needs to sign in');
     }
     
     // CROSS-DEVICE LOCK DETECTION: Check when tab becomes visible
