@@ -390,12 +390,15 @@ def complete_recovery():
     """
     Complete account recovery - issue admin lemma directly.
     
-    The recovery token proves identity (API key + email confirmation).
-    No passkey is required - the passkey only affects wallet lock/unlock state.
+    Identity is already proven by two factors:
+      1. API key (proves site ownership)
+      2. Email confirmation (proves they control the admin email)
+    
+    No passkey is required. The passkey only affects wallet lock/unlock state.
     This endpoint issues the admin proof and returns it for wallet storage.
     
     Optionally accepts a wallet PPID to bind the credential to and update site_admins.
-    If no PPID provided, issues to an email-derived DID (wallet can re-derive later).
+    If no PPID provided, issues to an email-derived DID.
     """
     try:
         data = request.get_json() or {}
@@ -457,7 +460,7 @@ def complete_recovery():
             _update_site_admin_ppid(site_id, admin_email, ppid)
             _update_all_admin_sites(admin_email, ppid, exclude_site_id=site_id)
         
-        # Store recovery context in session (for dashboard redirect)
+        # Store recovery context in session (for dashboard access)
         from flask import session as flask_session
         flask_session['recovery_complete'] = True
         flask_session['recovery_site_id'] = site_id

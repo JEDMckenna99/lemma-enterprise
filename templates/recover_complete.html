@@ -97,13 +97,8 @@
             padding: 8px 0;
         }
         
-        .site-info-row:first-child {
-            padding-top: 0;
-        }
-        
-        .site-info-row:last-child {
-            padding-bottom: 0;
-        }
+        .site-info-row:first-child { padding-top: 0; }
+        .site-info-row:last-child { padding-bottom: 0; }
         
         .site-info-label {
             color: #64748b;
@@ -163,30 +158,10 @@
         
         #loading-state,
         #error-state,
-        #success-state {
+        #success-state,
+        #confirm-state {
             display: none;
         }
-        
-        .step-log {
-            background: #f8fafc;
-            border-radius: 8px;
-            padding: 12px 16px;
-            margin: 16px 0;
-            text-align: left;
-            font-size: 13px;
-            color: #475569;
-            line-height: 1.8;
-        }
-        
-        .step-log .step {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-        
-        .step-log .step.done { color: #059669; }
-        .step-log .step.active { color: #667eea; font-weight: 500; }
-        .step-log .step.pending { color: #94a3b8; }
     </style>
 </head>
 <body>
@@ -196,7 +171,7 @@
             <p>Account Recovery</p>
         </div>
         
-        <!-- Loading / Processing State -->
+        <!-- Loading State -->
         <div id="loading-state">
             <div class="status-icon loading">
                 <svg class="spinner" viewBox="0 0 24 24" fill="none" stroke="#667eea" stroke-width="2">
@@ -204,15 +179,8 @@
                     <path d="M12 2a10 10 0 0 1 10 10" stroke-linecap="round"></path>
                 </svg>
             </div>
-            <h2 class="status-title" id="loading-title">Restoring access...</h2>
-            <p class="status-message" id="loading-message">Verifying your recovery link and reissuing your admin proof.</p>
-            
-            <div class="step-log" id="step-log">
-                <div class="step active" id="step-validate">Validating recovery link...</div>
-                <div class="step pending" id="step-wallet">Checking wallet...</div>
-                <div class="step pending" id="step-issue">Issuing admin proof...</div>
-                <div class="step pending" id="step-store">Storing in wallet...</div>
-            </div>
+            <h2 class="status-title">Validating...</h2>
+            <p class="status-message">Please wait while we verify your recovery link.</p>
         </div>
         
         <!-- Error State -->
@@ -224,11 +192,40 @@
                     <line x1="9" y1="9" x2="15" y2="15"></line>
                 </svg>
             </div>
-            <h2 class="status-title">Recovery Failed</h2>
+            <h2 class="status-title">Link Invalid</h2>
             <p class="status-message" id="error-message">This recovery link is invalid or has expired.</p>
             <a href="/recover" class="action-btn" style="text-decoration: none; display: inline-block;">
                 Request New Link
             </a>
+        </div>
+        
+        <!-- Confirm State - identity verified, ready to restore -->
+        <div id="confirm-state">
+            <div class="status-icon loading">
+                <svg viewBox="0 0 24 24" fill="none" stroke="#667eea" stroke-width="2">
+                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+                    <polyline points="9 12 12 15 16 10" stroke-linecap="round" stroke-linejoin="round"></polyline>
+                </svg>
+            </div>
+            <h2 class="status-title">Identity Verified</h2>
+            <p class="status-message">Your API key and email have been confirmed. Click below to restore your admin access.</p>
+            
+            <div class="site-info">
+                <div class="site-info-row">
+                    <span class="site-info-label">Site ID</span>
+                    <span class="site-info-value" id="site-id-display">-</span>
+                </div>
+                <div class="site-info-row">
+                    <span class="site-info-label">Admin Email</span>
+                    <span class="site-info-value" id="email-display">-</span>
+                </div>
+            </div>
+            
+            <button class="action-btn" id="restore-btn">
+                Restore Admin Access
+            </button>
+            
+            <a href="/recover" class="secondary-btn">Cancel</a>
         </div>
         
         <!-- Success State -->
@@ -239,18 +236,7 @@
                 </svg>
             </div>
             <h2 class="status-title">Admin Access Restored</h2>
-            <p class="status-message" id="success-message">Your admin proof has been reissued for your site.</p>
-            
-            <div class="site-info" id="success-site-info" style="display: none;">
-                <div class="site-info-row">
-                    <span class="site-info-label">Site</span>
-                    <span class="site-info-value" id="success-site-id">-</span>
-                </div>
-                <div class="site-info-row">
-                    <span class="site-info-label">Credential</span>
-                    <span class="site-info-value" id="success-credential-id">-</span>
-                </div>
-            </div>
+            <p class="status-message" id="success-message">Your admin lemma has been reissued. You can now access your developer dashboard.</p>
             
             <a href="/developer" class="action-btn" style="text-decoration: none; display: inline-block;">
                 Go to Developer Dashboard
@@ -266,41 +252,21 @@
         
         const loadingState = document.getElementById('loading-state');
         const errorState = document.getElementById('error-state');
+        const confirmState = document.getElementById('confirm-state');
         const successState = document.getElementById('success-state');
         
-        function setStep(stepId, status) {
-            const el = document.getElementById(stepId);
-            if (!el) return;
-            el.className = 'step ' + status;
-            if (status === 'done') {
-                el.innerHTML = '&#10003; ' + el.textContent;
-            }
-        }
+        let siteData = null;
+        let wallet = null;
         
         function showError(message) {
             loadingState.style.display = 'none';
+            confirmState.style.display = 'none';
             document.getElementById('error-message').textContent = message;
             errorState.style.display = 'block';
         }
         
-        function showSuccess(siteId, credentialId, message) {
-            loadingState.style.display = 'none';
-            
-            if (message) {
-                document.getElementById('success-message').textContent = message;
-            }
-            
-            if (siteId) {
-                document.getElementById('success-site-id').textContent = siteId;
-                document.getElementById('success-credential-id').textContent = 
-                    credentialId ? credentialId.substring(0, 20) + '...' : 'Issued';
-                document.getElementById('success-site-info').style.display = 'block';
-            }
-            
-            successState.style.display = 'block';
-        }
-        
-        async function runRecovery() {
+        // Step 1: Validate the recovery token
+        async function validateToken() {
             loadingState.style.display = 'block';
             
             if (!token) {
@@ -308,134 +274,109 @@
                 return;
             }
             
-            // Step 1: Validate the token
-            setStep('step-validate', 'active');
-            
-            let tokenData;
             try {
-                const validateResponse = await fetch('/api/recovery/validate', {
+                // Initialize wallet SDK in parallel (non-blocking)
+                try {
+                    if (typeof LemmaWallet !== 'undefined') {
+                        wallet = new LemmaWallet({ siteId: 'lemma.id', debug: false });
+                        await wallet.init();
+                    }
+                } catch (e) {
+                    console.log('[Recovery] Wallet SDK init:', e.message);
+                }
+                
+                // Validate token with server
+                const response = await fetch('/api/recovery/validate', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ token })
                 });
                 
-                tokenData = await validateResponse.json();
+                const data = await response.json();
                 
-                if (!tokenData.success) {
-                    showError(tokenData.error || 'Invalid or expired recovery link.');
-                    return;
+                if (data.success) {
+                    siteData = data;
+                    loadingState.style.display = 'none';
+                    document.getElementById('site-id-display').textContent = data.site_id;
+                    document.getElementById('email-display').textContent = data.email;
+                    confirmState.style.display = 'block';
+                } else {
+                    showError(data.error || 'Invalid or expired token.');
                 }
                 
-                setStep('step-validate', 'done');
-                console.log('[Recovery] Token validated for site:', tokenData.site_id);
-                
             } catch (err) {
-                console.error('[Recovery] Token validation failed:', err);
+                console.error('[Recovery] Validation error:', err);
                 showError('Failed to validate recovery link.');
-                return;
             }
-            
-            // Step 2: Try to initialize wallet and get PPID (optional)
-            setStep('step-wallet', 'active');
-            
-            let wallet = null;
-            let ppid = null;
+        }
+        
+        // Step 2: Complete recovery - issue admin lemma
+        async function restoreAccess() {
+            const btn = document.getElementById('restore-btn');
+            btn.disabled = true;
+            btn.textContent = 'Restoring...';
             
             try {
-                if (typeof LemmaWallet !== 'undefined') {
-                    wallet = new LemmaWallet({ siteId: 'lemma.id', debug: false });
-                    await wallet.init();
-                    
-                    // Check if wallet is unlocked
-                    const authState = await wallet.getAuthState();
-                    
-                    if (authState.isUnlocked) {
-                        ppid = await wallet.derivePPID('lemma.id');
-                        console.log('[Recovery] Wallet unlocked, PPID:', ppid?.substring(0, 30) + '...');
-                    } else if (wallet.session?.isUnlocked) {
-                        ppid = await wallet.derivePPID('lemma.id');
-                        console.log('[Recovery] Wallet session unlocked, PPID:', ppid?.substring(0, 30) + '...');
-                    } else {
-                        // Try autoAuthenticate (checks global session)
-                        const authResult = await wallet.autoAuthenticate();
-                        if (authResult.authenticated) {
+                // Try to get wallet PPID if wallet is unlocked (optional)
+                let ppid = null;
+                try {
+                    if (wallet) {
+                        const authState = await wallet.getAuthState();
+                        if (authState.isUnlocked || (wallet.session && wallet.session.isUnlocked)) {
                             ppid = await wallet.derivePPID('lemma.id');
-                            console.log('[Recovery] Wallet auto-authenticated, PPID:', ppid?.substring(0, 30) + '...');
+                            console.log('[Recovery] Wallet PPID:', ppid?.substring(0, 30) + '...');
                         }
                     }
-                }
-            } catch (err) {
-                console.log('[Recovery] Wallet init (non-fatal):', err.message);
-            }
-            
-            setStep('step-wallet', 'done');
-            
-            // Step 3: Complete recovery - this issues the admin lemma
-            setStep('step-issue', 'active');
-            
-            let recoveryData;
-            try {
-                const body = { token };
-                if (ppid) {
-                    body.ppid = ppid;
+                } catch (e) {
+                    console.log('[Recovery] PPID derivation skipped:', e.message);
                 }
                 
+                // Call complete recovery - issues admin lemma directly
                 const response = await fetch('/api/recovery/complete', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     credentials: 'include',
-                    body: JSON.stringify(body)
+                    body: JSON.stringify({
+                        token: token,
+                        ppid: ppid || ''
+                    })
                 });
                 
-                recoveryData = await response.json();
+                const data = await response.json();
                 
-                if (!recoveryData.success) {
-                    showError(recoveryData.error || 'Failed to issue admin proof.');
-                    return;
+                if (!data.success) {
+                    throw new Error(data.error || 'Recovery failed');
                 }
                 
-                setStep('step-issue', 'done');
-                console.log('[Recovery] Admin proof issued:', recoveryData.credential_id);
+                console.log('[Recovery] Admin lemma issued:', data.credential_id);
+                
+                // Store credential in wallet if available
+                if (data.credential && wallet) {
+                    try {
+                        if (wallet.storeCredential) {
+                            await wallet.storeCredential(data.credential);
+                            console.log('[Recovery] Admin lemma stored in wallet');
+                        }
+                    } catch (e) {
+                        console.warn('[Recovery] Wallet store skipped:', e.message);
+                    }
+                }
+                
+                // Show success
+                confirmState.style.display = 'none';
+                successState.style.display = 'block';
                 
             } catch (err) {
-                console.error('[Recovery] Recovery completion failed:', err);
-                showError('Failed to complete recovery. Please try again.');
-                return;
+                console.error('[Recovery] Restore error:', err);
+                alert(err.message || 'Recovery failed. Please try again.');
+                btn.disabled = false;
+                btn.textContent = 'Restore Admin Access';
             }
-            
-            // Step 4: Store credential in wallet (if wallet is available)
-            setStep('step-store', 'active');
-            
-            let stored = false;
-            
-            if (wallet && recoveryData.credential) {
-                try {
-                    if (wallet.storeCredential) {
-                        await wallet.storeCredential(recoveryData.credential);
-                        stored = true;
-                        console.log('[Recovery] Admin proof stored in wallet');
-                    }
-                } catch (err) {
-                    console.warn('[Recovery] Could not store in wallet (non-fatal):', err.message);
-                }
-            }
-            
-            setStep('step-store', 'done');
-            
-            // Done - show success
-            const message = stored
-                ? 'Your admin proof has been reissued and stored in your wallet.'
-                : 'Your admin proof has been reissued. Sign in to your wallet to sync it.';
-            
-            showSuccess(
-                recoveryData.site_id || tokenData.site_id,
-                recoveryData.credential_id,
-                message
-            );
         }
         
-        // Start recovery immediately
-        runRecovery();
+        // Initialize
+        document.getElementById('restore-btn').addEventListener('click', restoreAccess);
+        validateToken();
     </script>
 </body>
 </html>
