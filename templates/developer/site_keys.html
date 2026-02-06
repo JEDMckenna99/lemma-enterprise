@@ -295,12 +295,12 @@ async function loadKeys() {
                         <code style="font-size: 12px; background: #f1f5f9; padding: 4px 8px; border-radius: 4px;">
                             ${escapeHtml(key.key_prefix)}
                         </code>
-                        <button class="copy-key-btn" data-action="view-full-key" data-key-id="${key.id}" title="View & Copy Full Key" style="padding: 4px 8px; background: #667eea; color: white; border: none; border-radius: 4px; font-size: 11px; cursor: pointer; display: flex; align-items: center; gap: 4px;">
-                            <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2">
-                                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-                                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                        <button class="copy-key-btn" data-action="view-full-key" data-key-id="${key.id}" title="View & Copy Full Key" style="padding: 6px 12px; background: #667eea; color: white; border: none; border-radius: 6px; font-size: 12px; cursor: pointer; display: flex; align-items: center; gap: 6px; font-weight: 500;">
+                            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                                <circle cx="12" cy="12" r="3"></circle>
                             </svg>
-                            Copy
+                            View & Copy
                         </button>
                     </div>
                 </td>
@@ -435,9 +435,14 @@ async function revokeKey(keyId, keyName) {
 
 let currentFullKey = '';
 
-function copySiteId() {
+async function copySiteId() {
     const siteId = SITE_ID;
-    navigator.clipboard.writeText(siteId).then(() => {
+    console.log('[Keys] Copying Site ID:', siteId);
+    
+    try {
+        await navigator.clipboard.writeText(siteId);
+        console.log('[Keys] Site ID copied successfully');
+        
         const btn = document.getElementById('copy-site-id-btn');
         const originalHtml = btn.innerHTML;
         btn.innerHTML = `
@@ -458,34 +463,64 @@ function copySiteId() {
         }, 2000);
         
         if (window.showToast) showToast('success', 'Copied!', 'Site ID copied to clipboard');
-    }).catch(err => {
-        console.error('Copy failed:', err);
+    } catch (err) {
+        console.error('[Keys] Clipboard API failed:', err);
+        // Fallback method
         const textarea = document.createElement('textarea');
         textarea.value = siteId;
+        textarea.style.position = 'fixed';
+        textarea.style.left = '-9999px';
         document.body.appendChild(textarea);
         textarea.select();
-        document.execCommand('copy');
+        try {
+            document.execCommand('copy');
+            console.log('[Keys] Fallback copy succeeded');
+            if (window.showToast) showToast('success', 'Copied!', 'Site ID copied to clipboard');
+        } catch (e) {
+            console.error('[Keys] Fallback copy failed:', e);
+            alert('Copy failed. Site ID: ' + siteId);
+        }
         document.body.removeChild(textarea);
-        if (window.showToast) showToast('success', 'Copied!', 'Site ID copied to clipboard');
-    });
+    }
 }
 
 async function viewFullKey(keyId) {
     try {
-        const response = await fetch(`/api/developer/sites/${SITE_ID}/keys/${keyId}/reveal`, {
-            headers: await getAuthHeaders()
-        });
-        const data = await response.json();
+        console.log('[Keys] Fetching full key for keyId:', keyId);
+        const headers = await getAuthHeaders();
+        console.log('[Keys] Using headers:', headers);
         
-        if (!data.success) throw new Error(data.error);
+        const response = await fetch(`/api/developer/sites/${SITE_ID}/keys/${keyId}/reveal`, {
+            method: 'GET',
+            headers: headers
+        });
+        
+        console.log('[Keys] Response status:', response.status);
+        const data = await response.json();
+        console.log('[Keys] Response data:', data);
+        
+        if (!data.success) throw new Error(data.error || 'Failed to retrieve key');
         
         currentFullKey = data.key;
         document.getElementById('full-key-value').textContent = data.key;
         document.getElementById('view-key-modal').style.display = 'block';
         
+        // Auto-copy to clipboard when modal opens
+        try {
+            await navigator.clipboard.writeText(data.key);
+            console.log('[Keys] Auto-copied to clipboard');
+            if (window.showToast) showToast('success', 'Copied!', 'API key copied to clipboard');
+        } catch (clipErr) {
+            console.log('[Keys] Auto-copy failed, user can manually copy');
+        }
+        
     } catch (e) {
-        console.error('Failed to get key:', e);
-        if (window.showToast) showToast('error', 'Error', e.message || 'Failed to retrieve key');
+        console.error('[Keys] Failed to get key:', e);
+        if (window.showToast) {
+            showToast('error', 'Error', e.message || 'Failed to retrieve key');
+        } else {
+            alert('Error: ' + (e.message || 'Failed to retrieve key'));
+        }
     }
 }
 
