@@ -332,6 +332,103 @@
         let siteData = null;
         let walletUnlocked = false;
         let wallet = null;
+        let recoverySessionEstablished = false;
+        let cachedRecoveryData = null;
+        
+        /**
+         * Establish recovery session (call /api/recovery/complete).
+         * Only calls the endpoint once - subsequent calls return cached data.
+         * This prevents "Token already used" errors when switching between
+         * passkey sign-in and register flows.
+         */
+        async function ensureRecoverySession() {
+            if (recoverySessionEstablished && cachedRecoveryData) {
+                console.log('[Recovery] Using cached recovery session');
+                return cachedRecoveryData;
+            }
+            
+            const recoveryResponse = await fetch('/api/recovery/complete', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify({ token: token })
+            });
+            
+            const recoveryData = await recoveryResponse.json();
+            if (!recoveryData.success) {
+                throw new Error(recoveryData.error || 'Recovery failed');
+            }
+            
+            recoverySessionEstablished = true;
+            cachedRecoveryData = recoveryData;
+            console.log('[Recovery] Recovery session established for site:', recoveryData.site_id);
+            return recoveryData;
+        }
+        
+        /**
+         * Request and store the admin proof (permission lemma) after recovery auth.
+         * This is the critical step that reissues the developer's admin credential.
+         * 
+         * @param {string} siteId - The recovered site ID
+         * @returns {boolean} true if credential was stored successfully
+         */
+        async function requestAndStoreAdminProof(siteId) {
+            try {
+                // Initialize wallet if not already done
+                if (!wallet && typeof LemmaWallet !== 'undefined') {
+                    wallet = new LemmaWallet({ siteId: 'lemma.id', debug: false });
+                    await wallet.init();
+                }
+                
+                if (!wallet) {
+                    console.warn('[Recovery] Wallet SDK not available - cannot store admin proof');
+                    return false;
+                }
+                
+                // Derive PPID for the site
+                const siteDomain = siteId; // site_id is typically the domain-derived ID
+                const ppid = await wallet.derivePPID('lemma.id');
+                
+                if (!ppid) {
+                    console.warn('[Recovery] Could not derive PPID - wallet may not be unlocked');
+                    return false;
+                }
+                
+                console.log('[Recovery] Requesting admin proof for site:', siteId, 'PPID:', ppid.substring(0, 30) + '...');
+                
+                // Call the recovery admin proof endpoint
+                const response = await fetch('/api/recovery/issue-admin-proof', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify({
+                        site_id: siteId,
+                        ppid: ppid
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success && data.credential) {
+                    console.log('[Recovery] Admin proof issued:', data.credential_id);
+                    
+                    // Store credential in wallet
+                    if (wallet.storeCredential) {
+                        await wallet.storeCredential(data.credential);
+                        console.log('[Recovery] Admin proof stored in wallet');
+                    }
+                    
+                    return true;
+                } else {
+                    console.warn('[Recovery] Failed to get admin proof:', data.error);
+                    return false;
+                }
+                
+            } catch (err) {
+                console.error('[Recovery] Admin proof request failed:', err);
+                return false;
+            }
+        }
         
         // Check if wallet session is synced/unlocked using the SDK
         async function checkWalletSession() {
@@ -458,18 +555,8 @@
                     throw new Error('Passkeys are not supported in this browser.');
                 }
                 
-                // Step 1: First complete recovery to establish session
-                const recoveryResponse = await fetch('/api/recovery/complete', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    credentials: 'include',
-                    body: JSON.stringify({ token: token })
-                });
-                
-                const recoveryData = await recoveryResponse.json();
-                if (!recoveryData.success) {
-                    throw new Error(recoveryData.error || 'Recovery failed');
-                }
+                // Step 1: Establish recovery session (only calls API once)
+                const recoveryData = await ensureRecoverySession();
                 
                 // Step 2: Get passkey registration options from server (includes challenge)
                 const beginResponse = await fetch('/api/passkey/register/begin', {
@@ -533,7 +620,21 @@
                 const completeData = await completeResponse.json();
                 
                 if (completeData.success) {
+                    // Step 5: Request and store admin proof (permission lemma) for the site
+                    try {
+                        const proofStored = await requestAndStoreAdminProof(siteData.site_id);
+                        if (proofStored) {
+                            console.log('[Recovery] Admin proof stored after passkey registration');
+                        } else {
+                            console.warn('[Recovery] Admin proof not stored - developer may need to re-issue from dashboard');
+                        }
+                    } catch (e) {
+                        console.warn('[Recovery] Admin proof issuance error:', e.message);
+                    }
+                    
                     passkeyState.style.display = 'none';
+                    document.querySelector('#success-state .status-message').textContent = 
+                        'New passkey registered and admin access restored.';
                     successState.style.display = 'block';
                 } else {
                     throw new Error(completeData.error || 'Failed to complete passkey registration.');
@@ -573,14 +674,13 @@
                 const data = await response.json();
                 
                 if (data.success) {
-                    // Store credentials using the SDK if available
+                    // Store credentials returned from wallet recovery
                     if (data.credentials && data.credentials.length > 0 && wallet) {
                         try {
                             for (const credential of data.credentials) {
-                                // Use SDK to store credential properly
                                 if (wallet.storeCredential) {
                                     await wallet.storeCredential(credential);
-                                    console.log('[Recovery] Credential stored via SDK:', credential.id);
+                                    console.log('[Recovery] Admin credential stored via SDK:', credential.id);
                                 }
                             }
                         } catch (e) {
@@ -613,7 +713,7 @@
                     
                     walletRestoreState.style.display = 'none';
                     document.querySelector('#success-state .status-message').textContent = 
-                        'Your credentials have been restored to your wallet.';
+                        'Admin access restored to your wallet.';
                     successState.style.display = 'block';
                 } else {
                     throw new Error(data.error || 'Failed to restore to wallet.');
@@ -633,18 +733,8 @@
             btn.textContent = 'Signing in...';
             
             try {
-                // Step 1: Complete recovery to establish session context
-                const recoveryResponse = await fetch('/api/recovery/complete', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    credentials: 'include',
-                    body: JSON.stringify({ token: token })
-                });
-                
-                const recoveryData = await recoveryResponse.json();
-                if (!recoveryData.success) {
-                    throw new Error(recoveryData.error || 'Recovery failed');
-                }
+                // Step 1: Establish recovery session (only calls API once)
+                const recoveryData = await ensureRecoverySession();
                 
                 // Step 2: Get authentication options from server using user_id from recovery
                 const authBeginResponse = await fetch('/api/passkey/authenticate/begin', {
@@ -743,9 +833,21 @@
                         // Continue anyway - local auth still succeeded
                     }
                     
+                    // Step 6: Request and store admin proof (permission lemma) for the site
+                    try {
+                        const proofStored = await requestAndStoreAdminProof(siteData.site_id);
+                        if (proofStored) {
+                            console.log('[Recovery] Admin proof stored successfully');
+                        } else {
+                            console.warn('[Recovery] Admin proof not stored - developer may need to re-issue from dashboard');
+                        }
+                    } catch (e) {
+                        console.warn('[Recovery] Admin proof issuance error:', e.message);
+                    }
+                    
                     passkeyState.style.display = 'none';
                     document.querySelector('#success-state .status-message').textContent = 
-                        'Successfully signed in with your passkey. Access restored.';
+                        'Successfully signed in with your passkey. Admin access restored.';
                     successState.style.display = 'block';
                 } else {
                     throw new Error(authCompleteData.error || 'Authentication failed');
