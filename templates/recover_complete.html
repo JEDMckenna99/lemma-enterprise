@@ -119,7 +119,7 @@
         .action-btn {
             width: 100%;
             padding: 14px 24px;
-            background: linear-gradient(135deg, #667eea, #764ba2);
+            background: #667eea;
             color: white;
             border: none;
             border-radius: 10px;
@@ -163,34 +163,30 @@
         
         #loading-state,
         #error-state,
-        #success-state,
-        #passkey-state,
-        #wallet-restore-state {
+        #success-state {
             display: none;
         }
         
-        .wallet-detected {
-            background: linear-gradient(135deg, rgba(16, 185, 129, 0.1), rgba(5, 150, 105, 0.1));
-            border: 1px solid rgba(16, 185, 129, 0.2);
-            border-radius: 10px;
-            padding: 16px;
-            margin-bottom: 24px;
+        .step-log {
+            background: #f8fafc;
+            border-radius: 8px;
+            padding: 12px 16px;
+            margin: 16px 0;
+            text-align: left;
+            font-size: 13px;
+            color: #475569;
+            line-height: 1.8;
         }
         
-        .wallet-detected-icon {
+        .step-log .step {
             display: flex;
             align-items: center;
-            gap: 10px;
-            color: #059669;
-            font-weight: 500;
-            margin-bottom: 8px;
+            gap: 8px;
         }
         
-        .wallet-detected-text {
-            color: #064e3b;
-            font-size: 14px;
-            line-height: 1.5;
-        }
+        .step-log .step.done { color: #059669; }
+        .step-log .step.active { color: #667eea; font-weight: 500; }
+        .step-log .step.pending { color: #94a3b8; }
     </style>
 </head>
 <body>
@@ -200,7 +196,7 @@
             <p>Account Recovery</p>
         </div>
         
-        <!-- Loading State -->
+        <!-- Loading / Processing State -->
         <div id="loading-state">
             <div class="status-icon loading">
                 <svg class="spinner" viewBox="0 0 24 24" fill="none" stroke="#667eea" stroke-width="2">
@@ -208,8 +204,15 @@
                     <path d="M12 2a10 10 0 0 1 10 10" stroke-linecap="round"></path>
                 </svg>
             </div>
-            <h2 class="status-title">Validating...</h2>
-            <p class="status-message">Please wait while we verify your recovery link.</p>
+            <h2 class="status-title" id="loading-title">Restoring access...</h2>
+            <p class="status-message" id="loading-message">Verifying your recovery link and reissuing your admin proof.</p>
+            
+            <div class="step-log" id="step-log">
+                <div class="step active" id="step-validate">Validating recovery link...</div>
+                <div class="step pending" id="step-wallet">Checking wallet...</div>
+                <div class="step pending" id="step-issue">Issuing admin proof...</div>
+                <div class="step pending" id="step-store">Storing in wallet...</div>
+            </div>
         </div>
         
         <!-- Error State -->
@@ -221,84 +224,11 @@
                     <line x1="9" y1="9" x2="15" y2="15"></line>
                 </svg>
             </div>
-            <h2 class="status-title">Link Invalid</h2>
+            <h2 class="status-title">Recovery Failed</h2>
             <p class="status-message" id="error-message">This recovery link is invalid or has expired.</p>
             <a href="/recover" class="action-btn" style="text-decoration: none; display: inline-block;">
                 Request New Link
             </a>
-        </div>
-        
-        <!-- Wallet Restore State (unlocked wallet detected) -->
-        <div id="wallet-restore-state">
-            <div class="status-icon loading" style="background: linear-gradient(135deg, rgba(16, 185, 129, 0.2), rgba(5, 150, 105, 0.2));">
-                <svg viewBox="0 0 24 24" fill="none" stroke="#059669" stroke-width="2">
-                    <rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect>
-                    <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path>
-                </svg>
-            </div>
-            <h2 class="status-title">Wallet Detected</h2>
-            <p class="status-message">Your wallet session is active. We can restore access directly.</p>
-            
-            <div class="wallet-detected">
-                <div class="wallet-detected-icon">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <polyline points="20 6 9 17 4 12"></polyline>
-                    </svg>
-                    Wallet Session Synced
-                </div>
-                <div class="wallet-detected-text">
-                    Your credentials will be restored to your existing wallet without requiring a new passkey.
-                </div>
-            </div>
-            
-            <div class="site-info">
-                <div class="site-info-row">
-                    <span class="site-info-label">Site ID</span>
-                    <span class="site-info-value" id="wallet-site-id-display">-</span>
-                </div>
-                <div class="site-info-row">
-                    <span class="site-info-label">Admin Email</span>
-                    <span class="site-info-value" id="wallet-email-display">-</span>
-                </div>
-            </div>
-            
-            <button class="action-btn" id="restore-wallet-btn">
-                Restore to Wallet
-            </button>
-            
-            <a href="#" class="secondary-btn" id="use-passkey-instead">Use passkey instead</a>
-        </div>
-        
-        <!-- Passkey State - Sign in or Register -->
-        <div id="passkey-state">
-            <div class="status-icon loading">
-                <svg viewBox="0 0 24 24" fill="none" stroke="#667eea" stroke-width="2">
-                    <path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"></path>
-                </svg>
-            </div>
-            <h2 class="status-title">Register New Passkey</h2>
-            <p class="status-message">Your identity has been verified. Register a new passkey to restore access to your account.</p>
-            
-            <div class="site-info">
-                <div class="site-info-row">
-                    <span class="site-info-label">Site ID</span>
-                    <span class="site-info-value" id="site-id-display">-</span>
-                </div>
-                <div class="site-info-row">
-                    <span class="site-info-label">Admin Email</span>
-                    <span class="site-info-value" id="email-display">-</span>
-                </div>
-            </div>
-            
-            <button class="action-btn" id="register-passkey-btn" style="margin-bottom: 12px;">
-                Register New Passkey
-            </button>
-            
-            <button class="action-btn" id="signin-passkey-btn" style="background: #64748b; margin-bottom: 12px;">
-                I still have my passkey
-            </button>
-            
-            <a href="/recover" class="secondary-btn">Cancel recovery</a>
         </div>
         
         <!-- Success State -->
@@ -308,8 +238,19 @@
                     <polyline points="20 6 9 17 4 12"></polyline>
                 </svg>
             </div>
-            <h2 class="status-title">Account Recovered</h2>
-            <p class="status-message">Your passkey has been updated. You can now sign in.</p>
+            <h2 class="status-title">Admin Access Restored</h2>
+            <p class="status-message" id="success-message">Your admin proof has been reissued for your site.</p>
+            
+            <div class="site-info" id="success-site-info" style="display: none;">
+                <div class="site-info-row">
+                    <span class="site-info-label">Site</span>
+                    <span class="site-info-value" id="success-site-id">-</span>
+                </div>
+                <div class="site-info-row">
+                    <span class="site-info-label">Credential</span>
+                    <span class="site-info-value" id="success-credential-id">-</span>
+                </div>
+            </div>
             
             <a href="/developer" class="action-btn" style="text-decoration: none; display: inline-block;">
                 Go to Developer Dashboard
@@ -325,164 +266,41 @@
         
         const loadingState = document.getElementById('loading-state');
         const errorState = document.getElementById('error-state');
-        const passkeyState = document.getElementById('passkey-state');
-        const walletRestoreState = document.getElementById('wallet-restore-state');
         const successState = document.getElementById('success-state');
         
-        let siteData = null;
-        let walletUnlocked = false;
-        let wallet = null;
-        let recoverySessionEstablished = false;
-        let cachedRecoveryData = null;
-        
-        /**
-         * Establish recovery session (call /api/recovery/complete).
-         * Only calls the endpoint once - subsequent calls return cached data.
-         * This prevents "Token already used" errors when switching between
-         * passkey sign-in and register flows.
-         */
-        async function ensureRecoverySession() {
-            if (recoverySessionEstablished && cachedRecoveryData) {
-                console.log('[Recovery] Using cached recovery session');
-                return cachedRecoveryData;
-            }
-            
-            const recoveryResponse = await fetch('/api/recovery/complete', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                credentials: 'include',
-                body: JSON.stringify({ token: token })
-            });
-            
-            const recoveryData = await recoveryResponse.json();
-            if (!recoveryData.success) {
-                throw new Error(recoveryData.error || 'Recovery failed');
-            }
-            
-            recoverySessionEstablished = true;
-            cachedRecoveryData = recoveryData;
-            console.log('[Recovery] Recovery session established for site:', recoveryData.site_id);
-            return recoveryData;
-        }
-        
-        /**
-         * Request and store the admin proof (permission lemma) after recovery auth.
-         * This is the critical step that reissues the developer's admin credential.
-         * 
-         * @param {string} siteId - The recovered site ID
-         * @returns {boolean} true if credential was stored successfully
-         */
-        async function requestAndStoreAdminProof(siteId) {
-            try {
-                // Initialize wallet if not already done
-                if (!wallet && typeof LemmaWallet !== 'undefined') {
-                    wallet = new LemmaWallet({ siteId: 'lemma.id', debug: false });
-                    await wallet.init();
-                }
-                
-                if (!wallet) {
-                    console.warn('[Recovery] Wallet SDK not available - cannot store admin proof');
-                    return false;
-                }
-                
-                // Derive PPID for the site
-                const siteDomain = siteId; // site_id is typically the domain-derived ID
-                const ppid = await wallet.derivePPID('lemma.id');
-                
-                if (!ppid) {
-                    console.warn('[Recovery] Could not derive PPID - wallet may not be unlocked');
-                    return false;
-                }
-                
-                console.log('[Recovery] Requesting admin proof for site:', siteId, 'PPID:', ppid.substring(0, 30) + '...');
-                
-                // Call the recovery admin proof endpoint
-                const response = await fetch('/api/recovery/issue-admin-proof', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    credentials: 'include',
-                    body: JSON.stringify({
-                        site_id: siteId,
-                        ppid: ppid
-                    })
-                });
-                
-                const data = await response.json();
-                
-                if (data.success && data.credential) {
-                    console.log('[Recovery] Admin proof issued:', data.credential_id);
-                    
-                    // Store credential in wallet
-                    if (wallet.storeCredential) {
-                        await wallet.storeCredential(data.credential);
-                        console.log('[Recovery] Admin proof stored in wallet');
-                    }
-                    
-                    return true;
-                } else {
-                    console.warn('[Recovery] Failed to get admin proof:', data.error);
-                    return false;
-                }
-                
-            } catch (err) {
-                console.error('[Recovery] Admin proof request failed:', err);
-                return false;
+        function setStep(stepId, status) {
+            const el = document.getElementById(stepId);
+            if (!el) return;
+            el.className = 'step ' + status;
+            if (status === 'done') {
+                el.innerHTML = '&#10003; ' + el.textContent;
             }
         }
         
-        // Check if wallet session is synced/unlocked using the SDK
-        async function checkWalletSession() {
-            try {
-                // Initialize the Lemma Wallet SDK
-                if (typeof LemmaWallet !== 'undefined') {
-                    wallet = new LemmaWallet({ 
-                        siteId: 'lemma.id',
-                        debug: false
-                    });
-                    
-                    // Initialize and check auth state
-                    await wallet.init();
-                    
-                    // Check if wallet is unlocked
-                    const authState = await wallet.getAuthState();
-                    console.log('[Recovery] Wallet auth state:', authState);
-                    
-                    if (authState.isUnlocked) {
-                        console.log('[Recovery] Wallet is unlocked via SDK');
-                        return true;
-                    }
-                    
-                    // Check if wallet has credentials stored
-                    if (wallet.session && wallet.session.isUnlocked) {
-                        console.log('[Recovery] Wallet session is unlocked');
-                        return true;
-                    }
-                }
-            } catch (err) {
-                console.log('[Recovery] Wallet SDK check error:', err.message);
-            }
-            
-            // Fallback: Check server-side session
-            try {
-                const response = await fetch('/api/wallet/status', {
-                    method: 'GET',
-                    credentials: 'include'
-                });
-                
-                if (response.ok) {
-                    const data = await response.json();
-                    if (data.authenticated === true) {
-                        return true;
-                    }
-                }
-            } catch (err) {
-                console.log('[Recovery] Server wallet check:', err.message);
-            }
-            
-            return false;
+        function showError(message) {
+            loadingState.style.display = 'none';
+            document.getElementById('error-message').textContent = message;
+            errorState.style.display = 'block';
         }
         
-        async function validateToken() {
+        function showSuccess(siteId, credentialId, message) {
+            loadingState.style.display = 'none';
+            
+            if (message) {
+                document.getElementById('success-message').textContent = message;
+            }
+            
+            if (siteId) {
+                document.getElementById('success-site-id').textContent = siteId;
+                document.getElementById('success-credential-id').textContent = 
+                    credentialId ? credentialId.substring(0, 20) + '...' : 'Issued';
+                document.getElementById('success-site-info').style.display = 'block';
+            }
+            
+            successState.style.display = 'block';
+        }
+        
+        async function runRecovery() {
             loadingState.style.display = 'block';
             
             if (!token) {
@@ -490,402 +308,134 @@
                 return;
             }
             
+            // Step 1: Validate the token
+            setStep('step-validate', 'active');
+            
+            let tokenData;
             try {
-                // Check wallet status in parallel with token validation
-                const [walletStatus, tokenResponse] = await Promise.all([
-                    checkWalletSession(),
-                    fetch('/api/recovery/validate', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ token })
-                    })
-                ]);
+                const validateResponse = await fetch('/api/recovery/validate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ token })
+                });
                 
-                walletUnlocked = walletStatus;
-                const data = await tokenResponse.json();
+                tokenData = await validateResponse.json();
                 
-                if (data.success) {
-                    siteData = data;
-                    loadingState.style.display = 'none';
-                    
-                    if (walletUnlocked) {
-                        // Wallet is unlocked - offer direct restore
-                        document.getElementById('wallet-site-id-display').textContent = data.site_id;
-                        document.getElementById('wallet-email-display').textContent = data.email;
-                        walletRestoreState.style.display = 'block';
-                    } else {
-                        // No wallet session - require passkey
-                        document.getElementById('site-id-display').textContent = data.site_id;
-                        document.getElementById('email-display').textContent = data.email;
-                        passkeyState.style.display = 'block';
-                    }
-                } else {
-                    showError(data.error || 'Invalid or expired token.');
+                if (!tokenData.success) {
+                    showError(tokenData.error || 'Invalid or expired recovery link.');
+                    return;
                 }
                 
+                setStep('step-validate', 'done');
+                console.log('[Recovery] Token validated for site:', tokenData.site_id);
+                
             } catch (err) {
-                console.error('Validation error:', err);
+                console.error('[Recovery] Token validation failed:', err);
                 showError('Failed to validate recovery link.');
+                return;
             }
-        }
-        
-        function showError(message) {
-            loadingState.style.display = 'none';
-            passkeyState.style.display = 'none';
-            walletRestoreState.style.display = 'none';
-            document.getElementById('error-message').textContent = message;
-            errorState.style.display = 'block';
-        }
-        
-        function switchToPasskey() {
-            walletRestoreState.style.display = 'none';
-            document.getElementById('site-id-display').textContent = siteData.site_id;
-            document.getElementById('email-display').textContent = siteData.email;
-            passkeyState.style.display = 'block';
-        }
-        
-        async function registerPasskey() {
-            const btn = document.getElementById('register-passkey-btn');
-            btn.disabled = true;
-            btn.textContent = 'Registering...';
+            
+            // Step 2: Try to initialize wallet and get PPID (optional)
+            setStep('step-wallet', 'active');
+            
+            let wallet = null;
+            let ppid = null;
             
             try {
-                // Check WebAuthn support
-                if (!window.PublicKeyCredential) {
-                    throw new Error('Passkeys are not supported in this browser.');
-                }
-                
-                // Step 1: Establish recovery session (only calls API once)
-                const recoveryData = await ensureRecoverySession();
-                
-                // Step 2: Get passkey registration options from server
-                // Note: user identity comes from the recovery session (set by complete_recovery),
-                // NOT from the request body - the server enforces this for security
-                const beginResponse = await fetch('/api/passkey/register/begin', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    credentials: 'include',
-                    body: JSON.stringify({
-                        device_name: 'Recovery Passkey'
-                    })
-                });
-                
-                const beginData = await beginResponse.json();
-                if (!beginData.success) {
-                    throw new Error(beginData.error || 'Failed to start passkey registration');
-                }
-                
-                // Step 3: Create credential with server-provided options
-                const options = beginData.options;
-                
-                // Decode base64url challenge
-                const challenge = Uint8Array.from(atob(options.challenge.replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0));
-                const userId = Uint8Array.from(atob(options.user.id.replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0));
-                
-                const credential = await navigator.credentials.create({
-                    publicKey: {
-                        challenge: challenge,
-                        rp: options.rp,
-                        user: {
-                            id: userId,
-                            name: options.user.name,
-                            displayName: options.user.displayName
-                        },
-                        pubKeyCredParams: options.pubKeyCredParams,
-                        authenticatorSelection: options.authenticatorSelection,
-                        timeout: options.timeout || 60000
-                    }
-                });
-                
-                // Step 4: Send credential to server for verification
-                const credentialData = {
-                    id: credential.id,
-                    rawId: btoa(String.fromCharCode(...new Uint8Array(credential.rawId))),
-                    type: credential.type,
-                    response: {
-                        clientDataJSON: btoa(String.fromCharCode(...new Uint8Array(credential.response.clientDataJSON))),
-                        attestationObject: btoa(String.fromCharCode(...new Uint8Array(credential.response.attestationObject)))
-                    }
-                };
-                
-                const completeResponse = await fetch('/api/passkey/register/complete', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    credentials: 'include',
-                    body: JSON.stringify({
-                        user_id: siteData.email,
-                        credential: credentialData
-                    })
-                });
-                
-                const completeData = await completeResponse.json();
-                
-                if (completeData.success) {
-                    // Step 5: Request and store admin proof (permission lemma) for the site
-                    try {
-                        const proofStored = await requestAndStoreAdminProof(siteData.site_id);
-                        if (proofStored) {
-                            console.log('[Recovery] Admin proof stored after passkey registration');
-                        } else {
-                            console.warn('[Recovery] Admin proof not stored - developer may need to re-issue from dashboard');
-                        }
-                    } catch (e) {
-                        console.warn('[Recovery] Admin proof issuance error:', e.message);
-                    }
+                if (typeof LemmaWallet !== 'undefined') {
+                    wallet = new LemmaWallet({ siteId: 'lemma.id', debug: false });
+                    await wallet.init();
                     
-                    passkeyState.style.display = 'none';
-                    document.querySelector('#success-state .status-message').textContent = 
-                        'New passkey registered and admin access restored.';
-                    successState.style.display = 'block';
-                } else {
-                    throw new Error(completeData.error || 'Failed to complete passkey registration.');
-                }
-                
-            } catch (err) {
-                console.error('Passkey registration error:', err);
-                
-                if (err.name === 'NotAllowedError') {
-                    alert('Passkey registration was cancelled or timed out. Please try again.');
-                } else {
-                    alert(err.message || 'Failed to register passkey. Please try again.');
-                }
-                
-                btn.disabled = false;
-                btn.textContent = 'Register Passkey';
-            }
-        }
-        
-        async function restoreToWallet() {
-            const btn = document.getElementById('restore-wallet-btn');
-            btn.disabled = true;
-            btn.textContent = 'Restoring...';
-            
-            try {
-                // Complete recovery via wallet restore (no passkey needed)
-                const response = await fetch('/api/recovery/complete-wallet', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    credentials: 'include',
-                    body: JSON.stringify({
-                        token: token,
-                        restore_method: 'wallet_session'
-                    })
-                });
-                
-                const data = await response.json();
-                
-                if (data.success) {
-                    // Store credentials returned from wallet recovery
-                    if (data.credentials && data.credentials.length > 0 && wallet) {
-                        try {
-                            for (const credential of data.credentials) {
-                                if (wallet.storeCredential) {
-                                    await wallet.storeCredential(credential);
-                                    console.log('[Recovery] Admin credential stored via SDK:', credential.id);
-                                }
-                            }
-                        } catch (e) {
-                            console.warn('[Recovery] SDK credential store failed:', e);
-                        }
-                    }
+                    // Check if wallet is unlocked
+                    const authState = await wallet.getAuthState();
                     
-                    // Set global wallet session for cross-device sync
-                    try {
-                        const walletState = await wallet?.getDebugState?.() || {};
-                        const walletId = walletState.walletId || data.user_id;
-                        
-                        if (walletId) {
-                            console.log('[Recovery] Setting global wallet session...');
-                            await fetch('/api/wallet/set-session', {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                credentials: 'include',
-                                body: JSON.stringify({
-                                    wallet_id: walletId,
-                                    unlocked_at: Date.now(),
-                                    profile_id: 'default',
-                                    profile_name: 'Personal'
-                                })
-                            });
-                        }
-                    } catch (e) {
-                        console.warn('[Recovery] Failed to set global session:', e.message);
-                    }
-                    
-                    walletRestoreState.style.display = 'none';
-                    document.querySelector('#success-state .status-message').textContent = 
-                        'Admin access restored to your wallet.';
-                    successState.style.display = 'block';
-                } else {
-                    throw new Error(data.error || 'Failed to restore to wallet.');
-                }
-                
-            } catch (err) {
-                console.error('[Recovery] Wallet restore error:', err);
-                alert(err.message || 'Failed to restore to wallet. Try using passkey instead.');
-                btn.disabled = false;
-                btn.textContent = 'Restore to Wallet';
-            }
-        }
-        
-        async function signInWithPasskey() {
-            const btn = document.getElementById('signin-passkey-btn');
-            btn.disabled = true;
-            btn.textContent = 'Signing in...';
-            
-            try {
-                // Step 1: Establish recovery session (only calls API once)
-                const recoveryData = await ensureRecoverySession();
-                
-                // Step 2: Get authentication options from server using user_id from recovery
-                const authBeginResponse = await fetch('/api/passkey/authenticate/begin', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    credentials: 'include',
-                    body: JSON.stringify({ user_id: recoveryData.user_id })
-                });
-                
-                const authBeginData = await authBeginResponse.json();
-                if (!authBeginData.success) {
-                    throw new Error(authBeginData.error || 'No existing passkey found. Please register a new one.');
-                }
-                
-                // Store challenge_key for complete step
-                const challengeKey = authBeginData.challenge_key;
-                
-                // Step 3: Get credential from browser
-                const options = authBeginData.options;
-                const challenge = Uint8Array.from(atob(options.challenge.replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0));
-                
-                const allowCredentials = (options.allowCredentials || []).map(cred => ({
-                    id: Uint8Array.from(atob(cred.id.replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0)),
-                    type: cred.type,
-                    transports: cred.transports
-                }));
-                
-                const credential = await navigator.credentials.get({
-                    publicKey: {
-                        challenge: challenge,
-                        rpId: options.rpId,
-                        allowCredentials: allowCredentials,
-                        userVerification: options.userVerification || 'preferred',
-                        timeout: options.timeout || 60000
-                    }
-                });
-                
-                // Step 4: Send credential to server for verification
-                const credentialData = {
-                    id: credential.id,
-                    rawId: btoa(String.fromCharCode(...new Uint8Array(credential.rawId))),
-                    type: credential.type,
-                    response: {
-                        clientDataJSON: btoa(String.fromCharCode(...new Uint8Array(credential.response.clientDataJSON))),
-                        authenticatorData: btoa(String.fromCharCode(...new Uint8Array(credential.response.authenticatorData))),
-                        signature: btoa(String.fromCharCode(...new Uint8Array(credential.response.signature))),
-                        userHandle: credential.response.userHandle ? btoa(String.fromCharCode(...new Uint8Array(credential.response.userHandle))) : null
-                    }
-                };
-                
-                const authCompleteResponse = await fetch('/api/passkey/authenticate/complete', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    credentials: 'include',
-                    body: JSON.stringify({
-                        challenge_key: challengeKey,
-                        credential: credentialData
-                    })
-                });
-                
-                const authCompleteData = await authCompleteResponse.json();
-                
-                if (authCompleteData.success) {
-                    // Step 5: Set global wallet session for cross-device sync
-                    try {
-                        // Priority: auth response > recovery response > SDK local > user_id fallback
-                        let walletId = authCompleteData.wallet_id || recoveryData.wallet_id;
-                        
-                        if (!walletId && wallet) {
-                            // Try to get wallet_id from SDK's local storage
-                            const walletState = await wallet.getDebugState?.() || {};
-                            walletId = walletState.walletId;
-                        }
-                        
-                        walletId = walletId || authCompleteData.user_id;
-                        
-                        if (walletId) {
-                            console.log('[Recovery] Setting global wallet session for cross-device sync, wallet:', walletId?.substring(0, 12) + '...');
-                            const setSessionResponse = await fetch('/api/wallet/set-session', {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                credentials: 'include',
-                                body: JSON.stringify({
-                                    wallet_id: walletId,
-                                    unlocked_at: Date.now(),
-                                    profile_id: 'default',
-                                    profile_name: 'Personal'
-                                })
-                            });
-                            
-                            const setSessionData = await setSessionResponse.json();
-                            console.log('[Recovery] Global session set:', setSessionData);
-                        }
-                    } catch (e) {
-                        console.warn('[Recovery] Failed to set global session:', e.message);
-                        // Continue anyway - local auth still succeeded
-                    }
-                    
-                    // Step 6: Request and store admin proof (permission lemma) for the site
-                    try {
-                        const proofStored = await requestAndStoreAdminProof(siteData.site_id);
-                        if (proofStored) {
-                            console.log('[Recovery] Admin proof stored successfully');
-                        } else {
-                            console.warn('[Recovery] Admin proof not stored - developer may need to re-issue from dashboard');
-                        }
-                    } catch (e) {
-                        console.warn('[Recovery] Admin proof issuance error:', e.message);
-                    }
-                    
-                    passkeyState.style.display = 'none';
-                    document.querySelector('#success-state .status-message').textContent = 
-                        'Successfully signed in with your passkey. Admin access restored.';
-                    successState.style.display = 'block';
-                } else {
-                    throw new Error(authCompleteData.error || 'Authentication failed');
-                }
-                
-            } catch (err) {
-                console.error('[Recovery] Sign-in error:', err);
-                
-                if (err.name === 'NotAllowedError') {
-                    alert('Sign-in was cancelled or timed out. Please try again.');
-                    btn.disabled = false;
-                    btn.textContent = 'I still have my passkey';
-                } else {
-                    // Passkey not found or auth failed - guide user to register new one
-                    const msg = err.message || '';
-                    if (msg.toLowerCase().includes('not found') || msg.toLowerCase().includes('no existing')) {
-                        alert('No existing passkey found for this account. Please register a new passkey to restore access.');
+                    if (authState.isUnlocked) {
+                        ppid = await wallet.derivePPID('lemma.id');
+                        console.log('[Recovery] Wallet unlocked, PPID:', ppid?.substring(0, 30) + '...');
+                    } else if (wallet.session?.isUnlocked) {
+                        ppid = await wallet.derivePPID('lemma.id');
+                        console.log('[Recovery] Wallet session unlocked, PPID:', ppid?.substring(0, 30) + '...');
                     } else {
-                        alert(msg || 'Failed to sign in. Please register a new passkey instead.');
+                        // Try autoAuthenticate (checks global session)
+                        const authResult = await wallet.autoAuthenticate();
+                        if (authResult.authenticated) {
+                            ppid = await wallet.derivePPID('lemma.id');
+                            console.log('[Recovery] Wallet auto-authenticated, PPID:', ppid?.substring(0, 30) + '...');
+                        }
                     }
-                    btn.disabled = false;
-                    btn.textContent = 'I still have my passkey';
-                    // Highlight the register button to guide the user
-                    document.getElementById('register-passkey-btn').style.boxShadow = '0 0 0 3px rgba(102, 126, 234, 0.4)';
+                }
+            } catch (err) {
+                console.log('[Recovery] Wallet init (non-fatal):', err.message);
+            }
+            
+            setStep('step-wallet', 'done');
+            
+            // Step 3: Complete recovery - this issues the admin lemma
+            setStep('step-issue', 'active');
+            
+            let recoveryData;
+            try {
+                const body = { token };
+                if (ppid) {
+                    body.ppid = ppid;
+                }
+                
+                const response = await fetch('/api/recovery/complete', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify(body)
+                });
+                
+                recoveryData = await response.json();
+                
+                if (!recoveryData.success) {
+                    showError(recoveryData.error || 'Failed to issue admin proof.');
+                    return;
+                }
+                
+                setStep('step-issue', 'done');
+                console.log('[Recovery] Admin proof issued:', recoveryData.credential_id);
+                
+            } catch (err) {
+                console.error('[Recovery] Recovery completion failed:', err);
+                showError('Failed to complete recovery. Please try again.');
+                return;
+            }
+            
+            // Step 4: Store credential in wallet (if wallet is available)
+            setStep('step-store', 'active');
+            
+            let stored = false;
+            
+            if (wallet && recoveryData.credential) {
+                try {
+                    if (wallet.storeCredential) {
+                        await wallet.storeCredential(recoveryData.credential);
+                        stored = true;
+                        console.log('[Recovery] Admin proof stored in wallet');
+                    }
+                } catch (err) {
+                    console.warn('[Recovery] Could not store in wallet (non-fatal):', err.message);
                 }
             }
+            
+            setStep('step-store', 'done');
+            
+            // Done - show success
+            const message = stored
+                ? 'Your admin proof has been reissued and stored in your wallet.'
+                : 'Your admin proof has been reissued. Sign in to your wallet to sync it.';
+            
+            showSuccess(
+                recoveryData.site_id || tokenData.site_id,
+                recoveryData.credential_id,
+                message
+            );
         }
         
-        // Initialize
-        document.getElementById('signin-passkey-btn').addEventListener('click', signInWithPasskey);
-        document.getElementById('register-passkey-btn').addEventListener('click', registerPasskey);
-        document.getElementById('restore-wallet-btn').addEventListener('click', restoreToWallet);
-        document.getElementById('use-passkey-instead').addEventListener('click', (e) => {
-            e.preventDefault();
-            switchToPasskey();
-        });
-        validateToken();
+        // Start recovery immediately
+        runRecovery();
     </script>
 </body>
 </html>

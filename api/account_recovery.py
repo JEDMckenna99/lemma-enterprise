@@ -388,12 +388,19 @@ def validate_recovery_token():
 @cross_origin()
 def complete_recovery():
     """
-    Complete account recovery - registers new passkey credential
+    Complete account recovery - issue admin lemma directly.
+    
+    The recovery token proves identity (API key + email confirmation).
+    No passkey is required - the passkey only affects wallet lock/unlock state.
+    This endpoint issues the admin proof and returns it for wallet storage.
+    
+    Optionally accepts a wallet PPID to bind the credential to and update site_admins.
+    If no PPID provided, issues to an email-derived DID (wallet can re-derive later).
     """
     try:
         data = request.get_json() or {}
         token = data.get('token', '').strip()
-        credential = data.get('credential')  # WebAuthn credential from passkey registration
+        ppid = data.get('ppid', '').strip()  # Optional: wallet PPID if wallet is unlocked
         
         if not token:
             return jsonify({'success': False, 'error': 'Token required'}), 400
@@ -419,43 +426,57 @@ def complete_recovery():
         site_id = token_data['site_id']
         admin_email = token_data['admin_email']
         
-        # Get actual customer_id from database
-        from api.database import SessionLocal, Customer
+        # Look up site details
+        from api.database import SessionLocal, Site
         db = SessionLocal()
-        customer_id = None
-        wallet_id = None
         try:
-            customer = db.query(Customer).filter(Customer.email == admin_email).first()
-            if customer:
-                customer_id = customer.customer_id
-                wallet_id = customer.wallet_id
+            site = db.query(Site).filter(Site.site_id == site_id).first()
+            if not site:
+                return jsonify({'success': False, 'error': 'Site not found'}), 404
+            site_domain = site.site_domain or site_id
         finally:
             db.close()
         
-        # Store recovery context in session for passkey registration
-        # IMPORTANT: passkey_auth.py reads 'customer_id' and 'user_email' from session
+        # Issue the admin lemma - identity is already proven by API key + email
+        credential = _issue_site_admin_proof(
+            site_id=site_id,
+            site_domain=site_domain,
+            admin_email=admin_email,
+            user_ppid=ppid if ppid and ppid.startswith('did:lemma:ppid_') else None,
+            recovery_method='email_verified'
+        )
+        
+        if not credential:
+            return jsonify({
+                'success': False,
+                'error': 'Failed to issue admin proof'
+            }), 500
+        
+        # Update site_admins if a wallet PPID was provided
+        if ppid and ppid.startswith('did:lemma:ppid_'):
+            _update_site_admin_ppid(site_id, admin_email, ppid)
+            _update_all_admin_sites(admin_email, ppid, exclude_site_id=site_id)
+        
+        # Store recovery context in session (for dashboard redirect)
         from flask import session as flask_session
         flask_session['recovery_complete'] = True
         flask_session['recovery_site_id'] = site_id
         flask_session['recovery_email'] = admin_email
-        flask_session['customer_id'] = customer_id or admin_email
         flask_session['customer_email'] = admin_email
-        flask_session['user_email'] = admin_email  # Required by passkey registration endpoint
+        flask_session['user_email'] = admin_email
         
-        # Mark token as used ONLY after all work succeeded
-        # This prevents the token from being consumed if something above fails,
-        # allowing the developer to retry the recovery
+        # Mark token as used ONLY after everything succeeded
         mark_token_used(token_hash)
         
-        logger.info(f"Recovery complete - session restored for {admin_email[:3]}*** (site: {site_id})")
-        logger.info(f"Account recovery completed for site {site_id}")
+        logger.info(f"Recovery complete - admin lemma issued for site {site_id} to {admin_email[:3]}***")
         
         return jsonify({
             'success': True,
-            'message': 'Account recovered successfully',
+            'message': 'Admin access restored',
             'site_id': site_id,
-            'user_id': customer_id,
-            'wallet_id': wallet_id,
+            'site_domain': site_domain,
+            'credential': credential,
+            'credential_id': credential.get('id'),
             'redirect': '/developer'
         })
         
