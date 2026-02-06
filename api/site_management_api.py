@@ -923,6 +923,32 @@ def create_api_key(site_id):
 def rotate_api_key(site_id, key_id):
     """Rotate an API key (deactivate old, create new)"""
     try:
+        # Handle key_id=0 as the primary site key (stored in sites table)
+        if key_id == 0:
+            from api.database import SessionLocal, Site
+            
+            db = SessionLocal()
+            site = db.query(Site).filter(Site.site_id == site_id).first()
+            
+            if not site:
+                db.close()
+                return jsonify({'success': False, 'error': 'Site not found'}), 404
+            
+            # Generate new primary API key
+            new_key = f"lm_{secrets.token_urlsafe(32)}"
+            site.api_key = new_key
+            db.commit()
+            db.close()
+            
+            logger.info(f"SECURITY: Primary API key rotated for site {site_id}")
+            
+            return jsonify({
+                'success': True,
+                'key_id': 0,
+                'key': new_key,
+                'warning': 'This key is shown only once. Store it securely.'
+            })
+        
         from api.database import get_db_connection
         
         conn = get_db_connection(site_id)
