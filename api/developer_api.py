@@ -525,6 +525,55 @@ def create_site_key(site_id):
         }), 500
 
 
+@developer_api_bp.route('/api/developer/sites/<site_id>/keys/<key_id>/rotate', methods=['POST'])
+@cross_origin()
+@require_agent_or_user_auth(required_scope='write')
+def rotate_site_key(site_id, key_id):
+    """Rotate/regenerate an API key for a site
+    
+    SECURITY: Requires site ownership verification.
+    Old key is immediately invalidated, new key returned once.
+    """
+    auth_error = _require_site_ownership(site_id)
+    if auth_error:
+        return auth_error
+    
+    try:
+        from api.database import SessionLocal, Site
+        
+        db = SessionLocal()
+        site = db.query(Site).filter(Site.site_id == site_id).first()
+        
+        if not site:
+            db.close()
+            return jsonify({
+                'success': False,
+                'error': 'Site not found'
+            }), 404
+        
+        # Generate new API key (invalidates old one)
+        new_key = f"lm_{secrets.token_urlsafe(32)}"
+        site.api_key = new_key
+        db.commit()
+        db.close()
+        
+        logger.info(f"SECURITY: API key rotated for site {site_id} by {_get_authenticated_ppid()[:30] if _get_authenticated_ppid() else 'unknown'}...")
+        
+        return jsonify({
+            'success': True,
+            'key_id': key_id,
+            'key': new_key,  # Only shown once!
+            'warning': 'This key is shown only once. Store it securely.'
+        })
+        
+    except Exception as e:
+        logger.error(f"Failed to rotate API key: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
 @developer_api_bp.route('/api/developer/sites/<site_id>/keys/<key_id>', methods=['DELETE'])
 @cross_origin()
 @require_agent_or_user_auth(required_scope='admin')
