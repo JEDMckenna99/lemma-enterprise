@@ -4735,7 +4735,8 @@ class LemmaWallet {
         
         if (options.qrData) {
             // Full QR code data
-            payload = await this._decryptLinkQR(options.qrData);
+            const normalizedQrData = this._normalizeLinkInput(options.qrData);
+            payload = await this._decryptLinkQR(normalizedQrData);
         } else if (options.shortCode) {
             // Short code - need to look up from bridge or prompt QR scan
             throw new Error('Short code linking requires scanning QR on the source device. Please use QR scan.');
@@ -5130,6 +5131,46 @@ class LemmaWallet {
         combined.set(new Uint8Array(encrypted), iv.length);
         
         return btoa(String.fromCharCode(...combined));
+    }
+    
+    /**
+     * Normalize link input to raw QR JSON data.
+     * Accepts full URL, hash-only base64, or raw JSON.
+     */
+    _normalizeLinkInput(linkInput) {
+        if (!linkInput || typeof linkInput !== 'string') {
+            throw new Error('Invalid link code');
+        }
+        
+        let data = linkInput.trim();
+        
+        // If a full URL was pasted, extract the hash
+        if (/^https?:\/\//i.test(data)) {
+            try {
+                const url = new URL(data);
+                if (url.hash && url.hash.length > 1) {
+                    data = url.hash.substring(1);
+                }
+            } catch (e) {
+                // Fall through - treat as raw input
+            }
+        }
+        
+        // If not JSON, try base64url decode to JSON
+        if (data && data[0] !== '{') {
+            let base64 = data.replace(/-/g, '+').replace(/_/g, '/');
+            while (base64.length % 4) base64 += '=';
+            
+            try {
+                const decoded = atob(base64);
+                JSON.parse(decoded);
+                return decoded;
+            } catch (e) {
+                // Fall through - let JSON.parse throw in _decryptLinkQR
+            }
+        }
+        
+        return data;
     }
     
     /**
