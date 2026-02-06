@@ -549,6 +549,12 @@ def _update_site_admin_ppid(site_id: str, admin_email: str, new_ppid: str):
     
     During recovery, the developer may have a new wallet/passkey which generates
     a different PPID. This ensures they still have admin access to their site.
+    
+    Lookup order:
+    1. Check if new PPID already has access (no-op)
+    2. Find existing record by email
+    3. Find existing record by owner role (covers cases where admin_email was stored as '')
+    4. Fall back to creating a new record
     """
     try:
         from api.database import SessionLocal, SiteAdmin
@@ -563,25 +569,43 @@ def _update_site_admin_ppid(site_id: str, admin_email: str, new_ppid: str):
             ).first()
             
             if existing:
+                # Already has access - just update the email if it was empty
+                if not existing.admin_email and admin_email:
+                    existing.admin_email = admin_email
+                    db.commit()
                 logger.info(f"Site admin record already exists for PPID {new_ppid[:30]}... on site {site_id}")
                 return
             
-            # Check if there's an existing record for this email
-            email_admin = db.query(SiteAdmin).filter(
-                SiteAdmin.site_id == site_id,
-                SiteAdmin.admin_email == admin_email,
-                SiteAdmin.is_active == True
-            ).first()
+            # Try to find existing record to update (by email first, then by owner role)
+            existing_admin = None
             
-            if email_admin:
-                # Update existing record with new PPID
-                old_ppid = email_admin.admin_did
-                email_admin.admin_did = new_ppid
-                email_admin.last_activity = datetime.utcnow()
+            # Method 1: Match by email
+            if admin_email:
+                existing_admin = db.query(SiteAdmin).filter(
+                    SiteAdmin.site_id == site_id,
+                    SiteAdmin.admin_email == admin_email,
+                    SiteAdmin.is_active == True
+                ).first()
+            
+            # Method 2: Match by owner role (handles cases where admin_email was '')
+            if not existing_admin:
+                existing_admin = db.query(SiteAdmin).filter(
+                    SiteAdmin.site_id == site_id,
+                    SiteAdmin.admin_role == 'owner',
+                    SiteAdmin.is_active == True
+                ).first()
+            
+            if existing_admin:
+                # Update existing record with new PPID and email
+                old_ppid = existing_admin.admin_did
+                existing_admin.admin_did = new_ppid
+                if admin_email:
+                    existing_admin.admin_email = admin_email
+                existing_admin.last_activity = datetime.utcnow()
                 db.commit()
-                logger.info(f"Updated site admin PPID for {admin_email} on site {site_id}: {old_ppid[:20]}... -> {new_ppid[:20]}...")
+                logger.info(f"Updated site admin PPID on site {site_id}: {old_ppid[:20]}... -> {new_ppid[:20]}...")
             else:
-                # Create new admin record
+                # No existing record found - create new
                 new_admin = SiteAdmin(
                     site_id=site_id,
                     admin_did=new_ppid,
@@ -599,6 +623,87 @@ def _update_site_admin_ppid(site_id: str, admin_email: str, new_ppid: str):
             
     except Exception as e:
         logger.error(f"Failed to update site admin PPID: {e}")
+
+
+def _update_all_admin_sites(admin_email: str, new_ppid: str, exclude_site_id: str = None) -> list:
+    """
+    Update ALL sites owned by this admin with the new PPID.
+    
+    When a developer recovers with a different wallet, their other sites still
+    have the old PPID in site_admins. This finds all sites where the admin_email
+    matches (in the sites table) and updates site_admins for each one.
+    
+    Returns list of other site_ids that were updated.
+    """
+    updated_sites = []
+    
+    if not admin_email:
+        return updated_sites
+    
+    try:
+        from api.database import SessionLocal, Site, SiteAdmin
+        
+        db = SessionLocal()
+        try:
+            # Find all sites where this email is the admin
+            owned_sites = db.query(Site).filter(
+                Site.admin_email == admin_email
+            ).all()
+            
+            for site in owned_sites:
+                if site.site_id == exclude_site_id:
+                    continue  # Already handled
+                
+                # Check if this site already has a record with the new PPID
+                existing = db.query(SiteAdmin).filter(
+                    SiteAdmin.site_id == site.site_id,
+                    SiteAdmin.admin_did == new_ppid,
+                    SiteAdmin.is_active == True
+                ).first()
+                
+                if existing:
+                    continue  # Already up to date
+                
+                # Find the existing owner/admin record to update
+                old_admin = db.query(SiteAdmin).filter(
+                    SiteAdmin.site_id == site.site_id,
+                    SiteAdmin.is_active == True
+                ).order_by(
+                    # Prefer owner records
+                    SiteAdmin.admin_role.desc()
+                ).first()
+                
+                if old_admin:
+                    old_admin.admin_did = new_ppid
+                    if admin_email:
+                        old_admin.admin_email = admin_email
+                    old_admin.last_activity = datetime.utcnow()
+                    updated_sites.append(site.site_id)
+                    logger.info(f"Updated PPID for additional site {site.site_id} during recovery")
+                else:
+                    # No admin record exists - create one
+                    new_admin = SiteAdmin(
+                        site_id=site.site_id,
+                        admin_did=new_ppid,
+                        admin_email=admin_email,
+                        admin_role='owner',
+                        is_active=True,
+                        added_by='account_recovery'
+                    )
+                    db.add(new_admin)
+                    updated_sites.append(site.site_id)
+                    logger.info(f"Created admin record for additional site {site.site_id} during recovery")
+            
+            if updated_sites:
+                db.commit()
+                
+        finally:
+            db.close()
+            
+    except Exception as e:
+        logger.error(f"Failed to update other admin sites: {e}")
+    
+    return updated_sites
 
 
 @account_recovery_bp.route('/api/recovery/issue-admin-proof', methods=['POST'])
@@ -682,14 +787,20 @@ def issue_recovery_admin_proof():
                 'error': 'Failed to issue admin proof'
             }), 500
         
-        # Update site_admins table with the new PPID
+        # Update site_admins table with the new PPID for the recovered site
         _update_site_admin_ppid(site_id, admin_email, ppid)
+        
+        # Also update any OTHER sites this admin owns
+        # (their old PPID won't match after wallet change)
+        other_sites_updated = _update_all_admin_sites(admin_email, ppid, exclude_site_id=site_id)
         
         # Clear one-time recovery flag (but keep session active)
         flask_session.pop('recovery_complete', None)
         flask_session.pop('recovery_site_id', None)
         
         logger.info(f"Recovery admin proof issued for site {site_id} to PPID {ppid[:30]}...")
+        if other_sites_updated:
+            logger.info(f"Also updated {len(other_sites_updated)} other site(s): {other_sites_updated}")
         
         return jsonify({
             'success': True,
@@ -697,6 +808,7 @@ def issue_recovery_admin_proof():
             'credential_id': credential.get('id'),
             'site_id': site_id,
             'site_domain': site_domain,
+            'other_sites_updated': other_sites_updated,
             'message': 'Admin proof issued. Store in your wallet.'
         })
         
