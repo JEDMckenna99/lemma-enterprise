@@ -1603,15 +1603,15 @@ class LemmaWallet {
                     };
             }
             
-            // Not authorized - redirect to lemma.id
-            console.log(`[Lemma] Not authorized (${authResult.reason}) - redirecting to lemma.id`);
-                this.unlockWithRedirect();
-                return {
-                    success: false,
-                    redirecting: true,
+            // Not authorized - return status (developer decides whether to redirect)
+            console.log(`[Lemma] Not authorized (${authResult.reason}) - developer should handle redirect`);
+            return {
+                success: false,
+                needsRedirect: true,
                 reason: authResult.reason,
-                    message: 'Redirecting to lemma.id for authentication...'
-                };
+                message: 'User needs to sign in via lemma.id',
+                redirectUrl: `https://lemma.id/unlock?return=${encodeURIComponent(window.location.href)}`
+            };
         }
 
         if (!this._isPasskeySupported()) {
@@ -1822,16 +1822,16 @@ class LemmaWallet {
                 };
             }
             
-            // Not authorized - redirect to lemma.id
-            console.log(`[Lemma] Not authorized (${authResult.reason}) - redirecting to lemma.id`);
-                this.unlockWithRedirect();
-                return {
-                    success: false,
-                    redirecting: true,
+            // Not authorized - return status (developer decides whether to redirect)
+            console.log(`[Lemma] Not authorized (${authResult.reason}) - developer should handle redirect`);
+            return {
+                success: false,
+                needsRedirect: true,
                 reason: authResult.reason,
-                    message: 'Redirecting to lemma.id for authentication...'
-                };
-            }
+                message: 'User needs to sign in via lemma.id',
+                redirectUrl: `https://lemma.id/unlock?return=${encodeURIComponent(window.location.href)}`
+            };
+        }
 
         // ============================================================
         // LOCAL-ONLY PASSKEY VERIFICATION
