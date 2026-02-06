@@ -433,12 +433,14 @@ def complete_recovery():
             db.close()
         
         # Store recovery context in session for passkey registration
+        # IMPORTANT: passkey_auth.py reads 'customer_id' and 'user_email' from session
         from flask import session as flask_session
         flask_session['recovery_complete'] = True
         flask_session['recovery_site_id'] = site_id
         flask_session['recovery_email'] = admin_email
         flask_session['customer_id'] = customer_id or admin_email
         flask_session['customer_email'] = admin_email
+        flask_session['user_email'] = admin_email  # Required by passkey registration endpoint
         
         # Mark token as used ONLY after all work succeeded
         # This prevents the token from being consumed if something above fails,
