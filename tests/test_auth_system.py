@@ -561,5 +561,142 @@ class TestAuthIntegration:
         assert '@rate_limit(credential_issue_limit)' in content
 
 
+# ============================================
+# SESSION MANAGER TESTS
+# ============================================
+
+class TestSessionManager:
+    """Test centralized session management."""
+
+    def test_session_manager_imports(self):
+        """Session manager should export all required functions."""
+        from auth.session_manager import (
+            SESSION_DURATION,
+            SESSION_COOKIE_NAME,
+            CSRF_COOKIE_NAME,
+            UNLOCK_TOKEN_TTL,
+            generate_session_token,
+            validate_session_token,
+            generate_unlock_token,
+            validate_unlock_token,
+            generate_csrf_token,
+            get_session_expiry,
+            get_current_time_ms,
+            is_session_expired,
+            get_time_remaining,
+        )
+
+        assert SESSION_DURATION == 24 * 60 * 60
+        assert callable(generate_session_token)
+        assert callable(validate_session_token)
+
+    def test_session_token_roundtrip(self):
+        """Session token should validate after generation."""
+        from auth.session_manager import generate_session_token, validate_session_token
+
+        wallet_id = "wallet_test123"
+        unlocked_at = int(time.time() * 1000)
+
+        token = generate_session_token(wallet_id, unlocked_at)
+        assert token is not None
+
+        data = validate_session_token(token)
+        assert data is not None
+        assert data['wallet_id'] == wallet_id
+
+    def test_session_token_with_profile(self):
+        """Session token should preserve profile information."""
+        from auth.session_manager import generate_session_token, validate_session_token
+
+        wallet_id = "wallet_profile_test"
+        unlocked_at = int(time.time() * 1000)
+        profile_id = "work"
+        profile_name = "Work Profile"
+
+        token = generate_session_token(wallet_id, unlocked_at, profile_id, profile_name)
+        data = validate_session_token(token)
+
+        assert data is not None
+        assert data['profile_id'] == profile_id
+        assert data['profile_name'] == profile_name
+
+    def test_session_token_invalid_signature(self):
+        """Tampered session token should not validate."""
+        from auth.session_manager import generate_session_token, validate_session_token
+
+        token = generate_session_token("wallet_123", int(time.time() * 1000))
+        # Tamper with the token
+        parts = token.split(':')
+        parts[-1] = 'invalid_signature_12345678'
+        tampered = ':'.join(parts)
+
+        assert validate_session_token(tampered) is None
+
+    def test_unlock_token_roundtrip(self):
+        """Unlock token should validate within TTL."""
+        from auth.session_manager import generate_unlock_token, validate_unlock_token
+
+        wallet_id = "wallet_unlock_test"
+        unlocked_at = int(time.time() * 1000)
+        expires_at = int(time.time()) + 86400
+
+        token = generate_unlock_token(wallet_id, unlocked_at, expires_at)
+        assert token is not None
+
+        data = validate_unlock_token(token)
+        assert data is not None
+        assert data['wallet_id'] == wallet_id
+        assert data['expires_at'] == expires_at
+
+    def test_unlock_token_expiry(self):
+        """Unlock token should expire after TTL."""
+        from auth.session_manager import (
+            generate_unlock_token,
+            validate_unlock_token,
+            UNLOCK_TOKEN_TTL
+        )
+
+        # We can't easily test real expiry without waiting,
+        # but we can verify the TTL constant is reasonable
+        assert UNLOCK_TOKEN_TTL == 5 * 60  # 5 minutes
+
+    def test_csrf_token_generation(self):
+        """CSRF token should be generated securely."""
+        from auth.session_manager import generate_csrf_token
+
+        token1 = generate_csrf_token()
+        token2 = generate_csrf_token()
+
+        assert token1 is not None
+        assert len(token1) > 20  # Should be sufficiently long
+        assert token1 != token2  # Should be unique
+
+    def test_session_expiry_helpers(self):
+        """Session expiry helpers should work correctly."""
+        from auth.session_manager import (
+            get_session_expiry,
+            is_session_expired,
+            get_time_remaining,
+            SESSION_DURATION
+        )
+
+        expires_at = get_session_expiry()
+        assert expires_at > int(time.time())
+        assert expires_at <= int(time.time()) + SESSION_DURATION + 1
+
+        # Not expired yet
+        assert not is_session_expired(expires_at)
+
+        # Time remaining should be positive
+        remaining = get_time_remaining(expires_at)
+        assert remaining > 0
+        assert remaining <= SESSION_DURATION
+
+        # Expired session
+        past_expiry = int(time.time()) - 100
+        assert is_session_expired(past_expiry)
+        assert get_time_remaining(past_expiry) == 0
+
+
 if __name__ == '__main__':
     pytest.main([__file__, '-v', '--tb=short'])

@@ -651,17 +651,18 @@ def passkey_authenticate_complete():
         expires_at = None
         unlocked_at_ms = int(datetime.utcnow().timestamp() * 1000)
         try:
-            from api.wallet_session_sync import (
+            from auth.session_manager import (
                 generate_session_token,
                 generate_unlock_token,
+                generate_csrf_token,
                 SESSION_COOKIE_NAME,
                 CSRF_COOKIE_NAME,
-                SESSION_DURATION,
-                _store_global_session,
+                get_session_expiry,
             )
-            csrf_token = secrets.token_urlsafe(32)
+            from api.wallet_session_sync import _store_global_session
+            csrf_token = generate_csrf_token()
             session_token = generate_session_token(wallet_id, unlocked_at_ms)
-            expires_at = int(datetime.utcnow().timestamp()) + SESSION_DURATION
+            expires_at = get_session_expiry()
             global_stored = _store_global_session(
                 wallet_id=wallet_id,
                 unlocked_at=unlocked_at_ms,
@@ -1102,10 +1103,10 @@ def wallet_auth():
             
             # Set global wallet session for cross-device sync
             try:
-                from api.wallet_session_sync import _store_global_session, SESSION_DURATION
-                import time
-                unlocked_at_ms = int(time.time() * 1000)
-                expires_at = int(time.time()) + SESSION_DURATION
+                from auth.session_manager import get_session_expiry, get_current_time_ms
+                from api.wallet_session_sync import _store_global_session
+                unlocked_at_ms = get_current_time_ms()
+                expires_at = get_session_expiry()
                 _store_global_session(
                     wallet_id=wallet_id,
                     unlocked_at=unlocked_at_ms,

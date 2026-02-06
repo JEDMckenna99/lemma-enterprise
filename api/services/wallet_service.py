@@ -36,13 +36,21 @@ from flask import Blueprint, request, jsonify, session, make_response, g
 logger = logging.getLogger(__name__)
 
 # ============================================================================
-# CONFIGURATION
+# CONFIGURATION - Import from centralized session manager
 # ============================================================================
 
-SESSION_COOKIE_NAME = 'lemma_wallet_session'
-SESSION_DURATION = 24 * 60 * 60  # 24 hours
-SESSION_SECRET = os.environ.get('SESSION_SECRET', 'dev-secret-change-in-production')
-CSRF_COOKIE_NAME = 'lemma_wallet_csrf'
+from auth.session_manager import (
+    SESSION_COOKIE_NAME,
+    SESSION_DURATION,
+    CSRF_COOKIE_NAME,
+    validate_session_token,
+    validate_unlock_token,
+    generate_session_token,
+    generate_csrf_token,
+    get_session_expiry,
+    get_current_time_ms,
+)
+
 TOKEN_EXPIRY = 86400  # 24 hours for PIN reset
 
 # CORS configuration from environment
@@ -151,53 +159,10 @@ def cross_origin_response(data: dict, status: int = 200):
 
 
 # ============================================================================
-# SESSION TOKEN MANAGEMENT
+# SESSION TOKEN MANAGEMENT - Imported from auth.session_manager
 # ============================================================================
-
-def generate_session_token(wallet_id: str, unlocked_at: int) -> str:
-    """Generate a secure session token for the cookie."""
-    session_nonce = secrets.token_hex(16)
-    payload = f"{wallet_id}:{unlocked_at}:{int(time.time())}:{session_nonce}"
-    signature = hmac.new(
-        SESSION_SECRET.encode(),
-        payload.encode(),
-        hashlib.sha256
-    ).hexdigest()[:32]
-    return f"{payload}:{signature}"
-
-
-def validate_session_token(token: str) -> dict:
-    """Validate and decode a session token."""
-    try:
-        parts = token.split(':')
-        if len(parts) != 5:
-            return None
-        
-        wallet_id, unlocked_at, created_at, session_nonce, signature = parts
-        unlocked_at = int(unlocked_at)
-        created_at = int(created_at)
-        
-        payload = f"{wallet_id}:{unlocked_at}:{created_at}:{session_nonce}"
-        expected_sig = hmac.new(
-            SESSION_SECRET.encode(),
-            payload.encode(),
-            hashlib.sha256
-        ).hexdigest()[:32]
-        
-        if not hmac.compare_digest(signature, expected_sig):
-            return None
-        
-        if time.time() - created_at > SESSION_DURATION:
-            return None
-        
-        return {
-            'wallet_id': wallet_id,
-            'unlocked_at': unlocked_at,
-            'created_at': created_at,
-            'expires_at': created_at + SESSION_DURATION
-        }
-    except Exception:
-        return None
+# generate_session_token, validate_session_token, etc. are now imported from
+# auth.session_manager to centralize session logic and avoid duplication.
 
 
 # ============================================================================
@@ -346,7 +311,6 @@ def require_wallet_auth(f):
             unlock_token = _extract_unlock_token()
             if unlock_token:
                 try:
-                    from api.wallet_session_sync import validate_unlock_token
                     unlock_data = validate_unlock_token(unlock_token)
                 except Exception:
                     unlock_data = None

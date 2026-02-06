@@ -29,25 +29,30 @@ What lemma.id CANNOT see:
 
 from flask import Blueprint, request, jsonify, make_response
 import time
-import hashlib
-import hmac
 import os
-import json
 import secrets
 import logging
 from datetime import datetime, timedelta
 from urllib.parse import urlparse
 
+# Import session logic from centralized module
+from auth.session_manager import (
+    SESSION_DURATION,
+    SESSION_COOKIE_NAME,
+    CSRF_COOKIE_NAME,
+    UNLOCK_TOKEN_TTL,
+    generate_session_token,
+    validate_session_token,
+    generate_unlock_token,
+    validate_unlock_token,
+    generate_csrf_token,
+    get_session_expiry,
+    get_current_time_ms,
+)
+
 logger = logging.getLogger(__name__)
 
 wallet_session_sync_bp = Blueprint('wallet_session_sync', __name__)
-
-# Session configuration
-SESSION_COOKIE_NAME = 'lemma_wallet_session'
-SESSION_DURATION = 24 * 60 * 60  # 24 hours in seconds
-SESSION_SECRET = os.environ.get('SESSION_SECRET', 'dev-secret-change-in-production')
-CSRF_COOKIE_NAME = 'lemma_wallet_csrf'
-UNLOCK_TOKEN_TTL = 5 * 60  # 5 minutes
 
 _ALLOWED_ORIGINS = {
     origin.strip().lower()
@@ -114,126 +119,11 @@ def _cors_headers(origin: str | None) -> dict:
 
 
 def _validate_csrf() -> bool:
+    """Validate CSRF token from cookie matches header."""
+    from auth.session_manager import validate_csrf
     csrf_cookie = request.cookies.get(CSRF_COOKIE_NAME)
     csrf_header = request.headers.get('X-Lemma-CSRF')
-    if not csrf_cookie or not csrf_header:
-        return False
-    return secrets.compare_digest(csrf_cookie, csrf_header)
-
-
-def generate_session_token(wallet_id: str, unlocked_at: int, profile_id: str = 'default', profile_name: str = 'Personal') -> str:
-    """Generate a secure session token for the cookie.
-    
-    Args:
-        wallet_id: The user's wallet ID
-        unlocked_at: Timestamp when wallet was unlocked
-        profile_id: Active profile ID (default: 'default')
-        profile_name: Active profile display name (default: 'Personal')
-    """
-    session_nonce = secrets.token_hex(16)
-    # Include profile info in payload (URL-safe encoding for profile name)
-    import base64
-    profile_name_encoded = base64.urlsafe_b64encode(profile_name.encode()).decode()
-    payload = f"{wallet_id}:{unlocked_at}:{int(time.time())}:{session_nonce}:{profile_id}:{profile_name_encoded}"
-    signature = hmac.new(
-        SESSION_SECRET.encode(),
-        payload.encode(),
-        hashlib.sha256
-    ).hexdigest()[:32]
-    return f"{payload}:{signature}"
-
-
-def generate_unlock_token(wallet_id: str, unlocked_at: int, expires_at: int) -> str:
-    """Generate a short-lived unlock token after verified passkey authentication."""
-    issued_at = int(time.time())
-    nonce = secrets.token_hex(8)
-    payload = f"{wallet_id}:{unlocked_at}:{expires_at}:{issued_at}:{nonce}"
-    signature = hmac.new(
-        SESSION_SECRET.encode(),
-        payload.encode(),
-        hashlib.sha256
-    ).hexdigest()[:32]
-    return f"{payload}:{signature}"
-
-
-def validate_unlock_token(token: str) -> dict | None:
-    """Validate an unlock token and return decoded fields."""
-    try:
-        wallet_id, unlocked_at, expires_at, issued_at, nonce, signature = token.split(':')
-        unlocked_at = int(unlocked_at)
-        expires_at = int(expires_at)
-        issued_at = int(issued_at)
-        payload = f"{wallet_id}:{unlocked_at}:{expires_at}:{issued_at}:{nonce}"
-        expected_sig = hmac.new(
-            SESSION_SECRET.encode(),
-            payload.encode(),
-            hashlib.sha256
-        ).hexdigest()[:32]
-        if not hmac.compare_digest(signature, expected_sig):
-            return None
-        if int(time.time()) - issued_at > UNLOCK_TOKEN_TTL:
-            return None
-        return {
-            'wallet_id': wallet_id,
-            'unlocked_at': unlocked_at,
-            'expires_at': expires_at
-        }
-    except Exception:
-        return None
-
-
-def validate_session_token(token: str) -> dict:
-    """Validate and decode a session token."""
-    import base64
-    try:
-        parts = token.split(':')
-        
-        # Support both old format (5 parts) and new format with profiles (7 parts)
-        if len(parts) == 5:
-            # Legacy format without profile
-            wallet_id, unlocked_at, created_at, session_nonce, signature = parts
-            profile_id = 'default'
-            profile_name = 'Personal'
-            payload = f"{wallet_id}:{unlocked_at}:{created_at}:{session_nonce}"
-        elif len(parts) == 7:
-            # New format with profile
-            wallet_id, unlocked_at, created_at, session_nonce, profile_id, profile_name_encoded, signature = parts
-            try:
-                profile_name = base64.urlsafe_b64decode(profile_name_encoded.encode()).decode()
-            except:
-                profile_name = 'Personal'
-            payload = f"{wallet_id}:{unlocked_at}:{created_at}:{session_nonce}:{profile_id}:{profile_name_encoded}"
-        else:
-            return None
-        
-        unlocked_at = int(unlocked_at)
-        created_at = int(created_at)
-        
-        # Verify signature
-        expected_sig = hmac.new(
-            SESSION_SECRET.encode(),
-            payload.encode(),
-            hashlib.sha256
-        ).hexdigest()[:32]
-        
-        if not hmac.compare_digest(signature, expected_sig):
-            return None
-        
-        # Check expiration
-        if time.time() - created_at > SESSION_DURATION:
-            return None
-        
-        return {
-            'wallet_id': wallet_id,
-            'unlocked_at': unlocked_at,
-            'created_at': created_at,
-            'expires_at': created_at + SESSION_DURATION,
-            'profile_id': profile_id,
-            'profile_name': profile_name
-        }
-    except Exception:
-        # PRIVACY: Don't log validation errors (could leak timing info)
-        return None
+    return validate_csrf(csrf_cookie, csrf_header)
 
 
 @wallet_session_sync_bp.route('/api/wallet/session-sync', methods=['POST', 'OPTIONS'])
