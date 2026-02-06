@@ -462,6 +462,58 @@ def get_site_keys(site_id):
         }), 500
 
 
+@developer_api_bp.route('/api/developer/sites/<site_id>/keys/<key_id>/reveal', methods=['GET'])
+@cross_origin()
+@require_agent_or_user_auth(required_scope='read')
+def reveal_site_key(site_id, key_id):
+    """Reveal the full API key for copying
+    
+    SECURITY: Requires site ownership verification.
+    Only reveals the primary key (id=0) stored in the sites table.
+    """
+    auth_error = _require_site_ownership(site_id)
+    if auth_error:
+        return auth_error
+    
+    try:
+        from api.database import SessionLocal, Site
+        
+        db = SessionLocal()
+        site = db.query(Site).filter(Site.site_id == site_id).first()
+        
+        if not site:
+            db.close()
+            return jsonify({
+                'success': False,
+                'error': 'Site not found'
+            }), 404
+        
+        if not site.api_key:
+            db.close()
+            return jsonify({
+                'success': False,
+                'error': 'No API key found for this site'
+            }), 404
+        
+        full_key = site.api_key
+        db.close()
+        
+        logger.info(f"API key revealed for site {site_id} by {_get_authenticated_ppid()[:30] if _get_authenticated_ppid() else 'unknown'}...")
+        
+        return jsonify({
+            'success': True,
+            'key': full_key,
+            'key_id': key_id
+        })
+        
+    except Exception as e:
+        logger.error(f"Failed to reveal API key: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
 @developer_api_bp.route('/api/developer/sites/<site_id>/keys', methods=['POST'])
 @cross_origin()
 @require_agent_or_user_auth(required_scope='write')
