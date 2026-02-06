@@ -63,25 +63,34 @@ heroku create lemma-demo-shop --remote demo-shop
 heroku create lemma-demo-bank --remote demo-bank
 ```
 
-### 2. Set environment variables (cross-site URLs):
+### 2. Set environment variables:
+
+Each site needs cross-site URLs and Lemma.id API credentials.
+Get your `LEMMA_API_KEY` and `LEMMA_SITE_ID` from https://lemma.id/developer after registering each site.
 
 ```bash
 # For Site 1 (News)
 heroku config:set SITE1_URL=https://lemma-demo-news.herokuapp.com \
                   SITE2_URL=https://lemma-demo-shop.herokuapp.com \
                   SITE3_URL=https://lemma-demo-bank.herokuapp.com \
+                  LEMMA_API_KEY=your_news_api_key \
+                  LEMMA_SITE_ID=your_news_site_id \
                   --app lemma-demo-news
 
 # For Site 2 (Shop)
 heroku config:set SITE1_URL=https://lemma-demo-news.herokuapp.com \
                   SITE2_URL=https://lemma-demo-shop.herokuapp.com \
                   SITE3_URL=https://lemma-demo-bank.herokuapp.com \
+                  LEMMA_API_KEY=your_shop_api_key \
+                  LEMMA_SITE_ID=your_shop_site_id \
                   --app lemma-demo-shop
 
 # For Site 3 (Bank)
 heroku config:set SITE1_URL=https://lemma-demo-news.herokuapp.com \
                   SITE2_URL=https://lemma-demo-shop.herokuapp.com \
                   SITE3_URL=https://lemma-demo-bank.herokuapp.com \
+                  LEMMA_API_KEY=your_bank_api_key \
+                  LEMMA_SITE_ID=your_bank_site_id \
                   --app lemma-demo-bank
 ```
 
@@ -154,4 +163,4 @@ SITE_CONFIG = {
 }
 ```
 
-The shared template is in `shared/base.html`.
+Each site has its own template in `templates/index.html`.

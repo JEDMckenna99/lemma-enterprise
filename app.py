@@ -126,6 +126,12 @@ def create_app():
         from auth.decorators import init_csrf_protection
         init_csrf_protection(app)
 
+        # Initialize rate limiting (brute force protection)
+        from auth.rate_limiter import create_limiter
+        limiter = create_limiter(app)
+        app.limiter = limiter  # Store on app for blueprint access
+        logger.info("✅ Rate limiter initialized")
+
         # Initialize Stripe manager
         from billing.stripe_manager import init_stripe
         init_stripe()

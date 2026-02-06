@@ -38,6 +38,8 @@ from webauthn.helpers.structs import (
 from webauthn.helpers.cose import COSEAlgorithmIdentifier
 
 from .database import get_db, Passkey, Customer
+from auth.rate_limiter import rate_limit, auth_limit, registration_limit
+from auth import redis_store
 
 logger = logging.getLogger(__name__)
 
@@ -126,8 +128,47 @@ def secure_cors(f):
     
     return decorated_function
 
-# Challenge storage (use Redis in production)
-_challenges = {}  # In-memory for now, move to Redis
+# Challenge storage - uses Redis in production for multi-dyno support
+# Falls back to thread-safe in-memory storage for local development
+CHALLENGE_TTL_SECONDS = 300  # 5 minutes
+
+
+def store_challenge(key: str, value: dict) -> None:
+    """
+    Store a challenge with automatic expiration.
+
+    Uses Redis in production (supports multiple Heroku dynos).
+    Falls back to in-memory for local development.
+    """
+    redis_store.store(f"challenge:{key}", value, ttl_seconds=CHALLENGE_TTL_SECONDS)
+
+
+def get_challenge(key: str) -> dict | None:
+    """
+    Retrieve a stored challenge.
+
+    Returns None if not found or expired.
+    """
+    return redis_store.get(f"challenge:{key}")
+
+
+def delete_challenge(key: str) -> bool:
+    """
+    Delete a challenge after use.
+
+    Returns True if the challenge existed.
+    """
+    return redis_store.delete(f"challenge:{key}")
+
+
+def cleanup_expired_challenges() -> int:
+    """
+    Clean up expired challenges.
+
+    Note: Redis handles expiration automatically, so this only
+    affects the in-memory fallback store.
+    """
+    return redis_store.cleanup_expired()
 
 
 def get_user_passkeys(user_id: str) -> list:
@@ -206,6 +247,7 @@ def update_passkey_sign_count(passkey_id: int, new_sign_count: int):
 
 @passkey_bp.route('/api/passkey/register/begin', methods=['POST', 'OPTIONS'])
 @secure_cors
+@rate_limit(registration_limit)
 def passkey_register_begin():
     """
     Begin passkey registration - returns options for navigator.credentials.create()
@@ -273,15 +315,15 @@ def passkey_register_begin():
             timeout=60000,  # 60 seconds
         )
         
-        # Store challenge for verification
+        # Store challenge for verification (thread-safe)
         challenge_key = f"passkey_reg_{user_id}"
-        _challenges[challenge_key] = {
+        store_challenge(challenge_key, {
             'challenge': base64.urlsafe_b64encode(options.challenge).decode('utf-8'),
             'user_id': user_id,
             'user_email': user_email,
             'device_name': device_name,
             'expires': (datetime.utcnow() + timedelta(minutes=5)).isoformat()
-        }
+        })
         
         logger.info(f"🔐 Passkey registration started for {user_email}")
         
@@ -300,6 +342,7 @@ def passkey_register_begin():
 
 @passkey_bp.route('/api/passkey/register/complete', methods=['POST', 'OPTIONS'])
 @secure_cors
+@rate_limit(registration_limit)
 def passkey_register_complete():
     """
     Complete passkey registration - verify and store the credential
@@ -341,22 +384,22 @@ def passkey_register_complete():
                 'error': 'WebAuthn credential response is required'
             }), 400
         
-        # Retrieve stored challenge
+        # Retrieve stored challenge (thread-safe)
         challenge_key = f"passkey_reg_{user_id}"
-        stored = _challenges.get(challenge_key)
-        
+        stored = get_challenge(challenge_key)
+
         if not stored:
             return jsonify({
                 'success': False,
                 'error': 'Registration session expired or not started'
             }), 400
-        
+
         # SECURITY: Verify challenge hasn't expired
         expires_str = stored.get('expires')
         if expires_str:
             expires = datetime.fromisoformat(expires_str)
             if datetime.utcnow() > expires:
-                del _challenges[challenge_key]
+                delete_challenge(challenge_key)
                 return jsonify({
                     'success': False,
                     'error': 'Registration challenge expired - please start again'
@@ -384,9 +427,9 @@ def passkey_register_complete():
             attestation_data=verification.attestation_object if hasattr(verification, 'attestation_object') else None,
         )
         
-        # Clean up challenge
-        del _challenges[challenge_key]
-        
+        # Clean up challenge (thread-safe)
+        delete_challenge(challenge_key)
+
         logger.info(f"✅ Passkey registered for {stored['user_email']}")
         
         # Return public key for local wallet storage (wallet-centric architecture)
@@ -418,6 +461,7 @@ def passkey_register_complete():
 
 @passkey_bp.route('/api/passkey/authenticate/begin', methods=['POST', 'OPTIONS'])
 @secure_cors
+@rate_limit(auth_limit)
 def passkey_authenticate_begin():
     """
     Begin passkey authentication - returns options for navigator.credentials.get()
@@ -452,14 +496,14 @@ def passkey_authenticate_begin():
             timeout=60000,
         )
         
-        # Store challenge
+        # Store challenge (thread-safe)
         challenge_b64 = base64.urlsafe_b64encode(options.challenge).decode('utf-8')
         challenge_key = f"passkey_auth_{challenge_b64[:16]}"
-        _challenges[challenge_key] = {
+        store_challenge(challenge_key, {
             'challenge': challenge_b64,
             'user_id': user_id,
             'expires': (datetime.utcnow() + timedelta(minutes=5)).isoformat()
-        }
+        })
         
         logger.info(f"🔐 Passkey authentication started")
         
@@ -479,6 +523,7 @@ def passkey_authenticate_begin():
 
 @passkey_bp.route('/api/passkey/authenticate/complete', methods=['POST', 'OPTIONS'])
 @secure_cors
+@rate_limit(auth_limit)
 def passkey_authenticate_complete():
     """
     Complete passkey authentication - verify and issue lemma with embedded proof
@@ -523,20 +568,20 @@ def passkey_authenticate_complete():
                 'error': 'Passkey not found'
             }), 401
         
-        # Retrieve stored challenge
-        stored = _challenges.get(challenge_key)
+        # Retrieve stored challenge (thread-safe)
+        stored = get_challenge(challenge_key)
         if not stored:
             return jsonify({
                 'success': False,
                 'error': 'Authentication session expired'
             }), 400
-        
+
         # SECURITY: Verify challenge hasn't expired
         expires_str = stored.get('expires')
         if expires_str:
             expires = datetime.fromisoformat(expires_str)
             if datetime.utcnow() > expires:
-                del _challenges[challenge_key]
+                delete_challenge(challenge_key)
                 return jsonify({
                     'success': False,
                     'error': 'Authentication challenge expired - please start again'
@@ -555,10 +600,10 @@ def passkey_authenticate_complete():
         
         # Update sign count
         update_passkey_sign_count(passkey.id, verification.new_sign_count)
-        
-        # Clean up challenge
-        del _challenges[challenge_key]
-        
+
+        # Clean up challenge (thread-safe)
+        delete_challenge(challenge_key)
+
         # Get user info and stored wallet_id
         db = get_db()
         wallet_id = None
@@ -904,6 +949,7 @@ def delete_passkey(passkey_id):
 
 @passkey_bp.route('/api/wallet/auth', methods=['POST', 'OPTIONS'])
 @secure_cors
+@rate_limit(auth_limit)
 def wallet_auth():
     """
     SECURE wallet authentication via WebAuthn assertion.
@@ -967,22 +1013,22 @@ def wallet_auth():
                 'error': 'WebAuthn credential assertion is required'
             }), 400
         
-        # SECURITY: Validate challenge exists and hasn't expired
-        challenge_data = _challenges.get(challenge_key)
+        # SECURITY: Validate challenge exists and hasn't expired (thread-safe)
+        challenge_data = get_challenge(challenge_key)
         if not challenge_data:
             logger.warning(f"🚫 SECURITY: Invalid challenge_key attempted: {challenge_key}")
             return jsonify({
                 'success': False,
                 'error': 'Invalid or expired challenge - call /api/passkey/authenticate/begin first'
             }), 401
-        
+
         # SECURITY: Check challenge expiration
         expires_str = challenge_data.get('expires')
         if expires_str:
             expires = datetime.fromisoformat(expires_str)
             if datetime.utcnow() > expires:
                 # Clean up expired challenge
-                del _challenges[challenge_key]
+                delete_challenge(challenge_key)
                 logger.warning(f"🚫 SECURITY: Expired challenge attempted: {challenge_key}")
                 return jsonify({
                     'success': False,
@@ -1035,9 +1081,9 @@ def wallet_auth():
                     'error': 'WebAuthn assertion verification failed'
                 }), 401
             
-            # SECURITY: Delete used challenge to prevent replay
-            del _challenges[challenge_key]
-            
+            # SECURITY: Delete used challenge to prevent replay (thread-safe)
+            delete_challenge(challenge_key)
+
             # Get user info
             user_id = passkey.user_id
             

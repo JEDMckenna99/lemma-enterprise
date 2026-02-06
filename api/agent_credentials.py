@@ -29,6 +29,8 @@ from functools import wraps
 from flask import Blueprint, request, jsonify, g, session
 from flask_cors import cross_origin
 
+from auth.rate_limiter import rate_limit, credential_issue_limit
+
 logger = logging.getLogger(__name__)
 
 agent_credentials_bp = Blueprint('agent_credentials', __name__)
@@ -45,6 +47,39 @@ def hash_task(task_description):
     return hashlib.sha256(task_description.strip().encode()).hexdigest()
 
 
+def normalize_path(path: str) -> str:
+    """
+    Normalize a URL path to prevent path traversal attacks.
+
+    SECURITY: This prevents attacks like:
+    - /api/sites/../admin → /admin (traversal blocked)
+    - /api/sites/./files → /api/sites/files (dot removal)
+    - /api//sites///files → /api/sites/files (slash normalization)
+
+    Returns the canonical path or raises ValueError if traversal detected.
+    """
+    if not path:
+        return '/'
+
+    # Split path into segments
+    segments = path.split('/')
+    normalized = []
+
+    for segment in segments:
+        if segment == '' or segment == '.':
+            # Skip empty segments and current directory
+            continue
+        elif segment == '..':
+            # SECURITY: Block parent directory traversal entirely
+            # Rather than allowing it to go up, we reject the path
+            raise ValueError(f"Path traversal detected in: {path}")
+        else:
+            normalized.append(segment)
+
+    result = '/' + '/'.join(normalized)
+    return result
+
+
 def path_matches_pattern(path, pattern):
     """
     Check if a request path matches an allowed pattern.
@@ -55,16 +90,24 @@ def path_matches_pattern(path, pattern):
     - Double wildcard: "/api/sites/**" matches "/api/sites/123/files/foo"
     - Glob patterns: "/api/*/credentials" matches "/api/agent/credentials"
 
+    SECURITY: Paths are normalized before matching to prevent traversal attacks.
+
     Examples:
         path_matches_pattern("/api/sites/123", "/api/sites/*") -> True
         path_matches_pattern("/api/sites/123/files", "/api/sites/*") -> False
         path_matches_pattern("/api/sites/123/files", "/api/sites/**") -> True
+        path_matches_pattern("/api/sites/../admin", "/api/sites/*") -> ValueError
     """
     if not pattern:
         return True  # No pattern = allow all
 
-    # Normalize paths
-    path = path.rstrip('/')
+    # SECURITY: Normalize paths to prevent traversal attacks
+    try:
+        path = normalize_path(path)
+    except ValueError:
+        # Path traversal detected - reject immediately
+        return False
+
     pattern = pattern.rstrip('/')
 
     # Convert pattern to regex
@@ -134,6 +177,7 @@ def hash_token(plaintext_token):
 
 @agent_credentials_bp.route('/api/agent/credentials/issue', methods=['POST'])
 @cross_origin()
+@rate_limit(credential_issue_limit)
 def issue_agent_credential():
     """
     Issue a new agent credential with optional task-bound authorization.
@@ -989,6 +1033,7 @@ def get_task_adherence_report(token_id):
 # ============================================
 
 @agent_credentials_bp.route('/api/agent/auto-issue', methods=['GET', 'POST'])
+@rate_limit(credential_issue_limit)
 def auto_issue_agent_credential():
     """
     Auto-issue an agent credential if wallet session is active.

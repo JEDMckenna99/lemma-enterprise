@@ -810,11 +810,16 @@ window.addEventListener('message', async (event) => {
                 // SECURITY: Validate credential's siteId matches the requesting origin
                 // EXCEPTIONS:
                 // - lemma.id can store credentials for ANY site (unified wallet)
-                // - Internal site IDs (site_xxx format) are allowed (they're opaque identifiers)
+                // - Internal site IDs (site_xxx format) are only allowed FROM lemma.id origin
+                // SECURITY: The hex regex was removed - it allowed any site to fake internal IDs
                 const credClaims = credential.claims || credential.credentialSubject || {};
                 const credSiteId = (credClaims.siteId || credClaims.site_id || '').toLowerCase().replace(/^www\./, '');
                 const isLemmaOrigin = requestingSite.includes('lemma.id') || requestingSite.includes('lemma-enterprise');
-                const isInternalSiteId = credSiteId.startsWith('site_') || credSiteId.match(/^[a-f0-9-]{20,}$/);
+
+                // SECURITY: Internal siteIds can ONLY come from lemma.id, not arbitrary sites
+                const isInternalSiteId = isLemmaOrigin && (
+                    credSiteId.startsWith('site_') || credSiteId.match(/^[a-f0-9-]{20,}$/)
+                );
 
                 if (!isLemmaOrigin && !isInternalSiteId && credSiteId && credSiteId !== requestingSite &&
                     !requestingSite.endsWith('.' + credSiteId) &&
@@ -889,11 +894,15 @@ window.addEventListener('message', async (event) => {
                 const verifyClaims = credToVerify.claims || credToVerify.credentialSubject || {};
                 const verifySiteId = (verifyClaims.siteId || verifyClaims.site_id || '').toLowerCase().replace(/^www\./, '');
                 const isLemmaVerifying = requestingSite.includes('lemma.id') || requestingSite.includes('lemma-enterprise');
-                const isInternalVerifySiteId = verifySiteId.startsWith('site_') || verifySiteId.match(/^[a-f0-9-]{20,}$/);
-                
+
+                // SECURITY: Internal siteIds only trusted from lemma.id origin
+                const isInternalVerifySiteId = isLemmaVerifying && (
+                    verifySiteId.startsWith('site_') || verifySiteId.match(/^[a-f0-9-]{20,}$/)
+                );
+
                 // Allow verification if:
                 // 1. lemma.id is verifying (unified wallet)
-                // 2. siteId is internal/opaque
+                // 2. siteId is internal/opaque (only from lemma.id)
                 // 3. siteId matches requesting site (or subdomain)
                 // 4. No siteId (cross-site credential)
                 const siteIdMatches = !verifySiteId || isLemmaVerifying || isInternalVerifySiteId ||
@@ -948,8 +957,12 @@ window.addEventListener('message', async (event) => {
                 const quickClaims = quickCredential.claims || quickCredential.credentialSubject || {};
                 const quickSiteId = (quickClaims.siteId || quickClaims.site_id || '').toLowerCase().replace(/^www\./, '');
                 const isLemmaQuickVerify = requestingSite.includes('lemma.id') || requestingSite.includes('lemma-enterprise');
-                const isInternalQuickSiteId = quickSiteId.startsWith('site_') || quickSiteId.match(/^[a-f0-9-]{20,}$/);
-                
+
+                // SECURITY: Internal siteIds only trusted from lemma.id origin
+                const isInternalQuickSiteId = isLemmaQuickVerify && (
+                    quickSiteId.startsWith('site_') || quickSiteId.match(/^[a-f0-9-]{20,}$/)
+                );
+
                 const quickSiteMatches = !quickSiteId || isLemmaQuickVerify || isInternalQuickSiteId ||
                     quickSiteId === requestingSite ||
                     requestingSite.endsWith('.' + quickSiteId) ||
