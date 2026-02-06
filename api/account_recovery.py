@@ -228,14 +228,59 @@ def initiate_recovery():
                     'message': 'If the API key is valid, a recovery link has been sent to the admin email.'
                 })
             
-            # API key is valid - generate recovery token
-            admin_email = site.admin_email
+            # API key is valid - look up the admin email for this site
+            # Priority: customer email (from customer who owns the site) > site.admin_email
+            admin_email = None
+            
+            # Method 1: Look up customer via customer_id in sites table
+            try:
+                from api.database import get_db_connection, Customer
+                conn = get_db_connection()
+                cursor = conn.cursor()
+                cursor.execute("""
+                    SELECT c.email FROM customers c
+                    JOIN sites s ON s.customer_id = c.customer_id
+                    WHERE s.site_id = %s AND c.email IS NOT NULL AND c.email != ''
+                    LIMIT 1
+                """, (site_id,))
+                row = cursor.fetchone()
+                if row and row[0] and '@' in row[0]:
+                    admin_email = row[0]
+                    logger.info(f"Found admin email via customer join for site {site_id}")
+                cursor.close()
+                conn.close()
+            except Exception as e:
+                logger.debug(f"Customer email lookup via join failed: {e}")
+            
+            # Method 2: Check if site.admin_email is a real email (not a PPID)
+            if not admin_email and site.admin_email and '@' in site.admin_email:
+                admin_email = site.admin_email
+            
+            # Method 3: Search customers whose sites JSON contains this site_id
+            if not admin_email:
+                try:
+                    customers_with_site = db.query(Customer).filter(
+                        Customer.email.isnot(None),
+                        Customer.email != ''
+                    ).all()
+                    for c in customers_with_site:
+                        if c.sites:
+                            for s in (c.sites or []):
+                                if isinstance(s, dict) and s.get('site_id') == site_id:
+                                    if c.email and '@' in c.email:
+                                        admin_email = c.email
+                                        logger.info(f"Found admin email via customer sites JSON for site {site_id}")
+                                        break
+                        if admin_email:
+                            break
+                except Exception as e:
+                    logger.debug(f"Customer email lookup via JSON failed: {e}")
             
             if not admin_email:
-                logger.error(f"No admin email for site {site_id}")
+                logger.error(f"No admin email found for site {site_id}")
                 return jsonify({
                     'success': False,
-                    'error': 'No admin email configured for this site. Contact support.'
+                    'error': 'No admin email found for this site. Contact support.'
                 }), 400
             
             # Generate secure token
