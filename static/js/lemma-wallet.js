@@ -1508,7 +1508,13 @@ class LemmaWallet {
                     const redirectResult = await this.checkRedirectReturn();
                     if (redirectResult?.authenticated) {
                         console.log('[Lemma] ✅ Auto-processed redirect - session established');
-                        // Session is now set, continue to check stored session below
+                        
+                        // If session was set in memory by redirect, persist it and use it
+                        if (this.session.isUnlocked && this.session.walletSecret) {
+                            console.log('[Lemma] Redirect set session in memory - persisting to IndexedDB');
+                            await this._put('session', { id: 'current', ...this.session });
+                            return; // Session is ready, skip the IndexedDB read below
+                        }
                     } else {
                         console.warn('[Lemma] Redirect processing did not authenticate:', redirectResult);
                     }
