@@ -850,7 +850,7 @@ class LemmaWallet {
             params.set('state', btoa(JSON.stringify(state)));
         }
         
-        window.location.href = `https://lemma.id/app?${params.toString()}`;
+        window.location.href = `https://lemma.id/unlock?${params.toString()}`;
     }
     
     /**
