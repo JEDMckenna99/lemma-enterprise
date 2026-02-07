@@ -395,6 +395,56 @@ class LemmaWallet {
                 }
             } catch (e) {}
             
+            // Not authorized locally - try bridge session as cross-site fallback
+            // This handles: User authenticated on Site A, now visiting Site B
+            // The bridge iframe shares session state across origins
+            if (authResult.reason === 'wallet_locked' || authResult.reason === 'no_lemma' || authResult.reason === 'session_expired') {
+                try {
+                    console.log('[Lemma] No local auth - checking bridge for cross-site session...');
+                    const bridgeSession = await this.checkBridgeSession();
+
+                    if (bridgeSession.valid) {
+                        console.log('[Lemma] Bridge has valid session - retrieving wallet secret...');
+                        let walletSecret = null;
+                        try {
+                            const secretResult = await this._sendBridgeMessage('GET_WALLET_SECRET');
+                            walletSecret = secretResult?.walletSecret;
+                        } catch (e) {
+                            console.warn('[Lemma] Could not get wallet secret from bridge:', e.message);
+                        }
+
+                        if (walletSecret) {
+                            // Establish local session from bridge data
+                            this.session = {
+                                isUnlocked: true,
+                                unlockedAt: bridgeSession.session?.unlockedAt || Date.now(),
+                                expiresAt: bridgeSession.session?.expiresAt || (Date.now() + getSessionDurationMs()),
+                                walletId: bridgeSession.walletId,
+                                walletSecret: walletSecret,
+                                source: 'bridge_sync'
+                            };
+                            await this._put('session', { id: 'current', ...this.session });
+                            await this._put('secrets', { id: 'master', secret: walletSecret, source: 'bridge_sync' });
+
+                            console.log('[Lemma] ✅ Cross-site auth via bridge - session established');
+                            this._setupLockEventListener();
+
+                            return {
+                                authenticated: true,
+                                needsPasskey: false,
+                                needsRedirect: false,
+                                walletSecret: walletSecret,
+                                walletId: bridgeSession.walletId,
+                                message: 'Authenticated via cross-site bridge session',
+                                source: 'bridge_sync'
+                            };
+                        }
+                    }
+                } catch (e) {
+                    console.warn('[Lemma] Bridge session check failed:', e.message);
+                }
+            }
+
             // Not authorized - check why and recommend action
             if (authResult.reason === 'wallet_locked' || authResult.reason === 'session_expired') {
                 console.log('[Lemma] Wallet locked/expired - redirect to unlock');
@@ -403,7 +453,7 @@ class LemmaWallet {
                 result.message = authResult.message;
                 return result;
             }
-            
+
             if (authResult.reason === 'no_lemma') {
                 console.log('[Lemma] No lemma and no session - redirect to sign in');
                 result.needsRedirect = true;
@@ -411,7 +461,7 @@ class LemmaWallet {
                 result.message = 'Sign in with Lemma to access this site';
                 return result;
             }
-            
+
             // Verification failed (signature/revoked/etc)
             console.log(`[Lemma] Authorization failed: ${authResult.reason}`);
             result.needsRedirect = true;
@@ -827,10 +877,10 @@ class LemmaWallet {
         };
         
         try {
-            sessionStorage.setItem('lemma_redirect_state', JSON.stringify(redirectState));
+            localStorage.setItem('lemma_redirect_state', JSON.stringify(redirectState));
         } catch (e) {
             // Fallback to URL-encoded state in the redirect
-            console.warn('[Lemma] Could not save redirect state to sessionStorage');
+            console.warn('[Lemma] Could not save redirect state to localStorage');
         }
         
         console.log('[Lemma] Redirecting to lemma.id for wallet unlock...');
@@ -850,13 +900,72 @@ class LemmaWallet {
             params.set('state', btoa(JSON.stringify(state)));
         }
         
+        this._showRedirectOverlay('Connecting to Lemma...');
         window.location.href = `https://lemma.id/unlock?${params.toString()}`;
     }
-    
+
+    /**
+     * Show a full-page overlay during redirects to prevent blank page flash.
+     * Uses inline styles and z-index:2147483647 to work on any site.
+     * @param {string} message - Text to display
+     * @private
+     */
+    _showRedirectOverlay(message) {
+        try {
+            const overlay = document.createElement('div');
+            overlay.id = 'lemma-redirect-overlay';
+            overlay.setAttribute('style',
+                'position:fixed;top:0;left:0;width:100%;height:100%;' +
+                'background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);' +
+                'z-index:2147483647;display:flex;flex-direction:column;' +
+                'align-items:center;justify-content:center;opacity:0;' +
+                'transition:opacity 200ms ease-in;'
+            );
+            overlay.innerHTML =
+                '<div style="width:40px;height:40px;border:3px solid rgba(255,255,255,0.3);' +
+                'border-radius:50%;border-top-color:#fff;animation:lemma-spin 0.8s linear infinite;' +
+                'margin-bottom:16px;"></div>' +
+                '<div style="color:#fff;font-family:-apple-system,BlinkMacSystemFont,sans-serif;' +
+                'font-size:1.1rem;font-weight:500;">' + (message || 'Connecting to Lemma...') + '</div>';
+
+            const style = document.createElement('style');
+            style.textContent = '@keyframes lemma-spin{to{transform:rotate(360deg)}}';
+            overlay.appendChild(style);
+
+            document.body.appendChild(overlay);
+            requestAnimationFrame(() => {
+                requestAnimationFrame(() => { overlay.style.opacity = '1'; });
+            });
+        } catch (e) {
+            // Non-critical UI enhancement; don't block redirect
+        }
+    }
+
+    /**
+     * Clean up stale redirect state from localStorage.
+     * Prevents localStorage pollution from abandoned redirect flows.
+     * @private
+     */
+    _cleanupStaleRedirectState() {
+        try {
+            const stateJson = localStorage.getItem('lemma_redirect_state');
+            if (stateJson) {
+                const state = JSON.parse(stateJson);
+                if (Date.now() - state.timestamp > 10 * 60 * 1000) {
+                    localStorage.removeItem('lemma_redirect_state');
+                    console.log('[Lemma] Cleaned up stale redirect state');
+                }
+            }
+        } catch (e) {
+            // If we can't parse it, remove it
+            try { localStorage.removeItem('lemma_redirect_state'); } catch (_) {}
+        }
+    }
+
     /**
      * Check if we're returning from a redirect-based unlock.
      * Call this on page load to complete the redirect flow.
-     * 
+     *
      * @returns {Promise<Object|null>} Auth result if returning from redirect, null otherwise
      */
     async checkRedirectReturn() {
@@ -871,12 +980,12 @@ class LemmaWallet {
         // Retrieve saved redirect state (contains decryption key)
         let savedState = null;
         try {
-            const stateJson = sessionStorage.getItem('lemma_redirect_state');
+            const stateJson = localStorage.getItem('lemma_redirect_state');
             if (stateJson) {
                 savedState = JSON.parse(stateJson);
                 // Only valid if recent (within 10 minutes)
                 if (Date.now() - savedState.timestamp > 10 * 60 * 1000) {
-                    sessionStorage.removeItem('lemma_redirect_state');
+                    localStorage.removeItem('lemma_redirect_state');
                     savedState = null;
                 }
             }
@@ -890,7 +999,7 @@ class LemmaWallet {
                     
         // Clear the redirect state AFTER we've read it
         try {
-            sessionStorage.removeItem('lemma_redirect_state');
+            localStorage.removeItem('lemma_redirect_state');
         } catch (e) {}
         
         // Clean up URL (remove lemma params)
@@ -1391,6 +1500,7 @@ class LemmaWallet {
                 this.db = request.result;
                 this._initialized = true;
                 await this._checkSessionState();
+                this._cleanupStaleRedirectState();
                 resolve();
             };
 

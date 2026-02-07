@@ -512,6 +512,34 @@ async function handleRedirectReturn() {
     }
 }
 
+// Get wallet ID directly from IndexedDB (fast-path, ~10ms)
+async function getStoredWalletIdDirectly() {
+    return new Promise((resolve) => {
+        const request = indexedDB.open('LemmaWallet', 4);
+        request.onerror = () => resolve(null);
+        request.onsuccess = () => {
+            const db = request.result;
+            try {
+                const tx = db.transaction(['passkey'], 'readonly');
+                const store = tx.objectStore('passkey');
+                const getRequest = store.get('walletId');
+                getRequest.onsuccess = () => {
+                    const record = getRequest.result;
+                    db.close();
+                    resolve(record?.value || null);
+                };
+                getRequest.onerror = () => {
+                    db.close();
+                    resolve(null);
+                };
+            } catch (e) {
+                db.close();
+                resolve(null);
+            }
+        };
+    });
+}
+
 // Get wallet secret directly from IndexedDB (uses DB version 4)
 async function getStoredSecretDirectly() {
     return new Promise((resolve) => {
@@ -677,7 +705,58 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('create-wallet-btn').addEventListener('click', createWallet);
     
     parseParams();
-    
+
+    // FAST-PATH: For returning users with valid global session, skip all debug checks
+    // and bounce through in <300ms instead of ~500-800ms
+    if (redirectParams) {
+        try {
+            const fastWalletId = await getStoredWalletIdDirectly();
+            if (fastWalletId) {
+                const globalCheck = await fetch('/api/wallet/global-session', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ wallet_id: fastWalletId })
+                });
+                if (globalCheck.ok) {
+                    const globalData = await globalCheck.json();
+                    if (globalData.valid === true) {
+                        const fastSecret = await getStoredSecretDirectly();
+                        if (fastSecret) {
+                            console.log('[Unlock Fast-Path] Valid global session + wallet secret found, bouncing through');
+                            document.getElementById('unlock-btn').innerHTML = '<span class="spinner"></span>Redirecting...';
+                            document.getElementById('unlock-btn').disabled = true;
+
+                            // Set local session so handleRedirectReturn works
+                            await wallet.init();
+                            await wallet._put('session', {
+                                id: 'current',
+                                isUnlocked: true,
+                                unlockedAt: Date.now(),
+                                expiresAt: Date.now() + 24 * 60 * 60 * 1000,
+                                walletId: fastWalletId,
+                                walletSecret: fastSecret,
+                                source: 'fast_path'
+                            });
+                            wallet.session = {
+                                isUnlocked: true,
+                                unlockedAt: Date.now(),
+                                expiresAt: Date.now() + 24 * 60 * 60 * 1000,
+                                walletId: fastWalletId,
+                                walletSecret: fastSecret,
+                                source: 'fast_path'
+                            };
+
+                            await handleRedirectReturn();
+                            return;
+                        }
+                    }
+                }
+            }
+        } catch (e) {
+            console.warn('[Unlock Fast-Path] Failed, falling through to normal path:', e);
+        }
+    }
+
     // Debug: Check IndexedDB directly first
     const dbDebug = await debugCheckIndexedDB();
     console.log('[Unlock Debug] Direct DB check:', dbDebug);

@@ -11,6 +11,7 @@ from sqlalchemy import func, and_, or_
 
 from api.database import get_db_connection
 from api.usage_tracking import get_monthly_active_users, get_verification_count
+from auth.decorators import require_api_key
 
 logger = logging.getLogger(__name__)
 
@@ -710,10 +711,13 @@ def get_time_ago(timestamp):
 
 
 @platform_stats_bp.route('/api/platform/issue-site-permission', methods=['POST'])
+@require_api_key
 def issue_site_permission():
     """
     Issue a permission credential directly to a user for any registered site.
     This allows platform admins to grant access without the email confirmation flow.
+    
+    Security: Requires valid API key (platform or customer).
     
     POST /api/platform/issue-site-permission
     {

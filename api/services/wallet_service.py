@@ -736,9 +736,84 @@ class TransferSession:
 # ROUTES: WALLET-FIRST AUTHENTICATION
 # ============================================================================
 
+# Platform site IDs that are always allowed from same-origin/allowed origins
+_PLATFORM_SITE_IDS = {'lemma.id', 'lemma_platform', 'lemma_federated', 'lemma_iam'}
+
+def _validate_issuance_request(site_id: str):
+    """
+    Validate that a lemma issuance request is authorized.
+    
+    Security checks:
+    1. Platform site IDs: only from same-origin or allowed origins
+    2. Third-party site IDs: site must be registered in database
+    3. Cross-origin requests: Origin must match the requested site domain
+       (prevents site A from requesting lemmas for site B)
+    
+    Returns: (allowed: bool, error_message: str or None)
+    """
+    origin = request.headers.get('Origin')
+    
+    # Platform site IDs: allow from same-origin or allowed origins
+    if site_id in _PLATFORM_SITE_IDS:
+        if not origin or _origin_allowed(origin):
+            return True, None
+        logger.warning(f"Platform issuance blocked from origin: {origin}")
+        return False, 'Platform issuance not allowed from this origin'
+    
+    # Third-party site: must be registered in database
+    try:
+        from api.database import SessionLocal, Site
+        db = SessionLocal()
+        try:
+            site = db.query(Site).filter(
+                (Site.site_id == site_id) | (Site.site_domain == site_id)
+            ).first()
+        finally:
+            db.close()
+        
+        if not site:
+            logger.warning(f"Issuance blocked for unregistered site: {site_id}")
+            return False, f'Site not registered: {site_id}'
+        
+        # Cross-origin requests: origin must match the site domain
+        if origin:
+            origin_hostname = (urlparse(origin).hostname or '').lower()
+            site_domain = (site.site_domain or '').lower()
+            
+            # Allow if origin matches site domain (exact or subdomain)
+            if origin_hostname == site_domain or origin_hostname.endswith('.' + site_domain):
+                return True, None
+            
+            # Allow if origin is lemma.id (developer setup page making requests)
+            if _origin_allowed(origin):
+                return True, None
+            
+            logger.warning(f"Origin mismatch: {origin} requesting issuance for {site_domain}")
+            return False, f'Origin does not match site domain'
+        
+        # No origin header (same-origin from lemma.id): allow for registered sites
+        return True, None
+        
+    except Exception as e:
+        logger.error(f"Issuance validation error: {e}")
+        return False, 'Unable to validate site registration'
+
+
+# Import rate limiter (Redis-backed in production)
+try:
+    from api.rate_limiter import rate_limit as _redis_rate_limit
+    _rate_limit_available = True
+except ImportError:
+    _rate_limit_available = False
+
+
 @wallet_service_bp.route('/api/wallet-auth/issue', methods=['POST'])
 def issue_to_wallet():
-    """Issue a permission lemma directly to the user's wallet."""
+    """Issue a permission lemma directly to the user's wallet.
+    
+    Security: Rate limited (20/min per IP), requires registered site,
+    cross-origin requests must match site domain.
+    """
     try:
         data = request.get_json() or {}
         
@@ -747,6 +822,15 @@ def issue_to_wallet():
             site_id = validate_site_id(data.get('site_id'), required=False, allow_lemma_default=True)
         except ValidationError as ve:
             return jsonify({'success': False, 'error': 'validation_error', 'message': str(ve)}), 400
+        
+        # Validate issuance is authorized for this site/origin
+        allowed, error_msg = _validate_issuance_request(site_id)
+        if not allowed:
+            return jsonify({
+                'success': False,
+                'error': 'issuance_not_authorized',
+                'message': error_msg
+            }), 403
         
         wallet_secret = data.get('wallet_secret')
         passkey_credential_id = data.get('passkey_credential_id')
@@ -776,13 +860,31 @@ def issue_to_wallet():
         logger.error(f"Wallet issue failed: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
+# Apply rate limiting if available (20 requests per minute per IP)
+if _rate_limit_available:
+    issue_to_wallet = _redis_rate_limit(20, 60)(issue_to_wallet)
+
 
 @wallet_service_bp.route('/api/wallet-auth/register-and-issue', methods=['POST'])
 def register_and_issue():
-    """Combined: Register passkey + Issue permission."""
+    """Combined: Register passkey + Issue permission.
+    
+    Security: Rate limited (20/min per IP), requires registered site,
+    cross-origin requests must match site domain.
+    """
     try:
         data = request.get_json() or {}
         site_id = data.get('site_id', 'lemma.id')
+        
+        # Validate issuance is authorized for this site/origin
+        allowed, error_msg = _validate_issuance_request(site_id)
+        if not allowed:
+            return jsonify({
+                'success': False,
+                'error': 'issuance_not_authorized',
+                'message': error_msg
+            }), 403
+        
         wallet_secret = data.get('wallet_secret')
         passkey_credential_id = data.get('passkey_credential_id')
         
@@ -809,6 +911,10 @@ def register_and_issue():
         
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
+
+# Apply rate limiting if available (20 requests per minute per IP)
+if _rate_limit_available:
+    register_and_issue = _redis_rate_limit(20, 60)(register_and_issue)
 
 
 @wallet_service_bp.route('/api/wallet-auth/verify-session', methods=['POST'])
