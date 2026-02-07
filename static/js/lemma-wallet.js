@@ -1507,13 +1507,31 @@ class LemmaWallet {
                 try {
                     const redirectResult = await this.checkRedirectReturn();
                     if (redirectResult?.authenticated) {
-                        console.log('[Lemma] ✅ Auto-processed redirect - session established');
+                        console.log('[Lemma] ✅ Redirect returned authenticated');
                         
-                        // If session was set in memory by redirect, persist it and use it
-                        if (this.session.isUnlocked && this.session.walletSecret) {
-                            console.log('[Lemma] Redirect set session in memory - persisting to IndexedDB');
+                        // checkRedirectReturn() returns data but doesn't set this.session
+                        // We need to set it ourselves from the returned data
+                        const walletSecret = redirectResult.walletSecret || this.session.walletSecret;
+                        const walletId = redirectResult.walletId || this.session.walletId;
+                        
+                        if (walletSecret) {
+                            this.session = {
+                                isUnlocked: true,
+                                unlockedAt: Date.now(),
+                                expiresAt: Date.now() + (24 * 60 * 60 * 1000),
+                                walletId: walletId,
+                                walletSecret: walletSecret,
+                                source: 'redirect'
+                            };
                             await this._put('session', { id: 'current', ...this.session });
-                            return; // Session is ready, skip the IndexedDB read below
+                            
+                            // Also store wallet secret for future use
+                            await this._put('secrets', { id: 'master', secret: walletSecret, source: 'redirect' });
+                            
+                            console.log('[Lemma] ✅ Session created from redirect data and persisted');
+                            return; // Session is ready
+                        } else {
+                            console.warn('[Lemma] Redirect authenticated but no walletSecret returned');
                         }
                     } else {
                         console.warn('[Lemma] Redirect processing did not authenticate:', redirectResult);
