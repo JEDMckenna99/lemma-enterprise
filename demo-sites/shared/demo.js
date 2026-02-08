@@ -4,7 +4,6 @@
 
 const wallet = new LemmaWallet();
 let startTime = 0, keystrokes = 0, tradSteps = 0;
-document.addEventListener('keydown', e => { if (e.target.tagName === 'INPUT') keystrokes++; });
 
 // =============================================
 // LEMMA INTEGRATION (what every developer does)
@@ -88,13 +87,13 @@ function hideInterstitial() {
 // =============================================
 
 function toggleTrad() { const panel = document.getElementById('trad-panel'); const arrow = document.getElementById('trad-arrow'); if (panel) panel.classList.toggle('open'); if (arrow) arrow.classList.toggle('open'); }
-function switchTab(t) { document.getElementById('tab-create').classList.toggle('active', t==='create'); document.getElementById('tab-signin').classList.toggle('active', t==='signin'); document.getElementById('create-form').classList.toggle('hidden', t!=='create'); document.getElementById('signin-form').classList.toggle('hidden', t!=='signin'); }
-function checkPassword() { const pw=document.getElementById('create-password').value; const c={'req-length':pw.length>=8,'req-upper':/[A-Z]/.test(pw),'req-number':/[0-9]/.test(pw),'req-special':/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(pw)}; let ok=true; for(const[id,met] of Object.entries(c)){document.getElementById(id).className='pw-req '+(met?'met':'unmet');if(!met)ok=false;} checkConfirm(); return ok; }
-function checkConfirm() { const pw=document.getElementById('create-password').value,cf=document.getElementById('create-confirm').value; const v=checkPasswordValid(),m=pw===cf&&cf.length>0; document.getElementById('confirm-error').style.display=(cf.length>0&&!m)?'block':'none'; document.getElementById('create-confirm').className=cf.length>0?(m?'valid':'invalid'):''; document.getElementById('create-btn').disabled=!(v&&m); }
-function checkPasswordValid() { const pw=document.getElementById('create-password').value; return pw.length>=8&&/[A-Z]/.test(pw)&&/[0-9]/.test(pw)&&/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(pw); }
-function handleCreate(e) { e.preventDefault(); if(!checkPasswordValid()) return false; startTime=startTime||performance.now(); tradSteps=3; document.getElementById('verify-email-display').textContent=document.getElementById('create-email').value; document.getElementById('email-verify-step').classList.remove('hidden'); document.getElementById('create-btn').classList.add('hidden'); return false; }
-async function completeVerification() { tradSteps=4; const email=document.getElementById('create-email').value; await fetch('/api/auth/password',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email})}); showSuccess(email,'password',((performance.now()-startTime)/1000).toFixed(1),keystrokes,tradSteps+' steps'); }
-async function handleSignIn(e) { e.preventDefault(); startTime=startTime||performance.now(); const email=document.getElementById('signin-email').value; await fetch('/api/auth/password',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email})}); showSuccess(email,'password',((performance.now()-startTime)/1000).toFixed(1),keystrokes,'2 steps'); return false; }
+function switchTab() {}
+function checkPassword() {}
+function checkConfirm() {}
+function checkPasswordValid() { return false; }
+function handleCreate(e) { if (e) e.preventDefault(); return false; }
+function completeVerification() {}
+function handleSignIn(e) { if (e) e.preventDefault(); return false; }
 
 function showSuccess(u, m, t, k, s) {
     hideInterstitial();
@@ -108,7 +107,7 @@ function showSuccess(u, m, t, k, s) {
     document.getElementById('stat-keys').textContent = k;
     document.getElementById('stat-steps').textContent = s;
     const tag = document.getElementById('success-method');
-    tag.textContent = m === 'lemma' ? 'Signed in with Lemma' : 'Signed in with password';
+    tag.textContent = m === 'lemma' ? 'Signed in with Lemma.id' : 'Signed in with password';
     tag.className = 'method-tag ' + (m === 'lemma' ? 'method-lm' : 'method-pw');
     renderSignoutActions(m);
 
@@ -144,7 +143,7 @@ function renderSignoutActions(m) {
 }
 
 async function doLogout() { await fetch('/api/auth/logout', { method: 'POST' }); resetUI(); }
-function resetUI() { keystrokes=0; startTime=0; tradSteps=0; hideInterstitial(); document.getElementById('auth-view').classList.remove('hidden'); document.getElementById('success-view').classList.add('hidden'); document.getElementById('email-verify-step').classList.add('hidden'); document.getElementById('create-btn').classList.remove('hidden'); document.querySelectorAll('input').forEach(i => i.value = ''); document.getElementById('create-btn').disabled = true; checkPassword(); document.getElementById('lemma-status').innerHTML = 'Click to sign in with Lemma.id'; }
+function resetUI() { keystrokes=0; startTime=0; tradSteps=0; hideInterstitial(); document.getElementById('auth-view').classList.remove('hidden'); document.getElementById('success-view').classList.add('hidden'); document.getElementById('lemma-status').innerHTML = 'Click to sign in with Lemma.id'; }
 
 // =============================================
 // PAGE LOAD
