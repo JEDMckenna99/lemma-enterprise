@@ -559,7 +559,14 @@ def signal_unlock():
         response.headers.update(_cors_headers(origin))
         return response, 500
     
-    logger.info(f"Signal-unlock: ✅ session stored for wallet {wallet_id[:8]}")
+    logger.info(f"Signal-unlock: session stored for wallet {wallet_id[:8]}")
+    
+    # Publish SSE event so other devices detect the unlock instantly
+    try:
+        from api.revocation_events import publish_session_event
+        publish_session_event(wallet_id, 'session_restored', expires_at=expires_at)
+    except Exception as e:
+        logger.warning(f"Signal-unlock: SSE publish failed (non-fatal): {e}")
     
     # Also set session cookie for bridge iframe
     session_token = generate_session_token(wallet_id, unlocked_at)
@@ -618,6 +625,13 @@ def clear_session():
         logger.info(f"Clear-session: attempting to clear global session for {wallet_id[:8]}...")
         global_cleared = _clear_global_session(wallet_id)
         logger.info(f"Clear-session: global_cleared={global_cleared} for {wallet_id[:8]}...")
+        
+        # Publish SSE event so other devices detect the lock instantly
+        try:
+            from api.revocation_events import publish_session_event
+            publish_session_event(wallet_id, 'session_invalidated')
+        except Exception as e:
+            logger.warning(f"Clear-session: SSE publish failed (non-fatal): {e}")
     else:
         logger.warning("Clear-session: no wallet_id provided")
         global_cleared = False

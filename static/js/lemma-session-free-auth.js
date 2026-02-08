@@ -53,62 +53,102 @@ class SessionFreeAuth {
     }
     
     /**
-     * Setup event-driven revocation listener
-     * Listens for site-targeted revocation events from Redis pub/sub
+     * Setup event-driven listener for revocation and session events.
+     * Subscribes to the unified SSE stream which delivers:
+     * - revocation events (credential invalidation)
+     * - session_invalidated events (cross-device wallet lock)
+     * - session_restored events (cross-device wallet unlock)
      */
     setupRevocationListener() {
         try {
-            // Server-Sent Events for real-time revocation notifications
-            // Note: This would need a new SSE endpoint in Flask
             this.eventSource = new EventSource('/api/events/revocations', {
                 withCredentials: true
             });
             
+            // --- Revocation events ---
             this.eventSource.addEventListener('revocation', (event) => {
                 try {
                     const data = JSON.parse(event.data);
                     const {credential_id, site_id, credential_type} = data;
                     
-                    // Site-targeted filtering: Only invalidate if it affects us
                     const ourSite = window.location.hostname;
                     
                     if (site_id === null || site_id === ourSite) {
-                        // This revocation affects us - invalidate cache
                         this.verificationCache.delete(credential_id);
                         
                         if (this.debug) {
-                            console.log(`🔄 Cache invalidated for ${credential_id}`);
-                            console.log(`   Type: ${credential_type}`);
-                            console.log(`   Site: ${site_id || 'global'}`);
+                            console.log(`[SessionFreeAuth] Cache invalidated for ${credential_id} (type: ${credential_type}, site: ${site_id || 'global'})`);
                         }
                         
-                        // Trigger Bloom filter sync
                         this.wallet.syncRevocationLists().catch(e => {
-                            if (this.debug) console.warn('Bloom filter sync failed:', e);
+                            if (this.debug) console.warn('[SessionFreeAuth] Bloom filter sync failed:', e);
                         });
                     } else {
                         if (this.debug) {
-                            console.log(`⏭️  Skipping revocation for ${site_id} (we're ${ourSite})`);
+                            console.log(`[SessionFreeAuth] Skipping revocation for ${site_id} (we're ${ourSite})`);
                         }
                     }
                 } catch (error) {
                     if (this.debug) {
-                        console.error('❌ Failed to process revocation event:', error);
+                        console.error('[SessionFreeAuth] Failed to process revocation event:', error);
                     }
                 }
             });
             
-            this.eventSource.addEventListener('open', () => {
-                this.reconnectAttempts = 0;
-                if (this.debug) {
-                    console.log('✅ Revocation event stream connected');
+            // --- Session invalidation events (cross-device lock) ---
+            this.eventSource.addEventListener('session_invalidated', (event) => {
+                try {
+                    const data = JSON.parse(event.data);
+                    
+                    // Clear all cached verifications — session is no longer valid
+                    this.verificationCache.clear();
+                    
+                    if (this.debug) {
+                        console.log(`[SessionFreeAuth] Session invalidated for wallet ${data.wallet_id?.substring(0, 8)}... — cache cleared`);
+                    }
+                    
+                    // Dispatch event for app-level handling (e.g. redirect to login)
+                    window.dispatchEvent(new CustomEvent('lemma:session-invalidated', {
+                        detail: { wallet_id: data.wallet_id, timestamp: data.timestamp }
+                    }));
+                } catch (error) {
+                    if (this.debug) {
+                        console.error('[SessionFreeAuth] Failed to process session_invalidated event:', error);
+                    }
                 }
             });
             
-            this.eventSource.addEventListener('error', (error) => {
+            // --- Session restored events (cross-device unlock) ---
+            this.eventSource.addEventListener('session_restored', (event) => {
+                try {
+                    const data = JSON.parse(event.data);
+                    
+                    if (this.debug) {
+                        console.log(`[SessionFreeAuth] Session restored for wallet ${data.wallet_id?.substring(0, 8)}...`);
+                    }
+                    
+                    window.dispatchEvent(new CustomEvent('lemma:session-restored', {
+                        detail: { wallet_id: data.wallet_id, expires_at: data.expires_at, timestamp: data.timestamp }
+                    }));
+                } catch (error) {
+                    if (this.debug) {
+                        console.error('[SessionFreeAuth] Failed to process session_restored event:', error);
+                    }
+                }
+            });
+            
+            // --- Connection lifecycle ---
+            this.eventSource.addEventListener('connected', () => {
+                this.reconnectAttempts = 0;
+                if (this.debug) {
+                    console.log('[SessionFreeAuth] SSE event stream connected (revocation + session events)');
+                }
+            });
+            
+            this.eventSource.addEventListener('error', () => {
                 if (this.eventSource.readyState === EventSource.CLOSED) {
                     if (this.debug) {
-                        console.warn('⚠️ Revocation event stream closed, reconnecting...');
+                        console.warn('[SessionFreeAuth] Event stream closed, reconnecting...');
                     }
                     this.reconnectEventSource();
                 }
@@ -116,7 +156,7 @@ class SessionFreeAuth {
             
         } catch (error) {
             if (this.debug) {
-                console.warn('⚠️ Event-driven revocation not available, using periodic sync', error);
+                console.warn('[SessionFreeAuth] Event-driven listener not available, using periodic sync', error);
             }
         }
     }
