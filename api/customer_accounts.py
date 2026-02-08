@@ -1996,8 +1996,11 @@ def logout():
         except Exception:
             pass
 
-    # Redirect with flag so client-side can broadcast LOCK on BroadcastChannel
-    response = make_response(redirect('/?logged_out=1'))
+    # Redirect to /app (always serves wallet_simple.html) with flag so
+    # client-side can broadcast LOCK on BroadcastChannel.
+    # Note: can't use / because smart router checks cookies we just deleted
+    # and would serve the marketing page instead of wallet_simple.html.
+    response = make_response(redirect('/app?logged_out=1'))
     response.delete_cookie('lemma_wallet_session', path='/')
     response.delete_cookie('lemma_wallet_csrf', path='/')
     return response
