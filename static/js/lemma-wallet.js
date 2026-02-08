@@ -1615,12 +1615,41 @@ class LemmaWallet {
                 // AUTO-PROCESS redirect return to establish session immediately
                 // This ensures the session is set up without requiring explicit call
                 try {
+                    // Check for new lemma-based redirect (privacy-preserving)
+                    const lemmaCredParam = urlParams.get('lemma_credential');
+                    if (lemmaCredParam) {
+                        console.log('[Lemma] Processing lemma-based redirect (no wallet_secret transferred)');
+                        try {
+                            const credData = JSON.parse(atob(lemmaCredParam));
+                            
+                            if (credData.lemma && credData.ppid) {
+                                // Store the lemma in wallet
+                                await this.storeCredential(credData.lemma);
+                                
+                                // Set session as unlocked
+                                this.session = {
+                                    isUnlocked: true,
+                                    unlockedAt: Date.now(),
+                                    expiresAt: Date.now() + (24 * 60 * 60 * 1000),
+                                    walletId: credData.lemma.walletId || credData.ppid,
+                                    source: 'redirect_lemma'
+                                };
+                                await this._put('session', { id: 'current', ...this.session });
+                                
+                                console.log('[Lemma] ✅ Lemma stored + session created. PPID:', credData.ppid?.substring(0, 20) + '...');
+                                console.log('[Lemma] ✅ wallet_secret was NOT transferred (privacy preserved)');
+                                return; // Session is ready
+                            }
+                        } catch (parseErr) {
+                            console.warn('[Lemma] Could not parse lemma_credential:', parseErr.message);
+                        }
+                    }
+                    
+                    // Legacy fallback: try old checkRedirectReturn (encrypted wallet_secret)
                     const redirectResult = await this.checkRedirectReturn();
                     if (redirectResult?.authenticated) {
-                        console.log('[Lemma] ✅ Redirect returned authenticated');
+                        console.log('[Lemma] ✅ Redirect returned authenticated (legacy flow)');
                         
-                        // checkRedirectReturn() returns data but doesn't set this.session
-                        // We need to set it ourselves from the returned data
                         const walletSecret = redirectResult.walletSecret || this.session.walletSecret;
                         const walletId = redirectResult.walletId || this.session.walletId;
                         
@@ -1634,20 +1663,15 @@ class LemmaWallet {
                                 source: 'redirect'
                             };
                             await this._put('session', { id: 'current', ...this.session });
-                            
-                            // Also store wallet secret for future use
                             await this._put('secrets', { id: 'master', secret: walletSecret, source: 'redirect' });
-                            
-                            console.log('[Lemma] ✅ Session created from redirect data and persisted');
-                            return; // Session is ready
-                        } else {
-                            console.warn('[Lemma] Redirect authenticated but no walletSecret returned');
+                            console.log('[Lemma] ✅ Session created from legacy redirect');
+                            return;
                         }
                     } else {
-                        console.warn('[Lemma] Redirect processing did not authenticate:', redirectResult);
+                        console.warn('[Lemma] Redirect processing did not authenticate');
                     }
                 } catch (e) {
-                    console.error('[Lemma] Failed to auto-process redirect:', e);
+                    console.error('[Lemma] Failed to process redirect:', e);
                 }
             }
             
@@ -4168,25 +4192,52 @@ class LemmaWallet {
     async getAuthenticatedPPID(siteId = null) {
         try {
             await this.init();
+            const hostname = siteId || window.location.hostname;
             
-            // First, check if we're returning from a redirect-based unlock
+            // 1. Check for lemma-based auth (privacy-preserving - no wallet_secret needed)
+            //    This handles both: stored lemmas from previous visits AND new redirect returns
+            const allLemmas = await this._getAll('lemmas');
+            const siteLemma = allLemmas.find(lemma => {
+                const claims = lemma.claims || lemma.credentialSubject || {};
+                const lemmaSiteId = claims.siteId || claims.site_id || claims.domain || lemma.siteId;
+                return lemmaSiteId === hostname || hostname.endsWith('.' + lemmaSiteId);
+            });
+            
+            if (siteLemma && this.session.isUnlocked) {
+                // Verify the lemma signature
+                const verification = await this.verifyLemma(siteLemma);
+                if (verification.valid) {
+                    const claims = siteLemma.claims || siteLemma.credentialSubject || {};
+                    const ppid = siteLemma.subject || claims.id || claims.ppid || claims.subject;
+                    
+                    console.log('[Lemma] ✅ Authenticated via stored lemma (no wallet_secret transferred)');
+                    return {
+                        authenticated: true,
+                        ppid: ppid,
+                        lemma: siteLemma,
+                        needsPasskey: false,
+                        message: 'Authenticated via verified lemma'
+                    };
+                }
+            }
+            
+            // 2. Legacy: check redirect with wallet_secret (backwards compatibility)
             const redirectResult = await this.checkRedirectReturn();
             if (redirectResult?.authenticated && redirectResult.walletSecret) {
-                console.log('[Lemma] ✅ Authenticated via redirect token exchange');
+                console.log('[Lemma] Authenticated via legacy redirect (wallet_secret)');
                 
-                // Derive PPID directly using the wallet secret from redirect
-                const ppidHash = await this._hmacSha256(redirectResult.walletSecret, siteId || window.location.hostname);
+                const ppidHash = await this._hmacSha256(redirectResult.walletSecret, hostname);
                 const ppid = `did:lemma:ppid_${ppidHash}`;
                 
                 return {
                     authenticated: true,
                     ppid: ppid,
                     needsPasskey: false,
-                    message: 'Authenticated via redirect - PPID derived for your site'
+                    message: 'Authenticated via redirect'
                 };
             }
             
-            // Check if authenticated (this auto-handles mobile Safari popup fallback)
+            // 3. Check if authenticated via autoAuthenticate
             const authResult = await this.autoAuthenticate();
             
             const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
