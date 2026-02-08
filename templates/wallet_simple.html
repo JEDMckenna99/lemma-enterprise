@@ -788,13 +788,30 @@ function arrayBufferToBase64(buffer) {
 // Initialize
 document.addEventListener('DOMContentLoaded', async () => {
     loadSessionDuration();
-    
+
+    // Handle logout: lock wallet + broadcast LOCK so bridge iframes on other sites get notified
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('logged_out') === '1') {
+        window.history.replaceState({}, '', window.location.pathname);
+        try {
+            await initWallet();
+            const info = await wallet.getWalletInfo();
+            if (info.walletId) {
+                await wallet.lock();
+                broadcastSessionChange('LOCK', info.walletId);
+                console.log('[Logout] Wallet locked + LOCK broadcast to other tabs/sites');
+            }
+        } catch (e) {
+            console.warn('[Logout] Could not lock wallet:', e.message);
+        }
+    }
+
     // Check for redirect flow
     const redirectParams = getRedirectParams();
     if (redirectParams) {
         updateStatusDisplay(false, 'Signing In...', `Returning to ${new URL(redirectParams.returnUrl).origin}`);
     }
-    
+
     const isUnlocked = await checkWalletState();
     
     // If redirect flow and already unlocked, redirect immediately

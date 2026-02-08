@@ -15,7 +15,7 @@ from typing import Dict, Any, Optional, List
 from dataclasses import dataclass, asdict, field
 from collections import defaultdict
 from threading import Lock
-from flask import Blueprint, request, jsonify, session, redirect, url_for, render_template
+from flask import Blueprint, request, jsonify, session, redirect, url_for, render_template, make_response
 from flask_cors import cross_origin
 import stripe
 from sqlalchemy.orm import Session
@@ -1984,9 +1984,23 @@ def create_test_accounts():
 
 @customer_accounts_bp.route('/logout')
 def logout():
-    """Customer logout"""
+    """Customer logout — clear server session + wallet cookies + global session."""
     session.pop('customer_id', None)
-    return redirect('/')
+
+    # Clear global wallet session so other devices detect the lock
+    wallet_id = request.cookies.get('lemma_wallet_csrf')  # CSRF cookie contains wallet context
+    if wallet_id:
+        try:
+            from api.wallet_session_sync import _clear_global_session
+            _clear_global_session(wallet_id)
+        except Exception:
+            pass
+
+    # Redirect with flag so client-side can broadcast LOCK on BroadcastChannel
+    response = make_response(redirect('/?logged_out=1'))
+    response.delete_cookie('lemma_wallet_session', path='/')
+    response.delete_cookie('lemma_wallet_csrf', path='/')
+    return response
 
 # Export the manager for use in other modules
 __all__ = ['customer_accounts_bp', 'customer_manager']
