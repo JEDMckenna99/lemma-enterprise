@@ -714,16 +714,17 @@ async function handleRedirectReturn(returnUrl) {
     const siteDomain = new URL(returnUrl).hostname;
     console.log('[Redirect] Issuing lemma for:', siteDomain);
     
-    // PRIVACY: Derive PPID and issue lemma ON LEMMA.ID
-    // wallet_secret NEVER leaves this page
+    // PRIVACY: Derive PPID client-side, send only PPID to issuance API
+    // wallet_secret stays in the browser, never sent over the network
     try {
+        const ppid = await wallet.derivePPID(siteDomain);
         const issueResponse = await fetch('/api/wallet-auth/issue', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             credentials: 'include',
             body: JSON.stringify({
                 site_id: siteDomain,
-                wallet_secret: walletSecret
+                ppid: ppid
             })
         });
         

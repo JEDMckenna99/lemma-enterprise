@@ -358,15 +358,15 @@ async function initSetupPage() {
         
         // No credential but wallet is ready - try auto-issue
         if (wallet.isUnlocked()) {
-            console.log('🔐 Wallet unlocked, attempting auto-issue...');
+            console.log('Wallet unlocked, attempting auto-issue...');
             try {
-                const walletSecret = await wallet.getWalletSecret();
+                const ppid = await wallet.derivePPID('lemma.id');
                 const response = await fetch('/api/wallet-auth/issue', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         site_id: 'lemma.id',
-                        wallet_secret: walletSecret
+                        ppid: ppid
                     })
                 });
                 

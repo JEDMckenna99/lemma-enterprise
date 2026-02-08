@@ -811,6 +811,11 @@ except ImportError:
 def issue_to_wallet():
     """Issue a permission lemma directly to the user's wallet.
     
+    Accepts three authentication methods (in order of preference):
+    1. ppid — client-derived PPID (PREFERRED: wallet_secret stays in browser)
+    2. passkey_credential_id — server-side PPID derivation from passkey
+    3. wallet_secret — DEPRECATED, kept for backwards compatibility
+    
     Security: Rate limited (20/min per IP), requires registered site,
     cross-origin requests must match site domain.
     """
@@ -832,13 +837,25 @@ def issue_to_wallet():
                 'message': error_msg
             }), 403
         
+        # Accept client-derived PPID directly (preferred — wallet_secret never leaves browser)
+        client_ppid = data.get('ppid')
         wallet_secret = data.get('wallet_secret')
         passkey_credential_id = data.get('passkey_credential_id')
         
-        if not wallet_secret and not passkey_credential_id:
-            return jsonify({'success': False, 'error': 'Either wallet_secret or passkey_credential_id required'}), 400
-        
-        ppid = derive_user_ppid(site_id, wallet_secret, passkey_credential_id)
+        if client_ppid:
+            # Validate PPID format: did:lemma:ppid_<64-hex-chars>
+            import re
+            if not re.match(r'^did:lemma:ppid_[0-9a-f]{64}$', client_ppid):
+                return jsonify({'success': False, 'error': 'Invalid PPID format'}), 400
+            ppid = client_ppid
+        elif passkey_credential_id:
+            ppid = derive_user_ppid(site_id, passkey_credential_id=passkey_credential_id)
+        elif wallet_secret:
+            # DEPRECATED: wallet_secret should not be sent to server
+            logger.warning(f"Issue: wallet_secret used (deprecated) for site {site_id}")
+            ppid = derive_user_ppid(site_id, wallet_secret=wallet_secret)
+        else:
+            return jsonify({'success': False, 'error': 'ppid, passkey_credential_id, or wallet_secret required'}), 400
         
         permission_lemma = issue_permission_lemma(
             subject_ppid=ppid,

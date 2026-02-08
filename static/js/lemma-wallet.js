@@ -314,20 +314,40 @@ class LemmaWallet {
                 try {
                     const redirectResult = await this.checkRedirectReturn();
                     if (redirectResult.success && redirectResult.authenticated) {
-                        console.log('[Lemma] ✅ Redirect processed - returning session');
+                        console.log('[Lemma] Redirect processed - auto-issuing lemma...');
                         
                         // Start listening for lock events
                         this._setupLockEventListener();
                         
-                        // Return the wallet_secret so site can issue lemma
-                        // This is needed for first-time visits (no lemma yet)
+                        // Auto-issue a lemma for this site (wallet_secret stays in SDK)
+                        const siteId = window.location.hostname;
+                        const issueResult = await this._autoIssueLemma(siteId);
+                        
+                        if (issueResult.success) {
+                            return {
+                                authenticated: true,
+                                needsPasskey: false,
+                                needsRedirect: false,
+                                ppid: issueResult.ppid,
+                                claims: issueResult.claims,
+                                lemma: issueResult.lemma,
+                                walletId: redirectResult.walletId,
+                                message: 'Authorized via redirect + verified lemma',
+                                source: 'redirect'
+                            };
+                        }
+                        
+                        // Issuance failed — still return authenticated with PPID
+                        // (user proved passkey possession, just no lemma yet)
+                        console.warn('[Lemma] Lemma issuance failed after redirect, deriving PPID only');
+                        const ppid = await this.derivePPID(siteId);
                         return {
                             authenticated: true,
                             needsPasskey: false,
                             needsRedirect: false,
-                            walletSecret: redirectResult.walletSecret,
+                            ppid: ppid,
                             walletId: redirectResult.walletId,
-                            message: 'Authenticated via redirect',
+                            message: 'Authenticated via redirect (lemma issuance pending)',
                             source: 'redirect'
                         };
                     }
@@ -357,43 +377,43 @@ class LemmaWallet {
                 return result;
             }
             
-            // Not authorized via lemma - check if we have a valid session with wallet_secret
-            // This handles returning users who have unlocked but site hasn't issued lemma yet
-            if (this.session.isUnlocked && this.session.walletSecret) {
-                console.log('[Lemma] ✅ No lemma but have valid session - returning wallet_secret for lemma issuance');
+            // Not authorized via lemma - if session is valid, auto-issue a lemma
+            // via lemma.id API. The wallet_secret stays in the SDK (only PPID is sent).
+            if (this.session.isUnlocked) {
+                const hasSecret = this.session.walletSecret || await this._get('secrets', 'master').then(r => r?.secret).catch(() => null);
                 
-                this._setupLockEventListener();
-                
-                return {
-                    authenticated: true,
-                    needsPasskey: false,
-                    needsRedirect: false,
-                    walletSecret: this.session.walletSecret,
-                    walletId: this.session.walletId,
-                    message: 'Session valid - issue lemma to complete authorization',
-                    source: 'session'
-                };
-            }
-            
-            // Check if we have wallet_secret in storage (from previous redirect)
-            try {
-                const secretRecord = await this._get('secrets', 'master');
-                if (secretRecord?.secret && this.session.isUnlocked) {
-                    console.log('[Lemma] ✅ Found stored wallet_secret - returning for lemma issuance');
+                if (hasSecret) {
+                    // Ensure getWalletSecret() will work for derivePPID()
+                    if (!this.session.walletSecret && hasSecret !== true) {
+                        this.session.walletSecret = hasSecret;
+                    }
                     
-                    this._setupLockEventListener();
+                    const siteId = window.location.hostname;
+                    console.log(`[Lemma] No lemma for ${siteId} - requesting issuance (wallet_secret stays local)`);
                     
-                    return {
-                        authenticated: true,
-                        needsPasskey: false,
-                        needsRedirect: false,
-                        walletSecret: secretRecord.secret,
-                        walletId: this.session.walletId,
-                        message: 'Session valid - issue lemma to complete authorization',
-                        source: 'stored_secret'
-                    };
+                    const issueResult = await this._autoIssueLemma(siteId);
+                    
+                    if (issueResult.success) {
+                        console.log(`[Lemma] Lemma issued and verified for ${siteId}`);
+                        
+                        this._setupLockEventListener();
+                        
+                        return {
+                            authenticated: true,
+                            needsPasskey: false,
+                            needsRedirect: false,
+                            ppid: issueResult.ppid,
+                            claims: issueResult.claims,
+                            lemma: issueResult.lemma,
+                            walletId: this.session.walletId,
+                            message: 'Authorized via auto-issued and verified lemma',
+                            source: 'auto_issued'
+                        };
+                    }
+                    
+                    console.warn(`[Lemma] Auto-issue failed: ${issueResult.error}`);
                 }
-            } catch (e) {}
+            }
             
             // Not authorized locally - try bridge session as cross-site fallback
             // This handles: User authenticated on Site A, now visiting Site B
@@ -404,7 +424,7 @@ class LemmaWallet {
                     const bridgeSession = await this.checkBridgeSession();
 
                     if (bridgeSession.valid) {
-                        console.log('[Lemma] Bridge has valid session - retrieving wallet secret...');
+                        console.log('[Lemma] Bridge has valid session - syncing and auto-issuing...');
                         let walletSecret = null;
                         try {
                             const secretResult = await this._sendBridgeMessage('GET_WALLET_SECRET');
@@ -415,6 +435,7 @@ class LemmaWallet {
 
                         if (walletSecret) {
                             // Establish local session from bridge data
+                            // wallet_secret is stored locally but NEVER returned to customer site
                             this.session = {
                                 isUnlocked: true,
                                 unlockedAt: bridgeSession.session?.unlockedAt || Date.now(),
@@ -426,18 +447,28 @@ class LemmaWallet {
                             await this._put('session', { id: 'current', ...this.session });
                             await this._put('secrets', { id: 'master', secret: walletSecret, source: 'bridge_sync' });
 
-                            console.log('[Lemma] ✅ Cross-site auth via bridge - session established');
-                            this._setupLockEventListener();
+                            // Auto-issue lemma for this site (wallet_secret stays internal)
+                            const siteId = window.location.hostname;
+                            const issueResult = await this._autoIssueLemma(siteId);
+                            
+                            if (issueResult.success) {
+                                console.log('[Lemma] Cross-site auth via bridge + auto-issued lemma');
+                                this._setupLockEventListener();
 
-                            return {
-                                authenticated: true,
-                                needsPasskey: false,
-                                needsRedirect: false,
-                                walletSecret: walletSecret,
-                                walletId: bridgeSession.walletId,
-                                message: 'Authenticated via cross-site bridge session',
-                                source: 'bridge_sync'
-                            };
+                                return {
+                                    authenticated: true,
+                                    needsPasskey: false,
+                                    needsRedirect: false,
+                                    ppid: issueResult.ppid,
+                                    claims: issueResult.claims,
+                                    lemma: issueResult.lemma,
+                                    walletId: bridgeSession.walletId,
+                                    message: 'Authorized via bridge session + verified lemma',
+                                    source: 'bridge_sync'
+                                };
+                            }
+                            
+                            console.warn('[Lemma] Bridge sync succeeded but lemma issuance failed');
                         }
                     }
                 } catch (e) {
@@ -3672,6 +3703,74 @@ class LemmaWallet {
     }
 
     // ========================================
+    // INTERNAL LEMMA ISSUANCE
+    // ========================================
+    // When a user has a valid session but no lemma for the current site,
+    // the SDK requests issuance from lemma.id's API internally.
+    // The wallet_secret NEVER leaves the SDK — only the derived PPID
+    // is sent to lemma.id, which returns an HSM-signed credential.
+    // ========================================
+
+    /**
+     * Request lemma issuance from lemma.id for the current site.
+     * The wallet_secret stays in the browser — only the site-specific PPID is sent.
+     * 
+     * @param {string} siteId - The site to issue a lemma for
+     * @returns {Promise<Object>} { success, ppid, lemma } or { success: false, error }
+     * @private
+     */
+    async _autoIssueLemma(siteId) {
+        try {
+            // Derive PPID locally — wallet_secret stays in the SDK
+            const ppid = await this.derivePPID(siteId);
+            
+            console.log(`[Lemma] Requesting lemma issuance for ${siteId} (PPID-only, no secret transmitted)`);
+            
+            const response = await fetch('https://lemma.id/api/wallet-auth/issue', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    site_id: siteId,
+                    ppid: ppid
+                })
+            });
+            
+            if (!response.ok) {
+                const err = await response.json().catch(() => ({}));
+                console.warn(`[Lemma] Lemma issuance failed: ${response.status}`, err);
+                return { success: false, error: err.error || 'issuance_failed' };
+            }
+            
+            const result = await response.json();
+            
+            if (result.success && result.permission_lemma) {
+                // Store the issued lemma locally
+                await this.storeCredential(result.permission_lemma);
+                
+                // Verify the lemma we just received (Ed25519 signature check)
+                const verification = await this.verifyLemma(result.permission_lemma);
+                if (!verification.valid) {
+                    console.error('[Lemma] Issued lemma failed verification:', verification.reason);
+                    return { success: false, error: 'verification_failed' };
+                }
+                
+                console.log(`[Lemma] Lemma issued and verified for ${siteId}`);
+                return {
+                    success: true,
+                    ppid: ppid,
+                    lemma: result.permission_lemma,
+                    claims: result.permission_lemma.claims || result.permission_lemma.credentialSubject || {}
+                };
+            }
+            
+            return { success: false, error: result.error || 'no_lemma_returned' };
+        } catch (e) {
+            console.warn('[Lemma] Auto-issue failed:', e.message);
+            return { success: false, error: e.message };
+        }
+    }
+
+    // ========================================
     // SIMPLIFIED THIRD-PARTY VERIFICATION
     // ========================================
     // For third-party sites: Just check local session + verify local lemmas
@@ -4389,13 +4488,9 @@ class LemmaWallet {
             }
             
             // Derive PPID for this site
-            // Use walletSecret from authResult if available (faster, avoids another lookup)
-            let ppid;
-            if (authResult.walletSecret) {
-                // Direct HMAC derivation using the secret we already have
-                const ppidHash = await this._hmacSha256(authResult.walletSecret, siteId || window.location.hostname);
-                ppid = `did:lemma:ppid_${ppidHash}`;
-            } else {
+            // autoAuthenticate now returns ppid directly (no walletSecret exposure)
+            let ppid = authResult.ppid;
+            if (!ppid) {
                 ppid = await this.derivePPID(siteId || window.location.hostname);
             }
             
