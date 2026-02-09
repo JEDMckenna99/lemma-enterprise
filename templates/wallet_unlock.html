@@ -53,26 +53,16 @@
         }
 
         .lemma-logo {
-            width: 64px;
-            height: 64px;
+            width: 72px;
+            height: 72px;
             margin-bottom: 24px;
-            border-radius: 16px;
-            background: linear-gradient(135deg, var(--lemma-primary), var(--lemma-secondary));
-            display: flex;
-            align-items: center;
-            justify-content: center;
             margin-left: auto;
             margin-right: auto;
         }
 
         .lemma-logo svg {
-            width: 40px;
-            height: 40px;
-            fill: none;
-            stroke: white;
-            stroke-width: 2;
-            stroke-linecap: round;
-            stroke-linejoin: round;
+            width: 72px;
+            height: 72px;
         }
 
         .unlock-title {
@@ -280,8 +270,19 @@
         <div class="unlock-card">
             <!-- Lemma Logo -->
             <div class="lemma-logo">
-                <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120">
+                    <defs>
+                        <linearGradient id="logoGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                            <stop offset="0%" stop-color="#667eea"/>
+                            <stop offset="100%" stop-color="#764ba2"/>
+                        </linearGradient>
+                    </defs>
+                    <g stroke="url(#logoGrad)" stroke-width="6" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                        <ellipse cx="60" cy="60" rx="38" ry="14" />
+                        <ellipse cx="60" cy="60" rx="38" ry="14" transform="rotate(90 60 60)" />
+                        <ellipse cx="60" cy="60" rx="38" ry="14" transform="rotate(45 60 60)" />
+                        <ellipse cx="60" cy="60" rx="38" ry="14" transform="rotate(-45 60 60)" />
+                    </g>
                 </svg>
             </div>
             

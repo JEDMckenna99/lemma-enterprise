@@ -15,6 +15,15 @@
     margin-bottom: 32px; 
     text-align: center; 
 }
+.wallet-logo {
+    width: 64px;
+    height: 64px;
+    margin: 0 auto 16px;
+}
+.wallet-logo svg {
+    width: 64px;
+    height: 64px;
+}
 .wallet-header h1 { 
     font-size: 1.75rem; 
     font-weight: 600; 
