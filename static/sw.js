@@ -1,12 +1,16 @@
 // Lemma Service Worker - Minimal Implementation
 // This prevents service worker errors and provides basic caching
 
-const CACHE_NAME = 'lemma-v12';  // v2.46.0 - Session persistence debugging
+const CACHE_NAME = 'lemma-v14';  // v2.48.0 - Exclude SSE + API from SW interception
 const STATIC_ASSETS = [
   '/static/css/lemma.css',
-  '/static/js/lemma-wallet.js',
   '/static/js/lemma-bot-shield-simple.js',
   '/static/img/lemma_logo.svg'
+];
+
+// JS files that change frequently — use network-first, cache as fallback
+const NETWORK_FIRST_PATTERNS = [
+  '/static/js/lemma-wallet.js'
 ];
 
 // Install event - cache static assets
@@ -57,6 +61,17 @@ self.addEventListener('fetch', event => {
     return;
   }
   
+  // Skip SSE event streams — long-lived connections should NOT go through SW
+  if (event.request.url.includes('/api/events/') ||
+      event.request.headers.get('Accept') === 'text/event-stream') {
+    return;
+  }
+
+  // Skip API calls — these should always hit the network directly
+  if (event.request.url.includes('/api/')) {
+    return;
+  }
+
   // Additional safety: Skip known analytics patterns
   if (event.request.url.includes('cloudflareinsights.com') || 
       event.request.url.includes('beacon.min.js') ||
@@ -72,20 +87,42 @@ self.addEventListener('fetch', event => {
     return;
   }
 
+  // Network-first for frequently-updated JS (lemma-wallet.js)
+  const isNetworkFirst = NETWORK_FIRST_PATTERNS.some(pattern =>
+    event.request.url.includes(pattern)
+  );
+
+  if (isNetworkFirst) {
+    event.respondWith(
+      fetch(event.request)
+        .then(response => {
+          if (response.status === 200) {
+            const responseToCache = response.clone();
+            caches.open(CACHE_NAME).then(cache => cache.put(event.request, responseToCache));
+          }
+          console.log('[SW] Fetching from network (network-first):', event.request.url);
+          return response;
+        })
+        .catch(() => {
+          console.log('[SW] Network failed, falling back to cache:', event.request.url);
+          return caches.match(event.request);
+        })
+    );
+    return;
+  }
+
+  // Cache-first for truly static assets (images, CSS)
   event.respondWith(
     caches.match(event.request)
       .then(response => {
-        // Return cached version if available
         if (response) {
           console.log('[SW] Serving from cache:', event.request.url);
           return response;
         }
 
-        // Fallback to network
         console.log('[SW] Fetching from network:', event.request.url);
         return fetch(event.request)
           .then(response => {
-            // Cache successful responses for static assets
             if (response.status === 200 && STATIC_ASSETS.some(asset => event.request.url.endsWith(asset))) {
               const responseToCache = response.clone();
               caches.open(CACHE_NAME)

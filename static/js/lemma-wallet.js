@@ -1467,21 +1467,28 @@ class LemmaWallet {
         };
         document.addEventListener('visibilitychange', this._visibilityHandler);
         
+        // Clear any previous startup timer before creating a new one
+        if (this._heartbeatStartupTimer) {
+            clearTimeout(this._heartbeatStartupTimer);
+        }
         // Run an immediate check on startup
-        setTimeout(async () => {
+        this._heartbeatStartupTimer = setTimeout(async () => {
+            this._heartbeatStartupTimer = null;
             await performHeartbeatCheck();
         }, 2000);
         
         // Also check on window focus (backup for visibility API)
-        if (!this._focusHandler) {
-            this._focusHandler = async () => {
-                if (this.session.isUnlocked) {
-                    console.log('[Lemma] Window focused - checking session');
-                    await performHeartbeatCheck();
-                }
-            };
-            window.addEventListener('focus', this._focusHandler);
+        // Remove previous handler first to prevent duplicates
+        if (this._focusHandler) {
+            window.removeEventListener('focus', this._focusHandler);
         }
+        this._focusHandler = async () => {
+            if (this.session.isUnlocked) {
+                console.log('[Lemma] Window focused - checking session');
+                await performHeartbeatCheck();
+            }
+        };
+        window.addEventListener('focus', this._focusHandler);
     }
 
     /**
@@ -1588,10 +1595,14 @@ class LemmaWallet {
                     // Clear session from IndexedDB
         await this._delete('session', 'current');
         
-        // Stop heartbeat, SSE, and visibility listeners
+        // Stop heartbeat, SSE, timers, and visibility listeners
         if (this._heartbeatInterval) {
             clearInterval(this._heartbeatInterval);
             this._heartbeatInterval = null;
+        }
+        if (this._heartbeatStartupTimer) {
+            clearTimeout(this._heartbeatStartupTimer);
+            this._heartbeatStartupTimer = null;
         }
         if (this._sessionEventSource) {
             this._sessionEventSource.close();
