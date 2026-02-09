@@ -2884,17 +2884,21 @@ class LemmaWallet {
             document.body.appendChild(bridge);
             
             // Wait for WALLET_BRIDGE_READY message (not just onload)
-            // Reduced timeout from 8s to 2.5s - bridge should be fast, don't block auth
-            await new Promise((resolve, reject) => {
+            // 5s timeout to handle slower connections + SW cache misses
+            this._bridgeReady = false;
+            await new Promise((resolve) => {
                 const timeoutId = setTimeout(() => {
                     window.removeEventListener('message', handler);
-                    console.warn('[Lemma] Bridge ready timeout - continuing anyway');
-                    resolve(); // Don't reject, try to continue
-                }, 2500);
+                    if (!this._bridgeReady) {
+                        console.warn('[Lemma] Bridge ready timeout (5s) - bridge may not have loaded');
+                    }
+                    resolve();
+                }, 5000);
 
                 const handler = (event) => {
                     if (event.origin === 'https://lemma.id' &&
                         event.data?.type === 'WALLET_BRIDGE_READY') {
+                        this._bridgeReady = true;
                         clearTimeout(timeoutId);
                         window.removeEventListener('message', handler);
                         console.log('[Lemma] Bridge ready, session:', event.data.session?.valid ? 'active' : 'none');
@@ -2908,6 +2912,26 @@ class LemmaWallet {
             // Set up persistent listener for instant session invalidation (via BroadcastChannel)
             // This enables instant lock detection when user locks wallet in another tab
             this._setupSessionInvalidationListener();
+            
+            // If bridge didn't signal ready, set up a background listener
+            // so it can become ready later (e.g., slow network)
+            if (!this._bridgeReady) {
+                const lateHandler = (event) => {
+                    if (event.origin === 'https://lemma.id' &&
+                        event.data?.type === 'WALLET_BRIDGE_READY') {
+                        this._bridgeReady = true;
+                        window.removeEventListener('message', lateHandler);
+                        console.log('[Lemma] Bridge became ready (late load)');
+                    }
+                };
+                window.addEventListener('message', lateHandler);
+            }
+        }
+        
+        // If bridge never signaled ready, don't attempt postMessage
+        // (it would fail with origin mismatch since iframe is still at about:blank)
+        if (!this._bridgeReady) {
+            throw new Error('Bridge not ready (still loading or blocked)');
         }
         
         return new Promise((resolve, reject) => {
@@ -2932,7 +2956,7 @@ class LemmaWallet {
             // Guard: Ensure bridge contentWindow is accessible before posting
             if (bridge.contentWindow) {
                 try {
-            bridge.contentWindow.postMessage({ type, payload, requestId }, 'https://lemma.id');
+                    bridge.contentWindow.postMessage({ type, payload, requestId }, 'https://lemma.id');
                 } catch (e) {
                     console.warn('[Lemma] Bridge postMessage failed:', e.message);
                     clearTimeout(timeoutId);
