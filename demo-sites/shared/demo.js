@@ -23,6 +23,10 @@ async function signInWithLemma() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ ppid: result.ppid })
         });
+
+        // Start session heartbeat for instant logout detection
+        wallet.startSessionHeartbeat();
+
         showSuccess('Lemma User', 'lemma', ((performance.now() - startTime) / 1000).toFixed(1), 0, '1 tap');
     } else {
         // Redirect to lemma.id (user creates/unlocks wallet there)
@@ -39,6 +43,10 @@ async function checkLemmaAuth() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ ppid: result.ppid })
         });
+
+        // Start session heartbeat for instant logout detection
+        wallet.startSessionHeartbeat();
+
         return true;
     }
     return false;
@@ -188,6 +196,10 @@ async function init() {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ ppid: silentResult.ppid })
             });
+
+            // Start session heartbeat for instant logout detection
+            wallet.startSessionHeartbeat();
+
             showSuccess('Lemma User', 'lemma', '0.2', 0, 'auto');
             return;
         }

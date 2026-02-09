@@ -17,28 +17,28 @@ const BUILD_CONFIG = {
   basePath: path.resolve(__dirname, '..'),
   outputPath: path.resolve(__dirname, 'dist'),
   sources: {
-    'lemma-auto': {
-      input: 'frontend/js/lemma-auto.js',
+    'lemma-wallet': {
+      input: 'static/js/lemma-wallet.js',
       minified: true,
       gzip: true,
       brotli: true
     },
-    'lemma-verification-flow': {
-      input: 'frontend/js/lemma-verification-flow.js',
+    'lemma-session-free-auth': {
+      input: 'static/js/lemma-session-free-auth.js',
       minified: true,
       gzip: true,
       brotli: true
     },
-    'lemma-shield-inline': {
-      input: 'frontend/js/lemma-shield-inline.js',
+    'lemma-verifier': {
+      input: 'static/js/lemma-verifier.js',
       minified: true,
       gzip: true,
       brotli: true
     }
   },
   css: {
-    'lemma-design-system': {
-      input: 'static/css/lemma-design-system.css',
+    'lemma-styles': {
+      input: 'static/css/lemma.css',
       minified: true,
       gzip: true,
       brotli: true

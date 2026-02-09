@@ -625,6 +625,11 @@ def clear_session():
         logger.info(f"Clear-session: attempting to clear global session for {wallet_id[:8]}...")
         global_cleared = _clear_global_session(wallet_id)
         logger.info(f"Clear-session: global_cleared={global_cleared} for {wallet_id[:8]}...")
+
+        # Server-side session revocation: blacklist ALL sessions for this wallet
+        # so stolen/cached tokens are rejected even before cookie expiry
+        from auth.session_manager import revoke_wallet_sessions
+        revoke_wallet_sessions(wallet_id)
         
         # Publish SSE event so other devices detect the lock instantly
         try:

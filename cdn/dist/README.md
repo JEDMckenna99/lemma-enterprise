@@ -48,7 +48,7 @@ All files include SHA-384 integrity hashes for security. Check `manifest.json` f
 ## Version Information
 
 - Version: 1.0.0
-- Build Date: 2025-07-16T00:18:35.339Z
+- Build Date: 2026-02-09T17:46:22.645Z
 - Environment: Production
 
 ## Self-Hosting

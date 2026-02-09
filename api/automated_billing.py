@@ -15,8 +15,12 @@ from datetime import datetime, timedelta
 
 logger = logging.getLogger(__name__)
 
-# Set up Stripe with the working API key
-stripe.api_key = os.getenv('STRIPE_SECRET_KEY', 'sk_test_51QJDkbP8RRlCYD4t8GWdrvJOlE6bZRnSqJ8Xzx8mKJHdVE3I8eOhCvMXZjNGq0gJNvJKFGP9t8QXzlW8NNQ6M2kN00XBuMjIuM')
+# Set up Stripe - requires STRIPE_SECRET_KEY env var in production
+_stripe_key = os.getenv('STRIPE_SECRET_KEY')
+if _stripe_key:
+    stripe.api_key = _stripe_key
+else:
+    logger.warning("STRIPE_SECRET_KEY not set — billing endpoints will fail")
 
 # Create blueprint
 automated_billing_bp = Blueprint('automated_billing', __name__)

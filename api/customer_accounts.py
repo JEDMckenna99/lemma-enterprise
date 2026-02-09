@@ -1988,11 +1988,26 @@ def logout():
     session.pop('customer_id', None)
 
     # Clear global wallet session so other devices detect the lock
-    wallet_id = request.cookies.get('lemma_wallet_csrf')  # CSRF cookie contains wallet context
+    # Extract wallet_id from the session token (more reliable than CSRF cookie)
+    session_token = request.cookies.get('lemma_wallet_session')
+    wallet_id = None
+    if session_token:
+        try:
+            from auth.session_manager import revoke_wallet_sessions
+            # Parse wallet_id from token without full validation (we're revoking it anyway)
+            parts = session_token.split(':')
+            if len(parts) in (5, 7):
+                wallet_id = parts[0]
+        except Exception:
+            pass
+
     if wallet_id:
         try:
             from api.wallet_session_sync import _clear_global_session
             _clear_global_session(wallet_id)
+            # Server-side revocation: blacklist all sessions for this wallet
+            from auth.session_manager import revoke_wallet_sessions
+            revoke_wallet_sessions(wallet_id)
         except Exception:
             pass
 

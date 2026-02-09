@@ -28,11 +28,126 @@ logger = logging.getLogger(__name__)
 
 SESSION_DURATION = 24 * 60 * 60  # 24 hours in seconds
 UNLOCK_TOKEN_TTL = 5 * 60  # 5 minutes
-SESSION_SECRET = os.environ.get('SESSION_SECRET', 'dev-secret-change-in-production')
+
+_session_secret = os.environ.get('SESSION_SECRET')
+if not _session_secret:
+    if os.environ.get('FLASK_ENV') == 'development' or os.environ.get('LEMMA_DEV_MODE') == '1':
+        _session_secret = 'dev-only-' + secrets.token_hex(16)
+        logger.warning("SESSION_SECRET not set — using random dev secret (sessions won't survive restarts)")
+    else:
+        raise RuntimeError(
+            "SESSION_SECRET environment variable is required in production. "
+            "Generate one with: python -c \"import secrets; print(secrets.token_hex(32))\""
+        )
+SESSION_SECRET = _session_secret
 
 # Cookie names
 SESSION_COOKIE_NAME = 'lemma_wallet_session'
 CSRF_COOKIE_NAME = 'lemma_wallet_csrf'
+
+# Session revocation key prefix
+_REVOKED_SESSION_PREFIX = 'revoked_session:'
+_REVOKED_WALLET_PREFIX = 'revoked_wallet_sessions:'
+
+
+# ============================================
+# SESSION REVOCATION (server-side blacklist)
+# ============================================
+
+def revoke_session(token: str) -> bool:
+    """
+    Revoke a specific session token server-side.
+
+    Adds the token's signature to a Redis-backed blacklist with TTL
+    equal to the session's remaining lifetime. After expiry, the entry
+    auto-deletes (the session would be invalid anyway).
+
+    Args:
+        token: The session token string to revoke
+
+    Returns:
+        True if revoked successfully
+    """
+    from auth import redis_store
+
+    try:
+        parts = token.split(':')
+        if len(parts) not in (5, 7):
+            return False
+
+        signature = parts[-1]
+        # Parse created_at to compute remaining TTL
+        created_at = int(parts[2])
+        remaining = max(0, (created_at + SESSION_DURATION) - int(time.time()))
+
+        if remaining <= 0:
+            return True  # Already expired, nothing to revoke
+
+        redis_store.store(
+            f"{_REVOKED_SESSION_PREFIX}{signature}",
+            {'revoked_at': int(time.time())},
+            ttl_seconds=remaining
+        )
+        logger.info(f"Session revoked (sig={signature[:8]}..., ttl={remaining}s)")
+        return True
+    except Exception as e:
+        logger.error(f"Failed to revoke session: {e}")
+        return False
+
+
+def revoke_wallet_sessions(wallet_id: str) -> bool:
+    """
+    Revoke ALL sessions for a wallet (used on logout/lock).
+
+    Stores the wallet_id in a blacklist. validate_session_token checks
+    this list and rejects any session for this wallet issued before
+    the revocation timestamp.
+
+    Args:
+        wallet_id: The wallet whose sessions should be revoked
+
+    Returns:
+        True if revoked successfully
+    """
+    from auth import redis_store
+
+    try:
+        redis_store.store(
+            f"{_REVOKED_WALLET_PREFIX}{wallet_id}",
+            {'revoked_at': int(time.time())},
+            ttl_seconds=SESSION_DURATION
+        )
+        logger.info(f"All sessions revoked for wallet {wallet_id[:8]}...")
+        return True
+    except Exception as e:
+        logger.error(f"Failed to revoke wallet sessions: {e}")
+        return False
+
+
+def _is_session_revoked(token: str, wallet_id: str, created_at: int) -> bool:
+    """Check if a session has been revoked server-side."""
+    from auth import redis_store
+
+    try:
+        # Check 1: specific session signature blacklisted
+        parts = token.split(':')
+        signature = parts[-1]
+        if redis_store.get(f"{_REVOKED_SESSION_PREFIX}{signature}"):
+            return True
+
+        # Check 2: all wallet sessions revoked after this session was created
+        wallet_revocation = redis_store.get(f"{_REVOKED_WALLET_PREFIX}{wallet_id}")
+        if wallet_revocation:
+            revoked_at = wallet_revocation.get('revoked_at', 0)
+            if created_at <= revoked_at:
+                return True
+
+        return False
+    except Exception:
+        # If Redis is down, fail open (session continues until natural expiry)
+        # This is the conservative choice — blocking all sessions on Redis
+        # failure would be a denial-of-service on ourselves
+        return False
 
 
 # ============================================
@@ -114,6 +229,11 @@ def validate_session_token(token: str) -> Optional[dict]:
 
         # Check expiration
         if time.time() - created_at > SESSION_DURATION:
+            return None
+
+        # Check server-side revocation (Redis-backed blacklist)
+        if _is_session_revoked(token, wallet_id, created_at):
+            logger.info(f"Session rejected: revoked server-side (wallet={wallet_id[:8]}...)")
             return None
 
         return {

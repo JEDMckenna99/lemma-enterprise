@@ -59,7 +59,7 @@ ALLOWED_AUTH_ORIGINS = set(
 )
 ALLOWED_ORIGIN_SUFFIXES = [
     s.strip().lower() for s in
-    os.getenv('LEMMA_ALLOWED_ORIGIN_SUFFIXES', '.lemma.id,.herokuapp.com').split(',')
+    os.getenv('LEMMA_ALLOWED_ORIGIN_SUFFIXES', '.lemma.id').split(',')
     if s.strip()
 ]
 
