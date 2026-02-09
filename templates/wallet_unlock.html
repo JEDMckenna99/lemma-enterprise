@@ -325,7 +325,7 @@
     </div>
 
     <!-- Load SDK with cache-buster to ensure latest version -->
-    <script src="/static/js/lemma-wallet.js?v=2463" nonce="{{ csp_nonce }}"></script>
+    <script src="/static/js/lemma-wallet.js?v=2470" nonce="{{ csp_nonce }}"></script>
     <script nonce="{{ csp_nonce }}">
 // Initialize wallet SDK
 const wallet = new LemmaWallet();
@@ -425,6 +425,9 @@ async function handleUnlock() {
 }
 
 // Handle redirect back to calling site
+// SIMPLIFIED FLOW: Issue a lemma for the requesting site, send it in the URL.
+// The wallet_secret NEVER leaves lemma.id. Only the server-signed lemma travels.
+// No encryption keys, no localStorage dependency, no decryption needed on the other side.
 async function handleRedirectReturn() {
     if (!redirectParams || !returnUrl) {
         console.error('No redirect params');
@@ -434,12 +437,11 @@ async function handleRedirectReturn() {
     try {
         const info = await wallet.getWalletInfo();
         
-        // Get wallet secret
+        // Get wallet secret (stays on lemma.id - used only for PPID derivation)
         let walletSecret = null;
         try {
             walletSecret = await wallet.getWalletSecret();
         } catch (e) {
-            // Try direct IndexedDB access
             walletSecret = await getStoredSecretDirectly();
         }
         
@@ -448,62 +450,47 @@ async function handleRedirectReturn() {
             return;
         }
         
-        // Set global session for cross-device sync
-        // IMPORTANT: Requires unlock_token from server-verified passkey auth
-        try {
-            const unlockToken = wallet.session?.serverUnlockToken;
-            if (info.walletId && unlockToken) {
-                const activeProfile = await wallet.getActiveProfile();
-                const setSessionResp = await fetch('/api/wallet/set-session', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    credentials: 'include',
-                    body: JSON.stringify({
-                        wallet_id: info.walletId,
-                        unlock_token: unlockToken,
-                        profile_id: activeProfile.id,
-                        profile_name: activeProfile.name
-                    })
-                });
-                const setSessionData = await setSessionResp.json();
-                console.log('[Unlock] set-session result:', setSessionData);
-            } else {
-                console.warn('[Unlock] No unlock_token available for set-session');
-            }
-        } catch (e) {
-            console.warn('Failed to set global session:', e);
-        }
+        // Extract the requesting site's domain from return URL
+        const siteDomain = new URL(returnUrl).hostname;
+        console.log('[Unlock] Issuing lemma for:', siteDomain);
         
         // Build redirect URL
         const url = new URL(returnUrl);
         url.searchParams.set('lemma_unlocked', '1');
         
-        // Encrypt wallet data if we have an encryption key (privacy-preserving)
-        if (encKey) {
-            const walletData = {
-                wallet_id: info.walletId,
-                wallet_secret: walletSecret
-            };
-            const encryptedData = await encryptWalletData(walletData, encKey);
-            url.searchParams.set('lemma_data', encryptedData);
-        } else {
-            // Legacy server-side token (deprecated)
-            const tokenResp = await fetch('/api/wallet/create-redirect-token', {
+        // Issue a lemma for the requesting site
+        // PPID is derived CLIENT-SIDE on lemma.id, wallet_secret never sent over the network
+        try {
+            const ppid = await wallet.derivePPID(siteDomain);
+            const issueResponse = await fetch('/api/wallet-auth/issue', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 credentials: 'include',
                 body: JSON.stringify({
-                    wallet_id: info.walletId,
-                    wallet_secret: walletSecret
+                    site_id: siteDomain,
+                    ppid: ppid
                 })
             });
-            const tokenData = await tokenResp.json();
-            if (tokenData.success) {
-                url.searchParams.set('lemma_token', tokenData.token);
+            
+            const issueData = await issueResponse.json();
+            
+            if (issueData.success && issueData.permission_lemma) {
+                console.log('[Unlock] Lemma issued for', siteDomain);
+                
+                // Send the SIGNED LEMMA back (not the wallet_secret)
+                url.searchParams.set('lemma_credential', btoa(JSON.stringify({
+                    lemma: issueData.permission_lemma,
+                    ppid: issueData.ppid,
+                    site_id: siteDomain
+                })));
+            } else {
+                console.warn('[Unlock] Lemma issuance failed:', issueData.error);
             }
+        } catch (e) {
+            console.warn('[Unlock] Issuance error:', e.message);
         }
         
-        // Redirect!
+        // Redirect back to the requesting site
         window.location.href = url.toString();
         
     } catch (e) {
