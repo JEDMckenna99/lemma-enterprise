@@ -660,9 +660,66 @@ window.addEventListener('message', async (event) => {
                 }
                 break;
                 
+            case 'ISSUE_LEMMA':
+                // Issue a lemma for the requesting site WITHOUT exposing wallet_secret.
+                // The bridge derives the PPID internally (first-party origin has the secret)
+                // and calls lemma.id's issuance API. Only the signed lemma crosses origins.
+                console.log('ISSUE_LEMMA request from', requestingSite);
+                if (!wallet) await initWallet();
+                
+                const issueSiteId = payload?.siteId || requestingSite;
+                const issueSession = await checkSession();
+                
+                if (!issueSession.valid) {
+                    respond({ success: false, error: 'session_invalid' });
+                    return;
+                }
+                
+                try {
+                    // Derive PPID internally (wallet_secret stays on lemma.id origin)
+                    const ppid = await wallet.derivePPID(issueSiteId);
+                    
+                    // Call issuance API (first-party request, includes cookies)
+                    const issueResp = await fetch('/api/wallet-auth/issue', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        credentials: 'include',
+                        body: JSON.stringify({ site_id: issueSiteId, ppid: ppid })
+                    });
+                    
+                    if (!issueResp.ok) {
+                        const errData = await issueResp.json().catch(() => ({}));
+                        console.warn('ISSUE_LEMMA failed:', issueResp.status, errData);
+                        respond({ success: false, error: errData.error || 'issuance_failed' });
+                        return;
+                    }
+                    
+                    const issueData = await issueResp.json();
+                    
+                    if (issueData.success && issueData.permission_lemma) {
+                        // Store the lemma in the bridge's IndexedDB
+                        await wallet.storeCredential(issueData.permission_lemma);
+                        
+                        console.log('ISSUE_LEMMA: issued and stored for', issueSiteId);
+                        respond({
+                            success: true,
+                            ppid: issueData.ppid,
+                            lemma: issueData.permission_lemma,
+                            site_id: issueSiteId
+                        });
+                    } else {
+                        respond({ success: false, error: issueData.error || 'no_lemma_returned' });
+                    }
+                } catch (e) {
+                    console.error('ISSUE_LEMMA error:', e.message);
+                    respond({ success: false, error: e.message });
+                }
+                break;
+
             case 'GET_WALLET_SECRET':
-                // Get wallet secret for PPID derivation (requires valid session)
-                console.log('🔑 GET_WALLET_SECRET request received');
+                // DEPRECATED: Use ISSUE_LEMMA instead. Wallet secret should not cross origins.
+                // Kept for backwards compatibility during migration.
+                console.log('GET_WALLET_SECRET request received (DEPRECATED - use ISSUE_LEMMA)');
                 if (!wallet) await initWallet();
                 const secretSession = await checkSession();
                 console.log('🔑 Session check for secret:', secretSession.valid ? 'valid' : 'invalid');
@@ -1609,14 +1666,15 @@ try {
             capabilities: {
                 checkSession: true,
                 extendSession: true,
+                issueLemma: true,   // Bridge-side PPID derivation + issuance (wallet_secret stays on lemma.id)
                 quickVerify: true,
                 localVerification: true,
                 revocationCache: true,
                 freshAuth: true,
                 authFreshnessCheck: true,
                 storageAccessAPI: !!document.hasStorageAccess,
-                sessionSync: true,  // Server session sync capability
-                instantSync: !!sessionChannel  // BroadcastChannel for instant same-device sync
+                sessionSync: true,
+                instantSync: !!sessionChannel
             },
             // If no session, include unlock URL for SDK to redirect
             unlockUrl: session.needsUnlock ? 'https://lemma.id/wallet/unlock' : null
