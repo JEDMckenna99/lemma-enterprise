@@ -763,7 +763,7 @@ def create_app():
         response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
         response.headers['Pragma'] = 'no-cache'
         response.headers['Expires'] = '0'
-        response.headers['X-SDK-Version'] = '2.4.0-ppid-derive'
+        response.headers['X-SDK-Version'] = '2.36.0'
         response.headers['Access-Control-Allow-Origin'] = '*'
         return response
 
@@ -778,7 +778,7 @@ def create_app():
         response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
         response.headers['Pragma'] = 'no-cache'
         response.headers['Expires'] = '0'
-        response.headers['X-SDK-Version'] = '2.4.0-ppid-derive'
+        response.headers['X-SDK-Version'] = '2.36.0'
         response.headers['Access-Control-Allow-Origin'] = '*'
         return response
 
@@ -1041,64 +1041,92 @@ def create_app():
             return "Documentation not found", 404
 
     # ==================== ADMIN PLATFORM ====================
+    # SECURITY: Server-side gate requires active wallet session to serve admin pages.
+    # Defense-in-depth:
+    #   Layer 1 (server): Wallet session cookie required (blocks anonymous visitors)
+    #   Layer 2 (client): JS verifies admin credential via Ed25519 + bloom filter
+    #   Layer 3 (API): require_admin decorator on all admin API endpoints
+    
+    def _require_wallet_session(template_name, **template_kwargs):
+        """
+        Server-side guard for admin pages.
+        Requires an active wallet session cookie before serving admin HTML.
+        Returns the rendered template with noindex headers if session exists,
+        or redirects to home if no session.
+        """
+        has_session = request.cookies.get('lemma_wallet_session')
+        has_wallet_cookie = request.cookies.get('lemma_wallet_csrf')
+        
+        if not has_session and not has_wallet_cookie:
+            logger.warning(f"Admin page access denied - no wallet session: {request.path} from {request.remote_addr}")
+            return redirect('/')
+        
+        response = render_template(template_name, **template_kwargs)
+        return response, 200, {
+            'X-Robots-Tag': 'noindex, nofollow',
+            'Cache-Control': 'no-cache, no-store, must-revalidate, private',
+            'Pragma': 'no-cache',
+            'Expires': '0'
+        }
+
     @app.route('/admin')
     def admin_dashboard():
         """Admin Dashboard - Platform overview"""
-        logger.info("🛡️ Serving admin dashboard")
-        return render_template('admin/dashboard.html')
+        logger.info("Serving admin dashboard")
+        return _require_wallet_session('admin/dashboard.html')
     
     @app.route('/admin/monitoring')
     def admin_monitoring_page():
         """Admin Monitoring - Bloom filter, system health"""
-        logger.info("🔧 Serving admin monitoring")
-        return render_template('admin/platform_monitoring.html')
+        logger.info("Serving admin monitoring")
+        return _require_wallet_session('admin/platform_monitoring.html')
     
     @app.route('/admin/health')
     def admin_health_page():
         """Admin Health - System health details"""
-        logger.info("💚 Serving admin health")
-        return render_template('admin/health.html')
+        logger.info("Serving admin health")
+        return _require_wallet_session('admin/health.html')
     
     @app.route('/admin/users')
     def admin_users():
         """Admin Users - User management"""
-        logger.info("👥 Serving admin users")
-        return render_template('admin/users.html')
+        logger.info("Serving admin users")
+        return _require_wallet_session('admin/users.html')
     
     @app.route('/admin/sites')
     def admin_sites():
         """Admin Sites - All registered sites"""
-        logger.info("🌐 Serving admin sites")
-        return render_template('admin/sites.html')
+        logger.info("Serving admin sites")
+        return _require_wallet_session('admin/sites.html')
     
     @app.route('/admin/credentials')
     def admin_credentials():
         """Admin Credentials - Credential management"""
-        logger.info("🎫 Serving admin credentials")
-        return render_template('admin/credentials.html')
+        logger.info("Serving admin credentials")
+        return _require_wallet_session('admin/credentials.html')
     
     @app.route('/admin/revocations')
     def admin_revocations():
         """Admin Revocations - Revocation management"""
-        logger.info("🚫 Serving admin revocations")
-        return render_template('admin/revocations.html')
+        logger.info("Serving admin revocations")
+        return _require_wallet_session('admin/revocations.html')
     
     @app.route('/admin/audit')
     def admin_audit():
         """Admin Audit - Audit log"""
-        logger.info("📜 Serving admin audit")
-        return render_template('admin/audit.html')
+        logger.info("Serving admin audit")
+        return _require_wallet_session('admin/audit.html')
 
     @app.route('/admin/debug')
     def admin_debug():
         """Admin Debug - API endpoint testing for agent debugging"""
-        logger.info("🔧 Serving admin debug dashboard")
-        return render_template('admin/debug.html')
+        logger.info("Serving admin debug dashboard")
+        return _require_wallet_session('admin/debug.html')
 
     @app.route('/admin/bootstrap')
     def admin_bootstrap():
         """Admin credential bootstrap page"""
-        return render_template('modern/admin_bootstrap.html')
+        return _require_wallet_session('modern/admin_bootstrap.html')
     
     # Legacy redirects
     @app.route('/admin/legacy')
