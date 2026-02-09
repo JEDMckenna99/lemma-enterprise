@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sign In with Lemma</title>
+    <title>Sign in with Lemma.id</title>
     <meta name="description" content="Unlock your wallet to sign in securely.">
     <link rel="icon" href="/static/favicon.ico" type="image/x-icon">
     
@@ -53,16 +53,16 @@
         }
 
         .lemma-logo {
-            width: 72px;
-            height: 72px;
+            width: 120px;
+            height: 120px;
             margin-bottom: 24px;
             margin-left: auto;
             margin-right: auto;
         }
 
         .lemma-logo svg {
-            width: 72px;
-            height: 72px;
+            width: 120px;
+            height: 120px;
         }
 
         .unlock-title {
@@ -286,8 +286,7 @@
                 </svg>
             </div>
             
-            <h1 class="unlock-title">Sign In with Lemma</h1>
-            <p class="unlock-subtitle" id="unlock-subtitle">Authenticate with your passkey to continue</p>
+            <h1 class="unlock-title">Sign in with Lemma.id</h1>
             
             <!-- Requesting Site Info -->
             <div class="requesting-site" id="requesting-site">
@@ -362,7 +361,7 @@ function parseParams() {
     } else {
         // No redirect - hide requesting site section
         document.getElementById('requesting-site').style.display = 'none';
-        document.getElementById('unlock-subtitle').textContent = 'Access your Lemma wallet';
+        // No subtitle needed
     }
 }
 
