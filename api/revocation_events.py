@@ -231,7 +231,6 @@ def generate_sse_events():
 
 
 @revocation_events_bp.route('/api/events/revocations', methods=['GET', 'OPTIONS'])
-@cross_origin()
 def revocation_event_stream():
     """
     Server-Sent Events endpoint for real-time platform events.
@@ -257,10 +256,11 @@ def revocation_event_stream():
     Returns:
         SSE stream (Content-Type: text/event-stream)
     """
+    origin = request.headers.get('Origin', '*')
+    
     if request.method == 'OPTIONS':
-        # Handle CORS preflight
         response = Response()
-        response.headers['Access-Control-Allow-Origin'] = request.headers.get('Origin', '*')
+        response.headers['Access-Control-Allow-Origin'] = origin
         response.headers['Access-Control-Allow-Methods'] = 'GET, OPTIONS'
         response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Cache-Control'
         response.headers['Access-Control-Allow-Credentials'] = 'true'
@@ -274,8 +274,8 @@ def revocation_event_stream():
         headers={
             'Cache-Control': 'no-cache',
             'Connection': 'keep-alive',
-            'X-Accel-Buffering': 'no',  # Disable nginx buffering
-            'Access-Control-Allow-Origin': request.headers.get('Origin', '*'),
+            'X-Accel-Buffering': 'no',
+            'Access-Control-Allow-Origin': origin,
             'Access-Control-Allow-Credentials': 'true'
         }
     )
