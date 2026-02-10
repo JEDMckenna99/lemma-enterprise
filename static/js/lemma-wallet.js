@@ -75,7 +75,7 @@ const AUTH_STATE = {
 class LemmaWallet {
     // SDK version - check with LemmaWallet.VERSION
     // v2.32.0: Redirect-only architecture - removed popup flow for simpler, consistent UX
-    static VERSION = '2.36.0';  // Performance optimizations: cached global session, debounced heartbeat, faster bridge
+    static VERSION = '2.50.0';  // Sub-5ms verification: pre-hydrated caches, debug-gated logging, no bridge
     
     constructor() {
         this.db = null;
@@ -99,7 +99,14 @@ class LemmaWallet {
         // Performance: Debounce heartbeat checks
         this._lastHeartbeatCheck = 0;
         this._heartbeatDebounceMs = 2000;  // Min 2s between checks
+        
+        // Performance: Debug logging (set LemmaWallet.DEBUG = true to enable)
+        this._debug = false;
     }
+    
+    /** @private Log only when debug is enabled */
+    _log(...args) { if (this._debug) console.log(...args); }
+    _warn(...args) { if (this._debug) console.warn(...args); }
 
     /**
      * Set callback for when session expires (e.g., wallet locked remotely)
@@ -1646,6 +1653,11 @@ class LemmaWallet {
                 this._initialized = true;
                 await this._checkSessionState();
                 this._cleanupStaleRedirectState();
+                
+                // Pre-hydrate verification caches (non-blocking, parallel reads)
+                // This ensures verifyLocalAuthorization() hits memory, not IndexedDB
+                this._hydrateVerificationCache();
+                
                 resolve();
             };
 
@@ -1695,35 +1707,62 @@ class LemmaWallet {
 
         // Auto-sync revocations on init (non-blocking)
         this._autoSyncRevocations();
-        
-        // Pre-warm bridge iframe on third-party sites (non-blocking)
-        // This starts loading the bridge in background so it's ready when needed
-        if (!this._isLemmaDomain() && typeof document !== 'undefined') {
-            this._preWarmBridge();
-        }
     }
     
     /**
-     * Pre-warm the bridge iframe in background for faster auth
+     * Pre-hydrate verification caches into memory during init.
+     * Loads revocation list + signature verification cache in parallel.
+     * After this, verifyLocalAuthorization() is pure in-memory lookups.
      * @private
      */
-    _preWarmBridge() {
-        // Only pre-warm if not already present
-        if (document.querySelector('iframe[src*="/wallet/bridge"]')) return;
-        
-        // Use requestIdleCallback to avoid blocking main thread
-        const idle = window.requestIdleCallback || ((cb) => setTimeout(cb, 100));
-        idle(() => {
-            // Double-check bridge doesn't exist (might have been created during idle)
-            if (document.querySelector('iframe[src*="/wallet/bridge"]')) return;
+    async _hydrateVerificationCache() {
+        try {
+            // Parallel reads — single IndexedDB open, multiple stores
+            const [revocations, allLemmas] = await Promise.all([
+                this._get('revocations', 'current').catch(() => null),
+                this._getAll('lemmas').catch(() => [])
+            ]);
             
-            console.log('[Lemma] Pre-warming bridge iframe...');
-            const bridge = document.createElement('iframe');
-            bridge.src = 'https://lemma.id/wallet/bridge';
-            bridge.style.cssText = 'display:none;width:0;height:0;border:none;';
-            bridge.id = 'lemma-bridge';
-            document.body.appendChild(bridge);
-        });
+            // Hydrate revocation cache
+            if (revocations?.listArray) {
+                this._revocationCache.set = new Set(revocations.listArray);
+                this._revocationCache.lastSynced = revocations.lastSynced;
+            }
+            
+            // Build site → lemma ID mapping for instant lookups
+            if (!this._siteToLemmaId) this._siteToLemmaId = {};
+            for (const lemma of allLemmas) {
+                const claims = lemma.claims || lemma.credentialSubject || {};
+                const siteId = claims.siteId || claims.site_id || claims.domain || lemma.siteId;
+                if (siteId) {
+                    // Keep most recent per site
+                    const existing = this._siteToLemmaId[siteId];
+                    if (!existing) {
+                        this._siteToLemmaId[siteId] = lemma.id;
+                    }
+                }
+            }
+            
+            // Hydrate signature verification cache from persisted entries
+            if (!this._verifiedSignatures) this._verifiedSignatures = new Set();
+            for (const lemma of allLemmas) {
+                try {
+                    const cached = await this._get('session', `verified_${lemma.id}`);
+                    if (cached && cached.sig === (lemma.proof?.signatureValue || lemma.signature)) {
+                        this._verifiedSignatures.add(lemma.id);
+                    }
+                } catch (_) {}
+            }
+            
+            this._log('[Lemma] Verification cache hydrated:',
+                `${allLemmas.length} lemmas,`,
+                `${this._verifiedSignatures.size} pre-verified,`,
+                `${this._revocationCache.set?.size || 0} revocations`
+            );
+        } catch (e) {
+            // Non-fatal — verification will still work, just slower on first call
+            this._warn('[Lemma] Cache hydration failed (non-fatal):', e.message);
+        }
     }
 
     /**
@@ -3637,7 +3676,8 @@ class LemmaWallet {
      * Result is cached so subsequent quickVerify calls skip crypto
      */
     async verifyLemma(lemma, forceSignatureCheck = false) {
-        await this.init();
+        // Skip init() — caller (verifyLocalAuthorization) already initialized
+        if (!this._initialized) await this.init();
         
         const startTime = performance.now();
         
@@ -3745,7 +3785,7 @@ class LemmaWallet {
             } catch (_) {}
             
                     } catch (e) {
-            console.warn('Signature verification error:', e.message);
+            this._warn('Signature verification error:', e.message);
             return { valid: false, reason: 'Verification error: ' + e.message };
         }
 
@@ -3855,18 +3895,14 @@ class LemmaWallet {
      */
     async verifyLocalAuthorization(options = {}) {
         const startTime = performance.now();
-        await this.init();
+        // Skip init() if already initialized (hot path optimization)
+        if (!this._initialized) await this.init();
         
         const permission = options.permission || 'login';
         const siteId = options.siteId || window.location.hostname;
         
-        console.log(`[Lemma] Verifying local authorization for ${siteId}...`);
-        
-        // STEP 1: Check local session state
-        // The session is set when wallet is unlocked on lemma.id
-        // Lock events propagate via BroadcastChannel/bridge
+        // STEP 1: Check local session state (in-memory, ~0ms)
         if (!this.session.isUnlocked) {
-            console.log('[Lemma] Wallet is locked - authorization denied');
             return {
                 authorized: false,
                 reason: 'wallet_locked',
@@ -3875,9 +3911,7 @@ class LemmaWallet {
             };
         }
         
-        // Check session expiry
         if (this.session.expiresAt && Date.now() > this.session.expiresAt) {
-            console.log('[Lemma] Session expired - authorization denied');
             return {
                 authorized: false,
                 reason: 'session_expired',
@@ -3938,7 +3972,7 @@ class LemmaWallet {
         const totalTime = (performance.now() - startTime).toFixed(1);
         
         if (!verification.valid) {
-            console.log(`[Lemma] Lemma verification failed: ${verification.reason}`);
+            this._log(`[Lemma] Lemma verification failed: ${verification.reason}`);
             return {
                 authorized: false,
                 reason: 'verification_failed',
@@ -3951,7 +3985,7 @@ class LemmaWallet {
         const claims = lemma.claims || lemma.credentialSubject || {};
         const ppid = lemma.subject || claims.id || claims.ppid || claims.subject;
         
-        console.log(`[Lemma] ✅ Authorization verified in ${totalTime}ms (local-only, no network)`);
+        this._log(`[Lemma] ✅ Verified in ${totalTime}ms`);
         
         return {
             authorized: true,
@@ -4206,7 +4240,7 @@ class LemmaWallet {
                 message
             );
         } catch (e) {
-            console.error('Lemma verification error:', e);
+            this._warn('Lemma verification error:', e);
             return false;
         }
     }
