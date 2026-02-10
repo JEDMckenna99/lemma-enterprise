@@ -3660,15 +3660,35 @@ class LemmaWallet {
             return { valid: false, reason: 'Expired' };
         }
         
-        // 3. Check if we can skip signature verification
-        if (!forceSignatureCheck && this._verifiedSignatures.has(lemma.id)) {
-            const verifyTime = ((performance.now() - startTime) * 1000).toFixed(1);
-            return {
-                valid: true,
-                signatureCached: true,
-                verifyTimeUs: verifyTime,
-                revocationUnchecked: revocationStatus.unchecked
-            };
+        // 3. Check if we can skip signature verification (in-memory + persisted cache)
+        if (!forceSignatureCheck) {
+            // Fast: in-memory cache (same page session)
+            if (this._verifiedSignatures.has(lemma.id)) {
+                const verifyTime = ((performance.now() - startTime) * 1000).toFixed(1);
+                return {
+                    valid: true,
+                    signatureCached: true,
+                    verifyTimeUs: verifyTime,
+                    revocationUnchecked: revocationStatus.unchecked
+                };
+            }
+            
+            // Medium: IndexedDB persisted cache (survives page reload)
+            try {
+                const cached = await this._get('session', `verified_${lemma.id}`);
+                if (cached && cached.sig === (lemma.proof?.signatureValue || lemma.signature)) {
+                    // Signature hasn't changed — trust the cached result
+                    this._verifiedSignatures.add(lemma.id);
+                    const verifyTime = ((performance.now() - startTime) * 1000).toFixed(1);
+                    return {
+                        valid: true,
+                        signatureCached: true,
+                        verifyTimeUs: verifyTime,
+                        revocationUnchecked: revocationStatus.unchecked,
+                        issuer: cached.issuer
+                    };
+                }
+            } catch (_) {}
         }
 
         // 4. Get public key
@@ -3713,8 +3733,16 @@ class LemmaWallet {
                 return { valid: false, reason: 'Invalid signature' };
             }
             
-            // Cache successful verification
+            // Cache successful verification (in-memory + persisted)
             this._verifiedSignatures.add(lemma.id);
+            try {
+                await this._put('session', {
+                    id: `verified_${lemma.id}`,
+                    sig: lemma.proof?.signatureValue || lemma.signature,
+                    issuer: issuerName,
+                    at: Date.now()
+                });
+            } catch (_) {}
             
                     } catch (e) {
             console.warn('Signature verification error:', e.message);
@@ -3858,50 +3886,53 @@ class LemmaWallet {
             };
         }
         
-        // STEP 2: Get lemmas for this site from local storage
-        const allLemmas = await this._getAll('lemmas');
+        // STEP 2: Find lemma for this site (fast path: check cached ID first)
+        let lemma = null;
+        const cachedLemmaId = this._siteToLemmaId?.[siteId];
         
-        // Find lemmas that match this site
-        const siteLemmas = allLemmas.filter(lemma => {
-            const claims = lemma.claims || lemma.credentialSubject || {};
-            const lemmaSiteId = claims.siteId || claims.site_id || claims.domain || lemma.siteId;
-            const lemmaPermission = claims.permission || claims.permissions || lemma.permission;
-            
-            // Match site (exact or subdomain)
-            const siteMatches = lemmaSiteId === siteId || 
-                               siteId.endsWith('.' + lemmaSiteId) ||
-                               lemmaSiteId === '*'; // Wildcard
-            
-            // Match permission
-            const permissionMatches = !permission || 
-                                      lemmaPermission === permission ||
-                                      (Array.isArray(lemmaPermission) && lemmaPermission.includes(permission));
-            
-            return siteMatches && permissionMatches;
-        });
-        
-        if (siteLemmas.length === 0) {
-            console.log(`[Lemma] No lemmas found for ${siteId} with permission ${permission}`);
-            return {
-                authorized: false,
-                reason: 'no_lemma',
-                message: `No authorization found for this site. Please sign in via lemma.id.`,
-                verifyTimeMs: (performance.now() - startTime).toFixed(1)
-            };
+        if (cachedLemmaId) {
+            // Fast path: direct ID lookup (~2ms vs ~10ms for getAll+filter)
+            lemma = await this._get('lemmas', cachedLemmaId);
         }
         
-        // STEP 3: Verify the most recent lemma
-        // Sort by issuedAt/storedAt to get most recent
-        siteLemmas.sort((a, b) => {
-            const aTime = a.issuedAt || a.storedAt || 0;
-            const bTime = b.issuedAt || b.storedAt || 0;
-            return bTime - aTime;
-        });
+        if (!lemma) {
+            // Slow path: scan all lemmas (first visit to this site in this session)
+            const allLemmas = await this._getAll('lemmas');
+            
+            const siteLemmas = allLemmas.filter(l => {
+                const claims = l.claims || l.credentialSubject || {};
+                const lemmaSiteId = claims.siteId || claims.site_id || claims.domain || l.siteId;
+                const lemmaPermission = claims.permission || claims.permissions || l.permission;
+                
+                const siteMatches = lemmaSiteId === siteId || 
+                                   siteId.endsWith('.' + lemmaSiteId) ||
+                                   lemmaSiteId === '*';
+                const permissionMatches = !permission || 
+                                          lemmaPermission === permission ||
+                                          (Array.isArray(lemmaPermission) && lemmaPermission.includes(permission));
+                
+                return siteMatches && permissionMatches;
+            });
+            
+            if (siteLemmas.length === 0) {
+                return {
+                    authorized: false,
+                    reason: 'no_lemma',
+                    message: `No authorization found for this site. Please sign in via lemma.id.`,
+                    verifyTimeMs: (performance.now() - startTime).toFixed(1)
+                };
+            }
+            
+            // Most recent first
+            siteLemmas.sort((a, b) => (b.issuedAt || b.storedAt || 0) - (a.issuedAt || a.storedAt || 0));
+            lemma = siteLemmas[0];
+            
+            // Cache the mapping for instant lookup next time
+            if (!this._siteToLemmaId) this._siteToLemmaId = {};
+            this._siteToLemmaId[siteId] = lemma.id;
+        }
         
-        const lemma = siteLemmas[0];
-        console.log(`[Lemma] Found lemma for ${siteId}, verifying signature...`);
-        
-        // Use existing verification (includes signature check, revocation, expiry)
+        // STEP 3: Verify the lemma (signature cached across page loads)
         const verification = await this.verifyLemma(lemma);
         
         const totalTime = (performance.now() - startTime).toFixed(1);
