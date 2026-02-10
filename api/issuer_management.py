@@ -51,7 +51,10 @@ class LemmaIssuerManager:
         
         db = SessionLocal()
         try:
-            site = db.query(Site).filter_by(site_id=site_id).first()
+            # Query by site_domain (hostname) first, fall back to site_id
+            site = db.query(Site).filter_by(site_domain=site_id).first()
+            if not site:
+                site = db.query(Site).filter_by(site_id=site_id).first()
             kms = get_kms_manager()
             
             # Try to load existing KMS-encrypted key
@@ -172,7 +175,10 @@ class LemmaIssuerManager:
         
         db = SessionLocal()
         try:
-            site = db.query(Site).filter_by(site_id=site_id).first()
+            # Query by site_domain (hostname) first, fall back to site_id
+            site = db.query(Site).filter_by(site_domain=site_id).first()
+            if not site:
+                site = db.query(Site).filter_by(site_id=site_id).first()
             kms = get_kms_manager()
             
             from lemma_crypto import PyMinimalIssuer
