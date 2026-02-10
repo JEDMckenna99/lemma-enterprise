@@ -415,73 +415,56 @@ class LemmaWallet {
                 }
             }
             
-            // Not authorized locally - try bridge for cross-site lemma issuance
-            // The bridge runs on lemma.id's origin, so it has the wallet_secret.
-            // It derives the PPID internally and returns only the signed lemma.
-            // The wallet_secret NEVER crosses the origin boundary.
-            if (authResult.reason === 'wallet_locked' || authResult.reason === 'no_lemma' || authResult.reason === 'session_expired') {
+            // ============================================================
+            // FAST PATH: If wallet is locked, check global session (ONE API call)
+            // If unlocked remotely, set local session and retry local verification.
+            // No bridge iframe, no postMessage, no session-sync cookies.
+            // ============================================================
+            if (authResult.reason === 'wallet_locked' || authResult.reason === 'session_expired') {
                 try {
-                    console.log('[Lemma] No local auth - checking bridge for cross-site session...');
-                    const bridgeSession = await this.checkBridgeSession();
-
-                    if (bridgeSession.valid) {
-                        console.log('[Lemma] Bridge has valid session - requesting lemma issuance via bridge...');
+                    const walletIdRecord = await this._get('passkey', 'walletId');
+                    const walletId = walletIdRecord?.value;
+                    
+                    if (walletId) {
+                        console.log('[Lemma] Wallet locked - checking global session (single API call)...');
+                        const globalSession = await this._checkGlobalSession(walletId);
                         
-                        const siteId = window.location.hostname;
-                        
-                        try {
-                            // Ask bridge to issue lemma (PPID derived on lemma.id origin, secret stays there)
-                            const issueResult = await this._sendBridgeMessage('ISSUE_LEMMA', { siteId: siteId });
+                        if (globalSession.valid) {
+                            console.log('[Lemma] Global session valid - syncing locally...');
+                            const gs = globalSession.session || globalSession;
+                            this.session = {
+                                isUnlocked: true,
+                                unlockedAt: gs.unlocked_at || gs.unlockedAt || Date.now(),
+                                expiresAt: (gs.expires_at || gs.expiresAt) * 1000,
+                                walletId: walletId,
+                                source: 'global_sync'
+                            };
+                            await this._put('session', { id: 'current', ...this.session });
                             
-                            if (issueResult?.success && issueResult.lemma) {
-                                // Store the lemma locally
-                                await this.storeCredential(issueResult.lemma);
-                                
-                                // Verify the lemma we received (Ed25519 signature check)
-                                const verification = await this.verifyLemma(issueResult.lemma);
-                                
-                                if (verification.valid) {
-                                    // Establish local session (without wallet_secret)
-                                    this.session = {
-                                        isUnlocked: true,
-                                        unlockedAt: bridgeSession.session?.unlockedAt || Date.now(),
-                                        expiresAt: bridgeSession.session?.expiresAt || (Date.now() + getSessionDurationMs()),
-                                        walletId: bridgeSession.walletId,
-                                        source: 'bridge_issue'
-                                    };
-                                    await this._put('session', { id: 'current', ...this.session });
-                                    
-                                    const claims = issueResult.lemma.claims || issueResult.lemma.credentialSubject || {};
-                                    
-                                    console.log('[Lemma] Cross-site auth via bridge-issued lemma (verified, no secret transferred)');
-                                    this._setupLockEventListener();
-
-                                    return {
-                                        authenticated: true,
-                                        needsPasskey: false,
-                                        needsRedirect: false,
-                                        ppid: issueResult.ppid,
-                                        claims: claims,
-                                        lemma: issueResult.lemma,
-                                        walletId: bridgeSession.walletId,
-                                        message: 'Authorized via bridge-issued verified lemma',
-                                        source: 'bridge_issue'
-                                    };
-                                }
-                                
-                                console.warn('[Lemma] Bridge-issued lemma failed verification:', verification.reason);
+                            // Retry local verification with updated session
+                            const retryResult = await this.verifyLocalAuthorization();
+                            if (retryResult.authorized) {
+                                console.log(`[Lemma] ✅ Authorized after global sync in ${retryResult.verifyTimeMs}ms`);
+                                this._setupLockEventListener();
+                                return {
+                                    authenticated: true,
+                                    needsPasskey: false,
+                                    needsRedirect: false,
+                                    ppid: retryResult.ppid,
+                                    claims: retryResult.claims,
+                                    lemma: retryResult.lemma,
+                                    walletId: walletId,
+                                    message: 'Authorized via local lemma + global session sync',
+                                    verifyTimeMs: retryResult.verifyTimeMs,
+                                    source: 'global_sync'
+                                };
                             }
-                        } catch (e) {
-                            console.warn('[Lemma] Bridge ISSUE_LEMMA failed:', e.message);
                         }
                     }
                 } catch (e) {
-                    console.warn('[Lemma] Bridge session check failed:', e.message);
+                    console.warn('[Lemma] Global session check failed:', e.message);
                 }
-            }
-
-            // Not authorized - check why and recommend action
-            if (authResult.reason === 'wallet_locked' || authResult.reason === 'session_expired') {
+                
                 console.log('[Lemma] Wallet locked/expired - redirect to unlock');
                 result.needsRedirect = true;
                 result.needsPasskey = false;
@@ -490,7 +473,7 @@ class LemmaWallet {
             }
 
             if (authResult.reason === 'no_lemma') {
-                console.log('[Lemma] No lemma and no session - redirect to sign in');
+                console.log('[Lemma] No lemma for this site - redirect to sign in');
                 result.needsRedirect = true;
                 result.needsPasskey = false;
                 result.message = 'Sign in with Lemma to access this site';
