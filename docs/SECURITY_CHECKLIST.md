@@ -24,6 +24,7 @@ This checklist helps developers verify their Lemma integration follows security 
   - `docs/launch-evidence/2026-02-11-code-remediation.md`
   - `docs/launch-evidence/2026-02-11-post-remediation-scan.md`
   - `docs/launch-evidence/2026-02-11-130201-post-deploy-summary.md`
+  - `docs/launch-evidence/2026-02-11-132844-post-deploy-summary.md`
   - `docs/launch-evidence/2026-02-11-ci-gate-setup.md`
 - Note: this snapshot does not replace full manual/browser E2E validation.
 
@@ -145,7 +146,7 @@ if (!result.valid) {
 | Check | Status | Notes |
 |-------|--------|-------|
 | Revocation list synced periodically | IN_PROGRESS | Revocation endpoints healthy and cache metadata present |
-| Credentials checked against revocation | IN_PROGRESS | Revocation/bloom paths implemented; full revoke-then-deny E2E evidence pending |
+| Credentials checked against revocation | FAIL | Post-deploy test found site-specific revoke did not appear in list/bloom (`site_updated=false`) |
 | Stale revocation data flagged | UNKNOWN | Needs explicit stale-cache scenario test output |
 | Network failure doesn't block auth | UNKNOWN | Offline/failure-mode validation not yet recorded |
 
@@ -268,6 +269,7 @@ We follow responsible disclosure and will work with you to resolve issues.
 |------|---------|-------|--------|
 | TBD | TBD | Full SDK audit | TBD |
 | 2026-02-11 | Internal (launch gate) | Production smoke + header + guardrail checks | Partial verification complete; full audit pending |
+| 2026-02-11 | Internal (post-deploy) | Heroku `v1676` automated launch gate run | Smoke/transport/origin checks passed; full E2E audit still pending |
 
 ---
 

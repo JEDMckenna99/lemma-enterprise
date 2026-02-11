@@ -31,7 +31,8 @@ Evidence: __________
 
 - Date: 2026-02-11
 - Environment: production `https://lemma.id` (Heroku deploy)
-- Type: non-destructive smoke checks
+- Deployment Version: Heroku release `v1676`, commit `8bb73981`
+- Type: post-deploy automated launch gate + smoke checks
 - Evidence:
   - `docs/launch-evidence/2026-02-11-heroku-smoke.md`
   - `docs/launch-evidence/2026-02-11-heroku-smoke.txt`
@@ -48,6 +49,12 @@ Evidence: __________
   - `docs/launch-evidence/2026-02-11-130201-post-deploy-smoke.txt`
   - `docs/launch-evidence/2026-02-11-130201-post-deploy-transport.txt`
   - `docs/launch-evidence/2026-02-11-130201-post-deploy-origin.txt`
+  - `docs/launch-evidence/2026-02-11-132844-post-deploy-summary.md`
+  - `docs/launch-evidence/2026-02-11-132844-post-deploy-smoke.txt`
+  - `docs/launch-evidence/2026-02-11-132844-post-deploy-transport.txt`
+  - `docs/launch-evidence/2026-02-11-132844-post-deploy-origin.txt`
+  - `docs/launch-evidence/2026-02-11-revocation-path-post-deploy.md`
+  - `docs/launch-evidence/2026-02-11-revocation-path-post-deploy.txt`
   - `docs/launch-evidence/2026-02-11-ci-gate-setup.md`
   - `docs/launch-evidence/2026-02-11-launch-gate-ci-local.txt`
 - Coverage in this run:
@@ -59,6 +66,7 @@ Evidence: __________
   - static scan evidence for `eval`/`innerHTML` usage patterns
   - repository code remediation for passkey/revocation/frontend safety blockers
   - post-deploy verification automation run (scripted)
+  - deployed-release verification on Heroku `v1676`
   - bridge security/cache headers
   - revocation status endpoint behavior
   - unauthenticated guardrail behavior on selected auth/session APIs
@@ -140,14 +148,16 @@ Evidence:
   - Revoked credential is consistently rejected across clients after sync SLA.
   - Verified by automated and manual tests.
 - Current Known Gap:
-  - Code path is remediated in repository; deployed environment still needs post-deploy revocation propagation validation.
+  - Post-deploy validation found revocation success response with `site_updated=false` and missing list/bloom visibility for test credential.
 
-Status: `IN_PROGRESS`  
+Status: `FAIL`  
 Owner: Backend Lead  
 Target Date: __________  
 Evidence:
 - `docs/launch-evidence/2026-02-11-code-remediation.md`
-- Remaining requirement: post-deploy propagation test evidence (revoke -> sync -> deny across clients)
+- `docs/launch-evidence/2026-02-11-revocation-path-post-deploy.md`
+- Remediation in progress: hard-fail persistence path and real status lookup in `api/wallet_revocation.py`
+- Remaining requirement: redeploy + successful revoke -> list/bloom visibility -> deny-path evidence
 
 ### P0-5 Passkey Algorithm Handling Correctness
 

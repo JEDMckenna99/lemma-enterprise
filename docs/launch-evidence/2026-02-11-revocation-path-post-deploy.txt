@@ -1,0 +1,11 @@
+﻿Revocation path validation: 2026-02-11T13:45:26.9264649-05:00
+credential_id=launch_gate_test_795a29e6-98f1-44a1-b3ec-049b7c67fcd7
+
+POST /api/wallet/revoke -> 200
+body={"credential_id":"launch_gate_test_795a29e6-98f1-44a1-b3ec-049b7c67fcd7","revocation_type":"site_specific","site_updated":false,"success":true}
+
+
+GET /api/v1/revocation/list -> 200
+in_revocation_list=False count=2
+GET /api/revocation/bloom-filter -> 200
+in_hashed_revoked_ids=False count=2

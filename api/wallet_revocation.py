@@ -110,6 +110,17 @@ def revoke_credential():
         # For permission lemmas: Site-specific revocation
         elif credential_type == 'permission':
             site_success = await_site_revocation(credential_id, reason, site_domain)
+
+            if not site_success:
+                logger.error(f"❌ Site-specific revocation persistence failed for {credential_id}")
+                return jsonify({
+                    'success': False,
+                    'error': 'revocation_persist_failed',
+                    'credential_id': credential_id,
+                    'revocation_type': 'site_specific',
+                    'site_domain': site_domain,
+                    'message': 'Failed to persist site-specific revocation',
+                }), 500
             
             # Trigger IMMEDIATE bloom filter sync via event bus (FIXES VULN-001)
             # Permission = Site-specific revocation (only that site syncs)
@@ -265,20 +276,49 @@ def get_revocation_status():
                 'message': 'No credential IDs provided'
             }), 400
         
-        # Check revocation status for each credential
-        statuses = {}
-        for cred_id in credential_ids:
-            # In production, this would check:
-            # 1. Network revocation lists (for PoH lemmas)
-            # 2. Site revocation lists (for permission lemmas)
-            # 3. Bloom filter (for efficient revocation checks)
-            
-            statuses[cred_id] = {
-                'revoked': False,  # Placeholder
-                'revocation_time': None,
-                'reason': None,
-                'scope': 'unknown'
-            }
+        # Check revocation status from persistent revocation registry.
+        from api.database import get_db_connection
+
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        try:
+            statuses = {}
+            for cred_id in credential_ids:
+                cursor.execute("""
+                    SELECT
+                        COALESCE(credential_id, lemma_id) as cred_id,
+                        revoked_at,
+                        reason,
+                        site_id,
+                        lemma_type
+                    FROM revocation_list
+                    WHERE COALESCE(credential_id, lemma_id) = %s
+                    ORDER BY revoked_at DESC
+                    LIMIT 1
+                """, (cred_id,))
+
+                row = cursor.fetchone()
+                if row:
+                    _, revoked_at, reason, site_id, lemma_type = row
+                    scope = 'global' if lemma_type == 'poh' else 'site_specific'
+                    statuses[cred_id] = {
+                        'revoked': True,
+                        'revocation_time': revoked_at.isoformat() if revoked_at else None,
+                        'reason': reason,
+                        'scope': scope,
+                        'site_id': site_id
+                    }
+                else:
+                    statuses[cred_id] = {
+                        'revoked': False,
+                        'revocation_time': None,
+                        'reason': None,
+                        'scope': 'unknown',
+                        'site_id': None
+                    }
+        finally:
+            cursor.close()
+            conn.close()
         
         return jsonify({
             'success': True,
