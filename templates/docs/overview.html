@@ -1,150 +1,125 @@
 {% extends "docs/layout.html" %}
 {% set active_page = 'overview' %}
 {% set hero_title = 'Developer Documentation' %}
-{% set hero_subtitle = 'Everything you need to integrate Lemma into your platform' %}
+{% set hero_subtitle = 'Passwordless authentication with local verification. One script tag, zero server load.' %}
 
 {% block docs_content %}
 <div class="docs-section">
-    <h2>Welcome to Lemma</h2>
-    <p>Lemma provides passwordless authentication with credentials that verify locally in the browser. No server calls for verification, no passwords to manage, no sessions to track.</p>
-    
-    <div class="feature-grid">
-        <div class="feature-card">
-            <h3>Local Verification</h3>
-            <p>Credentials are cryptographically verified in the browser using Ed25519 signatures. Your servers never handle auth traffic.</p>
-        </div>
-        <div class="feature-card">
-            <h3>Wallet-Based Identity</h3>
-            <p>Users control their credentials in a browser-based wallet protected by passkeys. No accounts, no passwords.</p>
-        </div>
-        <div class="feature-card">
-            <h3>Privacy-First</h3>
-            <p>Pairwise identifiers (PPIDs) prevent cross-site tracking. Users are pseudo-anonymous across different sites.</p>
-        </div>
-        <div class="feature-card">
-            <h3>Works Offline</h3>
-            <p>Once credentials are issued, verification works entirely offline. Perfect for edge computing.</p>
-        </div>
-    </div>
-</div>
-
-<div class="docs-section" id="quickstart">
-    <h2>Quick Start</h2>
-    <p>Get Lemma running on your site in 3 steps:</p>
-    
-    <h3>1. Add the SDK</h3>
-    <div class="code-block">
-        <div class="code-header">
-            <span>HTML</span>
-            <button class="copy-btn">Copy</button>
-        </div>
-        <code>&lt;script src="https://lemma.id/static/js/lemma-wallet.js"&gt;&lt;/script&gt;</code>
-    </div>
-    
-    <h3>2. Initialize the Wallet</h3>
-    <div class="code-block">
-        <div class="code-header">
-            <span>JavaScript</span>
-            <button class="copy-btn">Copy</button>
-        </div>
-        <code>const wallet = new LemmaWallet({
-    siteId: 'your-site-id',
-    apiKey: 'your-api-key'
-});
-
-await wallet.init();</code>
-    </div>
-    
-    <h3>3. Authenticate Users</h3>
-    <div class="code-block">
-        <div class="code-header">
-            <span>JavaScript</span>
-            <button class="copy-btn">Copy</button>
-        </div>
-        <code>// Start wallet redirect flow
-await wallet.startRedirectFlow({
-    returnUrl: window.location.href
-});
-
-// On return, check for credentials
-const result = await wallet.checkRedirectReturn();
-if (result.authenticated) {
-    const ppid = await wallet.derivePPID();
-    console.log('User authenticated:', ppid);
-}</code>
-    </div>
+    <h2>What is Lemma.id?</h2>
+    <p>Lemma.id replaces passwords and OAuth with hardware-backed passkeys and locally-verifiable credentials. Users authenticate once with a passkey on lemma.id, and every site they visit can verify their identity instantly -- no network calls, no tokens, no shared secrets.</p>
     
     <div class="callout callout--info">
-        <div class="callout-title">Need an API Key?</div>
-        <p>Register your site at <a href="/developer">lemma.id/developer</a> to get your API key.</p>
+        <div class="callout-title">For developers</div>
+        <p>Your integration is: <strong>1 script tag + 1 backend endpoint</strong>. The SDK handles passkeys, credential issuance, Ed25519 verification, cross-device sync, and revocation. Your backend just stores a pseudonymous ID.</p>
     </div>
 </div>
 
-<div class="docs-section" id="how-it-works">
+<div class="docs-section">
     <h2>How It Works</h2>
     
-    <h3>The Wallet Redirect Flow</h3>
-    <p>When a user needs to authenticate:</p>
-    <ol style="color: var(--gray-600); line-height: 1.8;">
-        <li>Your site redirects to <code>lemma.id/wallet/unlock</code></li>
-        <li>User unlocks their wallet with a passkey</li>
-        <li>Lemma redirects back with an encrypted credential in the URL</li>
-        <li>Your site decrypts and verifies the credential locally</li>
-        <li>User is authenticated - no server calls needed</li>
+    <h3>First visit (one-time setup)</h3>
+    <ol>
+        <li>User clicks "Sign in with Lemma.id" on your site</li>
+        <li>Redirects to lemma.id -- user taps passkey (biometric)</li>
+        <li>Lemma.id issues a signed credential (lemma) for your site</li>
+        <li>Redirects back -- SDK stores credential in your site's IndexedDB</li>
+        <li>Your backend receives the user's PPID (site-specific pseudonymous ID)</li>
     </ol>
     
-    <h3>Credential Verification</h3>
-    <p>Credentials are W3C Verifiable Credentials with Ed25519 signatures:</p>
-    <div class="code-block">
-        <div class="code-header">
-            <span>JavaScript</span>
-            <button class="copy-btn">Copy</button>
-        </div>
-        <code>// Verify a credential locally
-const isValid = await wallet.verifyCredential(credential);
-
-// The SDK handles:
-// - Ed25519 signature verification
-// - Expiration checking
-// - Revocation status (synced hourly)</code>
-    </div>
+    <h3>Every visit after (instant, zero network calls)</h3>
+    <ol>
+        <li>SDK reads credential from IndexedDB (~2ms)</li>
+        <li>Ed25519 signature verification (local WebCrypto, ~1ms)</li>
+        <li>Check unlock state (in-memory, ~0ms)</li>
+        <li>Return PPID to your code -- user is authenticated</li>
+    </ol>
+    <p><strong>Total: &lt;5ms. No calls to lemma.id. No calls to your server for auth.</strong></p>
     
-    <h3>Pairwise Identifiers (PPIDs)</h3>
-    <p>PPIDs are site-specific user identifiers derived from:</p>
-    <div class="code-block">
-        <div class="code-header">
-            <span>Formula</span>
-            <button class="copy-btn">Copy</button>
-        </div>
-        <code>PPID = HMAC-SHA256(wallet_secret, site_domain)</code>
-    </div>
-    <p>This means:</p>
-    <ul style="color: var(--gray-600); line-height: 1.8;">
-        <li>Each user has a unique, stable identifier on your site</li>
-        <li>The same user has different PPIDs on different sites</li>
-        <li>Sites cannot correlate users across domains</li>
+    <h3>Lock and unlock (SSE real-time push)</h3>
+    <ul>
+        <li>User locks wallet on any device -- SSE pushes <code>session_invalidated</code> to all sites in &lt;100ms</li>
+        <li>User unlocks on another device -- SSE pushes <code>session_restored</code> to all sites in &lt;100ms</li>
+        <li>No polling. No heartbeats. Persistent EventSource connection.</li>
     </ul>
 </div>
 
-<div class="docs-section" id="next-steps">
-    <h2>Next Steps</h2>
-    <div class="feature-grid">
-        <a href="{{ url_for('docs_wallet_flow') }}" class="feature-card" style="text-decoration: none;">
-            <h3>Wallet Redirect Flow</h3>
-            <p>Detailed guide to implementing the authentication flow</p>
-        </a>
-        <a href="{{ url_for('docs_sdk_js') }}" class="feature-card" style="text-decoration: none;">
-            <h3>SDK Reference</h3>
-            <p>Complete documentation of SDK methods and options</p>
-        </a>
-        <a href="{{ url_for('docs_examples') }}" class="feature-card" style="text-decoration: none;">
-            <h3>Code Examples</h3>
-            <p>Full working examples for common use cases</p>
-        </a>
-        <a href="{{ url_for('docs_api_auth') }}" class="feature-card" style="text-decoration: none;">
-            <h3>API Reference</h3>
-            <p>Server-side API for credential issuance and management</p>
-        </a>
-    </div>
+<div class="docs-section">
+    <h2>Architecture</h2>
+    
+    <table class="docs-table">
+        <thead>
+            <tr><th>Component</th><th>Where it runs</th><th>What it does</th></tr>
+        </thead>
+        <tbody>
+            <tr><td>Passkey</td><td>User's device (TPM/Secure Enclave)</td><td>Hardware-backed biometric authentication</td></tr>
+            <tr><td>Credential (lemma)</td><td>Each site's IndexedDB</td><td>Ed25519-signed proof of identity</td></tr>
+            <tr><td>Verification</td><td>Browser (WebCrypto)</td><td>Local Ed25519 signature check, &lt;5ms</td></tr>
+            <tr><td>SSE stream</td><td>Browser (EventSource)</td><td>Real-time lock/unlock + revocation events</td></tr>
+            <tr><td>PPID</td><td>Your backend</td><td>Site-specific pseudonymous user ID</td></tr>
+            <tr><td>Signing keys</td><td>AWS KMS (HSM-backed)</td><td>Ed25519 key generation + storage</td></tr>
+            <tr><td>Revocation</td><td>Redis + SSE</td><td>Instant credential invalidation (&lt;1s)</td></tr>
+        </tbody>
+    </table>
+</div>
+
+<div class="docs-section">
+    <h2>Security Model</h2>
+    
+    <table class="docs-table">
+        <thead>
+            <tr><th>Property</th><th>How it's enforced</th></tr>
+        </thead>
+        <tbody>
+            <tr><td>Credentials can't be forged</td><td>Ed25519 signatures, private key in HSM (AWS KMS)</td></tr>
+            <tr><td>Credentials can't be stolen</td><td>Stored in origin-scoped IndexedDB (same-origin policy)</td></tr>
+            <tr><td>Revocation is instant</td><td>SSE push via Redis pub/sub (&lt;1 second propagation)</td></tr>
+            <tr><td>No user data to breach</td><td>Site stores only PPID (pseudonymous, one-way derived)</td></tr>
+            <tr><td>Cross-site tracking prevented</td><td>PPIDs are site-specific: HMAC(wallet_secret, site_domain)</td></tr>
+            <tr><td>Passkey is hardware-bound</td><td>TPM/Secure Enclave, never leaves the device</td></tr>
+        </tbody>
+    </table>
+</div>
+
+<div class="docs-section">
+    <h2>What Your Site Never Sees</h2>
+    <ul>
+        <li>No passwords (none exist)</li>
+        <li>No email addresses (unless you ask for one separately)</li>
+        <li>No OAuth tokens (no token refresh, no expiry management)</li>
+        <li>No wallet secrets (stays on lemma.id, used only for PPID derivation)</li>
+        <li>No passkey material (hardware-bound, never leaves device)</li>
+    </ul>
+    <p>Your site stores one column: <code>lemma_ppid</code>. If your database is breached, the attacker gets pseudonymous IDs that are meaningless without the wallet secret (which you never had).</p>
+</div>
+
+<div class="docs-section">
+    <h2>Comparison</h2>
+    
+    <table class="docs-table">
+        <thead>
+            <tr><th></th><th>Lemma.id</th><th>OAuth (Google/Auth0)</th><th>Password</th></tr>
+        </thead>
+        <tbody>
+            <tr><td>Return visit auth speed</td><td>&lt;5ms (local)</td><td>~100ms+ (token refresh)</td><td>~150ms (bcrypt)</td></tr>
+            <tr><td>Network calls per auth</td><td>0</td><td>2-4 to provider</td><td>1 (+ MFA)</td></tr>
+            <tr><td>User data stored by site</td><td>PPID only</td><td>Email, name, profile</td><td>Email, password hash</td></tr>
+            <tr><td>Backend integration</td><td>1 endpoint, ~10 lines</td><td>Token exchange + validation</td><td>Hash + salt + session</td></tr>
+            <tr><td>Cost at 100K MAU</td><td>~$25/mo (SSE only)</td><td>$1,200+/mo (Auth0)</td><td>Infra + email + MFA</td></tr>
+            <tr><td>Breach exposure</td><td>Pseudonymous IDs</td><td>Emails + tokens</td><td>Password hashes</td></tr>
+            <tr><td>Instant remote logout</td><td>Yes (SSE, &lt;100ms)</td><td>Partial (backchannel)</td><td>No</td></tr>
+        </tbody>
+    </table>
+</div>
+
+<div class="docs-section">
+    <h2>Get Started</h2>
+    <p>Ready to integrate?</p>
+    <ul>
+        <li><a href="/docs/quickstart">Quick Start Guide</a> -- 5 minutes to working auth</li>
+        <li><a href="/docs/installation">Installation</a> -- CDN, requirements, site registration</li>
+        <li><a href="/docs/sdk/methods">SDK Methods</a> -- Complete API reference</li>
+        <li><a href="/docs/examples">Examples</a> -- Alongside Google auth, migration, lock detection</li>
+        <li><a href="/developer">Developer Dashboard</a> -- Register your site</li>
+    </ul>
 </div>
 {% endblock %}

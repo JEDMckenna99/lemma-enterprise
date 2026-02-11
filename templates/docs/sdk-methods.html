@@ -1,59 +1,188 @@
 {% extends "docs/layout.html" %}
 {% set active_page = 'sdk-methods' %}
 {% set hero_title = 'SDK Methods' %}
-{% set hero_subtitle = 'Complete method reference' %}
+{% set hero_subtitle = 'Complete API reference for the Lemma JavaScript SDK' %}
 
 {% block docs_content %}
 <div class="docs-section">
-    <h2>Authentication Methods</h2>
+    <h2>Core Methods</h2>
+    <p>Most integrations only need two methods: <code>getAuthenticatedPPID()</code> and <code>unlockWithRedirect()</code>.</p>
+</div>
+
+<div class="docs-section" id="getAuthenticatedPPID">
+    <h3><code>getAuthenticatedPPID()</code></h3>
+    <p>The primary method for authentication. Returns the user's site-specific PPID if authenticated, or instructions for what to do if not.</p>
     
-    <h3><code>startRedirectFlow(options)</code></h3>
-    <p>Start the wallet redirect authentication flow.</p>
-    <ul class="params-list">
-        <li><span class="param-name">returnUrl</span><span class="param-type">string</span><span class="param-required">required</span> - URL to return to after auth</li>
-        <li><span class="param-name">permissions</span><span class="param-type">string[]</span><span class="param-optional">optional</span> - Permissions to request</li>
-        <li><span class="param-name">prompt</span><span class="param-type">string</span><span class="param-optional">optional</span> - 'login' or 'consent'</li>
-    </ul>
-    
-    <h3><code>checkRedirectReturn()</code></h3>
-    <p>Check if returning from auth and extract credentials.</p>
     <div class="code-block">
-        <div class="code-header"><span>Response</span></div>
-        <code>{
-    authenticated: boolean,
-    credentials: Credential[],
-    error?: string
-}</code>
+        <div class="code-header">
+            <span>JavaScript</span>
+            <button class="copy-btn">Copy</button>
+        </div>
+        <code>const wallet = new LemmaWallet();
+const result = await wallet.getAuthenticatedPPID();
+
+// result.authenticated  - boolean: is the user authenticated?
+// result.ppid           - string: "did:lemma:ppid_abc..." (site-specific)
+// result.needsRedirect  - boolean: should you redirect to lemma.id?
+// result.walletId       - string: wallet identifier</code>
+    </div>
+    
+    <p><strong>Performance:</strong> &lt;5ms for return visitors (local Ed25519 verification, zero network calls).</p>
+    
+    <div class="callout callout--info">
+        <div class="callout-title">How it works internally</div>
+        <p>1. Reads stored credential (lemma) from IndexedDB<br>
+        2. Verifies Ed25519 signature locally using WebCrypto<br>
+        3. Checks session unlock state (set via SSE from lemma.id)<br>
+        4. Checks revocation list (local Set lookup)<br>
+        All in-memory after first page load. Zero network calls.</p>
     </div>
 </div>
 
-<div class="docs-section">
-    <h2>Credential Methods</h2>
+<div class="docs-section" id="autoAuthenticate">
+    <h3><code>autoAuthenticate()</code></h3>
+    <p>Lower-level method that <code>getAuthenticatedPPID()</code> wraps. Returns more detail about the auth state.</p>
     
-    <h3><code>getCredentials(options?)</code></h3>
-    <p>Get stored credentials.</p>
-    <ul class="params-list">
-        <li><span class="param-name">type</span><span class="param-type">string</span><span class="param-optional">optional</span> - Filter by credential type</li>
-        <li><span class="param-name">valid</span><span class="param-type">boolean</span><span class="param-optional">optional</span> - Only return valid credentials</li>
-    </ul>
-    
-    <h3><code>verifyCredential(credential)</code></h3>
-    <p>Verify a credential's signature and status.</p>
-    
-    <h3><code>quickVerify(credential, options?)</code></h3>
-    <p>Fast verification with caching.</p>
+    <div class="code-block">
+        <div class="code-header">
+            <span>JavaScript</span>
+            <button class="copy-btn">Copy</button>
+        </div>
+        <code>const result = await wallet.autoAuthenticate();
+
+// result.authenticated   - boolean
+// result.ppid            - string (PPID)
+// result.needsRedirect   - boolean (user needs to visit lemma.id)
+// result.needsPasskey    - boolean (no wallet on this device)
+// result.lemma           - object (the signed credential)
+// result.claims          - object (credential claims/permissions)
+// result.walletId        - string
+// result.source          - string: 'local_lemma', 'redirect', 'global_sync'
+// result.verifyTimeMs    - string: verification time in ms</code>
+    </div>
 </div>
 
-<div class="docs-section">
-    <h2>Wallet Methods</h2>
+<div class="docs-section" id="unlockWithRedirect">
+    <h3><code>unlockWithRedirect(options)</code></h3>
+    <p>Redirect the user to lemma.id to unlock their wallet. On return, the SDK automatically processes the credential.</p>
     
-    <h3><code>unlock()</code></h3>
-    <p>Prompt user to unlock wallet with passkey.</p>
+    <div class="code-block">
+        <div class="code-header">
+            <span>JavaScript</span>
+            <button class="copy-btn">Copy</button>
+        </div>
+        <code>wallet.unlockWithRedirect({
+    returnUrl: window.location.href   // Where to come back after unlock
+});</code>
+    </div>
     
-    <h3><code>lock()</code></h3>
-    <p>Lock the wallet.</p>
+    <p>The redirect flow:</p>
+    <ol>
+        <li>User navigates to <code>lemma.id/unlock</code></li>
+        <li>User taps passkey (biometric verification)</li>
+        <li>Lemma.id issues a signed credential for your site</li>
+        <li>User redirects back with <code>?lemma_unlocked=1&amp;lemma_credential=...</code></li>
+        <li>SDK automatically stores the credential in IndexedDB</li>
+    </ol>
+    <p>This only happens once per site. After that, authentication is instant and local.</p>
+</div>
+
+<div class="docs-section" id="getWalletInfo">
+    <h3><code>getWalletInfo()</code></h3>
+    <p>Get current wallet state without triggering authentication.</p>
     
-    <h3><code>isUnlocked()</code></h3>
-    <p>Check if wallet is unlocked.</p>
+    <div class="code-block">
+        <div class="code-header">
+            <span>JavaScript</span>
+            <button class="copy-btn">Copy</button>
+        </div>
+        <code>const info = await wallet.getWalletInfo();
+
+// info.isUnlocked      - boolean: is wallet currently unlocked?
+// info.walletId        - string: wallet identifier (null if no wallet)
+// info.hasPasskey      - boolean: passkey registered on this device?
+// info.hasWalletSecret - boolean: wallet secret available locally?</code>
+    </div>
+</div>
+
+<div class="docs-section" id="verifyLocalAuthorization">
+    <h3><code>verifyLocalAuthorization(options?)</code></h3>
+    <p>Directly verify a stored credential without triggering redirect flows. Useful for checking auth state silently.</p>
+    
+    <div class="code-block">
+        <div class="code-header">
+            <span>JavaScript</span>
+            <button class="copy-btn">Copy</button>
+        </div>
+        <code>const result = await wallet.verifyLocalAuthorization({
+    permission: 'login',             // Optional: required permission (default: 'login')
+    siteId: window.location.hostname // Optional: override site (default: current domain)
+});
+
+// result.authorized   - boolean
+// result.reason       - string: 'wallet_locked', 'no_lemma', 'session_expired', 'verification_failed'
+// result.ppid         - string (if authorized)
+// result.lemma        - object (if authorized)
+// result.verifyTimeMs - string: time taken</code>
+    </div>
+</div>
+
+<div class="docs-section" id="lock-unlock">
+    <h2>Lock and Unlock (lemma.id only)</h2>
+    <p>These methods are used on lemma.id itself. Third-party sites don't call these directly -- the SDK handles lock state via SSE.</p>
+    
+    <div class="code-block">
+        <div class="code-header">
+            <span>JavaScript</span>
+            <button class="copy-btn">Copy</button>
+        </div>
+        <code>// Unlock with local passkey (lemma.id only)
+await wallet.unlock();
+
+// Lock wallet (clears session everywhere via SSE)
+await wallet.lock();</code>
+    </div>
+</div>
+
+<div class="docs-section" id="events">
+    <h2>Events</h2>
+    <p>Listen for session changes in your application:</p>
+    
+    <div class="code-block">
+        <div class="code-header">
+            <span>JavaScript</span>
+            <button class="copy-btn">Copy</button>
+        </div>
+        <code>// Wallet locked (from another device or tab)
+window.addEventListener('lemma-wallet-locked', () => {
+    // Clear your site's session
+    fetch('/api/auth/logout', { method: 'POST' });
+    showLoginScreen();
+});
+
+// Session expired naturally (24h default)
+window.addEventListener('lemma:session-expired', (e) => {
+    console.log('Session expired:', e.detail.reason);
+    showLoginScreen();
+});</code>
+    </div>
+</div>
+
+<div class="docs-section" id="debug">
+    <h2>Debugging</h2>
+    <p>Enable verbose logging to see the SDK's internal operations:</p>
+    
+    <div class="code-block">
+        <div class="code-header">
+            <span>JavaScript (Browser Console)</span>
+            <button class="copy-btn">Copy</button>
+        </div>
+        <code>// Enable debug logging
+const wallet = new LemmaWallet();
+wallet._debug = true;
+
+// Check SDK version
+console.log(LemmaWallet.VERSION); // "2.50.0"</code>
+    </div>
 </div>
 {% endblock %}

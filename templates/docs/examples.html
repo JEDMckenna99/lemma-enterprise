@@ -1,141 +1,216 @@
 {% extends "docs/layout.html" %}
 {% set active_page = 'examples' %}
-{% set hero_title = 'Code Examples' %}
-{% set hero_subtitle = 'Complete working examples' %}
+{% set hero_title = 'Examples' %}
+{% set hero_subtitle = 'Complete integration patterns for common scenarios' %}
 
 {% block docs_content %}
-<div class="docs-section">
-    <h2>Basic Authentication</h2>
-    <p>A simple login/logout implementation:</p>
+<div class="docs-section" id="basic">
+    <h2>Basic Integration</h2>
+    <p>The minimal complete example. One script tag, one button, one backend endpoint.</p>
     
     <div class="code-block">
         <div class="code-header">
             <span>HTML + JavaScript</span>
             <button class="copy-btn">Copy</button>
         </div>
-        <code>&lt;!DOCTYPE html&gt;
-&lt;html&gt;
-&lt;head&gt;
-    &lt;title&gt;Lemma Auth Example&lt;/title&gt;
-    &lt;script src="https://lemma.id/static/js/lemma-wallet.js"&gt;&lt;/script&gt;
-&lt;/head&gt;
-&lt;body&gt;
-    &lt;div id="app"&gt;
-        &lt;!-- Guest View --&gt;
-        &lt;div id="guest"&gt;
-            &lt;h1&gt;Welcome&lt;/h1&gt;
-            &lt;button id="login-btn"&gt;Sign in with Lemma&lt;/button&gt;
-        &lt;/div&gt;
-        
-        &lt;!-- Authenticated View --&gt;
-        &lt;div id="user" style="display: none;"&gt;
-            &lt;h1&gt;Hello, &lt;span id="user-name"&gt;&lt;/span&gt;&lt;/h1&gt;
-            &lt;p&gt;Your ID: &lt;code id="user-id"&gt;&lt;/code&gt;&lt;/p&gt;
-            &lt;button id="logout-btn"&gt;Sign Out&lt;/button&gt;
-        &lt;/div&gt;
-    &lt;/div&gt;
+        <code>&lt;script src="https://lemma.id/sdk/lemma-wallet.js"&gt;&lt;/script&gt;
+
+&lt;button id="sign-in" style="display:none"&gt;Sign in with Lemma.id&lt;/button&gt;
+&lt;div id="user-info" style="display:none"&gt;&lt;/div&gt;
+
+&lt;script&gt;
+const wallet = new LemmaWallet();
+
+async function init() {
+    const result = await wallet.getAuthenticatedPPID();
     
-    &lt;script&gt;
-    (async () =&gt; {
-        // Initialize
-        const wallet = new LemmaWallet({
-            siteId: 'your-site-id',
-            apiKey: 'your-api-key'
+    if (result.authenticated) {
+        // Tell your backend
+        await fetch('/api/auth/lemma', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ppid: result.ppid })
         });
-        await wallet.init();
-        
-        // Check for auth return
-        const result = await wallet.checkRedirectReturn();
-        if (result.authenticated) {
-            showUser(await wallet.derivePPID());
-        }
-        
-        // Also check if already authenticated
-        if (await wallet.isUnlocked()) {
-            showUser(await wallet.derivePPID());
-        }
-        
-        // Login button
-        document.getElementById('login-btn').onclick = () =&gt; {
-            wallet.startRedirectFlow({
-                returnUrl: window.location.href
-            });
-        };
-        
-        // Logout button  
-        document.getElementById('logout-btn').onclick = async () =&gt; {
-            await wallet.lock();
-            showGuest();
-        };
-        
-        function showUser(ppid) {
-            document.getElementById('guest').style.display = 'none';
-            document.getElementById('user').style.display = 'block';
-            document.getElementById('user-id').textContent = ppid.slice(0, 16) + '...';
-        }
-        
-        function showGuest() {
-            document.getElementById('guest').style.display = 'block';
-            document.getElementById('user').style.display = 'none';
-        }
-    })();
-    &lt;/script&gt;
-&lt;/body&gt;
-&lt;/html&gt;</code>
+        document.getElementById('user-info').style.display = 'block';
+        document.getElementById('user-info').textContent = 'Signed in';
+    } else {
+        document.getElementById('sign-in').style.display = 'block';
+    }
+}
+
+document.getElementById('sign-in').addEventListener('click', () => {
+    wallet.unlockWithRedirect({ returnUrl: window.location.href });
+});
+
+init();
+&lt;/script&gt;</code>
     </div>
 </div>
 
-<div class="docs-section">
-    <h2>Protected Content</h2>
-    <p>Show different content based on authentication:</p>
+<div class="docs-section" id="alongside-google">
+    <h2>Running Alongside Google Auth</h2>
+    <p>Add Lemma.id as another sign-in option without touching existing auth.</p>
+    
+    <div class="code-block">
+        <div class="code-header">
+            <span>Database Schema</span>
+            <button class="copy-btn">Copy</button>
+        </div>
+        <code>-- Add to your existing users table
+ALTER TABLE users ADD COLUMN lemma_ppid TEXT UNIQUE;</code>
+    </div>
+    
+    <div class="code-block">
+        <div class="code-header">
+            <span>Python (Flask)</span>
+            <button class="copy-btn">Copy</button>
+        </div>
+        <code># Existing Google auth - unchanged
+@app.route('/api/auth/google', methods=['POST'])
+def google_auth():
+    google_id = verify_google_token(request.json['token'])
+    user = User.query.filter_by(google_id=google_id).first()
+    if not user:
+        user = User(google_id=google_id, email=get_google_email(google_id))
+        db.session.add(user)
+        db.session.commit()
+    session['user_id'] = user.id
+    return jsonify({'success': True})
+
+# NEW: Lemma auth - 10 lines
+@app.route('/api/auth/lemma', methods=['POST'])
+def lemma_auth():
+    ppid = request.json.get('ppid')
+    user = User.query.filter_by(lemma_ppid=ppid).first()
+    if not user:
+        user = User(lemma_ppid=ppid)
+        db.session.add(user)
+        db.session.commit()
+    session['user_id'] = user.id
+    return jsonify({'success': True})
+
+# Link Lemma to existing account
+@app.route('/api/auth/link-lemma', methods=['POST'])
+def link_lemma():
+    if not session.get('user_id'):
+        return jsonify({'error': 'Must be signed in'}), 401
+    ppid = request.json.get('ppid')
+    user = User.query.get(session['user_id'])
+    user.lemma_ppid = ppid
+    db.session.commit()
+    return jsonify({'success': True, 'linked': True})</code>
+    </div>
+    
+    <div class="code-block">
+        <div class="code-header">
+            <span>Login Page</span>
+            <button class="copy-btn">Copy</button>
+        </div>
+        <code>&lt;button onclick="signInWithLemma()"&gt;Sign in with Lemma.id&lt;/button&gt;
+&lt;button onclick="signInWithGoogle()"&gt;Sign in with Google&lt;/button&gt;</code>
+    </div>
+</div>
+
+<div class="docs-section" id="migration">
+    <h2>Migrating from Password Auth</h2>
+    <p>Add Lemma.id first, then gradually phase out passwords.</p>
+    
+    <div class="code-block">
+        <div class="code-header">
+            <span>Step 1: Add alongside passwords (zero risk)</span>
+            <button class="copy-btn">Copy</button>
+        </div>
+        <code># Add lemma_ppid to users table
+ALTER TABLE users ADD COLUMN lemma_ppid TEXT UNIQUE;
+
+# Add Lemma endpoint (existing password auth unchanged)
+# Add SDK script tag to login page
+# Add "Sign in with Lemma.id" button</code>
+    </div>
+    
+    <div class="code-block">
+        <div class="code-header">
+            <span>Step 2: Prompt existing users to link</span>
+            <button class="copy-btn">Copy</button>
+        </div>
+        <code>// After user signs in with password, offer to add Lemma.id
+if (!user.lemma_ppid) {
+    showBanner('Add Lemma.id for faster sign-in next time');
+}
+
+// When user clicks, link their PPID to their existing account
+async function linkLemma() {
+    const result = await wallet.getAuthenticatedPPID();
+    if (result.authenticated) {
+        await fetch('/api/auth/link-lemma', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ppid: result.ppid })
+        });
+    }
+}</code>
+    </div>
+    
+    <div class="code-block">
+        <div class="code-header">
+            <span>Step 3: Deprecate passwords (optional)</span>
+            <button class="copy-btn">Copy</button>
+        </div>
+        <code># Stop accepting new password registrations
+# Existing password users can still sign in
+# Over time, all users migrate naturally
+
+# What you can remove after full migration:
+# - bcrypt/argon2 dependency
+# - Password reset flow (emails, tokens, rate limiting)
+# - MFA infrastructure (TOTP, SMS, backup codes)
+# - Account lockout logic
+# - Password validation rules</code>
+    </div>
+</div>
+
+<div class="docs-section" id="lock-detection">
+    <h2>Instant Lock Detection</h2>
+    <p>When a user locks their wallet on any device, your site detects it instantly via SSE.</p>
     
     <div class="code-block">
         <div class="code-header">
             <span>JavaScript</span>
             <button class="copy-btn">Copy</button>
         </div>
-        <code>async function loadProtectedContent() {
-    const wallet = new LemmaWallet({ siteId: 'your-site-id' });
-    await wallet.init();
-    
-    if (!await wallet.isUnlocked()) {
-        document.getElementById('content').innerHTML = `
-            &lt;p&gt;Please sign in to view this content.&lt;/p&gt;
-            &lt;button onclick="signIn()"&gt;Sign In&lt;/button&gt;
-        `;
-        return;
-    }
-    
-    // User is authenticated - show content
-    const ppid = await wallet.derivePPID();
-    
-    // Fetch user-specific data
-    const response = await fetch('/api/user/data', {
-        headers: {
-            'X-User-PPID': ppid
-        }
-    });
-    const data = await response.json();
-    
-    document.getElementById('content').innerHTML = `
-        &lt;h2&gt;Your Dashboard&lt;/h2&gt;
-        &lt;pre&gt;${JSON.stringify(data, null, 2)}&lt;/pre&gt;
-    `;
-}</code>
+        <code>// The SDK automatically connects to SSE for lock/unlock events.
+// Listen for the wallet-locked event to sign out on your site:
+
+window.addEventListener('lemma-wallet-locked', async () => {
+    await fetch('/api/auth/logout', { method: 'POST' });
+    window.location.reload();
+});
+
+// That's it. No polling. No heartbeat. SSE pushes the event in &lt;100ms.</code>
     </div>
 </div>
 
-<div class="docs-section">
-    <h2>More Examples</h2>
-    <div class="feature-grid">
-        <a href="/examples/complete-integration-example.html" class="feature-card" style="text-decoration: none;" target="_blank">
-            <h3>Complete Integration</h3>
-            <p>Full working example with all features</p>
-        </a>
-        <a href="{{ url_for('docs_quickstart') }}" class="feature-card" style="text-decoration: none;">
-            <h3>Quick Start</h3>
-            <p>Get started in 5 minutes</p>
-        </a>
+<div class="docs-section" id="revocation">
+    <h2>Revoking a User</h2>
+    <p>Site admins can revoke user access. The revocation propagates to all devices in under 1 second via SSE.</p>
+    
+    <div class="code-block">
+        <div class="code-header">
+            <span>cURL (Admin API)</span>
+            <button class="copy-btn">Copy</button>
+        </div>
+        <code># Revoke a specific user from your site
+curl -X POST https://lemma.id/api/wallet/revoke-user \
+  -H "Content-Type: application/json" \
+  -d '{
+    "ppid": "did:lemma:ppid_abc123...",
+    "site_id": "yoursite.com",
+    "reason": "terms_violation"
+  }'
+
+# The user's credential is immediately invalid.
+# Their browser's SDK detects the revocation via SSE within 1 second.
+# Re-issuance: issue a new credential (different credential_id, same PPID).</code>
     </div>
 </div>
 {% endblock %}

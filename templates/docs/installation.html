@@ -1,92 +1,99 @@
 {% extends "docs/layout.html" %}
 {% set active_page = 'installation' %}
 {% set hero_title = 'Installation' %}
-{% set hero_subtitle = 'Multiple ways to add Lemma to your project' %}
+{% set hero_subtitle = 'One script tag. No build step required.' %}
 
 {% block docs_content %}
 <div class="docs-section">
-    <h2>Installation Methods</h2>
-    <p>Choose the installation method that fits your project:</p>
-</div>
-
-<div class="docs-section" id="cdn">
     <h2>CDN (Recommended)</h2>
-    <p>The simplest way to get started - just add the script tag:</p>
+    <p>Add the SDK to any HTML page. Always serves the latest version with no-cache headers.</p>
     
     <div class="code-block">
         <div class="code-header">
             <span>HTML</span>
             <button class="copy-btn">Copy</button>
         </div>
-        <code>&lt;script src="https://lemma.id/static/js/lemma-wallet.js"&gt;&lt;/script&gt;</code>
+        <code>&lt;script src="https://lemma.id/sdk/lemma-wallet.js"&gt;&lt;/script&gt;</code>
     </div>
     
-    <div class="callout callout--success">
-        <div class="callout-title">Benefits</div>
-        <p>Automatic updates, CDN caching, no build step required.</p>
-    </div>
+    <p>No API key. No configuration. No build step. The SDK is self-configuring.</p>
 </div>
 
-<div class="docs-section" id="npm">
-    <h2>NPM Package</h2>
-    <p>For projects using npm/yarn:</p>
+<div class="docs-section">
+    <h2>Static Hosting (Versioned)</h2>
+    <p>If you need a specific version pinned for production stability:</p>
     
     <div class="code-block">
         <div class="code-header">
-            <span>Terminal</span>
+            <span>HTML</span>
             <button class="copy-btn">Copy</button>
         </div>
-        <code>npm install @lemma/wallet-sdk
-# or
-yarn add @lemma/wallet-sdk</code>
-    </div>
-    
-    <p>Then import in your JavaScript:</p>
-    <div class="code-block">
-        <div class="code-header">
-            <span>JavaScript</span>
-            <button class="copy-btn">Copy</button>
-        </div>
-        <code>import { LemmaWallet } from '@lemma/wallet-sdk';
-
-const wallet = new LemmaWallet({
-    siteId: 'your-site-id',
-    apiKey: 'your-api-key'
-});</code>
+        <code>&lt;!-- Pinned version (update manually) --&gt;
+&lt;script src="https://lemma.id/static/js/lemma-wallet.js?v=2.50.0"&gt;&lt;/script&gt;</code>
     </div>
 </div>
 
-<div class="docs-section" id="requirements">
-    <h2>Browser Requirements</h2>
-    <p>Lemma requires modern browser features:</p>
+<div class="docs-section">
+    <h2>Requirements</h2>
     
     <table class="docs-table">
         <thead>
-            <tr>
-                <th>Feature</th>
-                <th>Requirement</th>
-                <th>Notes</th>
-            </tr>
+            <tr><th>Requirement</th><th>Minimum</th><th>Notes</th></tr>
         </thead>
         <tbody>
-            <tr>
-                <td>Web Crypto API</td>
-                <td>Required</td>
-                <td>For Ed25519 signature verification</td>
-            </tr>
-            <tr>
-                <td>IndexedDB</td>
-                <td>Required</td>
-                <td>For secure credential storage</td>
-            </tr>
-            <tr>
-                <td>WebAuthn</td>
-                <td>Recommended</td>
-                <td>For passkey-protected wallet</td>
-            </tr>
+            <tr><td>HTTPS</td><td>Required</td><td>Passkeys and WebCrypto require secure context</td></tr>
+            <tr><td>Chrome/Edge</td><td>109+</td><td>Full passkey + Ed25519 support</td></tr>
+            <tr><td>Safari</td><td>17+</td><td>Ed25519 WebCrypto added in Safari 17</td></tr>
+            <tr><td>Firefox</td><td>119+</td><td>Passkey support</td></tr>
+            <tr><td>iOS</td><td>16+</td><td>Passkey via iCloud Keychain</td></tr>
+            <tr><td>Android</td><td>9+</td><td>Passkey via Google Password Manager</td></tr>
         </tbody>
     </table>
+</div>
+
+<div class="docs-section">
+    <h2>Backend Requirements</h2>
+    <p>Lemma.id is backend-agnostic. Your server needs exactly one endpoint:</p>
     
-    <p><strong>Supported browsers:</strong> Chrome 67+, Firefox 60+, Safari 14+, Edge 79+</p>
+    <div class="code-block">
+        <div class="code-header">
+            <span>Any Language</span>
+            <button class="copy-btn">Copy</button>
+        </div>
+        <code>POST /api/auth/lemma
+Body: { "ppid": "did:lemma:ppid_abc123..." }
+
+Response: 
+  - If PPID exists in your database: sign in (create session)
+  - If PPID is new: create account + sign in</code>
+    </div>
+    
+    <p>No password hashing libraries. No OAuth client libraries. No token management. Your backend receives a PPID and stores it. That's the entire integration.</p>
+</div>
+
+<div class="docs-section">
+    <h2>Register Your Site</h2>
+    <p>Register your domain on the <a href="/developer/sites">Developer Dashboard</a> to enable lemma issuance. This is required so Lemma.id knows which sites are authorized to receive signed credentials.</p>
+    
+    <div class="callout callout--info">
+        <div class="callout-title">Why registration?</div>
+        <p>Site registration ensures only authorized domains can request lemma issuance. The signing key for your site is unique and KMS-encrypted. No other site can issue credentials that appear to come from yours.</p>
+    </div>
+</div>
+
+<div class="docs-section">
+    <h2>Running Alongside Existing Auth</h2>
+    <p>Lemma.id doesn't replace your existing auth -- it sits alongside it. Add a <code>lemma_ppid</code> column to your users table:</p>
+    
+    <div class="code-block">
+        <div class="code-header">
+            <span>SQL</span>
+            <button class="copy-btn">Copy</button>
+        </div>
+        <code>ALTER TABLE users ADD COLUMN lemma_ppid TEXT UNIQUE;</code>
+    </div>
+    
+    <p>Users can sign in with Lemma.id, Google, or password. Link accounts by associating a PPID with an existing user record.</p>
+    <p>See <a href="/docs/examples">Examples</a> for complete integration patterns.</p>
 </div>
 {% endblock %}

@@ -1,179 +1,179 @@
 {% extends "docs/layout.html" %}
 {% set active_page = 'quickstart' %}
 {% set hero_title = 'Quick Start Guide' %}
-{% set hero_subtitle = 'Get Lemma running in 5 minutes' %}
+{% set hero_subtitle = 'Add Lemma.id authentication in 5 minutes' %}
 
 {% block docs_content %}
 <div class="docs-section">
     <h2>Quick Start</h2>
-    <p>This guide will help you integrate Lemma authentication into your website in just a few minutes.</p>
+    <p>Add passwordless authentication to your site with 1 script tag and 3 backend endpoints. No API keys required. No configuration. The SDK handles everything.</p>
     
     <div class="callout callout--info">
-        <div class="callout-title">Prerequisites</div>
-        <p>You'll need a Lemma developer account. <a href="/developer">Sign up here</a> to get your API key.</p>
+        <div class="callout-title">What you'll build</div>
+        <p>A complete sign-in flow where users authenticate with a passkey on lemma.id, and your site receives a pseudonymous ID (PPID) to identify them. No passwords, no OAuth tokens, no user data to store.</p>
     </div>
 </div>
 
 <div class="docs-section" id="step1">
     <h2>Step 1: Add the SDK</h2>
-    <p>Include the Lemma SDK in your HTML:</p>
+    <p>Include the Lemma SDK from the CDN. Always serves the latest version.</p>
     
     <div class="code-block">
         <div class="code-header">
             <span>HTML</span>
             <button class="copy-btn">Copy</button>
         </div>
-        <code>&lt;!-- Add to your &lt;head&gt; --&gt;
-&lt;script src="https://lemma.id/static/js/lemma-wallet.js"&gt;&lt;/script&gt;</code>
+        <code>&lt;script src="https://lemma.id/sdk/lemma-wallet.js"&gt;&lt;/script&gt;</code>
     </div>
     
-    <p>Or install via npm:</p>
-    <div class="code-block">
-        <div class="code-header">
-            <span>Terminal</span>
-            <button class="copy-btn">Copy</button>
-        </div>
-        <code>npm install @lemma/wallet-sdk</code>
-    </div>
+    <p>That's it. No npm install, no API keys, no configuration files.</p>
 </div>
 
 <div class="docs-section" id="step2">
-    <h2>Step 2: Initialize</h2>
-    <p>Initialize the wallet with your site configuration:</p>
+    <h2>Step 2: Add Sign-In (Frontend)</h2>
+    <p>The entire frontend integration is 10 lines:</p>
     
     <div class="code-block">
         <div class="code-header">
             <span>JavaScript</span>
             <button class="copy-btn">Copy</button>
         </div>
-        <code>const wallet = new LemmaWallet({
-    siteId: 'your-site-id',     // From developer dashboard
-    apiKey: 'your-api-key',      // From developer dashboard
-    debug: true                  // Enable console logging
-});
+        <code>const wallet = new LemmaWallet();
 
-// Initialize the wallet
-await wallet.init();</code>
+async function signIn() {
+    const result = await wallet.getAuthenticatedPPID();
+    
+    if (result.authenticated) {
+        // Send the PPID to YOUR backend - this is the user's ID for your site
+        await fetch('/api/auth/lemma', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ppid: result.ppid })
+        });
+        // User is signed in!
+    } else {
+        // Redirect to lemma.id for wallet unlock (first time only)
+        wallet.unlockWithRedirect({ returnUrl: window.location.href });
+    }
+}</code>
+    </div>
+    
+    <div class="callout callout--info">
+        <div class="callout-title">What happens under the hood</div>
+        <p><strong>First visit:</strong> User redirects to lemma.id, taps their passkey, gets a signed credential (lemma) stored in your site's IndexedDB. Takes ~2 seconds.<br>
+        <strong>Every visit after:</strong> The SDK verifies the stored credential locally with Ed25519. Zero network calls. Takes &lt;5ms.</p>
     </div>
 </div>
 
 <div class="docs-section" id="step3">
-    <h2>Step 3: Add Sign-In Button</h2>
-    <p>Add a sign-in button that triggers the wallet flow:</p>
+    <h2>Step 3: Handle the PPID (Backend)</h2>
+    <p>Your backend receives a PPID (Pairwise Pseudonymous ID) - a unique, site-specific identifier for the user. Use it like you'd use a Google OAuth ID or email address.</p>
     
     <div class="code-block">
         <div class="code-header">
-            <span>HTML</span>
+            <span>Python (Flask)</span>
             <button class="copy-btn">Copy</button>
         </div>
-        <code>&lt;button id="sign-in-btn"&gt;Sign in with Lemma&lt;/button&gt;</code>
+        <code>@app.route('/api/auth/lemma', methods=['POST'])
+def lemma_auth():
+    ppid = request.json.get('ppid')
+    
+    # Look up or create user by PPID
+    user = db.query(User).filter_by(lemma_ppid=ppid).first()
+    if not user:
+        user = User(lemma_ppid=ppid)
+        db.add(user)
+        db.commit()
+    
+    session['user_id'] = user.id
+    return jsonify({'success': True})</code>
     </div>
     
     <div class="code-block">
         <div class="code-header">
-            <span>JavaScript</span>
+            <span>Node.js (Express)</span>
             <button class="copy-btn">Copy</button>
         </div>
-        <code>document.getElementById('sign-in-btn').addEventListener('click', async () => {
-    // Redirect to Lemma wallet
-    await wallet.startRedirectFlow({
-        returnUrl: window.location.href,
-        permissions: ['basic']  // Optional: request permissions
-    });
+        <code>app.post('/api/auth/lemma', async (req, res) => {
+    const { ppid } = req.body;
+    
+    // Look up or create user by PPID
+    let user = await User.findOne({ lemma_ppid: ppid });
+    if (!user) {
+        user = await User.create({ lemma_ppid: ppid });
+    }
+    
+    req.session.userId = user.id;
+    res.json({ success: true });
 });</code>
+    </div>
+    
+    <div class="code-block">
+        <div class="code-header">
+            <span>Ruby (Rails)</span>
+            <button class="copy-btn">Copy</button>
+        </div>
+        <code>def lemma_auth
+  ppid = params[:ppid]
+  user = User.find_or_create_by(lemma_ppid: ppid)
+  session[:user_id] = user.id
+  render json: { success: true }
+end</code>
     </div>
 </div>
 
 <div class="docs-section" id="step4">
-    <h2>Step 4: Handle the Return</h2>
-    <p>When the user returns from the wallet, check for authentication:</p>
+    <h2>Step 4: Auto-Sign-In on Page Load</h2>
+    <p>Check if the user is already authenticated when the page loads. For return visitors, this completes in under 5ms with zero network calls.</p>
     
     <div class="code-block">
         <div class="code-header">
             <span>JavaScript</span>
             <button class="copy-btn">Copy</button>
         </div>
-        <code>// On page load, check if returning from wallet
-document.addEventListener('DOMContentLoaded', async () => {
-    const result = await wallet.checkRedirectReturn();
-    
-    if (result.authenticated) {
-        // User is signed in
-        const ppid = await wallet.derivePPID();
-        console.log('User PPID:', ppid);
-        
-        // Update your UI
-        showUserDashboard(ppid);
-    }
-});</code>
+        <code>// On page load
+const wallet = new LemmaWallet();
+const result = await wallet.getAuthenticatedPPID();
+
+if (result.authenticated) {
+    // User already signed in - show authenticated UI
+    console.log('Welcome back! PPID:', result.ppid);
+    await fetch('/api/auth/lemma', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ppid: result.ppid })
+    });
+} else {
+    // Show sign-in button
+    document.getElementById('sign-in-btn').style.display = 'block';
+}</code>
     </div>
 </div>
 
-<div class="docs-section" id="complete">
-    <h2>Complete Example</h2>
-    <p>Here's everything together:</p>
+<div class="docs-section" id="done">
+    <h2>That's It</h2>
+    <p>Your users can now sign in with a passkey. No passwords to hash, no OAuth to configure, no MFA to implement, no user emails to store.</p>
     
-    <div class="code-block">
-        <div class="code-header">
-            <span>HTML</span>
-            <button class="copy-btn">Copy</button>
-        </div>
-        <code>&lt;!DOCTYPE html&gt;
-&lt;html&gt;
-&lt;head&gt;
-    &lt;title&gt;My App&lt;/title&gt;
-    &lt;script src="https://lemma.id/static/js/lemma-wallet.js"&gt;&lt;/script&gt;
-&lt;/head&gt;
-&lt;body&gt;
-    &lt;div id="guest"&gt;
-        &lt;button id="sign-in-btn"&gt;Sign in with Lemma&lt;/button&gt;
-    &lt;/div&gt;
-    &lt;div id="authenticated" style="display: none;"&gt;
-        &lt;p&gt;Welcome! Your ID: &lt;span id="user-id"&gt;&lt;/span&gt;&lt;/p&gt;
-    &lt;/div&gt;
+    <table class="docs-table">
+        <thead>
+            <tr><th>What</th><th>Who handles it</th></tr>
+        </thead>
+        <tbody>
+            <tr><td>Passkey authentication</td><td>Lemma SDK (browser + lemma.id)</td></tr>
+            <tr><td>Credential issuance</td><td>Lemma SDK (one-time redirect)</td></tr>
+            <tr><td>Ed25519 signature verification</td><td>Lemma SDK (local, &lt;5ms)</td></tr>
+            <tr><td>Cross-device lock/unlock</td><td>Lemma SDK (SSE real-time push)</td></tr>
+            <tr><td>Revocation</td><td>Lemma SDK (SSE + local cache)</td></tr>
+            <tr><td>User identity on your site</td><td><strong>Your backend</strong> (store PPID, create session)</td></tr>
+        </tbody>
+    </table>
     
-    &lt;script&gt;
-    (async () =&gt; {
-        const wallet = new LemmaWallet({
-            siteId: 'your-site-id',
-            apiKey: 'your-api-key'
-        });
-        await wallet.init();
-        
-        // Check if returning from auth
-        const result = await wallet.checkRedirectReturn();
-        if (result.authenticated) {
-            document.getElementById('guest').style.display = 'none';
-            document.getElementById('authenticated').style.display = 'block';
-            document.getElementById('user-id').textContent = await wallet.derivePPID();
-        }
-        
-        // Sign-in button
-        document.getElementById('sign-in-btn').addEventListener('click', () =&gt; {
-            wallet.startRedirectFlow({ returnUrl: window.location.href });
-        });
-    })();
-    &lt;/script&gt;
-&lt;/body&gt;
-&lt;/html&gt;</code>
-    </div>
-</div>
-
-<div class="docs-section">
-    <h2>Next Steps</h2>
-    <div class="feature-grid">
-        <a href="{{ url_for('docs_wallet_flow') }}" class="feature-card" style="text-decoration: none;">
-            <h3>Wallet Flow Details</h3>
-            <p>Learn about all authentication options</p>
-        </a>
-        <a href="{{ url_for('docs_verification') }}" class="feature-card" style="text-decoration: none;">
-            <h3>Credential Verification</h3>
-            <p>Understand how credentials are verified</p>
-        </a>
-        <a href="{{ url_for('docs_sdk_js') }}" class="feature-card" style="text-decoration: none;">
-            <h3>SDK Reference</h3>
-            <p>Full SDK documentation</p>
-        </a>
+    <div class="callout callout--info">
+        <div class="callout-title">Next steps</div>
+        <p><a href="/docs/wallet-flow">Wallet Redirect Flow</a> - Understand the full authentication flow<br>
+        <a href="/docs/sdk/methods">SDK Methods</a> - Complete API reference<br>
+        <a href="/docs/examples">Examples</a> - Running alongside Google auth, migration guides<br>
+        <a href="/developer">Developer Dashboard</a> - Register your site</p>
     </div>
 </div>
 {% endblock %}
