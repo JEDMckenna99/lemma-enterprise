@@ -340,9 +340,9 @@ async function checkWalletState() {
             return true;
         }
         
-        // CROSS-DEVICE SYNC: If local shows locked but we have walletId + secret,
+        // CROSS-DEVICE SYNC: If local shows locked but we have walletId,
         // check global session - user may have unlocked on another device
-        if (!info.isUnlocked && info.walletId && info.hasWalletSecret) {
+        if (!info.isUnlocked && info.walletId) {
             console.log('[CrossDevice] Local locked but have wallet - checking global session...');
             const globalSession = await syncGlobalSession(info.walletId);
             
