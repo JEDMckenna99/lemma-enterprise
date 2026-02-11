@@ -171,6 +171,33 @@ def cleanup_expired_challenges() -> int:
     return redis_store.cleanup_expired()
 
 
+def _extract_passkey_algorithm(credential: dict) -> int | None:
+    """
+    Extract COSE algorithm from client credential payload when available.
+
+    Browser registration responses can expose this as
+    `credential.response.publicKeyAlgorithm`.
+    """
+    if not isinstance(credential, dict):
+        return None
+
+    response = credential.get('response')
+    if not isinstance(response, dict):
+        return None
+
+    alg = response.get('publicKeyAlgorithm')
+    if isinstance(alg, int):
+        return alg
+
+    if isinstance(alg, str):
+        try:
+            return int(alg)
+        except ValueError:
+            return None
+
+    return None
+
+
 def get_user_passkeys(user_id: str) -> list:
     """Get all passkeys for a user"""
     db = get_db()
@@ -432,6 +459,8 @@ def passkey_register_complete():
 
         logger.info(f"✅ Passkey registered for {stored['user_email']}")
         
+        passkey_algorithm = _extract_passkey_algorithm(credential)
+
         # Return public key for local wallet storage (wallet-centric architecture)
         return jsonify({
             'success': True,
@@ -443,7 +472,7 @@ def passkey_register_complete():
             'wallet_storage': {
                 'credentialId': passkey.credential_id,
                 'publicKey': passkey.public_key,
-                'algorithm': -7  # ES256, TODO: detect actual algorithm
+                'algorithm': passkey_algorithm
             }
         })
         

@@ -4086,6 +4086,9 @@ class LemmaWallet {
         
         if (response.attestationObject) {
             serialized.response.attestationObject = this._bufferToBase64url(response.attestationObject);
+            if (typeof response.getPublicKeyAlgorithm === 'function') {
+                serialized.response.publicKeyAlgorithm = response.getPublicKeyAlgorithm();
+            }
         }
         
         if (response.authenticatorData) {
@@ -6380,7 +6383,11 @@ if (typeof window !== 'undefined') {
         
         const entry = document.createElement('div');
         entry.className = `lemma-log-entry ${log.type}`;
-        entry.innerHTML = `<span class="lemma-log-time">${log.time}</span>${escapeHtml(log.message)}`;
+        const timeSpan = document.createElement('span');
+        timeSpan.className = 'lemma-log-time';
+        timeSpan.textContent = log.time;
+        entry.appendChild(timeSpan);
+        entry.appendChild(document.createTextNode(log.message || ''));
         logsContainer.appendChild(entry);
         logsContainer.scrollTop = logsContainer.scrollHeight;
     }

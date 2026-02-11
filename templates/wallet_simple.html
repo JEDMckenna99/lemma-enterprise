@@ -742,6 +742,15 @@ function hideQR() {
 async function linkDevice() {
     const code = document.getElementById('receive-code').value.trim();
     const statusEl = document.getElementById('receive-status');
+
+    function escapeHtml(value) {
+        return String(value)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
     
     if (!code) {
         statusEl.innerHTML = '<div class="info-box" style="background: #fef2f2; border-color: #ef4444; color: #991b1b;">Please paste the transfer code</div>';
@@ -771,7 +780,15 @@ async function linkDevice() {
         }
     } catch (e) {
         console.error('Link failed:', e);
-        statusEl.innerHTML = `<div class="info-box" style="background: #fef2f2; border-color: #ef4444; color: #991b1b;">${e.message}</div>`;
+        const safeMessage = escapeHtml(e && e.message ? e.message : 'Link failed');
+        statusEl.innerHTML = '';
+        const errorBox = document.createElement('div');
+        errorBox.className = 'info-box';
+        errorBox.style.background = '#fef2f2';
+        errorBox.style.borderColor = '#ef4444';
+        errorBox.style.color = '#991b1b';
+        errorBox.textContent = safeMessage;
+        statusEl.appendChild(errorBox);
     }
 }
 

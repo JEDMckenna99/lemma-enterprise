@@ -212,6 +212,9 @@ class LemmaPasskey {
         // Registration response
         if (response.attestationObject) {
             serialized.response.attestationObject = this._bufferToBase64url(response.attestationObject);
+            if (typeof response.getPublicKeyAlgorithm === 'function') {
+                serialized.response.publicKeyAlgorithm = response.getPublicKeyAlgorithm();
+            }
         }
 
         // Authentication response

@@ -167,6 +167,31 @@
     </div>
 </div>
 
+<!-- Launch Gate Quick Check -->
+<div class="admin-card" style="margin-top: 20px;">
+    <div class="admin-card-header">
+        <h2 class="admin-card-title">Launch Gate Quick Check</h2>
+        <button class="admin-btn admin-btn--secondary admin-btn--sm" id="run-launch-gate-btn">Run Checks</button>
+    </div>
+    <div class="admin-card-body">
+        <p class="admin-subtitle" style="margin-bottom: 12px;">
+            Read-only production checks for endpoint health and security headers. This is a fast smoke gate, not a full audit.
+        </p>
+        <div style="display:flex; gap:10px; align-items:center; margin-bottom:10px;">
+            <span class="badge badge--neutral" id="launch-gate-overall">Not Run</span>
+            <span style="font-size:12px; color: var(--admin-text-muted);" id="launch-gate-timestamp">Last run: --</span>
+        </div>
+        <ul class="activity-list" id="launch-gate-results">
+            <li class="activity-item">
+                <div class="activity-content">
+                    <div class="activity-title">No checks run yet</div>
+                    <div class="activity-meta">Click "Run Checks" after each deployment</div>
+                </div>
+            </li>
+        </ul>
+    </div>
+</div>
+
 <script nonce="{{ csp_nonce }}">
 // Admin auth state
 let adminCredential = null;
@@ -179,6 +204,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     loadRecentActivity();
     
     document.getElementById('refresh-health-btn').addEventListener('click', loadHealthStatus);
+    document.getElementById('run-launch-gate-btn').addEventListener('click', runLaunchGateQuickChecks);
 });
 
 async function checkAdminAuth() {
@@ -269,7 +295,12 @@ async function loadDashboardStats() {
         const growthEl = document.getElementById('stat-growth');
         if (growthEl) {
             if (newThisWeek > 0) {
-                growthEl.innerHTML = `<span style="color: var(--admin-success);">+${newThisWeek}</span> this week`;
+                growthEl.innerHTML = '';
+                const growthCount = document.createElement('span');
+                growthCount.style.color = 'var(--admin-success)';
+                growthCount.textContent = `+${newThisWeek}`;
+                growthEl.appendChild(growthCount);
+                growthEl.appendChild(document.createTextNode(' this week'));
             } else {
                 growthEl.textContent = 'No new sites this week';
             }
@@ -408,6 +439,123 @@ function escapeHtml(text) {
     const div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;
+}
+
+function setLaunchGateOverall(state, text) {
+    const overall = document.getElementById('launch-gate-overall');
+    if (!overall) return;
+    overall.className = 'badge';
+    if (state === 'pass') {
+        overall.classList.add('badge--success');
+    } else if (state === 'fail') {
+        overall.classList.add('badge--danger');
+    } else if (state === 'running') {
+        overall.classList.add('badge--warning');
+    } else {
+        overall.classList.add('badge--neutral');
+    }
+    overall.textContent = text;
+}
+
+function appendLaunchGateResult(name, ok, details) {
+    const list = document.getElementById('launch-gate-results');
+    if (!list) return;
+    const item = document.createElement('li');
+    item.className = 'activity-item';
+
+    const content = document.createElement('div');
+    content.className = 'activity-content';
+
+    const title = document.createElement('div');
+    title.className = 'activity-title';
+    title.textContent = `${ok ? 'PASS' : 'FAIL'} - ${name}`;
+
+    const meta = document.createElement('div');
+    meta.className = 'activity-meta';
+    meta.textContent = details;
+
+    content.appendChild(title);
+    content.appendChild(meta);
+    item.appendChild(content);
+    list.appendChild(item);
+}
+
+async function runLaunchGateQuickChecks() {
+    const list = document.getElementById('launch-gate-results');
+    const ts = document.getElementById('launch-gate-timestamp');
+    if (!list || !ts) return;
+
+    list.innerHTML = '';
+    setLaunchGateOverall('running', 'Running');
+
+    const checks = [];
+
+    checks.push(async () => {
+        const r = await fetch('/api/revocation/bloom-filter');
+        const j = await r.json();
+        const ok = r.ok && j.success === true;
+        appendLaunchGateResult(
+            'Revocation Bloom Endpoint',
+            ok,
+            ok ? `HTTP ${r.status}, count=${j.count ?? 'n/a'}` : `HTTP ${r.status}`
+        );
+        return ok;
+    });
+
+    checks.push(async () => {
+        const r = await fetch('/api/v1/revocation/list');
+        const j = await r.json();
+        const ok = r.ok && j.success === true;
+        appendLaunchGateResult(
+            'Revocation List Endpoint',
+            ok,
+            ok ? `HTTP ${r.status}, count=${j.count ?? 'n/a'}` : `HTTP ${r.status}`
+        );
+        return ok;
+    });
+
+    checks.push(async () => {
+        const r = await fetch('/wallet/bridge', { method: 'HEAD' });
+        const csp = r.headers.get('content-security-policy') || '';
+        const cache = r.headers.get('cache-control') || '';
+        const ok = r.ok && csp.includes('frame-ancestors') && cache.length > 0;
+        appendLaunchGateResult(
+            'Bridge Header Checks',
+            ok,
+            ok ? `HTTP ${r.status}, CSP and cache-control present` : `HTTP ${r.status}, missing expected headers`
+        );
+        return ok;
+    });
+
+    checks.push(async () => {
+        const r = await fetch('/api/passkey/authenticate/begin', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: '{}'
+        });
+        const j = await r.json();
+        const ok = r.ok && j.success === true;
+        appendLaunchGateResult(
+            'Passkey Authenticate Begin',
+            ok,
+            ok ? `HTTP ${r.status}, challenge issued` : `HTTP ${r.status}`
+        );
+        return ok;
+    });
+
+    let allPassed = true;
+    for (const check of checks) {
+        try {
+            const ok = await check();
+            if (!ok) allPassed = false;
+        } catch (e) {
+            appendLaunchGateResult('Check Execution', false, e.message || 'Unexpected error');
+            allPassed = false;
+        }
+    }
+
+    ts.textContent = `Last run: ${new Date().toLocaleString()}`;
+    setLaunchGateOverall(allPassed ? 'pass' : 'fail', allPassed ? 'Pass' : 'Fail');
 }
 </script>
 {% endblock %}

@@ -1,0 +1,29 @@
+name: Launch Gate Smoke
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "scripts/launch_gate_smoke_ci.py"
+      - ".github/workflows/launch-gate-smoke.yml"
+      - "docs/GA_LAUNCH_READINESS_CHECKLIST.md"
+      - "docs/launch-evidence/**"
+
+jobs:
+  launch-gate-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Run non-destructive launch-gate smoke checks
+        env:
+          LEMMA_BASE_URL: https://lemma.id
+        run: python scripts/launch_gate_smoke_ci.py
+

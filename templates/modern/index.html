@@ -277,7 +277,16 @@
             
             // Update UI
             document.getElementById('lemma-user-email').textContent = email;
-            document.getElementById('lemma-permission-badge').innerHTML = `<span style="background: rgba(255,255,255,0.15); padding: 8px 20px; border-radius: 24px; font-weight: 500; font-size: var(--font-size-sm);">${displayName}</span>`;
+            const badgeContainer = document.getElementById('lemma-permission-badge');
+            badgeContainer.innerHTML = '';
+            const badge = document.createElement('span');
+            badge.style.background = 'rgba(255,255,255,0.15)';
+            badge.style.padding = '8px 20px';
+            badge.style.borderRadius = '24px';
+            badge.style.fontWeight = '500';
+            badge.style.fontSize = 'var(--font-size-sm)';
+            badge.textContent = displayName;
+            badgeContainer.appendChild(badge);
             
             // Show valid lemma state
             loadingEl.style.display = 'none';

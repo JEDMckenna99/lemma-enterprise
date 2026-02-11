@@ -430,9 +430,13 @@ async function loadSites() {
         // Populate site selector if multiple sites
         if (allSites.length > 1) {
             const select = document.getElementById('site-select');
-            select.innerHTML = allSites.map((site, i) => 
-                `<option value="${i}">${site.site_id || site.domain}</option>`
-            ).join('');
+            select.innerHTML = '';
+            allSites.forEach((site, i) => {
+                const option = document.createElement('option');
+                option.value = String(i);
+                option.textContent = site.site_id || site.domain;
+                select.appendChild(option);
+            });
             document.getElementById('site-selector-container').style.display = 'block';
         }
 
@@ -454,8 +458,9 @@ function updateCodeForSite() {
 
     const domain = currentSite?.site_id || currentSite?.domain || 'your-site.com';
     
-    // Update hero subtitle
-    document.getElementById('hero-subtitle').innerHTML = `Ready-to-use code for <strong>${domain}</strong>`;
+    // Update hero subtitle without HTML interpolation
+    const heroSubtitle = document.getElementById('hero-subtitle');
+    heroSubtitle.textContent = `Ready-to-use code for ${domain}`;
     
     // Update current domain display
     document.getElementById('current-domain').textContent = domain;

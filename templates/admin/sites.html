@@ -458,7 +458,11 @@ function openSitePanel(site) {
     // Plan badge
     const planEl = document.getElementById('panel-plan');
     const plan = site.plan || 'starter';
-    planEl.innerHTML = `<span class="status-badge ${getPlanClass(plan)}">${plan.charAt(0).toUpperCase() + plan.slice(1)}</span>`;
+    planEl.innerHTML = '';
+    const planBadge = document.createElement('span');
+    planBadge.className = `status-badge ${getPlanClass(plan)}`;
+    planBadge.textContent = plan.charAt(0).toUpperCase() + plan.slice(1);
+    planEl.appendChild(planBadge);
     
     // Set copy button data
     const copyBtn = document.getElementById('copy-site-id-btn');
@@ -473,7 +477,14 @@ function openSitePanel(site) {
     // Status badge
     const statusEl = document.getElementById('panel-status');
     const status = site.status || 'Active';
-    statusEl.innerHTML = `<span class="status-badge ${getStatusClass(status)}"><span class="status-dot"></span>${status}</span>`;
+    statusEl.innerHTML = '';
+    const statusBadge = document.createElement('span');
+    statusBadge.className = `status-badge ${getStatusClass(status)}`;
+    const statusDot = document.createElement('span');
+    statusDot.className = 'status-dot';
+    statusBadge.appendChild(statusDot);
+    statusBadge.appendChild(document.createTextNode(status));
+    statusEl.appendChild(statusBadge);
     
     // Site ID with copy
     const siteIdEl = document.getElementById('panel-site-id');

@@ -1,0 +1,30 @@
+﻿Transport/TLS checks: 2026-02-11T13:01:41.7851275-05:00
+# HTTP to HTTPS redirect
+curl.exe : curl: try 'curl --help' or 'curl --manual' for more information
+At C:\Users\jedmc\lemma-enterprise\lemma-rebuild\scripts\post_deploy_launch_gate.ps1:39 char:9
++         & curl.exe @Args 2>&1 | Out-File -FilePath $OutputPath -Appen ...
++         ~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (curl: try 'curl...ore information:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+exit_code=2
+
+# Force old TLS (expect failure if TLS1.2+ only)
+curl.exe : curl: try 'curl --help' or 'curl --manual' for more information
+At C:\Users\jedmc\lemma-enterprise\lemma-rebuild\scripts\post_deploy_launch_gate.ps1:39 char:9
++         & curl.exe @Args 2>&1 | Out-File -FilePath $OutputPath -Appen ...
++         ~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (curl: try 'curl...ore information:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+exit_code=2
+
+# Force TLS1.2 (expect success)
+curl.exe : curl: try 'curl --help' or 'curl --manual' for more information
+At C:\Users\jedmc\lemma-enterprise\lemma-rebuild\scripts\post_deploy_launch_gate.ps1:39 char:9
++         & curl.exe @Args 2>&1 | Out-File -FilePath $OutputPath -Appen ...
++         ~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (curl: try 'curl...ore information:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+exit_code=2

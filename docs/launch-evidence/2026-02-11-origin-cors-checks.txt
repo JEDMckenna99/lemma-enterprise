@@ -1,0 +1,22 @@
+﻿Origin/CORS validation run: 2026-02-11T12:52:22.6832288-05:00
+
+OPTIONS https://lemma.id/api/passkey/authenticate/begin Origin=https://lemma.id -> 200
+  ACAO=https://lemma.id
+  ACAC=true
+
+OPTIONS https://lemma.id/api/passkey/authenticate/begin Origin=https://evil.example -> 200
+  ACAO=*
+  ACAC=
+
+POST https://lemma.id/api/passkey/authenticate/begin Origin=https://lemma.id -> 200
+  ACAO=https://lemma.id
+  ACAC=true
+  Body={"challenge_key":"passkey_auth_wThFcl8fNQPkGP8C","options":{"allowCredentials":[],"challenge":"wThFcl8fNQPkGP8CMvlnjh25o8KodZYLDqcIsvYAphhEsChEyOwswGf_Fq_cMWKfAQfo1oSgdMM3RY2mg-nnbg","rpId":"lemma.id","timeout":60000,"userVerification":"preferred"},"success":true}
+
+
+POST https://lemma.id/api/passkey/authenticate/begin Origin=https://evil.example -> 200
+  ACAO=
+  ACAC=
+  Body={"challenge_key":"passkey_auth_ndzDUR_i9btwQxn2","options":{"allowCredentials":[],"challenge":"ndzDUR_i9btwQxn2bcuARe4d5HtY0PIS-464maruzsTeyE9AqwXt4ES42hX0p4xnwmW-axj7Ysg-IIiDkDefxA","rpId":"lemma.id","timeout":60000,"userVerification":"preferred"},"success":true}
+
+

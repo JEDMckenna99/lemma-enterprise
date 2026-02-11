@@ -1,0 +1,2 @@
+﻿Transport/TLS checks: 2026-02-11T13:01:15.9976104-05:00
+# HTTP to HTTPS redirect

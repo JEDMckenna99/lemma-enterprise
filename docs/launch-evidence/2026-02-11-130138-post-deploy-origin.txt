@@ -1,0 +1,17 @@
+﻿Origin/CORS checks: 2026-02-11T13:01:42.1570693-05:00
+OPTIONS https://lemma.id/api/passkey/authenticate/begin Origin=https://lemma.id -> 200
+  ACAO=https://lemma.id
+  ACAC=true
+
+OPTIONS https://lemma.id/api/passkey/authenticate/begin Origin=https://evil.example -> 200
+  ACAO=*
+  ACAC=
+
+POST https://lemma.id/api/passkey/authenticate/begin Origin=https://lemma.id -> 200
+  ACAO=https://lemma.id
+  ACAC=true
+
+POST https://lemma.id/api/passkey/authenticate/begin Origin=https://evil.example -> 200
+  ACAO=
+  ACAC=
+

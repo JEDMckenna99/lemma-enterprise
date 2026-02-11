@@ -216,16 +216,29 @@ def await_site_revocation(credential_id: str, reason: str, site_domain: str = No
                 revoked_by='user_self_revoke',
                 revoked_at=datetime.utcnow(),
                 reason=reason,
-                bloom_filter_updated=False  # Will be updated by background job
+                bloom_filter_updated=False
             )
             
             session.add(revocation)
             session.commit()
             
             logger.info(f"✅ Added {credential_id} to revocation registry for site {site_domain}")
-            
-            # TODO: Update bloom filter for efficient offline checking
-            # This would be done by a background job in production
+
+            # Keep revocation data path current by immediately syncing this credential.
+            # Event-bus propagation still occurs in revoke_credential().
+            bloom_synced = False
+            try:
+                from api.permission_verification import sync_single_revocation
+                bloom_synced = bool(sync_single_revocation(credential_id))
+            except Exception as sync_err:
+                logger.warning(f"⚠️ Local bloom sync failed for {credential_id}: {sync_err}")
+
+            if bloom_synced:
+                revocation.bloom_filter_updated = True
+                session.commit()
+                logger.info(f"✅ Local bloom filter updated for {credential_id}")
+            else:
+                logger.warning(f"⚠️ Revocation stored but bloom_filter_updated remains false for {credential_id}")
             
             return True
             
