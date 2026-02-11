@@ -642,6 +642,22 @@ def require_agent_or_user_auth(required_scope=None, enforce_task_bounds=True):
 
                 return f(*args, **kwargs)
 
+            # Support browser agent sessions created via /api/agent/session.
+            if session.get('agent_authenticated'):
+                session_scope = session.get('agent_scope', [])
+                if required_scope and required_scope not in session_scope:
+                    return jsonify({
+                        'success': False,
+                        'error': f'Agent session lacks required scope: {required_scope}'
+                    }), 403
+
+                session_ppid = session.get('agent_ppid')
+                if session_ppid:
+                    g.ppid = session_ppid
+                g.authenticated = True
+                g.auth_method = 'agent_session'
+                return f(*args, **kwargs)
+
             # Fall back to user auth
             ppid = request.headers.get('X-Lemma-PPID')
             api_key = request.headers.get('X-API-Key')

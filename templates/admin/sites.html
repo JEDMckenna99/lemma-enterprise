@@ -465,10 +465,10 @@ function openSitePanel(site) {
     planEl.appendChild(planBadge);
     
     // Set copy button data
-    const copyBtn = document.getElementById('copy-site-id-btn');
-    if (copyBtn) {
-        copyBtn.dataset.copy = site.site_id;
-        copyBtn.onclick = () => { if (window.copyToClipboard) copyToClipboard(site.site_id, copyBtn); };
+    const panelCopyBtn = document.getElementById('copy-site-id-btn');
+    if (panelCopyBtn) {
+        panelCopyBtn.dataset.copy = site.site_id;
+        panelCopyBtn.onclick = () => { if (window.copyToClipboard) copyToClipboard(site.site_id, panelCopyBtn); };
     }
     
     // Store site for actions
