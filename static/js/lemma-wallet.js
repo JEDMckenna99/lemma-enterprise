@@ -77,7 +77,7 @@ class LemmaWallet {
     // v2.32.0: Redirect-only architecture - removed popup flow for simpler, consistent UX
     static VERSION = '2.50.0';  // Sub-5ms verification: pre-hydrated caches, debug-gated logging, no bridge
     
-    constructor() {
+    constructor(options = {}) {
         this.db = null;
         this.session = {
             isUnlocked: false,
@@ -100,13 +100,65 @@ class LemmaWallet {
         this._lastHeartbeatCheck = 0;
         this._heartbeatDebounceMs = 2000;  // Min 2s between checks
         
-        // Performance: Debug logging (set LemmaWallet.DEBUG = true to enable)
-        this._debug = false;
+        // Logging level controls SDK verbosity without affecting app-wide logs.
+        // Supported levels: 'debug' | 'info' | 'warn' | 'error' | 'silent'
+        this._logLevel = this._resolveLogLevel(options);
+        this._debug = options.debug === true || this._logLevel === 'debug';
+        this._installSdkLogGate();
+        this._isClearingSession = false;
     }
     
     /** @private Log only when debug is enabled */
     _log(...args) { if (this._debug) console.log(...args); }
     _warn(...args) { if (this._debug) console.warn(...args); }
+
+    _resolveLogLevel(options = {}) {
+        if (options.logLevel) return String(options.logLevel).toLowerCase();
+        if (typeof window !== 'undefined' && window.LEMMA_LOG_LEVEL) {
+            return String(window.LEMMA_LOG_LEVEL).toLowerCase();
+        }
+        try {
+            const stored = localStorage.getItem('lemma_log_level');
+            if (stored) return String(stored).toLowerCase();
+        } catch (e) {
+            // Ignore storage access issues and use default.
+        }
+        // Default to warnings/errors in production usage to reduce log overhead.
+        return 'warn';
+    }
+
+    _installSdkLogGate() {
+        if (typeof window === 'undefined') return;
+        if (window.__lemmaSdkLogGateInstalled) return;
+
+        const levelOrder = { debug: 10, info: 20, warn: 30, error: 40, silent: 50 };
+        const minLevel = this._logLevel in levelOrder ? this._logLevel : 'warn';
+
+        const originalLog = console.log.bind(console);
+        const originalWarn = console.warn.bind(console);
+
+        const isLemmaTagged = (args) => {
+            if (!args || args.length === 0) return false;
+            const first = String(args[0] ?? '');
+            return first.includes('[Lemma]') || first.includes('Lemma Wallet') || first.includes('lemma.id');
+        };
+
+        const allow = (level, args) => {
+            if (!isLemmaTagged(args)) return true;
+            return levelOrder[level] >= levelOrder[minLevel];
+        };
+
+        console.log = (...args) => {
+            if (allow('info', args)) originalLog(...args);
+        };
+
+        console.warn = (...args) => {
+            if (allow('warn', args)) originalWarn(...args);
+        };
+
+        // Keep console.error untouched for operational visibility.
+        window.__lemmaSdkLogGateInstalled = true;
+    }
 
     /**
      * Set callback for when session expires (e.g., wallet locked remotely)
@@ -114,6 +166,29 @@ class LemmaWallet {
      */
     onSessionExpired(callback) {
         this._onSessionExpired = callback;
+    }
+
+    /**
+     * Notify host app that session expired without letting host callback
+     * exceptions crash SDK internals.
+     * @private
+     */
+    _notifySessionExpired(payload) {
+        if (this._onSessionExpired && typeof this._onSessionExpired === 'function') {
+            try {
+                this._onSessionExpired(payload);
+            } catch (e) {
+                console.warn('[Lemma] onSessionExpired callback error:', e.message);
+            }
+        }
+
+        try {
+            window.dispatchEvent(new CustomEvent('lemma:session-expired', {
+                detail: payload
+            }));
+        } catch (e) {
+            console.warn('[Lemma] Failed to dispatch lemma:session-expired event:', e.message);
+        }
     }
 
     // ========================================
@@ -851,7 +926,6 @@ class LemmaWallet {
      * @private
      */
     _autoStartHeartbeat() {
-        if (this._isLemmaDomain()) return;
         if (this._heartbeatInterval) return; // Already running
         
         console.log('[Lemma] 🔄 Auto-starting session heartbeat (visibility + 5min backup)');
@@ -1283,9 +1357,7 @@ class LemmaWallet {
             console.log('[Lemma] Session expired locally');
             this.session = { isUnlocked: false };
             await this._delete('session', 'current');
-            if (this._onSessionExpired) {
-                this._onSessionExpired({ reason: 'expired' });
-            }
+            this._notifySessionExpired({ reason: 'expired' });
             return false;
         }
         
@@ -1312,9 +1384,7 @@ class LemmaWallet {
                     console.log('[Lemma] Session invalidated by bridge (legacy check)');
                     this.session = { isUnlocked: false };
                     await this._delete('session', 'current');
-                    if (this._onSessionExpired) {
-                        this._onSessionExpired({ reason: 'bridge_invalid' });
-                    }
+                    this._notifySessionExpired({ reason: 'bridge_invalid' });
                     return false;
                 }
             } catch (e) {
@@ -1363,9 +1433,8 @@ class LemmaWallet {
      * @param {number} intervalMs - Fallback poll interval in ms (default: 300000 = 5 minutes)
      */
     startSessionHeartbeat(intervalMs = 300000) {
-        // Only run on third-party sites
-        if (window.location.hostname.includes('lemma.id') ||
-            window.location.hostname.includes('localhost')) {
+        // Skip only on localhost dev hosts where SSE endpoint may not exist.
+        if (window.location.hostname.includes('localhost')) {
             return;
         }
 
@@ -1575,47 +1644,50 @@ class LemmaWallet {
      * @private
      */
     async _clearSessionGracefully(reason, message) {
-                    // Clear local session
-                    this.session = {
-                        isUnlocked: false,
-                        unlockedAt: null,
-                        expiresAt: null
-                    };
-                    
-                    // Clear session from IndexedDB
-        await this._delete('session', 'current');
-        
-        // Stop heartbeat, SSE, timers, and visibility listeners
-        if (this._heartbeatInterval) {
-            clearInterval(this._heartbeatInterval);
-            this._heartbeatInterval = null;
+        if (this._isClearingSession) {
+            this._warn('[Lemma] Session clear already in progress - skipping duplicate clear');
+            return;
         }
-        if (this._heartbeatStartupTimer) {
-            clearTimeout(this._heartbeatStartupTimer);
-            this._heartbeatStartupTimer = null;
+
+        this._isClearingSession = true;
+        try {
+            // Clear local session
+            this.session = {
+                isUnlocked: false,
+                unlockedAt: null,
+                expiresAt: null
+            };
+
+            // Clear session from IndexedDB
+            await this._delete('session', 'current');
+
+            // Stop heartbeat, SSE, timers, and visibility listeners
+            if (this._heartbeatInterval) {
+                clearInterval(this._heartbeatInterval);
+                this._heartbeatInterval = null;
+            }
+            if (this._heartbeatStartupTimer) {
+                clearTimeout(this._heartbeatStartupTimer);
+                this._heartbeatStartupTimer = null;
+            }
+            if (this._sessionEventSource) {
+                this._sessionEventSource.close();
+                this._sessionEventSource = null;
+            }
+            if (this._visibilityHandler) {
+                document.removeEventListener('visibilitychange', this._visibilityHandler);
+                this._visibilityHandler = null;
+            }
+            if (this._focusHandler) {
+                window.removeEventListener('focus', this._focusHandler);
+                this._focusHandler = null;
+            }
+
+            // Trigger callback and event safely.
+            this._notifySessionExpired({ reason, message });
+        } finally {
+            this._isClearingSession = false;
         }
-        if (this._sessionEventSource) {
-            this._sessionEventSource.close();
-            this._sessionEventSource = null;
-        }
-        if (this._visibilityHandler) {
-            document.removeEventListener('visibilitychange', this._visibilityHandler);
-            this._visibilityHandler = null;
-        }
-        if (this._focusHandler) {
-            window.removeEventListener('focus', this._focusHandler);
-            this._focusHandler = null;
-                    }
-                    
-        // Trigger callback if set (for customer sites to handle)
-                    if (this._onSessionExpired) {
-            this._onSessionExpired({ reason, message });
-                    }
-                    
-                    // Dispatch custom event for apps to listen to
-                    window.dispatchEvent(new CustomEvent('lemma:session-expired', {
-            detail: { reason, message }
-                    }));
     }
 
     /**

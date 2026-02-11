@@ -31,7 +31,7 @@ Evidence: __________
 
 - Date: 2026-02-11
 - Environment: production `https://lemma.id` (Heroku deploy)
-- Deployment Version: Heroku release `v1676`, commit `8bb73981`
+- Deployment Version: Heroku release `v1682`, commit `34c68e4a`
 - Type: post-deploy automated launch gate + smoke checks
 - Evidence:
   - `docs/launch-evidence/2026-02-11-heroku-smoke.md`
@@ -55,6 +55,15 @@ Evidence: __________
   - `docs/launch-evidence/2026-02-11-132844-post-deploy-origin.txt`
   - `docs/launch-evidence/2026-02-11-revocation-path-post-deploy.md`
   - `docs/launch-evidence/2026-02-11-revocation-path-post-deploy.txt`
+  - `docs/launch-evidence/2026-02-11-revocation-path-post-dbfix.md`
+  - `docs/launch-evidence/2026-02-11-revocation-path-post-dbfix.txt`
+  - `docs/launch-evidence/2026-02-11-135840-post-deploy-summary.md`
+  - `docs/launch-evidence/2026-02-11-135840-post-deploy-smoke.txt`
+  - `docs/launch-evidence/2026-02-11-135840-post-deploy-transport.txt`
+  - `docs/launch-evidence/2026-02-11-135840-post-deploy-origin.txt`
+  - `docs/launch-evidence/2026-02-11-agent-token-ux-automation.md`
+  - `docs/launch-evidence/2026-02-11-agent-ux-suite-full-pass.txt`
+  - `docs/launch-evidence/2026-02-11-agent-ux-suite-interaction-pass.txt`
   - `docs/launch-evidence/2026-02-11-ci-gate-setup.md`
   - `docs/launch-evidence/2026-02-11-launch-gate-ci-local.txt`
 - Coverage in this run:
@@ -66,7 +75,8 @@ Evidence: __________
   - static scan evidence for `eval`/`innerHTML` usage patterns
   - repository code remediation for passkey/revocation/frontend safety blockers
   - post-deploy verification automation run (scripted)
-  - deployed-release verification on Heroku `v1676`
+  - deployed-release verification on Heroku `v1682`
+  - full token-driven UX automation (comprehensive + interaction suites) passed
   - bridge security/cache headers
   - revocation status endpoint behavior
   - unauthenticated guardrail behavior on selected auth/session APIs
@@ -116,7 +126,11 @@ Evidence:
 - Smoke/guardrail artifacts:
   - `docs/launch-evidence/2026-02-11-heroku-smoke.md`
   - `docs/launch-evidence/2026-02-11-130201-post-deploy-summary.md`
-- Remaining requirement: full browser flow execution and reruns across all critical scenarios in `docs/FULL_TEST_SUITE.md`
+- Full browser/token automation artifacts:
+  - `docs/launch-evidence/2026-02-11-agent-token-ux-automation.md`
+  - `docs/launch-evidence/2026-02-11-agent-ux-suite-full-pass.txt`
+  - `docs/launch-evidence/2026-02-11-agent-ux-suite-interaction-pass.txt`
+- Remaining requirement: execute any still-uncovered critical scenarios from `docs/FULL_TEST_SUITE.md` (if required for formal sign-off)
 
 ### P0-3 CI Release Gate for Auth/Security Paths
 
@@ -148,16 +162,17 @@ Evidence:
   - Revoked credential is consistently rejected across clients after sync SLA.
   - Verified by automated and manual tests.
 - Current Known Gap:
-  - Post-deploy validation found revocation success response with `site_updated=false` and missing list/bloom visibility for test credential.
+  - Persistence/visibility now validated on production, but end-user deny-path validation across clients is still pending.
 
-Status: `FAIL`  
+Status: `IN_PROGRESS`  
 Owner: Backend Lead  
 Target Date: __________  
 Evidence:
 - `docs/launch-evidence/2026-02-11-code-remediation.md`
 - `docs/launch-evidence/2026-02-11-revocation-path-post-deploy.md`
-- Remediation in progress: hard-fail persistence path and real status lookup in `api/wallet_revocation.py`
-- Remaining requirement: redeploy + successful revoke -> list/bloom visibility -> deny-path evidence
+- `docs/launch-evidence/2026-02-11-revocation-path-post-dbfix.md`
+- Active route fixed in `api/services/wallet_service.py` and deployed (`v1679`)
+- Remaining requirement: revoke -> client sync -> credential deny evidence across supported clients
 
 ### P0-5 Passkey Algorithm Handling Correctness
 
@@ -260,6 +275,10 @@ Evidence: approved policy docs
   - `docs/POST_DEPLOY_LAUNCH_VERIFICATION.md`
 - Deployment release checklist:
   - `docs/DEPLOYMENT_RELEASE_CHECKLIST.md`
+- Solo operator execution sheet:
+  - `docs/SOLO_GA_TEST_EXECUTION_SHEET.md`
+- Agent monitoring API (custom dashboard integration):
+  - `docs/AGENT_MONITORING_API.md`
 - Automation script:
   - `scripts/post_deploy_launch_gate.ps1`
 

@@ -310,6 +310,40 @@ h1{color:#1e293b;font-weight:600;line-height:1.25;margin-bottom:16px;font-size:4
                     await window.globalLemmaWallet.init();
                 }
                 const wallet = window.globalLemmaWallet;
+                // Ensure lock/unlock changes propagate on lemma.id too.
+                wallet._autoStartHeartbeat?.();
+
+                function setLoggedOutUI() {
+                    const userDropdown = document.getElementById('user-dropdown');
+                    const authButtons = document.getElementById('auth-buttons');
+                    if (userDropdown) userDropdown.style.display = 'none';
+                    if (authButtons) authButtons.style.display = 'block';
+
+                    const navAdmin = document.getElementById('nav-admin');
+                    const adminDropdown = document.getElementById('admin-dropdown-link');
+                    if (navAdmin) navAdmin.style.display = 'none';
+                    if (adminDropdown) adminDropdown.style.display = 'none';
+
+                    const pricingLink = document.getElementById('nav-pricing');
+                    if (pricingLink) pricingLink.style.display = 'block';
+
+                    delete window.lemmaCredential;
+                    delete window.lemmaAuth;
+                }
+
+                function handleLockedState() {
+                    setLoggedOutUI();
+                    const protectedPath = /^\/(developer|admin|wallet)(\/|$)/.test(window.location.pathname);
+                    if (protectedPath) {
+                        window.location.href = '/login?reason=wallet_locked';
+                    }
+                }
+
+                if (!window.__lemmaLockHandlersBound) {
+                    window.addEventListener('lemma:session-expired', handleLockedState);
+                    window.addEventListener('lemma-wallet-locked', handleLockedState);
+                    window.__lemmaLockHandlersBound = true;
+                }
                 
                 // Get all permission credentials
                 const permissions = await wallet.getCredentials('permission');
@@ -338,7 +372,8 @@ h1{color:#1e293b;font-weight:600;line-height:1.25;margin-bottom:16px;font-size:4
                     cred = lemmaPermissions[0];
                 }
                 
-                if (cred) {
+                const walletUnlocked = wallet.isUnlocked();
+                if (cred && walletUnlocked) {
                     // Use normalized claims for consistent access
                     const normalized = utils ? utils.normalizeCredentialClaims(cred) : null;
                     const claims = cred.claims || cred.credentialSubject || {};
@@ -403,6 +438,7 @@ h1{color:#1e293b;font-weight:600;line-height:1.25;margin-bottom:16px;font-size:4
                     const auth = new SessionFreeAuth(wallet, {debug: false});
                     window.lemmaAuth = auth;
                 } else {
+                    setLoggedOutUI();
                     // NO CREDENTIAL FOUND - Check if we can auto-issue
                     // This handles recovery when credential was revoked but wallet is still valid
                     if (wallet.isUnlocked()) {

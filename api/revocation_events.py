@@ -60,6 +60,9 @@ except Exception as e:
 
 REVOCATION_CHANNEL = 'lemma:revocations'
 SESSION_CHANNEL = 'lemma:sessions'
+# Keepalive interval must stay comfortably below Gunicorn worker timeout
+# to avoid sync worker restarts on long-lived SSE streams.
+SSE_HEARTBEAT_SECONDS = 10
 
 
 def publish_session_event(wallet_id: str, event_type: str, expires_at: int = None) -> bool:
@@ -145,7 +148,7 @@ def generate_sse_events():
         logger.info("SSE: Redis not available, using heartbeat-only mode")
         while True:
             yield ": heartbeat\n\n"
-            time.sleep(30)
+            time.sleep(SSE_HEARTBEAT_SECONDS)
     
     # Create a separate Redis connection for pub/sub (required by redis-py)
     try:
@@ -174,13 +177,15 @@ def generate_sse_events():
         listener_thread.start()
         
         # Main event loop
-        heartbeat_interval = 30  # seconds
+        heartbeat_interval = SSE_HEARTBEAT_SECONDS
         last_heartbeat = time.time()
         
         while True:
             try:
                 try:
-                    item = event_queue.get(timeout=5)
+                    # Short timeout keeps loop responsive and guarantees
+                    # regular heartbeats under low event volume.
+                    item = event_queue.get(timeout=1)
                     
                     if item is None:
                         break
@@ -227,7 +232,7 @@ def generate_sse_events():
         logger.error(f"SSE: Failed to setup Redis pub/sub: {e}")
         while True:
             yield ": heartbeat\n\n"
-            time.sleep(30)
+            time.sleep(SSE_HEARTBEAT_SECONDS)
 
 
 @revocation_events_bp.route('/api/events/revocations', methods=['GET', 'OPTIONS'])

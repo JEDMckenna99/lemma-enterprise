@@ -171,6 +171,88 @@ def hash_token(plaintext_token):
     return hashlib.sha256(plaintext_token.encode()).hexdigest()
 
 
+def _resolve_monitor_identity():
+    """
+    Resolve owner identity for monitoring endpoints.
+
+    Supports:
+    - X-Agent-Token (owner inferred from credential)
+    - X-Lemma-PPID
+    - Flask session customer_id
+    - X-API-Key (for custom site dashboards)
+    """
+    agent_token = request.headers.get('X-Agent-Token')
+    if agent_token:
+        credential_info = validate_agent_token(agent_token)
+        if not credential_info:
+            return None, ('Invalid, expired, or revoked agent token', 401)
+
+        principal = credential_info.get('authorized_by_ppid') or credential_info.get('authorized_by_email')
+        if not principal:
+            return None, ('Agent token missing authorized principal', 401)
+
+        return {
+            'auth_method': 'agent_token',
+            'principal': principal
+        }, None
+
+    ppid = request.headers.get('X-Lemma-PPID')
+    if ppid:
+        if not ppid.startswith('did:lemma:ppid_'):
+            return None, ('Invalid PPID format', 400)
+        return {
+            'auth_method': 'ppid',
+            'principal': ppid
+        }, None
+
+    customer_id = session.get('customer_id')
+    if customer_id:
+        return {
+            'auth_method': 'session',
+            'principal': f"customer:{customer_id}"
+        }, None
+
+    api_key = request.headers.get('X-API-Key')
+    if api_key:
+        try:
+            from api.customer_accounts import customer_manager
+            key_validation = customer_manager.validate_api_key(api_key)
+            if not key_validation.get('valid'):
+                return None, (key_validation.get('error', 'Invalid API key'), 401)
+
+            customer_id = key_validation.get('customer_id')
+            customer = customer_manager.get_customer(customer_id)
+            return {
+                'auth_method': 'api_key',
+                'principal': f"customer:{customer_id}",
+                'customer_email': getattr(customer, 'email', None)
+            }, None
+        except Exception as e:
+            logger.error(f"API key validation failed for monitor endpoint: {e}")
+            return None, ('Failed to validate API key', 500)
+
+    return None, ('Authentication required', 401)
+
+
+def _build_owner_filter(identity, alias='ac'):
+    """
+    Build SQL filter for ownership checks.
+    Returns (clause, params)
+    """
+    principal = identity.get('principal')
+    customer_email = identity.get('customer_email')
+
+    clauses = [f"{alias}.authorized_by_ppid = %s", f"{alias}.authorized_by_email = %s"]
+    params = [principal, principal]
+
+    # For API-key auth, also allow matching by customer email when available.
+    if identity.get('auth_method') == 'api_key' and customer_email:
+        clauses.append(f"{alias}.authorized_by_email = %s")
+        params.append(customer_email)
+
+    return f"({' OR '.join(clauses)})", params
+
+
 # ============================================
 # CREDENTIAL ISSUANCE (Requires Passkey Auth)
 # ============================================
@@ -1053,6 +1135,256 @@ def get_task_adherence_report(token_id):
             'success': False,
             'error': str(e)
         }), 500
+
+
+# ============================================
+# MONITORING ENDPOINTS (for custom site UIs)
+# ============================================
+
+@agent_credentials_bp.route('/api/agent/monitor/tokens', methods=['GET'])
+@cross_origin()
+def get_agent_monitor_tokens():
+    """List agent credentials for monitoring dashboards."""
+    identity, auth_error = _resolve_monitor_identity()
+    if auth_error:
+        message, status = auth_error
+        return jsonify({'success': False, 'error': message}), status
+
+    include_revoked = request.args.get('include_revoked', 'false').lower() == 'true'
+    limit = min(max(int(request.args.get('limit', 100)), 1), 500)
+
+    try:
+        from api.database import get_db_connection
+
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        owner_filter, owner_params = _build_owner_filter(identity, alias='ac')
+        revoked_filter = '' if include_revoked else 'AND ac.revoked = FALSE'
+
+        query = f"""
+            SELECT ac.token_id, ac.agent_name, ac.scope, ac.allowed_paths, ac.max_operations,
+                   ac.use_count, ac.task_deviation_count, ac.last_used_at, ac.issued_at, ac.expires_at,
+                   ac.revoked, ac.revoked_at, ac.description
+            FROM agent_credentials ac
+            WHERE {owner_filter}
+            {revoked_filter}
+            ORDER BY ac.issued_at DESC
+            LIMIT %s
+        """
+        cursor.execute(query, (*owner_params, limit))
+        rows = cursor.fetchall()
+        cursor.close()
+        conn.close()
+
+        tokens = []
+        for row in rows:
+            scope = row[2] if isinstance(row[2], list) else json.loads(row[2] or '[]')
+            allowed_paths = row[3] if isinstance(row[3], list) else (json.loads(row[3]) if row[3] else None)
+            use_count = row[5] or 0
+            max_ops = row[4]
+            tokens.append({
+                'token_id': row[0],
+                'agent_name': row[1],
+                'scope': scope,
+                'allowed_paths': allowed_paths,
+                'max_operations': max_ops,
+                'use_count': use_count,
+                'operations_remaining': (max_ops - use_count) if max_ops is not None else None,
+                'task_deviation_count': row[6] or 0,
+                'last_used_at': row[7].isoformat() + 'Z' if row[7] else None,
+                'issued_at': row[8].isoformat() + 'Z' if row[8] else None,
+                'expires_at': row[9].isoformat() + 'Z' if row[9] else None,
+                'revoked': row[10],
+                'revoked_at': row[11].isoformat() + 'Z' if row[11] else None,
+                'description': row[12],
+                'status': 'revoked' if row[10] else ('expired' if row[9] and row[9] < datetime.now(timezone.utc) else 'active')
+            })
+
+        return jsonify({
+            'success': True,
+            'auth_method': identity.get('auth_method'),
+            'tokens': tokens
+        })
+    except Exception as e:
+        logger.error(f"Failed to load monitor tokens: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@agent_credentials_bp.route('/api/agent/monitor/events', methods=['GET'])
+@cross_origin()
+def get_agent_monitor_events():
+    """Get detailed per-request audit events for monitoring dashboards."""
+    identity, auth_error = _resolve_monitor_identity()
+    if auth_error:
+        message, status = auth_error
+        return jsonify({'success': False, 'error': message}), status
+
+    token_id = request.args.get('token_id')
+    status_filter = (request.args.get('status') or 'all').lower()  # all | success | failure
+    hours = min(max(int(request.args.get('hours', 24)), 1), 24 * 30)
+    limit = min(max(int(request.args.get('limit', 200)), 1), 1000)
+
+    if status_filter not in ('all', 'success', 'failure'):
+        return jsonify({'success': False, 'error': 'status must be one of: all, success, failure'}), 400
+
+    try:
+        from api.database import get_db_connection
+
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        owner_filter, owner_params = _build_owner_filter(identity, alias='ac')
+        where_parts = [
+            owner_filter,
+            "al.timestamp >= (NOW() - (%s || ' hours')::interval)"
+        ]
+        params = [*owner_params, str(hours)]
+
+        if token_id:
+            where_parts.append("al.token_id = %s")
+            params.append(token_id)
+
+        if status_filter == 'success':
+            where_parts.append("al.success = TRUE")
+        elif status_filter == 'failure':
+            where_parts.append("al.success = FALSE")
+
+        query = f"""
+            SELECT al.token_id, al.action, al.resource, al.method, al.path,
+                   al.status_code, al.success, al.path_allowed, al.task_deviation,
+                   al.deviation_reason, al.timestamp
+            FROM agent_audit_log al
+            JOIN agent_credentials ac ON al.credential_id = ac.id
+            WHERE {' AND '.join(where_parts)}
+            ORDER BY al.timestamp DESC
+            LIMIT %s
+        """
+        params.append(limit)
+        cursor.execute(query, tuple(params))
+        rows = cursor.fetchall()
+        cursor.close()
+        conn.close()
+
+        events = [{
+            'token_id': row[0],
+            'action': row[1],
+            'resource': row[2],
+            'method': row[3],
+            'path': row[4],
+            'status_code': row[5],
+            'success': row[6],
+            'path_allowed': row[7],
+            'task_deviation': row[8],
+            'deviation_reason': row[9],
+            'timestamp': row[10].isoformat() + 'Z' if row[10] else None
+        } for row in rows]
+
+        return jsonify({
+            'success': True,
+            'auth_method': identity.get('auth_method'),
+            'window_hours': hours,
+            'events': events
+        })
+    except Exception as e:
+        logger.error(f"Failed to load monitor events: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@agent_credentials_bp.route('/api/agent/monitor/summary', methods=['GET'])
+@cross_origin()
+def get_agent_monitor_summary():
+    """Get aggregate visibility metrics for delegated agent activity."""
+    identity, auth_error = _resolve_monitor_identity()
+    if auth_error:
+        message, status = auth_error
+        return jsonify({'success': False, 'error': message}), status
+
+    token_id = request.args.get('token_id')
+    hours = min(max(int(request.args.get('hours', 24)), 1), 24 * 30)
+
+    try:
+        from api.database import get_db_connection
+
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        owner_filter, owner_params = _build_owner_filter(identity, alias='ac')
+        where_parts = [
+            owner_filter,
+            "al.timestamp >= (NOW() - (%s || ' hours')::interval)"
+        ]
+        params = [*owner_params, str(hours)]
+
+        if token_id:
+            where_parts.append("al.token_id = %s")
+            params.append(token_id)
+
+        summary_query = f"""
+            SELECT
+                COUNT(*) AS total_actions,
+                COUNT(*) FILTER (WHERE al.success = TRUE) AS success_count,
+                COUNT(*) FILTER (WHERE al.success = FALSE) AS failure_count,
+                COUNT(*) FILTER (WHERE al.status_code = 403 OR al.path_allowed = FALSE) AS denied_count,
+                COUNT(*) FILTER (WHERE al.task_deviation = TRUE) AS deviation_count,
+                COUNT(DISTINCT al.path) AS unique_paths,
+                MAX(al.timestamp) AS last_seen_at
+            FROM agent_audit_log al
+            JOIN agent_credentials ac ON al.credential_id = ac.id
+            WHERE {' AND '.join(where_parts)}
+        """
+        cursor.execute(summary_query, tuple(params))
+        row = cursor.fetchone()
+
+        path_query = f"""
+            SELECT al.path, COUNT(*) AS count
+            FROM agent_audit_log al
+            JOIN agent_credentials ac ON al.credential_id = ac.id
+            WHERE {' AND '.join(where_parts)}
+            GROUP BY al.path
+            ORDER BY count DESC
+            LIMIT 10
+        """
+        cursor.execute(path_query, tuple(params))
+        path_rows = cursor.fetchall()
+
+        status_query = f"""
+            SELECT al.status_code, COUNT(*) AS count
+            FROM agent_audit_log al
+            JOIN agent_credentials ac ON al.credential_id = ac.id
+            WHERE {' AND '.join(where_parts)}
+            GROUP BY al.status_code
+            ORDER BY count DESC
+            LIMIT 10
+        """
+        cursor.execute(status_query, tuple(params))
+        status_rows = cursor.fetchall()
+
+        cursor.close()
+        conn.close()
+
+        summary = {
+            'total_actions': row[0] or 0,
+            'success_count': row[1] or 0,
+            'failure_count': row[2] or 0,
+            'denied_count': row[3] or 0,
+            'deviation_count': row[4] or 0,
+            'unique_paths': row[5] or 0,
+            'last_seen_at': row[6].isoformat() + 'Z' if row[6] else None,
+            'top_paths': [{'path': p[0], 'count': p[1]} for p in path_rows],
+            'status_codes': [{'status_code': s[0], 'count': s[1]} for s in status_rows]
+        }
+
+        return jsonify({
+            'success': True,
+            'auth_method': identity.get('auth_method'),
+            'window_hours': hours,
+            'token_id': token_id,
+            'summary': summary
+        })
+    except Exception as e:
+        logger.error(f"Failed to load monitor summary: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 
 # ============================================
