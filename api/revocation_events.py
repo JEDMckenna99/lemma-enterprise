@@ -63,6 +63,9 @@ SESSION_CHANNEL = 'lemma:sessions'
 # Keepalive interval must stay comfortably below Gunicorn worker timeout
 # to avoid sync worker restarts on long-lived SSE streams.
 SSE_HEARTBEAT_SECONDS = 10
+# Gunicorn sync workers will be aborted near the global timeout (commonly 30s).
+# Rotate SSE streams proactively so clients reconnect before worker timeout.
+SSE_MAX_STREAM_SECONDS = 20
 
 
 def publish_session_event(wallet_id: str, event_type: str, expires_at: int = None) -> bool:
@@ -140,6 +143,7 @@ def generate_sse_events():
         SSE-formatted event strings
     """
     event_queue = Queue()
+    stream_started_at = time.time()
     
     # Send initial connection event with supported event types
     yield "event: connected\ndata: {\"types\": [\"revocation\", \"session_invalidated\", \"session_restored\"]}\n\n"
@@ -147,6 +151,9 @@ def generate_sse_events():
     if not REDIS_AVAILABLE:
         logger.info("SSE: Redis not available, using heartbeat-only mode")
         while True:
+            if time.time() - stream_started_at >= SSE_MAX_STREAM_SECONDS:
+                yield "event: reconnect\ndata: {\"reason\":\"stream_rotate\"}\n\n"
+                break
             yield ": heartbeat\n\n"
             time.sleep(SSE_HEARTBEAT_SECONDS)
     
@@ -182,6 +189,11 @@ def generate_sse_events():
         
         while True:
             try:
+                if time.time() - stream_started_at >= SSE_MAX_STREAM_SECONDS:
+                    # Ask client to reconnect before worker timeout is reached.
+                    yield "event: reconnect\ndata: {\"reason\":\"stream_rotate\"}\n\n"
+                    break
+
                 try:
                     # Short timeout keeps loop responsive and guarantees
                     # regular heartbeats under low event volume.
@@ -231,6 +243,9 @@ def generate_sse_events():
     except Exception as e:
         logger.error(f"SSE: Failed to setup Redis pub/sub: {e}")
         while True:
+            if time.time() - stream_started_at >= SSE_MAX_STREAM_SECONDS:
+                yield "event: reconnect\ndata: {\"reason\":\"stream_rotate\"}\n\n"
+                break
             yield ": heartbeat\n\n"
             time.sleep(SSE_HEARTBEAT_SECONDS)
 
