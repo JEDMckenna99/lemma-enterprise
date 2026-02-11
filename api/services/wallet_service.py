@@ -672,9 +672,9 @@ def await_network_revocation(credential_id: str, reason: str) -> bool:
 
 def await_site_revocation(credential_id: str, reason: str, site_domain: str = None) -> bool:
     try:
-        from api.database import get_db_session, RevocationList
+        from api.database import get_db, RevocationList
         
-        db_session = get_db_session()
+        db_session = get_db()
         try:
             existing = db_session.query(RevocationList).filter_by(lemma_id=credential_id).first()
             if existing:
