@@ -1050,14 +1050,16 @@ def create_app():
     def _require_wallet_session(template_name, **template_kwargs):
         """
         Server-side guard for admin pages.
-        Requires an active wallet session cookie before serving admin HTML.
+        Requires an active wallet session cookie (or an authenticated admin
+        agent session) before serving admin HTML.
         Returns the rendered template with noindex headers if session exists,
         or redirects to home if no session.
         """
         has_session = request.cookies.get('lemma_wallet_session')
         has_wallet_cookie = request.cookies.get('lemma_wallet_csrf')
+        has_admin_agent_session = bool(session.get('agent_authenticated') and session.get('is_admin'))
         
-        if not has_session and not has_wallet_cookie:
+        if not has_session and not has_wallet_cookie and not has_admin_agent_session:
             logger.warning(f"Admin page access denied - no wallet session: {request.path} from {request.remote_addr}")
             return redirect('/')
         
