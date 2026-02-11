@@ -676,16 +676,27 @@ def require_agent_or_user_auth(required_scope=None, enforce_task_bounds=True):
 @cross_origin()
 def list_agent_credentials():
     """List all agent credentials for the authenticated user, including task-bound info."""
+    # Allow direct token-based auth for automation and API clients.
+    agent_token = request.headers.get('X-Agent-Token')
+    credential_info = validate_agent_token(agent_token) if agent_token else None
+
     ppid = request.headers.get('X-Lemma-PPID')
     customer_id = session.get('customer_id')
 
-    if not ppid and not customer_id:
+    if credential_info:
+        authorized_by = credential_info.get('authorized_by_ppid') or credential_info.get('authorized_by_email')
+        if not authorized_by:
+            return jsonify({
+                'success': False,
+                'error': 'Agent token missing authorized principal'
+            }), 401
+    elif not ppid and not customer_id:
         return jsonify({
             'success': False,
             'error': 'Authentication required'
         }), 401
-
-    authorized_by = ppid or f"customer:{customer_id}"
+    else:
+        authorized_by = ppid or f"customer:{customer_id}"
 
     try:
         from api.database import get_db_connection

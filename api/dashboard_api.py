@@ -407,8 +407,8 @@ def issue_admin_lemma_endpoint():
         
         if not admin_did or not admin_did.startswith('did:lemma:ppid_'):
             # Fall back to username-based derivation (legacy)
-            logger.warning(f"No wallet PPID provided, falling back to username-derived DID")
-        admin_did = derive_ppid_did(username, site_domain)
+            logger.warning("No wallet PPID provided, falling back to username-derived DID")
+            admin_did = derive_ppid_did(username, site_domain)
         else:
             logger.info(f"Using wallet-derived PPID: {admin_did[:50]}...")
         
