@@ -1392,6 +1392,7 @@ def get_agent_monitor_summary():
 # ============================================
 
 @agent_credentials_bp.route('/api/agent/auto-issue', methods=['GET', 'POST'])
+@agent_credentials_bp.route('/api/agent/credentials/session-issue', methods=['POST'])
 @rate_limit(credential_issue_limit)
 def auto_issue_agent_credential():
     """
@@ -1456,9 +1457,11 @@ def auto_issue_agent_credential():
         # Parse parameters from GET query string or POST body
         if request.method == 'POST':
             data = request.get_json() or {}
-            ttl_hours = min(int(data.get('ttl', 4)), 24)
-            scope_param = data.get('scope', 'read,write')
-            agent_name = data.get('name', 'Auto-issued Agent Token')
+            ttl_value = data.get('ttl_hours', data.get('ttl', 4))
+            ttl_hours = min(int(ttl_value), 24)
+            ttl_hours = max(ttl_hours, 1)
+            scope_param = data.get('scope', ['read', 'write'])
+            agent_name = data.get('agent_name', data.get('name', 'Auto-issued Agent Token'))
             task_description = data.get('task')
             allowed_paths = data.get('allowed_paths')
             max_operations = data.get('max_operations')
@@ -1539,7 +1542,7 @@ def auto_issue_agent_credential():
             'expires_at': expires_at.isoformat() + 'Z',
             'ttl_hours': ttl_hours,
             'authorized_by': authorized_by,
-            'message': 'Token auto-issued based on active wallet session'
+            'message': 'Token issued from active wallet session'
         }
 
         # Add task-bound info if present
