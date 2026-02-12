@@ -36,7 +36,7 @@
 
 .dev-sidebar-toggle {
     position: fixed;
-    top: 88px;
+    top: 50%;
     left: calc(var(--dev-sidebar-width) + 8px);
     width: auto;
     min-width: 36px;
@@ -52,6 +52,7 @@
     justify-content: center;
     cursor: pointer;
     z-index: 110;
+    transform: translateY(-50%);
     transition: left 0.25s ease, color 0.2s ease, box-shadow 0.2s ease;
 }
 
@@ -669,6 +670,7 @@
     .dev-sidebar-toggle {
         top: 84px;
         left: 8px;
+        transform: none;
     }
 
     .dev-sidebar {
