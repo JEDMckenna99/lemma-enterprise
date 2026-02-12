@@ -36,14 +36,14 @@
 
 .dev-sidebar-toggle {
     position: fixed;
-    top: 92px;
-    left: calc(var(--dev-sidebar-width) - 16px);
-    width: 32px;
-    height: 32px;
+    top: 88px;
+    left: calc(var(--dev-sidebar-width) + 8px);
+    width: 36px;
+    height: 36px;
     border-radius: 999px;
-    border: 1px solid var(--dev-border);
-    background: var(--dev-card-bg);
-    color: var(--dev-text-muted);
+    border: none;
+    background: var(--dev-primary);
+    color: #ffffff;
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -59,34 +59,14 @@
 }
 
 .dev-sidebar-toggle:hover {
-    color: var(--dev-primary);
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
-}
-
-.dev-sidebar-header {
-    padding: 20px 24px;
-    border-bottom: 1px solid var(--dev-border);
-}
-
-.dev-logo {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    font-size: 18px;
-    font-weight: 600;
-    color: var(--dev-text);
-    text-decoration: none;
-}
-
-.dev-logo:hover {
-    color: var(--dev-primary);
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.35);
 }
 
 /* Navigation */
 .dev-nav {
     flex: 1;
     overflow-y: auto;
-    padding: 16px 0;
+    padding: 20px 0;
 }
 
 .dev-nav-section {
@@ -193,7 +173,7 @@
 }
 
 .dev-container.dev-sidebar-closed .dev-sidebar-toggle {
-    left: 16px;
+    left: 8px;
 }
 
 .dev-container.dev-sidebar-closed .dev-sidebar-toggle svg {
@@ -675,7 +655,7 @@
 @media (max-width: 768px) {
     .dev-sidebar-toggle {
         top: 84px;
-        left: 16px;
+        left: 8px;
     }
 
     .dev-sidebar {

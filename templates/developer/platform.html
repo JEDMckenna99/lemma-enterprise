@@ -38,14 +38,14 @@
 
         .sidebar-toggle {
             position: fixed;
-            top: 92px;
-            left: calc(var(--sidebar-width) - 16px);
-            width: 32px;
-            height: 32px;
+            top: 88px;
+            left: calc(var(--sidebar-width) + 8px);
+            width: 36px;
+            height: 36px;
             border-radius: 999px;
-            border: 1px solid #e5e7eb;
-            background: #ffffff;
-            color: #6b7280;
+            border: none;
+            background: #667eea;
+            color: #ffffff;
             display: inline-flex;
             align-items: center;
             justify-content: center;
@@ -55,8 +55,7 @@
         }
 
         .sidebar-toggle:hover {
-            color: #667eea;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.35);
         }
 
         .sidebar-toggle svg {
@@ -141,7 +140,7 @@
         }
 
         .platform-container.sidebar-closed .sidebar-toggle {
-            left: 16px;
+            left: 8px;
         }
 
         .platform-container.sidebar-closed .sidebar-toggle svg {
@@ -535,14 +534,6 @@
     <div class="platform-container">
         <!-- Sidebar Navigation -->
         <div class="sidebar">
-            <div class="sidebar-header">
-                <div class="sidebar-logo" aria-label="Developer home">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"></path>
-                    </svg>
-                </div>
-            </div>
-            
             <nav class="sidebar-nav">
                 <div class="nav-section">
                     <a class="nav-item active" data-section="overview">
@@ -558,7 +549,6 @@
                         <span>Permission Types</span>
                     </a>
                     <a class="nav-item" data-section="api">
-                        <span class="nav-icon">Key</span>
                         <span>API & Integration</span>
                     </a>
                     <a class="nav-item" data-section="agent-delegation">
