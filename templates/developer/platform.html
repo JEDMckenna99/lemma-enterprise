@@ -625,22 +625,6 @@
                     </div>
                 </div>
 
-                <!-- Agent Delegated Lemmas -->
-                <div class="card">
-                    <div class="card-header">
-                        <h2 class="card-title">Agent Delegated Lemmas</h2>
-                        <button class="btn btn-secondary btn-sm" onclick="loadAgentDelegatedLemmas()">
-                            Refresh
-                        </button>
-                    </div>
-                    <p style="margin-top: 0; margin-bottom: 16px; color: #6b7280; font-size: 14px;">
-                        Active agent credentials authorized by your wallet identity. Revoke any token immediately if needed.
-                    </p>
-                    <div id="agent-lemmas-container">
-                        <div class="loading">Loading agent delegated lemmas...</div>
-                    </div>
-                </div>
-                
                 <!-- Recent Activity -->
                 <div class="card">
                     <div class="card-header">
@@ -816,7 +800,16 @@
                         <button class="btn btn-primary btn-sm" onclick="loadAgentDelegationSummary(); loadAgentDelegationEvents();">
                             Apply
                         </button>
+                        <button class="btn btn-secondary btn-sm" onclick="revokeSelectedAgentDelegatedLemma()">
+                            Revoke Selected Token
+                        </button>
+                        <button class="btn btn-sm" style="background: #dc2626; color: white;" onclick="revokeAllActiveAgentDelegatedLemmas()">
+                            Revoke All Active Tokens
+                        </button>
                     </div>
+                    <p style="margin-top: 12px; margin-bottom: 0; color: #6b7280; font-size: 13px;">
+                        Revocation removes agent access immediately. Existing activity history remains for audit visibility.
+                    </p>
                 </div>
 
                 <div class="stat-grid">
@@ -1318,90 +1311,6 @@
             return null;
         }
 
-        async function loadAgentDelegatedLemmas() {
-            const container = document.getElementById('agent-lemmas-container');
-            if (!container) return;
-
-            container.innerHTML = '<div class="loading">Loading agent delegated lemmas...</div>';
-
-            try {
-                const ppid = await resolveAgentDelegationPPID();
-                const headers = {};
-                if (ppid) {
-                    headers['X-Lemma-PPID'] = ppid;
-                }
-
-                const response = await fetch('/api/agent/credentials', { headers });
-                const data = await response.json();
-
-                if (!response.ok || !data.success) {
-                    throw new Error(data.error || 'Failed to load delegated lemmas');
-                }
-
-                const activeCreds = (data.credentials || []).filter((c) => c.status === 'active');
-                window.agentDelegationPPID = ppid || window.agentDelegationPPID || null;
-
-                if (activeCreds.length === 0) {
-                    container.innerHTML = `
-                        <div class="empty-state" style="padding: 24px 16px;">
-                            <div class="empty-state-icon">🤖</div>
-                            <div>No active agent delegated lemmas</div>
-                            <div style="font-size: 13px; margin-top: 8px;">Create one from Agent Token management when you need automation access.</div>
-                        </div>
-                    `;
-                    return;
-                }
-
-                const tableRows = activeCreds.map((cred) => `
-                    <tr>
-                        <td>
-                            <div style="font-weight: 600;">${escapeHTML(cred.agent_name || 'AI Agent')}</div>
-                            <div style="font-size: 12px; color: #6b7280;">${escapeHTML(cred.token_id)}</div>
-                        </td>
-                        <td><span class="badge badge-info">${escapeHTML((cred.scope || []).join(', ') || 'read')}</span></td>
-                        <td>${formatDate(cred.expires_at)}</td>
-                        <td>${escapeHTML(String(cred.use_count || 0))}</td>
-                        <td>
-                            <button class="btn btn-sm" style="background: #dc2626; color: white;" data-action="revoke-agent-lemma" data-token-id="${escapeHTML(cred.token_id)}">
-                                Revoke
-                            </button>
-                        </td>
-                    </tr>
-                `).join('');
-
-                container.innerHTML = `
-                    <table class="data-table">
-                        <thead>
-                            <tr>
-                                <th>Agent</th>
-                                <th>Scope</th>
-                                <th>Expires</th>
-                                <th>Use Count</th>
-                                <th>Action</th>
-                            </tr>
-                        </thead>
-                        <tbody>${tableRows}</tbody>
-                    </table>
-                `;
-
-                container.querySelectorAll('[data-action="revoke-agent-lemma"]').forEach((btn) => {
-                    btn.addEventListener('click', async () => {
-                        const tokenId = btn.getAttribute('data-token-id');
-                        await revokeAgentDelegatedLemma(tokenId);
-                    });
-                });
-            } catch (error) {
-                console.error('Failed to load agent delegated lemmas:', error);
-                container.innerHTML = `
-                    <div class="empty-state" style="padding: 24px 16px;">
-                        <div class="empty-state-icon">⚠️</div>
-                        <div>Unable to load agent delegated lemmas</div>
-                        <div style="font-size: 13px; margin-top: 8px; color: #dc2626;">${escapeHTML(error.message || 'Unknown error')}</div>
-                    </div>
-                `;
-            }
-        }
-
         async function revokeAgentDelegatedLemma(tokenId) {
             if (!tokenId) {
                 showToast('Missing token identifier', 'error');
@@ -1432,7 +1341,6 @@
                 }
 
                 showToast('Agent delegated lemma revoked');
-                await loadAgentDelegatedLemmas();
                 await loadAgentDelegationTokens();
                 await loadAgentDelegationSummary();
                 await loadAgentDelegationEvents();
@@ -1440,6 +1348,38 @@
                 console.error('Failed to revoke agent delegated lemma:', error);
                 showToast(error.message || 'Failed to revoke delegated lemma', 'error');
             }
+        }
+
+        async function revokeSelectedAgentDelegatedLemma() {
+            const tokenId = document.getElementById('agent-token-filter')?.value || '';
+            if (!tokenId) {
+                showToast('Select a token first', 'error');
+                return;
+            }
+            await revokeAgentDelegatedLemma(tokenId);
+        }
+
+        async function revokeAllActiveAgentDelegatedLemmas() {
+            const activeTokens = (window.agentDelegationTokens || []).filter((t) => t.status === 'active');
+            if (activeTokens.length === 0) {
+                showToast('No active delegated tokens to revoke');
+                return;
+            }
+
+            const confirmed = confirm(`Revoke all active delegated tokens (${activeTokens.length})? Agents will immediately lose access.`);
+            if (!confirmed) return;
+
+            let revokedCount = 0;
+            for (const token of activeTokens) {
+                try {
+                    await revokeAgentDelegatedLemma(token.token_id);
+                    revokedCount += 1;
+                } catch (e) {
+                    console.warn('Bulk revoke failed for token:', token.token_id, e);
+                }
+            }
+
+            showToast(`Revoked ${revokedCount} of ${activeTokens.length} active delegated tokens`);
         }
 
         function getAgentMonitorFilters() {
@@ -1481,6 +1421,7 @@
                 }
 
                 const tokens = data.tokens || [];
+                window.agentDelegationTokens = tokens;
                 const tokenFilter = document.getElementById('agent-token-filter');
                 const selectedToken = tokenFilter ? tokenFilter.value : '';
                 if (tokenFilter) {
@@ -1862,7 +1803,6 @@
             // Load data and show platform
             loadAPIKeysData(false);
             loadOverviewData();
-            loadAgentDelegatedLemmas();
             
             document.getElementById('loading-state').style.display = 'none';
             document.getElementById('section-overview').style.display = 'block';
@@ -2057,8 +1997,6 @@
                 loadPermissionTemplates();
             } else if (sectionName === 'agent-delegation') {
                 loadAgentDelegationTab();
-            } else if (sectionName === 'overview') {
-                loadAgentDelegatedLemmas();
             }
             
             currentSection = sectionName;
