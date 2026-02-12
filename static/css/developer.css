@@ -31,6 +31,36 @@
     display: flex;
     flex-direction: column;
     z-index: 100;
+    transition: transform 0.25s ease;
+}
+
+.dev-sidebar-toggle {
+    position: fixed;
+    top: 92px;
+    left: calc(var(--dev-sidebar-width) - 16px);
+    width: 32px;
+    height: 32px;
+    border-radius: 999px;
+    border: 1px solid var(--dev-border);
+    background: var(--dev-card-bg);
+    color: var(--dev-text-muted);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    z-index: 110;
+    transition: left 0.25s ease, color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.dev-sidebar-toggle svg {
+    width: 16px;
+    height: 16px;
+    transition: transform 0.25s ease;
+}
+
+.dev-sidebar-toggle:hover {
+    color: var(--dev-primary);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
 }
 
 .dev-sidebar-header {
@@ -151,6 +181,23 @@
     flex: 1;
     margin-left: var(--dev-sidebar-width);
     min-height: 100vh;
+    transition: margin-left 0.25s ease;
+}
+
+.dev-container.dev-sidebar-closed .dev-sidebar {
+    transform: translateX(calc(-1 * var(--dev-sidebar-width)));
+}
+
+.dev-container.dev-sidebar-closed .dev-main {
+    margin-left: 0;
+}
+
+.dev-container.dev-sidebar-closed .dev-sidebar-toggle {
+    left: 16px;
+}
+
+.dev-container.dev-sidebar-closed .dev-sidebar-toggle svg {
+    transform: rotate(180deg);
 }
 
 .dev-content {
@@ -626,6 +673,11 @@
 
 /* Mobile Responsive */
 @media (max-width: 768px) {
+    .dev-sidebar-toggle {
+        top: 84px;
+        left: 16px;
+    }
+
     .dev-sidebar {
         transform: translateX(-100%);
         transition: transform 0.3s ease;

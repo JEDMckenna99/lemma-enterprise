@@ -12,11 +12,10 @@
     <!-- Sidebar Navigation -->
     <aside class="dev-sidebar">
         <div class="dev-sidebar-header">
-            <a href="/developer" class="dev-logo">
+            <a href="/developer" class="dev-logo" aria-label="Developer home">
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"></path>
                 </svg>
-                <span>lemma.id</span>
             </a>
         </div>
         
@@ -137,6 +136,18 @@
             </div>
         </div>
     </aside>
+
+    <button
+        type="button"
+        class="dev-sidebar-toggle"
+        id="dev-sidebar-toggle"
+        aria-label="Close sidebar"
+        aria-expanded="true"
+    >
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M15 18l-6-6 6-6"></path>
+        </svg>
+    </button>
     
     <!-- Main Content -->
     <main class="dev-main">
@@ -201,6 +212,75 @@ window.setButtonLoading = function(button, loading) {
         button.disabled = false;
     }
 };
+
+// Sidebar toggle (open/close with persisted desktop preference)
+(function initDeveloperSidebarToggle() {
+    const container = document.querySelector('.dev-container');
+    const sidebar = document.querySelector('.dev-sidebar');
+    const toggle = document.getElementById('dev-sidebar-toggle');
+    if (!container || !sidebar || !toggle) return;
+
+    const STORAGE_KEY = 'lemma_dev_sidebar_closed';
+    const media = window.matchMedia('(max-width: 768px)');
+
+    function isMobile() {
+        return media.matches;
+    }
+
+    function setToggleState(isOpen) {
+        toggle.setAttribute('aria-expanded', String(isOpen));
+        toggle.setAttribute('aria-label', isOpen ? 'Close sidebar' : 'Open sidebar');
+    }
+
+    function setMobileOpen(isOpen) {
+        sidebar.classList.toggle('open', isOpen);
+        setToggleState(isOpen);
+    }
+
+    function setDesktopClosed(isClosed) {
+        container.classList.toggle('dev-sidebar-closed', isClosed);
+        localStorage.setItem(STORAGE_KEY, isClosed ? '1' : '0');
+        setToggleState(!isClosed);
+    }
+
+    function syncByViewport() {
+        if (isMobile()) {
+            container.classList.remove('dev-sidebar-closed');
+            setMobileOpen(false);
+            return;
+        }
+        sidebar.classList.remove('open');
+        setDesktopClosed(localStorage.getItem(STORAGE_KEY) === '1');
+    }
+
+    toggle.addEventListener('click', () => {
+        if (isMobile()) {
+            setMobileOpen(!sidebar.classList.contains('open'));
+            return;
+        }
+        setDesktopClosed(!container.classList.contains('dev-sidebar-closed'));
+    });
+
+    sidebar.querySelectorAll('.dev-nav-item').forEach((item) => {
+        item.addEventListener('click', () => {
+            if (isMobile()) setMobileOpen(false);
+        });
+    });
+
+    document.addEventListener('click', (event) => {
+        if (!isMobile() || !sidebar.classList.contains('open')) return;
+        if (sidebar.contains(event.target) || toggle.contains(event.target)) return;
+        setMobileOpen(false);
+    });
+
+    if (typeof media.addEventListener === 'function') {
+        media.addEventListener('change', syncByViewport);
+    } else if (typeof media.addListener === 'function') {
+        media.addListener(syncByViewport);
+    }
+
+    syncByViewport();
+})();
 
 // Developer platform initialization
 document.addEventListener('DOMContentLoaded', async () => {

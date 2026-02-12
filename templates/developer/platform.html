@@ -32,6 +32,37 @@
             position: fixed;
             height: 100vh;
             overflow-y: auto;
+            transition: transform 0.25s ease;
+            z-index: 100;
+        }
+
+        .sidebar-toggle {
+            position: fixed;
+            top: 92px;
+            left: calc(var(--sidebar-width) - 16px);
+            width: 32px;
+            height: 32px;
+            border-radius: 999px;
+            border: 1px solid #e5e7eb;
+            background: #ffffff;
+            color: #6b7280;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            z-index: 110;
+            transition: left 0.25s ease, color 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .sidebar-toggle:hover {
+            color: #667eea;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+        }
+
+        .sidebar-toggle svg {
+            width: 16px;
+            height: 16px;
+            transition: transform 0.25s ease;
         }
         
         .sidebar-header {
@@ -98,6 +129,23 @@
             margin-left: var(--sidebar-width);
             flex: 1;
             padding: 24px;
+            transition: margin-left 0.25s ease;
+        }
+
+        .platform-container.sidebar-closed .sidebar {
+            transform: translateX(calc(-1 * var(--sidebar-width)));
+        }
+
+        .platform-container.sidebar-closed .main-content {
+            margin-left: 0;
+        }
+
+        .platform-container.sidebar-closed .sidebar-toggle {
+            left: 16px;
+        }
+
+        .platform-container.sidebar-closed .sidebar-toggle svg {
+            transform: rotate(180deg);
         }
         
         .content-header {
@@ -488,42 +536,41 @@
         <!-- Sidebar Navigation -->
         <div class="sidebar">
             <div class="sidebar-header">
-                <div class="sidebar-logo">
+                <div class="sidebar-logo" aria-label="Developer home">
                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"></path>
                     </svg>
-                    <span>lemma.id</span>
                 </div>
             </div>
             
             <nav class="sidebar-nav">
                 <div class="nav-section">
                     <a class="nav-item active" data-section="overview">
-                        <span class="nav-icon">📊</span>
+                        <span class="nav-icon">Stats</span>
                         <span>Overview</span>
                     </a>
                     <a class="nav-item" data-section="users">
-                        <span class="nav-icon">👥</span>
+                        <span class="nav-icon">Users</span>
                         <span>Site Users</span>
                     </a>
                     <a class="nav-item" data-section="permissions">
-                        <span class="nav-icon">🛡️</span>
+                        <span class="nav-icon">Admin</span>
                         <span>Permission Types</span>
                     </a>
                     <a class="nav-item" data-section="api">
-                        <span class="nav-icon">🔑</span>
+                        <span class="nav-icon">Key</span>
                         <span>API & Integration</span>
                     </a>
                     <a class="nav-item" data-section="agent-delegation">
-                        <span class="nav-icon">🤖</span>
+                        <span class="nav-icon">Agent</span>
                         <span>Agent Delegation</span>
                     </a>
                     <a class="nav-item" data-section="analytics">
-                        <span class="nav-icon">📈</span>
+                        <span class="nav-icon">Chart</span>
                         <span>Analytics</span>
                     </a>
                     <a class="nav-item" data-section="settings">
-                        <span class="nav-icon">⚙️</span>
+                        <span class="nav-icon">Settings</span>
                         <span>Settings</span>
                     </a>
                 </div>
@@ -531,11 +578,11 @@
                 <div class="nav-section">
                     <div class="nav-section-title">Resources</div>
                     <a class="nav-item" href="/docs" target="_blank">
-                        <span class="nav-icon">📚</span>
+                        <span class="nav-icon">Docs</span>
                         <span>Documentation</span>
                     </a>
                     <a class="nav-item" href="/wallet">
-                        <span class="nav-icon">💼</span>
+                        <span class="nav-icon">Wallet</span>
                         <span>Your Wallet</span>
                     </a>
                 </div>
@@ -544,12 +591,24 @@
                 <div class="nav-section" id="admin-section" style="display: none;">
                     <div class="nav-section-title">Platform Admin</div>
                     <a class="nav-item" data-section="platform-admin">
-                        <span class="nav-icon">🛡️</span>
+                        <span class="nav-icon">Admin</span>
                         <span>Platform Users</span>
                     </a>
                 </div>
             </nav>
         </div>
+
+        <button
+            type="button"
+            class="sidebar-toggle"
+            id="platform-sidebar-toggle"
+            aria-label="Close sidebar"
+            aria-expanded="true"
+        >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M15 18l-6-6 6-6"></path>
+            </svg>
+        </button>
         
         <!-- Main Content Area -->
         <div class="main-content">
@@ -561,7 +620,7 @@
             
             <!-- Access Denied State -->
             <div id="access-denied" style="display: none; text-align: center; padding: 60px 20px;">
-                <div style="font-size: 64px; margin-bottom: 24px;">🔒</div>
+                <div style="font-size: 64px; margin-bottom: 24px;"></div>
                 <h2>Access Denied</h2>
                 <p style="color: #6b7280; margin-bottom: 24px;">
                     You need a valid Lemma permission credential to access the developer platform.
@@ -607,19 +666,19 @@
                     </div>
                     <div class="quick-actions">
                         <div class="quick-action" onclick="showIssuePermissionModal()">
-                            <div class="quick-action-icon">➕</div>
+                            <div class="quick-action-icon">Add</div>
                             <div class="quick-action-title">Issue Permission</div>
                         </div>
                         <div class="quick-action" onclick="showSection('api')">
-                            <div class="quick-action-icon">🔑</div>
+                            <div class="quick-action-icon">Key</div>
                             <div class="quick-action-title">Generate API Key</div>
                         </div>
                         <div class="quick-action" onclick="showSection('users')">
-                            <div class="quick-action-icon">👥</div>
+                            <div class="quick-action-icon">Users</div>
                             <div class="quick-action-title">Manage Users</div>
                         </div>
                         <div class="quick-action" onclick="showSection('analytics')">
-                            <div class="quick-action-icon">📈</div>
+                            <div class="quick-action-icon">Chart</div>
                             <div class="quick-action-title">View Analytics</div>
                         </div>
                     </div>
@@ -690,7 +749,7 @@
                     </div>
                     <div id="permission-types-container">
                         <div class="empty-state">
-                            <div class="empty-state-icon">🛡️</div>
+                            <div class="empty-state-icon">Admin</div>
                             <div>Select a site above to manage permission types</div>
                             <div style="font-size: 14px; margin-top: 8px;">Define custom permissions like "viewer", "editor", "admin", etc.</div>
                         </div>
@@ -863,7 +922,7 @@
                 
                 <div class="card">
                     <p style="text-align: center; padding: 60px 20px; color: #6b7280;">
-                        📈 Analytics charts coming soon!<br>
+                        Analytics charts coming soon!<br>
                         <span style="font-size: 14px;">Track MAU, verification trends, and performance metrics.</span>
                     </p>
                 </div>
@@ -878,7 +937,7 @@
                 
                 <div class="card">
                     <p style="text-align: center; padding: 60px 20px; color: #6b7280;">
-                        ⚙️ Settings page coming soon!<br>
+                        Settings page coming soon!<br>
                         <span style="font-size: 14px;">Customize email templates, branding, and more.</span>
                     </p>
                 </div>
@@ -916,7 +975,7 @@
             
             <div style="background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; padding: 16px; margin-bottom: 24px;">
                 <div style="display: flex; align-items: start; gap: 12px;">
-                    <div style="color: #dc2626; font-size: 20px; flex-shrink: 0;">⚠️</div>
+                    <div style="color: #dc2626; font-size: 20px; flex-shrink: 0;">Warning</div>
                     <div>
                         <div style="font-weight: 600; color: #991b1b; margin-bottom: 4px;">This action cannot be undone</div>
                         <div style="font-size: 14px; color: #7f1d1d;">
@@ -973,10 +1032,10 @@
             <!-- Tabs for Email vs Direct Issue -->
             <div style="display: flex; gap: 8px; margin-bottom: 20px; border-bottom: 1px solid #e5e7eb; padding-bottom: 12px;">
                 <button type="button" class="tab-btn active" onclick="switchIssueTab('email')" id="issue-tab-email" style="padding: 8px 16px; border: none; background: #667eea; color: white; border-radius: 6px; cursor: pointer;">
-                    📧 Via Email
+                    Via Email
                 </button>
                 <button type="button" class="tab-btn" onclick="switchIssueTab('direct')" id="issue-tab-direct" style="padding: 8px 16px; border: 1px solid #d1d5db; background: white; color: #374151; border-radius: 6px; cursor: pointer;">
-                    ⚡ Direct to My Wallet
+                    Direct to My Wallet
                 </button>
             </div>
             
@@ -985,7 +1044,7 @@
                 <!-- Privacy Notice -->
                 <div style="background: #ecfdf5; border: 1px solid #a7f3d0; border-radius: 8px; padding: 16px; margin-bottom: 20px;">
                     <p style="margin: 0; font-size: 13px; color: #065f46;">
-                        <strong>🔒 Privacy Mode:</strong> Email addresses are used <strong>only for delivery</strong> - they are never stored by Lemma. 
+                        <strong>Privacy Mode:</strong> Email addresses are used <strong>only for delivery</strong> - they are never stored by Lemma.
                         Recipients must authenticate with passkey to claim their permission.
                     </p>
                 </div>
@@ -1024,7 +1083,7 @@
                     
                     <div class="modal-actions">
                         <button type="button" class="btn btn-secondary" onclick="closeModal('issue-permission-modal')">Cancel</button>
-                        <button type="submit" class="btn btn-primary">📧 Send Claim Link</button>
+                        <button type="submit" class="btn btn-primary">Send Claim Link</button>
                     </div>
                 </form>
             </div>
@@ -1033,7 +1092,7 @@
             <div id="issue-tab-direct-content" style="display: none;">
                 <div style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 16px; margin-bottom: 20px;">
                     <p style="margin: 0; font-size: 14px; color: #1e40af;">
-                        <strong>⚡ Direct Issue</strong> - Issue a permission credential directly to your current browser's wallet. 
+                        <strong>Direct Issue</strong> - Issue a permission credential directly to your current browser's wallet.
                         Perfect for giving yourself admin access to your own site.
                     </p>
                 </div>
@@ -1068,7 +1127,7 @@
                     <div class="modal-actions">
                         <button type="button" class="btn btn-secondary" onclick="closeModal('issue-permission-modal')">Cancel</button>
                         <button type="submit" class="btn btn-primary" id="direct-issue-btn">
-                            ⚡ Issue to My Wallet
+                            Issue to My Wallet
                         </button>
                     </div>
                 </form>
@@ -1440,7 +1499,7 @@
                 if (tokens.length === 0) {
                     container.innerHTML = `
                         <div class="empty-state">
-                            <div class="empty-state-icon">🤖</div>
+                            <div class="empty-state-icon">Agent</div>
                             <div>No delegated tokens found</div>
                         </div>
                     `;
@@ -1492,7 +1551,7 @@
                 console.error('Failed to load delegated tokens:', error);
                 container.innerHTML = `
                     <div class="empty-state">
-                        <div class="empty-state-icon">⚠️</div>
+                        <div class="empty-state-icon">Warning</div>
                         <div>Failed to load delegated tokens</div>
                         <div style="font-size: 13px; margin-top: 8px; color: #dc2626;">${escapeHTML(error.message || 'Unknown error')}</div>
                     </div>
@@ -1555,7 +1614,7 @@
                 if (events.length === 0) {
                     container.innerHTML = `
                         <div class="empty-state">
-                            <div class="empty-state-icon">📭</div>
+                            <div class="empty-state-icon">Empty</div>
                             <div>No agent activity in selected window</div>
                         </div>
                     `;
@@ -1599,7 +1658,7 @@
                 console.error('Failed to load agent events:', error);
                 container.innerHTML = `
                     <div class="empty-state">
-                        <div class="empty-state-icon">⚠️</div>
+                        <div class="empty-state-icon">Warning</div>
                         <div>Failed to load agent activity</div>
                         <div style="font-size: 13px; margin-top: 8px; color: #dc2626;">${escapeHTML(error.message || 'Unknown error')}</div>
                     </div>
@@ -1613,7 +1672,7 @@
         
         // Initialize platform using standard Lemma SDK pattern
         async function initPlatform() {
-            console.log('🚀 Initializing developer platform (using Lemma SDK)...');
+            console.log('Initializing developer platform (using Lemma SDK)...');
             
             try {
                 // Wait for global wallet AND credential check (both set by layout.html)
@@ -1630,7 +1689,7 @@
                 const wallet = window.globalLemmaWallet;
                 
                 if (!wallet) {
-                    console.log('❌ Wallet not available');
+                    console.log('Wallet not available');
                     showSetupWallet();
                     return;
                 }
@@ -1638,7 +1697,7 @@
                 // Wait a bit more for layout.html to finish checking credentials
                 // This prevents race condition where wallet exists but credential check isn't done
                 if (!window.lemmaCredential) {
-                    console.log('⏳ Waiting for layout.html credential check...');
+                    console.log('Waiting for layout.html credential check...');
                     let credAttempts = 0;
                     while (!window.lemmaCredential && credAttempts < 20) {
                         await new Promise(resolve => setTimeout(resolve, 100));
@@ -1649,15 +1708,15 @@
                 // Check if window.lemmaCredential was set by layout.html
                 // This is the standard SDK pattern - layout.html checks for lemma permissions
                 if (window.lemmaCredential) {
-                    console.log('✅ Using credential from layout.html (standard SDK pattern)');
-                    console.log('📋 Credential claims:', window.lemmaCredential.claims || window.lemmaCredential.credentialSubject);
+                    console.log('Using credential from layout.html (standard SDK pattern)');
+                    console.log('Credential claims:', window.lemmaCredential.claims || window.lemmaCredential.credentialSubject);
                     
                     // Verify credential using wallet's verifyLemma method (quick local check)
                     // The credential was already validated when stored, so quickVerify is sufficient
                     const verificationResult = await wallet.quickVerify(window.lemmaCredential);
                     
                     if (!verificationResult.valid) {
-                        console.log('❌ Credential verification failed:', verificationResult.reason);
+                        console.log('Credential verification failed:', verificationResult.reason);
                         await tryAutoIssue(wallet);
                         return;
                     }
@@ -1665,7 +1724,7 @@
                     // Check revocation using wallet's isRevoked method
                     const revocationResult = await wallet.isRevoked(window.lemmaCredential.id);
                     if (revocationResult.revoked) {
-                        console.log('🚫 Credential revoked');
+                        console.log('Credential revoked');
                         await wallet.removeCredential(window.lemmaCredential.id);
                         showRevoked();
                         return;
@@ -1677,11 +1736,11 @@
                 }
                 
                 // No credential from layout - try to auto-issue (wallet-first pattern)
-                console.log('ℹ️ No credential from layout.html after waiting, trying auto-issue...');
+                console.log('No credential from layout.html after waiting, trying auto-issue...');
                 await tryAutoIssue(wallet);
                 
             } catch (error) {
-                console.error('❌ Platform initialization failed:', error);
+                console.error('Platform initialization failed:', error);
                 document.getElementById('loading-state').innerHTML = `
                     <div style="text-align: center; padding: 40px; color: #ef4444;">
                         Failed to load platform. Please refresh the page.
@@ -1704,14 +1763,14 @@
                 let passkeyCredentialId = null;
                 try {
                     passkeyCredentialId = await wallet.getPasskeyCredentialId();
-                    console.log('📱 Found passkey credential ID:', passkeyCredentialId ? 'yes' : 'no');
+                    console.log('Found passkey credential ID:', passkeyCredentialId ? 'yes' : 'no');
                 } catch (e) {
                     console.warn('No passkey:', e.message);
                 }
                 
                 // If wallet is not unlocked but has passkey, try to unlock it
                 if (!wallet.isUnlocked() && passkeyCredentialId) {
-                    console.log('🔓 Wallet locked, attempting passkey unlock...');
+                    console.log('Wallet locked, attempting passkey unlock...');
                     document.getElementById('loading-state').innerHTML = `
                         <div style="text-align: center; padding: 60px 20px;">
                             <div class="spinner"></div>
@@ -1720,7 +1779,7 @@
                     `;
                     try {
                         await wallet.unlock();
-                        console.log('✅ Wallet unlocked via passkey');
+                        console.log('Wallet unlocked via passkey');
                     } catch (e) {
                         console.warn('Passkey unlock failed:', e.message);
                         // Continue anyway - maybe we can still issue with just the passkey ID
@@ -1731,13 +1790,13 @@
                 let walletSecret = null;
                 try {
                     walletSecret = await wallet.getWalletSecret();
-                    console.log('🔑 Got wallet secret:', walletSecret ? 'yes' : 'no');
+                    console.log('Got wallet secret:', walletSecret ? 'yes' : 'no');
                 } catch (e) {
                     console.warn('No wallet secret:', e.message);
                 }
                 
                 if (!walletSecret && !passkeyCredentialId) {
-                    console.log('❌ No wallet credentials - need setup');
+                    console.log('No wallet credentials - need setup');
                     showSetupWallet();
                     return;
                 }
@@ -1757,12 +1816,12 @@
                 const result = await response.json();
                 
                 if (!result.success) {
-                    console.error('❌ Auto-issue failed:', result.error);
+                    console.error('Auto-issue failed:', result.error);
                     showSetupWallet();
                     return;
                 }
                 
-                console.log('✅ Developer permission auto-issued');
+                console.log('Developer permission auto-issued');
                 
                 // Store in wallet using standard SDK method
                 await wallet.storeCredential(result.permission_lemma);
@@ -1774,7 +1833,7 @@
                 grantPlatformAccess(result.permission_lemma);
                 
             } catch (error) {
-                console.error('❌ Auto-issue error:', error);
+                console.error('Auto-issue error:', error);
                 showSetupWallet();
             }
         }
@@ -1785,7 +1844,7 @@
             userPermission = claims.permissionId || claims.permission_level || 'developer';
             lemmaPlatformCredentialString = JSON.stringify(credential);
             
-            console.log('✅ Platform access granted -', userPermission);
+            console.log('Platform access granted -', userPermission);
             
             // Check admin status
             const adminPermissions = ['admin_access', 'super_admin', 'admin', 'superadmin', 'site_admin'];
@@ -1812,7 +1871,7 @@
         function showSetupWallet() {
             document.getElementById('loading-state').innerHTML = `
                 <div style="text-align: center; padding: 60px 20px;">
-                    <div style="font-size: 64px; margin-bottom: 24px;">💼</div>
+                    <div style="font-size: 64px; margin-bottom: 24px;">Wallet</div>
                     <h2>Set Up Your Wallet</h2>
                     <p style="color: #6b7280; margin-bottom: 24px;">
                         Create a passkey to access the developer platform.<br>
@@ -1827,7 +1886,7 @@
         function showRevoked() {
             document.getElementById('loading-state').innerHTML = `
                 <div style="text-align: center; padding: 60px 20px;">
-                    <div style="font-size: 64px; margin-bottom: 24px;">🚫</div>
+                    <div style="font-size: 64px; margin-bottom: 24px;">Revoked</div>
                     <h2>Access Revoked</h2>
                     <p style="color: #6b7280; margin-bottom: 24px;">
                         Your platform access has been revoked by an administrator.<br>
@@ -1840,7 +1899,7 @@
         // Load overview data (shows stats for the caller's site)
         async function loadOverviewData() {
             try {
-                console.log('📊 Fetching stats for your site...');
+                console.log('Fetching stats for your site...');
                 
                 // Get user's credential to determine their site
                 let userCredential = null;
@@ -1877,12 +1936,12 @@
                     document.getElementById('stat-users').textContent = stats.active_users.toLocaleString();
                     document.getElementById('stat-sites').textContent = stats.registered_sites.toLocaleString();
                     
-                    console.log('✅ Stats loaded:', stats);
+                    console.log('Stats loaded:', stats);
                     
                     // Store site context for overview
                     window.overviewSiteDomain = data.site_domain;
                     window.overviewAvailableSites = data.available_sites || [];
-                    console.log('✅ Stats loaded for', data.site_domain || 'platform');
+                    console.log('Stats loaded for', data.site_domain || 'platform');
                     
                     // Show which site's stats are displayed
                     const overviewHeader = document.querySelector('#section-overview .section-header');
@@ -1897,7 +1956,7 @@
                         }
                         siteIndicator.innerHTML = `
                             <span style="font-size: 13px; color: #166534;">
-                                📊 Showing stats for: <strong>${data.site_domain}</strong>
+                                Showing stats for: <strong>${data.site_domain}</strong>
                             </span>
                         `;
                     }
@@ -1927,7 +1986,7 @@
                         // No site registered
                         document.getElementById('recent-activity').innerHTML = `
                             <div class="empty-state">
-                                <div class="empty-state-icon">🏢</div>
+                                <div class="empty-state-icon">Site</div>
                                 <div>No Site Registered</div>
                                 <div style="font-size: 14px; margin-top: 8px;">${data.message}</div>
                             </div>
@@ -1936,19 +1995,19 @@
                         // Site exists but no activity
                         document.getElementById('recent-activity').innerHTML = `
                             <div class="empty-state">
-                                <div class="empty-state-icon">📋</div>
+                                <div class="empty-state-icon">Details</div>
                                 <div>No recent activity yet</div>
                                 <div style="font-size: 14px; margin-top: 8px;">Activity will appear here as users authenticate via ${data.site_domain || 'your site'}</div>
                             </div>
                         `;
                     }
                 } else {
-                    console.error('❌ Failed to load stats:', data.error);
+                    console.error('Failed to load stats:', data.error);
                     throw new Error(data.error);
                 }
                 
             } catch (error) {
-                console.error('❌ Failed to load platform stats:', error);
+                console.error('Failed to load platform stats:', error);
                 
                 // Show error state
                 document.getElementById('stat-mau').textContent = 'Error';
@@ -1959,7 +2018,7 @@
                 
                 document.getElementById('recent-activity').innerHTML = `
                     <div class="empty-state">
-                        <div class="empty-state-icon">⚠️</div>
+                        <div class="empty-state-icon">Warning</div>
                         <div>Failed to load activity</div>
                         <div style="font-size: 14px; margin-top: 8px; color: #ef4444;">
                             ${error.message}
@@ -2026,7 +2085,7 @@
         // Load users data (shows users for the caller's site)
         async function loadUsersData(specificSiteId = null) {
             try {
-                console.log('👥 Fetching users for your site...');
+                console.log('Fetching users for your site...');
                 
                 // Get user's credential to determine their site
                 let userCredential = null;
@@ -2114,8 +2173,8 @@
                                     // Auth method badge
                                     const authMethod = user.auth_method || (user.email ? 'email' : 'wallet');
                                     const authBadge = authMethod === 'wallet' 
-                                        ? '<span class="badge" style="background: #dbeafe; color: #1d4ed8;">🔐 Wallet</span>'
-                                        : '<span class="badge" style="background: #dcfce7; color: #166534;">📧 Email</span>';
+                                        ? '<span class="badge" style="background: #dbeafe; color: #1d4ed8;">Wallet</span>'
+                                        : '<span class="badge" style="background: #dcfce7; color: #166534;">Email</span>';
                                     
                                     return `
                                     <tr>
@@ -2143,13 +2202,13 @@
                     `;
                     
                     document.getElementById('users-table-container').innerHTML = tableHTML;
-                    console.log('✅ Loaded', data.users.length, 'users for', data.site_domain || 'platform');
+                    console.log('Loaded', data.users.length, 'users for', data.site_domain || 'platform');
                     
                 } else if (data.message) {
                     // No site registered yet
                     document.getElementById('users-table-container').innerHTML = `
                         <div class="empty-state">
-                            <div class="empty-state-icon">🏢</div>
+                            <div class="empty-state-icon">Site</div>
                             <div>No Site Registered</div>
                             <div style="font-size: 14px; margin-top: 8px;">${data.message}</div>
                             <div style="font-size: 13px; margin-top: 16px; color: #6b7280;">
@@ -2162,7 +2221,7 @@
                     document.getElementById('users-table-container').innerHTML = `
                         ${siteContext}
                         <div class="empty-state">
-                            <div class="empty-state-icon">👥</div>
+                            <div class="empty-state-icon">Users</div>
                             <div>No users yet</div>
                             <div style="font-size: 14px; margin-top: 8px;">Users will appear here when they authenticate via your site</div>
                         </div>
@@ -2170,10 +2229,10 @@
                 }
                 
             } catch (error) {
-                console.error('❌ Failed to load users:', error);
+                console.error('Failed to load users:', error);
                 document.getElementById('users-table-container').innerHTML = `
                     <div class="empty-state">
-                        <div class="empty-state-icon">⚠️</div>
+                        <div class="empty-state-icon">Warning</div>
                         <div>Failed to load users</div>
                         <div style="font-size: 14px; margin-top: 8px; color: #ef4444;">
                             ${error.message}
@@ -2186,7 +2245,7 @@
         // Switch to a different site for users view
         async function switchUsersSite(siteId) {
             window.selectedUsersSiteId = siteId;
-            console.log('📊 Switching to site:', siteId);
+            console.log('Switching to site:', siteId);
             await loadUsersData(siteId);
         }
         
@@ -2412,7 +2471,7 @@
             const permissionLevel = document.getElementById('permission-level').value;
             const expiryDays = parseInt(document.getElementById('permission-expiry').value) || 90;
             
-            console.log('📧 Sending claim link (privacy mode):', { siteDomain, permissionLevel, expiryDays });
+            console.log('Sending claim link (privacy mode):', { siteDomain, permissionLevel, expiryDays });
             
             try {
                 const response = await fetch('/api/v1/iam/request-access', {
@@ -2431,18 +2490,18 @@
                 const data = await response.json();
                 
                 if (data.success) {
-                    alert(`✅ Claim link sent!\n\n` +
-                          `🔒 Privacy Mode: Email address not stored\n\n` +
+                    alert(`Claim link sent!\n\n` +
+                          `Privacy Mode: Email address not stored\n\n` +
                           `The recipient will receive a link to claim their ${permissionLevel} permission.\n` +
                           `They must authenticate with passkey to claim.`);
                     closeModal('issue-permission-modal');
                     document.getElementById('issue-permission-form').reset();
                 } else {
-                    alert(`❌ Failed: ${data.error || data.message || 'Unknown error'}`);
+                    alert(`Failed: ${data.error || data.message || 'Unknown error'}`);
                 }
                 
             } catch (error) {
-                console.error('❌ Issue permission failed:', error);
+                console.error('Issue permission failed:', error);
                 alert('Failed to send email. Please try again.');
             }
         }
@@ -2714,10 +2773,10 @@
             
             // Show loading
             submitBtn.disabled = true;
-            submitBtn.innerHTML = '⏳ Issuing...';
+            submitBtn.innerHTML = 'Issuing...';
             resultDiv.innerHTML = `
                 <div style="text-align: center; padding: 20px; color: #6b7280;">
-                    <div style="font-size: 24px; margin-bottom: 8px;">⏳</div>
+                    <div style="font-size: 24px; margin-bottom: 8px;">Loading</div>
                     Issuing permission credential...
                 </div>
             `;
@@ -2746,7 +2805,7 @@
                         resultDiv.innerHTML = `
                             <div style="background: #ecfdf5; border: 1px solid #a7f3d0; border-radius: 6px; padding: 16px;">
                                 <div style="text-align: center; margin-bottom: 12px;">
-                                    <div style="font-size: 32px;">✅</div>
+                            <div style="font-size: 32px;">Success</div>
                                     <div style="font-weight: 600; color: #065f46;">Permission Stored in Wallet!</div>
                                 </div>
                                 <div style="font-size: 13px; color: #065f46;">
@@ -2755,8 +2814,8 @@
                                     <div><strong>Expires:</strong> ${expiryDays} days</div>
                                     <div><strong>Issue Time:</strong> ${result.issue_time_us?.toFixed(2) || '~'}µs</div>
                                 </div>
-                                <div style="margin-top: 12px; padding: 8px; background: #d1fae5; border-radius: 4px; font-size: 12px;">
-                                    🎉 You now have <strong>${permissionLevel}</strong> access to <strong>${siteDomain}</strong>!
+                                    <div style="margin-top: 12px; padding: 8px; background: #d1fae5; border-radius: 4px; font-size: 12px;">
+                                    You now have <strong>${permissionLevel}</strong> access to <strong>${siteDomain}</strong>!
                                     <br>View at <a href="/wallet" style="color: #065f46;">lemma.id/wallet</a>
                                 </div>
                             </div>
@@ -2773,7 +2832,7 @@
                 resultDiv.innerHTML = `
                     <div style="background: #fef2f2; border: 1px solid #fecaca; border-radius: 6px; padding: 16px;">
                         <div style="text-align: center; margin-bottom: 8px;">
-                            <div style="font-size: 24px;">❌</div>
+                            <div style="font-size: 24px;">Error</div>
                             <div style="font-weight: 600; color: #991b1b;">Failed to Issue</div>
                         </div>
                         <div style="font-size: 13px; color: #991b1b;">${error.message}</div>
@@ -2781,7 +2840,7 @@
                 `;
             } finally {
                 submitBtn.disabled = false;
-                submitBtn.innerHTML = '⚡ Issue to My Wallet';
+                submitBtn.innerHTML = 'Issue to My Wallet';
             }
         }
         
@@ -2818,7 +2877,7 @@
 
             if (!confirmed) return;
 
-            console.log('🚨 Revoking permission:', revokeData);
+            console.log('Alert Revoking permission:', revokeData);
             
             // Get caller's credential for authorization
             let adminCredential = null;
@@ -2847,7 +2906,7 @@
                 const data = await response.json();
                 
                 if (data.success) {
-                    alert(`✅ Permission revoked!\n\n` +
+                    alert(`Permission revoked!\n\n` +
                           `• User: ${data.email || data.credential_did || 'User #' + data.instance_id}\n` +
                           `• Database updated\n` +
                           `• Revocation will sync to clients\n`);
@@ -2859,11 +2918,11 @@
                     // Reload users list to show updated status
                     loadUsersData();
                 } else {
-                    alert(`❌ Failed to revoke: ${data.error || 'Unknown error'}`);
+                    alert(`Failed to revoke: ${data.error || 'Unknown error'}`);
                 }
                 
             } catch (error) {
-                console.error('❌ Revoke permission failed:', error);
+                console.error('Revoke permission failed:', error);
                 alert('Failed to revoke permission. Please try again.');
             }
         }
@@ -3204,7 +3263,7 @@
                 console.error('Failed to load permission types:', error);
                 container.innerHTML = `
                     <div class="empty-state">
-                        <div class="empty-state-icon">⚠️</div>
+                        <div class="empty-state-icon">Warning</div>
                         <div>Failed to load permission types</div>
                         <div style="font-size: 14px; margin-top: 8px; color: #ef4444;">${error.message}</div>
                     </div>
@@ -3218,7 +3277,7 @@
             if (currentPermissionTypes.length === 0) {
                 container.innerHTML = `
                     <div class="empty-state">
-                        <div class="empty-state-icon">🛡️</div>
+                        <div class="empty-state-icon">Admin</div>
                         <div>No permission types defined</div>
                         <div style="font-size: 14px; margin-top: 8px;">Create your first permission type or use a template below.</div>
                     </div>
@@ -3395,6 +3454,27 @@
             document.getElementById('perm-type-duration-group').style.display = 
                 this.value === 'time-bound' ? 'block' : 'none';
         });
+
+        function initSidebarToggle() {
+            const container = document.querySelector('.platform-container');
+            const toggle = document.getElementById('platform-sidebar-toggle');
+            if (!container || !toggle) return;
+
+            const storageKey = 'lemma_platform_sidebar_closed';
+
+            function setClosed(isClosed) {
+                container.classList.toggle('sidebar-closed', isClosed);
+                toggle.setAttribute('aria-expanded', String(!isClosed));
+                toggle.setAttribute('aria-label', isClosed ? 'Open sidebar' : 'Close sidebar');
+                localStorage.setItem(storageKey, isClosed ? '1' : '0');
+            }
+
+            toggle.addEventListener('click', () => {
+                setClosed(!container.classList.contains('sidebar-closed'));
+            });
+
+            setClosed(localStorage.getItem(storageKey) === '1');
+        }
         
         // Close modals on background click
         document.addEventListener('click', (e) => {
@@ -3404,10 +3484,15 @@
         });
         
         // Initialize on load
-        if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', initPlatform);
-        } else {
+        function initializePage() {
+            initSidebarToggle();
             initPlatform();
+        }
+
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initializePage);
+        } else {
+            initializePage();
         }
     </script>
 {% endblock %}
