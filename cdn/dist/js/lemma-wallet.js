@@ -599,6 +599,7 @@ class LemmaWallet {
             
             if (walletSecret) {
                 console.log(`[Lemma] ✅ Using existing local session (source: ${this.session.source || 'unknown'})`);
+                this._autoStartHeartbeat();
                 
                 result.walletSecret = walletSecret;
                 result.walletId = this.session.walletId;
@@ -632,6 +633,7 @@ class LemmaWallet {
                         source: 'global_sync'
                     };
                     await this._put('session', { id: 'current', ...this.session });
+                    this._autoStartHeartbeat();
                     
                     result.walletSecret = secretRecord.secret;
                     result.walletId = walletIdRecord.value;
