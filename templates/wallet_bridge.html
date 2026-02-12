@@ -78,7 +78,7 @@ function isOriginAllowed(origin) {
     try {
         parsedOrigin = new URL(origin);
     } catch (e) {
-        console.warn(`🔒 Rejected invalid origin: ${origin}`);
+        console.warn(` Rejected invalid origin: ${origin}`);
         return false;
     }
 
@@ -96,7 +96,7 @@ function isOriginAllowed(origin) {
         return true;
     }
 
-    console.warn(`🔒 Rejected non-HTTPS origin: ${origin}`);
+    console.warn(` Rejected non-HTTPS origin: ${origin}`);
     return false;
 }
 
@@ -164,7 +164,7 @@ async function requestStorageAccess() {
     
     // Check if Storage Access API is available
     if (!document.hasStorageAccess) {
-        console.warn('⚠️ Storage Access API not available - storage may be partitioned');
+        console.warn(' Storage Access API not available - storage may be partitioned');
         return false;
     }
     
@@ -172,7 +172,7 @@ async function requestStorageAccess() {
         // Check if we already have access
         const hasAccess = await document.hasStorageAccess();
         if (hasAccess) {
-            console.log('✅ Storage access already granted');
+            console.log(' Storage access already granted');
             storageAccessGranted = true;
             return true;
         }
@@ -182,11 +182,11 @@ async function requestStorageAccess() {
         // Safari: requires user interaction
         // Firefox: requires user interaction
         await document.requestStorageAccess();
-        console.log('✅ Storage access granted via API');
+        console.log(' Storage access granted via API');
         storageAccessGranted = true;
         return true;
     } catch (e) {
-        console.warn('⚠️ Storage access denied:', e.message);
+        console.warn(' Storage access denied:', e.message);
         console.warn('   User may need to click to grant access');
         return false;
     }
@@ -237,17 +237,17 @@ async function initWallet() {
         }
         
         if (typeof LemmaWallet === 'undefined') {
-            console.error('❌ LemmaWallet not loaded');
+            console.error(' LemmaWallet not loaded');
             return false;
         }
         
         wallet = window.globalLemmaWallet || new LemmaWallet({ debug: true });
         await wallet.init();
-        console.log('✅ Wallet bridge initialized (v2.0 - local-first)');
+        console.log(' Wallet bridge initialized (v2.0 - local-first)');
         console.log('   Storage access:', storageAccessGranted ? 'unpartitioned' : 'partitioned');
         return true;
     } catch (e) {
-        console.error('❌ Wallet init failed:', e);
+        console.error(' Wallet init failed:', e);
         return false;
     }
 }
@@ -283,20 +283,20 @@ async function checkSession(options = {}) {
         if (shouldSyncServer) {
             lastServerSync = now;
             try {
-                console.log('🔄 Checking server session cookie...');
+                console.log(' Checking server session cookie...');
                 const response = await fetch('/api/wallet/session-sync', {
                     method: 'POST',
                     credentials: 'include',
                     headers: { 'Content-Type': 'application/json' }
                 });
                 const data = await response.json();
-                console.log('🔄 Server response:', response.status, data.success ? 'valid' : data.error);
+                console.log(' Server response:', response.status, data.success ? 'valid' : data.error);
                 
                 // API returns {success: true, session: {...}} when valid
                 // API returns {success: false, error: 'no_session'|'session_expired'} when invalid
                 if (response.ok && data.success && data.session) {
                     // Server says session is valid
-                    console.log('✅ Server session confirmed valid');
+                    console.log(' Server session confirmed valid');
                     
                     // If local is missing/stale, restore from server
                     if (!session || session.expiresAt < data.session.expires_at * 1000) {
@@ -309,7 +309,7 @@ async function checkSession(options = {}) {
                             source: 'server_sync'
                         };
                         await wallet._put('session', session);
-                        console.log('📥 Local session restored from server');
+                        console.log(' Local session restored from server');
                     }
                 } else if (session) {
                     // Server returned 401 (no cookie) but we have local session
@@ -321,11 +321,11 @@ async function checkSession(options = {}) {
                     // We can't distinguish these cases, so TRUST the local session
                     // if it hasn't expired. The local session has the wallet secret
                     // which proves the user authenticated.
-                    console.log('ℹ️ Session-sync returned 401 but local session exists');
-                    console.log('ℹ️ Keeping local session (cookies may be blocked)');
+                    console.log('ℹ Session-sync returned 401 but local session exists');
+                    console.log('ℹ Keeping local session (cookies may be blocked)');
                     // Don't clear - trust the local session
                 } else {
-                    console.log('ℹ️ No server session and no local session');
+                    console.log('ℹ No server session and no local session');
                 }
             } catch (e) {
                 console.warn('Server sync failed (offline?):', e.message);
@@ -447,7 +447,7 @@ async function extendSession() {
         
         await wallet._put('session', { id: 'current', ...updatedSession });
         
-        console.log(`✅ Session extended (${extensionCount + 1}/${SESSION_CONFIG.MAX_EXTENSIONS})`);
+        console.log(` Session extended (${extensionCount + 1}/${SESSION_CONFIG.MAX_EXTENSIONS})`);
         
         const result = {
             success: true,
@@ -514,7 +514,7 @@ window.addEventListener('message', async (event) => {
     
     // Basic origin validation (client-side only, no server call)
     if (!isOriginAllowed(origin)) {
-        console.warn('⚠️ Message from unauthorized origin:', origin);
+        console.warn(' Message from unauthorized origin:', origin);
         return;
     }
     
@@ -523,7 +523,7 @@ window.addEventListener('message', async (event) => {
     if (!type) return;
     
     const requestingSite = getHostnameFromOrigin(origin);
-    console.log(`📨 Bridge received: ${type} from ${requestingSite}`);
+    console.log(` Bridge received: ${type} from ${requestingSite}`);
     
     // Helper to send response back with timing info
     const respond = (data) => {
@@ -580,7 +580,7 @@ window.addEventListener('message', async (event) => {
                 // force: true bypasses cache and syncs with server (use after popup unlock)
                 const forceRefresh = payload?.force === true;
                 if (forceRefresh) {
-                    console.log('🔄 Force session refresh requested - syncing with server...');
+                    console.log(' Force session refresh requested - syncing with server...');
                     // Clear cache and force server sync
                     cache.session = { value: null, ts: 0, promise: null };
                     lastServerSync = 0;
@@ -602,7 +602,7 @@ window.addEventListener('message', async (event) => {
                 const incomingSecret = payload?.walletSecret;
 
                 if (incomingSession && incomingSession.isUnlocked) {
-                    console.log('📥 SET_LOCAL_SESSION: Receiving session from SDK');
+                    console.log(' SET_LOCAL_SESSION: Receiving session from SDK');
 
                     // Store session in bridge's IndexedDB
                     const sessionToStore = {
@@ -619,19 +619,19 @@ window.addEventListener('message', async (event) => {
                     // This is critical for the global-session fallback when cookies are blocked
                     if (incomingSession.walletId) {
                         await wallet._put('passkey', { id: 'walletId', value: incomingSession.walletId });
-                        console.log('📥 Wallet ID stored for global-session lookups');
+                        console.log(' Wallet ID stored for global-session lookups');
                     }
 
                     // Store wallet secret if provided
                     if (incomingSecret) {
                         await wallet._put('secrets', { id: 'master', secret: incomingSecret, source: 'sdk_sync' });
-                        console.log('📥 Wallet secret stored from SDK');
+                        console.log(' Wallet secret stored from SDK');
                     }
 
                     // Clear session cache so next check uses fresh data
                     cache.session = { value: null, ts: 0, promise: null };
 
-                    console.log('✅ Session synced from SDK - bridge now has valid session');
+                    console.log(' Session synced from SDK - bridge now has valid session');
                     respond({ success: true, sessionSet: true });
                 } else {
                     respond({ success: false, error: 'Invalid session data' });
@@ -642,6 +642,65 @@ window.addEventListener('message', async (event) => {
                 // Extend session with tap-only auth
                 const extendResult = await extendSession();
                 respond(extendResult);
+                break;
+
+            case 'LOCK_SESSION':
+                // Clear central session from lemma.id origin on behalf of a third-party tab.
+                // This ensures lock/signoff propagates across all devices and sites.
+                if (!wallet) await initWallet();
+                try {
+                    const requestedWalletId = payload?.walletId || payload?.wallet_id;
+                    const localSession = await wallet._get('session', 'current');
+                    const fallbackWalletId = localSession?.walletId || null;
+                    const lockWalletId = requestedWalletId || fallbackWalletId;
+
+                    const lockResp = await fetch('/api/wallet/clear-session', {
+                        method: 'POST',
+                        credentials: 'include',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(lockWalletId ? { wallet_id: lockWalletId } : {})
+                    });
+
+                    const lockData = await lockResp.json().catch(() => ({}));
+
+                    // Clear bridge-local session cache/storage immediately.
+                    try {
+                        await wallet._delete('session', 'current');
+                    } catch (e) {
+                        console.warn('LOCK_SESSION: failed to clear local bridge session:', e.message);
+                    }
+                    cache.session = { value: null, ts: 0, promise: null };
+
+                    // Same-device instant fan-out for other lemma.id tabs/bridges.
+                    if (sessionChannel) {
+                        sessionChannel.postMessage({
+                            type: 'LOCK',
+                            walletId: lockWalletId || null,
+                            source: 'bridge'
+                        });
+                    }
+
+                    // Notify parent immediately so host app can react without waiting.
+                    if (window.parent !== window) {
+                        window.parent.postMessage({
+                            type: 'SESSION_INVALIDATED',
+                            reason: 'lock',
+                            walletId: lockWalletId || null,
+                            timestamp: Date.now(),
+                            instant: true
+                        }, '*');
+                    }
+
+                    respond({
+                        success: lockResp.ok,
+                        walletId: lockWalletId || null,
+                        serverStatus: lockResp.status,
+                        ...lockData
+                    });
+                } catch (e) {
+                    console.error('LOCK_SESSION error:', e.message);
+                    respond({ success: false, error: e.message });
+                }
                 break;
                 
             case 'WALLET_UNLOCK':
@@ -722,7 +781,7 @@ window.addEventListener('message', async (event) => {
                 console.log('GET_WALLET_SECRET request received (DEPRECATED - use ISSUE_LEMMA)');
                 if (!wallet) await initWallet();
                 const secretSession = await checkSession();
-                console.log('🔑 Session check for secret:', secretSession.valid ? 'valid' : 'invalid');
+                console.log(' Session check for secret:', secretSession.valid ? 'valid' : 'invalid');
                 
                 // DEBUG: Log what's in storage
                 try {
@@ -730,7 +789,7 @@ window.addEventListener('message', async (event) => {
                     const debugSecret = await wallet._get('secrets', 'master');
                     const debugProfile = await wallet._get('profiles', 'default');
                     const debugWalletId = await wallet._get('passkey', 'walletId');
-                    console.log('🔑 DEBUG Storage state:', {
+                    console.log(' DEBUG Storage state:', {
                         hasSession: !!debugSession,
                         sessionUnlocked: debugSession?.isUnlocked,
                         sessionExpired: debugSession?.expiresAt ? debugSession.expiresAt < Date.now() : 'no expiry',
@@ -740,11 +799,11 @@ window.addEventListener('message', async (event) => {
                         walletIsUnlocked: wallet.isUnlocked()
                     });
                 } catch (debugErr) {
-                    console.log('🔑 DEBUG error:', debugErr.message);
+                    console.log(' DEBUG error:', debugErr.message);
                 }
                 
                 if (!secretSession.valid) {
-                    console.warn('🔑 ❌ Session invalid for GET_WALLET_SECRET');
+                    console.warn('  Session invalid for GET_WALLET_SECRET');
                     respond({ 
                         success: false, 
                         error: 'Session expired or invalid',
@@ -753,7 +812,7 @@ window.addEventListener('message', async (event) => {
                     return;
                 }
                 try {
-                    console.log('🔑 Attempting to get wallet secret...');
+                    console.log(' Attempting to get wallet secret...');
                     let walletSecret = null;
                     
                     // First try the normal SDK method (checks isUnlocked)
@@ -764,7 +823,7 @@ window.addEventListener('message', async (event) => {
                         // we can trust the server and get secret directly from storage.
                         // This handles the case of newly linked devices where the server
                         // cookie is valid but local passkey unlock hasn't happened yet.
-                        console.log('🔑 Local session locked, but server session valid - getting secret directly');
+                        console.log(' Local session locked, but server session valid - getting secret directly');
                         
                         // Try to get from active profile first
                         const activeProfileSetting = await wallet._get('passkey', 'activeProfile');
@@ -773,13 +832,13 @@ window.addEventListener('message', async (event) => {
                         
                         if (profile?.secret) {
                             walletSecret = profile.secret;
-                            console.log('🔑 Got secret from profile:', profileId);
+                            console.log(' Got secret from profile:', profileId);
                         } else {
                             // Fallback to legacy secrets/master
                             const secretRecord = await wallet._get('secrets', 'master');
                             if (secretRecord?.secret) {
                                 walletSecret = secretRecord.secret;
-                                console.log('🔑 Got secret from legacy storage');
+                                console.log(' Got secret from legacy storage');
                             }
                         }
                         
@@ -803,12 +862,12 @@ window.addEventListener('message', async (event) => {
                                 walletId: secretSession.walletId,
                                 walletSecret: walletSecret
                             };
-                            console.log('🔑 ✅ Synced local session from server');
+                            console.log('  Synced local session from server');
                         }
                     }
                     
                     if (walletSecret) {
-                        console.log('🔑 ✅ Got wallet secret:', walletSecret.length + ' chars');
+                        console.log('  Got wallet secret:', walletSecret.length + ' chars');
                     respond({
                         success: true,
                         walletSecret: walletSecret
@@ -816,8 +875,8 @@ window.addEventListener('message', async (event) => {
                     } else {
                         // Last resort: storage might be partitioned (mobile Safari)
                         // Signal that popup flow is required
-                        console.error('🔑 ❌ No wallet secret found in bridge storage');
-                        console.log('🔑 Storage may be partitioned - popup flow required');
+                        console.error('  No wallet secret found in bridge storage');
+                        console.log(' Storage may be partitioned - popup flow required');
                         respond({ 
                             success: false, 
                             error: 'No wallet secret found',
@@ -826,7 +885,7 @@ window.addEventListener('message', async (event) => {
                         });
                     }
                 } catch (e) {
-                    console.error('🔑 ❌ Failed to get wallet secret:', e.message);
+                    console.error('  Failed to get wallet secret:', e.message);
                     respond({ success: false, error: e.message });
                 }
                 break;
@@ -843,7 +902,7 @@ window.addEventListener('message', async (event) => {
                 // Check session for write operations
                 const storeSession = await checkSession();
                 if (!storeSession.valid) {
-                    console.warn(`🔒 Blocked store: No valid session from ${requestingSite}`);
+                    console.warn(` Blocked store: No valid session from ${requestingSite}`);
                     respond({ 
                         success: false, 
                         error: 'Session required to store credentials',
@@ -881,7 +940,7 @@ window.addEventListener('message', async (event) => {
                 if (!isLemmaOrigin && !isInternalSiteId && credSiteId && credSiteId !== requestingSite &&
                     !requestingSite.endsWith('.' + credSiteId) &&
                     !credSiteId.endsWith('.' + requestingSite)) {
-                    console.warn(`🔒 Blocked: ${requestingSite} tried to store credential for ${credSiteId}`);
+                    console.warn(` Blocked: ${requestingSite} tried to store credential for ${credSiteId}`);
                     respond({ success: false, error: 'Cannot store credentials for other sites' });
                     return;
                 }
@@ -895,7 +954,7 @@ window.addEventListener('message', async (event) => {
                 // Store the credential locally (no server sync - privacy preserved)
                 const storeResult = await wallet.storeCredential(credential);
                 clearCredentialsCache();
-                console.log(`✅ Credential stored locally via bridge for ${requestingSite} (siteId: ${credSiteId}):`, credential.id);
+                console.log(` Credential stored locally via bridge for ${requestingSite} (siteId: ${credSiteId}):`, credential.id);
 
                 respond({
                     success: true,
@@ -920,7 +979,7 @@ window.addEventListener('message', async (event) => {
                 // Get session status for client convenience
                 const getCredsSession = await checkSession();
                 
-                console.log(`🔒 Returning ${credentials.length} credentials for ${requestingSite}${isLemmaRequesting ? ' (unified wallet)' : ''}`);
+                console.log(` Returning ${credentials.length} credentials for ${requestingSite}${isLemmaRequesting ? ' (unified wallet)' : ''}`);
                 
                 respond({
                     success: true,
@@ -968,7 +1027,7 @@ window.addEventListener('message', async (event) => {
                     verifySiteId.endsWith('.' + requestingSite);
                 
                 if (!siteIdMatches) {
-                    console.warn(`🔒 Blocked verify: ${requestingSite} tried to verify credential for ${verifySiteId}`);
+                    console.warn(` Blocked verify: ${requestingSite} tried to verify credential for ${verifySiteId}`);
                     respond({ 
                         success: false, 
                         valid: false,
@@ -1026,7 +1085,7 @@ window.addEventListener('message', async (event) => {
                     quickSiteId.endsWith('.' + requestingSite);
                 
                 if (!quickSiteMatches) {
-                    console.warn(`🔒 Blocked quick verify: ${requestingSite} tried to verify credential for ${quickSiteId}`);
+                    console.warn(` Blocked quick verify: ${requestingSite} tried to verify credential for ${quickSiteId}`);
                     respond({ 
                         success: false, 
                         valid: false,
@@ -1054,7 +1113,7 @@ window.addEventListener('message', async (event) => {
                 // Check session for write operations
                 const removeSession = await checkSession();
                 if (!removeSession.valid) {
-                    console.warn(`🔒 Blocked remove: No valid session from ${requestingSite}`);
+                    console.warn(` Blocked remove: No valid session from ${requestingSite}`);
                     respond({ 
                         success: false, 
                         error: 'Session required to remove credentials',
@@ -1080,7 +1139,7 @@ window.addEventListener('message', async (event) => {
                     if (removeSiteId && removeSiteId !== requestingSite &&
                         !requestingSite.endsWith('.' + removeSiteId) &&
                         !removeSiteId.endsWith('.' + requestingSite)) {
-                        console.warn(`🔒 Blocked: ${requestingSite} tried to remove credential for ${removeSiteId}`);
+                        console.warn(` Blocked: ${requestingSite} tried to remove credential for ${removeSiteId}`);
                         respond({ success: false, error: 'Cannot remove credentials for other sites' });
                         return;
                     }
@@ -1088,7 +1147,7 @@ window.addEventListener('message', async (event) => {
                 
                 await wallet.removeCredential(credId);
                 clearCredentialsCache();
-                console.log(`✅ Credential removed via bridge for ${requestingSite}:`, credId);
+                console.log(` Credential removed via bridge for ${requestingSite}:`, credId);
                 respond({ success: true, removed: true });
                 break;
             
@@ -1118,7 +1177,7 @@ window.addEventListener('message', async (event) => {
                 // Check session for write operations
                 const revokeSession = await checkSession();
                 if (!revokeSession.valid) {
-                    console.warn(`🔒 Blocked revoke: No valid session from ${requestingSite}`);
+                    console.warn(` Blocked revoke: No valid session from ${requestingSite}`);
                     respond({ 
                         success: false, 
                         error: 'Session required to revoke credentials',
@@ -1151,7 +1210,7 @@ window.addEventListener('message', async (event) => {
                     if (!isLemmaRevoking && revokeSiteId !== requestingSite &&
                         !requestingSite.endsWith('.' + revokeSiteId) &&
                         !revokeSiteId.endsWith('.' + requestingSite)) {
-                        console.warn(`🔒 Blocked: ${requestingSite} tried to revoke credential for ${revokeSiteId}`);
+                        console.warn(` Blocked: ${requestingSite} tried to revoke credential for ${revokeSiteId}`);
                         respond({ success: false, error: 'Cannot revoke credentials for other sites' });
                         return;
                     }
@@ -1175,12 +1234,12 @@ window.addEventListener('message', async (event) => {
                     if (revokeResponse.ok) {
                         const revokeData = await revokeResponse.json();
                         serverRevoked = revokeData.success;
-                        console.log(`✅ Credential revoked on server: ${revokeCredId}`, revokeData);
+                        console.log(` Credential revoked on server: ${revokeCredId}`, revokeData);
                     } else {
-                        console.warn(`⚠️ Server revocation failed: ${revokeResponse.status}`);
+                        console.warn(` Server revocation failed: ${revokeResponse.status}`);
                     }
                 } catch (e) {
-                    console.warn(`⚠️ Server revocation error: ${e.message}`);
+                    console.warn(` Server revocation error: ${e.message}`);
                 }
                 
                 // 2. Delete from local IndexedDB
@@ -1190,7 +1249,7 @@ window.addEventListener('message', async (event) => {
                 // 3. Force sync revocation list locally
                 await wallet.syncRevocations();
                 
-                console.log(`🚨 Credential revoked via bridge for ${requestingSite}:`, revokeCredId);
+                console.log(` Credential revoked via bridge for ${requestingSite}:`, revokeCredId);
                 respond({ 
                     success: true, 
                     revoked: true,
@@ -1220,7 +1279,7 @@ window.addEventListener('message', async (event) => {
                 const allCredentials = await wallet.getCredentials();
                 const allSession = await checkSession();
                 
-                console.log(`📦 Returning ALL ${allCredentials.length} credentials for unified wallet`);
+                console.log(` Returning ALL ${allCredentials.length} credentials for unified wallet`);
                 
                 respond({
                     success: true,
@@ -1408,7 +1467,7 @@ window.addEventListener('message', async (event) => {
         }
         
     } catch (error) {
-        console.error(`❌ Bridge error handling ${type}:`, error);
+        console.error(` Bridge error handling ${type}:`, error);
         respond({ success: false, error: error.message });
     }
 });
@@ -1441,7 +1500,7 @@ function getSecureHeaders() {
 
 async function syncSessionFromServer() {
     try {
-        console.log('🔄 Attempting session sync from server...');
+        console.log(' Attempting session sync from server...');
 
         // First try cookie-based session-sync
         const response = await fetch('https://lemma.id/api/wallet/session-sync', {
@@ -1453,14 +1512,14 @@ async function syncSessionFromServer() {
         if (response.ok) {
             const data = await response.json();
             if (data.success && data.session) {
-                console.log('✅ Session synced from server (via cookie)!');
+                console.log(' Session synced from server (via cookie)!');
                 return await storeSessionFromServer(data.session, data.credentials);
             }
         }
 
         // Cookie-based sync failed - try global-session fallback
         // This works even when third-party cookies are blocked
-        console.log('⚠️ Cookie sync failed, trying global-session fallback...');
+        console.log(' Cookie sync failed, trying global-session fallback...');
 
         // Get wallet_id from local IndexedDB
         let walletId = null;
@@ -1470,7 +1529,7 @@ async function syncSessionFromServer() {
         }
 
         if (!walletId) {
-            console.log('⚠️ No wallet_id in local storage - cannot check global session');
+            console.log(' No wallet_id in local storage - cannot check global session');
             return { success: false, error: 'no_wallet_id' };
         }
 
@@ -1484,16 +1543,16 @@ async function syncSessionFromServer() {
         if (globalResponse.ok) {
             const globalData = await globalResponse.json();
             if (globalData.success && globalData.valid && globalData.session) {
-                console.log('✅ Session synced from global-session (bypassed cookie blocking)!');
+                console.log(' Session synced from global-session (bypassed cookie blocking)!');
                 return await storeSessionFromServer(globalData.session, []);
             }
         }
 
-        console.log('⚠️ Session sync: No valid session on server');
+        console.log(' Session sync: No valid session on server');
         return { success: false, error: 'no_session' };
 
     } catch (e) {
-        console.warn('⚠️ Session sync error:', e.message);
+        console.warn(' Session sync error:', e.message);
         return { success: false, error: e.message };
     }
 }
@@ -1556,7 +1615,7 @@ async function storeSessionFromServer(session, credentials = []) {
 let sessionChannel = null;
 try {
     sessionChannel = new BroadcastChannel('lemma-session');
-    console.log('🔗 BroadcastChannel initialized for instant same-device sync');
+    console.log(' BroadcastChannel initialized for instant same-device sync');
 
     sessionChannel.onmessage = async (event) => {
         const { type, walletId, source } = event.data || {};
@@ -1564,13 +1623,13 @@ try {
         // Ignore messages from the bridge itself
         if (source === 'bridge') return;
 
-        console.log(`📡 Bridge received ${type} via BroadcastChannel from ${source}`);
+        console.log(` Bridge received ${type} via BroadcastChannel from ${source}`);
 
         if (type === 'LOCK') {
             // Wallet was locked in another tab - notify parent immediately
             // This is the key optimization: instant notification, no polling
             if (window.parent !== window) {
-                console.log('🔒 Forwarding LOCK to parent via postMessage');
+                console.log(' Forwarding LOCK to parent via postMessage');
                 window.parent.postMessage({
                     type: 'SESSION_INVALIDATED',
                     reason: 'lock',
@@ -1585,7 +1644,7 @@ try {
         } else if (type === 'UNLOCK') {
             // Wallet was unlocked in another tab - notify parent to refresh
             if (window.parent !== window) {
-                console.log('🔓 Forwarding UNLOCK to parent via postMessage');
+                console.log(' Forwarding UNLOCK to parent via postMessage');
                 window.parent.postMessage({
                     type: 'SESSION_RESTORED',
                     walletId: walletId,
@@ -1599,7 +1658,7 @@ try {
         }
     };
 } catch (e) {
-    console.warn('⚠️ BroadcastChannel not supported:', e.message);
+    console.warn(' BroadcastChannel not supported:', e.message);
 }
 
 // ============================================
@@ -1644,12 +1703,12 @@ try {
     
     const initTime = performance.now() - initStart;
     
-    console.log('🌉 Wallet bridge ready (v2.4 instant sync)');
+    console.log(' Wallet bridge ready (v2.4 instant sync)');
     console.log(`   ├─ Initialized in ${initTime.toFixed(0)}ms`);
     console.log(`   ├─ Storage: ${storageAccessGranted ? 'unpartitioned' : 'partitioned'}`);
-    console.log(`   ├─ Session: ${session.valid ? 'active ✓' : 'none/expired'}`);
+    console.log(`   ├─ Session: ${session.valid ? 'active ' : 'none/expired'}`);
     console.log(`   ├─ Synced from server: ${session.syncedFromServer ? 'yes' : 'no'}`);
-    console.log(`   ├─ Instant sync: ${sessionChannel ? 'enabled ✓' : 'disabled'}`);
+    console.log(`   ├─ Instant sync: ${sessionChannel ? 'enabled ' : 'disabled'}`);
     console.log(`   └─ Network calls: ${networkCalls}`);
 
     // Notify parent that bridge is ready with session info

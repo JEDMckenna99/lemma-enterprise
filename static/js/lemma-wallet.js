@@ -2484,6 +2484,10 @@ class LemmaWallet {
             window.removeEventListener('focus', this._focusHandler);
             this._focusHandler = null;
         }
+        // Reset global-session cache so future checks do not reuse stale "valid" state.
+        this._globalSessionCache.result = null;
+        this._globalSessionCache.timestamp = 0;
+        this._globalSessionCache.pendingPromise = null;
         
         // Clear server session AND global session (for cross-device lock detection)
         const isLemma = this._isLemmaDomain();
@@ -2511,8 +2515,36 @@ class LemmaWallet {
             } catch (e) {
                 console.warn('[Lemma] Failed to clear global session:', e.message);
             }
-        } else if (!isLemma) {
-            console.log('[Lemma] Wallet locked locally (not on lemma.id)');
+        } else {
+            // Third-party sites cannot directly manage lemma.id cookies reliably.
+            // Route lock through the bridge (lemma.id origin) so cross-device/site signoff propagates.
+            try {
+                console.log('[Lemma] Lock: forwarding lock to bridge for global signoff...');
+                const bridgeResp = await this._sendBridgeMessage('LOCK_SESSION', { walletId }, 8000);
+                if (bridgeResp?.success) {
+                    console.log('[Lemma]  Bridge lock propagated globally');
+                } else {
+                    console.warn('[Lemma] Bridge lock returned non-success:', bridgeResp?.error || bridgeResp);
+                }
+            } catch (bridgeErr) {
+                console.warn('[Lemma] Bridge lock path failed:', bridgeErr.message);
+                // Best-effort fallback: attempt direct call to lemma.id (may be blocked by CORS policy).
+                try {
+                    const directResp = await fetch('https://lemma.id/api/wallet/clear-session', {
+                        method: 'POST',
+                        credentials: 'include',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(walletId ? { wallet_id: walletId } : {})
+                    });
+                    if (directResp.ok) {
+                        console.log('[Lemma]  Direct fallback lock call succeeded');
+                    } else {
+                        console.warn('[Lemma] Direct fallback lock returned', directResp.status);
+                    }
+                } catch (directErr) {
+                    console.warn('[Lemma] Direct fallback lock failed:', directErr.message);
+                }
+            }
         }
     }
 
