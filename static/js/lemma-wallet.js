@@ -92,9 +92,12 @@ class LemmaWallet {
         this._globalSessionCache = {
             result: null,
             timestamp: 0,
-            ttlMs: 5000,  // Cache valid for 5 seconds
+            ttlMs: 60000,  // Cache valid for 60 seconds
             pendingPromise: null  // Deduplicate concurrent requests
         };
+        // Guardrail: avoid repeated network checks from rapid focus/visibility churn.
+        this._lastGlobalSessionNetworkCheck = 0;
+        this._minGlobalSessionCheckMs = 60000; // At most one network check per minute unless forced.
         
         // Performance: Debounce heartbeat checks
         this._lastHeartbeatCheck = 0;
@@ -330,7 +333,7 @@ class LemmaWallet {
         return `<div class="${className}" style="margin-top: 12px; text-align: center; font-size: 0.85rem;">
     <span style="color: #6b7280;">${text}</span>
     <a href="${url}" target="_blank" rel="noopener" style="color: #667eea; margin-left: 4px; text-decoration: none; font-weight: 500;">
-        🔗 ${linkText}
+         ${linkText}
     </a>
 </div>`;
     }
@@ -442,7 +445,7 @@ class LemmaWallet {
             const authResult = await this.verifyLocalAuthorization();
             
             if (authResult.authorized) {
-                console.log(`[Lemma] ✅ Authorized via local lemma in ${authResult.verifyTimeMs}ms`);
+                console.log(`[Lemma]  Authorized via local lemma in ${authResult.verifyTimeMs}ms`);
                 
                 result.authenticated = true;
                 result.needsPasskey = false;
@@ -526,7 +529,7 @@ class LemmaWallet {
                             // Retry local verification with updated session
                             const retryResult = await this.verifyLocalAuthorization();
                             if (retryResult.authorized) {
-                                console.log(`[Lemma] ✅ Authorized after global sync in ${retryResult.verifyTimeMs}ms`);
+                                console.log(`[Lemma]  Authorized after global sync in ${retryResult.verifyTimeMs}ms`);
                                 this._setupLockEventListener();
                                 return {
                                     authenticated: true,
@@ -585,7 +588,7 @@ class LemmaWallet {
             }
             
             if (walletSecret) {
-                console.log(`[Lemma] ✅ Using existing local session (source: ${this.session.source || 'unknown'})`);
+                console.log(`[Lemma]  Using existing local session (source: ${this.session.source || 'unknown'})`);
                 this._autoStartHeartbeat();
                 
                 result.walletSecret = walletSecret;
@@ -609,7 +612,7 @@ class LemmaWallet {
                 const globalSession = await this._checkGlobalSession(walletIdRecord.value);
                 
                 if (globalSession.valid) {
-                    console.log('[Lemma] ✅ Global session valid - user unlocked on another device');
+                    console.log('[Lemma]  Global session valid - user unlocked on another device');
                     
                     this.session = {
                         isUnlocked: true,
@@ -871,33 +874,41 @@ class LemmaWallet {
         const now = Date.now();
         const cache = this._globalSessionCache;
         const forceRefresh = options.force === true;
+        const sinceLastNetwork = now - this._lastGlobalSessionNetworkCheck;
         
         // Return cached result if fresh (unless force refresh)
         if (!forceRefresh && cache.result && (now - cache.timestamp) < cache.ttlMs) {
-            console.log('[Lemma] 🔍 Using cached global session (age:', now - cache.timestamp, 'ms)');
+            console.log('[Lemma]  Using cached global session (age:', now - cache.timestamp, 'ms)');
+            return cache.result;
+        }
+        // If cache is stale but present, and we checked very recently, reuse stale result
+        // to avoid bursty network traffic from tab focus/visibility events.
+        if (!forceRefresh && cache.result && sinceLastNetwork < this._minGlobalSessionCheckMs) {
+            console.log('[Lemma]  Reusing stale global session cache to avoid rapid recheck');
             return cache.result;
         }
         
         // Deduplicate concurrent requests
         if (cache.pendingPromise && !forceRefresh) {
-            console.log('[Lemma] 🔍 Waiting for pending global session check...');
+            console.log('[Lemma]  Waiting for pending global session check...');
             return cache.pendingPromise;
         }
         
         // Make the actual request
         cache.pendingPromise = (async () => {
         try {
-            console.log('[Lemma] 🔍 Checking global session for wallet:', walletId?.substring(0, 8) + '...');
+            this._lastGlobalSessionNetworkCheck = Date.now();
+            console.log('[Lemma]  Checking global session for wallet:', walletId?.substring(0, 8) + '...');
             const response = await fetch('https://lemma.id/api/wallet/global-session', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ wallet_id: walletId })
             });
             
-            console.log('[Lemma] 🔍 Global session response status:', response.status);
+            console.log('[Lemma]  Global session response status:', response.status);
             
             if (!response.ok) {
-                console.log('[Lemma] 🔍 Global session not OK, returning invalid');
+                console.log('[Lemma]  Global session not OK, returning invalid');
                     const result = { valid: false };
                     cache.result = result;
                     cache.timestamp = now;
@@ -905,7 +916,7 @@ class LemmaWallet {
             }
             
             const data = await response.json();
-            console.log('[Lemma] 🔍 Global session result:', JSON.stringify(data));
+            console.log('[Lemma]  Global session result:', JSON.stringify(data));
                 
                 // Cache the result
                 cache.result = data;
@@ -930,7 +941,7 @@ class LemmaWallet {
     _autoStartHeartbeat() {
         if (this._heartbeatInterval) return; // Already running
         
-        console.log('[Lemma] 🔄 Auto-starting session heartbeat (visibility + 5min backup)');
+        console.log('[Lemma]  Auto-starting session heartbeat (visibility + 5min backup)');
         this.startSessionHeartbeat(300000); // 5 minute backup interval (primary is tab focus)
     }
 
@@ -1007,7 +1018,7 @@ class LemmaWallet {
         }
         
         console.log('[Lemma] Redirecting to lemma.id for wallet unlock...');
-        console.log('[Lemma] 🔐 Using client-side encryption (wallet secret never touches server)');
+        console.log('[Lemma]  Using client-side encryption (wallet secret never touches server)');
         
         // Build the redirect URL with encryption key
         // PRIVACY: The enc_key is only used by client-side JavaScript on lemma.id
@@ -1198,7 +1209,7 @@ class LemmaWallet {
                 const data = await response.json();
                 
                 if (data.success && data.wallet_secret) {
-                    console.log('[Lemma] ✅ Legacy token exchange successful');
+                    console.log('[Lemma]  Legacy token exchange successful');
 
                     await this._put('secrets', { id: 'master', secret: data.wallet_secret, source: 'redirect_token' });
 
@@ -1667,38 +1678,38 @@ class LemmaWallet {
 
         this._isClearingSession = true;
         try {
-            // Clear local session
-            this.session = {
-                isUnlocked: false,
-                unlockedAt: null,
-                expiresAt: null
-            };
-
-            // Clear session from IndexedDB
-            await this._delete('session', 'current');
-
-            // Stop heartbeat, SSE, timers, and visibility listeners
-            if (this._heartbeatInterval) {
-                clearInterval(this._heartbeatInterval);
-                this._heartbeatInterval = null;
-            }
-            if (this._heartbeatStartupTimer) {
-                clearTimeout(this._heartbeatStartupTimer);
-                this._heartbeatStartupTimer = null;
-            }
-            if (this._sessionEventSource) {
-                this._sessionEventSource.close();
-                this._sessionEventSource = null;
-            }
-            if (this._visibilityHandler) {
-                document.removeEventListener('visibilitychange', this._visibilityHandler);
-                this._visibilityHandler = null;
-            }
-            if (this._focusHandler) {
-                window.removeEventListener('focus', this._focusHandler);
-                this._focusHandler = null;
-            }
-
+                    // Clear local session
+                    this.session = {
+                        isUnlocked: false,
+                        unlockedAt: null,
+                        expiresAt: null
+                    };
+                    
+                    // Clear session from IndexedDB
+        await this._delete('session', 'current');
+        
+        // Stop heartbeat, SSE, timers, and visibility listeners
+        if (this._heartbeatInterval) {
+            clearInterval(this._heartbeatInterval);
+            this._heartbeatInterval = null;
+        }
+        if (this._heartbeatStartupTimer) {
+            clearTimeout(this._heartbeatStartupTimer);
+            this._heartbeatStartupTimer = null;
+        }
+        if (this._sessionEventSource) {
+            this._sessionEventSource.close();
+            this._sessionEventSource = null;
+        }
+        if (this._visibilityHandler) {
+            document.removeEventListener('visibilitychange', this._visibilityHandler);
+            this._visibilityHandler = null;
+        }
+        if (this._focusHandler) {
+            window.removeEventListener('focus', this._focusHandler);
+            this._focusHandler = null;
+                    }
+                    
             // Trigger callback and event safely.
             this._notifySessionExpired({ reason, message });
         } finally {
@@ -1863,10 +1874,10 @@ class LemmaWallet {
             
             // Sync if never synced or older than 1 hour
             if (!revInfo.synced || revInfo.age > ONE_HOUR) {
-                console.log('🔄 Auto-syncing revocation list...');
+                console.log(' Auto-syncing revocation list...');
                 await this.syncRevocations();
             } else {
-                console.log(`✅ Revocation list up to date (${revInfo.count} entries, ${Math.round(revInfo.age / 60000)}min old)`);
+                console.log(` Revocation list up to date (${revInfo.count} entries, ${Math.round(revInfo.age / 60000)}min old)`);
             }
         } catch (e) {
             console.warn('Auto-sync revocations failed:', e);
@@ -1908,8 +1919,8 @@ class LemmaWallet {
                                 };
                                 await this._put('session', { id: 'current', ...this.session });
                                 
-                                console.log('[Lemma] ✅ Lemma stored + session created. PPID:', credData.ppid?.substring(0, 20) + '...');
-                                console.log('[Lemma] ✅ wallet_secret was NOT transferred (privacy preserved)');
+                                console.log('[Lemma]  Lemma stored + session created. PPID:', credData.ppid?.substring(0, 20) + '...');
+                                console.log('[Lemma]  wallet_secret was NOT transferred (privacy preserved)');
                                 return; // Session is ready
                             }
                         } catch (parseErr) {
@@ -1920,7 +1931,7 @@ class LemmaWallet {
                     // Legacy fallback: try old checkRedirectReturn (encrypted wallet_secret)
                     const redirectResult = await this.checkRedirectReturn();
                     if (redirectResult?.authenticated) {
-                        console.log('[Lemma] ✅ Redirect returned authenticated (legacy flow)');
+                        console.log('[Lemma]  Redirect returned authenticated (legacy flow)');
                         
                         const walletSecret = redirectResult.walletSecret || this.session.walletSecret;
                         const walletId = redirectResult.walletId || this.session.walletId;
@@ -1936,7 +1947,7 @@ class LemmaWallet {
                             };
                             await this._put('session', { id: 'current', ...this.session });
                             await this._put('secrets', { id: 'master', secret: walletSecret, source: 'redirect' });
-                            console.log('[Lemma] ✅ Session created from legacy redirect');
+                            console.log('[Lemma]  Session created from legacy redirect');
                             return;
                         }
                     } else {
@@ -1967,7 +1978,7 @@ class LemmaWallet {
                     walletSecret: storedSession.walletSecret,
                     source: storedSession.source || 'local'
                 };
-                console.log('[Lemma] ✅ Session restored from IndexedDB - isUnlocked:', this.session.isUnlocked);
+                console.log('[Lemma]  Session restored from IndexedDB - isUnlocked:', this.session.isUnlocked);
                 
                 // AUTO-START HEARTBEAT on third-party sites with existing session
                 // This ensures lock detection works even after page refresh
@@ -2009,7 +2020,7 @@ class LemmaWallet {
             const authResult = await this.verifyLocalAuthorization();
                 
             if (authResult.authorized) {
-                console.log(`[Lemma] ✅ Already authorized via local lemma in ${authResult.verifyTimeMs}ms`);
+                console.log(`[Lemma]  Already authorized via local lemma in ${authResult.verifyTimeMs}ms`);
                     
                 // Set local session
                     this.session = {
@@ -2110,7 +2121,7 @@ class LemmaWallet {
         };
 
         await this._put('passkey', passkeyRecord);
-        console.log('[Lemma] ✅ Passkey created locally (server never sees it)');
+        console.log('[Lemma]  Passkey created locally (server never sees it)');
 
         // Get wallet secret for PPID derivation
         // CRITICAL: Check multiple sources for the secret (profiles, secrets, session)
@@ -2148,7 +2159,7 @@ class LemmaWallet {
                 source: 'generated'
             };
             await this._put('secrets', walletSecret);
-            console.log('🔐 Generated NEW wallet secret for PPID derivation');
+            console.log(' Generated NEW wallet secret for PPID derivation');
         } else {
             console.log('[Lemma] Using existing wallet secret (source:', walletSecret.source || 'stored', ')');
         }
@@ -2163,7 +2174,7 @@ class LemmaWallet {
             walletSecret: walletSecret.secret
         };
         await this._put('session', { id: 'current', ...this.session });
-        console.log('✅ Wallet created and auto-unlocked after passkey registration');
+        console.log(' Wallet created and auto-unlocked after passkey registration');
 
         // Signal to server for cross-device sync (simple state update)
         if (this._isLemmaDomain()) {
@@ -2183,7 +2194,7 @@ class LemmaWallet {
                         })
                     });
                 if (signalResponse.ok) {
-                    console.log('[Lemma] ✅ Server notified - cross-device sync enabled');
+                    console.log('[Lemma]  Server notified - cross-device sync enabled');
                     this.session.serverSessionActive = true;
                     await this._put('session', { id: 'current', ...this.session });
                     } else {
@@ -2227,7 +2238,7 @@ class LemmaWallet {
             const authResult = await this.verifyLocalAuthorization();
 
             if (authResult.authorized) {
-                console.log(`[Lemma] ✅ Already authorized via local lemma in ${authResult.verifyTimeMs}ms`);
+                console.log(`[Lemma]  Already authorized via local lemma in ${authResult.verifyTimeMs}ms`);
                 
                 // Set local session
                     this.session = {
@@ -2304,7 +2315,7 @@ class LemmaWallet {
             throw new Error('Passkey authentication cancelled');
         }
         
-        console.log('✅ Browser verified user via biometrics');
+        console.log(' Browser verified user via biometrics');
 
         // Get wallet ID (create and store if missing)
         let walletIdRecord = await this._get('passkey', 'walletId');
@@ -2350,7 +2361,7 @@ class LemmaWallet {
                 source: 'generated_legacy'
             };
             await this._put('secrets', walletSecretRecord);
-            console.log('🔐 Generated wallet secret for legacy wallet');
+            console.log(' Generated wallet secret for legacy wallet');
         } else {
             console.log('[Lemma] Using existing wallet secret (source:', walletSecretRecord.source || 'stored', ')');
         }
@@ -2371,7 +2382,7 @@ class LemmaWallet {
             ...this.session
         });
 
-        console.log('✅ Wallet unlocked successfully (local passkey verification)');
+        console.log(' Wallet unlocked successfully (local passkey verification)');
 
         // Signal to server that wallet is unlocked (for cross-device sync)
         // This is a simple state update - no cryptographic verification needed
@@ -2394,7 +2405,7 @@ class LemmaWallet {
                 });
                 if (signalResponse.ok) {
                     const result = await signalResponse.json();
-                    console.log(`[Lemma] ✅ Server notified of unlock - cross-device sync enabled`);
+                    console.log(`[Lemma]  Server notified of unlock - cross-device sync enabled`);
                     // Store that we have a server session for this wallet
                     this.session.serverSessionActive = true;
                     await this._put('session', { id: 'current', ...this.session });
@@ -2493,7 +2504,7 @@ class LemmaWallet {
                 });
                 if (response.ok) {
                     const data = await response.json();
-                    console.log('[Lemma] ✅ Wallet locked, server notified. global_session_cleared:', data.global_session_cleared);
+                    console.log('[Lemma]  Wallet locked, server notified. global_session_cleared:', data.global_session_cleared);
                 } else {
                     console.warn('[Lemma] Lock: clear-session returned', response.status);
                 }
@@ -2922,7 +2933,7 @@ class LemmaWallet {
             const bridgeSession = await this.checkBridgeSession();
             
             if (bridgeSession.valid) {
-                console.log('[Lemma] ✅ Authenticated via bridge session');
+                console.log('[Lemma]  Authenticated via bridge session');
                 return {
                     authenticated: true,
                     source: 'bridge',
@@ -2935,7 +2946,7 @@ class LemmaWallet {
             
             // No valid session - redirect to unlock
             if (autoRedirect) {
-                console.log('[Lemma] 🔓 Redirecting to unlock...');
+                console.log('[Lemma]  Redirecting to unlock...');
                 const unlockUrl = `https://lemma.id/unlock?return=${encodeURIComponent(returnUrl)}`;
                 window.location.href = unlockUrl;
                 return { authenticated: false, redirecting: true };
@@ -3194,7 +3205,7 @@ class LemmaWallet {
             }, 5000);
 
             if (result?.success) {
-                console.log('[Lemma] ✅ Session synced to bridge');
+                console.log('[Lemma]  Session synced to bridge');
             } else {
                 console.warn('[Lemma] Bridge session sync failed:', result?.error);
             }
@@ -3419,7 +3430,7 @@ class LemmaWallet {
     async syncRevocations() {
         // Check if we're offline first
         if (typeof navigator !== 'undefined' && !navigator.onLine) {
-            console.log('📴 Offline - using cached revocation list');
+            console.log(' Offline - using cached revocation list');
             const cached = await this.getRevocationInfo();
             return { 
                 success: false, 
@@ -3456,13 +3467,13 @@ class LemmaWallet {
                 count: revocations.length
             });
             
-            console.log(`✅ Synced ${revocations.length} revocations`);
+            console.log(` Synced ${revocations.length} revocations`);
             return { success: true, count: revocations.length };
         } catch (e) {
             // Network error - check if we have cached data
             const cached = await this.getRevocationInfo();
             if (cached.synced) {
-                console.log(`📴 Network error - using cached revocations (${cached.count} entries, ${Math.round(cached.age / 60000)}min old)`);
+                console.log(` Network error - using cached revocations (${cached.count} entries, ${Math.round(cached.age / 60000)}min old)`);
                 return { 
                     success: false, 
                     offline: true, 
@@ -3613,7 +3624,7 @@ class LemmaWallet {
                 });
                 
                 if (result.success) {
-                    console.log(`🚨 Credential revoked: ${credentialId}`);
+                    console.log(` Credential revoked: ${credentialId}`);
                     console.log(`   Server revoked: ${result.serverRevoked}`);
                     console.log(`   Bloom filter: ${result.addedToBloomFilter}`);
                 }
@@ -3657,12 +3668,12 @@ class LemmaWallet {
             if (response.ok) {
                 const data = await response.json();
                 serverRevoked = data.success;
-                console.log(`✅ Server revocation: ${credentialId}`, data);
+                console.log(` Server revocation: ${credentialId}`, data);
             } else {
-                console.warn(`⚠️ Server revocation failed: ${response.status}`);
+                console.warn(` Server revocation failed: ${response.status}`);
             }
         } catch (e) {
-            console.warn(`⚠️ Server revocation error: ${e.message}`);
+            console.warn(` Server revocation error: ${e.message}`);
         }
         
         // 3. Delete from local IndexedDB
@@ -3671,7 +3682,7 @@ class LemmaWallet {
         // 4. Sync revocation list locally
         await this.syncRevocations();
         
-        console.log(`🚨 Credential revoked: ${credentialId}`);
+        console.log(` Credential revoked: ${credentialId}`);
         return {
             success: true,
             revoked: true,
@@ -4072,7 +4083,7 @@ class LemmaWallet {
         const claims = lemma.claims || lemma.credentialSubject || {};
         const ppid = lemma.subject || claims.id || claims.ppid || claims.subject;
         
-        this._log(`[Lemma] ✅ Verified in ${totalTime}ms`);
+        this._log(`[Lemma]  Verified in ${totalTime}ms`);
         
         return {
             authorized: true,
@@ -4606,7 +4617,7 @@ class LemmaWallet {
                     const claims = siteLemma.claims || siteLemma.credentialSubject || {};
                     const ppid = siteLemma.subject || claims.id || claims.ppid || claims.subject;
                     
-                    console.log('[Lemma] ✅ Authenticated via stored lemma (no wallet_secret transferred)');
+                    console.log('[Lemma]  Authenticated via stored lemma (no wallet_secret transferred)');
                     return {
                         authenticated: true,
                         ppid: ppid,
@@ -5154,7 +5165,7 @@ class LemmaWallet {
                 throw new Error('Passkey verification cancelled');
             }
             
-            console.log('[Lemma] ✅ Fresh passkey verification successful');
+            console.log('[Lemma]  Fresh passkey verification successful');
             
             const walletIdRecord = await this._get('passkey', 'walletId');
             
@@ -5337,7 +5348,7 @@ class LemmaWallet {
         if (existingSecret?.secret) {
             // Same wallet - already linked
             if (existingSecret.secret === payload.walletSecret) {
-                console.log('[Lemma] ✅ Wallet already linked to this device');
+                console.log('[Lemma]  Wallet already linked to this device');
                 return {
                     success: true,
                     alreadyLinked: true,
@@ -5348,7 +5359,7 @@ class LemmaWallet {
             
             // Different wallet - auto-replace with backup (simplest UX)
             // User can recover old wallet from backup if needed
-            console.log('[Lemma] 🔄 Replacing existing wallet (backed up for recovery)');
+            console.log('[Lemma]  Replacing existing wallet (backed up for recovery)');
             console.log('[Lemma]    Old wallet:', existingWalletId?.value?.substring(0, 16) + '...');
             console.log('[Lemma]    New wallet:', payload.walletId?.substring(0, 16) + '...');
             
@@ -5405,7 +5416,7 @@ class LemmaWallet {
             source: 'link'
         };
         await this._put('session', { id: 'current', ...this.session });
-        console.log('[Lemma] ✅ Local session set after linking');
+        console.log('[Lemma]  Local session set after linking');
         
         // Signal to server that this device is now unlocked (if on lemma.id)
         let serverSessionSet = false;
@@ -5425,7 +5436,7 @@ class LemmaWallet {
                     })
                 });
                 if (signalResponse.ok) {
-                    console.log('[Lemma] ✅ Server notified of linked device unlock');
+                    console.log('[Lemma]  Server notified of linked device unlock');
                     serverSessionSet = true;
                 }
             } catch (e) {
@@ -5442,7 +5453,7 @@ class LemmaWallet {
                 const globalSession = await this._checkGlobalSession(payload.walletId, { force: true });
 
                 if (globalSession?.valid && globalSession?.session) {
-                    console.log('[Lemma] ✅ Global session found! Wallet was unlocked on another device.');
+                    console.log('[Lemma]  Global session found! Wallet was unlocked on another device.');
 
                     // We have a valid global session - set local session state
                     // The user will still need to create a passkey on this device,
@@ -5470,7 +5481,7 @@ class LemmaWallet {
         }
 
         if (!serverSessionSet && !this.session?.isUnlocked) {
-            console.warn('[Lemma] ⚠️ Server session not set - user will need to create passkey for cross-site auth');
+            console.warn('[Lemma]  Server session not set - user will need to create passkey for cross-site auth');
         }
         
         console.log(`[Lemma] Device linked successfully with profile: ${profileName}`);
@@ -5497,7 +5508,7 @@ class LemmaWallet {
                     // Store the issued credential
                     await this.storeCredential(issueData.permission_lemma);
                     platformCredentialIssued = true;
-                    console.log('[Lemma] ✅ Platform credential issued and stored for linked device');
+                    console.log('[Lemma]  Platform credential issued and stored for linked device');
                 }
             }
         } catch (e) {
@@ -5830,7 +5841,7 @@ class LemmaWallet {
         
         // Store locally
         await this._put('lemmas', lemma);
-        console.log('✅ Credential stored locally:', lemma.id);
+        console.log(' Credential stored locally:', lemma.id);
         
         // If on third-party site, also sync to central lemma.id wallet via bridge
         if (!window.location.hostname.includes('lemma.id') && 
@@ -5879,7 +5890,7 @@ class LemmaWallet {
                     if (event.data?.requestId === requestId) {
                         window.removeEventListener('message', handler);
                         if (event.data.success) {
-                            console.log('✅ Credential synced to central wallet:', credential.id);
+                            console.log(' Credential synced to central wallet:', credential.id);
                         }
                         resolve(event.data);
                     }
@@ -5900,7 +5911,7 @@ class LemmaWallet {
             });
             
         } catch (e) {
-            console.warn('⚠️ Could not sync to central wallet:', e.message);
+            console.warn(' Could not sync to central wallet:', e.message);
         }
     }
 
@@ -5927,7 +5938,7 @@ class LemmaWallet {
                     }
                 }
             } catch (e) {
-                console.warn('⚠️ Could not fetch from central wallet:', e.message);
+                console.warn(' Could not fetch from central wallet:', e.message);
             }
         }
         
@@ -6120,7 +6131,7 @@ class LemmaWallet {
             });
             
         } catch (e) {
-            console.warn('⚠️ Could not get from central wallet:', e.message);
+            console.warn(' Could not get from central wallet:', e.message);
             return [];
         }
     }
@@ -6511,7 +6522,7 @@ if (typeof window !== 'undefined') {
             originalConsole.log.apply(console, args);
             const msg = args.join(' ');
             if (msg.includes('[Lemma]') || msg.includes('Lemma')) {
-                const type = msg.includes('✅') ? 'success' : 'info';
+                const type = msg.includes('') ? 'success' : 'info';
                 logToDebug(msg, type);
             }
         };

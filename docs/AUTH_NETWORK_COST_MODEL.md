@@ -44,10 +44,10 @@ Core login/IAM path calls:
 - `LemmaIssueCalls = SitesPerUserPerDay * LemmaIssueRate`
   - (`/api/wallet-auth/issue`) when local site lemma is missing
 
-SSE reconnect traffic (current):
-- stream rotates every ~20s (`/api/events/revocations`)
-- `LemmaSseRequestsPerUserPerDay = AvgTabsOpen * ActiveHoursPerUserPerDay * 180`
-  - because `3 requests/min/tab = 180 requests/hour/tab`
+SSE reconnect traffic (current deployed defaults):
+- stream rotates every ~10 minutes (`/api/events/revocations`)
+- `LemmaSseRequestsPerUserPerDay = AvgTabsOpen * ActiveHoursPerUserPerDay * 6`
+  - because `0.1 requests/min/tab = 6 requests/hour/tab`
 
 Total per-user/day:
 - `LemmaCallsPerUserPerDay = LemmaUnlockCalls + LemmaGlobalSessionChecks + LemmaIssueCalls + LemmaSseRequestsPerUserPerDay`
@@ -64,7 +64,7 @@ Total per-day:
   - one app request lifecycle per reconnect,
   - one Redis pub/sub subscription context while stream is active
 
-Implication: your auth decision path is local-first, but current SSE rotation can dominate app request volume.
+Implication: your auth decision path is local-first. SSE reconnect overhead is now much lower, but can still dominate if tab-hours are very high.
 
 ---
 
@@ -98,11 +98,11 @@ Lemma per-user/day:
 - Unlock: `1`
 - Global session checks: `3`
 - Issue: `0.9`
-- SSE reconnect: `2 * 2 * 180 = 720`
-- Total: `724.9 calls/user/day`
+- SSE reconnect: `2 * 2 * 6 = 24`
+- Total: `28.9 calls/user/day`
 
 Lemma total/day:
-- `7,249,000 calls/day`
+- `289,000 calls/day`
 
 Traditional OIDC per-user/day:
 - `1.2 * 6 = 7.2 calls/user/day`
@@ -111,8 +111,8 @@ Traditional total/day:
 - `72,000 calls/day`
 
 Observation:
-- In current code, SSE reconnect behavior is the main driver of request volume.
-- Without SSE churn, Lemma login/IAM calls are low (single digits per user/day in many cases).
+- SSE reconnect behavior remains the main transport driver.
+- Local-proof login/IAM path itself is low-call (single digits to low tens per user/day in common usage).
 
 ---
 
@@ -165,3 +165,28 @@ If stream rotation moves from ~20s to 10 minutes:
 - reconnect request rate drops from `3/min/tab` to `0.1/min/tab` (~30x reduction).
 
 This preserves your local-proof auth advantages while reducing baseline request load and dyno overhead.
+
+---
+
+## 8) Structural-cheap mode (target)
+
+To be structurally cheaper than traditional auth/providers while keeping cross-device/site SSO:
+
+- Keep local proof as the default authorization path (`0` network calls on warm auth decisions).
+- Keep SSE long-lived and stable (few reconnects per active hour).
+- Throttle redundant global-session rechecks on focus/visibility churn (SDK now caches/reuses results for 60s unless forced).
+
+Recommended operating targets:
+- `Requests/min/active_tab` from SSE reconnects: `<= 0.1`
+- Warm authorization path calls: `0`
+- Cross-device signout p95 when SSE connected: `< 3s`
+- Fallback-only mode worst-case detection: bounded by poll interval
+
+Break-even helper:
+- `LemmaCheaperThanOIDC` when:
+  - `LemmaUnlockCalls + LemmaGlobalSessionChecks + LemmaIssueCalls + LemmaSseRequestsPerUserPerDay`
+  - `< OidcCeremonyCalls * OidcLoginsPerUserPerDay`
+
+Interpretation:
+- Local proof removes many traditional online checks.
+- SSE/session sync must stay low-churn for total cost leadership.
