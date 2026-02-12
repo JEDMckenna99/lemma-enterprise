@@ -75,7 +75,7 @@ const AUTH_STATE = {
 class LemmaWallet {
     // SDK version - check with LemmaWallet.VERSION
     // v2.32.0: Redirect-only architecture - removed popup flow for simpler, consistent UX
-    static VERSION = '2.36.0';  // Performance optimizations: cached global session, debounced heartbeat, faster bridge
+    static VERSION = '2.50.1';  // Lock propagation fix: resolve walletId for SSE events across tabs/devices
     
     constructor(options = {}) {
         this.db = null;
@@ -955,6 +955,28 @@ class LemmaWallet {
     }
 
     /**
+     * Resolve current wallet ID from memory or IndexedDB.
+     * Some tabs may have a valid unlocked session but missing in-memory walletId,
+     * which would otherwise cause remote lock SSE events to be ignored.
+     * @private
+     */
+    async _resolveCurrentWalletId() {
+        if (this.session.walletId) {
+            return this.session.walletId;
+        }
+        try {
+            const walletIdRecord = await this._get('passkey', 'walletId');
+            if (walletIdRecord?.value) {
+                this.session.walletId = walletIdRecord.value;
+                return walletIdRecord.value;
+            }
+        } catch (e) {
+            // Best-effort lookup only; caller handles null.
+        }
+        return null;
+    }
+
+    /**
      * Redirect-based unlock flow for all browsers.
      * More reliable than popups on iOS Safari which blocks popups aggressively.
      * 
@@ -1497,15 +1519,7 @@ class LemmaWallet {
             }
             
             try {
-                let walletId = this.session.walletId;
-                
-                if (!walletId) {
-                    const walletIdRecord = await this._get('passkey', 'walletId');
-                    if (walletIdRecord?.value) {
-                        this.session.walletId = walletIdRecord.value;
-                        walletId = walletIdRecord.value;
-                    }
-                }
+                let walletId = await this._resolveCurrentWalletId();
                 
                 if (walletId) {
                     const sessionSource = this.session.source;
@@ -1576,7 +1590,7 @@ class LemmaWallet {
             this._sessionEventSource.addEventListener('session_invalidated', async (event) => {
                 try {
                     const data = JSON.parse(event.data);
-                    const walletId = this.session.walletId;
+                    const walletId = await this._resolveCurrentWalletId();
 
                     // Only react if this event is for our wallet
                     if (!walletId || data.wallet_id !== walletId) return;
@@ -1588,10 +1602,10 @@ class LemmaWallet {
                 }
             });
 
-            this._sessionEventSource.addEventListener('session_restored', (event) => {
+            this._sessionEventSource.addEventListener('session_restored', async (event) => {
                 try {
                     const data = JSON.parse(event.data);
-                    const walletId = this.session.walletId;
+                    const walletId = await this._resolveCurrentWalletId();
 
                     if (!walletId || data.wallet_id !== walletId) return;
 
