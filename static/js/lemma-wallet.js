@@ -403,6 +403,7 @@ class LemmaWallet {
                         
                         // Start listening for lock events
                         this._setupLockEventListener();
+                        this._autoStartHeartbeat();
                         
                         // Auto-issue a lemma for this site (wallet_secret stays in SDK)
                         const siteId = window.location.hostname;
@@ -458,6 +459,7 @@ class LemmaWallet {
                 
                 // Start listening for lock events from bridge
                 this._setupLockEventListener();
+                this._autoStartHeartbeat();
                 
                 return result;
             }
@@ -482,6 +484,7 @@ class LemmaWallet {
                         console.log(`[Lemma] Lemma issued and verified for ${siteId}`);
                         
                         this._setupLockEventListener();
+                            this._autoStartHeartbeat();
                         
                         return {
                             authenticated: true,
@@ -531,6 +534,7 @@ class LemmaWallet {
                             if (retryResult.authorized) {
                                 console.log(`[Lemma]  Authorized after global sync in ${retryResult.verifyTimeMs}ms`);
                                 this._setupLockEventListener();
+                                this._autoStartHeartbeat();
                                 return {
                                     authenticated: true,
                                     needsPasskey: false,
@@ -2252,6 +2256,7 @@ class LemmaWallet {
 
                 // Start listening for lock events
                 this._setupLockEventListener();
+                this._autoStartHeartbeat();
 
                     return {
                         success: true,
