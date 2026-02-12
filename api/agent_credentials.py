@@ -35,6 +35,79 @@ logger = logging.getLogger(__name__)
 
 agent_credentials_bp = Blueprint('agent_credentials', __name__)
 
+DEFAULT_DELEGATION_ALLOWED_PERMISSIONS = 'admin_access,super_admin_access'
+DEFAULT_DELEGATION_ALLOWED_ROLES = 'admin,super_admin'
+
+
+def _get_allowed_values(env_key: str, default_csv: str) -> set[str]:
+    raw = os.environ.get(env_key, default_csv)
+    return {item.strip().lower() for item in raw.split(',') if item.strip()}
+
+
+def _require_delegation_admin_session():
+    """
+    Require an active unlocked lemma.id wallet session and allowed admin role/permission
+    before allowing delegated agent credential issuance.
+    """
+    passkey_verified = bool(session.get('passkey_verified'))
+    session_permission_id = (session.get('permission_id') or '').strip().lower()
+    session_user_role = (session.get('user_role') or '').strip().lower()
+
+    # Wallet session cookie is the 24h "unlocked for the day" anchor.
+    wallet_session_cookie = request.cookies.get('lemma_wallet_session')
+    if not passkey_verified or not wallet_session_cookie:
+        return False, (
+            jsonify({
+                'success': False,
+                'error': 'Admin wallet unlock required',
+                'message': 'Unlock your lemma.id wallet for the day before issuing delegated agent credentials.'
+            }),
+            403
+        )
+
+    # Validate cookie cryptographically (prevents stale/forged session usage).
+    try:
+        from auth.session_manager import validate_session_token
+        wallet_session_data = validate_session_token(wallet_session_cookie)
+    except Exception:
+        wallet_session_data = None
+
+    if not wallet_session_data:
+        return False, (
+            jsonify({
+                'success': False,
+                'error': 'Wallet session expired',
+                'message': 'Your wallet unlock session is expired. Unlock lemma.id again.'
+            }),
+            403
+        )
+
+    allowed_permissions = _get_allowed_values(
+        'AGENT_DELEGATION_ALLOWED_PERMISSIONS',
+        DEFAULT_DELEGATION_ALLOWED_PERMISSIONS
+    )
+    allowed_roles = _get_allowed_values(
+        'AGENT_DELEGATION_ALLOWED_ROLES',
+        DEFAULT_DELEGATION_ALLOWED_ROLES
+    )
+
+    has_allowed_permission = session_permission_id in allowed_permissions if session_permission_id else False
+    has_allowed_role = session_user_role in allowed_roles if session_user_role else False
+
+    if not (has_allowed_permission or has_allowed_role):
+        return False, (
+            jsonify({
+                'success': False,
+                'error': 'Insufficient permission',
+                'message': 'Delegated agent credential issuance requires an allowed admin role/permission.',
+                'required_permissions': sorted(list(allowed_permissions)),
+                'required_roles': sorted(list(allowed_roles))
+            }),
+            403
+        )
+
+    return True, None
+
 
 # ============================================
 # TASK-BOUND AUTHORIZATION HELPERS
@@ -288,6 +361,10 @@ def issue_agent_credential():
         - task_hash: SHA256 of task for verification (if task provided)
     """
     try:
+        is_allowed, error_response = _require_delegation_admin_session()
+        if not is_allowed:
+            return error_response
+
         # SECURITY CHECK 1: User must be authenticated
         # Check for passkey session or PPID
         ppid = request.headers.get('X-Lemma-PPID')
@@ -1419,6 +1496,10 @@ def auto_issue_agent_credential():
     """
     try:
         from flask import session
+
+        is_allowed, error_response = _require_delegation_admin_session()
+        if not is_allowed:
+            return error_response
 
         # Check for active wallet session
         customer_id = session.get('customer_id')
