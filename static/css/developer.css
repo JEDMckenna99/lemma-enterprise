@@ -38,8 +38,11 @@
     position: fixed;
     top: 88px;
     left: calc(var(--dev-sidebar-width) + 8px);
-    width: 36px;
+    width: auto;
+    min-width: 36px;
     height: 36px;
+    padding: 0 10px;
+    gap: 6px;
     border-radius: 999px;
     border: none;
     background: var(--dev-primary);
@@ -56,6 +59,12 @@
     width: 16px;
     height: 16px;
     transition: transform 0.25s ease;
+}
+
+.dev-sidebar-toggle-label {
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1;
 }
 
 .dev-sidebar-toggle:hover {
@@ -178,6 +187,10 @@
 
 .dev-container.dev-sidebar-closed .dev-sidebar-toggle svg {
     transform: rotate(180deg);
+}
+
+.dev-container.dev-sidebar-closed .dev-sidebar-toggle-label {
+    display: none;
 }
 
 .dev-content {

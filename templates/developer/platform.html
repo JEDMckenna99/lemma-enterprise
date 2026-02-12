@@ -40,8 +40,11 @@
             position: fixed;
             top: 88px;
             left: calc(var(--sidebar-width) + 8px);
-            width: 36px;
+            width: auto;
+            min-width: 36px;
             height: 36px;
+            padding: 0 10px;
+            gap: 6px;
             border-radius: 999px;
             border: none;
             background: #667eea;
@@ -62,6 +65,12 @@
             width: 16px;
             height: 16px;
             transition: transform 0.25s ease;
+        }
+
+        .sidebar-toggle-label {
+            font-size: 12px;
+            font-weight: 600;
+            line-height: 1;
         }
         
         .sidebar-header {
@@ -145,6 +154,10 @@
 
         .platform-container.sidebar-closed .sidebar-toggle svg {
             transform: rotate(180deg);
+        }
+
+        .platform-container.sidebar-closed .sidebar-toggle-label {
+            display: none;
         }
         
         .content-header {
@@ -595,6 +608,7 @@
             aria-label="Close sidebar"
             aria-expanded="true"
         >
+            <span class="sidebar-toggle-label">Sidebar</span>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M15 18l-6-6 6-6"></path>
             </svg>
