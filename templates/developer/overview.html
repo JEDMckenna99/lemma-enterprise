@@ -38,22 +38,6 @@
     </div>
 </div>
 
-<!-- Agent Token (AI Development Access) -->
-<div class="dev-card" id="agent-token-card">
-    <div class="dev-card-header">
-        <h2 class="dev-card-title">AI Agent Access</h2>
-        <span class="dev-badge dev-badge-info" id="agent-status">Checking...</span>
-    </div>
-    <div class="dev-card-body">
-        <div id="agent-token-content">
-            <div class="dev-loading">
-                <div class="dev-spinner"></div>
-                <div>Checking wallet authentication...</div>
-            </div>
-        </div>
-    </div>
-</div>
-
 <!-- Quick Actions -->
 <div class="dev-card">
     <div class="dev-card-header">
@@ -436,7 +420,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     await loadOverviewStats();
     await loadRecentSites();
     updateChecklist();
-    await checkAgentTokenStatus();
 });
 
 async function getWalletPpid() {
@@ -671,7 +654,7 @@ function showGeneratedToken(credential, ppid) {
     container.innerHTML = `
         <div class="agent-token-generated">
             <div class="agent-success-header">
-                <span class="agent-success-icon">✓</span>
+                <span class="agent-success-icon"></span>
                 <span>Token Generated Successfully</span>
             </div>
             
@@ -786,7 +769,7 @@ async function loadRecentSites() {
         if (sites.length === 0) {
             container.innerHTML = `
                 <div class="dev-empty">
-                    <div class="dev-empty-icon">🌐</div>
+                    <div class="dev-empty-icon"></div>
                     <div class="dev-empty-title">No sites yet</div>
                     <div class="dev-empty-text">Register your first site to start using Lemma authentication</div>
                     <a href="/developer/sites/new" class="dev-btn dev-btn-primary">Register Site</a>
@@ -803,7 +786,7 @@ async function loadRecentSites() {
                 ${recentSites.map(site => `
                     <div class="dev-site-card">
                         <div class="dev-site-header">
-                            <div class="dev-site-icon">🌐</div>
+                            <div class="dev-site-icon"></div>
                             <div>
                                 <div class="dev-site-name">${escapeHtml(site.name || site.site_id)}</div>
                                 <div class="dev-site-domain">${escapeHtml(site.domain || site.site_id)}</div>
@@ -832,7 +815,7 @@ async function loadRecentSites() {
         console.warn('Could not load sites:', e);
         container.innerHTML = `
             <div class="dev-empty">
-                <div class="dev-empty-icon">🌐</div>
+                <div class="dev-empty-icon"></div>
                 <div class="dev-empty-title">No sites yet</div>
                 <div class="dev-empty-text">Register your first site to start using Lemma authentication</div>
                 <a href="/developer/sites/new" class="dev-btn dev-btn-primary">Register Site</a>

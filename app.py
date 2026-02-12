@@ -8,8 +8,10 @@ import secrets
 from datetime import datetime, timedelta
 from flask import Flask, request, jsonify, render_template, session, redirect, url_for, g
 
-# Set up logging
-logging.basicConfig(level=logging.INFO)
+# Set up logging (override with LOG_LEVEL, e.g. DEBUG/INFO/WARNING/ERROR)
+_LOG_LEVEL_NAME = os.environ.get('LOG_LEVEL', 'INFO').upper()
+_LOG_LEVEL = getattr(logging, _LOG_LEVEL_NAME, logging.INFO)
+logging.basicConfig(level=_LOG_LEVEL)
 logger = logging.getLogger(__name__)
 
 def create_app():
@@ -1010,6 +1012,14 @@ def create_app():
             user_email=request.headers.get('X-User-Email'),
             is_admin=False,
             page='usage'
+        )
+
+    @app.route('/developer/agent-delegation')
+    def developer_agent_delegation():
+        """Developer Platform - Agent delegation"""
+        return render_template('developer/agent_delegation.html',
+            user_email=request.headers.get('X-User-Email'),
+            is_admin=request.headers.get('X-Permission-ID', '').lower() in ['super_admin', 'admin_access']
         )
     
     @app.route('/developer/billing')
