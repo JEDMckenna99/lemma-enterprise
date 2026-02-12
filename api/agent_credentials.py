@@ -196,7 +196,7 @@ def _resolve_monitor_identity():
             'principal': principal
         }, None
 
-    ppid = request.headers.get('X-Lemma-PPID')
+    ppid = request.headers.get('X-Lemma-PPID') or session.get('ppid')
     if ppid:
         if not ppid.startswith('did:lemma:ppid_'):
             return None, ('Invalid PPID format', 400)
@@ -778,7 +778,7 @@ def list_agent_credentials():
     agent_token = request.headers.get('X-Agent-Token')
     credential_info = validate_agent_token(agent_token) if agent_token else None
 
-    ppid = request.headers.get('X-Lemma-PPID')
+    ppid = request.headers.get('X-Lemma-PPID') or session.get('ppid')
     customer_id = session.get('customer_id')
 
     if credential_info:
@@ -864,7 +864,7 @@ def revoke_agent_credential(token_id):
     - Session is no longer needed
     - Security concern
     """
-    ppid = request.headers.get('X-Lemma-PPID')
+    ppid = request.headers.get('X-Lemma-PPID') or session.get('ppid')
     customer_id = session.get('customer_id')
     
     if not ppid and not customer_id:
