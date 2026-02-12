@@ -1,1 +1,1 @@
-web: gunicorn app:app
+web: gunicorn app:app --worker-class gevent --workers ${WEB_CONCURRENCY:-2} --worker-connections ${GUNICORN_WORKER_CONNECTIONS:-1000} --timeout ${GUNICORN_TIMEOUT:-120} --graceful-timeout ${GUNICORN_GRACEFUL_TIMEOUT:-30} --keep-alive ${GUNICORN_KEEPALIVE:-5}

@@ -60,12 +60,30 @@ except Exception as e:
 
 REVOCATION_CHANNEL = 'lemma:revocations'
 SESSION_CHANNEL = 'lemma:sessions'
-# Keepalive interval must stay comfortably below Gunicorn worker timeout
-# to avoid sync worker restarts on long-lived SSE streams.
-SSE_HEARTBEAT_SECONDS = 10
-# Gunicorn sync workers will be aborted near the global timeout (commonly 30s).
-# Rotate SSE streams proactively so clients reconnect before worker timeout.
-SSE_MAX_STREAM_SECONDS = 20
+
+
+def _get_env_int(name: str, default: int, minimum: int) -> int:
+    """Read an integer env var with safe fallback and minimum clamp."""
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+    try:
+        value = int(raw)
+        return max(minimum, value)
+    except ValueError:
+        logger.warning(
+            "SSE config %s has invalid value %r; using default=%s",
+            name,
+            raw,
+            default
+        )
+        return default
+
+
+# Keepalive interval and stream lifetime are configurable for deployment tuning.
+# Defaults are chosen for async workers and long-lived streams.
+SSE_HEARTBEAT_SECONDS = _get_env_int('SSE_HEARTBEAT_SECONDS', default=15, minimum=5)
+SSE_MAX_STREAM_SECONDS = _get_env_int('SSE_MAX_STREAM_SECONDS', default=600, minimum=30)
 
 
 def publish_session_event(wallet_id: str, event_type: str, expires_at: int = None) -> bool:
