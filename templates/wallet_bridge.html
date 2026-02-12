@@ -312,18 +312,50 @@ async function checkSession(options = {}) {
                         console.log(' Local session restored from server');
                     }
                 } else if (session) {
-                    // Server returned 401 (no cookie) but we have local session
-                    // IMPORTANT: Do NOT clear local session here!
-                    // 401 can mean:
-                    //   1. Cookies blocked by browser (third-party cookie policy)
-                    //   2. Cookie expired/missing
-                    //   3. User actually locked wallet
-                    // We can't distinguish these cases, so TRUST the local session
-                    // if it hasn't expired. The local session has the wallet secret
-                    // which proves the user authenticated.
-                    console.log('ℹ Session-sync returned 401 but local session exists');
-                    console.log('ℹ Keeping local session (cookies may be blocked)');
-                    // Don't clear - trust the local session
+                    // Server returned no valid cookie session but local session exists.
+                    // Disambiguate "cookies blocked" vs "user really locked":
+                    // verify global session state by wallet_id (cookie-independent).
+                    console.log('ℹ Session-sync returned non-valid result; checking global-session state...');
+                    let globalValid = true;
+                    try {
+                        const walletId = session.walletId || (await wallet._get('passkey', 'walletId'))?.value;
+                        if (walletId) {
+                            const globalResp = await fetch('/api/wallet/global-session', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ wallet_id: walletId })
+                            });
+                            const globalData = await globalResp.json().catch(() => ({}));
+                            globalValid = !!(globalResp.ok && globalData.success && globalData.valid === true);
+                            console.log('ℹ Global-session check:', globalValid ? 'valid' : 'invalid');
+                        }
+                    } catch (globalErr) {
+                        console.warn('Global-session disambiguation failed:', globalErr.message);
+                        // Conservative for UX: if check fails, keep local session for now.
+                        globalValid = true;
+                    }
+
+                    if (!globalValid) {
+                        console.log(' Session invalidated globally - clearing local bridge session');
+                        try {
+                            await wallet._delete('session', 'current');
+                        } catch (e) {}
+                        cache.session = { value: null, ts: 0, promise: null };
+
+                        if (window.parent !== window) {
+                            window.parent.postMessage({
+                                type: 'SESSION_INVALIDATED',
+                                reason: 'global_session_invalid',
+                                walletId: session.walletId || null,
+                                timestamp: Date.now(),
+                                instant: false
+                            }, '*');
+                        }
+
+                        session = null;
+                    } else {
+                        console.log('ℹ Keeping local session (cookie/session-sync unavailable but global session still valid)');
+                    }
                 } else {
                     console.log('ℹ No server session and no local session');
                 }
