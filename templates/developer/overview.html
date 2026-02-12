@@ -87,57 +87,18 @@
     </div>
 </div>
 
-<!-- Getting Started Checklist -->
-<div class="dev-card" id="getting-started-card">
+<!-- First-Time Onboarding (shown only when no sites are registered) -->
+<div class="dev-card" id="first-site-onboarding" style="display: none;">
     <div class="dev-card-header">
         <h2 class="dev-card-title">Getting Started</h2>
-        <span class="dev-badge dev-badge-info" id="checklist-progress">0/4 Complete</span>
     </div>
     <div class="dev-card-body">
-        <div id="checklist-container">
-            <div class="checklist-item" data-step="register">
-                <div class="checklist-check">
-                    <input type="checkbox" id="check-register" disabled>
-                </div>
-                <div class="checklist-content">
-                    <div class="checklist-title">Register your first site</div>
-                    <div class="checklist-desc">Add your website domain to start using Lemma auth</div>
-                </div>
-                <a href="/developer/sites/new" class="dev-btn dev-btn-sm dev-btn-secondary">Register Site</a>
-            </div>
-            
-            <div class="checklist-item" data-step="sdk">
-                <div class="checklist-check">
-                    <input type="checkbox" id="check-sdk" disabled>
-                </div>
-                <div class="checklist-content">
-                    <div class="checklist-title">Install the SDK</div>
-                    <div class="checklist-desc">Add our JavaScript SDK to your website</div>
-                </div>
-                <a href="/docs/sdk" class="dev-btn dev-btn-sm dev-btn-secondary" target="_blank">View Docs</a>
-            </div>
-            
-            <div class="checklist-item" data-step="verify">
-                <div class="checklist-check">
-                    <input type="checkbox" id="check-verify" disabled>
-                </div>
-                <div class="checklist-content">
-                    <div class="checklist-title">Make your first verification</div>
-                    <div class="checklist-desc">Test the auth flow on your site</div>
-                </div>
-                <a href="/test" class="dev-btn dev-btn-sm dev-btn-secondary" target="_blank">Test Page</a>
-            </div>
-            
-            <div class="checklist-item" data-step="production">
-                <div class="checklist-check">
-                    <input type="checkbox" id="check-production" disabled>
-                </div>
-                <div class="checklist-content">
-                    <div class="checklist-title">Go to production</div>
-                    <div class="checklist-desc">Switch from test mode to production</div>
-                </div>
-                <a href="/developer/sites" class="dev-btn dev-btn-sm dev-btn-secondary">Manage Sites</a>
-            </div>
+        <p class="onboarding-intro">
+            Register your first site to activate developer onboarding. After your first site is added, this section is hidden automatically.
+        </p>
+        <div class="onboarding-actions">
+            <a href="/developer/sites/new" class="dev-btn dev-btn-primary">Register First Site</a>
+            <a href="/docs/getting-started" class="dev-btn dev-btn-secondary" target="_blank">Read Setup Guide</a>
         </div>
     </div>
 </div>
@@ -157,42 +118,16 @@
 </div>
 
 <style>
-.checklist-item {
+.onboarding-intro {
+    margin: 0 0 16px 0;
+    color: var(--dev-text-muted);
+    font-size: 14px;
+}
+
+.onboarding-actions {
     display: flex;
-    align-items: center;
-    gap: 16px;
-    padding: 16px 0;
-    border-bottom: 1px solid var(--dev-border);
-}
-
-.checklist-item:last-child {
-    border-bottom: none;
-}
-
-.checklist-check input {
-    width: 20px;
-    height: 20px;
-    accent-color: var(--dev-primary);
-}
-
-.checklist-content {
-    flex: 1;
-}
-
-.checklist-title {
-    font-weight: 500;
-    color: var(--dev-text);
-    margin-bottom: 4px;
-}
-
-.checklist-desc {
-    font-size: 13px;
-    color: var(--dev-text-muted);
-}
-
-.checklist-item.completed .checklist-title {
-    text-decoration: line-through;
-    color: var(--dev-text-muted);
+    gap: 12px;
+    flex-wrap: wrap;
 }
 
 /* Agent Token Styles */
@@ -419,7 +354,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Then load data with auth
     await loadOverviewStats();
     await loadRecentSites();
-    updateChecklist();
 });
 
 async function getWalletPpid() {
@@ -765,6 +699,7 @@ async function loadRecentSites() {
         
         const data = await response.json();
         const sites = data.sites || [];
+        toggleOnboardingCard(sites.length === 0);
         
         if (sites.length === 0) {
             container.innerHTML = `
@@ -813,6 +748,7 @@ async function loadRecentSites() {
         
     } catch (e) {
         console.warn('Could not load sites:', e);
+        toggleOnboardingCard(true);
         container.innerHTML = `
             <div class="dev-empty">
                 <div class="dev-empty-icon"></div>
@@ -824,29 +760,10 @@ async function loadRecentSites() {
     }
 }
 
-function updateChecklist() {
-    // Check completion status from localStorage or API
-    const completed = JSON.parse(localStorage.getItem('lemma_onboarding') || '{}');
-    
-    let completedCount = 0;
-    
-    ['register', 'sdk', 'verify', 'production'].forEach(step => {
-        const checkbox = document.getElementById(`check-${step}`);
-        const item = document.querySelector(`.checklist-item[data-step="${step}"]`);
-        
-        if (completed[step]) {
-            checkbox.checked = true;
-            item.classList.add('completed');
-            completedCount++;
-        }
-    });
-    
-    document.getElementById('checklist-progress').textContent = `${completedCount}/4 Complete`;
-    
-    // Hide checklist if all complete
-    if (completedCount === 4) {
-        document.getElementById('getting-started-card').style.display = 'none';
-    }
+function toggleOnboardingCard(show) {
+    const card = document.getElementById('first-site-onboarding');
+    if (!card) return;
+    card.style.display = show ? 'block' : 'none';
 }
 
 function formatNumber(num) {
