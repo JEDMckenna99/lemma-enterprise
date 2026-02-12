@@ -618,6 +618,16 @@ def clear_session():
     origin = request.headers.get('Origin')
     data = request.get_json() or {}
     wallet_id = data.get('wallet_id')
+    # Fallback: derive wallet_id from signed session cookie if client did not send it.
+    if not wallet_id:
+        try:
+            session_token = request.cookies.get(SESSION_COOKIE_NAME)
+            session_data = validate_session_token(session_token) if session_token else None
+            wallet_id = session_data.get('wallet_id') if session_data else None
+            if wallet_id:
+                logger.info(f"Clear-session: derived wallet_id from session cookie ({wallet_id[:8]}...)")
+        except Exception as e:
+            logger.warning(f"Clear-session: failed to derive wallet_id from cookie: {e}")
     
     # Clear global session if wallet_id provided
     # This ensures other devices detect the lock
@@ -638,7 +648,7 @@ def clear_session():
         except Exception as e:
             logger.warning(f"Clear-session: SSE publish failed (non-fatal): {e}")
     else:
-        logger.warning("Clear-session: no wallet_id provided")
+        logger.warning("Clear-session: no wallet_id available (request or cookie)")
         global_cleared = False
     
     response = jsonify({

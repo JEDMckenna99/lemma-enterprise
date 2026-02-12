@@ -2446,9 +2446,10 @@ class LemmaWallet {
         const isLemma = this._isLemmaDomain();
         console.log('[Lemma] Lock: isLemmaDomain=', isLemma, 'walletId=', walletId);
         
-        if (isLemma && walletId) {
+        if (isLemma) {
             try {
                 console.log('[Lemma] Lock: calling /api/wallet/clear-session...');
+                const payload = walletId ? { wallet_id: walletId } : {};
                 const response = await fetch('/api/wallet/clear-session', {
                     method: 'POST',
                     credentials: 'include',
@@ -2456,7 +2457,7 @@ class LemmaWallet {
                         ...this._getSecureHeaders(),
                         'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify({ wallet_id: walletId })
+                    body: JSON.stringify(payload)
                 });
                 if (response.ok) {
                     const data = await response.json();
@@ -2469,8 +2470,6 @@ class LemmaWallet {
             }
         } else if (!isLemma) {
             console.log('[Lemma] Wallet locked locally (not on lemma.id)');
-        } else {
-            console.warn('[Lemma] Lock: no wallet_id available to clear global session');
         }
     }
 
