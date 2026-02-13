@@ -17,6 +17,8 @@ from flask import request, jsonify, g, make_response, session
 from typing import Optional
 import logging
 
+from auth.permissions import normalize_scopes, is_admin_permission
+
 logger = logging.getLogger(__name__)
 
 
@@ -173,7 +175,7 @@ def require_site_admin(f):
         if agent_token:
             is_valid, credential_info = validate_agent_token(agent_token)
             if is_valid:
-                scope = credential_info.get('scope', [])
+                scope = normalize_scopes(credential_info.get('scope', []))
                 if 'admin' in scope:
                     g.is_admin = True
                     g.admin_email = credential_info.get('authorized_by_email', 'agent@lemma.id')
@@ -194,7 +196,7 @@ def require_site_admin(f):
         # METHOD 0b: Agent session (from /api/agent/session - browser requests)
         is_agent_session, session_info = check_agent_session()
         if is_agent_session:
-            scope = session_info.get('scope', [])
+            scope = normalize_scopes(session_info.get('scope', []))
             if 'admin' in scope:
                 g.is_admin = True
                 g.admin_email = 'agent@lemma.id'
@@ -224,9 +226,8 @@ def require_site_admin(f):
             if is_credential_revoked(credential_id):
                 return _auth_error('credential_revoked', 'Credential revoked', status=401, auth_method='credential')
             
-            # Verify it's an admin permission (accept common admin permission names)
-            admin_permissions = ['admin_access', 'super_admin', 'admin', 'superadmin', 'site_admin']
-            if permission_id in admin_permissions or 'admin' in permission_id.lower():
+            # Verify it's an admin permission
+            if is_admin_permission(permission_id):
                 g.is_admin = True
                 g.admin_email = user_email or 'admin@lemma.id'
                 g.credential_id = credential_id
@@ -351,7 +352,7 @@ def require_admin(f):
         if agent_token:
             is_valid, credential_info = validate_agent_token(agent_token)
             if is_valid:
-                scope = credential_info.get('scope', [])
+                scope = normalize_scopes(credential_info.get('scope', []))
                 if 'admin' in scope:
                     g.is_admin = True
                     g.admin_email = credential_info.get('authorized_by_email', 'agent@lemma.id')
@@ -371,7 +372,7 @@ def require_admin(f):
         # Method 0b: Agent session (browser requests from /api/agent/session)
         is_agent_session, session_info = check_agent_session()
         if is_agent_session:
-            scope = session_info.get('scope', [])
+            scope = normalize_scopes(session_info.get('scope', []))
             if 'admin' in scope:
                 g.is_admin = True
                 g.admin_email = 'agent@lemma.id'
@@ -399,8 +400,7 @@ def require_admin(f):
                 return _auth_error('credential_revoked', 'Credential revoked', status=401, auth_method='credential')
 
             # Verify it's an admin permission
-            admin_permissions = ['admin_access', 'super_admin', 'admin', 'superadmin', 'site_admin']
-            if permission_id in admin_permissions or 'admin' in permission_id.lower():
+            if is_admin_permission(permission_id):
                 g.is_admin = True
                 g.credential_id = credential_id
                 g.permission_id = permission_id
