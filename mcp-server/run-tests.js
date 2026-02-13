@@ -8,8 +8,8 @@
 import puppeteer from 'puppeteer';
 import fetch from 'node-fetch';
 
-const LEMMA_BASE_URL = 'https://lemma.id';
-const AGENT_TOKEN = 'lm_agent_0OHnZ9X9G7FXYzC7MzAMCWuFKkz04oK8FPJzlePyiWU';
+const LEMMA_BASE_URL = (process.env.LEMMA_BASE_URL || 'https://lemma.id').replace(/\/$/, '');
+const AGENT_TOKEN = process.env.LEMMA_AGENT_TOKEN || 'lm_agent_0OHnZ9X9G7FXYzC7MzAMCWuFKkz04oK8FPJzlePyiWU';
 
 let browser = null;
 let page = null;
@@ -53,13 +53,25 @@ async function callApi(endpoint, options = {}) {
     'X-Agent-Token': AGENT_TOKEN,
     ...options.headers
   };
-  
+
   const response = await fetch(url, { ...options, headers });
   return {
     status: response.status,
     ok: response.ok,
     data: await response.json().catch(() => null)
   };
+}
+
+async function requireAuthPreflight() {
+  const result = await callApi('/api/agent/validate', { method: 'POST' });
+  const scopes = result.data?.scope || result.data?.scopes || [];
+  if (!(result.ok && result.data?.valid === true)) {
+    const reason = result.data?.error || result.data?.message || `status_${result.status}`;
+    throw new Error(`AUTH_PREFLIGHT_FAILED: ${reason}`);
+  }
+  if (!Array.isArray(scopes) || !scopes.includes('admin')) {
+    throw new Error(`AUTH_PREFLIGHT_FAILED: missing_admin_scope (scopes=${JSON.stringify(scopes)})`);
+  }
 }
 
 async function runTest(name, testFn) {
@@ -107,7 +119,7 @@ async function testAuthValidation() {
     const result = await callApi('/api/agent/validate', { method: 'POST' });
     return {
       passed: result.ok && result.data?.valid === true,
-      details: `Token valid: ${result.data?.valid}, Scopes: ${JSON.stringify(result.data?.scopes)}`
+      details: `Token valid: ${result.data?.valid}, Scopes: ${JSON.stringify(result.data?.scope || result.data?.scopes)}`
     };
   });
   
@@ -468,6 +480,9 @@ async function main() {
   console.log('╚════════════════════════════════════════════════════════════╝');
   
   try {
+    // Mandatory auth preflight gate
+    await requireAuthPreflight();
+
     // Run all test suites
     await testAuthValidation();
     await testAdminDashboard();
@@ -491,7 +506,9 @@ async function main() {
   console.log(`║  Total Tests: ${String(results.passed + results.failed).padEnd(44)}║`);
   console.log(`║  Passed:      ${String(results.passed).padEnd(44)}║`);
   console.log(`║  Failed:      ${String(results.failed).padEnd(44)}║`);
-  console.log(`║  Pass Rate:   ${((results.passed / (results.passed + results.failed)) * 100).toFixed(1)}%${' '.repeat(42)}║`);
+  const total = results.passed + results.failed;
+  const passRate = total > 0 ? ((results.passed / total) * 100).toFixed(1) : '0.0';
+  console.log(`║  Pass Rate:   ${passRate}%${' '.repeat(42)}║`);
   console.log('╚════════════════════════════════════════════════════════════╝');
   
   // List failed tests

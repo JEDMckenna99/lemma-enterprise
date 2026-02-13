@@ -20,6 +20,19 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+def _auth_error(code: str, message: str, status: int = 401, auth_method: str = 'none', required_scope=None, provided_scope=None):
+    payload = {
+        'error': code,
+        'message': message,
+        'auth_method': auth_method,
+    }
+    if required_scope is not None:
+        payload['required_scope'] = required_scope
+    if provided_scope is not None:
+        payload['provided_scope'] = provided_scope
+    return jsonify(payload), status
+
+
 def validate_agent_token(token):
     """
     Validate an agent token and return the credential info if valid.
@@ -169,10 +182,14 @@ def require_site_admin(f):
                     g.ppid = credential_info.get('authorized_by_ppid')
                     return f(*args, **kwargs)
                 else:
-                    return jsonify({
-                        'error': 'Agent token lacks admin scope',
-                        'message': 'Token was issued without admin scope. Request a new token with admin scope.'
-                    }), 403
+                    return _auth_error(
+                        'missing_scope',
+                        'Token was issued without admin scope. Request a new token with admin scope.',
+                        status=403,
+                        auth_method='agent_token',
+                        required_scope=['admin'],
+                        provided_scope=scope,
+                    )
         
         # METHOD 0b: Agent session (from /api/agent/session - browser requests)
         is_agent_session, session_info = check_agent_session()
@@ -186,10 +203,14 @@ def require_site_admin(f):
                 g.agent_credential = session_info
                 return f(*args, **kwargs)
             else:
-                return jsonify({
-                    'error': 'Agent session lacks admin scope',
-                    'message': 'Agent was authorized without admin scope.'
-                }), 403
+                return _auth_error(
+                    'missing_scope',
+                    'Agent was authorized without admin scope.',
+                    status=403,
+                    auth_method='agent_session',
+                    required_scope=['admin'],
+                    provided_scope=scope,
+                )
         
         # METHOD 1: Client-side verified credential (edge verification)
         credential_id = request.headers.get('X-Credential-ID')
@@ -201,7 +222,7 @@ def require_site_admin(f):
             from api.wallet_revocation import is_credential_revoked
             
             if is_credential_revoked(credential_id):
-                return jsonify({'error': 'Credential revoked'}), 401
+                return _auth_error('credential_revoked', 'Credential revoked', status=401, auth_method='credential')
             
             # Verify it's an admin permission (accept common admin permission names)
             admin_permissions = ['admin_access', 'super_admin', 'admin', 'superadmin', 'site_admin']
@@ -213,7 +234,12 @@ def require_site_admin(f):
                 g.auth_method = 'credential'
                 return f(*args, **kwargs)
             else:
-                return jsonify({'error': f'Admin permission required, got: {permission_id}'}), 403
+                return _auth_error(
+                    'missing_permission',
+                    f'Admin permission required, got: {permission_id}',
+                    status=403,
+                    auth_method='credential',
+                )
         
         # METHOD 2: API key (programmatic access - still supported)
         api_key = request.headers.get('X-API-Key') or request.args.get('api_key')
@@ -228,7 +254,11 @@ def require_site_admin(f):
             return f(*args, **kwargs)
         
         # No valid auth found
-        return jsonify({'error': 'Admin authentication required (credential ID, API key, or agent token with admin scope)'}), 401
+        return _auth_error(
+            'auth_required',
+            'Admin authentication required (credential ID, API key, or agent token with admin scope)',
+            status=401,
+        )
     
     return decorated_function
 
@@ -311,7 +341,7 @@ def require_admin(f):
     """
     Decorator to require admin privileges via credential, API key, or agent token.
     Uses the same pattern as require_site_admin for consistency.
-    
+
     AGENT DELEGATION: Also checks for agent sessions from /api/agent/session
     """
     @wraps(f)
@@ -329,12 +359,15 @@ def require_admin(f):
                     g.agent_credential = credential_info
                     g.ppid = credential_info.get('authorized_by_ppid')
                     return f(*args, **kwargs)
-                else:
-                    return jsonify({
-                        'error': 'Agent token lacks admin scope',
-                        'message': 'Token was issued without admin scope. Request a new token with admin scope.'
-                    }), 403
-        
+                return _auth_error(
+                    'missing_scope',
+                    'Token was issued without admin scope. Request a new token with admin scope.',
+                    status=403,
+                    auth_method='agent_token',
+                    required_scope=['admin'],
+                    provided_scope=scope,
+                )
+
         # Method 0b: Agent session (browser requests from /api/agent/session)
         is_agent_session, session_info = check_agent_session()
         if is_agent_session:
@@ -346,22 +379,25 @@ def require_admin(f):
                 g.ppid = session_info.get('authorized_by_ppid')
                 g.agent_credential = session_info
                 return f(*args, **kwargs)
-            else:
-                return jsonify({
-                    'error': 'Agent session lacks admin scope',
-                    'message': 'Agent was authorized without admin scope.'
-                }), 403
-        
+            return _auth_error(
+                'missing_scope',
+                'Agent was authorized without admin scope.',
+                status=403,
+                auth_method='agent_session',
+                required_scope=['admin'],
+                provided_scope=scope,
+            )
+
         # Method 1: Client-side verified credential (edge verification)
         credential_id = request.headers.get('X-Credential-ID')
         permission_id = request.headers.get('X-Permission-ID')
-        
+
         if credential_id and permission_id:
             from api.wallet_revocation import is_credential_revoked
-            
+
             if is_credential_revoked(credential_id):
-                return jsonify({'error': 'Credential revoked'}), 401
-            
+                return _auth_error('credential_revoked', 'Credential revoked', status=401, auth_method='credential')
+
             # Verify it's an admin permission
             admin_permissions = ['admin_access', 'super_admin', 'admin', 'superadmin', 'site_admin']
             if permission_id in admin_permissions or 'admin' in permission_id.lower():
@@ -370,9 +406,13 @@ def require_admin(f):
                 g.permission_id = permission_id
                 g.auth_method = 'credential'
                 return f(*args, **kwargs)
-            else:
-                return jsonify({'error': f'Admin permission required, got: {permission_id}'}), 403
-        
+            return _auth_error(
+                'missing_permission',
+                f'Admin permission required, got: {permission_id}',
+                status=403,
+                auth_method='credential',
+            )
+
         # Method 2: API key fallback (programmatic access)
         api_key = request.headers.get('X-API-Key') or request.args.get('api_key')
         is_valid_key, key_obj, key_error = validate_api_key_secure(api_key)
@@ -381,9 +421,13 @@ def require_admin(f):
             g.is_admin = True
             g.auth_method = 'api_key'
             return f(*args, **kwargs)
-        
-        return jsonify({'error': 'Admin authentication required (credential, API key, or agent token with admin scope)'}), 401
-    
+
+        return _auth_error(
+            'auth_required',
+            'Admin authentication required (credential, API key, or agent token with admin scope)',
+            status=401,
+        )
+
     return decorated_function
 
 

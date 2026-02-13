@@ -110,7 +110,7 @@ def revoke_credential():
         # For permission lemmas: Site-specific revocation
         elif credential_type == 'permission':
             site_success = await_site_revocation(credential_id, reason, site_domain)
-
+            
             if not site_success:
                 logger.error(f"❌ Site-specific revocation persistence failed for {credential_id}")
                 return jsonify({
@@ -234,7 +234,7 @@ def await_site_revocation(credential_id: str, reason: str, site_domain: str = No
             session.commit()
             
             logger.info(f"✅ Added {credential_id} to revocation registry for site {site_domain}")
-
+            
             # Keep revocation data path current by immediately syncing this credential.
             # Event-bus propagation still occurs in revoke_credential().
             bloom_synced = False

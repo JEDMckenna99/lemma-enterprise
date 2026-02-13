@@ -1854,7 +1854,8 @@ def validate_agent_token_endpoint():
         else:
             return jsonify({
                 'valid': False,
-                'error': 'Invalid, expired, revoked, or max operations exceeded'
+                'error': 'invalid_token',
+                'message': 'Invalid, expired, revoked, or max operations exceeded'
             }), 401
 
     # Check for session-based agent auth (from /api/agent/session)
@@ -1871,5 +1872,6 @@ def validate_agent_token_endpoint():
     # No auth found - return valid: false (not an error, just not authenticated)
     return jsonify({
         'valid': False,
+        'error': 'auth_required',
         'message': 'No agent token or session found'
     })
