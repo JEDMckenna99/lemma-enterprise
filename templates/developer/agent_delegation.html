@@ -221,15 +221,33 @@ async function generateAgentToken() {
     const data = await response.json();
     if (!response.ok || !data.success) throw new Error(data.error || 'Failed to generate token');
 
-    const token = data?.credential?.token || '';
-    const tokenId = data?.credential?.token_id || '';
-    const expires = data?.credential?.expires_at || '';
+    const token = data?.credential?.token || data?.token || '';
+    const tokenId = data?.credential?.token_id || data?.token_id || '';
+    const expires = data?.credential?.expires_at || data?.expires_at || '';
     const container = document.getElementById('agent-token-content');
+
+    if (!token) {
+        container.insertAdjacentHTML('afterbegin', `
+            <div class="agent-generated" style="border-left:4px solid #f59e0b;">
+                <div><strong>Token created, but plaintext token not returned</strong></div>
+                <div style="font-size:12px; color: var(--dev-text-muted); margin-top:6px;">
+                    Token ID: ${escapeHtml(tokenId)} | Expires: ${formatDate(expires)}
+                </div>
+                <div style="font-size:12px; margin-top:8px;">
+                    Use <code>/api/agent/credentials/session-issue</code> while signed in to retrieve a new plaintext token.
+                </div>
+            </div>
+        `);
+        await loadAgentTokenPanel();
+        return;
+    }
+
     container.insertAdjacentHTML('afterbegin', `
         <div class="agent-generated">
-            <div><strong>New token generated</strong></div>
+            <div><strong>New token generated (shown once)</strong></div>
             <div class="agent-token-value" id="new-agent-token">${escapeHtml(token)}</div>
             <div style="font-size:12px; color: var(--dev-text-muted);">Token ID: ${escapeHtml(tokenId)} | Expires: ${formatDate(expires)}</div>
+            <div style="font-size:12px; color:#b45309; margin-top:6px;">Copy now — this token may not be shown again.</div>
             <div style="margin-top:10px;">
                 <button class="dev-btn dev-btn-primary dev-btn-sm" data-action="copy-new-token">Copy Token</button>
             </div>
