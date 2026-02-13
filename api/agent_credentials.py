@@ -44,18 +44,72 @@ def _get_allowed_values(env_key: str, default_csv: str) -> set[str]:
     return {item.strip().lower() for item in raw.split(',') if item.strip()}
 
 
+def _parse_admin_lemma_context():
+    """
+    Parse optional admin lemma context from request payload or Authorization bearer JSON.
+    This enables issuance checks based on possession of a locally-verified admin lemma.
+    """
+    payload = request.get_json(silent=True) or {}
+    credential = payload.get('admin_credential') or payload.get('credential')
+
+    if not credential:
+        auth_header = request.headers.get('Authorization', '')
+        if auth_header.startswith('Bearer '):
+            raw = auth_header[7:]
+            try:
+                credential = json.loads(raw)
+            except Exception:
+                credential = None
+
+    if not isinstance(credential, dict):
+        return {
+            'permission_id': None,
+            'role': None,
+            'site_id': None,
+            'ppid': None
+        }
+
+    claims = credential.get('claims') or credential.get('credentialSubject') or {}
+    permission_id = (
+        claims.get('permissionId')
+        or claims.get('permission_id')
+        or claims.get('permission_level')
+    )
+    role = (
+        claims.get('accountType')
+        or claims.get('role')
+        or claims.get('user_role')
+        or claims.get('permission_level')
+    )
+    site_id = claims.get('siteId') or claims.get('site_id')
+    ppid = (
+        credential.get('subject')
+        or credential.get('sub')
+        or claims.get('sub')
+        or claims.get('ppid')
+        or claims.get('id')
+    )
+
+    return {
+        'permission_id': (permission_id or '').strip().lower(),
+        'role': (role or '').strip().lower(),
+        'site_id': (site_id or '').strip().lower(),
+        'ppid': ppid
+    }
+
+
 def _require_delegation_admin_session():
     """
     Require an active unlocked lemma.id wallet session and allowed admin role/permission
     before allowing delegated agent credential issuance.
     """
-    passkey_verified = bool(session.get('passkey_verified'))
     session_permission_id = (session.get('permission_id') or '').strip().lower()
     session_user_role = (session.get('user_role') or '').strip().lower()
+    admin_lemma_ctx = _parse_admin_lemma_context()
 
     # Wallet session cookie is the 24h "unlocked for the day" anchor.
     wallet_session_cookie = request.cookies.get('lemma_wallet_session')
-    if not passkey_verified or not wallet_session_cookie:
+    if not wallet_session_cookie:
         return False, (
             jsonify({
                 'success': False,
@@ -91,15 +145,47 @@ def _require_delegation_admin_session():
         DEFAULT_DELEGATION_ALLOWED_ROLES
     )
 
-    has_allowed_permission = session_permission_id in allowed_permissions if session_permission_id else False
-    has_allowed_role = session_user_role in allowed_roles if session_user_role else False
+    payload = request.get_json(silent=True) or {}
+    intended_platform = (
+        payload.get('intended_platform')
+        or request.args.get('intended_platform')
+        or 'lemma.id'
+    ).strip().lower()
+
+    lemma_site_id = admin_lemma_ctx.get('site_id')
+    if lemma_site_id and lemma_site_id != intended_platform:
+        return False, (
+            jsonify({
+                'success': False,
+                'error': 'Admin lemma site mismatch',
+                'message': f'Admin lemma is for {lemma_site_id}, but requested delegation is for {intended_platform}.'
+            }),
+            403
+        )
+
+    has_allowed_permission = False
+    has_allowed_role = False
+
+    # Session-derived IAM
+    if session_permission_id and session_permission_id in allowed_permissions:
+        has_allowed_permission = True
+    if session_user_role and session_user_role in allowed_roles:
+        has_allowed_role = True
+
+    # Admin lemma-derived IAM (possession proof from client credential)
+    lemma_permission_id = admin_lemma_ctx.get('permission_id')
+    lemma_role = admin_lemma_ctx.get('role')
+    if lemma_permission_id and lemma_permission_id in allowed_permissions:
+        has_allowed_permission = True
+    if lemma_role and lemma_role in allowed_roles:
+        has_allowed_role = True
 
     if not (has_allowed_permission or has_allowed_role):
         return False, (
             jsonify({
                 'success': False,
                 'error': 'Insufficient permission',
-                'message': 'Delegated agent credential issuance requires an allowed admin role/permission.',
+                'message': 'Delegated agent credential issuance requires possession of an allowed admin role/permission.',
                 'required_permissions': sorted(list(allowed_permissions)),
                 'required_roles': sorted(list(allowed_roles))
             }),

@@ -204,10 +204,13 @@ async function generateAgentToken() {
     const scope = ['read'];
     if (document.getElementById('scope-write')?.checked) scope.push('write');
     if (document.getElementById('scope-admin')?.checked) scope.push('admin');
+    const adminCredential = window.lemmaCredential || null;
     const payload = {
         agent_name: document.getElementById('agent-name')?.value || 'AI Agent',
         ttl_hours: parseInt(document.getElementById('agent-ttl')?.value || '4', 10),
-        scope
+        scope,
+        intended_platform: 'lemma.id',
+        admin_credential: adminCredential
     };
 
     const response = await fetch('/api/agent/credentials/issue', {
