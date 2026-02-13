@@ -226,8 +226,13 @@ async function generateAgentToken() {
     const expires = data?.credential?.expires_at || data?.expires_at || '';
     const container = document.getElementById('agent-token-content');
 
+    // Refresh token list first so the generated token panel is not overwritten by re-render
+    await loadAgentTokenPanel();
+
+    const refreshedContainer = document.getElementById('agent-token-content');
+
     if (!token) {
-        container.insertAdjacentHTML('afterbegin', `
+        refreshedContainer.insertAdjacentHTML('afterbegin', `
             <div class="agent-generated" style="border-left:4px solid #f59e0b;">
                 <div><strong>Token created, but plaintext token not returned</strong></div>
                 <div style="font-size:12px; color: var(--dev-text-muted); margin-top:6px;">
@@ -238,11 +243,10 @@ async function generateAgentToken() {
                 </div>
             </div>
         `);
-        await loadAgentTokenPanel();
         return;
     }
 
-    container.insertAdjacentHTML('afterbegin', `
+    refreshedContainer.insertAdjacentHTML('afterbegin', `
         <div class="agent-generated">
             <div><strong>New token generated (shown once)</strong></div>
             <div class="agent-token-value" id="new-agent-token">${escapeHtml(token)}</div>
@@ -253,7 +257,6 @@ async function generateAgentToken() {
             </div>
         </div>
     `);
-    await loadAgentTokenPanel();
 }
 
 async function revokeAgentToken(tokenId) {
