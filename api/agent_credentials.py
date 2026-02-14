@@ -100,41 +100,15 @@ def _parse_admin_lemma_context():
 
 def _require_delegation_admin_session():
     """
-    Require an active unlocked lemma.id wallet session and allowed admin role/permission
-    before allowing delegated agent credential issuance.
+    Require admin IAM with lemma-bound identity before allowing delegated credential issuance.
+
+    Accepted admin contexts:
+    1) Agent token with admin scope + bound lemma PPID (machine flow)
+    2) Browser wallet session unlock + allowed admin role/permission (interactive flow)
     """
     session_permission_id = (session.get('permission_id') or '').strip().lower()
     session_user_role = (session.get('user_role') or '').strip().lower()
     admin_lemma_ctx = _parse_admin_lemma_context()
-
-    # Wallet session cookie is the 24h "unlocked for the day" anchor.
-    wallet_session_cookie = request.cookies.get('lemma_wallet_session')
-    if not wallet_session_cookie:
-        return False, (
-            jsonify({
-                'success': False,
-                'error': 'Admin wallet unlock required',
-                'message': 'Unlock your lemma.id wallet for the day before issuing delegated agent credentials.'
-            }),
-            403
-        )
-
-    # Validate cookie cryptographically (prevents stale/forged session usage).
-    try:
-        from auth.session_manager import validate_session_token
-        wallet_session_data = validate_session_token(wallet_session_cookie)
-    except Exception:
-        wallet_session_data = None
-
-    if not wallet_session_data:
-        return False, (
-            jsonify({
-                'success': False,
-                'error': 'Wallet session expired',
-                'message': 'Your wallet unlock session is expired. Unlock lemma.id again.'
-            }),
-            403
-        )
 
     allowed_permissions = _get_allowed_values(
         'AGENT_DELEGATION_ALLOWED_PERMISSIONS',
@@ -157,8 +131,73 @@ def _require_delegation_admin_session():
         return False, (
             jsonify({
                 'success': False,
-                'error': 'Admin lemma site mismatch',
+                'error': 'admin_lemma_site_mismatch',
                 'message': f'Admin lemma is for {lemma_site_id}, but requested delegation is for {intended_platform}.'
+            }),
+            403
+        )
+
+    # Path A: machine flow via agent token (no browser wallet cookie required)
+    # This still enforces lemma-bound identity (authorized_by_ppid).
+    agent_token = request.headers.get('X-Agent-Token')
+    if agent_token and agent_token.startswith('lm_agent_'):
+        token_info = validate_agent_token(agent_token)
+        if token_info:
+            token_scope = token_info.get('scope') or []
+            if isinstance(token_scope, str):
+                token_scope = [token_scope]
+            token_scope = [str(s).strip().lower() for s in token_scope if s]
+
+            if 'admin' not in token_scope:
+                return False, (
+                    jsonify({
+                        'success': False,
+                        'error': 'missing_scope',
+                        'message': 'Token was issued without admin scope.',
+                        'required_scope': ['admin'],
+                        'provided_scope': token_scope
+                    }),
+                    403
+                )
+
+            token_ppid = token_info.get('authorized_by_ppid') or token_info.get('authorized_by')
+            if not token_ppid or not str(token_ppid).startswith('did:lemma:ppid_'):
+                return False, (
+                    jsonify({
+                        'success': False,
+                        'error': 'missing_admin_lemma_binding',
+                        'message': 'Admin-scoped token is not bound to a lemma identity required for delegation issuance.'
+                    }),
+                    403
+                )
+
+            return True, None
+
+    # Path B: browser wallet session unlock anchor.
+    wallet_session_cookie = request.cookies.get('lemma_wallet_session')
+    if not wallet_session_cookie:
+        return False, (
+            jsonify({
+                'success': False,
+                'error': 'wallet_unlock_required',
+                'message': 'Unlock your lemma.id wallet for the day before issuing delegated agent credentials.'
+            }),
+            403
+        )
+
+    # Validate cookie cryptographically (prevents stale/forged session usage).
+    try:
+        from auth.session_manager import validate_session_token
+        wallet_session_data = validate_session_token(wallet_session_cookie)
+    except Exception:
+        wallet_session_data = None
+
+    if not wallet_session_data:
+        return False, (
+            jsonify({
+                'success': False,
+                'error': 'wallet_session_expired',
+                'message': 'Your wallet unlock session is expired. Unlock lemma.id again.'
             }),
             403
         )
@@ -184,7 +223,7 @@ def _require_delegation_admin_session():
         return False, (
             jsonify({
                 'success': False,
-                'error': 'Insufficient permission',
+                'error': 'insufficient_permission',
                 'message': 'Delegated agent credential issuance requires possession of an allowed admin role/permission.',
                 'required_permissions': sorted(list(allowed_permissions)),
                 'required_roles': sorted(list(allowed_roles))
@@ -1760,7 +1799,8 @@ def create_agent_session():
     if not token:
         return jsonify({
             'success': False,
-            'error': 'X-Agent-Token header required'
+            'error': 'auth_required',
+            'message': 'X-Agent-Token header required'
         }), 400
     
     credential_info = validate_agent_token(token)
@@ -1768,7 +1808,8 @@ def create_agent_session():
     if not credential_info:
         return jsonify({
             'success': False,
-            'error': 'Invalid, expired, or revoked agent token'
+            'error': 'invalid_token',
+            'message': 'Invalid, expired, or revoked agent token'
         }), 401
     
     # Create session from agent token
