@@ -1077,13 +1077,26 @@ def revoke_agent_credential(token_id):
     """
     ppid = request.headers.get('X-Lemma-PPID') or session.get('ppid')
     customer_id = session.get('customer_id')
-    
+
+    # Machine flow: allow owner resolution from a lemma-bound admin agent token.
+    if not ppid:
+        agent_token = request.headers.get('X-Agent-Token')
+        if agent_token and agent_token.startswith('lm_agent_'):
+            token_info = validate_agent_token(agent_token)
+            if token_info:
+                token_scope = token_info.get('scope') or []
+                if isinstance(token_scope, str):
+                    token_scope = [token_scope]
+                token_scope = [str(s).strip().lower() for s in token_scope if s]
+                if 'admin' in token_scope:
+                    ppid = token_info.get('authorized_by_ppid') or token_info.get('authorized_by')
+
     if not ppid and not customer_id:
         return jsonify({
             'success': False,
-            'error': 'Authentication required'
+            'error': 'auth_required'
         }), 401
-    
+
     authorized_by = ppid or f"customer:{customer_id}"
     
     data = request.get_json() or {}
