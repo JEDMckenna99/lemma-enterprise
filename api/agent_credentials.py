@@ -491,7 +491,7 @@ def issue_agent_credential():
             return error_response
 
         # SECURITY CHECK 1: User must be authenticated
-        # Check for passkey session or PPID
+        # Check for passkey session, explicit PPID, or lemma-bound admin token context.
         ppid = request.headers.get('X-Lemma-PPID')
         passkey_verified = session.get('passkey_verified', False)
         customer_id = session.get('customer_id')
@@ -507,11 +507,20 @@ def issue_agent_credential():
             except:
                 pass
 
+        # Agent-token machine flow: derive lemma binding from token when present.
+        agent_token = request.headers.get('X-Agent-Token')
+        if not ppid and agent_token and agent_token.startswith('lm_agent_'):
+            token_info = validate_agent_token(agent_token)
+            if token_info:
+                ppid = token_info.get('authorized_by_ppid') or token_info.get('authorized_by')
+                if not user_email:
+                    user_email = token_info.get('authorized_by_email')
+
         if not ppid and not customer_id:
             return jsonify({
                 'success': False,
-                'error': 'Authentication required',
-                'message': 'You must be signed in with passkey to issue agent credentials'
+                'error': 'auth_required',
+                'message': 'You must be signed in with passkey or provide a lemma-bound admin token to issue agent credentials.'
             }), 401
 
         # SECURITY: Validate PPID format if provided via header (prevent spoofing)
