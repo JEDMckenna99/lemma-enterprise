@@ -1756,6 +1756,7 @@ class LemmaWallet {
                 this._initialized = true;
                 await this._checkSessionState();
                 this._cleanupStaleRedirectState();
+                await this._processCredentialTransferToken();
                 
                 // Pre-hydrate verification caches (non-blocking, parallel reads)
                 // This ensures verifyLocalAuthorization() hits memory, not IndexedDB
@@ -1885,6 +1886,45 @@ class LemmaWallet {
             }
         } catch (e) {
             console.warn('Auto-sync revocations failed:', e);
+        }
+    }
+
+    /**
+     * Process one-time transfer tokens used to import an issued credential
+     * into the current site's IndexedDB context.
+     */
+    async _processCredentialTransferToken() {
+        try {
+            const url = new URL(window.location.href);
+            const transferToken = url.searchParams.get('lemma_transfer_token');
+            if (!transferToken) {
+                return;
+            }
+
+            this._log('[Lemma] Found credential transfer token in URL; attempting redeem');
+            const redeemResp = await fetch('https://lemma.id/api/developer/credential-transfer/redeem', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    token: transferToken,
+                    site_domain: window.location.hostname
+                })
+            });
+
+            const redeemData = await redeemResp.json();
+            if (!redeemResp.ok || !redeemData.success || !redeemData.credential) {
+                this._warn('[Lemma] Credential transfer redeem failed:', redeemData?.error || redeemData?.message || redeemResp.status);
+                return;
+            }
+
+            await this.storeCredential(redeemData.credential);
+            this._log('[Lemma] Credential transfer redeemed and stored for site:', redeemData.site_domain || window.location.hostname);
+
+            // Remove one-time token from URL after successful import.
+            url.searchParams.delete('lemma_transfer_token');
+            window.history.replaceState({}, document.title, url.toString());
+        } catch (e) {
+            this._warn('[Lemma] Credential transfer processing failed (non-fatal):', e.message);
         }
     }
 

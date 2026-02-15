@@ -7,6 +7,7 @@ SECURITY: All site-specific operations require ownership validation.
 
 import logging
 import secrets
+import json
 from datetime import datetime, timedelta
 from flask import Blueprint, request, jsonify, g
 from flask_cors import cross_origin
@@ -14,6 +15,7 @@ from auth.decorators import require_wallet_ppid, require_customer_or_admin
 from api.agent_credentials import require_agent_or_user_auth
 from api.usage_tracking import get_monthly_active_users
 from api.lemma_format import normalize_site_permission_lemma
+from api.database import get_redis_client
 
 logger = logging.getLogger(__name__)
 
@@ -240,6 +242,10 @@ def _canonical_site_key(value: str) -> str:
     if not value:
         return ''
     return ''.join(ch for ch in str(value).lower() if ch.isalnum())
+
+
+def _build_admin_transfer_key(token: str) -> str:
+    return f"admin_transfer_token:{token}"
 
 
 @developer_api_bp.route('/api/developer/stats', methods=['GET'])
@@ -725,6 +731,172 @@ def bootstrap_site_admin(site_id):
         return jsonify({
             'success': False,
             'error': 'bootstrap_failed',
+            'message': str(e)
+        }), 500
+
+
+@developer_api_bp.route('/api/developer/sites/<site_id>/admin-transfer-token', methods=['POST'])
+@cross_origin()
+@require_agent_or_user_auth(required_scope='write')
+def create_admin_transfer_token(site_id):
+    """
+    Create a one-time token that allows the target site origin to redeem
+    and locally store a freshly issued admin credential in that site's IndexedDB.
+    """
+    auth_error = _require_site_ownership(site_id)
+    if auth_error:
+        return auth_error
+
+    caller_ppid = _get_authenticated_ppid()
+    if not caller_ppid:
+        return jsonify({
+            'success': False,
+            'error': 'auth_required',
+            'message': 'Wallet authentication required.'
+        }), 401
+
+    data = request.get_json(silent=True) or {}
+    credential = data.get('credential')
+    if not isinstance(credential, dict):
+        return jsonify({
+            'success': False,
+            'error': 'credential_required',
+            'message': 'Credential payload is required.'
+        }), 400
+
+    try:
+        from api.database import SessionLocal, Site
+        db = SessionLocal()
+        try:
+            site = db.query(Site).filter(Site.site_id == site_id).first()
+            if not site:
+                return jsonify({
+                    'success': False,
+                    'error': 'site_not_found',
+                    'message': 'Site not found.'
+                }), 404
+
+            claims = credential.get('claims') or credential.get('credentialSubject') or {}
+            if claims.get('siteId') != site_id:
+                return jsonify({
+                    'success': False,
+                    'error': 'site_mismatch',
+                    'message': 'Credential siteId does not match requested site.'
+                }), 400
+            if claims.get('permissionId') != 'admin':
+                return jsonify({
+                    'success': False,
+                    'error': 'permission_mismatch',
+                    'message': 'Only admin credentials can be transferred with this endpoint.'
+                }), 400
+
+            token = secrets.token_urlsafe(32)
+            expires_in_seconds = 300
+            payload = {
+                'site_id': site_id,
+                'site_domain': site.site_domain,
+                'credential': credential,
+                'created_by': caller_ppid,
+                'created_at': datetime.utcnow().isoformat()
+            }
+
+            redis_client = get_redis_client()
+            redis_client.setex(
+                _build_admin_transfer_key(token),
+                expires_in_seconds,
+                json.dumps(payload)
+            )
+
+            return jsonify({
+                'success': True,
+                'token': token,
+                'expires_in': expires_in_seconds,
+                'site_id': site_id,
+                'site_domain': site.site_domain,
+                'import_url': f"https://{site.site_domain}/?lemma_transfer_token={token}",
+                'message': 'Open the import URL on the site to store credential in site-local IndexedDB.'
+            }), 201
+        finally:
+            db.close()
+    except Exception as e:
+        logger.error(f"Failed to create admin transfer token for {site_id}: {e}")
+        return jsonify({
+            'success': False,
+            'error': 'transfer_token_failed',
+            'message': str(e)
+        }), 500
+
+
+@developer_api_bp.route('/api/developer/credential-transfer/redeem', methods=['POST'])
+@cross_origin()
+def redeem_credential_transfer_token():
+    """
+    Redeem a one-time admin credential transfer token.
+    Intended for use by relying-site frontend code on the target site origin.
+    """
+    data = request.get_json(silent=True) or {}
+    token = data.get('token')
+    if not token:
+        return jsonify({
+            'success': False,
+            'error': 'token_required',
+            'message': 'Transfer token is required.'
+        }), 400
+
+    try:
+        redis_client = get_redis_client()
+        redis_key = _build_admin_transfer_key(token)
+        raw = redis_client.get(redis_key)
+        if not raw:
+            return jsonify({
+                'success': False,
+                'error': 'invalid_or_expired_token',
+                'message': 'Transfer token is invalid, expired, or already redeemed.'
+            }), 400
+
+        payload = json.loads(raw)
+        site_domain = (payload.get('site_domain') or '').lower()
+        origin = request.headers.get('Origin', '')
+        origin_host = ''
+        if origin:
+            try:
+                from urllib.parse import urlparse
+                origin_host = (urlparse(origin).hostname or '').lower()
+            except Exception:
+                origin_host = ''
+
+        requested_domain = (data.get('site_domain') or '').lower()
+        allowed_hosts = {site_domain}
+        if site_domain.startswith('localhost') or site_domain.startswith('127.0.0.1'):
+            allowed_hosts.add('localhost')
+            allowed_hosts.add('127.0.0.1')
+
+        if origin_host and origin_host not in allowed_hosts:
+            return jsonify({
+                'success': False,
+                'error': 'origin_mismatch',
+                'message': 'Token redemption attempted from non-target origin.'
+            }), 403
+        if requested_domain and requested_domain not in allowed_hosts:
+            return jsonify({
+                'success': False,
+                'error': 'site_domain_mismatch',
+                'message': 'Token does not belong to requested site domain.'
+            }), 403
+
+        redis_client.delete(redis_key)
+
+        return jsonify({
+            'success': True,
+            'site_id': payload.get('site_id'),
+            'site_domain': site_domain,
+            'credential': payload.get('credential')
+        })
+    except Exception as e:
+        logger.error(f"Failed to redeem credential transfer token: {e}")
+        return jsonify({
+            'success': False,
+            'error': 'redeem_failed',
             'message': str(e)
         }), 500
 

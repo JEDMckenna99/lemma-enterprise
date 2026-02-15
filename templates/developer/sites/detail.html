@@ -310,6 +310,8 @@ if (result.authenticated) {
 const siteId = '{{ site_id }}';
 const currentTab = '{{ tab }}';
 let currentPpid = null;
+let currentSiteDomain = null;
+let bootstrapState = null;
 
 // Get authenticated PPID from wallet
 async function getWalletPpid() {
@@ -377,6 +379,7 @@ async function loadSiteDetails() {
         
         const data = await response.json();
         const site = data.site;
+        currentSiteDomain = site.domain || site.site_id;
         
         document.getElementById('site-name').textContent = site.name || site.site_id;
         document.getElementById('site-domain').textContent = site.domain || site.site_id;
@@ -425,6 +428,7 @@ async function loadBootstrapStatus() {
             cache: 'no-store'
         });
         const data = await response.json();
+        bootstrapState = data;
 
         if (!response.ok || data.success === false) {
             statusEl.textContent = data.message || data.error || 'Could not determine bootstrap status.';
@@ -440,10 +444,10 @@ async function loadBootstrapStatus() {
             return;
         }
 
-        if (data.already_issued) {
-            statusEl.textContent = 'Already issued: bootstrap has already been completed for this site.';
-            button.textContent = 'Already Issued';
-            button.disabled = true;
+        if (data.already_issued && data.can_reissue) {
+            statusEl.textContent = 'Admin credential already exists. Reissue creates a fresh admin lemma for this site.';
+            button.textContent = 'Reissue Admin Credential';
+            button.disabled = false;
             return;
         }
 
@@ -457,6 +461,24 @@ async function loadBootstrapStatus() {
     }
 }
 
+async function deriveSiteScopedPpid() {
+    if (typeof LemmaWallet === 'undefined') {
+        return currentPpid;
+    }
+
+    try {
+        const wallet = new LemmaWallet();
+        await wallet.init();
+        const ppid = await wallet.derivePPID(currentSiteDomain || siteId);
+        if (ppid && ppid.startsWith('did:lemma:ppid_')) {
+            return ppid;
+        }
+    } catch (e) {
+        console.warn('Site PPID derivation failed, using authenticated PPID fallback:', e);
+    }
+    return currentPpid;
+}
+
 async function bootstrapAdminCredential() {
     const statusEl = document.getElementById('bootstrap-status-text');
     const resultEl = document.getElementById('bootstrap-result');
@@ -468,10 +490,16 @@ async function bootstrapAdminCredential() {
     resultEl.textContent = '';
 
     try {
+        const siteScopedPpid = await deriveSiteScopedPpid();
+        const isReissue = Boolean(bootstrapState && bootstrapState.already_issued && bootstrapState.can_reissue);
+
         const response = await fetch(`/api/developer/sites/${encodeURIComponent(siteId)}/bootstrap-admin`, {
             method: 'POST',
             headers: getAuthHeaders(),
-            body: JSON.stringify({})
+            body: JSON.stringify({
+                reissue: isReissue,
+                user_ppid: siteScopedPpid
+            })
         });
         const data = await response.json();
 
@@ -484,13 +512,41 @@ async function bootstrapAdminCredential() {
                 const wallet = new LemmaWallet();
                 await wallet.init();
                 await wallet.storeCredential(data.credential);
-                resultEl.textContent = 'Admin credential issued and stored in wallet.';
+                resultEl.textContent = isReissue
+                    ? 'Admin credential reissued and stored in wallet.'
+                    : 'Admin credential issued and stored in wallet.';
             } else {
                 resultEl.textContent = 'Admin credential issued. Wallet SDK not available for automatic storage.';
             }
         } catch (walletErr) {
             resultEl.textContent = 'Admin credential issued. Store it manually in wallet if needed.';
             console.warn('Credential issued but wallet storage failed:', walletErr);
+        }
+
+        try {
+            const transferResponse = await fetch(`/api/developer/sites/${encodeURIComponent(siteId)}/admin-transfer-token`, {
+                method: 'POST',
+                headers: getAuthHeaders(),
+                body: JSON.stringify({ credential: data.credential })
+            });
+            const transferData = await transferResponse.json();
+            if (transferResponse.ok && transferData.success && transferData.import_url) {
+                const importUrl = transferData.import_url;
+                resultEl.innerHTML = `
+                    ${isReissue ? 'Admin credential reissued and stored in dashboard wallet.' : 'Admin credential issued and stored in dashboard wallet.'}
+                    <br><br>
+                    <strong>Next step:</strong> Open site import URL so this credential is saved in the site's IndexedDB.
+                    <br>
+                    <a href="${importUrl}" target="_blank" rel="noopener noreferrer">${importUrl}</a>
+                `;
+                try {
+                    window.open(importUrl, '_blank', 'noopener');
+                } catch (openErr) {
+                    console.warn('Could not auto-open site import URL:', openErr);
+                }
+            }
+        } catch (transferErr) {
+            console.warn('Could not create site import handoff token:', transferErr);
         }
 
         await loadBootstrapStatus();
