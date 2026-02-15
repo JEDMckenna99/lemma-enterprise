@@ -12,6 +12,8 @@ Falls back to in-memory limiting for local development.
 
 import os
 import logging
+import json
+import hashlib
 from flask import request
 
 # Optional flask_limiter import - allows module to work without it installed
@@ -44,6 +46,70 @@ def get_client_identifier():
         ip = get_remote_address()
 
     return ip
+
+
+def _safe_token_fingerprint(token: str) -> str:
+    if not token:
+        return ''
+    return hashlib.sha256(token.encode()).hexdigest()[:16]
+
+
+def get_issuance_identifier():
+    """
+    Principal-aware identifier for delegated credential issuance endpoints.
+
+    Priority:
+    1) Verified user principal (PPID/customer/session)
+    2) Agent token fingerprint (bounded identifier, never raw token)
+    3) Fallback to source IP
+    """
+    try:
+        from flask import session
+    except Exception:
+        session = {}
+
+    ppid = (request.headers.get('X-Lemma-PPID') or '').strip()
+    if ppid.startswith('did:lemma:ppid_'):
+        return f"principal:{ppid.lower()}"
+
+    session_ppid = (session.get('ppid') or '').strip() if isinstance(session, dict) else ''
+    if session_ppid.startswith('did:lemma:ppid_'):
+        return f"principal:{session_ppid.lower()}"
+
+    customer_id = ''
+    if isinstance(session, dict):
+        customer_id = str(session.get('customer_id') or '').strip().lower()
+    if customer_id:
+        return f"principal:customer:{customer_id}"
+
+    auth_header = request.headers.get('Authorization', '')
+    if auth_header.startswith('Bearer '):
+        raw = auth_header[7:]
+        try:
+            cred = json.loads(raw)
+            subject = (
+                cred.get('subject')
+                or cred.get('sub')
+                or (cred.get('credentialSubject') or {}).get('id')
+                or ''
+            )
+            subject = str(subject).strip().lower()
+            if subject:
+                return f"principal:{subject}"
+        except Exception:
+            pass
+
+    agent_token = (request.headers.get('X-Agent-Token') or '').strip()
+    if agent_token.startswith('lm_agent_'):
+        return f"principal:agent_token:{_safe_token_fingerprint(agent_token)}"
+
+    return f"ip:{get_client_identifier()}"
+
+
+def _classify_identifier_scope(identifier: str) -> str:
+    if str(identifier).startswith('principal:'):
+        return 'principal'
+    return 'ip'
 
 
 def create_limiter(app):
@@ -97,8 +163,16 @@ def registration_limit():
 
 
 def credential_issue_limit():
-    """Limit for credential issuance - expensive operation."""
-    return "20 per hour"
+    """
+    Limit for credential issuance.
+
+    Principal-authenticated flows get a higher ceiling than anonymous/IP-only
+    paths to avoid blocking legitimate admin automation runs.
+    """
+    identifier = get_issuance_identifier()
+    if identifier.startswith('principal:'):
+        return os.environ.get('CREDENTIAL_ISSUE_LIMIT_AUTHENTICATED', '120 per hour')
+    return os.environ.get('CREDENTIAL_ISSUE_LIMIT_ANONYMOUS', '20 per hour')
 
 
 def session_limit():
@@ -111,7 +185,7 @@ def validation_limit():
     return "100 per minute"
 
 
-def rate_limit(limit_func_or_string):
+def rate_limit(limit_func_or_string, key_func=None):
     """
     Rate limit decorator for blueprint routes.
 
@@ -148,19 +222,23 @@ def rate_limit(limit_func_or_string):
                 limit_string = limit_func_or_string
 
             try:
+                key_func_to_use = key_func or get_client_identifier
                 # Create a decorated version with the rate limit
-                limited_func = limiter.limit(limit_string)(f)
+                limited_func = limiter.limit(limit_string, key_func=key_func_to_use)(f)
                 return limited_func(*args, **kwargs)
             except Exception as e:
                 # Check if it's a rate limit error
                 error_name = type(e).__name__
                 if 'RateLimitExceeded' in error_name or '429' in str(e):
-                    logger.warning(f"Rate limit exceeded ({limit_string}): {get_client_identifier()}")
+                    identifier = (key_func or get_client_identifier)()
+                    retry_after = int(getattr(e, 'retry_after', 60) or 60)
+                    logger.warning(f"Rate limit exceeded ({limit_string}) [{_classify_identifier_scope(identifier)}]: {identifier}")
                     return jsonify({
                         'success': False,
                         'error': 'rate_limit_exceeded',
-                        'message': f'Too many requests. Please try again later.',
-                        'retry_after': 60  # seconds
+                        'message': 'Too many requests. Please try again later.',
+                        'retry_after': retry_after,
+                        'limit_scope': _classify_identifier_scope(identifier)
                     }), 429
                 # Non-rate-limit errors - re-raise
                 raise

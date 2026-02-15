@@ -29,7 +29,7 @@ from functools import wraps
 from flask import Blueprint, request, jsonify, g, session
 from flask_cors import cross_origin
 
-from auth.rate_limiter import rate_limit, credential_issue_limit
+from auth.rate_limiter import rate_limit, credential_issue_limit, get_issuance_identifier
 
 logger = logging.getLogger(__name__)
 
@@ -535,7 +535,7 @@ def _build_owner_filter(identity, alias='ac'):
 
 @agent_credentials_bp.route('/api/agent/credentials/issue', methods=['POST'])
 @cross_origin()
-@rate_limit(credential_issue_limit)
+@rate_limit(credential_issue_limit, key_func=get_issuance_identifier)
 def issue_agent_credential():
     """
     Issue a new agent credential with optional task-bound authorization.
@@ -1760,7 +1760,7 @@ def get_agent_monitor_summary():
 
 @agent_credentials_bp.route('/api/agent/auto-issue', methods=['GET', 'POST'])
 @agent_credentials_bp.route('/api/agent/credentials/session-issue', methods=['POST'])
-@rate_limit(credential_issue_limit)
+@rate_limit(credential_issue_limit, key_func=get_issuance_identifier)
 def auto_issue_agent_credential():
     """
     Auto-issue an agent credential if wallet session is active.
