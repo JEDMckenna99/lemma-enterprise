@@ -145,6 +145,13 @@ def _column_exists(cursor, table_name: str, column_name: str) -> bool:
     return cursor.fetchone() is not None
 
 
+def _canonical_site_key(value: str) -> str:
+    """Normalize site identifiers by removing separators and lowercasing."""
+    if not value:
+        return ''
+    return ''.join(ch for ch in str(value).lower() if ch.isalnum())
+
+
 @developer_api_bp.route('/api/developer/stats', methods=['GET'])
 @cross_origin()
 @require_agent_or_user_auth(required_scope='read')
@@ -160,7 +167,7 @@ def get_developer_stats():
         
         # Try to query database if available
         try:
-            from api.database import SessionLocal, Site, SiteAdmin, get_db_connection
+            from api.database import SessionLocal, Site, SiteAdmin
             db = SessionLocal()
             
             # Count sites owned by this developer
@@ -246,6 +253,7 @@ def get_developer_sites():
                         site_identifiers.add(domain)
                         site_identifiers.add(domain.replace('.', '_').replace('-', '_'))
                     site_keys = list(site_identifiers)
+                    canonical_key = _canonical_site_key(site.site_id) or _canonical_site_key(domain)
 
                     pi_total = 0
                     spg_total = 0
@@ -257,8 +265,9 @@ def get_developer_sites():
                             SELECT COUNT(*)::BIGINT
                             FROM permission_instances
                             WHERE site_id = ANY(%s)
+                               OR regexp_replace(lower(site_id), '[_\\.-]', '', 'g') = %s
                             """,
-                            (site_keys,)
+                            (site_keys, canonical_key)
                         )
                         pi_total = cursor.fetchone()[0] or 0
 
@@ -268,8 +277,9 @@ def get_developer_sites():
                             SELECT COUNT(*)::BIGINT
                             FROM site_permission_grants
                             WHERE site_id = ANY(%s)
+                               OR regexp_replace(lower(site_id), '[_\\.-]', '', 'g') = %s
                             """,
-                            (site_keys,)
+                            (site_keys, canonical_key)
                         )
                         spg_total = cursor.fetchone()[0] or 0
 
@@ -278,10 +288,13 @@ def get_developer_sites():
                             """
                             SELECT COUNT(*)::BIGINT
                             FROM user_lemmas
-                            WHERE site_id = ANY(%s)
+                            WHERE (
+                                    site_id = ANY(%s)
+                                    OR regexp_replace(lower(site_id), '[_\\.-]', '', 'g') = %s
+                                  )
                               AND (lemma_type = 'permission' OR lemma_type = 'access')
                             """,
-                            (site_keys,)
+                            (site_keys, canonical_key)
                         )
                         ul_total = cursor.fetchone()[0] or 0
 
@@ -503,6 +516,7 @@ def get_site_stats(site_id):
             # Non-fatal; continue with provided site_id only.
             pass
         site_keys = list(site_identifiers)
+        canonical_key = _canonical_site_key(site_id)
 
         # Permission/lemma issuance + revocation lifecycle metrics.
         # Read from multiple tables because deployments have evolved schema paths.
@@ -531,8 +545,9 @@ def get_site_stats(site_id):
                     )::BIGINT AS active_count
                 FROM permission_instances
                 WHERE site_id = ANY(%s)
+                   OR regexp_replace(lower(site_id), '[_\\.-]', '', 'g') = %s
                 """,
-                (site_keys,)
+                (site_keys, canonical_key)
             )
             row = cursor.fetchone() or (0, 0, 0, 0, 0)
             pi_issued_total, pi_issued_30d, pi_revoked_total, pi_revoked_30d, pi_active_count = row
@@ -563,8 +578,9 @@ def get_site_stats(site_id):
                     )::BIGINT AS active_count
                 FROM site_permission_grants
                 WHERE site_id = ANY(%s)
+                   OR regexp_replace(lower(site_id), '[_\\.-]', '', 'g') = %s
                 """,
-                (site_keys,)
+                (site_keys, canonical_key)
             )
             row = cursor.fetchone() or (0, 0, 0, 0, 0)
             spg_issued_total, spg_issued_30d, spg_revoked_total, spg_revoked_30d, spg_active_count = row
@@ -594,10 +610,13 @@ def get_site_stats(site_id):
                           AND (expires_at IS NULL OR expires_at > NOW())
                     )::BIGINT AS active_count
                 FROM user_lemmas
-                WHERE site_id = ANY(%s)
+                WHERE (
+                        site_id = ANY(%s)
+                        OR regexp_replace(lower(site_id), '[_\\.-]', '', 'g') = %s
+                      )
                   AND (lemma_type = 'permission' OR lemma_type = 'access')
                 """,
-                (site_keys,)
+                (site_keys, canonical_key)
             )
             row = cursor.fetchone() or (0, 0, 0, 0, 0)
             ul_issued_total, ul_issued_30d, ul_revoked_total, ul_revoked_30d, ul_active_count = row
