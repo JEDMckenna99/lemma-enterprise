@@ -7,7 +7,7 @@ SECURITY: All site-specific operations require ownership validation.
 
 import logging
 import secrets
-from datetime import datetime
+from datetime import datetime, timedelta
 from flask import Blueprint, request, jsonify, g
 from flask_cors import cross_origin
 from auth.decorators import require_wallet_ppid, require_customer_or_admin
@@ -121,6 +121,91 @@ def _require_site_ownership(site_id: str):
         }), 403
     
     return None  # Authorized
+
+
+def _get_site_bootstrap_status(db, site_id: str, caller_ppid: str):
+    """
+    Determine whether caller can bootstrap admin permission for this site.
+
+    Returns a tuple: (status_dict, http_status_code)
+    """
+    from api.database import Site, SiteAdmin, UserLemma, SitePermissionGrant
+
+    site = db.query(Site).filter(Site.site_id == site_id).first()
+    if not site:
+        return ({
+            'success': False,
+            'eligible': False,
+            'already_issued': False,
+            'reason': 'site_not_found',
+            'message': 'Site not found.'
+        }, 404)
+
+    admin_record = db.query(SiteAdmin).filter(
+        SiteAdmin.site_id == site_id,
+        SiteAdmin.admin_did == caller_ppid,
+        SiteAdmin.is_active == True
+    ).first()
+
+    if not admin_record:
+        return ({
+            'success': False,
+            'eligible': False,
+            'already_issued': False,
+            'reason': 'not_site_admin',
+            'message': 'You are not an active admin for this site.'
+        }, 403)
+
+    site_admin_email = (site.admin_email or '').strip().lower()
+    caller_admin_email = (admin_record.admin_email or '').strip().lower()
+    if site_admin_email and caller_admin_email and site_admin_email != caller_admin_email:
+        return ({
+            'success': True,
+            'eligible': False,
+            'already_issued': False,
+            'reason': 'owner_email_mismatch',
+            'message': 'Signed-in admin does not match the site owner email.',
+            'site_id': site_id,
+            'site_domain': site.site_domain,
+            'site_admin_email': site.admin_email
+        }, 200)
+
+    existing_active_admin = db.query(UserLemma).filter(
+        UserLemma.site_id == site_id,
+        UserLemma.lemma_type.in_(['permission', 'access']),
+        UserLemma.permission_id.in_(['admin', 'admin_access', 'super_admin']),
+        UserLemma.revoked_at.is_(None),
+        UserLemma.is_active == True
+    ).first()
+
+    existing_site_grant = db.query(SitePermissionGrant).filter(
+        SitePermissionGrant.site_id == site_id,
+        SitePermissionGrant.permission_id.in_(['admin', 'admin_access', 'super_admin']),
+        SitePermissionGrant.revoked_at.is_(None),
+        SitePermissionGrant.is_active == True
+    ).first()
+
+    if existing_active_admin or existing_site_grant:
+        return ({
+            'success': True,
+            'eligible': False,
+            'already_issued': True,
+            'reason': 'bootstrap_completed',
+            'message': 'Admin bootstrap already completed for this site.',
+            'site_id': site_id,
+            'site_domain': site.site_domain
+        }, 200)
+
+    return ({
+        'success': True,
+        'eligible': True,
+        'already_issued': False,
+        'reason': 'ready',
+        'message': 'Eligible for one-time admin bootstrap.',
+        'site_id': site_id,
+        'site_domain': site.site_domain,
+        'site_admin_email': site.admin_email
+    }, 200)
 
 
 def _table_exists(cursor, table_name: str) -> bool:
@@ -474,6 +559,160 @@ def get_site_detail(site_id):
         return jsonify({
             'success': False,
             'error': str(e)
+        }), 500
+
+
+@developer_api_bp.route('/api/developer/sites/<site_id>/bootstrap-status', methods=['GET'])
+@cross_origin()
+@require_agent_or_user_auth(required_scope='read')
+def get_site_bootstrap_status(site_id):
+    """Return eligibility state for one-time site admin bootstrap."""
+    auth_error = _require_site_ownership(site_id)
+    if auth_error:
+        return auth_error
+
+    caller_ppid = _get_authenticated_ppid()
+    if not caller_ppid:
+        return jsonify({
+            'success': False,
+            'eligible': False,
+            'already_issued': False,
+            'reason': 'auth_required',
+            'message': 'Wallet authentication required.'
+        }), 401
+
+    try:
+        from api.database import SessionLocal
+        db = SessionLocal()
+        try:
+            payload, status_code = _get_site_bootstrap_status(db, site_id, caller_ppid)
+            payload['caller_ppid'] = caller_ppid
+            return jsonify(payload), status_code
+        finally:
+            db.close()
+    except Exception as e:
+        logger.error(f"Failed to fetch bootstrap status for {site_id}: {e}")
+        return jsonify({
+            'success': False,
+            'eligible': False,
+            'already_issued': False,
+            'reason': 'internal_error',
+            'message': 'Failed to evaluate bootstrap status.'
+        }), 500
+
+
+@developer_api_bp.route('/api/developer/sites/<site_id>/bootstrap-admin', methods=['POST'])
+@cross_origin()
+@require_agent_or_user_auth(required_scope='write')
+def bootstrap_site_admin(site_id):
+    """Issue one-time admin credential for site owner/admin via Lemma-authenticated PPID."""
+    auth_error = _require_site_ownership(site_id)
+    if auth_error:
+        return auth_error
+
+    caller_ppid = _get_authenticated_ppid()
+    if not caller_ppid:
+        return jsonify({
+            'success': False,
+            'error': 'auth_required',
+            'message': 'Wallet authentication required.'
+        }), 401
+
+    try:
+        from api.database import SessionLocal, Site, UserLemma, SitePermissionGrant
+        from api.real_iam_manager import get_or_create_site_manager
+
+        db = SessionLocal()
+        try:
+            status_payload, status_code = _get_site_bootstrap_status(db, site_id, caller_ppid)
+            if status_code != 200:
+                return jsonify(status_payload), status_code
+            if not status_payload.get('eligible'):
+                return jsonify(status_payload), 409
+
+            site = db.query(Site).filter(Site.site_id == site_id).first()
+            if not site:
+                return jsonify({
+                    'success': False,
+                    'error': 'site_not_found',
+                    'message': 'Site not found.'
+                }), 404
+
+            manager = get_or_create_site_manager(site.site_id, site.site_domain)
+            if not manager:
+                return jsonify({
+                    'success': False,
+                    'error': 'manager_unavailable',
+                    'message': 'Failed to initialize site IAM manager.'
+                }), 500
+
+            if 'admin' not in manager.permissions:
+                manager.add_permission({
+                    'permission_id': 'admin',
+                    'display_name': 'Administrator',
+                    'scope': ['*'],
+                    'conditions': [],
+                    'priority': 100
+                })
+
+            expires_at = datetime.utcnow() + timedelta(days=365)
+            permission_lemma = manager.issue_permission_lemma(
+                caller_ppid,
+                'admin',
+                expiry_days=365,
+                custom_claims={
+                    'siteId': site.site_id,
+                    'siteDomain': site.site_domain,
+                    'accountType': 'admin',
+                    'permissionId': 'admin',
+                    'issuedVia': 'developer_bootstrap_admin'
+                }
+            )
+            permission_lemma['type'] = ['VerifiableCredential', 'PermissionLemma']
+            permission_lemma['packageType'] = 'permission'
+            if 'credentialSubject' in permission_lemma:
+                permission_lemma['credentialSubject']['packageType'] = 'permission'
+            if 'claims' in permission_lemma:
+                permission_lemma['claims']['packageType'] = 'permission'
+
+            db.add(UserLemma(
+                user_did=caller_ppid,
+                lemma_type='permission',
+                site_id=site.site_id,
+                permission_id='admin',
+                lemma_data=permission_lemma,
+                expires_at=expires_at,
+                is_active=True
+            ))
+            db.add(SitePermissionGrant(
+                site_id=site.site_id,
+                user_did=caller_ppid,
+                permission_id='admin',
+                granted_by=caller_ppid,
+                expires_at=expires_at,
+                is_active=True,
+                conditions={'bootstrap': True}
+            ))
+            db.commit()
+
+            return jsonify({
+                'success': True,
+                'site_id': site.site_id,
+                'site_domain': site.site_domain,
+                'permission_id': 'admin',
+                'credential': permission_lemma,
+                'credential_id': permission_lemma.get('id'),
+                'expires_at': expires_at.isoformat(),
+                'message': 'Admin credential bootstrapped. Store this credential in your wallet.'
+            }), 201
+        finally:
+            db.close()
+    except Exception as e:
+        logger.error(f"Failed bootstrap-admin for {site_id}: {e}")
+        return jsonify({
+            'success': False,
+            'error': 'bootstrap_failed',
+            'message': str(e)
         }), 500
 
 
