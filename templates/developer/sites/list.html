@@ -204,7 +204,7 @@ async function getWalletPpid() {
         // FAST PATH: If session is already valid, use it directly
         // This avoids calling autoAuthenticate which does extra checks
         if (wallet.session?.isUnlocked && wallet.session?.expiresAt > Date.now()) {
-            console.log('[Developer] ✅ Using existing session (fast path)');
+            console.log('[Developer]  Using existing session (fast path)');
             const ppid = await wallet.derivePPID('lemma.id');
             console.log('[Developer] PPID:', ppid);
             return ppid;
@@ -264,7 +264,7 @@ async function loadSites() {
             <div class="dev-card">
                 <div class="dev-card-body">
                     <div class="dev-empty">
-                        <div class="dev-empty-icon">🔒</div>
+                        <div class="dev-empty-icon"></div>
                         <div class="dev-empty-title">Sign in required</div>
                         <div class="dev-empty-text">You need to unlock your Lemma wallet to access developer features.</div>
                         <button class="dev-btn dev-btn-primary" onclick="signInAndRetry()">Sign In with Lemma</button>
@@ -277,7 +277,8 @@ async function loadSites() {
     
     try {
         const response = await fetch('/api/developer/sites', {
-            headers: getAuthHeaders()
+            headers: getAuthHeaders(),
+            cache: 'no-store'
         });
         if (!response.ok) throw new Error('Failed to load sites');
         
@@ -289,7 +290,7 @@ async function loadSites() {
                 <div class="dev-card">
                     <div class="dev-card-body">
                         <div class="dev-empty">
-                            <div class="dev-empty-icon">🌐</div>
+                            <div class="dev-empty-icon"></div>
                             <div class="dev-empty-title">No sites registered</div>
                             <div class="dev-empty-text">Register your first site to start using Lemma authentication on your website or app.</div>
                             <button class="dev-btn dev-btn-primary register-site-trigger">Register Your First Site</button>
@@ -312,7 +313,7 @@ async function loadSites() {
             <div class="dev-card">
                 <div class="dev-card-body">
                     <div class="dev-empty">
-                        <div class="dev-empty-icon">⚠️</div>
+                        <div class="dev-empty-icon"></div>
                         <div class="dev-empty-title">Could not load sites</div>
                         <div class="dev-empty-text">Please try refreshing the page.</div>
                         <button class="dev-btn dev-btn-secondary" onclick="loadSites()">Retry</button>
@@ -351,7 +352,7 @@ function renderSiteCard(site) {
         <div class="dev-site-card">
             <div class="dev-site-status">${statusBadge}</div>
             <div class="dev-site-header">
-                <div class="dev-site-icon">🌐</div>
+                <div class="dev-site-icon"></div>
                 <div>
                     <div class="dev-site-name">${escapeHtml(site.name || site.site_id)}</div>
                     <div class="dev-site-domain">${escapeHtml(site.domain || site.site_id)}</div>
@@ -359,8 +360,8 @@ function renderSiteCard(site) {
             </div>
             <div class="dev-site-stats">
                 <div class="dev-site-stat">
-                    <div class="dev-site-stat-value">${formatNumber(site.verification_count || 0)}</div>
-                    <div class="dev-site-stat-label">Verifications</div>
+                    <div class="dev-site-stat-value">${formatNumber(site.issued_lemmas_total || 0)}</div>
+                    <div class="dev-site-stat-label">Lemmas Issued</div>
                 </div>
                 <div class="dev-site-stat">
                     <div class="dev-site-stat-value">${formatNumber(site.user_count || 0)}</div>

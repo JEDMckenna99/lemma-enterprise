@@ -12,6 +12,7 @@ from flask import Blueprint, request, jsonify, g
 from flask_cors import cross_origin
 from auth.decorators import require_wallet_ppid, require_customer_or_admin
 from api.agent_credentials import require_agent_or_user_auth
+from api.usage_tracking import get_monthly_active_users
 
 logger = logging.getLogger(__name__)
 
@@ -122,6 +123,28 @@ def _require_site_ownership(site_id: str):
     return None  # Authorized
 
 
+def _table_exists(cursor, table_name: str) -> bool:
+    """Return True if a table exists in the public schema."""
+    cursor.execute("SELECT to_regclass(%s)", (f"public.{table_name}",))
+    return cursor.fetchone()[0] is not None
+
+
+def _column_exists(cursor, table_name: str, column_name: str) -> bool:
+    """Return True if a column exists on a table in the public schema."""
+    cursor.execute(
+        """
+        SELECT 1
+        FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = %s
+          AND column_name = %s
+        LIMIT 1
+        """,
+        (table_name, column_name)
+    )
+    return cursor.fetchone() is not None
+
+
 @developer_api_bp.route('/api/developer/stats', methods=['GET'])
 @cross_origin()
 @require_agent_or_user_auth(required_scope='read')
@@ -137,7 +160,7 @@ def get_developer_stats():
         
         # Try to query database if available
         try:
-            from api.database import SessionLocal, Site, SiteAdmin
+            from api.database import SessionLocal, Site, SiteAdmin, get_db_connection
             db = SessionLocal()
             
             # Count sites owned by this developer
@@ -190,7 +213,7 @@ def get_developer_sites():
         
         # Try to query database if available
         try:
-            from api.database import SessionLocal, Site, SiteAdmin
+            from api.database import SessionLocal, Site, SiteAdmin, get_db_connection
             db = SessionLocal()
             
             # Get sites for this developer via SiteAdmin table
@@ -208,6 +231,69 @@ def get_developer_sites():
             else:
                 db_sites = []
             
+            # Resolve total lemma issuance per site from canonical tracking tables.
+            lemma_totals = {}
+            conn = None
+            cursor = None
+            try:
+                conn = get_db_connection()
+                cursor = conn.cursor()
+
+                for site in db_sites:
+                    site_identifiers = {site.site_id}
+                    domain = (site.site_domain or '').strip().lower()
+                    if domain:
+                        site_identifiers.add(domain)
+                        site_identifiers.add(domain.replace('.', '_').replace('-', '_'))
+                    site_keys = list(site_identifiers)
+
+                    pi_total = 0
+                    spg_total = 0
+                    ul_total = 0
+
+                    if _table_exists(cursor, 'permission_instances'):
+                        cursor.execute(
+                            """
+                            SELECT COUNT(*)::BIGINT
+                            FROM permission_instances
+                            WHERE site_id = ANY(%s)
+                            """,
+                            (site_keys,)
+                        )
+                        pi_total = cursor.fetchone()[0] or 0
+
+                    if _table_exists(cursor, 'site_permission_grants'):
+                        cursor.execute(
+                            """
+                            SELECT COUNT(*)::BIGINT
+                            FROM site_permission_grants
+                            WHERE site_id = ANY(%s)
+                            """,
+                            (site_keys,)
+                        )
+                        spg_total = cursor.fetchone()[0] or 0
+
+                    if _table_exists(cursor, 'user_lemmas'):
+                        cursor.execute(
+                            """
+                            SELECT COUNT(*)::BIGINT
+                            FROM user_lemmas
+                            WHERE site_id = ANY(%s)
+                              AND (lemma_type = 'permission' OR lemma_type = 'access')
+                            """,
+                            (site_keys,)
+                        )
+                        ul_total = cursor.fetchone()[0] or 0
+
+                    lemma_totals[site.site_id] = max(pi_total, spg_total, ul_total)
+            except Exception as count_err:
+                logger.warning(f"Lemma issuance count query failed: {count_err}")
+            finally:
+                if cursor:
+                    cursor.close()
+                if conn:
+                    conn.close()
+
             for site in db_sites:
                 sites.append({
                     'site_id': site.site_id,
@@ -215,7 +301,7 @@ def get_developer_sites():
                     'domain': site.site_domain or site.site_id,
                     'status': 'active' if getattr(site, 'key_status', 'active') == 'active' else 'inactive',
                     'issuer_did': getattr(site, 'issuer_did', None),
-                    'verification_count': getattr(site, 'verification_count', 0) or 0,
+                    'issued_lemmas_total': int(lemma_totals.get(site.site_id, 0)),
                     'user_count': getattr(site, 'user_count', 0) or 0,
                     'api_key_count': 1,  # Placeholder
                     'created_at': site.created_at.isoformat() if site.created_at else None
@@ -378,26 +464,241 @@ def get_site_detail(site_id):
         }), 500
 
 
-@developer_api_bp.route('/api/developer/sites/<site_id>/stats', methods=['GET'])
+@developer_api_bp.route('/api/developer/sites/<site_id>/stats-summary', methods=['GET'])
 @cross_origin()
 @require_agent_or_user_auth(required_scope='read')
 def get_site_stats(site_id):
-    """Get stats for a specific site"""
+    """Get DB-backed stats for a specific site."""
+    auth_error = _require_site_ownership(site_id)
+    if auth_error:
+        return auth_error
+
+    issued_lemmas_total = 0
+    issued_lemmas_30d = 0
+    revoked_lemmas_total = 0
+    revoked_lemmas_30d = 0
+    active_lemmas = 0
+    total_users = 0
+    active_users_30d = 0
+    mau_current_month = 0
+
     try:
-        # In production, query actual metrics
+        from api.database import get_db_connection, SessionLocal, Site
+
+        conn = get_db_connection(site_id)
+        cursor = conn.cursor()
+
+        # Resolve alternate site identifiers used across historical issuance flows.
+        site_identifiers = {site_id}
+        try:
+            db = SessionLocal()
+            site_row = db.query(Site).filter(Site.site_id == site_id).first()
+            if site_row and site_row.site_domain:
+                site_domain = str(site_row.site_domain).strip().lower()
+                if site_domain:
+                    site_identifiers.add(site_domain)
+                    site_identifiers.add(site_domain.replace('.', '_').replace('-', '_'))
+            db.close()
+        except Exception:
+            # Non-fatal; continue with provided site_id only.
+            pass
+        site_keys = list(site_identifiers)
+
+        # Permission/lemma issuance + revocation lifecycle metrics.
+        # Read from multiple tables because deployments have evolved schema paths.
+        pi_issued_total = 0
+        pi_issued_30d = 0
+        pi_revoked_total = 0
+        pi_revoked_30d = 0
+        pi_active_count = 0
+        if _table_exists(cursor, 'permission_instances'):
+            cursor.execute(
+                """
+                SELECT
+                    COUNT(*)::BIGINT AS issued_total,
+                    COUNT(*) FILTER (
+                        WHERE granted_at >= NOW() - INTERVAL '30 days'
+                    )::BIGINT AS issued_30d,
+                    COUNT(*) FILTER (
+                        WHERE revoked_at IS NOT NULL
+                    )::BIGINT AS revoked_total,
+                    COUNT(*) FILTER (
+                        WHERE revoked_at >= NOW() - INTERVAL '30 days'
+                    )::BIGINT AS revoked_30d,
+                    COUNT(*) FILTER (
+                        WHERE revoked_at IS NULL
+                          AND (expires_at IS NULL OR expires_at > NOW())
+                    )::BIGINT AS active_count
+                FROM permission_instances
+                WHERE site_id = ANY(%s)
+                """,
+                (site_keys,)
+            )
+            row = cursor.fetchone() or (0, 0, 0, 0, 0)
+            pi_issued_total, pi_issued_30d, pi_revoked_total, pi_revoked_30d, pi_active_count = row
+
+        spg_issued_total = 0
+        spg_issued_30d = 0
+        spg_revoked_total = 0
+        spg_revoked_30d = 0
+        spg_active_count = 0
+        if _table_exists(cursor, 'site_permission_grants'):
+            cursor.execute(
+                """
+                SELECT
+                    COUNT(*)::BIGINT AS issued_total,
+                    COUNT(*) FILTER (
+                        WHERE granted_at >= NOW() - INTERVAL '30 days'
+                    )::BIGINT AS issued_30d,
+                    COUNT(*) FILTER (
+                        WHERE revoked_at IS NOT NULL OR is_active = FALSE
+                    )::BIGINT AS revoked_total,
+                    COUNT(*) FILTER (
+                        WHERE revoked_at >= NOW() - INTERVAL '30 days'
+                    )::BIGINT AS revoked_30d,
+                    COUNT(*) FILTER (
+                        WHERE COALESCE(is_active, TRUE) = TRUE
+                          AND revoked_at IS NULL
+                          AND (expires_at IS NULL OR expires_at > NOW())
+                    )::BIGINT AS active_count
+                FROM site_permission_grants
+                WHERE site_id = ANY(%s)
+                """,
+                (site_keys,)
+            )
+            row = cursor.fetchone() or (0, 0, 0, 0, 0)
+            spg_issued_total, spg_issued_30d, spg_revoked_total, spg_revoked_30d, spg_active_count = row
+
+        ul_issued_total = 0
+        ul_issued_30d = 0
+        ul_revoked_total = 0
+        ul_revoked_30d = 0
+        ul_active_count = 0
+        if _table_exists(cursor, 'user_lemmas'):
+            cursor.execute(
+                """
+                SELECT
+                    COUNT(*)::BIGINT AS issued_total,
+                    COUNT(*) FILTER (
+                        WHERE issued_at >= NOW() - INTERVAL '30 days'
+                    )::BIGINT AS issued_30d,
+                    COUNT(*) FILTER (
+                        WHERE revoked_at IS NOT NULL OR COALESCE(is_active, TRUE) = FALSE
+                    )::BIGINT AS revoked_total,
+                    COUNT(*) FILTER (
+                        WHERE revoked_at >= NOW() - INTERVAL '30 days'
+                    )::BIGINT AS revoked_30d,
+                    COUNT(*) FILTER (
+                        WHERE COALESCE(is_active, TRUE) = TRUE
+                          AND revoked_at IS NULL
+                          AND (expires_at IS NULL OR expires_at > NOW())
+                    )::BIGINT AS active_count
+                FROM user_lemmas
+                WHERE site_id = ANY(%s)
+                  AND (lemma_type = 'permission' OR lemma_type = 'access')
+                """,
+                (site_keys,)
+            )
+            row = cursor.fetchone() or (0, 0, 0, 0, 0)
+            ul_issued_total, ul_issued_30d, ul_revoked_total, ul_revoked_30d, ul_active_count = row
+
+        # Use the largest observed count across canonical stores to avoid undercounting.
+        issued_lemmas_total = max(pi_issued_total, spg_issued_total, ul_issued_total)
+        issued_lemmas_30d = max(pi_issued_30d, spg_issued_30d, ul_issued_30d)
+        revoked_lemmas_total = max(pi_revoked_total, spg_revoked_total, ul_revoked_total)
+        revoked_lemmas_30d = max(pi_revoked_30d, spg_revoked_30d, ul_revoked_30d)
+        active_lemmas = max(pi_active_count, spg_active_count, ul_active_count)
+
+        # Active users in last 30d and total users from site-local user registry.
+        if _table_exists(cursor, 'site_users'):
+            has_user_ppid = _column_exists(cursor, 'site_users', 'user_ppid')
+            has_user_did = _column_exists(cursor, 'site_users', 'user_did')
+            has_last_seen = _column_exists(cursor, 'site_users', 'last_seen')
+            has_last_login = _column_exists(cursor, 'site_users', 'last_login')
+            has_status = _column_exists(cursor, 'site_users', 'status')
+            has_user_status = _column_exists(cursor, 'site_users', 'user_status')
+
+            subject_col = 'user_ppid' if has_user_ppid else ('user_did' if has_user_did else None)
+            activity_col = 'last_seen' if has_last_seen else ('last_login' if has_last_login else None)
+            status_col = 'status' if has_status else ('user_status' if has_user_status else None)
+
+            if subject_col:
+                cursor.execute(
+                    f"""
+                    SELECT COUNT(DISTINCT {subject_col})::BIGINT
+                    FROM site_users
+                    WHERE site_id = ANY(%s)
+                    """,
+                    (site_keys,)
+                )
+                total_users = cursor.fetchone()[0] or 0
+
+                if activity_col:
+                    if status_col:
+                        cursor.execute(
+                            f"""
+                            SELECT COUNT(DISTINCT {subject_col})::BIGINT
+                            FROM site_users
+                            WHERE site_id = ANY(%s)
+                              AND {activity_col} >= NOW() - INTERVAL '30 days'
+                              AND {status_col} NOT IN ('revoked', 'suspended', 'banned')
+                            """,
+                            (site_keys,)
+                        )
+                    else:
+                        cursor.execute(
+                            f"""
+                            SELECT COUNT(DISTINCT {subject_col})::BIGINT
+                            FROM site_users
+                            WHERE site_id = ANY(%s)
+                              AND {activity_col} >= NOW() - INTERVAL '30 days'
+                            """,
+                            (site_keys,)
+                        )
+                    active_users_30d = cursor.fetchone()[0] or 0
+
+        cursor.close()
+        conn.close()
+
+        # MAU from privacy-preserving per-site usage tracking.
+        mau_current_month = get_monthly_active_users(site_id)
+
+        # Fallback when Redis MAU is unavailable: derive monthly active users from site-local activity.
+        if mau_current_month == 0 and active_users_30d > 0:
+            mau_current_month = active_users_30d
+
         return jsonify({
             'success': True,
-            'verifications': 0,
-            'users': 0,
-            'success_rate': 99.9,
-            'avg_latency_ms': 0.5
+            'issued_lemmas_total': int(issued_lemmas_total),
+            'issued_lemmas_30d': int(issued_lemmas_30d),
+            'revoked_lemmas_total': int(revoked_lemmas_total),
+            'revoked_lemmas_30d': int(revoked_lemmas_30d),
+            'active_lemmas': int(active_lemmas),
+            'total_users': int(total_users),
+            'active_users_30d': int(active_users_30d),
+            'mau_current_month': int(mau_current_month),
+            # Backward compatibility keys for older dashboard clients.
+            'verifications': int(issued_lemmas_30d),
+            'users': int(active_users_30d),
+            'privacy_model': {
+                'mau_tracking': 'per-site pseudonymous counting',
+                'cross_site_linking': False
+            }
         })
         
     except Exception as e:
         logger.error(f"Failed to get site stats: {e}")
         return jsonify({
             'success': False,
-            'error': str(e)
+            'error': str(e),
+            'issued_lemmas_total': 0,
+            'issued_lemmas_30d': 0,
+            'revoked_lemmas_total': 0,
+            'revoked_lemmas_30d': 0,
+            'active_lemmas': 0,
+            'total_users': 0,
+            'active_users_30d': 0,
+            'mau_current_month': 0
         }), 500
 
 
@@ -630,11 +931,11 @@ def revoke_site_key(site_id, key_id):
         }), 500
 
 
-@developer_api_bp.route('/api/developer/sites/<site_id>/users', methods=['GET'])
+@developer_api_bp.route('/api/developer/sites/<site_id>/users-summary', methods=['GET'])
 @cross_origin()
 @require_agent_or_user_auth(required_scope='read')
-def get_site_users(site_id):
-    """Get users who have authenticated on a site"""
+def get_site_users_summary(site_id):
+    """Get lightweight site user summary for dashboard cards."""
     try:
         # In production, query actual user data
         # For now, return empty list

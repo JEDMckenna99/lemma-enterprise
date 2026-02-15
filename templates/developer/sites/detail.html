@@ -32,24 +32,24 @@
     <!-- Overview Tab -->
     <div class="dev-stats">
         <div class="dev-stat-card">
-            <div class="dev-stat-label">Total Verifications</div>
-            <div class="dev-stat-value" id="stat-verifications">-</div>
-            <div class="dev-stat-change">This month</div>
+            <div class="dev-stat-label">Total Site Lemmas Issued</div>
+            <div class="dev-stat-value" id="stat-issued-total">-</div>
+            <div class="dev-stat-change">All time</div>
+        </div>
+        <div class="dev-stat-card">
+            <div class="dev-stat-label">Lemmas Revoked</div>
+            <div class="dev-stat-value" id="stat-users">-</div>
+            <div class="dev-stat-change">Last 30 days</div>
+        </div>
+        <div class="dev-stat-card">
+            <div class="dev-stat-label">Monthly Active Users</div>
+            <div class="dev-stat-value" id="stat-success">-</div>
+            <div class="dev-stat-change">Current month</div>
         </div>
         <div class="dev-stat-card">
             <div class="dev-stat-label">Active Users</div>
-            <div class="dev-stat-value" id="stat-users">-</div>
-            <div class="dev-stat-change">Total registered</div>
-        </div>
-        <div class="dev-stat-card">
-            <div class="dev-stat-label">Success Rate</div>
-            <div class="dev-stat-value" id="stat-success">-</div>
-            <div class="dev-stat-change">Auth success</div>
-        </div>
-        <div class="dev-stat-card">
-            <div class="dev-stat-label">Avg Latency</div>
             <div class="dev-stat-value" id="stat-latency">-</div>
-            <div class="dev-stat-change">Verification time</div>
+            <div class="dev-stat-change">Seen in last 30 days</div>
         </div>
     </div>
     
@@ -60,19 +60,19 @@
         <div class="dev-card-body">
             <div class="dev-actions">
                 <a href="/developer/sites/{{ site_id }}/integration" class="dev-action">
-                    <div class="dev-action-icon">📋</div>
+                    <div class="dev-action-icon"></div>
                     <div class="dev-action-title">View Integration Code</div>
                 </a>
                 <a href="/developer/sites/{{ site_id }}/keys" class="dev-action">
-                    <div class="dev-action-icon">🔑</div>
+                    <div class="dev-action-icon"></div>
                     <div class="dev-action-title">Manage API Keys</div>
                 </a>
                 <a href="/developer/sites/{{ site_id }}/users" class="dev-action">
-                    <div class="dev-action-icon">👥</div>
+                    <div class="dev-action-icon"></div>
                     <div class="dev-action-title">View Users</div>
                 </a>
                 <a href="/docs" class="dev-action" target="_blank">
-                    <div class="dev-action-icon">📚</div>
+                    <div class="dev-action-icon"></div>
                     <div class="dev-action-title">Documentation</div>
                 </a>
             </div>
@@ -177,15 +177,25 @@ if (result.authenticated) {
     <!-- Users Tab -->
     <div class="dev-card">
         <div class="dev-card-header">
-            <h2 class="dev-card-title">Authenticated Users</h2>
-            <div style="display: flex; gap: 12px;">
-                <input type="text" class="dev-input" placeholder="Search users..." style="width: 250px;" id="user-search">
-            </div>
+            <h2 class="dev-card-title">User Data Ownership</h2>
         </div>
         <div class="dev-card-body" id="users-container">
-            <div class="dev-loading">
-                <div class="dev-spinner"></div>
-                <div>Loading users...</div>
+            <p style="margin: 0 0 12px 0; color: var(--dev-text-muted);">
+                Lemma.id handles identity proofs. Your app should own user CRUD and profile data in your own backend.
+            </p>
+            <p style="margin: 0 0 12px 0; color: var(--dev-text-muted);">
+                Recommended flow: use PPID from wallet auth as your stable user key for this site, then map it to your internal user record.
+            </p>
+            <div class="dev-code">
+                <div class="dev-code-header">
+                    <span class="dev-code-lang">Backend Model Hint</span>
+                </div>
+                <pre>users (
+  id UUID PRIMARY KEY,
+  lemma_ppid TEXT UNIQUE NOT NULL,
+  email TEXT,
+  created_at TIMESTAMP
+)</pre>
             </div>
         </div>
     </div>
@@ -336,8 +346,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         await loadSiteStats();
     } else if (currentTab === 'keys') {
         await loadApiKeys();
-    } else if (currentTab === 'users') {
-        await loadUsers();
     } else if (currentTab === 'integration') {
         await loadIssuerDid();
     }
@@ -368,15 +376,16 @@ async function loadSiteDetails() {
 
 async function loadSiteStats() {
     try {
-        const response = await fetch(`/api/developer/sites/${encodeURIComponent(siteId)}/stats`, {
-            headers: getAuthHeaders()
+        const response = await fetch(`/api/developer/sites/${encodeURIComponent(siteId)}/stats-summary`, {
+            headers: getAuthHeaders(),
+            cache: 'no-store'
         });
         const data = await response.json();
         
-        document.getElementById('stat-verifications').textContent = formatNumber(data.verifications || 0);
-        document.getElementById('stat-users').textContent = formatNumber(data.users || 0);
-        document.getElementById('stat-success').textContent = (data.success_rate || 99.9).toFixed(1) + '%';
-        document.getElementById('stat-latency').textContent = (data.avg_latency_ms || 0.5).toFixed(1) + 'ms';
+        document.getElementById('stat-issued-total').textContent = formatNumber(data.issued_lemmas_total || 0);
+        document.getElementById('stat-users').textContent = formatNumber(data.revoked_lemmas_30d || 0);
+        document.getElementById('stat-success').textContent = formatNumber(data.mau_current_month || 0);
+        document.getElementById('stat-latency').textContent = formatNumber(data.active_users_30d || data.users || 0);
         
     } catch (e) {
         console.warn('Could not load stats');
@@ -412,7 +421,7 @@ async function loadApiKeys() {
         if (keys.length === 0) {
             container.innerHTML = `
                 <div class="dev-empty">
-                    <div class="dev-empty-icon">🔑</div>
+                    <div class="dev-empty-icon"></div>
                     <div class="dev-empty-title">No API keys</div>
                     <div class="dev-empty-text">Create an API key to start making authenticated requests.</div>
                     <button class="dev-btn dev-btn-primary" onclick="showCreateKeyModal()">Create API Key</button>
@@ -437,67 +446,9 @@ async function loadApiKeys() {
     } catch (e) {
         container.innerHTML = `
             <div class="dev-empty">
-                <div class="dev-empty-icon">⚠️</div>
+                <div class="dev-empty-icon"></div>
                 <div class="dev-empty-title">Could not load keys</div>
                 <button class="dev-btn dev-btn-secondary" onclick="loadApiKeys()">Retry</button>
-            </div>
-        `;
-    }
-}
-
-async function loadUsers() {
-    const container = document.getElementById('users-container');
-    
-    try {
-        const response = await fetch(`/api/developer/sites/${encodeURIComponent(siteId)}/users`, {
-            headers: getAuthHeaders()
-        });
-        const data = await response.json();
-        const users = data.users || [];
-        
-        if (users.length === 0) {
-            container.innerHTML = `
-                <div class="dev-empty">
-                    <div class="dev-empty-icon">👥</div>
-                    <div class="dev-empty-title">No users yet</div>
-                    <div class="dev-empty-text">Users will appear here once they authenticate on your site.</div>
-                </div>
-            `;
-            return;
-        }
-        
-        container.innerHTML = `
-            <table class="dev-table">
-                <thead>
-                    <tr>
-                        <th>User</th>
-                        <th>First Seen</th>
-                        <th>Last Active</th>
-                        <th>Verifications</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    ${users.map(user => `
-                        <tr>
-                            <td>
-                                <div style="font-weight: 500;">${escapeHtml(user.email || 'Anonymous')}</div>
-                                <div style="font-size: 12px; color: var(--dev-text-muted);">${user.ppid?.substring(0, 20)}...</div>
-                            </td>
-                            <td>${formatDate(user.created_at)}</td>
-                            <td>${formatDate(user.last_active)}</td>
-                            <td>${user.verification_count || 0}</td>
-                        </tr>
-                    `).join('')}
-                </tbody>
-            </table>
-        `;
-        
-    } catch (e) {
-        container.innerHTML = `
-            <div class="dev-empty">
-                <div class="dev-empty-icon">👥</div>
-                <div class="dev-empty-title">No users yet</div>
-                <div class="dev-empty-text">Users will appear here once they authenticate on your site.</div>
             </div>
         `;
     }
