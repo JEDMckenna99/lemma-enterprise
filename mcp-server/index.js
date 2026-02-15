@@ -24,6 +24,7 @@ import puppeteer from 'puppeteer';
 // Configuration
 const LEMMA_BASE_URL = process.env.LEMMA_URL || 'https://lemma.id';
 const AGENT_TOKEN = process.env.LEMMA_AGENT_TOKEN || '';
+const REQUIRED_AUDIENCE = (process.env.OPENCLAW_REQUIRED_AUDIENCE || '').trim().toLowerCase();
 
 let browser = null;
 let page = null;
@@ -73,6 +74,185 @@ async function callApi(endpoint, options = {}) {
     ok: response.ok,
     data: await response.json().catch(() => null)
   };
+}
+
+function normalizeScope(scopeRaw) {
+  if (Array.isArray(scopeRaw)) {
+    return scopeRaw.map(s => String(s).trim().toLowerCase()).filter(Boolean);
+  }
+  if (typeof scopeRaw === 'string') {
+    return [scopeRaw.trim().toLowerCase()].filter(Boolean);
+  }
+  return [];
+}
+
+function normalizePath(path) {
+  const raw = String(path || '').trim();
+  if (!raw) return null;
+  if (!raw.startsWith('/')) return null;
+  if (raw.includes('..')) return null;
+  return raw.replace(/\/{2,}/g, '/');
+}
+
+function pathMatchesPattern(path, pattern) {
+  if (!pattern) return true;
+  const normalizedPath = normalizePath(path);
+  const normalizedPattern = normalizePath(pattern);
+  if (!normalizedPath || !normalizedPattern) return false;
+  const regexPattern = '^' +
+    normalizedPattern
+      .replace(/[.+?^${}()|[\]\\]/g, '\\$&')
+      .replace(/\\\*\\\*/g, '.*')
+      .replace(/\\\*/g, '[^/]*') +
+    '$';
+  return new RegExp(regexPattern).test(normalizedPath);
+}
+
+function checkPathAllowed(path, allowedPaths) {
+  if (allowedPaths == null) return { allowed: true, pattern: null };
+  if (!Array.isArray(allowedPaths) || allowedPaths.length === 0) {
+    return { allowed: false, pattern: null };
+  }
+  for (const pattern of allowedPaths) {
+    if (typeof pattern === 'string' && pathMatchesPattern(path, pattern)) {
+      return { allowed: true, pattern };
+    }
+  }
+  return { allowed: false, pattern: null };
+}
+
+function requiredScopeForTool(name, args = {}) {
+  if (name === 'lemma_check_auth') return null;
+  if (name === 'lemma_debug_dashboard') return 'admin';
+  if (name === 'lemma_api_call') {
+    const endpoint = String(args.endpoint || '').toLowerCase();
+    const method = String(args.method || 'GET').toUpperCase();
+    if (endpoint.startsWith('/api/admin')) return 'admin';
+    if (method !== 'GET') return 'write';
+    return 'read';
+  }
+  if ([
+    'lemma_click', 'lemma_type', 'lemma_select', 'lemma_checkbox',
+    'lemma_fill_form', 'lemma_test_site_registration',
+    'lemma_test_api_key_generation', 'lemma_test_agent_token_flow'
+  ].includes(name)) {
+    return 'write';
+  }
+  return 'read';
+}
+
+function requestedPathForTool(name, args = {}) {
+  if (name === 'lemma_api_call') return normalizePath(args.endpoint);
+  if (name === 'lemma_view_page' || name === 'lemma_screenshot' || name === 'lemma_get_console_logs') {
+    return normalizePath(args.path);
+  }
+  if (name === 'lemma_get_elements') return normalizePath(args.path || '');
+  if (name === 'lemma_wait_for' || name === 'lemma_fill_form') {
+    return normalizePath(new URL(page?.url?.() || `${LEMMA_BASE_URL}/`).pathname);
+  }
+  return null;
+}
+
+function deny(errorCode, details = {}) {
+  return {
+    content: [{
+      type: 'text',
+      text: JSON.stringify({
+        success: false,
+        allow: false,
+        error_code: errorCode,
+        reason: errorCode,
+        ...details
+      }, null, 2)
+    }],
+    isError: true
+  };
+}
+
+async function authorizeThenExecute(toolName, args, executeFn) {
+  if (toolName === 'lemma_check_auth') {
+    return executeFn();
+  }
+
+  if (!AGENT_TOKEN) {
+    return deny('auth_required', { message: 'LEMMA_AGENT_TOKEN is not configured' });
+  }
+
+  const validation = await callApi('/api/agent/validate', { method: 'POST' });
+  const validationBody = validation.data || {};
+  if (!(validation.ok && validationBody.valid === true)) {
+    return deny(validationBody.error || 'invalid_token', {
+      validation_status: validation.status
+    });
+  }
+
+  const providedScope = normalizeScope(validationBody.scope || validationBody.scopes);
+  const requiredScope = requiredScopeForTool(toolName, args);
+  if (requiredScope && !providedScope.includes(requiredScope)) {
+    return deny('missing_scope', {
+      required_scope: [requiredScope],
+      provided_scope: providedScope
+    });
+  }
+
+  if (REQUIRED_AUDIENCE) {
+    const tokenAudience = String(validationBody.audience || '').trim().toLowerCase();
+    if (!tokenAudience) {
+      return deny('audience_mismatch', {
+        required_audience: REQUIRED_AUDIENCE,
+        token_audience: null
+      });
+    }
+    if (tokenAudience !== REQUIRED_AUDIENCE) {
+      return deny('audience_mismatch', {
+        required_audience: REQUIRED_AUDIENCE,
+        token_audience: tokenAudience
+      });
+    }
+  }
+
+  const requestedPath = requestedPathForTool(toolName, args);
+  const { allowed, pattern } = checkPathAllowed(requestedPath, validationBody.allowed_paths);
+  if (requestedPath && !allowed) {
+    return deny('path_not_allowed', {
+      path: requestedPath,
+      allowed_paths: validationBody.allowed_paths || []
+    });
+  }
+
+  const expectedTaskHash = String(args?.task_hash || args?.taskHash || '').trim();
+  const tokenTaskHash = String(validationBody.task_hash || '').trim();
+  if (expectedTaskHash && tokenTaskHash && expectedTaskHash !== tokenTaskHash) {
+    return deny('task_mismatch', {
+      expected_task_hash: expectedTaskHash,
+      token_task_hash: tokenTaskHash
+    });
+  }
+
+  const remaining = validationBody.operations_remaining;
+  if (typeof remaining === 'number' && remaining < 0) {
+    return deny('max_operations_exceeded', {
+      operations_remaining: remaining
+    });
+  }
+
+  const result = await executeFn();
+  if (result && result.content && !result.isError) {
+    result.content.push({
+      type: 'text',
+      text: JSON.stringify({
+        authz: {
+          allow: true,
+          required_scope: requiredScope,
+          provided_scope: providedScope,
+          path: requestedPath,
+          matched_pattern: pattern,
+          token_id: validationBody.token_id || null
+        }
+      }, null, 2)
+    });
+  }
+  return result;
 }
 
 // Create MCP Server
@@ -392,7 +572,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   const { name, arguments: args } = request.params;
   
   try {
-    switch (name) {
+    return await authorizeThenExecute(name, args, async () => {
+      switch (name) {
       case 'lemma_view_page': {
         const p = await getPage();
         const url = `${LEMMA_BASE_URL}${args.path}`;
@@ -1068,9 +1249,10 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         };
       }
       
-      default:
-        throw new Error(`Unknown tool: ${name}`);
-    }
+        default:
+          throw new Error(`Unknown tool: ${name}`);
+      }
+    });
   } catch (error) {
     return {
       content: [{

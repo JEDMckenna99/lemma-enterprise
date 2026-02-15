@@ -9,7 +9,11 @@ import puppeteer from 'puppeteer';
 import fetch from 'node-fetch';
 
 const LEMMA_BASE_URL = (process.env.LEMMA_BASE_URL || 'https://lemma.id').replace(/\/$/, '');
-const AGENT_TOKEN = process.env.LEMMA_AGENT_TOKEN || 'lm_agent_0OHnZ9X9G7FXYzC7MzAMCWuFKkz04oK8FPJzlePyiWU';
+const AGENT_TOKEN = process.env.LEMMA_AGENT_TOKEN || '';
+
+if (!AGENT_TOKEN.startsWith('lm_agent_')) {
+  throw new Error('Missing valid LEMMA_AGENT_TOKEN in environment');
+}
 
 let browser = null;
 let page = null;

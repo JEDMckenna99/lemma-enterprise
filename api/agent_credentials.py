@@ -39,6 +39,47 @@ DEFAULT_DELEGATION_ALLOWED_PERMISSIONS = 'admin_access,super_admin_access'
 DEFAULT_DELEGATION_ALLOWED_ROLES = 'admin,super_admin'
 
 
+def _encode_credential_description(description: str, audience: str | None = None) -> str:
+    """
+    Keep backward compatibility with plain-text description while allowing
+    structured metadata needed by OpenClaw profile checks.
+    """
+    description_text = (description or '').strip()
+    if not audience:
+        return description_text
+    return json.dumps({
+        'description': description_text,
+        'audience': str(audience).strip().lower()
+    })
+
+
+def _decode_credential_description(raw_description: str | None) -> dict:
+    """Parse description metadata when stored as JSON; fallback to plain text."""
+    if not raw_description:
+        return {'description': '', 'audience': None}
+
+    if isinstance(raw_description, dict):
+        return {
+            'description': str(raw_description.get('description') or '').strip(),
+            'audience': str(raw_description.get('audience') or '').strip().lower() or None
+        }
+
+    if not isinstance(raw_description, str):
+        return {'description': str(raw_description), 'audience': None}
+
+    try:
+        decoded = json.loads(raw_description)
+        if isinstance(decoded, dict):
+            return {
+                'description': str(decoded.get('description') or '').strip(),
+                'audience': str(decoded.get('audience') or '').strip().lower() or None
+            }
+    except Exception:
+        pass
+
+    return {'description': raw_description, 'audience': None}
+
+
 def _get_allowed_values(env_key: str, default_csv: str) -> set[str]:
     raw = os.environ.get(env_key, default_csv)
     return {item.strip().lower() for item in raw.split(',') if item.strip()}
@@ -587,6 +628,7 @@ def issue_agent_credential():
         ttl_hours = min(data.get('ttl_hours', 4), 24)  # Max 24 hours
         allowed_sites = data.get('allowed_sites')  # null = all user's sites
         description = data.get('description', '')
+        audience = (data.get('audience') or data.get('aud') or '').strip().lower() or None
 
         # NEW: Task-bound authorization fields
         task_description = data.get('task')
@@ -618,11 +660,21 @@ def issue_agent_credential():
                     'error': 'max_operations must be at least 1'
                 }), 400
 
+        if audience is not None:
+            if not re.match(r'^[a-z0-9._-]{2,64}$', audience):
+                return jsonify({
+                    'success': False,
+                    'error': 'invalid_audience',
+                    'message': 'audience must match [a-z0-9._-]{2,64}'
+                }), 400
+
         # Validate scope
         valid_scopes = ['read', 'write', 'admin', 'test']
         scope = [s for s in scope if s in valid_scopes]
         if not scope:
             scope = ['read']
+
+        encoded_description = _encode_credential_description(description, audience)
 
         # Generate token
         token_id, plaintext_token, token_hash = generate_agent_token()
@@ -653,7 +705,7 @@ def issue_agent_credential():
                 json.dumps(allowed_sites) if allowed_sites else None,
                 expires_at,
                 agent_name,
-                description,
+                encoded_description,
                 task_description,
                 task_hash_value,
                 json.dumps(allowed_paths) if allowed_paths else None,
@@ -700,6 +752,8 @@ def issue_agent_credential():
             response_data['credential']['allowed_paths'] = allowed_paths
         if max_operations:
             response_data['credential']['max_operations'] = max_operations
+        if audience:
+            response_data['credential']['audience'] = audience
 
         return jsonify(response_data)
 
@@ -730,16 +784,19 @@ def validate_agent_token_internal(token):
     return False, None
 
 
-def validate_agent_token(token):
+def validate_agent_token_with_reason(token):
     """
-    Validate an agent token and return credential info if valid.
+    Validate an agent token and provide deterministic machine-readable failure
+    reasons for wrapper enforcement and conformance tests.
 
     Returns:
-        dict with credential info if valid (includes task-bound fields)
-        None if invalid/expired/revoked
+        (credential_info, None) when valid
+        (None, error_code) when invalid
     """
-    if not token or not token.startswith('lm_agent_'):
-        return None
+    if not token:
+        return None, 'auth_required'
+    if not token.startswith('lm_agent_'):
+        return None, 'invalid_token'
 
     token_hash = hash_token(token)
 
@@ -753,32 +810,38 @@ def validate_agent_token(token):
             SELECT id, token_id, authorized_by_ppid, authorized_by_email,
                    scope, allowed_sites, expires_at, agent_name,
                    task_description, task_hash, allowed_paths, max_operations,
-                   use_count, task_deviation_count
+                   use_count, task_deviation_count, revoked, description
             FROM agent_credentials
             WHERE token_hash = %s
-              AND revoked = FALSE
-              AND expires_at > NOW()
+            LIMIT 1
         """, (token_hash,))
 
         row = cursor.fetchone()
-
         if not row:
             cursor.close()
             conn.close()
-            return None
+            return None, 'invalid_token'
+
+        is_revoked = bool(row[14])
+        expires_at = row[6]
+        if is_revoked:
+            cursor.close()
+            conn.close()
+            return None, 'token_revoked'
+        if not expires_at or expires_at <= datetime.utcnow():
+            cursor.close()
+            conn.close()
+            return None, 'token_expired'
 
         credential_id = row[0]
         use_count = row[12] or 0
         max_operations = row[11]
-
-        # Check max_operations limit BEFORE incrementing
         if max_operations is not None and use_count >= max_operations:
             cursor.close()
             conn.close()
             logger.warning(f"Agent credential {row[1]} exceeded max_operations ({max_operations})")
-            return None
+            return None, 'max_operations_exceeded'
 
-        # Update usage stats
         cursor.execute("""
             UPDATE agent_credentials
             SET last_used_at = NOW(), use_count = use_count + 1
@@ -789,27 +852,45 @@ def validate_agent_token(token):
         cursor.close()
         conn.close()
 
+        allowed_sites = row[5] if isinstance(row[5], list) else (json.loads(row[5]) if row[5] else None)
+        description_meta = _decode_credential_description(row[15])
+        inferred_audience = description_meta.get('audience')
+        if not inferred_audience and isinstance(allowed_sites, list) and len(allowed_sites) == 1:
+            inferred_audience = str(allowed_sites[0]).strip().lower()
+
         return {
             'credential_id': credential_id,
             'token_id': row[1],
             'authorized_by_ppid': row[2],
             'authorized_by_email': row[3],
             'scope': row[4] if isinstance(row[4], list) else json.loads(row[4] or '["read"]'),
-            'allowed_sites': row[5] if isinstance(row[5], list) else (json.loads(row[5]) if row[5] else None),
-            'expires_at': row[6],
+            'allowed_sites': allowed_sites,
+            'expires_at': expires_at,
             'agent_name': row[7],
-            # Task-bound fields
             'task_description': row[8],
             'task_hash': row[9],
             'allowed_paths': row[10] if isinstance(row[10], list) else (json.loads(row[10]) if row[10] else None),
-            'max_operations': row[11],
-            'use_count': use_count + 1,  # After increment
-            'task_deviation_count': row[13] or 0
-        }
+            'max_operations': max_operations,
+            'use_count': use_count + 1,
+            'task_deviation_count': row[13] or 0,
+            'audience': inferred_audience
+        }, None
 
     except Exception as e:
         logger.error(f"Token validation error: {e}")
-        return None
+        return None, 'invalid_token'
+
+
+def validate_agent_token(token):
+    """
+    Validate an agent token and return credential info if valid.
+
+    Returns:
+        dict with credential info if valid (includes task-bound fields)
+        None if invalid/expired/revoked
+    """
+    info, _reason = validate_agent_token_with_reason(token)
+    return info
 
 
 def log_agent_action(credential_info, action, resource=None, success=True, status_code=200,
@@ -904,12 +985,12 @@ def require_agent_or_user_auth(required_scope=None, enforce_task_bounds=True):
             agent_token = request.headers.get('X-Agent-Token')
 
             if agent_token:
-                credential_info = validate_agent_token(agent_token)
+                credential_info, token_error = validate_agent_token_with_reason(agent_token)
 
                 if not credential_info:
                     return jsonify({
                         'success': False,
-                        'error': 'Invalid, expired, or max operations exceeded'
+                        'error': token_error or 'invalid_token'
                     }), 401
 
                 # Check scope if required
@@ -919,7 +1000,9 @@ def require_agent_or_user_auth(required_scope=None, enforce_task_bounds=True):
                                         success=False, status_code=403)
                         return jsonify({
                             'success': False,
-                            'error': f'Agent credential lacks required scope: {required_scope}'
+                            'error': 'missing_scope',
+                            'required_scope': [required_scope],
+                            'provided_scope': credential_info.get('scope', [])
                         }), 403
 
                 # Enforce optional site-level restrictions
@@ -961,7 +1044,7 @@ def require_agent_or_user_auth(required_scope=None, enforce_task_bounds=True):
                                         deviation_reason=deviation_reason)
                         return jsonify({
                             'success': False,
-                            'error': 'Path not allowed for this task-bound credential',
+                            'error': 'path_not_allowed',
                             'path': request.path,
                             'allowed_paths': allowed_paths,
                             'task': credential_info.get('task_description'),
@@ -1029,7 +1112,7 @@ def require_agent_or_user_auth(required_scope=None, enforce_task_bounds=True):
 
             return jsonify({
                 'success': False,
-                'error': 'Authentication required',
+                'error': 'auth_required',
                 'message': 'Provide X-Agent-Token, X-Lemma-PPID, or X-API-Key header'
             }), 401
 
@@ -1950,7 +2033,7 @@ def validate_agent_token_endpoint():
     token = request.headers.get('X-Agent-Token')
 
     if token:
-        credential_info = validate_agent_token(token)
+        credential_info, token_error = validate_agent_token_with_reason(token)
 
         if credential_info:
             response = {
@@ -1964,6 +2047,7 @@ def validate_agent_token_endpoint():
                 # Task-bound info
                 'is_task_bound': credential_info.get('task_description') is not None or credential_info.get('allowed_paths') is not None,
                 'task': credential_info.get('task_description'),
+                'task_hash': credential_info.get('task_hash'),
                 'allowed_paths': credential_info.get('allowed_paths'),
                 'max_operations': credential_info.get('max_operations'),
                 'operations_used': credential_info.get('use_count', 0),
@@ -1973,12 +2057,14 @@ def validate_agent_token_endpoint():
                 ),
                 'task_deviation_count': credential_info.get('task_deviation_count', 0)
             }
+            if credential_info.get('audience'):
+                response['audience'] = credential_info.get('audience')
             return jsonify(response)
         else:
             return jsonify({
                 'valid': False,
-                'error': 'invalid_token',
-                'message': 'Invalid, expired, revoked, or max operations exceeded'
+                'error': token_error or 'invalid_token',
+                'message': 'Token failed validation'
             }), 401
 
     # Check for session-based agent auth (from /api/agent/session)

@@ -2,7 +2,11 @@
 import puppeteer from 'puppeteer';
 
 const LEMMA_BASE_URL = 'https://lemma.id';
-const AGENT_TOKEN = 'lm_agent_0OHnZ9X9G7FXYzC7MzAMCWuFKkz04oK8FPJzlePyiWU';
+const AGENT_TOKEN = process.env.LEMMA_AGENT_TOKEN || '';
+
+if (!AGENT_TOKEN.startsWith('lm_agent_')) {
+  throw new Error('Missing valid LEMMA_AGENT_TOKEN in environment');
+}
 
 async function main() {
   const browser = await puppeteer.launch({
