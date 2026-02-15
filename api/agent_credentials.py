@@ -828,7 +828,9 @@ def validate_agent_token_with_reason(token):
             cursor.close()
             conn.close()
             return None, 'token_revoked'
-        if not expires_at or expires_at <= datetime.utcnow():
+        if expires_at and expires_at.tzinfo is None:
+            expires_at = expires_at.replace(tzinfo=timezone.utc)
+        if not expires_at or expires_at <= datetime.now(timezone.utc):
             cursor.close()
             conn.close()
             return None, 'token_expired'
