@@ -15,6 +15,7 @@ from datetime import datetime, timedelta
 from auth.decorators import require_api_key, require_site_admin
 from billing.usage_logger import log_permission_operation
 from .database_models import db, Site, Permission, ActivityType
+from .lemma_format import normalize_site_permission_lemma
 
 # REAL IAM manager with Rust crypto - site-specific keys and revocation
 from .real_iam_manager import get_or_create_site_manager, get_site_manager
@@ -289,6 +290,12 @@ def grant_user_permission(site_id, user_did):
             permission_id,
             expiry_days,
             custom_claims=data.get('custom_claims')
+        )
+        credential = normalize_site_permission_lemma(
+            credential,
+            site_id,
+            site_domain,
+            permission_id
         )
         issue_time_us = (time.perf_counter() - start_time) * 1_000_000
         

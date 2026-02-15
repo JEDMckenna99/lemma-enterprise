@@ -13,6 +13,7 @@ from flask_cors import cross_origin
 from auth.decorators import require_wallet_ppid, require_customer_or_admin
 from api.agent_credentials import require_agent_or_user_auth
 from api.usage_tracking import get_monthly_active_users
+from api.lemma_format import normalize_site_permission_lemma
 
 logger = logging.getLogger(__name__)
 
@@ -152,6 +153,7 @@ def _get_site_bootstrap_status(db, site_id: str, caller_ppid: str):
             'success': False,
             'eligible': False,
             'already_issued': False,
+            'can_reissue': False,
             'reason': 'not_site_admin',
             'message': 'You are not an active admin for this site.'
         }, 403)
@@ -163,6 +165,7 @@ def _get_site_bootstrap_status(db, site_id: str, caller_ppid: str):
             'success': True,
             'eligible': False,
             'already_issued': False,
+            'can_reissue': False,
             'reason': 'owner_email_mismatch',
             'message': 'Signed-in admin does not match the site owner email.',
             'site_id': site_id,
@@ -190,8 +193,9 @@ def _get_site_bootstrap_status(db, site_id: str, caller_ppid: str):
             'success': True,
             'eligible': False,
             'already_issued': True,
+            'can_reissue': True,
             'reason': 'bootstrap_completed',
-            'message': 'Admin bootstrap already completed for this site.',
+            'message': 'Admin credential already exists. You can reissue a new one.',
             'site_id': site_id,
             'site_domain': site.site_domain
         }, 200)
@@ -200,6 +204,7 @@ def _get_site_bootstrap_status(db, site_id: str, caller_ppid: str):
         'success': True,
         'eligible': True,
         'already_issued': False,
+        'can_reissue': False,
         'reason': 'ready',
         'message': 'Eligible for one-time admin bootstrap.',
         'site_id': site_id,
@@ -577,6 +582,7 @@ def get_site_bootstrap_status(site_id):
             'success': False,
             'eligible': False,
             'already_issued': False,
+            'can_reissue': False,
             'reason': 'auth_required',
             'message': 'Wallet authentication required.'
         }), 401
@@ -596,6 +602,7 @@ def get_site_bootstrap_status(site_id):
             'success': False,
             'eligible': False,
             'already_issued': False,
+            'can_reissue': False,
             'reason': 'internal_error',
             'message': 'Failed to evaluate bootstrap status.'
         }), 500
@@ -624,10 +631,18 @@ def bootstrap_site_admin(site_id):
 
         db = SessionLocal()
         try:
+            request_data = request.get_json(silent=True) or {}
+            reissue_requested = bool(request_data.get('reissue'))
+            requested_user_ppid = request_data.get('user_ppid')
+            if isinstance(requested_user_ppid, str) and requested_user_ppid.startswith('did:lemma:ppid_'):
+                target_user_ppid = requested_user_ppid
+            else:
+                target_user_ppid = caller_ppid
+
             status_payload, status_code = _get_site_bootstrap_status(db, site_id, caller_ppid)
             if status_code != 200:
                 return jsonify(status_payload), status_code
-            if not status_payload.get('eligible'):
+            if status_payload.get('already_issued') and not reissue_requested:
                 return jsonify(status_payload), 409
 
             site = db.query(Site).filter(Site.site_id == site_id).first()
@@ -657,26 +672,19 @@ def bootstrap_site_admin(site_id):
 
             expires_at = datetime.utcnow() + timedelta(days=365)
             permission_lemma = manager.issue_permission_lemma(
-                caller_ppid,
+                target_user_ppid,
                 'admin',
-                expiry_days=365,
-                custom_claims={
-                    'siteId': site.site_id,
-                    'siteDomain': site.site_domain,
-                    'accountType': 'admin',
-                    'permissionId': 'admin',
-                    'issuedVia': 'developer_bootstrap_admin'
-                }
+                expiry_days=365
             )
-            permission_lemma['type'] = ['VerifiableCredential', 'PermissionLemma']
-            permission_lemma['packageType'] = 'permission'
-            if 'credentialSubject' in permission_lemma:
-                permission_lemma['credentialSubject']['packageType'] = 'permission'
-            if 'claims' in permission_lemma:
-                permission_lemma['claims']['packageType'] = 'permission'
+            permission_lemma = normalize_site_permission_lemma(
+                permission_lemma,
+                site.site_id,
+                site.site_domain,
+                'admin'
+            )
 
             db.add(UserLemma(
-                user_did=caller_ppid,
+                user_did=target_user_ppid,
                 lemma_type='permission',
                 site_id=site.site_id,
                 permission_id='admin',
@@ -686,12 +694,15 @@ def bootstrap_site_admin(site_id):
             ))
             db.add(SitePermissionGrant(
                 site_id=site.site_id,
-                user_did=caller_ppid,
+                user_did=target_user_ppid,
                 permission_id='admin',
                 granted_by=caller_ppid,
                 expires_at=expires_at,
                 is_active=True,
-                conditions={'bootstrap': True}
+                conditions={
+                    'bootstrap': not reissue_requested,
+                    'reissue': reissue_requested
+                }
             ))
             db.commit()
 
@@ -703,7 +714,9 @@ def bootstrap_site_admin(site_id):
                 'credential': permission_lemma,
                 'credential_id': permission_lemma.get('id'),
                 'expires_at': expires_at.isoformat(),
-                'message': 'Admin credential bootstrapped. Store this credential in your wallet.'
+                'reissued': reissue_requested,
+                'user_ppid': target_user_ppid,
+                'message': 'Admin credential reissued. Store this credential in your wallet.' if reissue_requested else 'Admin credential bootstrapped. Store this credential in your wallet.'
             }), 201
         finally:
             db.close()
