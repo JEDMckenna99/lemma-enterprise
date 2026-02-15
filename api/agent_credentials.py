@@ -344,6 +344,43 @@ def check_path_allowed(path, allowed_paths):
 
     return False, None
 
+
+def infer_requested_site_ids():
+    """
+    Infer site identifiers referenced by the current request.
+
+    Sources:
+    - URL path segments (e.g. /api/sites/<site_id>/...)
+    - Query params: site_id, siteId
+    - JSON body: site_id, siteId, intended_platform
+
+    Returns lowercased unique site ids.
+    """
+    site_ids = set()
+
+    try:
+        path = (request.path or '').strip('/').split('/')
+        for i, seg in enumerate(path):
+            if seg in ('sites', 'site') and i + 1 < len(path):
+                candidate = (path[i + 1] or '').strip().lower()
+                if candidate:
+                    site_ids.add(candidate)
+    except Exception:
+        pass
+
+    for key in ('site_id', 'siteId'):
+        val = request.args.get(key)
+        if val:
+            site_ids.add(str(val).strip().lower())
+
+    payload = request.get_json(silent=True) or {}
+    for key in ('site_id', 'siteId', 'intended_platform'):
+        val = payload.get(key)
+        if val:
+            site_ids.add(str(val).strip().lower())
+
+    return sorted(site_ids)
+
 # ============================================
 # SECURITY: Token Generation and Hashing
 # ============================================
@@ -885,6 +922,27 @@ def require_agent_or_user_auth(required_scope=None, enforce_task_bounds=True):
                             'error': f'Agent credential lacks required scope: {required_scope}'
                         }), 403
 
+                # Enforce optional site-level restrictions
+                allowed_sites = credential_info.get('allowed_sites')
+                requested_sites = infer_requested_site_ids()
+                if allowed_sites is not None:
+                    allowed_sites_norm = {str(s).strip().lower() for s in allowed_sites if str(s).strip()}
+                    blocked_sites = [s for s in requested_sites if s not in allowed_sites_norm]
+                    if blocked_sites:
+                        log_agent_action(
+                            credential_info,
+                            f'site_denied:{blocked_sites[0]}',
+                            success=False,
+                            status_code=403,
+                        )
+                        return jsonify({
+                            'success': False,
+                            'error': 'site_not_allowed',
+                            'site': blocked_sites[0],
+                            'allowed_sites': sorted(list(allowed_sites_norm)),
+                            'message': 'This agent credential is restricted to specific sites. Request a new credential with the correct allowed_sites.'
+                        }), 403
+
                 # Check task-bound path restrictions
                 allowed_paths = credential_info.get('allowed_paths')
                 path_allowed, matching_pattern = check_path_allowed(request.path, allowed_paths)
@@ -919,6 +977,8 @@ def require_agent_or_user_auth(required_scope=None, enforce_task_bounds=True):
                 g.task_info = {
                     'task': credential_info.get('task_description'),
                     'task_hash': credential_info.get('task_hash'),
+                    'allowed_sites': credential_info.get('allowed_sites'),
+                    'requested_sites': requested_sites,
                     'allowed_paths': allowed_paths,
                     'path_allowed': path_allowed,
                     'matching_pattern': matching_pattern,
