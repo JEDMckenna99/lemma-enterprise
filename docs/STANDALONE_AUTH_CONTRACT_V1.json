@@ -1,0 +1,62 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://lemma.id/schemas/standalone-auth-contract-v1.json",
+  "title": "Lemma.id Standalone Auth Decision Contract v1",
+  "type": "object",
+  "required": ["allow", "error_code"],
+  "properties": {
+    "allow": {
+      "type": "boolean"
+    },
+    "error_code": {
+      "type": "string",
+      "enum": [
+        "none",
+        "auth_required",
+        "invalid_token",
+        "token_expired",
+        "token_revoked",
+        "audience_mismatch",
+        "missing_scope",
+        "path_not_allowed",
+        "max_operations_exceeded",
+        "task_mismatch",
+        "rate_limit_exceeded"
+      ]
+    },
+    "reason": {
+      "type": "string"
+    },
+    "token_id": {
+      "type": ["string", "null"]
+    },
+    "required_scope": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "provided_scope": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "required_audience": {
+      "type": ["string", "null"]
+    },
+    "token_audience": {
+      "type": ["string", "null"]
+    },
+    "path": {
+      "type": ["string", "null"]
+    },
+    "allowed_paths": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "expected_task_hash": {
+      "type": ["string", "null"]
+    },
+    "token_task_hash": {
+      "type": ["string", "null"]
+    }
+  },
+  "additionalProperties": true
+}

@@ -23,6 +23,10 @@ async function call(path, options = {}) {
   return { res, data };
 }
 
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 function authorizeDecision({ validation, requiredScope, requiredAudience, requestPath, expectedTaskHash }) {
   if (!(validation?.valid === true)) {
     return { allow: false, error_code: validation?.error || 'invalid_token' };
@@ -43,7 +47,10 @@ function authorizeDecision({ validation, requiredScope, requiredAudience, reques
   if (requestPath && Array.isArray(validation.allowed_paths)) {
     const allowed = validation.allowed_paths.some((pattern) => {
       if (typeof pattern !== 'string') return false;
-      const escaped = pattern.replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace(/\\\*\\\*/g, '.*').replace(/\\\*/g, '[^/]*');
+      const escaped = pattern
+        .replace(/[.+?^${}()|[\]\\]/g, '\\$&')
+        .replace(/\*\*/g, '.*')
+        .replace(/\*/g, '[^/]*');
       return new RegExp(`^${escaped}$`).test(requestPath);
     });
     if (!allowed) {
@@ -71,15 +78,33 @@ async function issueToken(overrides = {}) {
     ...overrides
   };
 
-  const issued = await call('/api/agent/credentials/issue', {
-    method: 'POST',
-    headers: headers(),
-    body: JSON.stringify(payload)
-  });
-  if (!issued.res.ok || !issued.data?.success) {
-    throw new Error(`Failed to issue token: status=${issued.res.status} body=${JSON.stringify(issued.data)}`);
+  const maxAttempts = 4;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    const issued = await call('/api/agent/credentials/issue', {
+      method: 'POST',
+      headers: headers(),
+      body: JSON.stringify(payload)
+    });
+    if (issued.res.ok && issued.data?.success) {
+      return issued.data.credential;
+    }
+
+    const isRateLimited = issued.res.status === 429 || issued.data?.error === 'rate_limit_exceeded';
+    if (!isRateLimited || attempt === maxAttempts) {
+      throw new Error(`Failed to issue token: status=${issued.res.status} body=${JSON.stringify(issued.data)}`);
+    }
+
+    const retryAfterSeconds = Number(
+      issued.data?.retry_after ||
+      issued.res.headers.get('retry-after') ||
+      60
+    );
+    const waitMs = Math.max(1000, retryAfterSeconds * 1000);
+    console.log(`Rate-limited on token issue. Waiting ${Math.round(waitMs / 1000)}s before retry ${attempt + 1}/${maxAttempts}...`);
+    await sleep(waitMs);
   }
-  return issued.data.credential;
+
+  throw new Error('Failed to issue token after retries');
 }
 
 async function revokeToken(tokenId) {
@@ -110,6 +135,7 @@ async function main() {
   console.log('=== OpenClaw Conformance (Sprint 1 minimum matrix) ===');
 
   let tokenValid;
+  let validationValid;
   await runTest('1) valid token + required scope + allowed path -> allow', async () => {
     const issued = await issueToken({
       scope: ['read'],
@@ -117,6 +143,7 @@ async function main() {
     });
     tokenValid = issued.token;
     const { data } = await validateToken(issued.token);
+    validationValid = data;
     const decision = authorizeDecision({
       validation: data,
       requiredScope: 'read',
@@ -136,9 +163,8 @@ async function main() {
   });
 
   await runTest('3) wrong audience -> audience_mismatch', async () => {
-    const { data } = await validateToken(tokenValid);
     const decision = authorizeDecision({
-      validation: data,
+      validation: validationValid,
       requiredScope: 'read',
       requiredAudience: 'not-openclaw',
       requestPath: '/api/agent/validate'
@@ -170,10 +196,8 @@ async function main() {
   });
 
   await runTest('6) missing scope -> missing_scope', async () => {
-    const issued = await issueToken({ scope: ['read'] });
-    const { data } = await validateToken(issued.token);
     const decision = authorizeDecision({
-      validation: data,
+      validation: validationValid,
       requiredScope: 'write',
       requiredAudience: REQUIRED_AUDIENCE,
       requestPath: '/api/agent/validate'
