@@ -16,6 +16,7 @@ For all other admin operations, use @require_site_admin protected endpoints.
 
 import os
 import logging
+from datetime import datetime
 from flask import Blueprint, request, jsonify
 from flask_cors import cross_origin
 
@@ -111,7 +112,7 @@ def admin_self_issue():
         
         api_key = auth_header.replace('Bearer ', '').strip()
         
-        data = request.get_json()
+        data = request.get_json(silent=True) or {}
         
         # Validate required fields
         required = ['site_id', 'user_email', 'permission_level']
@@ -164,7 +165,39 @@ def admin_self_issue():
         if not user_did or not user_did.startswith('did:lemma:ppid_'):
             # Fall back to email-based derivation (legacy)
             logger.warning(f"No wallet PPID provided, falling back to email-derived DID")
-        user_did = derive_ppid_did(user_email, site_domain)
+            user_did = derive_ppid_did(user_email, site_domain)
+
+        # Ensure SiteAdmin ownership record exists/updated for this admin DID.
+        try:
+            from api.database import SessionLocal, SiteAdmin
+            db = SessionLocal()
+            try:
+                admin_record = db.query(SiteAdmin).filter(
+                    SiteAdmin.site_id == site_id,
+                    SiteAdmin.admin_did == user_did
+                ).first()
+
+                if admin_record:
+                    admin_record.admin_email = user_email
+                    admin_record.admin_role = 'owner' if admin_record.admin_role == 'owner' else 'admin'
+                    admin_record.is_active = True
+                    admin_record.last_activity = datetime.utcnow()
+                else:
+                    db.add(SiteAdmin(
+                        site_id=site_id,
+                        admin_did=user_did,
+                        admin_email=user_email,
+                        admin_role='owner',
+                        permissions=['users', 'permissions', 'billing'],
+                        added_by='self_issue',
+                        is_active=True,
+                        last_activity=datetime.utcnow()
+                    ))
+                db.commit()
+            finally:
+                db.close()
+        except Exception as upsert_err:
+            logger.warning(f"SiteAdmin upsert failed (non-fatal) for {site_id}: {upsert_err}")
         
         # Issue permission lemma with REAL Ed25519 signature
         import time

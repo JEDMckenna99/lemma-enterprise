@@ -248,6 +248,81 @@ def _build_admin_transfer_key(token: str) -> str:
     return f"admin_transfer_token:{token}"
 
 
+def _get_owned_site_ids(db, ppid: str):
+    """
+    Resolve site ownership for a PPID from multiple admin authority sources:
+    - SiteAdmin records
+    - Active site_permission_grants with admin-like permissions
+    - Active user_lemmas with admin-like permissions
+    """
+    from api.database import SiteAdmin, SitePermissionGrant, UserLemma
+
+    if not ppid:
+        return []
+
+    owned_site_ids = set()
+
+    admin_records = db.query(SiteAdmin).filter(
+        SiteAdmin.admin_did == ppid,
+        SiteAdmin.is_active == True
+    ).all()
+    owned_site_ids.update(a.site_id for a in admin_records if a.site_id)
+
+    admin_permission_ids = ['admin', 'admin_access', 'super_admin']
+
+    grant_records = db.query(SitePermissionGrant).filter(
+        SitePermissionGrant.user_did == ppid,
+        SitePermissionGrant.permission_id.in_(admin_permission_ids),
+        SitePermissionGrant.is_active == True,
+        SitePermissionGrant.revoked_at.is_(None)
+    ).all()
+    owned_site_ids.update(g.site_id for g in grant_records if g.site_id)
+
+    lemma_records = db.query(UserLemma).filter(
+        UserLemma.user_did == ppid,
+        UserLemma.lemma_type.in_(['permission', 'access']),
+        UserLemma.permission_id.in_(admin_permission_ids),
+        UserLemma.is_active == True,
+        UserLemma.revoked_at.is_(None)
+    ).all()
+    owned_site_ids.update(l.site_id for l in lemma_records if l.site_id)
+
+    return sorted(list(owned_site_ids))
+
+
+def _upsert_site_admin_record(db, site_id: str, admin_did: str, admin_email: str = ''):
+    """Ensure SiteAdmin row exists for bootstrap/self-issue style admin issuance."""
+    from api.database import SiteAdmin
+
+    if not site_id or not admin_did:
+        return
+
+    admin_record = db.query(SiteAdmin).filter(
+        SiteAdmin.site_id == site_id,
+        SiteAdmin.admin_did == admin_did
+    ).first()
+
+    if admin_record:
+        if admin_email:
+            admin_record.admin_email = admin_email
+        admin_record.is_active = True
+        admin_record.last_activity = datetime.utcnow()
+        if not admin_record.permissions:
+            admin_record.permissions = ['users', 'permissions', 'billing']
+        return
+
+    db.add(SiteAdmin(
+        site_id=site_id,
+        admin_did=admin_did,
+        admin_email=admin_email or '',
+        admin_role='owner',
+        permissions=['users', 'permissions', 'billing'],
+        added_by='bootstrap_issue',
+        is_active=True,
+        last_activity=datetime.utcnow()
+    ))
+
+
 @developer_api_bp.route('/api/developer/stats', methods=['GET'])
 @cross_origin()
 @require_agent_or_user_auth(required_scope='read')
@@ -263,16 +338,12 @@ def get_developer_stats():
         
         # Try to query database if available
         try:
-            from api.database import SessionLocal, Site, SiteAdmin
+            from api.database import SessionLocal, Site
             db = SessionLocal()
             
             # Count sites owned by this developer
             if ppid:
-                admin_records = db.query(SiteAdmin).filter(
-                    SiteAdmin.admin_did == ppid,
-                    SiteAdmin.is_active == True
-                ).all()
-                site_ids = [a.site_id for a in admin_records]
+                site_ids = _get_owned_site_ids(db, ppid)
                 if site_ids:
                     sites = db.query(Site).filter(Site.site_id.in_(site_ids)).all()
                     site_count = len(sites)
@@ -316,17 +387,13 @@ def get_developer_sites():
         
         # Try to query database if available
         try:
-            from api.database import SessionLocal, Site, SiteAdmin, get_db_connection
+            from api.database import SessionLocal, Site, get_db_connection
             db = SessionLocal()
             
             # Get sites for this developer via SiteAdmin table
             if ppid:
-                # Find sites where this PPID is an admin
-                admin_records = db.query(SiteAdmin).filter(
-                    SiteAdmin.admin_did == ppid,
-                    SiteAdmin.is_active == True
-                ).all()
-                site_ids = [a.site_id for a in admin_records]
+                # Find sites where this PPID has admin ownership/authority.
+                site_ids = _get_owned_site_ids(db, ppid)
                 db_sites = db.query(Site).filter(Site.site_id.in_(site_ids)).all() if site_ids else []
             elif credential_id:
                 # Admin can see all sites
@@ -675,6 +742,9 @@ def bootstrap_site_admin(site_id):
                     'conditions': [],
                     'priority': 100
                 })
+
+            # Ensure this issuance path is reflected in site admin ownership table.
+            _upsert_site_admin_record(db, site.site_id, target_user_ppid, site.admin_email or '')
 
             expires_at = datetime.utcnow() + timedelta(days=365)
             permission_lemma = manager.issue_permission_lemma(
