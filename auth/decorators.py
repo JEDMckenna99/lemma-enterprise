@@ -22,6 +22,25 @@ from auth.permissions import normalize_scopes, is_admin_permission
 logger = logging.getLogger(__name__)
 
 
+def _extract_api_key_from_request() -> Optional[str]:
+    """
+    Extract API key from supported locations.
+    Preferred order: X-API-Key header, api_key query param, Authorization Bearer token.
+    """
+    api_key = request.headers.get('X-API-Key') or request.args.get('api_key')
+    if api_key:
+        return api_key
+
+    auth_header = request.headers.get('Authorization', '')
+    if auth_header.startswith('Bearer '):
+        token = auth_header[7:].strip()
+        # Ignore likely credential JSON/JWT payloads and agent tokens here.
+        if token and not token.startswith('{') and not token.startswith('lm_agent_'):
+            return token
+
+    return None
+
+
 def _auth_error(code: str, message: str, status: int = 401, auth_method: str = 'none', required_scope=None, provided_scope=None):
     payload = {
         'error': code,
@@ -116,7 +135,7 @@ def require_api_key(f):
     """
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        api_key = request.headers.get('X-API-Key') or request.args.get('api_key')
+        api_key = _extract_api_key_from_request()
         
         if not api_key:
             return jsonify({'error': 'API key required'}), 401
@@ -243,7 +262,7 @@ def require_site_admin(f):
                 )
         
         # METHOD 2: API key (programmatic access - still supported)
-        api_key = request.headers.get('X-API-Key') or request.args.get('api_key')
+        api_key = _extract_api_key_from_request()
         
         is_valid_key, key_obj, key_error = validate_api_key_secure(api_key)
         if is_valid_key:
@@ -312,7 +331,7 @@ def optional_auth(f):
                 return f(*args, **kwargs)
         
         # Method 3: API key fallback
-        api_key = request.headers.get('X-API-Key') or request.args.get('api_key')
+        api_key = _extract_api_key_from_request()
         is_valid_key, key_obj, key_error = validate_api_key_secure(api_key)
         if is_valid_key:
             g.api_key = api_key
@@ -414,7 +433,7 @@ def require_admin(f):
             )
 
         # Method 2: API key fallback (programmatic access)
-        api_key = request.headers.get('X-API-Key') or request.args.get('api_key')
+        api_key = _extract_api_key_from_request()
         is_valid_key, key_obj, key_error = validate_api_key_secure(api_key)
         if is_valid_key:
             g.api_key = api_key
@@ -477,7 +496,7 @@ def init_csrf_protection(app):
                 return
         
         # Skip if API key is present (programmatic access)
-        if request.headers.get('X-API-Key') or request.headers.get('Authorization', '').startswith('Bearer lemma_'):
+        if _extract_api_key_from_request():
             return
         
         # Validate CSRF token
@@ -576,7 +595,7 @@ def require_authenticated(f):
                 return f(*args, **kwargs)
         
         # Method 3: API key fallback
-        api_key = request.headers.get('X-API-Key') or request.args.get('api_key')
+        api_key = _extract_api_key_from_request()
         is_valid_key, key_obj, key_error = validate_api_key_secure(api_key)
         if is_valid_key:
             g.api_key = api_key
@@ -721,7 +740,7 @@ def require_wallet_ppid(f):
             return f(*args, **kwargs)
         
         # Method 3: API key fallback (for programmatic access)
-        api_key = request.headers.get('X-API-Key') or request.args.get('api_key')
+        api_key = _extract_api_key_from_request()
         is_valid_key, key_obj, key_error = validate_api_key_secure(api_key)
         if is_valid_key:
             g.api_key = api_key
@@ -733,7 +752,7 @@ def require_wallet_ppid(f):
         return jsonify({
             'success': False,
             'error': 'Authentication required',
-            'message': 'Provide X-Agent-Token, X-Lemma-PPID, or X-API-Key'
+            'message': 'Provide X-Agent-Token, X-Lemma-PPID, X-API-Key, or Authorization: Bearer <api_key>'
         }), 401
     
     return decorated_function
@@ -803,7 +822,7 @@ def require_customer_or_admin(f):
             return f(*args, **kwargs)
         
         # API key fallback
-        api_key = request.headers.get('X-API-Key') or request.args.get('api_key')
+        api_key = _extract_api_key_from_request()
         is_valid_key, key_obj, key_error = validate_api_key_secure(api_key)
         if is_valid_key:
             g.api_key = api_key

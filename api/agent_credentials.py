@@ -447,6 +447,24 @@ def hash_token(plaintext_token):
     return hashlib.sha256(plaintext_token.encode()).hexdigest()
 
 
+def _extract_api_key_from_request():
+    """
+    Extract API key from supported locations.
+    Preferred order: X-API-Key header, api_key query param, Authorization Bearer token.
+    """
+    api_key = request.headers.get('X-API-Key') or request.args.get('api_key')
+    if api_key:
+        return api_key
+
+    auth_header = request.headers.get('Authorization', '')
+    if auth_header.startswith('Bearer '):
+        token = auth_header[7:].strip()
+        if token and not token.startswith('{') and not token.startswith('lm_agent_'):
+            return token
+
+    return None
+
+
 def _resolve_monitor_identity():
     """
     Resolve owner identity for monitoring endpoints.
@@ -488,7 +506,7 @@ def _resolve_monitor_identity():
             'principal': f"customer:{customer_id}"
         }, None
 
-    api_key = request.headers.get('X-API-Key')
+    api_key = _extract_api_key_from_request()
     if api_key:
         try:
             from api.customer_accounts import customer_manager
@@ -1126,7 +1144,7 @@ def require_agent_or_user_auth(required_scope=None, enforce_task_bounds=True):
 
             # Fall back to user auth
             ppid = request.headers.get('X-Lemma-PPID')
-            api_key = request.headers.get('X-API-Key')
+            api_key = _extract_api_key_from_request()
 
             if ppid and ppid.startswith('did:lemma:ppid_'):
                 g.ppid = ppid
@@ -1145,7 +1163,7 @@ def require_agent_or_user_auth(required_scope=None, enforce_task_bounds=True):
             return jsonify({
                 'success': False,
                 'error': 'auth_required',
-                'message': 'Provide X-Agent-Token, X-Lemma-PPID, or X-API-Key header'
+                'message': 'Provide X-Agent-Token, X-Lemma-PPID, X-API-Key, or Authorization: Bearer <api_key> header'
             }), 401
 
         return decorated_function
