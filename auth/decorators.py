@@ -35,10 +35,47 @@ def _extract_api_key_from_request() -> Optional[str]:
     if auth_header.startswith('Bearer '):
         token = auth_header[7:].strip()
         # Ignore likely credential JSON/JWT payloads and agent tokens here.
-        if token and not token.startswith('{') and not token.startswith('lm_agent_'):
+        if token and not token.startswith('{') and not token.startswith('lm_agent_') and not token.startswith('lm_at_'):
             return token
 
     return None
+
+
+def _extract_bearer_token_from_request() -> Optional[str]:
+    auth_header = request.headers.get('Authorization', '')
+    if not auth_header.startswith('Bearer '):
+        return None
+    token = auth_header[7:].strip()
+    return token or None
+
+
+def _try_authenticate_access_token(required_scope: Optional[str] = None):
+    """
+    Attempt auth via server-issued access token.
+    Returns (handled, response_tuple_or_none).
+    """
+    bearer = _extract_bearer_token_from_request()
+    if not bearer or not bearer.startswith('lm_at_'):
+        return False, None
+
+    try:
+        from api.access_tokens import validate_access_token
+        payload, error = validate_access_token(bearer, required_scope=required_scope)
+    except Exception as e:
+        logger.error(f"Access token validation error: {e}")
+        return True, (jsonify({'error': 'token_validation_failed'}), 500)
+
+    if not payload:
+        return True, (jsonify({'error': 'invalid_access_token', 'reason': error}), 401)
+
+    g.authenticated = True
+    g.auth_method = 'access_token'
+    g.ppid = payload.get('sub')
+    g.permission_id = payload.get('permission_id')
+    g.access_token_claims = payload
+    if payload.get('is_admin'):
+        g.is_admin = True
+    return True, None
 
 
 def _auth_error(code: str, message: str, status: int = 401, auth_method: str = 'none', required_scope=None, provided_scope=None):
@@ -292,6 +329,12 @@ def optional_auth(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
         g.authenticated = False
+
+        handled, token_response = _try_authenticate_access_token()
+        if handled:
+            if token_response:
+                return token_response
+            return f(*args, **kwargs)
         
         # Method 0a: Agent token header
         agent_token = request.headers.get('X-Agent-Token')
@@ -557,6 +600,12 @@ def require_authenticated(f):
     """
     @wraps(f)
     def decorated_function(*args, **kwargs):
+        handled, token_response = _try_authenticate_access_token()
+        if handled:
+            if token_response:
+                return token_response
+            return f(*args, **kwargs)
+
         # Method 0a: Agent token header
         agent_token = request.headers.get('X-Agent-Token')
         if agent_token:
@@ -705,6 +754,12 @@ def require_wallet_ppid(f):
     """
     @wraps(f)
     def decorated_function(*args, **kwargs):
+        handled, token_response = _try_authenticate_access_token(required_scope='read')
+        if handled:
+            if token_response:
+                return token_response
+            return f(*args, **kwargs)
+
         # Method 0a: Agent token (delegated access from human)
         agent_token = request.headers.get('X-Agent-Token')
         if agent_token:
@@ -769,6 +824,13 @@ def require_customer_or_admin(f):
     """
     @wraps(f)
     def decorated_function(*args, **kwargs):
+        handled, token_response = _try_authenticate_access_token(required_scope='read')
+        if handled:
+            if token_response:
+                return token_response
+            g.is_admin = bool(getattr(g, 'is_admin', False))
+            return f(*args, **kwargs)
+
         # Try agent token first (header)
         agent_token = request.headers.get('X-Agent-Token')
         if agent_token:
