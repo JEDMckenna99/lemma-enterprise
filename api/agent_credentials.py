@@ -510,6 +510,34 @@ def _resolve_monitor_identity():
     return None, ('Authentication required', 401)
 
 
+def _validate_request_api_key(api_key: str):
+    """
+    Validate API key for generic request auth paths.
+    Accepts platform env keys and customer keys stored in database.
+    Returns (is_valid, metadata_dict).
+    """
+    if not api_key:
+        return False, {}
+
+    platform_key = os.getenv('LEMMA_API_KEY') or os.getenv('LEMMA_PLATFORM_API_KEY')
+    if platform_key and api_key == platform_key:
+        return True, {'type': 'platform'}
+
+    try:
+        from api.customer_accounts import customer_manager
+        validation = customer_manager.validate_api_key(api_key)
+        if validation.get('valid'):
+            return True, {
+                'type': 'customer',
+                'customer_id': validation.get('customer_id'),
+                'site_id': validation.get('site_id'),
+            }
+    except Exception as e:
+        logger.warning(f"API key validation failed in agent auth decorator: {e}")
+
+    return False, {}
+
+
 def _build_owner_filter(identity, alias='ac'):
     """
     Build SQL filter for ownership checks.
@@ -1106,8 +1134,10 @@ def require_agent_or_user_auth(required_scope=None, enforce_task_bounds=True):
                 g.auth_method = 'ppid'
                 return f(*args, **kwargs)
 
-            if api_key and len(api_key) >= 10:
+            is_valid_key, key_info = _validate_request_api_key(api_key)
+            if is_valid_key:
                 g.api_key = api_key
+                g.api_key_info = key_info
                 g.authenticated = True
                 g.auth_method = 'api_key'
                 return f(*args, **kwargs)

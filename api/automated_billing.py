@@ -12,6 +12,7 @@ import stripe
 from flask import Blueprint, request, jsonify, redirect, url_for
 from typing import Dict, Any, Optional, List
 from datetime import datetime, timedelta
+from auth.decorators import require_api_key, require_customer_or_admin
 
 logger = logging.getLogger(__name__)
 
@@ -210,6 +211,7 @@ class AutomatedBillingManager:
 billing_manager = AutomatedBillingManager()
 
 @automated_billing_bp.route('/api/billing/create-checkout', methods=['POST'])
+@require_customer_or_admin
 def create_checkout():
     """Create a Stripe Checkout session for subscription signup"""
     try:
@@ -241,6 +243,7 @@ def create_checkout():
         return jsonify({'error': 'Failed to create checkout session'}), 500
 
 @automated_billing_bp.route('/api/billing/report-usage', methods=['POST'])
+@require_api_key
 def report_usage():
     """Report user usage for metered billing"""
     try:
@@ -270,6 +273,7 @@ def report_usage():
         return jsonify({'error': 'Failed to report usage'}), 500
 
 @automated_billing_bp.route('/api/billing/usage/<customer_id>', methods=['GET'])
+@require_customer_or_admin
 def get_usage(customer_id):
     """Get usage summary for a customer"""
     try:
