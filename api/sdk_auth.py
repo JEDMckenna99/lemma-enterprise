@@ -10,6 +10,7 @@ import ast
 from flask import Blueprint, request, jsonify, redirect, render_template_string
 from flask_cors import cross_origin
 from urllib.parse import urlencode, urlparse
+from auth.decorators import require_api_key
 
 logger = logging.getLogger(__name__)
 
@@ -282,6 +283,57 @@ def exchange_proof_for_token():
     except Exception as e:
         logger.error(f"Proof exchange error: {e}")
         return jsonify({'success': False, 'error': 'exchange_failed'}), 500
+
+
+@sdk_auth_bp.route('/api/auth/introspect', methods=['POST', 'OPTIONS'])
+@cross_origin()
+@require_api_key
+def introspect_access_token_endpoint():
+    """Introspect a server-issued access token (requires API key auth)."""
+    if request.method == 'OPTIONS':
+        return jsonify({'success': True}), 200
+
+    data = request.get_json() or {}
+    token = data.get('token', '').strip()
+    required_site = (data.get('site_id') or '').strip().lower() or None
+    if not token:
+        return jsonify({'success': False, 'error': 'token_required'}), 400
+
+    from .access_tokens import introspect_access_token
+    result = introspect_access_token(token, required_site_id=required_site)
+    return jsonify({'success': True, 'introspection': result}), 200
+
+
+@sdk_auth_bp.route('/api/auth/revoke', methods=['POST', 'OPTIONS'])
+@cross_origin()
+@require_api_key
+def revoke_access_token_endpoint():
+    """Revoke a server-issued access token (requires API key auth)."""
+    if request.method == 'OPTIONS':
+        return jsonify({'success': True}), 200
+
+    data = request.get_json() or {}
+    token = (data.get('token') or '').strip() or None
+    jti = (data.get('jti') or '').strip() or None
+    reason = (data.get('reason') or 'revoked_by_api').strip()[:128]
+    revoked_by = 'api_key'
+
+    from .access_tokens import revoke_access_token
+    ok, metadata, error = revoke_access_token(
+        token=token,
+        jti=jti,
+        reason=reason,
+        revoked_by=revoked_by,
+    )
+
+    if not ok:
+        return jsonify({'success': False, 'error': error}), 400
+
+    return jsonify({
+        'success': True,
+        'revoked': True,
+        'metadata': metadata,
+    }), 200
 
 
 # Clean up old pending requests periodically
