@@ -133,7 +133,13 @@ def _decode_signed_token(jwt_token: str, *, verify_exp: bool = True) -> Tuple[Op
             jwt_token,
             _get_access_token_secret(),
             algorithms=["HS256"],
-            options={"verify_exp": verify_exp},
+            options={
+                "verify_exp": verify_exp,
+                # We enforce aud/iss manually below to keep behavior explicit
+                # and compatible across callers that don't pass audience params.
+                "verify_aud": False,
+                "verify_iss": False,
+            },
         )
         return payload, None
     except jwt.ExpiredSignatureError:
