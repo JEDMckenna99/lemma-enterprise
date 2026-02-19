@@ -6,6 +6,7 @@ Handles sign-in flow for sites using Lemma Sign-In SDK
 import os
 import secrets
 import logging
+import ast
 from flask import Blueprint, request, jsonify, redirect, render_template_string
 from flask_cors import cross_origin
 from urllib.parse import urlencode, urlparse
@@ -16,6 +17,39 @@ sdk_auth_bp = Blueprint('sdk_auth', __name__)
 
 # Store pending SDK auth requests (in production, use Redis)
 pending_sdk_requests = {}
+
+
+def _normalize_scopes(raw_scopes) -> list[str]:
+    """Normalize scope values from claims/request into canonical lowercase list."""
+    if raw_scopes is None:
+        return []
+
+    values = raw_scopes
+    if isinstance(raw_scopes, str):
+        text = raw_scopes.strip()
+        if not text:
+            return []
+        # Support stringified list formats like "['read']" or "[\"read\",\"write\"]".
+        if text.startswith("[") and text.endswith("]"):
+            try:
+                parsed = ast.literal_eval(text)
+                values = parsed
+            except Exception:
+                values = text
+        else:
+            values = text
+
+    if isinstance(values, (list, tuple, set)):
+        source = values
+    else:
+        source = str(values).split(",")
+
+    normalized = []
+    for item in source:
+        scope = str(item).strip().strip("'\"").lower()
+        if scope and scope not in normalized:
+            normalized.append(scope)
+    return normalized
 
 
 @sdk_auth_bp.route('/auth/sdk-request', methods=['GET'])
@@ -206,25 +240,14 @@ def exchange_proof_for_token():
             or 'read'
         )
 
-        raw_scopes = claims.get('scope', [])
-        if isinstance(raw_scopes, str):
-            scopes = [s.strip().lower() for s in raw_scopes.split(',') if s.strip()]
-        elif isinstance(raw_scopes, list):
-            scopes = [str(s).strip().lower() for s in raw_scopes if str(s).strip()]
-        else:
-            scopes = []
+        scopes = _normalize_scopes(claims.get('scope', []))
 
         if not scopes:
             scopes = ['admin', 'write', 'read'] if 'admin' in str(permission_id).lower() else ['read']
 
         requested_scope = data.get('requested_scope')
         if requested_scope:
-            if isinstance(requested_scope, str):
-                requested = [s.strip().lower() for s in requested_scope.split(',') if s.strip()]
-            elif isinstance(requested_scope, list):
-                requested = [str(s).strip().lower() for s in requested_scope if str(s).strip()]
-            else:
-                requested = []
+            requested = _normalize_scopes(requested_scope)
             if requested and not set(requested).issubset(set(scopes)):
                 return jsonify({
                     'success': False,
