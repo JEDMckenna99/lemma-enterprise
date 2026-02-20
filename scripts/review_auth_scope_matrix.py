@@ -29,6 +29,7 @@ ANY_AUTH_DECORATORS = {
     "require_authenticated",
     "require_api_key",
     "require_agent_or_user_auth",
+    "require_agent_or_user_session",
     "optional_auth",
 }
 

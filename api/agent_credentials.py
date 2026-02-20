@@ -575,6 +575,77 @@ def _build_owner_filter(identity, alias='ac'):
     return f"({' OR '.join(clauses)})", params
 
 
+def require_agent_or_user_session(required_scope=None):
+    """
+    Lightweight explicit auth decorator for credential management endpoints.
+    Accepts agent token, PPID header, API key, or active agent browser session.
+    """
+    def decorator(f):
+        @wraps(f)
+        def wrapped(*args, **kwargs):
+            agent_token = request.headers.get('X-Agent-Token')
+            if agent_token:
+                credential_info = validate_agent_token(agent_token)
+                if not credential_info:
+                    return jsonify({'success': False, 'error': 'invalid_token'}), 401
+
+                scope = credential_info.get('scope') or []
+                if isinstance(scope, str):
+                    scope = [scope]
+                if required_scope and required_scope not in scope:
+                    return jsonify({
+                        'success': False,
+                        'error': 'missing_scope',
+                        'required_scope': [required_scope],
+                        'provided_scope': scope,
+                    }), 403
+
+                g.agent_credential = credential_info
+                g.ppid = credential_info.get('authorized_by_ppid')
+                g.authenticated = True
+                g.auth_method = 'agent_token'
+                return f(*args, **kwargs)
+
+            ppid = request.headers.get('X-Lemma-PPID')
+            if ppid and ppid.startswith('did:lemma:ppid_'):
+                g.ppid = ppid
+                g.authenticated = True
+                g.auth_method = 'ppid'
+                return f(*args, **kwargs)
+
+            if session.get('agent_authenticated'):
+                session_scope = session.get('agent_scope', [])
+                if required_scope and required_scope not in session_scope:
+                    return jsonify({
+                        'success': False,
+                        'error': 'missing_scope',
+                        'required_scope': [required_scope],
+                        'provided_scope': session_scope,
+                    }), 403
+                g.ppid = session.get('agent_ppid')
+                g.authenticated = True
+                g.auth_method = 'agent_session'
+                return f(*args, **kwargs)
+
+            api_key = _extract_api_key_from_request()
+            is_valid_key, key_info = _validate_request_api_key(api_key)
+            if is_valid_key:
+                g.api_key = api_key
+                g.api_key_info = key_info
+                g.authenticated = True
+                g.auth_method = 'api_key'
+                return f(*args, **kwargs)
+
+            return jsonify({
+                'success': False,
+                'error': 'auth_required',
+                'message': 'Provide X-Agent-Token, X-Lemma-PPID, X-API-Key, or Authorization: Bearer <api_key> header',
+            }), 401
+
+        return wrapped
+    return decorator
+
+
 # ============================================
 # CREDENTIAL ISSUANCE (Requires Passkey Auth)
 # ============================================
@@ -582,6 +653,7 @@ def _build_owner_filter(identity, alias='ac'):
 @agent_credentials_bp.route('/api/agent/credentials/issue', methods=['POST'])
 @cross_origin()
 @rate_limit(credential_issue_limit, key_func=get_issuance_identifier)
+@require_agent_or_user_session()
 def issue_agent_credential():
     """
     Issue a new agent credential with optional task-bound authorization.
@@ -1259,6 +1331,7 @@ def list_agent_credentials():
 
 @agent_credentials_bp.route('/api/agent/credentials/<token_id>/revoke', methods=['POST'])
 @cross_origin()
+@require_agent_or_user_session()
 def revoke_agent_credential(token_id):
     """
     Revoke an agent credential immediately.
@@ -1811,6 +1884,7 @@ def get_agent_monitor_summary():
 @agent_credentials_bp.route('/api/agent/auto-issue', methods=['GET', 'POST'])
 @agent_credentials_bp.route('/api/agent/credentials/session-issue', methods=['POST'])
 @rate_limit(credential_issue_limit, key_func=get_issuance_identifier)
+@require_agent_or_user_session()
 def auto_issue_agent_credential():
     """
     Auto-issue an agent credential if wallet session is active.

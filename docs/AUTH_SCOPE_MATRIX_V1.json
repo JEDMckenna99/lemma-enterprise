@@ -186,9 +186,12 @@
       "handler": "revoke_agent_credential",
       "required_scope": "write",
       "auth_mode": "custom_or_internal",
-      "auth_decorators": [],
+      "auth_decorators": [
+        "require_agent_or_user_session"
+      ],
       "decorator_chain": [
-        "cross_origin"
+        "cross_origin",
+        "require_agent_or_user_session"
       ]
     },
     {
@@ -228,10 +231,13 @@
       "handler": "issue_agent_credential",
       "required_scope": "write",
       "auth_mode": "custom_or_internal",
-      "auth_decorators": [],
+      "auth_decorators": [
+        "require_agent_or_user_session"
+      ],
       "decorator_chain": [
         "cross_origin",
-        "rate_limit"
+        "rate_limit",
+        "require_agent_or_user_session"
       ]
     },
     {
@@ -243,9 +249,12 @@
       "handler": "auto_issue_agent_credential",
       "required_scope": "write",
       "auth_mode": "custom_or_internal",
-      "auth_decorators": [],
+      "auth_decorators": [
+        "require_agent_or_user_session"
+      ],
       "decorator_chain": [
-        "rate_limit"
+        "rate_limit",
+        "require_agent_or_user_session"
       ]
     },
     {
