@@ -66,6 +66,8 @@ def _try_authenticate_access_token(required_scope: Optional[str] = None):
         return True, (jsonify({'error': 'token_validation_failed'}), 500)
 
     if not payload:
+        if error in {"missing_scope", "site_mismatch", "audience_mismatch"}:
+            return True, (jsonify({'error': error, 'reason': error}), 403)
         return True, (jsonify({'error': 'invalid_access_token', 'reason': error}), 401)
 
     g.authenticated = True
@@ -226,6 +228,13 @@ def require_site_admin(f):
     """
     @wraps(f)
     def decorated_function(*args, **kwargs):
+        handled, token_response = _try_authenticate_access_token(required_scope='admin')
+        if handled:
+            if token_response:
+                return token_response
+            g.is_admin = True
+            return f(*args, **kwargs)
+
         # METHOD 0a: Agent token with admin scope (header)
         agent_token = request.headers.get('X-Agent-Token')
         if agent_token:
@@ -409,6 +418,13 @@ def require_admin(f):
     """
     @wraps(f)
     def decorated_function(*args, **kwargs):
+        handled, token_response = _try_authenticate_access_token(required_scope='admin')
+        if handled:
+            if token_response:
+                return token_response
+            g.is_admin = True
+            return f(*args, **kwargs)
+
         # Method 0a: Agent token with admin scope (header)
         agent_token = request.headers.get('X-Agent-Token')
         if agent_token:
