@@ -37,6 +37,11 @@ issuer trust, site binding, permission claim, and revocation-aware verification.
   - Input: `token` or `jti`, optional `reason`
   - Output: `revoked: true` and revocation metadata
 
+- `POST /api/auth/refresh`
+  - Input: `refresh_token`, optional `site_id`
+  - Output: rotated `access_token` + rotated `refresh_token`
+  - Behavior: fails if refresh token is revoked/expired or auth context was revoked
+
 ## 4) Status Code Contract
 
 - `400`: malformed request (missing required fields)

@@ -141,18 +141,54 @@ def _run_positive_check(fixture: dict[str, Any]) -> dict[str, Any]:
     return payload
 
 
-def _run_control_plane_cycle(token: str, site_id: str, api_key: str) -> None:
+def _run_control_plane_cycle(token: str, site_id: str, api_key: str, refresh_token: str = "") -> None:
     if not api_key:
         print("Control-plane cycle skipped: set LEMMA_PLATFORM_API_KEY to test introspect/revoke.")
         return
 
     headers = {"X-API-Key": api_key}
+    current_token = token
+
+    if refresh_token:
+        refresh_url = f"{BASE_URL}/api/auth/refresh"
+        status, content = _request(
+            refresh_url,
+            method="POST",
+            body={"refresh_token": refresh_token, "site_id": site_id},
+        )
+        print(f"POST {refresh_url} -> {status}")
+        _assert(status == 200, f"Expected 200 from refresh endpoint, got {status}")
+        refresh_payload = _parse_json(content)
+        _assert(refresh_payload.get("success") is True, "Refresh success != true")
+        new_access = refresh_payload.get("access_token", "")
+        new_refresh = refresh_payload.get("refresh_token", "")
+        _assert(new_access.startswith("lm_at_"), "Refresh did not return lm_at_ access token")
+        _assert(new_refresh.startswith("lm_rt_"), "Refresh did not rotate lm_rt_ refresh token")
+
+        protected_url = f"{BASE_URL}/api/billing/usage/cus_test"
+        status, content = _request(
+            protected_url,
+            method="GET",
+            headers={"Authorization": f"Bearer {new_access}"},
+        )
+        print(f"GET {protected_url} (refreshed token) -> {status}")
+        _assert(status == 200, f"Expected 200 from protected endpoint with refreshed token, got {status}")
+
+        # Old refresh token should be invalid after rotation.
+        status, content = _request(
+            refresh_url,
+            method="POST",
+            body={"refresh_token": refresh_token, "site_id": site_id},
+        )
+        print(f"POST {refresh_url} (old refresh token) -> {status}")
+        _assert(status == 401, f"Expected 401 from old refresh token, got {status}")
+        current_token = new_access
 
     introspect_url = f"{BASE_URL}/api/auth/introspect"
     status, content = _request(
         introspect_url,
         method="POST",
-        body={"token": token, "site_id": site_id},
+        body={"token": current_token, "site_id": site_id},
         headers=headers,
     )
     print(f"POST {introspect_url} (before revoke) -> {status}")
@@ -164,7 +200,7 @@ def _run_control_plane_cycle(token: str, site_id: str, api_key: str) -> None:
     status, content = _request(
         revoke_url,
         method="POST",
-        body={"token": token, "reason": "proof_exchange_contract_check"},
+        body={"token": current_token, "reason": "proof_exchange_contract_check"},
         headers=headers,
     )
     print(f"POST {revoke_url} -> {status}")
@@ -176,7 +212,7 @@ def _run_control_plane_cycle(token: str, site_id: str, api_key: str) -> None:
     status, content = _request(
         introspect_url,
         method="POST",
-        body={"token": token, "site_id": site_id},
+        body={"token": current_token, "site_id": site_id},
         headers=headers,
     )
     print(f"POST {introspect_url} (after revoke) -> {status}")
@@ -189,7 +225,7 @@ def _run_control_plane_cycle(token: str, site_id: str, api_key: str) -> None:
     status, content = _request(
         protected_url,
         method="GET",
-        headers={"Authorization": f"Bearer {token}"},
+        headers={"Authorization": f"Bearer {current_token}"},
     )
     print(f"GET {protected_url} (revoked token) -> {status}")
     _assert(status == 401, f"Expected 401 from protected endpoint after revoke, got {status}")
@@ -215,9 +251,10 @@ def main() -> int:
 
     exchange_payload = _run_positive_check(fixture)
     token = exchange_payload.get("access_token", "")
+    refresh_token = exchange_payload.get("refresh_token", "")
     site_id = (exchange_payload.get("site_id") or os.environ.get("LEMMA_EXCHANGE_SITE_ID") or "").strip().lower()
     api_key = os.environ.get("LEMMA_PLATFORM_API_KEY", "").strip()
-    _run_control_plane_cycle(token, site_id, api_key)
+    _run_control_plane_cycle(token, site_id, api_key, refresh_token=refresh_token)
     print("All proof-exchange checks passed.")
     return 0
 

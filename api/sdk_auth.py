@@ -259,7 +259,7 @@ def exchange_proof_for_token():
                 scopes = requested
 
         ttl_seconds = int(data.get('ttl_seconds', 900))
-        from .access_tokens import issue_access_token
+        from .access_tokens import issue_access_token, issue_refresh_token
         access_token, expires_in = issue_access_token(
             subject=subject,
             site_id=site_id,
@@ -269,12 +269,41 @@ def exchange_proof_for_token():
             issuer_did=credential.get('issuer'),
             ttl_seconds=ttl_seconds,
         )
+        # Refresh token is longer-lived and tied to this auth context.
+        from .access_tokens import DEFAULT_REFRESH_TTL_SECONDS
+        refresh_token = None
+        refresh_expires_in = None
+
+        # Derive auth context jti from decoded access token.
+        from .access_tokens import validate_access_token
+        access_payload, _ = validate_access_token(access_token)
+        if access_payload and access_payload.get('jti'):
+            refresh_token, refresh_expires_in = issue_refresh_token(
+                subject=subject,
+                site_id=site_id,
+                permission_id=str(permission_id),
+                scopes=scopes,
+                auth_context_jti=str(access_payload.get('jti')),
+                ttl_seconds=DEFAULT_REFRESH_TTL_SECONDS,
+            )
+        else:
+            # Fallback keeps exchange usable even if access payload decode changes.
+            refresh_token, refresh_expires_in = issue_refresh_token(
+                subject=subject,
+                site_id=site_id,
+                permission_id=str(permission_id),
+                scopes=scopes,
+                auth_context_jti="unknown_context",
+                ttl_seconds=DEFAULT_REFRESH_TTL_SECONDS,
+            )
 
         return jsonify({
             'success': True,
             'token_type': 'Bearer',
             'access_token': access_token,
             'expires_in': expires_in,
+            'refresh_token': refresh_token,
+            'refresh_expires_in': refresh_expires_in,
             'site_id': site_id,
             'subject': subject,
             'scope': scopes,
@@ -333,6 +362,31 @@ def revoke_access_token_endpoint():
         'success': True,
         'revoked': True,
         'metadata': metadata,
+    }), 200
+
+
+@sdk_auth_bp.route('/api/auth/refresh', methods=['POST', 'OPTIONS'])
+@cross_origin()
+def refresh_access_token_endpoint():
+    """Refresh an access token using a refresh token."""
+    if request.method == 'OPTIONS':
+        return jsonify({'success': True}), 200
+
+    data = request.get_json() or {}
+    refresh_token = (data.get('refresh_token') or '').strip()
+    site_id = (data.get('site_id') or '').strip().lower() or None
+    if not refresh_token:
+        return jsonify({'success': False, 'error': 'refresh_token_required'}), 400
+
+    from .access_tokens import refresh_access_token
+    result, error = refresh_access_token(refresh_token, required_site_id=site_id)
+    if not result:
+        return jsonify({'success': False, 'error': error}), 401
+
+    return jsonify({
+        'success': True,
+        'token_type': 'Bearer',
+        **result,
     }), 200
 
 
