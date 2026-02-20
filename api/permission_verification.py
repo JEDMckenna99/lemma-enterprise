@@ -20,6 +20,7 @@ Flow:
 
 from flask import Blueprint, request, jsonify
 from flask_cors import cross_origin
+from auth.decorators import require_site_admin
 import logging
 import time
 import os
@@ -373,6 +374,7 @@ def verify_permission_lemma():
 
 
 @permission_verification_bp.route('/api/admin/nonce-stats', methods=['GET'])
+@require_site_admin
 def nonce_stats():
     """
     Admin endpoint to monitor nonce cache (bot activity detection)

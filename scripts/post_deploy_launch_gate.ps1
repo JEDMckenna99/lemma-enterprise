@@ -2,7 +2,8 @@ param(
     [string]$BaseUrl = "https://lemma.id",
     [string]$OutputDir = "docs/launch-evidence",
     [string]$ProofFixturePath = "",
-    [string]$PlatformApiKey = ""
+    [string]$PlatformApiKey = "",
+    [switch]$StrictScopePolicy
 )
 
 $ErrorActionPreference = "Stop"
@@ -11,6 +12,7 @@ New-Item -ItemType Directory -Force -Path $OutputDir | Out-Null
 
 $stamp = Get-Date -Format "yyyy-MM-dd-HHmmss"
 $smokeOut = Join-Path $OutputDir "$stamp-post-deploy-smoke.txt"
+$scopePolicyOut = Join-Path $OutputDir "$stamp-post-deploy-auth-scope-policy.txt"
 $contractOut = Join-Path $OutputDir "$stamp-post-deploy-auth-contract.txt"
 $scopeMatrixOut = Join-Path $OutputDir "$stamp-post-deploy-auth-scope-matrix.txt"
 $transportOut = Join-Path $OutputDir "$stamp-post-deploy-transport.txt"
@@ -52,6 +54,14 @@ function Run-CurlCapture {
 
 # 1) Core smoke checks
 python scripts/launch_gate_smoke_ci.py | Tee-Object -FilePath $smokeOut
+
+# 1a) Auth scope policy baseline generation + review
+python scripts/generate_auth_scope_matrix.py | Tee-Object -FilePath $scopePolicyOut
+if ($StrictScopePolicy) {
+    python scripts/review_auth_scope_matrix.py --strict-state-changing | Tee-Object -FilePath $scopePolicyOut -Append
+} else {
+    python scripts/review_auth_scope_matrix.py | Tee-Object -FilePath $scopePolicyOut -Append
+}
 
 # 1b) Auth contract checks (baseline always, strict when fixture provided)
 $env:LEMMA_BASE_URL = $BaseUrl
@@ -139,6 +149,7 @@ TestReq 'POST' $authnUrl 'https://evil.example' '{}'
 - Timestamp: $(Get-Date -Format o)
 - Artifacts:
   - \`$smokeOut\`
+  - \`$scopePolicyOut\`
   - \`$contractOut\`
   - \`$scopeMatrixOut\`
   - \`$transportOut\`
@@ -147,6 +158,7 @@ TestReq 'POST' $authnUrl 'https://evil.example' '{}'
 ## Pass Conditions
 
 - Smoke script exits successfully.
+- Scope matrix generation/review exits successfully.
 - Auth contract script exits successfully (strict positive when fixture provided).
 - Scope matrix script exits successfully when platform API key is provided.
 - HTTP redirects to HTTPS, TLS <=1.1 handshake fails, TLS1.2 succeeds.
@@ -160,6 +172,7 @@ TestReq 'POST' $authnUrl 'https://evil.example' '{}'
 
 Write-Output "Artifacts generated:"
 Write-Output " - $smokeOut"
+Write-Output " - $scopePolicyOut"
 Write-Output " - $contractOut"
 Write-Output " - $scopeMatrixOut"
 Write-Output " - $transportOut"
