@@ -1,6 +1,8 @@
 param(
     [string]$BaseUrl = "https://lemma.id",
-    [string]$OutputDir = "docs/launch-evidence"
+    [string]$OutputDir = "docs/launch-evidence",
+    [string]$ProofFixturePath = "",
+    [string]$PlatformApiKey = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -9,6 +11,8 @@ New-Item -ItemType Directory -Force -Path $OutputDir | Out-Null
 
 $stamp = Get-Date -Format "yyyy-MM-dd-HHmmss"
 $smokeOut = Join-Path $OutputDir "$stamp-post-deploy-smoke.txt"
+$contractOut = Join-Path $OutputDir "$stamp-post-deploy-auth-contract.txt"
+$scopeMatrixOut = Join-Path $OutputDir "$stamp-post-deploy-auth-scope-matrix.txt"
 $transportOut = Join-Path $OutputDir "$stamp-post-deploy-transport.txt"
 $originOut = Join-Path $OutputDir "$stamp-post-deploy-origin.txt"
 $summaryOut = Join-Path $OutputDir "$stamp-post-deploy-summary.md"
@@ -48,6 +52,30 @@ function Run-CurlCapture {
 
 # 1) Core smoke checks
 python scripts/launch_gate_smoke_ci.py | Tee-Object -FilePath $smokeOut
+
+# 1b) Auth contract checks (baseline always, strict when fixture provided)
+$env:LEMMA_BASE_URL = $BaseUrl
+if ($ProofFixturePath) {
+    $env:LEMMA_PROOF_FIXTURE_PATH = $ProofFixturePath
+    $env:LEMMA_STRICT_POSITIVE = "1"
+} else {
+    Remove-Item Env:LEMMA_PROOF_FIXTURE_PATH -ErrorAction SilentlyContinue
+    Remove-Item Env:LEMMA_STRICT_POSITIVE -ErrorAction SilentlyContinue
+}
+
+# Prefer explicit param, then existing env var.
+if ($PlatformApiKey) {
+    $env:LEMMA_PLATFORM_API_KEY = $PlatformApiKey
+}
+python scripts/proof_exchange_contract_check.py | Tee-Object -FilePath $contractOut
+
+# 1c) Scope matrix checks (requires platform API key)
+if ($env:LEMMA_PLATFORM_API_KEY) {
+    python scripts/auth_scope_matrix_check.py | Tee-Object -FilePath $scopeMatrixOut
+} else {
+    "Scope matrix skipped: set -PlatformApiKey or LEMMA_PLATFORM_API_KEY" | Out-File -FilePath $scopeMatrixOut -Encoding utf8
+    Write-Output "Scope matrix skipped (no platform API key provided)."
+}
 
 # 2) Transport/TLS checks
 "Transport/TLS checks: $(Get-Date -Format o)" | Out-File -FilePath $transportOut -Encoding utf8
@@ -111,12 +139,16 @@ TestReq 'POST' $authnUrl 'https://evil.example' '{}'
 - Timestamp: $(Get-Date -Format o)
 - Artifacts:
   - \`$smokeOut\`
+  - \`$contractOut\`
+  - \`$scopeMatrixOut\`
   - \`$transportOut\`
   - \`$originOut\`
 
 ## Pass Conditions
 
 - Smoke script exits successfully.
+- Auth contract script exits successfully (strict positive when fixture provided).
+- Scope matrix script exits successfully when platform API key is provided.
 - HTTP redirects to HTTPS, TLS <=1.1 handshake fails, TLS1.2 succeeds.
 - Allowed origin returns ACAO for passkey auth begin, disallowed origin does not receive credentialed ACAO on POST.
 
@@ -128,6 +160,8 @@ TestReq 'POST' $authnUrl 'https://evil.example' '{}'
 
 Write-Output "Artifacts generated:"
 Write-Output " - $smokeOut"
+Write-Output " - $contractOut"
+Write-Output " - $scopeMatrixOut"
 Write-Output " - $transportOut"
 Write-Output " - $originOut"
 Write-Output " - $summaryOut"
