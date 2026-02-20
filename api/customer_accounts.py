@@ -20,6 +20,7 @@ from flask_cors import cross_origin
 import stripe
 from sqlalchemy.orm import Session
 from .database import get_db, Customer as DBCustomer, init_database
+from auth.decorators import require_customer_or_admin
 
 # Configure Stripe
 stripe.api_key = os.getenv('STRIPE_SECRET_KEY')
@@ -28,6 +29,57 @@ logger = logging.getLogger(__name__)
 
 # Create blueprint
 customer_accounts_bp = Blueprint('customer_accounts', __name__)
+
+def _parse_bool_env(value: Optional[str], default: bool = False) -> bool:
+    """Parse boolean-like environment values safely."""
+    if value is None:
+        return default
+    return value.strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _is_invite_only_mode_enabled() -> bool:
+    """
+    Determine whether invite-only registration is enabled.
+
+    Priority:
+    1) Explicit override via LEMMA_AUTH_INVITE_ONLY
+    2) Default to enabled in development
+    """
+    configured = os.getenv("LEMMA_AUTH_INVITE_ONLY")
+    if configured is not None:
+        return _parse_bool_env(configured, default=False)
+
+    return (os.getenv("FLASK_ENV", "").strip().lower() == "development")
+
+
+def _get_allowed_invite_codes() -> List[str]:
+    """
+    Return normalized invite codes from environment.
+
+    Use LEMMA_AUTH_INVITE_CODES as comma-separated values.
+    In development, fall back to a default code if none configured.
+    """
+    configured_codes = os.getenv("LEMMA_AUTH_INVITE_CODES", "")
+    codes = [code.strip() for code in configured_codes.split(",") if code.strip()]
+
+    if codes:
+        return codes
+
+    if os.getenv("FLASK_ENV", "").strip().lower() == "development":
+        return ["lemma-dev-invite"]
+
+    return []
+
+
+def _is_valid_invite_code(invite_code: str) -> bool:
+    """Validate invite code using constant-time comparison."""
+    if not invite_code:
+        return False
+
+    for allowed_code in _get_allowed_invite_codes():
+        if secrets.compare_digest(invite_code, allowed_code):
+            return True
+    return False
 
 
 # =============================================================================
@@ -1238,7 +1290,10 @@ customer_manager = CustomerAccountManager()
 def register():
     """Customer registration page and handler - SECURE VERSION"""
     if request.method == 'GET':
-        return render_template('modern/register.html')
+        return render_template(
+            'modern/register.html',
+            invite_only_mode=_is_invite_only_mode_enabled()
+        )
     
     # SECURITY: Redirect POST requests to secure registration
     elif request.method == 'POST':
@@ -1372,6 +1427,7 @@ def register_secure():
         name = data.get('name', '').strip()
         company = data.get('company', '').strip()
         billing_email = data.get('billing_email', '').strip().lower()
+        invite_code = data.get('invite_code', '').strip()
         
         # Validation
         if not all([email, name, company]):
@@ -1385,6 +1441,12 @@ def register_secure():
                 'success': False,
                 'error': 'Invalid email address'
             }), 400
+
+        if _is_invite_only_mode_enabled() and not _is_valid_invite_code(invite_code):
+            return jsonify({
+                'success': False,
+                'error': 'Invite code required or invalid'
+            }), 403
         
         # Check if customer already exists
         existing = customer_manager.get_customer_by_email(email)
@@ -1579,6 +1641,7 @@ def get_customer_info():
     })
 
 @customer_accounts_bp.route('/api/customer/api-keys', methods=['GET', 'POST', 'DELETE'])
+@require_customer_or_admin
 def manage_api_keys():
     """Manage customer API keys (session-free)"""
     customer_id = _extract_customer_id_from_request()
@@ -1644,6 +1707,7 @@ def manage_api_keys():
 
 @customer_accounts_bp.route('/api/customer/api-keys/rotate', methods=['POST'])
 @cross_origin()
+@require_customer_or_admin
 def rotate_api_key():
     """
     Rotate an API key: generate a new key and revoke the old one.

@@ -11,7 +11,7 @@ from sqlalchemy import func, and_, or_
 
 from api.database import get_db_connection
 from api.usage_tracking import get_monthly_active_users, get_verification_count
-from auth.decorators import require_api_key
+from auth.decorators import require_api_key, require_customer_or_admin
 
 logger = logging.getLogger(__name__)
 
@@ -19,6 +19,7 @@ platform_stats_bp = Blueprint('platform_stats', __name__)
 
 
 @platform_stats_bp.route('/api/platform/stats', methods=['GET', 'POST'])
+@require_customer_or_admin
 def get_platform_stats():
     """
     Get platform statistics for the developer dashboard
@@ -246,6 +247,7 @@ def get_platform_stats():
 
 
 @platform_stats_bp.route('/api/platform/users', methods=['GET', 'POST'])
+@require_customer_or_admin
 def get_platform_users():
     """
     Get all users with permissions for the caller's site
@@ -462,6 +464,7 @@ def get_platform_users():
 
 
 @platform_stats_bp.route('/api/platform/revoke-permission', methods=['POST'])
+@require_customer_or_admin
 def revoke_platform_permission():
     """
     Revoke a user's permission from a site

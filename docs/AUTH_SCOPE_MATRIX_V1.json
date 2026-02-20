@@ -529,10 +529,14 @@
       ],
       "module": "api/customer_accounts.py",
       "handler": "manage_api_keys",
-      "required_scope": "write",
-      "auth_mode": "custom_or_internal",
-      "auth_decorators": [],
-      "decorator_chain": []
+      "required_scope": "read",
+      "auth_mode": "customer_or_admin",
+      "auth_decorators": [
+        "require_customer_or_admin"
+      ],
+      "decorator_chain": [
+        "require_customer_or_admin"
+      ]
     },
     {
       "path": "/api/customer/api-keys/rotate",
@@ -541,11 +545,14 @@
       ],
       "module": "api/customer_accounts.py",
       "handler": "rotate_api_key",
-      "required_scope": "write",
-      "auth_mode": "custom_or_internal",
-      "auth_decorators": [],
+      "required_scope": "read",
+      "auth_mode": "customer_or_admin",
+      "auth_decorators": [
+        "require_customer_or_admin"
+      ],
       "decorator_chain": [
-        "cross_origin"
+        "cross_origin",
+        "require_customer_or_admin"
       ]
     },
     {
@@ -1703,10 +1710,14 @@
       ],
       "module": "api/platform_stats.py",
       "handler": "revoke_platform_permission",
-      "required_scope": "write",
-      "auth_mode": "custom_or_internal",
-      "auth_decorators": [],
-      "decorator_chain": []
+      "required_scope": "read",
+      "auth_mode": "customer_or_admin",
+      "auth_decorators": [
+        "require_customer_or_admin"
+      ],
+      "decorator_chain": [
+        "require_customer_or_admin"
+      ]
     },
     {
       "path": "/api/platform/stats",
@@ -1716,10 +1727,14 @@
       ],
       "module": "api/platform_stats.py",
       "handler": "get_platform_stats",
-      "required_scope": "write",
-      "auth_mode": "custom_or_internal",
-      "auth_decorators": [],
-      "decorator_chain": []
+      "required_scope": "read",
+      "auth_mode": "customer_or_admin",
+      "auth_decorators": [
+        "require_customer_or_admin"
+      ],
+      "decorator_chain": [
+        "require_customer_or_admin"
+      ]
     },
     {
       "path": "/api/platform/users",
@@ -1729,10 +1744,14 @@
       ],
       "module": "api/platform_stats.py",
       "handler": "get_platform_users",
-      "required_scope": "write",
-      "auth_mode": "custom_or_internal",
-      "auth_decorators": [],
-      "decorator_chain": []
+      "required_scope": "read",
+      "auth_mode": "customer_or_admin",
+      "auth_decorators": [
+        "require_customer_or_admin"
+      ],
+      "decorator_chain": [
+        "require_customer_or_admin"
+      ]
     },
     {
       "path": "/api/recovery/complete",
