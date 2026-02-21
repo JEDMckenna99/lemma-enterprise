@@ -38,8 +38,10 @@ ANY_AUTH_DECORATORS = {
 
 # Known intentional public flows and preflight-compatible auth exchange paths.
 PUBLIC_STATE_CHANGING_ALLOWLIST = {
+    "/api/auth/lemma-signin",
     "/api/auth/exchange-proof",
     "/api/auth/refresh",
+    "/api/auth/request-beta-access",
     "/api/auth/signout",
     "/api/agent/validate",
     "/api/recovery/initiate",
@@ -48,6 +50,7 @@ PUBLIC_STATE_CHANGING_ALLOWLIST = {
     "/api/recovery/complete-wallet",
     "/api/recovery/issue-admin-proof",
     "/api/customer/register-secure",
+    "/api/developer/credential-transfer/redeem",
     "/api/passkey/register/begin",
     "/api/passkey/register/complete",
     "/api/passkey/authenticate/begin",
@@ -75,7 +78,11 @@ PUBLIC_STATE_CHANGING_ALLOWLIST = {
     "/api/wallet/transfer/get-wallet",
     "/api/wallet/transfer/set-wallet",
     "/api/passkey/<int:passkey_id>",
+    "/api/sdk/verify",
+    "/api/test/issue-credential",
+    "/api/v1/iam/claim-permission",
     "/api/v1/oauth/token",
+    "/api/verify-credential",
     "/api/validate-key",
     "/api/wallet/session-sync",
     "/api/wallet/sync",

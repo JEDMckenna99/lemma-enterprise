@@ -16,6 +16,7 @@ import logging
 import hashlib
 from flask import Blueprint, request, jsonify, render_template, redirect
 from flask_cors import cross_origin
+from auth.decorators import require_api_key
 
 from api.email_service import send_email, render_email_template
 from api.real_iam_manager import get_site_manager, get_or_create_site_manager
@@ -129,6 +130,7 @@ def delete_confirmation_token(token):
 @cross_origin()
 @check_ip_not_blocked()
 @rate_limit_email_confirmation()
+@require_api_key
 def request_access():
     """
     PRIVACY-PRESERVING: Send permission claim link via email
@@ -612,6 +614,7 @@ def get_default_scope(permission_level: str) -> list:
 
 @iam_email_bp.route('/api/v1/iam/send-credential-email', methods=['POST'])
 @cross_origin()
+@require_api_key
 def send_credential_directly():
     """
     Legacy endpoint - redirects to privacy-preserving flow
@@ -623,6 +626,7 @@ def send_credential_directly():
 
 @iam_email_bp.route('/api/v1/iam/invite', methods=['POST'])
 @cross_origin()
+@require_api_key
 def invite_user():
     """
     DEVELOPER API: Invite a user to your site via email

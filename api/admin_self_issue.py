@@ -19,6 +19,7 @@ import logging
 from datetime import datetime
 from flask import Blueprint, request, jsonify
 from flask_cors import cross_origin
+from auth.decorators import require_api_key
 
 from api.real_iam_manager import get_site_manager, get_or_create_site_manager
 from api.ppid import derive_ppid_did
@@ -75,6 +76,7 @@ def validate_api_key(api_key: str, site_id: str) -> bool:
 
 @admin_self_issue_bp.route('/api/v1/iam/admin/self-issue', methods=['POST'])
 @cross_origin()
+@require_api_key
 def admin_self_issue():
     """
     Admin self-issue endpoint for site owners to bootstrap their first admin credential

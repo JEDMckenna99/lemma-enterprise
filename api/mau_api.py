@@ -7,6 +7,7 @@ import logging
 from datetime import datetime, timedelta
 from flask import Blueprint, request, jsonify
 from typing import Dict, Any, Optional
+from auth.decorators import require_api_key
 
 # MAU tracking integrated directly
 # from api.mau_tracker import mau_tracker, track_user_activity, track_stripe_identity_verification, get_monthly_billing_data, get_customer_analytics
@@ -17,6 +18,7 @@ logger = logging.getLogger(__name__)
 mau_api_bp = Blueprint('mau_api', __name__)
 
 @mau_api_bp.route('/api/mau/track', methods=['POST'])
+@require_api_key
 def track_user():
     """
     Track user activity for MAU calculation
@@ -66,6 +68,7 @@ def track_user():
         return jsonify({'error': 'Failed to track user activity'}), 500
 
 @mau_api_bp.route('/api/mau/track/stripe-identity', methods=['POST'])
+@require_api_key
 def track_stripe_identity():
     """
     Track Stripe Identity verification for $2.00 billing
@@ -239,6 +242,7 @@ def health_check():
 
 # Batch tracking endpoint for high-volume scenarios
 @mau_api_bp.route('/api/mau/track/batch', methods=['POST'])
+@require_api_key
 def track_users_batch():
     """
     Track multiple user activities in batch for MAU calculation

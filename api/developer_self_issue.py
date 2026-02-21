@@ -11,6 +11,7 @@ import logging
 from datetime import datetime, timedelta
 from flask import Blueprint, request, jsonify, g
 from flask_cors import cross_origin
+from auth.decorators import require_customer_or_admin
 
 logger = logging.getLogger(__name__)
 
@@ -65,6 +66,7 @@ def _authenticate_developer():
 
 @developer_self_issue_bp.route('/api/developer/issue-self-permission', methods=['POST'])
 @cross_origin()
+@require_customer_or_admin
 def issue_self_permission():
     """
     Issue a permission credential to the calling developer's wallet.

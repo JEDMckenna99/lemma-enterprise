@@ -21,6 +21,7 @@ import logging
 from flask import Blueprint, request, jsonify, session, redirect, url_for, render_template
 from functools import wraps
 from typing import Dict, List, Optional, Any
+from auth.decorators import require_api_key
 
 # Import real-time network sync for federated identity
 # Network sync handled by network registry
@@ -759,6 +760,7 @@ def identity_network_health():
         }), 500
 
 @lemma_shield_bp.route('/api/identity-network/test-integration', methods=['POST'])
+@require_api_key
 def test_integration():
     """
     Test the complete identity network integration flow

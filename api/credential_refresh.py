@@ -15,6 +15,7 @@ Flow:
 
 from flask import Blueprint, request, jsonify
 from flask_cors import cross_origin
+from auth.decorators import require_api_key
 import logging
 import time
 import json
@@ -27,6 +28,7 @@ credential_refresh_bp = Blueprint('credential_refresh', __name__)
 
 @credential_refresh_bp.route('/api/credentials/refresh', methods=['POST'])
 @cross_origin()
+@require_api_key
 def refresh_credential():
     """
     Refresh a credential before it expires
@@ -237,6 +239,7 @@ def refresh_poh_credential(old_credential: dict) -> dict:
 
 @credential_refresh_bp.route('/api/credentials/check-refresh-eligibility', methods=['POST'])
 @cross_origin()
+@require_api_key
 def check_refresh_eligibility():
     """
     Check if credentials are eligible for refresh

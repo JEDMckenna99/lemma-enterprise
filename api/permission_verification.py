@@ -20,7 +20,7 @@ Flow:
 
 from flask import Blueprint, request, jsonify
 from flask_cors import cross_origin
-from auth.decorators import require_site_admin
+from auth.decorators import require_site_admin, require_api_key
 import logging
 import time
 import os
@@ -218,6 +218,7 @@ def is_nonce_fresh(nonce: str) -> bool:
 
 @permission_verification_bp.route('/api/sdk/verify-permission-lemma', methods=['POST'])
 @cross_origin()
+@require_api_key
 def verify_permission_lemma():
     """
     Verify permission lemma with nonce for bot defense

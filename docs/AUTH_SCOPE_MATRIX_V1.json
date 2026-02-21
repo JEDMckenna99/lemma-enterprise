@@ -515,11 +515,14 @@
       ],
       "module": "api/credential_refresh.py",
       "handler": "check_refresh_eligibility",
-      "required_scope": "write",
-      "auth_mode": "custom_or_internal",
-      "auth_decorators": [],
+      "required_scope": "api_key",
+      "auth_mode": "api_key",
+      "auth_decorators": [
+        "require_api_key"
+      ],
       "decorator_chain": [
-        "cross_origin"
+        "cross_origin",
+        "require_api_key"
       ]
     },
     {
@@ -529,11 +532,14 @@
       ],
       "module": "api/credential_refresh.py",
       "handler": "refresh_credential",
-      "required_scope": "write",
-      "auth_mode": "custom_or_internal",
-      "auth_decorators": [],
+      "required_scope": "api_key",
+      "auth_mode": "api_key",
+      "auth_decorators": [
+        "require_api_key"
+      ],
       "decorator_chain": [
-        "cross_origin"
+        "cross_origin",
+        "require_api_key"
       ]
     },
     {
@@ -680,11 +686,14 @@
       ],
       "module": "api/developer_self_issue.py",
       "handler": "issue_self_permission",
-      "required_scope": "write",
-      "auth_mode": "custom_or_internal",
-      "auth_decorators": [],
+      "required_scope": "read",
+      "auth_mode": "customer_or_admin",
+      "auth_decorators": [
+        "require_customer_or_admin"
+      ],
       "decorator_chain": [
-        "cross_origin"
+        "cross_origin",
+        "require_customer_or_admin"
       ]
     },
     {
@@ -1376,10 +1385,14 @@
       ],
       "module": "api/lemma_shield.py",
       "handler": "test_integration",
-      "required_scope": "write",
-      "auth_mode": "custom_or_internal",
-      "auth_decorators": [],
-      "decorator_chain": []
+      "required_scope": "api_key",
+      "auth_mode": "api_key",
+      "auth_decorators": [
+        "require_api_key"
+      ],
+      "decorator_chain": [
+        "require_api_key"
+      ]
     },
     {
       "path": "/api/internal/registered-sites",
@@ -1400,11 +1413,14 @@
       ],
       "module": "api/pairwise_tagging.py",
       "handler": "generate_pairwise_tag",
-      "required_scope": "write",
-      "auth_mode": "custom_or_internal",
-      "auth_decorators": [],
+      "required_scope": "api_key",
+      "auth_mode": "api_key",
+      "auth_decorators": [
+        "require_api_key"
+      ],
       "decorator_chain": [
-        "cross_origin"
+        "cross_origin",
+        "require_api_key"
       ]
     },
     {
@@ -1428,11 +1444,14 @@
       ],
       "module": "api/pairwise_tagging.py",
       "handler": "validate_tag_uniqueness",
-      "required_scope": "write",
-      "auth_mode": "custom_or_internal",
-      "auth_decorators": [],
+      "required_scope": "api_key",
+      "auth_mode": "api_key",
+      "auth_decorators": [
+        "require_api_key"
+      ],
       "decorator_chain": [
-        "cross_origin"
+        "cross_origin",
+        "require_api_key"
       ]
     },
     {
@@ -1595,10 +1614,14 @@
       ],
       "module": "api/mau_api.py",
       "handler": "track_user",
-      "required_scope": "write",
-      "auth_mode": "custom_or_internal",
-      "auth_decorators": [],
-      "decorator_chain": []
+      "required_scope": "api_key",
+      "auth_mode": "api_key",
+      "auth_decorators": [
+        "require_api_key"
+      ],
+      "decorator_chain": [
+        "require_api_key"
+      ]
     },
     {
       "path": "/api/mau/track/batch",
@@ -1607,10 +1630,14 @@
       ],
       "module": "api/mau_api.py",
       "handler": "track_users_batch",
-      "required_scope": "write",
-      "auth_mode": "custom_or_internal",
-      "auth_decorators": [],
-      "decorator_chain": []
+      "required_scope": "api_key",
+      "auth_mode": "api_key",
+      "auth_decorators": [
+        "require_api_key"
+      ],
+      "decorator_chain": [
+        "require_api_key"
+      ]
     },
     {
       "path": "/api/mau/track/stripe-identity",
@@ -1619,10 +1646,14 @@
       ],
       "module": "api/mau_api.py",
       "handler": "track_stripe_identity",
-      "required_scope": "write",
-      "auth_mode": "custom_or_internal",
-      "auth_decorators": [],
-      "decorator_chain": []
+      "required_scope": "api_key",
+      "auth_mode": "api_key",
+      "auth_decorators": [
+        "require_api_key"
+      ],
+      "decorator_chain": [
+        "require_api_key"
+      ]
     },
     {
       "path": "/api/passkey/<int:passkey_id>",
@@ -2120,11 +2151,14 @@
       ],
       "module": "api/permission_verification.py",
       "handler": "verify_permission_lemma",
-      "required_scope": "write",
-      "auth_mode": "custom_or_internal",
-      "auth_decorators": [],
+      "required_scope": "api_key",
+      "auth_mode": "api_key",
+      "auth_decorators": [
+        "require_api_key"
+      ],
       "decorator_chain": [
-        "cross_origin"
+        "cross_origin",
+        "require_api_key"
       ]
     },
     {
@@ -2235,11 +2269,14 @@
       ],
       "module": "api/admin_self_issue.py",
       "handler": "admin_self_issue",
-      "required_scope": "write",
-      "auth_mode": "custom_or_internal",
-      "auth_decorators": [],
+      "required_scope": "api_key",
+      "auth_mode": "api_key",
+      "auth_decorators": [
+        "require_api_key"
+      ],
       "decorator_chain": [
-        "cross_origin"
+        "cross_origin",
+        "require_api_key"
       ]
     },
     {
@@ -2263,11 +2300,14 @@
       ],
       "module": "api/iam_email_confirmation.py",
       "handler": "invite_user",
-      "required_scope": "write",
-      "auth_mode": "custom_or_internal",
-      "auth_decorators": [],
+      "required_scope": "api_key",
+      "auth_mode": "api_key",
+      "auth_decorators": [
+        "require_api_key"
+      ],
       "decorator_chain": [
-        "cross_origin"
+        "cross_origin",
+        "require_api_key"
       ]
     },
     {
@@ -2277,13 +2317,16 @@
       ],
       "module": "api/iam_email_confirmation.py",
       "handler": "request_access",
-      "required_scope": "write",
-      "auth_mode": "custom_or_internal",
-      "auth_decorators": [],
+      "required_scope": "api_key",
+      "auth_mode": "api_key",
+      "auth_decorators": [
+        "require_api_key"
+      ],
       "decorator_chain": [
         "cross_origin",
         "check_ip_not_blocked",
-        "rate_limit_email_confirmation"
+        "rate_limit_email_confirmation",
+        "require_api_key"
       ]
     },
     {
@@ -2293,11 +2336,14 @@
       ],
       "module": "api/iam_email_confirmation.py",
       "handler": "send_credential_directly",
-      "required_scope": "write",
-      "auth_mode": "custom_or_internal",
-      "auth_decorators": [],
+      "required_scope": "api_key",
+      "auth_mode": "api_key",
+      "auth_decorators": [
+        "require_api_key"
+      ],
       "decorator_chain": [
-        "cross_origin"
+        "cross_origin",
+        "require_api_key"
       ]
     },
     {

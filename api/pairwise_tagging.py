@@ -9,6 +9,7 @@ import logging
 from typing import Dict, Optional
 from flask import Blueprint, request, jsonify, session
 from flask_cors import cross_origin
+from auth.decorators import require_api_key
 
 logger = logging.getLogger(__name__)
 
@@ -110,6 +111,7 @@ tag_manager = PairwiseTagManager()
 
 @pairwise_tagging_bp.route('/api/issuer/pairwise-tag', methods=['POST'])
 @cross_origin()
+@require_api_key
 def generate_pairwise_tag():
     """
     Generate pairwise tag for RP uniqueness enforcement
@@ -173,6 +175,7 @@ def generate_pairwise_tag():
 
 @pairwise_tagging_bp.route('/api/issuer/validate-uniqueness', methods=['POST'])
 @cross_origin()
+@require_api_key
 def validate_tag_uniqueness():
     """
     Validate pairwise tag uniqueness for RP
