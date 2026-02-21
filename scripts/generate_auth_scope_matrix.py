@@ -25,6 +25,8 @@ DEFAULT_SCOPE_BY_DECORATOR = {
     "require_admin": "admin",
     "require_customer_or_admin": "read",
     "require_wallet_ppid": "read",
+    "require_wallet_auth": "read",
+    "require_permission": "read",
     "require_authenticated": "read",
     "require_api_key": "api_key",
     "validate_api_key": "api_key",
@@ -111,6 +113,8 @@ def _classify_auth_mode(decorators: list[str], scope: str | None) -> str:
         return "customer_or_admin"
     if "require_wallet_ppid" in decorators:
         return "wallet_or_api_key"
+    if "require_wallet_auth" in decorators or "require_permission" in decorators:
+        return "wallet_session"
     if "require_agent_or_user_auth" in decorators:
         return "agent_or_user"
     if scope == "public":

@@ -1162,6 +1162,7 @@ def session_sync():
 # ============================================================================
 
 @wallet_service_bp.route('/api/wallet/connect-poh', methods=['POST'])
+@require_wallet_auth
 def connect_poh_to_wallet():
     """Connect PoH verification to wallet retrieval."""
     try:
@@ -1183,6 +1184,7 @@ def connect_poh_to_wallet():
 
 
 @wallet_service_bp.route('/api/wallet/retrieve', methods=['POST'])
+@require_wallet_auth
 def retrieve_wallet():
     """Retrieve wallet using RID/VID from PoH verification."""
     try:
@@ -1241,6 +1243,7 @@ def get_wallet_status():
 # ============================================================================
 
 @wallet_service_bp.route('/api/wallet/revoke', methods=['POST'])
+@require_wallet_auth
 def revoke_credential():
     """Revoke credential from wallet."""
     try:
@@ -1364,6 +1367,7 @@ def get_revocation_status():
 
 
 @wallet_service_bp.route('/api/wallet/revoke-user', methods=['POST'])
+@require_wallet_auth
 def revoke_user():
     """
     Revoke ALL credentials for a user (PPID) on ONE SITE across ALL devices.
