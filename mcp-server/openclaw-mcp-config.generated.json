@@ -9,7 +9,7 @@
                                               "env":  {
                                                           "LEMMA_URL":  "https://lemma.id",
                                                           "OPENCLAW_REQUIRED_AUDIENCE":  "openclaw",
-                                                          "LEMMA_AGENT_TOKEN":  "lm_agent_s-HNaAhBW0-PxoZlywnEVIIQdaHjD0YeP6oy5_-C-lw"
+                                                          "LEMMA_AGENT_TOKEN":  "lm_agent_REDACTED"
                                                       },
                                               "command":  "cmd"
                                           }

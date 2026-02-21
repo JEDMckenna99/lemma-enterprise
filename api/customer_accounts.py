@@ -82,6 +82,68 @@ def _is_valid_invite_code(invite_code: str) -> bool:
     return False
 
 
+def _public_cors_origins() -> List[str]:
+    """
+    CORS origins used for public customer auth endpoints.
+    Internal deployment URLs are intentionally excluded from source.
+    """
+    origins = {"https://lemma.id"}
+    if os.getenv("FLASK_ENV", "").strip().lower() == "development":
+        origins.update({"http://localhost:5000", "http://127.0.0.1:5000"})
+    return sorted(origins)
+
+def _parse_bool_env(value: Optional[str], default: bool = False) -> bool:
+    """Parse boolean-like environment values safely."""
+    if value is None:
+        return default
+    return value.strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _is_invite_only_mode_enabled() -> bool:
+    """
+    Determine whether invite-only registration is enabled.
+
+    Priority:
+    1) Explicit override via LEMMA_AUTH_INVITE_ONLY
+    2) Default to enabled in development
+    """
+    configured = os.getenv("LEMMA_AUTH_INVITE_ONLY")
+    if configured is not None:
+        return _parse_bool_env(configured, default=False)
+
+    return (os.getenv("FLASK_ENV", "").strip().lower() == "development")
+
+
+def _get_allowed_invite_codes() -> List[str]:
+    """
+    Return normalized invite codes from environment.
+
+    Use LEMMA_AUTH_INVITE_CODES as comma-separated values.
+    In development, fall back to a default code if none configured.
+    """
+    configured_codes = os.getenv("LEMMA_AUTH_INVITE_CODES", "")
+    codes = [code.strip() for code in configured_codes.split(",") if code.strip()]
+
+    if codes:
+        return codes
+
+    if os.getenv("FLASK_ENV", "").strip().lower() == "development":
+        return ["lemma-dev-invite"]
+
+    return []
+
+
+def _is_valid_invite_code(invite_code: str) -> bool:
+    """Validate invite code using constant-time comparison."""
+    if not invite_code:
+        return False
+
+    for allowed_code in _get_allowed_invite_codes():
+        if secrets.compare_digest(invite_code, allowed_code):
+            return True
+    return False
+
+
 # =============================================================================
 # RATE LIMITING FOR API KEY VALIDATION
 # =============================================================================
@@ -1286,7 +1348,7 @@ customer_manager = CustomerAccountManager()
 # API Routes
 
 @customer_accounts_bp.route('/register', methods=['GET', 'POST'])
-@cross_origin(origins=['https://lemma.id', 'https://lemma-enterprise-0f6ba17076c1.herokuapp.com'], supports_credentials=True)
+@cross_origin(origins=_public_cors_origins(), supports_credentials=True)
 def register():
     """Customer registration page and handler - SECURE VERSION"""
     if request.method == 'GET':
@@ -1414,7 +1476,7 @@ def register():
         }), 500
 
 @customer_accounts_bp.route('/api/customer/register-secure', methods=['POST'])
-@cross_origin(origins=['https://lemma.id', 'https://lemma-enterprise-0f6ba17076c1.herokuapp.com', 'http://localhost:5000'], supports_credentials=True, allow_headers=['Content-Type', 'Authorization'])
+@cross_origin(origins=_public_cors_origins(), supports_credentials=True, allow_headers=['Content-Type', 'Authorization'])
 def register_secure():
     """
     Secure customer registration endpoint - requires email confirmation.
@@ -1501,7 +1563,7 @@ def register_secure():
 
 
 @customer_accounts_bp.route('/login', methods=['GET', 'POST'])
-@cross_origin(origins=['https://lemma.id', 'https://lemma-enterprise-0f6ba17076c1.herokuapp.com', 'http://localhost:5000'], supports_credentials=True, allow_headers=['Content-Type', 'Authorization'])
+@cross_origin(origins=_public_cors_origins(), supports_credentials=True, allow_headers=['Content-Type', 'Authorization'])
 def login():
     """Customer login page and handler"""
     if request.method == 'GET':

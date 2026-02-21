@@ -31,7 +31,7 @@ class LemmaUnifiedCrypto {
         if (hostname.includes('lemma.id')) {
             return 'https://cdn.lemma.id';
         } else if (hostname.includes('herokuapp.com')) {
-            return 'https://lemma-enterprise-0f6ba17076c1.herokuapp.com/cdn';
+            return 'https://lemma.id/cdn';
         } else {
             return 'https://cdn.lemma.id'; // Default to main CDN
         }

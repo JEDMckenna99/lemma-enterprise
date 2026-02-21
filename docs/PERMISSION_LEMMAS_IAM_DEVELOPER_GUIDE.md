@@ -1,17 +1,18 @@
-# 🔐 Permission Lemmas IAM - Developer Guide
+# Permission Lemmas IAM - Developer Guide
 
-## 🎯 **Overview**
+## Overview
 
-**Permission Lemmas IAM** is a complete Identity and Access Management system that enables companies to replace Auth0, Duo, and other IAM providers with **microsecond-level verification** and **90%+ cost savings**. 
+Permission Lemmas IAM is a beta IAM implementation based on signed permission credentials and local verification paths.
+It is intended for teams evaluating wallet-first authorization and locally verifiable permissions.
 
-**✅ LIVE ON HEROKU**: https://lemma-enterprise-0f6ba17076c1.herokuapp.com
+Production endpoint (beta): https://lemma.id
 
-## 🚀 **Quick Start (5 minutes)**
+## Quick Start (5 minutes)
 
 ### **1. Register Your Company Site**
 
 ```bash
-curl -X POST https://lemma-enterprise-0f6ba17076c1.herokuapp.com/api/v1/sites/register \
+curl -X POST https://lemma.id/api/v1/sites/register \
   -H "Content-Type: application/json" \
   -H "X-API-Key: your-api-key" \
   -d '{
@@ -38,7 +39,7 @@ curl -X POST https://lemma-enterprise-0f6ba17076c1.herokuapp.com/api/v1/sites/re
 ### **2. Create Permission Definitions**
 
 ```bash
-curl -X POST https://lemma-enterprise-0f6ba17076c1.herokuapp.com/api/v1/sites/site_abc123/permissions \
+curl -X POST https://lemma.id/api/v1/sites/site_abc123/permissions \
   -H "Content-Type: application/json" \
   -H "X-API-Key: lemma_api_xyz789" \
   -d '{
@@ -65,7 +66,7 @@ curl -X POST https://lemma-enterprise-0f6ba17076c1.herokuapp.com/api/v1/sites/si
 ### **3. Verify User Access (Core IAM)**
 
 ```bash
-curl -X POST https://lemma-enterprise-0f6ba17076c1.herokuapp.com/api/v1/auth/verify \
+curl -X POST https://lemma.id/api/v1/auth/verify \
   -H "Content-Type: application/json" \
   -d '{
     "site_id": "site_abc123",
@@ -101,7 +102,7 @@ curl -X POST https://lemma-enterprise-0f6ba17076c1.herokuapp.com/api/v1/auth/ver
 
 ```bash
 # 1. Redirect user to Lemma for authorization
-GET https://lemma-enterprise-0f6ba17076c1.herokuapp.com/api/v1/oauth/authorize?client_id=lemma_oauth_site_abc123&redirect_uri=https://yourcompany.com/callback&scope=profile+permissions&state=random_state_123
+GET https://lemma.id/api/v1/oauth/authorize?client_id=lemma_oauth_site_abc123&redirect_uri=https://yourcompany.com/callback&scope=profile+permissions&state=random_state_123
 ```
 
 **Response:**
@@ -116,7 +117,7 @@ GET https://lemma-enterprise-0f6ba17076c1.herokuapp.com/api/v1/oauth/authorize?c
 
 ```bash
 # 2. Exchange authorization code for access token
-curl -X POST https://lemma-enterprise-0f6ba17076c1.herokuapp.com/api/v1/oauth/token \
+curl -X POST https://lemma.id/api/v1/oauth/token \
   -H "Content-Type: application/json" \
   -d '{
     "grant_type": "authorization_code",
@@ -331,7 +332,7 @@ import { LemmaIAM } from '@lemma/iam-sdk';
 const lemmaIAM = new LemmaIAM({
   apiKey: 'your-api-key',
   siteId: 'site_abc123',
-  baseUrl: 'https://lemma-enterprise-0f6ba17076c1.herokuapp.com/api/v1',
+  baseUrl: 'https://lemma.id/api/v1',
   clientId: 'lemma_oauth_site_abc123',
   redirectUri: 'https://yourcompany.com/callback'
 });
@@ -359,7 +360,7 @@ from lemma_iam import LemmaIAM
 lemma = LemmaIAM(
     api_key='your-api-key',
     site_id='site_abc123',
-    base_url='https://lemma-enterprise-0f6ba17076c1.herokuapp.com/api/v1'
+    base_url='https://lemma.id/api/v1'
 )
 
 # Verify user access
@@ -435,39 +436,39 @@ impl BackgroundWallet {
 
 ## 📊 **Performance Benchmarks**
 
-### **Live Production Results**
+### Measured Snapshot (Environment-dependent)
 
-| Operation | Performance | Comparison |
+| Operation | Observed Value | Notes |
 |-----------|-------------|------------|
-| **Access Verification** | **2.38µs** | 210,084x faster than Auth0 |
-| **Site Registration** | ~200ms | Complete setup vs weeks |
-| **Permission Creation** | ~150ms | Instant vs complex config |
-| **OAuth Authorization** | ~100ms | Standard OAuth flow |
+| **Access Verification** | **2.38µs** | One measured run in this environment |
+| **Site Registration** | ~200ms | Includes API and storage path |
+| **Permission Creation** | ~150ms | Endpoint and persistence latency |
+| **OAuth Authorization** | ~100ms | Observed on this deployment |
 
-### **Throughput Capacity**
+### Throughput Snapshot
 
-- **Concurrent Verifications**: 239,446/second
-- **Site Registrations**: 1,000/second
-- **Permission Operations**: 5,000/second
-- **OAuth Flows**: 2,000/second
+- **Concurrent Verifications**: 239,446/second (benchmark run)
+- **Site Registrations**: 1,000/second (benchmark run)
+- **Permission Operations**: 5,000/second (benchmark run)
+- **OAuth Flows**: 2,000/second (benchmark run)
 
-## 💰 **Pricing Comparison**
+## Pricing Comparison (Illustrative)
 
-### **Cost Analysis**
+### Cost Analysis (Model-based)
 
-| Provider | Monthly Cost (10K MAU) | Annual Cost | Features |
+| Provider | Monthly Cost (10K MAU) | Annual Cost | Notes |
 |----------|------------------------|-------------|----------|
-| **Auth0 + Duo** | $5,000 - $13,000 | $60K - $156K | Basic IAM |
-| **Lemma IAM** | **$200** | **$2,400** | Complete IAM + PoH |
-| **Savings** | **$4,800 - $12,800** | **$57.6K - $153.6K** | **96% reduction** |
+| **Auth0 + Duo** | $5,000 - $13,000 | $60K - $156K | Published-list-price style estimate |
+| **Lemma IAM** | **$200** | **$2,400** | Internal model assumption |
+| **Difference** | **$4,800 - $12,800** | **$57.6K - $153.6K** | Scenario-dependent, validate independently |
 
-### **Performance Comparison**
+### Performance Comparison (Directional)
 
-| Provider | Response Time | Throughput | Reliability |
+| Provider | Response Time | Throughput | Reliability Notes |
 |----------|---------------|------------|-------------|
 | **Auth0** | 500ms - 2s | Limited | Variable |
 | **Duo** | 1s - 3s | Limited | Variable |
-| **Lemma IAM** | **2.38µs** | **239K/sec** | **100%** |
+| **Lemma IAM** | **2.38µs** | **239K/sec** | Based on internal benchmark runs |
 
 ## 🔧 **Integration Examples**
 
@@ -561,7 +562,7 @@ def edit_post(request, post_id):
     return render(request, 'edit_post.html', {'post': post})
 ```
 
-## 🚀 **Getting Started Checklist**
+## Getting Started Checklist
 
 - [ ] **Register your site** using the API
 - [ ] **Define permissions** for your application
@@ -571,9 +572,9 @@ def edit_post(request, post_id):
 - [ ] **Deploy to production** with live API endpoints
 - [ ] **Monitor usage** through the dashboard
 
-## 📞 **Support & Resources**
+## Support & Resources
 
-- **Live API**: https://lemma-enterprise-0f6ba17076c1.herokuapp.com
+- **Live API**: https://lemma.id
 - **Documentation**: https://docs.lemma.id/iam
 - **Dashboard**: https://lemma.id/dashboard
 - **SDK Downloads**: https://github.com/lemma-org/iam-sdks
@@ -581,6 +582,4 @@ def edit_post(request, post_id):
 
 ---
 
-**🎉 Ready to replace Auth0 and Duo with microsecond-level IAM?**
-
-Start with the Quick Start guide above and have your complete IAM system running in 5 minutes!
+If you are evaluating Lemma.id, start with the Quick Start above and validate behavior against your own latency, reliability, and security requirements.
