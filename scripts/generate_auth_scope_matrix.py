@@ -27,13 +27,14 @@ DEFAULT_SCOPE_BY_DECORATOR = {
     "require_wallet_ppid": "read",
     "require_authenticated": "read",
     "require_api_key": "api_key",
+    "validate_api_key": "api_key",
 }
 
 
 def _is_auth_decorator(name: str) -> bool:
     return (
         name.startswith("require_")
-        or name in {"optional_auth"}
+        or name in {"optional_auth", "validate_api_key"}
     )
 
 
@@ -102,7 +103,7 @@ def _route_meta(dec: ast.AST) -> tuple[str | None, list[str] | None]:
 
 
 def _classify_auth_mode(decorators: list[str], scope: str | None) -> str:
-    if "require_api_key" in decorators:
+    if "require_api_key" in decorators or "validate_api_key" in decorators:
         return "api_key"
     if "require_site_admin" in decorators or "require_admin" in decorators:
         return "admin_controlled"
@@ -124,7 +125,7 @@ def _derive_required_scope(route_path: str, methods: list[str], scope_hint: str 
         return "admin"
     if "require_customer_or_admin" in decorators or "require_wallet_ppid" in decorators:
         return "read"
-    if "require_api_key" in decorators:
+    if "require_api_key" in decorators or "validate_api_key" in decorators:
         return "api_key"
     if route_path.startswith("/api/admin/"):
         return "admin"

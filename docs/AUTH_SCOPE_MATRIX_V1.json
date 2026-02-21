@@ -1873,9 +1873,11 @@
       ],
       "module": "api/sdk_api.py",
       "handler": "check_credentials",
-      "required_scope": "write",
-      "auth_mode": "custom_or_internal",
-      "auth_decorators": [],
+      "required_scope": "api_key",
+      "auth_mode": "api_key",
+      "auth_decorators": [
+        "validate_api_key"
+      ],
       "decorator_chain": [
         "validate_api_key",
         "rate_limit"
@@ -1903,9 +1905,11 @@
       ],
       "module": "api/sdk_api.py",
       "handler": "complete_identity_verification",
-      "required_scope": "write",
-      "auth_mode": "custom_or_internal",
-      "auth_decorators": [],
+      "required_scope": "api_key",
+      "auth_mode": "api_key",
+      "auth_decorators": [
+        "validate_api_key"
+      ],
       "decorator_chain": [
         "cors_headers",
         "validate_api_key",
@@ -1983,9 +1987,11 @@
       ],
       "module": "api/sdk_api.py",
       "handler": "revoke_credential",
-      "required_scope": "write",
-      "auth_mode": "custom_or_internal",
-      "auth_decorators": [],
+      "required_scope": "api_key",
+      "auth_mode": "api_key",
+      "auth_decorators": [
+        "validate_api_key"
+      ],
       "decorator_chain": [
         "validate_api_key",
         "rate_limit"
@@ -1998,9 +2004,11 @@
       ],
       "module": "api/sdk_api.py",
       "handler": "update_security_config",
-      "required_scope": "write",
-      "auth_mode": "custom_or_internal",
-      "auth_decorators": [],
+      "required_scope": "api_key",
+      "auth_mode": "api_key",
+      "auth_decorators": [
+        "validate_api_key"
+      ],
       "decorator_chain": [
         "validate_api_key",
         "rate_limit"
@@ -2013,9 +2021,11 @@
       ],
       "module": "api/sdk_api.py",
       "handler": "get_security_status",
-      "required_scope": "public",
-      "auth_mode": "public",
-      "auth_decorators": [],
+      "required_scope": "api_key",
+      "auth_mode": "api_key",
+      "auth_decorators": [
+        "validate_api_key"
+      ],
       "decorator_chain": [
         "validate_api_key",
         "rate_limit"
@@ -2029,9 +2039,11 @@
       ],
       "module": "api/sdk_api.py",
       "handler": "start_identity_verification",
-      "required_scope": "write",
-      "auth_mode": "custom_or_internal",
-      "auth_decorators": [],
+      "required_scope": "api_key",
+      "auth_mode": "api_key",
+      "auth_decorators": [
+        "validate_api_key"
+      ],
       "decorator_chain": [
         "cors_headers",
         "validate_api_key",
@@ -2045,9 +2057,11 @@
       ],
       "module": "api/sdk_api.py",
       "handler": "store_credential",
-      "required_scope": "write",
-      "auth_mode": "custom_or_internal",
-      "auth_decorators": [],
+      "required_scope": "api_key",
+      "auth_mode": "api_key",
+      "auth_decorators": [
+        "validate_api_key"
+      ],
       "decorator_chain": [
         "validate_api_key",
         "rate_limit"
@@ -2060,9 +2074,11 @@
       ],
       "module": "api/sdk_api.py",
       "handler": "trigger_security_check",
-      "required_scope": "write",
-      "auth_mode": "custom_or_internal",
-      "auth_decorators": [],
+      "required_scope": "api_key",
+      "auth_mode": "api_key",
+      "auth_decorators": [
+        "validate_api_key"
+      ],
       "decorator_chain": [
         "validate_api_key",
         "rate_limit"
@@ -2087,9 +2103,11 @@
       ],
       "module": "api/sdk_api.py",
       "handler": "verify_offline",
-      "required_scope": "write",
-      "auth_mode": "custom_or_internal",
-      "auth_decorators": [],
+      "required_scope": "api_key",
+      "auth_mode": "api_key",
+      "auth_decorators": [
+        "validate_api_key"
+      ],
       "decorator_chain": [
         "validate_api_key",
         "rate_limit"
@@ -2356,11 +2374,14 @@
       ],
       "module": "api/permission_type_api.py",
       "handler": "create_permission_type",
-      "required_scope": "write",
-      "auth_mode": "custom_or_internal",
-      "auth_decorators": [],
+      "required_scope": "read",
+      "auth_mode": "customer_or_admin",
+      "auth_decorators": [
+        "require_customer_or_admin"
+      ],
       "decorator_chain": [
-        "cross_origin"
+        "cross_origin",
+        "require_customer_or_admin"
       ]
     },
     {
@@ -2370,11 +2391,14 @@
       ],
       "module": "api/permission_type_api.py",
       "handler": "delete_permission_type",
-      "required_scope": "write",
-      "auth_mode": "custom_or_internal",
-      "auth_decorators": [],
+      "required_scope": "read",
+      "auth_mode": "customer_or_admin",
+      "auth_decorators": [
+        "require_customer_or_admin"
+      ],
       "decorator_chain": [
-        "cross_origin"
+        "cross_origin",
+        "require_customer_or_admin"
       ]
     },
     {
@@ -2398,11 +2422,14 @@
       ],
       "module": "api/permission_type_api.py",
       "handler": "update_permission_type",
-      "required_scope": "write",
-      "auth_mode": "custom_or_internal",
-      "auth_decorators": [],
+      "required_scope": "read",
+      "auth_mode": "customer_or_admin",
+      "auth_decorators": [
+        "require_customer_or_admin"
+      ],
       "decorator_chain": [
-        "cross_origin"
+        "cross_origin",
+        "require_customer_or_admin"
       ]
     },
     {
@@ -2837,11 +2864,14 @@
       ],
       "module": "api/wallet_revocation.py",
       "handler": "revoke_credential",
-      "required_scope": "write",
-      "auth_mode": "custom_or_internal",
-      "auth_decorators": [],
+      "required_scope": "read",
+      "auth_mode": "customer_or_admin",
+      "auth_decorators": [
+        "require_customer_or_admin"
+      ],
       "decorator_chain": [
         "cross_origin",
+        "require_customer_or_admin",
         "rate_limit"
       ]
     },

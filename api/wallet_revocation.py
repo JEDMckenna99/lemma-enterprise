@@ -6,7 +6,7 @@ import time
 import logging
 from flask import Blueprint, request, jsonify, session
 from flask_cors import cross_origin
-from auth.decorators import require_api_key, rate_limit
+from auth.decorators import require_customer_or_admin, rate_limit
 
 # Set up logging
 logger = logging.getLogger(__name__)
@@ -16,6 +16,7 @@ wallet_revocation_bp = Blueprint('wallet_revocation', __name__)
 
 @wallet_revocation_bp.route('/api/wallet/revoke', methods=['POST'])
 @cross_origin()
+@require_customer_or_admin
 @rate_limit(max_requests=10, window=60)  # Limit revocation calls
 def revoke_credential():
     """

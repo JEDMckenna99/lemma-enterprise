@@ -23,6 +23,7 @@ import logging
 from datetime import datetime
 from flask import Blueprint, request, jsonify
 from flask_cors import cross_origin
+from auth.decorators import require_customer_or_admin
 
 logger = logging.getLogger(__name__)
 
@@ -152,6 +153,7 @@ def list_permission_types(site_id):
 
 @permission_type_api.route('/api/v1/sites/<site_id>/permission-types', methods=['POST'])
 @cross_origin()
+@require_customer_or_admin
 def create_permission_type(site_id):
     """
     Create a new permission type for a site.
@@ -301,6 +303,7 @@ def get_permission_type(site_id, name):
 
 @permission_type_api.route('/api/v1/sites/<site_id>/permission-types/<name>', methods=['PUT'])
 @cross_origin()
+@require_customer_or_admin
 def update_permission_type(site_id, name):
     """
     Update a permission type.
@@ -385,6 +388,7 @@ def update_permission_type(site_id, name):
 
 @permission_type_api.route('/api/v1/sites/<site_id>/permission-types/<name>', methods=['DELETE'])
 @cross_origin()
+@require_customer_or_admin
 def delete_permission_type(site_id, name):
     """
     Delete a permission type (soft delete - sets active=false).
