@@ -3,7 +3,8 @@ param(
     [string]$OutputDir = "docs/launch-evidence",
     [string]$ProofFixturePath = "",
     [string]$PlatformApiKey = "",
-    [switch]$StrictScopePolicy
+    [switch]$StrictScopePolicy,
+    [switch]$RelaxedScopePolicy
 )
 
 $ErrorActionPreference = "Stop"
@@ -57,7 +58,14 @@ python scripts/launch_gate_smoke_ci.py | Tee-Object -FilePath $smokeOut
 
 # 1a) Auth scope policy baseline generation + review
 python scripts/generate_auth_scope_matrix.py | Tee-Object -FilePath $scopePolicyOut
-if ($StrictScopePolicy) {
+$enforceStrictScopePolicy = $true
+if ($RelaxedScopePolicy) {
+    $enforceStrictScopePolicy = $false
+} elseif ($PSBoundParameters.ContainsKey('StrictScopePolicy')) {
+    $enforceStrictScopePolicy = [bool]$StrictScopePolicy
+}
+
+if ($enforceStrictScopePolicy) {
     python scripts/review_auth_scope_matrix.py --strict-state-changing | Tee-Object -FilePath $scopePolicyOut -Append
 } else {
     python scripts/review_auth_scope_matrix.py | Tee-Object -FilePath $scopePolicyOut -Append
