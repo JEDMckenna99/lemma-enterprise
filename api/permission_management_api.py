@@ -665,6 +665,7 @@ def remove_site_user(site_id, user_did):
 
 @permission_api.route('/api/v1/auth/verify', methods=['POST'])
 @cross_origin()
+@require_api_key
 @rate_limit_access_verification()
 def verify_access():
     """

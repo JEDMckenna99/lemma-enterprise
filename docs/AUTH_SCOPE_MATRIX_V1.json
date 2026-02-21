@@ -2217,11 +2217,14 @@
       ],
       "module": "api/permission_management_api.py",
       "handler": "verify_access",
-      "required_scope": "write",
-      "auth_mode": "custom_or_internal",
-      "auth_decorators": [],
+      "required_scope": "api_key",
+      "auth_mode": "api_key",
+      "auth_decorators": [
+        "require_api_key"
+      ],
       "decorator_chain": [
         "cross_origin",
+        "require_api_key",
         "rate_limit_access_verification"
       ]
     },
