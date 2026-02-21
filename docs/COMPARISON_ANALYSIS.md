@@ -1,20 +1,21 @@
 # Lemma vs Traditional Auth: Security, Privacy & Operational Cost Analysis
 
-> A comprehensive comparison of Lemma's local-first authentication against traditional providers (Auth0, Okta, Firebase Auth, Cognito)
+> A technical comparison of Lemma's local-first authentication model against common centralized providers (Auth0, Okta, Firebase Auth, Cognito).
+> Figures are directional and should be validated for your environment, traffic profile, and security requirements.
 
 ## Executive Summary
 
-| Category | Traditional Auth | Lemma | Winner |
-|----------|------------------|-------|--------|
-| **Security** | Server-trusting model | Client-verifiable proofs | **Lemma** |
-| **Privacy** | Centralized tracking | PPID unlinkability | **Lemma** |
-| **Operational Cost** | ~$0.01-0.05/MAU | ~$0.001/MAU | **Lemma (10-50x)** |
-| **Network Calls** | 5-7 per login | 1 (issuance only) | **Lemma (5-7× fewer)** |
-| **Offline Capability** | None | Full | **Lemma** |
-| **Vendor Lock-in** | High | None | **Lemma** |
-| **Maturity** | Production-grade | Emerging | **Traditional** |
-| **Enterprise Integrations** | SAML/LDAP/AD | Growing | **Traditional** |
-| **User Directory** | Managed only | Managed OR self-hosted | **Lemma (flexible)** |
+| Category | Traditional Auth | Lemma | Practical Note |
+|----------|------------------|-------|----------------|
+| **Security** | Server-trusting model | Client-verifiable proofs | Different trust boundaries; evaluate threat model fit |
+| **Privacy** | Centralized tracking possible | PPID unlinkability | Depends on integration and telemetry choices |
+| **Operational Cost** | ~$0.01-0.05/MAU | ~$0.001/MAU | Model-based estimate, not a guaranteed outcome |
+| **Network Calls** | 5-7 per login | 1 (issuance only) | Depends on cache/session strategy |
+| **Offline Capability** | Limited | Strong after issuance | Revocation/issuance still require network |
+| **Vendor Lock-in** | Typically high | Lower with local proofs | Migration cost still applies |
+| **Maturity** | Production-grade | Emerging | Validate before critical workloads |
+| **Enterprise Integrations** | SAML/LDAP/AD | Growing | Existing enterprise stack may require adapters |
+| **User Directory** | Managed only | Managed or self-hosted patterns | Operational ownership differs |
 
 ---
 

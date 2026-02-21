@@ -1,7 +1,7 @@
 {
   "edge_nodes": {
     "primary": {
-      "url": "https://lemma-enterprise-0f6ba17076c1.herokuapp.com",
+      "url": "https://lemma.id",
       "region": "us-east",
       "crypto_engine": "PyOptimizedVerifier",
       "expected_performance": "93-118\u03bcs",

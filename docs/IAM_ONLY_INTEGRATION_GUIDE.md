@@ -1,14 +1,14 @@
-# 🔐 Lemma IAM - Integration Guide (IAM-Only, No PoH Required)
+# Lemma IAM - Integration Guide (IAM-Only, No PoH Required)
 
-## 🎯 **What is Lemma IAM?**
+## What is Lemma IAM?
 
-Lemma IAM is a **standalone Identity and Access Management system** that provides:
+Lemma IAM is a standalone Identity and Access Management system that provides:
 
 - **Microsecond-level permission verification** (31-94µs server, 0.36µs client)
 - **Real Ed25519 + OPRF cryptography** (not JWT tokens)
 - **No Stripe Identity required** (unlike full federated network)
 - **Simple network**: Just your site ↔ your users
-- **90%+ cost savings** vs Auth0/Duo ($0.15/MAU vs $2-8/MAU)
+- Lower projected operating cost in some usage profiles (model-based; validate against your own provider pricing and workload)
 
 ---
 
@@ -27,7 +27,7 @@ Lemma IAM is a **standalone Identity and Access Management system** that provide
 
 ---
 
-## 🚀 **5-Minute Integration**
+## 5-Minute Integration
 
 ### **Step 1: Register Your Site (2 minutes)**
 

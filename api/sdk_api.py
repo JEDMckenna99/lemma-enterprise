@@ -1458,10 +1458,7 @@ def get_registered_sites():
             sites = []
         
         # Always include Lemma infrastructure
-        infrastructure_sites = [
-            'lemma.id',
-            'lemma-enterprise-0f6ba17076c1.herokuapp.com',
-        ]
+        infrastructure_sites = ['lemma.id']
         
         # Combine and deduplicate
         all_sites = list(set(sites + infrastructure_sites))

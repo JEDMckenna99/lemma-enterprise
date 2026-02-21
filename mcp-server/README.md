@@ -43,7 +43,7 @@ Add to your Cursor MCP settings (`.cursor/mcp.json` or Cursor settings):
   "mcpServers": {
     "lemma": {
       "command": "node",
-      "args": ["C:/Users/jedmc/lemma-enterprise/lemma-rebuild/mcp-server/index.js"],
+      "args": ["<PATH_TO_REPO>/mcp-server/index.js"],
       "env": {
         "LEMMA_AGENT_TOKEN": "lm_agent_YOUR_TOKEN_HERE"
       }
@@ -59,7 +59,7 @@ Or for Windows:
   "mcpServers": {
     "lemma": {
       "command": "cmd",
-      "args": ["/c", "node", "C:\\Users\\jedmc\\lemma-enterprise\\lemma-rebuild\\mcp-server\\index.js"],
+      "args": ["/c", "node", "<PATH_TO_REPO>\\mcp-server\\index.js"],
       "env": {
         "LEMMA_AGENT_TOKEN": "lm_agent_YOUR_TOKEN_HERE"
       }

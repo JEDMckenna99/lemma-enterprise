@@ -251,7 +251,7 @@ const cryptoConfig = {
     },
     "cdn_endpoints": {
         "primary": "https://cdn.lemma.id/crypto/",
-        "fallback": "https://lemma-enterprise-0f6ba17076c1.herokuapp.com/cdn/crypto/",
+        "fallback": "https://lemma.id/cdn/crypto/",
         "regions": [
             "https://cdn-us.lemma.id/crypto/",
             "https://cdn-eu.lemma.id/crypto/", 

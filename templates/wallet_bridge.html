@@ -68,8 +68,7 @@ const SESSION_CONFIG = {
 function isOriginAllowed(origin) {
     // Allow Lemma infrastructure (exact match)
     if (origin === 'https://lemma.id' ||
-        origin === 'https://www.lemma.id' ||
-        origin === 'https://lemma-enterprise-0f6ba17076c1.herokuapp.com') {
+        origin === 'https://www.lemma.id') {
         return true;
     }
 
@@ -109,6 +108,12 @@ function getHostnameFromOrigin(origin) {
     } catch (e) {
         return null;
     }
+}
+
+function isLemmaInfrastructureSite(site) {
+    if (!site) return false;
+    const normalized = site.toLowerCase();
+    return normalized === 'lemma.id' || normalized.endsWith('.lemma.id');
 }
 
 // ============================================
@@ -515,7 +520,7 @@ async function getCredentialsCached(filterType, requestingSite, showAll) {
     }
     const promise = (async () => {
         let credentials = await wallet.getCredentials(filterType);
-        const isLemmaRequesting = requestingSite.includes('lemma.id') || requestingSite.includes('lemma-enterprise');
+        const isLemmaRequesting = isLemmaInfrastructureSite(requestingSite);
         if (!isLemmaRequesting && !showAll) {
             credentials = credentials.filter(c => {
                 const claims = c.claims || c.credentialSubject || {};
@@ -962,7 +967,7 @@ window.addEventListener('message', async (event) => {
                 // SECURITY: The hex regex was removed - it allowed any site to fake internal IDs
                 const credClaims = credential.claims || credential.credentialSubject || {};
                 const credSiteId = (credClaims.siteId || credClaims.site_id || '').toLowerCase().replace(/^www\./, '');
-                const isLemmaOrigin = requestingSite.includes('lemma.id') || requestingSite.includes('lemma-enterprise');
+                const isLemmaOrigin = isLemmaInfrastructureSite(requestingSite);
 
                 // SECURITY: Internal siteIds can ONLY come from lemma.id, not arbitrary sites
                 const isInternalSiteId = isLemmaOrigin && (
@@ -1041,7 +1046,7 @@ window.addEventListener('message', async (event) => {
                 // This enforces site-specific credential isolation
                 const verifyClaims = credToVerify.claims || credToVerify.credentialSubject || {};
                 const verifySiteId = (verifyClaims.siteId || verifyClaims.site_id || '').toLowerCase().replace(/^www\./, '');
-                const isLemmaVerifying = requestingSite.includes('lemma.id') || requestingSite.includes('lemma-enterprise');
+                const isLemmaVerifying = isLemmaInfrastructureSite(requestingSite);
 
                 // SECURITY: Internal siteIds only trusted from lemma.id origin
                 const isInternalVerifySiteId = isLemmaVerifying && (
@@ -1104,7 +1109,7 @@ window.addEventListener('message', async (event) => {
                 // SECURITY: Same siteId validation as full verify
                 const quickClaims = quickCredential.claims || quickCredential.credentialSubject || {};
                 const quickSiteId = (quickClaims.siteId || quickClaims.site_id || '').toLowerCase().replace(/^www\./, '');
-                const isLemmaQuickVerify = requestingSite.includes('lemma.id') || requestingSite.includes('lemma-enterprise');
+                const isLemmaQuickVerify = isLemmaInfrastructureSite(requestingSite);
 
                 // SECURITY: Internal siteIds only trusted from lemma.id origin
                 const isInternalQuickSiteId = isLemmaQuickVerify && (
@@ -1238,7 +1243,7 @@ window.addEventListener('message', async (event) => {
                     credType = credToRevoke.packageType || 'permission';
                     
                     // Check site ownership (lemma.id can revoke any)
-                    const isLemmaRevoking = requestingSite.includes('lemma.id') || requestingSite.includes('lemma-enterprise');
+                    const isLemmaRevoking = isLemmaInfrastructureSite(requestingSite);
                     if (!isLemmaRevoking && revokeSiteId !== requestingSite &&
                         !requestingSite.endsWith('.' + revokeSiteId) &&
                         !revokeSiteId.endsWith('.' + requestingSite)) {
@@ -1298,7 +1303,7 @@ window.addEventListener('message', async (event) => {
                 // SECURITY: Only allowed from lemma.id origin
                 if (!wallet) await initWallet();
                 
-                const isWalletOrigin = requestingSite.includes('lemma.id') || requestingSite.includes('lemma-enterprise');
+                const isWalletOrigin = isLemmaInfrastructureSite(requestingSite);
                 if (!isWalletOrigin) {
                     respond({ 
                         success: false, 
