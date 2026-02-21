@@ -9,7 +9,7 @@ import os
 import logging
 from flask import Blueprint, request, jsonify, redirect, url_for, g
 from typing import Dict, Any
-from auth.decorators import require_wallet_ppid
+from auth.decorators import require_wallet_ppid, require_customer_or_admin
 
 logger = logging.getLogger(__name__)
 
@@ -73,6 +73,7 @@ SUBSCRIPTION_PLANS = {
 PAYMENT_LINKS_CACHE = {}
 
 @stripe_checkout_bp.route('/api/create-checkout-session', methods=['POST'])
+@require_customer_or_admin
 def create_checkout_session():
     """
     Create a Stripe Payment Link for subscription (more reliable than checkout sessions)

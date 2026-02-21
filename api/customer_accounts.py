@@ -1779,6 +1779,7 @@ def validate_api_key():
 
 
 @customer_accounts_bp.route('/api/customer/register-site', methods=['POST'])
+@require_customer_or_admin
 def register_customer_site():
     """
     Register a new site for customer + auto-issue admin credential

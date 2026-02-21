@@ -36,10 +36,14 @@ ANY_AUTH_DECORATORS = {
 # Known intentional public flows and preflight-compatible auth exchange paths.
 PUBLIC_STATE_CHANGING_ALLOWLIST = {
     "/api/auth/exchange-proof",
+    "/api/agent/validate",
+    "/api/customer/register-secure",
     "/api/passkey/register/begin",
     "/api/passkey/register/complete",
     "/api/passkey/authenticate/begin",
     "/api/passkey/authenticate/complete",
+    "/api/v1/oauth/token",
+    "/api/validate-key",
     "/api/wallet/session-sync",
     "/api/wallet/sync",
 }

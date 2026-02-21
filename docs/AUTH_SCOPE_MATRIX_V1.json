@@ -309,9 +309,12 @@
       "handler": "create_agent_session",
       "required_scope": "write",
       "auth_mode": "custom_or_internal",
-      "auth_decorators": [],
+      "auth_decorators": [
+        "require_agent_or_user_session"
+      ],
       "decorator_chain": [
-        "cross_origin"
+        "cross_origin",
+        "require_agent_or_user_session"
       ]
     },
     {
@@ -496,10 +499,14 @@
       ],
       "module": "api/stripe_checkout.py",
       "handler": "create_checkout_session",
-      "required_scope": "write",
-      "auth_mode": "custom_or_internal",
-      "auth_decorators": [],
-      "decorator_chain": []
+      "required_scope": "read",
+      "auth_mode": "customer_or_admin",
+      "auth_decorators": [
+        "require_customer_or_admin"
+      ],
+      "decorator_chain": [
+        "require_customer_or_admin"
+      ]
     },
     {
       "path": "/api/credentials/check-refresh-eligibility",
@@ -614,10 +621,14 @@
       ],
       "module": "api/customer_accounts.py",
       "handler": "register_customer_site",
-      "required_scope": "write",
-      "auth_mode": "custom_or_internal",
-      "auth_decorators": [],
-      "decorator_chain": []
+      "required_scope": "read",
+      "auth_mode": "customer_or_admin",
+      "auth_decorators": [
+        "require_customer_or_admin"
+      ],
+      "decorator_chain": [
+        "require_customer_or_admin"
+      ]
     },
     {
       "path": "/api/customer/sites",
@@ -1459,11 +1470,14 @@
       ],
       "module": "api/issuer_registry.py",
       "handler": "revoke_issuer",
-      "required_scope": "write",
-      "auth_mode": "custom_or_internal",
-      "auth_decorators": [],
+      "required_scope": "api_key",
+      "auth_mode": "api_key",
+      "auth_decorators": [
+        "require_api_key"
+      ],
       "decorator_chain": [
-        "cross_origin"
+        "cross_origin",
+        "require_api_key"
       ]
     },
     {
@@ -1487,11 +1501,14 @@
       ],
       "module": "api/issuer_registry.py",
       "handler": "register_issuer",
-      "required_scope": "write",
-      "auth_mode": "custom_or_internal",
-      "auth_decorators": [],
+      "required_scope": "api_key",
+      "auth_mode": "api_key",
+      "auth_decorators": [
+        "require_api_key"
+      ],
       "decorator_chain": [
-        "cross_origin"
+        "cross_origin",
+        "require_api_key"
       ]
     },
     {
@@ -1501,11 +1518,14 @@
       ],
       "module": "api/issuer_registry.py",
       "handler": "verify_issuer",
-      "required_scope": "write",
-      "auth_mode": "custom_or_internal",
-      "auth_decorators": [],
+      "required_scope": "api_key",
+      "auth_mode": "api_key",
+      "auth_decorators": [
+        "require_api_key"
+      ],
       "decorator_chain": [
-        "cross_origin"
+        "cross_origin",
+        "require_api_key"
       ]
     },
     {

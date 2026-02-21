@@ -2063,6 +2063,7 @@ def auto_issue_agent_credential():
 
 @agent_credentials_bp.route('/api/agent/session', methods=['GET', 'POST'])
 @cross_origin(supports_credentials=True)
+@require_agent_or_user_session()
 def create_agent_session():
     """
     Create a browser session from an agent token.
