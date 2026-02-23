@@ -24,6 +24,7 @@ import json
 import secrets
 import hashlib
 import logging
+from urllib.parse import urlparse
 from datetime import datetime, timedelta, timezone
 from functools import wraps
 from flask import Blueprint, request, jsonify, g, session
@@ -37,6 +38,27 @@ agent_credentials_bp = Blueprint('agent_credentials', __name__)
 
 DEFAULT_DELEGATION_ALLOWED_PERMISSIONS = 'admin_access,super_admin_access'
 DEFAULT_DELEGATION_ALLOWED_ROLES = 'admin,super_admin'
+
+
+def _normalize_site_identifier(value: str | None) -> str | None:
+    """Normalize host/site identifiers for consistent policy checks."""
+    if not value:
+        return None
+    text = str(value).strip().lower()
+    if not text:
+        return None
+
+    if '://' in text:
+        parsed = urlparse(text)
+        text = parsed.hostname or ''
+    else:
+        text = text.split('/')[0]
+        text = text.split(':')[0]
+
+    if text.startswith('www.'):
+        text = text[4:]
+
+    return text or None
 
 
 def _encode_credential_description(description: str, audience: str | None = None) -> str:
@@ -403,24 +425,61 @@ def infer_requested_site_ids():
         path = (request.path or '').strip('/').split('/')
         for i, seg in enumerate(path):
             if seg in ('sites', 'site') and i + 1 < len(path):
-                candidate = (path[i + 1] or '').strip().lower()
+                candidate = _normalize_site_identifier(path[i + 1])
                 if candidate:
                     site_ids.add(candidate)
     except Exception:
         pass
 
+    host_site = _normalize_site_identifier(request.host)
+    if host_site:
+        site_ids.add(host_site)
+
+    origin = request.headers.get('Origin')
+    origin_site = _normalize_site_identifier(origin)
+    if origin_site:
+        site_ids.add(origin_site)
+
     for key in ('site_id', 'siteId'):
         val = request.args.get(key)
         if val:
-            site_ids.add(str(val).strip().lower())
+            normalized = _normalize_site_identifier(val)
+            if normalized:
+                site_ids.add(normalized)
 
     payload = request.get_json(silent=True) or {}
     for key in ('site_id', 'siteId', 'intended_platform'):
         val = payload.get(key)
         if val:
-            site_ids.add(str(val).strip().lower())
+            normalized = _normalize_site_identifier(val)
+            if normalized:
+                site_ids.add(normalized)
 
     return sorted(site_ids)
+
+
+def check_site_allowed(credential_info):
+    """
+    Enforce allowed_sites restriction for the current request.
+    Returns (is_allowed, blocked_site, allowed_sites_norm, requested_sites).
+    """
+    allowed_sites = credential_info.get('allowed_sites')
+    requested_sites = infer_requested_site_ids()
+
+    if allowed_sites is None:
+        return True, None, None, requested_sites
+
+    allowed_sites_norm = {
+        s for s in (_normalize_site_identifier(item) for item in allowed_sites) if s
+    }
+    if not allowed_sites_norm:
+        return False, None, set(), requested_sites
+
+    blocked_sites = [s for s in requested_sites if s not in allowed_sites_norm]
+    if blocked_sites:
+        return False, blocked_sites[0], allowed_sites_norm, requested_sites
+
+    return True, None, allowed_sites_norm, requested_sites
 
 # ============================================
 # SECURITY: Token Generation and Hashing
@@ -600,6 +659,15 @@ def require_agent_or_user_session(required_scope=None):
                         'provided_scope': scope,
                     }), 403
 
+                site_ok, blocked_site, allowed_sites_norm, _requested_sites = check_site_allowed(credential_info)
+                if not site_ok:
+                    return jsonify({
+                        'success': False,
+                        'error': 'site_not_allowed',
+                        'site': blocked_site,
+                        'allowed_sites': sorted(list(allowed_sites_norm)) if allowed_sites_norm is not None else None,
+                        'message': 'This agent credential is restricted to specific sites.'
+                    }), 403
                 g.agent_credential = credential_info
                 g.ppid = credential_info.get('authorized_by_ppid')
                 g.authenticated = True
@@ -622,6 +690,19 @@ def require_agent_or_user_session(required_scope=None):
                         'required_scope': [required_scope],
                         'provided_scope': session_scope,
                     }), 403
+                session_allowed_sites = session.get('agent_allowed_sites')
+                if session_allowed_sites is not None:
+                    site_ok, blocked_site, allowed_sites_norm, _requested_sites = check_site_allowed({
+                        'allowed_sites': session_allowed_sites
+                    })
+                    if not site_ok:
+                        return jsonify({
+                            'success': False,
+                            'error': 'site_not_allowed',
+                            'site': blocked_site,
+                            'allowed_sites': sorted(list(allowed_sites_norm)) if allowed_sites_norm is not None else None,
+                            'message': 'This agent session is restricted to specific sites.'
+                        }), 403
                 g.ppid = session.get('agent_ppid')
                 g.authenticated = True
                 g.auth_method = 'agent_session'
@@ -744,7 +825,19 @@ def issue_agent_credential():
         agent_name = data.get('agent_name', 'AI Agent')
         scope = data.get('scope', ['read'])
         ttl_hours = min(data.get('ttl_hours', 4), 24)  # Max 24 hours
-        allowed_sites = data.get('allowed_sites')  # null = all user's sites
+        intended_platform = (
+            data.get('intended_platform')
+            or request.args.get('intended_platform')
+            or request.headers.get('Origin')
+            or request.host
+            or 'lemma.id'
+        )
+        intended_platform = _normalize_site_identifier(intended_platform) or 'lemma.id'
+
+        allowed_sites = data.get('allowed_sites')
+        if allowed_sites is None:
+            # Security default: site-bind credentials to the site where they are issued.
+            allowed_sites = [intended_platform]
         description = data.get('description', '')
         audience = (data.get('audience') or data.get('aud') or '').strip().lower() or None
 
@@ -778,6 +871,22 @@ def issue_agent_credential():
                     'error': 'max_operations must be at least 1'
                 }), 400
 
+        if not isinstance(allowed_sites, list):
+            return jsonify({
+                'success': False,
+                'error': 'allowed_sites must be a list of site identifiers'
+            }), 400
+        normalized_allowed_sites = []
+        for site in allowed_sites:
+            site_norm = _normalize_site_identifier(site)
+            if not site_norm:
+                return jsonify({
+                    'success': False,
+                    'error': f'Invalid site identifier: {site}'
+                }), 400
+            normalized_allowed_sites.append(site_norm)
+        allowed_sites = sorted(list(set(normalized_allowed_sites)))
+
         if audience is not None:
             if not re.match(r'^[a-z0-9._-]{2,64}$', audience):
                 return jsonify({
@@ -785,6 +894,8 @@ def issue_agent_credential():
                     'error': 'invalid_audience',
                     'message': 'audience must match [a-z0-9._-]{2,64}'
                 }), 400
+        else:
+            audience = intended_platform
 
         # Validate scope
         valid_scopes = ['read', 'write', 'admin', 'test']
@@ -820,7 +931,7 @@ def issue_agent_credential():
                 authorized_by,
                 user_email,
                 json.dumps(scope),
-                json.dumps(allowed_sites) if allowed_sites else None,
+                json.dumps(allowed_sites) if allowed_sites is not None else None,
                 expires_at,
                 agent_name,
                 encoded_description,
@@ -851,6 +962,7 @@ def issue_agent_credential():
                 'token': plaintext_token,  # SHOWN ONLY ONCE
                 'token_id': token_id,
                 'scope': scope,
+                'allowed_sites': allowed_sites,
                 'expires_at': expires_at.isoformat() + 'Z',
                 'ttl_hours': ttl_hours,
                 'agent_name': agent_name
@@ -1126,25 +1238,21 @@ def require_agent_or_user_auth(required_scope=None, enforce_task_bounds=True):
                         }), 403
 
                 # Enforce optional site-level restrictions
-                allowed_sites = credential_info.get('allowed_sites')
-                requested_sites = infer_requested_site_ids()
-                if allowed_sites is not None:
-                    allowed_sites_norm = {str(s).strip().lower() for s in allowed_sites if str(s).strip()}
-                    blocked_sites = [s for s in requested_sites if s not in allowed_sites_norm]
-                    if blocked_sites:
-                        log_agent_action(
-                            credential_info,
-                            f'site_denied:{blocked_sites[0]}',
-                            success=False,
-                            status_code=403,
-                        )
-                        return jsonify({
-                            'success': False,
-                            'error': 'site_not_allowed',
-                            'site': blocked_sites[0],
-                            'allowed_sites': sorted(list(allowed_sites_norm)),
-                            'message': 'This agent credential is restricted to specific sites. Request a new credential with the correct allowed_sites.'
-                        }), 403
+                site_ok, blocked_site, allowed_sites_norm, requested_sites = check_site_allowed(credential_info)
+                if not site_ok:
+                    log_agent_action(
+                        credential_info,
+                        f'site_denied:{blocked_site or "unknown"}',
+                        success=False,
+                        status_code=403,
+                    )
+                    return jsonify({
+                        'success': False,
+                        'error': 'site_not_allowed',
+                        'site': blocked_site,
+                        'allowed_sites': sorted(list(allowed_sites_norm)) if allowed_sites_norm is not None else None,
+                        'message': 'This agent credential is restricted to specific sites. Request a new credential with the correct allowed_sites.'
+                    }), 403
 
                 # Check task-bound path restrictions
                 allowed_paths = credential_info.get('allowed_paths')
@@ -1206,6 +1314,20 @@ def require_agent_or_user_auth(required_scope=None, enforce_task_bounds=True):
                         'success': False,
                         'error': f'Agent session lacks required scope: {required_scope}'
                     }), 403
+
+                session_allowed_sites = session.get('agent_allowed_sites')
+                if session_allowed_sites is not None:
+                    site_ok, blocked_site, allowed_sites_norm, requested_sites = check_site_allowed({
+                        'allowed_sites': session_allowed_sites
+                    })
+                    if not site_ok:
+                        return jsonify({
+                            'success': False,
+                            'error': 'site_not_allowed',
+                            'site': blocked_site,
+                            'allowed_sites': sorted(list(allowed_sites_norm)) if allowed_sites_norm is not None else None,
+                            'message': 'This agent session is restricted to specific sites.'
+                        }), 403
 
                 session_ppid = session.get('agent_ppid')
                 if session_ppid:
@@ -1960,6 +2082,14 @@ def auto_issue_agent_credential():
             task_description = data.get('task')
             allowed_paths = data.get('allowed_paths')
             max_operations = data.get('max_operations')
+            allowed_sites = data.get('allowed_sites')
+            intended_platform = (
+                data.get('intended_platform')
+                or request.args.get('intended_platform')
+                or request.headers.get('Origin')
+                or request.host
+                or 'lemma.id'
+            )
         else:
             ttl_hours = min(int(request.args.get('ttl', 4)), 24)
             scope_param = request.args.get('scope', 'read,write')
@@ -1970,6 +2100,33 @@ def auto_issue_agent_credential():
             allowed_paths = paths_param.split(',') if paths_param else None
             max_ops_param = request.args.get('max_ops')
             max_operations = int(max_ops_param) if max_ops_param else None
+            allowed_sites = request.args.get('allowed_sites')
+            if allowed_sites:
+                allowed_sites = [s.strip() for s in str(allowed_sites).split(',') if s.strip()]
+            intended_platform = (
+                request.args.get('intended_platform')
+                or request.headers.get('Origin')
+                or request.host
+                or 'lemma.id'
+            )
+
+        if allowed_sites is None:
+            allowed_sites = [_normalize_site_identifier(intended_platform) or 'lemma.id']
+        if not isinstance(allowed_sites, list):
+            return jsonify({
+                'success': False,
+                'error': 'allowed_sites must be a list of site identifiers'
+            }), 400
+        normalized_allowed_sites = []
+        for site in allowed_sites:
+            site_norm = _normalize_site_identifier(site)
+            if not site_norm:
+                return jsonify({
+                    'success': False,
+                    'error': f'Invalid site identifier: {site}'
+                }), 400
+            normalized_allowed_sites.append(site_norm)
+        allowed_sites = sorted(list(set(normalized_allowed_sites)))
 
         # Parse scope
         if isinstance(scope_param, list):
@@ -1996,9 +2153,9 @@ def auto_issue_agent_credential():
             cursor.execute("""
                 INSERT INTO agent_credentials
                 (token_id, token_hash, authorized_by_ppid, authorized_by_email,
-                 scope, expires_at, agent_name, description,
+                 scope, allowed_sites, expires_at, agent_name, description,
                  task_description, task_hash, allowed_paths, max_operations)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 RETURNING id
             """, (
                 token_id,
@@ -2006,6 +2163,7 @@ def auto_issue_agent_credential():
                 authorized_by,
                 user_email,
                 json.dumps(scope),
+                json.dumps(allowed_sites),
                 expires_at,
                 agent_name,
                 f'Auto-issued via active session (auth_method: {auth_method})',
@@ -2034,6 +2192,7 @@ def auto_issue_agent_credential():
             'token': plaintext_token,
             'token_id': token_id,
             'scope': scope,
+            'allowed_sites': allowed_sites,
             'expires_at': expires_at.isoformat() + 'Z',
             'ttl_hours': ttl_hours,
             'authorized_by': authorized_by,
@@ -2101,12 +2260,23 @@ def create_agent_session():
             'error': 'invalid_token',
             'message': 'Invalid, expired, or revoked agent token'
         }), 401
+
+    site_ok, blocked_site, allowed_sites_norm, _requested_sites = check_site_allowed(credential_info)
+    if not site_ok:
+        return jsonify({
+            'success': False,
+            'error': 'site_not_allowed',
+            'site': blocked_site,
+            'allowed_sites': sorted(list(allowed_sites_norm)) if allowed_sites_norm is not None else None,
+            'message': 'This agent credential is restricted to specific sites and cannot create a session here.'
+        }), 403
     
     # Create session from agent token
     session['agent_authenticated'] = True
     session['agent_token_id'] = credential_info['token_id']
     session['agent_ppid'] = credential_info['authorized_by_ppid']
     session['agent_scope'] = credential_info['scope']
+    session['agent_allowed_sites'] = credential_info.get('allowed_sites')
     session['customer_id'] = credential_info.get('authorized_by_ppid', '').replace('did:lemma:', '')
     session['auth_method'] = 'agent_token'
     
@@ -2131,6 +2301,7 @@ def create_agent_session():
         'session_created': True,
         'token_id': credential_info['token_id'],
         'scope': credential_info['scope'],
+        'allowed_sites': credential_info.get('allowed_sites'),
         'ppid': credential_info['authorized_by_ppid'],
         'is_admin': 'admin' in credential_info['scope'],
         'message': 'Browser session created. You can now navigate authenticated pages.',
@@ -2199,6 +2370,7 @@ def validate_agent_token_endpoint():
             'auth_method': 'session',
             'token_id': session.get('agent_token_id'),
             'scope': session.get('agent_scope', []),
+            'allowed_sites': session.get('agent_allowed_sites'),
             'ppid': session.get('agent_ppid'),
             'message': 'Authenticated via agent session cookie'
         })

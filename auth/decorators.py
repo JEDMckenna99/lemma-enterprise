@@ -158,11 +158,41 @@ def check_agent_session():
                 'token_id': session.get('agent_token_id'),
                 'authorized_by_ppid': session.get('agent_ppid'),
                 'scope': session.get('agent_scope', []),
+                'allowed_sites': session.get('agent_allowed_sites'),
                 'auth_method': 'agent_session'
             }
     except Exception as e:
         logger.debug(f"Agent session check error: {e}")
     return False, None
+
+
+def _enforce_agent_site_scope(credential_info: dict, auth_method: str):
+    """
+    Enforce allowed_sites checks for agent token and agent session auth paths.
+    """
+    try:
+        from api.agent_credentials import check_site_allowed
+        site_ok, blocked_site, allowed_sites_norm, _requested_sites = check_site_allowed(credential_info or {})
+    except Exception as e:
+        logger.warning(f"Agent site-scope check failed: {e}")
+        return _auth_error(
+            'site_scope_validation_failed',
+            'Unable to validate agent site restrictions.',
+            status=500,
+            auth_method=auth_method,
+        )
+
+    if not site_ok:
+        return _auth_error(
+            'site_not_allowed',
+            'This agent authorization is restricted to different site(s).',
+            status=403,
+            auth_method=auth_method,
+            required_scope=sorted(list(allowed_sites_norm)) if allowed_sites_norm is not None else None,
+            provided_scope=[blocked_site] if blocked_site else None,
+        )
+
+    return None
 
 def require_api_key(f):
     """
@@ -242,6 +272,9 @@ def require_site_admin(f):
             if is_valid:
                 scope = normalize_scopes(credential_info.get('scope', []))
                 if 'admin' in scope:
+                    site_scope_error = _enforce_agent_site_scope(credential_info, 'agent_token')
+                    if site_scope_error:
+                        return site_scope_error
                     g.is_admin = True
                     g.admin_email = credential_info.get('authorized_by_email', 'agent@lemma.id')
                     g.auth_method = 'agent_token'
@@ -263,6 +296,9 @@ def require_site_admin(f):
         if is_agent_session:
             scope = normalize_scopes(session_info.get('scope', []))
             if 'admin' in scope:
+                site_scope_error = _enforce_agent_site_scope(session_info, 'agent_session')
+                if site_scope_error:
+                    return site_scope_error
                 g.is_admin = True
                 g.admin_email = 'agent@lemma.id'
                 g.auth_method = 'agent_session'
@@ -350,6 +386,9 @@ def optional_auth(f):
         if agent_token:
             is_valid, credential_info = validate_agent_token(agent_token)
             if is_valid:
+                site_scope_error = _enforce_agent_site_scope(credential_info, 'agent_token')
+                if site_scope_error:
+                    return site_scope_error
                 g.ppid = credential_info.get('authorized_by_ppid')
                 g.authenticated = True
                 g.auth_method = 'agent_token'
@@ -359,6 +398,9 @@ def optional_auth(f):
         # Method 0b: Agent session (browser requests from /api/agent/session)
         is_agent_session, session_info = check_agent_session()
         if is_agent_session:
+            site_scope_error = _enforce_agent_site_scope(session_info, 'agent_session')
+            if site_scope_error:
+                return site_scope_error
             g.ppid = session_info.get('authorized_by_ppid')
             g.authenticated = True
             g.auth_method = 'agent_session'
@@ -432,6 +474,9 @@ def require_admin(f):
             if is_valid:
                 scope = normalize_scopes(credential_info.get('scope', []))
                 if 'admin' in scope:
+                    site_scope_error = _enforce_agent_site_scope(credential_info, 'agent_token')
+                    if site_scope_error:
+                        return site_scope_error
                     g.is_admin = True
                     g.admin_email = credential_info.get('authorized_by_email', 'agent@lemma.id')
                     g.auth_method = 'agent_token'
@@ -452,6 +497,9 @@ def require_admin(f):
         if is_agent_session:
             scope = normalize_scopes(session_info.get('scope', []))
             if 'admin' in scope:
+                site_scope_error = _enforce_agent_site_scope(session_info, 'agent_session')
+                if site_scope_error:
+                    return site_scope_error
                 g.is_admin = True
                 g.admin_email = 'agent@lemma.id'
                 g.auth_method = 'agent_session'
@@ -627,6 +675,9 @@ def require_authenticated(f):
         if agent_token:
             is_valid, credential_info = validate_agent_token(agent_token)
             if is_valid:
+                site_scope_error = _enforce_agent_site_scope(credential_info, 'agent_token')
+                if site_scope_error:
+                    return site_scope_error
                 g.ppid = credential_info.get('authorized_by_ppid')
                 g.authenticated = True
                 g.auth_method = 'agent_token'
@@ -636,6 +687,9 @@ def require_authenticated(f):
         # Method 0b: Agent session (browser requests from /api/agent/session)
         is_agent_session, session_info = check_agent_session()
         if is_agent_session:
+            site_scope_error = _enforce_agent_site_scope(session_info, 'agent_session')
+            if site_scope_error:
+                return site_scope_error
             g.ppid = session_info.get('authorized_by_ppid')
             g.authenticated = True
             g.auth_method = 'agent_session'
@@ -781,6 +835,9 @@ def require_wallet_ppid(f):
         if agent_token:
             is_valid, credential_info = validate_agent_token(agent_token)
             if is_valid:
+                site_scope_error = _enforce_agent_site_scope(credential_info, 'agent_token')
+                if site_scope_error:
+                    return site_scope_error
                 g.ppid = credential_info.get('authorized_by_ppid')
                 g.authenticated = True
                 g.auth_method = 'agent_token'
@@ -790,6 +847,9 @@ def require_wallet_ppid(f):
         # Method 0b: Agent session (browser requests from /api/agent/session)
         is_agent_session, session_info = check_agent_session()
         if is_agent_session:
+            site_scope_error = _enforce_agent_site_scope(session_info, 'agent_session')
+            if site_scope_error:
+                return site_scope_error
             g.ppid = session_info.get('authorized_by_ppid')
             g.authenticated = True
             g.auth_method = 'agent_session'
@@ -853,6 +913,9 @@ def require_customer_or_admin(f):
             is_valid, credential_info = validate_agent_token(agent_token)
             if is_valid:
                 scope = credential_info.get('scope', [])
+                site_scope_error = _enforce_agent_site_scope(credential_info, 'agent_token')
+                if site_scope_error:
+                    return site_scope_error
                 g.ppid = credential_info.get('authorized_by_ppid')
                 g.authenticated = True
                 g.auth_method = 'agent_token'
@@ -864,6 +927,9 @@ def require_customer_or_admin(f):
         is_agent_session, session_info = check_agent_session()
         if is_agent_session:
             scope = session_info.get('scope', [])
+            site_scope_error = _enforce_agent_site_scope(session_info, 'agent_session')
+            if site_scope_error:
+                return site_scope_error
             g.ppid = session_info.get('authorized_by_ppid')
             g.authenticated = True
             g.auth_method = 'agent_session'
