@@ -22,6 +22,64 @@ from auth.permissions import normalize_scopes, is_admin_permission
 logger = logging.getLogger(__name__)
 
 
+def _extract_api_key_from_request() -> Optional[str]:
+    """
+    Extract API key from supported locations.
+    Preferred order: X-API-Key header, api_key query param, Authorization Bearer token.
+    """
+    api_key = request.headers.get('X-API-Key') or request.args.get('api_key')
+    if api_key:
+        return api_key
+
+    auth_header = request.headers.get('Authorization', '')
+    if auth_header.startswith('Bearer '):
+        token = auth_header[7:].strip()
+        # Ignore likely credential JSON/JWT payloads and agent tokens here.
+        if token and not token.startswith('{') and not token.startswith('lm_agent_') and not token.startswith('lm_at_'):
+            return token
+
+    return None
+
+
+def _extract_bearer_token_from_request() -> Optional[str]:
+    auth_header = request.headers.get('Authorization', '')
+    if not auth_header.startswith('Bearer '):
+        return None
+    token = auth_header[7:].strip()
+    return token or None
+
+
+def _try_authenticate_access_token(required_scope: Optional[str] = None):
+    """
+    Attempt auth via server-issued access token.
+    Returns (handled, response_tuple_or_none).
+    """
+    bearer = _extract_bearer_token_from_request()
+    if not bearer or not bearer.startswith('lm_at_'):
+        return False, None
+
+    try:
+        from api.access_tokens import validate_access_token
+        payload, error = validate_access_token(bearer, required_scope=required_scope)
+    except Exception as e:
+        logger.error(f"Access token validation error: {e}")
+        return True, (jsonify({'error': 'token_validation_failed'}), 500)
+
+    if not payload:
+        if error in {"missing_scope", "site_mismatch", "audience_mismatch"}:
+            return True, (jsonify({'error': error, 'reason': error}), 403)
+        return True, (jsonify({'error': 'invalid_access_token', 'reason': error}), 401)
+
+    g.authenticated = True
+    g.auth_method = 'access_token'
+    g.ppid = payload.get('sub')
+    g.permission_id = payload.get('permission_id')
+    g.access_token_claims = payload
+    if payload.get('is_admin'):
+        g.is_admin = True
+    return True, None
+
+
 def _auth_error(code: str, message: str, status: int = 401, auth_method: str = 'none', required_scope=None, provided_scope=None):
     payload = {
         'error': code,
@@ -100,11 +158,41 @@ def check_agent_session():
                 'token_id': session.get('agent_token_id'),
                 'authorized_by_ppid': session.get('agent_ppid'),
                 'scope': session.get('agent_scope', []),
+                'allowed_sites': session.get('agent_allowed_sites'),
                 'auth_method': 'agent_session'
             }
     except Exception as e:
         logger.debug(f"Agent session check error: {e}")
     return False, None
+
+
+def _enforce_agent_site_scope(credential_info: dict, auth_method: str):
+    """
+    Enforce allowed_sites checks for agent token and agent session auth paths.
+    """
+    try:
+        from api.agent_credentials import check_site_allowed
+        site_ok, blocked_site, allowed_sites_norm, _requested_sites = check_site_allowed(credential_info or {})
+    except Exception as e:
+        logger.warning(f"Agent site-scope check failed: {e}")
+        return _auth_error(
+            'site_scope_validation_failed',
+            'Unable to validate agent site restrictions.',
+            status=500,
+            auth_method=auth_method,
+        )
+
+    if not site_ok:
+        return _auth_error(
+            'site_not_allowed',
+            'This agent authorization is restricted to different site(s).',
+            status=403,
+            auth_method=auth_method,
+            required_scope=sorted(list(allowed_sites_norm)) if allowed_sites_norm is not None else None,
+            provided_scope=[blocked_site] if blocked_site else None,
+        )
+
+    return None
 
 def require_api_key(f):
     """
@@ -116,7 +204,7 @@ def require_api_key(f):
     """
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        api_key = request.headers.get('X-API-Key') or request.args.get('api_key')
+        api_key = _extract_api_key_from_request()
         
         if not api_key:
             return jsonify({'error': 'API key required'}), 401
@@ -170,6 +258,13 @@ def require_site_admin(f):
     """
     @wraps(f)
     def decorated_function(*args, **kwargs):
+        handled, token_response = _try_authenticate_access_token(required_scope='admin')
+        if handled:
+            if token_response:
+                return token_response
+            g.is_admin = True
+            return f(*args, **kwargs)
+
         # METHOD 0a: Agent token with admin scope (header)
         agent_token = request.headers.get('X-Agent-Token')
         if agent_token:
@@ -177,6 +272,9 @@ def require_site_admin(f):
             if is_valid:
                 scope = normalize_scopes(credential_info.get('scope', []))
                 if 'admin' in scope:
+                    site_scope_error = _enforce_agent_site_scope(credential_info, 'agent_token')
+                    if site_scope_error:
+                        return site_scope_error
                     g.is_admin = True
                     g.admin_email = credential_info.get('authorized_by_email', 'agent@lemma.id')
                     g.auth_method = 'agent_token'
@@ -198,6 +296,9 @@ def require_site_admin(f):
         if is_agent_session:
             scope = normalize_scopes(session_info.get('scope', []))
             if 'admin' in scope:
+                site_scope_error = _enforce_agent_site_scope(session_info, 'agent_session')
+                if site_scope_error:
+                    return site_scope_error
                 g.is_admin = True
                 g.admin_email = 'agent@lemma.id'
                 g.auth_method = 'agent_session'
@@ -243,7 +344,7 @@ def require_site_admin(f):
                 )
         
         # METHOD 2: API key (programmatic access - still supported)
-        api_key = request.headers.get('X-API-Key') or request.args.get('api_key')
+        api_key = _extract_api_key_from_request()
         
         is_valid_key, key_obj, key_error = validate_api_key_secure(api_key)
         if is_valid_key:
@@ -273,12 +374,21 @@ def optional_auth(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
         g.authenticated = False
+
+        handled, token_response = _try_authenticate_access_token()
+        if handled:
+            if token_response:
+                return token_response
+            return f(*args, **kwargs)
         
         # Method 0a: Agent token header
         agent_token = request.headers.get('X-Agent-Token')
         if agent_token:
             is_valid, credential_info = validate_agent_token(agent_token)
             if is_valid:
+                site_scope_error = _enforce_agent_site_scope(credential_info, 'agent_token')
+                if site_scope_error:
+                    return site_scope_error
                 g.ppid = credential_info.get('authorized_by_ppid')
                 g.authenticated = True
                 g.auth_method = 'agent_token'
@@ -288,6 +398,9 @@ def optional_auth(f):
         # Method 0b: Agent session (browser requests from /api/agent/session)
         is_agent_session, session_info = check_agent_session()
         if is_agent_session:
+            site_scope_error = _enforce_agent_site_scope(session_info, 'agent_session')
+            if site_scope_error:
+                return site_scope_error
             g.ppid = session_info.get('authorized_by_ppid')
             g.authenticated = True
             g.auth_method = 'agent_session'
@@ -312,7 +425,7 @@ def optional_auth(f):
                 return f(*args, **kwargs)
         
         # Method 3: API key fallback
-        api_key = request.headers.get('X-API-Key') or request.args.get('api_key')
+        api_key = _extract_api_key_from_request()
         is_valid_key, key_obj, key_error = validate_api_key_secure(api_key)
         if is_valid_key:
             g.api_key = api_key
@@ -347,6 +460,13 @@ def require_admin(f):
     """
     @wraps(f)
     def decorated_function(*args, **kwargs):
+        handled, token_response = _try_authenticate_access_token(required_scope='admin')
+        if handled:
+            if token_response:
+                return token_response
+            g.is_admin = True
+            return f(*args, **kwargs)
+
         # Method 0a: Agent token with admin scope (header)
         agent_token = request.headers.get('X-Agent-Token')
         if agent_token:
@@ -354,6 +474,9 @@ def require_admin(f):
             if is_valid:
                 scope = normalize_scopes(credential_info.get('scope', []))
                 if 'admin' in scope:
+                    site_scope_error = _enforce_agent_site_scope(credential_info, 'agent_token')
+                    if site_scope_error:
+                        return site_scope_error
                     g.is_admin = True
                     g.admin_email = credential_info.get('authorized_by_email', 'agent@lemma.id')
                     g.auth_method = 'agent_token'
@@ -374,6 +497,9 @@ def require_admin(f):
         if is_agent_session:
             scope = normalize_scopes(session_info.get('scope', []))
             if 'admin' in scope:
+                site_scope_error = _enforce_agent_site_scope(session_info, 'agent_session')
+                if site_scope_error:
+                    return site_scope_error
                 g.is_admin = True
                 g.admin_email = 'agent@lemma.id'
                 g.auth_method = 'agent_session'
@@ -414,7 +540,7 @@ def require_admin(f):
             )
 
         # Method 2: API key fallback (programmatic access)
-        api_key = request.headers.get('X-API-Key') or request.args.get('api_key')
+        api_key = _extract_api_key_from_request()
         is_valid_key, key_obj, key_error = validate_api_key_secure(api_key)
         if is_valid_key:
             g.api_key = api_key
@@ -477,7 +603,7 @@ def init_csrf_protection(app):
                 return
         
         # Skip if API key is present (programmatic access)
-        if request.headers.get('X-API-Key') or request.headers.get('Authorization', '').startswith('Bearer lemma_'):
+        if _extract_api_key_from_request():
             return
         
         # Validate CSRF token
@@ -538,11 +664,20 @@ def require_authenticated(f):
     """
     @wraps(f)
     def decorated_function(*args, **kwargs):
+        handled, token_response = _try_authenticate_access_token()
+        if handled:
+            if token_response:
+                return token_response
+            return f(*args, **kwargs)
+
         # Method 0a: Agent token header
         agent_token = request.headers.get('X-Agent-Token')
         if agent_token:
             is_valid, credential_info = validate_agent_token(agent_token)
             if is_valid:
+                site_scope_error = _enforce_agent_site_scope(credential_info, 'agent_token')
+                if site_scope_error:
+                    return site_scope_error
                 g.ppid = credential_info.get('authorized_by_ppid')
                 g.authenticated = True
                 g.auth_method = 'agent_token'
@@ -552,6 +687,9 @@ def require_authenticated(f):
         # Method 0b: Agent session (browser requests from /api/agent/session)
         is_agent_session, session_info = check_agent_session()
         if is_agent_session:
+            site_scope_error = _enforce_agent_site_scope(session_info, 'agent_session')
+            if site_scope_error:
+                return site_scope_error
             g.ppid = session_info.get('authorized_by_ppid')
             g.authenticated = True
             g.auth_method = 'agent_session'
@@ -576,7 +714,7 @@ def require_authenticated(f):
                 return f(*args, **kwargs)
         
         # Method 3: API key fallback
-        api_key = request.headers.get('X-API-Key') or request.args.get('api_key')
+        api_key = _extract_api_key_from_request()
         is_valid_key, key_obj, key_error = validate_api_key_secure(api_key)
         if is_valid_key:
             g.api_key = api_key
@@ -686,11 +824,20 @@ def require_wallet_ppid(f):
     """
     @wraps(f)
     def decorated_function(*args, **kwargs):
+        handled, token_response = _try_authenticate_access_token(required_scope='read')
+        if handled:
+            if token_response:
+                return token_response
+            return f(*args, **kwargs)
+
         # Method 0a: Agent token (delegated access from human)
         agent_token = request.headers.get('X-Agent-Token')
         if agent_token:
             is_valid, credential_info = validate_agent_token(agent_token)
             if is_valid:
+                site_scope_error = _enforce_agent_site_scope(credential_info, 'agent_token')
+                if site_scope_error:
+                    return site_scope_error
                 g.ppid = credential_info.get('authorized_by_ppid')
                 g.authenticated = True
                 g.auth_method = 'agent_token'
@@ -700,6 +847,9 @@ def require_wallet_ppid(f):
         # Method 0b: Agent session (browser requests from /api/agent/session)
         is_agent_session, session_info = check_agent_session()
         if is_agent_session:
+            site_scope_error = _enforce_agent_site_scope(session_info, 'agent_session')
+            if site_scope_error:
+                return site_scope_error
             g.ppid = session_info.get('authorized_by_ppid')
             g.authenticated = True
             g.auth_method = 'agent_session'
@@ -721,7 +871,7 @@ def require_wallet_ppid(f):
             return f(*args, **kwargs)
         
         # Method 3: API key fallback (for programmatic access)
-        api_key = request.headers.get('X-API-Key') or request.args.get('api_key')
+        api_key = _extract_api_key_from_request()
         is_valid_key, key_obj, key_error = validate_api_key_secure(api_key)
         if is_valid_key:
             g.api_key = api_key
@@ -733,7 +883,7 @@ def require_wallet_ppid(f):
         return jsonify({
             'success': False,
             'error': 'Authentication required',
-            'message': 'Provide X-Agent-Token, X-Lemma-PPID, or X-API-Key'
+            'message': 'Provide X-Agent-Token, X-Lemma-PPID, X-API-Key, or Authorization: Bearer <api_key>'
         }), 401
     
     return decorated_function
@@ -750,12 +900,22 @@ def require_customer_or_admin(f):
     """
     @wraps(f)
     def decorated_function(*args, **kwargs):
+        handled, token_response = _try_authenticate_access_token(required_scope='read')
+        if handled:
+            if token_response:
+                return token_response
+            g.is_admin = bool(getattr(g, 'is_admin', False))
+            return f(*args, **kwargs)
+
         # Try agent token first (header)
         agent_token = request.headers.get('X-Agent-Token')
         if agent_token:
             is_valid, credential_info = validate_agent_token(agent_token)
             if is_valid:
                 scope = credential_info.get('scope', [])
+                site_scope_error = _enforce_agent_site_scope(credential_info, 'agent_token')
+                if site_scope_error:
+                    return site_scope_error
                 g.ppid = credential_info.get('authorized_by_ppid')
                 g.authenticated = True
                 g.auth_method = 'agent_token'
@@ -767,6 +927,9 @@ def require_customer_or_admin(f):
         is_agent_session, session_info = check_agent_session()
         if is_agent_session:
             scope = session_info.get('scope', [])
+            site_scope_error = _enforce_agent_site_scope(session_info, 'agent_session')
+            if site_scope_error:
+                return site_scope_error
             g.ppid = session_info.get('authorized_by_ppid')
             g.authenticated = True
             g.auth_method = 'agent_session'
@@ -803,7 +966,7 @@ def require_customer_or_admin(f):
             return f(*args, **kwargs)
         
         # API key fallback
-        api_key = request.headers.get('X-API-Key') or request.args.get('api_key')
+        api_key = _extract_api_key_from_request()
         is_valid_key, key_obj, key_error = validate_api_key_secure(api_key)
         if is_valid_key:
             g.api_key = api_key

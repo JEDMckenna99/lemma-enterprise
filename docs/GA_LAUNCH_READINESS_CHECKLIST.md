@@ -29,43 +29,18 @@ Evidence: __________
 
 ## Latest Verification Run
 
-- Date: 2026-02-11
+- Date: 2026-02-22
 - Environment: production `https://lemma.id` (Heroku deploy)
-- Deployment Version: Heroku release `v1682`, commit `34c68e4a`
-- Type: post-deploy automated launch gate + smoke checks
+- Deployment Version: Heroku release `v1744`, commit `80191413`
+- Type: strict auth gate + post-deploy launch gate verification
 - Evidence:
-  - `docs/launch-evidence/2026-02-11-heroku-smoke.md`
-  - `docs/launch-evidence/2026-02-11-heroku-smoke.txt`
-  - `docs/launch-evidence/2026-02-11-heroku-extended-smoke.md`
-  - `docs/launch-evidence/2026-02-11-heroku-extended-smoke.txt`
-  - `docs/launch-evidence/2026-02-11-transport-tls-checks.md`
-  - `docs/launch-evidence/2026-02-11-transport-tls-checks.txt`
-  - `docs/launch-evidence/2026-02-11-origin-cors-checks.txt`
-  - `docs/launch-evidence/2026-02-11-origin-and-dom-safety-checks.md`
-  - `docs/launch-evidence/2026-02-11-code-remediation.md`
-  - `docs/launch-evidence/2026-02-11-post-remediation-scan.md`
-  - `docs/launch-evidence/2026-02-11-post-fix-smoke-current-prod.txt`
-  - `docs/launch-evidence/2026-02-11-130201-post-deploy-summary.md`
-  - `docs/launch-evidence/2026-02-11-130201-post-deploy-smoke.txt`
-  - `docs/launch-evidence/2026-02-11-130201-post-deploy-transport.txt`
-  - `docs/launch-evidence/2026-02-11-130201-post-deploy-origin.txt`
-  - `docs/launch-evidence/2026-02-11-132844-post-deploy-summary.md`
-  - `docs/launch-evidence/2026-02-11-132844-post-deploy-smoke.txt`
-  - `docs/launch-evidence/2026-02-11-132844-post-deploy-transport.txt`
-  - `docs/launch-evidence/2026-02-11-132844-post-deploy-origin.txt`
-  - `docs/launch-evidence/2026-02-11-revocation-path-post-deploy.md`
-  - `docs/launch-evidence/2026-02-11-revocation-path-post-deploy.txt`
-  - `docs/launch-evidence/2026-02-11-revocation-path-post-dbfix.md`
-  - `docs/launch-evidence/2026-02-11-revocation-path-post-dbfix.txt`
-  - `docs/launch-evidence/2026-02-11-135840-post-deploy-summary.md`
-  - `docs/launch-evidence/2026-02-11-135840-post-deploy-smoke.txt`
-  - `docs/launch-evidence/2026-02-11-135840-post-deploy-transport.txt`
-  - `docs/launch-evidence/2026-02-11-135840-post-deploy-origin.txt`
-  - `docs/launch-evidence/2026-02-11-agent-token-ux-automation.md`
-  - `docs/launch-evidence/2026-02-11-agent-ux-suite-full-pass.txt`
-  - `docs/launch-evidence/2026-02-11-agent-ux-suite-interaction-pass.txt`
-  - `docs/launch-evidence/2026-02-11-ci-gate-setup.md`
-  - `docs/launch-evidence/2026-02-11-launch-gate-ci-local.txt`
+  - Local post-deploy launch gate pass against `https://lemma.id` (release `v1744`)
+  - Strict scope policy output: `admin routes missing explicit admin auth: 0`
+  - Strict scope policy output: `state-changing routes missing explicit auth: 0`
+  - Proof exchange lifecycle output: `All proof-exchange checks passed`
+  - Scope matrix output: `Auth scope matrix checks passed`
+  - GitHub Actions workflow: `.github/workflows/auth-launch-gate.yml`
+  - GitHub Actions result: latest `Auth Launch Gate` run passed on `main`
 - Coverage in this run:
   - core endpoint availability
   - transport/security header validation on root + bridge
@@ -141,17 +116,17 @@ Evidence:
   - CI must fail build on any regression in P0 scenarios.
   - Required checks must pass before deploy tag/release.
 - Current Known Gap:
-  - Smoke gate exists, but coverage is still limited and CI run history evidence is pending.
+  - No current blocker for baseline auth gate coverage. Expand over time as new critical paths are added.
 
-Status: `IN_PROGRESS`  
+Status: `PASS`  
 Owner: Platform/DevOps  
 Target Date: __________  
 Evidence:
-- `.github/workflows/launch-gate-smoke.yml`
-- `scripts/launch_gate_smoke_ci.py`
-- `docs/launch-evidence/2026-02-11-ci-gate-setup.md`
-- `docs/launch-evidence/2026-02-11-launch-gate-ci-local.txt`
-- Remaining requirement: successful CI runner executions (target: last 3 green runs)
+- `.github/workflows/auth-launch-gate.yml`
+- `scripts/post_deploy_launch_gate.ps1`
+- `scripts/proof_exchange_contract_check.py`
+- `scripts/auth_scope_matrix_check.py`
+- Latest `main` GitHub Actions run status: PASS (strict auth gate)
 
 ### P0-4 Revocation Data Path Completeness
 
@@ -217,7 +192,14 @@ Evidence: final report + remediation tracker
 Status: `IN_PROGRESS`  
 Owner: SRE Lead  
 Target Date: __________  
-Evidence: basic production availability and header checks captured in `docs/launch-evidence/2026-02-11-heroku-smoke.md`; monitoring/drill evidence still required
+Evidence:
+- `monitoring/UPTIME_MONITORING_SETUP.md`
+- `monitoring/SENTRY_SETUP_GUIDE.md`
+- `docs/GITHUB_OPERATIONS_BASELINE.md`
+- `docs/INCIDENT_DRILL_RUNBOOK.md`
+- `scripts/run_sentry_alert_routing_drill.py`
+- `docs/launch-evidence/2026-02-22-143828-incident-drill-auth-control-plane.md` (MTTD=6s, MTTR=11s)
+- Remaining requirement: document on-call escalation routing outcome from a live alert path test
 
 ---
 
