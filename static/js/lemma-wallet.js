@@ -4676,25 +4676,73 @@ class LemmaWallet {
     async getAuthenticatedPPID(siteId = null) {
         try {
             await this.init();
-            const hostname = siteId || window.location.hostname;
+            const normalizeSite = (value) => {
+                const raw = String(value || '').trim().toLowerCase();
+                if (!raw) return '';
+                try {
+                    if (raw.includes('://')) {
+                        return new URL(raw).hostname.toLowerCase();
+                    }
+                } catch (e) {
+                    // Fall through to manual normalization.
+                }
+                return raw.split('/')[0].split(':')[0];
+            };
+            const isAdminLike = (claims) => {
+                const permissionId = String(claims.permissionId || claims.permission_level || claims.permission_id || '').toLowerCase();
+                const accountType = String(claims.accountType || claims.account_type || '').toLowerCase();
+                return ['admin_access', 'super_admin', 'admin', 'superadmin', 'site_admin', 'platform_admin'].includes(permissionId)
+                    || permissionId.includes('admin')
+                    || accountType === 'admin';
+            };
+            const toEpoch = (lemma) => {
+                const claims = lemma.claims || lemma.credentialSubject || {};
+                const raw = lemma.issuanceDate || lemma.issuedAt || claims.issuedAt || claims.issuanceDate || 0;
+                const asNum = Number(raw || 0);
+                return Number.isFinite(asNum) ? asNum : 0;
+            };
+            const hostname = normalizeSite(siteId || window.location.hostname);
             
             // 1. Check for lemma-based auth (privacy-preserving - no wallet_secret needed)
             //    This handles both: stored lemmas from previous visits AND new redirect returns
             const allLemmas = await this._getAll('lemmas');
-            const siteLemma = allLemmas.find(lemma => {
+            const siteLemmas = allLemmas.filter(lemma => {
                 const claims = lemma.claims || lemma.credentialSubject || {};
-                const lemmaSiteId = claims.siteId || claims.site_id || claims.domain || lemma.siteId;
-                return lemmaSiteId === hostname || hostname.endsWith('.' + lemmaSiteId);
+                const lemmaSiteId = normalizeSite(claims.siteId || claims.site || claims.site_id || claims.siteDomain || claims.site_domain || claims.domain || lemma.siteId);
+                return lemmaSiteId && (lemmaSiteId === hostname || hostname.endsWith('.' + lemmaSiteId));
             });
             
-            if (siteLemma && this.session.isUnlocked) {
-                // Verify the lemma signature
-                const verification = await this.verifyLemma(siteLemma);
-                if (verification.valid) {
+            if (siteLemmas.length > 0 && this.session.isUnlocked) {
+                const verifiedLemmas = [];
+                for (const lemma of siteLemmas) {
+                    try {
+                        const verification = await this.verifyLemma(lemma);
+                        if (verification.valid) {
+                            verifiedLemmas.push(lemma);
+                        }
+                    } catch (e) {
+                        // Ignore invalid/unverifiable lemmas.
+                    }
+                }
+
+                if (verifiedLemmas.length > 0) {
+                    verifiedLemmas.sort((a, b) => {
+                        const aClaims = a.claims || a.credentialSubject || {};
+                        const bClaims = b.claims || b.credentialSubject || {};
+                        const aAdmin = isAdminLike(aClaims) ? 1 : 0;
+                        const bAdmin = isAdminLike(bClaims) ? 1 : 0;
+                        if (aAdmin !== bAdmin) return bAdmin - aAdmin;
+                        const aPkg = String(a.packageType || aClaims.packageType || '').toLowerCase() === 'permission' ? 1 : 0;
+                        const bPkg = String(b.packageType || bClaims.packageType || '').toLowerCase() === 'permission' ? 1 : 0;
+                        if (aPkg !== bPkg) return bPkg - aPkg;
+                        return toEpoch(b) - toEpoch(a);
+                    });
+
+                    const siteLemma = verifiedLemmas[0];
                     const claims = siteLemma.claims || siteLemma.credentialSubject || {};
                     const ppid = siteLemma.subject || claims.id || claims.ppid || claims.subject;
                     
-                    console.log('[Lemma]  Authenticated via stored lemma (no wallet_secret transferred)');
+                    console.log('[Lemma] Authenticated via best verified site lemma (no wallet_secret transferred)');
                     return {
                         authenticated: true,
                         ppid: ppid,
