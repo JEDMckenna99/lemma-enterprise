@@ -11,7 +11,7 @@
 <section class="section" style="min-height: 80vh; display: flex; align-items: center; justify-content: center;">
     <div class="container" style="max-width: 600px;">
         <div class="card" style="padding: 48px;">
-            <h1 style="text-align: center; margin-bottom: 32px;">🔐 Admin Bootstrap</h1>
+            <h1 style="text-align: center; margin-bottom: 32px;">Admin Bootstrap</h1>
             
             <p style="text-align: center; color: var(--gray-600); margin-bottom: 32px;">
                 Issue your first admin credential using your Lemma API key
@@ -19,14 +19,16 @@
             
             <form id="bootstrap-form" style="display: flex; flex-direction: column; gap: 20px;">
                 <div>
-                    <label style="display: block; font-weight: 600; margin-bottom: 8px;">Site ID</label>
-                    <input type="text" id="site_id" value="lemma_platform" 
+                    <label style="display: block; font-weight: 600; margin-bottom: 8px;">Site ID (optional)</label>
+                    <input type="text" id="site_id" value=""
+                           placeholder="Leave blank to auto-resolve from API key"
                            style="width: 100%; padding: 12px; border: 1px solid var(--gray-300); border-radius: 6px; font-family: monospace;">
                 </div>
                 
                 <div>
                     <label style="display: block; font-weight: 600; margin-bottom: 8px;">Site Domain</label>
-                    <input type="text" id="site_domain" value="lemma.id" 
+                    <input type="text" id="site_domain" value=""
+                           placeholder="example.com (recommended for site-scoped PPID derivation)"
                            style="width: 100%; padding: 12px; border: 1px solid var(--gray-300); border-radius: 6px;">
                 </div>
                 
@@ -95,8 +97,8 @@
 document.getElementById('bootstrap-form').addEventListener('submit', async (e) => {
     e.preventDefault();
     
-    const site_id = document.getElementById('site_id').value;
-    const site_domain = document.getElementById('site_domain').value;
+    const site_id = document.getElementById('site_id').value.trim();
+    const site_domain = document.getElementById('site_domain').value.trim();
     const user_email = document.getElementById('user_email').value;
     const permission_level = document.getElementById('permission_level').value;
     const api_key = document.getElementById('api_key').value;
@@ -109,18 +111,34 @@ document.getElementById('bootstrap-form').addEventListener('submit', async (e) =
     showStatus('Issuing credential...', 'loading');
     
     try {
+        // Require wallet identity proof and derive site-scoped PPID for issuance.
+        if (!window.globalLemmaWallet) {
+            throw new Error('Wallet not initialized. Unlock your Lemma wallet first.');
+        }
+        const wallet = window.globalLemmaWallet;
+        const ppidDomain = site_domain || site_id;
+        if (!ppidDomain) {
+            throw new Error('Provide site domain or site id so wallet can derive a site-scoped PPID.');
+        }
+        const user_ppid = await wallet.derivePPID(ppidDomain);
+        if (!user_ppid || !String(user_ppid).startsWith('did:lemma:ppid_')) {
+            throw new Error('Could not derive a valid site PPID from your wallet.');
+        }
+
         // Call admin self-issue endpoint
         const response = await fetch('/api/v1/iam/admin/self-issue', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${api_key}`
+                'Authorization': `Bearer ${api_key}`,
+                'X-Lemma-PPID': user_ppid
             },
             body: JSON.stringify({
-                site_id,
-                site_domain,
+                ...(site_id ? { site_id } : {}),
+                ...(site_domain ? { site_domain } : {}),
                 user_email,
-                permission_level
+                permission_level,
+                user_ppid
             })
         });
         
@@ -142,8 +160,6 @@ document.getElementById('bootstrap-form').addEventListener('submit', async (e) =
         if (!window.globalLemmaWallet) {
             throw new Error('Global wallet not initialized');
         }
-        
-        const wallet = window.globalLemmaWallet;
         
         // Ensure credential has correct format for session-free architecture
         // CRITICAL: packageType must be at TOP LEVEL (not just in claims)

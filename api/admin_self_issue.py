@@ -28,6 +28,54 @@ logger = logging.getLogger(__name__)
 admin_self_issue_bp = Blueprint('admin_self_issue', __name__)
 
 
+def resolve_site_from_api_key(api_key: str):
+    """
+    Resolve a default site for an API key when site_id/site_domain are omitted.
+
+    Returns:
+        (site_id, site_domain) tuple when resolvable, else (None, None).
+    """
+    if not api_key:
+        return None, None
+
+    # Prefer direct api_keys table resolution when available.
+    try:
+        from api.database import get_db_connection
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            SELECT site_id, site_domain
+            FROM api_keys
+            WHERE api_key = %s AND active = TRUE
+            LIMIT 1
+            """,
+            (api_key,)
+        )
+        row = cursor.fetchone()
+        cursor.close()
+        conn.close()
+        if row and row[0]:
+            return row[0], (row[1] or row[0])
+    except Exception as e:
+        logger.warning(f"Could not resolve site via api_keys table: {e}")
+
+    # Fallback: customer profile sites from customer manager.
+    try:
+        from api.customer_accounts import customer_manager
+        customer = customer_manager.get_customer_by_api_key(api_key)
+        if customer and getattr(customer, "sites", None):
+            first_site = customer.sites[0]
+            site_id = first_site.get("site_id") or first_site.get("site_domain")
+            site_domain = first_site.get("site_domain") or site_id
+            if site_id:
+                return site_id, site_domain
+    except Exception as e:
+        logger.warning(f"Could not resolve site via customer profile: {e}")
+
+    return None, None
+
+
 def validate_api_key(api_key: str, site_id: str) -> bool:
     """
     Validate API key for site.
@@ -86,8 +134,8 @@ def admin_self_issue():
         X-Lemma-PPID: did:lemma:ppid_xxx (optional - wallet-derived PPID)
     Body:
     {
-        "site_id": "lemma_platform",
-        "site_domain": "lemma.id",
+        "site_id": "lemma_platform",  // optional if API key maps to exactly one site
+        "site_domain": "lemma.id",    // optional
         "user_email": "jedmckenna@lemma.id",
         "permission_level": "super_admin",
         "user_ppid": "did:lemma:ppid_xxx" (optional - wallet-derived PPID)
@@ -116,13 +164,23 @@ def admin_self_issue():
         data = request.get_json(silent=True) or {}
         
         # Validate required fields
-        required = ['site_id', 'user_email', 'permission_level']
+        required = ['user_email', 'permission_level']
         for field in required:
             if not data.get(field):
                 return jsonify({'error': f'Missing required field: {field}'}), 400
-        
-        site_id = data['site_id']
-        site_domain = data.get('site_domain', f'{site_id}.com')
+
+        site_id = data.get('site_id')
+        site_domain = data.get('site_domain')
+        if not site_id:
+            resolved_site_id, resolved_site_domain = resolve_site_from_api_key(api_key)
+            if not resolved_site_id:
+                return jsonify({
+                    'error': 'site_resolution_failed',
+                    'message': 'site_id is required when API key cannot be resolved to a site'
+                }), 400
+            site_id = resolved_site_id
+            site_domain = site_domain or resolved_site_domain
+        site_domain = site_domain or f'{site_id}.com'
         user_email = data['user_email']
         permission_level = data['permission_level']
         
