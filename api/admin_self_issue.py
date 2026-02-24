@@ -122,27 +122,60 @@ def validate_customer_binding_for_self_issue(api_key: str, site_id: str, submitt
         customer = customer_manager.get_customer_by_api_key(api_key)
     except Exception as e:
         logger.warning(f"Customer DB lookup failed for API key binding check: {e}")
-        return False, 'customer_lookup_failed', 'Could not validate customer record for API key.'
+        return False, 'customer_lookup_failed', 'Could not validate customer record for API key.', None
 
     if not customer:
-        return False, 'customer_not_found', 'API key is not bound to a customer record.'
-
-    customer_email = str(getattr(customer, 'email', '') or '').strip().lower()
-    if not customer_email:
-        return False, 'customer_email_missing', 'Customer record has no email on file.'
+        return False, 'customer_not_found', 'API key is not bound to a customer record.', None
 
     normalized_email = str(submitted_email or '').strip().lower()
-    if normalized_email != customer_email:
-        return False, 'email_mismatch', 'Submitted email does not match customer email on record.'
 
     owned_sites = [str(s.get('site_id') or '').strip().lower() for s in (customer.sites or []) if isinstance(s, dict)]
     owned_domains = [str(s.get('site_domain') or '').strip().lower() for s in (customer.sites or []) if isinstance(s, dict)]
     site_id_norm = str(site_id or '').strip().lower()
 
     if site_id_norm not in owned_sites and site_id_norm not in owned_domains:
-        return False, 'site_mismatch', 'Requested site is not registered under this customer account.'
+        return False, 'site_mismatch', 'Requested site is not registered under this customer account.', None
 
-    return True, None, None
+    # Email authority sources in customer DB for this API-key owner.
+    # Keep strictness: submitted email must match at least one DB-backed authority email.
+    candidate_emails = set()
+    primary_email = str(getattr(customer, 'email', '') or '').strip().lower()
+    if primary_email:
+        candidate_emails.add(primary_email)
+    billing_email = str(getattr(customer, 'billing_email', '') or '').strip().lower()
+    if billing_email:
+        candidate_emails.add(billing_email)
+
+    for site in (customer.sites or []):
+        if not isinstance(site, dict):
+            continue
+        sid = str(site.get('site_id') or '').strip().lower()
+        sdomain = str(site.get('site_domain') or '').strip().lower()
+        if site_id_norm in {sid, sdomain}:
+            site_admin_email = str(site.get('admin_email') or '').strip().lower()
+            if site_admin_email:
+                candidate_emails.add(site_admin_email)
+            site_contact_email = str(site.get('email') or '').strip().lower()
+            if site_contact_email:
+                candidate_emails.add(site_contact_email)
+
+    if not candidate_emails:
+        return (
+            False,
+            'customer_email_missing',
+            'No authority email is configured for this customer/site in the customer database.',
+            None
+        )
+
+    if normalized_email not in candidate_emails:
+        return (
+            False,
+            'email_mismatch',
+            'Submitted email does not match the customer/site email on record.',
+            None
+        )
+
+    return True, None, None, normalized_email
 
 
 def validate_api_key(api_key: str, site_id: str) -> bool:
@@ -255,7 +288,7 @@ def admin_self_issue():
         normalized_user_email = str(user_email).strip().lower()
         
         # Strict customer DB match: api_key + site_id + user_email must all belong together.
-        bound_ok, bound_error, bound_message = validate_customer_binding_for_self_issue(
+        bound_ok, bound_error, bound_message, bound_authority_email = validate_customer_binding_for_self_issue(
             api_key=api_key,
             site_id=site_id,
             submitted_email=normalized_user_email
@@ -274,7 +307,7 @@ def admin_self_issue():
                 'message': 'Invalid API key for this site'
             }), 401
 
-        expected_email = resolve_expected_admin_email(api_key, site_id) or normalized_user_email
+        expected_email = bound_authority_email or resolve_expected_admin_email(api_key, site_id) or normalized_user_email
         
         # Get or create site manager
         manager = get_site_manager(site_id, site_domain)
