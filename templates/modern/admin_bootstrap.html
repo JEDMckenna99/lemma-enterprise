@@ -19,9 +19,10 @@
             
             <form id="bootstrap-form" style="display: flex; flex-direction: column; gap: 20px;">
                 <div>
-                    <label style="display: block; font-weight: 600; margin-bottom: 8px;">Site ID (optional)</label>
+                    <label style="display: block; font-weight: 600; margin-bottom: 8px;">Site ID</label>
                     <input type="text" id="site_id" value=""
-                           placeholder="Leave blank to auto-resolve from API key"
+                           placeholder="Required: your site id"
+                           required
                            style="width: 100%; padding: 12px; border: 1px solid var(--gray-300); border-radius: 6px; font-family: monospace;">
                 </div>
                 
@@ -34,7 +35,9 @@
                 
                 <div>
                     <label style="display: block; font-weight: 600; margin-bottom: 8px;">Your Email</label>
-                    <input type="email" id="user_email" value="jedmckenna@lemma.id" 
+                    <input type="email" id="user_email" value="" 
+                           placeholder="Required: must match customer email on record"
+                           required
                            style="width: 100%; padding: 12px; border: 1px solid var(--gray-300); border-radius: 6px;">
                 </div>
                 
@@ -114,6 +117,9 @@ document.getElementById('bootstrap-form').addEventListener('submit', async (e) =
         // Require wallet identity proof and derive site-scoped PPID for issuance.
         if (!window.globalLemmaWallet) {
             throw new Error('Wallet not initialized. Unlock your Lemma wallet first.');
+        }
+        if (!site_id) {
+            throw new Error('Site ID is required.');
         }
         const wallet = window.globalLemmaWallet;
         const ppidDomain = site_domain || site_id;
