@@ -6048,17 +6048,60 @@ class LemmaWallet {
         await this.init();
         
         const startTime = performance.now();
+        const normalizeSite = (value) => {
+            const raw = String(value || '').trim().toLowerCase();
+            if (!raw) return '';
+            try {
+                if (raw.includes('://')) {
+                    return new URL(raw).hostname.toLowerCase();
+                }
+            } catch (e) {
+                // Fall through to manual normalization.
+            }
+            return raw.split('/')[0].split(':')[0];
+        };
+        const normalizeScope = (rawScope) => {
+            if (Array.isArray(rawScope)) {
+                return rawScope.map(s => String(s).trim()).filter(Boolean);
+            }
+            if (typeof rawScope === 'string') {
+                const text = rawScope.trim();
+                if (!text) return [];
+                if (text.startsWith('[') && text.endsWith(']')) {
+                    try {
+                        const jsonLike = text.replace(/'/g, '"');
+                        const parsed = JSON.parse(jsonLike);
+                        if (Array.isArray(parsed)) {
+                            return parsed.map(s => String(s).trim()).filter(Boolean);
+                        }
+                    } catch (e) {
+                        // Fall back to comma parsing below.
+                    }
+                }
+                return text.split(',').map(s => s.trim()).filter(Boolean);
+            }
+            return [];
+        };
+        const isAdminPermission = (claims) => {
+            const permId = String(claims.permissionId || claims.permission_level || claims.permission_id || '').toLowerCase();
+            const accountType = String(claims.accountType || claims.account_type || '').toLowerCase();
+            return ['admin_access', 'super_admin', 'admin', 'superadmin', 'site_admin', 'platform_admin'].includes(permId)
+                || permId.includes('admin')
+                || accountType === 'admin';
+        };
         
         // 1. Get all permission lemmas from IndexedDB
         const permissions = await this.getCredentials('permission');
         
         // 2. Filter for requested site
+        const normalizedTargetSite = normalizeSite(siteId);
         const sitePermissions = permissions.filter(p => {
             const claims = p.claims || p.credentialSubject || {};
-            const credSiteId = claims.siteId || claims.site || claims.site_id || '';
-            return credSiteId === siteId || 
-                   credSiteId.includes(siteId) || 
-                   siteId.includes(credSiteId);
+            const credSiteId = normalizeSite(claims.siteId || claims.site || claims.site_id || claims.siteDomain || claims.site_domain || '');
+            if (!credSiteId || !normalizedTargetSite) return false;
+            return credSiteId === normalizedTargetSite
+                || credSiteId.includes(normalizedTargetSite)
+                || normalizedTargetSite.includes(credSiteId);
         });
         
         if (sitePermissions.length === 0) {
@@ -6072,7 +6115,6 @@ class LemmaWallet {
         
         // 3. Verify each permission locally (Ed25519 + revocation check)
         const verifiedPermissions = [];
-        const allClaims = {};
         
         for (const perm of sitePermissions) {
             try {
@@ -6080,13 +6122,6 @@ class LemmaWallet {
                 
                 if (verification.valid) {
                     verifiedPermissions.push(perm);
-                    
-                    // Extract claims
-                    const claims = perm.claims || perm.credentialSubject || {};
-                    for (const [key, value] of Object.entries(claims)) {
-                        // Aggregate claims (later lemmas override earlier)
-                        allClaims[key] = value;
-                    }
                 } else {
                     console.warn(`[Lemma] Permission ${perm.id} failed verification: ${verification.reason}`);
                 }
@@ -6097,24 +6132,36 @@ class LemmaWallet {
         
         const verifyTime = ((performance.now() - startTime) * 1000).toFixed(1);
         
-        // Extract PPID from first verified permission (should be same across all)
+        // Prefer the strongest verified credential for role/scope derivation.
+        const rankedPermissions = [...verifiedPermissions].sort((a, b) => {
+            const claimsA = a.claims || a.credentialSubject || {};
+            const claimsB = b.claims || b.credentialSubject || {};
+            const adminA = isAdminPermission(claimsA) ? 1 : 0;
+            const adminB = isAdminPermission(claimsB) ? 1 : 0;
+            if (adminA !== adminB) return adminB - adminA;
+            const expA = Number(a.expirationDate || claimsA.expiresAt || 0);
+            const expB = Number(b.expirationDate || claimsB.expiresAt || 0);
+            return expB - expA;
+        });
+        const bestPermission = rankedPermissions[0] || null;
+        const bestClaims = (bestPermission?.claims || bestPermission?.credentialSubject || {});
+
+        // Extract PPID from best verified permission.
         let ppid = null;
-        if (verifiedPermissions.length > 0) {
-            const firstPerm = verifiedPermissions[0];
-            const firstClaims = firstPerm.claims || firstPerm.credentialSubject || {};
-            ppid = firstPerm.subject || firstClaims.id || firstClaims.ppid;
+        if (bestPermission) {
+            ppid = bestPermission.subject || bestClaims.id || bestClaims.ppid;
         }
         
         return {
             hasAccess: verifiedPermissions.length > 0,
             permissions: verifiedPermissions,
-            claims: allClaims,
+            claims: bestClaims,
             // User identity
             ppid: ppid,  // The user's PPID for this site (for revocation purposes)
             // Common claim accessors
-            role: allClaims.role || allClaims.accountType || 'user',
-            scope: (allClaims.scope || '').split(',').filter(Boolean),
-            permissionId: allClaims.permissionId,
+            role: bestClaims.role || bestClaims.accountType || bestClaims.account_type || 'user',
+            scope: normalizeScope(bestClaims.scope),
+            permissionId: bestClaims.permissionId || bestClaims.permission_level || bestClaims.permission_id,
             // Performance metrics
             verified: verifiedPermissions.length,
             total: sitePermissions.length,
