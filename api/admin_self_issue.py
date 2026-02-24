@@ -22,6 +22,7 @@ from flask_cors import cross_origin
 from auth.decorators import require_api_key
 
 from api.real_iam_manager import get_site_manager, get_or_create_site_manager
+from api.email_service import send_email
 
 logger = logging.getLogger(__name__)
 
@@ -74,6 +75,74 @@ def resolve_site_from_api_key(api_key: str):
         logger.warning(f"Could not resolve site via customer profile: {e}")
 
     return None, None
+
+
+def resolve_expected_admin_email(api_key: str, site_id: str) -> str | None:
+    """
+    Resolve the expected admin email for self-issue validation.
+
+    Priority:
+    1) Customer email owning the API key
+    2) Site.admin_email for the requested site
+    """
+    try:
+        from api.customer_accounts import customer_manager
+        customer = customer_manager.get_customer_by_api_key(api_key)
+        if customer and getattr(customer, "email", None):
+            return str(customer.email).strip().lower()
+    except Exception as e:
+        logger.warning(f"Could not resolve expected email from customer manager: {e}")
+
+    try:
+        from api.database import SessionLocal, Site
+        db = SessionLocal()
+        try:
+            site = db.query(Site).filter(Site.site_id == site_id).first()
+            if site and getattr(site, "admin_email", None):
+                return str(site.admin_email).strip().lower()
+        finally:
+            db.close()
+    except Exception as e:
+        logger.warning(f"Could not resolve expected email from site record: {e}")
+
+    return None
+
+
+def validate_customer_binding_for_self_issue(api_key: str, site_id: str, submitted_email: str):
+    """
+    Strict binding check for admin self-issue.
+
+    Enforces all three conditions against customer DB:
+    1) API key belongs to a customer record
+    2) Requested site_id belongs to that same customer's registered sites
+    3) Submitted admin email matches that same customer email
+    """
+    try:
+        from api.customer_accounts import customer_manager
+        customer = customer_manager.get_customer_by_api_key(api_key)
+    except Exception as e:
+        logger.warning(f"Customer DB lookup failed for API key binding check: {e}")
+        return False, 'customer_lookup_failed', 'Could not validate customer record for API key.'
+
+    if not customer:
+        return False, 'customer_not_found', 'API key is not bound to a customer record.'
+
+    customer_email = str(getattr(customer, 'email', '') or '').strip().lower()
+    if not customer_email:
+        return False, 'customer_email_missing', 'Customer record has no email on file.'
+
+    normalized_email = str(submitted_email or '').strip().lower()
+    if normalized_email != customer_email:
+        return False, 'email_mismatch', 'Submitted email does not match customer email on record.'
+
+    owned_sites = [str(s.get('site_id') or '').strip().lower() for s in (customer.sites or []) if isinstance(s, dict)]
+    owned_domains = [str(s.get('site_domain') or '').strip().lower() for s in (customer.sites or []) if isinstance(s, dict)]
+    site_id_norm = str(site_id or '').strip().lower()
+
+    if site_id_norm not in owned_sites and site_id_norm not in owned_domains:
+        return False, 'site_mismatch', 'Requested site is not registered under this customer account.'
+
+    return True, None, None
 
 
 def validate_api_key(api_key: str, site_id: str) -> bool:
@@ -183,7 +252,20 @@ def admin_self_issue():
         site_domain = site_domain or f'{site_id}.com'
         user_email = data['user_email']
         permission_level = data['permission_level']
+        normalized_user_email = str(user_email).strip().lower()
         
+        # Strict customer DB match: api_key + site_id + user_email must all belong together.
+        bound_ok, bound_error, bound_message = validate_customer_binding_for_self_issue(
+            api_key=api_key,
+            site_id=site_id,
+            submitted_email=normalized_user_email
+        )
+        if not bound_ok:
+            return jsonify({
+                'error': bound_error,
+                'message': bound_message
+            }), 403
+
         # Validate API key for this site
         if not validate_api_key(api_key, site_id):
             logger.warning(f"Invalid API key attempt for site {site_id}")
@@ -191,6 +273,8 @@ def admin_self_issue():
                 'error': 'unauthorized',
                 'message': 'Invalid API key for this site'
             }), 401
+
+        expected_email = resolve_expected_admin_email(api_key, site_id) or normalized_user_email
         
         # Get or create site manager
         manager = get_site_manager(site_id, site_domain)
@@ -296,6 +380,23 @@ def admin_self_issue():
         logger.info(f"🔐 Package Type: {permission_lemma.get('packageType', 'MISSING!')}")
         logger.info(f"🔐 User DID: {user_did}")
         logger.info(f"🔐 Issuer DID: {manager.issuer_did[:50]}...")
+
+        # Notification to customer/site email of admin credential issuance.
+        try:
+            notify_to = expected_email or normalized_user_email
+            subject = f"Admin credential issued for {site_id}"
+            html = (
+                "<p>An admin credential was issued.</p>"
+                f"<p><strong>Site ID:</strong> {site_id}<br>"
+                f"<strong>Site domain:</strong> {site_domain}<br>"
+                f"<strong>Permission:</strong> {permission_level}<br>"
+                f"<strong>User PPID:</strong> {user_did}</p>"
+                "<p>If this was not expected, rotate your API key and review admin access immediately.</p>"
+            )
+            send_result = send_email(to=notify_to, subject=subject, html=html)
+            logger.info(f"Admin self-issue notification email status: {send_result.get('success')} provider={send_result.get('provider')}")
+        except Exception as email_err:
+            logger.warning(f"Failed to send admin self-issue notification email: {email_err}")
         
         return jsonify({
             'success': True,
@@ -306,6 +407,7 @@ def admin_self_issue():
             'site_domain': site_domain,
             'permission_level': permission_level,
             'issue_time_us': issue_time_us,
+            'notification_email': expected_email or normalized_user_email,
             'message': 'Admin credential issued successfully. Store this credential in your browser wallet.'
         })
         
