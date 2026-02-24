@@ -624,7 +624,7 @@ def passkey_authenticate_complete():
             expected_origin=ORIGIN,
             credential_public_key=base64.urlsafe_b64decode(passkey.public_key),
             credential_current_sign_count=passkey.sign_count,
-            require_user_verification=False,
+            require_user_verification=True,
         )
         
         # Update sign count
@@ -828,15 +828,8 @@ def issue_lemma_with_passkey_proof(user_id: str, user_email: str, user_role: str
         
     except Exception as e:
         logger.error(f"❌ Failed to issue lemma with passkey proof: {e}")
-        # Return basic lemma without proof on error
-        return {
-            'id': f"lemma_{secrets.token_hex(8)}",
-            'claims': {
-                'authMethod': 'passkey',
-                'passkeyVerified': 'true',
-            },
-            'error': 'Full lemma issuance failed, basic proof returned'
-        }
+        # Fail closed: never emit fallback auth artifacts when issuance fails.
+        raise RuntimeError("lemma_issuance_failed") from e
 
 
 # ============================================

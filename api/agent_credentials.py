@@ -165,9 +165,11 @@ def _require_delegation_admin_session():
     """
     Require admin IAM with lemma-bound identity before allowing delegated credential issuance.
 
-    Accepted admin contexts:
-    1) Agent token with admin scope + bound lemma PPID (machine flow)
-    2) Browser wallet session unlock + allowed admin role/permission (interactive flow)
+    Accepted admin context:
+    1) Browser wallet session unlock + lemma PPID + allowed admin role/permission
+
+    Strict policy: issuance is human-gated by wallet unlock state and PPID identity.
+    Machine-token-only issuance is intentionally disallowed.
     """
     session_permission_id = (session.get('permission_id') or '').strip().lower()
     session_user_role = (session.get('user_role') or '').strip().lower()
@@ -200,43 +202,7 @@ def _require_delegation_admin_session():
             403
         )
 
-    # Path A: machine flow via agent token (no browser wallet cookie required)
-    # This still enforces lemma-bound identity (authorized_by_ppid).
-    agent_token = request.headers.get('X-Agent-Token')
-    if agent_token and agent_token.startswith('lm_agent_'):
-        token_info = validate_agent_token(agent_token)
-        if token_info:
-            token_scope = token_info.get('scope') or []
-            if isinstance(token_scope, str):
-                token_scope = [token_scope]
-            token_scope = [str(s).strip().lower() for s in token_scope if s]
-
-            if 'admin' not in token_scope:
-                return False, (
-                    jsonify({
-                        'success': False,
-                        'error': 'missing_scope',
-                        'message': 'Token was issued without admin scope.',
-                        'required_scope': ['admin'],
-                        'provided_scope': token_scope
-                    }),
-                    403
-                )
-
-            token_ppid = token_info.get('authorized_by_ppid') or token_info.get('authorized_by')
-            if not token_ppid or not str(token_ppid).startswith('did:lemma:ppid_'):
-                return False, (
-                    jsonify({
-                        'success': False,
-                        'error': 'missing_admin_lemma_binding',
-                        'message': 'Admin-scoped token is not bound to a lemma identity required for delegation issuance.'
-                    }),
-                    403
-                )
-
-            return True, None
-
-    # Path B: browser wallet session unlock anchor.
+    # Browser wallet session unlock anchor is mandatory for issuance.
     wallet_session_cookie = request.cookies.get('lemma_wallet_session')
     if not wallet_session_cookie:
         return False, (
@@ -261,6 +227,22 @@ def _require_delegation_admin_session():
                 'success': False,
                 'error': 'wallet_session_expired',
                 'message': 'Your wallet unlock session is expired. Unlock lemma.id again.'
+            }),
+            403
+        )
+
+    # Require explicit lemma PPID identity for attribution.
+    delegator_ppid = (
+        request.headers.get('X-Lemma-PPID')
+        or admin_lemma_ctx.get('ppid')
+        or session.get('ppid')
+    )
+    if not delegator_ppid or not str(delegator_ppid).startswith('did:lemma:ppid_'):
+        return False, (
+            jsonify({
+                'success': False,
+                'error': 'ppid_required',
+                'message': 'Delegation issuance requires a valid lemma PPID (did:lemma:ppid_...).'
             }),
             403
         )
@@ -294,6 +276,7 @@ def _require_delegation_admin_session():
             403
         )
 
+    g.delegation_ppid = str(delegator_ppid)
     return True, None
 
 
@@ -767,58 +750,15 @@ def issue_agent_credential():
         if not is_allowed:
             return error_response
 
-        # SECURITY CHECK 1: User must be authenticated
-        # Check for passkey session, explicit PPID, or lemma-bound admin token context.
-        ppid = request.headers.get('X-Lemma-PPID')
-        passkey_verified = session.get('passkey_verified', False)
-        customer_id = session.get('customer_id')
+        # Strict issuance identity: PPID from validated delegation session only.
+        authorized_by = getattr(g, 'delegation_ppid', None)
         user_email = session.get('user_email')
-
-        # Also check Authorization header for Bearer token with credential
-        auth_header = request.headers.get('Authorization', '')
-        if auth_header.startswith('Bearer ') and not ppid:
-            # Could be a JSON credential - extract PPID
-            try:
-                cred_data = json.loads(auth_header[7:])
-                ppid = cred_data.get('subject') or cred_data.get('credentialSubject', {}).get('id')
-            except:
-                pass
-
-        # Agent-token machine flow: derive lemma binding from token when present.
-        agent_token = request.headers.get('X-Agent-Token')
-        if not ppid and agent_token and agent_token.startswith('lm_agent_'):
-            token_info = validate_agent_token(agent_token)
-            if token_info:
-                ppid = token_info.get('authorized_by_ppid') or token_info.get('authorized_by')
-                if not user_email:
-                    user_email = token_info.get('authorized_by_email')
-
-        if not ppid and not customer_id:
+        if not authorized_by or not str(authorized_by).startswith('did:lemma:ppid_'):
             return jsonify({
                 'success': False,
-                'error': 'auth_required',
-                'message': 'You must be signed in with passkey or provide a lemma-bound admin token to issue agent credentials.'
-            }), 401
-
-        # SECURITY: Validate PPID format if provided via header (prevent spoofing)
-        if ppid and not ppid.startswith('did:lemma:ppid_'):
-            return jsonify({
-                'success': False,
-                'error': 'Invalid PPID format',
-                'message': 'PPID must be a valid Lemma identifier'
-            }), 400
-
-        # SECURITY: For customer_id auth, require passkey verification
-        # This prevents session-only auth from issuing agent credentials
-        if customer_id and not ppid and not passkey_verified:
-            return jsonify({
-                'success': False,
-                'error': 'Passkey verification required',
-                'message': 'Agent credentials require passkey authentication, not just session'
+                'error': 'ppid_required',
+                'message': 'Delegation issuance requires a valid lemma PPID and unlocked wallet session.'
             }), 403
-
-        # Use PPID as identifier, fall back to customer_id
-        authorized_by = ppid or f"customer:{customer_id}"
 
         # Parse request data
         data = request.get_json() or {}
@@ -2038,38 +1978,23 @@ def auto_issue_agent_credential():
             return error_response
 
         # Check for active wallet session
-        customer_id = session.get('customer_id')
         passkey_verified = session.get('passkey_verified', False)
         auth_method = session.get('auth_method')
         user_email = session.get('user_email')
-        wallet_id = session.get('wallet_id')
-
-        # Also check for PPID in session or derived from wallet
-        ppid = session.get('ppid')
+        ppid = getattr(g, 'delegation_ppid', None) or session.get('ppid') or request.headers.get('X-Lemma-PPID')
 
         # Debug: log what we found
-        logger.info(f"Auto-issue check: customer_id={customer_id}, passkey_verified={passkey_verified}, auth_method={auth_method}, wallet_id={wallet_id}")
+        logger.info(f"Auto-issue check: passkey_verified={passkey_verified}, auth_method={auth_method}, has_ppid={bool(ppid)}")
 
-        # Must have some form of authentication
-        if not customer_id and not wallet_id and not ppid:
+        # Strict policy: require lemma PPID identity (no customer/wallet fallback identifiers)
+        if not ppid or not str(ppid).startswith('did:lemma:ppid_'):
             return jsonify({
                 'success': False,
-                'error': 'No active wallet session',
-                'message': 'Please sign in with your wallet first',
-                'debug': {
-                    'customer_id': customer_id,
-                    'passkey_verified': passkey_verified,
-                    'auth_method': auth_method
-                }
-            }), 401
+                'error': 'ppid_required',
+                'message': 'Please unlock wallet and provide a valid lemma PPID to issue delegated credentials.'
+            }), 403
 
-        # Build authorized_by identifier
-        if ppid:
-            authorized_by = ppid
-        elif wallet_id:
-            authorized_by = f"wallet:{wallet_id}"
-        else:
-            authorized_by = f"customer:{customer_id}"
+        authorized_by = str(ppid)
 
         # Parse parameters from GET query string or POST body
         if request.method == 'POST':

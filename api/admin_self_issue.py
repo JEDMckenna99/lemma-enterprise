@@ -22,7 +22,6 @@ from flask_cors import cross_origin
 from auth.decorators import require_api_key
 
 from api.real_iam_manager import get_site_manager, get_or_create_site_manager
-from api.ppid import derive_ppid_did
 
 logger = logging.getLogger(__name__)
 
@@ -157,17 +156,18 @@ def admin_self_issue():
                 'priority': 100 if 'admin' in permission_level else 50
             })
         
-        # Get user DID - prefer wallet-derived PPID if provided
-        # Priority: 1) Header 2) Body 3) Derive from email (legacy)
+        # Get user DID from wallet-derived PPID only (legacy email-derived DID disabled)
+        # Priority: 1) Header 2) Body
         user_did = request.headers.get('X-Lemma-PPID')
         
         if not user_did or not user_did.startswith('did:lemma:ppid_'):
             user_did = data.get('user_ppid')
         
         if not user_did or not user_did.startswith('did:lemma:ppid_'):
-            # Fall back to email-based derivation (legacy)
-            logger.warning(f"No wallet PPID provided, falling back to email-derived DID")
-            user_did = derive_ppid_did(user_email, site_domain)
+            return jsonify({
+                'error': 'invalid_ppid',
+                'message': 'Valid wallet PPID is required (did:lemma:ppid_...). Email-derived DID is disabled.'
+            }), 400
 
         # Ensure SiteAdmin ownership record exists/updated for this admin DID.
         try:
