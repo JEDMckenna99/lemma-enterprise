@@ -16,6 +16,7 @@ For all other admin operations, use @require_site_admin protected endpoints.
 
 import os
 import logging
+import hashlib
 from datetime import datetime
 from flask import Blueprint, request, jsonify
 from flask_cors import cross_origin
@@ -29,6 +30,120 @@ logger = logging.getLogger(__name__)
 admin_self_issue_bp = Blueprint('admin_self_issue', __name__)
 
 
+def _lookup_api_key_binding(api_key: str, requested_site_id: str | None = None) -> dict | None:
+    """
+    Resolve API key binding from normalized PostgreSQL tables first.
+
+    Returns:
+        {
+            "site_id": str,
+            "site_domain": str | None,
+            "customer_id": str | None,
+            "authority_emails": set[str]
+        }
+        or None if no binding found.
+    """
+    if not api_key:
+        return None
+
+    key_hash = hashlib.sha256(api_key.encode()).hexdigest()
+    requested = str(requested_site_id or "").strip().lower()
+
+    try:
+        from api.database import get_db_connection
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        try:
+            # Path A (canonical): customer api_keys table.
+            cursor.execute(
+                """
+                SELECT ak.customer_id, ak.site_id, s.site_domain, c.email, c.billing_email, s.admin_email
+                FROM api_keys ak
+                LEFT JOIN sites s ON s.site_id = ak.site_id
+                LEFT JOIN customers c ON c.customer_id = ak.customer_id
+                WHERE ak.key_hash = %s
+                  AND ak.status = 'active'
+                LIMIT 1
+                """,
+                (key_hash,)
+            )
+            row = cursor.fetchone()
+
+            # Path B: site_api_keys table (site-managed keys).
+            if not row:
+                cursor.execute(
+                    """
+                    SELECT s.customer_id, sak.site_id, s.site_domain, c.email, c.billing_email, s.admin_email
+                    FROM site_api_keys sak
+                    JOIN sites s ON s.site_id = sak.site_id
+                    LEFT JOIN customers c ON c.customer_id = s.customer_id
+                    WHERE sak.key_hash = %s
+                      AND sak.is_active = TRUE
+                    LIMIT 1
+                    """,
+                    (key_hash,)
+                )
+                row = cursor.fetchone()
+
+            # Path C (legacy): sites.api_key may contain raw key or hash.
+            if not row:
+                cursor.execute(
+                    """
+                    SELECT s.customer_id, s.site_id, s.site_domain, c.email, c.billing_email, s.admin_email
+                    FROM sites s
+                    LEFT JOIN customers c ON c.customer_id = s.customer_id
+                    WHERE s.api_key = %s OR s.api_key = %s
+                    LIMIT 1
+                    """,
+                    (api_key, key_hash)
+                )
+                row = cursor.fetchone()
+
+            if not row:
+                return None
+
+            customer_id, bound_site_id, site_domain, customer_email, billing_email, site_admin_email = row
+            bound_site_norm = str(bound_site_id or "").strip().lower()
+            bound_domain_norm = str(site_domain or "").strip().lower()
+
+            if requested and requested not in {bound_site_norm, bound_domain_norm}:
+                return None
+
+            authority_emails = set()
+            for val in (customer_email, billing_email, site_admin_email):
+                norm = str(val or "").strip().lower()
+                if norm:
+                    authority_emails.add(norm)
+
+            # Add active site-admin emails as authority sources.
+            cursor.execute(
+                """
+                SELECT admin_email
+                FROM site_admins
+                WHERE site_id = %s AND is_active = TRUE
+                """,
+                (bound_site_id,)
+            )
+            for admin_row in cursor.fetchall() or []:
+                admin_email = str((admin_row[0] if admin_row else "") or "").strip().lower()
+                if admin_email:
+                    authority_emails.add(admin_email)
+
+            return {
+                "site_id": bound_site_id,
+                "site_domain": site_domain,
+                "customer_id": customer_id,
+                "authority_emails": authority_emails,
+            }
+        finally:
+            cursor.close()
+            conn.close()
+    except Exception as e:
+        logger.warning(f"Normalized API key binding lookup failed: {e}")
+
+    return None
+
+
 def resolve_site_from_api_key(api_key: str):
     """
     Resolve a default site for an API key when site_id/site_domain are omitted.
@@ -39,7 +154,12 @@ def resolve_site_from_api_key(api_key: str):
     if not api_key:
         return None, None
 
-    # Prefer direct api_keys table resolution when available.
+    # Prefer normalized table resolution first.
+    normalized = _lookup_api_key_binding(api_key)
+    if normalized and normalized.get("site_id"):
+        return normalized.get("site_id"), (normalized.get("site_domain") or normalized.get("site_id"))
+
+    # Legacy fallback: direct api_keys table with plaintext key (older schema variants).
     try:
         from api.database import get_db_connection
         conn = get_db_connection()
@@ -117,6 +237,30 @@ def validate_customer_binding_for_self_issue(api_key: str, site_id: str, submitt
     2) Requested site_id belongs to that same customer's registered sites
     3) Submitted admin email matches that same customer email
     """
+    normalized_email = str(submitted_email or '').strip().lower()
+    site_id_norm = str(site_id or '').strip().lower()
+
+    # First, use normalized DB tables (authoritative in production).
+    binding = _lookup_api_key_binding(api_key=api_key, requested_site_id=site_id_norm)
+    if binding:
+        candidates = {e for e in (binding.get("authority_emails") or set()) if e}
+        if not candidates:
+            return (
+                False,
+                'customer_email_missing',
+                'No authority email is configured for this customer/site in the customer database.',
+                None
+            )
+        if normalized_email not in candidates:
+            return (
+                False,
+                'email_mismatch',
+                'Submitted email does not match the customer/site email on record.',
+                None
+            )
+        return True, None, None, normalized_email
+
+    # Fallback to legacy customer manager cache/json path.
     try:
         from api.customer_accounts import customer_manager
         customer = customer_manager.get_customer_by_api_key(api_key)
@@ -127,11 +271,8 @@ def validate_customer_binding_for_self_issue(api_key: str, site_id: str, submitt
     if not customer:
         return False, 'customer_not_found', 'API key is not bound to a customer record.', None
 
-    normalized_email = str(submitted_email or '').strip().lower()
-
     owned_sites = [str(s.get('site_id') or '').strip().lower() for s in (customer.sites or []) if isinstance(s, dict)]
     owned_domains = [str(s.get('site_domain') or '').strip().lower() for s in (customer.sites or []) if isinstance(s, dict)]
-    site_id_norm = str(site_id or '').strip().lower()
 
     if site_id_norm not in owned_sites and site_id_norm not in owned_domains:
         return False, 'site_mismatch', 'Requested site is not registered under this customer account.', None
@@ -192,6 +333,12 @@ def validate_api_key(api_key: str, site_id: str) -> bool:
     
     if platform_key and api_key == platform_key:
         logger.info(f"Valid platform API key for site {site_id}")
+        return True
+
+    # Canonical production path: normalized key binding tables.
+    normalized = _lookup_api_key_binding(api_key=api_key, requested_site_id=site_id)
+    if normalized:
+        logger.info(f"Valid normalized API key binding for site {site_id}")
         return True
     
     # Check against customer's registered API keys
