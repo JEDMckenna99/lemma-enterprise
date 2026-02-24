@@ -110,6 +110,24 @@ function normalizeSiteIdentifier(rawValue) {
     return value.split('/')[0].split(':')[0];
 }
 
+function normalizeScopeClaim(rawScope) {
+    if (Array.isArray(rawScope)) return rawScope;
+    if (typeof rawScope !== 'string') return [];
+    const value = rawScope.trim();
+    if (!value) return [];
+    if (value.startsWith('[') && value.endsWith(']')) {
+        try {
+            // Handle Python-list-like strings e.g. "['*']"
+            const jsonLike = value.replace(/'/g, '"');
+            const parsed = JSON.parse(jsonLike);
+            if (Array.isArray(parsed)) return parsed.map(s => String(s).trim()).filter(Boolean);
+        } catch (e) {
+            // Fallback below
+        }
+    }
+    return value.split(',').map(s => s.trim()).filter(Boolean);
+}
+
 document.getElementById('bootstrap-form').addEventListener('submit', async (e) => {
     e.preventDefault();
     
@@ -189,6 +207,10 @@ document.getElementById('bootstrap-form').addEventListener('submit', async (e) =
             throw new Error('Global wallet not initialized');
         }
         
+        const issuedClaims = result.credential?.claims || result.credential?.credentialSubject || {};
+        const issuedPermissionId = (issuedClaims.permissionId || issuedClaims.permission_level || permission_level || 'admin_access');
+        const normalizedScope = normalizeScopeClaim(issuedClaims.scope);
+
         // Ensure credential has correct format for session-free architecture
         // CRITICAL: packageType must be at TOP LEVEL (not just in claims)
         const credentialToStore = {
@@ -200,8 +222,9 @@ document.getElementById('bootstrap-form').addEventListener('submit', async (e) =
                 packageType: 'permission',  // Also in credentialSubject
                 siteId: normalizedSiteDomain,  // Use normalized hostname for site matching
                 siteDomain: normalizedSiteDomain,
-                permissionId: 'admin_access',  // Set admin_access for session-free auth
+                permissionId: issuedPermissionId,
                 accountType: 'admin',
+                ...(normalizedScope.length ? { scope: normalizedScope } : {}),
                 email: user_email
             },
             // Also set claims for backwards compatibility
@@ -210,8 +233,9 @@ document.getElementById('bootstrap-form').addEventListener('submit', async (e) =
                 packageType: 'permission',
                 siteId: normalizedSiteDomain,
                 siteDomain: normalizedSiteDomain,
-                permissionId: 'admin_access',
+                permissionId: issuedPermissionId,
                 accountType: 'admin',
+                ...(normalizedScope.length ? { scope: normalizedScope } : {}),
                 email: user_email
             }
         };
