@@ -97,6 +97,19 @@
 </section>
 
 <script nonce="{{ csp_nonce }}">
+function normalizeSiteIdentifier(rawValue) {
+    const value = String(rawValue || '').trim().toLowerCase();
+    if (!value) return '';
+    try {
+        if (value.includes('://')) {
+            return (new URL(value)).hostname.toLowerCase();
+        }
+    } catch (e) {
+        // Fall through to manual normalization.
+    }
+    return value.split('/')[0].split(':')[0];
+}
+
 document.getElementById('bootstrap-form').addEventListener('submit', async (e) => {
     e.preventDefault();
     
@@ -121,8 +134,17 @@ document.getElementById('bootstrap-form').addEventListener('submit', async (e) =
         if (!site_id) {
             throw new Error('Site ID is required.');
         }
+        const normalizedSiteId = normalizeSiteIdentifier(site_id);
+        const normalizedSiteDomain = normalizeSiteIdentifier(site_domain || site_id);
+        if (!normalizedSiteId) {
+            throw new Error('Invalid site ID. Use a hostname like example.com.');
+        }
+        if (!normalizedSiteDomain) {
+            throw new Error('Invalid site domain. Use a hostname like example.com.');
+        }
+
         const wallet = window.globalLemmaWallet;
-        const ppidDomain = site_domain || site_id;
+        const ppidDomain = normalizedSiteDomain;
         if (!ppidDomain) {
             throw new Error('Provide site domain or site id so wallet can derive a site-scoped PPID.');
         }
@@ -140,8 +162,8 @@ document.getElementById('bootstrap-form').addEventListener('submit', async (e) =
                 'X-Lemma-PPID': user_ppid
             },
             body: JSON.stringify({
-                ...(site_id ? { site_id } : {}),
-                ...(site_domain ? { site_domain } : {}),
+                ...(normalizedSiteId ? { site_id: normalizedSiteId } : {}),
+                ...(normalizedSiteDomain ? { site_domain: normalizedSiteDomain } : {}),
                 user_email,
                 permission_level,
                 user_ppid
@@ -176,8 +198,8 @@ document.getElementById('bootstrap-form').addEventListener('submit', async (e) =
             credentialSubject: {
                 ...(result.credential.credentialSubject || result.credential.claims || {}),
                 packageType: 'permission',  // Also in credentialSubject
-                siteId: site_domain,  // Use domain (lemma.id) not site_id
-                siteDomain: site_domain,
+                siteId: normalizedSiteDomain,  // Use normalized hostname for site matching
+                siteDomain: normalizedSiteDomain,
                 permissionId: 'admin_access',  // Set admin_access for session-free auth
                 accountType: 'admin',
                 email: user_email
@@ -186,8 +208,8 @@ document.getElementById('bootstrap-form').addEventListener('submit', async (e) =
             claims: {
                 ...(result.credential.claims || result.credential.credentialSubject || {}),
                 packageType: 'permission',
-                siteId: site_domain,
-                siteDomain: site_domain,
+                siteId: normalizedSiteDomain,
+                siteDomain: normalizedSiteDomain,
                 permissionId: 'admin_access',
                 accountType: 'admin',
                 email: user_email
