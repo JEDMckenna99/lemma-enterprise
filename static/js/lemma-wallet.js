@@ -6077,13 +6077,31 @@ class LemmaWallet {
      */
     async getCredentials(type = null) {
         await this.init();
-        let lemmas = await this._getAll('lemmas');
+        const normalizeCredentialRecord = (record) => {
+            if (!record || typeof record !== 'object') return record;
+            const nested = (record.credential && typeof record.credential === 'object')
+                ? record.credential
+                : ((record.lemma && typeof record.lemma === 'object') ? record.lemma : null);
+            const base = nested
+                ? { ...record, ...nested }
+                : { ...record };
+            const claims = base.claims || base.credentialSubject || {};
+            const credentialSubject = base.credentialSubject || base.claims || {};
+            return {
+                ...base,
+                claims,
+                credentialSubject,
+                packageType: base.packageType || claims.packageType || credentialSubject.packageType || base.type?.[1]
+            };
+        };
+
+        let lemmas = (await this._getAll('lemmas')).map(normalizeCredentialRecord);
         
         // On third-party sites, also fetch from central wallet
         if (!window.location.hostname.includes('lemma.id') && 
             !window.location.hostname.includes('localhost')) {
             try {
-                const centralCreds = await this._getFromCentralWallet(type);
+                const centralCreds = (await this._getFromCentralWallet(type)).map(normalizeCredentialRecord);
                 
                 // Merge: add central creds not in local
                 const localIds = new Set(lemmas.map(l => l.id));
