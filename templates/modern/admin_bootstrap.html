@@ -281,8 +281,8 @@ document.getElementById('bootstrap-form').addEventListener('submit', async (e) =
         console.log('=== CREDENTIAL FORMAT CHECK ===');
         console.log('TOP LEVEL packageType:', credentialToStore.packageType);
         console.log('TOP LEVEL type:', credentialToStore.type);
-        console.log('credentialSubject.packageType:', credentialToStore.credentialSubject.packageType);
-        console.log('claims.packageType:', credentialToStore.claims.packageType);
+        console.log('credentialSubject.packageType:', credentialToStore.credentialSubject?.packageType);
+        console.log('claims.packageType:', credentialToStore.claims?.packageType);
         
         console.log('=== STORING CREDENTIAL ===');
         console.log('Credential to store:', credentialToStore);
