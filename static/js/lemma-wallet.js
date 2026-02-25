@@ -3064,6 +3064,33 @@ class LemmaWallet {
     }
 
     /**
+     * Wait briefly for bridge readiness signal when iframe exists but hasn't
+     * posted WALLET_BRIDGE_READY yet.
+     * @private
+     */
+    async _waitForBridgeReady(maxWaitMs = 2000) {
+        if (this._bridgeReady) return true;
+        return new Promise((resolve) => {
+            let done = false;
+            const finish = (ready) => {
+                if (done) return;
+                done = true;
+                clearTimeout(timeoutId);
+                window.removeEventListener('message', handler);
+                resolve(ready);
+            };
+            const timeoutId = setTimeout(() => finish(!!this._bridgeReady), maxWaitMs);
+            const handler = (event) => {
+                if (event.origin === 'https://lemma.id' && event.data?.type === 'WALLET_BRIDGE_READY') {
+                    this._bridgeReady = true;
+                    finish(true);
+                }
+            };
+            window.addEventListener('message', handler);
+        });
+    }
+
+    /**
      * Send message to bridge iframe and get response
      * @private
      */
@@ -3128,7 +3155,10 @@ class LemmaWallet {
         // If bridge never signaled ready, don't attempt postMessage
         // (it would fail with origin mismatch since iframe is still at about:blank)
         if (!this._bridgeReady) {
-            throw new Error('Bridge not ready (still loading or blocked)');
+            const becameReady = await this._waitForBridgeReady(2500);
+            if (!becameReady) {
+                throw new Error('Bridge not ready (still loading or blocked)');
+            }
         }
         
         return new Promise((resolve, reject) => {
