@@ -550,6 +550,14 @@ def admin_self_issue():
             permission_lemma['credentialSubject']['packageType'] = 'permission'
         if 'claims' in permission_lemma:
             permission_lemma['claims']['packageType'] = 'permission'
+
+        # Canonicalize claim shape for strict PPID/site IAM compatibility.
+        permission_lemma = _canonicalize_admin_permission_lemma(
+            permission_lemma=permission_lemma,
+            permission_level=permission_level,
+            site_domain=site_domain,
+            user_email=user_email,
+        )
         
         issue_time_us = (time.perf_counter() - start_time) * 1_000_000
         
@@ -611,4 +619,64 @@ def get_default_scope(permission_level: str) -> list:
         'viewer': ['posts:read', 'comments:read']
     }
     return scopes.get(permission_level, ['posts:read'])
+
+
+def _canonicalize_admin_permission_lemma(permission_lemma: dict, permission_level: str, site_domain: str, user_email: str) -> dict:
+    """
+    Normalize admin lemmas to a strict, compatibility-safe claim shape.
+    - Canonical admin permission id remains `admin_access` for broad client compatibility.
+    - Exact selected level is preserved in `permission_level`.
+    - Timestamps are numeric, booleans are real booleans, and site identifiers are normalized.
+    """
+    claims = dict(permission_lemma.get('claims') or permission_lemma.get('credentialSubject') or {})
+    site_key = str(site_domain or claims.get('siteId') or claims.get('site_domain') or '').strip().lower()
+    if not site_key:
+        site_key = str(permission_lemma.get('site_id') or '').strip().lower()
+
+    def _to_int(value, default_value: int) -> int:
+        try:
+            return int(float(value))
+        except Exception:
+            return int(default_value)
+
+    now_epoch = int(datetime.utcnow().timestamp())
+    issued_at = _to_int(permission_lemma.get('issuanceDate') or claims.get('issuedAt') or claims.get('issuanceDate'), now_epoch)
+    expires_at = _to_int(permission_lemma.get('expirationDate') or claims.get('expiresAt') or claims.get('expirationDate'), issued_at + (90 * 86400))
+
+    raw_scope = claims.get('scope')
+    if isinstance(raw_scope, list):
+        scope = [str(item).strip() for item in raw_scope if str(item).strip()]
+    elif isinstance(raw_scope, str) and raw_scope.strip():
+        scope = [part.strip() for part in raw_scope.split(',') if part.strip()]
+    else:
+        scope = get_default_scope(permission_level)
+
+    canonical_permission_id = 'admin_access'
+    permission_aliases = [canonical_permission_id]
+    if permission_level and permission_level not in permission_aliases:
+        permission_aliases.append(permission_level)
+
+    canonical_claims = {
+        **claims,
+        'email': user_email,
+        'siteId': site_key,
+        'siteDomain': site_key,
+        'site_domain': site_key,
+        'accountType': 'admin',
+        'permissionId': canonical_permission_id,
+        'permission_level': permission_level,
+        'permissionAliases': permission_aliases,
+        'isAdmin': True,
+        'networkShared': False,
+        'issuedAt': issued_at,
+        'expiresAt': expires_at,
+        'packageType': 'permission',
+        'scope': scope,
+    }
+
+    permission_lemma['issuanceDate'] = issued_at
+    permission_lemma['expirationDate'] = expires_at
+    permission_lemma['claims'] = dict(canonical_claims)
+    permission_lemma['credentialSubject'] = dict(canonical_claims)
+    return permission_lemma
 

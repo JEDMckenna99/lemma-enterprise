@@ -6223,6 +6223,13 @@ class LemmaWallet {
         });
         const bestPermission = rankedPermissions[0] || null;
         const bestClaims = (bestPermission?.claims || bestPermission?.credentialSubject || {});
+        const rawPermissionId = bestClaims.permissionId || bestClaims.permission_level || bestClaims.permission_id || '';
+        const rawAliases = bestClaims.permissionAliases || bestClaims.permission_aliases || [];
+        const permissionAliases = Array.isArray(rawAliases)
+            ? rawAliases.map(v => String(v).trim()).filter(Boolean)
+            : String(rawAliases || '').split(',').map(v => v.trim()).filter(Boolean);
+        const adminLike = isAdminPermission(bestClaims) || permissionAliases.some(alias => String(alias).toLowerCase().includes('admin'));
+        const normalizedPermissionId = adminLike ? 'admin_access' : rawPermissionId;
 
         // Extract PPID from best verified permission.
         let ppid = null;
@@ -6237,9 +6244,11 @@ class LemmaWallet {
             // User identity
             ppid: ppid,  // The user's PPID for this site (for revocation purposes)
             // Common claim accessors
-            role: bestClaims.role || bestClaims.accountType || bestClaims.account_type || 'user',
+            role: adminLike ? 'admin' : (bestClaims.role || bestClaims.accountType || bestClaims.account_type || 'user'),
             scope: normalizeScope(bestClaims.scope),
-            permissionId: bestClaims.permissionId || bestClaims.permission_level || bestClaims.permission_id,
+            permissionId: normalizedPermissionId,
+            permissionLevel: bestClaims.permission_level || rawPermissionId || null,
+            permissionAliases: permissionAliases,
             // Performance metrics
             verified: verifiedPermissions.length,
             total: sitePermissions.length,
@@ -6274,6 +6283,13 @@ class LemmaWallet {
         // Check permissionId
         if (perms.permissionId === requiredPermission || 
             perms.permissionId?.includes(requiredPermission)) {
+            return true;
+        }
+
+        // Check aliases (for compatibility across permission naming conventions)
+        if ((perms.permissionAliases || []).some(alias =>
+            alias === requiredPermission || alias.includes(requiredPermission)
+        )) {
             return true;
         }
         
