@@ -536,7 +536,13 @@ def admin_self_issue():
                 'site_domain': site_domain,
                 'issued_via': 'admin_self_issue',
                 'accountType': 'admin',  # CRITICAL for session-free auth
-                'permissionId': permission_level  # Use actual permission level (super_admin, admin, etc)
+                # Canonical compatibility permission ID for broad client checks.
+                'permissionId': 'admin_access',
+                # Preserve selected level separately.
+                'permission_level': permission_level,
+                'permissionAliases': ['admin_access', permission_level],
+                'isAdmin': True,
+                'networkShared': False,
             }
         )
         
@@ -545,19 +551,8 @@ def admin_self_issue():
         permission_lemma['type'] = ['VerifiableCredential', 'PermissionLemma']
         permission_lemma['packageType'] = 'permission'  # For wallet filtering
         
-        # Ensure claims/credentialSubject has packageType
-        if 'credentialSubject' in permission_lemma:
-            permission_lemma['credentialSubject']['packageType'] = 'permission'
-        if 'claims' in permission_lemma:
-            permission_lemma['claims']['packageType'] = 'permission'
-
-        # Canonicalize claim shape for strict PPID/site IAM compatibility.
-        permission_lemma = _canonicalize_admin_permission_lemma(
-            permission_lemma=permission_lemma,
-            permission_level=permission_level,
-            site_domain=site_domain,
-            user_email=user_email,
-        )
+        # IMPORTANT: Do not mutate claims/credentialSubject after signing.
+        # Any post-signature claim edits invalidate Ed25519 verification.
         
         issue_time_us = (time.perf_counter() - start_time) * 1_000_000
         
