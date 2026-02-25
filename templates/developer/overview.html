@@ -380,11 +380,10 @@ async function getWalletPpid() {
 }
 
 function getAuthHeaders() {
-    const headers = {};
-    if (currentPpid) {
-        headers['X-Lemma-PPID'] = currentPpid;
+    if (typeof window.getLemmaAuthHeaders === 'function') {
+        return window.getLemmaAuthHeaders();
     }
-    return headers;
+    return {};
 }
 
 // ============================================
@@ -458,9 +457,7 @@ async function loadAgentCredentials(ppid) {
     try {
         // Get PPID for the request
         const response = await fetch('/api/agent/credentials', {
-            headers: {
-                'X-Lemma-PPID': ppid
-            }
+            headers: getAuthHeaders()
         });
         
         if (!response.ok) {
@@ -556,7 +553,7 @@ async function generateAgentToken(ppid) {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'X-Lemma-PPID': ppid
+                ...getAuthHeaders()
             },
             body: JSON.stringify({
                 agent_name: agentName,
@@ -644,7 +641,7 @@ async function revokeAgentToken(tokenId, ppid) {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'X-Lemma-PPID': ppid
+                ...getAuthHeaders()
             },
             body: JSON.stringify({ reason: 'Manual revocation from dashboard' })
         });

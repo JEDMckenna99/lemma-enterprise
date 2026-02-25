@@ -29,7 +29,7 @@ developer_api_bp = Blueprint('developer_api', __name__)
 def _get_authenticated_ppid() -> str:
     """
     Extract the authenticated user's PPID from request context.
-    Works with agent tokens, agent sessions, and direct PPID headers.
+    Works with agent tokens, agent sessions, and full lemma credential headers.
     """
     # Check g context first (set by auth decorators)
     if hasattr(g, 'ppid') and g.ppid:
@@ -39,8 +39,24 @@ def _get_authenticated_ppid() -> str:
     if hasattr(g, 'agent_credential') and g.agent_credential:
         return g.agent_credential.get('authorized_by_ppid')
     
-    # Fallback to header
-    return request.headers.get('X-Lemma-PPID')
+    # Fallback to full credential header for direct calls.
+    raw_lemma = request.headers.get('X-Lemma-Credential')
+    if raw_lemma:
+        try:
+            import base64
+            text = str(raw_lemma).strip()
+            if text.startswith('{'):
+                credential = json.loads(text)
+            else:
+                padded = text + ('=' * (-len(text) % 4))
+                credential = json.loads(base64.urlsafe_b64decode(padded.encode('utf-8')).decode('utf-8'))
+            claims = credential.get('claims') or credential.get('credentialSubject') or {}
+            ppid = credential.get('subject') or credential.get('sub') or claims.get('ppid') or claims.get('id')
+            if ppid and str(ppid).startswith('did:lemma:ppid_'):
+                return str(ppid)
+        except Exception:
+            return None
+    return None
 
 
 def _verify_site_ownership(site_id: str, ppid: str) -> bool:
@@ -329,8 +345,8 @@ def _upsert_site_admin_record(db, site_id: str, admin_did: str, admin_email: str
 def get_developer_stats():
     """Get overview stats for the developer dashboard"""
     try:
-        # Get PPID from header for user-specific stats
-        ppid = request.headers.get('X-Lemma-PPID')
+        # Get PPID from authenticated context for user-specific stats
+        ppid = _get_authenticated_ppid()
         
         site_count = 0
         total_verifications = 0
@@ -380,7 +396,7 @@ def get_developer_stats():
 def get_developer_sites():
     """Get all sites owned by the developer"""
     try:
-        ppid = request.headers.get('X-Lemma-PPID')
+        ppid = _get_authenticated_ppid()
         credential_id = request.headers.get('X-Credential-ID')
         
         sites = []
@@ -525,7 +541,7 @@ def create_developer_site():
         # Generate site ID
         site_id = domain.replace('.', '_').replace('-', '_')
         
-        ppid = request.headers.get('X-Lemma-PPID')
+        ppid = _get_authenticated_ppid()
         
         from api.database import SessionLocal, Site
         from api.real_iam_manager import get_or_create_site_manager

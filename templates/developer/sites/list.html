@@ -248,11 +248,10 @@ async function getWalletPpid() {
 }
 
 function getAuthHeaders() {
-    const headers = { 'Content-Type': 'application/json' };
-    if (currentPpid) {
-        headers['X-Lemma-PPID'] = currentPpid;
-    }
-    return headers;
+    const base = (typeof window.getLemmaAuthHeaders === 'function')
+        ? window.getLemmaAuthHeaders()
+        : {};
+    return { 'Content-Type': 'application/json', ...base };
 }
 
 async function loadSites() {

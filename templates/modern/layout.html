@@ -433,6 +433,37 @@ h1{color:#1e293b;font-weight:600;line-height:1.25;margin-bottom:16px;font-size:4
                     
                     // Store credential globally for API calls
                     window.lemmaCredential = cred;
+                    window.encodeLemmaCredentialHeader = function encodeLemmaCredentialHeader(credential) {
+                        try {
+                            const json = JSON.stringify(credential || {});
+                            return btoa(unescape(encodeURIComponent(json)))
+                                .replace(/\+/g, '-')
+                                .replace(/\//g, '_')
+                                .replace(/=+$/, '');
+                        } catch (e) {
+                            return '';
+                        }
+                    };
+                    window.getLemmaAuthHeaders = function getLemmaAuthHeaders(extraHeaders) {
+                        const headers = { ...(extraHeaders || {}) };
+                        const credential = window.lemmaCredential;
+                        if (!credential || typeof credential !== 'object') {
+                            return headers;
+                        }
+                        const encoded = window.encodeLemmaCredentialHeader(credential);
+                        if (encoded) {
+                            headers['X-Lemma-Credential'] = encoded;
+                        }
+                        if (credential.id) {
+                            headers['X-Credential-ID'] = credential.id;
+                        }
+                        const claims = credential.claims || credential.credentialSubject || {};
+                        const permissionId = claims.permissionId || claims.permission_id || claims.permission_level || claims.permission;
+                        if (permissionId) {
+                            headers['X-Permission-ID'] = String(permissionId);
+                        }
+                        return headers;
+                    };
                     
                     // Initialize session-free auth with smart caching
                     const auth = new SessionFreeAuth(wallet, {debug: false});
@@ -447,27 +478,19 @@ h1{color:#1e293b;font-weight:600;line-height:1.25;margin-bottom:16px;font-size:4
                         }
                         
                         try {
-                            // Get wallet identifiers for auto-issue
-                            let walletSecret = null;
-                            let passkeyCredentialId = null;
-                            
+                            let ppid = null;
                             try {
-                                walletSecret = await wallet.getWalletSecret();
+                                ppid = await wallet.derivePPID('lemma.id');
                             } catch (e) { /* ok if unavailable */ }
-                            
-                            try {
-                                passkeyCredentialId = await wallet.getPasskeyCredentialId();
-                            } catch (e) { /* ok if unavailable */ }
-                            
-                            if (walletSecret || passkeyCredentialId) {
+
+                            if (ppid) {
                                 // Auto-issue credential via API
                                 const response = await fetch('/api/wallet-auth/issue', {
                                     method: 'POST',
                                     headers: { 'Content-Type': 'application/json' },
                                     body: JSON.stringify({
                                         site_id: 'lemma.id',
-                                        wallet_secret: walletSecret,
-                                        passkey_credential_id: passkeyCredentialId
+                                        ppid: ppid
                                     })
                                 });
                                 

@@ -21,6 +21,7 @@ WHY THIS IS SECURE:
 import os
 import re
 import json
+import base64
 import secrets
 import hashlib
 import logging
@@ -233,7 +234,7 @@ def _require_delegation_admin_session():
 
     # Require explicit lemma PPID identity for attribution.
     delegator_ppid = (
-        request.headers.get('X-Lemma-PPID')
+        _extract_ppid_from_lemma_header()
         or admin_lemma_ctx.get('ppid')
         or session.get('ppid')
     )
@@ -507,13 +508,60 @@ def _extract_api_key_from_request():
     return None
 
 
+def _extract_ppid_from_lemma_header():
+    """
+    Extract verified PPID from full credential header.
+    Header format: X-Lemma-Credential = base64url(JSON credential) or raw JSON.
+    """
+    raw = request.headers.get('X-Lemma-Credential')
+    if not raw:
+        return None
+
+    text = str(raw).strip()
+    if not text:
+        return None
+
+    try:
+        if text.startswith('{'):
+            credential = json.loads(text)
+        else:
+            padded = text + ('=' * (-len(text) % 4))
+            decoded = base64.urlsafe_b64decode(padded.encode('utf-8')).decode('utf-8')
+            credential = json.loads(decoded)
+    except Exception:
+        return None
+
+    if not isinstance(credential, dict):
+        return None
+
+    try:
+        from api.trusted_issuers import verify_credential_with_trust
+        verification = verify_credential_with_trust(credential)
+        if not verification.get('valid'):
+            return None
+    except Exception:
+        return None
+
+    claims = credential.get('claims') or credential.get('credentialSubject') or {}
+    ppid = (
+        credential.get('subject')
+        or credential.get('sub')
+        or claims.get('ppid')
+        or claims.get('id')
+        or claims.get('subject')
+    )
+    if ppid and str(ppid).startswith('did:lemma:ppid_'):
+        return str(ppid)
+    return None
+
+
 def _resolve_monitor_identity():
     """
     Resolve owner identity for monitoring endpoints.
 
     Supports:
     - X-Agent-Token (owner inferred from credential)
-    - X-Lemma-PPID
+    - X-Lemma-Credential
     - Flask session customer_id
     - X-API-Key (for custom site dashboards)
     """
@@ -532,7 +580,7 @@ def _resolve_monitor_identity():
             'principal': principal
         }, None
 
-    ppid = request.headers.get('X-Lemma-PPID') or session.get('ppid')
+    ppid = _extract_ppid_from_lemma_header() or session.get('ppid')
     if ppid:
         if not ppid.startswith('did:lemma:ppid_'):
             return None, ('Invalid PPID format', 400)
@@ -657,7 +705,7 @@ def require_agent_or_user_session(required_scope=None):
                 g.auth_method = 'agent_token'
                 return f(*args, **kwargs)
 
-            ppid = request.headers.get('X-Lemma-PPID')
+            ppid = _extract_ppid_from_lemma_header()
             if ppid and ppid.startswith('did:lemma:ppid_'):
                 g.ppid = ppid
                 g.authenticated = True
@@ -703,7 +751,7 @@ def require_agent_or_user_session(required_scope=None):
             return jsonify({
                 'success': False,
                 'error': 'auth_required',
-                'message': 'Provide X-Agent-Token, X-Lemma-PPID, X-API-Key, or Authorization: Bearer <api_key> header',
+                'message': 'Provide X-Agent-Token, X-Lemma-Credential, X-API-Key, or Authorization: Bearer <api_key> header',
             }), 401
 
         return wrapped
@@ -1277,7 +1325,7 @@ def require_agent_or_user_auth(required_scope=None, enforce_task_bounds=True):
                 return f(*args, **kwargs)
 
             # Fall back to user auth
-            ppid = request.headers.get('X-Lemma-PPID')
+            ppid = _extract_ppid_from_lemma_header()
             api_key = _extract_api_key_from_request()
 
             if ppid and ppid.startswith('did:lemma:ppid_'):
@@ -1297,7 +1345,7 @@ def require_agent_or_user_auth(required_scope=None, enforce_task_bounds=True):
             return jsonify({
                 'success': False,
                 'error': 'auth_required',
-                'message': 'Provide X-Agent-Token, X-Lemma-PPID, X-API-Key, or Authorization: Bearer <api_key> header'
+                'message': 'Provide X-Agent-Token, X-Lemma-Credential, X-API-Key, or Authorization: Bearer <api_key> header'
             }), 401
 
         return decorated_function
@@ -1316,7 +1364,7 @@ def list_agent_credentials():
     agent_token = request.headers.get('X-Agent-Token')
     credential_info = validate_agent_token(agent_token) if agent_token else None
 
-    ppid = request.headers.get('X-Lemma-PPID') or session.get('ppid')
+    ppid = _extract_ppid_from_lemma_header() or session.get('ppid')
     customer_id = session.get('customer_id')
 
     if credential_info:
@@ -1403,7 +1451,7 @@ def revoke_agent_credential(token_id):
     - Session is no longer needed
     - Security concern
     """
-    ppid = request.headers.get('X-Lemma-PPID') or session.get('ppid')
+    ppid = _extract_ppid_from_lemma_header() or session.get('ppid')
     customer_id = session.get('customer_id')
 
     # Machine flow: allow owner resolution from a lemma-bound admin agent token.
@@ -1475,7 +1523,7 @@ def revoke_agent_credential(token_id):
 @cross_origin()
 def get_agent_audit_log():
     """Get audit log for agent actions."""
-    ppid = request.headers.get('X-Lemma-PPID')
+    ppid = _extract_ppid_from_lemma_header()
     customer_id = session.get('customer_id')
     
     if not ppid and not customer_id:
@@ -1565,7 +1613,7 @@ def get_task_adherence_report(token_id):
 
     This helps humans verify that agents stayed on-task.
     """
-    ppid = request.headers.get('X-Lemma-PPID')
+    ppid = _extract_ppid_from_lemma_header()
     customer_id = session.get('customer_id')
 
     if not ppid and not customer_id:
@@ -1981,7 +2029,7 @@ def auto_issue_agent_credential():
         passkey_verified = session.get('passkey_verified', False)
         auth_method = session.get('auth_method')
         user_email = session.get('user_email')
-        ppid = getattr(g, 'delegation_ppid', None) or session.get('ppid') or request.headers.get('X-Lemma-PPID')
+        ppid = getattr(g, 'delegation_ppid', None) or session.get('ppid') or _extract_ppid_from_lemma_header()
 
         # Debug: log what we found
         logger.info(f"Auto-issue check: passkey_verified={passkey_verified}, auth_method={auth_method}, has_ppid={bool(ppid)}")

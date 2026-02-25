@@ -106,9 +106,10 @@ async function getWalletPpid() {
 }
 
 function getAuthHeaders() {
-    const headers = {};
-    if (currentPpid) headers['X-Lemma-PPID'] = currentPpid;
-    return headers;
+    if (typeof window.getLemmaAuthHeaders === 'function') {
+        return window.getLemmaAuthHeaders();
+    }
+    return {};
 }
 
 async function loadAgentTokenPanel() {

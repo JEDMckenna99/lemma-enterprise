@@ -7,6 +7,7 @@ Authentication: Requires wallet credential (PPID) or API key
 
 import time
 import json
+import base64
 import logging
 from datetime import datetime, timedelta
 from flask import Blueprint, request, jsonify, g
@@ -24,13 +25,34 @@ def _authenticate_developer():
     
     Returns: (customer_id, ppid) or (None, None) if auth fails
     """
-    # Method 1: PPID from wallet auth (X-Lemma-PPID header)
-    ppid = request.headers.get('X-Lemma-PPID')
+    # Method 1: PPID from auth decorators
+    ppid = getattr(g, 'ppid', None)
     if ppid and ppid.startswith('did:lemma:ppid_'):
         from api.customer_accounts import customer_manager
         customer = customer_manager.get_customer_by_ppid(ppid)
         if customer:
             return customer.customer_id, ppid
+
+    # Method 1b: Full lemma header
+    raw_lemma = request.headers.get('X-Lemma-Credential')
+    if raw_lemma:
+        try:
+            text = str(raw_lemma).strip()
+            if text.startswith('{'):
+                credential = json.loads(text)
+            else:
+                padded = text + ('=' * (-len(text) % 4))
+                decoded = base64.urlsafe_b64decode(padded.encode('utf-8')).decode('utf-8')
+                credential = json.loads(decoded)
+            claims = credential.get('claims') or credential.get('credentialSubject') or {}
+            lemma_ppid = credential.get('subject') or credential.get('sub') or claims.get('ppid') or claims.get('id')
+            if lemma_ppid and str(lemma_ppid).startswith('did:lemma:ppid_'):
+                from api.customer_accounts import customer_manager
+                customer = customer_manager.get_customer_by_ppid(str(lemma_ppid))
+                if customer:
+                    return customer.customer_id, str(lemma_ppid)
+        except Exception:
+            pass
     
     # Method 2: Bearer token with credential
     auth_header = request.headers.get('Authorization', '')
@@ -76,7 +98,7 @@ def issue_self_permission():
     - Test permissions before deploying
     - Set up initial admin accounts
     
-    Authentication: Wallet credential (X-Lemma-PPID) or API key
+    Authentication: Wallet credential (X-Lemma-Credential) or API key
     
     POST /api/developer/issue-self-permission
     {
@@ -99,7 +121,7 @@ def issue_self_permission():
             return jsonify({
                 'success': False,
                 'error': 'Authentication required',
-                'message': 'Provide X-Lemma-PPID header or X-API-Key'
+                'message': 'Provide X-Lemma-Credential header or X-API-Key'
             }), 401
         
         data = request.get_json()

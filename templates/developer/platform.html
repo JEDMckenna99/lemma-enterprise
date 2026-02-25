@@ -1381,11 +1381,9 @@
             if (!confirmed) return;
 
             try {
-                const headers = { 'Content-Type': 'application/json' };
-                const ppid = window.agentDelegationPPID || await resolveAgentDelegationPPID();
-                if (ppid) {
-                    headers['X-Lemma-PPID'] = ppid;
-                }
+                const headers = (typeof window.getLemmaAuthHeaders === 'function')
+                    ? window.getLemmaAuthHeaders({ 'Content-Type': 'application/json' })
+                    : { 'Content-Type': 'application/json' };
 
                 const response = await fetch(`/api/agent/credentials/${encodeURIComponent(tokenId)}/revoke`, {
                     method: 'POST',
@@ -1450,13 +1448,10 @@
         }
 
         async function getAgentMonitorHeaders() {
-            const headers = {};
-            const ppid = window.agentDelegationPPID || await resolveAgentDelegationPPID();
-            if (ppid) {
-                headers['X-Lemma-PPID'] = ppid;
-                window.agentDelegationPPID = ppid;
+            if (typeof window.getLemmaAuthHeaders === 'function') {
+                return window.getLemmaAuthHeaders();
             }
-            return headers;
+            return {};
         }
 
         async function loadAgentDelegationTab() {

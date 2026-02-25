@@ -15,11 +15,105 @@ User Passkey → Agent Token → Browser Session → API Calls
 from functools import wraps
 from flask import request, jsonify, g, make_response, session
 from typing import Optional
+import base64
+import json
 import logging
 
 from auth.permissions import normalize_scopes, is_admin_permission
 
 logger = logging.getLogger(__name__)
+
+
+def _decode_lemma_header(raw_header: str) -> Optional[dict]:
+    """
+    Decode `X-Lemma-Credential` header content.
+    Accepts either JSON or URL-safe base64(JSON).
+    """
+    if not raw_header:
+        return None
+
+    text = raw_header.strip()
+    if not text:
+        return None
+
+    # Allow direct JSON for diagnostics/manual calls.
+    if text.startswith("{"):
+        try:
+            parsed = json.loads(text)
+            return parsed if isinstance(parsed, dict) else None
+        except Exception:
+            return None
+
+    # Default transport: URL-safe base64 encoded JSON.
+    try:
+        padded = text + ("=" * (-len(text) % 4))
+        decoded = base64.urlsafe_b64decode(padded.encode("utf-8")).decode("utf-8")
+        parsed = json.loads(decoded)
+        return parsed if isinstance(parsed, dict) else None
+    except Exception:
+        return None
+
+
+def _extract_verified_lemma_context():
+    """
+    Verify a full permission lemma from `X-Lemma-Credential` and return auth context.
+    Returns (context_dict_or_none, error_code_or_none).
+    """
+    raw_credential = request.headers.get("X-Lemma-Credential")
+    if not raw_credential:
+        return None, "missing_lemma_header"
+
+    credential = _decode_lemma_header(raw_credential)
+    if not credential:
+        return None, "invalid_lemma_header"
+
+    try:
+        from api.trusted_issuers import verify_credential_with_trust
+    except Exception as e:
+        logger.warning(f"Could not import trusted issuer verifier: {e}")
+        return None, "verifier_unavailable"
+
+    verification = verify_credential_with_trust(credential)
+    if not verification.get("valid"):
+        return None, f"invalid_lemma:{verification.get('reason', 'unknown')}"
+
+    claims = credential.get("claims") or credential.get("credentialSubject") or {}
+    permission_id = (
+        claims.get("permissionId")
+        or claims.get("permission_id")
+        or claims.get("permission_level")
+        or claims.get("permission")
+        or claims.get("accountType")
+        or "read"
+    )
+    ppid = (
+        credential.get("subject")
+        or credential.get("sub")
+        or claims.get("sub")
+        or claims.get("ppid")
+        or claims.get("id")
+        or claims.get("subject")
+    )
+    if not ppid or not str(ppid).startswith("did:lemma:ppid_"):
+        return None, "invalid_lemma_subject"
+
+    credential_id = credential.get("id")
+    header_credential_id = request.headers.get("X-Credential-ID")
+    if header_credential_id and credential_id and header_credential_id != credential_id:
+        return None, "credential_id_mismatch"
+
+    scope = normalize_scopes(claims.get("scope", []))
+    if not scope:
+        scope = ["admin", "write", "read"] if is_admin_permission(str(permission_id)) else ["read"]
+
+    return {
+        "credential": credential,
+        "claims": claims,
+        "ppid": str(ppid),
+        "credential_id": credential_id,
+        "permission_id": str(permission_id),
+        "scope": scope,
+    }, None
 
 
 def _extract_api_key_from_request() -> Optional[str]:
@@ -407,11 +501,14 @@ def optional_auth(f):
             g.agent_credential = session_info
             return f(*args, **kwargs)
         
-        # Method 1: PPID from header (SDK sends this after wallet auth)
-        ppid = request.headers.get('X-Lemma-PPID')
-        if ppid and ppid.startswith('did:lemma:ppid_'):
-            g.ppid = ppid
+        # Method 1: Full lemma header (server-verified)
+        lemma_ctx, _lemma_error = _extract_verified_lemma_context()
+        if lemma_ctx:
+            g.ppid = lemma_ctx.get('ppid')
+            g.credential_id = lemma_ctx.get('credential_id')
+            g.permission_id = lemma_ctx.get('permission_id')
             g.authenticated = True
+            g.auth_method = 'lemma_header'
             return f(*args, **kwargs)
         
         # Method 2: Credential headers (edge computing)
@@ -696,11 +793,14 @@ def require_authenticated(f):
             g.agent_credential = session_info
             return f(*args, **kwargs)
         
-        # Method 1: PPID from header (SDK sends this after wallet auth)
-        ppid = request.headers.get('X-Lemma-PPID')
-        if ppid and ppid.startswith('did:lemma:ppid_'):
-            g.ppid = ppid
+        # Method 1: Full lemma header (server-verified)
+        lemma_ctx, _lemma_error = _extract_verified_lemma_context()
+        if lemma_ctx:
+            g.ppid = lemma_ctx.get('ppid')
+            g.credential_id = lemma_ctx.get('credential_id')
+            g.permission_id = lemma_ctx.get('permission_id')
             g.authenticated = True
+            g.auth_method = 'lemma_header'
             return f(*args, **kwargs)
         
         # Method 2: Credential headers (edge computing)
@@ -808,14 +908,13 @@ def rate_limit(max_requests=100, window=60):
 
 def require_wallet_ppid(f):
     """
-    Decorator requiring authenticated wallet (via PPID).
+    Decorator requiring authenticated wallet.
     
     Accepts:
     1. X-Agent-Token header (AI agent with delegated access)
     2. Agent session via Flask session (from /api/agent/session)
-    3. X-Lemma-PPID header (from SDK after wallet auth)
-    4. PPID in request body (for API calls)
-    5. API key fallback (X-API-Key)
+    3. X-Lemma-Credential header (full signed permission lemma)
+    4. API key fallback (X-API-Key)
     
     AGENT DELEGATION: Both header and session methods inherit PPID from
     the authorizing user's passkey.
@@ -856,18 +955,14 @@ def require_wallet_ppid(f):
             g.agent_credential = session_info
             return f(*args, **kwargs)
         
-        # Method 1: PPID from header (SDK sends this after wallet auth)
-        ppid = request.headers.get('X-Lemma-PPID')
-        
-        # Method 2: PPID from request body
-        if not ppid:
-            data = request.get_json(silent=True) or {}
-            ppid = data.get('ppid')
-        
-        if ppid and ppid.startswith('did:lemma:ppid_'):
-            g.ppid = ppid
+        # Method 1: Full lemma header
+        lemma_ctx, lemma_error = _extract_verified_lemma_context()
+        if lemma_ctx:
+            g.ppid = lemma_ctx.get('ppid')
+            g.credential_id = lemma_ctx.get('credential_id')
+            g.permission_id = lemma_ctx.get('permission_id')
             g.authenticated = True
-            g.auth_method = 'ppid'
+            g.auth_method = 'lemma_header'
             return f(*args, **kwargs)
         
         # Method 3: API key fallback (for programmatic access)
@@ -883,7 +978,8 @@ def require_wallet_ppid(f):
         return jsonify({
             'success': False,
             'error': 'Authentication required',
-            'message': 'Provide X-Agent-Token, X-Lemma-PPID, X-API-Key, or Authorization: Bearer <api_key>'
+            'message': 'Provide X-Agent-Token, X-Lemma-Credential, X-API-Key, or Authorization: Bearer <api_key>',
+            'lemma_error': lemma_error
         }), 401
     
     return decorated_function
@@ -952,17 +1048,17 @@ def require_customer_or_admin(f):
                     g.auth_method = 'credential'
                     return f(*args, **kwargs)
         
-        # Try PPID auth
-        ppid = request.headers.get('X-Lemma-PPID')
-        if not ppid:
-            data = request.get_json(silent=True) or {}
-            ppid = data.get('ppid')
-        
-        if ppid and ppid.startswith('did:lemma:ppid_'):
-            g.ppid = ppid
-            g.is_admin = False
+        # Try full lemma auth
+        lemma_ctx, _lemma_error = _extract_verified_lemma_context()
+        if lemma_ctx:
+            permission_id = lemma_ctx.get('permission_id', '')
+            scope = lemma_ctx.get('scope', [])
+            g.ppid = lemma_ctx.get('ppid')
+            g.credential_id = lemma_ctx.get('credential_id')
+            g.permission_id = permission_id
+            g.is_admin = is_admin_permission(permission_id) or ('admin' in scope)
             g.authenticated = True
-            g.auth_method = 'ppid'
+            g.auth_method = 'lemma_header'
             return f(*args, **kwargs)
         
         # API key fallback

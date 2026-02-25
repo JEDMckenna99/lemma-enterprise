@@ -209,7 +209,7 @@ document.getElementById('bootstrap-form').addEventListener('submit', async (e) =
             headers: {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${api_key}`,
-                'X-Lemma-PPID': user_ppid
+                ...(typeof window.getLemmaAuthHeaders === 'function' ? window.getLemmaAuthHeaders() : {})
             },
             body: JSON.stringify({
                 ...(normalizedSiteId ? { site_id: normalizedSiteId } : {}),
