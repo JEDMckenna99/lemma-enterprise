@@ -270,35 +270,12 @@ document.getElementById('bootstrap-form').addEventListener('submit', async (e) =
             throw new Error(`Issued site binding mismatch. Requested "${[...requestedCandidates].join(', ')}" but server issued "${[...issuedCandidates].join(', ')}".`);
         }
 
-        // Ensure credential has correct format for session-free architecture
-        // CRITICAL: packageType must be at TOP LEVEL (not just in claims)
+        // IMPORTANT: Preserve signed payload exactly as issued by server.
+        // Mutating claims/credentialSubject here would invalidate signature verification.
         const credentialToStore = {
             ...result.credential,
-            packageType: 'permission',  // TOP LEVEL - wallet filters on this
-            type: ['VerifiableCredential', 'PermissionLemma'],
-            credentialSubject: {
-                ...(result.credential.credentialSubject || result.credential.claims || {}),
-                packageType: 'permission',  // Also in credentialSubject
-                siteId: issuedSite,  // Use server-issued canonical site binding
-                siteDomain: issuedSite,
-                site_domain: issuedSite,
-                permissionId: issuedPermissionId,
-                accountType: 'admin',
-                ...(normalizedScope.length ? { scope: normalizedScope } : {}),
-                email: user_email
-            },
-            // Also set claims for backwards compatibility
-            claims: {
-                ...(result.credential.claims || result.credential.credentialSubject || {}),
-                packageType: 'permission',
-                siteId: issuedSite,
-                siteDomain: issuedSite,
-                site_domain: issuedSite,
-                permissionId: issuedPermissionId,
-                accountType: 'admin',
-                ...(normalizedScope.length ? { scope: normalizedScope } : {}),
-                email: user_email
-            }
+            packageType: result.credential?.packageType || 'permission',
+            type: result.credential?.type || ['VerifiableCredential', 'PermissionLemma']
         };
         
         console.log('=== CREDENTIAL FORMAT CHECK ===');
@@ -331,6 +308,15 @@ document.getElementById('bootstrap-form').addEventListener('submit', async (e) =
         
         // Verify it was stored by reading it back
         const permissionCreds = await wallet.getCredentials('permission');
+        const storedCred = permissionCreds.find(c => c.id === credentialToStore.id);
+        let verifyStoredResult = null;
+        if (storedCred) {
+            try {
+                verifyStoredResult = await wallet.verifyLemma(storedCred, true);
+            } catch (verifyErr) {
+                verifyStoredResult = { valid: false, reason: verifyErr?.message || 'verify_error' };
+            }
+        }
         console.log('=== VERIFICATION ===');
         console.log('Permission credentials in wallet:', permissionCreds);
         console.log('Total permission credentials:', permissionCreds.length);
@@ -347,8 +333,10 @@ document.getElementById('bootstrap-form').addEventListener('submit', async (e) =
             storeResult: storeResult,
             bridgeSyncResult: bridgeSyncResult,
             verificationCheck: {
-                foundInWallet: permissionCreds.length > 0,
-                totalPermissionCreds: permissionCreds.length
+                foundInWallet: permissionCreds.some(c => c.id === credentialToStore.id),
+                totalPermissionCreds: permissionCreds.length,
+                signatureValid: verifyStoredResult?.valid === true,
+                signatureReason: verifyStoredResult?.reason || null
             }
         }, null, 2);
         
