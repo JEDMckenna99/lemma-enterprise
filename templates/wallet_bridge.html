@@ -159,12 +159,31 @@ function getCredentialSiteBinding(claims) {
 
 function normalizeCredentialRecord(record) {
     if (!record || typeof record !== 'object') return record;
+    const pickRichClaims = (first, second) => {
+        const a = (first && typeof first === 'object') ? first : {};
+        const b = (second && typeof second === 'object') ? second : {};
+        const score = (obj) => {
+            let s = 0;
+            if (Object.keys(obj).length > 0) s += 1;
+            if (obj.permissionId || obj.permission_level || obj.permission_id) s += 2;
+            if (obj.accountType || obj.account_type) s += 2;
+            if (obj.siteId || obj.site_id || obj.siteDomain || obj.site_domain) s += 2;
+            return s;
+        };
+        return score(a) >= score(b) ? a : b;
+    };
     const nested = (record.credential && typeof record.credential === 'object')
         ? record.credential
         : ((record.lemma && typeof record.lemma === 'object') ? record.lemma : null);
     const base = nested ? { ...record, ...nested } : { ...record };
-    const claims = base.claims || base.credentialSubject || nested?.claims || nested?.credentialSubject || {};
-    const credentialSubject = base.credentialSubject || base.claims || nested?.credentialSubject || nested?.claims || {};
+    const claims = pickRichClaims(
+        base.claims || nested?.claims,
+        base.credentialSubject || nested?.credentialSubject
+    );
+    const credentialSubject = pickRichClaims(
+        base.credentialSubject || nested?.credentialSubject,
+        base.claims || nested?.claims
+    );
     return {
         ...base,
         claims,

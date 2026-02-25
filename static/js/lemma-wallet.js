@@ -6077,6 +6077,19 @@ class LemmaWallet {
      */
     async getCredentials(type = null) {
         await this.init();
+        const pickRichClaims = (first, second) => {
+            const a = (first && typeof first === 'object') ? first : {};
+            const b = (second && typeof second === 'object') ? second : {};
+            const score = (obj) => {
+                let s = 0;
+                if (Object.keys(obj).length > 0) s += 1;
+                if (obj.permissionId || obj.permission_level || obj.permission_id) s += 2;
+                if (obj.accountType || obj.account_type) s += 2;
+                if (obj.siteId || obj.site_id || obj.siteDomain || obj.site_domain) s += 2;
+                return s;
+            };
+            return score(a) >= score(b) ? a : b;
+        };
         const normalizeCredentialRecord = (record) => {
             if (!record || typeof record !== 'object') return record;
             const nested = (record.credential && typeof record.credential === 'object')
@@ -6085,8 +6098,8 @@ class LemmaWallet {
             const base = nested
                 ? { ...record, ...nested }
                 : { ...record };
-            const claims = base.claims || base.credentialSubject || {};
-            const credentialSubject = base.credentialSubject || base.claims || {};
+            const claims = pickRichClaims(base.claims, base.credentialSubject);
+            const credentialSubject = pickRichClaims(base.credentialSubject, base.claims);
             return {
                 ...base,
                 claims,
