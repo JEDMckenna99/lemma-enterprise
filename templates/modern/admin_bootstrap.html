@@ -111,7 +111,30 @@ function normalizeSiteIdentifier(rawValue) {
 }
 
 function normalizeScopeClaim(rawScope) {
-    if (Array.isArray(rawScope)) return rawScope;
+    if (Array.isArray(rawScope)) {
+        const flattened = [];
+        for (const entry of rawScope) {
+            const value = String(entry || '').trim();
+            if (!value) continue;
+            if (value.startsWith('[') && value.endsWith(']')) {
+                try {
+                    const jsonLike = value.replace(/'/g, '"');
+                    const parsed = JSON.parse(jsonLike);
+                    if (Array.isArray(parsed)) {
+                        for (const inner of parsed) {
+                            const innerValue = String(inner || '').trim();
+                            if (innerValue) flattened.push(innerValue);
+                        }
+                        continue;
+                    }
+                } catch (e) {
+                    // Fall through to push raw value
+                }
+            }
+            flattened.push(value);
+        }
+        return flattened.filter(Boolean);
+    }
     if (typeof rawScope !== 'string') return [];
     const value = rawScope.trim();
     if (!value) return [];
@@ -210,6 +233,22 @@ document.getElementById('bootstrap-form').addEventListener('submit', async (e) =
         const issuedClaims = result.credential?.claims || result.credential?.credentialSubject || {};
         const issuedPermissionId = (issuedClaims.permissionId || issuedClaims.permission_level || permission_level || 'admin_access');
         const normalizedScope = normalizeScopeClaim(issuedClaims.scope);
+        const issuedSite = normalizeSiteIdentifier(
+            issuedClaims.siteId ||
+            issuedClaims.site_domain ||
+            issuedClaims.siteDomain ||
+            result.site_domain ||
+            result.site_id ||
+            normalizedSiteDomain
+        );
+        if (!issuedSite) {
+            throw new Error('Issued credential did not include a valid site binding.');
+        }
+        // Guardrail: if user entered a site, prevent storing a credential that resolves to another site.
+        const requestedSite = normalizeSiteIdentifier(normalizedSiteId || normalizedSiteDomain);
+        if (requestedSite && requestedSite !== issuedSite) {
+            throw new Error(`Issued site binding mismatch. Requested "${requestedSite}" but server issued "${issuedSite}".`);
+        }
 
         // Ensure credential has correct format for session-free architecture
         // CRITICAL: packageType must be at TOP LEVEL (not just in claims)
@@ -220,8 +259,9 @@ document.getElementById('bootstrap-form').addEventListener('submit', async (e) =
             credentialSubject: {
                 ...(result.credential.credentialSubject || result.credential.claims || {}),
                 packageType: 'permission',  // Also in credentialSubject
-                siteId: normalizedSiteDomain,  // Use normalized hostname for site matching
-                siteDomain: normalizedSiteDomain,
+                siteId: issuedSite,  // Use server-issued canonical site binding
+                siteDomain: issuedSite,
+                site_domain: issuedSite,
                 permissionId: issuedPermissionId,
                 accountType: 'admin',
                 ...(normalizedScope.length ? { scope: normalizedScope } : {}),
@@ -231,8 +271,9 @@ document.getElementById('bootstrap-form').addEventListener('submit', async (e) =
             claims: {
                 ...(result.credential.claims || result.credential.credentialSubject || {}),
                 packageType: 'permission',
-                siteId: normalizedSiteDomain,
-                siteDomain: normalizedSiteDomain,
+                siteId: issuedSite,
+                siteDomain: issuedSite,
+                site_domain: issuedSite,
                 permissionId: issuedPermissionId,
                 accountType: 'admin',
                 ...(normalizedScope.length ? { scope: normalizedScope } : {}),
