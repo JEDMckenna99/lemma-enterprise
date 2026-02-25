@@ -185,7 +185,7 @@ def subscription_success():
 def get_subscription_status():
     """
     Get current user's subscription status.
-    Requires PPID authentication (via X-Lemma-PPID header).
+    Requires wallet authentication (via verified X-Lemma-Credential header).
     """
     ppid = getattr(g, 'ppid', None)
     

@@ -668,7 +668,7 @@ def _build_owner_filter(identity, alias='ac'):
 def require_agent_or_user_session(required_scope=None):
     """
     Lightweight explicit auth decorator for credential management endpoints.
-    Accepts agent token, PPID header, API key, or active agent browser session.
+    Accepts agent token, full lemma credential header, API key, or active agent browser session.
     """
     def decorator(f):
         @wraps(f)
@@ -1178,7 +1178,7 @@ def require_agent_or_user_auth(required_scope=None, enforce_task_bounds=True):
     """
     Decorator that allows either:
     1. Agent token (X-Agent-Token header)
-    2. User auth (X-Lemma-PPID header or session)
+    2. User auth (X-Lemma-Credential header or session)
 
     For agent tokens, also enforces task-bound authorization:
     - Checks if the request path is in allowed_paths

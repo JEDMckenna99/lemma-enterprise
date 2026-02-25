@@ -380,7 +380,7 @@ def admin_self_issue():
     POST /api/v1/iam/admin/self-issue
     Headers:
         Authorization: Bearer <api_key>
-        X-Lemma-PPID: did:lemma:ppid_xxx (optional - wallet-derived PPID)
+        X-Lemma-Credential: <base64url(full permission lemma)> (optional - wallet-derived PPID source)
     Body:
     {
         "site_id": "lemma_platform",  // optional if API key maps to exactly one site

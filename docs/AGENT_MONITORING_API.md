@@ -13,7 +13,7 @@ Base URL examples:
 Any one of the following is supported on monitoring endpoints:
 
 - `X-API-Key: <site_api_key>` (recommended for external/custom dashboards)
-- `X-Lemma-PPID: did:lemma:ppid_...`
+- `X-Lemma-Credential: <base64url(full permission lemma)>`
 - `X-Agent-Token: lm_agent_...`
 - Browser session cookie (`customer_id`)
 
