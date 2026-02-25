@@ -110,6 +110,14 @@ function normalizeSiteIdentifier(rawValue) {
     return value.split('/')[0].split(':')[0];
 }
 
+function isHostnameLike(value) {
+    const v = normalizeSiteIdentifier(value);
+    if (!v) return false;
+    // Accept localhost and normal hostnames; reject opaque internal IDs like site_xxx.
+    if (v === 'localhost') return true;
+    return v.includes('.') && !v.startsWith('site_');
+}
+
 function normalizeScopeClaim(rawScope) {
     if (Array.isArray(rawScope)) {
         const flattened = [];
@@ -176,16 +184,17 @@ document.getElementById('bootstrap-form').addEventListener('submit', async (e) =
             throw new Error('Site ID is required.');
         }
         const normalizedSiteId = normalizeSiteIdentifier(site_id);
-        const normalizedSiteDomain = normalizeSiteIdentifier(site_domain || site_id);
+        const normalizedSiteDomain = normalizeSiteIdentifier(site_domain);
+        const derivedDomain = normalizedSiteDomain || (isHostnameLike(normalizedSiteId) ? normalizedSiteId : '');
         if (!normalizedSiteId) {
             throw new Error('Invalid site ID. Use a hostname like example.com.');
         }
-        if (!normalizedSiteDomain) {
-            throw new Error('Invalid site domain. Use a hostname like example.com.');
+        if (!derivedDomain) {
+            throw new Error('Site Domain is required when Site ID is an internal identifier (e.g. site_xxx).');
         }
 
         const wallet = window.globalLemmaWallet;
-        const ppidDomain = normalizedSiteDomain;
+        const ppidDomain = derivedDomain;
         if (!ppidDomain) {
             throw new Error('Provide site domain or site id so wallet can derive a site-scoped PPID.');
         }
@@ -239,15 +248,26 @@ document.getElementById('bootstrap-form').addEventListener('submit', async (e) =
             issuedClaims.siteDomain ||
             result.site_domain ||
             result.site_id ||
-            normalizedSiteDomain
+            derivedDomain
         );
         if (!issuedSite) {
             throw new Error('Issued credential did not include a valid site binding.');
         }
-        // Guardrail: if user entered a site, prevent storing a credential that resolves to another site.
-        const requestedSite = normalizeSiteIdentifier(normalizedSiteId || normalizedSiteDomain);
-        if (requestedSite && requestedSite !== issuedSite) {
-            throw new Error(`Issued site binding mismatch. Requested "${requestedSite}" but server issued "${issuedSite}".`);
+        // Guardrail: prevent storing a credential bound to a different site/domain.
+        const requestedCandidates = new Set([
+            normalizeSiteIdentifier(normalizedSiteId),
+            normalizeSiteIdentifier(derivedDomain),
+            normalizeSiteIdentifier(result.site_id),
+            normalizeSiteIdentifier(result.site_domain)
+        ].filter(Boolean));
+        const issuedCandidates = new Set([
+            normalizeSiteIdentifier(issuedSite),
+            normalizeSiteIdentifier(result.site_id),
+            normalizeSiteIdentifier(result.site_domain)
+        ].filter(Boolean));
+        const matches = [...requestedCandidates].some(value => issuedCandidates.has(value));
+        if (!matches) {
+            throw new Error(`Issued site binding mismatch. Requested "${[...requestedCandidates].join(', ')}" but server issued "${[...issuedCandidates].join(', ')}".`);
         }
 
         // Ensure credential has correct format for session-free architecture
