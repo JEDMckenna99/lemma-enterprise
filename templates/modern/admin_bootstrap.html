@@ -312,6 +312,19 @@ document.getElementById('bootstrap-form').addEventListener('submit', async (e) =
         
         // Store credential in wallet
         const storeResult = await wallet.storeCredential(credentialToStore);
+
+        // Ensure customer-site bridge reads the same newly issued credential.
+        // On lemma.id, local storage and bridge storage should align, but this
+        // explicit sync removes timing/context ambiguity for third-party retrieval.
+        let bridgeSyncResult = null;
+        if (typeof wallet._syncToCentralWallet === 'function') {
+            try {
+                bridgeSyncResult = await wallet._syncToCentralWallet(credentialToStore);
+                console.log('Bridge sync result:', bridgeSyncResult);
+            } catch (syncError) {
+                console.warn('Bridge sync failed (non-fatal):', syncError?.message || syncError);
+            }
+        }
         
         console.log('=== STORAGE RESULT ===');
         console.log('Store result:', storeResult);
@@ -332,6 +345,7 @@ document.getElementById('bootstrap-form').addEventListener('submit', async (e) =
         document.getElementById('credential-json').textContent = JSON.stringify({
             credential: credentialToStore,
             storeResult: storeResult,
+            bridgeSyncResult: bridgeSyncResult,
             verificationCheck: {
                 foundInWallet: permissionCreds.length > 0,
                 totalPermissionCreds: permissionCreds.length
