@@ -20,7 +20,7 @@ import hashlib
 from datetime import datetime
 from flask import Blueprint, request, jsonify
 from flask_cors import cross_origin
-from auth.decorators import require_api_key
+from auth.decorators import require_api_key, extract_authenticated_ppid_from_request
 
 from api.real_iam_manager import get_site_manager, get_or_create_site_manager
 from api.email_service import send_email
@@ -480,7 +480,7 @@ def admin_self_issue():
         
         # Get user DID from wallet-derived PPID only (legacy email-derived DID disabled)
         # Priority: 1) Header 2) Body
-        user_did = request.headers.get('X-Lemma-PPID')
+        user_did = extract_authenticated_ppid_from_request()
         
         if not user_did or not user_did.startswith('did:lemma:ppid_'):
             user_did = data.get('user_ppid')

@@ -7,13 +7,21 @@ import logging
 import secrets
 import hashlib
 from datetime import datetime, timezone
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, g
 from flask_cors import cross_origin
 from api.agent_credentials import require_agent_or_user_auth
 
 logger = logging.getLogger(__name__)
 
 site_management_bp = Blueprint('site_management', __name__)
+
+
+def _actor_ppid_for_audit() -> str:
+    """Resolve authenticated actor PPID for audit fields."""
+    ppid = getattr(g, 'ppid', None)
+    if ppid and str(ppid).startswith('did:lemma:ppid_'):
+        return str(ppid)
+    return 'api'
 
 
 # ============================================
@@ -154,7 +162,7 @@ def add_site_user(site_id):
         if role not in ['user', 'moderator', 'admin']:
             role = 'user'
         
-        added_by = request.headers.get('X-Lemma-PPID', 'api')
+        added_by = _actor_ppid_for_audit()
         
         conn = get_db_connection(site_id)
         cursor = conn.cursor()
@@ -541,7 +549,7 @@ def create_permission_type(site_id):
             delegation_allowed=data.get('delegation_allowed', False),
             priority=data.get('priority', 0),
             created_at=datetime.now(timezone.utc),
-            created_by=request.headers.get('X-Lemma-PPID', 'api')
+            created_by=_actor_ppid_for_audit()
         )
         
         db.add(permission)
@@ -708,7 +716,7 @@ def grant_user_permission(site_id, ppid):
             return jsonify({'success': False, 'error': 'User already has this permission'}), 400
         
         # Grant permission
-        granted_by = request.headers.get('X-Lemma-PPID', 'api')
+        granted_by = _actor_ppid_for_audit()
         cursor.execute("""
             INSERT INTO site_permission_grants (site_id, user_did, permission_id, granted_by, granted_at, is_active)
             VALUES (%s, %s, %s, %s, NOW(), true)
@@ -893,7 +901,7 @@ def create_api_key(site_id):
             key_hash,
             full_key[:12] + '...',
             key_type,
-            request.headers.get('X-Lemma-PPID', 'api'),
+            _actor_ppid_for_audit(),
             str(permissions).replace("'", '"')
         ))
         
@@ -991,7 +999,7 @@ def rotate_api_key(site_id, key_id):
             key_hash,
             full_key[:12] + '...',
             key_type,
-            request.headers.get('X-Lemma-PPID', 'api'),
+            _actor_ppid_for_audit(),
             str(permissions or ['read', 'write']).replace("'", '"')
         ))
         

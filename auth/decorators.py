@@ -116,6 +116,16 @@ def _extract_verified_lemma_context():
     }, None
 
 
+def extract_authenticated_ppid_from_request() -> Optional[str]:
+    """
+    Return PPID from a verified `X-Lemma-Credential` header, if present and valid.
+    """
+    lemma_ctx, _lemma_error = _extract_verified_lemma_context()
+    if lemma_ctx:
+        return lemma_ctx.get("ppid")
+    return None
+
+
 def _extract_api_key_from_request() -> Optional[str]:
     """
     Extract API key from supported locations.

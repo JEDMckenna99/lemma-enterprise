@@ -20,7 +20,7 @@ from flask_cors import cross_origin
 import stripe
 from sqlalchemy.orm import Session
 from .database import get_db, Customer as DBCustomer, init_database
-from auth.decorators import require_customer_or_admin
+from auth.decorators import require_customer_or_admin, extract_authenticated_ppid_from_request
 
 # Configure Stripe
 stripe.api_key = os.getenv('STRIPE_SECRET_KEY')
@@ -351,12 +351,12 @@ def _extract_customer_id_from_request() -> Optional[str]:
             logger.error(f"Failed to parse credential from Authorization header: {e}")
             return None
     
-    # Check for PPID in header (SDK sends this after wallet auth)
-    ppid = request.headers.get('X-Lemma-PPID')
+    # Check for PPID from verified full-lemma header.
+    ppid = extract_authenticated_ppid_from_request()
     if ppid and ppid.startswith('did:lemma:ppid_'):
         customer = customer_manager.get_customer_by_did(ppid)
         if customer:
-            logger.info(f"✅ Authenticated via PPID header: {customer.customer_id}")
+            logger.info(f"✅ Authenticated via lemma header PPID: {customer.customer_id}")
             return customer.customer_id
     
     # Check for credential headers (edge computing pattern)

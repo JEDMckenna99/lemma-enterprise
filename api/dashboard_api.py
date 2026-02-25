@@ -25,7 +25,7 @@ dashboard_bp = Blueprint('dashboard', __name__)
 from .usage_tracking import get_usage_summary, get_monthly_active_users, track_active_user
 
 # Import auth decorators
-from auth.decorators import require_site_admin, require_api_key, require_wallet_ppid, require_customer_or_admin
+from auth.decorators import require_site_admin, require_api_key, require_wallet_ppid, require_customer_or_admin, extract_authenticated_ppid_from_request
 
 # ================================================================================
 # CUSTOMER DASHBOARD ENDPOINTS
@@ -37,7 +37,7 @@ from auth.decorators import require_site_admin, require_api_key, require_wallet_
 def get_customer_profile():
     """Get customer profile information
     
-    Requires: Authenticated wallet (X-Lemma-PPID header) or API key
+    Requires: Authenticated wallet (X-Lemma-Credential header) or API key
     """
     try:
         # Auth verified by @require_wallet_ppid decorator
@@ -396,9 +396,8 @@ def issue_admin_lemma_endpoint():
                 'priority': 100
             })
         
-        # Get admin DID - prefer wallet-derived PPID if provided
-        # This allows credentials to be issued to the wallet's actual PPID
-        admin_did = request.headers.get('X-Lemma-PPID')
+        # Get admin DID from verified lemma header first (preferred).
+        admin_did = extract_authenticated_ppid_from_request()
         
         if not admin_did or not admin_did.startswith('did:lemma:ppid_'):
             # Check request body for PPID
@@ -469,7 +468,7 @@ def issue_admin_credential():
     
     POST /api/admin/issue-admin-credential
     Headers:
-        X-Lemma-PPID: did:lemma:ppid_xxx (from wallet.derivePPID('lemma.id'))
+        X-Lemma-Credential: <base64url(full permission lemma)>
         X-API-Key: lemma_xxx (platform API key for authorization)
         OR Authorization: Bearer lemma_xxx
     Body:
@@ -484,14 +483,14 @@ def issue_admin_credential():
         - issuer_did: Platform issuer DID
     """
     try:
-        # 1. REQUIRE wallet-derived PPID
-        ppid = request.headers.get('X-Lemma-PPID')
+        # 1. REQUIRE wallet-derived PPID from verified full lemma
+        ppid = extract_authenticated_ppid_from_request()
         
         if not ppid or not ppid.startswith('did:lemma:ppid_'):
             return jsonify({
                 'success': False,
-                'error': 'X-Lemma-PPID header required',
-                'message': 'Derive PPID from unlocked wallet: await wallet.derivePPID("lemma.id")'
+                'error': 'X-Lemma-Credential header required',
+                'message': 'Provide full wallet lemma in X-Lemma-Credential so server can verify subject PPID.'
             }), 400
         
         # 2. REQUIRE API key authorization (proves they have platform access)
