@@ -157,6 +157,22 @@ function getCredentialSiteBinding(claims) {
     ).toLowerCase().replace(/^www\./, '');
 }
 
+function normalizeCredentialRecord(record) {
+    if (!record || typeof record !== 'object') return record;
+    const nested = (record.credential && typeof record.credential === 'object')
+        ? record.credential
+        : ((record.lemma && typeof record.lemma === 'object') ? record.lemma : null);
+    const base = nested ? { ...record, ...nested } : { ...record };
+    const claims = base.claims || base.credentialSubject || nested?.claims || nested?.credentialSubject || {};
+    const credentialSubject = base.credentialSubject || base.claims || nested?.credentialSubject || nested?.claims || {};
+    return {
+        ...base,
+        claims,
+        credentialSubject,
+        packageType: base.packageType || claims.packageType || credentialSubject.packageType || base.type?.[1] || null
+    };
+}
+
 function updateSessionCache(value) {
     cache.session.value = value;
     cache.session.ts = Date.now();
@@ -529,7 +545,7 @@ async function getCredentialsCached(filterType, requestingSite, showAll) {
         return await cache.credentialsPromises.get(key);
     }
     const promise = (async () => {
-        let credentials = await wallet.getCredentials(filterType);
+        let credentials = (await wallet.getCredentials(filterType)).map(normalizeCredentialRecord);
         const isLemmaRequesting = isLemmaInfrastructureSite(requestingSite);
         if (!isLemmaRequesting && !showAll) {
             credentials = credentials.filter(c => {
