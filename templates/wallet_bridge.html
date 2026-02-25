@@ -147,6 +147,16 @@ function clearCredentialsCache() {
     cache.credentialsPromises.clear();
 }
 
+function getCredentialSiteBinding(claims) {
+    return String(
+        claims?.siteId ||
+        claims?.site_id ||
+        claims?.siteDomain ||
+        claims?.site_domain ||
+        ''
+    ).toLowerCase().replace(/^www\./, '');
+}
+
 function updateSessionCache(value) {
     cache.session.value = value;
     cache.session.ts = Date.now();
@@ -524,8 +534,8 @@ async function getCredentialsCached(filterType, requestingSite, showAll) {
         if (!isLemmaRequesting && !showAll) {
             credentials = credentials.filter(c => {
                 const claims = c.claims || c.credentialSubject || {};
-                const credSiteId = claims.siteId || claims.site_id || '';
-                const normalizedCredSite = credSiteId.toLowerCase().replace(/^www\./, '');
+                const normalizedCredSite = getCredentialSiteBinding(claims);
+                if (!normalizedCredSite) return false;
                 return normalizedCredSite === requestingSite ||
                        requestingSite.endsWith('.' + normalizedCredSite) ||
                        normalizedCredSite.endsWith('.' + requestingSite);
@@ -966,7 +976,7 @@ window.addEventListener('message', async (event) => {
                 // - Internal site IDs (site_xxx format) are only allowed FROM lemma.id origin
                 // SECURITY: The hex regex was removed - it allowed any site to fake internal IDs
                 const credClaims = credential.claims || credential.credentialSubject || {};
-                const credSiteId = (credClaims.siteId || credClaims.site_id || '').toLowerCase().replace(/^www\./, '');
+                const credSiteId = getCredentialSiteBinding(credClaims);
                 const isLemmaOrigin = isLemmaInfrastructureSite(requestingSite);
 
                 // SECURITY: Internal siteIds can ONLY come from lemma.id, not arbitrary sites
@@ -1045,7 +1055,7 @@ window.addEventListener('message', async (event) => {
                 // SECURITY: Validate credential's siteId matches requesting site
                 // This enforces site-specific credential isolation
                 const verifyClaims = credToVerify.claims || credToVerify.credentialSubject || {};
-                const verifySiteId = (verifyClaims.siteId || verifyClaims.site_id || '').toLowerCase().replace(/^www\./, '');
+                const verifySiteId = getCredentialSiteBinding(verifyClaims);
                 const isLemmaVerifying = isLemmaInfrastructureSite(requestingSite);
 
                 // SECURITY: Internal siteIds only trusted from lemma.id origin
@@ -1108,7 +1118,7 @@ window.addEventListener('message', async (event) => {
                 
                 // SECURITY: Same siteId validation as full verify
                 const quickClaims = quickCredential.claims || quickCredential.credentialSubject || {};
-                const quickSiteId = (quickClaims.siteId || quickClaims.site_id || '').toLowerCase().replace(/^www\./, '');
+                const quickSiteId = getCredentialSiteBinding(quickClaims);
                 const isLemmaQuickVerify = isLemmaInfrastructureSite(requestingSite);
 
                 // SECURITY: Internal siteIds only trusted from lemma.id origin
@@ -1171,7 +1181,7 @@ window.addEventListener('message', async (event) => {
                 
                 if (credToRemove) {
                     const removeClaims = credToRemove.claims || credToRemove.credentialSubject || {};
-                    const removeSiteId = (removeClaims.siteId || removeClaims.site_id || '').toLowerCase().replace(/^www\./, '');
+                    const removeSiteId = getCredentialSiteBinding(removeClaims);
                     
                     if (removeSiteId && removeSiteId !== requestingSite &&
                         !requestingSite.endsWith('.' + removeSiteId) &&
