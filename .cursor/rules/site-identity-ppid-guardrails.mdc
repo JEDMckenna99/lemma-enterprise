@@ -1,0 +1,39 @@
+﻿---
+alwaysApply: true
+description: Enforce PPID and site identity guardrails for admin and customer flows
+---
+# Site Identity and PPID Guardrails
+
+Use these rules when editing auth, IAM, wallet, admin bootstrap, or customer site integration code.
+
+## Canonical identity model
+
+- Treat internal site identifiers (site_*) as ownership and database binding keys.
+- Treat normalized hostnames/domains as PPID derivation and runtime credential matching keys.
+- Do not assume internal site_* by itself is sufficient for customer site runtime matching.
+
+## PPID derivation requirements
+
+- Derive PPID from wallet secret plus normalized hostname/domain only.
+- Normalize host values before use: lowercase, no scheme, no path, no port, strip www. when applicable.
+- On customer sites, default identity input should align with window.location.hostname.
+
+## Issuance and storage safety
+
+- Fail closed on issued/requested site binding mismatch.
+- When both site_id and site_domain exist, preserve both for validation context.
+- Use server-issued canonical site binding when storing issued credentials.
+- Do not silently coerce mismatched bindings.
+
+## Credential shape invariants
+
+- Keep admin compatibility: canonical permissionId should remain admin_access.
+- Preserve selected admin level separately (for example permission_level).
+- Keep timestamps numeric and booleans as booleans.
+- Keep scope as an array of strings.
+
+## Deployment and testing expectations
+
+- Prefer minimal additive changes that avoid auth flow rewrites.
+- After auth/IAM changes, run smoke validation on live deployment endpoints.
+- Do not remove PPID-first and wallet-unlocked requirements.
