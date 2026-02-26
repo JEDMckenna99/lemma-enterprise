@@ -245,47 +245,107 @@ h1{color:#1e293b;font-weight:600;line-height:1.25;margin-bottom:16px;font-size:4
             }
         })();
         
-        // AUTO-ATTACH WALLET AUTH TO ALL API REQUESTS
-        // This makes wallet unlock = signed in across the platform
+        // AUTH HELPERS + AUTO-ATTACH FOR API REQUESTS (session-free lemma auth)
         (function() {
-            const originalFetch = window.fetch;
-            
-            // Unicode-safe base64 encoding for HTTP headers
-            function encodeForHeader(obj) {
-                const jsonStr = JSON.stringify(obj);
-                // Use TextEncoder to handle Unicode properly
-                const bytes = new TextEncoder().encode(jsonStr);
-                // Convert bytes to base64
-                let binary = '';
-                for (let i = 0; i < bytes.length; i++) {
-                    binary += String.fromCharCode(bytes[i]);
-                }
-                return btoa(binary);
-            }
-            
-            window.fetch = async function(url, options = {}) {
-                // Only modify requests to our API
-                if (url.startsWith('/api/') || url.includes('lemma.id/api/')) {
+            if (!window.encodeLemmaCredentialHeader) {
+                window.encodeLemmaCredentialHeader = function encodeLemmaCredentialHeader(credential) {
                     try {
-                        const wallet = window.globalLemmaWallet || window.lemmaWallet;
-                        if (wallet && typeof wallet.isUnlocked === 'function' && wallet.isUnlocked()) {
-                            const authProof = await wallet.getAuthProof();
-                            // Encode to ensure HTTP header compatibility (ISO-8859-1)
-                            const authProofEncoded = encodeForHeader(authProof);
-                            options.headers = options.headers || {};
-                            if (options.headers instanceof Headers) {
-                                options.headers.set('X-Wallet-Auth', authProofEncoded);
-                            } else {
-                                options.headers['X-Wallet-Auth'] = authProofEncoded;
+                        const json = JSON.stringify(credential || {});
+                        return btoa(unescape(encodeURIComponent(json)))
+                            .replace(/\+/g, '-')
+                            .replace(/\//g, '_')
+                            .replace(/=+$/, '');
+                    } catch (_) {
+                        return '';
+                    }
+                };
+            }
+
+            if (!window.ensureLemmaCredential) {
+                window.ensureLemmaCredential = async function ensureLemmaCredential(forceRefresh = false) {
+                    if (!forceRefresh && window.lemmaCredential && typeof window.lemmaCredential === 'object') {
+                        return window.lemmaCredential;
+                    }
+                    if (typeof LemmaWallet === 'undefined') {
+                        return null;
+                    }
+                    try {
+                        if (!window.globalLemmaWallet) {
+                            window.globalLemmaWallet = new LemmaWallet({ debug: false, enableDeviceSync: true, enableAdvancedFeatures: true });
+                            await window.globalLemmaWallet.init();
+                        }
+                        const wallet = window.globalLemmaWallet;
+                        const all = await wallet.getCredentials('permission');
+                        const utils = window.LemmaCredentialUtils;
+                        const lemmaPermissions = (all || []).filter((cred) => {
+                            const claims = cred.claims || cred.credentialSubject || {};
+                            const siteId = String(claims.siteId || claims.site || claims.site_id || claims.siteDomain || '').toLowerCase();
+                            return siteId === 'lemma.id' || siteId === 'lemma_platform' || siteId.includes('lemma');
+                        });
+                        let selected = null;
+                        if (utils && typeof utils.selectBestCredentials === 'function') {
+                            const valid = utils.selectBestCredentials(lemmaPermissions);
+                            selected = valid.length ? valid[0] : null;
+                        } else {
+                            selected = lemmaPermissions.length ? lemmaPermissions[0] : null;
+                        }
+                        if (selected) {
+                            window.lemmaCredential = selected;
+                        }
+                        return selected;
+                    } catch (_) {
+                        return null;
+                    }
+                };
+            }
+
+            if (!window.getLemmaAuthHeaders) {
+                window.getLemmaAuthHeaders = function getLemmaAuthHeaders(extraHeaders) {
+                    const headers = { ...(extraHeaders || {}) };
+                    const credential = window.lemmaCredential;
+                    if (!credential || typeof credential !== 'object') return headers;
+                    const encoded = window.encodeLemmaCredentialHeader(credential);
+                    if (encoded) headers['X-Lemma-Credential'] = encoded;
+                    if (credential.id) headers['X-Credential-ID'] = credential.id;
+                    const claims = credential.claims || credential.credentialSubject || {};
+                    const permissionId = claims.permissionId || claims.permission_id || claims.permission_level || claims.permission;
+                    if (permissionId) headers['X-Permission-ID'] = String(permissionId);
+                    return headers;
+                };
+            }
+
+            if (!window.getLemmaAuthHeadersAsync) {
+                window.getLemmaAuthHeadersAsync = async function getLemmaAuthHeadersAsync(extraHeaders) {
+                    await window.ensureLemmaCredential(false);
+                    return window.getLemmaAuthHeaders(extraHeaders);
+                };
+            }
+
+            if (!window.__lemmaFetchWrapped) {
+                const originalFetch = window.fetch.bind(window);
+                window.fetch = async function(input, init) {
+                    try {
+                        const reqInit = init ? { ...init } : {};
+                        const urlString = typeof input === 'string' ? input : (input && input.url) || '';
+                        const isSameOriginApi = typeof urlString === 'string'
+                            && (urlString.startsWith('/api/') || urlString.startsWith(window.location.origin + '/api/'));
+                        if (isSameOriginApi) {
+                            const h = new Headers(reqInit.headers || (input && input.headers) || {});
+                            if (!h.has('X-Lemma-Credential') && !h.has('X-Agent-Token') && !h.has('X-API-Key') && !h.has('Authorization')) {
+                                const authHeaders = await window.getLemmaAuthHeadersAsync();
+                                Object.entries(authHeaders).forEach(([k, v]) => {
+                                    if (v != null && v !== '') h.set(k, v);
+                                });
+                                reqInit.headers = h;
                             }
                         }
-                    } catch (e) {
-                        // Silent fail - don't break requests if auth fails
-                        console.warn('Wallet auth attach failed:', e.message);
+                        return originalFetch(input, reqInit);
+                    } catch (_) {
+                        return originalFetch(input, init);
                     }
-                }
-                return originalFetch.call(this, url, options);
-            };
+                };
+                window.__lemmaFetchWrapped = true;
+            }
             console.log('🔐 Wallet auth auto-attach enabled');
         })();
 
@@ -313,87 +373,7 @@ h1{color:#1e293b;font-weight:600;line-height:1.25;margin-bottom:16px;font-size:4
                 // Ensure lock/unlock changes propagate on lemma.id too.
                 wallet._autoStartHeartbeat?.();
 
-                // Shared auth header helpers used across dashboard pages.
-                window.encodeLemmaCredentialHeader = function encodeLemmaCredentialHeader(credential) {
-                    try {
-                        const json = JSON.stringify(credential || {});
-                        return btoa(unescape(encodeURIComponent(json)))
-                            .replace(/\+/g, '-')
-                            .replace(/\//g, '_')
-                            .replace(/=+$/, '');
-                    } catch (_) {
-                        return '';
-                    }
-                };
-
-                window.getLemmaAuthHeaders = function getLemmaAuthHeaders(extraHeaders) {
-                    const headers = { ...(extraHeaders || {}) };
-                    const credential = window.lemmaCredential;
-                    if (!credential || typeof credential !== 'object') {
-                        return headers;
-                    }
-
-                    const encoded = window.encodeLemmaCredentialHeader(credential);
-                    if (encoded) {
-                        headers['X-Lemma-Credential'] = encoded;
-                    }
-                    if (credential.id) {
-                        headers['X-Credential-ID'] = credential.id;
-                    }
-
-                    const claims = credential.claims || credential.credentialSubject || {};
-                    const permissionId = claims.permissionId || claims.permission_id || claims.permission_level || claims.permission;
-                    if (permissionId) {
-                        headers['X-Permission-ID'] = String(permissionId);
-                    }
-                    return headers;
-                };
-
-                window.getLemmaAuthHeadersAsync = async function getLemmaAuthHeadersAsync(extraHeaders) {
-                    if (!window.lemmaCredential && window.globalLemmaWallet) {
-                        try {
-                            const all = await window.globalLemmaWallet.getCredentials('permission');
-                            const maybe = (all || []).find((cred) => {
-                                const claims = cred.claims || cred.credentialSubject || {};
-                                const siteId = String(claims.siteId || claims.site || claims.site_id || claims.siteDomain || '').toLowerCase();
-                                return siteId === 'lemma.id' || siteId === 'lemma_platform' || siteId.includes('lemma');
-                            });
-                            if (maybe) {
-                                window.lemmaCredential = maybe;
-                            }
-                        } catch (_) {
-                            // Best effort only.
-                        }
-                    }
-                    return window.getLemmaAuthHeaders(extraHeaders);
-                };
-
-                // Auto-attach verified lemma credential to same-origin API calls.
-                if (!window.__lemmaFetchWrapped) {
-                    const originalFetch = window.fetch.bind(window);
-                    window.fetch = async function(input, init) {
-                        try {
-                            const reqInit = init ? { ...init } : {};
-                            const urlString = typeof input === 'string' ? input : (input?.url || '');
-                            const isSameOriginApi = typeof urlString === 'string'
-                                && (urlString.startsWith('/api/') || urlString.startsWith(window.location.origin + '/api/'));
-                            if (isSameOriginApi) {
-                                const h = new Headers(reqInit.headers || (input && input.headers) || {});
-                                if (!h.has('X-Lemma-Credential') && !h.has('X-Agent-Token') && !h.has('X-API-Key') && !h.has('Authorization')) {
-                                    const authHeaders = await window.getLemmaAuthHeadersAsync();
-                                    Object.entries(authHeaders).forEach(([k, v]) => {
-                                        if (v != null && v !== '') h.set(k, v);
-                                    });
-                                    reqInit.headers = h;
-                                }
-                            }
-                            return originalFetch(input, reqInit);
-                        } catch (_) {
-                            return originalFetch(input, init);
-                        }
-                    };
-                    window.__lemmaFetchWrapped = true;
-                }
+                // Shared auth helpers/auto-attach are initialized globally above.
 
                 function setLoggedOutUI() {
                     const userDropdown = document.getElementById('user-dropdown');
