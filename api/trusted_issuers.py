@@ -12,6 +12,7 @@ import logging
 import os
 from typing import Set, Optional
 from datetime import datetime, timedelta
+from sqlalchemy import or_
 
 logger = logging.getLogger(__name__)
 
@@ -84,7 +85,7 @@ def get_trusted_issuer_dids() -> Set[str]:
         sites = db.query(Site).filter(
             Site.kms_encrypted_signing_key != None,
             Site.issuer_did != None,
-            Site.key_status == 'active'
+            or_(Site.key_status == 'active', Site.key_status == None)
         ).all()
         
         for site in sites:
@@ -97,7 +98,7 @@ def get_trusted_issuer_dids() -> Set[str]:
         platform_sites = db.query(Site).filter(
             Site.site_id.in_(['lemma.id', 'lemma_platform']),
             Site.issuer_did != None,
-            Site.key_status == 'active'
+            or_(Site.key_status == 'active', Site.key_status == None)
         ).all()
         for site in platform_sites:
             if site.issuer_did not in trusted_dids:
@@ -118,6 +119,22 @@ def get_trusted_issuer_dids() -> Set[str]:
                     logger.info(f"Trusted registry issuer added: {issuer.issuer_did[:50]}...")
         except Exception as e:
             logger.warning(f"Issuer-registry trust source unavailable: {e}")
+
+        # Compatibility trust source: active lemma.id issuer records even when legacy
+        # verification metadata is incomplete.
+        try:
+            from api.issuer_registry import IssuerRecord
+            platform_registry_issuers = db.query(IssuerRecord).filter(
+                IssuerRecord.domain.in_(['lemma.id', 'www.lemma.id']),
+                IssuerRecord.is_active == True,
+                IssuerRecord.revoked_at == None,
+            ).all()
+            for issuer in platform_registry_issuers:
+                if issuer.issuer_did and issuer.issuer_did not in trusted_dids:
+                    trusted_dids.add(issuer.issuer_did)
+                    logger.warning(f"Trusted legacy platform registry issuer added: {issuer.issuer_did[:50]}...")
+        except Exception as e:
+            logger.warning(f"Legacy platform registry trust source unavailable: {e}")
 
         # Runtime canonical issuer fallback: include currently loaded platform IAM issuers.
         try:
