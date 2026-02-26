@@ -166,9 +166,14 @@ let currentPpid = null;
 document.addEventListener('DOMContentLoaded', async () => {
     // First authenticate to get PPID
     currentPpid = await getWalletPpid();
+
+    // Ensure unified-credential context has had a chance to hydrate before first API call.
+    if (typeof window.ensureLemmaCredential === 'function') {
+        await window.ensureLemmaCredential(true);
+    }
     
     // Then load sites with auth
-    loadSites();
+    await loadSites();
     
     // Register button event listeners
     document.getElementById('register-site-btn').addEventListener('click', showCreateSiteModal);
@@ -268,6 +273,10 @@ async function waitForLemmaCredentialHeader(maxWaitMs = 3000) {
     while ((Date.now() - start) < maxWaitMs) {
         const headers = await getAuthHeaders();
         if (headers['X-Lemma-Credential']) {
+            console.debug('[Developer/Sites] lemma header ready', {
+                hasCredential: true,
+                headerLength: String(headers['X-Lemma-Credential']).length
+            });
             return headers;
         }
         await new Promise(resolve => setTimeout(resolve, 100));
