@@ -6077,29 +6077,49 @@ class LemmaWallet {
      */
     async getCredentials(type = null) {
         await this.init();
-        const pickRichClaims = (first, second) => {
-            const a = (first && typeof first === 'object') ? first : {};
-            const b = (second && typeof second === 'object') ? second : {};
+        const pickRichClaims = (...candidates) => {
+            const normalized = candidates.map(c => (c && typeof c === 'object') ? c : {});
             const score = (obj) => {
                 let s = 0;
                 if (Object.keys(obj).length > 0) s += 1;
                 if (obj.permissionId || obj.permission_level || obj.permission_id) s += 2;
                 if (obj.accountType || obj.account_type) s += 2;
                 if (obj.siteId || obj.site_id || obj.siteDomain || obj.site_domain) s += 2;
+                if (obj.scope || obj.permissions) s += 1;
                 return s;
             };
-            return score(a) >= score(b) ? a : b;
+            return normalized.sort((x, y) => score(y) - score(x))[0] || {};
         };
         const normalizeCredentialRecord = (record) => {
             if (!record || typeof record !== 'object') return record;
             const nested = (record.credential && typeof record.credential === 'object')
                 ? record.credential
-                : ((record.lemma && typeof record.lemma === 'object') ? record.lemma : null);
+                : ((record.lemma && typeof record.lemma === 'object')
+                    ? record.lemma
+                    : ((record.payload?.credential && typeof record.payload.credential === 'object')
+                        ? record.payload.credential
+                        : ((record.data?.credential && typeof record.data.credential === 'object')
+                            ? record.data.credential
+                            : null)));
             const base = nested
                 ? { ...record, ...nested }
                 : { ...record };
-            const claims = pickRichClaims(base.claims, base.credentialSubject);
-            const credentialSubject = pickRichClaims(base.credentialSubject, base.claims);
+            const claims = pickRichClaims(
+                base.claims,
+                base.credentialSubject,
+                nested?.claims,
+                nested?.credentialSubject,
+                base.payload?.claims,
+                base.payload?.credentialSubject
+            );
+            const credentialSubject = pickRichClaims(
+                base.credentialSubject,
+                base.claims,
+                nested?.credentialSubject,
+                nested?.claims,
+                base.payload?.credentialSubject,
+                base.payload?.claims
+            );
             return {
                 ...base,
                 claims,
