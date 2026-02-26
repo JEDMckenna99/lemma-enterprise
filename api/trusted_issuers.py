@@ -131,6 +131,13 @@ def get_trusted_issuer_dids() -> Set[str]:
                         logger.info(f"Trusted runtime issuer added: {platform_site} -> {runtime_did[:50]}...")
                 except Exception as inner_e:
                     logger.warning(f"Runtime issuer unavailable for {platform_site}: {inner_e}")
+            try:
+                federated_did = issuer_manager.get_federated_issuer().get_did()
+                if federated_did and federated_did not in trusted_dids:
+                    trusted_dids.add(federated_did)
+                    logger.info(f"Trusted runtime federated issuer added: {federated_did[:50]}...")
+            except Exception as inner_e:
+                logger.warning(f"Runtime federated issuer unavailable: {inner_e}")
         except Exception as e:
             logger.warning(f"Runtime issuer fallback unavailable: {e}")
 
@@ -171,7 +178,6 @@ def is_trusted_issuer(issuer_did: str) -> bool:
         return False
     
     trusted = get_trusted_issuer_dids()
-
     # Fast path exact match.
     if issuer_did in trusted:
         return True
