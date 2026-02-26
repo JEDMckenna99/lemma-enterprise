@@ -24,7 +24,7 @@
 
 <!-- Create Site Modal -->
 <div class="dev-modal" id="create-site-modal">
-    <div class="dev-modal-backdrop" onclick="hideCreateSiteModal()"></div>
+    <div class="dev-modal-backdrop" data-action="hide-create-site-modal"></div>
     <div class="dev-modal-content">
         <div class="dev-modal-header">
             <h2 class="dev-modal-title">Register New Site</h2>
@@ -180,6 +180,12 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (e.target.classList.contains('register-site-trigger')) {
             showCreateSiteModal();
         }
+        const actionEl = e.target.closest('[data-action]');
+        if (!actionEl) return;
+        const action = actionEl.getAttribute('data-action');
+        if (action === 'sign-in-retry') signInAndRetry();
+        if (action === 'retry-load-sites') loadSites();
+        if (action === 'hide-create-site-modal') hideCreateSiteModal();
     });
 });
 
@@ -266,7 +272,7 @@ async function loadSites() {
                         <div class="dev-empty-icon"></div>
                         <div class="dev-empty-title">Sign in required</div>
                         <div class="dev-empty-text">You need to unlock your Lemma wallet to access developer features.</div>
-                        <button class="dev-btn dev-btn-primary" onclick="signInAndRetry()">Sign In with Lemma</button>
+                        <button class="dev-btn dev-btn-primary" data-action="sign-in-retry">Sign In with Lemma</button>
                     </div>
                 </div>
             </div>
@@ -315,7 +321,7 @@ async function loadSites() {
                         <div class="dev-empty-icon"></div>
                         <div class="dev-empty-title">Could not load sites</div>
                         <div class="dev-empty-text">Please try refreshing the page.</div>
-                        <button class="dev-btn dev-btn-secondary" onclick="loadSites()">Retry</button>
+                        <button class="dev-btn dev-btn-secondary" data-action="retry-load-sites">Retry</button>
                     </div>
                 </div>
             </div>
