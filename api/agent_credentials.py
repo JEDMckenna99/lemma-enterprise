@@ -30,6 +30,7 @@ from datetime import datetime, timedelta, timezone
 from functools import wraps
 from flask import Blueprint, request, jsonify, g, session
 from flask_cors import cross_origin
+from api.authz_engine import extract_user_lemma_principal
 
 from auth.rate_limiter import rate_limit, credential_issue_limit, get_issuance_identifier
 
@@ -1324,14 +1325,16 @@ def require_agent_or_user_auth(required_scope=None, enforce_task_bounds=True):
                 g.auth_method = 'agent_session'
                 return f(*args, **kwargs)
 
-            # Fall back to user auth
-            ppid = _extract_ppid_from_lemma_header()
+            # Fall back to user auth (unified verifier path)
+            lemma_principal, lemma_error = extract_user_lemma_principal(request.headers)
             api_key = _extract_api_key_from_request()
 
-            if ppid and ppid.startswith('did:lemma:ppid_'):
-                g.ppid = ppid
+            if lemma_principal:
+                g.ppid = lemma_principal.ppid
+                g.credential_id = lemma_principal.credential_id
+                g.permission_id = lemma_principal.permission_id
                 g.authenticated = True
-                g.auth_method = 'ppid'
+                g.auth_method = lemma_principal.auth_method
                 return f(*args, **kwargs)
 
             is_valid_key, key_info = _validate_request_api_key(api_key)
@@ -1345,7 +1348,8 @@ def require_agent_or_user_auth(required_scope=None, enforce_task_bounds=True):
             return jsonify({
                 'success': False,
                 'error': 'auth_required',
-                'message': 'Provide X-Agent-Token, X-Lemma-Credential, X-API-Key, or Authorization: Bearer <api_key> header'
+                'message': 'Provide X-Agent-Token, X-Lemma-Credential, X-API-Key, or Authorization: Bearer <api_key> header',
+                'lemma_error': lemma_error
             }), 401
 
         return decorated_function
