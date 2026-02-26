@@ -9,6 +9,7 @@ that would cryptographically verify but are NOT authorized by the network.
 """
 
 import logging
+import os
 from typing import Set, Optional
 from datetime import datetime, timedelta
 
@@ -63,6 +64,44 @@ def get_trusted_issuer_dids() -> Set[str]:
             if site.issuer_did not in trusted_dids:
                 trusted_dids.add(site.issuer_did)
                 logger.info(f"Trusted platform issuer added: {site.site_id} -> {site.issuer_did[:50]}...")
+
+        # Additional trust source: verified active issuer-registry records.
+        try:
+            from api.issuer_registry import IssuerRecord
+            registry_issuers = db.query(IssuerRecord).filter(
+                IssuerRecord.verified == True,
+                IssuerRecord.is_active == True,
+                IssuerRecord.revoked_at == None,
+            ).all()
+            for issuer in registry_issuers:
+                if issuer.issuer_did and issuer.issuer_did not in trusted_dids:
+                    trusted_dids.add(issuer.issuer_did)
+                    logger.info(f"Trusted registry issuer added: {issuer.issuer_did[:50]}...")
+        except Exception as e:
+            logger.warning(f"Issuer-registry trust source unavailable: {e}")
+
+        # Runtime canonical issuer fallback: include currently loaded platform IAM issuers.
+        try:
+            from api.issuer_management import get_issuer_manager
+            issuer_manager = get_issuer_manager()
+            for platform_site in ('lemma.id', 'lemma_platform'):
+                try:
+                    runtime_did = issuer_manager.get_iam_issuer(platform_site).get_did()
+                    if runtime_did and runtime_did not in trusted_dids:
+                        trusted_dids.add(runtime_did)
+                        logger.info(f"Trusted runtime issuer added: {platform_site} -> {runtime_did[:50]}...")
+                except Exception as inner_e:
+                    logger.warning(f"Runtime issuer unavailable for {platform_site}: {inner_e}")
+        except Exception as e:
+            logger.warning(f"Runtime issuer fallback unavailable: {e}")
+
+        # Optional explicit override via env for emergency trust bootstrapping.
+        env_trusted = os.getenv('TRUSTED_ISSUER_DIDS', '')
+        if env_trusted:
+            for did in [d.strip() for d in env_trusted.split(',') if d.strip()]:
+                if did not in trusted_dids:
+                    trusted_dids.add(did)
+                    logger.warning(f"Trusted issuer added from TRUSTED_ISSUER_DIDS: {did[:50]}...")
         
         db.close()
         
