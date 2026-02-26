@@ -20,6 +20,8 @@ import json
 import logging
 
 from auth.permissions import normalize_scopes, is_admin_permission
+from api.authz_engine import extract_user_lemma_principal
+from api.authz_policy import get_error_defaults
 
 logger = logging.getLogger(__name__)
 
@@ -120,9 +122,9 @@ def extract_authenticated_ppid_from_request() -> Optional[str]:
     """
     Return PPID from a verified `X-Lemma-Credential` header, if present and valid.
     """
-    lemma_ctx, _lemma_error = _extract_verified_lemma_context()
-    if lemma_ctx:
-        return lemma_ctx.get("ppid")
+    principal, _lemma_error = extract_user_lemma_principal(request.headers)
+    if principal:
+        return principal.ppid
     return None
 
 
@@ -184,17 +186,18 @@ def _try_authenticate_access_token(required_scope: Optional[str] = None):
     return True, None
 
 
-def _auth_error(code: str, message: str, status: int = 401, auth_method: str = 'none', required_scope=None, provided_scope=None):
+def _auth_error(code: str, message: Optional[str] = None, status: Optional[int] = None, auth_method: str = 'none', required_scope=None, provided_scope=None):
+    default_status, default_message = get_error_defaults(code)
     payload = {
         'error': code,
-        'message': message,
+        'message': message or default_message,
         'auth_method': auth_method,
     }
     if required_scope is not None:
         payload['required_scope'] = required_scope
     if provided_scope is not None:
         payload['provided_scope'] = provided_scope
-    return jsonify(payload), status
+    return jsonify(payload), (status or default_status)
 
 
 def validate_agent_token(token):
@@ -803,14 +806,14 @@ def require_authenticated(f):
             g.agent_credential = session_info
             return f(*args, **kwargs)
         
-        # Method 1: Full lemma header (server-verified)
-        lemma_ctx, _lemma_error = _extract_verified_lemma_context()
-        if lemma_ctx:
-            g.ppid = lemma_ctx.get('ppid')
-            g.credential_id = lemma_ctx.get('credential_id')
-            g.permission_id = lemma_ctx.get('permission_id')
+        # Method 1: Full lemma header (server-verified via unified authz engine)
+        lemma_principal, _lemma_error = extract_user_lemma_principal(request.headers)
+        if lemma_principal:
+            g.ppid = lemma_principal.ppid
+            g.credential_id = lemma_principal.credential_id
+            g.permission_id = lemma_principal.permission_id
             g.authenticated = True
-            g.auth_method = 'lemma_header'
+            g.auth_method = lemma_principal.auth_method
             return f(*args, **kwargs)
         
         # Method 2: Credential headers (edge computing)
@@ -831,7 +834,7 @@ def require_authenticated(f):
             g.authenticated = True
             return f(*args, **kwargs)
         
-        return jsonify({'error': 'Authentication required'}), 401
+        return _auth_error('auth_required')
     
     return decorated_function
 
@@ -965,14 +968,14 @@ def require_wallet_ppid(f):
             g.agent_credential = session_info
             return f(*args, **kwargs)
         
-        # Method 1: Full lemma header
-        lemma_ctx, lemma_error = _extract_verified_lemma_context()
-        if lemma_ctx:
-            g.ppid = lemma_ctx.get('ppid')
-            g.credential_id = lemma_ctx.get('credential_id')
-            g.permission_id = lemma_ctx.get('permission_id')
+        # Method 1: Full lemma header (server-verified via unified authz engine)
+        lemma_principal, lemma_error = extract_user_lemma_principal(request.headers)
+        if lemma_principal:
+            g.ppid = lemma_principal.ppid
+            g.credential_id = lemma_principal.credential_id
+            g.permission_id = lemma_principal.permission_id
             g.authenticated = True
-            g.auth_method = 'lemma_header'
+            g.auth_method = lemma_principal.auth_method
             return f(*args, **kwargs)
         
         # Method 3: API key fallback (for programmatic access)
@@ -985,12 +988,14 @@ def require_wallet_ppid(f):
             g.ppid = None  # No PPID for API key auth
             return f(*args, **kwargs)
         
-        return jsonify({
-            'success': False,
-            'error': 'Authentication required',
-            'message': 'Provide X-Agent-Token, X-Lemma-Credential, X-API-Key, or Authorization: Bearer <api_key>',
-            'lemma_error': lemma_error
-        }), 401
+        payload, status = _auth_error(
+            'auth_required',
+            'Provide X-Agent-Token, X-Lemma-Credential, X-API-Key, or Authorization: Bearer <api_key>',
+        )
+        body = payload.get_json() or {}
+        body['success'] = False
+        body['lemma_error'] = lemma_error
+        return jsonify(body), status
     
     return decorated_function
 
@@ -1058,17 +1063,17 @@ def require_customer_or_admin(f):
                     g.auth_method = 'credential'
                     return f(*args, **kwargs)
         
-        # Try full lemma auth
-        lemma_ctx, _lemma_error = _extract_verified_lemma_context()
-        if lemma_ctx:
-            permission_id = lemma_ctx.get('permission_id', '')
-            scope = lemma_ctx.get('scope', [])
-            g.ppid = lemma_ctx.get('ppid')
-            g.credential_id = lemma_ctx.get('credential_id')
+        # Try full lemma auth (server-verified via unified authz engine)
+        lemma_principal, _lemma_error = extract_user_lemma_principal(request.headers)
+        if lemma_principal:
+            permission_id = lemma_principal.permission_id
+            scope = lemma_principal.scope
+            g.ppid = lemma_principal.ppid
+            g.credential_id = lemma_principal.credential_id
             g.permission_id = permission_id
             g.is_admin = is_admin_permission(permission_id) or ('admin' in scope)
             g.authenticated = True
-            g.auth_method = 'lemma_header'
+            g.auth_method = lemma_principal.auth_method
             return f(*args, **kwargs)
         
         # API key fallback
@@ -1080,9 +1085,9 @@ def require_customer_or_admin(f):
             g.auth_method = 'api_key'
             return f(*args, **kwargs)
         
-        return jsonify({
-            'success': False,
-            'error': 'Authentication required'
-        }), 401
+        payload, status = _auth_error('auth_required')
+        body = payload.get_json() or {}
+        body['success'] = False
+        return jsonify(body), status
     
     return decorated_function
