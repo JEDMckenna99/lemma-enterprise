@@ -247,6 +247,9 @@ h1{color:#1e293b;font-weight:600;line-height:1.25;margin-bottom:16px;font-size:4
         
         // AUTH HELPERS + AUTO-ATTACH FOR API REQUESTS (session-free lemma auth)
         (function() {
+            if (!window.__lemmaRawFetch) {
+                window.__lemmaRawFetch = window.fetch.bind(window);
+            }
             if (!window.encodeLemmaCredentialHeader) {
                 window.encodeLemmaCredentialHeader = function encodeLemmaCredentialHeader(credential) {
                     try {
@@ -289,6 +292,30 @@ h1{color:#1e293b;font-weight:600;line-height:1.25;margin-bottom:16px;font-size:4
                         } else {
                             selected = lemmaPermissions.length ? lemmaPermissions[0] : null;
                         }
+
+                        // Fallback: if no lemma.id-scoped credential exists yet but wallet is unlocked,
+                        // request a fresh permission lemma using PPID (server-side issuance).
+                        if (!selected && typeof wallet.isUnlocked === 'function' && wallet.isUnlocked()) {
+                            try {
+                                const ppid = await wallet.derivePPID('lemma.id');
+                                if (ppid && String(ppid).startsWith('did:lemma:ppid_')) {
+                                    const netFetch = window.__lemmaRawFetch || window.fetch.bind(window);
+                                    const resp = await netFetch('/api/wallet-auth/issue', {
+                                        method: 'POST',
+                                        headers: { 'Content-Type': 'application/json' },
+                                        body: JSON.stringify({ site_id: 'lemma.id', ppid: ppid }),
+                                    });
+                                    const body = await resp.json();
+                                    if (resp.ok && body && body.success && body.permission_lemma) {
+                                        selected = body.permission_lemma;
+                                        try { await wallet.storeCredential(selected); } catch (_) { /* best effort */ }
+                                    }
+                                }
+                            } catch (_) {
+                                // best effort only
+                            }
+                        }
+
                         if (selected) {
                             window.lemmaCredential = selected;
                         }
@@ -317,6 +344,9 @@ h1{color:#1e293b;font-weight:600;line-height:1.25;margin-bottom:16px;font-size:4
             if (!window.getLemmaAuthHeadersAsync) {
                 window.getLemmaAuthHeadersAsync = async function getLemmaAuthHeadersAsync(extraHeaders) {
                     await window.ensureLemmaCredential(false);
+                    if (!window.lemmaCredential) {
+                        await window.ensureLemmaCredential(true);
+                    }
                     return window.getLemmaAuthHeaders(extraHeaders);
                 };
             }
