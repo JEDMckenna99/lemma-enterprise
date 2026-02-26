@@ -21,6 +21,12 @@ _trusted_issuers_cache: Optional[Set[str]] = None
 _cache_expires_at: Optional[datetime] = None
 CACHE_TTL_SECONDS = 300  # 5 minutes
 
+# Legacy platform issuer compatibility allowlist.
+# These are historical lemma.id/platform issuers used before trust-source unification.
+LEGACY_PLATFORM_ISSUER_DIDS = {
+    "did:lemma:c66b2d31342086885eb297c3e25322d5c5a4511c869db8b27d4a815008ff1111",
+}
+
 
 def _normalize_issuer_did(issuer_did: str) -> str:
     """Normalize issuer DID for trust comparison across legacy formats."""
@@ -182,6 +188,12 @@ def get_trusted_issuer_dids() -> Set[str]:
                 if did not in trusted_dids:
                     trusted_dids.add(did)
                     logger.warning(f"Trusted issuer added from TRUSTED_ISSUER_DIDS: {did[:50]}...")
+
+        # Hard compatibility list for known historical platform issuers.
+        for legacy_did in LEGACY_PLATFORM_ISSUER_DIDS:
+            if legacy_did not in trusted_dids:
+                trusted_dids.add(legacy_did)
+                logger.warning(f"Trusted legacy platform issuer allowlisted: {legacy_did[:50]}...")
         
         db.close()
         
