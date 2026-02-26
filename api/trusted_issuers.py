@@ -21,6 +21,45 @@ _cache_expires_at: Optional[datetime] = None
 CACHE_TTL_SECONDS = 300  # 5 minutes
 
 
+def _normalize_issuer_did(issuer_did: str) -> str:
+    """Normalize issuer DID for trust comparison across legacy formats."""
+    if not issuer_did:
+        return ""
+    text = str(issuer_did).strip()
+    if not text:
+        return ""
+    # Ignore fragment/query variants (e.g. did:web:lemma.id#key-1).
+    text = text.split('#', 1)[0].split('?', 1)[0].rstrip('/')
+    return text.lower()
+
+
+def _extract_issuer_did(credential: dict) -> Optional[str]:
+    """
+    Extract issuer DID from modern and legacy credential shapes.
+    Supports:
+    - issuer: "did:..."
+    - issuer: {"id": "did:..."} / {"did": "did:..."}
+    - issuerInfo.did
+    """
+    if not isinstance(credential, dict):
+        return None
+
+    issuer = credential.get('issuer')
+    if isinstance(issuer, dict):
+        issuer_did = issuer.get('id') or issuer.get('did')
+    else:
+        issuer_did = issuer
+
+    if not issuer_did:
+        issuer_info = credential.get('issuerInfo') or {}
+        if isinstance(issuer_info, dict):
+            issuer_did = issuer_info.get('did')
+
+    if issuer_did:
+        return str(issuer_did).strip()
+    return None
+
+
 def get_trusted_issuer_dids() -> Set[str]:
     """
     Get the set of trusted issuer DIDs from the database.
@@ -132,7 +171,14 @@ def is_trusted_issuer(issuer_did: str) -> bool:
         return False
     
     trusted = get_trusted_issuer_dids()
-    is_trusted = issuer_did in trusted
+
+    # Fast path exact match.
+    if issuer_did in trusted:
+        return True
+
+    normalized_issuer = _normalize_issuer_did(issuer_did)
+    trusted_normalized = {_normalize_issuer_did(did) for did in trusted}
+    is_trusted = normalized_issuer in trusted_normalized
     
     if not is_trusted:
         logger.warning(f"⚠️ UNTRUSTED ISSUER: {issuer_did[:50]}...")
@@ -178,7 +224,7 @@ def verify_credential_with_trust(credential: dict) -> dict:
     
     try:
         # 1. Check issuer trust FIRST
-        issuer_did = credential.get('issuer')
+        issuer_did = _extract_issuer_did(credential)
         if not issuer_did:
             result['reason'] = 'missing_issuer'
             return result
