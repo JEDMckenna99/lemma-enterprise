@@ -253,10 +253,13 @@ async function getWalletPpid() {
     return null;
 }
 
-function getAuthHeaders() {
-    const base = (typeof window.getLemmaAuthHeaders === 'function')
-        ? window.getLemmaAuthHeaders()
-        : {};
+async function getAuthHeaders() {
+    let base = {};
+    if (typeof window.getLemmaAuthHeadersAsync === 'function') {
+        base = await window.getLemmaAuthHeadersAsync();
+    } else if (typeof window.getLemmaAuthHeaders === 'function') {
+        base = window.getLemmaAuthHeaders();
+    }
     return { 'Content-Type': 'application/json', ...base };
 }
 
@@ -282,7 +285,7 @@ async function loadSites() {
     
     try {
         const response = await fetch('/api/developer/sites', {
-            headers: getAuthHeaders(),
+            headers: await getAuthHeaders(),
             cache: 'no-store'
         });
         if (!response.ok) {
@@ -421,7 +424,7 @@ async function createSite(e) {
         
         const response = await fetch('/api/developer/sites', {
             method: 'POST',
-            headers: getAuthHeaders(),
+            headers: await getAuthHeaders(),
             body: JSON.stringify({
                 name,
                 domain,
