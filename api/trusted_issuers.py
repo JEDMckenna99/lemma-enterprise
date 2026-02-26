@@ -40,7 +40,7 @@ def get_trusted_issuer_dids() -> Set[str]:
         
         trusted_dids = set()
         
-        # Get all sites with KMS-encrypted signing keys (these are the trusted issuers)
+        # Primary trust source: active sites with KMS-encrypted signing keys.
         sites = db.query(Site).filter(
             Site.kms_encrypted_signing_key != None,
             Site.issuer_did != None,
@@ -50,6 +50,19 @@ def get_trusted_issuer_dids() -> Set[str]:
         for site in sites:
             trusted_dids.add(site.issuer_did)
             logger.debug(f"Trusted issuer: {site.site_id} -> {site.issuer_did[:50]}...")
+
+        # Compatibility trust source for platform lemma issuers:
+        # Some deployments rotate/store platform signing metadata differently and may not
+        # populate kms_encrypted_signing_key on the platform site rows.
+        platform_sites = db.query(Site).filter(
+            Site.site_id.in_(['lemma.id', 'lemma_platform']),
+            Site.issuer_did != None,
+            Site.key_status == 'active'
+        ).all()
+        for site in platform_sites:
+            if site.issuer_did not in trusted_dids:
+                trusted_dids.add(site.issuer_did)
+                logger.info(f"Trusted platform issuer added: {site.site_id} -> {site.issuer_did[:50]}...")
         
         db.close()
         
