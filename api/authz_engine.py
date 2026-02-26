@@ -75,7 +75,14 @@ def extract_user_lemma_principal(
 
     verification = verify_credential_with_trust(credential)
     if not verification.get("valid"):
-        return None, f"invalid_lemma:{verification.get('reason', 'unknown')}"
+        reason = verification.get("reason", "unknown")
+        if reason == "untrusted_issuer":
+            issuer = str(verification.get("issuer") or "").strip()
+            if issuer:
+                # Include compact issuer fingerprint for diagnostics.
+                safe_issuer = issuer[:120]
+                return None, f"invalid_lemma:untrusted_issuer:{safe_issuer}"
+        return None, f"invalid_lemma:{reason}"
 
     claims = credential.get("claims") or credential.get("credentialSubject") or {}
     ppid = (

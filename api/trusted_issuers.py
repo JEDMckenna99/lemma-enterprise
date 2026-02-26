@@ -259,7 +259,8 @@ def verify_credential_with_trust(credential: dict) -> dict:
         'issuer_trusted': False,
         'not_expired': True,
         'not_revoked': True,
-        'reason': None
+        'reason': None,
+        'issuer': None,
     }
     
     try:
@@ -268,6 +269,7 @@ def verify_credential_with_trust(credential: dict) -> dict:
         if not issuer_did:
             result['reason'] = 'missing_issuer'
             return result
+        result['issuer'] = issuer_did
         
         if not is_trusted_issuer(issuer_did):
             result['reason'] = 'untrusted_issuer'
