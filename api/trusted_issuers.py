@@ -105,6 +105,23 @@ def get_trusted_issuer_dids() -> Set[str]:
                 trusted_dids.add(site.issuer_did)
                 logger.info(f"Trusted platform issuer added: {site.site_id} -> {site.issuer_did[:50]}...")
 
+        # Historical platform issuer compatibility:
+        # Keep prior platform issuers trusted (unless explicitly revoked/compromised)
+        # so still-valid previously-issued lemmas continue to verify after key rotations.
+        historical_platform_sites = db.query(Site).filter(
+            Site.site_id.in_(['lemma.id', 'lemma_platform']),
+            Site.issuer_did != None
+        ).all()
+        for site in historical_platform_sites:
+            status = (getattr(site, 'key_status', None) or '').strip().lower()
+            if status in {'revoked', 'compromised'}:
+                continue
+            if site.issuer_did not in trusted_dids:
+                trusted_dids.add(site.issuer_did)
+                logger.warning(
+                    f"Trusted historical platform issuer added: {site.site_id} [{status or 'unknown'}] -> {site.issuer_did[:50]}..."
+                )
+
         # Additional trust source: verified active issuer-registry records.
         try:
             from api.issuer_registry import IssuerRecord
