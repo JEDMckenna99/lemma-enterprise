@@ -772,8 +772,13 @@ def bootstrap_site_admin(site_id):
                 permission_lemma,
                 site.site_id,
                 site.site_domain,
-                'admin'
+                'admin_access'
             )
+            # Preserve selected admin level while keeping canonical admin permission id
+            # for broad client compatibility.
+            for key in ('claims', 'credentialSubject'):
+                if isinstance(permission_lemma.get(key), dict):
+                    permission_lemma[key]['permission_level'] = 'admin'
 
             db.add(UserLemma(
                 user_did=target_user_ppid,

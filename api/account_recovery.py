@@ -586,7 +586,10 @@ def _issue_site_admin_proof(site_id: str, site_domain: str, admin_email: str,
                 'siteId': site_id,
                 'siteDomain': site_domain,
                 'accountType': 'admin',
-                'permissionId': 'admin',
+                # Canonical admin compatibility identifier expected by clients.
+                'permissionId': 'admin_access',
+                # Preserve selected admin level separately.
+                'permission_level': 'admin',
                 'email': admin_email,
                 'issuedVia': f'account_recovery_{recovery_method}',
                 'recoveredAt': datetime.now(timezone.utc).isoformat()
@@ -605,6 +608,11 @@ def _issue_site_admin_proof(site_id: str, site_domain: str, admin_email: str,
             permission_lemma['claims']['packageType'] = 'permission'
             permission_lemma['claims']['siteId'] = site_id
             permission_lemma['claims']['siteDomain'] = site_domain
+            permission_lemma['claims']['permissionId'] = 'admin_access'
+            permission_lemma['claims']['permission_level'] = 'admin'
+        if 'credentialSubject' in permission_lemma:
+            permission_lemma['credentialSubject']['permissionId'] = 'admin_access'
+            permission_lemma['credentialSubject']['permission_level'] = 'admin'
         
         logger.info(f"Issued admin proof for recovery: site={site_id}, subject={subject_did[:40]}...")
         return permission_lemma
