@@ -264,6 +264,29 @@ h1{color:#1e293b;font-weight:600;line-height:1.25;margin-bottom:16px;font-size:4
                 };
             }
 
+            if (!window.buildLemmaCredentialForHeader) {
+                window.buildLemmaCredentialForHeader = function buildLemmaCredentialForHeader(credential) {
+                    if (!credential || typeof credential !== 'object') return null;
+
+                    const nested = (credential.credential && typeof credential.credential === 'object')
+                        ? credential.credential
+                        : ((credential.lemma && typeof credential.lemma === 'object') ? credential.lemma : null);
+                    const base = nested || credential;
+
+                    // Keep only signed VC-relevant fields; strip local/indexeddb metadata.
+                    const allowedKeys = [
+                        'id', 'issuer', 'subject', 'sub', 'type',
+                        'claims', 'credentialSubject', 'proof', 'signature',
+                        'issuedAt', 'expiresAt', 'issuerInfo', '@context', 'context'
+                    ];
+                    const sanitized = {};
+                    for (const key of allowedKeys) {
+                        if (base[key] !== undefined) sanitized[key] = base[key];
+                    }
+                    return sanitized;
+                };
+            }
+
             if (!window.ensureLemmaCredential) {
                 window.ensureLemmaCredential = async function ensureLemmaCredential(forceRefresh = false) {
                     if (!forceRefresh && window.lemmaCredential && typeof window.lemmaCredential === 'object') {
@@ -295,6 +318,7 @@ h1{color:#1e293b;font-weight:600;line-height:1.25;margin-bottom:16px;font-size:4
 
                         if (selected) {
                             window.lemmaCredential = selected;
+                            window.lemmaCredentialForHeader = window.buildLemmaCredentialForHeader(selected);
                         }
                         return selected;
                     } catch (_) {
@@ -306,7 +330,7 @@ h1{color:#1e293b;font-weight:600;line-height:1.25;margin-bottom:16px;font-size:4
             if (!window.getLemmaAuthHeaders) {
                 window.getLemmaAuthHeaders = function getLemmaAuthHeaders(extraHeaders) {
                     const headers = { ...(extraHeaders || {}) };
-                    const credential = window.lemmaCredential;
+                    const credential = window.lemmaCredentialForHeader || window.buildLemmaCredentialForHeader(window.lemmaCredential);
                     if (!credential || typeof credential !== 'object') return headers;
                     const encoded = window.encodeLemmaCredentialHeader(credential);
                     if (encoded) headers['X-Lemma-Credential'] = encoded;
@@ -502,6 +526,7 @@ h1{color:#1e293b;font-weight:600;line-height:1.25;margin-bottom:16px;font-size:4
                     
                     // Store credential globally for API calls
                     window.lemmaCredential = cred;
+                    window.lemmaCredentialForHeader = window.buildLemmaCredentialForHeader(cred);
                     window.dispatchEvent(new CustomEvent('lemma:credential-ready', {
                         detail: { id: cred.id || null }
                     }));
@@ -556,6 +581,7 @@ h1{color:#1e293b;font-weight:600;line-height:1.25;margin-bottom:16px;font-size:4
                 
                 // Clear global state
                 delete window.lemmaCredential;
+                    delete window.lemmaCredentialForHeader;
                 delete window.lemmaAuth;
                 
                 // Redirect to home
