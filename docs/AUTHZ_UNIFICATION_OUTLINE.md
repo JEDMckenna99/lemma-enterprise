@@ -10,7 +10,8 @@ Goal: converge on a unified verifier + policy engine while preserving current pl
 - [x] Phase 3 - Migrate `require_wallet_ppid` and `require_customer_or_admin`
 - [x] Phase 4 - Remove direct PPID header reads in targeted API modules
 - [x] Phase 5 - Add policy matrix + centralized deny reasons
-- [ ] Phase 6 - Full regression pass + deployment validation
+- [x] Phase 6 - Full regression pass + deployment validation
+- [x] Phase 7 - Add auth contract-gate tests for signed payload + header-to-authz path
 
 ## Acceptance Criteria
 
@@ -83,10 +84,30 @@ Goal: converge on a unified verifier + policy engine while preserving current pl
   - `tests/test_authz_engine_phase12.py` (5 tests) (PASS)
 
 ### Phase 6 - Full regression pass + deployment validation
-- Status: In progress
+- Status: Complete
 - Changes:
-  - Running consolidated regression checks before deployment.
+  - Ran consolidated regression checks.
+  - Deployed authz unification changes to production:
+    - Commit: `f8d2afe0`
+    - Heroku release: `v1775`
 - Tests:
   - `python -m pytest tests/test_authz_engine_phase12.py tests/test_authz_policy_phase5.py -v` (7 passed)
   - `python -m py_compile auth/decorators.py api/authz_engine.py api/authz_policy.py` (PASS)
-  - Deployment validation: pending (not pushed in this phase yet)
+  - Live smoke:
+    - `GET /api/health` => 200
+    - `GET /api/developer/sites` (no auth) => 401 `auth_required`
+    - `GET /api/developer/sites` (`X-Lemma-PPID` only) => 401 `auth_required`
+
+### Phase 7 - Add auth contract-gate tests for signed payload + header-to-authz path
+- Status: Complete
+- Changes:
+  - Added `tests/auth_contract/test_signed_lemma_roundtrip.py`:
+    - golden signed credential shape verification
+    - mutation guard for top-level legacy `signature` field
+    - mutation guard for string `issuanceDate`
+  - Added `tests/auth_contract/test_header_to_authz_contract.py`:
+    - `X-Lemma-Credential` decode -> `authz_engine` principal extraction
+    - deterministic untrusted-issuer diagnostic propagation
+    - invalid header payload rejection
+- Tests:
+  - `python -m pytest tests/auth_contract/test_signed_lemma_roundtrip.py tests/auth_contract/test_header_to_authz_contract.py -v` (6 passed)
