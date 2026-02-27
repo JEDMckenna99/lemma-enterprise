@@ -4526,44 +4526,91 @@ class LemmaWallet {
     }
 
     // IndexedDB helpers
+    _isRetriableDbError(error) {
+        if (!error) return false;
+        const name = String(error.name || '');
+        const message = String(error.message || '').toLowerCase();
+        return (
+            name === 'InvalidStateError' ||
+            name === 'AbortError' ||
+            message.includes('database connection is closing') ||
+            message.includes('connection is closing')
+        );
+    }
+
+    async _reopenDb() {
+        if (this._reopenDbPromise) {
+            return this._reopenDbPromise;
+        }
+        this._reopenDbPromise = (async () => {
+            try {
+                if (this.db) {
+                    this.db.close();
+                }
+            } catch (_) {
+                // Ignore close errors; we are forcing a clean reopen path.
+            }
+            this.db = null;
+            this._initialized = false;
+            await this.init();
+        })().finally(() => {
+            this._reopenDbPromise = null;
+        });
+        return this._reopenDbPromise;
+    }
+
+    async _withDbRetry(operationName, operation) {
+        await this.init();
+        try {
+            return await operation();
+        } catch (error) {
+            if (!this._isRetriableDbError(error)) {
+                throw error;
+            }
+            console.warn(`[Lemma] IndexedDB ${operationName} hit closing connection; reopening and retrying once`);
+            await this._reopenDb();
+            return await operation();
+        }
+    }
+
     async _get(storeName, key) {
-        return new Promise((resolve, reject) => {
+        return this._withDbRetry(`_get(${storeName})`, () => new Promise((resolve, reject) => {
             const tx = this.db.transaction(storeName, 'readonly');
             const store = tx.objectStore(storeName);
             const request = store.get(key);
             request.onsuccess = () => resolve(request.result);
             request.onerror = () => reject(request.error);
-        });
+        }));
     }
 
     async _getAll(storeName) {
-        return new Promise((resolve, reject) => {
+        return this._withDbRetry(`_getAll(${storeName})`, () => new Promise((resolve, reject) => {
             const tx = this.db.transaction(storeName, 'readonly');
             const store = tx.objectStore(storeName);
             const request = store.getAll();
             request.onsuccess = () => resolve(request.result);
             request.onerror = () => reject(request.error);
-        });
+        }));
     }
 
     async _put(storeName, value) {
-        return new Promise((resolve, reject) => {
+        return this._withDbRetry(`_put(${storeName})`, () => new Promise((resolve, reject) => {
             const tx = this.db.transaction(storeName, 'readwrite');
             const store = tx.objectStore(storeName);
             const request = store.put(value);
             request.onsuccess = () => resolve(request.result);
             request.onerror = () => reject(request.error);
-        });
+        }));
     }
 
     async _delete(storeName, key) {
-        return new Promise((resolve, reject) => {
+        return this._withDbRetry(`_delete(${storeName})`, () => new Promise((resolve, reject) => {
             const tx = this.db.transaction(storeName, 'readwrite');
             const store = tx.objectStore(storeName);
             const request = store.delete(key);
             request.onsuccess = () => resolve();
             request.onerror = () => reject(request.error);
-        });
+        }));
     }
 
     // ========================================
