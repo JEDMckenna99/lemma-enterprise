@@ -154,6 +154,12 @@ def resolve_site_from_api_key(api_key: str):
     if not api_key:
         return None, None
 
+    # Platform recovery path: allow canonical platform site resolution even when
+    # customer/site bindings are absent from normalized tables.
+    platform_key = os.getenv('LEMMA_API_KEY', os.getenv('LEMMA_PLATFORM_API_KEY'))
+    if platform_key and secrets.compare_digest(api_key, platform_key):
+        return 'lemma.id', 'lemma.id'
+
     # Prefer normalized table resolution first.
     normalized = _lookup_api_key_binding(api_key)
     if normalized and normalized.get("site_id"):
@@ -239,6 +245,27 @@ def validate_customer_binding_for_self_issue(api_key: str, site_id: str, submitt
     """
     normalized_email = str(submitted_email or '').strip().lower()
     site_id_norm = str(site_id or '').strip().lower()
+
+    # Platform recovery path: configured platform API key may bootstrap/recover
+    # lemma.id without requiring customer-site binding rows.
+    platform_key = os.getenv('LEMMA_API_KEY', os.getenv('LEMMA_PLATFORM_API_KEY'))
+    if (
+        platform_key
+        and secrets.compare_digest(api_key, platform_key)
+        and site_id_norm in {'lemma.id', 'lemma_platform'}
+    ):
+        # If an admin email env exists, require exact match; otherwise accept submitted.
+        configured_admin = str(
+            os.getenv('LEMMA_ADMIN_EMAIL', os.getenv('PLATFORM_ADMIN_EMAIL', '')) or ''
+        ).strip().lower()
+        if configured_admin and normalized_email != configured_admin:
+            return (
+                False,
+                'email_mismatch',
+                'Submitted email does not match platform admin email on record.',
+                None
+            )
+        return True, None, None, (configured_admin or normalized_email)
 
     # First, use normalized DB tables (authoritative in production).
     binding = _lookup_api_key_binding(api_key=api_key, requested_site_id=site_id_norm)
