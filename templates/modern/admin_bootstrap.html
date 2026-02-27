@@ -17,18 +17,6 @@
                 Issue your first admin credential using your Lemma API key
             </p>
 
-            <div style="padding: 16px; border: 1px solid var(--gray-200); border-radius: 8px; margin-bottom: 20px; background: #fff;">
-                <label style="display: block; font-weight: 600; margin-bottom: 8px;">Select Registered Site</label>
-                <select id="bootstrap-site-select"
-                        style="width: 100%; padding: 12px; border: 1px solid var(--gray-300); border-radius: 6px; margin-bottom: 10px;">
-                    <option value="">Load your sites...</option>
-                </select>
-                <button type="button" id="regain-admin-btn" class="btn btn-secondary" style="width: 100%; padding: 12px;">
-                    Regain Admin for Selected Site
-                </button>
-                <div id="regain-admin-result" style="display: none; margin-top: 10px; font-size: 13px; color: var(--gray-700);"></div>
-            </div>
-            
             <form id="bootstrap-form" style="display: flex; flex-direction: column; gap: 20px;">
                 <div>
                     <label style="display: block; font-weight: 600; margin-bottom: 8px;">Site ID</label>
@@ -169,125 +157,6 @@ function normalizeScopeClaim(rawScope) {
         }
     }
     return value.split(',').map(s => s.trim()).filter(Boolean);
-}
-
-function escapeHtml(str) {
-    if (!str) return '';
-    return String(str).replace(/[&<>"']/g, char => ({
-        '&': '&amp;',
-        '<': '&lt;',
-        '>': '&gt;',
-        '"': '&quot;',
-        "'": '&#39;'
-    })[char]);
-}
-
-async function getLemmaHeaders() {
-    if (typeof window.getLemmaAuthHeadersAsync === 'function') {
-        return await window.getLemmaAuthHeadersAsync({ 'Content-Type': 'application/json' });
-    }
-    if (typeof window.getLemmaAuthHeaders === 'function') {
-        return window.getLemmaAuthHeaders({ 'Content-Type': 'application/json' });
-    }
-    return { 'Content-Type': 'application/json' };
-}
-
-async function loadOwnedSitesForBootstrap() {
-    const select = document.getElementById('bootstrap-site-select');
-    if (!select) return;
-    try {
-        const headers = await getLemmaHeaders();
-        const response = await fetch('/api/developer/sites', { headers, cache: 'no-store' });
-        const data = await response.json().catch(() => ({}));
-        const sites = Array.isArray(data.sites) ? data.sites : [];
-
-        if (!response.ok || !sites.length) {
-            select.innerHTML = '<option value="">No owned sites found</option>';
-            return;
-        }
-
-        select.innerHTML = '<option value="">Select a site...</option>' + sites.map(site => {
-            const id = site.site_id || site.id || '';
-            const domain = site.domain || site.site_domain || id;
-            return `<option value="${escapeHtml(id)}" data-domain="${escapeHtml(domain)}">${escapeHtml(domain)}</option>`;
-        }).join('');
-    } catch (e) {
-        select.innerHTML = '<option value="">Could not load sites</option>';
-    }
-}
-
-async function regainAdminForSelectedSite() {
-    const select = document.getElementById('bootstrap-site-select');
-    const resultEl = document.getElementById('regain-admin-result');
-    const button = document.getElementById('regain-admin-btn');
-    const selected = select?.selectedOptions?.[0] || null;
-    const siteId = (selected?.value || document.getElementById('site_id').value || '').trim();
-    const siteDomain = (selected?.dataset?.domain || '').trim();
-
-    if (!siteId) {
-        if (resultEl) {
-            resultEl.style.display = 'block';
-            resultEl.textContent = 'Select a site first.';
-        }
-        return;
-    }
-
-    // Keep manual form fields in sync with selected site.
-    document.getElementById('site_id').value = siteId;
-    if (siteDomain) document.getElementById('site_domain').value = siteDomain;
-
-    const originalText = button.textContent;
-    button.disabled = true;
-    button.textContent = 'Reissuing...';
-    if (resultEl) {
-        resultEl.style.display = 'block';
-        resultEl.textContent = 'Reissuing admin credential...';
-    }
-
-    try {
-        const headers = await getLemmaHeaders();
-        if (!headers['X-Lemma-Credential']) {
-            throw new Error('No verified lemma credential available. Sign in and unlock wallet first.');
-        }
-
-        const response = await fetch(`/api/developer/sites/${encodeURIComponent(siteId)}/bootstrap-admin`, {
-            method: 'POST',
-            headers,
-            body: JSON.stringify({ reissue: true, create_transfer_token: true })
-        });
-        const data = await response.json().catch(() => ({}));
-        if (!response.ok || !data.success) {
-            throw new Error(data.message || data.error || 'Failed to reissue admin credential');
-        }
-
-        try {
-            if (window.globalLemmaWallet && data.credential) {
-                await window.globalLemmaWallet.storeCredential(data.credential);
-            }
-        } catch (walletErr) {
-            console.warn('Credential issued but wallet store failed:', walletErr);
-        }
-
-        if (data.import_url) {
-            try { window.open(data.import_url, '_blank', 'noopener'); } catch (_) {}
-        }
-
-        const notifyMsg = data.notification_email_sent
-            ? ` Notification sent to ${data.notification_email || 'site admin email'}.`
-            : '';
-        if (resultEl) {
-            resultEl.style.display = 'block';
-            resultEl.innerHTML = `Admin credential reissued for <strong>${escapeHtml(siteId)}</strong>.${notifyMsg}${data.import_url ? ' Import URL opened in a new tab.' : ''}`;
-        }
-    } catch (e) {
-        if (resultEl) {
-            resultEl.style.display = 'block';
-            resultEl.textContent = `Regrant failed: ${e.message}`;
-        }
-    } finally {
-        button.disabled = false;
-        button.textContent = originalText;
-    }
 }
 
 document.getElementById('bootstrap-form').addEventListener('submit', async (e) => {
@@ -519,15 +388,6 @@ const apiKeyParam = urlParams.get('api_key');
 if (apiKeyParam) {
     document.getElementById('api_key').value = apiKeyParam;
 }
-
-document.getElementById('bootstrap-site-select')?.addEventListener('change', (e) => {
-    const option = e.target.selectedOptions?.[0];
-    if (!option) return;
-    document.getElementById('site_id').value = option.value || '';
-    document.getElementById('site_domain').value = option.dataset.domain || '';
-});
-document.getElementById('regain-admin-btn')?.addEventListener('click', regainAdminForSelectedSite);
-loadOwnedSitesForBootstrap();
 </script>
 {% endblock %}
 

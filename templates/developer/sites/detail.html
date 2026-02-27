@@ -497,6 +497,7 @@ async function bootstrapAdminCredential() {
             headers: getAuthHeaders(),
             body: JSON.stringify({
                 reissue: isReissue,
+                create_transfer_token: true,
                 user_ppid: siteScopedPpid
             })
         });
@@ -523,14 +524,19 @@ async function bootstrapAdminCredential() {
         }
 
         try {
-            const transferResponse = await fetch(`/api/developer/sites/${encodeURIComponent(siteId)}/admin-transfer-token`, {
-                method: 'POST',
-                headers: getAuthHeaders(),
-                body: JSON.stringify({ credential: data.credential })
-            });
-            const transferData = await transferResponse.json();
-            if (transferResponse.ok && transferData.success && transferData.import_url) {
-                const importUrl = transferData.import_url;
+            let importUrl = data.import_url;
+            if (!importUrl) {
+                const transferResponse = await fetch(`/api/developer/sites/${encodeURIComponent(siteId)}/admin-transfer-token`, {
+                    method: 'POST',
+                    headers: getAuthHeaders(),
+                    body: JSON.stringify({ credential: data.credential })
+                });
+                const transferData = await transferResponse.json();
+                if (transferResponse.ok && transferData.success && transferData.import_url) {
+                    importUrl = transferData.import_url;
+                }
+            }
+            if (importUrl) {
                 resultEl.innerHTML = `
                     ${isReissue ? 'Admin credential reissued and stored in dashboard wallet.' : 'Admin credential issued and stored in dashboard wallet.'}
                     <br><br>
