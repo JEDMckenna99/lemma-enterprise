@@ -17,6 +17,7 @@ For all other admin operations, use @require_site_admin protected endpoints.
 import os
 import logging
 import hashlib
+import secrets
 from datetime import datetime
 from flask import Blueprint, request, jsonify
 from flask_cors import cross_origin
