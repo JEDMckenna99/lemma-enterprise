@@ -874,7 +874,29 @@ def create_admin_transfer_token(site_id):
                     'error': 'site_mismatch',
                     'message': 'Credential siteId does not match requested site.'
                 }), 400
-            if claims.get('permissionId') != 'admin':
+            permission_id = str(
+                claims.get('permissionId')
+                or claims.get('permission_id')
+                or claims.get('permission_level')
+                or ''
+            ).lower()
+            scope = claims.get('scope') or []
+            if isinstance(scope, str):
+                scope = [s.strip().lower() for s in scope.split(',') if s.strip()]
+            elif isinstance(scope, list):
+                scope = [str(s).strip().lower() for s in scope if str(s).strip()]
+            else:
+                scope = []
+
+            admin_like_permission_ids = {
+                'admin', 'admin_access', 'super_admin', 'superadmin', 'site_admin', 'platform_admin'
+            }
+            is_admin_credential = (
+                permission_id in admin_like_permission_ids
+                or ('admin' in permission_id if permission_id else False)
+                or ('admin' in scope)
+            )
+            if not is_admin_credential:
                 return jsonify({
                     'success': False,
                     'error': 'permission_mismatch',
