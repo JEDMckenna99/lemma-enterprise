@@ -1015,11 +1015,12 @@ def platform_login():
         is_new_user = False
         
         try:
-            # Try to find customer by PPID or passkey
+            # Try to find customer by PPID or wallet_id
             customer = None
             if passkey_credential_id:
+                # customers table does not have passkey_credential_id; PPID is the durable link.
                 customer = db.query(Customer).filter(
-                    Customer.passkey_credential_id == passkey_credential_id
+                    Customer.customer_did == ppid
                 ).first()
             
             if not customer:
@@ -1046,8 +1047,8 @@ def platform_login():
                 
                 customer = Customer(
                     customer_id=f"dev_{secrets.token_hex(8)}",
+                    customer_did=ppid,
                     wallet_id=canonical_wallet_id,
-                    passkey_credential_id=passkey_credential_id,
                     role='developer',
                     created_at=datetime.utcnow()
                 )
