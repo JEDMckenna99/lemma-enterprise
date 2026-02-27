@@ -289,12 +289,12 @@ h1{color:#1e293b;font-weight:600;line-height:1.25;margin-bottom:16px;font-size:4
                         if (value === undefined || value === null || value === '') return null;
                         const n = Number(value);
                         if (Number.isFinite(n)) {
-                            // Heuristic: values below 1e12 are seconds, otherwise ms.
-                            const ms = n < 1e12 ? n * 1000 : n;
-                            return Math.floor(ms);
+                            // Preserve issuer-native unit (many legacy lemmas use epoch seconds).
+                            return Math.floor(n);
                         }
                         const d = new Date(String(value));
-                        return Number.isNaN(d.getTime()) ? null : Math.floor(d.getTime());
+                        // Fallback only for non-numeric date strings.
+                        return Number.isNaN(d.getTime()) ? null : Math.floor(d.getTime() / 1000);
                     };
 
                     // Rust verifier expects W3C-style issuanceDate.
@@ -304,16 +304,6 @@ h1{color:#1e293b;font-weight:600;line-height:1.25;margin-bottom:16px;font-size:4
                             sanitized.issued_at ??
                             claims.issuedAt ??
                             claims.issued_at
-                        );
-                    }
-
-                    // Include expirationDate when available for standards compatibility.
-                    if (!sanitized.expirationDate) {
-                        sanitized.expirationDate = toU64(
-                            sanitized.expiresAt ??
-                            sanitized.expires_at ??
-                            claims.expiresAt ??
-                            claims.expires_at
                         );
                     }
 
