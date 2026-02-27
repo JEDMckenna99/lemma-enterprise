@@ -18,7 +18,7 @@
     -->
 </head>
 <body>
-<script src="/static/js/lemma-wallet.js?v=2471" nonce="{{ csp_nonce }}"></script>
+<script src="/static/js/lemma-wallet.js?v=2473" nonce="{{ csp_nonce }}"></script>
 <script nonce="{{ csp_nonce }}">
 /**
  * Lemma Wallet Bridge v2.0
@@ -148,13 +148,17 @@ function clearCredentialsCache() {
 }
 
 function getCredentialSiteBinding(claims) {
-    return String(
-        claims?.siteId ||
-        claims?.site_id ||
+    const normalizeHost = (value) => String(value || '').toLowerCase().replace(/^www\./, '').trim();
+    const siteDomain = normalizeHost(
         claims?.siteDomain ||
         claims?.site_domain ||
-        ''
-    ).toLowerCase().replace(/^www\./, '');
+        claims?.domain
+    );
+    if (siteDomain) return siteDomain;
+
+    const siteId = normalizeHost(claims?.siteId || claims?.site_id || '');
+    if (!siteId) return '';
+    return siteId;
 }
 
 function normalizeCredentialRecord(record) {

@@ -1913,7 +1913,14 @@ class LemmaWallet {
 
             const redeemData = await redeemResp.json();
             if (!redeemResp.ok || !redeemData.success || !redeemData.credential) {
-                this._warn('[Lemma] Credential transfer redeem failed:', redeemData?.error || redeemData?.message || redeemResp.status);
+                const errorCode = redeemData?.error || '';
+                this._warn('[Lemma] Credential transfer redeem failed:', errorCode || redeemData?.message || redeemResp.status);
+                // One-time tokens may be redeemed by another tab/attempt first.
+                // Treat as non-fatal and clear URL token to avoid repeated 400 loops.
+                if (errorCode === 'invalid_or_expired_token') {
+                    url.searchParams.delete('lemma_transfer_token');
+                    window.history.replaceState({}, document.title, url.toString());
+                }
                 return;
             }
 
