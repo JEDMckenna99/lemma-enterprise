@@ -285,21 +285,21 @@ h1{color:#1e293b;font-weight:600;line-height:1.25;margin-bottom:16px;font-size:4
                     }
 
                     const claims = sanitized.claims || sanitized.credentialSubject || {};
-                    const toIso = (value) => {
+                    const toU64 = (value) => {
                         if (value === undefined || value === null || value === '') return null;
                         const n = Number(value);
                         if (Number.isFinite(n)) {
                             // Heuristic: values below 1e12 are seconds, otherwise ms.
                             const ms = n < 1e12 ? n * 1000 : n;
-                            return new Date(ms).toISOString();
+                            return Math.floor(ms);
                         }
                         const d = new Date(String(value));
-                        return Number.isNaN(d.getTime()) ? null : d.toISOString();
+                        return Number.isNaN(d.getTime()) ? null : Math.floor(d.getTime());
                     };
 
                     // Rust verifier expects W3C-style issuanceDate.
                     if (!sanitized.issuanceDate) {
-                        sanitized.issuanceDate = toIso(
+                        sanitized.issuanceDate = toU64(
                             sanitized.issuedAt ??
                             sanitized.issued_at ??
                             claims.issuedAt ??
@@ -309,7 +309,7 @@ h1{color:#1e293b;font-weight:600;line-height:1.25;margin-bottom:16px;font-size:4
 
                     // Include expirationDate when available for standards compatibility.
                     if (!sanitized.expirationDate) {
-                        sanitized.expirationDate = toIso(
+                        sanitized.expirationDate = toU64(
                             sanitized.expiresAt ??
                             sanitized.expires_at ??
                             claims.expiresAt ??
