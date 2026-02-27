@@ -191,10 +191,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (action === 'sign-in-retry') signInAndRetry();
         if (action === 'retry-load-sites') loadSites();
         if (action === 'hide-create-site-modal') hideCreateSiteModal();
-        if (action === 'regain-admin') {
-            const siteId = actionEl.getAttribute('data-site-id');
-            if (siteId) regainAdminForSite(siteId, actionEl);
-        }
     });
 });
 
@@ -424,63 +420,9 @@ function renderSiteCard(site) {
                 <a href="/developer/sites/${encodeURIComponent(site.site_id)}/integration" class="dev-btn dev-btn-sm dev-btn-secondary" style="flex: 1; justify-content: center;">
                     Integration
                 </a>
-                <button class="dev-btn dev-btn-sm dev-btn-secondary" data-action="regain-admin" data-site-id="${escapeHtml(site.site_id)}" style="flex: 1; justify-content: center;">
-                    Regain Admin
-                </button>
             </div>
         </div>
     `;
-}
-
-async function regainAdminForSite(siteId, buttonEl) {
-    if (!siteId) return;
-    const originalText = buttonEl ? buttonEl.textContent : '';
-    try {
-        if (buttonEl) {
-            buttonEl.disabled = true;
-            buttonEl.textContent = 'Reissuing...';
-        }
-
-        const authHeaders = await waitForLemmaCredentialHeader();
-        if (!authHeaders['X-Lemma-Credential']) {
-            throw new Error('No verified lemma credential available. Please sign in again.');
-        }
-
-        const response = await fetch(`/api/developer/sites/${encodeURIComponent(siteId)}/bootstrap-admin`, {
-            method: 'POST',
-            headers: authHeaders,
-            body: JSON.stringify({
-                reissue: true,
-                create_transfer_token: true
-            })
-        });
-
-        const data = await response.json().catch(() => ({}));
-        if (!response.ok || !data.success) {
-            throw new Error(data.message || data.error || 'Failed to reissue admin credential');
-        }
-
-        const importUrl = data.import_url;
-        if (importUrl) {
-            try {
-                window.open(importUrl, '_blank', 'noopener');
-            } catch (openErr) {
-                console.warn('Could not auto-open import URL:', openErr);
-            }
-        }
-
-        const notifyHint = data.notification_email_sent
-            ? ` Notification sent to ${data.notification_email || 'site admin email'}.`
-            : '';
-        alert(`Admin credential reissued for ${siteId}.${notifyHint}${importUrl ? ' Import URL opened in a new tab.' : ''}`);
-    } catch (e) {
-        alert(`Failed to regain admin for ${siteId}: ${e.message}`);
-    } finally {
-        if (buttonEl) {
-            buttonEl.disabled = false;
-            buttonEl.textContent = originalText || 'Regain Admin';
-        }
-    }
 }
 
 function showCreateSiteModal() {
