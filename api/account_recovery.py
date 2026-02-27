@@ -11,6 +11,7 @@ import os
 from datetime import datetime, timezone, timedelta
 from flask import Blueprint, request, jsonify, render_template, redirect, url_for
 from flask_cors import cross_origin
+from api.admin_issuance_notifications import notify_admin_lemma_issued
 
 logger = logging.getLogger(__name__)
 
@@ -615,6 +616,16 @@ def _issue_site_admin_proof(site_id: str, site_domain: str, admin_email: str,
             permission_lemma['credentialSubject']['permission_level'] = 'admin'
         
         logger.info(f"Issued admin proof for recovery: site={site_id}, subject={subject_did[:40]}...")
+
+        notify_admin_lemma_issued(
+            site_id=site_id,
+            site_domain=site_domain,
+            user_did=subject_did,
+            permission_level='admin',
+            issued_via=f'account_recovery_{recovery_method}',
+            credential_id=permission_lemma.get('id'),
+            fallback_email=admin_email,
+        )
         return permission_lemma
         
     except Exception as e:

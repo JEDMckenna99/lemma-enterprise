@@ -13,6 +13,7 @@ from datetime import datetime, timedelta
 from flask import Blueprint, request, jsonify, g
 from flask_cors import cross_origin
 from auth.decorators import require_customer_or_admin
+from api.admin_issuance_notifications import notify_admin_lemma_issued
 
 logger = logging.getLogger(__name__)
 
@@ -256,6 +257,25 @@ def issue_self_permission():
         
         logger.info(f"✅ Developer self-issued: {permission_level} for {site_domain}")
         logger.info(f"⚡ Issue time: {issue_time_us:.2f}µs")
+
+        notification = None
+        if 'admin' in str(permission_level).lower():
+            fallback_email = None
+            try:
+                if customer and getattr(customer, 'email', None):
+                    fallback_email = customer.email
+            except Exception:
+                fallback_email = None
+
+            notification = notify_admin_lemma_issued(
+                site_id=site_id,
+                site_domain=site_domain,
+                user_did=developer_did,
+                permission_level=permission_level,
+                issued_via='developer_self_issue',
+                credential_id=permission_lemma.get('id'),
+                fallback_email=fallback_email,
+            )
         
         return jsonify({
             'success': True,
@@ -266,6 +286,8 @@ def issue_self_permission():
             'permission_level': permission_level,
             'expiry_days': expiry_days,
             'issue_time_us': issue_time_us,
+            'notification_email_sent': bool(notification and notification.get('sent')),
+            'notification_email': notification.get('recipient') if notification else None,
             'message': f'Permission credential issued. Store in your wallet to activate.'
         })
         

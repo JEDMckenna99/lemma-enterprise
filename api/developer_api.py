@@ -16,6 +16,7 @@ from api.agent_credentials import require_agent_or_user_auth
 from api.usage_tracking import get_monthly_active_users
 from api.lemma_format import normalize_site_permission_lemma
 from api.database import get_redis_client
+from api.admin_issuance_notifications import notify_admin_lemma_issued
 
 logger = logging.getLogger(__name__)
 
@@ -722,6 +723,7 @@ def bootstrap_site_admin(site_id):
         try:
             request_data = request.get_json(silent=True) or {}
             reissue_requested = bool(request_data.get('reissue'))
+            create_transfer_token = bool(request_data.get('create_transfer_token', reissue_requested))
             requested_user_ppid = request_data.get('user_ppid')
             if isinstance(requested_user_ppid, str) and requested_user_ppid.startswith('did:lemma:ppid_'):
                 target_user_ppid = requested_user_ppid
@@ -803,6 +805,42 @@ def bootstrap_site_admin(site_id):
             ))
             db.commit()
 
+            notification = notify_admin_lemma_issued(
+                site_id=site.site_id,
+                site_domain=site.site_domain,
+                user_did=target_user_ppid,
+                permission_level='admin',
+                issued_via='bootstrap_admin',
+                credential_id=permission_lemma.get('id'),
+                fallback_email=site.admin_email,
+            )
+
+            transfer_data = {}
+            if create_transfer_token:
+                try:
+                    token = secrets.token_urlsafe(32)
+                    expires_in_seconds = 300
+                    payload = {
+                        'site_id': site.site_id,
+                        'site_domain': site.site_domain,
+                        'credential': permission_lemma,
+                        'created_by': caller_ppid,
+                        'created_at': datetime.utcnow().isoformat()
+                    }
+                    redis_client = get_redis_client()
+                    redis_client.setex(
+                        _build_admin_transfer_key(token),
+                        expires_in_seconds,
+                        json.dumps(payload)
+                    )
+                    transfer_data = {
+                        'transfer_token': token,
+                        'transfer_expires_in': expires_in_seconds,
+                        'import_url': f"https://{site.site_domain}/?lemma_transfer_token={token}",
+                    }
+                except Exception as transfer_err:
+                    logger.warning(f"Failed to create transfer token in bootstrap-admin for {site.site_id}: {transfer_err}")
+
             return jsonify({
                 'success': True,
                 'site_id': site.site_id,
@@ -813,8 +851,10 @@ def bootstrap_site_admin(site_id):
                 'expires_at': expires_at.isoformat(),
                 'reissued': reissue_requested,
                 'user_ppid': target_user_ppid,
+                'notification_email_sent': bool(notification.get('sent')),
+                'notification_email': notification.get('recipient'),
                 'message': 'Admin credential reissued. Store this credential in your wallet.' if reissue_requested else 'Admin credential bootstrapped. Store this credential in your wallet.'
-            }), 201
+            } | transfer_data), 201
         finally:
             db.close()
     except Exception as e:

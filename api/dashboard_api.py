@@ -15,6 +15,7 @@ from datetime import datetime, timedelta
 from flask import Blueprint, request, jsonify, render_template, g
 from flask_cors import cross_origin
 from typing import Dict, Any, List
+from api.admin_issuance_notifications import notify_admin_lemma_issued
 
 logger = logging.getLogger(__name__)
 
@@ -436,11 +437,23 @@ def issue_admin_lemma_endpoint():
         if 'claims' in permission_lemma:
             permission_lemma['claims']['packageType'] = 'permission'
 
+        notification = notify_admin_lemma_issued(
+            site_id=site_id,
+            site_domain=site_domain,
+            user_did=admin_did,
+            permission_level='admin_access',
+            issued_via='dashboard_issue_admin_lemma',
+            credential_id=permission_lemma.get('id'),
+            fallback_email=username,
+        )
+
         return jsonify({
             'success': True,
             'admin_did': admin_did,
             'issuer_did': manager.issuer_did,
             'permission_lemma': permission_lemma,
+            'notification_email_sent': bool(notification.get('sent')),
+            'notification_email': notification.get('recipient'),
             'message': 'Admin permission lemma issued with Ed25519 signature. Store in your wallet.'
         })
 
@@ -585,6 +598,16 @@ def issue_admin_credential():
             permission_lemma['claims']['packageType'] = 'permission'
             permission_lemma['claims']['siteId'] = 'lemma.id'
             permission_lemma['claims']['siteDomain'] = 'lemma.id'
+
+        notification = notify_admin_lemma_issued(
+            site_id=site_id,
+            site_domain=site_domain,
+            user_did=ppid,
+            permission_level=permission_level,
+            issued_via='dashboard_issue_admin_credential',
+            credential_id=permission_lemma.get('id'),
+            fallback_email=email,
+        )
         
         logger.info(f"✅ Issued admin credential to wallet PPID")
         logger.info(f"   PPID: {ppid[:50]}...")
@@ -598,6 +621,8 @@ def issue_admin_credential():
             'permission_lemma': permission_lemma,
             'credential_id': permission_lemma.get('id'),
             'issue_time_us': issue_time_us,
+            'notification_email_sent': bool(notification.get('sent')),
+            'notification_email': notification.get('recipient'),
             'message': 'Admin credential issued to your wallet PPID. Store in your wallet.'
         })
         
