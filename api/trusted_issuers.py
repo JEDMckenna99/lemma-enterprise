@@ -25,6 +25,7 @@ CACHE_TTL_SECONDS = 300  # 5 minutes
 # These are historical lemma.id/platform issuers used before trust-source unification.
 LEGACY_PLATFORM_ISSUER_DIDS = {
     "did:lemma:c66b2d31342086885eb297c3e25322d5c5a4511c869db8b27d4a815008ff1111",
+    "did:lemma:7a5db0739dfa18260930ef70cd6f076d44440d2ac02e7be5e32933ac1aabb805",
 }
 
 
