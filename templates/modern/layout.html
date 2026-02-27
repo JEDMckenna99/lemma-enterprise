@@ -277,7 +277,9 @@ h1{color:#1e293b;font-weight:600;line-height:1.25;margin-bottom:16px;font-size:4
                     const allowedKeys = [
                         'id', 'issuer', 'subject', 'sub', 'type',
                         'claims', 'credentialSubject', 'proof',
-                        'issuedAt', 'expiresAt', 'issuerInfo', '@context', 'context'
+                        'issuedAt', 'expiresAt', 'issued_at', 'expires_at',
+                        'issuanceDate', 'expirationDate',
+                        'packageType', 'issuerInfo', '@context', 'context'
                     ];
                     const sanitized = {};
                     for (const key of allowedKeys) {
@@ -309,12 +311,23 @@ h1{color:#1e293b;font-weight:600;line-height:1.25;margin-bottom:16px;font-size:4
                     };
 
                     // Rust verifier expects W3C-style issuanceDate.
+                    // Preserve issuer-signed issuanceDate/expirationDate when present.
                     if (!sanitized.issuanceDate) {
                         sanitized.issuanceDate = toU64(
                             sanitized.issuedAt ??
                             sanitized.issued_at ??
                             claims.issuedAt ??
-                            claims.issued_at
+                            claims.issued_at ??
+                            claims.issuanceDate
+                        );
+                    }
+                    if (!sanitized.expirationDate) {
+                        sanitized.expirationDate = toU64(
+                            sanitized.expiresAt ??
+                            sanitized.expires_at ??
+                            claims.expiresAt ??
+                            claims.expires_at ??
+                            claims.expirationDate
                         );
                     }
 
@@ -347,7 +360,7 @@ h1{color:#1e293b;font-weight:600;line-height:1.25;margin-bottom:16px;font-size:4
                         if (utils && typeof utils.selectBestCredentials === 'function') {
                             const valid = utils.selectBestCredentials(lemmaPermissions);
                             selected = valid.length ? valid[0] : null;
-                        } else {
+                            } else {
                             selected = lemmaPermissions.length ? lemmaPermissions[0] : null;
                         }
 
@@ -403,13 +416,13 @@ h1{color:#1e293b;font-weight:600;line-height:1.25;margin-bottom:16px;font-size:4
                                     if (v != null && v !== '') h.set(k, v);
                                 });
                                 reqInit.headers = h;
-                            }
-                        }
+                    }
+                }
                         return originalFetch(input, reqInit);
                     } catch (_) {
                         return originalFetch(input, init);
                     }
-                };
+            };
                 window.__lemmaFetchWrapped = true;
             }
             console.log('🔐 Wallet auth auto-attach enabled');
