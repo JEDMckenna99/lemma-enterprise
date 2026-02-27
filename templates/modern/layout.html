@@ -276,7 +276,7 @@ h1{color:#1e293b;font-weight:600;line-height:1.25;margin-bottom:16px;font-size:4
                     // Keep only signed VC-relevant fields; strip local/indexeddb metadata.
                     const allowedKeys = [
                         'id', 'issuer', 'subject', 'sub', 'type',
-                        'claims', 'credentialSubject', 'proof', 'signature',
+                        'claims', 'credentialSubject', 'proof',
                         'issuedAt', 'expiresAt', 'issuerInfo', '@context', 'context'
                     ];
                     const sanitized = {};
@@ -285,6 +285,17 @@ h1{color:#1e293b;font-weight:600;line-height:1.25;margin-bottom:16px;font-size:4
                     }
 
                     const claims = sanitized.claims || sanitized.credentialSubject || {};
+
+                    // Do NOT include synthetic legacy signature fields; verifier expects VC proof.
+                    if (sanitized.signature !== undefined) {
+                        delete sanitized.signature;
+                    }
+                    if (sanitized.proof && typeof sanitized.proof === 'object') {
+                        // Normalize proof field naming for verifier compatibility.
+                        if (!sanitized.proof.signatureValue && sanitized.proof.proofValue) {
+                            sanitized.proof.signatureValue = sanitized.proof.proofValue;
+                        }
+                    }
                     const toU64 = (value) => {
                         if (value === undefined || value === null || value === '') return null;
                         const n = Number(value);
