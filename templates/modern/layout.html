@@ -283,6 +283,40 @@ h1{color:#1e293b;font-weight:600;line-height:1.25;margin-bottom:16px;font-size:4
                     for (const key of allowedKeys) {
                         if (base[key] !== undefined) sanitized[key] = base[key];
                     }
+
+                    const claims = sanitized.claims || sanitized.credentialSubject || {};
+                    const toIso = (value) => {
+                        if (value === undefined || value === null || value === '') return null;
+                        const n = Number(value);
+                        if (Number.isFinite(n)) {
+                            // Heuristic: values below 1e12 are seconds, otherwise ms.
+                            const ms = n < 1e12 ? n * 1000 : n;
+                            return new Date(ms).toISOString();
+                        }
+                        const d = new Date(String(value));
+                        return Number.isNaN(d.getTime()) ? null : d.toISOString();
+                    };
+
+                    // Rust verifier expects W3C-style issuanceDate.
+                    if (!sanitized.issuanceDate) {
+                        sanitized.issuanceDate = toIso(
+                            sanitized.issuedAt ??
+                            sanitized.issued_at ??
+                            claims.issuedAt ??
+                            claims.issued_at
+                        );
+                    }
+
+                    // Include expirationDate when available for standards compatibility.
+                    if (!sanitized.expirationDate) {
+                        sanitized.expirationDate = toIso(
+                            sanitized.expiresAt ??
+                            sanitized.expires_at ??
+                            claims.expiresAt ??
+                            claims.expires_at
+                        );
+                    }
+
                     return sanitized;
                 };
             }
