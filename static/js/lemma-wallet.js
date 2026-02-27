@@ -6035,16 +6035,35 @@ class LemmaWallet {
      */
     async storeCredential(credential) {
         await this.init();
+
+        const ensureObject = (value) => {
+            if (value && typeof value === 'object' && !Array.isArray(value)) return value;
+            if (typeof value === 'string') {
+                const text = value.trim();
+                if (!text) return {};
+                try {
+                    return JSON.parse(text);
+                } catch (_) {
+                    return {};
+                }
+            }
+            return {};
+        };
+        const rawClaims = ensureObject(credential?.claims);
+        const rawSubject = ensureObject(credential?.credentialSubject);
+        const mergedClaims = Object.keys(rawClaims).length ? rawClaims : rawSubject;
+        const mergedSubject = Object.keys(rawSubject).length ? rawSubject : rawClaims;
         
         // Normalize credential format
         const lemma = {
+            ...credential,
             id: credential.id || `cred_${Date.now()}`,
             issuer: credential.issuer || 'did:web:lemma.id',
             signature: credential.signature || credential.proof?.proofValue || 'legacy',
-            claims: credential.claims || credential.credentialSubject || {},
+            claims: mergedClaims,
+            credentialSubject: mergedSubject,
             type: credential.type || ['VerifiableCredential'],
-            packageType: credential.packageType || 'permission',
-            ...credential,
+            packageType: credential.packageType || mergedClaims.packageType || mergedSubject.packageType || 'permission',
             storedAt: Date.now()
         };
         
