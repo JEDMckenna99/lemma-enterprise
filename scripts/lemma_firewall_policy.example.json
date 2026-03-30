@@ -1,0 +1,32 @@
+{
+  "default_timeout_seconds": 25,
+  "apis": {
+    "github": {
+      "base_url": "https://api.github.com",
+      "allowed_methods": ["GET", "POST", "PATCH"],
+      "path_prefixes": ["/repos/", "/user", "/search/"],
+      "required_scope": "write",
+      "risk_tier": "high",
+      "forward_headers": ["authorization", "content-type", "accept"],
+      "taint_on_response": false
+    },
+    "stripe": {
+      "base_url": "https://api.stripe.com",
+      "allowed_methods": ["GET", "POST"],
+      "path_prefixes": ["/v1/customers", "/v1/payment_intents", "/v1/refunds"],
+      "required_scope": "admin",
+      "risk_tier": "critical",
+      "forward_headers": ["authorization", "content-type"],
+      "taint_on_response": false
+    },
+    "web_search": {
+      "base_url": "https://api.search.example.com",
+      "allowed_methods": ["GET"],
+      "path_prefixes": ["/"],
+      "required_scope": "read",
+      "risk_tier": "low",
+      "forward_headers": ["content-type"],
+      "taint_on_response": true
+    }
+  }
+}

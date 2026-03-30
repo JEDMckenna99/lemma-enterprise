@@ -1,0 +1,46 @@
+#!/bin/bash
+
+echo "🦀 HEROKU PRE-COMPILE: Setting up Rust environment"
+echo "==================================================="
+
+# Function to log with timestamp
+log() {
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1"
+}
+
+log "🔧 Setting up Rust build environment..."
+
+# Ensure Rust is in PATH if available
+RUST_PATHS=(
+    "/app/.heroku/rust/bin"
+    "/tmp/cache/.heroku/rust/bin"
+    "$HOME/.cargo/bin"
+    "/usr/local/cargo/bin"
+)
+
+for rust_path in "${RUST_PATHS[@]}"; do
+    if [ -d "$rust_path" ]; then
+        export PATH="$rust_path:$PATH"
+        log "✅ Added Rust path: $rust_path"
+    fi
+done
+
+# Set environment variables for consistent builds
+export CC=gcc
+export CXX=g++
+export RUSTFLAGS="-C linker=gcc -C target-cpu=generic"
+
+log "🔍 Environment setup complete"
+log "📁 Current directory: $(pwd)"
+log "📦 Build directory: ${BUILD_DIR:-$(pwd)}"
+
+# Check lemma-crypto directory
+if [ -d "lemma-crypto" ]; then
+    log "✅ lemma-crypto directory found"
+    log "📄 Cargo.toml preview:"
+    head -10 lemma-crypto/Cargo.toml 2>/dev/null || log "⚠️ Cannot read Cargo.toml"
+else
+    log "⚠️ lemma-crypto directory not found in pre-compile"
+fi
+
+log "🚀 Pre-compile setup completed" 

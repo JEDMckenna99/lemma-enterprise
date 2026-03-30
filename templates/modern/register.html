@@ -1,0 +1,848 @@
+{% extends "modern/layout.html" %}
+
+{% block title %}Create Account - lemma.id{% endblock %}
+{% block description %}Create your Lemma Shield account and get API keys to protect your website in minutes.{% endblock %}
+
+{% block head %}
+    {{ super() }}
+    <style>
+        .register-container {
+            max-width: 580px;
+            margin: var(--space-12) auto;
+            padding: 0 var(--space-6);
+        }
+
+        .register-card {
+            background: var(--white);
+            border: 1px solid var(--gray-200);
+            border-radius: 24px;
+            padding: var(--space-12);
+            box-shadow: 
+                0 4px 6px -1px rgba(0, 0, 0, 0.1),
+                0 2px 4px -1px rgba(0, 0, 0, 0.06),
+                0 0 0 1px rgba(255, 255, 255, 0.05);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .register-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(90deg, #6366f1, #8b5cf6, #ec4899);
+        }
+
+        .register-header {
+            text-align: center;
+            margin-bottom: var(--space-10);
+            position: relative;
+        }
+
+        .register-icon {
+            width: 64px;
+            height: 64px;
+            background: linear-gradient(135deg, #6366f1, #8b5cf6);
+            border-radius: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto var(--space-4);
+            font-size: 28px;
+            box-shadow: 0 8px 24px rgba(99, 102, 241, 0.3);
+        }
+
+        .register-title {
+            font-size: var(--font-size-3xl);
+            font-weight: 800;
+            color: var(--gray-900);
+            margin-bottom: var(--space-3);
+            background: linear-gradient(135deg, #1f2937, #4b5563);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .register-subtitle {
+            color: var(--gray-600);
+            font-size: var(--font-size-lg);
+            line-height: 1.6;
+            max-width: 400px;
+            margin: 0 auto;
+        }
+
+        .features-preview {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: var(--space-4);
+            margin-top: var(--space-6);
+            padding: var(--space-4);
+            background: var(--gray-50);
+            border-radius: 16px;
+            border: 1px solid var(--gray-100);
+        }
+
+        .feature-item {
+            text-align: center;
+            padding: var(--space-2);
+        }
+
+        .feature-icon {
+            font-size: 24px;
+            margin-bottom: var(--space-1);
+        }
+
+        .feature-text {
+            font-size: var(--font-size-sm);
+            color: var(--gray-600);
+            font-weight: 600;
+        }
+
+        .form-section {
+            background: var(--gray-50);
+            border-radius: 16px;
+            padding: var(--space-6);
+            margin-bottom: var(--space-6);
+            border: 1px solid var(--gray-100);
+        }
+
+        .section-title {
+            font-size: var(--font-size-lg);
+            font-weight: 700;
+            color: var(--gray-800);
+            margin-bottom: var(--space-4);
+            display: flex;
+            align-items: center;
+            gap: var(--space-2);
+        }
+
+        .section-icon {
+            font-size: 20px;
+        }
+
+        .form-group {
+            margin-bottom: var(--space-5);
+            position: relative;
+        }
+
+        .form-label {
+            display: block;
+            font-weight: 600;
+            color: var(--gray-700);
+            margin-bottom: var(--space-2);
+            font-size: var(--font-size-base);
+            display: flex;
+            align-items: center;
+            gap: var(--space-1);
+        }
+
+        .required-indicator {
+            color: #ef4444;
+            font-weight: 700;
+        }
+
+        .form-input {
+            width: 100%;
+            padding: var(--space-4) var(--space-4) var(--space-4) var(--space-12);
+            border: 2px solid var(--gray-200);
+            border-radius: 12px;
+            font-size: var(--font-size-base);
+            transition: all 0.3s ease;
+            background: var(--white);
+            position: relative;
+        }
+
+        .input-icon {
+            position: absolute;
+            left: var(--space-4);
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--gray-400);
+            font-size: 18px;
+            z-index: 1;
+            pointer-events: none;
+        }
+
+        .form-input:focus {
+            outline: none;
+            border-color: var(--primary-500);
+            box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.1);
+            background: var(--white);
+        }
+
+        .form-input:focus + .input-icon {
+            color: var(--primary-500);
+        }
+
+        .form-input.error {
+            border-color: var(--error);
+            box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.1);
+        }
+
+        .form-input.success {
+            border-color: #10b981;
+            box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.1);
+        }
+
+        .form-help {
+            font-size: var(--font-size-sm);
+            color: var(--gray-500);
+            margin-top: var(--space-2);
+            padding-left: var(--space-1);
+            display: flex;
+            align-items: center;
+            gap: var(--space-1);
+        }
+
+        .help-icon {
+            font-size: 14px;
+            color: var(--gray-400);
+        }
+
+        .error-message {
+            color: var(--error);
+            font-size: var(--font-size-sm);
+            margin-top: var(--space-2);
+            padding: var(--space-2) var(--space-3);
+            background: rgba(239, 68, 68, 0.1);
+            border-radius: 8px;
+            border-left: 3px solid var(--error);
+            display: none;
+            font-weight: 500;
+        }
+
+        .register-button {
+            width: 100%;
+            background: linear-gradient(135deg, #6366f1, #8b5cf6);
+            color: var(--white);
+            border: none;
+            padding: var(--space-5);
+            border-radius: 16px;
+            font-size: var(--font-size-lg);
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-top: var(--space-6);
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 8px 24px rgba(99, 102, 241, 0.3);
+        }
+
+        .register-button::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+            transition: left 0.5s ease;
+        }
+
+        .register-button:hover::before {
+            left: 100%;
+        }
+
+        .register-button:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 16px 40px rgba(99, 102, 241, 0.4);
+            background: linear-gradient(135deg, #5b5bf6, #7c3aed);
+        }
+
+        .register-button:active:not(:disabled) {
+            transform: translateY(0);
+            box-shadow: 0 8px 24px rgba(99, 102, 241, 0.3);
+        }
+
+        .register-button:disabled {
+            opacity: 0.7;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: 0 4px 12px rgba(99, 102, 241, 0.2);
+        }
+
+        .button-content {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: var(--space-2);
+        }
+
+        .button-icon {
+            font-size: 20px;
+        }
+
+        .login-link {
+            text-align: center;
+            margin-top: var(--space-8);
+            padding-top: var(--space-6);
+            border-top: 1px solid var(--gray-200);
+            color: var(--gray-600);
+        }
+
+        .login-link a {
+            color: var(--primary-600);
+            text-decoration: none;
+            font-weight: 600;
+            transition: all 0.2s ease;
+        }
+
+        .login-link a:hover {
+            color: var(--primary-700);
+            text-decoration: underline;
+        }
+
+        .success-message {
+            background: linear-gradient(135deg, #ecfdf5, #f0fdf4);
+            border: 2px solid #10b981;
+            color: #065f46;
+            padding: var(--space-6);
+            border-radius: 16px;
+            margin-bottom: var(--space-6);
+            display: none;
+            text-align: center;
+            font-weight: 600;
+            box-shadow: 0 4px 12px rgba(16, 185, 129, 0.2);
+        }
+
+        .success-message::before {
+            content: '🎉';
+            display: block;
+            font-size: 32px;
+            margin-bottom: var(--space-2);
+        }
+
+        .progress-indicator {
+            display: flex;
+            justify-content: center;
+            gap: var(--space-2);
+            margin-bottom: var(--space-8);
+        }
+
+        .progress-step {
+            width: 40px;
+            height: 4px;
+            background: var(--gray-200);
+            border-radius: 2px;
+            transition: all 0.3s ease;
+        }
+
+        .progress-step.active {
+            background: linear-gradient(90deg, #6366f1, #8b5cf6);
+        }
+
+        .trust-indicators {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: var(--space-6);
+            margin-top: var(--space-6);
+            padding: var(--space-4);
+            background: var(--gray-50);
+            border-radius: 12px;
+            border: 1px solid var(--gray-100);
+        }
+
+        .trust-item {
+            display: flex;
+            align-items: center;
+            gap: var(--space-1);
+            font-size: var(--font-size-sm);
+            color: var(--gray-600);
+            font-weight: 500;
+        }
+
+        .trust-icon {
+            font-size: 16px;
+            color: #10b981;
+        }
+
+        .loading-spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top-color: white;
+            animation: spin 1s ease-in-out infinite;
+            margin-right: var(--space-2);
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .api-key-display {
+            background: var(--gray-50);
+            border: 2px solid var(--primary-200);
+            border-radius: 12px;
+            padding: var(--space-4);
+            margin-top: var(--space-4);
+            display: none;
+        }
+
+        .api-key-label {
+            font-size: var(--font-size-sm);
+            font-weight: 600;
+            color: var(--gray-700);
+            margin-bottom: var(--space-2);
+        }
+
+        .api-key-value {
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+            font-size: var(--font-size-sm);
+            background: var(--white);
+            border: 1px solid var(--gray-200);
+            border-radius: 8px;
+            padding: var(--space-3);
+            word-break: break-all;
+            position: relative;
+        }
+
+        .copy-button {
+            position: absolute;
+            top: var(--space-2);
+            right: var(--space-2);
+            background: var(--primary-500);
+            color: var(--white);
+            border: none;
+            padding: var(--space-1) var(--space-2);
+            border-radius: 6px;
+            font-size: var(--font-size-xs);
+            cursor: pointer;
+        }
+
+        .copy-button:hover {
+            background: var(--primary-600);
+        }
+    </style>
+{% endblock %}
+
+{% block content %}
+    <div class="register-container">
+        <div class="register-card">
+            <div class="register-header">
+                <div class="register-icon">🛡️</div>
+                <h1 class="register-title">Join Lemma Shield</h1>
+                <p class="register-subtitle">
+                    Protect your website from bots with cryptographic verification. Get started in under 2 minutes.
+                </p>
+                
+                <div class="features-preview">
+                    <div class="feature-item">
+                        <div class="feature-icon">⚡</div>
+                        <div class="feature-text">Instant Setup</div>
+                    </div>
+                    <div class="feature-item">
+                        <div class="feature-icon">🔐</div>
+                        <div class="feature-text">Enterprise Security</div>
+                    </div>
+                    <div class="feature-item">
+                        <div class="feature-icon">📊</div>
+                        <div class="feature-text">Real-time Analytics</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="progress-indicator">
+                <div class="progress-step active"></div>
+                <div class="progress-step"></div>
+                <div class="progress-step"></div>
+            </div>
+
+            <div class="success-message" id="successMessage">
+                <strong>Welcome to Lemma Shield!</strong> Your API key is ready to use.
+            </div>
+
+            <form id="registerForm">
+                <div class="form-section">
+                    <div class="section-title">
+                        <span class="section-icon">👤</span>
+                        Your Information
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label" for="email">
+                            Email Address <span class="required-indicator">*</span>
+                        </label>
+                        <div class="input-icon">📧</div>
+                        <input type="email" id="email" name="email" class="form-input" required 
+                               placeholder="you@company.com">
+                        <div class="form-help">
+                            <span class="help-icon">💡</span>
+                            We'll use this for account notifications and API key management
+                        </div>
+                        <div class="error-message" id="emailError"></div>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="name">
+                            Full Name <span class="required-indicator">*</span>
+                        </label>
+                        <div class="input-icon">👤</div>
+                        <input type="text" id="name" name="name" class="form-input" required 
+                               placeholder="John Smith">
+                        <div class="error-message" id="nameError"></div>
+                    </div>
+                </div>
+
+                <div class="form-section">
+                    <div class="section-title">
+                        <span class="section-icon">🏢</span>
+                        Company Details
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label" for="company">
+                            Company Name <span class="required-indicator">*</span>
+                        </label>
+                        <div class="input-icon">🏢</div>
+                        <input type="text" id="company" name="company" class="form-input" required 
+                               placeholder="Acme Corporation">
+                        <div class="form-help">
+                            <span class="help-icon">💡</span>
+                            This will appear on your invoices and API documentation
+                        </div>
+                        <div class="error-message" id="companyError"></div>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="billingEmail">
+                            Billing Email (Optional)
+                        </label>
+                        <div class="input-icon">💳</div>
+                        <input type="email" id="billingEmail" name="billing_email" class="form-input" 
+                               placeholder="billing@company.com">
+                        <div class="form-help">
+                            <span class="help-icon">💡</span>
+                            Leave empty to use your main email for billing notifications
+                        </div>
+                        <div class="error-message" id="billingEmailError"></div>
+                    </div>
+                </div>
+
+                <button type="submit" class="register-button" id="registerButton">
+                    <div class="button-content">
+                        <span class="button-icon">🚀</span>
+                        Create Account & Get API Keys
+                    </div>
+                </button>
+
+                <div class="trust-indicators">
+                    <div class="trust-item">
+                        <span class="trust-icon">🔒</span>
+                        SOC 2 Compliant
+                    </div>
+                    <div class="trust-item">
+                        <span class="trust-icon">⚡</span>
+                        Free to Start
+                    </div>
+                    <div class="trust-item">
+                        <span class="trust-icon">🛡️</span>
+                        Enterprise Ready
+                    </div>
+                </div>
+            </form>
+
+            <div class="api-key-display" id="apiKeyDisplay">
+                <div class="api-key-label">Your API Key (save this securely):</div>
+                <div class="api-key-value">
+                    <span id="apiKeyValue"></span>
+                    <button class="copy-button" onclick="copyApiKey()">Copy</button>
+                </div>
+                <div class="form-help" style="margin-top: var(--space-2);">
+                    <strong>Important:</strong> Save this API key securely. You can generate additional keys from your dashboard.
+                </div>
+                <button onclick="goToDashboard()" class="register-button" style="margin-top: var(--space-4);">
+                    Go to Dashboard
+                </button>
+            </div>
+
+            <div class="login-link">
+                Already have an account? <a href="/login">Sign in here</a>
+            </div>
+        </div>
+    </div>
+
+    <script nonce="{{ csp_nonce }}">
+        // Auto-focus first input
+        document.getElementById('email').focus();
+        
+        // Add real-time validation
+        document.getElementById('email').addEventListener('blur', validateEmail);
+        document.getElementById('name').addEventListener('blur', validateName);
+        document.getElementById('company').addEventListener('blur', validateCompany);
+        
+        // Form submission
+        document.getElementById('registerForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const button = document.getElementById('registerButton');
+            const originalContent = button.innerHTML;
+            
+            // Clear previous errors
+            clearErrors();
+            
+            // Update progress
+            updateProgress(2);
+            
+            // Show loading state
+            button.disabled = true;
+            button.innerHTML = `
+                <div class="button-content">
+                    <span class="loading-spinner"></span>
+                    Creating your account...
+                </div>
+            `;
+            
+            try {
+                const formData = new FormData(this);
+                const data = Object.fromEntries(formData.entries());
+                
+                const response = await fetch('/api/customer/register-secure', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(data)
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    // Complete progress
+                    updateProgress(3);
+                    
+                    // Show email confirmation message instead of immediate success
+                    showEmailConfirmationMessage(data.email, data.company);
+                    
+                    // OLD CODE: Store permission lemma (now moved to confirmation step)
+                    // Wallet integration will happen after email confirmation
+                    
+                    // Email confirmation message is already shown by showEmailConfirmationMessage()
+                    // No additional processing needed since API keys come after confirmation
+                    
+                } else {
+                    // Reset progress
+                    updateProgress(1);
+                    
+                    // Show error
+                    if (result.errors && typeof result.errors === 'object') {
+                        // Show field-specific errors
+                        Object.keys(result.errors).forEach(field => {
+                            showError(field, result.errors[field]);
+                        });
+                    } else {
+                        showError('general', result.error || 'Registration failed');
+                    }
+                    
+                    button.disabled = false;
+                    button.innerHTML = originalContent;
+                }
+                
+            } catch (error) {
+                console.error('Registration error:', error);
+                updateProgress(1);
+                showError('general', 'Network error. Please try again.');
+                button.disabled = false;
+                button.innerHTML = originalContent;
+            }
+        });
+        
+        // Progress indicator functions
+        function updateProgress(step) {
+            const steps = document.querySelectorAll('.progress-step');
+            steps.forEach((stepEl, index) => {
+                if (index < step) {
+                    stepEl.classList.add('active');
+                } else {
+                    stepEl.classList.remove('active');
+                }
+            });
+        }
+        
+        // Validation functions
+        function validateEmail() {
+            const email = document.getElementById('email');
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            
+            if (email.value && emailRegex.test(email.value)) {
+                email.classList.remove('error');
+                email.classList.add('success');
+                return true;
+            } else if (email.value) {
+                showError('email', 'Please enter a valid email address');
+                return false;
+            }
+            return true;
+        }
+        
+        function validateName() {
+            const name = document.getElementById('name');
+            
+            if (name.value && name.value.trim().length >= 2) {
+                name.classList.remove('error');
+                name.classList.add('success');
+                return true;
+            } else if (name.value) {
+                showError('name', 'Please enter your full name');
+                return false;
+            }
+            return true;
+        }
+        
+        function validateCompany() {
+            const company = document.getElementById('company');
+            
+            if (company.value && company.value.trim().length >= 2) {
+                company.classList.remove('error');
+                company.classList.add('success');
+                return true;
+            } else if (company.value) {
+                showError('company', 'Please enter your company name');
+                return false;
+            }
+            return true;
+        }
+        
+        function clearErrors() {
+            const errorElements = document.querySelectorAll('.error-message');
+            errorElements.forEach(el => {
+                el.style.display = 'none';
+                el.textContent = '';
+            });
+            
+            const inputs = document.querySelectorAll('.form-input');
+            inputs.forEach(input => {
+                input.classList.remove('error');
+                input.classList.remove('success');
+            });
+        }
+        
+        function showError(field, message) {
+            const errorElement = document.getElementById(field + 'Error');
+            if (errorElement) {
+                errorElement.textContent = message;
+                errorElement.style.display = 'block';
+                
+                const input = document.getElementById(field);
+                if (input) {
+                    input.classList.add('error');
+                    input.classList.remove('success');
+                    input.focus();
+                }
+            } else {
+                // General error - create a toast notification
+                showToast('error', message);
+            }
+        }
+        
+        function showToast(type, message) {
+            const toast = document.createElement('div');
+            toast.className = `toast toast-${type}`;
+            toast.innerHTML = `
+                <span class="toast-icon">${type === 'error' ? '❌' : '✅'}</span>
+                <span class="toast-message">${message}</span>
+            `;
+            
+            // Add toast styles
+            toast.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                background: ${type === 'error' ? '#fef2f2' : '#f0fdf4'};
+                border: 2px solid ${type === 'error' ? '#fecaca' : '#bbf7d0'};
+                color: ${type === 'error' ? '#dc2626' : '#16a34a'};
+                padding: 16px 20px;
+                border-radius: 12px;
+                box-shadow: 0 8px 24px rgba(0,0,0,0.1);
+                z-index: 10000;
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                font-weight: 600;
+                max-width: 400px;
+                animation: slideIn 0.3s ease;
+            `;
+            
+            document.body.appendChild(toast);
+            
+            setTimeout(() => {
+                toast.style.animation = 'slideOut 0.3s ease';
+                setTimeout(() => {
+                    document.body.removeChild(toast);
+                }, 300);
+            }, 4000);
+        }
+        
+        function copyApiKey() {
+            const apiKeyValue = document.getElementById('apiKeyValue').textContent;
+            navigator.clipboard.writeText(apiKeyValue).then(() => {
+                const button = event.target;
+                const originalText = button.textContent;
+                button.textContent = 'Copied!';
+                button.style.background = '#10b981';
+                
+                setTimeout(() => {
+                    button.textContent = originalText;
+                    button.style.background = '';
+                }, 2000);
+                
+                showToast('success', 'API key copied to clipboard!');
+            }).catch(() => {
+                showToast('error', 'Failed to copy API key');
+            });
+        }
+        
+        function goToDashboard() {
+            window.location.href = '/dashboard';
+        }
+        
+        function showEmailConfirmationMessage(email, company) {
+            // Replace the form with email confirmation message
+            document.querySelector('.register-card').innerHTML = `
+                <div style="text-align: center; padding: 40px;">
+                    <h2 style="color: var(--gray-900); margin-bottom: 16px;">Check Your Email</h2>
+                    <p style="color: var(--gray-600); margin-bottom: 24px;">
+                        We've sent a confirmation email to <strong>${email}</strong>
+                    </p>
+                    <div style="background: var(--primary-light); border: 1px solid var(--primary); border-radius: 8px; padding: 20px; margin: 20px 0;">
+                        <h3 style="color: var(--gray-900); margin-bottom: 12px;">Next Steps:</h3>
+                        <ol style="color: var(--gray-700); text-align: left; margin: 0; padding-left: 20px;">
+                            <li>Check your email inbox</li>
+                            <li>Click the confirmation link</li>
+                            <li>Get your API keys</li>
+                            <li>Access your dashboard</li>
+                            <li>Start integrating Lemma IAM</li>
+                        </ol>
+                    </div>
+                    <div style="background: var(--warning-light); border: 1px solid var(--warning); border-radius: 6px; padding: 16px; margin: 20px 0;">
+                        <p style="color: var(--gray-700); margin: 0; font-size: 14px;">
+                            <strong>Security:</strong> API keys are only issued after email confirmation to protect your account.
+                        </p>
+                    </div>
+                    <p style="color: var(--gray-500); font-size: 14px;">
+                        Link expires in 24 hours. Didn't get the email? Check your spam folder.
+                    </p>
+                    <a href="/register" class="btn btn-secondary" style="margin-top: 20px;">Register Again</a>
+                </div>
+            `;
+        }
+        
+        // Add CSS animations
+        const style = document.createElement('style');
+        style.textContent = `
+            @keyframes slideIn {
+                from { transform: translateX(100%); opacity: 0; }
+                to { transform: translateX(0); opacity: 1; }
+            }
+            @keyframes slideOut {
+                from { transform: translateX(0); opacity: 1; }
+                to { transform: translateX(100%); opacity: 0; }
+            }
+        `;
+        document.head.appendChild(style);
+    </script>
+{% endblock %}

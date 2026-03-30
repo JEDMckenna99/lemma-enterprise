@@ -1,0 +1,122 @@
+{% extends "docs/layout.html" %}
+{% set active_page = 'api-auth' %}
+{% set hero_title = 'Authentication API' %}
+{% set hero_subtitle = 'Proof-first auth endpoints and compatibility token flows' %}
+
+{% block docs_content %}
+<div class="docs-section">
+    <h2>Overview</h2>
+    <p>New agent integrations should send <code>X-Lemma-Credential</code> directly to protected endpoints. Use the endpoints on this page for hosted wallet callbacks, proof exchange, and compatibility token management.</p>
+    
+    <div class="callout callout--info">
+        <div class="callout-title">Canonical auth modes</div>
+        <p><strong>Default:</strong> proof-first via <code>X-Lemma-Credential</code>.<br>
+        <strong>Compatibility only:</strong> exchange proof for short-lived bearer tokens when an older runtime cannot yet send the lemma header directly.</p>
+    </div>
+</div>
+
+<div class="docs-section">
+    <h2>Base URL</h2>
+    <p><code>https://lemma.id</code></p>
+</div>
+
+<div class="docs-section" id="sdk-request">
+    <h2>Start Hosted SDK Auth</h2>
+    <div class="api-endpoint">
+        <span class="http-method http-get">GET</span>
+        <code>/auth/sdk-request</code>
+    </div>
+    
+    <p>Creates a one-time state for hosted auth redirects. Typically called by integrations that use the hosted callback flow.</p>
+</div>
+
+<div class="docs-section" id="sdk-callback">
+    <h2>Hosted SDK Callback</h2>
+    <div class="api-endpoint">
+        <span class="http-method http-get">GET</span>
+        <code>/auth/sdk-callback</code>
+    </div>
+    
+    <p>Consumes state, verifies callback payload, and returns control to the integration origin.</p>
+</div>
+
+<div class="docs-section" id="exchange-proof">
+    <h2>Optional: Exchange Verified Proof for Access Token</h2>
+    <div class="api-endpoint">
+        <span class="http-method http-post">POST</span>
+        <code>/api/auth/exchange-proof</code>
+    </div>
+
+    <p>Compatibility path for legacy bearer-token integrations. Proof-first integrations should send <code>X-Lemma-Credential</code> directly instead of exchanging for <code>lm_at_...</code>.</p>
+
+    <h3>Request</h3>
+    <div class="code-block">
+        <div class="code-header"><span>JSON</span></div>
+        <code>{
+  "credential": { "...": "signed lemma object" },
+  "site_id": "example.com",
+  "requested_scope": ["read"],
+  "ttl_seconds": 900
+}</code>
+    </div>
+
+    <h3>Response</h3>
+    <div class="code-block">
+        <div class="code-header"><span>JSON</span></div>
+        <code>{
+  "access_token": "lm_at_...",
+  "token_type": "Bearer",
+  "expires_in": 900,
+  "site_id": "example.com",
+  "scope": ["read"],
+  "permission_id": "admin_access"
+}</code>
+    </div>
+</div>
+
+<div class="docs-section">
+    <h2>Primary Protected-Route Contract</h2>
+    <p>Protected routes should accept the lemma header directly:</p>
+
+    <div class="code-block">
+        <div class="code-header"><span>HTTP</span></div>
+        <code>POST /api/protected/action
+X-Lemma-Credential: &lt;base64url(full signed lemma)&gt;</code>
+    </div>
+
+    <p>Verify trust, signature, expiry, site binding, and required scope server-side. Treat bearer transport as a migration aid, not the source of truth.</p>
+</div>
+
+<div class="docs-section" id="token-management">
+    <h2>Token Management (API Key Protected)</h2>
+
+    <div class="api-endpoint">
+        <span class="http-method http-post">POST</span>
+        <code>/api/auth/introspect</code>
+    </div>
+
+    <div class="api-endpoint">
+        <span class="http-method http-post">POST</span>
+        <code>/api/auth/revoke</code>
+    </div>
+
+    <div class="callout callout--warning">
+        <div class="callout-title">API key required</div>
+        <p>These endpoints require <code>X-API-Key</code> and are intended for trusted backend/service calls.</p>
+    </div>
+</div>
+
+<div class="docs-section">
+    <h2>Use Which Path?</h2>
+    <table class="docs-table">
+        <thead>
+            <tr><th>Scenario</th><th>Recommended path</th></tr>
+        </thead>
+        <tbody>
+            <tr><td>New agent or runtime integration</td><td>Send <code>X-Lemma-Credential</code> directly</td></tr>
+            <tr><td>Legacy bearer-only transport</td><td><code>POST /api/auth/exchange-proof</code> to obtain <code>lm_at_...</code></td></tr>
+            <tr><td>Token diagnostics and revocation</td><td><code>/api/auth/introspect</code> and <code>/api/auth/revoke</code> with API key</td></tr>
+        </tbody>
+    </table>
+</div>
+{% endblock %}

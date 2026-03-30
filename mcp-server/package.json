@@ -1,0 +1,16 @@
+{
+  "name": "lemma-mcp-server",
+  "version": "1.0.0",
+  "description": "MCP server for Lemma.id platform - enables AI agents to view and debug the platform",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node index.js",
+    "conformance:lemma-firewall": "node run-lemma-firewall-conformance.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^0.5.0",
+    "node-fetch": "^3.3.2",
+    "puppeteer": "^21.0.0"
+  }
+}

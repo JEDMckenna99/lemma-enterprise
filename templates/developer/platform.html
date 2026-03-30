@@ -1,0 +1,3791 @@
+{% extends "modern/layout.html" %}
+
+{% block title %}Developer Platform - lemma.id{% endblock %}
+
+{% block head %}
+    {{ super() }}
+    
+    <!-- Lemma Wallet already loaded in layout.html - don't load again -->
+    
+    <style>
+        :root {
+            --sidebar-width: 240px;
+            --header-height: 64px;
+        }
+        
+        body {
+            margin: 0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: #f9fafb;
+        }
+        
+        .platform-container {
+            display: flex;
+            min-height: 100vh;
+        }
+        
+        /* Sidebar Navigation */
+        .sidebar {
+            width: var(--sidebar-width);
+            background: #ffffff;
+            border-right: 1px solid #e5e7eb;
+            position: fixed;
+            height: 100vh;
+            overflow-y: auto;
+            transition: transform 0.25s ease;
+            z-index: 100;
+        }
+
+        .sidebar-toggle {
+            position: fixed;
+            top: 50%;
+            left: calc(var(--sidebar-width) + 8px);
+            width: 34px;
+            height: 34px;
+            padding: 0;
+            border-radius: 999px;
+            border: 1px solid rgba(102, 126, 234, 0.28);
+            background: #ffffff;
+            color: #667eea;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            z-index: 110;
+            transform: translateY(-50%);
+            transition: left 0.25s ease, color 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .sidebar-toggle:hover {
+            background: #eef2ff;
+            box-shadow: 0 2px 8px rgba(102, 126, 234, 0.25);
+        }
+
+        .sidebar-toggle svg {
+            width: 15px;
+            height: 15px;
+            transition: transform 0.25s ease;
+        }
+        
+        .sidebar-header {
+            padding: 20px;
+            border-bottom: 1px solid #e5e7eb;
+        }
+        
+        .sidebar-logo {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 18px;
+            font-weight: 600;
+            color: #111827;
+        }
+        
+        .sidebar-nav {
+            padding: 16px 0;
+        }
+        
+        .nav-section {
+            margin-bottom: 24px;
+        }
+        
+        .nav-section-title {
+            padding: 8px 20px;
+            font-size: 12px;
+            font-weight: 600;
+            color: #6b7280;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .nav-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 10px 20px;
+            color: #4b5563;
+            text-decoration: none;
+            transition: all 0.2s;
+            cursor: pointer;
+        }
+        
+        .nav-item:hover {
+            background: #f3f4f6;
+            color: #667eea;
+        }
+        
+        .nav-item.active {
+            background: #eef2ff;
+            color: #667eea;
+            font-weight: 500;
+            border-right: 2px solid #667eea;
+        }
+        
+        .nav-icon {
+            width: 20px;
+            text-align: center;
+        }
+        
+        /* Main Content Area */
+        .main-content {
+            margin-left: var(--sidebar-width);
+            flex: 1;
+            padding: 24px;
+            transition: margin-left 0.25s ease;
+        }
+
+        .platform-container.sidebar-closed .sidebar {
+            transform: translateX(calc(-1 * var(--sidebar-width)));
+        }
+
+        .platform-container.sidebar-closed .main-content {
+            margin-left: 0;
+        }
+
+        .platform-container.sidebar-closed .sidebar-toggle {
+            left: 8px;
+        }
+
+        .platform-container.sidebar-closed .sidebar-toggle svg {
+            transform: rotate(180deg);
+        }
+
+        @media (max-width: 768px) {
+            .sidebar-toggle {
+                top: 84px;
+                left: 8px;
+                transform: none;
+            }
+        }
+        
+        .content-header {
+            margin-bottom: 32px;
+        }
+        
+        .content-title {
+            font-size: 28px;
+            font-weight: 600;
+            color: #111827;
+            margin: 0 0 8px 0;
+        }
+        
+        .content-subtitle {
+            font-size: 14px;
+            color: #6b7280;
+            margin: 0;
+        }
+        
+        /* Stat Cards */
+        .stat-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 20px;
+            margin-bottom: 32px;
+        }
+        
+        .stat-card {
+            background: white;
+            border-radius: 12px;
+            padding: 24px;
+            border: 1px solid #e5e7eb;
+        }
+        
+        .stat-label {
+            font-size: 14px;
+            color: #6b7280;
+            margin-bottom: 8px;
+        }
+        
+        .stat-value {
+            font-size: 32px;
+            font-weight: 700;
+            color: #111827;
+            margin-bottom: 4px;
+        }
+        
+        .stat-change {
+            font-size: 13px;
+            color: #10b981;
+        }
+        
+        .stat-change.negative {
+            color: #ef4444;
+        }
+        
+        /* Cards */
+        .card {
+            background: white;
+            border-radius: 12px;
+            padding: 24px;
+            border: 1px solid #e5e7eb;
+            margin-bottom: 24px;
+        }
+        
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        
+        .card-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: #111827;
+            margin: 0;
+        }
+        
+        /* Buttons */
+        .btn {
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            border: none;
+            text-decoration: none;
+            display: inline-block;
+        }
+        
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            background: #5568d3;
+        }
+        
+        .btn-secondary {
+            background: white;
+            color: #667eea;
+            border: 1px solid #667eea;
+        }
+        
+        .btn-secondary:hover {
+            background: #f5f7ff;
+        }
+        
+        .btn-sm {
+            padding: 6px 12px;
+            font-size: 13px;
+        }
+        
+        /* Table */
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        
+        .data-table thead {
+            background: #f9fafb;
+        }
+        
+        .data-table th {
+            text-align: left;
+            padding: 12px;
+            font-size: 13px;
+            font-weight: 600;
+            color: #6b7280;
+            border-bottom: 1px solid #e5e7eb;
+        }
+        
+        .data-table td {
+            padding: 12px;
+            border-bottom: 1px solid #f3f4f6;
+            font-size: 14px;
+            color: #111827;
+        }
+        
+        .data-table tbody tr:hover {
+            background: #f9fafb;
+        }
+        
+        /* Empty State */
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #6b7280;
+        }
+        
+        .empty-state-icon {
+            font-size: 48px;
+            margin-bottom: 16px;
+            opacity: 0.3;
+        }
+        
+        /* Badge */
+        .badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+        
+        .badge-success {
+            background: #d1fae5;
+            color: #065f46;
+        }
+        
+        .badge-warning {
+            background: #fef3c7;
+            color: #92400e;
+        }
+
+        .badge-danger {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+        
+        .badge-info {
+            background: #dbeafe;
+            color: #1e40af;
+        }
+        
+        /* Code Block */
+        .code-block {
+            background: #1e293b;
+            color: #e2e8f0;
+            padding: 20px;
+            border-radius: 8px;
+            font-family: 'Monaco', 'Courier New', monospace;
+            font-size: 13px;
+            line-height: 1.6;
+            overflow-x: auto;
+            position: relative;
+        }
+        
+        .code-block .copy-btn {
+            position: absolute;
+            top: 12px;
+            right: 12px;
+            background: #334155;
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 12px;
+            cursor: pointer;
+        }
+        
+        .code-block .copy-btn:hover {
+            background: #475569;
+        }
+        
+        /* Modal */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .modal.show {
+            display: flex;
+        }
+        
+        .modal-content {
+            background: white;
+            border-radius: 12px;
+            padding: 32px;
+            max-width: 500px;
+            width: 90%;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+        
+        .modal-header {
+            margin-bottom: 24px;
+        }
+        
+        .modal-title {
+            font-size: 20px;
+            font-weight: 600;
+            color: #111827;
+            margin: 0 0 8px 0;
+        }
+        
+        .modal-subtitle {
+            font-size: 14px;
+            color: #6b7280;
+            margin: 0;
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        .form-label {
+            display: block;
+            font-size: 14px;
+            font-weight: 500;
+            color: #374151;
+            margin-bottom: 8px;
+        }
+        
+        .form-input {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid #d1d5db;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: border-color 0.2s;
+        }
+        
+        .form-input:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+        
+        .form-select {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid #d1d5db;
+            border-radius: 8px;
+            font-size: 14px;
+            background: white;
+        }
+        
+        .modal-actions {
+            display: flex;
+            gap: 12px;
+            justify-content: flex-end;
+            margin-top: 24px;
+        }
+        
+        /* Loading State */
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #6b7280;
+        }
+        
+        .spinner {
+            border: 3px solid #f3f4f6;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 16px;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        /* Quick Actions */
+        .quick-actions {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+            margin-bottom: 32px;
+        }
+        
+        .quick-action {
+            background: white;
+            border: 1px solid #e5e7eb;
+            border-radius: 12px;
+            padding: 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .quick-action:hover {
+            border-color: #667eea;
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.1);
+        }
+        
+        .quick-action-icon {
+            font-size: 32px;
+            margin-bottom: 12px;
+        }
+        
+        .quick-action-title {
+            font-size: 14px;
+            font-weight: 500;
+            color: #111827;
+        }
+        
+        /* Toast animations */
+        @keyframes slideInUp {
+            from {
+                transform: translateY(20px);
+                opacity: 0;
+            }
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+        
+        @keyframes fadeOut {
+            from {
+                opacity: 1;
+            }
+            to {
+                opacity: 0;
+            }
+        }
+    </style>
+{% endblock %}
+
+{% block content %}
+    <div class="platform-container">
+        <!-- Sidebar Navigation -->
+        <div class="sidebar">
+            <nav class="sidebar-nav">
+                <div class="nav-section">
+                    <a class="nav-item active" data-section="overview">
+                        <span class="nav-icon">Stats</span>
+                        <span>Overview</span>
+                    </a>
+                    <a class="nav-item" data-section="api">
+                        <span>Connect & Keys</span>
+                    </a>
+                    <a class="nav-item" data-section="agent-delegation">
+                        <span class="nav-icon">Agent</span>
+                        <span>Monitor & Controls</span>
+                    </a>
+                    <a class="nav-item" data-section="settings">
+                        <span class="nav-icon">Settings</span>
+                        <span>Settings & Policy</span>
+                    </a>
+                    <a class="nav-item" href="/developer/billing">
+                        <span class="nav-icon">Billing</span>
+                        <span>Billing</span>
+                    </a>
+                </div>
+                
+                <div class="nav-section">
+                    <div class="nav-section-title">Resources</div>
+                    <a class="nav-item" href="/docs" target="_blank">
+                        <span class="nav-icon">Docs</span>
+                        <span>Documentation</span>
+                    </a>
+                    <a class="nav-item" href="/wallet">
+                        <span class="nav-icon">Wallet</span>
+                        <span>Your Wallet</span>
+                    </a>
+                </div>
+                
+                <!-- Internal admin surfaces intentionally hidden from customer developer platform -->
+            </nav>
+        </div>
+
+        <button
+            type="button"
+            class="sidebar-toggle"
+            id="platform-sidebar-toggle"
+            aria-label="Close sidebar"
+            aria-expanded="true"
+        >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M15 18l-6-6 6-6"></path>
+            </svg>
+        </button>
+        
+        <!-- Main Content Area -->
+        <div class="main-content">
+            <!-- Loading State -->
+            <div id="loading-state" class="loading">
+                <div class="spinner"></div>
+                <div>Loading developer platform...</div>
+            </div>
+            
+            <!-- Access Denied State -->
+            <div id="access-denied" style="display: none; text-align: center; padding: 60px 20px;">
+                <div style="font-size: 64px; margin-bottom: 24px;"></div>
+                <h2>Access Denied</h2>
+                <p style="color: #6b7280; margin-bottom: 24px;">
+                    You need a valid Lemma permission credential to access the developer platform.
+                </p>
+                <a href="/login" class="btn btn-primary">Sign In with Lemma</a>
+            </div>
+            
+            <!-- Overview Section -->
+            <div id="section-overview" class="content-section" style="display: none;">
+                <div class="content-header">
+                    <h1 class="content-title">Overview</h1>
+                    <p class="content-subtitle">Control center for bringing your own runtime, monitoring activity, and containing risky agents</p>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <h2 class="card-title">Start Here</h2>
+                    </div>
+                    <div style="padding: 0 20px 20px 20px; color: #4b5563; font-size: 14px;">
+                        <div style="margin-bottom: 8px;"><strong>1)</strong> Go to <strong>Connect &amp; Keys</strong> to install the CLI, start a wallet session, and wire your runtime to send <code>X-Lemma-Credential</code>.</div>
+                        <div style="margin-bottom: 8px;"><strong>2)</strong> Use <strong>Monitor &amp; Controls</strong> to review activity, inspect decisions, and revoke risky delegated credentials.</div>
+                        <div><strong>3)</strong> Open <strong>Settings &amp; Policy</strong> for defaults and safety controls. <code>Lemma Firewall</code> remains the reference runtime path, not the only supported integration model.</div>
+                    </div>
+                </div>
+                
+                <!-- Stat Cards -->
+                <div class="stat-grid">
+                    <div class="stat-card">
+                        <div class="stat-label">Monthly Active Users</div>
+                        <div class="stat-value" id="stat-mau">-</div>
+                        <div class="stat-change" id="stat-mau-change">Loading...</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Total Verifications</div>
+                        <div class="stat-value" id="stat-verifications">-</div>
+                        <div class="stat-change" id="stat-verifications-change">This month</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Active Users</div>
+                        <div class="stat-value" id="stat-users">-</div>
+                        <div class="stat-change" id="stat-users-change">Total issued</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Registered Integrations</div>
+                        <div class="stat-value" id="stat-sites">-</div>
+                        <div class="stat-change" id="stat-sites-change">Connected runtimes / sites</div>
+                    </div>
+                </div>
+                
+                <!-- Quick Actions -->
+                <div class="card">
+                    <div class="card-header">
+                        <h2 class="card-title">Quick Actions</h2>
+                    </div>
+                    <div class="quick-actions">
+                        <div class="quick-action" onclick="showSection('agent-delegation')">
+                            <div class="quick-action-icon">Agent</div>
+                            <div class="quick-action-title">Open Agent Ops</div>
+                        </div>
+                        <div class="quick-action" onclick="showSection('api')">
+                            <div class="quick-action-icon">Key</div>
+                            <div class="quick-action-title">Generate API Key</div>
+                        </div>
+                        <div class="quick-action" onclick="window.location.href='/developer/billing'">
+                            <div class="quick-action-icon">Billing</div>
+                            <div class="quick-action-title">Open Billing</div>
+                        </div>
+                        <div class="quick-action" onclick="showSection('settings')">
+                            <div class="quick-action-icon">Settings</div>
+                            <div class="quick-action-title">Platform Settings</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Recent Activity -->
+                <div class="card">
+                    <div class="card-header">
+                        <h2 class="card-title">Recent Activity</h2>
+                        <button class="btn btn-secondary btn-sm" type="button" onclick="loadOverviewData()">Refresh</button>
+                    </div>
+                    <div id="recent-activity">
+                        <div class="loading">Loading recent activity...</div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Users & Permissions Section -->
+            <div id="section-users" class="content-section" style="display: none;">
+                <div class="content-header">
+                    <h1 class="content-title">Users & Permissions</h1>
+                    <p class="content-subtitle">Manage user access and permissions</p>
+                </div>
+                
+                <div class="card">
+                    <div class="card-header">
+                        <div>
+                            <input type="text" id="user-search" class="form-input" placeholder="Search by email or domain..." style="width: 300px;">
+                        </div>
+                        <button class="btn btn-primary" onclick="showIssuePermissionModal()">
+                            + Issue Permission
+                        </button>
+                    </div>
+                    
+                    <div id="users-table-container">
+                        <div class="loading">Loading users...</div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Permission Types Section -->
+            <div id="section-permissions" class="content-section" style="display: none;">
+                <div class="content-header">
+                    <h1 class="content-title">Permission Types</h1>
+                    <p class="content-subtitle">Define what permissions your site offers to users</p>
+                </div>
+                
+                <!-- Site Selection for Permissions -->
+                <div class="card">
+                    <div class="card-header">
+                        <h2 class="card-title">Select Site</h2>
+                    </div>
+                    <div style="display: flex; gap: 12px; align-items: center;">
+                        <select id="permission-types-site-selector" class="form-select" style="flex: 1; max-width: 400px;">
+                            <option value="">Loading your sites...</option>
+                        </select>
+                        <button class="btn btn-primary" onclick="loadPermissionTypes()">Load Permissions</button>
+                    </div>
+                </div>
+                
+                <!-- Permission Types List -->
+                <div class="card">
+                    <div class="card-header">
+                        <h2 class="card-title">Permission Types</h2>
+                        <button class="btn btn-primary btn-sm" onclick="showAddPermissionTypeModal()" id="add-perm-type-btn" disabled>
+                            + Add Permission Type
+                        </button>
+                    </div>
+                    <div id="permission-types-container">
+                        <div class="empty-state">
+                            <div class="empty-state-icon">Admin</div>
+                            <div>Select a site above to manage permission types</div>
+                            <div style="font-size: 14px; margin-top: 8px;">Define custom permissions like "viewer", "editor", "admin", etc.</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Permission Templates -->
+                <div class="card">
+                    <div class="card-header">
+                        <h2 class="card-title">Templates</h2>
+                    </div>
+                    <p style="color: #6b7280; margin-bottom: 16px; font-size: 14px;">
+                        Click a template to use it as a starting point for your permission types.
+                    </p>
+                    <div id="permission-templates-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 12px;">
+                        <!-- Loaded dynamically -->
+                    </div>
+                </div>
+            </div>
+            
+            <!-- API & Integration Section -->
+            <div id="section-api" class="content-section" style="display: none;">
+                <div class="content-header">
+                    <h1 class="content-title">Connect & Keys</h1>
+                    <p class="content-subtitle">Install the CLI, manage keys, and wire proof-first runtime integration</p>
+                </div>
+
+                <div class="card" style="margin-bottom: 16px;">
+                    <div class="card-header">
+                        <h2 class="card-title">Key Manager Modes</h2>
+                    </div>
+                    <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
+                        <a class="btn btn-secondary btn-sm" href="/developer/external-api-keys">External API Key Manager</a>
+                        <span style="font-size: 13px; color: #6b7280;">Use this for customer/external integrations.</span>
+                    </div>
+                    <div style="margin-top: 10px; font-size: 13px; color: #6b7280;">
+                        For legacy per-site admin keys, open a specific site key page from your site list or direct legacy route.
+                    </div>
+                </div>
+                
+                <!-- API Keys -->
+                <div class="card">
+                    <div class="card-header">
+                        <h2 class="card-title">API Keys</h2>
+                        <button class="btn btn-primary btn-sm" id="create-api-key-btn" type="button">
+                            + Create New Key
+                        </button>
+                    </div>
+                    <div id="api-keys-container">
+                        <div class="loading">Loading API keys...</div>
+                    </div>
+                </div>
+                
+                <!-- Quick Integration -->
+                <div class="card">
+                    <div class="card-header">
+                        <h2 class="card-title">Quick Integration</h2>
+                    </div>
+                    <p style="margin-bottom: 16px; color: #6b7280;">
+                        Use the packaged CLI for onboarding, then configure your runtime to send <code>X-Lemma-Credential</code> on protected requests:
+                    </p>
+                    
+                    <div class="code-block">
+                        <button class="copy-btn" id="copy-integration-code-btn" type="button">Copy</button>
+                        <pre id="integration-code"># Install and confirm wallet session
+pipx install lemma-cli
+lemma session start --api-base https://lemma.id
+lemma session status --api-base https://lemma.id --json
+
+# Runtime environment
+LEMMA_BASE_URL=https://lemma.id
+LEMMA_PROOF_FILE=/path/to/.lemma-proof.json
+LEMMA_RUNTIME_ID=my-runtime
+LEMMA_AGENT_ID=my-agent
+LEMMA_WORKSPACE_ID=prod
+
+# Default protected-route contract
+POST /api/protected/action
+Headers:
+  X-Lemma-Credential: &lt;base64url(full signed lemma)&gt;
+
+# Compatibility only
+POST /api/auth/exchange-proof</pre>
+                    </div>
+                    
+                    <p style="margin-top: 16px; font-size: 14px; color: #6b7280;">
+                        <strong>Need a full reference runtime?</strong> Use <code>lemma setup-openclaw --api-base https://lemma.id</code>. For general onboarding, start with the <a href="/docs/quickstart" style="color: #667eea;">Quick Start</a>.
+                    </p>
+                </div>
+            </div>
+
+            <!-- Agent Ops Section -->
+            <div id="section-agent-delegation" class="content-section" style="display: none;">
+                <div class="content-header">
+                    <h1 class="content-title">Monitor & Controls</h1>
+                    <p class="content-subtitle">Monitor runtime activity, enforce proof-first controls, and contain compromised agents</p>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <h2 class="card-title">Filters</h2>
+                        <button class="btn btn-secondary btn-sm" onclick="loadAgentDelegationTab()">Refresh</button>
+                    </div>
+                    <div style="display: flex; flex-wrap: wrap; gap: 12px; align-items: center;">
+                        <label style="font-size: 13px; color: #374151;">Agent Credential</label>
+                        <select id="agent-token-filter" class="form-select" style="max-width: 320px;">
+                            <option value="">All credentials</option>
+                        </select>
+
+                        <label style="font-size: 13px; color: #374151;">Window</label>
+                        <select id="agent-window-hours" class="form-select" style="max-width: 140px;">
+                            <option value="1">1 hour</option>
+                            <option value="6">6 hours</option>
+                            <option value="24" selected>24 hours</option>
+                            <option value="72">72 hours</option>
+                            <option value="168">7 days</option>
+                        </select>
+
+                        <label style="font-size: 13px; color: #374151;">Runtime ID</label>
+                        <input id="agent-runtime-filter" class="form-input" style="max-width: 220px;" placeholder="lemma-firewall-default (optional)">
+
+                        <label style="display: flex; align-items: center; gap: 8px; font-size: 13px; color: #374151;">
+                            <input type="checkbox" id="agent-failures-only">
+                            Failures only
+                        </label>
+
+                        <button class="btn btn-primary btn-sm" onclick="loadAgentDelegationSummary(); loadAgentDelegationEvents();">
+                            Apply
+                        </button>
+                        <button class="btn btn-secondary btn-sm" onclick="loadFirewallDecisionFeed()">
+                            Refresh Decision Feed
+                        </button>
+                        <button class="btn btn-secondary btn-sm" onclick="exportFirewallDecisionBundle('json')">
+                            Export JSON
+                        </button>
+                        <button class="btn btn-secondary btn-sm" onclick="exportFirewallDecisionBundle('csv')">
+                            Export CSV
+                        </button>
+                        <button class="btn btn-secondary btn-sm" onclick="revokeSelectedAgentDelegatedLemma()">
+                            Revoke Selected Credential
+                        </button>
+                        <button class="btn btn-sm" style="background: #dc2626; color: white;" onclick="revokeAllActiveAgentDelegatedLemmas()">
+                            Revoke All Active Credentials
+                        </button>
+                    </div>
+                    <p style="margin-top: 12px; margin-bottom: 0; color: #6b7280; font-size: 13px;">
+                        Revocation removes agent access immediately. Existing activity history remains for audit visibility.
+                    </p>
+                </div>
+
+                <div class="stat-grid">
+                    <div class="stat-card">
+                        <div class="stat-label">Actions</div>
+                        <div class="stat-value" id="agent-stat-total">-</div>
+                        <div class="stat-change">Selected window</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Failures</div>
+                        <div class="stat-value" id="agent-stat-failures">-</div>
+                        <div class="stat-change negative">Error and denied activity</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Task Deviations</div>
+                        <div class="stat-value" id="agent-stat-deviations">-</div>
+                        <div class="stat-change negative">Out-of-bounds requests</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Last Seen</div>
+                        <div class="stat-value" id="agent-stat-last-seen" style="font-size: 16px;">-</div>
+                        <div class="stat-change" id="agent-stat-unique-paths">Unique paths: -</div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <h2 class="card-title">Delegated Agent Credentials</h2>
+                    </div>
+                    <div id="agent-tokens-table-container">
+                        <div class="loading">Loading delegated credentials...</div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <h2 class="card-title">Recent Activity</h2>
+                    </div>
+                    <div id="agent-events-table-container">
+                        <div class="loading">Loading activity...</div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <h2 class="card-title">Runtime Decision Feed (Proof-First)</h2>
+                    </div>
+                    <div id="firewall-decisions-container">
+                        <div class="loading">Loading Lemma Firewall decision feed...</div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Analytics Section -->
+            <div id="section-analytics" class="content-section" style="display: none;">
+                <div class="content-header">
+                    <h1 class="content-title">Analytics</h1>
+                    <p class="content-subtitle">Usage insights and verification metrics</p>
+                </div>
+                
+                <div class="card">
+                    <p style="text-align: center; padding: 60px 20px; color: #6b7280;">
+                        Analytics charts coming soon!<br>
+                        <span style="font-size: 14px;">Track MAU, verification trends, and performance metrics.</span>
+                    </p>
+                </div>
+            </div>
+            
+            <!-- Settings Section -->
+            <div id="section-settings" class="content-section" style="display: none;">
+                <div class="content-header">
+                    <h1 class="content-title">Settings & Policy</h1>
+                    <p class="content-subtitle">Agent Ops configuration, account settings, and billing navigation</p>
+                </div>
+                
+                <div class="card">
+                    <p style="text-align: center; padding: 60px 20px; color: #6b7280;">
+                        Settings surface is being streamlined for self-serve operators.<br>
+                        <span style="font-size: 14px;">Use this section for runtime defaults, notifications, and account controls. Billing is available in the Billing page.</span>
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Revoke Permission Modal -->
+    <div id="revoke-permission-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title">Revoke Permission</h3>
+                <p class="modal-subtitle">Remove user access and update Bloom filter</p>
+            </div>
+            
+            <div style="background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; padding: 16px; margin-bottom: 24px;">
+                <div style="display: flex; align-items: start; gap: 12px;">
+                    <div style="color: #dc2626; font-size: 20px; flex-shrink: 0;">Warning</div>
+                    <div>
+                        <div style="font-weight: 600; color: #991b1b; margin-bottom: 4px;">This action cannot be undone</div>
+                        <div style="font-size: 14px; color: #7f1d1d;">
+                            Revoking this permission will:
+                            <ul style="margin: 8px 0 0 0; padding-left: 20px;">
+                                <li>Mark the credential as revoked in the database</li>
+                                <li>Update the site-specific Bloom filter</li>
+                                <li>Trigger sync to all clients (within 7 days)</li>
+                                <li>User will lose access on next verification</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <form id="revoke-permission-form" onsubmit="revokePermission(event)">
+                <div class="form-group">
+                    <label class="form-label">User Identifier</label>
+                    <input type="text" class="form-input" id="revoke-email" readonly style="background: #f9fafb; font-family: monospace; font-size: 13px;">
+                    <div style="font-size: 12px; color: #6b7280; margin-top: 4px;">
+                        Email, Wallet ID (PPID), or Instance ID
+                    </div>
+                </div>
+
+                <input type="hidden" id="revoke-credential-id">
+                
+                <div class="form-group">
+                    <label class="form-label">Reason for Revocation</label>
+                    <select class="form-select" id="revoke-reason" required>
+                        <option value="admin_action">Admin action</option>
+                        <option value="user_requested">User requested</option>
+                        <option value="security_incident">Security incident</option>
+                        <option value="policy_violation">Policy violation</option>
+                        <option value="account_closed">Account closed</option>
+                    </select>
+                </div>
+                
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('revoke-permission-modal')">Cancel</button>
+                    <button type="submit" class="btn btn-primary" style="background: #dc2626;">Revoke Access</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <!-- Issue Permission Modal -->
+    <div id="issue-permission-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title">Issue Permission</h3>
+                <p class="modal-subtitle">Grant access to a user for your site</p>
+            </div>
+            
+            <!-- Tabs for Email vs Direct Issue -->
+            <div style="display: flex; gap: 8px; margin-bottom: 20px; border-bottom: 1px solid #e5e7eb; padding-bottom: 12px;">
+                <button type="button" class="tab-btn active" onclick="switchIssueTab('email')" id="issue-tab-email" style="padding: 8px 16px; border: none; background: #667eea; color: white; border-radius: 6px; cursor: pointer;">
+                    Via Email
+                </button>
+                <button type="button" class="tab-btn" onclick="switchIssueTab('direct')" id="issue-tab-direct" style="padding: 8px 16px; border: 1px solid #d1d5db; background: white; color: #374151; border-radius: 6px; cursor: pointer;">
+                    Direct to My Wallet
+                </button>
+            </div>
+            
+            <!-- Email Flow Tab -->
+            <div id="issue-tab-email-content">
+                <!-- Privacy Notice -->
+                <div style="background: #ecfdf5; border: 1px solid #a7f3d0; border-radius: 8px; padding: 16px; margin-bottom: 20px;">
+                    <p style="margin: 0; font-size: 13px; color: #065f46;">
+                        <strong>Privacy Mode:</strong> Email addresses are used for delivery workflows and are not intended for long-term retention beyond operational/audit requirements.
+                        Recipients must authenticate with passkey to claim their permission.
+                    </p>
+                </div>
+                
+                <form id="issue-permission-form" onsubmit="issuePermission(event)">
+                    <div class="form-group">
+                        <label class="form-label">Recipient Email</label>
+                        <input type="email" class="form-input" id="permission-email" required placeholder="user@example.com">
+                        <small style="color: #6b7280; font-size: 12px;">Used for delivery workflows; retention follows platform privacy policy</small>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label">Site</label>
+                        <select class="form-select" id="permission-site" required onchange="toggleCustomSite()">
+                            <option value="">Select a registered site...</option>
+                            <option value="lemma.id">lemma.id</option>
+                            <option value="custom">Custom site (enter below)</option>
+                        </select>
+                        <input type="text" class="form-input" id="permission-custom-site" placeholder="yoursite.com" style="margin-top: 8px; display: none;">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label">Permission Level</label>
+                        <select class="form-select" id="permission-level" required>
+                            <option value="user">User (Basic Access)</option>
+                            <option value="editor">Editor (Read/Write)</option>
+                            <option value="admin">Admin (Full Access)</option>
+                            <option value="super_admin">Super Admin</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label">Expiry (Days)</label>
+                        <input type="number" class="form-input" id="permission-expiry" value="90" min="1" max="730">
+                    </div>
+                    
+                    <div class="modal-actions">
+                        <button type="button" class="btn btn-secondary" onclick="closeModal('issue-permission-modal')">Cancel</button>
+                        <button type="submit" class="btn btn-primary">Send Claim Link</button>
+                    </div>
+                </form>
+            </div>
+            
+            <!-- Direct Issue Tab (to current wallet) -->
+            <div id="issue-tab-direct-content" style="display: none;">
+                <div style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 16px; margin-bottom: 20px;">
+                    <p style="margin: 0; font-size: 14px; color: #1e40af;">
+                        <strong>Direct Issue</strong> - Issue a permission credential directly to your current browser's wallet.
+                        Perfect for giving yourself admin access to your own site.
+                    </p>
+                </div>
+                
+                <form id="direct-issue-form" onsubmit="issueDirectPermission(event)">
+                    <div class="form-group">
+                        <label class="form-label">Your Site</label>
+                        <select class="form-select" id="direct-permission-site" required>
+                            <option value="">Select your registered site...</option>
+                            <!-- Populated dynamically from user's registered sites -->
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label">Permission Level</label>
+                        <select class="form-select" id="direct-permission-level" required>
+                            <option value="user">User (Basic Access)</option>
+                            <option value="editor">Editor (Read/Write)</option>
+                            <option value="admin" selected>Admin (Full Access)</option>
+                            <option value="super_admin">Super Admin</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label">Expiry (Days)</label>
+                        <input type="number" class="form-input" id="direct-permission-expiry" value="365" min="1" max="730">
+                        <small style="color: #6b7280; font-size: 12px;">How long this permission should be valid</small>
+                    </div>
+                    
+                    <div id="direct-issue-result" style="margin-bottom: 16px;"></div>
+                    
+                    <div class="modal-actions">
+                        <button type="button" class="btn btn-secondary" onclick="closeModal('issue-permission-modal')">Cancel</button>
+                        <button type="submit" class="btn btn-primary" id="direct-issue-btn">
+                            Issue to My Wallet
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <!-- API Key Generation Modal -->
+    <div id="api-key-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title">Register Site & Generate API Key</h3>
+                <p class="modal-subtitle">Register your site URL to receive an API key for Lemma authentication</p>
+            </div>
+            
+            <form id="api-key-form" onsubmit="submitAPIKeyForm(event)">
+                <div class="form-group">
+                    <label class="form-label">Site URL <span style="color: #ef4444;">*</span></label>
+                    <input type="text" class="form-input" id="api-key-site-domain" required placeholder="yoursite.com">
+                    <small style="color: #6b7280; font-size: 12px;">Your site domain (e.g., myapp.com or staging.myapp.com)</small>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">Display Name</label>
+                    <input type="text" class="form-input" id="api-key-site-label" placeholder="My Application">
+                    <small style="color: #6b7280; font-size: 12px;">A friendly name for this site in your dashboard</small>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">Environment</label>
+                    <select class="form-select" id="api-key-environment">
+                        <option value="production">Production</option>
+                        <option value="staging">Staging</option>
+                        <option value="development">Development</option>
+                        <option value="sandbox">Sandbox</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">API Key Name</label>
+                    <input type="text" class="form-input" id="api-key-name" placeholder="Production Key">
+                    <small style="color: #6b7280; font-size: 12px;">Optional label to identify this key</small>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">Contact Email</label>
+                    <input type="email" class="form-input" id="api-key-contact-email" placeholder="you@yoursite.com">
+                </div>
+                
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-secondary" id="api-key-modal-cancel-btn">Cancel</button>
+                    <button type="submit" class="btn btn-primary" id="api-key-submit-btn">Register Site</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <!-- Add/Edit Permission Type Modal -->
+    <div id="permission-type-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title" id="perm-type-modal-title">Add Permission Type</h3>
+                <p class="modal-subtitle">Define a new permission type for your site</p>
+            </div>
+            
+            <form id="permission-type-form" onsubmit="savePermissionType(event)">
+                <div class="form-group">
+                    <label class="form-label">Name <span style="color: #ef4444;">*</span></label>
+                    <input type="text" id="perm-type-name" class="form-input" placeholder="e.g., editor" required pattern="[a-z0-9_\-]+">
+                    <small style="color: #6b7280; font-size: 12px;">Lowercase letters, numbers, underscores, hyphens only</small>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">Type <span style="color: #ef4444;">*</span></label>
+                    <select id="perm-type-type" class="form-select" required>
+                        <option value="role">Role (e.g., viewer, admin)</option>
+                        <option value="subscription">Subscription (e.g., premium)</option>
+                        <option value="time-bound">Time-bound (e.g., trial)</option>
+                        <option value="scope">Scope (granular access)</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">Description</label>
+                    <textarea id="perm-type-description" class="form-input" style="min-height: 80px; resize: vertical;" placeholder="What this permission grants..."></textarea>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">Scopes</label>
+                    <input type="text" id="perm-type-scopes" class="form-input" placeholder="content:read, content:write">
+                    <small style="color: #6b7280; font-size: 12px;">Comma-separated list of scopes</small>
+                </div>
+                
+                <div class="form-group" id="perm-type-duration-group" style="display: none;">
+                    <label class="form-label">Duration (days)</label>
+                    <input type="number" id="perm-type-duration" class="form-input" placeholder="e.g., 14">
+                    <small style="color: #6b7280; font-size: 12px;">For time-bound permissions only</small>
+                </div>
+                
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('permission-type-modal')">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Save Permission Type</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <!-- API Key Success Modal -->
+    <div id="api-key-success-modal" class="modal">
+        <div class="modal-content" style="max-width: 560px;">
+            <div class="modal-header" style="text-align: center;">
+                <div style="width: 64px; height: 64px; background: #dcfce7; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 16px;">
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="20 6 9 17 4 12"></polyline>
+                    </svg>
+                </div>
+                <h3 class="modal-title">Site Registered Successfully</h3>
+                <p class="modal-subtitle">Your API key has been generated. Copy it now - it won't be shown again in full.</p>
+            </div>
+            
+            <div style="margin-bottom: 20px;">
+                <label style="font-weight: 600; font-size: 14px; color: #374151; display: block; margin-bottom: 8px;">Site Domain</label>
+                <div id="success-site-domain" style="font-size: 15px; color: #111827; padding: 12px; background: #f9fafb; border-radius: 8px;"></div>
+            </div>
+            
+            <div style="margin-bottom: 20px;">
+                <label style="font-weight: 600; font-size: 14px; color: #374151; display: block; margin-bottom: 8px;">Your API Key</label>
+                <div style="position: relative;">
+                    <input type="text" id="success-api-key" readonly 
+                        style="width: 100%; font-family: 'JetBrains Mono', 'Courier New', monospace; font-size: 14px; padding: 14px 100px 14px 14px; background: #1f2937; color: #22c55e; border: none; border-radius: 8px; letter-spacing: 0.5px;">
+                    <button type="button" id="copy-success-btn"
+                        style="position: absolute; right: 8px; top: 50%; transform: translateY(-50%); padding: 8px 16px; background: #374151; color: #fff; border: none; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: 500;">
+                        Copy
+                    </button>
+                </div>
+                <small style="color: #6b7280; font-size: 12px; display: block; margin-top: 8px;">
+                    Store this key securely. For security, only the last 8 characters will be visible in your dashboard.
+                </small>
+            </div>
+            
+            <div style="margin-bottom: 20px;">
+                <label style="font-weight: 600; font-size: 14px; color: #374151; display: block; margin-bottom: 8px;">Site ID</label>
+                <div style="position: relative;">
+                    <input type="text" id="success-site-id" readonly 
+                        style="width: 100%; font-family: 'JetBrains Mono', 'Courier New', monospace; font-size: 12px; padding: 12px 80px 12px 12px; background: #f3f4f6; color: #374151; border: 1px solid #e5e7eb; border-radius: 8px;">
+                    <button type="button" id="copy-site-id-btn"
+                        style="position: absolute; right: 8px; top: 50%; transform: translateY(-50%); padding: 6px 12px; background: #e5e7eb; color: #374151; border: none; border-radius: 6px; cursor: pointer; font-size: 12px;">
+                        Copy
+                    </button>
+                </div>
+                <small style="color: #6b7280; font-size: 12px; display: block; margin-top: 8px;">
+                    Use this Site ID in your Lemma SDK configuration.
+                </small>
+            </div>
+            
+            <div style="background: #fef3c7; border: 1px solid #fcd34d; border-radius: 8px; padding: 12px 16px; margin-bottom: 20px;">
+                <div style="font-weight: 600; font-size: 13px; color: #92400e; margin-bottom: 4px;">Important</div>
+                <div style="font-size: 13px; color: #78350f;">
+                    Make sure to copy your API key now. You will not be able to see the full key again after closing this dialog.
+                </div>
+            </div>
+            
+            <div class="modal-actions" style="justify-content: center;">
+                <button type="button" class="btn btn-primary" id="api-key-success-done-btn">Done</button>
+            </div>
+        </div>
+    </div>
+    
+    <script nonce="{{ csp_nonce }}">
+        // Global state
+        let currentSection = 'overview';
+        let userPermission = null;
+        let lemmaPlatformCredentialString = null;
+        
+        function encodeLemmaCredentialForHeader(credentialString) {
+            if (!credentialString) return '';
+            try {
+                const parsed = JSON.parse(credentialString);
+                const canonical = JSON.stringify(parsed);
+                const bytes = new TextEncoder().encode(canonical);
+                let binary = '';
+                bytes.forEach((b) => {
+                    binary += String.fromCharCode(b);
+                });
+                return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
+            } catch (e) {
+                return '';
+            }
+        }
+
+        function getLemmaAuthHeaders() {
+            if (!lemmaPlatformCredentialString) {
+                return {};
+            }
+            const headers = {
+                // Compatibility path used by some customer/account endpoints.
+                'Authorization': `Bearer ${lemmaPlatformCredentialString}`
+            };
+            const lemmaHeader = encodeLemmaCredentialForHeader(lemmaPlatformCredentialString);
+            // Canonical proof-first header required by route auth enforcement.
+            headers['X-Lemma-Credential'] = lemmaHeader || lemmaPlatformCredentialString;
+            return headers;
+        }
+        
+        function escapeHTML(value) {
+            if (typeof value !== 'string') {
+                return value ?? '';
+            }
+            return value
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+        
+        function formatDate(value) {
+            if (!value) return '—';
+            try {
+                return new Date(value).toLocaleString();
+            } catch (e) {
+                return value;
+            }
+        }
+
+        function getCurrentCredentialObject() {
+            if (!lemmaPlatformCredentialString) return null;
+            try {
+                return JSON.parse(lemmaPlatformCredentialString);
+            } catch (e) {
+                return null;
+            }
+        }
+
+        async function resolveAgentDelegationPPID() {
+            if (window.agentDelegationPPID) {
+                return window.agentDelegationPPID;
+            }
+
+            const cred = getCurrentCredentialObject();
+            const claims = cred ? (cred.claims || cred.credentialSubject || {}) : {};
+            const candidate = claims.ppid || claims.sub || claims.subject || cred?.subject || cred?.sub || null;
+            if (candidate) {
+                window.agentDelegationPPID = candidate;
+                return candidate;
+            }
+
+            // Fallback: derive site PPID from wallet for this domain.
+            try {
+                if (window.globalLemmaWallet && typeof window.globalLemmaWallet.derivePPID === 'function') {
+                    const ppid = await window.globalLemmaWallet.derivePPID('lemma.id');
+                    if (ppid) {
+                        window.agentDelegationPPID = ppid;
+                        return ppid;
+                    }
+                }
+            } catch (e) {
+                console.warn('Could not derive PPID for agent delegation:', e.message || e);
+            }
+
+            return null;
+        }
+
+        async function revokeAgentDelegatedLemma(tokenId) {
+            if (!tokenId) {
+                showToast('Missing credential identifier', 'error');
+                return;
+            }
+
+            const confirmed = confirm('Revoke this agent delegated lemma? The agent will immediately lose access.');
+            if (!confirmed) return;
+
+            try {
+                const headers = (typeof window.getLemmaAuthHeaders === 'function')
+                    ? window.getLemmaAuthHeaders({ 'Content-Type': 'application/json' })
+                    : { 'Content-Type': 'application/json' };
+
+                const response = await fetch(`/api/agent/credentials/${encodeURIComponent(tokenId)}/revoke`, {
+                    method: 'POST',
+                    headers,
+                    body: JSON.stringify({
+                        reason: 'Revoked from developer platform'
+                    })
+                });
+                const data = await response.json();
+
+                if (!response.ok || !data.success) {
+                    throw new Error(data.error || 'Failed to revoke delegated lemma');
+                }
+
+                showToast('Agent delegated lemma revoked');
+                await loadAgentDelegationTokens();
+                await loadAgentDelegationSummary();
+                await loadAgentDelegationEvents();
+            } catch (error) {
+                console.error('Failed to revoke agent delegated lemma:', error);
+                showToast(error.message || 'Failed to revoke delegated lemma', 'error');
+            }
+        }
+
+        async function revokeSelectedAgentDelegatedLemma() {
+            const tokenId = document.getElementById('agent-token-filter')?.value || '';
+            if (!tokenId) {
+                showToast('Select a credential first', 'error');
+                return;
+            }
+            await revokeAgentDelegatedLemma(tokenId);
+        }
+
+        async function revokeAllActiveAgentDelegatedLemmas() {
+            const activeTokens = (window.agentDelegationTokens || []).filter((t) => t.status === 'active');
+            if (activeTokens.length === 0) {
+                showToast('No active delegated credentials to revoke');
+                return;
+            }
+
+            const confirmed = confirm(`Revoke all active delegated credentials (${activeTokens.length})? Agents will immediately lose access.`);
+            if (!confirmed) return;
+
+            let revokedCount = 0;
+            for (const token of activeTokens) {
+                try {
+                    await revokeAgentDelegatedLemma(token.token_id);
+                    revokedCount += 1;
+                } catch (e) {
+                    console.warn('Bulk revoke failed for token:', token.token_id, e);
+                }
+            }
+
+            showToast(`Revoked ${revokedCount} of ${activeTokens.length} active delegated credentials`);
+        }
+
+        function getAgentMonitorFilters() {
+            const tokenId = document.getElementById('agent-token-filter')?.value || '';
+            const hours = parseInt(document.getElementById('agent-window-hours')?.value || '24', 10);
+            const failuresOnly = !!document.getElementById('agent-failures-only')?.checked;
+            const runtimeId = (document.getElementById('agent-runtime-filter')?.value || '').trim();
+            return { tokenId, hours, failuresOnly, runtimeId };
+        }
+
+        async function getAgentMonitorHeaders() {
+            if (typeof window.getLemmaAuthHeaders === 'function') {
+                return window.getLemmaAuthHeaders();
+            }
+            return {};
+        }
+
+        async function loadAgentDelegationTab() {
+            await loadAgentDelegationTokens();
+            await loadAgentDelegationSummary();
+            await loadAgentDelegationEvents();
+            await loadFirewallDecisionFeed();
+        }
+
+        async function loadAgentDelegationTokens() {
+            const container = document.getElementById('agent-tokens-table-container');
+            if (!container) return;
+
+            container.innerHTML = '<div class="loading">Loading delegated credentials...</div>';
+
+            try {
+                const headers = await getAgentMonitorHeaders();
+                const response = await fetch('/api/agent/monitor/tokens?include_revoked=true&limit=200', { headers });
+                const data = await response.json();
+
+                if (!response.ok || !data.success) {
+                    throw new Error(data.error || 'Failed to load delegated credentials');
+                }
+
+                const tokens = data.tokens || [];
+                window.agentDelegationTokens = tokens;
+                const tokenFilter = document.getElementById('agent-token-filter');
+                const selectedToken = tokenFilter ? tokenFilter.value : '';
+                if (tokenFilter) {
+                    tokenFilter.innerHTML = '<option value="">All credentials</option>';
+                    tokens.forEach((t) => {
+                        const option = document.createElement('option');
+                        option.value = t.token_id;
+                        option.textContent = `${t.agent_name || 'AI Agent'} (${t.token_id})`;
+                        tokenFilter.appendChild(option);
+                    });
+                    if (selectedToken && tokens.some((t) => t.token_id === selectedToken)) {
+                        tokenFilter.value = selectedToken;
+                    }
+                }
+
+                if (tokens.length === 0) {
+                    container.innerHTML = `
+                        <div class="empty-state">
+                            <div class="empty-state-icon">Agent</div>
+                            <div>No delegated credentials found</div>
+                        </div>
+                    `;
+                    return;
+                }
+
+                const rows = tokens.map((token) => {
+                    const scopeText = (token.scope || []).join(', ') || 'read';
+                    const statusClass = token.status === 'active' ? 'badge-success' : (token.status === 'revoked' ? 'badge-danger' : 'badge-warning');
+                    const remaining = token.operations_remaining === null || token.operations_remaining === undefined
+                        ? '∞'
+                        : String(token.operations_remaining);
+                    const revokeButton = token.status === 'active'
+                        ? `<button class="btn btn-sm" style="background: #dc2626; color: white;" onclick="revokeAgentDelegatedLemma('${escapeHTML(token.token_id)}')">Revoke</button>`
+                        : '<span style="color: #9ca3af; font-size: 12px;">—</span>';
+                    return `
+                        <tr>
+                            <td>
+                                <div style="font-weight: 600;">${escapeHTML(token.agent_name || 'AI Agent')}</div>
+                                <div style="font-size: 12px; color: #6b7280;">${escapeHTML(token.token_id)}</div>
+                            </td>
+                            <td><span class="badge badge-info">${escapeHTML(scopeText)}</span></td>
+                            <td>${escapeHTML(String(token.use_count || 0))}</td>
+                            <td>${escapeHTML(remaining)}</td>
+                            <td>${formatDate(token.expires_at)}</td>
+                            <td><span class="badge ${statusClass}">${escapeHTML(token.status || 'unknown')}</span></td>
+                            <td>${revokeButton}</td>
+                        </tr>
+                    `;
+                }).join('');
+
+                container.innerHTML = `
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Credential</th>
+                                <th>Scope</th>
+                                <th>Used</th>
+                                <th>Remaining Ops</th>
+                                <th>Expires</th>
+                                <th>Status</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>${rows}</tbody>
+                    </table>
+                `;
+            } catch (error) {
+                console.error('Failed to load delegated credentials:', error);
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-state-icon">Warning</div>
+                        <div>Failed to load delegated credentials</div>
+                        <div style="font-size: 13px; margin-top: 8px; color: #dc2626;">${escapeHTML(error.message || 'Unknown error')}</div>
+                    </div>
+                `;
+            }
+        }
+
+        async function loadAgentDelegationSummary() {
+            const { tokenId, hours } = getAgentMonitorFilters();
+            const query = new URLSearchParams({ hours: String(hours) });
+            if (tokenId) query.set('token_id', tokenId);
+
+            try {
+                const headers = await getAgentMonitorHeaders();
+                const response = await fetch(`/api/agent/monitor/summary?${query.toString()}`, { headers });
+                const data = await response.json();
+                if (!response.ok || !data.success) {
+                    throw new Error(data.error || 'Failed to load summary');
+                }
+
+                const summary = data.summary || {};
+                document.getElementById('agent-stat-total').textContent = String(summary.total_actions || 0);
+                document.getElementById('agent-stat-failures').textContent = String(summary.failure_count || 0);
+                document.getElementById('agent-stat-deviations').textContent = String(summary.deviation_count || 0);
+                document.getElementById('agent-stat-last-seen').textContent = summary.last_seen_at ? formatDate(summary.last_seen_at) : '—';
+                document.getElementById('agent-stat-unique-paths').textContent = `Unique paths: ${summary.unique_paths || 0}`;
+            } catch (error) {
+                console.error('Failed to load agent summary:', error);
+                document.getElementById('agent-stat-total').textContent = 'Error';
+                document.getElementById('agent-stat-failures').textContent = 'Error';
+                document.getElementById('agent-stat-deviations').textContent = 'Error';
+                document.getElementById('agent-stat-last-seen').textContent = 'Error';
+                document.getElementById('agent-stat-unique-paths').textContent = 'Unique paths: Error';
+            }
+        }
+
+        async function loadAgentDelegationEvents() {
+            const container = document.getElementById('agent-events-table-container');
+            if (!container) return;
+
+            container.innerHTML = '<div class="loading">Loading activity...</div>';
+
+            const { tokenId, hours, failuresOnly } = getAgentMonitorFilters();
+            const query = new URLSearchParams({
+                hours: String(hours),
+                limit: '300',
+                status: failuresOnly ? 'failure' : 'all'
+            });
+            if (tokenId) query.set('token_id', tokenId);
+
+            try {
+                const headers = await getAgentMonitorHeaders();
+                const response = await fetch(`/api/agent/monitor/events?${query.toString()}`, { headers });
+                const data = await response.json();
+                if (!response.ok || !data.success) {
+                    throw new Error(data.error || 'Failed to load events');
+                }
+
+                const events = data.events || [];
+                if (events.length === 0) {
+                    container.innerHTML = `
+                        <div class="empty-state">
+                            <div class="empty-state-icon">Empty</div>
+                            <div>No agent activity in selected window</div>
+                        </div>
+                    `;
+                    return;
+                }
+
+                const rows = events.map((event) => {
+                    const code = event.status_code || '';
+                    const statusClass = event.success ? 'badge-success' : 'badge-danger';
+                    const deviationBadge = event.task_deviation
+                        ? '<span class="badge badge-danger" style="padding: 2px 8px;">deviation</span>'
+                        : (event.path_allowed === false ? '<span class="badge badge-warning" style="padding: 2px 8px;">denied</span>' : '');
+                    return `
+                        <tr>
+                            <td>${formatDate(event.timestamp)}</td>
+                            <td>${escapeHTML(event.token_id || '—')}</td>
+                            <td>${escapeHTML(event.method || '—')}</td>
+                            <td style="font-family: monospace; font-size: 12px;">${escapeHTML(event.path || '—')}</td>
+                            <td><span class="badge ${statusClass}">${escapeHTML(String(code || (event.success ? 200 : 500)))}</span></td>
+                            <td>${deviationBadge}</td>
+                        </tr>
+                    `;
+                }).join('');
+
+                container.innerHTML = `
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Time</th>
+                                <th>Credential</th>
+                                <th>Method</th>
+                                <th>Path</th>
+                                <th>Status</th>
+                                <th>Flags</th>
+                            </tr>
+                        </thead>
+                        <tbody>${rows}</tbody>
+                    </table>
+                `;
+            } catch (error) {
+                console.error('Failed to load agent events:', error);
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-state-icon">Warning</div>
+                        <div>Failed to load agent activity</div>
+                        <div style="font-size: 13px; margin-top: 8px; color: #dc2626;">${escapeHTML(error.message || 'Unknown error')}</div>
+                    </div>
+                `;
+            }
+        }
+
+        async function loadFirewallDecisionFeed() {
+            const container = document.getElementById('firewall-decisions-container');
+            if (!container) return;
+            container.innerHTML = '<div class="loading">Loading Lemma Firewall decision feed...</div>';
+
+            const { failuresOnly, runtimeId } = getAgentMonitorFilters();
+            const query = new URLSearchParams({ limit: '250' });
+            if (runtimeId) query.set('runtime_id', runtimeId);
+
+            try {
+                const response = await fetch(`/api/wallet/runtimes/decisions?${query.toString()}`, {
+                    credentials: 'include'
+                });
+                const data = await response.json();
+                if (!response.ok || !data.success) {
+                    const detail = data.message || data.error || `HTTP ${response.status}`;
+                    throw new Error(detail);
+                }
+
+                let decisions = Array.isArray(data.decisions) ? data.decisions : [];
+                if (failuresOnly) {
+                    decisions = decisions.filter((item) => String(item.decision || '').toLowerCase() === 'deny');
+                }
+
+                if (decisions.length === 0) {
+                    container.innerHTML = `
+                        <div class="empty-state">
+                            <div class="empty-state-icon">Empty</div>
+                            <div>No Lemma Firewall decisions in selected scope</div>
+                        </div>
+                    `;
+                    return;
+                }
+
+                const rows = decisions.map((item) => {
+                    const decisionClass = String(item.decision || '').toLowerCase() === 'allow' ? 'badge-success' : 'badge-danger';
+                    const statusCode = item.status_code !== null && item.status_code !== undefined ? String(item.status_code) : '—';
+                    return `
+                        <tr>
+                            <td>${formatDate(item.timestamp)}</td>
+                            <td style="font-family: monospace; font-size: 12px;">${escapeHTML(item.runtime_id || '—')}</td>
+                            <td style="font-family: monospace; font-size: 12px;">${escapeHTML(item.credential_ref || '—')}</td>
+                            <td>${escapeHTML(item.method || '—')}</td>
+                            <td style="font-family: monospace; font-size: 12px;">${escapeHTML(item.path || '—')}</td>
+                            <td><span class="badge ${decisionClass}">${escapeHTML(item.decision || '—')}</span></td>
+                            <td><span class="badge ${decisionClass}">${escapeHTML(statusCode)}</span></td>
+                            <td style="font-family: monospace; font-size: 12px;">${escapeHTML(item.reason_code || '—')}</td>
+                            <td>
+                                <button class="btn btn-sm btn-secondary" onclick="explainFirewallDecision(${Number(item.decision_id || 0)})">Explain</button>
+                            </td>
+                        </tr>
+                    `;
+                }).join('');
+
+                container.innerHTML = `
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Time</th>
+                                <th>Runtime</th>
+                                <th>Credential</th>
+                                <th>Method</th>
+                                <th>Path</th>
+                                <th>Decision</th>
+                                <th>Status</th>
+                                <th>Reason</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>${rows}</tbody>
+                    </table>
+                `;
+            } catch (error) {
+                console.error('Failed to load Lemma Firewall decisions:', error);
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-state-icon">Warning</div>
+                        <div>Failed to load Lemma Firewall decision feed</div>
+                        <div style="font-size: 13px; margin-top: 8px; color: #dc2626;">${escapeHTML(error.message || 'Unknown error')}</div>
+                    </div>
+                `;
+            }
+        }
+
+        async function explainFirewallDecision(decisionId) {
+            if (!decisionId) return;
+            try {
+                const response = await fetch(`/api/wallet/runtimes/decisions/${encodeURIComponent(decisionId)}/explain`, {
+                    credentials: 'include'
+                });
+                const data = await response.json();
+                if (!response.ok || !data.success) {
+                    throw new Error(data.message || data.error || `HTTP ${response.status}`);
+                }
+
+                const explanation = data.explanation || {};
+                const decision = data.decision || {};
+                const summary = explanation.summary || 'No summary available.';
+                alert(
+                    `Decision ${decision.decision_id || decisionId}\n` +
+                    `Result: ${decision.decision || 'unknown'}\n` +
+                    `Reason: ${decision.reason_code || 'unknown'}\n` +
+                    `Policy profile: ${decision.policy_profile || 'n/a'}\n\n` +
+                    `${summary}`
+                );
+            } catch (error) {
+                showToast(error.message || 'Failed to load decision explanation', 'error');
+            }
+        }
+
+        async function exportFirewallDecisionBundle(format) {
+            const requestedFormat = String(format || 'json').toLowerCase() === 'csv' ? 'csv' : 'json';
+            const { runtimeId } = getAgentMonitorFilters();
+            const query = new URLSearchParams({
+                format: requestedFormat,
+                limit: '500'
+            });
+            if (runtimeId) query.set('runtime_id', runtimeId);
+
+            try {
+                const response = await fetch(`/api/wallet/runtimes/decisions/export?${query.toString()}`, {
+                    credentials: 'include'
+                });
+                if (!response.ok) {
+                    let detail = `HTTP ${response.status}`;
+                    try {
+                        const payload = await response.json();
+                        detail = payload.message || payload.error || detail;
+                    } catch (e) {
+                        console.warn('Could not parse error payload for export:', e);
+                    }
+                    throw new Error(detail);
+                }
+                const blob = await response.blob();
+                const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+                const fileName = requestedFormat === 'csv'
+                    ? `firewall-decisions-${stamp}.csv`
+                    : `firewall-decisions-${stamp}.json`;
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = fileName;
+                document.body.appendChild(link);
+                link.click();
+                link.remove();
+                URL.revokeObjectURL(url);
+                showToast(`Exported decision bundle (${requestedFormat.toUpperCase()})`);
+            } catch (error) {
+                showToast(error.message || 'Failed to export decision bundle', 'error');
+            }
+        }
+        
+        // ==========================================
+        // STANDARD LEMMA SDK AUTH (same as all sites)
+        // ==========================================
+        
+        // Initialize platform using standard Lemma SDK pattern
+        async function initPlatform() {
+            console.log('Initializing developer platform (using Lemma SDK)...');
+            
+            try {
+                // Wait for global wallet AND credential check (both set by layout.html)
+                // layout.html runs initSessionFreeNav() which:
+                // 1. Creates window.globalLemmaWallet
+                // 2. Checks for lemma.id permissions
+                // 3. Sets window.lemmaCredential if found
+                let attempts = 0;
+                while (!window.globalLemmaWallet && attempts < 30) {
+                    await new Promise(resolve => setTimeout(resolve, 100));
+                    attempts++;
+                }
+                
+                const wallet = window.globalLemmaWallet;
+                
+                if (!wallet) {
+                    console.log('Wallet not available');
+                    showSetupWallet();
+                    return;
+                }
+                
+                // Wait a bit more for layout.html to finish checking credentials
+                // This prevents race condition where wallet exists but credential check isn't done
+                if (!window.lemmaCredential) {
+                    console.log('Waiting for layout.html credential check...');
+                    let credAttempts = 0;
+                    while (!window.lemmaCredential && credAttempts < 20) {
+                        await new Promise(resolve => setTimeout(resolve, 100));
+                        credAttempts++;
+                    }
+                }
+                
+                // Check if window.lemmaCredential was set by layout.html
+                // This is the standard SDK pattern - layout.html checks for lemma permissions
+                if (window.lemmaCredential) {
+                    console.log('Using credential from layout.html (standard SDK pattern)');
+                    console.log('Credential claims:', window.lemmaCredential.claims || window.lemmaCredential.credentialSubject);
+                    
+                    // Verify credential using wallet's verifyLemma method (quick local check)
+                    // The credential was already validated when stored, so quickVerify is sufficient
+                    const verificationResult = await wallet.quickVerify(window.lemmaCredential);
+                    
+                    if (!verificationResult.valid) {
+                        console.log('Credential verification failed:', verificationResult.reason);
+                        await tryAutoIssue(wallet);
+                        return;
+                    }
+                    
+                    // Check revocation using wallet's isRevoked method
+                    const revocationResult = await wallet.isRevoked(window.lemmaCredential.id);
+                    if (revocationResult.revoked) {
+                        console.log('Credential revoked');
+                        await wallet.removeCredential(window.lemmaCredential.id);
+                        showRevoked();
+                        return;
+                    }
+                    
+                    // Credential valid - grant access
+                    grantPlatformAccess(window.lemmaCredential);
+                    return;
+                }
+                
+                // No credential from layout - try to auto-issue (wallet-first pattern)
+                console.log('No credential from layout.html after waiting, trying auto-issue...');
+                await tryAutoIssue(wallet);
+                
+            } catch (error) {
+                console.error('Platform initialization failed:', error);
+                document.getElementById('loading-state').innerHTML = `
+                    <div style="text-align: center; padding: 40px; color: #ef4444;">
+                        Failed to load platform. Please refresh the page.
+                    </div>
+                `;
+            }
+        }
+        
+        // Auto-issue developer credential (wallet-first pattern)
+        async function tryAutoIssue(wallet) {
+            try {
+                document.getElementById('loading-state').innerHTML = `
+                    <div style="text-align: center; padding: 60px 20px;">
+                        <div class="spinner"></div>
+                        <div style="margin-top: 16px; color: #6b7280;">Setting up developer access...</div>
+                    </div>
+                `;
+                
+                // First check if wallet has a passkey (can be checked without unlock)
+                let passkeyCredentialId = null;
+                try {
+                    passkeyCredentialId = await wallet.getPasskeyCredentialId();
+                    console.log('Found passkey credential ID:', passkeyCredentialId ? 'yes' : 'no');
+                } catch (e) {
+                    console.warn('No passkey:', e.message);
+                }
+                
+                // If wallet is not unlocked but has passkey, try to unlock it
+                if (!wallet.isUnlocked() && passkeyCredentialId) {
+                    console.log('Wallet locked, attempting passkey unlock...');
+                    document.getElementById('loading-state').innerHTML = `
+                        <div style="text-align: center; padding: 60px 20px;">
+                            <div class="spinner"></div>
+                            <div style="margin-top: 16px; color: #6b7280;">Unlocking wallet with passkey...</div>
+                        </div>
+                    `;
+                    try {
+                        await wallet.unlock();
+                        console.log('Wallet unlocked via passkey');
+                    } catch (e) {
+                        console.warn('Passkey unlock failed:', e.message);
+                        // Continue anyway - maybe we can still issue with just the passkey ID
+                    }
+                }
+                
+                // Get wallet secret (now that wallet should be unlocked)
+                let walletSecret = null;
+                try {
+                    walletSecret = await wallet.getWalletSecret();
+                    console.log('Got wallet secret:', walletSecret ? 'yes' : 'no');
+                } catch (e) {
+                    console.warn('No wallet secret:', e.message);
+                }
+                
+                if (!walletSecret && !passkeyCredentialId) {
+                    console.log('No wallet credentials - need setup');
+                    showSetupWallet();
+                    return;
+                }
+                
+                // Request permission using standard Lemma API
+                const response = await fetch('/api/wallet-auth/issue', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        site_id: 'lemma_platform',
+                        permission_level: 'developer',
+                        wallet_secret: walletSecret,
+                        passkey_credential_id: passkeyCredentialId
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (!result.success) {
+                    console.error('Auto-issue failed:', result.error);
+                    showSetupWallet();
+                    return;
+                }
+                
+                console.log('Developer permission auto-issued');
+                
+                // Store in wallet using standard SDK method
+                await wallet.storeCredential(result.permission_lemma);
+                
+                // Update global credential (standard SDK pattern)
+                window.lemmaCredential = result.permission_lemma;
+                
+                // Grant access
+                grantPlatformAccess(result.permission_lemma);
+                
+            } catch (error) {
+                console.error('Auto-issue error:', error);
+                showSetupWallet();
+            }
+        }
+        
+        // Grant platform access
+        function grantPlatformAccess(credential) {
+            const claims = credential.claims || credential.credentialSubject || {};
+            userPermission = claims.permissionId || claims.permission_level || 'developer';
+            lemmaPlatformCredentialString = JSON.stringify(credential);
+            
+            console.log('Platform access granted -', userPermission);
+            
+            // Check admin status
+            const adminPermissions = ['admin_access', 'super_admin', 'admin', 'superadmin', 'site_admin'];
+            const isAdmin = adminPermissions.includes(userPermission) || 
+                           (userPermission.toLowerCase().includes('admin') && 
+                            !userPermission.toLowerCase().includes('beta'));
+            
+            window.isLemmaAdmin = isAdmin;
+            
+            if (isAdmin) {
+                const adminSection = document.getElementById('admin-section');
+                if (adminSection) adminSection.style.display = 'block';
+            }
+            
+            // Load data and show platform
+            loadAPIKeysData(false);
+            loadOverviewData();
+            
+            document.getElementById('loading-state').style.display = 'none';
+            showSection(currentSection || 'overview', { updateUrl: false });
+        }
+        
+        // Show "setup wallet" message
+        function showSetupWallet() {
+            document.getElementById('loading-state').innerHTML = `
+                <div style="text-align: center; padding: 60px 20px;">
+                    <div style="font-size: 64px; margin-bottom: 24px;">Wallet</div>
+                    <h2>Set Up Your Wallet</h2>
+                    <p style="color: #6b7280; margin-bottom: 24px;">
+                        Create a passkey to access the developer platform.<br>
+                        <span style="font-size: 14px;">One-time setup, then fast access across participating Lemma-enabled sites.</span>
+                    </p>
+                    <a href="/wallet" class="btn btn-primary">Set Up Wallet</a>
+                </div>
+            `;
+        }
+        
+        // Show "revoked" message
+        function showRevoked() {
+            document.getElementById('loading-state').innerHTML = `
+                <div style="text-align: center; padding: 60px 20px;">
+                    <div style="font-size: 64px; margin-bottom: 24px;">Revoked</div>
+                    <h2>Access Revoked</h2>
+                    <p style="color: #6b7280; margin-bottom: 24px;">
+                        Your platform access has been revoked by an administrator.<br>
+                        <span style="font-size: 14px;">Please contact support if you believe this is an error.</span>
+                    </p>
+                </div>
+            `;
+        }
+        
+        // Load overview data (shows stats for the caller's site)
+        async function loadOverviewData() {
+            try {
+                console.log('Fetching stats for your site...');
+                
+                // Get user's credential to determine their site
+                let userCredential = null;
+                try {
+                    if (lemmaPlatformCredentialString) {
+                        userCredential = JSON.parse(lemmaPlatformCredentialString);
+                    }
+                } catch (e) {
+                    console.warn('Could not parse credential for stats');
+                }
+                
+                // POST request with user credential to determine site
+                // Include Authorization header for customer_id extraction
+                const response = await fetch('/api/platform/stats', {
+                    method: 'POST',
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        ...getLemmaAuthHeaders()
+                    },
+                    body: JSON.stringify({
+                        user_credential: userCredential
+                    })
+                });
+                const data = await response.json();
+                
+                if (data.success) {
+                    const stats = data.stats;
+                    
+                    // Update stat cards with real data
+                    document.getElementById('stat-mau').textContent = stats.mau.toLocaleString();
+                    document.getElementById('stat-mau-change').textContent = stats.mau > 0 ? 'This month' : 'Beta launch';
+                    
+                    document.getElementById('stat-verifications').textContent = stats.total_verifications.toLocaleString();
+                    document.getElementById('stat-users').textContent = stats.active_users.toLocaleString();
+                    document.getElementById('stat-sites').textContent = stats.registered_sites.toLocaleString();
+                    
+                    console.log('Stats loaded:', stats);
+                    
+                    // Store site context for overview
+                    window.overviewSiteDomain = data.site_domain;
+                    window.overviewAvailableSites = data.available_sites || [];
+                    console.log('Stats loaded for', data.site_domain || 'platform');
+                    
+                    // Show which site's stats are displayed
+                    const overviewHeader = document.querySelector('#section-overview .section-header');
+                    if (overviewHeader && data.site_domain && data.site_domain !== 'lemma.id') {
+                        // Add site indicator if not already present
+                        let siteIndicator = document.getElementById('overview-site-indicator');
+                        if (!siteIndicator) {
+                            siteIndicator = document.createElement('div');
+                            siteIndicator.id = 'overview-site-indicator';
+                            siteIndicator.style.cssText = 'margin-bottom: 16px; padding: 12px; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px;';
+                            overviewHeader.insertAdjacentElement('afterend', siteIndicator);
+                        }
+                        siteIndicator.innerHTML = `
+                            <span style="font-size: 13px; color: #166534;">
+                                Showing stats for: <strong>${data.site_domain}</strong>
+                            </span>
+                        `;
+                    }
+                    
+                    // Load recent activity
+                    if (data.recent_activity && data.recent_activity.length > 0) {
+                        const activityHTML = data.recent_activity.map(activity => `
+                            <div style="padding: 12px; border-bottom: 1px solid #f3f4f6;">
+                                <div style="display: flex; justify-content: space-between; align-items: start;">
+                                    <div>
+                                        <div style="font-size: 14px; color: #111827; margin-bottom: 4px;">
+                                            Permission granted to ${activity.user}
+                                        </div>
+                                        <div style="font-size: 13px; color: #6b7280;">
+                                            Level: ${activity.permission}
+                                        </div>
+                                    </div>
+                                    <div style="font-size: 13px; color: #9ca3af; white-space: nowrap;">
+                                        ${activity.time_ago}
+                                    </div>
+                                </div>
+                            </div>
+                        `).join('');
+                        
+                        document.getElementById('recent-activity').innerHTML = activityHTML;
+                    } else if (data.message) {
+                        // No site registered
+                        document.getElementById('recent-activity').innerHTML = `
+                            <div class="empty-state">
+                                <div class="empty-state-icon">Site</div>
+                                <div>No Site Registered</div>
+                                <div style="font-size: 14px; margin-top: 8px;">${data.message}</div>
+                            </div>
+                        `;
+                    } else {
+                        // Site exists but no activity
+                        document.getElementById('recent-activity').innerHTML = `
+                            <div class="empty-state">
+                                <div class="empty-state-icon">Details</div>
+                                <div>No recent activity yet</div>
+                                <div style="font-size: 14px; margin-top: 8px;">Activity will appear here as users authenticate via ${data.site_domain || 'your site'}</div>
+                            </div>
+                        `;
+                    }
+                } else {
+                    console.error('Failed to load stats:', data.error);
+                    throw new Error(data.error);
+                }
+                
+            } catch (error) {
+                console.error('Failed to load platform stats:', error);
+                
+                // Show error state
+                document.getElementById('stat-mau').textContent = 'Error';
+                document.getElementById('stat-mau-change').textContent = 'Failed to load';
+                document.getElementById('stat-verifications').textContent = 'Error';
+                document.getElementById('stat-users').textContent = 'Error';
+                document.getElementById('stat-sites').textContent = 'Error';
+                
+                document.getElementById('recent-activity').innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-state-icon">Warning</div>
+                        <div>Failed to load activity</div>
+                        <div style="font-size: 14px; margin-top: 8px; color: #ef4444;">
+                            ${error.message}
+                        </div>
+                    </div>
+                `;
+            }
+        }
+        
+        // Navigation
+        const CUSTOMER_VISIBLE_SECTIONS = new Set([
+            'overview',
+            'api',
+            'agent-delegation',
+            'settings'
+        ]);
+        const INTERNAL_ONLY_SECTIONS = ['users', 'permissions', 'analytics', 'platform-admin'];
+
+        function getInitialSectionFromURL() {
+            try {
+                const params = new URLSearchParams(window.location.search || '');
+                const requested = params.get('section');
+                if (!requested) return 'overview';
+                return CUSTOMER_VISIBLE_SECTIONS.has(requested) ? requested : 'overview';
+            } catch (e) {
+                return 'overview';
+            }
+        }
+
+        function showSection(sectionName, options = {}) {
+            const { updateUrl = true } = options;
+            if (!CUSTOMER_VISIBLE_SECTIONS.has(sectionName)) {
+                sectionName = 'overview';
+            }
+            // Hide all sections
+            document.querySelectorAll('.content-section').forEach(section => {
+                section.style.display = 'none';
+            });
+            
+            // Remove active state from all nav items
+            document.querySelectorAll('.nav-item').forEach(item => {
+                item.classList.remove('active');
+            });
+            
+            // Show selected section
+            const targetSection = document.getElementById('section-' + sectionName);
+            if (!targetSection) {
+                return;
+            }
+            targetSection.style.display = 'block';
+            
+            // Add active state to nav item
+            const navItem = document.querySelector(`[data-section="${sectionName}"]`);
+            if (navItem) {
+                navItem.classList.add('active');
+            }
+            
+            // Load section data if needed
+            if (sectionName === 'api') {
+                loadAPIKeysData();
+            } else if (sectionName === 'agent-delegation') {
+                loadAgentDelegationTab();
+            }
+            
+            currentSection = sectionName;
+            if (updateUrl) {
+                const url = new URL(window.location.href);
+                url.searchParams.set('section', sectionName);
+                window.history.replaceState({}, '', url.toString());
+            }
+        }
+        
+        // Setup navigation listeners
+        document.addEventListener('DOMContentLoaded', () => {
+            INTERNAL_ONLY_SECTIONS.forEach((sectionName) => {
+                const section = document.getElementById(`section-${sectionName}`);
+                if (section) {
+                    section.remove();
+                }
+                const nav = document.querySelector(`.nav-item[data-section="${sectionName}"]`);
+                if (nav) {
+                    nav.remove();
+                }
+            });
+
+            document.querySelectorAll('.nav-item[data-section]').forEach(item => {
+                item.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    const section = item.getAttribute('data-section');
+                    showSection(section);
+                });
+            });
+
+            const initialSection = getInitialSectionFromURL();
+            showSection(initialSection, { updateUrl: false });
+
+            setupApiKeysEventHandlers();
+            
+            // Site selector change
+            const permissionSiteSelect = document.getElementById('permission-site');
+            if (permissionSiteSelect) {
+                permissionSiteSelect.addEventListener('change', (e) => {
+                    const customInput = document.getElementById('permission-custom-site');
+                    if (customInput) {
+                        customInput.style.display = e.target.value === 'custom' ? 'block' : 'none';
+                    }
+                });
+            }
+        });
+
+        function setupApiKeysEventHandlers() {
+            const createBtn = document.getElementById('create-api-key-btn');
+            if (createBtn) {
+                createBtn.addEventListener('click', () => showAPIKeyModal());
+            }
+
+            const copyIntegrationBtn = document.getElementById('copy-integration-code-btn');
+            if (copyIntegrationBtn) {
+                copyIntegrationBtn.addEventListener('click', (event) => copyCode(event, 'integration-code'));
+            }
+
+            const cancelBtn = document.getElementById('api-key-modal-cancel-btn');
+            if (cancelBtn) {
+                cancelBtn.addEventListener('click', () => closeModal('api-key-modal'));
+            }
+
+            const copySuccessBtn = document.getElementById('copy-success-btn');
+            if (copySuccessBtn) {
+                copySuccessBtn.addEventListener('click', () => copySuccessAPIKey());
+            }
+
+            const copySiteBtn = document.getElementById('copy-site-id-btn');
+            if (copySiteBtn) {
+                copySiteBtn.addEventListener('click', () => copySiteId());
+            }
+
+            const successDoneBtn = document.getElementById('api-key-success-done-btn');
+            if (successDoneBtn) {
+                successDoneBtn.addEventListener('click', () => closeSuccessModal());
+            }
+
+            const apiKeysContainer = document.getElementById('api-keys-container');
+            if (!apiKeysContainer) return;
+            apiKeysContainer.addEventListener('click', async (event) => {
+                const actionButton = event.target.closest('button[data-action]');
+                if (!actionButton) return;
+
+                const action = actionButton.dataset.action;
+                if (action === 'open-api-key-modal') {
+                    showAPIKeyModal();
+                    return;
+                }
+                if (action === 'copy-site-id') {
+                    await copyToClipboard(actionButton.dataset.siteId || '', 'Site ID');
+                    return;
+                }
+                if (action === 'rotate-api-key') {
+                    await rotateAPIKey(actionButton.dataset.siteId || '', actionButton.dataset.keyHint || '');
+                    return;
+                }
+                if (action === 'revoke-api-key') {
+                    await revokeAPIKeyByHint(actionButton.dataset.siteId || '', actionButton.dataset.keyHint || '');
+                }
+            });
+        }
+        
+        // Store available sites globally
+        window.availableSites = [];
+        window.selectedUsersSiteId = null;
+        
+        // Load users data (shows users for the caller's site)
+        async function loadUsersData(specificSiteId = null) {
+            try {
+                console.log('Fetching users for your site...');
+                
+                // Get user's credential to determine their site
+                let userCredential = null;
+                try {
+                    if (lemmaPlatformCredentialString) {
+                        userCredential = JSON.parse(lemmaPlatformCredentialString);
+                    }
+                } catch (e) {
+                    console.warn('Could not parse credential');
+                }
+                
+                // POST request with user credential and optional specific site
+                // Include Authorization header for customer_id extraction
+                const response = await fetch('/api/platform/users', {
+                    method: 'POST',
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        ...getLemmaAuthHeaders()
+                    },
+                    body: JSON.stringify({
+                        user_credential: userCredential,
+                        site_id: specificSiteId || window.selectedUsersSiteId
+                    })
+                });
+                const data = await response.json();
+                
+                // Store current site context
+                window.currentSiteId = data.site_id;
+                window.currentSiteDomain = data.site_domain;
+                window.availableSites = data.available_sites || [];
+                window.selectedUsersSiteId = data.site_id;
+                
+                // Build site selector if multiple sites
+                let siteSelectorHtml = '';
+                if (window.availableSites.length > 1) {
+                    siteSelectorHtml = `
+                        <div style="margin-bottom: 16px;">
+                            <label style="font-size: 13px; color: #374151; margin-right: 8px;">Select Site:</label>
+                            <select id="users-site-selector" onchange="switchUsersSite(this.value)" style="padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px;">
+                                ${window.availableSites.map(site => `
+                                    <option value="${site.site_id}" ${site.site_id === data.site_id ? 'selected' : ''}>
+                                        ${site.site_domain} ${site.company_name ? `(${site.company_name})` : ''}
+                                    </option>
+                                `).join('')}
+                            </select>
+                        </div>
+                    `;
+                }
+                
+                // Show site context header
+                const siteContext = data.site_domain ? 
+                    `${siteSelectorHtml}
+                    <div style="margin-bottom: 16px; padding: 12px; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px;">
+                        <span style="font-size: 13px; color: #166534;">
+                            Showing users for: <strong>${data.site_domain}</strong>
+                            ${data.is_lemma_admin ? ' (Admin view)' : ''}
+                        </span>
+                    </div>` : '';
+                
+                if (data.success && data.users && data.users.length > 0) {
+                    // Store site_id for revocation
+                    window.currentUsersSiteId = data.site_id;
+                    
+                    // Create users table - support both email and wallet-based auth
+                    const tableHTML = `
+                        ${siteContext}
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>User</th>
+                                    <th>Auth Method</th>
+                                    <th>Permission</th>
+                                    <th>Status</th>
+                                    <th>Granted</th>
+                                    <th>Expires</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${data.users.map(user => {
+                                    // Determine display identifier
+                                    const displayId = user.display_identifier || user.email || 
+                                        (user.credential_did ? user.credential_did.substring(0, 25) + '...' : 'Unknown');
+                                    
+                                    // Auth method badge
+                                    const authMethod = user.auth_method || (user.email ? 'email' : 'wallet');
+                                    const authBadge = authMethod === 'wallet' 
+                                        ? '<span class="badge" style="background: #dbeafe; color: #1d4ed8;">Wallet</span>'
+                                        : '<span class="badge" style="background: #dcfce7; color: #166534;">Email</span>';
+                                    
+                                    return `
+                                    <tr>
+                                        <td>
+                                            <div style="font-size: 13px; font-weight: 500;">${escapeHTML(displayId)}</div>
+                                            ${user.credential_did && user.email ? `<div style="font-size: 11px; color: #9ca3af;">${escapeHTML(user.credential_did.substring(0, 30))}...</div>` : ''}
+                                        </td>
+                                        <td>${authBadge}</td>
+                                        <td><span class="badge badge-info">${escapeHTML(user.permission)}</span></td>
+                                        <td><span class="badge ${user.status === 'active' ? 'badge-success' : user.status === 'revoked' ? 'badge-danger' : 'badge-warning'}">${user.status}</span></td>
+                                        <td style="font-size: 13px; color: #6b7280;">${user.time_ago}</td>
+                                        <td style="font-size: 13px; color: #6b7280;">${user.expires_at}</td>
+                                        <td>
+                                            ${user.status === 'active' ? `
+                                                <button class="btn btn-secondary btn-sm" style="color: #dc2626; border-color: #fecaca;" 
+                                                    onclick="showRevokeModal('${escapeHTML(user.email || '')}', '${escapeHTML(user.credential_id || '')}', '${escapeHTML(user.credential_did || '')}', ${user.instance_id || 0})">
+                                                    Revoke
+                                                </button>
+                                            ` : '<span class="badge badge-danger" style="font-size: 11px;">Revoked</span>'}
+                                        </td>
+                                    </tr>
+                                `;}).join('')}
+                            </tbody>
+                        </table>
+                    `;
+                    
+                    document.getElementById('users-table-container').innerHTML = tableHTML;
+                    console.log('Loaded', data.users.length, 'users for', data.site_domain || 'platform');
+                    
+                } else if (data.message) {
+                    // No site registered yet
+                    document.getElementById('users-table-container').innerHTML = `
+                        <div class="empty-state">
+                            <div class="empty-state-icon">Site</div>
+                            <div>No Site Registered</div>
+                            <div style="font-size: 14px; margin-top: 8px;">${data.message}</div>
+                            <div style="font-size: 13px; margin-top: 16px; color: #6b7280;">
+                                Go to the <strong>API Keys</strong> section to register your first site.
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    // Empty state - site exists but no users
+                    document.getElementById('users-table-container').innerHTML = `
+                        ${siteContext}
+                        <div class="empty-state">
+                            <div class="empty-state-icon">Users</div>
+                            <div>No users yet</div>
+                            <div style="font-size: 14px; margin-top: 8px;">Users will appear here when they authenticate via your site</div>
+                        </div>
+                    `;
+                }
+                
+            } catch (error) {
+                console.error('Failed to load users:', error);
+                document.getElementById('users-table-container').innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-state-icon">Warning</div>
+                        <div>Failed to load users</div>
+                        <div style="font-size: 14px; margin-top: 8px; color: #ef4444;">
+                            ${error.message}
+                        </div>
+                    </div>
+                `;
+            }
+        }
+        
+        // Switch to a different site for users view
+        async function switchUsersSite(siteId) {
+            window.selectedUsersSiteId = siteId;
+            console.log('Switching to site:', siteId);
+            await loadUsersData(siteId);
+        }
+        
+        // Load API keys data
+        async function loadAPIKeysData(showLoading = true) {
+            const container = document.getElementById('api-keys-container');
+            if (!container) return;
+            
+            if (showLoading) {
+                container.innerHTML = `<div class="loading">Loading API keys...</div>`;
+            }
+            
+            if (!lemmaPlatformCredentialString) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-state-icon">
+                            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"></path>
+                            </svg>
+                        </div>
+                        <div style="font-weight: 600; font-size: 16px; margin-top: 12px;">Wallet authentication required</div>
+                        <div style="font-size: 14px; margin-top: 8px; color: #6b7280;">Sign in with your Lemma wallet to manage API keys.</div>
+                    </div>
+                `;
+                return;
+            }
+            
+            try {
+                const authHeaders = getLemmaAuthHeaders();
+                console.log('loadAPIKeysData - Auth headers:', Object.keys(authHeaders));
+                console.log('loadAPIKeysData - Credential length:', lemmaPlatformCredentialString?.length || 0);
+                
+                const response = await fetch('/api/customer/api-keys', {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        ...authHeaders
+                    }
+                });
+                
+                const data = await response.json();
+                console.log('API keys response:', response.status, data);
+                
+                if (!response.ok || !data.success) {
+                    throw new Error(data.error || 'Unable to load API keys');
+                }
+                
+                const siteMap = {};
+                (data.sites || []).forEach(site => {
+                    if (site && site.site_id) {
+                        siteMap[site.site_id] = site;
+                    }
+                });
+                
+                renderAPIKeys(data.api_keys || [], siteMap);
+            } catch (error) {
+                console.error('Failed to load API keys:', error);
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-state-icon">
+                            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                                <circle cx="12" cy="12" r="10"></circle>
+                                <line x1="12" y1="8" x2="12" y2="12"></line>
+                                <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                            </svg>
+                        </div>
+                        <div style="font-weight: 600; font-size: 16px; margin-top: 12px;">Failed to load API keys</div>
+                        <div style="font-size: 14px; margin-top: 8px; color: #ef4444;">
+                            ${escapeHTML(error.message)}
+                        </div>
+                    </div>
+                `;
+            }
+        }
+        
+        function renderAPIKeys(apiKeys, siteMap = {}) {
+            const container = document.getElementById('api-keys-container');
+            if (!container) return;
+            
+            if (!apiKeys || apiKeys.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-state-icon">
+                            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"></path>
+                            </svg>
+                        </div>
+                        <div style="font-weight: 600; font-size: 16px; margin-top: 12px;">No API keys yet</div>
+                        <div style="font-size: 14px; margin-top: 8px; color: #6b7280;">Register your first site to get an API key</div>
+                        <button class="btn btn-primary" data-action="open-api-key-modal" type="button" style="margin-top: 16px;">
+                            Register Site
+                        </button>
+                    </div>
+                `;
+                return;
+            }
+            
+            container.innerHTML = apiKeys.map((key, index) => {
+                const siteInfo = key.site_id ? siteMap[key.site_id] : null;
+                const siteLabel = siteInfo?.site_label || siteInfo?.site_domain || 'Unassigned';
+                const siteDomain = siteInfo?.site_domain || key.site_id || '';
+                const siteId = key.site_id || '';
+                const statusValue = key.status || 'active';
+                const statusLabel = statusValue.charAt(0).toUpperCase() + statusValue.slice(1);
+                const environment = siteInfo?.environment || 'production';
+                const isLast = index === apiKeys.length - 1;
+                
+                // Display masked key using the hint (last 8 chars stored securely on server)
+                const keyHint = key.key_hint || (key.key ? key.key.slice(-8) : '');
+                const maskedKey = keyHint ? `lemma_${'•'.repeat(24)}${keyHint}` : '—';
+                // Note: Full key is only available at creation time, not stored
+                
+                return `
+                    <div class="api-key-item" style="padding: 16px 0; ${!isLast ? 'border-bottom: 1px solid #f3f4f6;' : ''}">
+                        <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 12px; margin-bottom: 12px;">
+                            <div>
+                                <div style="font-weight: 600; font-size: 15px; color: #111827;">${escapeHTML(key.name || 'API Key')}</div>
+                                <div style="font-size: 13px; color: #6b7280; margin-top: 2px;">${escapeHTML(siteLabel)}</div>
+                            </div>
+                            <div style="display: flex; gap: 6px; align-items: center;">
+                                <span style="background: ${environment === 'production' ? '#dbeafe' : environment === 'staging' ? '#fef3c7' : '#f3e8ff'}; color: ${environment === 'production' ? '#1d4ed8' : environment === 'staging' ? '#92400e' : '#7c3aed'}; padding: 3px 8px; border-radius: 4px; font-size: 11px; font-weight: 500; text-transform: capitalize;">${escapeHTML(environment)}</span>
+                                <span class="badge ${statusValue === 'active' ? 'badge-success' : 'badge-warning'}" style="padding: 3px 8px; font-size: 11px;">${escapeHTML(statusLabel)}</span>
+                            </div>
+                        </div>
+                        
+                        <!-- API Key -->
+                        <div style="background: #f9fafb; border-radius: 6px; padding: 10px 12px; margin-bottom: 8px;">
+                            <div style="font-size: 10px; font-weight: 500; color: #6b7280; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px;">API Key</div>
+                            <div style="display: flex; justify-content: space-between; align-items: center; gap: 12px;">
+                                <code style="font-family: 'JetBrains Mono', 'Courier New', monospace; font-size: 12px; color: #374151; letter-spacing: 0.3px; overflow: hidden; text-overflow: ellipsis;">${escapeHTML(maskedKey)}</code>
+                                <span style="font-size: 11px; color: #9ca3af; white-space: nowrap;" title="For security, the full API key is only shown once when created">
+                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: -2px; margin-right: 2px;">
+                                        <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                                        <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                                    </svg>
+                                    Secured
+                                </span>
+                            </div>
+                        </div>
+                        
+                        <!-- Site ID -->
+                        ${siteId ? `
+                        <div style="background: #f9fafb; border-radius: 6px; padding: 10px 12px; margin-bottom: 12px;">
+                            <div style="font-size: 10px; font-weight: 500; color: #6b7280; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px;">Site ID</div>
+                            <div style="display: flex; justify-content: space-between; align-items: center; gap: 12px;">
+                                <code style="font-family: 'JetBrains Mono', 'Courier New', monospace; font-size: 12px; color: #374151; letter-spacing: 0.3px; overflow: hidden; text-overflow: ellipsis;">${escapeHTML(siteId)}</code>
+                                <button class="btn btn-secondary btn-sm" data-action="copy-site-id" data-site-id="${escapeHTML(siteId)}" type="button" style="white-space: nowrap; padding: 6px 10px; font-size: 12px;">
+                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 4px; vertical-align: -1px;">
+                                        <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                                        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                                    </svg>
+                                    Copy
+                                </button>
+                            </div>
+                        </div>
+                        ` : ''}
+                        
+                        ${siteDomain ? `
+                        <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 10px; font-size: 12px; color: #6b7280;">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <circle cx="12" cy="12" r="10"></circle>
+                                <line x1="2" y1="12" x2="22" y2="12"></line>
+                                <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
+                            </svg>
+                            <span>${escapeHTML(siteDomain)}</span>
+                        </div>
+                        ` : ''}
+                        
+                        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+                            <div style="font-size: 11px; color: #9ca3af;">
+                                Created ${formatDate(key.created_at)}
+                                ${key.last_used ? ` &bull; Last used ${formatDate(key.last_used)}` : ''}
+                            </div>
+                            <div style="display: flex; gap: 6px;">
+                                <button class="btn btn-secondary btn-sm" data-action="rotate-api-key" data-site-id="${escapeHTML(siteId)}" data-key-hint="${escapeHTML(keyHint)}" type="button" style="color: #2563eb; border-color: #bfdbfe; padding: 4px 10px; font-size: 11px;" title="Generate a new key and revoke this one">
+                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: -2px; margin-right: 2px;">
+                                        <path d="M21 2v6h-6"></path>
+                                        <path d="M3 12a9 9 0 0 1 15-6.7L21 8"></path>
+                                        <path d="M3 22v-6h6"></path>
+                                        <path d="M21 12a9 9 0 0 1-15 6.7L3 16"></path>
+                                    </svg>
+                                    Rotate
+                                </button>
+                                <button class="btn btn-secondary btn-sm" data-action="revoke-api-key" data-site-id="${escapeHTML(siteId)}" data-key-hint="${escapeHTML(keyHint)}" type="button" style="color: #dc2626; border-color: #fecaca; padding: 4px 10px; font-size: 11px;">
+                                    Revoke
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+            
+            // Update the Quick Integration code block with the first API key and Site ID
+            if (apiKeys.length > 0) {
+                const firstKey = apiKeys[0];
+                if (firstKey.key) {
+                    const codeApiKeySpan = document.getElementById('code-api-key');
+                    if (codeApiKeySpan) {
+                        codeApiKeySpan.textContent = firstKey.key;
+                    }
+                }
+                if (firstKey.site_id) {
+                    const codeSiteIdSpan = document.getElementById('code-site-id');
+                    if (codeSiteIdSpan) {
+                        codeSiteIdSpan.textContent = firstKey.site_id;
+                    }
+                }
+            }
+        }
+        
+        // Issue permission via email (privacy-preserving)
+        async function issuePermission(event) {
+            event.preventDefault();
+            
+            const email = document.getElementById('permission-email').value;
+            const siteSelect = document.getElementById('permission-site').value;
+            const siteId = siteSelect === 'custom' 
+                ? document.getElementById('permission-custom-site').value 
+                : (siteSelect || 'lemma_platform');
+            const siteDomain = siteSelect === 'custom'
+                ? document.getElementById('permission-custom-site').value
+                : (siteSelect || 'lemma.id');
+            const permissionLevel = document.getElementById('permission-level').value;
+            const expiryDays = parseInt(document.getElementById('permission-expiry').value) || 90;
+            
+            console.log('Sending claim link (privacy mode):', { siteDomain, permissionLevel, expiryDays });
+            
+            try {
+                const response = await fetch('/api/v1/iam/request-access', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        site_id: siteId,
+                        site_domain: siteDomain,
+                        user_email: email,
+                        permission_level: permissionLevel,
+                        expiry_days: expiryDays,
+                        redirect_url: `https://${siteDomain}/`
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    alert(`Claim link sent!\n\n` +
+                          `Privacy Mode: Email address not stored\n\n` +
+                          `The recipient will receive a link to claim their ${permissionLevel} permission.\n` +
+                          `They must authenticate with passkey to claim.`);
+                    closeModal('issue-permission-modal');
+                    document.getElementById('issue-permission-form').reset();
+                } else {
+                    alert(`Failed: ${data.error || data.message || 'Unknown error'}`);
+                }
+                
+            } catch (error) {
+                console.error('Issue permission failed:', error);
+                alert('Failed to send email. Please try again.');
+            }
+        }
+        
+        // Toggle custom site input
+        function toggleCustomSite() {
+            const siteSelect = document.getElementById('permission-site');
+            const customInput = document.getElementById('permission-custom-site');
+            customInput.style.display = siteSelect.value === 'custom' ? 'block' : 'none';
+        }
+        
+        // API key helpers
+        function showAPIKeyModal() {
+            document.getElementById('api-key-modal').classList.add('show');
+        }
+        
+        async function submitAPIKeyForm(event) {
+            event.preventDefault();
+            
+            const siteDomain = document.getElementById('api-key-site-domain').value.trim();
+            const siteLabel = document.getElementById('api-key-site-label').value.trim();
+            const environment = document.getElementById('api-key-environment').value;
+            const keyName = document.getElementById('api-key-name').value.trim();
+            const contactEmail = document.getElementById('api-key-contact-email').value.trim();
+            
+            if (!siteDomain) {
+                alert('Please enter a site URL.');
+                return;
+            }
+            
+            const submitBtn = document.getElementById('api-key-submit-btn');
+            const originalText = submitBtn.textContent;
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Registering...';
+            
+            try {
+                const authHeaders = getLemmaAuthHeaders();
+                console.log('Auth headers:', Object.keys(authHeaders));
+                console.log('Credential present:', !!lemmaPlatformCredentialString);
+                
+                if (!lemmaPlatformCredentialString) {
+                    throw new Error('No credential available. Please refresh the page.');
+                }
+                
+                const response = await fetch('/api/customer/register-site', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        ...authHeaders
+                    },
+                    body: JSON.stringify({
+                        site_domain: siteDomain,
+                        site_label: siteLabel,
+                        environment,
+                        key_name: keyName,
+                        contact_email: contactEmail
+                    })
+                });
+                
+                const data = await response.json();
+                console.log('Register site response:', response.status, data);
+                
+                if (!response.ok || !data.success) {
+                    throw new Error(data.error || 'Failed to generate API key');
+                }
+                
+                // Close the form modal and show success modal
+                closeModal('api-key-modal');
+                document.getElementById('api-key-form').reset();
+                
+                // Populate and show success modal
+                document.getElementById('success-site-domain').textContent = data.site_domain || siteDomain;
+                document.getElementById('success-api-key').value = data.api_key;
+                document.getElementById('success-site-id').value = data.site_id || '';
+                document.getElementById('api-key-success-modal').classList.add('show');
+                
+                // Refresh the API keys list
+                loadAPIKeysData(false);
+                
+            } catch (error) {
+                console.error('API key generation failed:', error);
+                alert(error.message || 'Failed to generate API key');
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.textContent = originalText;
+            }
+        }
+        
+        function copySuccessAPIKey() {
+            const apiKeyInput = document.getElementById('success-api-key');
+            const copyBtn = document.getElementById('copy-success-btn');
+            
+            navigator.clipboard.writeText(apiKeyInput.value).then(() => {
+                copyBtn.textContent = 'Copied!';
+                copyBtn.style.background = '#16a34a';
+                setTimeout(() => {
+                    copyBtn.textContent = 'Copy';
+                    copyBtn.style.background = '#374151';
+                }, 2000);
+            }).catch(() => {
+                apiKeyInput.select();
+                document.execCommand('copy');
+                copyBtn.textContent = 'Copied!';
+                setTimeout(() => { copyBtn.textContent = 'Copy'; }, 2000);
+            });
+        }
+        
+        function copySiteId() {
+            const siteIdInput = document.getElementById('success-site-id');
+            const copyBtn = document.getElementById('copy-site-id-btn');
+            
+            navigator.clipboard.writeText(siteIdInput.value).then(() => {
+                copyBtn.textContent = 'Copied!';
+                copyBtn.style.background = '#16a34a';
+                copyBtn.style.color = '#fff';
+                setTimeout(() => {
+                    copyBtn.textContent = 'Copy';
+                    copyBtn.style.background = '#e5e7eb';
+                    copyBtn.style.color = '#374151';
+                }, 2000);
+            }).catch(() => {
+                siteIdInput.select();
+                document.execCommand('copy');
+                copyBtn.textContent = 'Copied!';
+                setTimeout(() => { copyBtn.textContent = 'Copy'; }, 2000);
+            });
+        }
+        
+        function closeSuccessModal() {
+            document.getElementById('api-key-success-modal').classList.remove('show');
+        }
+        
+        // Modal helpers
+        function showIssuePermissionModal() {
+            document.getElementById('issue-permission-modal').classList.add('show');
+            // Load user's registered sites for both email and direct issue
+            loadUserSitesForDirectIssue();
+            loadUserSitesForEmailIssue();
+        }
+        
+        // Load sites for email permission issuance
+        async function loadUserSitesForEmailIssue() {
+            const select = document.getElementById('permission-site');
+            if (!select) return;
+            
+            try {
+                const response = await fetch('/api/sdk/auth/api-keys');
+                const data = await response.json();
+                
+                // Preserve custom option
+                select.innerHTML = '<option value="">Select your registered site...</option>';
+                
+                if (data.success && data.api_keys) {
+                    data.api_keys.forEach(key => {
+                        const option = document.createElement('option');
+                        option.value = key.site_id || key.site_domain;
+                        option.textContent = `${key.site_domain} (${key.site_label || key.environment || 'production'})`;
+                        option.dataset.domain = key.site_domain;
+                        select.appendChild(option);
+                    });
+                }
+                
+                // Add lemma.id option
+                const lemmaOption = document.createElement('option');
+                lemmaOption.value = 'lemma.id';
+                lemmaOption.textContent = 'lemma.id (Lemma Platform)';
+                select.appendChild(lemmaOption);
+                
+                // Add custom option at end
+                const customOption = document.createElement('option');
+                customOption.value = 'custom';
+                customOption.textContent = 'Custom site (enter below)';
+                select.appendChild(customOption);
+                
+            } catch (e) {
+                console.log('Could not load sites for email issue');
+            }
+        }
+        
+        // Switch between Email and Direct issue tabs
+        function switchIssueTab(tab) {
+            const emailTab = document.getElementById('issue-tab-email');
+            const directTab = document.getElementById('issue-tab-direct');
+            const emailContent = document.getElementById('issue-tab-email-content');
+            const directContent = document.getElementById('issue-tab-direct-content');
+            
+            if (tab === 'email') {
+                emailTab.style.background = '#667eea';
+                emailTab.style.color = 'white';
+                emailTab.style.border = 'none';
+                directTab.style.background = 'white';
+                directTab.style.color = '#374151';
+                directTab.style.border = '1px solid #d1d5db';
+                emailContent.style.display = 'block';
+                directContent.style.display = 'none';
+            } else {
+                directTab.style.background = '#667eea';
+                directTab.style.color = 'white';
+                directTab.style.border = 'none';
+                emailTab.style.background = 'white';
+                emailTab.style.color = '#374151';
+                emailTab.style.border = '1px solid #d1d5db';
+                emailContent.style.display = 'none';
+                directContent.style.display = 'block';
+            }
+        }
+        
+        // Load user's registered sites for direct issue dropdown
+        async function loadUserSitesForDirectIssue() {
+            const select = document.getElementById('direct-permission-site');
+            if (!select) return;
+            
+            try {
+                // Try to get sites from already loaded data or fetch
+                const response = await fetch('/api/sdk/auth/api-keys');
+                const data = await response.json();
+                
+                select.innerHTML = '<option value="">Select your registered site...</option>';
+                
+                if (data.success && data.api_keys) {
+                    data.api_keys.forEach(key => {
+                        const option = document.createElement('option');
+                        option.value = key.site_id || key.site_domain;
+                        option.textContent = `${key.site_domain} (${key.site_label || key.environment || 'production'})`;
+                        option.dataset.domain = key.site_domain;
+                        select.appendChild(option);
+                    });
+                }
+                
+                // Always add lemma.id as an option
+                if (!Array.from(select.options).find(o => o.value === 'lemma.id')) {
+                    const lemmaOption = document.createElement('option');
+                    lemmaOption.value = 'lemma.id';
+                    lemmaOption.textContent = 'lemma.id (Lemma Platform)';
+                    select.appendChild(lemmaOption);
+                }
+                
+            } catch (e) {
+                console.log('Could not load sites, using defaults');
+                select.innerHTML = `
+                    <option value="">Select your registered site...</option>
+                    <option value="lemma.id">lemma.id (Lemma Platform)</option>
+                `;
+            }
+        }
+        
+        // Issue permission directly to current wallet
+        async function issueDirectPermission(event) {
+            event.preventDefault();
+            
+            const siteId = document.getElementById('direct-permission-site').value;
+            const permissionLevel = document.getElementById('direct-permission-level').value;
+            const expiryDays = parseInt(document.getElementById('direct-permission-expiry').value) || 365;
+            const resultDiv = document.getElementById('direct-issue-result');
+            const submitBtn = document.getElementById('direct-issue-btn');
+            
+            if (!siteId) {
+                resultDiv.innerHTML = `
+                    <div style="background: #fef2f2; border: 1px solid #fecaca; border-radius: 6px; padding: 12px; color: #991b1b;">
+                        Please select a site
+                    </div>
+                `;
+                return;
+            }
+            
+            // Get site domain from selected option
+            const selectedOption = document.getElementById('direct-permission-site').selectedOptions[0];
+            const siteDomain = selectedOption?.dataset?.domain || siteId;
+            
+            // Show loading
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = 'Issuing...';
+            resultDiv.innerHTML = `
+                <div style="text-align: center; padding: 20px; color: #6b7280;">
+                    <div style="font-size: 24px; margin-bottom: 8px;">Loading</div>
+                    Issuing permission credential...
+                </div>
+            `;
+            
+            try {
+                // Call API to issue the permission
+                const response = await fetch('/api/developer/issue-self-permission', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        site_id: siteId,
+                        site_domain: siteDomain,
+                        permission_level: permissionLevel,
+                        expiry_days: expiryDays
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success && result.permission_lemma) {
+                    // Store in wallet
+                    const wallet = window.globalLemmaWallet;
+                    if (wallet) {
+                        await wallet.storeCredential(result.permission_lemma);
+                        
+                        resultDiv.innerHTML = `
+                            <div style="background: #ecfdf5; border: 1px solid #a7f3d0; border-radius: 6px; padding: 16px;">
+                                <div style="text-align: center; margin-bottom: 12px;">
+                            <div style="font-size: 32px;">Success</div>
+                                    <div style="font-weight: 600; color: #065f46;">Permission Stored in Wallet!</div>
+                                </div>
+                                <div style="font-size: 13px; color: #065f46;">
+                                    <div><strong>Site:</strong> ${siteDomain}</div>
+                                    <div><strong>Permission:</strong> ${permissionLevel}</div>
+                                    <div><strong>Expires:</strong> ${expiryDays} days</div>
+                                    <div><strong>Issue Time:</strong> ${result.issue_time_us?.toFixed(2) || '~'}µs</div>
+                                </div>
+                                    <div style="margin-top: 12px; padding: 8px; background: #d1fae5; border-radius: 4px; font-size: 12px;">
+                                    You now have <strong>${permissionLevel}</strong> access to <strong>${siteDomain}</strong>!
+                                    <br>View at <a href="/wallet" style="color: #065f46;">lemma.id/wallet</a>
+                                </div>
+                            </div>
+                        `;
+                    } else {
+                        throw new Error('Wallet not available');
+                    }
+                } else {
+                    throw new Error(result.error || 'Failed to issue permission');
+                }
+                
+            } catch (error) {
+                console.error('Direct issue failed:', error);
+                resultDiv.innerHTML = `
+                    <div style="background: #fef2f2; border: 1px solid #fecaca; border-radius: 6px; padding: 16px;">
+                        <div style="text-align: center; margin-bottom: 8px;">
+                            <div style="font-size: 24px;">Error</div>
+                            <div style="font-weight: 600; color: #991b1b;">Failed to Issue</div>
+                        </div>
+                        <div style="font-size: 13px; color: #991b1b;">${error.message}</div>
+                    </div>
+                `;
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = 'Issue to My Wallet';
+            }
+        }
+        
+        function showRevokeModal(email, credentialId, credentialDid, instanceId) {
+            // Store all identifiers for revocation
+            window.revokeData = {
+                email: email,
+                credentialId: credentialId,
+                credentialDid: credentialDid,
+                instanceId: instanceId,
+                siteId: window.currentUsersSiteId
+            };
+            
+            // Update modal display
+            const displayLabel = email || (credentialDid ? credentialDid.substring(0, 40) + '...' : `User #${instanceId}`);
+            document.getElementById('revoke-email').value = displayLabel;
+            document.getElementById('revoke-credential-id').value = credentialId;
+            document.getElementById('revoke-permission-modal').classList.add('show');
+        }
+        
+        function closeModal(modalId) {
+            document.getElementById(modalId).classList.remove('show');
+        }
+        
+        // Revoke permission - site owners can revoke their own site's users
+        async function revokePermission(event) {
+            event.preventDefault();
+
+            const revokeData = window.revokeData || {};
+            const reason = document.getElementById('revoke-reason').value;
+            const displayLabel = document.getElementById('revoke-email').value;
+
+            const confirmed = confirm(`Are you sure you want to revoke access for ${displayLabel}?\n\nThis will:\n- Revoke their permission immediately\n- Update the revocation list\n- Cannot be undone`);
+
+            if (!confirmed) return;
+
+            console.log('Alert Revoking permission:', revokeData);
+            
+            // Get caller's credential for authorization
+            let adminCredential = null;
+            try {
+                adminCredential = JSON.parse(lemmaPlatformCredentialString);
+            } catch (e) {
+                alert('Could not retrieve your credential for authorization');
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/platform/revoke-permission', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        email: revokeData.email || null,
+                        credential_did: revokeData.credentialDid || null,
+                        credential_id: revokeData.credentialId || null,
+                        instance_id: revokeData.instanceId || null,
+                        site_id: revokeData.siteId || null,
+                        reason: reason,
+                        admin_credential: adminCredential
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    alert(`Permission revoked!\n\n` +
+                          `• User: ${data.email || data.credential_did || 'User #' + data.instance_id}\n` +
+                          `• Database updated\n` +
+                          `• Revocation will sync to clients\n`);
+                    
+                    closeModal('revoke-permission-modal');
+                    document.getElementById('revoke-permission-form').reset();
+                    window.revokeData = null;
+                    
+                    // Reload users list to show updated status
+                    loadUsersData();
+                } else {
+                    alert(`Failed to revoke: ${data.error || 'Unknown error'}`);
+                }
+                
+            } catch (error) {
+                console.error('Revoke permission failed:', error);
+                alert('Failed to revoke permission. Please try again.');
+            }
+        }
+        
+        // Copy code
+        function copyCode(event, elementId) {
+            const code = document.getElementById(elementId).textContent;
+            navigator.clipboard.writeText(code);
+            
+            const btn = event.target;
+            btn.textContent = 'Copied!';
+            setTimeout(() => {
+                btn.textContent = 'Copy';
+            }, 2000);
+        }
+        
+        async function copyAPIKey(apiKey) {
+            await copyToClipboard(apiKey, 'API key');
+        }
+        
+        async function copyToClipboard(text, label = 'Text') {
+            try {
+                await navigator.clipboard.writeText(text);
+                showToast(`${label} copied to clipboard`);
+            } catch (error) {
+                // Fallback for older browsers
+                const textArea = document.createElement('textarea');
+                textArea.value = text;
+                textArea.style.position = 'fixed';
+                textArea.style.left = '-9999px';
+                document.body.appendChild(textArea);
+                textArea.select();
+                try {
+                    document.execCommand('copy');
+                    showToast(`${label} copied to clipboard`);
+                } catch (e) {
+                    showToast('Failed to copy. Please copy manually.', 'error');
+                }
+                document.body.removeChild(textArea);
+            }
+        }
+        
+        function showToast(message, type = 'success') {
+            // Remove existing toast if any
+            const existingToast = document.querySelector('.toast-notification');
+            if (existingToast) existingToast.remove();
+            
+            const toast = document.createElement('div');
+            toast.className = 'toast-notification';
+            toast.style.cssText = `
+                position: fixed;
+                bottom: 24px;
+                right: 24px;
+                padding: 14px 20px;
+                background: ${type === 'success' ? '#111827' : '#dc2626'};
+                color: #fff;
+                border-radius: 8px;
+                font-size: 14px;
+                font-weight: 500;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+                z-index: 10000;
+                animation: slideInUp 0.3s ease;
+            `;
+            toast.textContent = message;
+            document.body.appendChild(toast);
+            
+            setTimeout(() => {
+                toast.style.animation = 'fadeOut 0.3s ease';
+                setTimeout(() => toast.remove(), 300);
+            }, 2500);
+        }
+        
+        async function revokeAPIKey(apiKey) {
+            if (!confirm('Revoke this API key? This action cannot be undone.')) {
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/customer/api-keys', {
+                    method: 'DELETE',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        ...getLemmaAuthHeaders()
+                    },
+                    body: JSON.stringify({ api_key: apiKey })
+                });
+                
+                const result = await response.json();
+                if (!response.ok || !result.success) {
+                    throw new Error(result.error || 'Failed to revoke API key');
+                }
+                
+                showToast('API key revoked successfully');
+                loadAPIKeysData(false);
+            } catch (error) {
+                console.error('Failed to revoke API key:', error);
+                showToast(error.message || 'Failed to revoke API key', 'error');
+            }
+        }
+        
+        async function revokeAPIKeyByHint(siteId, keyHint) {
+            if (!confirm('Revoke this API key? This action cannot be undone.')) {
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/customer/api-keys', {
+                    method: 'DELETE',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        ...getLemmaAuthHeaders()
+                    },
+                    body: JSON.stringify({ site_id: siteId, key_hint: keyHint })
+                });
+                
+                const result = await response.json();
+                if (!response.ok || !result.success) {
+                    throw new Error(result.error || 'Failed to revoke API key');
+                }
+                
+                showToast('API key revoked successfully');
+                loadAPIKeysData(false);
+            } catch (error) {
+                console.error('Failed to revoke API key:', error);
+                showToast(error.message || 'Failed to revoke API key', 'error');
+            }
+        }
+        
+        async function rotateAPIKey(siteId, keyHint) {
+            if (!confirm('Rotate this API key?\n\nThis will:\n1. Generate a new API key\n2. Revoke the current key\n\nMake sure to update your application with the new key immediately.')) {
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/customer/api-keys/rotate', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        ...getLemmaAuthHeaders()
+                    },
+                    body: JSON.stringify({ site_id: siteId, key_hint: keyHint })
+                });
+                
+                const result = await response.json();
+                if (!response.ok || !result.success) {
+                    throw new Error(result.error || 'Failed to rotate API key');
+                }
+                
+                // Show the new key in the success modal (reuse existing modal)
+                const newKey = result.new_api_key;
+                
+                // Update modal title for rotation context
+                const modalTitle = document.querySelector('#api-key-success-modal .modal-title');
+                if (modalTitle) {
+                    modalTitle.textContent = 'API Key Rotated Successfully';
+                }
+                
+                const modalSubtitle = document.querySelector('#api-key-success-modal .modal-subtitle');
+                if (modalSubtitle) {
+                    modalSubtitle.textContent = 'Your new API key has been generated. The old key has been revoked. Copy it now - it won\'t be shown again in full.';
+                }
+                
+                // Update the modal fields with correct IDs
+                const siteDomainEl = document.getElementById('success-site-domain');
+                if (siteDomainEl) {
+                    siteDomainEl.textContent = siteId;
+                }
+                
+                const apiKeyEl = document.getElementById('success-api-key');
+                if (apiKeyEl) {
+                    apiKeyEl.value = newKey;
+                }
+                
+                const siteIdEl = document.getElementById('success-site-id');
+                if (siteIdEl) {
+                    siteIdEl.value = siteId;
+                }
+                
+                // Show the modal
+                document.getElementById('api-key-success-modal').classList.add('show');
+                
+                showToast('API key rotated successfully. Old key has been revoked.');
+                loadAPIKeysData(false);
+            } catch (error) {
+                console.error('Failed to rotate API key:', error);
+                showToast(error.message || 'Failed to rotate API key', 'error');
+            }
+        }
+        
+        // ==========================================
+        // PERMISSION TYPES MANAGEMENT
+        // ==========================================
+        
+        let currentPermTypeSiteId = null;
+        let currentPermTypeSiteApiKey = null;
+        let currentPermissionTypes = [];
+        let editingPermTypeName = null;
+        
+        // Load site selector for permission types (uses credential auth, not API key)
+        async function loadPermTypeSiteSelector() {
+            try {
+                // Get user's credential to determine their sites
+                let userCredential = null;
+                try {
+                    if (lemmaPlatformCredentialString) {
+                        userCredential = JSON.parse(lemmaPlatformCredentialString);
+                    }
+                } catch (e) {
+                    console.warn('Could not parse credential');
+                }
+                
+                // Fetch sites from the platform stats endpoint
+                // Include Authorization header for customer_id extraction
+                const response = await fetch('/api/platform/stats', {
+                    method: 'POST',
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        ...getLemmaAuthHeaders()
+                    },
+                    body: JSON.stringify({ user_credential: userCredential })
+                });
+                
+                const data = await response.json();
+                const selector = document.getElementById('permission-types-site-selector');
+                
+                // Also try to get sites from the API keys endpoint
+                const authHeaders = getLemmaAuthHeaders();
+                let sites = [];
+                
+                try {
+                    const keysResponse = await fetch('/api/customer/api-keys', {
+                        method: 'GET',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            ...authHeaders
+                        }
+                    });
+                    const keysData = await keysResponse.json();
+                    if (keysData.success && keysData.sites) {
+                        sites = keysData.sites;
+                    }
+                } catch (e) {
+                    console.warn('Could not load from api-keys:', e);
+                }
+                
+                // Fallback: use site from stats if no sites from api-keys
+                if (sites.length === 0 && data.site_id) {
+                    sites = [{ site_id: data.site_id, site_domain: data.site_domain }];
+                }
+                
+                if (sites.length > 0) {
+                    selector.innerHTML = sites.map(site => 
+                        `<option value="${site.site_id}">${site.site_domain || site.site_id}</option>`
+                    ).join('');
+                    
+                    // Set initial site
+                    currentPermTypeSiteId = sites[0].site_id;
+                } else {
+                    selector.innerHTML = '<option value="">No sites found - register a site first</option>';
+                }
+            } catch (error) {
+                console.error('Failed to load sites for permission types:', error);
+                document.getElementById('permission-types-site-selector').innerHTML = 
+                    '<option value="">Error loading sites</option>';
+            }
+        }
+        
+        // Load permission templates
+        async function loadPermissionTemplates() {
+            try {
+                const response = await fetch('/api/v1/permission-templates');
+                const data = await response.json();
+                
+                if (data.success && data.templates) {
+                    const grid = document.getElementById('permission-templates-grid');
+                    grid.innerHTML = data.templates.map(t => `
+                        <div onclick="usePermissionTemplate('${t.name}', '${t.type}', '${t.description}', '${(t.config.scopes || []).join(',')}', ${t.config.duration_days || 'null'})"
+                             style="padding: 16px; border: 2px solid #e5e7eb; border-radius: 8px; cursor: pointer; text-align: center; transition: all 0.2s;"
+                             onmouseover="this.style.borderColor='#667eea'; this.style.background='#f5f7ff';"
+                             onmouseout="this.style.borderColor='#e5e7eb'; this.style.background='white';">
+                            <div style="font-weight: 600; color: #111827;">${t.name}</div>
+                            <div style="font-size: 12px; color: #6b7280; margin-top: 4px;">${t.type}</div>
+                        </div>
+                    `).join('');
+                }
+            } catch (error) {
+                console.error('Failed to load permission templates:', error);
+            }
+        }
+        
+        function usePermissionTemplate(name, type, description, scopes, duration) {
+            showAddPermissionTypeModal();
+            document.getElementById('perm-type-name').value = name;
+            document.getElementById('perm-type-type').value = type;
+            document.getElementById('perm-type-description').value = description;
+            document.getElementById('perm-type-scopes').value = scopes;
+            if (duration) {
+                document.getElementById('perm-type-duration').value = duration;
+                document.getElementById('perm-type-duration-group').style.display = 'block';
+            }
+        }
+        
+        // Load permission types for selected site (uses credential auth)
+        async function loadPermissionTypes() {
+            const selector = document.getElementById('permission-types-site-selector');
+            currentPermTypeSiteId = selector.value;
+            
+            if (!currentPermTypeSiteId) {
+                showToast('Please select a site', 'error');
+                return;
+            }
+            
+            const container = document.getElementById('permission-types-container');
+            container.innerHTML = '<div class="loading">Loading permission types...</div>';
+            
+            try {
+                // Use credential-based authentication
+                const authHeaders = getLemmaAuthHeaders();
+                
+                const response = await fetch(`/api/v1/sites/${currentPermTypeSiteId}/permission-types`, {
+                    headers: {
+                        'Content-Type': 'application/json',
+                        ...authHeaders
+                    }
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    currentPermissionTypes = data.permission_types;
+                    renderPermissionTypes();
+                    document.getElementById('add-perm-type-btn').disabled = false;
+                } else {
+                    throw new Error(data.error || data.message || 'Failed to load permissions');
+                }
+                
+            } catch (error) {
+                console.error('Failed to load permission types:', error);
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-state-icon">Warning</div>
+                        <div>Failed to load permission types</div>
+                        <div style="font-size: 14px; margin-top: 8px; color: #ef4444;">${error.message}</div>
+                    </div>
+                `;
+            }
+        }
+        
+        function renderPermissionTypes() {
+            const container = document.getElementById('permission-types-container');
+            
+            if (currentPermissionTypes.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-state-icon">Admin</div>
+                        <div>No permission types defined</div>
+                        <div style="font-size: 14px; margin-top: 8px;">Create your first permission type or use a template below.</div>
+                    </div>
+                `;
+                return;
+            }
+            
+            const typeColors = {
+                'role': { bg: '#dbeafe', text: '#1e40af' },
+                'subscription': { bg: '#dcfce7', text: '#166534' },
+                'time-bound': { bg: '#fef3c7', text: '#92400e' },
+                'scope': { bg: '#f3e8ff', text: '#7c3aed' }
+            };
+            
+            container.innerHTML = `
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Type</th>
+                            <th>Description</th>
+                            <th>Scopes</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${currentPermissionTypes.map(p => {
+                            const colors = typeColors[p.type] || { bg: '#f3f4f6', text: '#374151' };
+                            const scopes = p.config?.scopes || [];
+                            return `
+                                <tr>
+                                    <td><code style="font-weight: 600;">${p.name}</code></td>
+                                    <td>
+                                        <span style="background: ${colors.bg}; color: ${colors.text}; padding: 3px 10px; border-radius: 12px; font-size: 12px; font-weight: 500;">
+                                            ${p.type}
+                                        </span>
+                                    </td>
+                                    <td style="max-width: 200px; overflow: hidden; text-overflow: ellipsis;">${p.description || '-'}</td>
+                                    <td style="font-size: 12px; color: #6b7280;">
+                                        ${scopes.slice(0, 2).join(', ')}${scopes.length > 2 ? ` +${scopes.length - 2}` : ''}
+                                    </td>
+                                    <td>
+                                        <button class="btn btn-secondary btn-sm" onclick="editPermissionType('${p.name}')" style="margin-right: 6px;">Edit</button>
+                                        <button class="btn btn-secondary btn-sm" onclick="deletePermissionType('${p.name}')" style="color: #dc2626; border-color: #fecaca;">Delete</button>
+                                    </td>
+                                </tr>
+                            `;
+                        }).join('')}
+                    </tbody>
+                </table>
+            `;
+        }
+        
+        function showAddPermissionTypeModal() {
+            editingPermTypeName = null;
+            document.getElementById('perm-type-modal-title').textContent = 'Add Permission Type';
+            document.getElementById('permission-type-form').reset();
+            document.getElementById('perm-type-name').disabled = false;
+            document.getElementById('perm-type-duration-group').style.display = 'none';
+            document.getElementById('permission-type-modal').classList.add('show');
+        }
+        
+        function editPermissionType(name) {
+            const perm = currentPermissionTypes.find(p => p.name === name);
+            if (!perm) return;
+            
+            editingPermTypeName = name;
+            document.getElementById('perm-type-modal-title').textContent = 'Edit Permission Type';
+            document.getElementById('perm-type-name').value = perm.name;
+            document.getElementById('perm-type-name').disabled = true;
+            document.getElementById('perm-type-type').value = perm.type;
+            document.getElementById('perm-type-description').value = perm.description || '';
+            document.getElementById('perm-type-scopes').value = (perm.config?.scopes || []).join(', ');
+            
+            if (perm.type === 'time-bound' && perm.config?.duration_days) {
+                document.getElementById('perm-type-duration').value = perm.config.duration_days;
+                document.getElementById('perm-type-duration-group').style.display = 'block';
+            } else {
+                document.getElementById('perm-type-duration-group').style.display = 'none';
+            }
+            
+            document.getElementById('permission-type-modal').classList.add('show');
+        }
+        
+        async function savePermissionType(event) {
+            event.preventDefault();
+            
+            const name = document.getElementById('perm-type-name').value.trim().toLowerCase();
+            const type = document.getElementById('perm-type-type').value;
+            const description = document.getElementById('perm-type-description').value.trim();
+            const scopesStr = document.getElementById('perm-type-scopes').value.trim();
+            const duration = document.getElementById('perm-type-duration').value;
+            
+            const scopes = scopesStr ? scopesStr.split(',').map(s => s.trim()).filter(s => s) : [];
+            
+            const config = { scopes };
+            if (type === 'time-bound' && duration) {
+                config.duration_days = parseInt(duration);
+            }
+            
+            const method = editingPermTypeName ? 'PUT' : 'POST';
+            const url = editingPermTypeName 
+                ? `/api/v1/sites/${currentPermTypeSiteId}/permission-types/${editingPermTypeName}`
+                : `/api/v1/sites/${currentPermTypeSiteId}/permission-types`;
+            
+            try {
+                // Use credential-based authentication
+                const authHeaders = getLemmaAuthHeaders();
+                
+                const response = await fetch(url, {
+                    method: method,
+                    headers: {
+                        'Content-Type': 'application/json',
+                        ...authHeaders
+                    },
+                    body: JSON.stringify({
+                        name: name,
+                        type: type,
+                        description: description,
+                        config: config
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    closeModal('permission-type-modal');
+                    await loadPermissionTypes();
+                    showToast(editingPermTypeName ? 'Permission type updated!' : 'Permission type created!');
+                } else {
+                    showToast('Error: ' + (data.error || data.message), 'error');
+                }
+                
+            } catch (error) {
+                console.error('Failed to save permission type:', error);
+                showToast('Failed to save permission type', 'error');
+            }
+        }
+        
+        async function deletePermissionType(name) {
+            if (!confirm(`Delete permission type "${name}"?\n\nThis won't revoke existing permissions, but you won't be able to issue new ones with this type.`)) {
+                return;
+            }
+            
+            try {
+                // Use credential-based authentication
+                const authHeaders = getLemmaAuthHeaders();
+                
+                const response = await fetch(`/api/v1/sites/${currentPermTypeSiteId}/permission-types/${name}`, {
+                    method: 'DELETE',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        ...authHeaders
+                    }
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    await loadPermissionTypes();
+                    showToast('Permission type deleted');
+                } else {
+                    showToast('Error: ' + (data.error || data.message), 'error');
+                }
+                
+            } catch (error) {
+                console.error('Failed to delete permission type:', error);
+                showToast('Failed to delete permission type', 'error');
+            }
+        }
+        
+        // Show/hide duration field based on type selection
+        document.getElementById('perm-type-type')?.addEventListener('change', function() {
+            document.getElementById('perm-type-duration-group').style.display = 
+                this.value === 'time-bound' ? 'block' : 'none';
+        });
+
+        function initSidebarToggle() {
+            const container = document.querySelector('.platform-container');
+            const toggle = document.getElementById('platform-sidebar-toggle');
+            if (!container || !toggle) return;
+
+            const storageKey = 'lemma_platform_sidebar_closed';
+
+            function setClosed(isClosed) {
+                container.classList.toggle('sidebar-closed', isClosed);
+                toggle.setAttribute('aria-expanded', String(!isClosed));
+                toggle.setAttribute('aria-label', isClosed ? 'Open sidebar' : 'Close sidebar');
+                localStorage.setItem(storageKey, isClosed ? '1' : '0');
+            }
+
+            toggle.addEventListener('click', () => {
+                setClosed(!container.classList.contains('sidebar-closed'));
+            });
+
+            setClosed(localStorage.getItem(storageKey) === '1');
+        }
+        
+        // Close modals on background click
+        document.addEventListener('click', (e) => {
+            if (e.target.classList.contains('modal')) {
+                e.target.classList.remove('show');
+            }
+        });
+        
+        // Initialize on load
+        function initializePage() {
+            initSidebarToggle();
+            initPlatform();
+        }
+
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initializePage);
+        } else {
+            initializePage();
+        }
+    </script>
+{% endblock %}
+

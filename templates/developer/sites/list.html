@@ -1,0 +1,530 @@
+{% extends layout_template|default("developer/layout.html") %}
+{% set active_page = active_page|default('sites') %}
+
+{% block head %}
+{{ super() }}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/developer.css') }}?v=4">
+{% endblock %}
+
+{% macro legacy_site_manager_content() %}
+
+<div class="dev-header">
+    <div class="dev-header-row">
+        <div>
+            <h1 class="dev-title">Your Sites</h1>
+            <p class="dev-subtitle">Manage your integrated websites and applications</p>
+        </div>
+        <button class="dev-btn dev-btn-primary" id="register-site-btn">
+            + Register New Site
+        </button>
+    </div>
+</div>
+
+<!-- Sites Grid -->
+<div id="sites-container">
+    <div class="dev-loading">
+        <div class="dev-spinner"></div>
+        <div>Loading your sites...</div>
+    </div>
+</div>
+
+<!-- Create Site Modal -->
+<div class="dev-modal" id="create-site-modal">
+    <div class="dev-modal-backdrop" data-action="hide-create-site-modal"></div>
+    <div class="dev-modal-content">
+        <div class="dev-modal-header">
+            <h2 class="dev-modal-title">Register New Site</h2>
+            <p class="dev-modal-subtitle">Add a website or app to use Lemma authentication</p>
+        </div>
+        
+        <form id="create-site-form">
+            <div class="dev-form-group">
+                <label class="dev-label">Site Name</label>
+                <input type="text" class="dev-input" id="site-name" placeholder="My Awesome App" required>
+            </div>
+            
+            <div class="dev-form-group">
+                <label class="dev-label">Domain</label>
+                <input type="text" class="dev-input" id="site-domain" placeholder="example.com" required>
+                <div class="dev-help-text">The domain where you'll use Lemma (without https://)</div>
+            </div>
+            
+            <div class="dev-form-group">
+                <label class="dev-label">Environment</label>
+                <select class="dev-select" id="site-env">
+                    <option value="development">Development (localhost allowed)</option>
+                    <option value="production">Production</option>
+                </select>
+            </div>
+            
+            <div class="dev-modal-actions">
+                <button type="button" class="dev-btn dev-btn-secondary" id="cancel-create-btn">Cancel</button>
+                <button type="submit" class="dev-btn dev-btn-primary" id="create-site-btn">Create Site</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<style>
+/* Modal Styles */
+.dev-modal {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 1000;
+    align-items: center;
+    justify-content: center;
+}
+
+.dev-modal.show {
+    display: flex;
+}
+
+.dev-modal-backdrop {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+}
+
+.dev-modal-content {
+    position: relative;
+    background: white;
+    border-radius: 16px;
+    padding: 32px;
+    max-width: 480px;
+    width: 90%;
+    max-height: 90vh;
+    overflow-y: auto;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
+}
+
+.dev-modal-header {
+    margin-bottom: 24px;
+}
+
+.dev-modal-title {
+    font-size: 20px;
+    font-weight: 600;
+    color: var(--dev-text);
+    margin: 0 0 8px 0;
+}
+
+.dev-modal-subtitle {
+    font-size: 14px;
+    color: var(--dev-text-muted);
+    margin: 0;
+}
+
+.dev-modal-actions {
+    display: flex;
+    gap: 12px;
+    justify-content: flex-end;
+    margin-top: 24px;
+    padding-top: 24px;
+    border-top: 1px solid var(--dev-border);
+}
+
+.dev-help-text {
+    font-size: 12px;
+    color: var(--dev-text-muted);
+    margin-top: 6px;
+}
+
+/* Site Card Enhancements */
+.dev-site-card {
+    position: relative;
+}
+
+.dev-site-status {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+}
+
+.dev-site-menu {
+    position: relative;
+}
+
+.dev-site-menu-btn {
+    background: none;
+    border: none;
+    padding: 8px;
+    cursor: pointer;
+    border-radius: 6px;
+    color: var(--dev-text-muted);
+}
+
+.dev-site-menu-btn:hover {
+    background: #f1f5f9;
+}
+</style>
+
+<script nonce="{{ csp_nonce }}">
+const SITES_BASE_PATH = '{{ sites_base_path|default("/developer/sites") }}';
+
+// Global auth state
+let currentPpid = null;
+
+document.addEventListener('DOMContentLoaded', async () => {
+    // First authenticate to get PPID
+    currentPpid = await getWalletPpid();
+
+    // Ensure unified-credential context has had a chance to hydrate before first API call.
+    if (typeof window.ensureLemmaCredential === 'function') {
+        await window.ensureLemmaCredential(true);
+    }
+    
+    // Then load sites with auth
+    await loadSites();
+    
+    // Register button event listeners
+    document.getElementById('register-site-btn').addEventListener('click', showCreateSiteModal);
+    document.getElementById('cancel-create-btn').addEventListener('click', hideCreateSiteModal);
+    document.getElementById('create-site-form').addEventListener('submit', createSite);
+    
+    // Also handle dynamically created buttons
+    document.addEventListener('click', (e) => {
+        if (e.target.classList.contains('register-site-trigger')) {
+            showCreateSiteModal();
+        }
+        const actionEl = e.target.closest('[data-action]');
+        if (!actionEl) return;
+        const action = actionEl.getAttribute('data-action');
+        if (action === 'sign-in-retry') signInAndRetry();
+        if (action === 'retry-load-sites') loadSites();
+        if (action === 'hide-create-site-modal') hideCreateSiteModal();
+    });
+});
+
+async function getWalletPpid() {
+    if (typeof LemmaWallet === 'undefined') {
+        console.warn('LemmaWallet not available');
+        return null;
+    }
+    
+    try {
+        const wallet = new LemmaWallet();
+        await wallet.init();
+        
+        // DEBUG: Check what's in the session after init
+        console.log('[Developer] Session state after init:', {
+            isUnlocked: wallet.session?.isUnlocked,
+            expiresAt: wallet.session?.expiresAt,
+            hasSecret: !!wallet.session?.walletSecret,
+            source: wallet.session?.source
+        });
+        
+        // FAST PATH: If session is already valid, use it directly
+        // This avoids calling autoAuthenticate which does extra checks
+        if (wallet.session?.isUnlocked && wallet.session?.expiresAt > Date.now()) {
+            console.log('[Developer]  Using existing session (fast path)');
+            const ppid = await wallet.derivePPID('lemma.id');
+            console.log('[Developer] PPID:', ppid);
+            return ppid;
+        }
+        
+        // Session not loaded - try autoAuthenticate (checks global session too)
+        console.log('[Developer] No local session - trying autoAuthenticate...');
+        const authResult = await wallet.autoAuthenticate();
+        
+        if (authResult.authenticated) {
+            const ppid = await wallet.derivePPID('lemma.id');
+            console.log('[Developer] Authenticated via autoAuthenticate, PPID:', ppid);
+            return ppid;
+        }
+        
+        // Still not authenticated - check if we have a passkey to unlock with
+        // This should only happen if session expired or was never created
+        console.log('[Developer] autoAuthenticate returned:', authResult);
+        console.log('[Developer] Checking if passkey exists for manual unlock...');
+        
+        try {
+            const unlockResult = await wallet.unlock();
+            
+            if (unlockResult.success) {
+                const ppid = await wallet.derivePPID('lemma.id');
+                console.log('[Developer] Authenticated via passkey unlock, PPID:', ppid);
+                return ppid;
+            }
+        } catch (unlockError) {
+            console.warn('[Developer] Passkey unlock failed:', unlockError.message);
+        }
+        
+        console.warn('[Developer] Could not authenticate - no valid session or passkey');
+        return null;
+        
+    } catch (e) {
+        console.warn('[Developer] Auth failed:', e);
+    }
+    
+    return null;
+}
+
+async function getAuthHeaders() {
+    let base = {};
+    if (typeof window.getLemmaAuthHeadersAsync === 'function') {
+        base = await window.getLemmaAuthHeadersAsync();
+    } else if (typeof window.getLemmaAuthHeaders === 'function') {
+        base = window.getLemmaAuthHeaders();
+    }
+    return { 'Content-Type': 'application/json', ...base };
+}
+
+async function waitForLemmaCredentialHeader(maxWaitMs = 3000) {
+    const start = Date.now();
+    while ((Date.now() - start) < maxWaitMs) {
+        const headers = await getAuthHeaders();
+        if (headers['X-Lemma-Credential']) {
+            console.debug('[Developer/Sites] lemma header ready', {
+                hasCredential: true,
+                headerLength: String(headers['X-Lemma-Credential']).length
+            });
+            return headers;
+        }
+        await new Promise(resolve => setTimeout(resolve, 100));
+    }
+    return await getAuthHeaders();
+}
+
+async function loadSites() {
+    const container = document.getElementById('sites-container');
+    
+    // Check if user is authenticated
+    if (!currentPpid) {
+        container.innerHTML = `
+            <div class="dev-card">
+                <div class="dev-card-body">
+                    <div class="dev-empty">
+                        <div class="dev-empty-icon"></div>
+                        <div class="dev-empty-title">Sign in required</div>
+                        <div class="dev-empty-text">You need to unlock your Lemma wallet to access developer features.</div>
+                        <button class="dev-btn dev-btn-primary" data-action="sign-in-retry">Sign In with Lemma</button>
+                    </div>
+                </div>
+            </div>
+        `;
+        return;
+    }
+    
+    try {
+        const authHeaders = await waitForLemmaCredentialHeader();
+        if (!authHeaders['X-Lemma-Credential']) {
+            throw new Error('Wallet is unlocked but no verified lemma credential is available for lemma.id. Re-authenticate to refresh your credential.');
+        }
+
+        const response = await fetch('/api/developer/sites', {
+            headers: authHeaders,
+            cache: 'no-store'
+        });
+        if (!response.ok) {
+            let details = '';
+            try {
+                const errBody = await response.json();
+                details = errBody?.lemma_error || errBody?.message || errBody?.error || '';
+            } catch (_) { /* ignore */ }
+            throw new Error(details ? `Failed to load sites: ${details}` : 'Failed to load sites');
+        }
+        
+        const data = await response.json();
+        const sites = data.sites || [];
+        
+        if (sites.length === 0) {
+            container.innerHTML = `
+                <div class="dev-card">
+                    <div class="dev-card-body">
+                        <div class="dev-empty">
+                            <div class="dev-empty-icon"></div>
+                            <div class="dev-empty-title">No sites registered</div>
+                            <div class="dev-empty-text">Register your first site to start using Lemma authentication on your website or app.</div>
+                            <button class="dev-btn dev-btn-primary register-site-trigger">Register Your First Site</button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            return;
+        }
+        
+        container.innerHTML = `
+            <div class="dev-site-grid">
+                ${sites.map(site => renderSiteCard(site)).join('')}
+            </div>
+        `;
+        
+    } catch (e) {
+        console.error('Failed to load sites:', e);
+        container.innerHTML = `
+            <div class="dev-card">
+                <div class="dev-card-body">
+                    <div class="dev-empty">
+                        <div class="dev-empty-icon"></div>
+                        <div class="dev-empty-title">Could not load sites</div>
+                        <div class="dev-empty-text">Please try refreshing the page.</div>
+                        <button class="dev-btn dev-btn-secondary" data-action="retry-load-sites">Retry</button>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+}
+
+async function signInAndRetry() {
+    try {
+        const wallet = new LemmaWallet();
+        const result = await wallet.unlock();
+        
+        if (result.success) {
+            // Re-authenticate and reload
+            currentPpid = await getWalletPpid();
+            loadSites();
+        } else {
+            // Redirect to sign in page
+            window.location.href = '/app?return_to=' + encodeURIComponent(window.location.href);
+        }
+    } catch (e) {
+        console.error('Sign in failed:', e);
+        window.location.href = '/app?return_to=' + encodeURIComponent(window.location.href);
+    }
+}
+
+function renderSiteCard(site) {
+    const statusBadge = site.status === 'active' 
+        ? '<span class="dev-badge dev-badge-success">Active</span>'
+        : '<span class="dev-badge dev-badge-warning">Inactive</span>';
+    
+    return `
+        <div class="dev-site-card">
+            <div class="dev-site-status">${statusBadge}</div>
+            <div class="dev-site-header">
+                <div class="dev-site-icon"></div>
+                <div>
+                    <div class="dev-site-name">${escapeHtml(site.name || site.site_id)}</div>
+                    <div class="dev-site-domain">${escapeHtml(site.domain || site.site_id)}</div>
+                </div>
+            </div>
+            <div class="dev-site-stats">
+                <div class="dev-site-stat">
+                    <div class="dev-site-stat-value">${formatNumber(site.issued_lemmas_total || 0)}</div>
+                    <div class="dev-site-stat-label">Lemmas Issued</div>
+                </div>
+                <div class="dev-site-stat">
+                    <div class="dev-site-stat-value">${formatNumber(site.user_count || 0)}</div>
+                    <div class="dev-site-stat-label">Users</div>
+                </div>
+                <div class="dev-site-stat">
+                    <div class="dev-site-stat-value">${site.api_key_count || 0}</div>
+                    <div class="dev-site-stat-label">API Keys</div>
+                </div>
+            </div>
+            <div class="dev-site-actions">
+                <a href="${SITES_BASE_PATH}/${encodeURIComponent(site.site_id)}" class="dev-btn dev-btn-sm dev-btn-primary" style="flex: 1; justify-content: center;">
+                    Dashboard
+                </a>
+                <a href="${SITES_BASE_PATH}/${encodeURIComponent(site.site_id)}/integration" class="dev-btn dev-btn-sm dev-btn-secondary" style="flex: 1; justify-content: center;">
+                    Integration
+                </a>
+            </div>
+        </div>
+    `;
+}
+
+function showCreateSiteModal() {
+    document.getElementById('create-site-modal').classList.add('show');
+    document.getElementById('site-name').focus();
+}
+
+function hideCreateSiteModal() {
+    document.getElementById('create-site-modal').classList.remove('show');
+    document.getElementById('create-site-form').reset();
+}
+
+async function createSite(e) {
+    e.preventDefault();
+    
+    const btn = document.getElementById('create-site-btn');
+    const originalText = btn.textContent;
+    btn.textContent = 'Creating...';
+    btn.disabled = true;
+    
+    try {
+        const name = document.getElementById('site-name').value;
+        const domain = document.getElementById('site-domain').value.toLowerCase().replace(/^https?:\/\//, '').replace(/\/$/, '');
+        const env = document.getElementById('site-env').value;
+        
+        const authHeaders = await waitForLemmaCredentialHeader();
+        if (!authHeaders['X-Lemma-Credential']) {
+            throw new Error('No verified lemma credential available. Please sign in again.');
+        }
+
+        const response = await fetch('/api/developer/sites', {
+            method: 'POST',
+            headers: authHeaders,
+            body: JSON.stringify({
+                name,
+                domain,
+                environment: env
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (!response.ok) {
+            throw new Error(data.error || 'Failed to create site');
+        }
+        
+        // Success - redirect to the new site
+        hideCreateSiteModal();
+        
+        // Mark onboarding step complete
+        const onboarding = JSON.parse(localStorage.getItem('lemma_onboarding') || '{}');
+        onboarding.register = true;
+        localStorage.setItem('lemma_onboarding', JSON.stringify(onboarding));
+        
+        // Redirect to integration page
+        window.location.href = `${SITES_BASE_PATH}/${encodeURIComponent(data.site_id)}/integration`;
+        
+    } catch (e) {
+        alert('Error: ' + e.message);
+        btn.textContent = originalText;
+        btn.disabled = false;
+    }
+}
+
+function formatNumber(num) {
+    if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M';
+    if (num >= 1000) return (num / 1000).toFixed(1) + 'K';
+    return num.toString();
+}
+
+function escapeHtml(str) {
+    if (!str) return '';
+    return str.replace(/[&<>"']/g, char => ({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#39;'
+    })[char]);
+}
+
+// Close modal on escape
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+        hideCreateSiteModal();
+    }
+});
+</script>
+{% endmacro %}
+
+{% block dev_content %}
+{{ legacy_site_manager_content() }}
+{% endblock %}
+
+{% block admin_content %}
+{{ legacy_site_manager_content() }}
+{% endblock %}

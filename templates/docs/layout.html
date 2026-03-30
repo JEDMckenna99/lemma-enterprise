@@ -1,0 +1,443 @@
+{% extends "modern/layout.html" %}
+
+{% block title %}{{ page_title or 'Documentation' }} - lemma.id{% endblock %}
+{% block description %}{{ page_description or 'Lemma developer documentation - guides, API reference, and integration examples.' }}{% endblock %}
+
+{% block preload_scripts %}
+<!-- Docs pages skip wallet preload for faster LCP -->
+{% endblock %}
+
+{% block wallet_scripts %}
+<!-- Docs pages skip wallet scripts for faster LCP -->
+{% endblock %}
+
+{% block auth_scripts %}
+<!-- Docs pages skip auth scripts for faster LCP -->
+{% endblock %}
+
+{% block head %}
+{{ super() }}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/docs.css') }}?v=3">
+{% endblock %}
+
+{% block content %}
+<div class="docs-hero">
+    <div class="container">
+        <h1>{{ hero_title or 'Developer Documentation' }}</h1>
+        <p>{{ hero_subtitle or 'Everything you need to integrate Lemma into your platform' }}</p>
+        
+        <!-- Docs Search -->
+        <div class="docs-search-container">
+            <div class="docs-search-wrapper">
+                <svg class="docs-search-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="11" cy="11" r="8"></circle>
+                    <path d="M21 21l-4.35-4.35"></path>
+                </svg>
+                <input type="text" id="docs-search-input" class="docs-search-input" placeholder="Search documentation..." autocomplete="off" aria-label="Search documentation">
+                <kbd class="docs-search-kbd">/</kbd>
+            </div>
+            <div class="docs-search-results" id="docs-search-results"></div>
+        </div>
+    </div>
+</div>
+
+<!-- Mobile sidebar overlay -->
+<div class="docs-sidebar-overlay" id="docs-sidebar-overlay"></div>
+
+<!-- Mobile nav toggle (fixed position) -->
+<button class="docs-mobile-nav-toggle" id="docs-nav-toggle" aria-label="Toggle documentation menu">
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+        <path d="M4 6h16M4 12h16M4 18h16" stroke-linecap="round"/>
+    </svg>
+</button>
+
+<div class="docs-container">
+    <div class="docs-layout">
+        <!-- Sidebar Navigation -->
+        <aside class="docs-sidebar" id="docs-sidebar">
+            <nav class="docs-nav">
+                <div class="nav-product-label">
+                    <a href="{{ url_for('docs_overview') }}" class="nav-product-link">Lemma Firewall</a>
+                </div>
+                <div class="nav-section">
+                    <div class="nav-title">Getting Started</div>
+                    <a href="{{ url_for('docs_overview') }}" class="nav-link {% if active_page == 'overview' %}active{% endif %}">Overview</a>
+                    <a href="{{ url_for('docs_quickstart') }}" class="nav-link {% if active_page == 'quickstart' %}active{% endif %}">Quick Start</a>
+                    <a href="{{ url_for('docs_installation') }}" class="nav-link {% if active_page == 'installation' %}active{% endif %}">Installation</a>
+                    <a href="{{ url_for('docs_cli') }}" class="nav-link {% if active_page == 'cli' %}active{% endif %}">CLI</a>
+                </div>
+                
+                <div class="nav-section">
+                    <div class="nav-title">Integration Guides</div>
+                    <a href="{{ url_for('docs_wallet_flow') }}" class="nav-link {% if active_page == 'wallet-flow' %}active{% endif %}">Wallet Redirect Flow</a>
+                    <a href="{{ url_for('docs_verification') }}" class="nav-link {% if active_page == 'verification' %}active{% endif %}">Credential Verification</a>
+                    <a href="{{ url_for('docs_permissions') }}" class="nav-link {% if active_page == 'permissions' %}active{% endif %}">Permissions & Roles</a>
+                </div>
+                
+                <div class="nav-section">
+                    <div class="nav-title">SDK Reference</div>
+                    <a href="{{ url_for('docs_sdk_js') }}" class="nav-link {% if active_page == 'sdk-js' %}active{% endif %}">JavaScript SDK</a>
+                    <a href="{{ url_for('docs_sdk_methods') }}" class="nav-link {% if active_page == 'sdk-methods' %}active{% endif %}">SDK Methods</a>
+                    <a href="{{ url_for('docs_sdk_events') }}" class="nav-link {% if active_page == 'sdk-events' %}active{% endif %}">Events & Callbacks</a>
+                </div>
+                
+                <div class="nav-section">
+                    <div class="nav-title">API Reference</div>
+                    <a href="{{ url_for('docs_api_auth') }}" class="nav-link {% if active_page == 'api-auth' %}active{% endif %}">Authentication API</a>
+                    <a href="{{ url_for('docs_api_verification') }}" class="nav-link {% if active_page == 'api-verification' %}active{% endif %}">Verification API</a>
+                    <a href="{{ url_for('docs_api_revocation') }}" class="nav-link {% if active_page == 'api-revocation' %}active{% endif %}">Revocation API</a>
+                </div>
+                
+                <div class="nav-section">
+                    <div class="nav-title">Resources</div>
+                    <a href="{{ url_for('docs_error_codes') }}" class="nav-link {% if active_page == 'errors' %}active{% endif %}">Error Codes</a>
+                    <a href="{{ url_for('docs_examples') }}" class="nav-link {% if active_page == 'examples' %}active{% endif %}">Code Examples</a>
+                    <a href="{{ url_for('docs_changelog') }}" class="nav-link {% if active_page == 'changelog' %}active{% endif %}">Changelog</a>
+                </div>
+            </nav>
+        </aside>
+        
+        <!-- Main Content -->
+        <main class="docs-main">
+            {% block docs_content %}{% endblock %}
+        </main>
+    </div>
+</div>
+
+<script nonce="{{ csp_nonce }}">
+document.addEventListener('DOMContentLoaded', () => {
+    // Mobile docs navigation toggle
+    const navToggle = document.getElementById('docs-nav-toggle');
+    const sidebar = document.getElementById('docs-sidebar');
+    
+    const overlay = document.getElementById('docs-sidebar-overlay');
+    const closeBtn = document.getElementById('docs-sidebar-close');
+    
+    function openSidebar() {
+        if (sidebar) sidebar.classList.add('mobile-open');
+        if (overlay) overlay.classList.add('active');
+        if (navToggle) navToggle.classList.add('active');
+        document.body.style.overflow = 'hidden';
+    }
+    
+    function closeSidebar() {
+        if (sidebar) sidebar.classList.remove('mobile-open');
+        if (overlay) overlay.classList.remove('active');
+        if (navToggle) navToggle.classList.remove('active');
+        document.body.style.overflow = '';
+    }
+    
+    if (navToggle) {
+        navToggle.addEventListener('click', () => {
+            sidebar.classList.toggle('mobile-open');
+            navToggle.classList.toggle('active');
+        });
+        
+        // Close sidebar when clicking a link (on mobile)
+        sidebar.querySelectorAll('.nav-link').forEach(link => {
+            link.addEventListener('click', () => {
+                if (window.innerWidth <= 900) {
+                    sidebar.classList.remove('mobile-open');
+                    navToggle.classList.remove('active');
+                }
+            });
+        });
+    }
+    
+    // Smooth scroll for anchor links
+    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+        anchor.addEventListener('click', function (e) {
+            e.preventDefault();
+            const target = document.querySelector(this.getAttribute('href'));
+            if (target) {
+                target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+        });
+    });
+    
+    // Copy code buttons
+    document.querySelectorAll('.copy-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const code = this.closest('.code-block').querySelector('code').textContent;
+            navigator.clipboard.writeText(code).then(() => {
+                const original = this.textContent;
+                this.textContent = 'Copied!';
+                setTimeout(() => this.textContent = original, 2000);
+            });
+        });
+    });
+    
+    // ========================================
+    // Docs Search Functionality
+    // ========================================
+    const searchInput = document.getElementById('docs-search-input');
+    const searchResults = document.getElementById('docs-search-results');
+    
+    // Search index - comprehensive docs content
+    const docsIndex = [
+        // Getting Started
+        {
+            title: 'Overview',
+            url: '{{ url_for("docs_overview") }}',
+            category: 'getting-started',
+            keywords: 'overview introduction agent auth runtime proof-first x-lemma-credential agent ops controls monitoring kill switch',
+            excerpt: 'Learn how Lemma handles proof-first runtime auth, agent ops controls, monitoring, and containment.'
+        },
+        {
+            title: 'Quick Start',
+            url: '{{ url_for("docs_quickstart") }}',
+            category: 'getting-started',
+            keywords: 'quick start getting started tutorial bring your own runtime x-lemma-credential proof-first setup-firewall session start',
+            excerpt: 'Install the CLI, acquire a proof, and send X-Lemma-Credential from your own runtime.'
+        },
+        {
+            title: 'Installation',
+            url: '{{ url_for("docs_installation") }}',
+            category: 'getting-started',
+            keywords: 'install installation pipx lemma-cli runtime prerequisites lemma-firewall reference runtime proof file',
+            excerpt: 'Install lemma-cli, prepare your proof-first runtime, and choose the reference runtime path only when needed.'
+        },
+        {
+            title: 'CLI',
+            url: '{{ url_for("docs_cli") }}',
+            category: 'getting-started',
+            keywords: 'lemma cli command line pipx session start session status doctor fix setup-firewall login non-interactive',
+            excerpt: 'Use lemma-cli for wallet sessions, remediation, reference runtime setup, and machine-readable checks.'
+        },
+        // Integration Guides
+        {
+            title: 'Wallet Redirect Flow',
+            url: '{{ url_for("docs_wallet_flow") }}',
+            category: 'integration',
+            keywords: 'wallet redirect flow authentication login user flow popup window oauth sso single sign-on',
+            excerpt: 'Implement the wallet redirect authentication flow. Guide users through secure credential verification via the Lemma wallet.'
+        },
+        {
+            title: 'Credential Verification',
+            url: '{{ url_for("docs_verification") }}',
+            category: 'integration',
+            keywords: 'verification verify credential proof validate token check authentication backend server',
+            excerpt: 'Server-side credential verification. Validate proofs and tokens returned from the Lemma wallet securely.'
+        },
+        {
+            title: 'Permissions & Roles',
+            url: '{{ url_for("docs_permissions") }}',
+            category: 'integration',
+            keywords: 'permissions roles access control authorization rbac admin user moderator custom roles',
+            excerpt: 'Implement role-based access control using Lemma permissions. Define custom roles and permission hierarchies.'
+        },
+        // SDK Reference
+        {
+            title: 'JavaScript SDK',
+            url: '{{ url_for("docs_sdk_js") }}',
+            category: 'sdk',
+            keywords: 'javascript sdk js client browser frontend react vue angular typescript',
+            excerpt: 'Complete JavaScript SDK reference. Initialize the client, configure options, and integrate with your frontend.'
+        },
+        {
+            title: 'SDK Methods',
+            url: '{{ url_for("docs_sdk_methods") }}',
+            category: 'sdk',
+            keywords: 'methods functions api startAuth verify getProof hasCredential checkPermission logout',
+            excerpt: 'Reference for all SDK methods including authentication, verification, and permission checking functions.'
+        },
+        {
+            title: 'Events & Callbacks',
+            url: '{{ url_for("docs_sdk_events") }}',
+            category: 'sdk',
+            keywords: 'events callbacks listeners hooks onAuth onError onReady state change async',
+            excerpt: 'Handle SDK events and callbacks. Listen for authentication state changes, errors, and verification results.'
+        },
+        // API Reference
+        {
+            title: 'Authentication API',
+            url: '{{ url_for("docs_api_auth") }}',
+            category: 'api',
+            keywords: 'authentication api auth x-lemma-credential exchange-proof compat bearer token protected routes',
+            excerpt: 'Use proof-first auth on protected routes and exchange proof for bearer tokens only for compatibility.'
+        },
+        {
+            title: 'Verification API',
+            url: '{{ url_for("docs_api_verification") }}',
+            category: 'api',
+            keywords: 'verification api verify proof credential validate backend server-side api endpoint post',
+            excerpt: 'Server-to-server verification API. Validate credential proofs and check verification status programmatically.'
+        },
+        {
+            title: 'Revocation API',
+            url: '{{ url_for("docs_api_revocation") }}',
+            category: 'api',
+            keywords: 'revocation api revoke credential invalidate cancel ban block suspend',
+            excerpt: 'Revoke and manage credential status. Check revocation lists and invalidate compromised credentials.'
+        },
+        // Resources
+        {
+            title: 'Error Codes',
+            url: '{{ url_for("docs_error_codes") }}',
+            category: 'resources',
+            keywords: 'error codes errors troubleshooting debug fix problems issues solutions',
+            excerpt: 'Complete list of error codes and their meanings. Troubleshoot integration issues with detailed explanations.'
+        },
+        {
+            title: 'Code Examples',
+            url: '{{ url_for("docs_examples") }}',
+            category: 'resources',
+            keywords: 'examples code samples snippets runtime express x-lemma-credential exchange-proof monitoring lemma-firewall',
+            excerpt: 'Ready-to-use runtime, server verification, compatibility, and monitoring examples for agent auth.'
+        },
+        {
+            title: 'Changelog',
+            url: '{{ url_for("docs_changelog") }}',
+            category: 'resources',
+            keywords: 'changelog updates releases version history changes new features',
+            excerpt: 'SDK and API changelog. Track version updates, new features, and breaking changes.'
+        }
+    ];
+    
+    let selectedIndex = -1;
+    
+    function highlightMatch(text, query) {
+        if (!query) return text;
+        const regex = new RegExp(`(${query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
+        return text.replace(regex, '<mark>$1</mark>');
+    }
+    
+    function searchDocs(query) {
+        if (!query || query.length < 2) return [];
+        
+        const terms = query.toLowerCase().split(/\s+/).filter(t => t.length > 1);
+        
+        return docsIndex
+            .map(doc => {
+                const searchText = `${doc.title} ${doc.keywords} ${doc.excerpt}`.toLowerCase();
+                let score = 0;
+                
+                // Score based on matches
+                terms.forEach(term => {
+                    if (doc.title.toLowerCase().includes(term)) score += 10;
+                    if (doc.keywords.includes(term)) score += 5;
+                    if (doc.excerpt.toLowerCase().includes(term)) score += 2;
+                });
+                
+                // Exact title match bonus
+                if (doc.title.toLowerCase() === query.toLowerCase()) score += 20;
+                
+                return { ...doc, score };
+            })
+            .filter(doc => doc.score > 0)
+            .sort((a, b) => b.score - a.score)
+            .slice(0, 8);
+    }
+    
+    function renderResults(results, query) {
+        if (results.length === 0) {
+            searchResults.innerHTML = `
+                <div class="docs-search-no-results">
+                    No results found for "${query}"
+                </div>
+                <div class="docs-search-hint">
+                    <span>Try different keywords</span>
+                    <span><kbd>Esc</kbd> to close</span>
+                </div>
+            `;
+            searchResults.classList.add('active');
+            return;
+        }
+        
+        const categoryLabels = {
+            'getting-started': 'Getting Started',
+            'integration': 'Integration',
+            'sdk': 'SDK',
+            'api': 'API',
+            'resources': 'Resources'
+        };
+        
+        let html = results.map((doc, i) => `
+            <a href="${doc.url}" class="docs-search-result ${i === selectedIndex ? 'selected' : ''}" data-index="${i}">
+                <div class="docs-search-result-title">
+                    ${highlightMatch(doc.title, query)}
+                    <span class="category-tag ${doc.category}">${categoryLabels[doc.category]}</span>
+                </div>
+                <div class="docs-search-result-excerpt">${highlightMatch(doc.excerpt, query)}</div>
+            </a>
+        `).join('');
+        
+        html += `
+            <div class="docs-search-hint">
+                <span><kbd>Enter</kbd> to select &bull; <kbd>Up</kbd>/<kbd>Down</kbd> to navigate</span>
+                <span><kbd>Esc</kbd> to close</span>
+            </div>
+        `;
+        
+        searchResults.innerHTML = html;
+        searchResults.classList.add('active');
+    }
+    
+    function closeSearch() {
+        searchResults.classList.remove('active');
+        searchResults.innerHTML = '';
+        selectedIndex = -1;
+    }
+    
+    if (searchInput) {
+        // Input handler
+        searchInput.addEventListener('input', (e) => {
+            const query = e.target.value.trim();
+            selectedIndex = -1;
+            
+            if (query.length < 2) {
+                closeSearch();
+                return;
+            }
+            
+            const results = searchDocs(query);
+            renderResults(results, query);
+        });
+        
+        // Keyboard navigation
+        searchInput.addEventListener('keydown', (e) => {
+            const results = searchResults.querySelectorAll('.docs-search-result');
+            
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                selectedIndex = Math.min(selectedIndex + 1, results.length - 1);
+                results.forEach((r, i) => r.classList.toggle('selected', i === selectedIndex));
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                selectedIndex = Math.max(selectedIndex - 1, 0);
+                results.forEach((r, i) => r.classList.toggle('selected', i === selectedIndex));
+            } else if (e.key === 'Enter' && selectedIndex >= 0) {
+                e.preventDefault();
+                results[selectedIndex]?.click();
+            } else if (e.key === 'Escape') {
+                closeSearch();
+                searchInput.blur();
+            }
+        });
+        
+        // Focus handler
+        searchInput.addEventListener('focus', () => {
+            if (searchInput.value.trim().length >= 2) {
+                const results = searchDocs(searchInput.value.trim());
+                renderResults(results, searchInput.value.trim());
+            }
+        });
+        
+        // Click outside to close
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest('.docs-search-container')) {
+                closeSearch();
+            }
+        });
+        
+        // Global "/" shortcut to focus search
+        document.addEventListener('keydown', (e) => {
+            if (e.key === '/' && !e.target.matches('input, textarea')) {
+                e.preventDefault();
+                searchInput.focus();
+            }
+        });
+    }
+});
+</script>
+{% endblock %}

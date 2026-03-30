@@ -1,0 +1,130 @@
+name: lemma-platform
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: lemma
+      POSTGRES_USER: lemma
+      POSTGRES_PASSWORD: lemma
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U lemma -d lemma"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.platform
+    env_file:
+      - .env.docker
+    environment:
+      FLASK_ENV: development
+      ENVIRONMENT: development
+      LOG_LEVEL: INFO
+      DATABASE_URL: postgresql://lemma:lemma@postgres:5432/lemma
+      REDIS_URL: redis://redis:6379/0
+      PORT: "5000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    ports:
+      - "5000:5000"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:5000/health || exit 1"]
+      interval: 20s
+      timeout: 5s
+      retries: 10
+
+  daemon:
+    build:
+      context: .
+      dockerfile: Dockerfile.platform
+    profiles: ["daemon"]
+    env_file:
+      - .env.docker
+    environment:
+      LEMMA_BASE_URL: http://api:5000
+      LEMMA_FIREWALL_HOST: 0.0.0.0
+      LEMMA_FIREWALL_PORT: "8787"
+      LEMMA_FIREWALL_POLICY_FILE: /app/scripts/lemma_firewall_policy.example.json
+    command: ["python", "scripts/lemma_firewall.py"]
+    depends_on:
+      api:
+        condition: service_healthy
+    ports:
+      - "8787:8787"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8787/aim/health || exit 1"]
+      interval: 20s
+      timeout: 5s
+      retries: 10
+
+  cli:
+    build:
+      context: .
+      dockerfile: Dockerfile.platform
+    profiles: ["cli"]
+    env_file:
+      - .env.docker
+    environment:
+      LEMMA_BASE_URL: http://api:5000
+      DATABASE_URL: postgresql://lemma:lemma@postgres:5432/lemma
+      REDIS_URL: redis://redis:6379/0
+    depends_on:
+      api:
+        condition: service_healthy
+    entrypoint: ["python", "scripts/lemma_cli.py"]
+    command: ["--help"]
+
+  migrate:
+    build:
+      context: .
+      dockerfile: Dockerfile.platform
+    profiles: ["ops"]
+    env_file:
+      - .env.docker
+    environment:
+      DATABASE_URL: postgresql://lemma:lemma@postgres:5432/lemma
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: ["python", "migrations/run_migration.py"]
+
+  test:
+    build:
+      context: .
+      dockerfile: Dockerfile.platform
+    profiles: ["test"]
+    environment:
+      LEMMA_BASE_URL: http://api:5000
+      LEMMA_FIREWALL_TAINT_ON_VIOLATION_ENABLED: "1"
+      DATABASE_URL: postgresql://lemma:lemma@postgres:5432/lemma
+      REDIS_URL: redis://redis:6379/0
+    depends_on:
+      api:
+        condition: service_healthy
+    command: ["python", "-m", "pytest", "tests/test_developer_control_panel.py", "tests/test_lemma_firewall_local_ops.py", "-v"]
+
+volumes:
+  postgres_data:
+  redis_data:

@@ -1,0 +1,645 @@
+openapi: 3.0.3
+info:
+  title: Lemma Identity Verification API
+  description: |
+    Federated identity verification platform with microsecond authentication and zero-knowledge privacy.
+    
+    ## Authentication
+    All API endpoints require a Bearer token in the Authorization header:
+    ```
+    Authorization: Bearer your-api-key
+    ```
+    
+    ## Two-Process Architecture
+    
+    ### 🔐 VERIFICATION (Identity Creation)
+    - **Purpose**: Create new identity credentials via Stripe KYC
+    - **Endpoints**: `/api/sdk/start-identity-verification`, `/api/sdk/complete-identity-verification`
+    - **Performance**: ~500ms (includes KYC validation)
+    
+    ### ⚡ AUTHENTICATION (Access Control)  
+    - **Purpose**: Validate existing credentials for instant access
+    - **Endpoints**: `/api/sdk/check-credentials`, `/api/sdk/verify-offline`
+    - **Performance**: ~1-50µs (offline cryptographic validation)
+    
+  version: 1.0.0
+  contact:
+    name: Lemma Support
+    email: support@lemma.id
+    url: https://lemma.id/contact
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+  x-logo:
+    url: https://lemma.id/static/img/lemma_logo.svg
+    altText: Lemma Identity Verification
+
+servers:
+  - url: https://lemma.id
+    description: Production server
+  - url: https://lemma-identity-network-aa6d939fd8f0.herokuapp.com
+    description: Testing/staging server
+
+security:
+  - ApiKeyAuth: []
+
+paths:
+  # SDK API Endpoints
+  /api/sdk/check-credentials:
+    post:
+      tags: ["SDK - Authentication"]
+      summary: Check existing credentials
+      description: |
+        Background wallet credential checking for offline authentication.
+        Enables 95% offline operation by validating cached credentials.
+      operationId: checkCredentials
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                credentials:
+                  type: array
+                  items:
+                    type: string
+                  description: Array of base64-encoded credentials to verify
+                enableRustEngine:
+                  type: boolean
+                  default: true
+                  description: Use Rust engine for verification
+                requireFullCrypto:
+                  type: boolean
+                  default: false
+                  description: Require full cryptographic verification
+            example:
+              credentials: ["eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9..."]
+              enableRustEngine: true
+              requireFullCrypto: false
+      responses:
+        '200':
+          description: Credential verification result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  hasValidCredentials:
+                    type: boolean
+                  verificationTime:
+                    type: number
+                    description: Verification time in microseconds
+                  confidence:
+                    type: number
+                    minimum: 0
+                    maximum: 1
+                  rustEngineUsed:
+                    type: boolean
+                  offline:
+                    type: boolean
+              example:
+                success: true
+                hasValidCredentials: true
+                verificationTime: 4.176
+                confidence: 0.95
+                rustEngineUsed: true
+                offline: true
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
+  /api/sdk/start-identity-verification:
+    post:
+      tags: ["SDK - Verification"]
+      summary: Start Stripe Identity verification
+      description: |
+        Initiate KYC verification process using Stripe Identity.
+        Returns a session URL for user to complete document verification.
+      operationId: startIdentityVerification
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                returnUrl:
+                  type: string
+                  format: uri
+                  description: URL to redirect user after verification
+                metadata:
+                  type: object
+                  description: Additional metadata for verification
+            example:
+              returnUrl: "https://yoursite.com/verified"
+              metadata:
+                userId: "user_123"
+                source: "checkout"
+      responses:
+        '200':
+          description: Verification session created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  sessionId:
+                    type: string
+                  sessionUrl:
+                    type: string
+                    format: uri
+                  expiresAt:
+                    type: string
+                    format: date-time
+              example:
+                success: true
+                sessionId: "vs_1234567890"
+                sessionUrl: "https://verify.stripe.com/start/..."
+                expiresAt: "2025-01-21T12:00:00Z"
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
+  /api/sdk/complete-identity-verification:
+    post:
+      tags: ["SDK - Verification"]
+      summary: Complete identity verification
+      description: |
+        Complete verification process and receive cryptographically-signed identity credential.
+        Call this endpoint after user completes Stripe Identity verification.
+      operationId: completeIdentityVerification
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                sessionId:
+                  type: string
+                  description: Stripe Identity session ID
+                verificationData:
+                  type: object
+                  description: Additional verification data
+            example:
+              sessionId: "vs_1234567890"
+      responses:
+        '200':
+          description: Identity credential issued
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  credential:
+                    $ref: '#/components/schemas/IdentityCredential'
+                  networkRegistered:
+                    type: boolean
+                  processingTime:
+                    type: number
+                    description: Processing time in microseconds
+              example:
+                success: true
+                credential:
+                  packageType: "identity"
+                  isHuman: true
+                  verificationMethod: "stripe_identity"
+                  signature: "base64_signature..."
+                networkRegistered: true
+                processingTime: 45.2
+
+  /api/sdk/verify-offline:
+    post:
+      tags: ["SDK - Authentication"]
+      summary: Offline credential verification
+      description: |
+        Ultra-fast offline verification using Rust/WASM engine.
+        Typical response time: 1-50 microseconds.
+      operationId: verifyOffline
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                credential:
+                  type: string
+                  description: Base64-encoded credential to verify
+                context:
+                  type: object
+                  description: Verification context
+            example:
+              credential: "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9..."
+              context:
+                action: "checkout"
+                timestamp: 1705834800
+      responses:
+        '200':
+          description: Verification result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VerificationResult'
+
+  /api/sdk/health:
+    get:
+      tags: ["SDK - System"]
+      summary: SDK health check
+      description: Check SDK API health and Rust engine availability
+      operationId: sdkHealth
+      security: []  # No auth required for health check
+      responses:
+        '200':
+          description: Health status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum: ["healthy", "degraded", "unhealthy"]
+                  service:
+                    type: string
+                  rust_engine:
+                    type: boolean
+                  background_checks:
+                    type: string
+                  security_levels:
+                    type: array
+                    items:
+                      type: string
+                  timestamp:
+                    type: number
+
+  # Network API Endpoints
+  /api/network/client-config:
+    get:
+      tags: ["Network - Configuration"]
+      summary: Get client network configuration
+      description: Dynamic network configuration for JavaScript clients
+      operationId: getClientNetworkConfig
+      security: []  # No auth required for public config
+      responses:
+        '200':
+          description: Network configuration
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  networkRegistryUrl:
+                    type: string
+                    format: uri
+                  nodeId:
+                    type: string
+                  nodeName:
+                    type: string
+                  endpoints:
+                    type: array
+                    items:
+                      type: string
+                  isPrimaryNode:
+                    type: boolean
+              example:
+                networkRegistryUrl: "https://lemma.id/api/network"
+                nodeId: "lemma-enterprise"
+                nodeName: "Lemma Enterprise"
+                endpoints: ["https://lemma.id"]
+                isPrimaryNode: true
+
+  /api/network/sync/check-shared-identity:
+    post:
+      tags: ["Network - Identity"]
+      summary: Check shared identity in network
+      description: |
+        Check if user has valid identity lemma in the federated network.
+        Supports both user ID and PPID-based lookups.
+      operationId: checkSharedIdentity
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - type: object
+                  properties:
+                    userId:
+                      type: string
+                      description: User identifier
+                - type: object
+                  properties:
+                    ppid:
+                      type: string
+                      description: Pairwise Pseudonymous ID
+                    origin:
+                      type: string
+                      description: Origin domain
+            examples:
+              userId:
+                summary: User ID lookup
+                value:
+                  userId: "user_123"
+              ppid:
+                summary: PPID lookup
+                value:
+                  ppid: "ppid_abc123"
+                  origin: "example.com"
+      responses:
+        '200':
+          description: Identity check result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  found:
+                    type: boolean
+                  credential:
+                    $ref: '#/components/schemas/IdentityCredential'
+                  lastSeen:
+                    type: string
+                    format: date-time
+
+  # Privacy API Endpoints  
+  /api/privacy/generate-ppid:
+    post:
+      tags: ["Privacy - PPID"]
+      summary: Generate Pairwise Pseudonymous ID
+      description: |
+        Generate privacy-preserving identifier unique to user-origin pair.
+        Enables cross-site verification without revealing user identity.
+      operationId: generatePPID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                userId:
+                  type: string
+                  description: User identifier
+                origin:
+                  type: string
+                  description: Origin domain
+                salt:
+                  type: string
+                  description: Optional salt for additional privacy
+            example:
+              userId: "user_123"
+              origin: "example.com"
+      responses:
+        '200':
+          description: PPID generated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  ppid:
+                    type: string
+                    description: Generated Pairwise Pseudonymous ID
+                  expiresAt:
+                    type: string
+                    format: date-time
+
+  # Simple Join API
+  /join:
+    get:
+      tags: ["Integration - Quick Setup"]
+      summary: Auto-join script
+      description: |
+        Get dynamically generated JavaScript for 3-line integration.
+        Automatically configures SDK and joins site to federation.
+      operationId: getAutoJoinScript
+      parameters:
+        - name: site
+          in: query
+          description: Your site domain
+          schema:
+            type: string
+          example: "yoursite.com"
+      security: []  # No auth required for public script
+      responses:
+        '200':
+          description: JavaScript integration script
+          content:
+            application/javascript:
+              schema:
+                type: string
+              example: |
+                // Auto-generated Lemma integration script
+                (function() {
+                  // Load and configure Lemma SDK
+                  // ... dynamic configuration
+                })();
+
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: API Key
+      description: |
+        API key authentication. Get your API key from the [dashboard](/dashboard).
+        
+        Include in requests as: `Authorization: Bearer your-api-key`
+
+  schemas:
+    IdentityCredential:
+      type: object
+      properties:
+        packageType:
+          type: string
+          enum: ["identity"]
+          description: Credential package type
+        isHuman:
+          type: boolean
+          description: Human verification status
+        verificationMethod:
+          type: string
+          enum: ["stripe_identity"]
+          description: Verification method used
+        signature:
+          type: string
+          description: Cryptographic signature
+        issuedAt:
+          type: string
+          format: date-time
+        expiresAt:
+          type: string
+          format: date-time
+        claims:
+          type: object
+          description: Additional verified claims
+      required:
+        - packageType
+        - isHuman
+        - verificationMethod
+        - signature
+
+    VerificationResult:
+      type: object
+      properties:
+        success:
+          type: boolean
+        verified:
+          type: boolean
+          description: Whether credential is valid
+        confidence:
+          type: number
+          minimum: 0
+          maximum: 1
+          description: Verification confidence score
+        verificationTime:
+          type: number
+          description: Verification time in microseconds
+        rustEngineUsed:
+          type: boolean
+          description: Whether Rust engine was used
+        offline:
+          type: boolean
+          description: Whether verification was performed offline
+        claims:
+          type: object
+          description: Verified claims from credential
+      required:
+        - success
+        - verified
+        - verificationTime
+
+    SecurityConfig:
+      type: object
+      properties:
+        securityLevel:
+          type: string
+          enum: ["low", "medium", "high", "critical"]
+          description: Security level configuration
+        backgroundChecks:
+          type: boolean
+          description: Enable background monitoring
+        checkOnEvents:
+          type: array
+          items:
+            type: string
+          description: Events that trigger verification
+        maxFailures:
+          type: integer
+          minimum: 1
+          description: Maximum failures before lockout
+        gracePeriod:
+          type: integer
+          description: Grace period in milliseconds
+      required:
+        - securityLevel
+
+    Error:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+        error:
+          type: string
+          description: Error code
+        message:
+          type: string
+          description: Human-readable error message
+        details:
+          type: object
+          description: Additional error details
+      required:
+        - success
+        - error
+        - message
+
+  responses:
+    Unauthorized:
+      description: Authentication required or invalid API key
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            success: false
+            error: "invalid_auth"
+            message: "Bearer token required"
+
+    RateLimited:
+      description: Rate limit exceeded
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            success: false
+            error: "rate_limited"
+            message: "Too many requests. Try again later."
+
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            success: false
+            error: "not_found"
+            message: "Resource not found"
+
+    ValidationError:
+      description: Request validation failed
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            success: false
+            error: "validation_error"
+            message: "Invalid request parameters"
+
+tags:
+  - name: "SDK - Authentication"
+    description: "Offline authentication and credential validation"
+  - name: "SDK - Verification" 
+    description: "Identity creation and KYC verification"
+  - name: "SDK - System"
+    description: "Health checks and system status"
+  - name: "Network - Configuration"
+    description: "Network configuration and discovery"
+  - name: "Network - Identity"
+    description: "Federated identity management"
+  - name: "Privacy - PPID"
+    description: "Privacy-preserving identifiers"
+  - name: "Integration - Quick Setup"
+    description: "Simplified integration tools"
+
+x-tagGroups:
+  - name: "SDK APIs"
+    tags:
+      - "SDK - Authentication"
+      - "SDK - Verification"
+      - "SDK - System"
+  - name: "Network APIs"
+    tags:
+      - "Network - Configuration"
+      - "Network - Identity"
+  - name: "Privacy APIs"
+    tags:
+      - "Privacy - PPID"
+  - name: "Integration Tools"
+    tags:
+      - "Integration - Quick Setup"

@@ -1,0 +1,84 @@
+# Rust target directories - too large for Heroku
+target/
+lemma-crypto/target/
+*/target/
+
+# Rust build artifacts
+*.rlib
+*.so
+*.dll
+*.dylib
+
+# Python wheels (generated during build)
+wheels/
+*.whl
+dist/
+build/
+*.egg-info/
+pip-wheel-metadata/
+.tmp_wheels/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# Virtual environments
+venv/
+env/
+ENV/
+
+# Local environment files
+.env
+.env.*
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Temporary files
+*.tmp
+*.temp
+nul
+
+# Node modules if any
+node_modules/
+
+# Coverage reports
+htmlcov/
+.coverage
+.coverage.*
+
+# Local runtime state
+*.db
+*.sqlite
+*.sqlite3
+recent_logs.txt
+
+# Local evidence / scratch outputs
+artifacts/
+ops/evidence/
+
+# Local browser automation state
+.playwright-mcp/
+
+# Agent token (contains secrets - never commit)
+.lemma-agent-token
+
+# Deployment evidence (may contain session tokens)
+docs/launch-evidence/
+
+# Cursor project state
+.cursor/

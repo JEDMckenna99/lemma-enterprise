@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lemma PIN Integration Example</title>
+    <link rel="stylesheet" href="/static/css/lemma.css">
+</head>
+<body>
+    <div class="container" style="max-width: 800px; padding: 40px 20px;">
+        <h1>Lemma PIN Protection - Integration Example</h1>
+        
+        <div style="background: var(--gray-50); padding: 24px; border-radius: 12px; margin: 24px 0;">
+            <h2>How PIN Protection Works</h2>
+            <ol style="line-height: 1.8;">
+                <li>User confirms email (one-time)</li>
+                <li><strong>User creates 4-digit PIN</strong> (on first credential storage)</li>
+                <li>PIN + browser fingerprint = encryption key</li>
+                <li>Wallet encrypted with key, stored in localStorage</li>
+                <li>Every visit: Enter PIN to unlock wallet</li>
+                <li>Background verification continues (transparent)</li>
+                <li>Auto-locks after 15 minutes of inactivity</li>
+            </ol>
+        </div>
+
+        <div style="background: white; padding: 24px; border-radius: 12px; box-shadow: var(--shadow-lg);">
+            <h2>Live Demo</h2>
+            
+            <div style="margin: 24px 0;">
+                <button onclick="demoSetupPIN()" class="btn-primary">
+                    1. Setup PIN (First Time)
+                </button>
+            </div>
+            
+            <div style="margin: 24px 0;">
+                <button onclick="demoStoreCredential()" class="btn-primary">
+                    2. Store a Credential (Auto-encrypted)
+                </button>
+            </div>
+            
+            <div style="margin: 24px 0;">
+                <button onclick="demoLockWallet()" class="btn-secondary">
+                    3. Lock Wallet
+                </button>
+            </div>
+            
+            <div style="margin: 24px 0;">
+                <button onclick="demoUnlockWallet()" class="btn-primary">
+                    4. Unlock Wallet (Enter PIN)
+                </button>
+            </div>
+            
+            <div style="margin: 24px 0;">
+                <button onclick="demoGetCredentials()" class="btn-secondary">
+                    5. View Credentials (Auto-prompts if locked)
+                </button>
+            </div>
+            
+            <div id="demo-output" style="margin-top: 24px; padding: 16px; background: var(--gray-100); border-radius: 8px; font-family: monospace; font-size: 13px; min-height: 100px;">
+                Ready for demo...
+            </div>
+        </div>
+
+        <div style="background: #fff3cd; padding: 24px; border-radius: 12px; margin: 24px 0; border-left: 4px solid var(--warning);">
+            <h3 style="margin: 0 0 12px 0; color: var(--warning);">Security Note</h3>
+            <p style="margin: 0; color: var(--gray-700);">
+                PIN is NEVER sent to the server. It's used purely client-side to derive an encryption key.
+                Even if the server is compromised, your PIN remains safe.
+            </p>
+        </div>
+    </div>
+
+    <!-- Load PIN modules -->
+    <script src="/static/js/lemma-wallet-pin.js"></script>
+    <script src="/static/js/lemma-pin-ui.js"></script>
+    <script src="/static/js/lemma-wallet-with-pin.js"></script>
+
+    <script>
+        let wallet;
+        
+        function log(message) {
+            const output = document.getElementById('demo-output');
+            output.innerHTML += message + '\n';
+            output.scrollTop = output.scrollHeight;
+        }
+        
+        async function demoSetupPIN() {
+            try {
+                wallet = new LemmaWalletWithPIN({ usePIN: true });
+                log('📝 Prompting for PIN setup...');
+                
+                await wallet.pinUI.showPINSetup({ allowSkip: false });
+                
+                log('✅ PIN setup complete!');
+                log(`   Wallet encrypted with your PIN`);
+                log(`   Salt stored in localStorage (public)`);
+                log(`   Your PIN never leaves your browser`);
+                
+            } catch (error) {
+                log(`❌ Error: ${error.message}`);
+            }
+        }
+        
+        async function demoStoreCredential() {
+            try {
+                if (!wallet) {
+                    wallet = new LemmaWalletWithPIN({ usePIN: true });
+                }
+                
+                const demoCredential = {
+                    id: 'cred_demo_' + Date.now(),
+                    issuer: 'did:lemma:example',
+                    subject: 'did:lemma:user123',
+                    claims: {
+                        packageType: 'permission',
+                        siteId: 'demo.com',
+                        permissionId: 'admin',
+                        email: 'user@example.com'
+                    },
+                    proof: {
+                        type: 'Ed25519Signature2020',
+                        signatureValue: 'demo_signature'
+                    }
+                };
+                
+                log('💾 Storing credential...');
+                await wallet.storeCredential(demoCredential);
+                
+                log('✅ Credential stored and encrypted!');
+                log(`   Encrypted with PIN-derived key`);
+                log(`   Stored in localStorage (encrypted)`);
+                
+            } catch (error) {
+                log(`❌ Error: ${error.message}`);
+            }
+        }
+        
+        async function demoLockWallet() {
+            try {
+                if (!wallet) {
+                    log('❌ Wallet not initialized');
+                    return;
+                }
+                
+                wallet.lock();
+                log('🔒 Wallet locked');
+                log('   Encryption key cleared from memory');
+                log('   Must enter PIN to access credentials');
+                
+            } catch (error) {
+                log(`❌ Error: ${error.message}`);
+            }
+        }
+        
+        async function demoUnlockWallet() {
+            try {
+                if (!wallet) {
+                    wallet = new LemmaWalletWithPIN({ usePIN: true });
+                }
+                
+                log('🔓 Prompting for PIN...');
+                const credentials = await wallet.pinUI.showPINEntry('Enter PIN to unlock');
+                
+                log('✅ Wallet unlocked!');
+                log(`   Found ${credentials.length} credential(s)`);
+                log(`   Wallet will auto-lock after 15 minutes`);
+                
+            } catch (error) {
+                log(`❌ Error: ${error.message}`);
+            }
+        }
+        
+        async function demoGetCredentials() {
+            try {
+                if (!wallet) {
+                    wallet = new LemmaWalletWithPIN({ usePIN: true });
+                }
+                
+                log('📂 Retrieving credentials...');
+                const credentials = await wallet.getCredentials();
+                
+                log('✅ Credentials retrieved:');
+                credentials.forEach((cred, i) => {
+                    log(`   ${i + 1}. ${cred.claims?.permissionId || 'Unknown'} for ${cred.claims?.siteId || 'Unknown'}`);
+                });
+                
+                if (credentials.length === 0) {
+                    log('   (No credentials stored yet)');
+                }
+                
+            } catch (error) {
+                log(`❌ Error: ${error.message}`);
+            }
+        }
+    </script>
+
+    <div style="background: var(--gray-900); color: white; padding: 40px 20px; margin-top: 60px;">
+        <div class="container" style="max-width: 800px;">
+            <h2 style="color: white;">Integration Code Example</h2>
+            
+            <h3 style="color: var(--gray-300); margin-top: 32px;">Regular Flow (No PIN):</h3>
+            <pre style="background: #1a1a1a; padding: 16px; border-radius: 8px; overflow-x: auto;"><code>// User confirms email
+// → Permission lemma issued
+// → Stored in wallet (encrypted)
+// → Shield checks permission (transparent)
+// → Access granted
+
+const wallet = new LemmaWalletWithPIN({ usePIN: false });
+await wallet.storeCredential(permissionLemma);
+// Done - no PIN prompt</code></pre>
+
+            <h3 style="color: var(--gray-300); margin-top: 32px;">With PIN (4-Factor Auth):</h3>
+            <pre style="background: #1a1a1a; padding: 16px; border-radius: 8px; overflow-x: auto;"><code>// User confirms email
+// → Permission lemma issued
+// → <strong>User creates 4-digit PIN</strong>
+// → Wallet encrypted with PIN
+// → Every visit: Enter PIN to unlock
+// → Shield checks permission (transparent)
+// → Access granted
+
+const wallet = new LemmaWalletWithPIN({ usePIN: true });
+await wallet.init();  // Prompts for PIN
+await wallet.storeCredential(permissionLemma);
+// PIN protects all credentials</code></pre>
+
+            <h3 style="color: var(--gray-300); margin-top: 32px;">Site Configuration:</h3>
+            <pre style="background: #1a1a1a; padding: 16px; border-radius: 8px; overflow-x: auto;"><code>// Site admin decides: Require PIN or not
+
+// Option 1: PIN optional (recommended)
+window.LEMMA_USE_PIN = true;  // Show PIN setup prompt
+                               // User can skip
+
+// Option 2: PIN required (high security)
+window.LEMMA_USE_PIN = true;
+window.LEMMA_PIN_REQUIRED = true;  // Cannot skip
+
+// Option 3: No PIN (default flow)
+window.LEMMA_USE_PIN = false;  // Standard encrypted wallet</code></pre>
+        </div>
+    </div>
+</body>
+</html>
+

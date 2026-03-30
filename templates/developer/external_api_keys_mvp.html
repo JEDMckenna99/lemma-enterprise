@@ -1,0 +1,240 @@
+{% extends "modern/layout.html" %}
+
+{% block title %}External API Key Manager - lemma.id{% endblock %}
+
+{% block head %}
+{{ super() }}
+<style>
+.ek-wrap{max-width:980px;margin:28px auto;padding:0 18px 48px;}
+.ek-top{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px}
+.ek-top h1{margin:0;font-size:24px;color:#0f172a}
+.ek-sub{font-size:13px;color:#64748b;margin:4px 0 0}
+.ek-btn{border:0;border-radius:9px;padding:8px 12px;background:#4f46e5;color:#fff;font-weight:700;cursor:pointer}
+.ek-btn.sec{background:#fff;color:#334155;border:1px solid #cbd5e1}
+.ek-card{background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:14px}
+.ek-table{width:100%;border-collapse:collapse}
+.ek-table th,.ek-table td{padding:9px;border-bottom:1px solid #e2e8f0;font-size:12px;text-align:left;vertical-align:top}
+.ek-table th{background:#f8fafc;color:#334155}
+.ek-note{font-size:12px;color:#64748b}
+.ek-badge{display:inline-block;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:700}
+.ek-active{background:#dcfce7;color:#166534}.ek-revoked{background:#fee2e2;color:#991b1b}
+.ek-overlay{position:fixed;inset:0;background:rgba(2,6,23,.5);display:none;z-index:999}
+.ek-panel{position:fixed;top:0;right:-520px;height:100vh;width:min(500px,94vw);background:#fff;box-shadow:-10px 0 30px rgba(15,23,42,.2);transition:right .25s;z-index:1000}
+.ek-panel.open{right:0}
+.ek-panel-body{padding:14px}
+.ek-field{margin-bottom:11px}
+.ek-field label{display:block;font-size:12px;color:#334155;margin-bottom:5px}
+.ek-field input,.ek-field select{width:100%;box-sizing:border-box;border:1px solid #dbe3ee;border-radius:8px;padding:8px 10px}
+.ek-modal{position:fixed;inset:0;background:rgba(2,6,23,.5);display:none;align-items:center;justify-content:center;z-index:1002}
+.ek-modal-card{background:#fff;border-radius:12px;max-width:740px;width:92vw;padding:14px}
+.ek-code{display:block;white-space:normal;word-break:break-all;background:#0f172a;color:#22c55e;padding:12px;border-radius:8px;font-size:12px}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="ek-wrap">
+  <div class="ek-top">
+    <div>
+      <h1>External API Key Manager</h1>
+      <p class="ek-sub">Create, rotate, and revoke customer-facing API keys for Agent Ops integrations.</p>
+    </div>
+    <div style="display:flex;gap:8px">
+      <a class="ek-btn sec" href="/developer/settings">Back to Settings</a>
+      <button class="ek-btn" type="button" data-action="open-register">Register Site + Issue Key</button>
+    </div>
+  </div>
+
+  <div class="ek-card">
+    <div class="ek-note" style="margin-bottom:10px;">Use this page when developers need to onboard external runtimes and rotate secrets without touching server config.</div>
+    <div style="overflow:auto">
+      <table class="ek-table">
+        <thead>
+          <tr><th>Name</th><th>Site</th><th>Key Hint</th><th>Status</th><th>Created</th><th>Actions</th></tr>
+        </thead>
+        <tbody id="keys-body"><tr><td colspan="6">Loading keys...</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<div class="ek-overlay" id="register-overlay"></div>
+<aside class="ek-panel" id="register-panel">
+  <div class="ek-panel-body">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+      <h3 style="margin:0">Register External Site</h3>
+      <button class="ek-btn sec" data-action="close-register" type="button">Close</button>
+    </div>
+    <div class="ek-field"><label for="site-domain">Site Domain</label><input id="site-domain" placeholder="customer.example.com"></div>
+    <div class="ek-field"><label for="site-label">Site Label</label><input id="site-label" placeholder="Customer Production"></div>
+    <div class="ek-field"><label for="site-env">Environment</label><select id="site-env"><option value="production">Production</option><option value="staging">Staging</option><option value="sandbox">Sandbox</option><option value="development">Development</option></select></div>
+    <div class="ek-field"><label for="key-name">Key Name</label><input id="key-name" placeholder="External Integration Key"></div>
+    <div class="ek-field"><label for="contact-email">Contact Email</label><input id="contact-email" type="email" placeholder="ops@example.com"></div>
+    <div style="display:flex;gap:8px"><button class="ek-btn sec" data-action="close-register" type="button">Cancel</button><button class="ek-btn" data-action="submit-register" type="button">Register + Issue Key</button></div>
+  </div>
+</aside>
+
+<div class="ek-modal" id="new-key-modal">
+  <div class="ek-modal-card">
+    <h3 style="margin:0 0 8px">New External API Key</h3>
+    <p class="ek-note">Copy this now. Full value is only shown once.</p>
+    <code class="ek-code" id="new-key-value"></code>
+    <div style="display:flex;gap:8px;margin-top:10px">
+      <button class="ek-btn sec" data-action="copy-key" type="button">Copy</button>
+      <button class="ek-btn" data-action="close-key" type="button">Done</button>
+    </div>
+  </div>
+</div>
+
+<script nonce="{{ csp_nonce }}">
+let currentPlainKey = "";
+
+function headers() {
+  if (typeof window.getLemmaAuthHeaders === "function") {
+    return window.getLemmaAuthHeaders({ "Content-Type": "application/json" });
+  }
+  return { "Content-Type": "application/json" };
+}
+
+function safe(value) {
+  const div = document.createElement("div");
+  div.textContent = value || "";
+  return div.innerHTML;
+}
+
+function dateFmt(value) {
+  if (!value) return "—";
+  try { return new Date(value).toLocaleString(); } catch (_e) { return value; }
+}
+
+async function loadKeys() {
+  const body = document.getElementById("keys-body");
+  body.innerHTML = "<tr><td colspan='6'>Loading keys...</td></tr>";
+  const resp = await fetch("/api/customer/api-keys", { method: "GET", headers: headers() });
+  const data = await resp.json();
+  if (!resp.ok || !data.success) {
+    body.innerHTML = `<tr><td colspan='6' class='ek-note'>Failed to load keys: ${safe(data.error || resp.status)}</td></tr>`;
+    return;
+  }
+  const siteMap = {};
+  (data.sites || []).forEach((s) => { if (s && s.site_id) siteMap[s.site_id] = s; });
+  const keys = data.api_keys || [];
+  if (!keys.length) {
+    body.innerHTML = "<tr><td colspan='6' class='ek-note'>No external keys yet.</td></tr>";
+    return;
+  }
+  body.innerHTML = keys.map((k) => {
+    const status = String(k.status || "active").toLowerCase();
+    const badge = status === "active" ? "ek-active" : "ek-revoked";
+    const site = siteMap[k.site_id] || {};
+    return `<tr>
+      <td><strong>${safe(k.name || "External Key")}</strong></td>
+      <td>${safe(site.site_domain || k.site_id || "—")}</td>
+      <td><code>...${safe(k.key_hint || "")}</code></td>
+      <td><span class="ek-badge ${badge}">${safe(status)}</span></td>
+      <td>${safe(dateFmt(k.created_at))}</td>
+      <td>
+        <button class="ek-btn sec" data-action="rotate" data-site-id="${safe(k.site_id || "")}" data-key-hint="${safe(k.key_hint || "")}">Rotate</button>
+        <button class="ek-btn sec" data-action="revoke" data-site-id="${safe(k.site_id || "")}" data-key-hint="${safe(k.key_hint || "")}">Revoke</button>
+      </td>
+    </tr>`;
+  }).join("");
+}
+
+function openRegister() {
+  document.getElementById("register-overlay").style.display = "block";
+  document.getElementById("register-panel").classList.add("open");
+}
+
+function closeRegister() {
+  document.getElementById("register-overlay").style.display = "none";
+  document.getElementById("register-panel").classList.remove("open");
+}
+
+function openNewKeyModal(value) {
+  currentPlainKey = value || "";
+  document.getElementById("new-key-value").textContent = currentPlainKey;
+  document.getElementById("new-key-modal").style.display = "flex";
+}
+
+function closeNewKeyModal() {
+  currentPlainKey = "";
+  document.getElementById("new-key-modal").style.display = "none";
+}
+
+async function submitRegister() {
+  const payload = {
+    site_domain: document.getElementById("site-domain").value.trim(),
+    site_label: document.getElementById("site-label").value.trim(),
+    environment: document.getElementById("site-env").value,
+    key_name: document.getElementById("key-name").value.trim(),
+    contact_email: document.getElementById("contact-email").value.trim(),
+  };
+  if (!payload.site_domain) {
+    alert("Site domain is required.");
+    return;
+  }
+  const resp = await fetch("/api/customer/register-site", {
+    method: "POST",
+    headers: headers(),
+    body: JSON.stringify(payload),
+  });
+  const data = await resp.json();
+  if (!resp.ok || !data.success) {
+    alert(`Register failed: ${data.error || resp.status}`);
+    return;
+  }
+  closeRegister();
+  openNewKeyModal(data.api_key || "");
+  await loadKeys();
+}
+
+async function rotateKey(siteId, keyHint) {
+  if (!siteId || !keyHint) return;
+  if (!confirm(`Rotate key ...${keyHint}?`)) return;
+  const resp = await fetch("/api/customer/api-keys/rotate", {
+    method: "POST",
+    headers: headers(),
+    body: JSON.stringify({ site_id: siteId, key_hint: keyHint }),
+  });
+  const data = await resp.json();
+  if (!resp.ok || !data.success) {
+    alert(`Rotate failed: ${data.error || resp.status}`);
+    return;
+  }
+  openNewKeyModal(data.new_api_key || "");
+  await loadKeys();
+}
+
+async function revokeKey(siteId, keyHint) {
+  if (!siteId || !keyHint) return;
+  if (!confirm(`Revoke key ...${keyHint}? This cannot be undone.`)) return;
+  const resp = await fetch("/api/customer/api-keys", {
+    method: "DELETE",
+    headers: headers(),
+    body: JSON.stringify({ site_id: siteId, key_hint: keyHint }),
+  });
+  const data = await resp.json();
+  if (!resp.ok || !data.success) {
+    alert(`Revoke failed: ${data.error || resp.status}`);
+    return;
+  }
+  await loadKeys();
+}
+
+document.addEventListener("click", async (event) => {
+  const target = event.target.closest("[data-action]");
+  if (!target) return;
+  const action = target.dataset.action;
+  if (action === "open-register") openRegister();
+  if (action === "close-register") closeRegister();
+  if (action === "submit-register") await submitRegister();
+  if (action === "rotate") await rotateKey(target.dataset.siteId || "", target.dataset.keyHint || "");
+  if (action === "revoke") await revokeKey(target.dataset.siteId || "", target.dataset.keyHint || "");
+  if (action === "copy-key" && currentPlainKey) await navigator.clipboard.writeText(currentPlainKey);
+  if (action === "close-key") closeNewKeyModal();
+});
+
+loadKeys();
+</script>
+{% endblock %}
+

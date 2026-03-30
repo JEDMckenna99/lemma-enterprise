@@ -1,0 +1,54 @@
+{% extends "docs/layout.html" %}
+{% set active_page = 'api-revocation' %}
+{% set hero_title = 'Revocation API' %}
+{% set hero_subtitle = 'Credential revocation management' %}
+
+{% block docs_content %}
+<div class="docs-section">
+    <h2>Overview</h2>
+    <p>Revoke credentials when users should lose access. Revocations are persisted and propagated to active clients.</p>
+</div>
+
+<div class="docs-section" id="revoke">
+    <h2>Revoke Credential</h2>
+    <div class="api-endpoint">
+        <span class="http-method http-post">POST</span>
+        <code>/api/wallet/revoke-user</code>
+    </div>
+    
+    <h3>Request</h3>
+    <div class="code-block">
+        <div class="code-header"><span>JSON</span></div>
+        <code>{
+    "ppid": "did:lemma:ppid_abc123...",
+    "site_id": "example.com",
+    "reason": "user_requested"    // Optional
+}</code>
+    </div>
+    
+    <h3>Response</h3>
+    <div class="code-block">
+        <div class="code-header"><span>JSON</span></div>
+        <code>{
+    "success": true,
+    "credential_id": "cred_xyz789...",
+    "revocation_type": "site_specific"
+}</code>
+    </div>
+</div>
+
+<div class="docs-section" id="bloom">
+    <h2>Revocation Status Check</h2>
+    <div class="api-endpoint">
+        <span class="http-method http-get">GET</span>
+        <code>/api/wallet/revocation-status?credential_ids=cred_1&amp;credential_ids=cred_2</code>
+    </div>
+    
+    <p>Check revocation status for one or more credential IDs.</p>
+    
+    <div class="callout callout--info">
+        <div class="callout-title">Integration tip</div>
+        <p>Most client integrations rely on SDK verification paths and only call this endpoint for diagnostics or explicit audits.</p>
+    </div>
+</div>
+{% endblock %}

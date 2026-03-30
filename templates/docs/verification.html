@@ -1,0 +1,57 @@
+{% extends "docs/layout.html" %}
+{% set active_page = 'verification' %}
+{% set hero_title = 'Credential Verification' %}
+{% set hero_subtitle = 'How credentials are verified locally' %}
+
+{% block docs_content %}
+<div class="docs-section">
+    <h2>Local Verification</h2>
+    <p>Lemma credentials are W3C Verifiable Credentials with Ed25519 signatures. Verification happens entirely in the browser - no server calls required.</p>
+    
+    <div class="feature-grid">
+        <div class="feature-card">
+            <h3>Signature Check</h3>
+            <p>Ed25519 cryptographic signature verified using Web Crypto API</p>
+        </div>
+        <div class="feature-card">
+            <h3>Expiration Check</h3>
+            <p>Credential expiration timestamp checked against current time</p>
+        </div>
+        <div class="feature-card">
+            <h3>Revocation Check</h3>
+            <p>Bloom filter synced hourly for revocation status</p>
+        </div>
+    </div>
+</div>
+
+<div class="docs-section" id="verify">
+    <h2>Verifying Credentials</h2>
+    <div class="code-block">
+        <div class="code-header">
+            <span>JavaScript</span>
+            <button class="copy-btn">Copy</button>
+        </div>
+        <code>// Fast verification path used by most integrations
+const result = await wallet.quickVerify(credential);
+
+if (result.valid) {
+    console.log('Credential is valid');
+} else {
+    console.log('Invalid:', result.reason);
+}</code>
+    </div>
+</div>
+
+<div class="docs-section" id="revocation">
+    <h2>Revocation Checks</h2>
+    <p>The SDK checks revocation in its normal verification path. You can also query a credential directly:</p>
+    <div class="code-block">
+        <div class="code-header">
+            <span>JavaScript</span>
+            <button class="copy-btn">Copy</button>
+        </div>
+        <code>// Check if a credential is revoked
+const isRevoked = await wallet.isRevoked(credentialId);</code>
+    </div>
+</div>
+{% endblock %}

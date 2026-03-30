@@ -1,0 +1,66 @@
+{% extends "docs/layout.html" %}
+{% set active_page = 'permissions' %}
+{% set hero_title = 'Permissions & Roles' %}
+{% set hero_subtitle = 'Control access with permission lemmas' %}
+
+{% block docs_content %}
+<div class="docs-section">
+    <h2>Permission System</h2>
+    <p>Lemma supports fine-grained permissions through "permission lemmas" - credentials that grant specific access levels.</p>
+</div>
+
+<div class="docs-section" id="types">
+    <h2>Permission Types</h2>
+    <table class="docs-table">
+        <thead>
+            <tr>
+                <th>Permission</th>
+                <th>Description</th>
+                <th>Use Case</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td><code>customer_access</code></td>
+                <td>Standard authenticated user access</td>
+                <td>Regular users</td>
+            </tr>
+            <tr>
+                <td><code>admin_access</code></td>
+                <td>Administrative access</td>
+                <td>Site administrators</td>
+            </tr>
+            <tr>
+                <td><code>permission_level</code></td>
+                <td>Human-readable role level (for example <code>admin</code>)</td>
+                <td>Site owners, API access</td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+
+<div class="docs-section" id="checking">
+    <h2>Checking Permissions</h2>
+    <div class="code-block">
+        <div class="code-header">
+            <span>JavaScript</span>
+            <button class="copy-btn">Copy</button>
+        </div>
+        <code>// Get all permission credentials for this site
+const permissions = await wallet.getCredentials('permission');
+
+// Check a specific permission against current site
+const hasAdmin = await wallet.hasPermission(window.location.hostname, 'admin_access');
+
+// Read canonical permission fields from claims
+for (const cred of permissions) {
+  const claims = cred.claims || cred.credentialSubject || {};
+  console.log({
+    permissionId: claims.permissionId,
+    permissionLevel: claims.permission_level,
+    scope: claims.scope || []
+  });
+}</code>
+    </div>
+</div>
+{% endblock %}

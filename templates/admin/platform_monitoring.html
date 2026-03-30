@@ -1,0 +1,263 @@
+{% extends "admin/layout.html" %}
+{% set active_page = 'monitoring' %}
+
+{% block title %}Platform Monitoring - lemma.id Admin{% endblock %}
+
+{% block head %}
+{{ super() }}
+<style>
+        .monitor-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 24px;
+            margin: 24px 0;
+        }
+        
+        .metric-card {
+            background: white;
+            padding: 24px;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        
+        .metric-value {
+            font-size: 32px;
+            font-weight: 700;
+            margin: 12px 0;
+        }
+        
+        .metric-label {
+            color: #6b7280;
+            font-size: 14px;
+        }
+        
+        .metric-status {
+            margin-top: 8px;
+            padding: 4px 12px;
+            border-radius: 4px;
+            display: inline-block;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        
+        .status-ok { background: #d1fae5; color: #065f46; }
+        .status-warning { background: #fef3c7; color: #92400e; }
+        .status-error { background: #fee2e2; color: #991b1b; }
+        
+        .chart-container {
+            background: white;
+            padding: 24px;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            margin: 24px 0;
+        }
+        
+        pre {
+            background: #1e1e1e;
+            color: #d4d4d4;
+            padding: 16px;
+            border-radius: 8px;
+            overflow-x: auto;
+            font-size: 12px;
+        }
+    </style>
+{% endblock %}
+
+{% block admin_content %}
+<div class="admin-header">
+    <h1 class="admin-title">Platform Monitoring</h1>
+    <p class="admin-subtitle">Track revocation pipeline and platform capacity from backend telemetry</p>
+</div>
+
+<div style="max-width: 1200px;">
+
+    <!-- Revocation Pipeline -->
+    <h2>🔐 Revocation Pipeline</h2>
+    <p style="color: #6b7280; margin-bottom: 16px;">
+        Operational counters sourced from backend revocation records
+    </p>
+    
+    <div class="monitor-grid">
+        <div class="metric-card">
+            <div class="metric-label">Total Revocations</div>
+            <div class="metric-value" id="total-revocations">-</div>
+            <div class="metric-status status-ok" id="revocation-status">Loading...</div>
+        </div>
+        
+        <div class="metric-card">
+            <div class="metric-label">Revocations (24h)</div>
+            <div class="metric-value" id="bloom-size">-</div>
+            <div class="metric-label" style="margin-top: 8px;">Bloom snapshot size: <span id="fp-rate">-</span></div>
+        </div>
+        
+        <div class="metric-card">
+            <div class="metric-label">User-Level Revocations</div>
+            <div class="metric-value" id="collision-tests">-</div>
+            <div class="metric-label" style="margin-top: 8px;">Credential-level: <span id="false-positives">-</span></div>
+        </div>
+        
+        <div class="metric-card">
+            <div class="metric-label">Latest Revocation Age</div>
+            <div class="metric-value" id="actual-fp-rate">-</div>
+            <div class="metric-status status-ok" id="fp-status">Fresh</div>
+        </div>
+    </div>
+
+    <!-- Revocation Snapshot -->
+    <div class="chart-container">
+        <h3>📋 Revocation Snapshot</h3>
+        <p style="color: #6b7280; margin-bottom: 16px;">
+            Aggregate telemetry only (no credential IDs exposed)
+        </p>
+        <pre id="test-output">Loading...</pre>
+    </div>
+
+    <!-- System Health -->
+    <h2>📊 System Health</h2>
+    
+    <div class="monitor-grid">
+        <div class="metric-card">
+            <div class="metric-label">API Response Time</div>
+            <div class="metric-value" id="api-response-time">-</div>
+            <div class="metric-status status-ok" id="api-status">Loading...</div>
+        </div>
+        
+        <div class="metric-card">
+            <div class="metric-label">Event Bus</div>
+            <div class="metric-value" id="sync-age">-</div>
+            <div class="metric-label" style="margin-top: 8px;">Updated: <span id="last-sync">-</span></div>
+        </div>
+        
+        <div class="metric-card">
+            <div class="metric-label">Total Users</div>
+            <div class="metric-value" id="cache-hit-rate">-</div>
+            <div class="metric-label" style="margin-top: 8px;">Active credentials: <span id="offline-status">-</span></div>
+        </div>
+        
+        <div class="metric-card">
+            <div class="metric-label">Total Sites</div>
+            <div class="metric-value" id="db-storage">-</div>
+            <div class="metric-label" style="margin-top: 8px;">Data source: <span id="storage-savings">-</span></div>
+        </div>
+    </div>
+
+    <!-- Revocation List Details (Privacy-Safe) -->
+    <div class="chart-container">
+        <h3>📋 Revocation List Details</h3>
+        <p style="color: #6b7280; margin-bottom: 16px;">
+            Aggregate statistics only (no credential IDs exposed)
+        </p>
+        
+        <pre id="revocation-details">Loading...</pre>
+    </div>
+</div>
+</div>
+
+<script nonce="{{ csp_nonce }}">
+    async function getAuthHeaders() {
+        if (typeof window.getLemmaAuthHeadersAsync === 'function') {
+            return await window.getLemmaAuthHeadersAsync({});
+        }
+        return {
+            'X-Credential-ID': localStorage.getItem('credentialId') || '',
+            'X-Permission-ID': localStorage.getItem('permissionId') || '',
+            'X-User-Email': localStorage.getItem('userEmail') || ''
+        };
+    }
+
+    async function loadMonitoringData() {
+        try {
+            const apiStart = performance.now();
+            const authHeaders = await getAuthHeaders();
+            const summaryResponse = await fetch('/api/admin/monitoring-summary', { headers: authHeaders });
+            const apiTime = Math.round(performance.now() - apiStart);
+            if (!summaryResponse.ok) {
+                throw new Error(`Monitoring API returned ${summaryResponse.status}`);
+            }
+            const summaryPayload = await summaryResponse.json();
+            const summary = summaryPayload.summary || {};
+            const revocations = summary.revocations || {};
+            const platform = summary.platform || {};
+            const pipeline = summary.pipeline || {};
+
+            let bloomData = null;
+            try {
+                const bloomResponse = await fetch('/api/revocation/bloom-filter', { headers: authHeaders });
+                if (bloomResponse.ok) {
+                    const bloomPayload = await bloomResponse.json();
+                    bloomData = bloomPayload.success ? bloomPayload : null;
+                }
+            } catch (err) {
+                console.warn('Bloom filter telemetry unavailable:', err);
+            }
+
+            document.getElementById('total-revocations').textContent = revocations.total ?? 0;
+            document.getElementById('revocation-status').textContent = (revocations.total ?? 0) > 0 ? 'Active' : 'No revocations yet';
+            document.getElementById('revocation-status').className = `metric-status ${(revocations.last_24h ?? 0) > 100 ? 'status-warning' : 'status-ok'}`;
+
+            document.getElementById('bloom-size').textContent = revocations.last_24h ?? 0;
+            const bloomCount = bloomData && Number.isFinite(bloomData.count) ? bloomData.count : 'unavailable';
+            document.getElementById('fp-rate').textContent = bloomCount;
+
+            document.getElementById('collision-tests').textContent = revocations.user_level ?? 0;
+            document.getElementById('false-positives').textContent = revocations.credential_level ?? 0;
+
+            const latestIso = revocations.latest_at || null;
+            document.getElementById('actual-fp-rate').textContent = latestIso ? formatAge(latestIso) : 'never';
+            const fresh = latestIso ? (Date.now() - new Date(latestIso).getTime()) < (24 * 60 * 60 * 1000) : false;
+            document.getElementById('fp-status').textContent = latestIso ? (fresh ? 'Fresh' : 'Stale') : 'No data';
+            document.getElementById('fp-status').className = `metric-status ${latestIso ? (fresh ? 'status-ok' : 'status-warning') : 'status-error'}`;
+
+            document.getElementById('api-response-time').textContent = `${apiTime}ms`;
+            document.getElementById('api-status').textContent = apiTime < 300 ? 'Healthy' : 'Slow';
+            document.getElementById('api-status').className = `metric-status ${apiTime < 300 ? 'status-ok' : 'status-warning'}`;
+
+            document.getElementById('sync-age').textContent = (pipeline.event_bus || 'unknown').replace('_', ' ');
+            document.getElementById('last-sync').textContent = summary.timestamp ? new Date(summary.timestamp).toLocaleString() : '-';
+
+            document.getElementById('cache-hit-rate').textContent = platform.total_users ?? 0;
+            document.getElementById('offline-status').textContent = platform.active_agent_credentials ?? 0;
+
+            document.getElementById('db-storage').textContent = platform.total_sites ?? 0;
+            document.getElementById('storage-savings').textContent = pipeline.bloom_source || 'unknown';
+
+            const details = {
+                generated_at: summary.timestamp || null,
+                revocations,
+                platform,
+                pipeline,
+                bloom_filter: bloomData ? {
+                    count: bloomData.count ?? null,
+                    filter_type: bloomData.filter_type ?? null,
+                    privacy_mechanism: bloomData.privacy_mechanism ?? null,
+                    hash_algorithm: bloomData.hash_algorithm ?? null,
+                    sync_interval_days: bloomData.sync_interval_days ?? null
+                } : 'unavailable'
+            };
+            document.getElementById('test-output').textContent = JSON.stringify(details, null, 2);
+            document.getElementById('revocation-details').textContent = JSON.stringify(details, null, 2);
+        } catch (error) {
+            console.error('❌ Failed to load monitoring data:', error);
+            document.getElementById('test-output').textContent = `Failed to load monitoring data: ${error.message}`;
+        }
+    }
+
+    function formatAge(isoTimestamp) {
+        const ms = Date.now() - new Date(isoTimestamp).getTime();
+        if (!Number.isFinite(ms) || ms < 0) return 'unknown';
+        const minutes = Math.floor(ms / 60000);
+        if (minutes < 60) return `${minutes}m`;
+        const hours = Math.floor(minutes / 60);
+        if (hours < 24) return `${hours}h`;
+        const days = Math.floor(hours / 24);
+        return `${days}d`;
+    }
+
+    // Load monitoring data on page load
+    loadMonitoringData();
+    
+    // Refresh every 30 seconds
+    setInterval(loadMonitoringData, 30000);
+</script>
+{% endblock %}
+

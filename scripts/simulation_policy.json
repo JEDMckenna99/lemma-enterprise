@@ -1,0 +1,13 @@
+{
+  "default_timeout_seconds": 15,
+  "apis": {
+    "httpbin": {
+      "base_url": "https://httpbin.org",
+      "allowed_methods": ["GET", "POST"],
+      "path_prefixes": ["/get", "/post", "/status/", "/headers", "/ip"],
+      "required_scope": "read",
+      "risk_tier": "low",
+      "forward_headers": ["content-type", "accept"]
+    }
+  }
+}

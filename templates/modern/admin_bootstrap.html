@@ -1,0 +1,393 @@
+{% extends "modern/layout.html" %}
+
+{% block title %}Admin Bootstrap - lemma.id{% endblock %}
+
+{% block head %}
+    {{ super() }}
+    <!-- Wallet scripts already loaded in layout.html -->
+{% endblock %}
+
+{% block content %}
+<section class="section" style="min-height: 80vh; display: flex; align-items: center; justify-content: center;">
+    <div class="container" style="max-width: 600px;">
+        <div class="card" style="padding: 48px;">
+            <h1 style="text-align: center; margin-bottom: 32px;">Admin Bootstrap</h1>
+            
+            <p style="text-align: center; color: var(--gray-600); margin-bottom: 32px;">
+                Issue your first admin credential using your Lemma API key
+            </p>
+
+            <form id="bootstrap-form" style="display: flex; flex-direction: column; gap: 20px;">
+                <div>
+                    <label style="display: block; font-weight: 600; margin-bottom: 8px;">Site ID</label>
+                    <input type="text" id="site_id" value=""
+                           placeholder="Required: your site id"
+                           required
+                           style="width: 100%; padding: 12px; border: 1px solid var(--gray-300); border-radius: 6px; font-family: monospace;">
+                </div>
+                
+                <div>
+                    <label style="display: block; font-weight: 600; margin-bottom: 8px;">Site Domain</label>
+                    <input type="text" id="site_domain" value=""
+                           placeholder="example.com (recommended for site-scoped PPID derivation)"
+                           style="width: 100%; padding: 12px; border: 1px solid var(--gray-300); border-radius: 6px;">
+                </div>
+                
+                <div>
+                    <label style="display: block; font-weight: 600; margin-bottom: 8px;">Your Email</label>
+                    <input type="email" id="user_email" value="" 
+                           placeholder="Required: must match customer email on record"
+                           required
+                           style="width: 100%; padding: 12px; border: 1px solid var(--gray-300); border-radius: 6px;">
+                </div>
+                
+                <div>
+                    <label style="display: block; font-weight: 600; margin-bottom: 8px;">Permission Level</label>
+                    <select id="permission_level" 
+                            style="width: 100%; padding: 12px; border: 1px solid var(--gray-300); border-radius: 6px;">
+                        <option value="super_admin">Super Admin (full access)</option>
+                        <option value="admin">Admin</option>
+                        <option value="editor">Editor</option>
+                        <option value="user">User</option>
+                    </select>
+                </div>
+                
+                <div>
+                    <label style="display: block; font-weight: 600; margin-bottom: 8px;">API Key</label>
+                    <input type="password" id="api_key" placeholder="Enter your Lemma API key" 
+                           style="width: 100%; padding: 12px; border: 1px solid var(--gray-300); border-radius: 6px; font-family: monospace;">
+                    <small style="color: var(--gray-600); margin-top: 4px; display: block;">
+                        Your API key is stored in Heroku config vars
+                    </small>
+                </div>
+                
+                <button type="submit" class="btn btn-primary" style="width: 100%; padding: 16px; font-size: 16px; margin-top: 16px;">
+                    Issue Admin Credential
+                </button>
+            </form>
+            
+            <div id="status" style="margin-top: 24px; padding: 16px; border-radius: 8px; display: none;"></div>
+            
+            <div id="success-actions" style="display: none; margin-top: 24px; text-align: center;">
+                <div style="font-size: 48px; margin-bottom: 16px;">✅</div>
+                <h3 style="color: var(--success-600); margin-bottom: 16px;">Credential Issued!</h3>
+                <p style="color: var(--gray-700); margin-bottom: 24px;">
+                    Your admin credential has been stored in your encrypted wallet.
+                </p>
+                <a href="/wallet" class="btn btn-primary" style="margin-right: 12px;">View Wallet</a>
+                <a href="/dashboard" class="btn btn-secondary">Go to Dashboard</a>
+            </div>
+            
+            <div id="credential-debug" style="display: none; margin-top: 24px; padding: 16px; background: var(--gray-100); border-radius: 8px; font-family: monospace; font-size: 12px; max-height: 300px; overflow-y: auto;">
+                <strong>Debug - Credential Details:</strong>
+                <pre id="credential-json" style="margin: 8px 0; white-space: pre-wrap;"></pre>
+            </div>
+        </div>
+        
+        <div style="margin-top: 24px; padding: 20px; background: var(--gray-50); border-radius: 8px; font-size: 14px; color: var(--gray-700);">
+            <strong>What happens:</strong>
+            <ul style="margin: 12px 0; padding-left: 20px;">
+                <li>Your API key validates your ownership of the site</li>
+                <li>Admin credential is issued after server verification (no email roundtrip required)</li>
+                <li>Credential is stored in your encrypted browser wallet</li>
+                <li>Access is granted immediately</li>
+            </ul>
+        </div>
+    </div>
+</section>
+
+<script nonce="{{ csp_nonce }}">
+function normalizeSiteIdentifier(rawValue) {
+    const value = String(rawValue || '').trim().toLowerCase();
+    if (!value) return '';
+    try {
+        if (value.includes('://')) {
+            return (new URL(value)).hostname.toLowerCase();
+        }
+    } catch (e) {
+        // Fall through to manual normalization.
+    }
+    return value.split('/')[0].split(':')[0];
+}
+
+function isHostnameLike(value) {
+    const v = normalizeSiteIdentifier(value);
+    if (!v) return false;
+    // Accept localhost and normal hostnames; reject opaque internal IDs like site_xxx.
+    if (v === 'localhost') return true;
+    return v.includes('.') && !v.startsWith('site_');
+}
+
+function normalizeScopeClaim(rawScope) {
+    if (Array.isArray(rawScope)) {
+        const flattened = [];
+        for (const entry of rawScope) {
+            const value = String(entry || '').trim();
+            if (!value) continue;
+            if (value.startsWith('[') && value.endsWith(']')) {
+                try {
+                    const jsonLike = value.replace(/'/g, '"');
+                    const parsed = JSON.parse(jsonLike);
+                    if (Array.isArray(parsed)) {
+                        for (const inner of parsed) {
+                            const innerValue = String(inner || '').trim();
+                            if (innerValue) flattened.push(innerValue);
+                        }
+                        continue;
+                    }
+                } catch (e) {
+                    // Fall through to push raw value
+                }
+            }
+            flattened.push(value);
+        }
+        return flattened.filter(Boolean);
+    }
+    if (typeof rawScope !== 'string') return [];
+    const value = rawScope.trim();
+    if (!value) return [];
+    if (value.startsWith('[') && value.endsWith(']')) {
+        try {
+            // Handle Python-list-like strings e.g. "['*']"
+            const jsonLike = value.replace(/'/g, '"');
+            const parsed = JSON.parse(jsonLike);
+            if (Array.isArray(parsed)) return parsed.map(s => String(s).trim()).filter(Boolean);
+        } catch (e) {
+            // Fallback below
+        }
+    }
+    return value.split(',').map(s => s.trim()).filter(Boolean);
+}
+
+document.getElementById('bootstrap-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    
+    const site_id = document.getElementById('site_id').value.trim();
+    const site_domain = document.getElementById('site_domain').value.trim();
+    const user_email = document.getElementById('user_email').value;
+    const permission_level = document.getElementById('permission_level').value;
+    const api_key = document.getElementById('api_key').value;
+    
+    if (!api_key) {
+        showStatus('Please enter your API key', 'error');
+        return;
+    }
+    
+    showStatus('Issuing credential...', 'loading');
+    
+    try {
+        // Require wallet identity proof and derive site-scoped PPID for issuance.
+        if (!window.globalLemmaWallet) {
+            throw new Error('Wallet not initialized. Unlock your Lemma wallet first.');
+        }
+        if (!site_id) {
+            throw new Error('Site ID is required.');
+        }
+        const normalizedSiteId = normalizeSiteIdentifier(site_id);
+        const normalizedSiteDomain = normalizeSiteIdentifier(site_domain);
+        const derivedDomain = normalizedSiteDomain || (isHostnameLike(normalizedSiteId) ? normalizedSiteId : '');
+        if (!normalizedSiteId) {
+            throw new Error('Invalid site ID. Use a hostname like example.com.');
+        }
+        if (!derivedDomain) {
+            throw new Error('Site Domain is required when Site ID is an internal identifier (e.g. site_xxx).');
+        }
+
+        const wallet = window.globalLemmaWallet;
+        const ppidDomain = derivedDomain;
+        if (!ppidDomain) {
+            throw new Error('Provide site domain or site id so wallet can derive a site-scoped PPID.');
+        }
+        const user_ppid = await wallet.derivePPID(ppidDomain);
+        if (!user_ppid || !String(user_ppid).startsWith('did:lemma:ppid_')) {
+            throw new Error('Could not derive a valid site PPID from your wallet.');
+        }
+
+        // Call admin self-issue endpoint
+        const response = await fetch('/api/v1/iam/admin/self-issue', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${api_key}`,
+                ...(typeof window.getLemmaAuthHeaders === 'function' ? window.getLemmaAuthHeaders() : {})
+            },
+            body: JSON.stringify({
+                ...(normalizedSiteId ? { site_id: normalizedSiteId } : {}),
+                ...(normalizedSiteDomain ? { site_domain: normalizedSiteDomain } : {}),
+                user_email,
+                permission_level,
+                user_ppid
+            })
+        });
+        
+        const result = await response.json();
+        
+        if (!response.ok) {
+            throw new Error(result.message || 'Failed to issue credential');
+        }
+        
+        console.log('Credential issued:', result);
+        
+        // Wait for global wallet to be ready
+        let attempts = 0;
+        while (!window.globalLemmaWallet && attempts < 20) {
+            await new Promise(resolve => setTimeout(resolve, 100));
+            attempts++;
+        }
+        
+        if (!window.globalLemmaWallet) {
+            throw new Error('Global wallet not initialized');
+        }
+        
+        const issuedClaims = result.credential?.claims || result.credential?.credentialSubject || {};
+        const issuedPermissionId = (issuedClaims.permissionId || issuedClaims.permission_level || permission_level || 'admin_access');
+        const normalizedScope = normalizeScopeClaim(issuedClaims.scope);
+        const issuedSite = normalizeSiteIdentifier(
+            issuedClaims.siteId ||
+            issuedClaims.site_domain ||
+            issuedClaims.siteDomain ||
+            result.site_domain ||
+            result.site_id ||
+            derivedDomain
+        );
+        if (!issuedSite) {
+            throw new Error('Issued credential did not include a valid site binding.');
+        }
+        // Guardrail: prevent storing a credential bound to a different site/domain.
+        const requestedCandidates = new Set([
+            normalizeSiteIdentifier(normalizedSiteId),
+            normalizeSiteIdentifier(derivedDomain),
+            normalizeSiteIdentifier(result.site_id),
+            normalizeSiteIdentifier(result.site_domain)
+        ].filter(Boolean));
+        const issuedCandidates = new Set([
+            normalizeSiteIdentifier(issuedSite),
+            normalizeSiteIdentifier(result.site_id),
+            normalizeSiteIdentifier(result.site_domain)
+        ].filter(Boolean));
+        const matches = [...requestedCandidates].some(value => issuedCandidates.has(value));
+        if (!matches) {
+            throw new Error(`Issued site binding mismatch. Requested "${[...requestedCandidates].join(', ')}" but server issued "${[...issuedCandidates].join(', ')}".`);
+        }
+
+        // IMPORTANT: Preserve signed payload exactly as issued by server.
+        // Mutating claims/credentialSubject here would invalidate signature verification.
+        const credentialToStore = {
+            ...result.credential,
+            packageType: result.credential?.packageType || 'permission',
+            type: result.credential?.type || ['VerifiableCredential', 'PermissionLemma']
+        };
+        
+        console.log('=== CREDENTIAL FORMAT CHECK ===');
+        console.log('TOP LEVEL packageType:', credentialToStore.packageType);
+        console.log('TOP LEVEL type:', credentialToStore.type);
+        console.log('credentialSubject.packageType:', credentialToStore.credentialSubject?.packageType);
+        console.log('claims.packageType:', credentialToStore.claims?.packageType);
+        
+        console.log('=== STORING CREDENTIAL ===');
+        console.log('Credential to store:', credentialToStore);
+        
+        // Store credential in wallet
+        const storeResult = await wallet.storeCredential(credentialToStore);
+
+        // Ensure customer-site bridge reads the same newly issued credential.
+        // On lemma.id, local storage and bridge storage should align, but this
+        // explicit sync removes timing/context ambiguity for third-party retrieval.
+        let bridgeSyncResult = null;
+        if (typeof wallet._syncToCentralWallet === 'function') {
+            try {
+                bridgeSyncResult = await wallet._syncToCentralWallet(credentialToStore);
+                console.log('Bridge sync result:', bridgeSyncResult);
+            } catch (syncError) {
+                console.warn('Bridge sync failed (non-fatal):', syncError?.message || syncError);
+            }
+        }
+        
+        console.log('=== STORAGE RESULT ===');
+        console.log('Store result:', storeResult);
+        
+        // Verify it was stored by reading it back
+        const permissionCreds = await wallet.getCredentials('permission');
+        const storedCred = permissionCreds.find(c => c.id === credentialToStore.id);
+        let verifyStoredResult = null;
+        if (storedCred) {
+            try {
+                verifyStoredResult = await wallet.verifyLemma(storedCred, true);
+            } catch (verifyErr) {
+                verifyStoredResult = { valid: false, reason: verifyErr?.message || 'verify_error' };
+            }
+        }
+        console.log('=== VERIFICATION ===');
+        console.log('Permission credentials in wallet:', permissionCreds);
+        console.log('Total permission credentials:', permissionCreds.length);
+        
+        // Verify storage succeeded
+        console.log('=== STORAGE VERIFICATION ===');
+        console.log('Stored credential ID:', credentialToStore.id);
+        console.log('Found in wallet:', permissionCreds.some(c => c.id === credentialToStore.id));
+        
+        // Show debug info
+        document.getElementById('credential-debug').style.display = 'block';
+        document.getElementById('credential-json').textContent = JSON.stringify({
+            credential: credentialToStore,
+            storeResult: storeResult,
+            bridgeSyncResult: bridgeSyncResult,
+            verificationCheck: {
+                foundInWallet: permissionCreds.some(c => c.id === credentialToStore.id),
+                totalPermissionCreds: permissionCreds.length,
+                signatureValid: verifyStoredResult?.valid === true,
+                signatureReason: verifyStoredResult?.reason || null
+            }
+        }, null, 2);
+        
+        // Set up SESSION-FREE AUTH
+        window.lemmaCredential = credentialToStore;
+        if (!window.lemmaAuth) {
+            window.lemmaAuth = new SessionFreeAuth(wallet, {debug: true});
+        }
+        
+        console.log('✅ Session-free auth configured');
+        console.log('✅ Credential stored globally:', window.lemmaCredential.id);
+        
+        // Show success
+        document.getElementById('bootstrap-form').style.display = 'none';
+        document.getElementById('status').style.display = 'none';
+        document.getElementById('success-actions').style.display = 'block';
+        
+        showStatus(`Success! Issued in ${result.issue_time_us.toFixed(2)}µs - Credential active!`, 'success');
+        
+    } catch (error) {
+        console.error('Bootstrap error:', error);
+        showStatus(`Error: ${error.message}`, 'error');
+    }
+});
+
+function showStatus(message, type) {
+    const status = document.getElementById('status');
+    status.style.display = 'block';
+    status.textContent = message;
+    
+    if (type === 'loading') {
+        status.style.background = 'var(--primary-50)';
+        status.style.color = 'var(--primary-700)';
+        status.style.border = '1px solid var(--primary-200)';
+    } else if (type === 'success') {
+        status.style.background = 'var(--success-50)';
+        status.style.color = 'var(--success-700)';
+        status.style.border = '1px solid var(--success-200)';
+    } else if (type === 'error') {
+        status.style.background = 'var(--danger-50)';
+        status.style.color = 'var(--danger-700)';
+        status.style.border = '1px solid var(--danger-200)';
+    }
+}
+
+// Auto-fill API key from URL parameter if present
+const urlParams = new URLSearchParams(window.location.search);
+const apiKeyParam = urlParams.get('api_key');
+if (apiKeyParam) {
+    document.getElementById('api_key').value = apiKeyParam;
+}
+</script>
+{% endblock %}
+

@@ -1,0 +1,656 @@
+{% extends "admin/layout.html" %}
+{% set active_page = 'sites' %}
+
+{% block title %}Sites - lemma.id Admin{% endblock %}
+
+{% block admin_content %}
+<div class="admin-header">
+    <h1 class="admin-title">Registered Sites</h1>
+    <p class="admin-subtitle">All sites integrated with Lemma</p>
+</div>
+
+<!-- Stats -->
+<div class="admin-stats">
+    <div class="stat-card stat-card--info">
+        <div class="stat-label">Total Sites</div>
+        <div class="stat-value stat-loading" id="stat-total"><span class="stat-skeleton"></span></div>
+    </div>
+    <div class="stat-card stat-card--success">
+        <div class="stat-label">Active</div>
+        <div class="stat-value stat-loading" id="stat-active"><span class="stat-skeleton"></span></div>
+    </div>
+    <div class="stat-card stat-card--warning">
+        <div class="stat-label">Development</div>
+        <div class="stat-value stat-loading" id="stat-dev"><span class="stat-skeleton"></span></div>
+    </div>
+    <div class="stat-card stat-card--danger">
+        <div class="stat-label">Production</div>
+        <div class="stat-value stat-loading" id="stat-prod"><span class="stat-skeleton"></span></div>
+    </div>
+</div>
+
+<style>
+.stat-loading .stat-skeleton {
+    display: inline-block;
+    width: 50px;
+    height: 28px;
+    background: linear-gradient(90deg, var(--admin-bg-tertiary) 25%, var(--admin-bg-secondary) 50%, var(--admin-bg-tertiary) 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite;
+    border-radius: 4px;
+}
+@keyframes shimmer {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+}
+</style>
+
+<!-- Sites Table -->
+<div class="admin-card card-gradient-hover">
+    <div class="admin-card-header">
+        <h2 class="admin-card-title">All Sites</h2>
+        <div style="display: flex; gap: 12px; align-items: center;">
+            <div style="position: relative;">
+                <svg style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); width: 16px; height: 16px; stroke: #94a3b8;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="11" cy="11" r="8"></circle>
+                    <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                </svg>
+                <input type="text" id="site-search" placeholder="Search sites..." class="focus-ring"
+                       style="padding: 8px 12px 8px 36px; border: 1px solid #e2e8f0; border-radius: 6px; font-size: 0.9rem; width: 220px; transition: border-color 0.2s, box-shadow 0.2s;">
+            </div>
+            <button class="admin-btn admin-btn--secondary admin-btn--sm ripple" id="refresh-sites-btn">
+                <svg style="width: 14px; height: 14px; margin-right: 6px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M23 4v6h-6"></path>
+                    <path d="M1 20v-6h6"></path>
+                    <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+                </svg>
+                Refresh
+            </button>
+        </div>
+    </div>
+    <div class="admin-card-body" style="padding: 0; overflow-x: auto;">
+        <table class="admin-table table-enhanced">
+            <thead>
+                <tr>
+                    <th style="width: 40px;"><input type="checkbox" class="row-checkbox"></th>
+                    <th class="sortable">Site ID</th>
+                    <th class="sortable">Domain</th>
+                    <th class="sortable">Company</th>
+                    <th class="sortable">Admin</th>
+                    <th>Plan</th>
+                    <th>Status</th>
+                    <th class="sortable">Created</th>
+                    <th style="width: 100px;">Actions</th>
+                </tr>
+            </thead>
+            <tbody id="sites-table-body">
+                <tr>
+                    <td colspan="9" style="text-align: center; padding: 40px;">
+                        <div class="skeleton" style="width: 200px; height: 20px; margin: 0 auto;"></div>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+    <div class="table-pagination" id="sites-pagination" style="display: none;">
+        <div class="pagination-info">
+            Showing <span id="pagination-start">1</span>-<span id="pagination-end">10</span> of <span id="pagination-total">0</span> sites
+        </div>
+        <div class="pagination-controls">
+            <select class="page-size-select" id="page-size">
+                <option value="10">10 per page</option>
+                <option value="25">25 per page</option>
+                <option value="50">50 per page</option>
+            </select>
+            <button class="pagination-btn" id="prev-page" disabled>
+                <svg style="width: 16px; height: 16px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="15 18 9 12 15 6"></polyline>
+                </svg>
+            </button>
+            <button class="pagination-btn" id="next-page">
+                <svg style="width: 16px; height: 16px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="9 18 15 12 9 6"></polyline>
+                </svg>
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Site Detail Panel -->
+<div class="slide-panel" id="site-detail-panel">
+    <div class="panel-header">
+        <h3 class="panel-title">Site Details</h3>
+        <button class="panel-close">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+        </button>
+    </div>
+    <div class="panel-body">
+        <div class="panel-section">
+            <div class="panel-section-title">Basic Information</div>
+            <div class="panel-field">
+                <div class="panel-field-label">Site ID</div>
+                <div class="panel-field-value mono" id="panel-site-id" style="font-size: 13px; display: flex; align-items: center; gap: 8px;">
+                    <span style="flex: 1; overflow: hidden; text-overflow: ellipsis;">-</span>
+                    <button class="copy-btn row-action-btn" id="copy-site-id-btn" style="opacity: 1;">
+                        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+            <div class="panel-field">
+                <div class="panel-field-label">Domain</div>
+                <div class="panel-field-value" id="panel-domain">-</div>
+            </div>
+            <div class="panel-field">
+                <div class="panel-field-label">Company Name</div>
+                <div class="panel-field-value" id="panel-company">-</div>
+            </div>
+            <div class="panel-field">
+                <div class="panel-field-label">Admin Email</div>
+                <div class="panel-field-value" id="panel-admin-email">-</div>
+            </div>
+        </div>
+        
+        <div class="panel-section">
+            <div class="panel-section-title">Configuration</div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                <div class="panel-field">
+                    <div class="panel-field-label">Plan</div>
+                    <div id="panel-plan">-</div>
+                </div>
+                <div class="panel-field">
+                    <div class="panel-field-label">Status</div>
+                    <div id="panel-status">-</div>
+                </div>
+            </div>
+            <div class="panel-field" style="margin-top: 12px;">
+                <div class="panel-field-label">Created</div>
+                <div class="panel-field-value" id="panel-created">-</div>
+            </div>
+        </div>
+        
+        <div class="panel-section">
+            <div class="panel-section-title">Cryptographic Identity</div>
+            <div class="panel-field">
+                <div class="panel-field-label">Issuer DID</div>
+                <div class="panel-field-value mono" id="panel-issuer-did" style="font-size: 11px; word-break: break-all; color: #64748b;">-</div>
+            </div>
+        </div>
+    </div>
+    <div class="panel-footer">
+        <button class="admin-btn admin-btn--secondary ripple" data-action="go-to-site">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 6px;">
+                <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+                <polyline points="15 3 21 3 21 9"></polyline>
+                <line x1="10" y1="14" x2="21" y2="3"></line>
+            </svg>
+            Manage
+        </button>
+        <button class="admin-btn admin-btn--danger ripple" data-action="revoke-site">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 6px;">
+                <circle cx="12" cy="12" r="10"></circle>
+                <path d="M4.93 4.93l14.14 14.14"></path>
+            </svg>
+            Revoke
+        </button>
+    </div>
+</div>
+
+<script nonce="{{ csp_nonce }}">
+// Admin auth state
+let adminCredential = null;
+
+document.addEventListener('DOMContentLoaded', async () => {
+    // Check for admin credential in wallet
+    await checkAdminAuth();
+    
+    loadSites();
+    loadSiteStats();
+    
+    document.getElementById('refresh-sites-btn').addEventListener('click', loadSites);
+    document.getElementById('site-search').addEventListener('input', debounce(filterSites, 300));
+    document.getElementById('page-size').addEventListener('change', (e) => {
+        pageSize = Math.max(parseInt(e.target.value, 10) || 10, 1);
+        currentPage = 1;
+        renderSites(getFilteredSites());
+    });
+    document.getElementById('prev-page').addEventListener('click', () => {
+        if (currentPage > 1) {
+            currentPage -= 1;
+            renderSites(getFilteredSites());
+        }
+    });
+    document.getElementById('next-page').addEventListener('click', () => {
+        const total = getFilteredSites().length;
+        const totalPages = Math.max(Math.ceil(total / pageSize), 1);
+        if (currentPage < totalPages) {
+            currentPage += 1;
+            renderSites(getFilteredSites());
+        }
+    });
+});
+
+async function checkAdminAuth() {
+    if (typeof LemmaWallet === 'undefined') {
+        console.warn('LemmaWallet not loaded');
+        return;
+    }
+    
+    try {
+        const wallet = new LemmaWallet();
+        const authResult = await wallet.autoAuthenticate();
+        
+        if (authResult.authenticated) {
+            // Look for admin credential
+            const credentials = await wallet.getCredentials({ siteId: 'lemma.id' });
+            adminCredential = credentials.find(c => {
+                const normalized = c.normalized || {};
+                return normalized.permissionId === 'admin_access' || 
+                       normalized.accountType === 'admin' ||
+                       (normalized.type && normalized.type.includes('admin'));
+            });
+            
+            if (adminCredential) {
+                console.log('Admin credential found:', adminCredential.id);
+            }
+        }
+    } catch (e) {
+        console.warn('Admin auth check failed:', e);
+    }
+}
+
+async function getAuthHeaders() {
+    if (typeof window.getLemmaAuthHeadersAsync === 'function') {
+        return await window.getLemmaAuthHeadersAsync({});
+    }
+    const headers = {};
+    if (adminCredential) {
+        headers['X-Credential-ID'] = adminCredential.id;
+        headers['X-Permission-ID'] = adminCredential.normalized?.permissionId || 'admin_access';
+        headers['X-Site-ID'] = 'lemma.id';
+    }
+    return headers;
+}
+
+let allSites = [];
+let currentPage = 1;
+let pageSize = 10;
+
+async function loadSiteStats() {
+    try {
+        const response = await fetch('/api/admin/site-stats', { headers: await getAuthHeaders() });
+        if (!response.ok) throw new Error('Failed');
+        const data = await response.json();
+        
+        updateStatValue('stat-total', data.total || 0);
+        updateStatValue('stat-active', data.active || 0);
+        updateStatValue('stat-dev', data.development || 0);
+        updateStatValue('stat-prod', data.production || 0);
+    } catch (e) {
+        updateStatValue('stat-total', '-');
+        updateStatValue('stat-active', '-');
+        updateStatValue('stat-dev', '-');
+        updateStatValue('stat-prod', '-');
+    }
+}
+
+function updateStatValue(id, value) {
+    const el = document.getElementById(id);
+    if (el) {
+        el.classList.remove('stat-loading');
+        el.textContent = typeof value === 'number' ? value.toLocaleString() : value;
+    }
+}
+
+async function loadSites() {
+    const tbody = document.getElementById('sites-table-body');
+    tbody.innerHTML = `<tr><td colspan="9" style="text-align: center; padding: 40px;">
+        <div style="display: flex; flex-direction: column; align-items: center; gap: 12px;">
+            <div class="skeleton" style="width: 300px; height: 20px;"></div>
+            <div class="skeleton" style="width: 200px; height: 16px;"></div>
+        </div>
+    </td></tr>`;
+    
+    try {
+        const response = await fetch('/api/admin/sites', { headers: await getAuthHeaders() });
+        if (!response.ok) throw new Error('Failed to load sites');
+        const data = await response.json();
+        
+        allSites = data.sites || [];
+        currentPage = 1;
+        renderSites(getFilteredSites());
+    } catch (e) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="9" style="text-align: center; padding: 60px;">
+                    <div class="admin-empty">
+                        <div class="admin-empty-icon">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                <circle cx="12" cy="12" r="10"></circle>
+                                <path d="M2 12h20"></path>
+                                <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
+                            </svg>
+                        </div>
+                        <div class="admin-empty-title">No sites registered</div>
+                        <div class="admin-empty-description">Sites will appear here as developers integrate Lemma</div>
+                    </div>
+                </td>
+            </tr>
+        `;
+    }
+}
+
+function renderSites(sites) {
+    const tbody = document.getElementById('sites-table-body');
+    const pagination = document.getElementById('sites-pagination');
+    
+    if (sites.length === 0) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="9" style="text-align: center; padding: 60px;">
+                    <div class="admin-empty">
+                        <div class="admin-empty-icon">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                <circle cx="12" cy="12" r="10"></circle>
+                                <path d="M2 12h20"></path>
+                                <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
+                            </svg>
+                        </div>
+                        <div class="admin-empty-title">No sites found</div>
+                        <div class="admin-empty-description">Sites will appear here as developers integrate Lemma</div>
+                    </div>
+                </td>
+            </tr>
+        `;
+        pagination.style.display = 'none';
+        return;
+    }
+    
+    const total = sites.length;
+    const totalPages = Math.max(Math.ceil(total / pageSize), 1);
+    if (currentPage > totalPages) currentPage = totalPages;
+    const startIndex = (currentPage - 1) * pageSize;
+    const endIndex = Math.min(startIndex + pageSize, total);
+    const pageSites = sites.slice(startIndex, endIndex);
+
+    // Show pagination
+    pagination.style.display = 'flex';
+    document.getElementById('pagination-total').textContent = total;
+    document.getElementById('pagination-start').textContent = (startIndex + 1).toString();
+    document.getElementById('pagination-end').textContent = endIndex.toString();
+    document.getElementById('prev-page').disabled = currentPage <= 1;
+    document.getElementById('next-page').disabled = currentPage >= totalPages;
+    
+    tbody.innerHTML = pageSites.map((site, index) => `
+        <tr class="highlight-new" style="animation-delay: ${index * 50}ms;">
+            <td><input type="checkbox" class="row-checkbox"></td>
+            <td>
+                <code style="font-size: 12px; background: #f1f5f9; padding: 4px 8px; border-radius: 4px;">${escapeHtml(site.site_id)}</code>
+            </td>
+            <td>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#64748b" stroke-width="2" style="flex-shrink: 0;">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <path d="M2 12h20"></path>
+                    </svg>
+                    <span style="font-weight: 500;">${escapeHtml(site.site_domain || '-')}</span>
+                </div>
+            </td>
+            <td style="color: #374151;">${escapeHtml(site.company_name || '-')}</td>
+            <td>
+                <div style="display: flex; align-items: center; gap: 6px;">
+                    <div style="width: 24px; height: 24px; border-radius: 50%; background: #e0e7ff; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; color: #4f46e5;">
+                        ${(site.admin_email || 'U')[0].toUpperCase()}
+                    </div>
+                    <span class="truncate" style="max-width: 140px; font-size: 13px; color: #64748b;">${escapeHtml(site.admin_email || '-')}</span>
+                </div>
+            </td>
+            <td>
+                <span class="status-badge ${getPlanClass(site.plan)}">
+                    ${escapeHtml((site.plan || 'starter').charAt(0).toUpperCase() + (site.plan || 'starter').slice(1))}
+                </span>
+            </td>
+            <td>
+                <span class="status-badge ${getStatusClass(site.status)}">
+                    <span class="status-dot"></span>
+                    ${escapeHtml((site.status || 'active').charAt(0).toUpperCase() + (site.status || 'active').slice(1))}
+                </span>
+            </td>
+            <td style="color: #64748b; font-size: 13px;">${formatDate(site.created_at)}</td>
+            <td>
+                <div class="row-actions" style="opacity: 1;">
+                    <button class="row-action-btn" data-action="view-site-panel" data-site='${JSON.stringify(site).replace(/'/g, "&#39;")}' data-tooltip="View details">
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                            <circle cx="12" cy="12" r="3"></circle>
+                        </svg>
+                    </button>
+                    <button class="row-action-btn" data-action="copy-site-id" data-copy="${escapeHtml(site.site_id)}" data-tooltip="Copy site ID">
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                        </svg>
+                    </button>
+                </div>
+            </td>
+        </tr>
+    `).join('');
+    
+    // Reinitialize row selection after render
+    if (window.initRowSelection) initRowSelection();
+}
+
+function filterSites() {
+    currentPage = 1;
+    renderSites(getFilteredSites());
+}
+
+function getFilteredSites() {
+    const search = (document.getElementById('site-search').value || '').toLowerCase();
+    if (!search) return allSites;
+    return allSites.filter(s => 
+        (s.site_id || '').toLowerCase().includes(search) ||
+        (s.site_domain || s.domain || '').toLowerCase().includes(search) ||
+        (s.company_name || s.name || '').toLowerCase().includes(search) ||
+        (s.admin_email || '').toLowerCase().includes(search)
+    );
+}
+
+function getStatusClass(status) {
+    const classes = {
+        'active': 'active',
+        'inactive': 'inactive',
+        'suspended': 'revoked',
+        'revoked': 'revoked',
+        'pending': 'pending'
+    };
+    return classes[status?.toLowerCase()] || 'active';
+}
+
+function getPlanClass(plan) {
+    const classes = {
+        'enterprise': 'info',
+        'professional': 'active',
+        'starter': 'pending',
+        'free': 'inactive'
+    };
+    return classes[plan?.toLowerCase()] || 'pending';
+}
+
+function viewSite(siteId) {
+    window.location.href = '/admin/site-manager/' + siteId;
+}
+
+function openSitePanel(site) {
+    // Populate panel fields
+    document.getElementById('panel-site-id').querySelector('span').textContent = site.site_id || '-';
+    document.getElementById('panel-domain').textContent = site.site_domain || '-';
+    document.getElementById('panel-company').textContent = site.company_name || '-';
+    document.getElementById('panel-admin-email').textContent = site.admin_email || '-';
+    document.getElementById('panel-created').textContent = formatDate(site.created_at);
+    document.getElementById('panel-issuer-did').textContent = site.issuer_did || '-';
+    
+    // Plan badge
+    const planEl = document.getElementById('panel-plan');
+    const plan = site.plan || 'starter';
+    planEl.innerHTML = '';
+    const planBadge = document.createElement('span');
+    planBadge.className = `status-badge ${getPlanClass(plan)}`;
+    planBadge.textContent = plan.charAt(0).toUpperCase() + plan.slice(1);
+    planEl.appendChild(planBadge);
+    
+    // Set copy button data
+    const panelCopyBtn = document.getElementById('copy-site-id-btn');
+    if (panelCopyBtn) {
+        panelCopyBtn.dataset.copy = site.site_id;
+        panelCopyBtn.onclick = () => { if (window.copyToClipboard) copyToClipboard(site.site_id, panelCopyBtn); };
+    }
+    
+    // Store site for actions
+    window.currentSite = site;
+    
+    // Status badge
+    const statusEl = document.getElementById('panel-status');
+    const status = site.status || 'Active';
+    statusEl.innerHTML = '';
+    const statusBadge = document.createElement('span');
+    statusBadge.className = `status-badge ${getStatusClass(status)}`;
+    const statusDot = document.createElement('span');
+    statusDot.className = 'status-dot';
+    statusBadge.appendChild(statusDot);
+    statusBadge.appendChild(document.createTextNode(status));
+    statusEl.appendChild(statusBadge);
+    
+    // Site ID with copy
+    const siteIdEl = document.getElementById('panel-site-id');
+    const siteIdSpan = siteIdEl.querySelector('span');
+    const copyBtn = siteIdEl.querySelector('.copy-btn');
+    siteIdSpan.textContent = site.site_id || '-';
+    copyBtn.dataset.copy = site.site_id || '';
+    copyBtn.onclick = () => copyToClipboard(site.site_id, copyBtn);
+    
+    // Store current site for actions
+    window.currentPanelSite = site;
+    
+    // Open panel
+    openPanel('site-detail-panel');
+}
+
+function formatNumber(num) {
+    if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M';
+    if (num >= 1000) return (num / 1000).toFixed(1) + 'K';
+    return num.toString();
+}
+
+function formatDate(dateStr) {
+    if (!dateStr) return '-';
+    try {
+        const date = new Date(dateStr);
+        return date.toLocaleDateString();
+    } catch {
+        return '-';
+    }
+}
+
+function escapeHtml(text) {
+    if (!text) return '';
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+function debounce(func, wait) {
+    let timeout;
+    return function(...args) {
+        clearTimeout(timeout);
+        timeout = setTimeout(() => func.apply(this, args), wait);
+    };
+}
+
+// Event delegation for CSP compliance
+document.addEventListener('click', function(e) {
+    const target = e.target.closest('[data-action]');
+    if (!target) return;
+    
+    const action = target.dataset.action;
+    
+    switch (action) {
+        case 'view-site':
+            viewSite(target.dataset.siteId);
+            break;
+            
+        case 'view-site-panel':
+            try {
+                const site = JSON.parse(target.dataset.site);
+                openSitePanel(site);
+            } catch (err) {
+                console.error('Failed to parse site data:', err);
+            }
+            break;
+            
+        case 'copy-site-id':
+            const siteId = target.dataset.copy;
+            if (siteId && window.copyToClipboard) {
+                copyToClipboard(siteId, target);
+                if (window.showToast) {
+                    showToast('success', 'Copied!', 'Site ID copied to clipboard');
+                }
+            }
+            break;
+            
+        case 'revoke-site-prompt':
+            if (confirm('Are you sure you want to revoke this site? This action cannot be undone.')) {
+                revokeSite(target.dataset.siteId);
+            }
+            break;
+            
+        case 'edit-site':
+            if (window.currentPanelSite) {
+                window.location.href = '/developer/sites/' + window.currentPanelSite.site_id + '/edit';
+            }
+            break;
+            
+        case 'revoke-site':
+            if (window.currentSite && confirm('Are you sure you want to revoke this site?')) {
+                revokeSite(window.currentSite.site_id);
+            }
+            break;
+            
+        case 'go-to-site':
+            if (window.currentSite) {
+                window.location.href = '/admin/site-manager/' + window.currentSite.site_id;
+            }
+            break;
+    }
+});
+
+async function revokeSite(siteId) {
+    try {
+        const authHeaders = await getAuthHeaders();
+        const response = await fetch(`/api/admin/sites/${siteId}/revoke`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                ...authHeaders
+            }
+        });
+        
+        if (response.ok) {
+            if (window.showToast) showToast('success', 'Site Revoked', 'The site has been successfully revoked');
+            closePanel();
+            loadSites();
+        } else {
+            if (window.showToast) showToast('error', 'Failed', 'Could not revoke site');
+        }
+    } catch (err) {
+        console.error('Revoke failed:', err);
+        if (window.showToast) showToast('error', 'Error', 'An error occurred');
+    }
+}
+</script>
+{% endblock %}

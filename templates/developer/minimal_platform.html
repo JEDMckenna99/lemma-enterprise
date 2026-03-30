@@ -1,0 +1,531 @@
+{% extends "modern/layout.html" %}
+
+{% block title %}Developer Platform - lemma.id{% endblock %}
+
+{% block head %}
+{{ super() }}
+<style>
+.mp-wrap{max-width:1080px;margin:30px auto;padding:0 18px 52px;}
+.mp-header{display:flex;justify-content:space-between;align-items:flex-start;gap:14px;flex-wrap:wrap;margin-bottom:20px}
+.mp-title{margin:0 0 4px;font-size:30px;letter-spacing:-0.01em;color:#0f172a}
+.mp-sub{margin:0;color:#475569;font-size:14px}
+.mp-nav{display:flex;gap:8px;flex-wrap:wrap;background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:6px}
+.mp-nav a{padding:7px 11px;border:1px solid transparent;border-radius:9px;text-decoration:none;color:#1e293b;font-size:12px;font-weight:700;background:transparent}
+.mp-nav a:hover{background:#fff;border-color:#cbd5e1}
+.mp-strip{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;margin:10px 0 20px}
+.mp-pill{background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:10px 12px;box-shadow:0 1px 2px rgba(15,23,42,.04)}
+.mp-pill-k{display:block;font-size:11px;color:#64748b;text-transform:uppercase;letter-spacing:.04em}
+.mp-pill-v{display:block;font-size:14px;color:#0f172a;font-weight:600}
+.mp-chip{display:inline-block;border-radius:999px;padding:2px 8px;font-size:11px;font-weight:700}
+.mp-chip.safe{background:#dcfce7;color:#166534}
+.mp-chip.degraded{background:#fef3c7;color:#92400e}
+.mp-chip.unsafe{background:#fee2e2;color:#991b1b}
+.mp-grid{display:grid;grid-template-columns:1fr;gap:16px}
+.mp-card{background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:18px;box-shadow:0 2px 4px rgba(15,23,42,.04)}
+.mp-card h2{margin:0 0 10px;font-size:19px;color:#0f172a}
+.mp-card h3{margin:0 0 8px;font-size:14px;color:#1e293b}
+.mp-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.mp-col{display:grid;gap:10px}
+.mp-split{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.mp-input,.mp-select,.mp-text{width:100%;box-sizing:border-box;border:1px solid #dbe3ee;border-radius:9px;padding:9px 10px;font-size:14px;background:#fff}
+.mp-input:focus,.mp-select:focus,.mp-text:focus{outline:none;border-color:#818cf8;box-shadow:0 0 0 3px rgba(129,140,248,.18)}
+.mp-text{min-height:120px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+.mp-btn{border:0;border-radius:9px;padding:8px 12px;background:#4f46e5;color:#fff;font-weight:700;cursor:pointer}
+.mp-btn:hover{background:#4338ca}
+.mp-btn.sec{background:#fff;color:#334155;border:1px solid #cbd5e1}
+.mp-btn.sec:hover{background:#f8fafc}
+.mp-code{background:#0f172a;color:#e2e8f0;padding:11px;border-radius:10px;overflow:auto;font-size:12px;line-height:1.45}
+.mp-note{font-size:12px;color:#64748b}
+.mp-warning{font-size:12px;color:#9a3412;background:#fff7ed;border:1px solid #fdba74;border-radius:10px;padding:9px}
+.mp-ok{color:#047857}.mp-bad{color:#b91c1c}
+.mp-table{width:100%;border-collapse:collapse}
+.mp-table th,.mp-table td{padding:8px;border-bottom:1px solid #e2e8f0;font-size:12px;text-align:left;vertical-align:top}
+.mp-table th{background:#f8fafc;font-weight:700;color:#334155}
+.mp-checklist{margin:0;padding-left:18px;font-size:13px;color:#334155}
+.mp-checklist li{margin:4px 0}
+.mp-checklist .done{color:#166534;font-weight:700}
+.mp-token-list{max-height:220px;overflow:auto;border:1px solid #e2e8f0;border-radius:10px;background:#fcfdff}
+.mp-token-row{display:flex;justify-content:space-between;gap:8px;padding:9px 10px;border-bottom:1px solid #e2e8f0;font-size:12px}
+.mp-token-row:last-child{border-bottom:0}
+@media (max-width: 900px){.mp-split{grid-template-columns:1fr}}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="mp-wrap">
+  <div class="mp-header">
+    <div>
+      <h1 class="mp-title">Agent Ops Minimal Console</h1>
+      <p class="mp-sub">Fallback UI for teams using lemma.id API-first proof-based authorization.</p>
+    </div>
+    <nav class="mp-nav">
+      <a href="#integrate">Integrate</a>
+      <a href="#operate">Operate</a>
+      <a href="#respond">Respond</a>
+      <a href="#internal-review">Internal Review</a>
+    </nav>
+  </div>
+
+  <div class="mp-strip">
+    <div class="mp-pill"><span class="mp-pill-k">Auth Principal</span><span class="mp-pill-v" id="st-principal">checking</span></div>
+    <div class="mp-pill"><span class="mp-pill-k">Proof Validation</span><span class="mp-pill-v" id="st-proof">not_run</span></div>
+    <div class="mp-pill"><span class="mp-pill-k">Revocation Freshness</span><span class="mp-pill-v" id="st-rev-fresh">unknown</span></div>
+    <div class="mp-pill"><span class="mp-pill-k">System State</span><span class="mp-pill-v" id="st-state"><span class="mp-chip degraded">degraded</span></span></div>
+  </div>
+
+  <div class="mp-grid">
+    <section class="mp-card" id="integrate">
+      <h2>Integrate</h2>
+      <div class="mp-split">
+        <div class="mp-col">
+          <h3>Quickstart Contract</h3>
+          <pre class="mp-code">POST /api/auth/exchange-proof
+Body:
+{
+  "credential": { ... },
+  "site_id": "lemma.id",
+  "requested_scope": ["read"],
+  "ttl_seconds": 900
+}
+
+Expected:
+200 + access_token + scope + site_id</pre>
+          <div class="mp-note">Start with least privilege: requested_scope = ["read"] and explicit site_id binding.</div>
+          <div class="mp-row">
+            <a class="mp-btn sec" href="/developer/external-api-keys">Open API Key Manager</a>
+            <a class="mp-btn sec" href="/docs/api/DEVELOPER_AUTH_CONTRACT_V1.md" target="_blank" rel="noopener">Auth Contract</a>
+          </div>
+        </div>
+        <div class="mp-col" id="proof-test">
+          <h3>Proof Exchange Test</h3>
+          <div class="mp-row">
+            <input id="req-site-id" class="mp-input" placeholder="site_id" value="lemma.id" style="max-width:220px">
+            <input id="req-scope" class="mp-input" placeholder="requested_scope (comma)" value="read" style="max-width:300px">
+            <input id="req-ttl" class="mp-input" placeholder="ttl_seconds" value="900" style="max-width:120px">
+          </div>
+          <textarea id="proof-json" class="mp-text" placeholder='{"credential": {...}}'></textarea>
+          <div class="mp-row">
+            <button class="mp-btn" id="run-proof-test">Run Exchange Test</button>
+            <span class="mp-note">Fails closed if site/scope mismatch is detected.</span>
+          </div>
+          <ol class="mp-checklist" id="integrate-checklist">
+            <li id="ck-credential">Credential JSON provided</li>
+            <li id="ck-exchange">Exchange endpoint returned success</li>
+            <li id="ck-binding">Returned site and scope match request</li>
+          </ol>
+          <pre class="mp-code" id="proof-result">No test run yet.</pre>
+        </div>
+      </div>
+    </section>
+
+    <section class="mp-card" id="operate">
+      <h2>Operate</h2>
+      <div class="mp-split">
+        <div class="mp-col">
+          <h3>Delegated Tokens</h3>
+          <div class="mp-warning">Plaintext delegated tokens are shown once and are never persisted in browser storage.</div>
+          <div class="mp-row">
+            <input id="agent-name" class="mp-input" style="max-width:220px" value="UI Review Agent">
+            <select id="agent-ttl" class="mp-select" style="max-width:130px">
+              <option value="1">1 hour</option>
+              <option value="4" selected>4 hours</option>
+              <option value="8">8 hours</option>
+              <option value="24">24 hours</option>
+            </select>
+            <label><input id="scope-read" type="checkbox" checked disabled> read</label>
+            <label><input id="scope-write" type="checkbox" checked> write</label>
+            <label><input id="scope-admin" type="checkbox"> admin</label>
+          </div>
+          <div class="mp-row">
+            <button class="mp-btn" id="issue-token">Issue Token</button>
+            <button class="mp-btn sec" id="refresh-tokens">Refresh Tokens</button>
+          </div>
+          <div class="mp-token-list" id="token-list"><div class="mp-token-row"><span>Loading...</span></div></div>
+          <pre class="mp-code" id="token-result">No token action yet.</pre>
+        </div>
+        <div class="mp-col" id="decision-feed">
+          <h3>Activity + Decisions</h3>
+          <div class="mp-row">
+            <select id="filter-token-id" class="mp-select" style="max-width:280px"><option value="">all tokens</option></select>
+            <select id="filter-hours" class="mp-select" style="max-width:130px">
+              <option value="1">1 hour</option>
+              <option value="6">6 hours</option>
+              <option value="24" selected>24 hours</option>
+              <option value="72">72 hours</option>
+            </select>
+            <label><input id="filter-failure" type="checkbox"> failures only</label>
+            <button class="mp-btn sec" id="refresh-feed">Refresh</button>
+          </div>
+          <div id="events-wrap" class="mp-note">Loading events...</div>
+          <div id="decisions-wrap" class="mp-note">Loading decisions...</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="mp-card" id="respond">
+      <h2>Respond</h2>
+      <div class="mp-split">
+        <div class="mp-col">
+          <h3>Revoke-to-Deny Drill</h3>
+          <div class="mp-row">
+            <input id="revoke-token-id" class="mp-input" placeholder="token_id for /api/agent/credentials/{id}/revoke" style="max-width:360px">
+            <button class="mp-btn" id="revoke-token">Revoke Delegated Token</button>
+          </div>
+          <div class="mp-row">
+            <input id="revoke-credential-id" class="mp-input" placeholder="credential_id for /api/wallet/revoke" style="max-width:360px">
+            <button class="mp-btn sec" id="revoke-credential">Revoke Credential</button>
+          </div>
+          <div class="mp-row">
+            <button class="mp-btn sec" id="poll-revocation">Poll Revocation Status + Delta</button>
+            <span class="mp-note">Target propagation SLA: 30s</span>
+          </div>
+          <pre class="mp-code" id="respond-result">No revoke action yet.</pre>
+        </div>
+        <div class="mp-col">
+          <h3>Freshness and Safety</h3>
+          <div id="rev-health" class="mp-note">No revocation poll yet.</div>
+          <pre class="mp-code" id="rev-status-result">No status payload yet.</pre>
+          <pre class="mp-code" id="rev-delta-result">No delta payload yet.</pre>
+        </div>
+      </div>
+    </section>
+
+    <section class="mp-card" id="internal-review">
+      <h2>Internal Review</h2>
+      <div class="mp-warning">Internal-only admin bypass tooling for lemma.id platform review and QA. Not required for customer proof-based integrations.</div>
+    </section>
+  </div>
+</div>
+
+<script nonce="{{ csp_nonce }}">
+const state = {
+  proofStatus: "not_run",
+  lastDeltaCursor: 0,
+  lastDeltaMs: 0,
+  staleDeltaCycles: 0,
+  activeTokens: [],
+  lastIssuedToken: null,
+};
+
+function lemmaHeaders(extra) {
+  if (typeof window.getLemmaAuthHeaders === "function") {
+    return window.getLemmaAuthHeaders(extra || {});
+  }
+  return extra || {};
+}
+
+async function api(path, options) {
+  const opts = options || {};
+  const hdrs = Object.assign({}, opts.headers || {}, lemmaHeaders());
+  const req = Object.assign({ credentials: "include", headers: hdrs }, opts);
+  const res = await fetch(path, req);
+  const txt = await res.text();
+  let data = {};
+  try { data = JSON.parse(txt); } catch (_e) { data = { raw: txt }; }
+  return { ok: res.ok, status: res.status, data };
+}
+
+function show(id, payload) {
+  const node = document.getElementById(id);
+  if (node) node.textContent = JSON.stringify(payload, null, 2);
+}
+
+function escapeHtml(v) {
+  return String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;" }[c]));
+}
+
+function parseScopeInput(value) {
+  return String(value || "")
+    .split(",")
+    .map((s) => s.trim().toLowerCase())
+    .filter((s) => s.length > 0);
+}
+
+function markChecklist(id, done) {
+  const item = document.getElementById(id);
+  if (!item) return;
+  item.className = done ? "done" : "";
+  item.textContent = item.textContent.replace(/^(\u2713 )|^(\u2717 )/, "");
+  item.textContent = (done ? "\u2713 " : "\u2717 ") + item.textContent;
+}
+
+function updateSystemStateChip() {
+  let level = "safe";
+  if (state.proofStatus !== "valid") level = "degraded";
+  if (state.staleDeltaCycles >= 2) level = "unsafe";
+  const node = document.getElementById("st-state");
+  if (!node) return;
+  node.innerHTML = `<span class="mp-chip ${level}">${level}</span>`;
+}
+
+function updateRevFreshness(deltaPayload) {
+  const now = Date.now();
+  const ttl = Number(deltaPayload?.ttl_ms || 30000);
+  const generated = Number(deltaPayload?.generated_at_ms || now);
+  const age = Math.max(0, now - generated);
+  document.getElementById("st-rev-fresh").textContent = `${Math.round(age / 1000)}s (ttl ${Math.round(ttl / 1000)}s)`;
+
+  if (Number(deltaPayload?.next_cursor || 0) === state.lastDeltaCursor && age > ttl) {
+    state.staleDeltaCycles += 1;
+  } else {
+    state.staleDeltaCycles = 0;
+  }
+  state.lastDeltaCursor = Number(deltaPayload?.next_cursor || state.lastDeltaCursor);
+  state.lastDeltaMs = generated;
+  updateSystemStateChip();
+}
+
+async function refreshPrincipal() {
+  const result = await api("/api/agent/validate", {
+    method: "POST",
+    headers: Object.assign({ "Content-Type": "application/json" }, lemmaHeaders()),
+    body: "{}",
+  });
+  const principal = result.data?.authorized_by || result.data?.ppid || result.data?.error || "unknown";
+  document.getElementById("st-principal").textContent = principal;
+}
+
+async function runProofExchangeTest() {
+  const raw = document.getElementById("proof-json").value.trim();
+  const siteId = String(document.getElementById("req-site-id").value || "").trim().toLowerCase();
+  const requestedScope = parseScopeInput(document.getElementById("req-scope").value);
+  const ttl = parseInt(document.getElementById("req-ttl").value || "900", 10);
+
+  markChecklist("ck-credential", !!raw);
+  if (!raw) {
+    state.proofStatus = "invalid";
+    document.getElementById("st-proof").textContent = "invalid (empty payload)";
+    updateSystemStateChip();
+    show("proof-result", { success: false, error: "empty_payload" });
+    return;
+  }
+
+  let parsed;
+  try {
+    parsed = JSON.parse(raw);
+  } catch (_e) {
+    state.proofStatus = "invalid";
+    document.getElementById("st-proof").textContent = "invalid (bad json)";
+    updateSystemStateChip();
+    markChecklist("ck-exchange", false);
+    markChecklist("ck-binding", false);
+    show("proof-result", { success: false, error: "invalid_json" });
+    return;
+  }
+
+  const payload = Object.assign({}, parsed, {
+    site_id: siteId || parsed.site_id || "lemma.id",
+    requested_scope: requestedScope.length ? requestedScope : ["read"],
+    ttl_seconds: Number.isFinite(ttl) ? ttl : 900,
+  });
+
+  const out = await api("/api/auth/exchange-proof", {
+    method: "POST",
+    headers: Object.assign({ "Content-Type": "application/json" }, lemmaHeaders()),
+    body: JSON.stringify(payload),
+  });
+  show("proof-result", out);
+
+  const exchangeOk = !!(out.ok && out.data?.success && out.data?.access_token);
+  markChecklist("ck-exchange", exchangeOk);
+
+  const returnedSite = String(out.data?.site_id || "").toLowerCase();
+  const returnedScope = Array.isArray(out.data?.scope) ? out.data.scope.map((s) => String(s).toLowerCase()) : [];
+  const requested = Array.isArray(payload.requested_scope) ? payload.requested_scope.map((s) => String(s).toLowerCase()) : [];
+  const siteMatch = !siteId || returnedSite === siteId;
+  const scopeSubset = requested.every((s) => returnedScope.includes(s));
+  const bindingOk = exchangeOk && siteMatch && scopeSubset;
+  markChecklist("ck-binding", bindingOk);
+
+  if (!bindingOk) {
+    state.proofStatus = "invalid";
+    document.getElementById("st-proof").textContent = "invalid (binding mismatch)";
+  } else {
+    state.proofStatus = "valid";
+    document.getElementById("st-proof").textContent = `valid (${returnedSite || "unknown_site"})`;
+  }
+  updateSystemStateChip();
+}
+
+function currentIssueScope() {
+  const scope = ["read"];
+  if (document.getElementById("scope-write").checked) scope.push("write");
+  if (document.getElementById("scope-admin").checked) scope.push("admin");
+  return scope;
+}
+
+async function refreshTokens() {
+  const res = await api("/api/agent/credentials", { method: "GET" });
+  if (!(res.ok && res.data?.success && Array.isArray(res.data?.credentials))) {
+    document.getElementById("token-list").innerHTML = `<div class="mp-token-row"><span class="mp-bad">Failed (${res.status})</span></div>`;
+    return;
+  }
+  state.activeTokens = res.data.credentials.filter((c) => c.status === "active");
+  const count = state.activeTokens.length;
+  document.getElementById("st-proof").textContent = state.proofStatus;
+
+  const rows = state.activeTokens.length
+    ? state.activeTokens.map((c) => `<div class="mp-token-row">
+        <span><strong>${escapeHtml(c.agent_name || "agent")}</strong><br>${escapeHtml(c.token_id)}</span>
+        <span>${escapeHtml(c.scope?.join(",") || "-")}<br>exp ${escapeHtml(c.expires_at || "-")}</span>
+      </div>`).join("")
+    : `<div class="mp-token-row"><span>No active tokens.</span></div>`;
+  document.getElementById("token-list").innerHTML = rows;
+
+  const selector = document.getElementById("filter-token-id");
+  const selected = selector.value;
+  selector.innerHTML = `<option value="">all tokens</option>` + state.activeTokens.map((t) => `<option value="${escapeHtml(t.token_id)}">${escapeHtml(t.agent_name || "agent")} (${escapeHtml(t.token_id)})</option>`).join("");
+  if (selected) selector.value = selected;
+  document.getElementById("st-principal").textContent = document.getElementById("st-principal").textContent;
+}
+
+async function issueToken() {
+  const payload = {
+    agent_name: document.getElementById("agent-name").value || "UI Review Agent",
+    ttl_hours: parseInt(document.getElementById("agent-ttl").value || "4", 10),
+    scope: currentIssueScope(),
+    intended_platform: "lemma.id",
+    admin_credential: window.lemmaCredential || null,
+  };
+  const usingBypass = !!payload.admin_credential;
+  const res = await api("/api/agent/credentials/issue", {
+    method: "POST",
+    headers: Object.assign({ "Content-Type": "application/json" }, lemmaHeaders()),
+    body: JSON.stringify(payload),
+  });
+
+  if (res.ok && res.data?.success) {
+    const oneTimeToken = String(res.data?.credential?.token || "");
+    state.lastIssuedToken = oneTimeToken || null;
+    const tokenId = res.data?.credential?.token_id || "";
+    const redacted = oneTimeToken ? `${oneTimeToken.slice(0, 20)}...` : "(not returned)";
+    show("token-result", {
+      success: true,
+      token_id: tokenId,
+      one_time_token_preview: redacted,
+      warning: "copy plaintext token now; token is not persisted in browser storage",
+      internal_bypass_warning: usingBypass ? "issued with admin_credential internal path" : null,
+    });
+  } else {
+    show("token-result", res);
+  }
+  await refreshTokens();
+  await refreshEventsAndDecisions();
+}
+
+async function revokeToken() {
+  const tokenId = String(document.getElementById("revoke-token-id").value || "").trim();
+  if (!tokenId) {
+    show("respond-result", { success: false, error: "token_id_required" });
+    return;
+  }
+  const res = await api(`/api/agent/credentials/${encodeURIComponent(tokenId)}/revoke`, {
+    method: "POST",
+    headers: Object.assign({ "Content-Type": "application/json" }, lemmaHeaders()),
+    body: JSON.stringify({ reason: "minimal_console_revoke" }),
+  });
+  show("respond-result", res);
+  await refreshTokens();
+  await refreshEventsAndDecisions();
+}
+
+async function revokeCredential() {
+  const credentialId = String(document.getElementById("revoke-credential-id").value || "").trim();
+  if (!credentialId) {
+    show("respond-result", { success: false, error: "credential_id_required" });
+    return;
+  }
+  const res = await api("/api/wallet/revoke", {
+    method: "POST",
+    headers: Object.assign({ "Content-Type": "application/json" }, lemmaHeaders()),
+    body: JSON.stringify({ credential_id: credentialId, credential_type: "permission", reason: "minimal_console_revoke" }),
+  });
+  show("respond-result", res);
+  await pollRevocation();
+}
+
+async function refreshEventsAndDecisions() {
+  const hours = parseInt(document.getElementById("filter-hours").value || "24", 10);
+  const tokenId = String(document.getElementById("filter-token-id").value || "").trim();
+  const failureOnly = !!document.getElementById("filter-failure").checked;
+  const status = failureOnly ? "failure" : "all";
+
+  const eventsPath = `/api/agent/monitor/events?hours=${encodeURIComponent(String(hours))}&limit=100&status=${encodeURIComponent(status)}${tokenId ? `&token_id=${encodeURIComponent(tokenId)}` : ""}`;
+  const events = await api(eventsPath, { method: "GET" });
+  if (!(events.ok && events.data?.success && Array.isArray(events.data?.events))) {
+    document.getElementById("events-wrap").innerHTML = `<div class="mp-bad">Events unavailable: ${escapeHtml(events.data?.error || events.status)}</div>`;
+  } else if (!events.data.events.length) {
+    document.getElementById("events-wrap").innerHTML = `<div class="mp-note">No events in selected window.</div>`;
+  } else {
+    const rows = events.data.events.slice(0, 20).map((e) => `<tr>
+      <td>${escapeHtml(e.timestamp || "-")}</td>
+      <td>${escapeHtml(String(e.method || "").toUpperCase())}</td>
+      <td>${escapeHtml(e.path || "-")}</td>
+      <td>${escapeHtml(String(e.status_code ?? "-"))}</td>
+      <td>${escapeHtml(e.token_id || "-")}</td>
+      <td>${escapeHtml(e.deviation_reason || (e.task_deviation ? "task_deviation" : "-"))}</td>
+    </tr>`).join("");
+    document.getElementById("events-wrap").innerHTML = `<table class="mp-table"><thead><tr><th>Time</th><th>Method</th><th>Path</th><th>Status</th><th>Token</th><th>Reason</th></tr></thead><tbody>${rows}</tbody></table>`;
+  }
+
+  const decisions = await api("/api/wallet/runtimes/decisions?limit=20", { method: "GET" });
+  if (!(decisions.ok && decisions.data?.success && Array.isArray(decisions.data?.decisions))) {
+    document.getElementById("decisions-wrap").innerHTML = `<div class="mp-note">Decisions feed unavailable (${escapeHtml(decisions.data?.error || decisions.status)}). Wallet session may be required.</div>`;
+  } else if (!decisions.data.decisions.length) {
+    document.getElementById("decisions-wrap").innerHTML = `<div class="mp-note">No decisions yet.</div>`;
+  } else {
+    const rows = decisions.data.decisions.slice(0, 20).map((d) => `<tr>
+      <td>${escapeHtml(d.timestamp || "-")}</td>
+      <td>${escapeHtml(d.decision || "-")}</td>
+      <td>${escapeHtml(d.reason_code || "-")}</td>
+      <td>${escapeHtml(d.path || "-")}</td>
+      <td>${escapeHtml(String(d.status_code ?? "-"))}</td>
+    </tr>`).join("");
+    document.getElementById("decisions-wrap").innerHTML = `<table class="mp-table"><thead><tr><th>Time</th><th>Decision</th><th>Reason</th><th>Path</th><th>Status</th></tr></thead><tbody>${rows}</tbody></table>`;
+  }
+}
+
+async function pollRevocation() {
+  const credentialId = String(document.getElementById("revoke-credential-id").value || "").trim();
+  let statusResult = { success: false, error: "credential_id_required_for_status" };
+  if (credentialId) {
+    const statusRes = await api(`/api/wallet/revocation-status?credential_ids=${encodeURIComponent(credentialId)}`, { method: "GET" });
+    statusResult = statusRes.data || statusRes;
+  }
+  show("rev-status-result", statusResult);
+
+  const deltaRes = await api(`/api/authz/revocation/delta?since=${encodeURIComponent(String(state.lastDeltaCursor))}&limit=200`, { method: "GET" });
+  show("rev-delta-result", deltaRes.data || deltaRes);
+  if (deltaRes.ok && deltaRes.data?.success) {
+    updateRevFreshness(deltaRes.data);
+  }
+
+  const startedAt = Date.now();
+  const elapsedSec = Math.round((Date.now() - startedAt) / 1000);
+  const stale = state.staleDeltaCycles >= 2;
+  document.getElementById("rev-health").innerHTML = stale
+    ? `<span class="mp-bad">Unsafe freshness state:</span> revocation delta cursor stale across polls. Treat empty delta as inconclusive.`
+    : `<span class="mp-ok">Freshness monitor:</span> last delta cursor ${escapeHtml(String(state.lastDeltaCursor))}, elapsed ${elapsedSec}s in this poll cycle.`;
+  updateSystemStateChip();
+}
+
+async function boot() {
+  await refreshPrincipal();
+  await refreshTokens();
+  await refreshEventsAndDecisions();
+  await pollRevocation();
+  document.getElementById("st-proof").textContent = state.proofStatus;
+  updateSystemStateChip();
+}
+
+document.getElementById("run-proof-test").addEventListener("click", runProofExchangeTest);
+document.getElementById("issue-token").addEventListener("click", issueToken);
+document.getElementById("refresh-tokens").addEventListener("click", refreshTokens);
+document.getElementById("refresh-feed").addEventListener("click", refreshEventsAndDecisions);
+document.getElementById("revoke-token").addEventListener("click", revokeToken);
+document.getElementById("revoke-credential").addEventListener("click", revokeCredential);
+document.getElementById("poll-revocation").addEventListener("click", pollRevocation);
+boot();
+</script>
+{% endblock %}
+

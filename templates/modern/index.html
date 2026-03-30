@@ -1,0 +1,507 @@
+{% extends "modern/layout.html" %}
+
+{% block title %}lemma.id - Local-First Agent Firewall{% endblock %}
+{% block description %}Lemma Firewall: local-first containment for AI agents. Signed credentials verified in under 1ms. Taint epoch, revocation, kill switch. Zero per-request server calls.{% endblock %}
+
+{% block head %}
+    {{ super() }}
+    <!-- Disable Cloudflare Rocket Loader and service worker interference -->
+    <meta name="cloudflare-no-rocket-loader" content="true">
+    <meta name="cf-2fa-verify" content="false">
+    
+    <!-- Note: lemma-wallet.js is already loaded in layout.html - no duplicate needed -->
+    
+    <!-- Local Verification Scripts - defer to improve LCP -->
+    <script src="{{ url_for('static', filename='js/lemma-verifier.js') }}?v=2000" defer></script>
+    
+    <!-- Bot Shield Assets - defer to improve LCP -->
+    <script src="/static/js/lemma-bot-shield-simple.js?v=1121" defer></script>
+    
+    <!-- Disable service worker to prevent resource blocking -->
+    <script nonce="{{ csp_nonce }}" data-cfasync="false">
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.getRegistrations().then(function(registrations) {
+                for (let registration of registrations) {
+                    console.log('Unregistering service worker:', registration.scope);
+                    registration.unregister();
+                }
+            });
+        }
+        
+        // Direct verification function for immediate widget display
+        window.startDirectVerification = async function(heroShield, verifyBtn) {
+            try {
+                console.log('Starting direct Stripe verification...');
+                
+                // Update button state
+                const originalText = verifyBtn.textContent;
+                verifyBtn.textContent = 'Starting verification...';
+                verifyBtn.disabled = true;
+                
+                // Start identity verification (creates Stripe session)
+                const response = await fetch(`${window.location.origin}/api/sdk/start-identity-verification`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': 'Bearer demo-integration-key-12345'
+                    },
+                    body: JSON.stringify({
+                        provider: 'stripe_identity',
+                        inline_mode: false,
+                        return_url: window.location.origin + window.location.pathname + '?verification_return=true'
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success && result.url) {
+                    console.log('Stripe session created, redirecting...');
+                    // Redirect to Stripe Identity
+                    window.location.href = result.url;
+                } else {
+                    throw new Error(result.message || 'Failed to start verification');
+                }
+                
+            } catch (error) {
+                console.error('Direct verification failed:', error);
+                
+                // Reset button
+                verifyBtn.textContent = 'Verification failed - Try again';
+                verifyBtn.disabled = false;
+                
+                setTimeout(() => {
+                    verifyBtn.textContent = 'Verify a Lemma';
+                }, 3000);
+            }
+        };
+        
+        // Legacy function for button-triggered verification
+        window.startHeroVerification = async function() {
+            try {
+                console.log('Starting hero verification...');
+                
+                const joinButton = document.getElementById('join-network-btn');
+                if (joinButton) {
+                    joinButton.textContent = 'Starting verification...';
+                    joinButton.disabled = true;
+                }
+                
+                // Create shield instance if not exists
+                if (!window.heroShield) {
+                    window.heroShield = new LemmaBotShield({
+                        debug: true,
+                        apiBase: window.location.origin
+                    });
+                    await window.heroShield.initializeFederatedWallet();
+                }
+                
+                // Use the shield's protect method to show verification widget
+                await window.heroShield.protect('#shield-api-card');
+                
+            } catch (error) {
+                console.error('Hero verification failed:', error);
+                
+                const joinButton = document.getElementById('join-network-btn');
+                if (joinButton) {
+                    joinButton.textContent = 'Verification Failed - Try Again';
+                    joinButton.disabled = false;
+                    
+                    setTimeout(() => {
+                        joinButton.textContent = 'Join Network';
+                    }, 3000);
+                }
+            }
+        };
+    </script>
+    
+    <style>
+        /* Status card transition */
+        #status-loading, #status-no-lemma, #status-has-lemma {
+            transition: opacity 0.3s ease-in-out;
+        }
+    </style>
+{% endblock %}
+
+{% block content %}
+<style>
+/* Mobile responsive adjustments for hero and steps */
+@media (max-width: 768px) {
+    .hero h1 { font-size: 2rem !important; }
+    .hero h1 br { display: none; }
+    #how-it-works > div > div:nth-child(2) {
+        grid-template-columns: 1fr !important;
+        gap: 8px !important;
+    }
+    #how-it-works > div > div:nth-child(2) > div {
+        padding: 20px 16px !important;
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        text-align: left !important;
+    }
+    #how-it-works > div > div:nth-child(2) > div > div:first-child {
+        margin: 0 !important;
+        flex-shrink: 0;
+        width: 40px !important;
+        height: 40px !important;
+        font-size: 18px !important;
+    }
+    #how-it-works > div > div:nth-child(2) > div h3 {
+        margin-bottom: 4px !important;
+    }
+}
+</style>
+
+<!-- Hero Section -->
+<section class="hero">
+    <div class="container" style="position: relative; z-index: 1;">
+        <div style="max-width: 800px; margin: 0 auto; text-align: center;">
+            <p style="font-size: var(--font-size-sm); font-weight: 600; text-transform: uppercase; letter-spacing: 2px; color: var(--primary); margin-bottom: 16px;">Local-First Agent Containment</p>
+            <h1 style="font-size: clamp(2.5rem, 5vw, 3.5rem); line-height: 1.1; margin-bottom: 24px;">Contain Your Agents.<br>Verify Locally.</h1>
+            <p style="font-size: var(--font-size-xl); font-weight: 500; margin-bottom: var(--space-4); color: var(--gray-700);">The Lemma Firewall sits between your agent and the APIs it calls. Every action is verified locally via signed credentials. Zero server calls per request.</p>
+            <p style="font-size: var(--font-size-base); color: var(--gray-600); max-width: 600px; margin: 0 auto;">Issue a signed credential from the control plane. The local firewall verifies it in &lt;1ms via Ed25519 signature check. Scope, path, and method containment enforced locally. Taint epoch denies credentials after context poisoning. Revocation propagates in seconds. Kill switch included.</p>
+            <div style="margin:20px auto 0;max-width:1120px;border:1px solid var(--gray-200);border-radius:16px;padding:16px;background:var(--white);box-shadow:0 10px 15px -3px rgb(0 0 0 / 0.1)">
+                <svg viewBox="0 0 1200 410" width="100%" role="img" aria-label="Lemma proof-first control plane diagram" style="font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,sans-serif">
+                    <rect x="22" y="54" width="226" height="126" rx="14" fill="#0A2540"></rect>
+                    <text x="38" y="84" fill="#e2e8f0" font-size="13" font-weight="700">Agent Runtime</text>
+                    <text x="38" y="112" fill="#e2e8f0" font-size="11">LLM + Prompt</text>
+                    <text x="38" y="152" fill="#cbd5e1" font-size="10">read • write • shell • exec • net • ingest</text>
+                    <text x="38" y="168" fill="#94a3b8" font-size="10">Connect Runtime (1 command)</text>
+
+                    <rect x="300" y="54" width="246" height="126" rx="14" fill="#64748B"></rect>
+                    <text x="320" y="84" fill="#f8fafc" font-size="13" font-weight="700">Proof Issuance</text>
+                    <text x="320" y="112" fill="#f8fafc" font-size="11">PPID-bound identity • taint_epoch=0</text>
+                    <text x="320" y="152" fill="#e2e8f0" font-size="10">low • high • critical</text>
+
+                    <rect x="598" y="54" width="560" height="126" rx="14" fill="#e2e8f0" stroke="#cbd5e1"></rect>
+                    <rect x="598" y="54" width="280" height="126" rx="14" fill="#10B981"></rect>
+                    <rect x="878" y="54" width="280" height="126" rx="14" fill="#3B82F6"></rect>
+                    <path d="M878 54 L878 180" stroke="#e2e8f0" stroke-width="2"></path>
+                    <text x="738" y="84" text-anchor="middle" fill="#ecfeff" font-size="13" font-weight="700">Per-Request Gateway</text>
+                    <text x="738" y="112" text-anchor="middle" fill="#ecfeff" font-size="11">Local Verifier (edge)</text>
+                    <text x="1018" y="112" text-anchor="middle" fill="#eff6ff" font-size="11">Hosted Control Plane (cloud)</text>
+                    <text x="878" y="166" text-anchor="middle" fill="#334155" font-size="10">X-Lemma-Credential header</text>
+
+                    <path d="M248 116 L300 116" stroke="#0f172a" stroke-width="3" fill="none"></path>
+                    <path d="M546 116 L598 116" stroke="#0f172a" stroke-width="3" fill="none"></path>
+
+                    <path d="M736 180 C648 222, 540 236, 424 246" stroke="#10B981" stroke-width="6" fill="none"></path>
+                    <path d="M878 180 C824 222, 732 236, 674 246" stroke="#F59E0B" stroke-width="5" fill="none" stroke-dasharray="10 8"></path>
+                    <path d="M1018 180 C1032 220, 1060 236, 1098 246" stroke="#EF4444" stroke-width="6" fill="none"></path>
+
+                    <rect x="286" y="246" width="258" height="66" rx="14" fill="#dcfce7" stroke="#86efac"></rect>
+                    <text x="415" y="272" text-anchor="middle" fill="#166534" font-size="12" font-weight="700">✅ ALLOW + Decision Log</text>
+                    <rect x="558" y="246" width="258" height="66" rx="14" fill="#fef3c7" stroke="#fcd34d"></rect>
+                    <text x="687" y="272" text-anchor="middle" fill="#92400e" font-size="12" font-weight="700">⚠ Taint Bump → Stale Denied</text>
+                    <rect x="830" y="246" width="328" height="66" rx="14" fill="#fee2e2" stroke="#fca5a5"></rect>
+                    <text x="994" y="272" text-anchor="middle" fill="#991b1b" font-size="12" font-weight="700">❌ Revocation / Kill Switch → token_revoked</text>
+
+                    <line x1="28" y1="350" x2="1168" y2="350" stroke="#cbd5e1" stroke-width="3"></line>
+                    <circle cx="28" cy="350" r="8" fill="#94a3b8"></circle><text x="28" y="374" text-anchor="middle" fill="#334155" font-size="9">t0</text>
+                    <circle cx="170" cy="350" r="8" fill="#10B981"></circle><text x="170" y="374" text-anchor="middle" fill="#334155" font-size="9">t1</text>
+                    <circle cx="312" cy="350" r="8" fill="#10B981"></circle><text x="312" y="374" text-anchor="middle" fill="#334155" font-size="9">t2</text>
+                    <circle cx="454" cy="350" r="8" fill="#10B981"></circle><text x="454" y="374" text-anchor="middle" fill="#334155" font-size="9">t3</text>
+                    <circle cx="596" cy="350" r="8" fill="#94a3b8"></circle><text x="596" y="374" text-anchor="middle" fill="#334155" font-size="9">t4</text>
+                    <circle cx="738" cy="350" r="8" fill="#F59E0B"></circle><text x="738" y="374" text-anchor="middle" fill="#334155" font-size="9">t5</text>
+                    <circle cx="880" cy="350" r="8" fill="#EF4444"></circle><text x="880" y="374" text-anchor="middle" fill="#334155" font-size="9">t6</text>
+                    <circle cx="1022" cy="350" r="8" fill="#EF4444"></circle><text x="1022" y="374" text-anchor="middle" fill="#334155" font-size="9">t7</text>
+                    <circle cx="1164" cy="350" r="8" fill="#EF4444"></circle><text x="1164" y="374" text-anchor="middle" fill="#334155" font-size="9">t8</text>
+                </svg>
+                <p style="margin:8px 0 0;text-align:center;font-size:12px;color:var(--gray-600)">Proof-First Control Plane • Same action. Different trust state. Instant containment.</p>
+            </div>
+            
+            <!-- Dynamic card: changes based on user's lemma status -->
+            <!-- Fixed min-height prevents CLS when state changes -->
+            <div id="lemma-status-card" style="margin-top: 32px; border-radius: 12px; min-height: 120px;">
+                <!-- Loading state - matches final height to prevent shift -->
+                <div id="status-loading" style="background: var(--gray-100); padding: 28px 40px; border-radius: 12px; max-width: 360px; margin: 0 auto; min-height: 120px; display: flex; align-items: center; justify-content: center;">
+                    <p style="margin: 0; font-size: var(--font-size-lg); color: var(--gray-600); text-align: center;">
+                        Checking credentials...
+                    </p>
+                </div>
+                
+                <!-- No lemma state (shown by default, hidden when lemma found) -->
+                <div id="status-no-lemma" style="display: none; background: var(--gray-900); padding: 28px 40px; border-radius: 12px; box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2); max-width: 360px; margin: 0 auto; text-align: center; min-height: 120px;">
+                    <p style="margin: 0 0 10px 0; font-size: var(--font-size-xl); color: var(--white); font-weight: 700;">
+                        Connect a Runtime
+                    </p>
+                    <p style="margin: 0; font-size: var(--font-size-sm); color: var(--gray-400);">
+                        One command to register a runtime and turn on per-request authorization.
+                    </p>
+                    <p style="margin: 10px 0 0 0; font-size: var(--font-size-xs); color: var(--gray-500);">
+                        Hosted control plane + local checks
+                    </p>
+                </div>
+                
+                <!-- Has valid lemma state - Signed In (Green for immediate visual confirmation) -->
+                <div id="status-has-lemma" style="display: none; background: #10b981; padding: 28px 40px; border-radius: 12px; box-shadow: 0 8px 24px rgba(16, 185, 129, 0.3); max-width: 360px; margin: 0 auto; text-align: center; min-height: 120px;">
+                    <!-- Checkmark icon -->
+                    <div id="signin-checkmark" style="margin-bottom: 12px; opacity: 0; transform: scale(0.5); transition: all 0.4s ease-out;">
+                        <svg width="48" height="48" viewBox="0 0 48 48" fill="none" style="display: inline-block;">
+                            <circle cx="24" cy="24" r="22" stroke="rgba(255,255,255,0.3)" stroke-width="2.5" fill="none"/>
+                            <circle id="check-circle" cx="24" cy="24" r="22" stroke="var(--white)" stroke-width="2.5" fill="none" stroke-dasharray="138" stroke-dashoffset="138" style="transition: stroke-dashoffset 0.5s ease-out 0.2s;"/>
+                            <path id="check-path" d="M14 25L21 32L34 18" stroke="var(--white)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none" stroke-dasharray="35" stroke-dashoffset="35" style="transition: stroke-dashoffset 0.3s ease-out 0.5s;"/>
+                        </svg>
+                    </div>
+                    
+                    <!-- Signed in header -->
+                    <div id="signin-header" style="opacity: 0; transform: translateY(10px); transition: all 0.3s ease-out 0.1s;">
+                        <p style="margin: 0 0 16px 0; font-size: var(--font-size-xl); color: var(--white); font-weight: 700;">
+                            Agent Ops Connected
+                        </p>
+                    </div>
+                    
+                    <!-- User info -->
+                    <div id="signin-userinfo" style="opacity: 0; transform: translateY(10px); transition: all 0.3s ease-out 0.2s;">
+                        <p id="lemma-user-email" style="margin: 0 0 10px 0; font-size: var(--font-size-base); color: var(--white); font-weight: 600;">
+                        </p>
+                        <p id="lemma-permission-badge" style="margin: 0; font-size: var(--font-size-sm); color: var(--white);">
+                        </p>
+                    </div>
+                    
+                    <!-- Footer message -->
+                    <div id="signin-details" style="opacity: 0; transform: translateY(10px); transition: all 0.3s ease-out 0.3s;">
+                        <p style="margin: 16px 0 0 0; font-size: var(--font-size-xs); color: rgba(255,255,255,0.7);">
+                            Runtime controls are active
+                        </p>
+                    </div>
+                </div>
+            </div>
+            
+            <div id="hero-buttons" style="margin-top: 48px; display: flex; gap: 16px; justify-content: center; flex-wrap: wrap;">
+                <a href="/app" class="btn btn-primary" id="hero-primary-btn">Open Agent Ops</a>
+                <a href="/demo" class="btn btn-primary">Try the Live Demo</a>
+                <a href="#how-it-works" class="btn btn-secondary">Learn More</a>
+                <a href="/developer" class="btn btn-secondary">Developer Platform</a>
+            </div>
+            
+            <!-- Trust indicators -->
+            <div style="margin-top: 48px; display: flex; gap: 32px; justify-content: center; flex-wrap: wrap; color: var(--gray-500); font-size: var(--font-size-sm);">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                    </svg>
+                    <span>Proof-first by default</span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                        <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                    </svg>
+                    <span>Runtime kill switches</span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"/>
+                        <line x1="2" y1="12" x2="22" y2="12"/>
+                        <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+                    </svg>
+                    <span>Decision logs + explainability</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<script nonce="{{ csp_nonce }}">
+// Hero card state - watches for window.lemmaCredential set by session-free nav in layout.html
+// Uses requestIdleCallback for non-blocking initialization (improves LCP)
+(function() {
+    function initHeroCard() {
+        const loadingEl = document.getElementById('status-loading');
+        const noLemmaEl = document.getElementById('status-no-lemma');
+        const hasLemmaEl = document.getElementById('status-has-lemma');
+        const primaryBtn = document.getElementById('hero-primary-btn');
+        
+        if (!loadingEl) {
+            // Elements not ready yet, retry
+            requestAnimationFrame(initHeroCard);
+            return;
+        }
+        
+        function showSignedIn(cred) {
+            const claims = cred.claims || cred.credentialSubject || {};
+            const email = claims.email || 'User';
+            const permissionId = claims.permissionId || claims.permission_level || 'access';
+            const displayName = claims.displayName || permissionId;
+            
+            // Update UI
+            document.getElementById('lemma-user-email').textContent = email;
+            const badgeContainer = document.getElementById('lemma-permission-badge');
+            badgeContainer.innerHTML = '';
+            const badge = document.createElement('span');
+            badge.style.background = 'rgba(255,255,255,0.15)';
+            badge.style.padding = '8px 20px';
+            badge.style.borderRadius = '24px';
+            badge.style.fontWeight = '500';
+            badge.style.fontSize = 'var(--font-size-sm)';
+            badge.textContent = displayName;
+            badgeContainer.appendChild(badge);
+            
+            // Show valid lemma state
+            loadingEl.style.display = 'none';
+            noLemmaEl.style.display = 'none';
+            hasLemmaEl.style.display = 'block';
+            
+            // Trigger sign-in animation
+            setTimeout(() => {
+                // Animate checkmark (scale in)
+                const checkmark = document.getElementById('signin-checkmark');
+                if (checkmark) {
+                    checkmark.style.opacity = '1';
+                    checkmark.style.transform = 'scale(1)';
+                }
+                
+                // Draw circle and check
+                const circle = document.getElementById('check-circle');
+                const path = document.getElementById('check-path');
+                if (circle) circle.style.strokeDashoffset = '0';
+                if (path) path.style.strokeDashoffset = '0';
+                
+                // Animate header
+                const header = document.getElementById('signin-header');
+                if (header) {
+                    header.style.opacity = '1';
+                    header.style.transform = 'translateY(0)';
+                }
+                
+                // Animate user info
+                const userinfo = document.getElementById('signin-userinfo');
+                if (userinfo) {
+                    userinfo.style.opacity = '1';
+                    userinfo.style.transform = 'translateY(0)';
+                }
+                
+                // Animate details
+                const details = document.getElementById('signin-details');
+                if (details) {
+                    details.style.opacity = '1';
+                    details.style.transform = 'translateY(0)';
+                }
+            }, 50);
+            
+            // Update button
+            primaryBtn.textContent = 'Open Developer Platform';
+            primaryBtn.href = '/developer/platform';
+        }
+        
+        function showJoinBeta() {
+            loadingEl.style.display = 'none';
+            noLemmaEl.style.display = 'block';
+            hasLemmaEl.style.display = 'none';
+        }
+        
+        // Poll for window.lemmaCredential (set by initSessionFreeNav in layout.html)
+        let checks = 0;
+        const maxChecks = 30; // 3 seconds max
+        const checkInterval = setInterval(() => {
+            checks++;
+            if (window.lemmaCredential) {
+                clearInterval(checkInterval);
+                showSignedIn(window.lemmaCredential);
+            } else if (checks >= maxChecks) {
+                clearInterval(checkInterval);
+                showJoinBeta();
+            }
+        }, 100);
+    }
+    
+    // Start after DOM is ready - use requestIdleCallback for non-blocking
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', () => {
+            if ('requestIdleCallback' in window) {
+                requestIdleCallback(initHeroCard);
+            } else {
+                setTimeout(initHeroCard, 0);
+            }
+        });
+    } else {
+        if ('requestIdleCallback' in window) {
+            requestIdleCallback(initHeroCard);
+        } else {
+            setTimeout(initHeroCard, 0);
+        }
+    }
+})();
+</script>
+
+<!-- How It Works Section -->
+<section class="section" id="how-it-works">
+    <div class="container">
+        <div style="text-align: center; margin-bottom: 64px;">
+            <h2>How Lemma.id Works</h2>
+            <p class="text-gray" style="max-width: 700px; margin: 16px auto 0;">Connect a runtime, enforce policy on every privileged request, and monitor or stop activity from one control plane.</p>
+        </div>
+        
+        <!-- Step-by-step flow -->
+        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; max-width: 900px; margin: 0 auto 64px; text-align: center;">
+            <div style="padding: 32px 24px;">
+                <div style="width: 56px; height: 56px; border-radius: 50%; background: var(--primary); color: white; font-size: 24px; font-weight: 700; display: flex; align-items: center; justify-content: center; margin: 0 auto 20px;">1</div>
+                <h3 style="font-size: var(--font-size-lg); margin-bottom: 8px;">Connect Runtime</h3>
+                <p style="color: var(--gray-600); font-size: var(--font-size-sm);">Run one command to register a runtime with Lemma.id and turn on proof-first defaults.</p>
+            </div>
+            <div style="padding: 32px 24px;">
+                <div style="width: 56px; height: 56px; border-radius: 50%; background: var(--primary); color: white; font-size: 24px; font-weight: 700; display: flex; align-items: center; justify-content: center; margin: 0 auto 20px;">2</div>
+                <h3 style="font-size: var(--font-size-lg); margin-bottom: 8px;">Enforce Per Request</h3>
+                <p style="color: var(--gray-600); font-size: var(--font-size-sm);">The gateway checks proof, scope, audience, and runtime state before any privileged action runs.</p>
+            </div>
+            <div style="padding: 32px 24px;">
+                <div style="width: 56px; height: 56px; border-radius: 50%; background: var(--primary); color: white; font-size: 24px; font-weight: 700; display: flex; align-items: center; justify-content: center; margin: 0 auto 20px;">3</div>
+                <h3 style="font-size: var(--font-size-lg); margin-bottom: 8px;">Monitor + Contain</h3>
+                <p style="color: var(--gray-600); font-size: var(--font-size-sm);">Track decisions live, investigate allow or deny results, and trigger kill switches to stop unsafe behavior immediately.</p>
+            </div>
+        </div>
+        
+        <!-- Feature cards -->
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 32px;">
+            <div class="card">
+                <h3 class="card-title">Proof-Native Authorization</h3>
+                <p>Signed proofs and claim checks authorize sensitive actions, with compatibility paths only where policy allows them.</p>
+            </div>
+            
+            <div class="card">
+                <h3 class="card-title">PPID-Bound Identity</h3>
+                <p>Runtime controls and delegation are tied to pairwise identifiers (PPIDs), so identity stays site-specific instead of globally trackable.</p>
+            </div>
+            
+            <div class="card">
+                <h3 class="card-title">Runtime Policy Defaults</h3>
+                <p>Every connected runtime inherits a policy profile and risk defaults (`low`, `high`, `critical`) with server-side enforcement.</p>
+            </div>
+            
+            <div class="card">
+                <h3 class="card-title">Kill Switch Controls</h3>
+                <p>Revoke or kill runtime access instantly and deterministically in the request path.</p>
+            </div>
+            
+            <div class="card">
+                <h3 class="card-title">Decision Explainability</h3>
+                <p>See why a request was allowed or denied with decision logs, runtime context, and the policy snapshot used at the time.</p>
+            </div>
+            
+            <div class="card">
+                <h3 class="card-title">Local-First + Hosted Control Plane</h3>
+                <p>Keep low-latency local verification where possible while using a hosted control plane for governance, revocation, and runtime operations.</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- CTA Section -->
+<section class="section" style="background: var(--gray-900); color: var(--white); padding: 80px 0;">
+    <div class="container" style="text-align: center;">
+        <h2 style="color: var(--white); font-size: var(--font-size-3xl); margin-bottom: 20px;">Deploy Runtime Authorization Without Building It Yourself</h2>
+        <p style="color: var(--gray-400); font-size: var(--font-size-lg); margin-bottom: 48px; max-width: 600px; margin-left: auto; margin-right: auto;">Ship per-request authorization, runtime monitoring, and kill-switch controls without standing up a separate authz stack.</p>
+        <div style="display: flex; gap: 20px; justify-content: center; flex-wrap: wrap;">
+            <a href="/app" class="btn btn-primary" style="font-size: var(--font-size-lg); padding: 16px 32px;">
+                Open Agent Ops
+            </a>
+            <a href="/docs" class="btn btn-secondary" style="background: transparent; border-color: var(--gray-600); color: var(--white);">View Docs</a>
+        </div>
+        <p style="color: var(--gray-500); font-size: var(--font-size-sm); margin-top: 24px;">
+            Proof-first • Site-specific identity • Runtime controls
+        </p>
+    </div>
+</section>
+
+{% endblock %}

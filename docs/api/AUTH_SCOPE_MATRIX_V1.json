@@ -1,0 +1,3650 @@
+{
+  "version": "1.0.0",
+  "generated_by": "scripts/generate_auth_scope_matrix.py",
+  "description": "Initial scope map inferred from route decorators; review required before enforcement.",
+  "routes": [
+    {
+      "path": "/api/admin/customers",
+      "methods": [
+        "GET"
+      ],
+      "module": "api/dashboard_api.py",
+      "handler": "get_all_customers",
+      "required_scope": "admin",
+      "auth_mode": "admin_controlled",
+      "auth_decorators": [
+        "require_site_admin"
+      ],
+      "decorator_chain": [
+        "cross_origin",
+        "require_site_admin"
+      ]
+    },
+    {
+      "path": "/api/admin/issue-admin-credential",
+      "methods": [
+        "POST"
+      ],
+      "module": "api/dashboard_api.py",
+      "handler": "issue_admin_credential",
+      "required_scope": "admin",
+      "auth_mode": "custom_or_internal",
+      "auth_decorators": [],
+      "decorator_chain": [
+        "cross_origin"
+      ]
+    },
+    {
+      "path": "/api/admin/issue-admin-lemma",
+      "methods": [
+        "POST"
+      ],
+      "module": "api/dashboard_api.py",
+      "handler": "issue_admin_lemma_endpoint",
+      "required_scope": "admin",
+      "auth_mode": "custom_or_internal",
+      "auth_decorators": [],
+      "decorator_chain": [
+        "cross_origin"
+      ]
+    },
+    {
+      "path": "/api/admin/monitoring-summary",
+      "methods": [
+        "GET"
+      ],
+      "module": "api/dashboard_api.py",
+      "handler": "get_admin_monitoring_summary",
+      "required_scope": "admin",
+      "auth_mode": "admin_controlled",
+      "auth_decorators": [
+        "require_site_admin"
+      ],
+      "decorator_chain": [
+        "cross_origin",
+        "require_site_admin"
+      ]
+    },
+    {
+      "path": "/api/admin/nonce-stats",
+      "methods": [
+        "GET"
+      ],
+      "module": "api/permission_verification.py",
+      "handler": "nonce_stats",
+      "required_scope": "admin",
+      "auth_mode": "admin_controlled",
+      "auth_decorators": [
+        "require_site_admin"
+      ],
+      "decorator_chain": [
+        "require_site_admin"
+      ]
+    },
+    {
+      "path": "/api/admin/platform-stats",
+      "methods": [
+        "GET"
+      ],
+      "module": "api/dashboard_api.py",
+      "handler": "get_platform_stats",
+      "required_scope": "admin",
+      "auth_mode": "admin_controlled",
+      "auth_decorators": [
+        "require_site_admin"
+      ],
+      "decorator_chain": [
+        "cross_origin",
+        "require_site_admin"
+      ]
+    },
+    {
+      "path": "/api/admin/recent-activity",
+      "methods": [
+        "GET"
+      ],
+      "module": "api/dashboard_api.py",
+      "handler": "get_admin_recent_activity",
+      "required_scope": "admin",
+      "auth_mode": "admin_controlled",
+      "auth_decorators": [
+        "require_site_admin"
+      ],
+      "decorator_chain": [
+        "cross_origin",
+        "require_site_admin"
+      ]
+    },
+    {
+      "path": "/api/admin/reissue-with-ppid",
+      "methods": [
+        "POST"
+      ],
+      "module": "api/dashboard_api.py",
+      "handler": "reissue_admin_with_ppid",
+      "required_scope": "admin",
+      "auth_mode": "custom_or_internal",
+      "auth_decorators": [],
+      "decorator_chain": [
+        "cross_origin"
+      ]
+    },
+    {
+      "path": "/api/admin/site-stats",
+      "methods": [
+        "GET"
+      ],
+      "module": "api/dashboard_api.py",
+      "handler": "get_admin_site_stats",
+      "required_scope": "admin",
+      "auth_mode": "admin_controlled",
+      "auth_decorators": [
+        "require_site_admin"
+      ],
+      "decorator_chain": [
+        "cross_origin",
+        "require_site_admin"
+      ]
+    },
+    {
+      "path": "/api/admin/sites",
+      "methods": [
+        "GET"
+      ],
+      "module": "api/dashboard_api.py",
+      "handler": "get_all_sites",
+      "required_scope": "admin",
+      "auth_mode": "admin_controlled",
+      "auth_decorators": [
+        "require_site_admin"
+      ],
+      "decorator_chain": [
+        "cross_origin",
+        "require_site_admin"
+      ]
+    },
+    {
+      "path": "/api/admin/user-stats",
+      "methods": [
+        "GET"
+      ],
+      "module": "api/dashboard_api.py",
+      "handler": "get_admin_user_stats",
+      "required_scope": "admin",
+      "auth_mode": "admin_controlled",
+      "auth_decorators": [
+        "require_site_admin"
+      ],
+      "decorator_chain": [
+        "cross_origin",
+        "require_site_admin"
+      ]
+    },
+    {
+      "path": "/api/admin/users",
+      "methods": [
+        "GET"
+      ],
+      "module": "api/dashboard_api.py",
+      "handler": "get_admin_users",
+      "required_scope": "admin",
+      "auth_mode": "admin_controlled",
+      "auth_decorators": [
+        "require_site_admin"
+      ],
+      "decorator_chain": [
+        "cross_origin",
+        "require_site_admin"
+      ]
+    },
+    {
+      "path": "/api/admin/users/revoke-access",
+      "methods": [
+        "POST"
+      ],
+      "module": "api/dashboard_api.py",
+      "handler": "revoke_admin_user_access",
+      "required_scope": "admin",
+      "auth_mode": "admin_controlled",
+      "auth_decorators": [
+        "require_site_admin"
+      ],
+      "decorator_chain": [
+        "cross_origin",
+        "require_site_admin"
+      ]
+    },
+    {
+      "path": "/api/agent/cli-login/complete",
+      "methods": [
+        "GET"
+      ],
+      "module": "api/agent_credentials.py",
+      "handler": "cli_login_complete",
+      "required_scope": "public",
+      "auth_mode": "public",
+      "auth_decorators": [],
+      "decorator_chain": []
+    },
+    {
+      "path": "/api/agent/cli-login/poll",
+      "methods": [
+        "GET"
+      ],
+      "module": "api/agent_credentials.py",
+      "handler": "cli_login_poll",
+      "required_scope": "public",
+      "auth_mode": "public",
+      "auth_decorators": [],
+      "decorator_chain": []
+    },
+    {
+      "path": "/api/agent/credentials",
+      "methods": [
+        "GET"
+      ],
+      "module": "api/agent_credentials.py",
+      "handler": "list_agent_credentials",
+      "required_scope": "public",
+      "auth_mode": "public",
+      "auth_decorators": [],
+      "decorator_chain": [
+        "restricted_cross_origin"
+      ]
+    },
+    {
+      "path": "/api/agent/credentials/<token_id>/revoke",
+      "methods": [
+        "POST"
+      ],
+      "module": "api/agent_credentials.py",
+      "handler": "revoke_agent_credential",
+      "required_scope": "write",
+      "auth_mode": "custom_or_internal",
+      "auth_decorators": [
+        "require_agent_or_user_session"
+      ],
+      "decorator_chain": [
+        "restricted_cross_origin",
+        "require_agent_or_user_session"
+      ]
+    },
+    {
+      "path": "/api/agent/credentials/<token_id>/task-report",
+      "methods": [
+        "GET"
+      ],
+      "module": "api/agent_credentials.py",
+      "handler": "get_task_adherence_report",
+      "required_scope": "public",
+      "auth_mode": "public",
+      "auth_decorators": [],
+      "decorator_chain": [
+        "restricted_cross_origin"
+      ]
+    },
+    {
+      "path": "/api/agent/credentials/audit",
+      "methods": [
+        "GET"
+      ],
+      "module": "api/agent_credentials.py",
+      "handler": "get_agent_audit_log",
+      "required_scope": "public",
+      "auth_mode": "public",
+      "auth_decorators": [],
+      "decorator_chain": [
+        "restricted_cross_origin"
+      ]
+    },
+    {
+      "path": "/api/agent/credentials/issue",
+      "methods": [
+        "POST"
+      ],
+      "module": "api/agent_credentials.py",
+      "handler": "issue_agent_credential",
+      "required_scope": "write",
+      "auth_mode": "custom_or_internal",
+      "auth_decorators": [
+        "require_agent_or_user_session"
+      ],
+      "decorator_chain": [
+        "restricted_cross_origin",
+        "rate_limit",
+        "require_agent_or_user_session"
+      ]
+    },
+    {
+      "path": "/api/agent/credentials/session-issue",
+      "methods": [
+        "POST"
+      ],
+      "module": "api/agent_credentials.py",
+      "handler": "auto_issue_agent_credential",
+      "required_scope": "write",
+      "auth_mode": "custom_or_internal",
+      "auth_decorators": [
+        "require_agent_or_user_session"
+      ],
+      "decorator_chain": [
+        "rate_limit",
+        "require_agent_or_user_session"
+      ]
+    },
+    {
+      "path": "/api/agent/monitor/events",
+      "methods": [
+        "GET"
+      ],
+      "module": "api/agent_credentials.py",
+      "handler": "get_agent_monitor_events",
+      "required_scope": "public",
+      "auth_mode": "public",
+      "auth_decorators": [],
+      "decorator_chain": [
+        "restricted_cross_origin"
+      ]
+    },
+    {
+      "path": "/api/agent/monitor/log-external",
+      "methods": [
+        "POST"
+      ],
+      "module": "api/agent_credentials.py",
+      "handler": "log_external_agent_activity",
+      "required_scope": "write",
+      "auth_mode": "custom_or_internal",
+      "auth_decorators": [],
+      "decorator_chain": [
+        "restricted_cross_origin"
+      ]
+    },
+    {
+      "path": "/api/agent/monitor/summary",
+      "methods": [
+        "GET"
+      ],
+      "module": "api/agent_credentials.py",
+      "handler": "get_agent_monitor_summary",
+      "required_scope": "public",
+      "auth_mode": "public",
+      "auth_decorators": [],
+      "decorator_chain": [
+        "restricted_cross_origin"
+      ]
+    },
+    {
+      "path": "/api/agent/monitor/tokens",
+      "methods": [
+        "GET"
+      ],
+      "module": "api/agent_credentials.py",
+      "handler": "get_agent_monitor_tokens",
+      "required_scope": "public",
+      "auth_mode": "public",
+      "auth_decorators": [],
+      "decorator_chain": [
+        "restricted_cross_origin"
+      ]
+    },
+    {
+      "path": "/api/agent/session",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "module": "api/agent_credentials.py",
+      "handler": "create_agent_session",
+      "required_scope": "write",
+      "auth_mode": "custom_or_internal",
+      "auth_decorators": [
+        "require_agent_or_user_session"
+      ],
+      "decorator_chain": [
+        "restricted_cross_origin",
+        "require_agent_or_user_session"
+      ]
+    },
+    {
+      "path": "/api/agent/validate",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "module": "api/agent_credentials.py",
+      "handler": "validate_agent_token_endpoint",
+      "required_scope": "write",
+      "auth_mode": "custom_or_internal",
+      "auth_decorators": [],
+      "decorator_chain": [
+        "restricted_cross_origin"
+      ]
+    },
+    {
+      "path": "/api/auth/exchange-proof",
+      "methods": [
+        "POST",
+        "OPTIONS"
+      ],
+      "module": "api/sdk_auth.py",
+      "handler": "exchange_proof_for_token",
+      "required_scope": "write",
+      "auth_mode": "custom_or_internal",
+      "auth_decorators": [],
+      "decorator_chain": [
+        "cross_origin"
+      ]
+    },
+    {
+      "path": "/api/auth/introspect",
+      "methods": [
+        "POST",
+        "OPTIONS"
+      ],
+      "module": "api/sdk_auth.py",
+      "handler": "introspect_access_token_endpoint",
+      "required_scope": "api_key",
+      "auth_mode": "api_key",
+      "auth_decorators": [
+        "require_api_key"
+      ],
+      "decorator_chain": [
+        "cross_origin",
+        "require_api_key"
+      ]
+    },
+    {
+      "path": "/api/auth/lemma-signin",
+      "methods": [
+        "POST"
+      ],
+      "module": "api/lemma_auth_endpoint.py",
+      "handler": "lemma_signin",
+      "required_scope": "write",
+      "auth_mode": "custom_or_internal",
+      "auth_decorators": [],
+      "decorator_chain": [
+        "cross_origin"
+      ]
+    },
+    {
+      "path": "/api/auth/refresh",
+      "methods": [
+        "POST",
+        "OPTIONS"
+      ],
+      "module": "api/sdk_auth.py",
+      "handler": "refresh_access_token_endpoint",
+      "required_scope": "write",
+      "auth_mode": "custom_or_internal",
+      "auth_decorators": [],
+      "decorator_chain": [
+        "cross_origin"
+      ]
+    },
+    {
+      "path": "/api/auth/request-beta-access",
+      "methods": [
+        "POST",
+        "OPTIONS"
+      ],
+      "module": "api/beta_access.py",
+      "handler": "request_beta_access",
+      "required_scope": "write",
+      "auth_mode": "custom_or_internal",
+      "auth_decorators": [],
+      "decorator_chain": [
+        "cross_origin",
+        "check_ip_not_blocked",
+        "rate_limit_email_confirmation"
+      ]
+    },
+    {
+      "path": "/api/auth/revoke",
+      "methods": [
+        "POST",
+        "OPTIONS"
+      ],
+      "module": "api/sdk_auth.py",
+      "handler": "revoke_access_token_endpoint",
+      "required_scope": "api_key",
+      "auth_mode": "api_key",
+      "auth_decorators": [
+        "require_api_key"
+      ],
+      "decorator_chain": [
+        "cross_origin",
+        "require_api_key"
+      ]
+    },
+    {
+      "path": "/api/auth/signout",
+      "methods": [
+        "POST",
+        "OPTIONS"
+      ],
+      "module": "api/sdk_auth.py",
+      "handler": "sdk_signout",
+      "required_scope": "write",
+      "auth_mode": "custom_or_internal",
+      "auth_decorators": [],
+      "decorator_chain": [
+        "cross_origin"
+      ]
+    },
+    {
+      "path": "/api/authz/jwks",
+      "methods": [
+        "GET"
+      ],
+      "module": "api/authz_control_plane.py",
+      "handler": "authz_jwks",
+      "required_scope": "public",
+      "auth_mode": "public",
+      "auth_decorators": [],
+      "decorator_chain": []
+    },
+    {
+      "path": "/api/authz/policy/snapshot",
+      "methods": [
+        "GET"
+      ],
+      "module": "api/authz_control_plane.py",
+      "handler": "policy_snapshot",
+      "required_scope": "public",
+      "auth_mode": "public",
+      "auth_decorators": [],
+      "decorator_chain": []
+    },
+    {
+      "path": "/api/authz/revocation/delta",
+      "methods": [
+        "GET"
+      ],
+      "module": "api/authz_control_plane.py",
+      "handler": "revocation_delta",
+      "required_scope": "public",
+      "auth_mode": "public",
+      "auth_decorators": [],
+      "decorator_chain": []
+    },
+    {
+      "path": "/api/billing/create-checkout",
+      "methods": [
+        "POST"
+      ],
+      "module": "api/automated_billing.py",
+      "handler": "create_checkout",
+      "required_scope": "read",
+      "auth_mode": "customer_or_admin",
+      "auth_decorators": [
+        "require_customer_or_admin"
+      ],
+      "decorator_chain": [
+        "require_customer_or_admin"
+      ]
+    },
+    {
+      "path": "/api/billing/report-usage",
+      "methods": [
+        "POST"
+      ],
+      "module": "api/automated_billing.py",
+      "handler": "report_usage",
+      "required_scope": "api_key",
+      "auth_mode": "api_key",
+      "auth_decorators": [
+        "require_api_key"
+      ],
+      "decorator_chain": [
+        "require_api_key"
+      ]
+    },
+    {
+      "path": "/api/billing/usage/<customer_id>",
+      "methods": [
+        "GET"
+      ],
+      "module": "api/automated_billing.py",
+      "handler": "get_usage",
+      "required_scope": "read",
+      "auth_mode": "customer_or_admin",
+      "auth_decorators": [
+        "require_customer_or_admin"
+      ],
+      "decorator_chain": [
+        "require_customer_or_admin"
+      ]
+    },
+    {
+      "path": "/api/create-checkout-session",
+      "methods": [
+        "POST"
+      ],
+      "module": "api/stripe_checkout.py",
+      "handler": "create_checkout_session",
+      "required_scope": "read",
+      "auth_mode": "customer_or_admin",
+      "auth_decorators": [
+        "require_customer_or_admin"
+      ],
+      "decorator_chain": [
+        "require_customer_or_admin"
+      ]
+    },
+    {
+      "path": "/api/credentials/check-refresh-eligibility",
+      "methods": [
+        "POST"
+      ],
+      "module": "api/credential_refresh.py",
+      "handler": "check_refresh_eligibility",
+      "required_scope": "api_key",
+      "auth_mode": "api_key",
+      "auth_decorators": [
+        "require_api_key"
+      ],
+      "decorator_chain": [
+        "cross_origin",
+        "require_api_key"
+      ]
+    },
+    {
+      "path": "/api/credentials/refresh",
+      "methods": [
+        "POST"
+      ],
+      "module": "api/credential_refresh.py",
+      "handler": "refresh_credential",
+      "required_scope": "api_key",
+      "auth_mode": "api_key",
+      "auth_decorators": [
+        "require_api_key"
+      ],
+      "decorator_chain": [
+        "cross_origin",
+        "require_api_key"
+      ]
+    },
+    {
+      "path": "/api/customer/api-keys",
+      "methods": [
+        "GET",
+        "POST",
+        "DELETE"
+      ],
+      "module": "api/customer_accounts.py",
+      "handler": "manage_api_keys",
+      "required_scope": "read",
+      "auth_mode": "customer_or_admin",
+      "auth_decorators": [
+        "require_customer_or_admin"
+      ],
+      "decorator_chain": [
+        "require_customer_or_admin"
+      ]
+    },
+    {
+      "path": "/api/customer/api-keys/rotate",
+      "methods": [
+        "POST"
+      ],
+      "module": "api/customer_accounts.py",
+      "handler": "rotate_api_key",
+      "required_scope": "read",
+      "auth_mode": "customer_or_admin",
+      "auth_decorators": [
+        "require_customer_or_admin"
+      ],
+      "decorator_chain": [
+        "cross_origin",
+        "require_customer_or_admin"
+      ]
+    },
+    {
+      "path": "/api/customer/info",
+      "methods": [
+        "GET"
+      ],
+      "module": "api/customer_accounts.py",
+      "handler": "get_customer_info",
+      "required_scope": "public",
+      "auth_mode": "public",
+      "auth_decorators": [],
+      "decorator_chain": []
+    },
+    {
+      "path": "/api/customer/profile",
+      "methods": [
+        "GET"
+      ],
+      "module": "api/dashboard_api.py",
+      "handler": "get_customer_profile",
+      "required_scope": "read",
+      "auth_mode": "wallet_or_api_key",
+      "auth_decorators": [
+        "require_wallet_ppid"
+      ],
+      "decorator_chain": [
+        "cross_origin",
+        "require_wallet_ppid"
+      ]
+    },
+    {
+      "path": "/api/customer/register-secure",
+      "methods": [
+        "POST"
+      ],
+      "module": "api/customer_accounts.py",
+      "handler": "register_secure",
+      "required_scope": "write",
+      "auth_mode": "custom_or_internal",
+      "auth_decorators": [],
+      "decorator_chain": [
+        "cross_origin"
+      ]
+    },
+    {
+      "path": "/api/customer/register-site",
+      "methods": [
+        "POST"
+      ],
+      "module": "api/customer_accounts.py",
+      "handler": "register_customer_site",
+      "required_scope": "read",
+      "auth_mode": "customer_or_admin",
+      "auth_decorators": [
+        "require_customer_or_admin"
+      ],
+      "decorator_chain": [
+        "require_customer_or_admin"
+      ]
+    },
+    {
+      "path": "/api/customer/sites",
+      "methods": [
+        "GET"
+      ],
+      "module": "api/customer_accounts.py",
+      "handler": "get_customer_sites",
+      "required_scope": "public",
+      "auth_mode": "public",
+      "auth_decorators": [],
+      "decorator_chain": []
+    },
+    {
+      "path": "/api/customer/usage",
+      "methods": [
+        "GET"
+      ],
+      "module": "api/dashboard_api.py",
+      "handler": "get_customer_usage",
+      "required_scope": "read",
+      "auth_mode": "customer_or_admin",
+      "auth_decorators": [
+        "require_customer_or_admin"
+      ],
+      "decorator_chain": [
+        "cross_origin",
+        "require_customer_or_admin"
+      ]
+    },
+    {
+      "path": "/api/demo/issue-proof",
+      "methods": [
+        "POST"
+      ],
+      "module": "api/demo_api.py",
+      "handler": "demo_issue_proof",
+      "required_scope": "write",
+      "auth_mode": "custom_or_internal",
+      "auth_decorators": [],
+      "decorator_chain": [
+        "rate_limit"
+      ]
+    },
+    {
+      "path": "/api/demo/revocation-status",
+      "methods": [
+        "GET"
+      ],
+      "module": "api/demo_api.py",
+      "handler": "demo_revocation_status",
+      "required_scope": "public",
+      "auth_mode": "public",
+      "auth_decorators": [],
+      "decorator_chain": [
+        "rate_limit"
+      ]
+    },
+    {
+      "path": "/api/demo/revoke",
+      "methods": [
+        "POST"
+      ],
+      "module": "api/demo_api.py",
+      "handler": "demo_revoke_proof",
+      "required_scope": "write",
+      "auth_mode": "custom_or_internal",
+      "auth_decorators": [],
+      "decorator_chain": [
+        "rate_limit"
+      ]
+    },
+    {
+      "path": "/api/demo/state",
+      "methods": [
+        "GET"
+      ],
+      "module": "api/demo_api.py",
+      "handler": "demo_state",
+      "required_scope": "public",
+      "auth_mode": "public",
+      "auth_decorators": [],
+      "decorator_chain": [
+        "rate_limit"
+      ]
+    },
+    {
+      "path": "/api/demo/taint-bump",
+      "methods": [
+        "POST"
+      ],
+      "module": "api/demo_api.py",
+      "handler": "demo_taint_bump",
+      "required_scope": "write",
+      "auth_mode": "custom_or_internal",
+      "auth_decorators": [],
+      "decorator_chain": [
+        "rate_limit"
+      ]
+    },
+    {
+      "path": "/api/demo/verify",
+      "methods": [
+        "POST"
+      ],
+      "module": "api/demo_api.py",
+      "handler": "demo_verify_action",
+      "required_scope": "write",
+      "auth_mode": "custom_or_internal",
+      "auth_decorators": [],
+      "decorator_chain": [
+        "rate_limit"
+      ]
+    },
+    {
+      "path": "/api/developer/credential-transfer/redeem",
+      "methods": [
+        "POST"
+      ],
+      "module": "api/developer_api.py",
+      "handler": "redeem_credential_transfer_token",
+      "required_scope": "write",
+      "auth_mode": "custom_or_internal",
+      "auth_decorators": [],
+      "decorator_chain": [
+        "cross_origin"
+      ]
+    },
+    {
+      "path": "/api/developer/issue-self-permission",
+      "methods": [
+        "POST"
+      ],
+      "module": "api/developer_self_issue.py",
+      "handler": "issue_self_permission",
+      "required_scope": "read",
+      "auth_mode": "customer_or_admin",
+      "auth_decorators": [
+        "require_customer_or_admin"
+      ],
+      "decorator_chain": [
+        "cross_origin",
+        "require_customer_or_admin"
+      ]
+    },
+    {
+      "path": "/api/developer/sites",
+      "methods": [
+        "GET"
+      ],
+      "module": "api/developer_api.py",
+      "handler": "get_developer_sites",
+      "required_scope": "read",
+      "auth_mode": "agent_or_user",
+      "auth_decorators": [
+        "require_agent_or_user_auth"
+      ],
+      "decorator_chain": [
+        "cross_origin",
+        "require_agent_or_user_auth"
+      ]
+    },
+    {
+      "path": "/api/developer/sites",
+      "methods": [
+        "POST"
+      ],
+      "module": "api/developer_api.py",
+      "handler": "create_developer_site",
+      "required_scope": "write",
+      "auth_mode": "agent_or_user",
+      "auth_decorators": [
+        "require_agent_or_user_auth"
+      ],
+      "decorator_chain": [
+        "cross_origin",
+        "require_agent_or_user_auth"
+      ]
+    },
+    {
+      "path": "/api/developer/sites/<site_id>",
+      "methods": [
+        "GET"
+      ],
+      "module": "api/developer_api.py",
+      "handler": "get_site_detail",
+      "required_scope": "read",
+      "auth_mode": "agent_or_user",
+      "auth_decorators": [
+        "require_agent_or_user_auth"
+      ],
+      "decorator_chain": [
+        "cross_origin",
+        "require_agent_or_user_auth"
+      ]
+    },
+    {
+      "path": "/api/developer/sites/<site_id>/admin-transfer-token",
+      "methods": [
+        "POST"
+      ],
+      "module": "api/developer_api.py",
+      "handler": "create_admin_transfer_token",
+      "required_scope": "write",
+      "auth_mode": "agent_or_user",
+      "auth_decorators": [
+        "require_agent_or_user_auth"
+      ],
+      "decorator_chain": [
+        "cross_origin",
+        "require_agent_or_user_auth"
+      ]
+    },
+    {
+      "path": "/api/developer/sites/<site_id>/bootstrap-admin",
+      "methods": [
+        "POST"
+      ],
+      "module": "api/developer_api.py",
+      "handler": "bootstrap_site_admin",
+      "required_scope": "write",
+      "auth_mode": "agent_or_user",
+      "auth_decorators": [
+        "require_agent_or_user_auth"
+      ],
+      "decorator_chain": [
+        "cross_origin",
+        "require_agent_or_user_auth"
+      ]
+    },
+    {
+      "path": "/api/developer/sites/<site_id>/bootstrap-status",
+      "methods": [
+        "GET"
+      ],
+      "module": "api/developer_api.py",
+      "handler": "get_site_bootstrap_status",
+      "required_scope": "read",
+      "auth_mode": "agent_or_user",
+      "auth_decorators": [
+        "require_agent_or_user_auth"
+      ],
+      "decorator_chain": [
+        "cross_origin",
+        "require_agent_or_user_auth"
+      ]
+    },
+    {
+      "path": "/api/developer/sites/<site_id>/keys",
+      "methods": [
+        "GET"
+      ],
+      "module": "api/developer_api.py",
+      "handler": "get_site_keys",
+      "required_scope": "read",
+      "auth_mode": "agent_or_user",
+      "auth_decorators": [
+        "require_agent_or_user_auth"
+      ],
+      "decorator_chain": [
+        "cross_origin",
+        "require_agent_or_user_auth"
+      ]
+    },
+    {
+      "path": "/api/developer/sites/<site_id>/keys",
+      "methods": [
+        "GET"
+      ],
+      "module": "api/site_management_api.py",
+      "handler": "get_api_keys",
+      "required_scope": "read",
+      "auth_mode": "agent_or_user",
+      "auth_decorators": [
+        "require_agent_or_user_auth"
+      ],
+      "decorator_chain": [
+        "cross_origin",
+        "require_agent_or_user_auth"
+      ]
+    },
+    {
+      "path": "/api/developer/sites/<site_id>/keys",
+      "methods": [
+        "POST"
+      ],
+      "module": "api/developer_api.py",
+      "handler": "create_site_key",
+      "required_scope": "admin",
+      "auth_mode": "agent_or_user",
+      "auth_decorators": [
+        "require_agent_or_user_auth"
+      ],
+      "decorator_chain": [
+        "cross_origin",
+        "require_agent_or_user_auth"
+      ]
+    },
+    {
+      "path": "/api/developer/sites/<site_id>/keys",
+      "methods": [
+        "POST"
+      ],
+      "module": "api/site_management_api.py",
+      "handler": "create_api_key",
+      "required_scope": "admin",
+      "auth_mode": "agent_or_user",
+      "auth_decorators": [
+        "require_agent_or_user_auth"
+      ],
+      "decorator_chain": [
+        "cross_origin",
+        "require_agent_or_user_auth"
+      ]
+    },
+    {
+      "path": "/api/developer/sites/<site_id>/keys/<int:key_id>",
+      "methods": [
+        "DELETE"
+      ],
+      "module": "api/site_management_api.py",
+      "handler": "revoke_api_key",
+      "required_scope": "admin",
+      "auth_mode": "agent_or_user",
+      "auth_decorators": [
+        "require_agent_or_user_auth"
+      ],
+      "decorator_chain": [
+        "cross_origin",
+        "require_agent_or_user_auth"
+      ]
+    },
+    {
+      "path": "/api/developer/sites/<site_id>/keys/<int:key_id>/rotate",
+      "methods": [
+        "POST"
+      ],
+      "module": "api/site_management_api.py",
+      "handler": "rotate_api_key",
+      "required_scope": "admin",
+      "auth_mode": "agent_or_user",
+      "auth_decorators": [
+        "require_agent_or_user_auth"
+      ],
+      "decorator_chain": [
+        "cross_origin",
+        "require_agent_or_user_auth"
+      ]
+    },
+    {
+      "path": "/api/developer/sites/<site_id>/keys/<key_id>",
+      "methods": [
+        "DELETE"
+      ],
+      "module": "api/developer_api.py",
+      "handler": "revoke_site_key",
+      "required_scope": "admin",
+      "auth_mode": "agent_or_user",
+      "auth_decorators": [
+        "require_agent_or_user_auth"
+      ],
+      "decorator_chain": [
+        "cross_origin",
+        "require_agent_or_user_auth"
+      ]
+    },
+    {
+      "path": "/api/developer/sites/<site_id>/keys/<key_id>/rotate",
+      "methods": [
+        "POST"
+      ],
+      "module": "api/developer_api.py",
+      "handler": "rotate_site_key",
+      "required_scope": "admin",
+      "auth_mode": "agent_or_user",
+      "auth_decorators": [
+        "require_agent_or_user_auth"
+      ],
+      "decorator_chain": [
+        "cross_origin",
+        "require_agent_or_user_auth"
+      ]
+    },
+    {
+      "path": "/api/developer/sites/<site_id>/permissions",
+      "methods": [
+        "GET"
+      ],
+      "module": "api/site_management_api.py",
+      "handler": "get_permission_types",
+      "required_scope": "read",
+      "auth_mode": "agent_or_user",
+      "auth_decorators": [
+        "require_agent_or_user_auth"
+      ],
+      "decorator_chain": [
+        "cross_origin",
+        "require_agent_or_user_auth"
+      ]
+    },
+    {
+      "path": "/api/developer/sites/<site_id>/permissions",
+      "methods": [
+        "POST"
+      ],
+      "module": "api/site_management_api.py",
+      "handler": "create_permission_type",
+      "required_scope": "write",
+      "auth_mode": "agent_or_user",
+      "auth_decorators": [
+        "require_agent_or_user_auth"
+      ],
+      "decorator_chain": [
+        "cross_origin",
+        "require_agent_or_user_auth"
+      ]
+    },
+    {
+      "path": "/api/developer/sites/<site_id>/permissions/<permission_id>",
+      "methods": [
+        "DELETE"
+      ],
+      "module": "api/site_management_api.py",
+      "handler": "delete_permission_type",
+      "required_scope": "write",
+      "auth_mode": "agent_or_user",
+      "auth_decorators": [
+        "require_agent_or_user_auth"
+      ],
+      "decorator_chain": [
+        "cross_origin",
+        "require_agent_or_user_auth"
+      ]
+    },
+    {
+      "path": "/api/developer/sites/<site_id>/permissions/<permission_id>",
+      "methods": [
+        "PUT"
+      ],
+      "module": "api/site_management_api.py",
+      "handler": "update_permission_type",
+      "required_scope": "write",
+      "auth_mode": "agent_or_user",
+      "auth_decorators": [
+        "require_agent_or_user_auth"
+      ],
+      "decorator_chain": [
+        "cross_origin",
+        "require_agent_or_user_auth"
+      ]
+    },
+    {
+      "path": "/api/developer/sites/<site_id>/stats",
+      "methods": [
+        "GET"
+      ],
+      "module": "api/site_management_api.py",
+      "handler": "get_site_stats",
+      "required_scope": "read",
+      "auth_mode": "agent_or_user",
+      "auth_decorators": [
+        "require_agent_or_user_auth"
+      ],
+      "decorator_chain": [
+        "cross_origin",
+        "require_agent_or_user_auth"
+      ]
+    },
+    {
+      "path": "/api/developer/sites/<site_id>/stats-summary",
+      "methods": [
+        "GET"
+      ],
+      "module": "api/developer_api.py",
+      "handler": "get_site_stats",
+      "required_scope": "read",
+      "auth_mode": "agent_or_user",
+      "auth_decorators": [
+        "require_agent_or_user_auth"
+      ],
+      "decorator_chain": [
+        "cross_origin",
+        "require_agent_or_user_auth"
+      ]
+    },
+    {
+      "path": "/api/developer/sites/<site_id>/users",
+      "methods": [
+        "GET"
+      ],
+      "module": "api/site_management_api.py",
+      "handler": "get_site_users",
+      "required_scope": "read",
+      "auth_mode": "agent_or_user",
+      "auth_decorators": [
+        "require_agent_or_user_auth"
+      ],
+      "decorator_chain": [
+        "cross_origin",
+        "require_agent_or_user_auth"
+      ]
+    },
+    {
+      "path": "/api/developer/sites/<site_id>/users",
+      "methods": [
+        "POST"
+      ],
+      "module": "api/site_management_api.py",
+      "handler": "add_site_user",
+      "required_scope": "write",
+      "auth_mode": "agent_or_user",
+      "auth_decorators": [
+        "require_agent_or_user_auth"
+      ],
+      "decorator_chain": [
+        "cross_origin",
+        "require_agent_or_user_auth"
+      ]
+    },
+    {
+      "path": "/api/developer/sites/<site_id>/users-summary",
+      "methods": [
+        "GET"
+      ],
+      "module": "api/developer_api.py",
+      "handler": "get_site_users_summary",
+      "required_scope": "read",
+      "auth_mode": "agent_or_user",
+      "auth_decorators": [
+        "require_agent_or_user_auth"
+      ],
+      "decorator_chain": [
+        "cross_origin",
+        "require_agent_or_user_auth"
+      ]
+    },
+    {
+      "path": "/api/developer/sites/<site_id>/users/<ppid>",
+      "methods": [
+        "GET"
+      ],
+      "module": "api/site_management_api.py",
+      "handler": "get_site_user_detail",
+      "required_scope": "read",
+      "auth_mode": "agent_or_user",
+      "auth_decorators": [
+        "require_agent_or_user_auth"
+      ],
+      "decorator_chain": [
+        "cross_origin",
+        "require_agent_or_user_auth"
+      ]
+    },
+    {
+      "path": "/api/developer/sites/<site_id>/users/<ppid>",
+      "methods": [
+        "PUT"
+      ],
+      "module": "api/site_management_api.py",
+      "handler": "update_site_user",
+      "required_scope": "write",
+      "auth_mode": "agent_or_user",
+      "auth_decorators": [
+        "require_agent_or_user_auth"
+      ],
+      "decorator_chain": [
+        "cross_origin",
+        "require_agent_or_user_auth"
+      ]
+    },
+    {
+      "path": "/api/developer/sites/<site_id>/users/<ppid>/permissions",
+      "methods": [
+        "POST"
+      ],
+      "module": "api/site_management_api.py",
+      "handler": "grant_user_permission",
+      "required_scope": "write",
+      "auth_mode": "agent_or_user",
+      "auth_decorators": [
+        "require_agent_or_user_auth"
+      ],
+      "decorator_chain": [
+        "cross_origin",
+        "require_agent_or_user_auth"
+      ]
+    },
+    {
+      "path": "/api/developer/sites/<site_id>/users/<ppid>/permissions/<permission_id>",
+      "methods": [
+        "DELETE"
+      ],
+      "module": "api/site_management_api.py",
+      "handler": "revoke_user_permission",
+      "required_scope": "write",
+      "auth_mode": "agent_or_user",
+      "auth_decorators": [
+        "require_agent_or_user_auth"
+      ],
+      "decorator_chain": [
+        "cross_origin",
+        "require_agent_or_user_auth"
+      ]
+    },
+    {
+      "path": "/api/developer/sites/<site_id>/users/<ppid>/revoke",
+      "methods": [
+        "POST"
+      ],
+      "module": "api/site_management_api.py",
+      "handler": "revoke_site_user",
+      "required_scope": "write",
+      "auth_mode": "agent_or_user",
+      "auth_decorators": [
+        "require_agent_or_user_auth"
+      ],
+      "decorator_chain": [
+        "cross_origin",
+        "require_agent_or_user_auth"
+      ]
+    },
+    {
+      "path": "/api/developer/sites/<site_id>/users/export",
+      "methods": [
+        "GET"
+      ],
+      "module": "api/site_management_api.py",
+      "handler": "export_site_users",
+      "required_scope": "read",
+      "auth_mode": "agent_or_user",
+      "auth_decorators": [
+        "require_agent_or_user_auth"
+      ],
+      "decorator_chain": [
+        "cross_origin",
+        "require_agent_or_user_auth"
+      ]
+    },
+    {
+      "path": "/api/developer/stats",
+      "methods": [
+        "GET"
+      ],
+      "module": "api/developer_api.py",
+      "handler": "get_developer_stats",
+      "required_scope": "read",
+      "auth_mode": "agent_or_user",
+      "auth_decorators": [
+        "require_agent_or_user_auth"
+      ],
+      "decorator_chain": [
+        "cross_origin",
+        "require_agent_or_user_auth"
+      ]
+    },
+    {
+      "path": "/api/events/revocations",
+      "methods": [
+        "GET",
+        "OPTIONS"
+      ],
+      "module": "api/revocation_events.py",
+      "handler": "revocation_event_stream",
+      "required_scope": "public",
+      "auth_mode": "public",
+      "auth_decorators": [],
+      "decorator_chain": []
+    },
+    {
+      "path": "/api/events/revocations/status",
+      "methods": [
+        "GET"
+      ],
+      "module": "api/revocation_events.py",
+      "handler": "revocation_events_status",
+      "required_scope": "public",
+      "auth_mode": "public",
+      "auth_decorators": [],
+      "decorator_chain": [
+        "cross_origin"
+      ]
+    },
+    {
+      "path": "/api/health/detailed",
+      "methods": [
+        "GET"
+      ],
+      "module": "api/dashboard_api.py",
+      "handler": "get_detailed_health",
+      "required_scope": "admin",
+      "auth_mode": "admin_controlled",
+      "auth_decorators": [
+        "require_site_admin"
+      ],
+      "decorator_chain": [
+        "cross_origin",
+        "require_site_admin"
+      ]
+    },
+    {
+      "path": "/api/iam/sites/<site_id>/permission-types",
+      "methods": [
+        "GET"
+      ],
+      "module": "api/iam_permission_types.py",
+      "handler": "list_permission_types",
+      "required_scope": "admin",
+      "auth_mode": "admin_controlled",
+      "auth_decorators": [
+        "require_site_admin"
+      ],
+      "decorator_chain": [
+        "cross_origin",
+        "require_site_admin"
+      ]
+    },
+    {
+      "path": "/api/iam/sites/<site_id>/permission-types",
+      "methods": [
+        "POST"
+      ],
+      "module": "api/iam_permission_types.py",
+      "handler": "create_permission_type",
+      "required_scope": "admin",
+      "auth_mode": "admin_controlled",
+      "auth_decorators": [
+        "require_site_admin"
+      ],
+      "decorator_chain": [
+        "cross_origin",
+        "require_site_admin"
+      ]
+    },
+    {
+      "path": "/api/iam/sites/<site_id>/permission-types/<int:type_id>",
+      "methods": [
+        "PUT"
+      ],
+      "module": "api/iam_permission_types.py",
+      "handler": "update_permission_type",
+      "required_scope": "admin",
+      "auth_mode": "admin_controlled",
+      "auth_decorators": [
+        "require_site_admin"
+      ],
+      "decorator_chain": [
+        "cross_origin",
+        "require_site_admin"
+      ]
+    },
+    {
+      "path": "/api/iam/sites/<site_id>/permissions/grant",
+      "methods": [
+        "POST"
+      ],
+      "module": "api/iam_permission_types.py",
+      "handler": "grant_permission",
+      "required_scope": "admin",
+      "auth_mode": "admin_controlled",
+      "auth_decorators": [
+        "require_site_admin"
+      ],
+      "decorator_chain": [
+        "cross_origin",
+        "require_site_admin"
+      ]
+    },
+    {
+      "path": "/api/iam/sites/<site_id>/permissions/revoke",
+      "methods": [
+        "POST"
+      ],
+      "module": "api/iam_permission_types.py",
+      "handler": "revoke_permission",
+      "required_scope": "admin",
+      "auth_mode": "admin_controlled",
+      "auth_decorators": [
+        "require_site_admin"
+      ],
+      "decorator_chain": [
+        "cross_origin",
+        "require_site_admin"
+      ]
+    },
+    {
+      "path": "/api/iam/sites/<site_id>/stats",
+      "methods": [
+        "GET"
+      ],
+      "module": "api/iam_permission_types.py",
+      "handler": "get_iam_stats",
+      "required_scope": "admin",
+      "auth_mode": "admin_controlled",
+      "auth_decorators": [
+        "require_site_admin"
+      ],
+      "decorator_chain": [
+        "cross_origin",
+        "require_site_admin"
+      ]
+    },
+    {
+      "path": "/api/iam/sites/<site_id>/users/search",
+      "methods": [
+        "GET"
+      ],
+      "module": "api/iam_permission_types.py",
+      "handler": "search_users_by_permission",
+      "required_scope": "admin",
+      "auth_mode": "admin_controlled",
+      "auth_decorators": [
+        "require_site_admin"
+      ],
+      "decorator_chain": [
+        "cross_origin",
+        "require_site_admin"
+      ]
+    },
+    {
+      "path": "/api/identity-network/health",
+      "methods": [
+        "GET"
+      ],
+      "module": "api/lemma_shield.py",
+      "handler": "identity_network_health",
+      "required_scope": "public",
+      "auth_mode": "public",
+      "auth_decorators": [],
+      "decorator_chain": []
+    },
+    {
+      "path": "/api/identity-network/test-integration",
+      "methods": [
+        "POST"
+      ],
+      "module": "api/lemma_shield.py",
+      "handler": "test_integration",
+      "required_scope": "api_key",
+      "auth_mode": "api_key",
+      "auth_decorators": [
+        "require_api_key"
+      ],
+      "decorator_chain": [
+        "require_api_key"
+      ]
+    },
+    {
+      "path": "/api/internal/registered-sites",
+      "methods": [
+        "GET"
+      ],
+      "module": "api/sdk_api.py",
+      "handler": "get_registered_sites",
+      "required_scope": "public",
+      "auth_mode": "public",
+      "auth_decorators": [],
+      "decorator_chain": []
+    },
+    {
+      "path": "/api/issuer/pairwise-tag",
+      "methods": [
+        "POST"
+      ],
+      "module": "api/pairwise_tagging.py",
+      "handler": "generate_pairwise_tag",
+      "required_scope": "api_key",
+      "auth_mode": "api_key",
+      "auth_decorators": [
+        "require_api_key"
+      ],
+      "decorator_chain": [
+        "cross_origin",
+        "require_api_key"
+      ]
+    },
+    {
+      "path": "/api/issuer/tag-stats",
+      "methods": [
+        "GET"
+      ],
+      "module": "api/pairwise_tagging.py",
+      "handler": "get_tag_stats",
+      "required_scope": "public",
+      "auth_mode": "public",
+      "auth_decorators": [],
+      "decorator_chain": [
+        "cross_origin"
+      ]
+    },
+    {
+      "path": "/api/issuer/validate-uniqueness",
+      "methods": [
+        "POST"
+      ],
+      "module": "api/pairwise_tagging.py",
+      "handler": "validate_tag_uniqueness",
+      "required_scope": "api_key",
+      "auth_mode": "api_key",
+      "auth_decorators": [
+        "require_api_key"
+      ],
+      "decorator_chain": [
+        "cross_origin",
+        "require_api_key"
+      ]
+    },
+    {
+      "path": "/api/issuers",
+      "methods": [
+        "GET"
+      ],
+      "module": "api/issuer_registry.py",
+      "handler": "list_issuers",
+      "required_scope": "public",
+      "auth_mode": "public",
+      "auth_decorators": [],
+      "decorator_chain": [
+        "cross_origin"
+      ]
+    },
+    {
+      "path": "/api/issuers/<path:issuer_did>",
+      "methods": [
+        "GET"
+      ],
+      "module": "api/issuer_registry.py",
+      "handler": "get_issuer",
+      "required_scope": "public",
+      "auth_mode": "public",
+      "auth_decorators": [],
+      "decorator_chain": [
+        "cross_origin"
+      ]
+    },
+    {
+      "path": "/api/issuers/<path:issuer_did>/revoke",
+      "methods": [
+        "POST"
+      ],
+      "module": "api/issuer_registry.py",
+      "handler": "revoke_issuer",
+      "required_scope": "api_key",
+      "auth_mode": "api_key",
+      "auth_decorators": [
+        "require_api_key"
+      ],
+      "decorator_chain": [
+        "cross_origin",
+        "require_api_key"
+      ]
+    },
+    {
+      "path": "/api/issuers/lemma",
+      "methods": [
+        "GET"
+      ],
+      "module": "api/issuer_registry.py",
+      "handler": "get_lemma_issuer",
+      "required_scope": "public",
+      "auth_mode": "public",
+      "auth_decorators": [],
+      "decorator_chain": [
+        "cross_origin"
+      ]
+    },
+    {
+      "path": "/api/issuers/register",
+      "methods": [
+        "POST"
+      ],
+      "module": "api/issuer_registry.py",
+      "handler": "register_issuer",
+      "required_scope": "api_key",
+      "auth_mode": "api_key",
+      "auth_decorators": [
+        "require_api_key"
+      ],
+      "decorator_chain": [
+        "cross_origin",
+        "require_api_key"
+      ]
+    },
+    {
+      "path": "/api/issuers/verify",
+      "methods": [
+        "POST"
+      ],
+      "module": "api/issuer_registry.py",
+      "handler": "verify_issuer",
+      "required_scope": "api_key",
+      "auth_mode": "api_key",
+      "auth_decorators": [
+        "require_api_key"
+      ],
+      "decorator_chain": [
+        "cross_origin",
+        "require_api_key"
+      ]
+    },
+    {
+      "path": "/api/mau/analytics/<customer_id>",
+      "methods": [
+        "GET"
+      ],
+      "module": "api/mau_api.py",
+      "handler": "get_analytics",
+      "required_scope": "public",
+      "auth_mode": "public",
+      "auth_decorators": [],
+      "decorator_chain": []
+    },
+    {
+      "path": "/api/mau/billing/<customer_id>",
+      "methods": [
+        "GET"
+      ],
+      "module": "api/mau_api.py",
+      "handler": "get_billing_data",
+      "required_scope": "public",
+      "auth_mode": "public",
+      "auth_decorators": [],
+      "decorator_chain": []
+    },
+    {
+      "path": "/api/mau/export/<customer_id>",
+      "methods": [
+        "GET"
+      ],
+      "module": "api/mau_api.py",
+      "handler": "export_billing_data",
+      "required_scope": "public",
+      "auth_mode": "public",
+      "auth_decorators": [],
+      "decorator_chain": []
+    },
+    {
+      "path": "/api/mau/health",
+      "methods": [
+        "GET"
+      ],
+      "module": "api/mau_api.py",
+      "handler": "health_check",
+      "required_scope": "public",
+      "auth_mode": "public",
+      "auth_decorators": [],
+      "decorator_chain": []
+    },
+    {
+      "path": "/api/mau/rolling/<customer_id>",
+      "methods": [
+        "GET"
+      ],
+      "module": "api/mau_api.py",
+      "handler": "get_rolling_mau",
+      "required_scope": "public",
+      "auth_mode": "public",
+      "auth_decorators": [],
+      "decorator_chain": []
+    },
+    {
+      "path": "/api/mau/track",
+      "methods": [
+        "POST"
+      ],
+      "module": "api/mau_api.py",
+      "handler": "track_user",
+      "required_scope": "api_key",
+      "auth_mode": "api_key",
+      "auth_decorators": [
+        "require_api_key"
+      ],
+      "decorator_chain": [
+        "require_api_key"
+      ]
+    },
+    {
+      "path": "/api/mau/track/batch",
+      "methods": [
+        "POST"
+      ],
+      "module": "api/mau_api.py",
+      "handler": "track_users_batch",
+      "required_scope": "api_key",
+      "auth_mode": "api_key",
+      "auth_decorators": [
+        "require_api_key"
+      ],
+      "decorator_chain": [
+        "require_api_key"
+      ]
+    },
+    {
+      "path": "/api/mau/track/stripe-identity",
+      "methods": [
+        "POST"
+      ],
+      "module": "api/mau_api.py",
+      "handler": "track_stripe_identity",
+      "required_scope": "api_key",
+      "auth_mode": "api_key",
+      "auth_decorators": [
+        "require_api_key"
+      ],
+      "decorator_chain": [
+        "require_api_key"
+      ]
+    },
+    {
+      "path": "/api/passkey/<int:passkey_id>",
+      "methods": [
+        "DELETE"
+      ],
+      "module": "api/passkey_auth.py",
+      "handler": "delete_passkey",
+      "required_scope": "write",
+      "auth_mode": "custom_or_internal",
+      "auth_decorators": [],
+      "decorator_chain": [
+        "cross_origin"
+      ]
+    },
+    {
+      "path": "/api/passkey/authenticate/begin",
+      "methods": [
+        "POST",
+        "OPTIONS"
+      ],
+      "module": "api/passkey_auth.py",
+      "handler": "passkey_authenticate_begin",
+      "required_scope": "write",
+      "auth_mode": "custom_or_internal",
+      "auth_decorators": [],
+      "decorator_chain": [
+        "secure_cors",
+        "rate_limit"
+      ]
+    },
+    {
+      "path": "/api/passkey/authenticate/complete",
+      "methods": [
+        "POST",
+        "OPTIONS"
+      ],
+      "module": "api/passkey_auth.py",
+      "handler": "passkey_authenticate_complete",
+      "required_scope": "write",
+      "auth_mode": "custom_or_internal",
+      "auth_decorators": [],
+      "decorator_chain": [
+        "secure_cors",
+        "rate_limit"
+      ]
+    },
+    {
+      "path": "/api/passkey/list",
+      "methods": [
+        "GET"
+      ],
+      "module": "api/passkey_auth.py",
+      "handler": "list_passkeys",
+      "required_scope": "public",
+      "auth_mode": "public",
+      "auth_decorators": [],
+      "decorator_chain": [
+        "cross_origin"
+      ]
+    },
+    {
+      "path": "/api/passkey/register/begin",
+      "methods": [
+        "POST",
+        "OPTIONS"
+      ],
+      "module": "api/passkey_auth.py",
+      "handler": "passkey_register_begin",
+      "required_scope": "write",
+      "auth_mode": "custom_or_internal",
+      "auth_decorators": [],
+      "decorator_chain": [
+        "secure_cors",
+        "rate_limit"
+      ]
+    },
+    {
+      "path": "/api/passkey/register/complete",
+      "methods": [
+        "POST",
+        "OPTIONS"
+      ],
+      "module": "api/passkey_auth.py",
+      "handler": "passkey_register_complete",
+      "required_scope": "write",
+      "auth_mode": "custom_or_internal",
+      "auth_decorators": [],
+      "decorator_chain": [
+        "secure_cors",
+        "rate_limit"
+      ]
+    },
+    {
+      "path": "/api/platform/issue-site-permission",
+      "methods": [
+        "POST"
+      ],
+      "module": "api/platform_stats.py",
+      "handler": "issue_site_permission",
+      "required_scope": "api_key",
+      "auth_mode": "api_key",
+      "auth_decorators": [
+        "require_api_key"
+      ],
+      "decorator_chain": [
+        "require_api_key"
+      ]
+    },
+    {
+      "path": "/api/platform/revoke-permission",
+      "methods": [
+        "POST"
+      ],
+      "module": "api/platform_stats.py",
+      "handler": "revoke_platform_permission",
+      "required_scope": "read",
+      "auth_mode": "customer_or_admin",
+      "auth_decorators": [
+        "require_customer_or_admin"
+      ],
+      "decorator_chain": [
+        "require_customer_or_admin"
+      ]
+    },
+    {
+      "path": "/api/platform/stats",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "module": "api/platform_stats.py",
+      "handler": "get_platform_stats",
+      "required_scope": "read",
+      "auth_mode": "customer_or_admin",
+      "auth_decorators": [
+        "require_customer_or_admin"
+      ],
+      "decorator_chain": [
+        "require_customer_or_admin"
+      ]
+    },
+    {
+      "path": "/api/platform/users",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "module": "api/platform_stats.py",
+      "handler": "get_platform_users",
+      "required_scope": "read",
+      "auth_mode": "customer_or_admin",
+      "auth_decorators": [
+        "require_customer_or_admin"
+      ],
+      "decorator_chain": [
+        "require_customer_or_admin"
+      ]
+    },
+    {
+      "path": "/api/recovery/complete",
+      "methods": [
+        "POST"
+      ],
+      "module": "api/account_recovery.py",
+      "handler": "complete_recovery",
+      "required_scope": "write",
+      "auth_mode": "custom_or_internal",
+      "auth_decorators": [],
+      "decorator_chain": [
+        "cross_origin"
+      ]
+    },
+    {
+      "path": "/api/recovery/complete-wallet",
+      "methods": [
+        "POST"
+      ],
+      "module": "api/account_recovery.py",
+      "handler": "complete_recovery_wallet",
+      "required_scope": "write",
+      "auth_mode": "custom_or_internal",
+      "auth_decorators": [],
+      "decorator_chain": [
+        "cross_origin"
+      ]
+    },
+    {
+      "path": "/api/recovery/initiate",
+      "methods": [
+        "POST"
+      ],
+      "module": "api/account_recovery.py",
+      "handler": "initiate_recovery",
+      "required_scope": "write",
+      "auth_mode": "custom_or_internal",
+      "auth_decorators": [],
+      "decorator_chain": [
+        "cross_origin"
+      ]
+    },
+    {
+      "path": "/api/recovery/issue-admin-proof",
+      "methods": [
+        "POST"
+      ],
+      "module": "api/account_recovery.py",
+      "handler": "issue_recovery_admin_proof",
+      "required_scope": "write",
+      "auth_mode": "custom_or_internal",
+      "auth_decorators": [],
+      "decorator_chain": [
+        "cross_origin"
+      ]
+    },
+    {
+      "path": "/api/recovery/validate",
+      "methods": [
+        "POST"
+      ],
+      "module": "api/account_recovery.py",
+      "handler": "validate_recovery_token",
+      "required_scope": "write",
+      "auth_mode": "custom_or_internal",
+      "auth_decorators": [],
+      "decorator_chain": [
+        "cross_origin"
+      ]
+    },
+    {
+      "path": "/api/revocation/bloom-filter",
+      "methods": [
+        "GET"
+      ],
+      "module": "api/revocation_api.py",
+      "handler": "get_bloom_filter",
+      "required_scope": "public",
+      "auth_mode": "public",
+      "auth_decorators": [],
+      "decorator_chain": [
+        "cross_origin"
+      ]
+    },
+    {
+      "path": "/api/sdk/check-credentials",
+      "methods": [
+        "POST"
+      ],
+      "module": "api/sdk_api.py",
+      "handler": "check_credentials",
+      "required_scope": "api_key",
+      "auth_mode": "api_key",
+      "auth_decorators": [
+        "validate_api_key"
+      ],
+      "decorator_chain": [
+        "validate_api_key",
+        "rate_limit"
+      ]
+    },
+    {
+      "path": "/api/sdk/check-update",
+      "methods": [
+        "GET"
+      ],
+      "module": "api/sdk_config.py",
+      "handler": "check_sdk_update",
+      "required_scope": "public",
+      "auth_mode": "public",
+      "auth_decorators": [],
+      "decorator_chain": [
+        "cross_origin"
+      ]
+    },
+    {
+      "path": "/api/sdk/complete-identity-verification",
+      "methods": [
+        "POST",
+        "OPTIONS"
+      ],
+      "module": "api/sdk_api.py",
+      "handler": "complete_identity_verification",
+      "required_scope": "api_key",
+      "auth_mode": "api_key",
+      "auth_decorators": [
+        "validate_api_key"
+      ],
+      "decorator_chain": [
+        "cors_headers",
+        "validate_api_key",
+        "rate_limit"
+      ]
+    },
+    {
+      "path": "/api/sdk/config",
+      "methods": [
+        "GET"
+      ],
+      "module": "api/sdk_config.py",
+      "handler": "get_sdk_config",
+      "required_scope": "public",
+      "auth_mode": "public",
+      "auth_decorators": [],
+      "decorator_chain": [
+        "cross_origin"
+      ]
+    },
+    {
+      "path": "/api/sdk/features",
+      "methods": [
+        "GET"
+      ],
+      "module": "api/sdk_config.py",
+      "handler": "get_feature_flags",
+      "required_scope": "public",
+      "auth_mode": "public",
+      "auth_decorators": [],
+      "decorator_chain": [
+        "cross_origin"
+      ]
+    },
+    {
+      "path": "/api/sdk/health",
+      "methods": [
+        "GET"
+      ],
+      "module": "api/sdk_api.py",
+      "handler": "sdk_health",
+      "required_scope": "public",
+      "auth_mode": "public",
+      "auth_decorators": [],
+      "decorator_chain": []
+    },
+    {
+      "path": "/api/sdk/integrity",
+      "methods": [
+        "GET"
+      ],
+      "module": "api/sri_hashes.py",
+      "handler": "get_sdk_integrity",
+      "required_scope": "public",
+      "auth_mode": "public",
+      "auth_decorators": [],
+      "decorator_chain": []
+    },
+    {
+      "path": "/api/sdk/integrity/<filename>",
+      "methods": [
+        "GET"
+      ],
+      "module": "api/sri_hashes.py",
+      "handler": "get_file_integrity",
+      "required_scope": "public",
+      "auth_mode": "public",
+      "auth_decorators": [],
+      "decorator_chain": []
+    },
+    {
+      "path": "/api/sdk/revoke-credential",
+      "methods": [
+        "POST"
+      ],
+      "module": "api/sdk_api.py",
+      "handler": "revoke_credential",
+      "required_scope": "api_key",
+      "auth_mode": "api_key",
+      "auth_decorators": [
+        "validate_api_key"
+      ],
+      "decorator_chain": [
+        "validate_api_key",
+        "rate_limit"
+      ]
+    },
+    {
+      "path": "/api/sdk/security-config",
+      "methods": [
+        "POST"
+      ],
+      "module": "api/sdk_api.py",
+      "handler": "update_security_config",
+      "required_scope": "api_key",
+      "auth_mode": "api_key",
+      "auth_decorators": [
+        "validate_api_key"
+      ],
+      "decorator_chain": [
+        "validate_api_key",
+        "rate_limit"
+      ]
+    },
+    {
+      "path": "/api/sdk/security-status",
+      "methods": [
+        "GET"
+      ],
+      "module": "api/sdk_api.py",
+      "handler": "get_security_status",
+      "required_scope": "api_key",
+      "auth_mode": "api_key",
+      "auth_decorators": [
+        "validate_api_key"
+      ],
+      "decorator_chain": [
+        "validate_api_key",
+        "rate_limit"
+      ]
+    },
+    {
+      "path": "/api/sdk/start-identity-verification",
+      "methods": [
+        "POST",
+        "OPTIONS"
+      ],
+      "module": "api/sdk_api.py",
+      "handler": "start_identity_verification",
+      "required_scope": "api_key",
+      "auth_mode": "api_key",
+      "auth_decorators": [
+        "validate_api_key"
+      ],
+      "decorator_chain": [
+        "cors_headers",
+        "validate_api_key",
+        "rate_limit"
+      ]
+    },
+    {
+      "path": "/api/sdk/store-credential",
+      "methods": [
+        "POST"
+      ],
+      "module": "api/sdk_api.py",
+      "handler": "store_credential",
+      "required_scope": "api_key",
+      "auth_mode": "api_key",
+      "auth_decorators": [
+        "validate_api_key"
+      ],
+      "decorator_chain": [
+        "validate_api_key",
+        "rate_limit"
+      ]
+    },
+    {
+      "path": "/api/sdk/trigger-check",
+      "methods": [
+        "POST"
+      ],
+      "module": "api/sdk_api.py",
+      "handler": "trigger_security_check",
+      "required_scope": "api_key",
+      "auth_mode": "api_key",
+      "auth_decorators": [
+        "validate_api_key"
+      ],
+      "decorator_chain": [
+        "validate_api_key",
+        "rate_limit"
+      ]
+    },
+    {
+      "path": "/api/sdk/verify",
+      "methods": [
+        "POST"
+      ],
+      "module": "api/sri_hashes.py",
+      "handler": "verify_integrity",
+      "required_scope": "write",
+      "auth_mode": "custom_or_internal",
+      "auth_decorators": [],
+      "decorator_chain": []
+    },
+    {
+      "path": "/api/sdk/verify-offline",
+      "methods": [
+        "POST"
+      ],
+      "module": "api/sdk_api.py",
+      "handler": "verify_offline",
+      "required_scope": "api_key",
+      "auth_mode": "api_key",
+      "auth_decorators": [
+        "validate_api_key"
+      ],
+      "decorator_chain": [
+        "validate_api_key",
+        "rate_limit"
+      ]
+    },
+    {
+      "path": "/api/sdk/verify-permission-lemma",
+      "methods": [
+        "POST"
+      ],
+      "module": "api/permission_verification.py",
+      "handler": "verify_permission_lemma",
+      "required_scope": "api_key",
+      "auth_mode": "api_key",
+      "auth_decorators": [
+        "require_api_key"
+      ],
+      "decorator_chain": [
+        "cross_origin",
+        "require_api_key"
+      ]
+    },
+    {
+      "path": "/api/subscription/status",
+      "methods": [
+        "GET"
+      ],
+      "module": "api/stripe_checkout.py",
+      "handler": "get_subscription_status",
+      "required_scope": "read",
+      "auth_mode": "wallet_or_api_key",
+      "auth_decorators": [
+        "require_wallet_ppid"
+      ],
+      "decorator_chain": [
+        "require_wallet_ppid"
+      ]
+    },
+    {
+      "path": "/api/test/issue-credential",
+      "methods": [
+        "POST",
+        "OPTIONS"
+      ],
+      "module": "api/test_credential_endpoint.py",
+      "handler": "issue_test_credential",
+      "required_scope": "write",
+      "auth_mode": "custom_or_internal",
+      "auth_decorators": [],
+      "decorator_chain": [
+        "cross_origin"
+      ]
+    },
+    {
+      "path": "/api/v1/audit/export",
+      "methods": [
+        "GET"
+      ],
+      "module": "api/audit_api.py",
+      "handler": "export_audit_logs_endpoint",
+      "required_scope": "admin",
+      "auth_mode": "admin_controlled",
+      "auth_decorators": [
+        "require_site_admin"
+      ],
+      "decorator_chain": [
+        "cross_origin",
+        "require_site_admin",
+        "rate_limit_audit_export"
+      ]
+    },
+    {
+      "path": "/api/v1/audit/logs",
+      "methods": [
+        "GET"
+      ],
+      "module": "api/audit_api.py",
+      "handler": "query_audit_logs",
+      "required_scope": "admin",
+      "auth_mode": "admin_controlled",
+      "auth_decorators": [
+        "require_site_admin"
+      ],
+      "decorator_chain": [
+        "cross_origin",
+        "require_site_admin"
+      ]
+    },
+    {
+      "path": "/api/v1/audit/stats",
+      "methods": [
+        "GET"
+      ],
+      "module": "api/audit_api.py",
+      "handler": "audit_stats",
+      "required_scope": "admin",
+      "auth_mode": "admin_controlled",
+      "auth_decorators": [
+        "require_site_admin"
+      ],
+      "decorator_chain": [
+        "cross_origin",
+        "require_site_admin"
+      ]
+    },
+    {
+      "path": "/api/v1/auth/verify",
+      "methods": [
+        "POST"
+      ],
+      "module": "api/permission_management_api.py",
+      "handler": "verify_access",
+      "required_scope": "api_key",
+      "auth_mode": "api_key",
+      "auth_decorators": [
+        "require_api_key"
+      ],
+      "decorator_chain": [
+        "cross_origin",
+        "require_api_key",
+        "rate_limit_access_verification"
+      ]
+    },
+    {
+      "path": "/api/v1/iam/admin/self-issue",
+      "methods": [
+        "POST"
+      ],
+      "module": "api/admin_self_issue.py",
+      "handler": "admin_self_issue",
+      "required_scope": "api_key",
+      "auth_mode": "api_key",
+      "auth_decorators": [
+        "require_api_key"
+      ],
+      "decorator_chain": [
+        "cross_origin",
+        "require_api_key"
+      ]
+    },
+    {
+      "path": "/api/v1/iam/claim-permission",
+      "methods": [
+        "POST"
+      ],
+      "module": "api/iam_email_confirmation.py",
+      "handler": "claim_permission",
+      "required_scope": "write",
+      "auth_mode": "custom_or_internal",
+      "auth_decorators": [],
+      "decorator_chain": [
+        "cross_origin"
+      ]
+    },
+    {
+      "path": "/api/v1/iam/invite",
+      "methods": [
+        "POST"
+      ],
+      "module": "api/iam_email_confirmation.py",
+      "handler": "invite_user",
+      "required_scope": "api_key",
+      "auth_mode": "api_key",
+      "auth_decorators": [
+        "require_api_key"
+      ],
+      "decorator_chain": [
+        "cross_origin",
+        "require_api_key"
+      ]
+    },
+    {
+      "path": "/api/v1/iam/request-access",
+      "methods": [
+        "POST"
+      ],
+      "module": "api/iam_email_confirmation.py",
+      "handler": "request_access",
+      "required_scope": "api_key",
+      "auth_mode": "api_key",
+      "auth_decorators": [
+        "require_api_key"
+      ],
+      "decorator_chain": [
+        "cross_origin",
+        "check_ip_not_blocked",
+        "rate_limit_email_confirmation",
+        "require_api_key"
+      ]
+    },
+    {
+      "path": "/api/v1/iam/send-credential-email",
+      "methods": [
+        "POST"
+      ],
+      "module": "api/iam_email_confirmation.py",
+      "handler": "send_credential_directly",
+      "required_scope": "api_key",
+      "auth_mode": "api_key",
+      "auth_decorators": [
+        "require_api_key"
+      ],
+      "decorator_chain": [
+        "cross_origin",
+        "require_api_key"
+      ]
+    },
+    {
+      "path": "/api/v1/oauth/authorize",
+      "methods": [
+        "GET"
+      ],
+      "module": "api/permission_management_api.py",
+      "handler": "oauth_authorize",
+      "required_scope": "public",
+      "auth_mode": "public",
+      "auth_decorators": [],
+      "decorator_chain": [
+        "cross_origin"
+      ]
+    },
+    {
+      "path": "/api/v1/oauth/token",
+      "methods": [
+        "POST"
+      ],
+      "module": "api/permission_management_api.py",
+      "handler": "oauth_token",
+      "required_scope": "write",
+      "auth_mode": "custom_or_internal",
+      "auth_decorators": [],
+      "decorator_chain": [
+        "cross_origin"
+      ]
+    },
+    {
+      "path": "/api/v1/permission-templates",
+      "methods": [
+        "GET"
+      ],
+      "module": "api/permission_type_api.py",
+      "handler": "get_permission_templates",
+      "required_scope": "public",
+      "auth_mode": "public",
+      "auth_decorators": [],
+      "decorator_chain": [
+        "cross_origin"
+      ]
+    },
+    {
+      "path": "/api/v1/revocation/list",
+      "methods": [
+        "GET"
+      ],
+      "module": "api/revocation_api.py",
+      "handler": "get_revocation_list",
+      "required_scope": "public",
+      "auth_mode": "public",
+      "auth_decorators": [],
+      "decorator_chain": [
+        "cross_origin"
+      ]
+    },
+    {
+      "path": "/api/v1/sites/<site_id>/permission-types",
+      "methods": [
+        "GET"
+      ],
+      "module": "api/permission_type_api.py",
+      "handler": "list_permission_types",
+      "required_scope": "public",
+      "auth_mode": "public",
+      "auth_decorators": [],
+      "decorator_chain": [
+        "cross_origin"
+      ]
+    },
+    {
+      "path": "/api/v1/sites/<site_id>/permission-types",
+      "methods": [
+        "POST"
+      ],
+      "module": "api/permission_type_api.py",
+      "handler": "create_permission_type",
+      "required_scope": "read",
+      "auth_mode": "customer_or_admin",
+      "auth_decorators": [
+        "require_customer_or_admin"
+      ],
+      "decorator_chain": [
+        "cross_origin",
+        "require_customer_or_admin"
+      ]
+    },
+    {
+      "path": "/api/v1/sites/<site_id>/permission-types/<name>",
+      "methods": [
+        "DELETE"
+      ],
+      "module": "api/permission_type_api.py",
+      "handler": "delete_permission_type",
+      "required_scope": "read",
+      "auth_mode": "customer_or_admin",
+      "auth_decorators": [
+        "require_customer_or_admin"
+      ],
+      "decorator_chain": [
+        "cross_origin",
+        "require_customer_or_admin"
+      ]
+    },
+    {
+      "path": "/api/v1/sites/<site_id>/permission-types/<name>",
+      "methods": [
+        "GET"
+      ],
+      "module": "api/permission_type_api.py",
+      "handler": "get_permission_type",
+      "required_scope": "public",
+      "auth_mode": "public",
+      "auth_decorators": [],
+      "decorator_chain": [
+        "cross_origin"
+      ]
+    },
+    {
+      "path": "/api/v1/sites/<site_id>/permission-types/<name>",
+      "methods": [
+        "PUT"
+      ],
+      "module": "api/permission_type_api.py",
+      "handler": "update_permission_type",
+      "required_scope": "read",
+      "auth_mode": "customer_or_admin",
+      "auth_decorators": [
+        "require_customer_or_admin"
+      ],
+      "decorator_chain": [
+        "cross_origin",
+        "require_customer_or_admin"
+      ]
+    },
+    {
+      "path": "/api/v1/sites/<site_id>/permissions",
+      "methods": [
+        "POST"
+      ],
+      "module": "api/permission_management_api.py",
+      "handler": "create_permission",
+      "required_scope": "admin",
+      "auth_mode": "admin_controlled",
+      "auth_decorators": [
+        "require_site_admin"
+      ],
+      "decorator_chain": [
+        "cross_origin",
+        "require_site_admin"
+      ]
+    },
+    {
+      "path": "/api/v1/sites/<site_id>/users",
+      "methods": [
+        "GET"
+      ],
+      "module": "api/permission_management_api.py",
+      "handler": "get_site_users",
+      "required_scope": "api_key",
+      "auth_mode": "api_key",
+      "auth_decorators": [
+        "require_api_key"
+      ],
+      "decorator_chain": [
+        "cross_origin",
+        "require_api_key"
+      ]
+    },
+    {
+      "path": "/api/v1/sites/<site_id>/users",
+      "methods": [
+        "POST"
+      ],
+      "module": "api/permission_management_api.py",
+      "handler": "add_site_user",
+      "required_scope": "api_key",
+      "auth_mode": "api_key",
+      "auth_decorators": [
+        "require_api_key"
+      ],
+      "decorator_chain": [
+        "cross_origin",
+        "require_api_key"
+      ]
+    },
+    {
+      "path": "/api/v1/sites/<site_id>/users/<user_did>",
+      "methods": [
+        "DELETE"
+      ],
+      "module": "api/permission_management_api.py",
+      "handler": "remove_site_user",
+      "required_scope": "api_key",
+      "auth_mode": "api_key",
+      "auth_decorators": [
+        "require_api_key"
+      ],
+      "decorator_chain": [
+        "cross_origin",
+        "require_api_key"
+      ]
+    },
+    {
+      "path": "/api/v1/sites/<site_id>/users/<user_did>/permissions",
+      "methods": [
+        "POST"
+      ],
+      "module": "api/permission_management_api.py",
+      "handler": "grant_user_permission",
+      "required_scope": "admin",
+      "auth_mode": "admin_controlled",
+      "auth_decorators": [
+        "require_site_admin"
+      ],
+      "decorator_chain": [
+        "cross_origin",
+        "require_site_admin",
+        "rate_limit_permission_grant"
+      ]
+    },
+    {
+      "path": "/api/v1/sites/<site_id>/users/<user_did>/permissions/<permission_id>",
+      "methods": [
+        "DELETE"
+      ],
+      "module": "api/permission_management_api.py",
+      "handler": "revoke_user_permission_site_specific",
+      "required_scope": "api_key",
+      "auth_mode": "api_key",
+      "auth_decorators": [
+        "require_api_key"
+      ],
+      "decorator_chain": [
+        "cross_origin",
+        "require_api_key"
+      ]
+    },
+    {
+      "path": "/api/v1/sites/register",
+      "methods": [
+        "POST"
+      ],
+      "module": "api/permission_management_api.py",
+      "handler": "register_site",
+      "required_scope": "api_key",
+      "auth_mode": "api_key",
+      "auth_decorators": [
+        "require_api_key"
+      ],
+      "decorator_chain": [
+        "cross_origin",
+        "require_api_key",
+        "check_ip_not_blocked",
+        "rate_limit_site_registration"
+      ]
+    },
+    {
+      "path": "/api/validate-key",
+      "methods": [
+        "POST"
+      ],
+      "module": "api/customer_accounts.py",
+      "handler": "validate_api_key",
+      "required_scope": "write",
+      "auth_mode": "custom_or_internal",
+      "auth_decorators": [],
+      "decorator_chain": []
+    },
+    {
+      "path": "/api/verify-credential",
+      "methods": [
+        "POST",
+        "OPTIONS"
+      ],
+      "module": "api/sdk_auth.py",
+      "handler": "verify_credential",
+      "required_scope": "write",
+      "auth_mode": "custom_or_internal",
+      "auth_decorators": [],
+      "decorator_chain": [
+        "cross_origin"
+      ]
+    },
+    {
+      "path": "/api/wallet-auth/issue",
+      "methods": [
+        "POST"
+      ],
+      "module": "api/services/wallet_service.py",
+      "handler": "issue_to_wallet",
+      "required_scope": "write",
+      "auth_mode": "custom_or_internal",
+      "auth_decorators": [],
+      "decorator_chain": []
+    },
+    {
+      "path": "/api/wallet-auth/platform-login",
+      "methods": [
+        "POST"
+      ],
+      "module": "api/services/wallet_service.py",
+      "handler": "platform_login",
+      "required_scope": "write",
+      "auth_mode": "custom_or_internal",
+      "auth_decorators": [],
+      "decorator_chain": []
+    },
+    {
+      "path": "/api/wallet-auth/register-and-issue",
+      "methods": [
+        "POST"
+      ],
+      "module": "api/services/wallet_service.py",
+      "handler": "register_and_issue",
+      "required_scope": "write",
+      "auth_mode": "custom_or_internal",
+      "auth_decorators": [],
+      "decorator_chain": []
+    },
+    {
+      "path": "/api/wallet-auth/restore-site-access",
+      "methods": [
+        "POST"
+      ],
+      "module": "api/services/wallet_service.py",
+      "handler": "restore_site_access",
+      "required_scope": "write",
+      "auth_mode": "custom_or_internal",
+      "auth_decorators": [],
+      "decorator_chain": []
+    },
+    {
+      "path": "/api/wallet-auth/verify-session",
+      "methods": [
+        "POST"
+      ],
+      "module": "api/services/wallet_service.py",
+      "handler": "verify_wallet_session",
+      "required_scope": "write",
+      "auth_mode": "custom_or_internal",
+      "auth_decorators": [],
+      "decorator_chain": []
+    },
+    {
+      "path": "/api/wallet-sync/create-qr-auth",
+      "methods": [
+        "POST"
+      ],
+      "module": "api/services/wallet_service.py",
+      "handler": "create_qr_auth_lemma",
+      "required_scope": "write",
+      "auth_mode": "custom_or_internal",
+      "auth_decorators": [],
+      "decorator_chain": []
+    },
+    {
+      "path": "/api/wallet-sync/health",
+      "methods": [
+        "GET"
+      ],
+      "module": "api/services/wallet_service.py",
+      "handler": "wallet_sync_health",
+      "required_scope": "public",
+      "auth_mode": "public",
+      "auth_decorators": [],
+      "decorator_chain": []
+    },
+    {
+      "path": "/api/wallet-sync/verify-qr-auth",
+      "methods": [
+        "POST"
+      ],
+      "module": "api/services/wallet_service.py",
+      "handler": "verify_qr_auth_lemma",
+      "required_scope": "write",
+      "auth_mode": "custom_or_internal",
+      "auth_decorators": [],
+      "decorator_chain": []
+    },
+    {
+      "path": "/api/wallet/agents/<token_id>/kill",
+      "methods": [
+        "POST"
+      ],
+      "module": "api/services/wallet_service.py",
+      "handler": "wallet_kill_agent",
+      "required_scope": "read",
+      "auth_mode": "wallet_session",
+      "auth_decorators": [
+        "require_wallet_auth"
+      ],
+      "decorator_chain": [
+        "require_wallet_auth"
+      ]
+    },
+    {
+      "path": "/api/wallet/agents/overview",
+      "methods": [
+        "GET"
+      ],
+      "module": "api/services/wallet_service.py",
+      "handler": "wallet_agents_overview",
+      "required_scope": "read",
+      "auth_mode": "wallet_session",
+      "auth_decorators": [
+        "require_wallet_auth"
+      ],
+      "decorator_chain": [
+        "require_wallet_auth"
+      ]
+    },
+    {
+      "path": "/api/wallet/auth",
+      "methods": [
+        "POST",
+        "OPTIONS"
+      ],
+      "module": "api/passkey_auth.py",
+      "handler": "wallet_auth",
+      "required_scope": "write",
+      "auth_mode": "custom_or_internal",
+      "auth_decorators": [],
+      "decorator_chain": [
+        "secure_cors",
+        "rate_limit"
+      ]
+    },
+    {
+      "path": "/api/wallet/clear-session",
+      "methods": [
+        "POST",
+        "OPTIONS"
+      ],
+      "module": "api/wallet_session_sync.py",
+      "handler": "clear_session",
+      "required_scope": "write",
+      "auth_mode": "custom_or_internal",
+      "auth_decorators": [],
+      "decorator_chain": []
+    },
+    {
+      "path": "/api/wallet/cli-link/approve",
+      "methods": [
+        "GET"
+      ],
+      "module": "api/wallet_session_sync.py",
+      "handler": "wallet_cli_link_approve",
+      "required_scope": "public",
+      "auth_mode": "public",
+      "auth_decorators": [],
+      "decorator_chain": []
+    },
+    {
+      "path": "/api/wallet/cli-link/poll",
+      "methods": [
+        "GET"
+      ],
+      "module": "api/wallet_session_sync.py",
+      "handler": "wallet_cli_link_poll",
+      "required_scope": "public",
+      "auth_mode": "public",
+      "auth_decorators": [],
+      "decorator_chain": []
+    },
+    {
+      "path": "/api/wallet/cli-link/start",
+      "methods": [
+        "POST"
+      ],
+      "module": "api/wallet_session_sync.py",
+      "handler": "wallet_cli_link_start",
+      "required_scope": "write",
+      "auth_mode": "custom_or_internal",
+      "auth_decorators": [
+        "optional_auth"
+      ],
+      "decorator_chain": [
+        "optional_auth"
+      ]
+    },
+    {
+      "path": "/api/wallet/connect-poh",
+      "methods": [
+        "POST"
+      ],
+      "module": "api/services/wallet_service.py",
+      "handler": "connect_poh_to_wallet",
+      "required_scope": "read",
+      "auth_mode": "wallet_session",
+      "auth_decorators": [
+        "require_wallet_auth"
+      ],
+      "decorator_chain": [
+        "require_wallet_auth"
+      ]
+    },
+    {
+      "path": "/api/wallet/control-plane/launch",
+      "methods": [
+        "GET"
+      ],
+      "module": "api/services/wallet_service.py",
+      "handler": "wallet_control_plane_launch",
+      "required_scope": "read",
+      "auth_mode": "wallet_session",
+      "auth_decorators": [
+        "require_wallet_auth"
+      ],
+      "decorator_chain": [
+        "require_wallet_auth"
+      ]
+    },
+    {
+      "path": "/api/wallet/control-plane/preferences",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "module": "api/services/wallet_service.py",
+      "handler": "wallet_control_plane_preferences",
+      "required_scope": "read",
+      "auth_mode": "wallet_session",
+      "auth_decorators": [
+        "require_wallet_auth"
+      ],
+      "decorator_chain": [
+        "require_wallet_auth"
+      ]
+    },
+    {
+      "path": "/api/wallet/create-redirect-token",
+      "methods": [
+        "POST",
+        "OPTIONS"
+      ],
+      "module": "api/wallet_session_sync.py",
+      "handler": "create_redirect_token",
+      "required_scope": "write",
+      "auth_mode": "custom_or_internal",
+      "auth_decorators": [],
+      "decorator_chain": []
+    },
+    {
+      "path": "/api/wallet/exchange-redirect-token",
+      "methods": [
+        "POST",
+        "OPTIONS"
+      ],
+      "module": "api/wallet_session_sync.py",
+      "handler": "exchange_redirect_token",
+      "required_scope": "write",
+      "auth_mode": "custom_or_internal",
+      "auth_decorators": [],
+      "decorator_chain": []
+    },
+    {
+      "path": "/api/wallet/global-session",
+      "methods": [
+        "POST",
+        "OPTIONS"
+      ],
+      "module": "api/wallet_session_sync.py",
+      "handler": "check_global_session",
+      "required_scope": "write",
+      "auth_mode": "custom_or_internal",
+      "auth_decorators": [],
+      "decorator_chain": []
+    },
+    {
+      "path": "/api/wallet/init-first-session",
+      "methods": [
+        "POST",
+        "OPTIONS"
+      ],
+      "module": "api/wallet_session_sync.py",
+      "handler": "init_first_session",
+      "required_scope": "write",
+      "auth_mode": "custom_or_internal",
+      "auth_decorators": [],
+      "decorator_chain": []
+    },
+    {
+      "path": "/api/wallet/link-unlock-token",
+      "methods": [
+        "POST",
+        "OPTIONS"
+      ],
+      "module": "api/wallet_session_sync.py",
+      "handler": "get_link_unlock_token",
+      "required_scope": "write",
+      "auth_mode": "custom_or_internal",
+      "auth_decorators": [],
+      "decorator_chain": []
+    },
+    {
+      "path": "/api/wallet/firewall/admin/controls",
+      "methods": [
+        "POST"
+      ],
+      "module": "api/services/wallet_service.py",
+      "handler": "wallet_firewall_admin_controls",
+      "required_scope": "read",
+      "auth_mode": "wallet_session",
+      "auth_decorators": [
+        "require_wallet_auth"
+      ],
+      "decorator_chain": [
+        "runtime_endpoint_compat",
+        "require_wallet_auth"
+      ]
+    },
+    {
+      "path": "/api/wallet/firewall/alerts/summary",
+      "methods": [
+        "GET"
+      ],
+      "module": "api/services/wallet_service.py",
+      "handler": "wallet_firewall_alerts_summary",
+      "required_scope": "read",
+      "auth_mode": "wallet_session",
+      "auth_decorators": [
+        "require_wallet_auth"
+      ],
+      "decorator_chain": [
+        "runtime_endpoint_compat",
+        "require_wallet_auth"
+      ]
+    },
+    {
+      "path": "/api/wallet/firewall/bootstrap",
+      "methods": [
+        "POST"
+      ],
+      "module": "api/services/wallet_service.py",
+      "handler": "wallet_firewall_bootstrap",
+      "required_scope": "read",
+      "auth_mode": "wallet_session",
+      "auth_decorators": [
+        "require_wallet_auth"
+      ],
+      "decorator_chain": [
+        "runtime_endpoint_compat",
+        "require_wallet_auth"
+      ]
+    },
+    {
+      "path": "/api/wallet/firewall/decisions",
+      "methods": [
+        "GET"
+      ],
+      "module": "api/services/wallet_service.py",
+      "handler": "wallet_firewall_decisions",
+      "required_scope": "read",
+      "auth_mode": "wallet_session",
+      "auth_decorators": [
+        "require_wallet_auth"
+      ],
+      "decorator_chain": [
+        "runtime_endpoint_compat",
+        "require_wallet_auth"
+      ]
+    },
+    {
+      "path": "/api/wallet/firewall/decisions/<int:decision_id>/explain",
+      "methods": [
+        "GET"
+      ],
+      "module": "api/services/wallet_service.py",
+      "handler": "wallet_firewall_decision_explain",
+      "required_scope": "read",
+      "auth_mode": "wallet_session",
+      "auth_decorators": [
+        "require_wallet_auth"
+      ],
+      "decorator_chain": [
+        "runtime_endpoint_compat",
+        "require_wallet_auth"
+      ]
+    },
+    {
+      "path": "/api/wallet/firewall/decisions/export",
+      "methods": [
+        "GET"
+      ],
+      "module": "api/services/wallet_service.py",
+      "handler": "wallet_firewall_decisions_export",
+      "required_scope": "read",
+      "auth_mode": "wallet_session",
+      "auth_decorators": [
+        "require_wallet_auth"
+      ],
+      "decorator_chain": [
+        "runtime_endpoint_compat",
+        "require_wallet_auth"
+      ]
+    },
+    {
+      "path": "/api/wallet/firewall/decisions/webhook",
+      "methods": [
+        "POST"
+      ],
+      "module": "api/services/wallet_service.py",
+      "handler": "wallet_firewall_decisions_webhook",
+      "required_scope": "read",
+      "auth_mode": "wallet_session",
+      "auth_decorators": [
+        "require_wallet_auth"
+      ],
+      "decorator_chain": [
+        "runtime_endpoint_compat",
+        "require_wallet_auth"
+      ]
+    },
+    {
+      "path": "/api/wallet/firewall/issue-proof",
+      "methods": [
+        "POST"
+      ],
+      "module": "api/services/wallet_service.py",
+      "handler": "wallet_firewall_issue_proof",
+      "required_scope": "read",
+      "auth_mode": "wallet_session",
+      "auth_decorators": [
+        "require_wallet_auth"
+      ],
+      "decorator_chain": [
+        "runtime_endpoint_compat",
+        "require_wallet_auth"
+      ]
+    },
+    {
+      "path": "/api/wallet/firewall/policies",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "module": "api/services/wallet_service.py",
+      "handler": "wallet_firewall_policies",
+      "required_scope": "read",
+      "auth_mode": "wallet_session",
+      "auth_decorators": [
+        "require_wallet_auth"
+      ],
+      "decorator_chain": [
+        "runtime_endpoint_compat",
+        "require_wallet_auth"
+      ]
+    },
+    {
+      "path": "/api/wallet/firewall/policies/<policy_profile_id>/publish",
+      "methods": [
+        "POST"
+      ],
+      "module": "api/services/wallet_service.py",
+      "handler": "wallet_firewall_policy_publish",
+      "required_scope": "read",
+      "auth_mode": "wallet_session",
+      "auth_decorators": [
+        "require_wallet_auth"
+      ],
+      "decorator_chain": [
+        "runtime_endpoint_compat",
+        "require_wallet_auth"
+      ]
+    },
+    {
+      "path": "/api/wallet/firewall/policies/<policy_profile_id>/rollback",
+      "methods": [
+        "POST"
+      ],
+      "module": "api/services/wallet_service.py",
+      "handler": "wallet_firewall_policy_rollback",
+      "required_scope": "read",
+      "auth_mode": "wallet_session",
+      "auth_decorators": [
+        "require_wallet_auth"
+      ],
+      "decorator_chain": [
+        "runtime_endpoint_compat",
+        "require_wallet_auth"
+      ]
+    },
+    {
+      "path": "/api/wallet/firewall/runtimes",
+      "methods": [
+        "GET"
+      ],
+      "module": "api/services/wallet_service.py",
+      "handler": "wallet_firewall_runtimes",
+      "required_scope": "read",
+      "auth_mode": "wallet_session",
+      "auth_decorators": [
+        "require_wallet_auth"
+      ],
+      "decorator_chain": [
+        "runtime_endpoint_compat",
+        "require_wallet_auth"
+      ]
+    },
+    {
+      "path": "/api/wallet/firewall/runtimes/<runtime_id>/authorize",
+      "methods": [
+        "POST"
+      ],
+      "module": "api/services/wallet_service.py",
+      "handler": "wallet_firewall_runtime_authorize",
+      "required_scope": "write",
+      "auth_mode": "custom_or_internal",
+      "auth_decorators": [],
+      "decorator_chain": [
+        "runtime_endpoint_compat"
+      ]
+    },
+    {
+      "path": "/api/wallet/firewall/runtimes/<runtime_id>/kill",
+      "methods": [
+        "POST"
+      ],
+      "module": "api/services/wallet_service.py",
+      "handler": "wallet_firewall_kill",
+      "required_scope": "read",
+      "auth_mode": "wallet_session",
+      "auth_decorators": [
+        "require_wallet_auth"
+      ],
+      "decorator_chain": [
+        "runtime_endpoint_compat",
+        "require_wallet_auth"
+      ]
+    },
+    {
+      "path": "/api/wallet/pin-reset/complete",
+      "methods": [
+        "POST"
+      ],
+      "module": "api/services/wallet_service.py",
+      "handler": "complete_pin_reset",
+      "required_scope": "write",
+      "auth_mode": "custom_or_internal",
+      "auth_decorators": [],
+      "decorator_chain": []
+    },
+    {
+      "path": "/api/wallet/pin-reset/request",
+      "methods": [
+        "POST"
+      ],
+      "module": "api/services/wallet_service.py",
+      "handler": "request_pin_reset",
+      "required_scope": "write",
+      "auth_mode": "custom_or_internal",
+      "auth_decorators": [],
+      "decorator_chain": []
+    },
+    {
+      "path": "/api/wallet/pin-reset/verify",
+      "methods": [
+        "POST"
+      ],
+      "module": "api/services/wallet_service.py",
+      "handler": "verify_reset_token",
+      "required_scope": "write",
+      "auth_mode": "custom_or_internal",
+      "auth_decorators": [],
+      "decorator_chain": []
+    },
+    {
+      "path": "/api/wallet/retrieve",
+      "methods": [
+        "POST"
+      ],
+      "module": "api/services/wallet_service.py",
+      "handler": "retrieve_wallet",
+      "required_scope": "read",
+      "auth_mode": "wallet_session",
+      "auth_decorators": [
+        "require_wallet_auth"
+      ],
+      "decorator_chain": [
+        "require_wallet_auth"
+      ]
+    },
+    {
+      "path": "/api/wallet/revocation-status",
+      "methods": [
+        "GET"
+      ],
+      "module": "api/services/wallet_service.py",
+      "handler": "get_revocation_status",
+      "required_scope": "public",
+      "auth_mode": "public",
+      "auth_decorators": [],
+      "decorator_chain": []
+    },
+    {
+      "path": "/api/wallet/revocation-status",
+      "methods": [
+        "GET"
+      ],
+      "module": "api/wallet_revocation.py",
+      "handler": "get_revocation_status",
+      "required_scope": "public",
+      "auth_mode": "public",
+      "auth_decorators": [],
+      "decorator_chain": [
+        "cross_origin"
+      ]
+    },
+    {
+      "path": "/api/wallet/revoke",
+      "methods": [
+        "POST"
+      ],
+      "module": "api/services/wallet_service.py",
+      "handler": "revoke_credential",
+      "required_scope": "read",
+      "auth_mode": "wallet_session",
+      "auth_decorators": [
+        "require_wallet_auth"
+      ],
+      "decorator_chain": [
+        "require_wallet_auth"
+      ]
+    },
+    {
+      "path": "/api/wallet/revoke",
+      "methods": [
+        "POST"
+      ],
+      "module": "api/wallet_revocation.py",
+      "handler": "revoke_credential",
+      "required_scope": "read",
+      "auth_mode": "customer_or_admin",
+      "auth_decorators": [
+        "require_customer_or_admin"
+      ],
+      "decorator_chain": [
+        "cross_origin",
+        "require_customer_or_admin",
+        "rate_limit"
+      ]
+    },
+    {
+      "path": "/api/wallet/revoke-user",
+      "methods": [
+        "POST"
+      ],
+      "module": "api/services/wallet_service.py",
+      "handler": "revoke_user",
+      "required_scope": "read",
+      "auth_mode": "wallet_session",
+      "auth_decorators": [
+        "require_wallet_auth"
+      ],
+      "decorator_chain": [
+        "require_wallet_auth"
+      ]
+    },
+    {
+      "path": "/api/wallet/revoke-wallet",
+      "methods": [
+        "POST"
+      ],
+      "module": "api/services/wallet_service.py",
+      "handler": "revoke_wallet",
+      "required_scope": "write",
+      "auth_mode": "custom_or_internal",
+      "auth_decorators": [],
+      "decorator_chain": []
+    },
+    {
+      "path": "/api/wallet/session-sync",
+      "methods": [
+        "POST",
+        "OPTIONS"
+      ],
+      "module": "api/services/wallet_service.py",
+      "handler": "session_sync",
+      "required_scope": "write",
+      "auth_mode": "custom_or_internal",
+      "auth_decorators": [],
+      "decorator_chain": []
+    },
+    {
+      "path": "/api/wallet/session-sync",
+      "methods": [
+        "POST",
+        "OPTIONS"
+      ],
+      "module": "api/wallet_session_sync.py",
+      "handler": "session_sync",
+      "required_scope": "write",
+      "auth_mode": "custom_or_internal",
+      "auth_decorators": [],
+      "decorator_chain": []
+    },
+    {
+      "path": "/api/wallet/set-session",
+      "methods": [
+        "POST",
+        "OPTIONS"
+      ],
+      "module": "api/wallet_session_sync.py",
+      "handler": "set_session",
+      "required_scope": "write",
+      "auth_mode": "custom_or_internal",
+      "auth_decorators": [],
+      "decorator_chain": []
+    },
+    {
+      "path": "/api/wallet/signal-unlock",
+      "methods": [
+        "POST",
+        "OPTIONS"
+      ],
+      "module": "api/wallet_session_sync.py",
+      "handler": "signal_unlock",
+      "required_scope": "write",
+      "auth_mode": "custom_or_internal",
+      "auth_decorators": [],
+      "decorator_chain": []
+    },
+    {
+      "path": "/api/wallet/status",
+      "methods": [
+        "GET"
+      ],
+      "module": "api/passkey_auth.py",
+      "handler": "wallet_status",
+      "required_scope": "public",
+      "auth_mode": "public",
+      "auth_decorators": [],
+      "decorator_chain": [
+        "cross_origin"
+      ]
+    },
+    {
+      "path": "/api/wallet/status",
+      "methods": [
+        "GET"
+      ],
+      "module": "api/services/wallet_service.py",
+      "handler": "get_wallet_status",
+      "required_scope": "public",
+      "auth_mode": "public",
+      "auth_decorators": [],
+      "decorator_chain": []
+    },
+    {
+      "path": "/api/wallet/transfer/create-session",
+      "methods": [
+        "POST",
+        "OPTIONS"
+      ],
+      "module": "api/services/wallet_service.py",
+      "handler": "create_transfer_session",
+      "required_scope": "write",
+      "auth_mode": "custom_or_internal",
+      "auth_decorators": [],
+      "decorator_chain": []
+    },
+    {
+      "path": "/api/wallet/transfer/get-wallet",
+      "methods": [
+        "POST",
+        "OPTIONS"
+      ],
+      "module": "api/services/wallet_service.py",
+      "handler": "get_wallet_data",
+      "required_scope": "write",
+      "auth_mode": "custom_or_internal",
+      "auth_decorators": [],
+      "decorator_chain": []
+    },
+    {
+      "path": "/api/wallet/transfer/set-wallet",
+      "methods": [
+        "POST",
+        "OPTIONS"
+      ],
+      "module": "api/services/wallet_service.py",
+      "handler": "set_wallet_data",
+      "required_scope": "write",
+      "auth_mode": "custom_or_internal",
+      "auth_decorators": [],
+      "decorator_chain": []
+    }
+  ]
+}

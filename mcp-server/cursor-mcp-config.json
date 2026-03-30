@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "lemma": {
+      "command": "node",
+      "args": ["./mcp-server/index.js"],
+      "env": {
+        "LEMMA_AGENT_TOKEN": "lm_agent_YOUR_TOKEN_HERE",
+        "LEMMA_URL": "https://lemma.id",
+        "LEMMA_FIREWALL_REQUIRED_AUDIENCE": "lemma-firewall"
+      }
+    }
+  }
+}

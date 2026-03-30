@@ -1,0 +1,67 @@
+%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#667eea'}}}%%
+flowchart TB
+
+    %% === BOUNDARIES ===
+    subgraph client["Client-Side (Private)"]
+        direction TB
+        wallet["User Wallet"]
+        bridge["Wallet Bridge"]
+        crypto_wasm{{"Crypto Engine (WASM)"}}
+        device_b["New Device"]
+    end
+
+    subgraph server["Lemma Backend"]
+        direction TB
+        backend[["Lemma Backend"]]
+        postgres[("PostgreSQL")]
+        redis[("Redis")]
+    end
+
+    subgraph external["Third-Party Sites"]
+        direction TB
+        site(["Third-Party Site"])
+    end
+
+    %% === FLOWS ===
+
+    %% AUTH FLOW
+    wallet -->|"1. Passkey registration/auth"| backend
+    backend -->|"2. Session token"| wallet
+
+    %% SSO FLOW
+    site -.->|"3. Load bridge iframe"| bridge
+    bridge -.->|"4. Check IndexedDB"| wallet
+    wallet -.->|"5. Return auth state"| bridge
+    bridge -.->|"6. postMessage response"| site
+
+    %% PPID FLOW
+    site ==>|"7. Derive PPID"| crypto_wasm
+
+    %% VERIFY FLOW
+    site ==>|"8. Verify credential"| crypto_wasm
+    site ==>|"9. Check revocation"| wallet
+
+    %% REVOCATION FLOW
+    wallet -->|"10. Fetch bloom filter"| backend
+    backend -->|"11. Read revocation list"| postgres
+    backend -->|"12. Return bloom filter"| wallet
+
+    %% DEVICE_LINK FLOW
+    wallet -.->|"13. Create transfer session"| backend
+    backend -.->|"14. Store transfer session"| redis
+    device_b -.->|"15. Poll transfer session"| backend
+    backend -.->|"16. Return encrypted wallet"| device_b
+
+    %% DATA FLOW
+    backend -->|"Data persistence"| postgres
+
+    %% === STYLING ===
+    classDef client fill:#d4edda,stroke:#28a745,stroke-width:2px
+    classDef server fill:#cce5ff,stroke:#007bff,stroke-width:2px
+    classDef storage fill:#e2e3e5,stroke:#6c757d,stroke-width:2px
+    classDef external fill:#fff3cd,stroke:#ffc107,stroke-width:2px
+
+    class wallet,bridge,crypto_wasm,device_b client
+    class backend server
+    class postgres,redis storage
+    class site external

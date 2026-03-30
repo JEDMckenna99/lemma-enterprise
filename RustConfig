@@ -1,0 +1,4 @@
+VERSION=stable
+RUST_CARGO_BUILD_DIR=lemma-crypto
+RUST_CARGO_BUILD_FLAGS="--release --features python"
+RUST_CARGO_INSTALL_TOOLS="maturin" 

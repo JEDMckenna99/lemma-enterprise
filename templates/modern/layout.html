@@ -1,0 +1,936 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}lemma.id - Identity Verification Platform{% endblock %}</title>
+    <meta name="description" content="{% block description %}Professional identity verification platform. Secure your platform with cryptographic verification.{% endblock %}">
+    
+    <!-- Favicon -->
+    <link rel="icon" href="{{ url_for('static', filename='img/lemma_logo.svg') }}" type="image/svg+xml">
+    
+    <!-- Preload critical resources -->
+    <link rel="preload" href="{{ url_for('static', filename='css/lemma.css') }}?v=20250121" as="style">
+    {% block preload_scripts %}{% endblock %}
+    
+    <!-- Critical CSS - minimal for fast LCP -->
+    <style nonce="{{ csp_nonce }}">
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{--primary:#667eea;--secondary:#764ba2;--gray-900:#1e293b;--gray-700:#475569;--gray-200:#f1f5f9;--white:#fff}
+html{font-size:17px;line-height:1.6}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;color:#475569;background:#fff}
+h1{color:#1e293b;font-weight:600;line-height:1.25;margin-bottom:16px;font-size:48px}
+.nav-header{background:rgba(255,255,255,.95);border-bottom:1px solid #f1f5f9;padding:16px 0;position:sticky;top:0;z-index:100;height:76px}
+.nav-container{display:flex;align-items:center;justify-content:space-between;max-width:1200px;margin:0 auto;padding:0 24px;height:44px}
+.nav-logo{display:flex;align-items:center;gap:12px;font-size:22px;font-weight:700;color:#1e293b;text-decoration:none}
+.nav-logo-icon{width:36px;height:36px}
+.nav-center{display:flex;gap:40px;align-items:center;flex:1;margin-left:60px}
+.nav-link{color:#475569;text-decoration:none;font-weight:500;font-size:17px;padding:8px 4px}
+.nav-right{display:flex;gap:16px;align-items:center;margin-left:auto}
+.btn{display:inline-flex;align-items:center;justify-content:center;padding:12px 24px;border-radius:8px;font-weight:500;font-size:17px;text-decoration:none;border:none;cursor:pointer}
+.btn-primary{background:linear-gradient(135deg,#667eea,#764ba2);color:#fff}
+.container{max-width:1200px;margin:0 auto;padding:0 24px}
+.hero{background:linear-gradient(135deg,#1e293b,#0f172a);color:#fff;padding:80px 0 100px;text-align:center}
+.hero h1{color:#fff;font-size:clamp(32px,5vw,56px);font-weight:700;margin-bottom:24px}
+    </style>
+    
+    <!-- Full CSS - async load with CSP-compliant approach -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/lemma.css') }}?v=20250121" media="print" id="main-css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/polish.css') }}?v=20250129" media="print" id="polish-css">
+    <script nonce="{{ csp_nonce }}">
+        document.getElementById('main-css').onload = function() { this.media = 'all'; };
+        document.getElementById('polish-css').onload = function() { this.media = 'all'; };
+    </script>
+    <noscript>
+        <link rel="stylesheet" href="{{ url_for('static', filename='css/lemma.css') }}?v=20250121">
+        <link rel="stylesheet" href="{{ url_for('static', filename='css/polish.css') }}?v=20250129">
+    </noscript>
+    
+    {% block head %}{% endblock %}
+</head>
+<body>
+    <!-- Navigation Header -->
+    <header class="nav-header">
+        <nav class="nav-container">
+            <!-- Brand Link with Logo - explicit dimensions prevent CLS -->
+            <a href="/" class="nav-logo">
+                <img src="{{ url_for('static', filename='img/lemma_logo.svg') }}" alt="lemma.id" class="nav-logo-icon" width="36" height="36">
+                <span>lemma.id</span>
+            </a>
+            
+            <!-- Mobile Menu Toggle -->
+            <button class="mobile-menu-toggle" id="mobile-menu-toggle" aria-label="Toggle navigation menu" aria-expanded="false">
+                <span class="hamburger-line"></span>
+                <span class="hamburger-line"></span>
+                <span class="hamburger-line"></span>
+            </button>
+            
+            <!-- Navigation Links - toggleable on mobile -->
+            <div class="nav-center" id="nav-center">
+                <a href="/developer" class="nav-link" id="nav-platform">Platform</a>
+                <a href="/admin" class="nav-link" id="nav-admin" style="display:none;">Admin</a>
+                <a href="/wallet" class="nav-link">Wallet</a>
+                <a href="/docs" class="nav-link">Docs</a>
+                <a href="/pricing" class="nav-link" id="nav-pricing">Pricing</a>
+            </div>
+            
+            <!-- Right Side - User State -->
+            <div class="nav-right">
+                <!-- User dropdown (hidden by default, shown by JS if authenticated) -->
+                <div class="user-dropdown" id="user-dropdown" style="display:none;">
+                    <button class="user-dropdown-toggle" id="user-dropdown-toggle" aria-expanded="false">
+                        <span class="user-avatar" id="user-avatar">
+                            <span class="avatar-initials" id="avatar-initials">U</span>
+                        </span>
+                        <span class="user-name" id="user-display-name">Account</span>
+                        <svg class="dropdown-arrow" width="12" height="12" viewBox="0 0 12 12" fill="currentColor">
+                            <path d="M2.5 4.5L6 8L9.5 4.5" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+                        </svg>
+                    </button>
+                    <div class="user-dropdown-menu" id="userDropdownMenu">
+                        <div class="dropdown-header">
+                            <div class="dropdown-user-info">
+                                <div class="dropdown-user-name" id="dropdown-email">Customer Account</div>
+                                <div class="dropdown-user-role" id="dropdown-role">Customer</div>
+                            </div>
+                        </div>
+                        <div class="dropdown-divider"></div>
+                        <a href="/wallet" class="dropdown-item">My Wallet</a>
+                        <a href="/developer" class="dropdown-item">Developer Dashboard</a>
+                        <a href="/developer/sites" class="dropdown-item">My Sites</a>
+                        <a href="/admin" class="dropdown-item admin-item" id="admin-dropdown-link" style="display:none;">Admin Panel</a>
+                        <div class="dropdown-divider"></div>
+                        <a href="#" class="dropdown-item logout-item" id="logout-btn">Sign Out</a>
+                    </div>
+                </div>
+                
+                <!-- Auth buttons (shown by default, hidden by JS if authenticated) -->
+                <div id="auth-buttons">
+                    <a href="/login" class="btn btn-primary">Sign In</a>
+                </div>
+            </div>
+        </nav>
+    </header>
+    
+    <!-- Main Content -->
+    <main id="main-content">
+        {% block content %}{% endblock %}
+    </main>
+    
+    <!-- Footer -->
+    <footer class="footer-section">
+        <div class="container">
+            <div style="text-align: center;">
+                <p>&copy; 2025 lemma.id. All rights reserved.</p>
+                <!-- Legal links for unauthenticated users -->
+                <p style="margin-top: 12px; font-size: 14px; color: var(--gray-500);">
+                    <a href="/terms" style="color: var(--gray-600); text-decoration: none; margin: 0 12px;">Terms of Service</a>
+                    <span style="color: var(--gray-400);">|</span>
+                    <a href="/privacy" style="color: var(--gray-600); text-decoration: none; margin: 0 12px;">Privacy Policy</a>
+                    <span style="color: var(--gray-400);">|</span>
+                    <a href="/docs" style="color: var(--gray-600); text-decoration: none; margin: 0 12px;">Documentation</a>
+                </p>
+            </div>
+        </div>
+    </footer>
+    
+    {% block scripts %}{% endblock %}
+    
+    <!-- Header & Navigation CSS - non-blocking -->
+    <style nonce="{{ csp_nonce }}">
+/* Mobile Menu Toggle */
+.mobile-menu-toggle{display:none;flex-direction:column;justify-content:center;gap:5px;width:40px;height:40px;background:transparent;border:none;cursor:pointer;padding:8px;border-radius:8px;transition:background 0.2s}
+.mobile-menu-toggle:hover{background:#f1f5f9}
+.hamburger-line{width:24px;height:2px;background:#475569;border-radius:2px;transition:all 0.3s}
+.mobile-menu-toggle.active .hamburger-line:nth-child(1){transform:rotate(45deg) translate(5px,5px)}
+.mobile-menu-toggle.active .hamburger-line:nth-child(2){opacity:0}
+.mobile-menu-toggle.active .hamburger-line:nth-child(3){transform:rotate(-45deg) translate(5px,-5px)}
+
+/* User Dropdown */
+.user-dropdown{position:relative;display:inline-block}
+.user-dropdown-toggle{display:flex;align-items:center;gap:8px;background:#fff;border:1px solid #e2e8f0;border-radius:50px;padding:6px 14px 6px 6px;cursor:pointer;font-size:0.9rem;color:#475569;transition:all 0.2s}
+.user-dropdown-toggle:hover{border-color:#cbd5e1;box-shadow:0 2px 8px rgba(0,0,0,0.08)}
+.user-avatar{width:32px;height:32px;background:linear-gradient(135deg,#667eea,#764ba2);border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:600;font-size:14px}
+.avatar-initials{text-transform:uppercase}
+.user-name{font-weight:500;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dropdown-arrow{transition:transform 0.2s;flex-shrink:0}
+.user-dropdown.open .dropdown-arrow{transform:rotate(180deg)}
+.user-dropdown-menu{position:absolute;top:calc(100% + 8px);right:0;background:#fff;border:1px solid #e2e8f0;border-radius:12px;box-shadow:0 10px 40px rgba(0,0,0,0.12);min-width:240px;z-index:1000;opacity:0;visibility:hidden;transform:translateY(-10px);transition:all 0.2s}
+.user-dropdown.open .user-dropdown-menu{opacity:1;visibility:visible;transform:translateY(0)}
+.dropdown-header{padding:16px;background:linear-gradient(135deg,#f8fafc,#f1f5f9);border-radius:12px 12px 0 0}
+.dropdown-user-info{text-align:left}
+.dropdown-user-name{font-weight:600;color:#1e293b;margin-bottom:2px;font-size:0.95rem}
+.dropdown-user-role{font-size:0.75rem;color:#667eea;text-transform:uppercase;letter-spacing:0.5px;font-weight:600}
+.dropdown-divider{height:1px;background:#f1f5f9;margin:4px 0}
+.dropdown-item{display:flex;align-items:center;padding:12px 16px;color:#475569;text-decoration:none;font-size:0.9rem;transition:all 0.15s}
+.dropdown-item:hover{background:#f8fafc;color:#1e293b}
+.admin-item{color:#667eea}
+.admin-item:hover{background:linear-gradient(135deg,rgba(102,126,234,0.08),rgba(118,75,162,0.08))}
+.logout-item{color:#ef4444}
+.logout-item:hover{background:#fef2f2}
+
+/* Mobile Responsive */
+@media(max-width:768px){
+    .mobile-menu-toggle{display:flex}
+    .nav-center{position:absolute;top:76px;left:0;right:0;background:#fff;flex-direction:column;padding:16px 24px;gap:0;margin-left:0;border-bottom:1px solid #f1f5f9;box-shadow:0 10px 40px rgba(0,0,0,0.1);display:none;z-index:99}
+    .nav-center.mobile-open{display:flex}
+    .nav-center .nav-link{padding:14px 0;border-bottom:1px solid #f1f5f9;width:100%}
+    .nav-center .nav-link:last-child{border-bottom:none}
+    .user-name{display:none}
+    .user-dropdown-toggle{padding:6px}
+}
+    </style>
+    
+    {% block wallet_scripts %}
+    <!-- Wallet Scripts - end of body for non-blocking -->
+    <script src="{{ url_for('static', filename='js/lemma-wallet.js') }}?v=2473" defer data-cfasync="false"></script>
+    <script src="{{ url_for('static', filename='js/encrypted-wallet-transparent.js') }}?v=1121" defer data-cfasync="false"></script>
+    <script src="{{ url_for('static', filename='js/lemma-session-free-auth.js') }}?v=1121" defer data-cfasync="false"></script>
+    <script src="{{ url_for('static', filename='js/lemma-credential-utils.js') }}?v=1" defer data-cfasync="false"></script>
+    {% endblock %}
+    
+    {% block auth_scripts %}
+    <!-- Navigation & Auth JavaScript -->
+    <script nonce="{{ csp_nonce }}">
+        // Mobile menu toggle
+        (function() {
+            const mobileToggle = document.getElementById('mobile-menu-toggle');
+            const navCenter = document.getElementById('nav-center');
+            
+            if (mobileToggle && navCenter) {
+                mobileToggle.addEventListener('click', function() {
+                    this.classList.toggle('active');
+                    navCenter.classList.toggle('mobile-open');
+                    this.setAttribute('aria-expanded', navCenter.classList.contains('mobile-open'));
+                });
+            }
+        })();
+        
+        // User dropdown toggle
+        (function() {
+            const dropdownToggle = document.getElementById('user-dropdown-toggle');
+            const dropdown = document.querySelector('.user-dropdown');
+            
+            if (dropdownToggle && dropdown) {
+                dropdownToggle.addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    dropdown.classList.toggle('open');
+                    this.setAttribute('aria-expanded', dropdown.classList.contains('open'));
+                });
+            }
+            
+            // Close dropdown when clicking outside
+            document.addEventListener('click', function(event) {
+                if (dropdown && !dropdown.contains(event.target)) {
+                    dropdown.classList.remove('open');
+                    if (dropdownToggle) dropdownToggle.setAttribute('aria-expanded', 'false');
+                }
+            });
+            
+            // Close on escape key
+            document.addEventListener('keydown', function(event) {
+                if (event.key === 'Escape' && dropdown) {
+                    dropdown.classList.remove('open');
+                    if (dropdownToggle) dropdownToggle.setAttribute('aria-expanded', 'false');
+                }
+            });
+            
+            // Logout button
+            const logoutBtn = document.getElementById('logout-btn');
+            if (logoutBtn) {
+                logoutBtn.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    handleSessionFreeLogout();
+                });
+            }
+        })();
+        
+        // AUTH HELPERS + AUTO-ATTACH FOR API REQUESTS (session-free lemma auth)
+        (function() {
+            if (!window.__lemmaRawFetch) {
+                window.__lemmaRawFetch = window.fetch.bind(window);
+            }
+            if (!window.encodeLemmaCredentialHeader) {
+                window.encodeLemmaCredentialHeader = function encodeLemmaCredentialHeader(credential) {
+                    try {
+                        const json = JSON.stringify(credential || {});
+                        return btoa(unescape(encodeURIComponent(json)))
+                            .replace(/\+/g, '-')
+                            .replace(/\//g, '_')
+                            .replace(/=+$/, '');
+                    } catch (_) {
+                        return '';
+                    }
+                };
+            }
+
+            if (!window.buildLemmaCredentialForHeader) {
+                window.buildLemmaCredentialForHeader = function buildLemmaCredentialForHeader(credential) {
+                    if (!credential || typeof credential !== 'object') return null;
+
+                    const nested = (credential.credential && typeof credential.credential === 'object')
+                        ? credential.credential
+                        : ((credential.lemma && typeof credential.lemma === 'object') ? credential.lemma : null);
+                    const base = nested || credential;
+
+                    // Keep only signed VC-relevant fields; strip local/indexeddb metadata.
+                    const allowedKeys = [
+                        'id', 'issuer', 'subject', 'sub', 'type',
+                        'claims', 'credentialSubject', 'proof',
+                        'issuedAt', 'expiresAt', 'issued_at', 'expires_at',
+                        'issuanceDate', 'expirationDate',
+                        'packageType', 'issuerInfo', '@context', 'context'
+                    ];
+                    const sanitized = {};
+                    for (const key of allowedKeys) {
+                        if (base[key] !== undefined) sanitized[key] = base[key];
+                    }
+
+                    const claims = sanitized.claims || sanitized.credentialSubject || {};
+
+                    // Do NOT include synthetic legacy signature fields; verifier expects VC proof.
+                    if (sanitized.signature !== undefined) {
+                        delete sanitized.signature;
+                    }
+                    if (sanitized.proof && typeof sanitized.proof === 'object') {
+                        // Normalize proof field naming for verifier compatibility.
+                        if (!sanitized.proof.signatureValue && sanitized.proof.proofValue) {
+                            sanitized.proof.signatureValue = sanitized.proof.proofValue;
+                        }
+                    }
+                    const toU64 = (value) => {
+                        if (value === undefined || value === null || value === '') return null;
+                        const n = Number(value);
+                        if (Number.isFinite(n)) {
+                            // Preserve issuer-native unit (many legacy lemmas use epoch seconds).
+                            return Math.floor(n);
+                        }
+                        const d = new Date(String(value));
+                        // Fallback only for non-numeric date strings.
+                        return Number.isNaN(d.getTime()) ? null : Math.floor(d.getTime() / 1000);
+                    };
+
+                    // Rust verifier expects W3C-style issuanceDate.
+                    // Preserve issuer-signed issuanceDate/expirationDate when present.
+                    if (!sanitized.issuanceDate) {
+                        sanitized.issuanceDate = toU64(
+                            sanitized.issuedAt ??
+                            sanitized.issued_at ??
+                            claims.issuedAt ??
+                            claims.issued_at ??
+                            claims.issuanceDate
+                        );
+                    }
+                    if (!sanitized.expirationDate) {
+                        sanitized.expirationDate = toU64(
+                            sanitized.expiresAt ??
+                            sanitized.expires_at ??
+                            claims.expiresAt ??
+                            claims.expires_at ??
+                            claims.expirationDate
+                        );
+                    }
+
+                    return sanitized;
+                };
+            }
+
+            if (!window.ensureLemmaCredential) {
+                window.ensureLemmaCredential = async function ensureLemmaCredential(forceRefresh = false) {
+                    if (!forceRefresh && window.lemmaCredential && typeof window.lemmaCredential === 'object') {
+                        return window.lemmaCredential;
+                    }
+                    if (typeof LemmaWallet === 'undefined') {
+                        return null;
+                    }
+                    try {
+                        if (!window.globalLemmaWallet) {
+                            window.globalLemmaWallet = new LemmaWallet({ debug: false, enableDeviceSync: true, enableAdvancedFeatures: true });
+                            await window.globalLemmaWallet.init();
+                        }
+                        const wallet = window.globalLemmaWallet;
+                        const all = await wallet.getCredentials('permission');
+                        const utils = window.LemmaCredentialUtils;
+                        const lemmaPermissions = (all || []).filter((cred) => {
+                            const claims = cred.claims || cred.credentialSubject || {};
+                            const siteId = String(claims.siteId || claims.site || claims.site_id || claims.siteDomain || '').toLowerCase();
+                            return siteId === 'lemma.id' || siteId === 'lemma_platform' || siteId.includes('lemma');
+                        });
+                        let selected = null;
+                        if (utils && typeof utils.selectBestCredentials === 'function') {
+                            const valid = utils.selectBestCredentials(lemmaPermissions);
+                            selected = valid.length ? valid[0] : null;
+                            } else {
+                            selected = lemmaPermissions.length ? lemmaPermissions[0] : null;
+                        }
+
+                        if (selected) {
+                            window.lemmaCredential = selected;
+                            window.lemmaCredentialForHeader = window.buildLemmaCredentialForHeader(selected);
+                        }
+                        return selected;
+                    } catch (_) {
+                        return null;
+                    }
+                };
+            }
+
+            if (!window.getLemmaAuthHeaders) {
+                if (!window.getAgentTokenOverrideForTesting) {
+                    window.getAgentTokenOverrideForTesting = function getAgentTokenOverrideForTesting() {
+                        try {
+                            const path = String(window.location.pathname || '');
+                            const isPrivilegedSurface = path.startsWith('/developer') || path.startsWith('/admin');
+                            if (!isPrivilegedSurface) return '';
+                            const key = '__lemma_agent_token_override';
+                            const params = new URLSearchParams(window.location.search || '');
+                            const fromUrl = String(params.get('agent_token') || '').trim();
+                            if (fromUrl.startsWith('lm_agent_')) {
+                                sessionStorage.setItem(key, fromUrl);
+                                params.delete('agent_token');
+                                const nextQuery = params.toString();
+                                const nextUrl = `${window.location.pathname}${nextQuery ? `?${nextQuery}` : ''}${window.location.hash || ''}`;
+                                window.history.replaceState({}, document.title, nextUrl);
+                                return fromUrl;
+                            }
+                            return String(sessionStorage.getItem(key) || '').trim();
+                        } catch (_) {
+                            return '';
+                        }
+                    };
+                }
+                window.getLemmaAuthHeaders = function getLemmaAuthHeaders(extraHeaders) {
+                    const headers = { ...(extraHeaders || {}) };
+                    const agentToken = window.getAgentTokenOverrideForTesting();
+                    if (agentToken) {
+                        headers['X-Agent-Token'] = agentToken;
+                        return headers;
+                    }
+                    const credential = window.lemmaCredentialForHeader || window.buildLemmaCredentialForHeader(window.lemmaCredential);
+                    if (!credential || typeof credential !== 'object') return headers;
+                    const encoded = window.encodeLemmaCredentialHeader(credential);
+                    if (encoded) headers['X-Lemma-Credential'] = encoded;
+                    if (credential.id) headers['X-Credential-ID'] = credential.id;
+                    const claims = credential.claims || credential.credentialSubject || {};
+                    const permissionId = claims.permissionId || claims.permission_id || claims.permission_level || claims.permission;
+                    if (permissionId) headers['X-Permission-ID'] = String(permissionId);
+                    return headers;
+                };
+            }
+
+            if (!window.getLemmaAuthHeadersAsync) {
+                window.getLemmaAuthHeadersAsync = async function getLemmaAuthHeadersAsync(extraHeaders) {
+                    await window.ensureLemmaCredential(false);
+                    if (!window.lemmaCredential) {
+                        await window.ensureLemmaCredential(true);
+                    }
+                    return window.getLemmaAuthHeaders(extraHeaders);
+                };
+            }
+
+            if (!window.__lemmaFetchWrapped) {
+                const originalFetch = window.fetch.bind(window);
+                window.fetch = async function(input, init) {
+                    try {
+                        const reqInit = init ? { ...init } : {};
+                        const urlString = typeof input === 'string' ? input : (input && input.url) || '';
+                        const isSameOriginApi = typeof urlString === 'string'
+                            && (urlString.startsWith('/api/') || urlString.startsWith(window.location.origin + '/api/'));
+                        if (isSameOriginApi) {
+                            const h = new Headers(reqInit.headers || (input && input.headers) || {});
+                            if (!h.has('X-Lemma-Credential') && !h.has('X-Agent-Token') && !h.has('X-API-Key') && !h.has('Authorization')) {
+                                const authHeaders = await window.getLemmaAuthHeadersAsync();
+                                Object.entries(authHeaders).forEach(([k, v]) => {
+                                    if (v != null && v !== '') h.set(k, v);
+                                });
+                                reqInit.headers = h;
+                    }
+                }
+                        return originalFetch(input, reqInit);
+                    } catch (_) {
+                        return originalFetch(input, init);
+                    }
+            };
+                window.__lemmaFetchWrapped = true;
+            }
+            console.log('🔐 Wallet auth auto-attach enabled');
+        })();
+
+        // SESSION-FREE: Initialize navigation based on credentials
+        // Wrapped to handle deferred script loading
+        async function initSessionFreeNav() {
+            // Wait for LemmaWallet to be available (handles defer loading)
+            if (typeof LemmaWallet === 'undefined') {
+                // Retry in 50ms if wallet script hasn't loaded yet
+                setTimeout(initSessionFreeNav, 50);
+                return;
+            }
+            
+            try {
+                // Create global wallet instance (reused by wallet.html)
+                if (!window.globalLemmaWallet) {
+                    window.globalLemmaWallet = new LemmaWallet({
+                        debug: false,
+                        enableDeviceSync: true,
+                        enableAdvancedFeatures: true
+                    });
+                    await window.globalLemmaWallet.init();
+                }
+                const wallet = window.globalLemmaWallet;
+                // Ensure lock/unlock changes propagate on lemma.id too.
+                wallet._autoStartHeartbeat?.();
+
+                // Shared auth helpers/auto-attach are initialized globally above.
+
+                function setLoggedOutUI() {
+                    const userDropdown = document.getElementById('user-dropdown');
+                    const authButtons = document.getElementById('auth-buttons');
+                    if (userDropdown) userDropdown.style.display = 'none';
+                    if (authButtons) authButtons.style.display = 'block';
+
+                    const navAdmin = document.getElementById('nav-admin');
+                    const adminDropdown = document.getElementById('admin-dropdown-link');
+                    if (navAdmin) navAdmin.style.display = 'none';
+                    if (adminDropdown) adminDropdown.style.display = 'none';
+
+                    const pricingLink = document.getElementById('nav-pricing');
+                    if (pricingLink) pricingLink.style.display = 'block';
+
+                    delete window.lemmaCredential;
+                    delete window.lemmaAuth;
+                }
+
+                function handleLockedState() {
+                    setLoggedOutUI();
+                    const protectedPath = /^\/(developer|admin|wallet)(\/|$)/.test(window.location.pathname);
+                    if (protectedPath) {
+                        window.location.href = '/login?reason=wallet_locked';
+                    }
+                }
+
+                async function ensureServerWalletSession(walletInstance, options) {
+                    const opts = options || {};
+                    try {
+                        let walletId = null;
+                        if (typeof walletInstance.getWalletInfo === 'function') {
+                            const info = await walletInstance.getWalletInfo();
+                            walletId = info?.walletId || null;
+                        }
+                        if (!walletId && typeof walletInstance._resolveCurrentWalletId === 'function') {
+                            walletId = await walletInstance._resolveCurrentWalletId();
+                        }
+                        if (!walletId && walletInstance.session?.walletId) {
+                            walletId = walletInstance.session.walletId;
+                        }
+                        if (!walletId) return false;
+
+                        // Refresh server-side wallet session + cookies so server-gated routes
+                        // (e.g. /admin) stay aligned with local unlocked wallet state.
+                        const nowMs = Date.now();
+                        const expiresAt = Math.floor((nowMs + (24 * 60 * 60 * 1000)) / 1000);
+                        const response = await window.__lemmaRawFetch('/api/wallet/signal-unlock', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            credentials: 'include',
+                            body: JSON.stringify({
+                                wallet_id: walletId,
+                                unlocked_at: nowMs,
+                                expires_at: expiresAt
+                            })
+                        });
+
+                        if (!response.ok) {
+                            if (opts.debug) {
+                                console.warn('Wallet session sync failed', response.status);
+                            }
+                            return false;
+                        }
+                        return true;
+                    } catch (e) {
+                        if (opts.debug) {
+                            console.warn('Wallet session sync error', e);
+                        }
+                        return false;
+                    }
+                }
+
+                if (!window.__lemmaLockHandlersBound) {
+                    window.addEventListener('lemma:session-expired', handleLockedState);
+                    window.addEventListener('lemma-wallet-locked', handleLockedState);
+                    window.__lemmaLockHandlersBound = true;
+                }
+                
+                // Get all permission credentials
+                const permissions = await wallet.getCredentials('permission');
+                
+                // Use credential utils if available, otherwise fallback
+                const utils = window.LemmaCredentialUtils;
+                
+                // Filter for lemma.id credentials (handles multiple siteId formats)
+                const lemmaPermissions = permissions.filter(p => {
+                    if (utils) {
+                        const normalized = utils.normalizeCredentialClaims(p);
+                        return normalized.isLemmaSite;
+                    }
+                    // Fallback if utils not loaded yet
+                    const claims = p.claims || p.credentialSubject || {};
+                    const siteId = (claims.siteId || claims.site || claims.site_id || claims.siteDomain || '').toLowerCase();
+                    return siteId === 'lemma.id' || siteId === 'lemma_platform' || siteId.includes('lemma');
+                });
+                
+                // Select best valid credential (non-expired, longest-lived)
+                let cred = null;
+                if (utils) {
+                    const validCreds = utils.selectBestCredentials(lemmaPermissions);
+                    cred = validCreds.length > 0 ? validCreds[0] : null;
+                } else if (lemmaPermissions.length > 0) {
+                    cred = lemmaPermissions[0];
+                }
+                
+                const walletUnlocked = wallet.isUnlocked();
+                if (cred && walletUnlocked) {
+                    // Use normalized claims for consistent access
+                    const normalized = utils ? utils.normalizeCredentialClaims(cred) : null;
+                    const claims = cred.claims || cred.credentialSubject || {};
+                    
+                    // Debug logging (enable with localStorage.setItem('lemma_debug_auth', 'true'))
+                    if (localStorage.getItem('lemma_debug_auth') === 'true') {
+                        console.log('🔐 Auth: Found credential', { id: cred.id, normalized });
+                    }
+                    
+                    // Show authenticated UI
+                    const userDropdown = document.getElementById('user-dropdown');
+                    const authButtons = document.getElementById('auth-buttons');
+                    if (userDropdown) userDropdown.style.display = 'block';
+                    if (authButtons) authButtons.style.display = 'none';
+                    
+                    // Update user info
+                    const email = normalized?.email || claims.email || 'Customer';
+                    const accountType = normalized?.accountType || claims.accountType || 'customer';
+                    const emailElem = document.getElementById('dropdown-email');
+                    const roleElem = document.getElementById('dropdown-role');
+                    const avatarInitials = document.getElementById('avatar-initials');
+                    const userDisplayName = document.getElementById('user-display-name');
+                    
+                    if (emailElem) emailElem.textContent = email;
+                    if (roleElem) roleElem.textContent = accountType.charAt(0).toUpperCase() + accountType.slice(1);
+                    
+                    // Set avatar initials from email
+                    if (avatarInitials && email && email !== 'Customer') {
+                        const initials = email.split('@')[0].substring(0, 2).toUpperCase();
+                        avatarInitials.textContent = initials;
+                    }
+                    
+                    // Set display name (first part of email or role)
+                    if (userDisplayName) {
+                        const displayName = email && email !== 'Customer' 
+                            ? email.split('@')[0] 
+                            : accountType.charAt(0).toUpperCase() + accountType.slice(1);
+                        userDisplayName.textContent = displayName;
+                    }
+                    
+                    // Check admin permission (SECURE: no loose .includes('admin') check)
+                    const isAdmin = normalized ? normalized.isAdmin : (
+                        ['admin_access', 'super_admin', 'admin', 'superadmin', 'site_admin'].includes(claims.permissionId) ||
+                        claims.accountType === 'admin'
+                    );
+                    
+                    if (isAdmin) {
+                        const navAdmin = document.getElementById('nav-admin');
+                        const adminDropdown = document.getElementById('admin-dropdown-link');
+                        if (navAdmin) navAdmin.style.display = 'block';
+                        if (adminDropdown) adminDropdown.style.display = 'block';
+
+                        // Keep server-side wallet session warm so /admin route gate
+                        // does not redirect authenticated admins back to home.
+                        await ensureServerWalletSession(wallet, {
+                            debug: localStorage.getItem('lemma_debug_auth') === 'true'
+                        });
+                    }
+                    
+                    // Hide pricing for authenticated users
+                    const pricingLink = document.getElementById('nav-pricing');
+                    if (pricingLink) pricingLink.style.display = 'none';
+                    
+                    // Store credential globally for API calls
+                    window.lemmaCredential = cred;
+                    window.lemmaCredentialForHeader = window.buildLemmaCredentialForHeader(cred);
+                    window.dispatchEvent(new CustomEvent('lemma:credential-ready', {
+                        detail: { id: cred.id || null }
+                    }));
+                    
+                    // Initialize session-free auth with smart caching
+                    const auth = new SessionFreeAuth(wallet, {debug: false});
+                    window.lemmaAuth = auth;
+                } else {
+                    setLoggedOutUI();
+                    // Credential-first policy: do not auto-issue via PPID fallback here.
+                }
+            } catch (error) {
+                // Log error for debugging (not completely silent)
+                console.warn('🔐 Auth init warning:', error.message);
+                if (localStorage.getItem('lemma_debug_auth') === 'true') {
+                    console.error('🔐 Auth init error details:', error);
+                }
+            }
+        }
+        
+        // Start initialization after DOM is ready
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initSessionFreeNav);
+        } else {
+            initSessionFreeNav();
+        }
+        
+        // Session-free logout
+        async function handleSessionFreeLogout() {
+            try {
+                // Reuse global wallet instance
+                const wallet = window.globalLemmaWallet || new LemmaWallet({
+                    debug: false,
+                    enableDeviceSync: true,
+                    enableAdvancedFeatures: true
+                });
+                if (!window.globalLemmaWallet) {
+                    await wallet.init();
+                }
+                
+                // Remove lemma.id credentials from wallet
+                const permissions = await wallet.getCredentials('permission');
+                const lemmaPermissions = permissions.filter(p => {
+                    const claims = p.claims || p.credentialSubject || {};
+                    const siteId = claims.siteId || claims.site || '';
+                    return siteId === 'lemma.id' || siteId === 'lemma_platform';
+                });
+                
+                for (const cred of lemmaPermissions) {
+                    await wallet.removeCredential(cred.id);
+                }
+                
+                // Clear global state
+                delete window.lemmaCredential;
+                    delete window.lemmaCredentialForHeader;
+                delete window.lemmaAuth;
+                
+                // Redirect to home
+                window.location.href = '/';
+            } catch (error) {
+                console.error('Logout failed:', error);
+                window.location.href = '/';
+            }
+        }
+        
+        // ============================================
+        // POLISH INTERACTION HELPERS
+        // ============================================
+        
+        // Copy to clipboard with feedback
+        window.copyToClipboard = async function(text, button) {
+            try {
+                await navigator.clipboard.writeText(text);
+                if (button) {
+                    button.classList.add('copied');
+                    setTimeout(() => button.classList.remove('copied'), 2000);
+                }
+                return true;
+            } catch (err) {
+                console.error('Failed to copy:', err);
+                // Fallback for older browsers
+                const textarea = document.createElement('textarea');
+                textarea.value = text;
+                textarea.style.position = 'fixed';
+                textarea.style.opacity = '0';
+                document.body.appendChild(textarea);
+                textarea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textarea);
+                if (button) {
+                    button.classList.add('copied');
+                    setTimeout(() => button.classList.remove('copied'), 2000);
+                }
+                return true;
+            }
+        };
+        
+        // Toggle switch handler
+        window.initToggleSwitches = function() {
+            document.querySelectorAll('.toggle-switch').forEach(toggle => {
+                toggle.addEventListener('click', function() {
+                    this.classList.toggle('active');
+                    const event = new CustomEvent('toggle', { 
+                        detail: { active: this.classList.contains('active') } 
+                    });
+                    this.dispatchEvent(event);
+                });
+            });
+        };
+        
+        // Slide panel system
+        window.openPanel = function(panelId) {
+            const panel = document.getElementById(panelId);
+            const overlay = document.getElementById('panel-overlay') || createPanelOverlay();
+            if (panel) {
+                overlay.classList.add('active');
+                panel.classList.add('active');
+                document.body.style.overflow = 'hidden';
+            }
+        };
+        
+        window.closePanel = function(panelId) {
+            const panel = panelId ? document.getElementById(panelId) : document.querySelector('.slide-panel.active');
+            const overlay = document.getElementById('panel-overlay');
+            if (panel) {
+                panel.classList.remove('active');
+            }
+            if (overlay) {
+                overlay.classList.remove('active');
+            }
+            document.body.style.overflow = '';
+        };
+        
+        function createPanelOverlay() {
+            const overlay = document.createElement('div');
+            overlay.id = 'panel-overlay';
+            overlay.className = 'panel-overlay';
+            overlay.addEventListener('click', () => closePanel());
+            document.body.appendChild(overlay);
+            return overlay;
+        }
+        
+        // Table sorting
+        window.initSortableTables = function() {
+            document.querySelectorAll('.table-enhanced th.sortable').forEach(header => {
+                header.addEventListener('click', function() {
+                    const table = this.closest('table');
+                    const tbody = table.querySelector('tbody');
+                    const columnIndex = Array.from(this.parentNode.children).indexOf(this);
+                    const rows = Array.from(tbody.querySelectorAll('tr'));
+                    const isAsc = this.classList.contains('asc');
+                    
+                    // Reset all headers
+                    table.querySelectorAll('th.sortable').forEach(th => {
+                        th.classList.remove('asc', 'desc');
+                    });
+                    
+                    // Sort rows
+                    rows.sort((a, b) => {
+                        const aVal = a.cells[columnIndex]?.textContent.trim() || '';
+                        const bVal = b.cells[columnIndex]?.textContent.trim() || '';
+                        
+                        // Try numeric sort first
+                        const aNum = parseFloat(aVal.replace(/[^0-9.-]/g, ''));
+                        const bNum = parseFloat(bVal.replace(/[^0-9.-]/g, ''));
+                        
+                        if (!isNaN(aNum) && !isNaN(bNum)) {
+                            return isAsc ? bNum - aNum : aNum - bNum;
+                        }
+                        
+                        // Fall back to string sort
+                        return isAsc ? bVal.localeCompare(aVal) : aVal.localeCompare(bVal);
+                    });
+                    
+                    // Update DOM
+                    rows.forEach(row => tbody.appendChild(row));
+                    this.classList.add(isAsc ? 'desc' : 'asc');
+                });
+            });
+        };
+        
+        // Row selection
+        window.initRowSelection = function() {
+            document.querySelectorAll('.table-enhanced .row-checkbox').forEach(checkbox => {
+                checkbox.addEventListener('change', function() {
+                    const row = this.closest('tr');
+                    if (this.checked) {
+                        row.classList.add('selected');
+                    } else {
+                        row.classList.remove('selected');
+                    }
+                    
+                    // Update select all checkbox
+                    const table = this.closest('table');
+                    const allCheckboxes = table.querySelectorAll('tbody .row-checkbox');
+                    const selectAll = table.querySelector('thead .row-checkbox');
+                    if (selectAll) {
+                        const allChecked = Array.from(allCheckboxes).every(cb => cb.checked);
+                        const someChecked = Array.from(allCheckboxes).some(cb => cb.checked);
+                        selectAll.checked = allChecked;
+                        selectAll.indeterminate = someChecked && !allChecked;
+                    }
+                });
+            });
+            
+            // Select all handler
+            document.querySelectorAll('.table-enhanced thead .row-checkbox').forEach(selectAll => {
+                selectAll.addEventListener('change', function() {
+                    const table = this.closest('table');
+                    const checkboxes = table.querySelectorAll('tbody .row-checkbox');
+                    checkboxes.forEach(cb => {
+                        cb.checked = this.checked;
+                        const row = cb.closest('tr');
+                        if (this.checked) {
+                            row.classList.add('selected');
+                        } else {
+                            row.classList.remove('selected');
+                        }
+                    });
+                });
+            });
+        };
+        
+        // Expandable cards
+        window.initExpandableCards = function() {
+            document.querySelectorAll('.expandable-card .card-header').forEach(header => {
+                header.addEventListener('click', function() {
+                    const card = this.closest('.expandable-card');
+                    card.classList.toggle('expanded');
+                });
+            });
+        };
+        
+        // Number animation
+        window.animateNumber = function(element, target, duration = 1000) {
+            const start = parseInt(element.textContent) || 0;
+            const increment = (target - start) / (duration / 16);
+            let current = start;
+            
+            const timer = setInterval(() => {
+                current += increment;
+                if ((increment > 0 && current >= target) || (increment < 0 && current <= target)) {
+                    element.textContent = target.toLocaleString();
+                    clearInterval(timer);
+                } else {
+                    element.textContent = Math.round(current).toLocaleString();
+                }
+            }, 16);
+        };
+        
+        // Initialize all polish features on DOM ready
+        document.addEventListener('DOMContentLoaded', function() {
+            initToggleSwitches();
+            initSortableTables();
+            initRowSelection();
+            initExpandableCards();
+            
+            // Initialize copy buttons
+            document.querySelectorAll('[data-copy]').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const text = this.dataset.copy || this.closest('[data-copy-text]')?.dataset.copyText;
+                    if (text) copyToClipboard(text, this);
+                });
+            });
+            
+            // Initialize panel close buttons
+            document.querySelectorAll('.panel-close').forEach(btn => {
+                btn.addEventListener('click', () => closePanel());
+            });
+            
+            // Close panel on Escape key
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape') closePanel();
+            });
+        });
+    </script>
+    {% endblock %}
+</body>
+</html>

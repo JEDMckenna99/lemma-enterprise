@@ -1,0 +1,105 @@
+{% extends "docs/layout.html" %}
+{% set active_page = 'cli' %}
+{% set hero_title = 'Lemma CLI' %}
+{% set hero_subtitle = 'Install, unlock, remediate, and validate proof-first agent auth.' %}
+
+{% block docs_content %}
+<div class="docs-section">
+    <h2>Install</h2>
+    <p>Install the packaged CLI with <code>pipx</code> for isolated, repeatable local usage. This is the default path for self-serve developer onboarding.</p>
+    <div class="code-block">
+        <div class="code-header">
+            <span>Shell</span>
+            <button class="copy-btn">Copy</button>
+        </div>
+        <code>pipx install lemma-cli</code>
+    </div>
+</div>
+
+<div class="docs-section">
+    <h2>Start a Wallet Session</h2>
+    <p>For local sensitive operations, start with a browser-backed wallet session so the CLI can acquire and validate proof-first auth state.</p>
+    <div class="code-block">
+        <div class="code-header">
+            <span>Shell</span>
+            <button class="copy-btn">Copy</button>
+        </div>
+        <code>lemma session start --api-base https://lemma.id
+lemma session status --api-base https://lemma.id --json</code>
+    </div>
+</div>
+
+<div class="docs-section">
+    <h2>OpenClaw Starter Setup</h2>
+    <p>Use the public starter-safe command when you want one browser approval, local firewall startup, and a visible allow plus kill-to-deny check.</p>
+    <div class="code-block">
+        <div class="code-header">
+            <span>Shell</span>
+            <button class="copy-btn">Copy</button>
+        </div>
+        <code>lemma setup-openclaw --api-base https://lemma.id
+lemma safety-status --firewall-url http://127.0.0.1:8787 --json</code>
+    </div>
+</div>
+
+<div class="docs-section">
+    <h2>Remediation Commands</h2>
+    <p>When onboarding fails, use machine-readable remediation instead of guessing from raw errors.</p>
+    <div class="code-block">
+        <div class="code-header">
+            <span>Shell</span>
+            <button class="copy-btn">Copy</button>
+        </div>
+        <code>lemma doctor --fix --error wallet_unlock_required --api-base https://lemma.id
+lemma doctor --fix --error invalid_ppid --api-base https://lemma.id
+lemma doctor --fix --error E_AUTH_REQUIRED --api-base https://lemma.id</code>
+    </div>
+</div>
+
+<div class="docs-section">
+    <h2>Headless / CI Authentication</h2>
+    <p>For non-interactive environments, authenticate with a platform API key and operator email. Use this only where browser approval is not available.</p>
+    <div class="code-block">
+        <div class="code-header">
+            <span>Shell</span>
+            <button class="copy-btn">Copy</button>
+        </div>
+        <code>lemma login --api-base https://lemma.id --non-interactive --platform-api-key "$LEMMA_API_KEY" --user-email "$LEMMA_ADMIN_EMAIL" --json</code>
+    </div>
+</div>
+
+<div class="docs-section">
+    <h2>General Setup and CI Commands</h2>
+    <p>These commands are still useful when you are wiring site configuration, audits, and launch checks around the core auth flow.</p>
+    <div class="code-block">
+        <div class="code-header">
+            <span>Shell</span>
+            <button class="copy-btn">Copy</button>
+        </div>
+        <code>lemma setup --site-id site_demo --site-domain example.com --framework flask --json
+lemma audit --project-dir . --framework flask --skip-health --json
+lemma fix --project-dir . --framework flask --safe --skip-health --json
+lemma ci --project-dir . --framework flask --skip-health --skip-smoke --json</code>
+    </div>
+</div>
+
+<div class="docs-section">
+    <h2>Machine Output Contract</h2>
+    <p>Machine-oriented commands support <code>--json</code> and emit consistent top-level fields:</p>
+    <ul>
+        <li><code>schema_version</code></li>
+        <li><code>command</code></li>
+        <li><code>ok</code></li>
+        <li><code>error_code</code></li>
+    </ul>
+</div>
+
+<div class="docs-section">
+    <h2>Related Docs</h2>
+    <ul>
+        <li><a href="/docs/quickstart">Quick Start</a> -- bring-your-own runtime auth path</li>
+        <li><a href="/docs/installation">Installation</a> -- packaged CLI and reference runtime setup</li>
+        <li><a href="/docs/api/auth">Authentication API</a> -- proof-first and compatibility contract</li>
+    </ul>
+</div>
+{% endblock %}

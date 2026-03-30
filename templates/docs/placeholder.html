@@ -1,0 +1,31 @@
+{% extends "docs/layout.html" %}
+
+{% block docs_content %}
+<div class="docs-section">
+    <h2>{{ page_title or 'Documentation' }}</h2>
+    <p>{{ page_description or 'This documentation page is coming soon.' }}</p>
+    
+    <div class="callout callout--info" style="margin-top: 32px;">
+        <div class="callout-title">Documentation in Progress</div>
+        <p>We're actively working on this documentation. In the meantime, check out our <a href="{{ url_for('docs_overview') }}">Overview</a> or <a href="{{ url_for('docs_examples') }}">Code Examples</a>.</p>
+    </div>
+    
+    <div style="margin-top: 40px;">
+        <h3>Quick Links</h3>
+        <div class="feature-grid">
+            <a href="{{ url_for('docs_overview') }}" class="feature-card" style="text-decoration: none;">
+                <h3>Overview</h3>
+                <p>Get started with Lemma basics</p>
+            </a>
+            <a href="/docs/integration/SIMPLE_INTEGRATION_GUIDE.md" class="feature-card" style="text-decoration: none;" target="_blank">
+                <h3>Integration Guide</h3>
+                <p>Step-by-step integration docs</p>
+            </a>
+            <a href="/developer" class="feature-card" style="text-decoration: none;">
+                <h3>Developer Dashboard</h3>
+                <p>Register your site and get API keys</p>
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}

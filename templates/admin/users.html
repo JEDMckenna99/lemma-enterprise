@@ -1,0 +1,359 @@
+{% extends "admin/layout.html" %}
+{% set active_page = 'users' %}
+
+{% block title %}Users - lemma.id Admin{% endblock %}
+
+{% block admin_content %}
+<div class="admin-header">
+    <h1 class="admin-title">User Management</h1>
+    <p class="admin-subtitle">View and manage platform users</p>
+</div>
+
+<!-- Stats -->
+<div class="admin-stats">
+    <div class="stat-card stat-card--info">
+        <div class="stat-label">Total Users</div>
+        <div class="stat-value stat-loading" id="stat-total"><span class="stat-skeleton"></span></div>
+    </div>
+    <div class="stat-card stat-card--success">
+        <div class="stat-label">Active Today</div>
+        <div class="stat-value stat-loading" id="stat-active"><span class="stat-skeleton"></span></div>
+    </div>
+    <div class="stat-card stat-card--warning">
+        <div class="stat-label">Developers</div>
+        <div class="stat-value stat-loading" id="stat-developers"><span class="stat-skeleton"></span></div>
+    </div>
+    <div class="stat-card stat-card--danger">
+        <div class="stat-label">Admins</div>
+        <div class="stat-value stat-loading" id="stat-admins"><span class="stat-skeleton"></span></div>
+    </div>
+</div>
+
+<style>
+.stat-loading .stat-skeleton {
+    display: inline-block;
+    width: 50px;
+    height: 28px;
+    background: linear-gradient(90deg, var(--admin-bg-tertiary) 25%, var(--admin-bg-secondary) 50%, var(--admin-bg-tertiary) 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite;
+    border-radius: 4px;
+}
+@keyframes shimmer {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+}
+</style>
+
+<!-- Users Table -->
+<div class="admin-card">
+    <div class="admin-card-header">
+        <h2 class="admin-card-title">All Users</h2>
+        <div style="display: flex; gap: 12px;">
+            <input type="text" id="user-search" placeholder="Search users..." 
+                   style="padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 0.9rem;">
+            <button class="admin-btn admin-btn--secondary admin-btn--sm" id="refresh-users-btn">
+                Refresh
+            </button>
+        </div>
+    </div>
+    <div class="admin-card-body" style="padding: 0;">
+        <div id="users-table-container">
+            <table class="admin-table">
+                <thead>
+                    <tr>
+                        <th>User</th>
+                        <th>Identifiers</th>
+                        <th>Type</th>
+                        <th>Sites</th>
+                        <th>Created</th>
+                        <th>Last Active</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="users-table-body">
+                    <tr>
+                        <td colspan="7" style="text-align: center; padding: 40px;">
+                            Loading users...
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script nonce="{{ csp_nonce }}">
+// Admin auth state
+let adminCredential = null;
+
+document.addEventListener('DOMContentLoaded', async () => {
+    await checkAdminAuth();
+    
+    loadUsers();
+    loadUserStats();
+    
+    document.getElementById('refresh-users-btn').addEventListener('click', loadUsers);
+    document.getElementById('user-search').addEventListener('input', debounce(filterUsers, 300));
+});
+
+async function checkAdminAuth() {
+    if (typeof LemmaWallet === 'undefined') {
+        console.warn('LemmaWallet not loaded');
+        return;
+    }
+    
+    try {
+        const wallet = new LemmaWallet();
+        const authResult = await wallet.autoAuthenticate();
+        
+        if (authResult.authenticated) {
+            const credentials = await wallet.getCredentials({ siteId: 'lemma.id' });
+            adminCredential = credentials.find(c => {
+                const normalized = c.normalized || {};
+                return normalized.permissionId === 'admin_access' || 
+                       normalized.accountType === 'admin' ||
+                       (normalized.type && normalized.type.includes('admin'));
+            });
+            
+            if (adminCredential) {
+                console.log('Admin credential found:', adminCredential.id);
+            }
+        }
+    } catch (e) {
+        console.warn('Admin auth check failed:', e);
+    }
+}
+
+async function getAuthHeaders() {
+    if (typeof window.getLemmaAuthHeadersAsync === 'function') {
+        return await window.getLemmaAuthHeadersAsync({});
+    }
+    const headers = {};
+    if (adminCredential) {
+        headers['X-Credential-ID'] = adminCredential.id;
+        headers['X-Permission-ID'] = adminCredential.normalized?.permissionId || 'admin_access';
+        headers['X-Site-ID'] = 'lemma.id';
+    }
+    return headers;
+}
+
+let allUsers = [];
+
+async function loadUserStats() {
+    try {
+        const response = await fetch('/api/admin/user-stats', { headers: await getAuthHeaders() });
+        if (!response.ok) throw new Error('Failed');
+        const data = await response.json();
+        
+        // Use stats object from response
+        const stats = data.stats || data;
+        updateStatValue('stat-total', stats.total_users || stats.total || 0);
+        updateStatValue('stat-active', stats.active_today || stats.new_this_week || 0);
+        updateStatValue('stat-developers', stats.developers || stats.active_sites || 0);
+        updateStatValue('stat-admins', stats.admins || 1);
+    } catch (e) {
+        updateStatValue('stat-total', '-');
+        updateStatValue('stat-active', '-');
+        updateStatValue('stat-developers', '-');
+        updateStatValue('stat-admins', '-');
+    }
+}
+
+function updateStatValue(id, value) {
+    const el = document.getElementById(id);
+    if (el) {
+        el.classList.remove('stat-loading');
+        el.textContent = typeof value === 'number' ? value.toLocaleString() : value;
+    }
+}
+
+async function loadUsers() {
+    const tbody = document.getElementById('users-table-body');
+    tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 40px;">Loading users...</td></tr>';
+    
+    try {
+        const response = await fetch('/api/admin/users', { headers: await getAuthHeaders() });
+        if (!response.ok) throw new Error('Failed to load users');
+        const data = await response.json();
+        
+        allUsers = data.users || [];
+        renderUsers(allUsers);
+    } catch (e) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="7" style="text-align: center; padding: 40px;">
+                    <div class="admin-empty">
+                        <div class="admin-empty-icon">👥</div>
+                        <div class="admin-empty-title">No users found</div>
+                        <p>Users will appear here as they create wallets</p>
+                    </div>
+                </td>
+            </tr>
+        `;
+    }
+}
+
+function renderUsers(users) {
+    const tbody = document.getElementById('users-table-body');
+    
+    if (users.length === 0) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="7" style="text-align: center; padding: 40px;">
+                    <div class="admin-empty">
+                        <div class="admin-empty-icon">👥</div>
+                        <div class="admin-empty-title">No users found</div>
+                    </div>
+                </td>
+            </tr>
+        `;
+        return;
+    }
+    
+    tbody.innerHTML = users.map(user => `
+        <tr>
+            <td>
+                <div style="display: flex; align-items: center; gap: 12px;">
+                    <div style="width: 36px; height: 36px; background: #f3f4f6; border-radius: 50%; display: flex; align-items: center; justify-content: center;">
+                        👤
+                    </div>
+                    <div>
+                        <div style="font-weight: 500;">${escapeHtml(user.display_name || user.ppid?.substring(0, 12) + '...' || 'Unknown')}</div>
+                        <div style="font-size: 0.75rem; color: #6b7280;">${escapeHtml(user.email || user.ppid?.substring(0, 20) + '...' || '')}</div>
+                    </div>
+                </div>
+            </td>
+            <td style="font-size: 0.75rem; color: #6b7280; line-height: 1.35;">
+                <div><strong>ID:</strong> ${escapeHtml(user.internal_identifier || user.id || '-')}</div>
+                <div><strong>PPID:</strong> ${escapeHtml(user.ppid ? `${String(user.ppid).substring(0, 20)}...` : '-')}</div>
+            </td>
+            <td>
+                <span class="badge ${getUserTypeBadge(user.type)}">${escapeHtml(user.type || 'User')}</span>
+            </td>
+            <td>${user.site_count || 0}</td>
+            <td>${formatDate(user.created_at)}</td>
+            <td>${formatDate(user.last_active)}</td>
+            <td>
+                <button class="admin-btn admin-btn--secondary admin-btn--sm" data-action="view-user" data-user-id="${escapeHtml(user.id || user.ppid)}">
+                    View
+                </button>
+                <button class="admin-btn admin-btn--danger admin-btn--sm" style="margin-left: 6px; ${user.ppid ? '' : 'opacity:0.5; cursor:not-allowed;'}" ${user.ppid ? '' : 'disabled'} data-action="revoke-user" data-user='${JSON.stringify(user).replace(/'/g, "&#39;")}'>
+                    Revoke Access
+                </button>
+            </td>
+        </tr>
+    `).join('');
+}
+
+function filterUsers() {
+    const search = document.getElementById('user-search').value.toLowerCase();
+    const filtered = allUsers.filter(u => 
+        (u.display_name || '').toLowerCase().includes(search) ||
+        (u.email || '').toLowerCase().includes(search) ||
+        (u.ppid || '').toLowerCase().includes(search) ||
+        (u.internal_identifier || u.id || '').toLowerCase().includes(search)
+    );
+    renderUsers(filtered);
+}
+
+function getUserTypeBadge(type) {
+    const badges = {
+        'admin': 'badge--danger',
+        'developer': 'badge--info',
+        'user': 'badge--neutral'
+    };
+    return badges[type] || 'badge--neutral';
+}
+
+function viewUser(id) {
+    alert('User details view coming soon. ID: ' + id);
+}
+
+async function revokeUserAccess(user) {
+    const identifier = user.email || user.ppid || user.internal_identifier || user.id || 'this user';
+    if (!user.ppid) {
+        if (window.showToast) {
+            showToast('warning', 'PPID Required', 'This user has no PPID on record, so user-level revocation API cannot be applied.');
+        }
+        return;
+    }
+    if (!confirm(`Revoke lemma.id access for ${identifier}? This will call the user-level revocation API and invalidate access for this PPID on lemma.id.`)) {
+        return;
+    }
+
+    try {
+        const response = await fetch('/api/wallet/revoke-user', {
+            method: 'POST',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                ppid: user.ppid,
+                site_id: 'lemma.id',
+                reason: 'manual_admin_revoke'
+            })
+        });
+
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok || data.success === false) {
+            throw new Error(data.error || `HTTP ${response.status}`);
+        }
+
+        if (window.showToast) {
+            showToast('success', 'Access Revoked', `Revocation API applied for ${identifier}`);
+        }
+        await loadUsers();
+        await loadUserStats();
+    } catch (err) {
+        console.error('Revoke user failed:', err);
+        if (window.showToast) {
+            showToast('error', 'Revoke Failed', err.message || 'Could not revoke user access');
+        }
+    }
+}
+
+function formatDate(dateStr) {
+    if (!dateStr) return '-';
+    try {
+        const date = new Date(dateStr);
+        return date.toLocaleDateString();
+    } catch {
+        return '-';
+    }
+}
+
+function escapeHtml(text) {
+    if (!text) return '';
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+function debounce(func, wait) {
+    let timeout;
+    return function(...args) {
+        clearTimeout(timeout);
+        timeout = setTimeout(() => func.apply(this, args), wait);
+    };
+}
+
+// Event delegation for CSP compliance
+document.addEventListener('click', function(e) {
+    const target = e.target.closest('[data-action]');
+    if (!target) return;
+    
+    if (target.dataset.action === 'view-user') {
+        viewUser(target.dataset.userId);
+        return;
+    }
+    if (target.dataset.action === 'revoke-user') {
+        try {
+            const user = JSON.parse(target.dataset.user);
+            revokeUserAccess(user);
+        } catch (e) {
+            console.error('Failed to parse user payload', e);
+        }
+    }
+});
+</script>
+{% endblock %}

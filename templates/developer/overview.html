@@ -1,0 +1,856 @@
+{% extends "developer/layout.html" %}
+{% set active_page = 'overview' %}
+
+{% block dev_content %}
+<div class="dev-header">
+    <div class="dev-header-row">
+        <div>
+            <h1 class="dev-title">Welcome back{{ ', ' + user_name if user_name else '' }}!</h1>
+            <p class="dev-subtitle">Here's an overview of your Lemma integration</p>
+        </div>
+        <a href="/developer/sites/new" class="dev-btn dev-btn-primary">
+            + Create New Site
+        </a>
+    </div>
+</div>
+
+<!-- Stats -->
+<div class="dev-stats" id="stats-container">
+    <div class="dev-stat-card">
+        <div class="dev-stat-label">Total Verifications</div>
+        <div class="dev-stat-value" id="stat-verifications">-</div>
+        <div class="dev-stat-change" id="stat-verifications-change">This month</div>
+    </div>
+    <div class="dev-stat-card">
+        <div class="dev-stat-label">Active Users</div>
+        <div class="dev-stat-value" id="stat-users">-</div>
+        <div class="dev-stat-change" id="stat-users-change">Across all sites</div>
+    </div>
+    <div class="dev-stat-card">
+        <div class="dev-stat-label">Your Sites</div>
+        <div class="dev-stat-value" id="stat-sites">-</div>
+        <div class="dev-stat-change" id="stat-sites-change">Active integrations</div>
+    </div>
+    <div class="dev-stat-card">
+        <div class="dev-stat-label">Avg Response Time</div>
+        <div class="dev-stat-value" id="stat-latency">-</div>
+        <div class="dev-stat-change" id="stat-latency-change">Verification latency</div>
+    </div>
+</div>
+
+<!-- Quick Actions -->
+<div class="dev-card">
+    <div class="dev-card-header">
+        <h2 class="dev-card-title">Quick Actions</h2>
+    </div>
+    <div class="dev-card-body">
+        <div class="dev-actions">
+            <a href="/developer/sites/new" class="dev-action">
+                <div class="dev-action-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <path d="M2 12h20"></path>
+                        <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
+                    </svg>
+                </div>
+                <div class="dev-action-title">Register New Site</div>
+            </a>
+            <a href="/developer/sites" class="dev-action">
+                <div class="dev-action-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"></path>
+                    </svg>
+                </div>
+                <div class="dev-action-title">Manage API Keys</div>
+            </a>
+            <a href="/docs/getting-started" class="dev-action" target="_blank">
+                <div class="dev-action-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
+                        <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
+                    </svg>
+                </div>
+                <div class="dev-action-title">Read Docs</div>
+            </a>
+            <a href="/developer/usage" class="dev-action">
+                <div class="dev-action-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M3 3v18h18"></path>
+                        <path d="M18 17V9"></path>
+                        <path d="M13 17V5"></path>
+                        <path d="M8 17v-3"></path>
+                    </svg>
+                </div>
+                <div class="dev-action-title">View Usage</div>
+            </a>
+        </div>
+    </div>
+</div>
+
+<!-- First-Time Onboarding (shown only when no sites are registered) -->
+<div class="dev-card" id="first-site-onboarding" style="display: none;">
+    <div class="dev-card-header">
+        <h2 class="dev-card-title">Getting Started</h2>
+    </div>
+    <div class="dev-card-body">
+        <p class="onboarding-intro">
+            Register your first site to activate developer onboarding. After your first site is added, this section is hidden automatically.
+        </p>
+        <div class="onboarding-actions">
+            <a href="/developer/sites/new" class="dev-btn dev-btn-primary">Register First Site</a>
+            <a href="/docs/getting-started" class="dev-btn dev-btn-secondary" target="_blank">Read Setup Guide</a>
+        </div>
+    </div>
+</div>
+
+<!-- Recent Sites -->
+<div class="dev-card">
+    <div class="dev-card-header">
+        <h2 class="dev-card-title">Your Sites</h2>
+        <a href="/developer/sites" class="dev-btn dev-btn-sm dev-btn-secondary">View All</a>
+    </div>
+    <div class="dev-card-body" id="sites-container">
+        <div class="dev-loading">
+            <div class="dev-spinner"></div>
+            <div>Loading your sites...</div>
+        </div>
+    </div>
+</div>
+
+<style>
+.onboarding-intro {
+    margin: 0 0 16px 0;
+    color: var(--dev-text-muted);
+    font-size: 14px;
+}
+
+.onboarding-actions {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+/* Agent Token Styles */
+.agent-auth-needed {
+    text-align: center;
+    padding: 20px;
+}
+
+.agent-auth-needed p {
+    margin: 0 0 12px 0;
+}
+
+.agent-desc {
+    font-size: 13px;
+    color: var(--dev-text-muted);
+}
+
+.agent-token-section {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.agent-token-info p {
+    margin: 0 0 8px 0;
+}
+
+.agent-token-form {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 16px;
+    background: var(--dev-bg-subtle);
+    border-radius: 8px;
+}
+
+.agent-form-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.agent-form-row label:first-child {
+    width: 100px;
+    font-weight: 500;
+}
+
+.agent-form-row .dev-input,
+.agent-form-row .dev-select {
+    flex: 1;
+    padding: 8px 12px;
+    border: 1px solid var(--dev-border);
+    border-radius: 6px;
+    background: var(--dev-bg);
+}
+
+.agent-scope-options {
+    display: flex;
+    gap: 16px;
+}
+
+.agent-scope-options label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-weight: normal;
+}
+
+.agent-active-tokens {
+    border-top: 1px solid var(--dev-border);
+    padding-top: 16px;
+}
+
+.agent-active-tokens h4 {
+    margin: 0 0 12px 0;
+    font-size: 14px;
+    color: var(--dev-text-muted);
+}
+
+.agent-token-item {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 12px;
+    background: var(--dev-bg-subtle);
+    border-radius: 6px;
+    margin-bottom: 8px;
+}
+
+.agent-token-meta {
+    flex: 1;
+}
+
+.agent-token-name {
+    font-weight: 500;
+    display: block;
+}
+
+.agent-token-id {
+    font-size: 12px;
+    color: var(--dev-text-muted);
+    font-family: monospace;
+}
+
+.agent-token-details {
+    display: flex;
+    flex-direction: column;
+    font-size: 12px;
+    color: var(--dev-text-muted);
+}
+
+.dev-btn-danger {
+    background: #dc3545;
+    color: white;
+    border: none;
+}
+
+.dev-btn-danger:hover {
+    background: #c82333;
+}
+
+/* Generated Token Display */
+.agent-token-generated {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.agent-success-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 16px;
+    font-weight: 600;
+    color: #28a745;
+}
+
+.agent-success-icon {
+    width: 24px;
+    height: 24px;
+    background: #28a745;
+    color: white;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.agent-token-display {
+    padding: 16px;
+    background: #1a1a2e;
+    border-radius: 8px;
+    border: 2px solid #28a745;
+}
+
+.agent-token-label {
+    font-size: 12px;
+    color: #aaa;
+    margin-bottom: 8px;
+}
+
+.agent-token-value {
+    font-family: monospace;
+    font-size: 14px;
+    color: #4ade80;
+    word-break: break-all;
+    padding: 12px;
+    background: #0d0d1a;
+    border-radius: 4px;
+    margin-bottom: 12px;
+}
+
+.agent-token-meta-info {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 13px;
+    padding: 12px;
+    background: var(--dev-bg-subtle);
+    border-radius: 6px;
+}
+
+.agent-token-usage {
+    padding: 12px;
+    background: var(--dev-bg-subtle);
+    border-radius: 6px;
+}
+
+.agent-usage-label {
+    font-size: 12px;
+    color: var(--dev-text-muted);
+    margin-bottom: 8px;
+}
+
+.agent-usage-code {
+    display: block;
+    font-family: monospace;
+    font-size: 13px;
+    padding: 8px 12px;
+    background: var(--dev-bg);
+    border-radius: 4px;
+    word-break: break-all;
+}
+
+#copy-btn.copied {
+    background: #28a745;
+}
+
+.agent-error {
+    text-align: center;
+    padding: 20px;
+    color: var(--dev-text-muted);
+}
+</style>
+
+<script nonce="{{ csp_nonce }}">
+// Global auth state
+let currentPpid = null;
+
+document.addEventListener('DOMContentLoaded', async () => {
+    // First, check wallet auth to get PPID
+    currentPpid = await getWalletPpid();
+    
+    // Then load data with auth
+    await loadOverviewStats();
+    await loadRecentSites();
+});
+
+async function getWalletPpid() {
+    if (typeof LemmaWallet === 'undefined') {
+        console.warn('LemmaWallet not available');
+        return null;
+    }
+    
+    try {
+        const wallet = new LemmaWallet();
+        const authResult = await wallet.autoAuthenticate();
+        
+        if (authResult.authenticated) {
+            // Derive site-specific PPID for lemma.id
+            const ppid = await wallet.derivePPID('lemma.id');
+            console.log('Wallet authenticated, PPID:', ppid);
+            return ppid;
+        }
+    } catch (e) {
+        console.warn('Wallet auth check failed:', e);
+    }
+    
+    return null;
+}
+
+function getAuthHeaders() {
+    if (typeof window.getLemmaAuthHeaders === 'function') {
+        return window.getLemmaAuthHeaders();
+    }
+    return {};
+}
+
+function formatDelegationIssueError(data, status) {
+    const code = String((data && data.error) || '').trim();
+    const detail = String((data && data.message) || '').trim();
+    if (code === 'wallet_unlock_required' || code === 'wallet_session_expired') {
+        return 'Wallet unlock is required for delegation. Open /unlock in this browser tab, then retry.';
+    }
+    if (code === 'ppid_required') {
+        return 'Delegation requires a valid lemma PPID. Refresh this page after wallet unlock and retry.';
+    }
+    if (code === 'admin_lemma_site_mismatch') {
+        return detail || 'Your admin credential does not match lemma.id. Reissue admin permission for lemma.id and refresh.';
+    }
+    if (code === 'site_ownership_mismatch') {
+        return 'Delegation is restricted to sites you own/administer. Check site binding and retry.';
+    }
+    if (code === 'insufficient_permission') {
+        return 'Admin permission is missing in this session. Refresh admin bootstrap state and retry.';
+    }
+    if (detail) {
+        return detail;
+    }
+    if (code) {
+        return `Issuance blocked: ${code}`;
+    }
+    return `Issuance failed (HTTP ${status || 'unknown'}).`;
+}
+
+// ============================================
+// AGENT TOKEN MANAGEMENT
+// ============================================
+
+async function checkAgentTokenStatus() {
+    const container = document.getElementById('agent-token-content');
+    const statusBadge = document.getElementById('agent-status');
+    
+    // Check if wallet is available
+    if (typeof LemmaWallet === 'undefined') {
+        showAgentNeedsAuth('Wallet not loaded');
+        return;
+    }
+    
+    try {
+        const wallet = new LemmaWallet();
+        const authResult = await wallet.autoAuthenticate();
+        
+        if (!authResult.authenticated) {
+            showAgentNeedsAuth('Not signed in');
+            return;
+        }
+        
+        // User is authenticated - derive PPID and check for existing tokens
+        const ppid = await wallet.derivePPID('lemma.id');
+        statusBadge.textContent = 'Authenticated';
+        statusBadge.className = 'dev-badge dev-badge-success';
+        
+        // Load existing agent credentials
+        await loadAgentCredentials(ppid);
+        
+    } catch (e) {
+        console.error('Agent token check failed:', e);
+        showAgentNeedsAuth('Auth check failed');
+    }
+}
+
+function showAgentNeedsAuth(reason) {
+    const container = document.getElementById('agent-token-content');
+    const statusBadge = document.getElementById('agent-status');
+    
+    statusBadge.textContent = reason;
+    statusBadge.className = 'dev-badge dev-badge-warning';
+    
+    container.innerHTML = `
+        <div class="agent-auth-needed">
+            <p>Sign in with your wallet to generate AI agent tokens.</p>
+            <p class="agent-desc">Agent tokens allow AI coding assistants (like Cursor) to test authenticated features on your behalf.</p>
+            <button class="dev-btn dev-btn-primary" data-action="sign-in-agent">
+                Sign In with Wallet
+            </button>
+        </div>
+    `;
+}
+
+async function signInForAgentToken() {
+    try {
+        const wallet = new LemmaWallet();
+        await wallet.startRedirectFlow({ returnUrl: window.location.href });
+    } catch (e) {
+        console.error('Sign in failed:', e);
+        alert('Sign in failed: ' + e.message);
+    }
+}
+
+async function loadAgentCredentials(ppid) {
+    const container = document.getElementById('agent-token-content');
+    
+    try {
+        // Get PPID for the request
+        const response = await fetch('/api/agent/credentials', {
+            headers: getAuthHeaders()
+        });
+        
+        if (!response.ok) {
+            throw new Error('Failed to load credentials');
+        }
+        
+        const data = await response.json();
+        const credentials = (data.credentials || []).filter(c => c.status === 'active');
+        
+        container.innerHTML = `
+            <div class="agent-token-section">
+                <div class="agent-token-info">
+                    <p><strong>Generate a token</strong> for your AI coding assistant to access the developer API.</p>
+                    <p class="agent-desc">Tokens are time-limited and can be revoked at any time.</p>
+                </div>
+                
+                <div class="agent-token-form">
+                    <div class="agent-form-row">
+                        <label>Agent Name</label>
+                        <input type="text" id="agent-name" value="Cursor AI" class="dev-input">
+                    </div>
+                    <div class="agent-form-row">
+                        <label>Duration</label>
+                        <select id="agent-ttl" class="dev-select">
+                            <option value="1">1 hour</option>
+                            <option value="4" selected>4 hours</option>
+                            <option value="8">8 hours</option>
+                            <option value="24">24 hours</option>
+                        </select>
+                    </div>
+                    <div class="agent-form-row">
+                        <label>Scope</label>
+                        <div class="agent-scope-options">
+                            <label><input type="checkbox" id="scope-read" checked disabled> Read</label>
+                            <label><input type="checkbox" id="scope-write" checked> Write</label>
+                            <label><input type="checkbox" id="scope-admin"> Admin</label>
+                        </div>
+                    </div>
+                    <button class="dev-btn dev-btn-primary" id="generate-btn" data-action="generate-token" data-ppid="${ppid}">
+                        Generate Token
+                    </button>
+                </div>
+                
+                ${credentials.length > 0 ? `
+                    <div class="agent-active-tokens">
+                        <h4>Active Tokens</h4>
+                        ${credentials.map(c => `
+                            <div class="agent-token-item">
+                                <div class="agent-token-meta">
+                                    <span class="agent-token-name">${escapeHtml(c.agent_name)}</span>
+                                    <span class="agent-token-id">${c.token_id}</span>
+                                </div>
+                                <div class="agent-token-details">
+                                    <span>Expires: ${new Date(c.expires_at).toLocaleString()}</span>
+                                    <span>Used: ${c.use_count} times</span>
+                                </div>
+                                <button class="dev-btn dev-btn-sm dev-btn-danger" data-action="revoke-token" data-token-id="${c.token_id}" data-ppid="${ppid}">
+                                    Revoke
+                                </button>
+                            </div>
+                        `).join('')}
+                    </div>
+                ` : ''}
+            </div>
+        `;
+        
+    } catch (e) {
+        console.error('Failed to load agent credentials:', e);
+        container.innerHTML = `
+            <div class="agent-error">
+                <p>Could not load agent credentials.</p>
+                <button class="dev-btn dev-btn-secondary" data-action="retry-agent-check">Retry</button>
+            </div>
+        `;
+    }
+}
+
+async function generateAgentToken(ppid) {
+    const btn = document.getElementById('generate-btn');
+    const originalText = btn.textContent;
+    btn.textContent = 'Generating...';
+    btn.disabled = true;
+    
+    try {
+        const agentName = document.getElementById('agent-name').value || 'AI Agent';
+        const ttlHours = parseInt(document.getElementById('agent-ttl').value);
+        
+        const scope = ['read'];
+        if (document.getElementById('scope-write').checked) scope.push('write');
+        if (document.getElementById('scope-admin').checked) scope.push('admin');
+        const adminCredential = window.lemmaCredential || null;
+        
+        const response = await fetch('/api/agent/credentials/issue', {
+            method: 'POST',
+            credentials: 'include',
+            headers: {
+                'Content-Type': 'application/json',
+                ...getAuthHeaders()
+            },
+            body: JSON.stringify({
+                agent_name: agentName,
+                scope: scope,
+                ttl_hours: ttlHours,
+                intended_platform: 'lemma.id',
+                admin_credential: adminCredential
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (!response.ok || !data.success) {
+            throw new Error(formatDelegationIssueError(data, response.status));
+        }
+        
+        // Show the token (only shown once!)
+        showGeneratedToken(data.credential, ppid);
+        
+    } catch (e) {
+        console.error('Failed to generate token:', e);
+        if (window.showToast) {
+            window.showToast('error', 'Agent Delegation', e.message || 'Failed to generate token');
+        } else {
+            alert('Failed to generate token: ' + e.message);
+        }
+        btn.textContent = originalText;
+        btn.disabled = false;
+    }
+}
+
+function showGeneratedToken(credential, ppid) {
+    const container = document.getElementById('agent-token-content');
+    
+    container.innerHTML = `
+        <div class="agent-token-generated">
+            <div class="agent-success-header">
+                <span class="agent-success-icon"></span>
+                <span>Token Generated Successfully</span>
+            </div>
+            
+            <div class="agent-token-display">
+                <div class="agent-token-label">Your Agent Token (copy this - shown only once!):</div>
+                <div class="agent-token-value" id="token-value">${credential.token}</div>
+                <button class="dev-btn dev-btn-primary" id="copy-btn" data-action="copy-token">
+                    Copy to Clipboard
+                </button>
+            </div>
+            
+            <div class="agent-token-meta-info">
+                <div><strong>Token ID:</strong> ${credential.token_id}</div>
+                <div><strong>Scope:</strong> ${credential.scope.join(', ')}</div>
+                <div><strong>Expires:</strong> ${new Date(credential.expires_at).toLocaleString()}</div>
+            </div>
+            
+            <div class="agent-token-usage">
+                <div class="agent-usage-label">Usage in AI Agent:</div>
+                <code class="agent-usage-code">X-Agent-Token: ${credential.token}</code>
+            </div>
+            
+            <button class="dev-btn dev-btn-secondary" data-action="back-to-tokens" data-ppid="${ppid}">
+                Done - Back to Token Management
+            </button>
+        </div>
+    `;
+}
+
+function copyAgentToken() {
+    const token = document.getElementById('token-value').textContent;
+    navigator.clipboard.writeText(token).then(() => {
+        const btn = document.getElementById('copy-btn');
+        btn.textContent = 'Copied!';
+        btn.classList.add('copied');
+        setTimeout(() => {
+            btn.textContent = 'Copy to Clipboard';
+            btn.classList.remove('copied');
+        }, 2000);
+    }).catch(e => {
+        console.error('Copy failed:', e);
+        alert('Copy failed - please select and copy manually');
+    });
+}
+
+async function revokeAgentToken(tokenId, ppid) {
+    if (!confirm('Revoke this token? The agent will immediately lose access.')) {
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/api/agent/credentials/${tokenId}/revoke`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                ...getAuthHeaders()
+            },
+            body: JSON.stringify({ reason: 'Manual revocation from dashboard' })
+        });
+        
+        const data = await response.json();
+        
+        if (!data.success) {
+            throw new Error(data.error || 'Failed to revoke');
+        }
+        
+        // Reload the credentials list
+        await loadAgentCredentials(ppid);
+        
+    } catch (e) {
+        console.error('Failed to revoke token:', e);
+        alert('Failed to revoke token: ' + e.message);
+    }
+}
+
+async function loadOverviewStats() {
+    try {
+        const response = await fetch('/api/developer/stats', {
+            headers: getAuthHeaders()
+        });
+        if (!response.ok) throw new Error('Failed to load stats');
+        
+        const data = await response.json();
+        
+        document.getElementById('stat-verifications').textContent = formatNumber(data.total_verifications || 0);
+        document.getElementById('stat-users').textContent = formatNumber(data.active_users || 0);
+        document.getElementById('stat-sites').textContent = data.site_count || 0;
+        document.getElementById('stat-latency').textContent = (data.avg_latency_ms || 0).toFixed(1) + 'ms';
+        
+    } catch (e) {
+        console.warn('Could not load stats:', e);
+        // Show default values
+        document.getElementById('stat-verifications').textContent = '0';
+        document.getElementById('stat-users').textContent = '0';
+        document.getElementById('stat-sites').textContent = '0';
+        document.getElementById('stat-latency').textContent = '<1ms';
+    }
+}
+
+async function loadRecentSites() {
+    const container = document.getElementById('sites-container');
+    
+    try {
+        const response = await fetch('/api/developer/sites', {
+            headers: getAuthHeaders()
+        });
+        if (!response.ok) throw new Error('Failed to load sites');
+        
+        const data = await response.json();
+        const sites = data.sites || [];
+        toggleOnboardingCard(sites.length === 0);
+        
+        if (sites.length === 0) {
+            container.innerHTML = `
+                <div class="dev-empty">
+                    <div class="dev-empty-icon"></div>
+                    <div class="dev-empty-title">No sites yet</div>
+                    <div class="dev-empty-text">Register your first site to start using Lemma authentication</div>
+                    <a href="/developer/sites/new" class="dev-btn dev-btn-primary">Register Site</a>
+                </div>
+            `;
+            return;
+        }
+        
+        // Show up to 3 recent sites
+        const recentSites = sites.slice(0, 3);
+        
+        container.innerHTML = `
+            <div class="dev-site-grid">
+                ${recentSites.map(site => `
+                    <div class="dev-site-card">
+                        <div class="dev-site-header">
+                            <div class="dev-site-icon"></div>
+                            <div>
+                                <div class="dev-site-name">${escapeHtml(site.name || site.site_id)}</div>
+                                <div class="dev-site-domain">${escapeHtml(site.domain || site.site_id)}</div>
+                            </div>
+                        </div>
+                        <div class="dev-site-stats">
+                            <div class="dev-site-stat">
+                                <div class="dev-site-stat-value">${formatNumber(site.verification_count || 0)}</div>
+                                <div class="dev-site-stat-label">Verifications</div>
+                            </div>
+                            <div class="dev-site-stat">
+                                <div class="dev-site-stat-value">${formatNumber(site.user_count || 0)}</div>
+                                <div class="dev-site-stat-label">Users</div>
+                            </div>
+                        </div>
+                        <div class="dev-site-actions">
+                            <a href="/developer/sites/${site.site_id}" class="dev-btn dev-btn-sm dev-btn-primary">Dashboard</a>
+                            <a href="/developer/sites/${site.site_id}/integration" class="dev-btn dev-btn-sm dev-btn-secondary">Integration</a>
+                        </div>
+                    </div>
+                `).join('')}
+            </div>
+        `;
+        
+    } catch (e) {
+        console.warn('Could not load sites:', e);
+        toggleOnboardingCard(true);
+        container.innerHTML = `
+            <div class="dev-empty">
+                <div class="dev-empty-icon"></div>
+                <div class="dev-empty-title">No sites yet</div>
+                <div class="dev-empty-text">Register your first site to start using Lemma authentication</div>
+                <a href="/developer/sites/new" class="dev-btn dev-btn-primary">Register Site</a>
+            </div>
+        `;
+    }
+}
+
+function toggleOnboardingCard(show) {
+    const card = document.getElementById('first-site-onboarding');
+    if (!card) return;
+    card.style.display = show ? 'block' : 'none';
+}
+
+function formatNumber(num) {
+    if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M';
+    if (num >= 1000) return (num / 1000).toFixed(1) + 'K';
+    return num.toString();
+}
+
+function escapeHtml(str) {
+    if (!str) return '';
+    return str.replace(/[&<>"']/g, char => ({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#39;'
+    })[char]);
+}
+
+// ============================================
+// EVENT DELEGATION (CSP-compliant click handling)
+// ============================================
+document.addEventListener('click', async function(e) {
+    const target = e.target.closest('[data-action]');
+    if (!target) return;
+    
+    const action = target.dataset.action;
+    const ppid = target.dataset.ppid;
+    const tokenId = target.dataset.tokenId;
+    
+    switch (action) {
+        case 'sign-in-agent':
+            await signInForAgentToken();
+            break;
+            
+        case 'generate-token':
+            await generateAgentToken(ppid);
+            break;
+            
+        case 'revoke-token':
+            await revokeAgentToken(tokenId, ppid);
+            break;
+            
+        case 'retry-agent-check':
+            await checkAgentTokenStatus();
+            break;
+            
+        case 'copy-token':
+            copyAgentToken();
+            break;
+            
+        case 'back-to-tokens':
+            await loadAgentCredentials(ppid);
+            break;
+    }
+});
+</script>
+{% endblock %}

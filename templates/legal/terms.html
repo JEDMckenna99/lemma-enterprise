@@ -1,0 +1,120 @@
+{% extends "modern/layout.html" %}
+
+{% block title %}Terms of Service - Lemma.id{% endblock %}
+{% block description %}Terms of Service for Lemma.id - Cryptographic Credential Verification Platform{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width: 900px; padding: 60px 20px;">
+    <div style="background: var(--white); padding: 48px; border-radius: 12px; box-shadow: var(--shadow-lg);">
+        <h1 style="color: var(--gray-900); margin-bottom: 8px;">Terms of Service</h1>
+        <p style="color: var(--gray-500); font-size: 14px; margin-bottom: 40px;">Last Updated: January 31, 2026</p>
+
+        <h2 style="margin-top: 40px;">1. Agreement to Terms</h2>
+        <p>By accessing or using Lemma.id ("Service"), you agree to be bound by these Terms of Service ("Terms"). If you do not agree to these Terms, do not use the Service.</p>
+
+        <h2>2. Description of Service</h2>
+        <p>Lemma.id provides cryptographic credential verification services including:</p>
+        <ul style="margin-left: 20px; margin-bottom: 20px;">
+            <li><strong>Credential Issuance:</strong> Ed25519-signed digital lemmas for identity verification</li>
+            <li><strong>Local Verification:</strong> Sub-millisecond credential verification without API calls</li>
+            <li><strong>Revocation System:</strong> Privacy-preserving Bloom filter revocation lists</li>
+            <li><strong>Browser Wallet:</strong> Encrypted credential storage in user's browser</li>
+            <li><strong>Developer SDK:</strong> JavaScript SDK for credential verification integration</li>
+            <li><strong>Permission Management:</strong> Role-based access control (RBAC) with cryptographic proofs</li>
+            <li><strong>Audit Logging:</strong> Compliance reporting and security event tracking</li>
+        </ul>
+
+        <h2>3. Account Registration</h2>
+        <p>To use the Service, you must:</p>
+        <ul style="margin-left: 20px; margin-bottom: 20px;">
+            <li>Provide accurate and complete registration information</li>
+            <li>Maintain the security of your API keys and credentials</li>
+            <li>Be at least 18 years of age</li>
+            <li>Not use the Service for any illegal purpose</li>
+        </ul>
+
+        <h2>4. Acceptable Use</h2>
+        <p>You agree not to:</p>
+        <ul style="margin-left: 20px; margin-bottom: 20px;">
+            <li>Attempt to gain unauthorized access to the Service or other users' data</li>
+            <li>Use the Service to transmit malware, spam, or malicious code</li>
+            <li>Reverse engineer, decompile, or disassemble the Service</li>
+            <li>Use the Service to violate any applicable laws or regulations</li>
+            <li>Exceed rate limits or attempt to overwhelm our infrastructure</li>
+            <li>Share your API keys with unauthorized parties</li>
+        </ul>
+
+        <h2>5. Pricing</h2>
+        <p>Lemma.id is currently <strong>free to use</strong> during our public beta program. We will provide at least 30 days notice before introducing paid features or pricing changes.</p>
+
+        <h2>6. Data and Privacy</h2>
+        <p>We collect and process data as described in our <a href="/privacy" style="color: var(--primary);">Privacy Policy</a>. You retain ownership of your data. We use your data only to provide the Service.</p>
+        <p>We implement industry-standard security measures including:</p>
+        <ul style="margin-left: 20px; margin-bottom: 20px;">
+            <li><strong>Ed25519 Signatures:</strong> Cryptographic signatures for credential authenticity</li>
+            <li><strong>Bloom Filter Revocation:</strong> Privacy-preserving credential revocation</li>
+            <li><strong>Encrypted Browser Wallet:</strong> Client-side credential storage</li>
+            <li><strong>Passkey Authentication:</strong> WebAuthn/FIDO2 for developer accounts</li>
+            <li><strong>Zero-Knowledge Verification:</strong> Your servers verify locally without contacting us</li>
+            <li><strong>Audit Logging:</strong> Comprehensive security event tracking</li>
+        </ul>
+
+        <h2>7. Service Availability</h2>
+        <p><strong>Service Level Agreement (SLA):</strong></p>
+        <ul style="margin-left: 20px; margin-bottom: 20px;">
+            <li>Free Tier: Best effort, no SLA</li>
+            <li>Starter: 99.5% uptime</li>
+            <li>Professional: 99.9% uptime</li>
+            <li>Enterprise: 99.95% uptime (custom SLA available)</li>
+        </ul>
+        <p>We may perform scheduled maintenance with 24 hours notice. Emergency maintenance may be performed without notice.</p>
+
+        <h2>8. Intellectual Property</h2>
+        <p>The Service, including all software, algorithms, and documentation, is owned by Lemma and protected by copyright and other intellectual property laws. You receive a limited license to use the Service, which does not transfer any ownership rights.</p>
+
+        <h2>9. Termination</h2>
+        <p>You may terminate your account at any time by contacting support@lemma.id. We may terminate or suspend your account if you violate these Terms, with or without notice.</p>
+        <p>Upon termination:</p>
+        <ul style="margin-left: 20px; margin-bottom: 20px;">
+            <li>Your access to the Service will cease immediately</li>
+            <li>We will delete your data within 30 days unless legally required to retain it</li>
+            <li>You remain responsible for any charges incurred before termination</li>
+        </ul>
+
+        <h2>10. Limitation of Liability</h2>
+        <p><strong>THE SERVICE IS PROVIDED "AS IS" WITHOUT WARRANTIES OF ANY KIND.</strong></p>
+        <p>To the maximum extent permitted by law, Lemma shall not be liable for:</p>
+        <ul style="margin-left: 20px; margin-bottom: 20px;">
+            <li>Any indirect, incidental, special, consequential, or punitive damages</li>
+            <li>Loss of profits, revenue, data, or use</li>
+            <li>Service interruptions or errors</li>
+            <li>Unauthorized access to or alteration of your data</li>
+        </ul>
+        <p><strong>Total liability is limited to the amount you paid us in the 12 months prior to the claim, or $100, whichever is greater.</strong></p>
+
+        <h2>11. Indemnification</h2>
+        <p>You agree to indemnify and hold Lemma harmless from any claims, damages, or expenses arising from your use of the Service or violation of these Terms.</p>
+
+        <h2>12. Changes to Terms</h2>
+        <p>We may modify these Terms at any time. We will notify you of material changes via email or through the Service. Continued use of the Service after changes constitutes acceptance of the modified Terms.</p>
+
+        <h2>13. Governing Law</h2>
+        <p>These Terms are governed by the laws of the State of Delaware, United States, without regard to conflict of law provisions. Any disputes shall be resolved in the courts of Delaware.</p>
+
+        <h2>14. Contact Information</h2>
+        <p>For questions about these Terms, contact us at:</p>
+        <p>
+            Email: support@lemma.id<br>
+            Website: https://lemma.id
+        </p>
+
+        <h2>15. Entire Agreement</h2>
+        <p>These Terms, together with our Privacy Policy, constitute the entire agreement between you and Lemma regarding the Service.</p>
+
+        <div style="text-align: center; margin-top: 60px; padding-top: 30px; border-top: 1px solid var(--gray-200);">
+            <a href="/" class="btn-secondary" style="margin: 0 8px;">Back to Home</a>
+            <a href="/privacy" class="btn-secondary" style="margin: 0 8px;">Privacy Policy</a>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,619 @@
+{% extends "developer/layout.html" %}
+{% set active_page = 'sites' %}
+
+{% block dev_content %}
+<div class="dev-header">
+    <div class="dev-header-row">
+        <div>
+            <nav class="admin-breadcrumb" style="margin-bottom: 8px;">
+                <a href="/developer/sites" style="color: var(--dev-text-muted);">Sites</a>
+                <span class="breadcrumb-separator">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 14px; height: 14px;">
+                        <polyline points="9 18 15 12 9 6"></polyline>
+                    </svg>
+                </span>
+                <span>{{ site_id }}</span>
+                <span class="breadcrumb-separator">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 14px; height: 14px;">
+                        <polyline points="9 18 15 12 9 6"></polyline>
+                    </svg>
+                </span>
+                <span style="color: var(--dev-text);">API Keys</span>
+            </nav>
+            <h1 class="dev-title">API Keys</h1>
+            <p class="dev-subtitle">Manage API keys for server-side SDK authentication</p>
+        </div>
+        <button class="dev-btn dev-btn-primary" data-action="show-create-modal">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 6px;">
+                <line x1="12" y1="5" x2="12" y2="19"></line>
+                <line x1="5" y1="12" x2="19" y2="12"></line>
+            </svg>
+            Create API Key
+        </button>
+    </div>
+</div>
+
+<!-- Site ID Section -->
+<div class="dev-card card-gradient-hover" style="margin-bottom: 24px;">
+    <div class="dev-card-body" style="padding: 16px 20px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+            <div>
+                <div style="font-size: 12px; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Site ID</div>
+                <code id="site-id-display" style="font-size: 14px; color: #1e293b; font-family: 'JetBrains Mono', 'Fira Code', monospace;">{{ site_id }}</code>
+            </div>
+            <button id="copy-site-id-btn" data-action="copy-site-id" style="padding: 8px 16px; background: #f1f5f9; color: #475569; border: 1px solid #e2e8f0; border-radius: 6px; font-size: 13px; cursor: pointer; display: flex; align-items: center; gap: 6px; font-weight: 500; transition: all 0.15s;">
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                </svg>
+                Copy Site ID
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Info Banner -->
+<div style="background: linear-gradient(135deg, rgba(102, 126, 234, 0.1), rgba(118, 75, 162, 0.1)); border: 1px solid rgba(102, 126, 234, 0.2); border-radius: 12px; padding: 16px 20px; margin-bottom: 24px; display: flex; gap: 16px; align-items: flex-start;">
+    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#667eea" stroke-width="2" style="flex-shrink: 0; margin-top: 2px;">
+        <circle cx="12" cy="12" r="10"></circle>
+        <line x1="12" y1="16" x2="12" y2="12"></line>
+        <line x1="12" y1="8" x2="12.01" y2="8"></line>
+    </svg>
+    <div>
+        <div style="font-weight: 600; color: #1e293b; margin-bottom: 4px;">Keep your API keys secure</div>
+        <div style="font-size: 14px; color: #64748b;">Never expose API keys in client-side code. Use test keys for development and live keys for production.</div>
+    </div>
+</div>
+
+<!-- API Keys Table -->
+<div class="dev-card card-gradient-hover">
+    <div class="dev-card-header">
+        <h2 class="dev-card-title">Your API Keys</h2>
+    </div>
+    <div class="dev-card-body" style="padding: 0;">
+        <table class="table-enhanced" style="width: 100%;">
+            <thead>
+                <tr>
+                    <th style="padding: 12px 16px;">Name</th>
+                    <th>Key</th>
+                    <th>Type</th>
+                    <th>Status</th>
+                    <th class="sortable">Last Used</th>
+                    <th class="sortable">Created</th>
+                    <th style="width: 140px;">Actions</th>
+                </tr>
+            </thead>
+            <tbody id="keys-table-body">
+                <tr>
+                    <td colspan="7" style="text-align: center; padding: 60px;">
+                        <div class="skeleton" style="width: 200px; height: 20px; margin: 0 auto;"></div>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Create Key Modal -->
+<div class="panel-overlay" id="key-modal-overlay" style="display: none;"></div>
+<div class="slide-panel" id="key-panel" style="width: 420px;">
+    <div class="panel-header">
+        <h3 class="panel-title">Create API Key</h3>
+        <button class="panel-close">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+        </button>
+    </div>
+    <div class="panel-body">
+        <form id="key-form">
+            <div class="panel-field" style="margin-bottom: 20px;">
+                <label class="panel-field-label" for="key-name">Key Name</label>
+                <input type="text" id="key-name" class="focus-ring" placeholder="e.g. Production Server, Staging"
+                       style="width: 100%; padding: 10px 12px; border: 1px solid #e2e8f0; border-radius: 6px;">
+            </div>
+            
+            <div class="panel-field" style="margin-bottom: 20px;">
+                <label class="panel-field-label">Key Type</label>
+                <div style="display: flex; gap: 12px; margin-top: 8px;">
+                    <label style="flex: 1; display: flex; align-items: center; gap: 10px; padding: 12px 16px; border: 2px solid #e2e8f0; border-radius: 8px; cursor: pointer; transition: all 0.2s;">
+                        <input type="radio" name="key-type" value="live" checked style="width: 18px; height: 18px;">
+                        <div>
+                            <div style="font-weight: 600;">Live</div>
+                            <div style="font-size: 12px; color: #64748b;">Production use</div>
+                        </div>
+                    </label>
+                    <label style="flex: 1; display: flex; align-items: center; gap: 10px; padding: 12px 16px; border: 2px solid #e2e8f0; border-radius: 8px; cursor: pointer; transition: all 0.2s;">
+                        <input type="radio" name="key-type" value="test" style="width: 18px; height: 18px;">
+                        <div>
+                            <div style="font-weight: 600;">Test</div>
+                            <div style="font-size: 12px; color: #64748b;">Development only</div>
+                        </div>
+                    </label>
+                </div>
+            </div>
+        </form>
+    </div>
+    <div class="panel-footer">
+        <button class="dev-btn dev-btn-secondary" data-action="cancel-key">Cancel</button>
+        <button class="dev-btn dev-btn-primary" data-action="create-key">Create Key</button>
+    </div>
+</div>
+
+<!-- New Key Display Modal -->
+<div class="panel-overlay" id="new-key-modal" style="display: none;">
+    <div style="position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 32px; border-radius: 16px; width: 560px; max-width: 90vw; z-index: 1002; text-align: center;">
+        <div style="width: 64px; height: 64px; background: linear-gradient(135deg, #10b981, #059669); border-radius: 50%; margin: 0 auto 20px; display: flex; align-items: center; justify-content: center;">
+            <svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="white" stroke-width="2">
+                <polyline points="20 6 9 17 4 12"></polyline>
+            </svg>
+        </div>
+        <h3 id="new-key-title" style="margin: 0 0 8px; font-size: 20px;">API Key Created</h3>
+        <p style="color: #64748b; margin: 0 0 24px;">Copy this key now - you won't be able to see it again!</p>
+        
+        <div style="background: linear-gradient(135deg, #1e293b, #334155); border-radius: 12px; padding: 20px; margin-bottom: 20px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                <span style="color: #94a3b8; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px;">Your API Key</span>
+                <button id="copy-new-key-btn" data-action="copy-new-key" style="padding: 6px 12px; background: #667eea; color: white; border: none; border-radius: 6px; font-size: 12px; cursor: pointer; display: flex; align-items: center; gap: 6px; font-weight: 500;">
+                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                    </svg>
+                    Copy to Clipboard
+                </button>
+            </div>
+            <code id="new-key-value" style="font-size: 14px; word-break: break-all; display: block; color: #e2e8f0; font-family: 'JetBrains Mono', 'Fira Code', monospace; line-height: 1.6; padding: 12px; background: rgba(0,0,0,0.2); border-radius: 8px;"></code>
+        </div>
+        
+        <div style="background: #fef3c7; border: 1px solid #fcd34d; border-radius: 8px; padding: 12px 16px; margin-bottom: 20px; display: flex; gap: 12px; align-items: flex-start; text-align: left;">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#d97706" stroke-width="2" style="flex-shrink: 0; margin-top: 2px;">
+                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+                <line x1="12" y1="9" x2="12" y2="13"></line>
+                <line x1="12" y1="17" x2="12.01" y2="17"></line>
+            </svg>
+            <div style="font-size: 13px; color: #92400e;">
+                <strong>Save this key securely.</strong> For security, we don't store the full key - this is the only time you'll see it.
+            </div>
+        </div>
+        
+        <button class="dev-btn dev-btn-primary" data-action="close-new-key-modal" style="width: 100%;">
+            I've copied the key
+        </button>
+    </div>
+</div>
+
+
+<script nonce="{{ csp_nonce }}">
+const SITE_ID = '{{ site_id }}';
+let newKeyValue = '';
+let currentPpid = null;
+let adminUiAllowed = false;
+
+async function waitForLemmaCredential(maxAttempts = 20) {
+    let attempts = 0;
+    while (!window.lemmaCredential && attempts < maxAttempts) {
+        await new Promise((resolve) => setTimeout(resolve, 120));
+        attempts += 1;
+    }
+}
+
+// Get authenticated PPID from wallet
+async function initAuth() {
+    if (typeof LemmaWallet === 'undefined') {
+        console.warn('[Keys] LemmaWallet not available');
+        return;
+    }
+    
+    try {
+        const wallet = new LemmaWallet();
+        await wallet.init();
+        
+        // Fast path: use existing session
+        if (wallet.session?.isUnlocked && wallet.session?.expiresAt > Date.now()) {
+            currentPpid = await wallet.derivePPID('lemma.id');
+            console.log('[Keys] Using existing session, PPID:', currentPpid?.substring(0, 30) + '...');
+            return;
+        }
+        
+        // Try autoAuthenticate
+        const authResult = await wallet.autoAuthenticate();
+        if (authResult.authenticated) {
+            currentPpid = await wallet.derivePPID('lemma.id');
+            console.log('[Keys] Authenticated via autoAuthenticate');
+            return;
+        }
+        
+        console.warn('[Keys] Not authenticated');
+    } catch (e) {
+        console.warn('[Keys] Auth failed:', e);
+    }
+}
+
+document.addEventListener('DOMContentLoaded', async () => {
+    await initAuth();
+    await waitForLemmaCredential();
+    adminUiAllowed = detectAdminPermission();
+    enforceAdminUiLock();
+    loadKeys();
+});
+
+async function getAuthHeaders() {
+    const base = (typeof window.getLemmaAuthHeaders === 'function')
+        ? window.getLemmaAuthHeaders()
+        : {};
+    return { 'Content-Type': 'application/json', ...base };
+}
+
+function detectAdminPermission() {
+    const cred = window.lemmaCredential || null;
+    if (!cred || typeof cred !== 'object') return false;
+    const claims = cred.claims || cred.credentialSubject || {};
+    const permissionId = String(
+        claims.permissionId ||
+        claims.permission_id ||
+        claims.permission_level ||
+        claims.permission ||
+        claims.accountType ||
+        ''
+    ).toLowerCase();
+    if (!permissionId) return false;
+    return ['admin_access', 'super_admin', 'admin', 'superadmin', 'site_admin'].includes(permissionId) ||
+        permissionId.includes('admin');
+}
+
+function enforceAdminUiLock() {
+    const createButton = document.querySelector('[data-action="show-create-modal"]');
+    if (createButton) {
+        createButton.disabled = !adminUiAllowed;
+        createButton.title = adminUiAllowed ? '' : 'Admin permission required';
+        if (!adminUiAllowed) {
+            createButton.style.opacity = '0.55';
+            createButton.style.cursor = 'not-allowed';
+        }
+    }
+}
+
+async function confirmSensitiveAdminAction(actionLabel) {
+    adminUiAllowed = detectAdminPermission();
+    enforceAdminUiLock();
+    if (!adminUiAllowed) {
+        if (window.showToast) showToast('error', 'Admin permission required', 'This key manager is restricted to admin credentials.');
+        return false;
+    }
+    const expected = `ADMIN ${SITE_ID}`;
+    const input = prompt(`${actionLabel}\n\nType "${expected}" to confirm.`);
+    return input === expected;
+}
+
+async function loadKeys() {
+    const tbody = document.getElementById('keys-table-body');
+    
+    try {
+        const response = await fetch(`/api/developer/sites/${SITE_ID}/keys`, { headers: await getAuthHeaders() });
+        const data = await response.json();
+        
+        if (!data.success) throw new Error(data.error);
+        
+        if (data.keys.length === 0) {
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="7" style="text-align: center; padding: 60px;">
+                        <div class="dev-empty">
+                            <div class="dev-empty-icon">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                    <path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"></path>
+                                </svg>
+                            </div>
+                            <div class="dev-empty-title">No API keys yet</div>
+                            <div class="dev-empty-description">Create an API key to authenticate your server-side SDK</div>
+                            <button class="dev-btn dev-btn-primary" data-action="show-create-modal" style="margin-top: 16px;">Create API Key</button>
+                        </div>
+                    </td>
+                </tr>
+            `;
+            return;
+        }
+        
+        tbody.innerHTML = data.keys.map(key => `
+            <tr class="highlight-new">
+                <td style="padding: 16px; font-weight: 500;">${escapeHtml(key.name)}</td>
+                <td>
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <code style="font-size: 12px; background: #f1f5f9; padding: 4px 8px; border-radius: 4px;">
+                            ${escapeHtml(key.key_prefix)}
+                        </code>
+                    </div>
+                </td>
+                <td>
+                    <span class="status-badge ${key.type === 'live' ? 'active' : 'info'}">
+                        ${key.type === 'live' ? 'Live' : 'Test'}
+                    </span>
+                </td>
+                <td>
+                    <span class="status-badge ${key.is_active ? 'active' : 'revoked'}">
+                        <span class="status-dot"></span>
+                        ${key.is_active ? 'Active' : 'Revoked'}
+                    </span>
+                </td>
+                <td style="color: #64748b; font-size: 13px;">${formatDate(key.last_used)}</td>
+                <td style="color: #64748b; font-size: 13px;">${formatDate(key.created_at)}</td>
+                <td>
+                    ${key.is_active && adminUiAllowed ? `
+                    <div class="row-actions" style="opacity: 1; gap: 8px;">
+                        <button class="dev-btn dev-btn-sm" data-action="rotate-key" data-key-id="${key.id}" data-key-name="${escapeHtml(key.name)}" style="padding: 6px 12px; display: flex; align-items: center; gap: 6px; font-size: 12px;">
+                            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M23 4v6h-6"></path>
+                                <path d="M1 20v-6h6"></path>
+                                <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+                            </svg>
+                            Regenerate
+                        </button>
+                        <button class="dev-btn dev-btn-sm dev-btn-danger" data-action="revoke-key" data-key-id="${key.id}" data-key-name="${escapeHtml(key.name)}" style="padding: 6px 12px; display: flex; align-items: center; gap: 6px; font-size: 12px;">
+                            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="12" cy="12" r="10"></circle>
+                                <path d="M4.93 4.93l14.14 14.14"></path>
+                            </svg>
+                            Revoke
+                        </button>
+                    </div>
+                    ` : `<span style="color: #94a3b8; font-size: 12px;">${key.is_active ? 'Admin required' : 'Revoked'}</span>`}
+                </td>
+            </tr>
+        `).join('');
+        
+    } catch (e) {
+        console.error('Failed to load keys:', e);
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="7" style="text-align: center; padding: 60px; color: var(--dev-danger);">
+                    Failed to load API keys
+                </td>
+            </tr>
+        `;
+    }
+}
+
+function showCreateModal() {
+    document.getElementById('key-name').value = '';
+    document.querySelector('input[name="key-type"][value="live"]').checked = true;
+    openPanel('key-panel');
+}
+
+async function createKey() {
+    if (!await confirmSensitiveAdminAction(`Create a new API key for ${SITE_ID}?`)) return;
+    const name = document.getElementById('key-name').value.trim() || 'API Key';
+    const type = document.querySelector('input[name="key-type"]:checked').value;
+    
+    try {
+        const response = await fetch(`/api/developer/sites/${SITE_ID}/keys`, {
+            method: 'POST',
+            headers: await getAuthHeaders(),
+            body: JSON.stringify({ name, type })
+        });
+        
+        const data = await response.json();
+        
+        if (!data.success) throw new Error(data.error);
+        
+        closePanel();
+        
+        // Show key in modal (created)
+        showNewKeyModal(data.key, false);
+        
+    } catch (e) {
+        console.error('Failed to create key:', e);
+        if (window.showToast) showToast('error', 'Error', e.message || 'Failed to create API key');
+    }
+}
+
+async function rotateKey(keyId, keyName) {
+    if (!confirm(`Regenerate "${keyName}"?\n\nThe current key will stop working immediately. You'll get a new key that you must copy - this is the only time you'll see it.`)) return;
+    if (!await confirmSensitiveAdminAction(`Rotate key "${keyName}" on ${SITE_ID}?`)) return;
+    
+    try {
+        const response = await fetch(`/api/developer/sites/${SITE_ID}/keys/${keyId}/rotate`, {
+            method: 'POST',
+            headers: await getAuthHeaders()
+        });
+        
+        const data = await response.json();
+        
+        if (!data.success) throw new Error(data.error);
+        
+        // Show key in modal (regenerated)
+        showNewKeyModal(data.key, true);
+        
+        loadKeys();
+        
+    } catch (e) {
+        console.error('Failed to regenerate key:', e);
+        if (window.showToast) showToast('error', 'Error', e.message || 'Failed to regenerate key');
+    }
+}
+
+async function revokeKey(keyId, keyName) {
+    if (!confirm(`Revoke "${keyName}"? Any applications using this key will stop working.`)) return;
+    if (!await confirmSensitiveAdminAction(`Revoke key "${keyName}" on ${SITE_ID}?`)) return;
+    
+    try {
+        const response = await fetch(`/api/developer/sites/${SITE_ID}/keys/${keyId}`, {
+            method: 'DELETE',
+            headers: await getAuthHeaders()
+        });
+        
+        const data = await response.json();
+        
+        if (!data.success) throw new Error(data.error);
+        
+        if (window.showToast) showToast('success', 'Key Revoked', 'API key has been revoked');
+        loadKeys();
+        
+    } catch (e) {
+        console.error('Failed to revoke key:', e);
+        if (window.showToast) showToast('error', 'Error', e.message || 'Failed to revoke key');
+    }
+}
+
+async function copySiteId() {
+    const siteId = SITE_ID;
+    console.log('[Keys] Copying Site ID:', siteId);
+    
+    try {
+        await navigator.clipboard.writeText(siteId);
+        console.log('[Keys] Site ID copied successfully');
+        
+        const btn = document.getElementById('copy-site-id-btn');
+        const originalHtml = btn.innerHTML;
+        btn.innerHTML = `
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="20 6 9 17 4 12"></polyline>
+            </svg>
+            Copied!
+        `;
+        btn.style.background = '#10b981';
+        btn.style.color = 'white';
+        btn.style.borderColor = '#10b981';
+        
+        setTimeout(() => {
+            btn.innerHTML = originalHtml;
+            btn.style.background = '#f1f5f9';
+            btn.style.color = '#475569';
+            btn.style.borderColor = '#e2e8f0';
+        }, 2000);
+        
+        if (window.showToast) showToast('success', 'Copied!', 'Site ID copied to clipboard');
+    } catch (err) {
+        console.error('[Keys] Clipboard API failed:', err);
+        // Fallback method
+        const textarea = document.createElement('textarea');
+        textarea.value = siteId;
+        textarea.style.position = 'fixed';
+        textarea.style.left = '-9999px';
+        document.body.appendChild(textarea);
+        textarea.select();
+        try {
+            document.execCommand('copy');
+            console.log('[Keys] Fallback copy succeeded');
+            if (window.showToast) showToast('success', 'Copied!', 'Site ID copied to clipboard');
+        } catch (e) {
+            console.error('[Keys] Fallback copy failed:', e);
+            alert('Copy failed. Site ID: ' + siteId);
+        }
+        document.body.removeChild(textarea);
+    }
+}
+
+async function copyNewKey() {
+    if (!newKeyValue) return;
+    
+    try {
+        await navigator.clipboard.writeText(newKeyValue);
+        const btn = document.getElementById('copy-new-key-btn');
+        const originalText = btn.innerHTML;
+        btn.innerHTML = `
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="20 6 9 17 4 12"></polyline>
+            </svg>
+            Copied!
+        `;
+        btn.style.background = '#10b981';
+        
+        setTimeout(() => {
+            btn.innerHTML = originalText;
+            btn.style.background = '#667eea';
+        }, 2000);
+        
+        if (window.showToast) showToast('success', 'Copied!', 'API key copied to clipboard');
+    } catch (err) {
+        console.error('[Keys] Copy failed:', err);
+        // Fallback for older browsers
+        const textarea = document.createElement('textarea');
+        textarea.value = newKeyValue;
+        textarea.style.position = 'fixed';
+        textarea.style.left = '-9999px';
+        document.body.appendChild(textarea);
+        textarea.select();
+        try {
+            document.execCommand('copy');
+            if (window.showToast) showToast('success', 'Copied!', 'API key copied to clipboard');
+        } catch (e) {
+            alert('Copy failed. Your key: ' + newKeyValue);
+        }
+        document.body.removeChild(textarea);
+    }
+}
+
+function showNewKeyModal(key, isRegenerate = false) {
+    newKeyValue = key;
+    document.getElementById('new-key-value').textContent = key;
+    document.getElementById('new-key-title').textContent = isRegenerate ? 'API Key Regenerated' : 'API Key Created';
+    document.getElementById('new-key-modal').style.display = 'block';
+    
+    // Auto-copy to clipboard
+    copyNewKey();
+}
+
+// Event delegation
+document.addEventListener('click', function(e) {
+    const target = e.target.closest('[data-action]');
+    if (!target) return;
+    
+    const action = target.dataset.action;
+    
+    switch (action) {
+        case 'show-create-modal':
+            showCreateModal();
+            break;
+        case 'cancel-key':
+            closePanel();
+            break;
+        case 'create-key':
+            createKey();
+            break;
+        case 'rotate-key':
+            rotateKey(target.dataset.keyId, target.dataset.keyName);
+            break;
+        case 'revoke-key':
+            revokeKey(target.dataset.keyId, target.dataset.keyName);
+            break;
+        case 'copy-site-id':
+            copySiteId();
+            break;
+        case 'copy-new-key':
+            copyNewKey();
+            break;
+        case 'close-new-key-modal':
+            document.getElementById('new-key-modal').style.display = 'none';
+            newKeyValue = '';
+            loadKeys();
+            break;
+    }
+});
+
+function formatDate(dateStr) {
+    if (!dateStr) return 'Never';
+    try {
+        const date = new Date(dateStr);
+        const now = new Date();
+        const diff = now - date;
+        
+        if (diff < 60000) return 'Just now';
+        if (diff < 3600000) return Math.floor(diff / 60000) + 'm ago';
+        if (diff < 86400000) return Math.floor(diff / 3600000) + 'h ago';
+        if (diff < 604800000) return Math.floor(diff / 86400000) + 'd ago';
+        
+        return date.toLocaleDateString();
+    } catch {
+        return '-';
+    }
+}
+
+function escapeHtml(text) {
+    if (!text) return '';
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+</script>
+{% endblock %}

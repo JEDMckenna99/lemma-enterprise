@@ -1,0 +1,83 @@
+name: Firewall Integration Tests
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "scripts/lemma_firewall.py"
+      - "api/action_taxonomy.py"
+      - "api/authz/**"
+      - "Dockerfile.firewall"
+      - "tests/test_developer_control_panel.py"
+      - "tests/test_lemma_firewall_local_ops.py"
+      - ".github/workflows/firewall-integration.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "scripts/lemma_firewall.py"
+      - "api/action_taxonomy.py"
+      - "api/authz/**"
+      - "Dockerfile.firewall"
+      - "tests/test_developer_control_panel.py"
+      - "tests/test_lemma_firewall_local_ops.py"
+
+jobs:
+  firewall-unit-tests:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.11", "3.12"]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install pytest flask requests
+
+      - name: Run firewall local ops tests
+        run: python -m pytest tests/test_lemma_firewall_local_ops.py -v
+
+      - name: Run developer control panel tests
+        run: python -m pytest tests/test_developer_control_panel.py -v
+
+  firewall-docker:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build firewall Docker image
+        run: docker build -f Dockerfile.firewall -t lemma-firewall:test .
+
+      - name: Start firewall container
+        run: |
+          docker run -d --name lemma-fw \
+            -p 8787:8787 \
+            -e LEMMA_FIREWALL_TAINT_ON_VIOLATION_ENABLED=1 \
+            -e LEMMA_FIREWALL_TAINT_ENFORCEMENT_ENABLED=1 \
+            -e LEMMA_FIREWALL_LOCAL_OPS_GATE=1 \
+            -e LEMMA_FIREWALL_CONTROL_PLANE_SYNC_ENABLED=0 \
+            lemma-firewall:test
+          sleep 3
+
+      - name: Health check
+        run: |
+          curl -fsS http://localhost:8787/aim/health
+          curl -fsS http://localhost:8787/aim/dashboard | head -20
+
+      - name: Verify SSE endpoint
+        run: |
+          timeout 5 curl -sN http://localhost:8787/aim/decisions/stream || true
+
+      - name: Cleanup
+        if: always()
+        run: docker rm -f lemma-fw || true

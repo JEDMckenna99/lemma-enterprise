@@ -1,0 +1,280 @@
+{% extends "admin/layout.html" %}
+{% set active_page = 'health' %}
+
+{% block title %}System Health - lemma.id Admin{% endblock %}
+
+{% block admin_content %}
+<div class="admin-header">
+    <h1 class="admin-title">System Health</h1>
+    <p class="admin-subtitle">Real-time platform health monitoring</p>
+</div>
+
+<!-- Health Overview -->
+<div class="admin-stats">
+    <div class="stat-card" id="overall-health-card">
+        <div class="stat-label">Overall Status</div>
+        <div class="stat-value" id="overall-status">Checking...</div>
+        <div class="stat-change" id="overall-uptime">-</div>
+    </div>
+    <div class="stat-card stat-card--info">
+        <div class="stat-label">Response Time</div>
+        <div class="stat-value" id="response-time">-</div>
+        <div class="stat-change">Average latency</div>
+    </div>
+    <div class="stat-card stat-card--success">
+        <div class="stat-label">Requests/min</div>
+        <div class="stat-value" id="requests-min">-</div>
+        <div class="stat-change">Current load</div>
+    </div>
+    <div class="stat-card stat-card--warning">
+        <div class="stat-label">Memory Usage</div>
+        <div class="stat-value" id="memory-usage">-</div>
+        <div class="stat-change">Allocated</div>
+    </div>
+</div>
+
+<div class="admin-grid">
+    <!-- Services Status -->
+    <div class="admin-card">
+        <div class="admin-card-header">
+            <h2 class="admin-card-title">Services Status</h2>
+            <button class="admin-btn admin-btn--secondary admin-btn--sm" id="refresh-health-btn">Refresh</button>
+        </div>
+        <div class="admin-card-body">
+            <table class="admin-table">
+                <thead>
+                    <tr>
+                        <th>Service</th>
+                        <th>Criticality</th>
+                        <th>Status</th>
+                        <th>Latency</th>
+                    </tr>
+                </thead>
+                <tbody id="services-table">
+                    <tr><td colspan="4" style="text-align: center;">Loading...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+    
+    <!-- Dependencies -->
+    <div class="admin-card">
+        <div class="admin-card-header">
+            <h2 class="admin-card-title">External Dependencies</h2>
+        </div>
+        <div class="admin-card-body">
+            <table class="admin-table">
+                <thead>
+                    <tr>
+                        <th>Dependency</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody id="deps-table">
+                    <tr><td colspan="2" style="text-align: center;">Loading...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<div class="admin-grid">
+    <div class="admin-card">
+        <div class="admin-card-header">
+            <h2 class="admin-card-title">Runtime Metadata</h2>
+        </div>
+        <div class="admin-card-body">
+            <table class="admin-table">
+                <tbody id="runtime-table">
+                    <tr><td colspan="2" style="text-align: center;">Loading...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+    <div class="admin-card">
+        <div class="admin-card-header">
+            <h2 class="admin-card-title">Operational Signals (5m)</h2>
+        </div>
+        <div class="admin-card-body">
+            <table class="admin-table">
+                <tbody id="signals-table">
+                    <tr><td colspan="2" style="text-align: center;">Loading...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script nonce="{{ csp_nonce }}">
+document.addEventListener('DOMContentLoaded', () => {
+    loadHealthStatus();
+    document.getElementById('refresh-health-btn').addEventListener('click', loadHealthStatus);
+    
+    // Auto-refresh every 30 seconds
+    setInterval(loadHealthStatus, 30000);
+});
+
+async function loadHealthStatus() {
+    try {
+        const started = performance.now();
+        const response = await fetch('/api/health/detailed');
+        if (!response.ok) {
+            throw new Error(`Health API returned ${response.status}`);
+        }
+        const data = await response.json();
+        const fetchLatency = Math.round(performance.now() - started);
+        
+        // Overall status
+        const overallCard = document.getElementById('overall-health-card');
+        const overallStatus = document.getElementById('overall-status');
+        
+        if (data.status === 'healthy' || data.healthy) {
+            overallCard.className = 'stat-card stat-card--success';
+            overallStatus.textContent = '✓ Healthy';
+        } else if (data.status === 'degraded') {
+            overallCard.className = 'stat-card stat-card--warning';
+            overallStatus.textContent = '⚠ Degraded';
+        } else {
+            overallCard.className = 'stat-card stat-card--danger';
+            overallStatus.textContent = '✗ Unhealthy';
+        }
+        
+        document.getElementById('overall-uptime').textContent = data.uptime || '-';
+        const responseTime = Number.isFinite(data.avg_response_ms) ? data.avg_response_ms : fetchLatency;
+        document.getElementById('response-time').textContent = `${responseTime}ms`;
+        document.getElementById('requests-min').textContent = data.requests_per_min ?? 'unavailable';
+        document.getElementById('memory-usage').textContent = Number.isFinite(data.memory_mb) ? `${data.memory_mb}MB` : 'unavailable';
+        
+        // Services table
+        const servicesTable = document.getElementById('services-table');
+        const services = Array.isArray(data.services) ? data.services : [];
+        
+        servicesTable.innerHTML = services.length ? services.map(s => `
+            <tr>
+                <td>
+                    <div class="health-indicator">
+                        <span class="health-dot ${getHealthDotClass(s.status || 'unknown')}"></span>
+                        <span>${s.name || 'Unknown service'}</span>
+                    </div>
+                </td>
+                <td>${getCriticalityText(s.criticality)}</td>
+                <td><span class="badge ${getHealthBadgeClass(s.status || 'unknown')}">${getStatusText(s.status || 'unknown')}</span></td>
+                <td>${Number.isFinite(s.latency_ms) ? `${s.latency_ms}ms` : '-'}</td>
+            </tr>
+        `).join('') : '<tr><td colspan="4" style="text-align: center;">No service telemetry available.</td></tr>';
+        
+        // Dependencies table
+        const depsTable = document.getElementById('deps-table');
+        const deps = Array.isArray(data.dependencies) ? data.dependencies : [];
+        
+        depsTable.innerHTML = deps.length ? deps.map(d => `
+            <tr>
+                <td>${d.name || 'Unknown dependency'}</td>
+                <td><span class="badge ${getHealthBadgeClass(d.status || 'unknown')}">${getStatusText(d.status || 'unknown')}</span></td>
+            </tr>
+        `).join('') : '<tr><td colspan="2" style="text-align: center;">No dependency telemetry available.</td></tr>';
+
+        // Runtime metadata
+        const runtime = data.runtime || {};
+        const runtimeTable = document.getElementById('runtime-table');
+        runtimeTable.innerHTML = [
+            ['Release', runtime.release_version || 'unavailable'],
+            ['Deploy Time', runtime.release_created_at ? new Date(runtime.release_created_at).toLocaleString() : 'unavailable'],
+            ['Source SHA', runtime.source_version || 'unavailable'],
+            ['Dyno', runtime.dyno || 'unavailable'],
+            ['Python', runtime.python_version || 'unavailable'],
+            ['Process Started', runtime.process_started_at ? new Date(runtime.process_started_at).toLocaleString() : 'unavailable'],
+            ['Last Health Check', data.timestamp ? new Date(data.timestamp).toLocaleString() : 'unavailable'],
+        ].map(([k, v]) => `<tr><td><strong>${k}</strong></td><td>${v}</td></tr>`).join('');
+
+        // Operational signals
+        const op = data.operational || {};
+        const opStates = op.states || {};
+        const signalsTable = document.getElementById('signals-table');
+        signalsTable.innerHTML = [
+            ['Responses (5m)', asDisplay(op.responses_5m), 'ok'],
+            ['401 Auth Errors (5m)', asDisplay(op.auth_401_5m), opStates.auth_401_5m],
+            ['403 Forbidden (5m)', asDisplay(op.forbidden_403_5m), opStates.forbidden_403_5m],
+            ['5xx Server Errors (5m)', asDisplay(op.server_5xx_5m), opStates.server_5xx_5m],
+            ['DB Connections (active/total)', formatConnectionPair(op.db_active_connections, op.db_total_connections), 'ok'],
+            ['DB Saturation', formatPercent(op.db_saturation_percent), opStates.db_saturation_percent],
+            ['Revocation Lag', formatLag(op.revocation_lag_seconds), opStates.revocation_lag_seconds],
+        ].map(([k, v, state]) => `<tr><td><strong>${k}</strong></td><td>${renderSignalValue(v, state)}</td></tr>`).join('');
+        
+    } catch (e) {
+        console.error('Health check failed:', e);
+        document.getElementById('overall-status').textContent = '? Unknown';
+    }
+}
+
+function getHealthDotClass(status) {
+    if (status === 'ok' || status === 'healthy' || status === true) return 'health-dot--ok';
+    if (status === 'warning' || status === 'degraded') return 'health-dot--warning';
+    if (status === 'disabled' || status === 'unavailable' || status === 'not_configured') return 'health-dot--warning';
+    return 'health-dot--error';
+}
+
+function getHealthBadgeClass(status) {
+    if (status === 'ok' || status === 'healthy' || status === true) return 'badge--success';
+    if (status === 'warning' || status === 'degraded') return 'badge--warning';
+    if (status === 'disabled' || status === 'unavailable' || status === 'not_configured' || status === 'unknown') return 'badge--neutral';
+    return 'badge--danger';
+}
+
+function getStatusText(status) {
+    if (status === 'ok' || status === 'healthy' || status === true) return 'Operational';
+    if (status === 'warning' || status === 'degraded') return 'Degraded';
+    if (status === 'not_configured') return 'Not Configured';
+    if (status === 'disabled' || status === 'unavailable') return 'Disabled';
+    if (status === 'unknown') return 'Unknown';
+    return 'Error';
+}
+
+function getCriticalityText(criticality) {
+    if (criticality === 'critical') return 'Critical';
+    if (criticality === 'optional') return 'Optional';
+    return 'Unknown';
+}
+
+function asDisplay(value) {
+    return Number.isFinite(value) ? value : 'unavailable';
+}
+
+function formatConnectionPair(active, total) {
+    if (!Number.isFinite(active) && !Number.isFinite(total)) return 'unavailable';
+    return `${Number.isFinite(active) ? active : '?'} / ${Number.isFinite(total) ? total : '?'}`;
+}
+
+function formatLag(seconds) {
+    if (!Number.isFinite(seconds)) return 'unavailable';
+    if (seconds < 60) return `${seconds}s`;
+    if (seconds < 3600) return `${Math.floor(seconds / 60)}m`;
+    return `${Math.floor(seconds / 3600)}h`;
+}
+
+function formatPercent(value) {
+    if (!Number.isFinite(value)) return 'unavailable';
+    return `${value}%`;
+}
+
+function renderSignalValue(value, state) {
+    const badgeClass = getSignalBadgeClass(state);
+    const label = getSignalStateLabel(state);
+    return `${value} <span class="badge ${badgeClass}" style="margin-left:8px;">${label}</span>`;
+}
+
+function getSignalBadgeClass(state) {
+    if (state === 'critical') return 'badge--danger';
+    if (state === 'warning') return 'badge--warning';
+    if (state === 'unavailable') return 'badge--neutral';
+    return 'badge--success';
+}
+
+function getSignalStateLabel(state) {
+    if (state === 'critical') return 'Critical';
+    if (state === 'warning') return 'Warning';
+    if (state === 'unavailable') return 'Unavailable';
+    return 'OK';
+}
+</script>
+{% endblock %}

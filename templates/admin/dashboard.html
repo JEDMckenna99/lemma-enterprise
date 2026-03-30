@@ -1,0 +1,561 @@
+{% extends "admin/layout.html" %}
+{% set active_page = 'dashboard' %}
+
+{% block title %}Admin Dashboard - lemma.id{% endblock %}
+
+{% block admin_content %}
+<div class="admin-header">
+    <h1 class="admin-title">Platform Dashboard</h1>
+    <p class="admin-subtitle">Overview of Lemma platform health and activity</p>
+</div>
+
+<!-- Stats Grid -->
+<div class="admin-stats">
+    <div class="stat-card stat-card--info">
+        <div class="stat-label">Total Users</div>
+        <div class="stat-value stat-loading" id="stat-users">
+            <span class="stat-skeleton"></span>
+        </div>
+        <div class="stat-change stat-change--up">↑ Active wallets</div>
+    </div>
+    <div class="stat-card stat-card--success">
+        <div class="stat-label">Registered Sites</div>
+        <div class="stat-value stat-loading" id="stat-sites">
+            <span class="stat-skeleton"></span>
+        </div>
+        <div class="stat-change" id="stat-growth">Loading...</div>
+    </div>
+    <div class="stat-card stat-card--warning">
+        <div class="stat-label">Active Credentials</div>
+        <div class="stat-value stat-loading" id="stat-credentials">
+            <span class="stat-skeleton"></span>
+        </div>
+        <div class="stat-change">Agent tokens</div>
+    </div>
+    <div class="stat-card stat-card--danger">
+        <div class="stat-label">Revocations</div>
+        <div class="stat-value stat-loading" id="stat-revocations">
+            <span class="stat-skeleton"></span>
+        </div>
+        <div class="stat-change">This month</div>
+    </div>
+</div>
+<div class="stats-timestamp" id="stats-timestamp" style="text-align: right; font-size: 12px; color: var(--admin-text-muted); margin-top: -10px; margin-bottom: 20px;">
+    Last updated: --
+</div>
+
+<style>
+.stat-loading .stat-skeleton {
+    display: inline-block;
+    width: 60px;
+    height: 32px;
+    background: linear-gradient(90deg, var(--admin-bg-tertiary) 25%, var(--admin-bg-secondary) 50%, var(--admin-bg-tertiary) 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite;
+    border-radius: 4px;
+}
+@keyframes shimmer {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+}
+.stat-value:not(.stat-loading) .stat-skeleton {
+    display: none;
+}
+</style>
+
+<div class="admin-grid">
+    <!-- System Health -->
+    <div class="admin-card">
+        <div class="admin-card-header">
+            <h2 class="admin-card-title">System Health</h2>
+            <button class="admin-btn admin-btn--secondary admin-btn--sm" id="refresh-health-btn">Refresh</button>
+        </div>
+        <div class="admin-card-body">
+            <table class="admin-table">
+                <tbody id="health-table">
+                    <tr>
+                        <td>
+                            <div class="health-indicator">
+                                <span class="health-dot health-dot--ok"></span>
+                                <span>API Server</span>
+                            </div>
+                        </td>
+                        <td><span class="badge badge--success">Operational</span></td>
+                    </tr>
+                    <tr>
+                        <td>
+                            <div class="health-indicator">
+                                <span class="health-dot" id="db-health-dot"></span>
+                                <span>Database</span>
+                            </div>
+                        </td>
+                        <td><span class="badge" id="db-health-badge">Checking...</span></td>
+                    </tr>
+                    <tr>
+                        <td>
+                            <div class="health-indicator">
+                                <span class="health-dot" id="redis-health-dot"></span>
+                                <span>Redis Cache</span>
+                            </div>
+                        </td>
+                        <td><span class="badge" id="redis-health-badge">Checking...</span></td>
+                    </tr>
+                    <tr>
+                        <td>
+                            <div class="health-indicator">
+                                <span class="health-dot" id="crypto-health-dot"></span>
+                                <span>Crypto Engine</span>
+                            </div>
+                        </td>
+                        <td><span class="badge" id="crypto-health-badge">Checking...</span></td>
+                    </tr>
+                    <tr>
+                        <td>
+                            <div class="health-indicator">
+                                <span class="health-dot" id="bloom-health-dot"></span>
+                                <span>Bloom Filter</span>
+                            </div>
+                        </td>
+                        <td><span class="badge" id="bloom-health-badge">Checking...</span></td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+    
+    <!-- Recent Activity -->
+    <div class="admin-card">
+        <div class="admin-card-header">
+            <h2 class="admin-card-title">Recent Activity</h2>
+            <a href="{{ url_for('admin_audit') }}" class="admin-btn admin-btn--secondary admin-btn--sm">View All</a>
+        </div>
+        <div class="admin-card-body">
+            <ul class="activity-list" id="activity-list">
+                <li class="activity-item">
+                    <div class="activity-icon">📊</div>
+                    <div class="activity-content">
+                        <div class="activity-title">Loading activity...</div>
+                        <div class="activity-meta">Please wait</div>
+                    </div>
+                </li>
+            </ul>
+        </div>
+    </div>
+</div>
+
+<!-- Quick Actions -->
+<div class="admin-card">
+    <div class="admin-card-header">
+        <h2 class="admin-card-title">Quick Actions</h2>
+    </div>
+    <div class="admin-card-body" style="display: flex; gap: 12px; flex-wrap: wrap;">
+        <a href="{{ url_for('admin_monitoring_page') }}" class="admin-btn admin-btn--secondary">
+            🔧 View Monitoring
+        </a>
+        <a href="{{ url_for('admin_users') }}" class="admin-btn admin-btn--secondary">
+            👥 Manage Users
+        </a>
+        <a href="{{ url_for('admin_sites') }}" class="admin-btn admin-btn--secondary">
+            🌐 View Sites
+        </a>
+        <a href="{{ url_for('admin_revocations') }}" class="admin-btn admin-btn--secondary">
+            🚫 Revocations
+        </a>
+        <a href="{{ url_for('admin_bootstrap') }}" class="admin-btn admin-btn--primary">
+            🔐 Admin Bootstrap
+        </a>
+    </div>
+</div>
+
+<!-- Launch Gate Quick Check -->
+<div class="admin-card" style="margin-top: 20px;">
+    <div class="admin-card-header">
+        <h2 class="admin-card-title">Launch Gate Quick Check</h2>
+        <button class="admin-btn admin-btn--secondary admin-btn--sm" id="run-launch-gate-btn">Run Checks</button>
+    </div>
+    <div class="admin-card-body">
+        <p class="admin-subtitle" style="margin-bottom: 12px;">
+            Read-only production checks for endpoint health and security headers. This is a fast smoke gate, not a full audit.
+        </p>
+        <div style="display:flex; gap:10px; align-items:center; margin-bottom:10px;">
+            <span class="badge badge--neutral" id="launch-gate-overall">Not Run</span>
+            <span style="font-size:12px; color: var(--admin-text-muted);" id="launch-gate-timestamp">Last run: --</span>
+        </div>
+        <ul class="activity-list" id="launch-gate-results">
+            <li class="activity-item">
+                <div class="activity-content">
+                    <div class="activity-title">No checks run yet</div>
+                    <div class="activity-meta">Click "Run Checks" after each deployment</div>
+                </div>
+            </li>
+        </ul>
+    </div>
+</div>
+
+<script nonce="{{ csp_nonce }}">
+// Admin auth state
+let adminCredential = null;
+
+document.addEventListener('DOMContentLoaded', async () => {
+    await checkAdminAuth();
+    
+    loadDashboardStats();
+    loadHealthStatus();
+    loadRecentActivity();
+    
+    document.getElementById('refresh-health-btn').addEventListener('click', loadHealthStatus);
+    document.getElementById('run-launch-gate-btn').addEventListener('click', runLaunchGateQuickChecks);
+});
+
+async function checkAdminAuth() {
+    // Check for agent session or token
+    // Agent sessions work via Flask session cookie (set by /api/agent/session)
+    // Agent tokens can be passed in URL for initial setup
+    try {
+        const agentToken = getAgentTokenFromUrl();
+        const headers = agentToken ? { 'X-Agent-Token': agentToken } : {};
+        
+        const sessionCheck = await fetch('/api/agent/validate', { headers });
+        const data = await sessionCheck.json();
+        
+        if (data.valid && data.scope?.includes('admin')) {
+            console.log('Agent admin auth active:', data.auth_method, data.token_id);
+            window.agentSessionActive = true;
+            return;
+        }
+    } catch (e) {
+        // Not an agent session, try wallet auth
+        console.debug('Agent auth check:', e.message);
+    }
+    
+    // Check for wallet-based auth
+    if (typeof LemmaWallet === 'undefined') {
+        console.warn('LemmaWallet not loaded');
+        return;
+    }
+    
+    try {
+        const wallet = new LemmaWallet();
+        const authResult = await wallet.autoAuthenticate();
+        
+        if (authResult.authenticated) {
+            const credentials = await wallet.getCredentials({ siteId: 'lemma.id' });
+            adminCredential = credentials.find(c => {
+                const normalized = c.normalized || {};
+                return normalized.permissionId === 'admin_access' || 
+                       normalized.accountType === 'admin' ||
+                       (normalized.type && normalized.type.includes('admin'));
+            });
+            
+            if (adminCredential) {
+                console.log('Admin credential found:', adminCredential.id);
+            }
+        }
+    } catch (e) {
+        console.warn('Admin auth check failed:', e);
+    }
+}
+
+function getAgentTokenFromUrl() {
+    const params = new URLSearchParams(window.location.search);
+    return params.get('agent_token');
+}
+
+function getAuthHeaders() {
+    const headers = {};
+    if (adminCredential) {
+        headers['X-Credential-ID'] = adminCredential.id;
+        headers['X-Permission-ID'] = adminCredential.normalized?.permissionId || 'admin_access';
+        headers['X-Site-ID'] = 'lemma.id';
+    }
+    return headers;
+}
+
+async function loadDashboardStats() {
+    try {
+        const response = await fetch('/api/admin/platform-stats', { headers: getAuthHeaders() });
+        if (!response.ok) throw new Error('Failed to load stats');
+        const data = await response.json();
+        
+        // Use flat response (with fallback to nested for backwards compatibility)
+        const users = data.total_users ?? data.stats?.total_customers ?? 0;
+        const sites = data.total_sites ?? data.stats?.active_sites ?? 0;
+        const credentials = data.total_credentials ?? data.stats?.iam_system?.total_permission_lemmas ?? 0;
+        const revocations = data.total_revocations ?? 0;
+        const growthRate = data.growth_rate ?? 0;
+        const newThisWeek = data.new_this_week ?? 0;
+        
+        // Update stats with animation
+        updateStatValue('stat-users', users);
+        updateStatValue('stat-sites', sites);
+        updateStatValue('stat-credentials', credentials);
+        updateStatValue('stat-revocations', revocations);
+        
+        // Update growth indicator
+        const growthEl = document.getElementById('stat-growth');
+        if (growthEl) {
+            if (newThisWeek > 0) {
+                growthEl.innerHTML = '';
+                const growthCount = document.createElement('span');
+                growthCount.style.color = 'var(--admin-success)';
+                growthCount.textContent = `+${newThisWeek}`;
+                growthEl.appendChild(growthCount);
+                growthEl.appendChild(document.createTextNode(' this week'));
+            } else {
+                growthEl.textContent = 'No new sites this week';
+            }
+        }
+        
+        // Update timestamp
+        if (data.last_updated) {
+            const timestamp = new Date(data.last_updated);
+            document.getElementById('stats-timestamp').textContent = 
+                `Last updated: ${timestamp.toLocaleTimeString()}`;
+        }
+        
+    } catch (e) {
+        console.warn('Could not load stats:', e);
+        updateStatValue('stat-users', '-');
+        updateStatValue('stat-sites', '-');
+        updateStatValue('stat-credentials', '-');
+        updateStatValue('stat-revocations', '-');
+    }
+}
+
+function updateStatValue(elementId, value) {
+    const el = document.getElementById(elementId);
+    if (el) {
+        el.classList.remove('stat-loading');
+        el.textContent = typeof value === 'number' ? value.toLocaleString() : value;
+    }
+}
+
+async function loadHealthStatus() {
+    try {
+        const response = await fetch('/api/health/detailed', { headers: getAuthHeaders() });
+        const data = await response.json();
+        
+        // Handle both nested and flat response formats
+        const components = data.components || data;
+        
+        updateHealthIndicator('db', components.database?.status || data.database || 'unknown');
+        updateHealthIndicator('redis', components.redis_cache?.status || data.redis || 'unknown');
+        updateHealthIndicator('crypto', components.crypto_engine?.status || data.crypto_engine || 'unknown');
+        updateHealthIndicator('bloom', components.bloom_filter?.status || data.bloom_filter || 'unknown');
+    } catch (e) {
+        console.warn('Could not load health:', e);
+        ['db', 'redis', 'crypto', 'bloom'].forEach(id => {
+            updateHealthIndicator(id, 'error');
+        });
+    }
+}
+
+function updateHealthIndicator(id, status) {
+    const dot = document.getElementById(`${id}-health-dot`);
+    const badge = document.getElementById(`${id}-health-badge`);
+    
+    if (!dot || !badge) return;
+    
+    // Reset classes
+    dot.className = 'health-dot';
+    badge.className = 'badge';
+    
+    if (status === 'ok' || status === 'healthy' || status === 'operational' || status === true) {
+        dot.classList.add('health-dot--ok');
+        badge.classList.add('badge--success');
+        badge.textContent = 'Operational';
+    } else if (status === 'warning' || status === 'degraded' || status === 'not_configured') {
+        dot.classList.add('health-dot--warning');
+        badge.classList.add('badge--warning');
+        badge.textContent = 'Degraded';
+    } else if (status === 'disabled' || status === 'unavailable') {
+        dot.classList.add('health-dot--warning');
+        badge.classList.add('badge--neutral');
+        badge.textContent = 'Disabled';
+    } else {
+        dot.classList.add('health-dot--error');
+        badge.classList.add('badge--danger');
+        badge.textContent = 'Error';
+    }
+}
+
+async function loadRecentActivity() {
+    const list = document.getElementById('activity-list');
+    
+    try {
+        const response = await fetch('/api/admin/recent-activity', { headers: getAuthHeaders() });
+        if (!response.ok) throw new Error('Failed to load activity');
+        const data = await response.json();
+        
+        if (data.activities && data.activities.length > 0) {
+            list.innerHTML = data.activities.slice(0, 5).map(activity => `
+                <li class="activity-item">
+                    <div class="activity-icon">${getActivityIcon(activity.type)}</div>
+                    <div class="activity-content">
+                        <div class="activity-title">${escapeHtml(activity.title)}</div>
+                        <div class="activity-meta">${escapeHtml(activity.meta)}</div>
+                    </div>
+                </li>
+            `).join('');
+        } else {
+            list.innerHTML = `
+                <li class="activity-item">
+                    <div class="activity-icon">${getActivityIcon('empty')}</div>
+                    <div class="activity-content">
+                        <div class="activity-title">No recent activity</div>
+                        <div class="activity-meta">Activity will appear here</div>
+                    </div>
+                </li>
+            `;
+        }
+    } catch (e) {
+        list.innerHTML = `
+            <li class="activity-item">
+                <div class="activity-icon">${getActivityIcon('empty')}</div>
+                <div class="activity-content">
+                    <div class="activity-title">No recent activity</div>
+                    <div class="activity-meta">Activity will appear here</div>
+                </div>
+            </li>
+        `;
+    }
+}
+
+function getActivityIcon(type) {
+    const icons = {
+        'user_created': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>',
+        'site_registered': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><path d="M2 12h20"></path><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>',
+        'credential_issued': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2"></rect><path d="M2 10h20"></path></svg>',
+        'credential_revoked': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><path d="M4.93 4.93l14.14 14.14"></path></svg>',
+        'admin_action': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>',
+        'error': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>',
+        'empty': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"></path></svg>',
+        'default': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>'
+    };
+    return icons[type] || icons['default'];
+}
+
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+function setLaunchGateOverall(state, text) {
+    const overall = document.getElementById('launch-gate-overall');
+    if (!overall) return;
+    overall.className = 'badge';
+    if (state === 'pass') {
+        overall.classList.add('badge--success');
+    } else if (state === 'fail') {
+        overall.classList.add('badge--danger');
+    } else if (state === 'running') {
+        overall.classList.add('badge--warning');
+    } else {
+        overall.classList.add('badge--neutral');
+    }
+    overall.textContent = text;
+}
+
+function appendLaunchGateResult(name, ok, details) {
+    const list = document.getElementById('launch-gate-results');
+    if (!list) return;
+    const item = document.createElement('li');
+    item.className = 'activity-item';
+
+    const content = document.createElement('div');
+    content.className = 'activity-content';
+
+    const title = document.createElement('div');
+    title.className = 'activity-title';
+    title.textContent = `${ok ? 'PASS' : 'FAIL'} - ${name}`;
+
+    const meta = document.createElement('div');
+    meta.className = 'activity-meta';
+    meta.textContent = details;
+
+    content.appendChild(title);
+    content.appendChild(meta);
+    item.appendChild(content);
+    list.appendChild(item);
+}
+
+async function runLaunchGateQuickChecks() {
+    const list = document.getElementById('launch-gate-results');
+    const ts = document.getElementById('launch-gate-timestamp');
+    if (!list || !ts) return;
+
+    list.innerHTML = '';
+    setLaunchGateOverall('running', 'Running');
+
+    const checks = [];
+
+    checks.push(async () => {
+        const r = await fetch('/api/revocation/bloom-filter');
+        const j = await r.json();
+        const ok = r.ok && j.success === true;
+        appendLaunchGateResult(
+            'Revocation Bloom Endpoint',
+            ok,
+            ok ? `HTTP ${r.status}, count=${j.count ?? 'n/a'}` : `HTTP ${r.status}`
+        );
+        return ok;
+    });
+
+    checks.push(async () => {
+        const r = await fetch('/api/v1/revocation/list');
+        const j = await r.json();
+        const ok = r.ok && j.success === true;
+        appendLaunchGateResult(
+            'Revocation List Endpoint',
+            ok,
+            ok ? `HTTP ${r.status}, count=${j.count ?? 'n/a'}` : `HTTP ${r.status}`
+        );
+        return ok;
+    });
+
+    checks.push(async () => {
+        const r = await fetch('/wallet/bridge', { method: 'HEAD' });
+        const csp = r.headers.get('content-security-policy') || '';
+        const cache = r.headers.get('cache-control') || '';
+        const ok = r.ok && csp.includes('frame-ancestors') && cache.length > 0;
+        appendLaunchGateResult(
+            'Bridge Header Checks',
+            ok,
+            ok ? `HTTP ${r.status}, CSP and cache-control present` : `HTTP ${r.status}, missing expected headers`
+        );
+        return ok;
+    });
+
+    checks.push(async () => {
+        const r = await fetch('/api/passkey/authenticate/begin', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: '{}'
+        });
+        const j = await r.json();
+        const ok = r.ok && j.success === true;
+        appendLaunchGateResult(
+            'Passkey Authenticate Begin',
+            ok,
+            ok ? `HTTP ${r.status}, challenge issued` : `HTTP ${r.status}`
+        );
+        return ok;
+    });
+
+    let allPassed = true;
+    for (const check of checks) {
+        try {
+            const ok = await check();
+            if (!ok) allPassed = false;
+        } catch (e) {
+            appendLaunchGateResult('Check Execution', false, e.message || 'Unexpected error');
+            allPassed = false;
+        }
+    }
+
+    ts.textContent = `Last run: ${new Date().toLocaleString()}`;
+    setLaunchGateOverall(allPassed ? 'pass' : 'fail', allPassed ? 'Pass' : 'Fail');
+}
+</script>
+{% endblock %}

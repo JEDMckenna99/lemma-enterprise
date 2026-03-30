@@ -1,0 +1,78 @@
+{% extends "docs/layout.html" %}
+{% set active_page = 'installation' %}
+{% set hero_title = 'Installation' %}
+{% set hero_subtitle = 'Install the packaged CLI and choose the right runtime path.' %}
+
+{% block docs_content %}
+<div class="docs-section">
+    <h2>Recommended Install Path</h2>
+    <p>Use the packaged CLI as the default install path for external developers. Repo-local scripts are still available for reference runtimes and internal validation, but they should not be your first integration step.</p>
+    
+    <div class="code-block">
+        <div class="code-header">
+            <span>Install</span>
+            <button class="copy-btn">Copy</button>
+        </div>
+        <code>pipx install lemma-cli</code>
+    </div>
+
+    <div class="callout callout--tip">
+        <div class="callout-title">Quickest way to get started</div>
+        <p>Run <code>lemma demo</code> to see the Lemma Firewall in action: issues a credential, starts the firewall, and runs containment tests in under 30 seconds.</p>
+    </div>
+    
+    <p>For local interactive flows, the CLI will open browser approval and help you confirm wallet unlock state before you connect a runtime.</p>
+</div>
+
+<div class="docs-section">
+    <h2>Prerequisites</h2>
+    <ul>
+        <li>Python 3.10+ with <code>pipx</code> available</li>
+        <li>A browser session for wallet approval, or an existing proof file for non-interactive workflows</li>
+        <li>Stable runtime identifiers for <code>runtime_id</code>, <code>agent_id</code>, and <code>workspace_id</code></li>
+        <li>Your runtime or gateway can attach <code>X-Lemma-Credential</code> to protected requests</li>
+    </ul>
+</div>
+
+<div class="docs-section">
+    <h2>Default Path: Bring Your Own Runtime</h2>
+    <p>Most developers should follow the generic proof-first path: start a wallet session, obtain a proof, and wire request headers in their own runtime.</p>
+    
+    <div class="code-block">
+        <div class="code-header">
+            <span>Shell</span>
+            <button class="copy-btn">Copy</button>
+        </div>
+        <code>lemma session start --api-base https://lemma.id
+lemma session status --api-base https://lemma.id --json</code>
+    </div>
+</div>
+
+<div class="docs-section">
+    <h2>Reference Path: Lemma Firewall</h2>
+    <p>If you want the full reference runtime, gateway, and conformance sequence, use the dedicated Lemma Firewall wrapper command.</p>
+
+    <div class="code-block">
+        <div class="code-header">
+            <span>Shell</span>
+            <button class="copy-btn">Copy</button>
+        </div>
+        <code>lemma setup-openclaw --api-base https://lemma.id</code>
+    </div>
+</div>
+
+<div class="docs-section">
+    <h2>What Gets Installed Into Your Flow</h2>
+    <ul>
+        <li>Proof-first request contract via <code>X-Lemma-Credential</code> on protected routes</li>
+        <li>Optional short-lived bearer compatibility via <code>/api/auth/exchange-proof</code></li>
+        <li>Runtime registration, policy defaults, and kill-switch controls in Agent Ops</li>
+        <li>Decision logging and explainability endpoints for incident review</li>
+    </ul>
+
+    <div class="callout callout--info">
+        <div class="callout-title">Repo scripts are optional</div>
+        <p>If you are using <code>Lemma Firewall</code> or internal validation scripts, the repo-local setup and firewall scripts remain available. Treat them as reference tooling, not as the default requirement for third-party runtime onboarding.</p>
+    </div>
+</div>
+{% endblock %}

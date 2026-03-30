@@ -1,0 +1,299 @@
+{% extends "modern/layout.html" %}
+
+{% block title %}Lemma Firewall Demo - Agent Containment in Action{% endblock %}
+
+{% block head %}
+{{ super() }}
+<style>
+:root{
+  --demo-bg:#ffffff;
+  --demo-card-bg:#ffffff;
+  --demo-text:#0f172a;
+  --demo-muted:#64748b;
+}
+[data-demo-theme="dark"]{
+  --demo-bg:#020617;
+  --demo-card-bg:#0f172a;
+  --demo-text:#e2e8f0;
+  --demo-muted:#94a3b8;
+}
+::view-transition-group(*),
+::view-transition-old(*),
+::view-transition-new(*) {
+  animation-duration: 0.25s;
+  animation-timing-function: cubic-bezier(0.19, 1, 0.22, 1);
+}
+.demo-wrap{max-width:1360px;margin:0 auto;padding:24px 16px 48px;background:var(--demo-bg)}
+.demo-hero{background:linear-gradient(135deg,#0f172a,#1e293b);color:#e2e8f0;border-radius:16px;padding:24px;border:1px solid #334155}
+.demo-hero h1{margin:0 0 8px;font-size:34px;color:#f8fafc}
+.demo-hero p{margin:0;color:#cbd5e1}
+.demo-hero-actions{margin-top:16px;display:flex;gap:10px;flex-wrap:wrap}
+.demo-btn{background:#4f46e5;color:#fff;border:none;border-radius:10px;padding:10px 14px;font-weight:700;cursor:pointer;transition:transform .16s ease,box-shadow .18s ease,background .2s ease}
+.demo-btn.sec{background:#fff;color:#1e293b;border:1px solid #cbd5e1}
+.demo-btn:hover{transform:translateY(-1px);box-shadow:0 6px 20px rgba(30,41,59,.12)}
+.demo-btn:active{transform:translateY(0)}
+.demo-main{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px}
+.demo-card{background:var(--demo-card-bg);border:1px solid #e2e8f0;border-radius:14px;padding:14px;transition:border-color .18s ease,box-shadow .2s ease}
+.demo-card h2{margin:0 0 10px;color:var(--demo-text);font-size:18px}
+.demo-step-rail{position:sticky;top:86px}
+.demo-steps-col{display:grid;gap:8px}
+.demo-step-btn{border:1px solid #cbd5e1;background:#f8fafc;border-radius:12px;padding:11px;text-align:left;cursor:pointer;font-weight:700;color:var(--demo-text);transition:transform .12s ease,border-color .18s ease,background .18s ease,box-shadow .18s ease}
+.demo-step-btn,.demo-action,.demo-btn,.demo-tab{min-height:42px;touch-action:manipulation}
+.demo-step-btn span{display:block;font-weight:500;font-size:12px;color:#475569}
+.demo-step-btn.active{border-color:#93c5fd;background:#eff6ff;color:#1d4ed8;box-shadow:0 0 0 2px rgba(147,197,253,.25)}
+.demo-step-btn{scroll-margin-top:90px}
+.demo-step-btn:hover{transform:translateY(-1px);box-shadow:0 10px 15px -3px rgb(0 0 0 / 0.1)}
+.demo-step-btn:active{transform:scale(.995)}
+.demo-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
+.demo-action{border:1px solid #cbd5e1;background:#f8fafc;border-radius:10px;padding:10px;text-align:left;cursor:pointer;transition:transform .12s ease,border-color .16s ease,background .16s ease}
+.demo-action.allow{border-color:#86efac;background:#f0fdf4;animation:demoPulseOk .45s ease}
+.demo-action.deny{border-color:#fca5a5;background:#fef2f2;animation:demoPulseDeny .45s ease}
+.demo-action strong{display:block;color:var(--demo-text)}
+.demo-action span{font-size:12px;color:#475569}
+.demo-action:hover{transform:translateY(-1px)}
+.demo-result-pill{display:inline-block;padding:4px 9px;border-radius:999px;border:1px solid #cbd5e1;font-size:12px;font-weight:800;letter-spacing:.02em}
+.demo-result-pill.allow{background:#dcfce7;border-color:#86efac;color:#166534}
+.demo-result-pill.deny{background:#fee2e2;border-color:#fca5a5;color:#991b1b}
+.demo-trust{display:inline-flex;align-items:center;gap:6px;margin-left:8px;padding:4px 8px;border-radius:999px;border:1px solid #cbd5e1;font-size:11px;font-weight:700;letter-spacing:.02em}
+.demo-trust.trusted{background:#ecfeff;border-color:#67e8f9;color:#155e75}
+.demo-trust.tainted{background:#fffbeb;border-color:#fcd34d;color:#92400e;animation:demoPulseWarn 1.2s infinite}
+.demo-trust.revoked{background:#fef2f2;border-color:#fca5a5;color:#991b1b;animation:demoPulseDeny 1.2s infinite}
+.demo-kv{display:grid;grid-template-columns:120px 1fr;gap:8px;font-size:13px}
+.demo-code{background:#0f172a;color:#dbeafe;border-radius:10px;padding:10px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;min-height:160px;overflow:auto}
+.demo-json .k{color:#93c5fd}
+.demo-json .s{color:#fca5a5}
+.demo-json .n{color:#fcd34d}
+.demo-json .b{color:#86efac}
+.demo-json mark{background:#dbeafe;color:#1e40af;padding:0 2px;border-radius:3px}
+.demo-strip{display:flex;gap:8px;overflow:auto;padding-bottom:6px}
+.demo-chip{border:1px solid #cbd5e1;border-radius:999px;padding:6px 10px;font-size:12px;white-space:nowrap}
+.demo-chip.ok{background:#dcfce7;border-color:#86efac;color:#166534}
+.demo-chip.deny{background:#fee2e2;border-color:#fca5a5;color:#991b1b}
+.demo-chip.warn{background:#fef3c7;border-color:#fcd34d;color:#92400e}
+.demo-columns{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.demo-without{background:#fef2f2;border:1px solid #fecaca;border-radius:10px;padding:10px;color:#7f1d1d;font-size:13px}
+.demo-with{background:#ecfeff;border:1px solid #67e8f9;border-radius:10px;padding:10px;color:#0f172a;font-size:13px}
+.demo-log{max-height:220px;overflow:auto;border:1px solid #e2e8f0;border-radius:10px}
+.demo-log table{width:100%;border-collapse:collapse}
+.demo-log th,.demo-log td{padding:8px;border-bottom:1px solid #e2e8f0;font-size:12px;text-align:left}
+.demo-log-filters{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 10px}
+.demo-log-filters input,.demo-log-filters select{border:1px solid #cbd5e1;border-radius:8px;padding:6px 8px;font-size:12px}
+.demo-muted{color:var(--demo-muted);font-size:12px}
+.demo-steps{margin:10px 0 0 18px;padding:0;color:#334155;font-size:13px}
+.demo-steps li{margin:4px 0}
+.demo-status{margin-top:10px;border:1px solid #cbd5e1;background:#f8fafc;border-radius:10px;padding:10px;color:#0f172a;font-size:13px}
+.demo-tour-start{margin-top:10px;border:1px solid #334155;background:rgba(15,23,42,.55);border-radius:12px;padding:12px}
+.demo-tour-start strong{display:block;color:#f8fafc;margin-bottom:4px}
+.demo-tour-start p{margin:0 0 8px;color:#cbd5e1;font-size:13px}
+.demo-tour-start-actions{display:flex;gap:8px;flex-wrap:wrap}
+.demo-tour-overlay{position:fixed;right:16px;bottom:16px;max-width:360px;background:#0f172a;color:#e2e8f0;border:1px solid #334155;border-radius:12px;padding:12px;z-index:120;box-shadow:0 12px 30px rgba(2,6,23,.45)}
+.demo-tour-overlay[hidden]{display:none}
+.demo-tour-overlay h3{margin:0 0 6px;font-size:15px;color:#f8fafc}
+.demo-tour-overlay p{margin:0 0 10px;color:#cbd5e1;font-size:13px}
+.demo-tour-controls{display:flex;gap:6px;flex-wrap:wrap}
+.demo-tour-overlay.fading{animation:demoOverlayIn .22s ease}
+.demo-toast{position:fixed;top:18px;right:18px;max-width:320px;padding:10px 12px;border-radius:10px;background:#0f172a;color:#e2e8f0;border:1px solid #334155;box-shadow:0 10px 22px rgba(2,6,23,.35);z-index:130;opacity:0;transform:translateY(-8px);pointer-events:none;transition:opacity .2s ease,transform .2s ease}
+.demo-toast.show{opacity:1;transform:translateY(0)}
+.demo-policy-row{display:flex;gap:8px;margin-top:10px;align-items:center;flex-wrap:wrap}
+.demo-policy-row label{font-size:12px;font-weight:700;color:var(--demo-text)}
+.demo-policy-pills{display:flex;gap:6px;flex-wrap:wrap}
+.demo-policy-pill{border:1px solid #cbd5e1;border-radius:999px;padding:5px 10px;font-size:12px;font-weight:700;cursor:pointer;background:#fff;color:#1e293b}
+.demo-policy-pill.active{box-shadow:0 0 0 2px rgba(99,102,241,.22)}
+.demo-policy-pill[data-profile="low"].active{border-color:#10B981;color:#065f46;background:#ecfdf5}
+.demo-policy-pill[data-profile="high"].active{border-color:#F59E0B;color:#92400e;background:#fffbeb}
+.demo-policy-pill[data-profile="critical"].active{border-color:#EF4444;color:#991b1b;background:#fef2f2}
+.demo-arch-wrap{margin-top:16px;max-width:100%;background:rgba(2,6,23,.28);border:1px solid #334155;border-radius:14px;padding:22px}
+.demo-arch-wrap #demo-architecture svg{width:100%;height:auto;min-height:360px}
+[data-demo-theme="light"] .demo-arch-wrap{background:#fff;border-color:#dbeafe}
+[data-demo-theme="light"] .demo-arch-wrap .demo-muted{color:#475569 !important}
+[data-demo-theme="dark"] .demo-card{border-color:#334155}
+[data-demo-theme="dark"] .demo-step-btn,[data-demo-theme="dark"] .demo-action,[data-demo-theme="dark"] .demo-tab,[data-demo-theme="dark"] .demo-log-filters input,[data-demo-theme="dark"] .demo-log-filters select,[data-demo-theme="dark"] .demo-policy-row select{background:#111827;color:#e2e8f0;border-color:#334155}
+[data-demo-theme="dark"] .demo-btn.sec{background:#111827;color:#e2e8f0;border-color:#334155}
+[data-demo-theme="dark"] .demo-status,[data-demo-theme="dark"] .demo-tour-start{background:#0b1222;border-color:#334155;color:#e2e8f0}
+[data-demo-theme="dark"] .demo-code{background:#020617}
+.demo-proof-why{margin-top:14px;border:1px solid #cbd5e1;background:#f8fafc;border-radius:10px;padding:12px}
+.demo-proof-why h3{margin:0 0 8px;font-size:15px;color:#0f172a}
+.demo-proof-why ul{margin:0 0 8px 18px;padding:0;color:#334155;font-size:13px}
+.demo-proof-why li{margin:4px 0}
+.demo-checklist{margin:8px 0 0 0;padding:0;list-style:none;font-size:13px}
+.demo-checklist li{margin:6px 0;padding:6px 8px;border:1px solid #e2e8f0;border-radius:8px;background:#fff;color:#334155}
+.demo-checklist .ok{border-color:#86efac;background:#f0fdf4;color:#166534}
+.demo-checklist .fail{border-color:#fca5a5;background:#fef2f2;color:#991b1b}
+.demo-checklist .run{border-color:#93c5fd;background:#eff6ff;color:#1d4ed8}
+.demo-scenarios{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-top:10px}
+.demo-scenario{border:1px solid #e2e8f0;border-radius:10px;padding:8px;background:#fff;font-size:12px;color:#334155}
+.demo-scenario strong{display:block;color:#0f172a;margin-bottom:3px}
+.demo-scenario.active{border-color:#93c5fd;background:#eff6ff}
+.demo-scenario.ok{border-color:#86efac;background:#f0fdf4}
+.demo-scenario.fail{border-color:#fca5a5;background:#fef2f2}
+.demo-why-box{margin-top:10px;border:1px solid #e2e8f0;border-radius:10px;padding:10px;background:#fff}
+.demo-why-box h4{margin:0 0 6px;color:#0f172a;font-size:14px}
+.demo-why-box p{margin:0;color:#334155;font-size:13px}
+.demo-integration-tabs{display:flex;gap:6px;margin-top:8px}
+.demo-tab{border:1px solid #cbd5e1;border-radius:8px;background:#fff;color:#1e293b;font-size:12px;padding:6px 8px;cursor:pointer}
+.demo-tab.active{background:#eff6ff;border-color:#93c5fd;color:#1d4ed8}
+.demo-log-row{opacity:0;transform:translateY(6px);animation:demoFadeRow .25s ease forwards}
+.demo-reason{cursor:help;text-decoration:underline dotted}
+.demo-live-result.flash-allow{animation:demoPanelAllow .34s ease}
+.demo-live-result.flash-deny{animation:demoPanelDeny .34s ease}
+@keyframes demoFadeRow{to{opacity:1;transform:translateY(0)}}
+@keyframes demoPulseOk{0%{box-shadow:0 0 0 0 rgba(34,197,94,.45)}100%{box-shadow:0 0 0 10px rgba(34,197,94,0)}}
+@keyframes demoPulseDeny{0%{box-shadow:0 0 0 0 rgba(239,68,68,.35)}100%{box-shadow:0 0 0 10px rgba(239,68,68,0)}}
+@keyframes demoPulseWarn{0%{box-shadow:0 0 0 0 rgba(245,158,11,.25)}100%{box-shadow:0 0 0 8px rgba(245,158,11,0)}}
+@keyframes demoPanelAllow{0%{box-shadow:0 0 0 0 rgba(34,197,94,.25)}100%{box-shadow:0 0 0 16px rgba(34,197,94,0)}}
+@keyframes demoPanelDeny{0%{box-shadow:0 0 0 0 rgba(239,68,68,.22)}100%{box-shadow:0 0 0 16px rgba(239,68,68,0)}}
+@keyframes demoOverlayIn{from{opacity:.4;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}
+@media (max-width: 980px){.demo-main{grid-template-columns:1fr}.demo-actions{grid-template-columns:repeat(2,minmax(0,1fr))}.demo-columns{grid-template-columns:1fr}}
+@media (max-width: 760px){
+  .demo-wrap{padding:14px 10px 30px}
+  .demo-hero{padding:16px}
+  .demo-hero h1{font-size:23px}
+  .demo-card{padding:12px}
+  .demo-step-rail{position:static}
+  .demo-arch-wrap{max-width:100%;padding:12px}
+  .demo-arch-wrap #demo-architecture svg{min-height:340px}
+  .demo-step-btn{padding:12px}
+  .demo-actions{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .demo-code{min-height:130px;font-size:11px}
+  .demo-integration-tabs{flex-wrap:wrap}
+  .demo-tour-overlay{left:10px;right:10px;bottom:10px;max-width:none}
+}
+@media (prefers-reduced-motion: reduce){
+  *,::view-transition-group(*),::view-transition-old(*),::view-transition-new(*){animation:none!important;transition:none!important}
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="demo-wrap" id="demo-root" data-runtime-id="{{ demo_runtime_id }}" data-demo-theme="light">
+  <section class="demo-hero">
+    <h1>Lemma Firewall Demo</h1>
+    <p>See agent containment in action. Signed credentials verified locally in &lt;1ms. Taint epoch, revocation, kill switch &mdash; zero server calls per request.</p>
+    <div class="demo-hero-actions">
+      <button class="demo-btn" id="demo-start-tour">Start Guided Demo</button>
+      <button class="demo-btn sec" id="demo-issue-top">Issue credential</button>
+      <button class="demo-btn sec" id="demo-theme-toggle" style="font-size:12px;padding:8px 10px">&#x263E; Theme</button>
+    </div>
+    <div class="demo-arch-wrap">
+      <div id="demo-architecture"></div>
+      <p class="demo-muted" style="margin-top:6px;color:#cbd5e1">Same action. Different trust state. The firewall decides locally &mdash; no server call needed.</p>
+    </div>
+    <div class="demo-status" id="demo-human-status" aria-live="polite">Ready to start. Click Step 1 to issue a signed credential.</div>
+    <div class="demo-tour-start" id="demo-tour-start-card">
+      <strong>How it works</strong>
+      <p>Issue a credential, try an action (allowed), bump the taint epoch (denied), re-issue (allowed again), revoke (denied). All verified locally by the firewall.</p>
+      <div class="demo-tour-start-actions">
+        <button class="demo-btn" id="demo-tour-start-cta">Run guided demo</button>
+        <button class="demo-btn sec" id="demo-tour-skip-cta">Skip, I'll click manually</button>
+      </div>
+    </div>
+  </section>
+
+  <div class="demo-main">
+    <section class="demo-card demo-step-rail">
+      <h2>Run The 5-step Flow</h2>
+      <div class="demo-steps-col">
+        <button class="demo-step-btn active" id="demo-issue">🔑 1. Issue credential<span>Signed credential from control plane (Ed25519)</span></button>
+        <button class="demo-step-btn" id="demo-step-verify">🛡️ 2. Try action<span>Firewall verifies locally and forwards request</span></button>
+        <button class="demo-step-btn" id="demo-taint-bump">⚠️ 3. Bump taint<span>Simulate prompt injection / context poisoning</span></button>
+        <button class="demo-step-btn" id="demo-step-reissue">♻️ 4. Re-issue credential<span>Fresh credential with current taint epoch</span></button>
+        <button class="demo-step-btn" id="demo-revoke">⛔ 5. Revoke credential<span>Kill switch — firewall denies immediately</span></button>
+      </div>
+      <button class="demo-btn sec" id="demo-reset" style="margin-top:12px;font-size:12px">Reset</button>
+      <div class="demo-policy-row" style="display:none">
+        <div class="demo-policy-pills" id="demo-policy-profile">
+          <button class="demo-policy-pill active" data-profile="low">low</button>
+          <button class="demo-policy-pill" data-profile="high">high</button>
+          <button class="demo-policy-pill" data-profile="critical">critical</button>
+        </div>
+      </div>
+      <div class="demo-actions" id="demo-actions" style="display:none"></div>
+      <p class="demo-muted" id="demo-actions-label" style="display:none"></p>
+    </section>
+
+    <aside class="demo-card demo-live-result" id="demo-live-result">
+      <h2>Live Result <span class="demo-result-pill" id="demo-result-pill" style="background:#f1f5f9;border-color:#e2e8f0;color:#64748b">WAITING</span><span class="demo-trust trusted" id="demo-trust-badge">CREDENTIAL STATUS</span></h2>
+      <p class="demo-muted" id="demo-runtime-status">Issue a credential to see live verification results.</p>
+      <div class="demo-kv">
+        <div>Reason</div><div id="demo-result-reason">waiting</div>
+        <div>Why</div><div id="demo-result-explain">Click Step 1 to issue a credential and start the demo.</div>
+        <div>Runtime</div><div id="demo-runtime-id"></div>
+        <div>Issuer</div><div id="demo-issuer-id"></div>
+        <div>Site</div><div id="demo-site-id"></div>
+        <div>Scope</div><div id="demo-field-scope">-</div>
+        <div>Taint epoch</div><div id="demo-field-epoch">0</div>
+        <div>Trust state</div><div id="demo-field-trust">trusted</div>
+        <div>Expires</div><div id="demo-field-expiry">-</div>
+      </div>
+      <div class="demo-code demo-json" id="demo-decision-json" style="margin-top:10px">{}</div>
+    </aside>
+  </div>
+
+  <div class="demo-strip" id="demo-timeline" style="display:none"></div>
+
+  <section class="demo-card" style="margin-top:14px">
+    <details>
+      <summary style="cursor:pointer;font-weight:700;color:#18181b;font-size:15px">Verifier Log</summary>
+      <div style="margin-top:10px">
+        <div class="demo-log-filters">
+          <select id="demo-log-filter-decision">
+            <option value="">All decisions</option>
+            <option value="allow">Allow</option>
+            <option value="deny">Deny</option>
+          </select>
+          <input type="text" id="demo-log-filter-text" placeholder="Filter reason/action...">
+        </div>
+        <div class="demo-log">
+          <table>
+            <thead><tr><th>Time</th><th>Action</th><th>Decision</th><th>Reason</th></tr></thead>
+            <tbody id="demo-log-rows"></tbody>
+          </table>
+        </div>
+      </div>
+    </details>
+    <details style="margin-top:8px">
+      <summary style="cursor:pointer;font-weight:700;color:#18181b;font-size:15px">Credential JSON</summary>
+      <p class="demo-muted" style="margin-top:6px">Highlighted fields are key to the current decision.</p>
+      <div class="demo-code demo-json" id="demo-proof-json" style="margin-top:8px">{}</div>
+    </details>
+  </section>
+
+  <hr style="margin:24px 0;border:none;border-top:1px solid #e4e4e7">
+
+  <section class="demo-card">
+    <h2 style="font-size:18px;color:#18181b">Integrate in Your Stack</h2>
+    <p class="demo-muted" style="margin-bottom:10px">Add the Lemma Firewall to your agent in a few lines of code.</p>
+    <div class="demo-integration-tabs">
+      <button class="demo-tab active" data-lang="ts" id="demo-tab-ts">TypeScript</button>
+      <button class="demo-tab" data-lang="py" id="demo-tab-py">Python</button>
+      <button class="demo-tab" data-lang="go" id="demo-tab-go">Go</button>
+      <button class="demo-tab" data-lang="langgraph" id="demo-tab-langgraph">LangGraph</button>
+      <button class="demo-tab" data-lang="crewai" id="demo-tab-crewai">CrewAI</button>
+      <button class="demo-tab" data-lang="autogen" id="demo-tab-autogen">AutoGen</button>
+      <button class="demo-tab" id="demo-copy-link">Copy Demo Link</button>
+      <button class="demo-tab" id="demo-copy-curl">Copy Integration Call</button>
+    </div>
+    <div class="demo-code" id="demo-integration-preview" style="margin-top:8px"></div>
+    <p class="demo-muted" style="margin-top:8px">
+      Continue with <a href="/developer">Developer Console</a>, <a href="/docs">Docs</a>, or run <code>lemma demo</code> locally.
+    </p>
+  </section>
+</div>
+<div class="demo-toast" id="demo-toast"></div>
+<div class="demo-tour-overlay" id="demo-tour-overlay" hidden>
+  <h3 id="demo-tour-title">Guided tour</h3>
+  <p id="demo-tour-copy">Follow each step to watch trust-state driven decision changes.</p>
+  <div class="demo-tour-controls">
+    <button class="demo-btn sec" id="demo-tour-pause">Pause</button>
+    <button class="demo-btn sec" id="demo-tour-resume" hidden>Resume</button>
+    <button class="demo-btn sec" id="demo-tour-skip">Skip</button>
+    <button class="demo-btn sec" id="demo-tour-reset">Reset</button>
+  </div>
+</div>
+
+<script src="{{ url_for('static', filename='js/demo/architecture-diagram.js') }}?v=20260323g"></script>
+<script src="{{ url_for('static', filename='js/demo/timeline-strip.js') }}?v=20260316l"></script>
+<script src="{{ url_for('static', filename='js/demo/verifier-log.js') }}?v=20260316l"></script>
+<script src="{{ url_for('static', filename='js/demo/proof-controls.js') }}?v=20260323d"></script>
+<script src="{{ url_for('static', filename='js/demo/simulator.js') }}?v=20260323d"></script>
+{% endblock %}

@@ -1,0 +1,46 @@
+FROM rust:1-bookworm AS crypto-builder
+
+WORKDIR /build
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    python3 \
+    python3-pip \
+    python3-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN pip3 install --no-cache-dir --break-system-packages maturin==1.4.0
+
+COPY lemma-crypto/ /build/lemma-crypto/
+
+RUN cd /build/lemma-crypto && maturin build --release --features python
+
+FROM python:3.11-slim AS runtime
+
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+ENV PORT=5000
+
+WORKDIR /app
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY requirements.docker.txt /app/requirements.docker.txt
+
+RUN pip install --no-cache-dir -r /app/requirements.docker.txt
+
+COPY --from=crypto-builder /build/lemma-crypto/target/wheels/*.whl /tmp/wheels/
+RUN pip install --no-cache-dir /tmp/wheels/*.whl && rm -rf /tmp/wheels
+
+COPY . /app
+
+RUN useradd -m -u 10001 lemma && chown -R lemma:lemma /app
+USER lemma
+
+EXPOSE 5000
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=5 \
+  CMD curl -fsS "http://localhost:${PORT}/health" || exit 1
+
+CMD ["gunicorn", "app:app", "--worker-class", "gevent", "--workers", "2", "--worker-connections", "1000", "--timeout", "120", "--graceful-timeout", "30", "--keep-alive", "5", "--bind", "0.0.0.0:5000"]

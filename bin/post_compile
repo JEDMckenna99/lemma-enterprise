@@ -1,0 +1,56 @@
+#!/bin/bash
+# Heroku post-compile script for lemma-crypto deployment
+
+set -euo pipefail
+
+echo "[post_compile] Building real crypto engine..."
+
+# Change to lemma-crypto directory
+cd lemma-crypto
+
+# Build the Python bindings with maturin
+echo "[post_compile] Building lemma-crypto Python bindings..."
+maturin build --release --features python --interpreter python
+
+# Install the built wheel
+echo "[post_compile] Installing lemma-crypto..."
+WHEEL_PATH=""
+
+# Heroku Rust buildpack may set CARGO_TARGET_DIR to app-root/target.
+if [[ -n "${CARGO_TARGET_DIR:-}" ]]; then
+  CANDIDATE="$(ls -1 "${CARGO_TARGET_DIR}/wheels/"*.whl 2>/dev/null | head -n 1 || true)"
+  if [[ -n "${CANDIDATE}" ]]; then
+    WHEEL_PATH="${CANDIDATE}"
+  fi
+fi
+
+# Fallbacks for local/dev builds.
+if [[ -z "${WHEEL_PATH}" ]]; then
+  CANDIDATE="$(ls -1 target/wheels/*.whl 2>/dev/null | head -n 1 || true)"
+  if [[ -n "${CANDIDATE}" ]]; then
+    WHEEL_PATH="${CANDIDATE}"
+  fi
+fi
+if [[ -z "${WHEEL_PATH}" ]]; then
+  CANDIDATE="$(ls -1 ../target/wheels/*.whl 2>/dev/null | head -n 1 || true)"
+  if [[ -n "${CANDIDATE}" ]]; then
+    WHEEL_PATH="${CANDIDATE}"
+  fi
+fi
+
+if [[ -z "${WHEEL_PATH}" ]]; then
+  echo "[post_compile] ERROR: No built wheel found in expected locations:"
+  echo "   - \${CARGO_TARGET_DIR}/wheels/*.whl"
+  echo "   - target/wheels/*.whl"
+  echo "   - ../target/wheels/*.whl"
+  exit 1
+fi
+
+echo "[post_compile] Installing wheel: ${WHEEL_PATH}"
+pip install "${WHEEL_PATH}"
+
+# Verify installation
+echo "[post_compile] Verifying crypto engine installation..."
+python -c "import lemma_crypto; print('[post_compile] lemma_crypto imported successfully'); issuer=lemma_crypto.PyMinimalIssuer(); print(f'[post_compile] Issuer created: {issuer.get_did()[:30]}...'); verifier=lemma_crypto.PyOptimizedVerifier(); print('[post_compile] Optimized verifier created'); print('[post_compile] REAL CRYPTO ENGINE READY FOR PRODUCTION')"
+
+echo "[post_compile] Complete - real crypto engine deployed."

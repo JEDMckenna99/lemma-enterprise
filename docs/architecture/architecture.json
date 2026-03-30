@@ -1,0 +1,332 @@
+{
+  "meta": {
+    "name": "Lemma Platform Architecture",
+    "version": "1.0.0",
+    "generated": "2026-01-21T13:56:35.511060",
+    "generator": "generate_architecture_diagram.py"
+  },
+  "nodes": [
+    {
+      "id": "wallet",
+      "label": "User Wallet",
+      "type": "client",
+      "description": "Browser IndexedDB storage for credentials and secrets",
+      "files": [
+        "static/js/lemma-wallet.js"
+      ],
+      "stores": [
+        "passkey",
+        "secrets",
+        "lemmas",
+        "revocations",
+        "session",
+        "profiles"
+      ],
+      "boundary": "client"
+    },
+    {
+      "id": "bridge",
+      "label": "Wallet Bridge",
+      "type": "client",
+      "description": "Cross-origin iframe for SSO session sharing",
+      "files": [
+        "templates/wallet_bridge.html"
+      ],
+      "boundary": "client"
+    },
+    {
+      "id": "crypto_wasm",
+      "label": "Crypto Engine (WASM)",
+      "type": "library",
+      "description": "Client-side Ed25519 verification and Bloom filter",
+      "files": [
+        "lemma-crypto/src/lib.rs",
+        "lemma-crypto/src/minimal_core.rs",
+        "lemma-crypto/src/bloom.rs"
+      ],
+      "boundary": "client"
+    },
+    {
+      "id": "site",
+      "label": "Third-Party Site",
+      "type": "external",
+      "description": "Customer sites using Lemma SDK",
+      "files": [],
+      "boundary": "external"
+    },
+    {
+      "id": "device_b",
+      "label": "New Device",
+      "type": "client",
+      "description": "Device being linked to existing wallet",
+      "files": [],
+      "boundary": "client"
+    },
+    {
+      "id": "backend",
+      "label": "Lemma Backend",
+      "type": "server",
+      "description": "Flask API server - auth, issuance, revocation",
+      "files": [
+        "app.py",
+        "api/lemma_shield.py",
+        "api/passkey_auth.py",
+        "api/revocation_api.py",
+        "api/services/wallet_service.py",
+        "api/ppid.py",
+        "api/wallet_transfer_session.py"
+      ],
+      "boundary": "server"
+    },
+    {
+      "id": "postgres",
+      "label": "PostgreSQL",
+      "type": "storage",
+      "description": "Persistent storage for sites, passkeys, revocations",
+      "files": [
+        "api/database.py",
+        "database_schema.sql"
+      ],
+      "tables": [
+        "passkeys",
+        "sites",
+        "revocation_list",
+        "federated_sites"
+      ],
+      "boundary": "server"
+    },
+    {
+      "id": "redis",
+      "label": "Redis",
+      "type": "storage",
+      "description": "Ephemeral storage for sessions and transfers",
+      "files": [],
+      "keys": [
+        "transfer_session:{id}",
+        "wallet_session:{id}"
+      ],
+      "boundary": "server"
+    }
+  ],
+  "edges": [
+    {
+      "from": "wallet",
+      "to": "backend",
+      "label": "1. Passkey registration/auth",
+      "flow": "auth",
+      "data": "WebAuthn challenge/response",
+      "privacy": "public_key only (private key never leaves device)"
+    },
+    {
+      "from": "backend",
+      "to": "wallet",
+      "label": "2. Session token",
+      "flow": "auth",
+      "data": "JWT or session cookie",
+      "privacy": "Identifies wallet_id, not user identity"
+    },
+    {
+      "from": "site",
+      "to": "bridge",
+      "label": "3. Load bridge iframe",
+      "flow": "sso",
+      "data": "iframe src=lemma.id/wallet/bridge",
+      "privacy": "Site origin visible to bridge"
+    },
+    {
+      "from": "bridge",
+      "to": "wallet",
+      "label": "4. Check IndexedDB",
+      "flow": "sso",
+      "data": "Read session, secrets",
+      "privacy": "Same-origin access only"
+    },
+    {
+      "from": "wallet",
+      "to": "bridge",
+      "label": "5. Return auth state",
+      "flow": "sso",
+      "data": "{authenticated, walletSecret, expiresAt}",
+      "privacy": "walletSecret enables PPID derivation"
+    },
+    {
+      "from": "bridge",
+      "to": "site",
+      "label": "6. postMessage response",
+      "flow": "sso",
+      "data": "{authenticated, walletSecret}",
+      "privacy": "Site receives secret for local PPID derivation"
+    },
+    {
+      "from": "site",
+      "to": "crypto_wasm",
+      "label": "7. Derive PPID",
+      "flow": "ppid",
+      "data": "HMAC(wallet_secret, site_domain)",
+      "privacy": "LOCAL ONLY - no network call"
+    },
+    {
+      "from": "site",
+      "to": "crypto_wasm",
+      "label": "8. Verify credential",
+      "flow": "verify",
+      "data": "Ed25519 signature check",
+      "privacy": "LOCAL ONLY - no network call"
+    },
+    {
+      "from": "site",
+      "to": "wallet",
+      "label": "9. Check revocation",
+      "flow": "verify",
+      "data": "Bloom filter lookup",
+      "privacy": "LOCAL ONLY - uses cached bloom filter"
+    },
+    {
+      "from": "wallet",
+      "to": "backend",
+      "label": "10. Fetch bloom filter",
+      "flow": "revocation",
+      "data": "GET /api/v1/revocation/bloom",
+      "privacy": "Public data, no user identification"
+    },
+    {
+      "from": "backend",
+      "to": "postgres",
+      "label": "11. Read revocation list",
+      "flow": "revocation",
+      "data": "SELECT from revocation_list",
+      "privacy": "Server-side only"
+    },
+    {
+      "from": "backend",
+      "to": "wallet",
+      "label": "12. Return bloom filter",
+      "flow": "revocation",
+      "data": "Bloom filter bytes + metadata",
+      "privacy": "Public data, cached 1 hour"
+    },
+    {
+      "from": "wallet",
+      "to": "backend",
+      "label": "13. Create transfer session",
+      "flow": "device_link",
+      "data": "Encrypted wallet_secret",
+      "privacy": "Encrypted, only recipient can decrypt"
+    },
+    {
+      "from": "backend",
+      "to": "redis",
+      "label": "14. Store transfer session",
+      "flow": "device_link",
+      "data": "transfer_session:{id}",
+      "privacy": "5 minute TTL, auto-deleted"
+    },
+    {
+      "from": "device_b",
+      "to": "backend",
+      "label": "15. Poll transfer session",
+      "flow": "device_link",
+      "data": "GET /api/wallet/transfer/{id}",
+      "privacy": "Requires session ID from QR/link"
+    },
+    {
+      "from": "backend",
+      "to": "device_b",
+      "label": "16. Return encrypted wallet",
+      "flow": "device_link",
+      "data": "Encrypted wallet_secret",
+      "privacy": "Decrypted locally on Device B"
+    },
+    {
+      "from": "backend",
+      "to": "postgres",
+      "label": "Data persistence",
+      "flow": "data",
+      "data": "Sites, passkeys, revocations",
+      "privacy": "Server-side storage"
+    }
+  ],
+  "boundaries": [
+    {
+      "id": "client",
+      "label": "Client-Side (Private)",
+      "nodes": [
+        "wallet",
+        "bridge",
+        "crypto_wasm",
+        "device_b"
+      ],
+      "color": "#d4edda",
+      "description": "Data stays on user's device"
+    },
+    {
+      "id": "server",
+      "label": "Lemma Backend",
+      "nodes": [
+        "backend",
+        "postgres",
+        "redis"
+      ],
+      "color": "#cce5ff",
+      "description": "Lemma infrastructure"
+    },
+    {
+      "id": "external",
+      "label": "Third-Party Sites",
+      "nodes": [
+        "site"
+      ],
+      "color": "#fff3cd",
+      "description": "Customer sites using SDK"
+    }
+  ],
+  "data_storage": {
+    "client": {
+      "location": "User's Browser (IndexedDB)",
+      "data": {
+        "wallet_secret": "32-byte hex - NEVER transmitted",
+        "passkey": "WebAuthn credential ID + public key",
+        "lemmas": "Signed credentials from issuers",
+        "revocations": "Bloom filter cache",
+        "session": "Auth state (unlocked_at, expires_at)"
+      }
+    },
+    "server_postgres": {
+      "location": "PostgreSQL",
+      "data": {
+        "passkeys": "credential_id, public_key (can verify, can't sign)",
+        "sites": "domain, api_key, signing_key",
+        "revocation_list": "revoked credential IDs"
+      }
+    },
+    "server_redis": {
+      "location": "Redis (Ephemeral)",
+      "data": {
+        "transfer_session": "Encrypted wallet (5 min TTL)",
+        "wallet_session": "Unlock timestamp (24 hour TTL)"
+      }
+    }
+  },
+  "privacy_guarantees": [
+    {
+      "property": "Pairwise Unlinkability",
+      "mechanism": "PPID = HMAC(wallet_secret, site_domain)",
+      "result": "Same user has different ID per site"
+    },
+    {
+      "property": "No Central Tracking",
+      "mechanism": "Verification is local (Ed25519 in WASM)",
+      "result": "Lemma cannot see which sites user visits"
+    },
+    {
+      "property": "Wallet Secret Protection",
+      "mechanism": "Never leaves IndexedDB, derived from passkey",
+      "result": "Only user can derive their PPIDs"
+    },
+    {
+      "property": "Revocation Privacy",
+      "mechanism": "Bloom filter (probabilistic, no queries)",
+      "result": "Lemma cannot see revocation checks"
+    }
+  ]
+}

@@ -1,0 +1,136 @@
+{% extends "docs/layout.html" %}
+{% set active_page = 'examples' %}
+{% set hero_title = 'Examples' %}
+{% set hero_subtitle = 'Proof-first runtime and backend patterns for common agent scenarios' %}
+
+{% block docs_content %}
+<div class="docs-section" id="basic">
+    <h2>Runtime Request: Send <code>X-Lemma-Credential</code></h2>
+    <p>This is the default request pattern for new agent integrations. Load the signed proof from disk or memory and attach it directly to protected requests.</p>
+    
+    <div class="code-block">
+        <div class="code-header">
+            <span>Node.js</span>
+            <button class="copy-btn">Copy</button>
+        </div>
+        <code>import fs from 'node:fs/promises';
+
+const proof = JSON.parse(await fs.readFile(process.env.LEMMA_PROOF_FILE, 'utf8'));
+const encodedProof = Buffer.from(JSON.stringify(proof)).toString('base64url');
+
+const response = await fetch('https://api.example.com/api/agent/run', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+    'X-Lemma-Credential': encodedProof,
+  },
+  body: JSON.stringify({ action: 'site.read' }),
+});
+
+if (!response.ok) {
+  const error = await response.json();
+  console.error('Lemma-protected request failed:', error);
+}</code>
+    </div>
+</div>
+
+<div class="docs-section" id="alongside-google">
+    <h2>Protected Backend Route</h2>
+    <p>On your server, decode the header, verify the signed proof, and derive the principal only after verification succeeds.</p>
+    
+    <div class="code-block">
+        <div class="code-header">
+            <span>Express</span>
+            <button class="copy-btn">Copy</button>
+        </div>
+        <code>app.post('/api/agent/run', async (req, res) => {
+  const encoded = (req.header('X-Lemma-Credential') || '').trim();
+  if (!encoded) {
+    return res.status(401).json({
+      success: false,
+      error: 'auth_required',
+      message: 'Provide X-Lemma-Credential',
+    });
+  }
+
+  const credential = JSON.parse(Buffer.from(encoded, 'base64url').toString('utf8'));
+  const verification = await verifyCredentialWithTrust(credential);
+  if (!verification.valid) {
+    return res.status(401).json({
+      success: false,
+      error: `invalid_lemma:${verification.reason || 'verification_failed'}`,
+      message: 'Credential verification failed',
+    });
+  }
+
+  const claims = credential.claims || credential.credentialSubject || {};
+  const subject = credential.subject || claims.ppid || claims.id;
+
+  return res.json({
+    success: true,
+    actor: subject,
+    auth_method: 'lemma_header',
+  });
+});</code>
+    </div>
+
+    <div class="code-block">
+        <div class="code-header">
+            <span>Verification Checklist</span>
+            <button class="copy-btn">Copy</button>
+        </div>
+        <code>- Verify issuer trust and signature
+- Check expiry / freshness
+- Check audience or site binding
+- Check required scope or permission
+- Deny by default on ambiguous or missing context</code>
+    </div>
+</div>
+
+<div class="docs-section" id="migration">
+    <h2>Compatibility Mode: Exchange Proof for Bearer</h2>
+    <p>Use this only when an existing integration cannot yet send <code>X-Lemma-Credential</code> directly.</p>
+    
+    <div class="code-block">
+        <div class="code-header">
+            <span>cURL</span>
+            <button class="copy-btn">Copy</button>
+        </div>
+        <code>curl -s -X POST "https://lemma.id/api/auth/exchange-proof" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "credential": { "...": "signed lemma object" },
+    "site_id": "example.com",
+    "requested_scope": ["read"],
+    "ttl_seconds": 900
+  }'</code>
+    </div>
+</div>
+
+<div class="docs-section" id="lock-detection">
+    <h2>Decision Monitoring</h2>
+    <p>Use the monitoring APIs to inspect runtime activity from your own UI or internal dashboards.</p>
+    
+    <div class="code-block">
+        <div class="code-header">
+            <span>cURL</span>
+            <button class="copy-btn">Copy</button>
+        </div>
+        <code>curl -s "https://lemma.id/api/agent/monitor/summary?hours=24" \
+  -H "X-API-Key: lemma_xxx"</code>
+    </div>
+</div>
+
+<div class="docs-section" id="revocation">
+    <h2>Reference Runtime Path</h2>
+    <p>If you want a complete reference implementation with gateway, conformance checks, and kill-switch validation, use the optional <code>Lemma Firewall</code> onboarding path.</p>
+    
+    <div class="code-block">
+        <div class="code-header">
+            <span>Shell</span>
+            <button class="copy-btn">Copy</button>
+        </div>
+        <code>lemma setup-openclaw --api-base https://lemma.id</code>
+    </div>
+</div>
+{% endblock %}

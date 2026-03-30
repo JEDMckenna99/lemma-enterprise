@@ -1,0 +1,96 @@
+import base64
+import json
+
+from flask import Flask, jsonify
+
+from auth import decorators
+
+
+def _encode_lemma_header(lemma: dict) -> str:
+    raw = json.dumps(lemma, separators=(",", ":"), sort_keys=True).encode("utf-8")
+    return base64.urlsafe_b64encode(raw).decode("utf-8").rstrip("=")
+
+
+def _stub_lemma(permission_id: str) -> dict:
+    scope_csv = "admin,write,read" if "admin" in permission_id else "read"
+    return {
+        "id": "cred_admin_header_test",
+        "issuer": "did:lemma:test_issuer",
+        "subject": "did:lemma:ppid_" + ("a" * 64),
+        "claims": {
+            "siteId": "lemma.id",
+            "permissionId": permission_id,
+            "scope": scope_csv,
+        },
+    }
+
+
+def _app_with_site_admin_route():
+    app = Flask(__name__)
+    app.config["TESTING"] = True
+
+    @app.route("/_test/admin", methods=["GET"])
+    @decorators.require_site_admin
+    def _route():
+        return jsonify({"ok": True}), 200
+
+    return app
+
+
+def test_require_site_admin_accepts_admin_lemma_header(monkeypatch):
+    app = _app_with_site_admin_route()
+
+    monkeypatch.setattr(
+        "api.trusted_issuers.verify_credential_with_trust",
+        lambda credential: {"valid": True, "reason": "ok"},
+    )
+
+    lemma_header = _encode_lemma_header(_stub_lemma("admin_access"))
+    with app.test_client() as client:
+        resp = client.get("/_test/admin", headers={"X-Lemma-Credential": lemma_header})
+        assert resp.status_code == 200
+        assert resp.get_json()["ok"] is True
+
+
+def test_require_site_admin_rejects_non_admin_lemma_header(monkeypatch):
+    app = _app_with_site_admin_route()
+
+    monkeypatch.setattr(
+        "api.trusted_issuers.verify_credential_with_trust",
+        lambda credential: {"valid": True, "reason": "ok"},
+    )
+
+    lemma_header = _encode_lemma_header(_stub_lemma("customer_access"))
+    with app.test_client() as client:
+        resp = client.get("/_test/admin", headers={"X-Lemma-Credential": lemma_header})
+        assert resp.status_code == 403
+        body = resp.get_json()
+        assert body["error"] == "missing_scope"
+
+
+def test_require_site_admin_rejects_invalid_credential(monkeypatch):
+    """When verify_credential_with_trust returns invalid, auth is denied."""
+    app = _app_with_site_admin_route()
+
+    monkeypatch.setattr(
+        "api.trusted_issuers.verify_credential_with_trust",
+        lambda credential: {"valid": False, "reason": "untrusted_issuer"},
+    )
+
+    lemma_header = _encode_lemma_header(_stub_lemma("admin_access"))
+    with app.test_client() as client:
+        resp = client.get("/_test/admin", headers={"X-Lemma-Credential": lemma_header})
+        assert resp.status_code == 401
+        body = resp.get_json()
+        assert body["error"] == "auth_required"
+
+
+def test_require_site_admin_rejects_missing_credential():
+    """No credential header at all -> 401."""
+    app = _app_with_site_admin_route()
+
+    with app.test_client() as client:
+        resp = client.get("/_test/admin")
+        assert resp.status_code == 401
+        body = resp.get_json()
+        assert body["error"] == "auth_required"

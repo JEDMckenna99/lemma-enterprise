@@ -1,0 +1,72 @@
+{% extends "docs/layout.html" %}
+{% set active_page = 'sdk-events' %}
+{% set hero_title = 'Events & Callbacks' %}
+{% set hero_subtitle = 'React to wallet state changes' %}
+
+{% block docs_content %}
+<div class="docs-section">
+    <h2>Event Listeners</h2>
+    <p>Subscribe to browser events emitted by the wallet to update your UI in real-time.</p>
+    
+    <div class="code-block">
+        <div class="code-header">
+            <span>JavaScript</span>
+            <button class="copy-btn">Copy</button>
+        </div>
+        <code>window.addEventListener('lemma-wallet-locked', async () => {
+  // Clear app session when wallet locks anywhere
+  await fetch('/api/auth/logout', { method: 'POST' });
+  window.location.reload();
+});
+
+window.addEventListener('lemma:session-restored', async () => {
+  // Wallet was unlocked on another tab/device
+  const result = await wallet.getAuthenticatedPPID();
+  if (result.authenticated) {
+    // Refresh UI and session if needed
+    updateUI();
+  }
+});
+
+window.addEventListener('lemma:session-expired', (e) => {
+  console.log('Lemma session expired:', e.detail?.reason);
+  showLoginButton();
+});</code>
+    </div>
+</div>
+
+<div class="docs-section">
+    <h2>Available Events</h2>
+    <table class="docs-table">
+        <thead>
+            <tr>
+                <th>Event</th>
+                <th>Data</th>
+                <th>Description</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td><code>init</code></td>
+                <td>-</td>
+                <td>SDK initialized</td>
+            </tr>
+            <tr>
+                <td><code>lemma:session-restored</code></td>
+                <td>reason</td>
+                <td>Session restored after unlock on another context</td>
+            </tr>
+            <tr>
+                <td><code>lemma-wallet-locked</code></td>
+                <td>-</td>
+                <td>Wallet/session locked or invalidated</td>
+            </tr>
+            <tr>
+                <td><code>lemma:session-expired</code></td>
+                <td>reason</td>
+                <td>Session expired and requires re-authentication</td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+{% endblock %}

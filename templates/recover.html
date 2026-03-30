@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Account Recovery - Lemma.id</title>
+    <style>
+        body {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%);
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            margin: 0;
+            padding: 20px;
+        }
+        
+        .recovery-container {
+            background: white;
+            border-radius: 16px;
+            padding: 40px;
+            width: 100%;
+            max-width: 440px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+        }
+        
+        .logo {
+            text-align: center;
+            margin-bottom: 32px;
+        }
+        
+        .logo h1 {
+            font-size: 28px;
+            font-weight: 700;
+            margin: 0;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        .logo p {
+            color: #64748b;
+            margin: 8px 0 0;
+            font-size: 15px;
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        .form-group label {
+            display: block;
+            font-weight: 600;
+            color: #334155;
+            margin-bottom: 8px;
+            font-size: 14px;
+        }
+        
+        .form-group input {
+            width: 100%;
+            padding: 12px 16px;
+            border: 2px solid #e2e8f0;
+            border-radius: 10px;
+            font-size: 15px;
+            transition: border-color 0.2s, box-shadow 0.2s;
+            box-sizing: border-box;
+        }
+        
+        .form-group input:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+        
+        .form-group input::placeholder {
+            color: #94a3b8;
+        }
+        
+        .form-group .hint {
+            font-size: 13px;
+            color: #64748b;
+            margin-top: 6px;
+        }
+        
+        .submit-btn {
+            width: 100%;
+            padding: 14px 24px;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        
+        .submit-btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 10px 20px -5px rgba(102, 126, 234, 0.4);
+        }
+        
+        .submit-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .info-box {
+            background: linear-gradient(135deg, rgba(59, 130, 246, 0.08), rgba(147, 51, 234, 0.08));
+            border: 1px solid rgba(59, 130, 246, 0.2);
+            border-radius: 10px;
+            padding: 16px;
+            margin-bottom: 24px;
+        }
+        
+        .info-box p {
+            margin: 0;
+            font-size: 14px;
+            color: #475569;
+            line-height: 1.5;
+        }
+        
+        .error-box {
+            background: #fef2f2;
+            border: 1px solid #fecaca;
+            border-radius: 10px;
+            padding: 14px 16px;
+            margin-bottom: 20px;
+            display: none;
+        }
+        
+        .error-box p {
+            margin: 0;
+            color: #dc2626;
+            font-size: 14px;
+        }
+        
+        .success-box {
+            background: #f0fdf4;
+            border: 1px solid #bbf7d0;
+            border-radius: 10px;
+            padding: 14px 16px;
+            margin-bottom: 20px;
+            display: none;
+        }
+        
+        .success-box p {
+            margin: 0;
+            color: #16a34a;
+            font-size: 14px;
+        }
+        
+        .back-link {
+            text-align: center;
+            margin-top: 24px;
+        }
+        
+        .back-link a {
+            color: #64748b;
+            text-decoration: none;
+            font-size: 14px;
+        }
+        
+        .back-link a:hover {
+            color: #667eea;
+        }
+    </style>
+</head>
+<body>
+    <div class="recovery-container">
+        <div class="logo">
+            <h1>Lemma.id</h1>
+            <p>Account Recovery</p>
+        </div>
+        
+        <div class="info-box">
+            <p>
+                Enter your API key and site ID to recover your account. 
+                A recovery link will be sent to the admin email on file.
+            </p>
+        </div>
+        
+        <div class="error-box" id="error-box">
+            <p id="error-message"></p>
+        </div>
+        
+        <div class="success-box" id="success-box">
+            <p id="success-message"></p>
+        </div>
+        
+        <form id="recovery-form">
+            <div class="form-group">
+                <label for="site-id">Site ID</label>
+                <input type="text" id="site-id" name="site_id" placeholder="site_abc123" required autocomplete="username">
+                <div class="hint">The unique identifier for your site</div>
+            </div>
+            
+            <div class="form-group">
+                <label for="api-key">API Key</label>
+                <input type="password" id="api-key" name="api_key" placeholder="sk_live_..." required autocomplete="current-password">
+                <div class="hint">Your live or test API key</div>
+            </div>
+            
+            <button type="submit" class="submit-btn" id="submit-btn">
+                Send Recovery Link
+            </button>
+        </form>
+        
+        <div class="back-link">
+            <a href="/developer">Back to sign in</a>
+        </div>
+    </div>
+    
+    <script nonce="{{ csp_nonce }}">
+        document.getElementById('recovery-form').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const submitBtn = document.getElementById('submit-btn');
+            const errorBox = document.getElementById('error-box');
+            const successBox = document.getElementById('success-box');
+            const errorMsg = document.getElementById('error-message');
+            const successMsg = document.getElementById('success-message');
+            
+            // Hide previous messages
+            errorBox.style.display = 'none';
+            successBox.style.display = 'none';
+            
+            // Disable button
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Sending...';
+            
+            try {
+                const response = await fetch('/api/recovery/initiate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        site_id: document.getElementById('site-id').value.trim(),
+                        api_key: document.getElementById('api-key').value.trim()
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (response.status === 429) {
+                    errorMsg.textContent = data.error || 'Too many attempts. Please try again later.';
+                    errorBox.style.display = 'block';
+                } else if (data.success) {
+                    successMsg.textContent = data.message || 'If the credentials are valid, a recovery link has been sent.';
+                    successBox.style.display = 'block';
+                    // Clear form
+                    document.getElementById('recovery-form').reset();
+                } else {
+                    errorMsg.textContent = data.error || 'Recovery failed. Please try again.';
+                    errorBox.style.display = 'block';
+                }
+                
+            } catch (err) {
+                console.error('Recovery error:', err);
+                errorMsg.textContent = 'Network error. Please try again.';
+                errorBox.style.display = 'block';
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Send Recovery Link';
+            }
+        });
+    </script>
+</body>
+</html>

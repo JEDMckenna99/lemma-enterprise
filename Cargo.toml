@@ -1,0 +1,6 @@
+[workspace]
+members = ["lemma-crypto"]
+resolver = "2"
+
+[workspace.dependencies]
+# Common dependencies can be defined here if needed 

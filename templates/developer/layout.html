@@ -1,0 +1,301 @@
+{% extends "modern/layout.html" %}
+
+{% block title %}{{ page_title|default('Developer Platform') }} - lemma.id{% endblock %}
+
+{% block head %}
+    {{ super() }}
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/developer.css') }}?v=4">
+{% endblock %}
+
+{% block content %}
+<div class="dev-container">
+    <!-- Sidebar Navigation -->
+    <aside class="dev-sidebar">
+        <nav class="dev-nav">
+            <div class="dev-nav-section">
+                <div class="dev-nav-title">Dashboard</div>
+                <a href="/developer" class="dev-nav-item {{ 'active' if active_page == 'overview' }}">
+                    <span class="dev-nav-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="3" y="3" width="7" height="7" rx="1"></rect>
+                            <rect x="14" y="3" width="7" height="7" rx="1"></rect>
+                            <rect x="3" y="14" width="7" height="7" rx="1"></rect>
+                            <rect x="14" y="14" width="7" height="7" rx="1"></rect>
+                        </svg>
+                    </span>
+                    <span>Overview</span>
+                </a>
+                <a href="/developer/sites" class="dev-nav-item {{ 'active' if active_page == 'sites' }}">
+                    <span class="dev-nav-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="10"></circle>
+                            <path d="M2 12h20"></path>
+                            <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
+                        </svg>
+                    </span>
+                    <span>Your Sites</span>
+                </a>
+                <a href="/developer/usage" class="dev-nav-item {{ 'active' if active_page == 'usage' }}">
+                    <span class="dev-nav-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M3 3v18h18"></path>
+                            <path d="M18 17V9"></path>
+                            <path d="M13 17V5"></path>
+                            <path d="M8 17v-3"></path>
+                        </svg>
+                    </span>
+                    <span>Usage</span>
+                </a>
+                <a href="/developer/agent-delegation" class="dev-nav-item {{ 'active' if active_page == 'agent_delegation' }}">
+                    <span class="dev-nav-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M16 18l6-6-6-6"></path>
+                            <path d="M8 6l-6 6 6 6"></path>
+                        </svg>
+                    </span>
+                    <span>Agent Delegation</span>
+                </a>
+                <a href="/developer/external-api-keys" class="dev-nav-item {{ 'active' if active_page == 'external_keys' }}">
+                    <span class="dev-nav-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"></path>
+                        </svg>
+                    </span>
+                    <span>External Keys</span>
+                </a>
+            </div>
+            
+            <div class="dev-nav-section">
+                <div class="dev-nav-title">Account</div>
+                <a href="/developer/billing" class="dev-nav-item {{ 'active' if active_page == 'billing' }}">
+                    <span class="dev-nav-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="1" y="4" width="22" height="16" rx="2"></rect>
+                            <path d="M1 10h22"></path>
+                        </svg>
+                    </span>
+                    <span>Billing</span>
+                </a>
+                <a href="/developer/settings" class="dev-nav-item {{ 'active' if active_page == 'settings' }}">
+                    <span class="dev-nav-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="3"></circle>
+                            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+                        </svg>
+                    </span>
+                    <span>Settings</span>
+                </a>
+            </div>
+            
+            <div class="dev-nav-section">
+                <div class="dev-nav-title">Resources</div>
+                <a href="/docs/getting-started" class="dev-nav-item" target="_blank">
+                    <span class="dev-nav-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
+                            <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
+                        </svg>
+                    </span>
+                    <span>Documentation</span>
+                </a>
+                <a href="/wallet" class="dev-nav-item">
+                    <span class="dev-nav-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 12V7H5a2 2 0 0 1 0-4h14v4"></path>
+                            <path d="M3 5v14a2 2 0 0 0 2 2h16v-5"></path>
+                            <path d="M18 12a2 2 0 0 0 0 4h4v-4z"></path>
+                        </svg>
+                    </span>
+                    <span>Your Wallet</span>
+                </a>
+            </div>
+            
+            {% if is_admin %}
+            <div class="dev-nav-section">
+                <div class="dev-nav-title">Admin</div>
+                <a href="/admin" class="dev-nav-item">
+                    <span class="dev-nav-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+                            <path d="M9 12l2 2 4-4"></path>
+                        </svg>
+                    </span>
+                    <span>Platform Admin</span>
+                </a>
+            </div>
+            {% endif %}
+        </nav>
+        
+        <div class="dev-sidebar-footer">
+            <div class="dev-user-info">
+                <div class="dev-user-avatar">{{ user_email[0]|upper if user_email else '?' }}</div>
+                <div class="dev-user-details">
+                    <div class="dev-user-name">{{ user_email|default('Developer') }}</div>
+                    <div class="dev-user-plan">{{ plan_name|default('Free Plan') }}</div>
+                </div>
+            </div>
+        </div>
+    </aside>
+
+    <button
+        type="button"
+        class="dev-sidebar-toggle"
+        id="dev-sidebar-toggle"
+        aria-label="Close sidebar"
+        aria-expanded="true"
+    >
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M15 18l-6-6 6-6"></path>
+        </svg>
+    </button>
+    
+    <!-- Main Content -->
+    <main class="dev-main">
+        <div class="dev-content">
+            {% block dev_content %}{% endblock %}
+        </div>
+    </main>
+</div>
+
+<!-- Toast Container -->
+<div class="toast-container" id="toast-container"></div>
+
+<!-- Toast JavaScript (shared with admin) -->
+<script nonce="{{ csp_nonce }}">
+// Toast notification system
+window.showToast = function(type, title, message, duration = 5000) {
+    const container = document.getElementById('toast-container');
+    const toast = document.createElement('div');
+    toast.className = `toast toast--${type}`;
+    
+    const icons = {
+        success: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>',
+        error: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg>',
+        warning: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>',
+        info: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>'
+    };
+    
+    toast.innerHTML = `
+        <span class="toast-icon">${icons[type] || icons.info}</span>
+        <div class="toast-content">
+            <div class="toast-title">${title}</div>
+            ${message ? `<div class="toast-message">${message}</div>` : ''}
+        </div>
+        <button class="toast-close" type="button">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+        </button>
+    `;
+    const closeButton = toast.querySelector('.toast-close');
+    if (closeButton) {
+        closeButton.addEventListener('click', () => {
+            toast.remove();
+        });
+    }
+    
+    container.appendChild(toast);
+    requestAnimationFrame(() => toast.classList.add('show'));
+    
+    if (duration > 0) {
+        setTimeout(() => {
+            toast.classList.remove('show');
+            toast.classList.add('hiding');
+            setTimeout(() => toast.remove(), 300);
+        }, duration);
+    }
+    return toast;
+};
+
+// Button loading helper
+window.setButtonLoading = function(button, loading) {
+    if (loading) {
+        button.classList.add('loading');
+        button.disabled = true;
+    } else {
+        button.classList.remove('loading');
+        button.disabled = false;
+    }
+};
+
+// Sidebar toggle (open/close with persisted desktop preference)
+(function initDeveloperSidebarToggle() {
+    const container = document.querySelector('.dev-container');
+    const sidebar = document.querySelector('.dev-sidebar');
+    const toggle = document.getElementById('dev-sidebar-toggle');
+    if (!container || !sidebar || !toggle) return;
+
+    const STORAGE_KEY = 'lemma_dev_sidebar_closed';
+    const media = window.matchMedia('(max-width: 768px)');
+
+    function isMobile() {
+        return media.matches;
+    }
+
+    function setToggleState(isOpen) {
+        toggle.setAttribute('aria-expanded', String(isOpen));
+        toggle.setAttribute('aria-label', isOpen ? 'Close sidebar' : 'Open sidebar');
+    }
+
+    function setMobileOpen(isOpen) {
+        sidebar.classList.toggle('open', isOpen);
+        setToggleState(isOpen);
+    }
+
+    function setDesktopClosed(isClosed) {
+        container.classList.toggle('dev-sidebar-closed', isClosed);
+        localStorage.setItem(STORAGE_KEY, isClosed ? '1' : '0');
+        setToggleState(!isClosed);
+    }
+
+    function syncByViewport() {
+        if (isMobile()) {
+            container.classList.remove('dev-sidebar-closed');
+            setMobileOpen(false);
+            return;
+        }
+        sidebar.classList.remove('open');
+        setDesktopClosed(localStorage.getItem(STORAGE_KEY) === '1');
+    }
+
+    toggle.addEventListener('click', () => {
+        if (isMobile()) {
+            setMobileOpen(!sidebar.classList.contains('open'));
+            return;
+        }
+        setDesktopClosed(!container.classList.contains('dev-sidebar-closed'));
+    });
+
+    sidebar.querySelectorAll('.dev-nav-item').forEach((item) => {
+        item.addEventListener('click', () => {
+            if (isMobile()) setMobileOpen(false);
+        });
+    });
+
+    document.addEventListener('click', (event) => {
+        if (!isMobile() || !sidebar.classList.contains('open')) return;
+        if (sidebar.contains(event.target) || toggle.contains(event.target)) return;
+        setMobileOpen(false);
+    });
+
+    if (typeof media.addEventListener === 'function') {
+        media.addEventListener('change', syncByViewport);
+    } else if (typeof media.addListener === 'function') {
+        media.addListener(syncByViewport);
+    }
+
+    syncByViewport();
+})();
+
+// Developer platform initialization
+document.addEventListener('DOMContentLoaded', async () => {
+    const wallet = window.globalLemmaWallet;
+    if (!wallet) {
+        console.log('Waiting for wallet...');
+        return;
+    }
+    console.log('Developer platform ready');
+});
+</script>
+{% endblock %}

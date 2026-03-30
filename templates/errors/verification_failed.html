@@ -1,0 +1,63 @@
+{% extends "modern/layout.html" %}
+
+{% block title %}Verification Failed - lemma.id{% endblock %}
+
+{% block content %}
+<div class="stripe-container">
+    <div class="section text-center">
+        <div class="hero-content">
+            <div style="font-size: 4rem; color: var(--error); margin-bottom: var(--space-6);">⚠️</div>
+            <h1 class="hero-title" style="color: var(--error); font-size: 2.5rem;">Verification Failed</h1>
+            <p class="hero-subtitle" style="color: var(--gray-600); max-width: 600px;">
+                We were unable to verify your identity. This could be due to network issues, 
+                invalid credentials, or temporary service unavailability.
+            </p>
+        </div>
+
+        <div class="card" style="max-width: 500px; margin: var(--space-8) auto; text-align: left;">
+            <div class="card-header">
+                <h3>What happened?</h3>
+            </div>
+            <div class="card-body">
+                <div class="form-group">
+                    <div class="form-error">
+                        <strong>Error Details:</strong> {{ error_message or "Identity verification could not be completed" }}
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <div class="form-help">
+                        <strong>Common causes:</strong>
+                        <ul style="margin-top: var(--space-2); padding-left: var(--space-4);">
+                            <li>Network connectivity issues</li>
+                            <li>Expired or invalid credentials</li>
+                            <li>Browser compatibility issues</li>
+                            <li>Temporary service maintenance</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            <div class="card-footer">
+                <div style="display: flex; gap: var(--space-3); flex-wrap: wrap;">
+                    <a href="/wallet" class="btn btn-primary">Try Again</a>
+                    <a href="/" class="btn btn-outline">Go Home</a>
+                    <a href="/support" class="btn btn-outline">Contact Support</a>
+                </div>
+            </div>
+        </div>
+
+        <div class="card" style="max-width: 500px; margin: var(--space-6) auto;">
+            <div class="card-body">
+                <h4 style="margin-bottom: var(--space-3);">Need Help?</h4>
+                <p style="margin-bottom: var(--space-4);">
+                    If this problem persists, please contact our support team with the error details above.
+                </p>
+                <div style="display: flex; gap: var(--space-3); flex-wrap: wrap; justify-content: center;">
+                    <a href="mailto:support@lemma.com" class="btn btn-outline">Email Support</a>
+                    <a href="/docs" class="btn btn-outline">View Documentation</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

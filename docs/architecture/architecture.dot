@@ -1,0 +1,54 @@
+digraph LemmaArchitecture {
+    rankdir=TB;
+    node [fontname="Helvetica", fontsize=12];
+    edge [fontname="Helvetica", fontsize=10];
+    compound=true;
+
+    subgraph cluster_client {
+        label="Client-Side (Private)";
+        style=filled;
+        color="#d4edda";
+        fillcolor="#d4edda";
+        wallet [label="User Wallet", shape=box];
+        bridge [label="Wallet Bridge", shape=box];
+        crypto_wasm [label="Crypto Engine (WASM)", shape=component];
+        device_b [label="New Device", shape=box];
+    }
+
+    subgraph cluster_server {
+        label="Lemma Backend";
+        style=filled;
+        color="#cce5ff";
+        fillcolor="#cce5ff";
+        backend [label="Lemma Backend", shape=box3d];
+        postgres [label="PostgreSQL", shape=cylinder];
+        redis [label="Redis", shape=cylinder];
+    }
+
+    subgraph cluster_external {
+        label="Third-Party Sites";
+        style=filled;
+        color="#fff3cd";
+        fillcolor="#fff3cd";
+        site [label="Third-Party Site", shape=ellipse];
+    }
+
+    // Edges
+    wallet -> backend [label="1. Passkey registration/auth", color="blue"];
+    backend -> wallet [label="2. Session token", color="blue"];
+    site -> bridge [label="3. Load bridge iframe", style="dashed", color="green"];
+    bridge -> wallet [label="4. Check IndexedDB", style="dashed", color="green"];
+    wallet -> bridge [label="5. Return auth state", style="dashed", color="green"];
+    bridge -> site [label="6. postMessage response", style="dashed", color="green"];
+    site -> crypto_wasm [label="7. Derive PPID", color="purple", penwidth=2];
+    site -> crypto_wasm [label="8. Verify credential", color="purple", penwidth=2];
+    site -> wallet [label="9. Check revocation", color="purple", penwidth=2];
+    wallet -> backend [label="10. Fetch bloom filter", color="orange"];
+    backend -> postgres [label="11. Read revocation list", color="orange"];
+    backend -> wallet [label="12. Return bloom filter", color="orange"];
+    wallet -> backend [label="13. Create transfer session", style="dashed", color="red"];
+    backend -> redis [label="14. Store transfer session", style="dashed", color="red"];
+    device_b -> backend [label="15. Poll transfer session", style="dashed", color="red"];
+    backend -> device_b [label="16. Return encrypted wallet", style="dashed", color="red"];
+    backend -> postgres [label="Data persistence", color="gray"];
+}

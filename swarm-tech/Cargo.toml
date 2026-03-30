@@ -1,0 +1,49 @@
+[package]
+name = "lemma-swarm"
+version = "0.1.0"
+edition = "2021"
+authors = ["Lemma Team"]
+description = "ESP32 swarm demo for Lemma verification engine with secure offline BLE communication"
+
+[[bin]]
+name = "lemma-swarm"
+path = "src/main.rs"
+
+[dependencies]
+# ESP32 HAL and core dependencies
+esp-hal = { version = "0.7", features = ["esp32"] }
+esp-backtrace = { version = "0.4", features = ["esp32", "panic-handler"] }
+esp-println = { version = "0.3", features = ["esp32"] }
+
+# Cryptography and signature verification
+ed25519-dalek = { version = "1.0", default-features = false, features = ["no_std"] }
+rand = { version = "0.8", default-features = false }
+rand_core = { version = "0.6", default-features = false }
+
+# BLE communication
+esp32-nimble = { version = "0.1", default-features = false }
+
+# Serialization for BLE data exchange
+serde = { version = "1.0", default-features = false, features = ["derive"] }
+postcard = { version = "1.0", default-features = false }
+
+# No-std collections and utilities
+heapless = { version = "0.8", default-features = false }
+nb = "1.0"
+
+# Embedded HAL traits
+embedded-hal = "1.0"
+
+[dev-dependencies]
+# Testing framework for embedded
+defmt-test = "0.3"
+
+[profile.dev]
+debug = true
+opt-level = "z"  # Optimize for size
+
+[profile.release]
+debug = false
+opt-level = "z"  # Optimize for size
+lto = true
+codegen-units = 1 

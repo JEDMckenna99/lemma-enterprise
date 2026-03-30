@@ -1,0 +1,129 @@
+{% extends "docs/layout.html" %}
+{% set active_page = 'errors' %}
+{% set hero_title = 'Error Codes' %}
+{% set hero_subtitle = 'Understanding and handling errors' %}
+
+{% block docs_content %}
+<div class="docs-section">
+    <h2>Error Format</h2>
+    <p>All errors follow a consistent format:</p>
+    <div class="code-block">
+        <div class="code-header"><span>JSON</span></div>
+        <code>{
+  "error": "auth_required",
+  "message": "Authentication required",
+  "auth_method": "none"
+}</code>
+    </div>
+</div>
+
+<div class="docs-section" id="auth">
+    <h2>Authentication Errors</h2>
+    <table class="docs-table">
+        <thead>
+            <tr>
+                <th>Code</th>
+                <th>Description</th>
+                <th>Solution</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td><code>auth_required</code></td>
+                <td>No valid auth proof provided</td>
+                <td>Provide <code>X-Lemma-Credential</code>, access token, agent token, or API key</td>
+            </tr>
+            <tr>
+                <td><code>missing_lemma_header</code></td>
+                <td><code>X-Lemma-Credential</code> missing</td>
+                <td>Send base64url(JSON) signed credential header</td>
+            </tr>
+            <tr>
+                <td><code>invalid_lemma_header</code></td>
+                <td>Credential header could not be decoded</td>
+                <td>Verify base64url encoding and JSON payload shape</td>
+            </tr>
+            <tr>
+                <td><code>invalid_lemma:untrusted_issuer</code></td>
+                <td>Issuer not in trust set</td>
+                <td>Add/align issuer DID in trusted issuer config</td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+
+<div class="docs-section" id="credential">
+    <h2>Credential Errors</h2>
+    <table class="docs-table">
+        <thead>
+            <tr>
+                <th>Code</th>
+                <th>Description</th>
+                <th>Solution</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td><code>invalid_lemma:invalid_signature</code></td>
+                <td>Credential signature invalid</td>
+                <td>Ensure signed fields are preserved and not rewritten client-side</td>
+            </tr>
+            <tr>
+                <td><code>invalid_lemma:expired</code></td>
+                <td>Credential has expired</td>
+                <td>Request new credential</td>
+            </tr>
+            <tr>
+                <td><code>credential_revoked</code></td>
+                <td>Credential was revoked</td>
+                <td>Request new credential</td>
+            </tr>
+            <tr>
+                <td><code>credential_id_mismatch</code></td>
+                <td><code>X-Credential-ID</code> does not match credential payload id</td>
+                <td>Send matching credential id or omit optional header</td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+
+<div class="docs-section" id="api">
+    <h2>API Errors</h2>
+    <table class="docs-table">
+        <thead>
+            <tr>
+                <th>Code</th>
+                <th>HTTP</th>
+                <th>Description</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td><code>Invalid API key</code></td>
+                <td>401</td>
+                <td>API key invalid or missing</td>
+            </tr>
+            <tr>
+                <td><code>RATE_LIMITED</code></td>
+                <td>429</td>
+                <td>Too many requests</td>
+            </tr>
+            <tr>
+                <td><code>missing_scope</code></td>
+                <td>403</td>
+                <td>Credential/token lacks required scope</td>
+            </tr>
+            <tr>
+                <td><code>invalid_access_token</code></td>
+                <td>401</td>
+                <td>Malformed, expired, or incompatible access token</td>
+            </tr>
+            <tr>
+                <td><code>SERVER_ERROR</code></td>
+                <td>500</td>
+                <td>Internal server error</td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+{% endblock %}

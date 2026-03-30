@@ -1,0 +1,74 @@
+{
+  "version": "1.0.0",
+  "timestamp": "2026-02-09T17:46:22.645Z",
+  "baseUrl": "https://cdn.lemma.id/",
+  "javascript": {
+    "lemma-wallet": {
+      "original": {
+        "path": "js/lemma-wallet.js",
+        "size": 255930
+      },
+      "minified": {
+        "path": "js/lemma-wallet.min.js",
+        "size": 126429,
+        "integrity": "sha384-mpDVjEMZMM48ydKZ+6J+HbDrJZeYio8C/6Gaee4vyDLc0cVQJXrD+6gU+BRRpQd7",
+        "compression": {
+          "gzip": "js/lemma-wallet.min.js.gz",
+          "brotli": "js/lemma-wallet.min.js.br"
+        }
+      }
+    },
+    "lemma-session-free-auth": {
+      "original": {
+        "path": "js/lemma-session-free-auth.js",
+        "size": 13287
+      },
+      "minified": {
+        "path": "js/lemma-session-free-auth.min.js",
+        "size": 6020,
+        "integrity": "sha384-ufMjft4TVqjtt1UaawpLp2oX7dmzeAg00VUGCgffoSTDU0KzTNwtNPQOtHVd5KQ4",
+        "compression": {
+          "gzip": "js/lemma-session-free-auth.min.js.gz",
+          "brotli": "js/lemma-session-free-auth.min.js.br"
+        }
+      }
+    },
+    "lemma-verifier": {
+      "original": {
+        "path": "js/lemma-verifier.js",
+        "size": 22064
+      },
+      "minified": {
+        "path": "js/lemma-verifier.min.js",
+        "size": 11238,
+        "integrity": "sha384-drMof8thSn5WhmAzx4ET20IsojwPMZWg9FwAnTticvuqdt9n1OhOIkpsFWRjRvix",
+        "compression": {
+          "gzip": "js/lemma-verifier.min.js.gz",
+          "brotli": "js/lemma-verifier.min.js.br"
+        }
+      }
+    }
+  },
+  "css": {
+    "lemma-styles": {
+      "original": {
+        "path": "css/lemma-styles.css",
+        "size": 9507
+      },
+      "minified": {
+        "path": "css/lemma-styles.min.css",
+        "size": 6563,
+        "integrity": "sha384-PVxuQbBpltzLtbZcuknswUOai7/EVzQaq2P38anQMxXxKLCLNCK5+QMUr95Qo0Oe",
+        "compression": {
+          "gzip": "css/lemma-styles.min.css.gz",
+          "brotli": "css/lemma-styles.min.css.br"
+        }
+      }
+    }
+  },
+  "examples": {
+    "basicIntegration": "<!-- Basic Lemma Integration -->\n<script src=\"https://cdn.lemma.id/js/lemma-auto.min.js\" \n        integrity=\"undefined\"\n        crossorigin=\"anonymous\"></script>\n<div data-lemma-verify=\"auto\" \n     data-lemma-credential-type=\"identity\">\n  <p>Loading verification...</p>\n</div>",
+    "withCSS": "<!-- Lemma with Styling -->\n<link rel=\"stylesheet\" \n      href=\"https://cdn.lemma.id/css/lemma-styles.min.css\"\n      integrity=\"sha384-PVxuQbBpltzLtbZcuknswUOai7/EVzQaq2P38anQMxXxKLCLNCK5+QMUr95Qo0Oe\"\n      crossorigin=\"anonymous\">\n<script src=\"https://cdn.lemma.id/js/lemma-auto.min.js\" \n        integrity=\"undefined\"\n        crossorigin=\"anonymous\"></script>",
+    "selfHosted": "<!-- Self-hosted version -->\n<script src=\"/static/js/lemma-auto.min.js\"></script>\n<div data-lemma-verify=\"auto\" data-lemma-api-key=\"your-api-key\">\n  <!-- Your credential verification content -->\n</div>"
+  }
+}

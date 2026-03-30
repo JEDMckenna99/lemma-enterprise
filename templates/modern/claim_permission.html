@@ -1,0 +1,543 @@
+{% extends "modern/layout.html" %}
+
+{% block title %}Claim Permission - lemma.id{% endblock %}
+
+{% block head %}
+{{ super() }}
+<style>
+    .claim-container {
+        max-width: 500px;
+        margin: 60px auto;
+        padding: 0 20px;
+    }
+    
+    .claim-card {
+        background: white;
+        border-radius: 16px;
+        box-shadow: 0 4px 24px rgba(0,0,0,0.08);
+        overflow: hidden;
+    }
+    
+    .claim-header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 32px;
+        text-align: center;
+    }
+    
+    .claim-icon {
+        font-size: 48px;
+        margin-bottom: 16px;
+    }
+    
+    .claim-header h1 {
+        margin: 0;
+        font-size: 24px;
+        font-weight: 600;
+    }
+    
+    .claim-header p {
+        margin: 8px 0 0;
+        opacity: 0.9;
+        font-size: 15px;
+    }
+    
+    .claim-body {
+        padding: 32px;
+    }
+    
+    .permission-details {
+        background: #f9fafb;
+        border-radius: 12px;
+        padding: 20px;
+        margin-bottom: 24px;
+    }
+    
+    .detail-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 8px 0;
+        border-bottom: 1px solid #e5e7eb;
+    }
+    
+    .detail-row:last-child {
+        border-bottom: none;
+    }
+    
+    .detail-label {
+        color: #6b7280;
+        font-size: 14px;
+    }
+    
+    .detail-value {
+        font-weight: 600;
+        color: #111827;
+    }
+    
+    .permission-badge {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 4px 12px;
+        border-radius: 20px;
+        font-size: 13px;
+        font-weight: 500;
+    }
+    
+    .privacy-notice {
+        background: #ecfdf5;
+        border: 1px solid #a7f3d0;
+        border-radius: 8px;
+        padding: 16px;
+        margin-bottom: 24px;
+        display: flex;
+        gap: 12px;
+        align-items: flex-start;
+    }
+    
+    .privacy-notice .icon {
+        font-size: 20px;
+        flex-shrink: 0;
+    }
+    
+    .privacy-notice p {
+        margin: 0;
+        font-size: 13px;
+        color: #065f46;
+        line-height: 1.5;
+    }
+    
+    .claim-btn {
+        width: 100%;
+        padding: 16px;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border: none;
+        border-radius: 12px;
+        font-size: 16px;
+        font-weight: 600;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        transition: transform 0.2s, box-shadow 0.2s;
+    }
+    
+    .claim-btn:hover:not(:disabled) {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 24px rgba(102, 126, 234, 0.4);
+    }
+    
+    .claim-btn:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+    }
+    
+    .claim-status {
+        text-align: center;
+        padding: 20px;
+        display: none;
+    }
+    
+    .claim-status.show {
+        display: block;
+    }
+    
+    .claim-status.loading .spinner {
+        width: 48px;
+        height: 48px;
+        border: 3px solid #e5e7eb;
+        border-top-color: #667eea;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+        margin: 0 auto 16px;
+    }
+    
+    @keyframes spin {
+        to { transform: rotate(360deg); }
+    }
+    
+    .claim-status.success {
+        color: #065f46;
+    }
+    
+    .claim-status.success .icon {
+        font-size: 48px;
+        color: #10b981;
+        margin-bottom: 16px;
+    }
+    
+    .claim-status.error {
+        color: #991b1b;
+    }
+    
+    .claim-status.error .icon {
+        font-size: 48px;
+        color: #ef4444;
+        margin-bottom: 16px;
+    }
+    
+    .error-card {
+        background: #fef2f2;
+        border: 1px solid #fecaca;
+        border-radius: 12px;
+        padding: 32px;
+        text-align: center;
+    }
+    
+    .error-card .icon {
+        font-size: 48px;
+        margin-bottom: 16px;
+    }
+    
+    .error-card h2 {
+        color: #991b1b;
+        margin: 0 0 8px;
+        font-size: 20px;
+    }
+    
+    .error-card p {
+        color: #7f1d1d;
+        margin: 0;
+        font-size: 14px;
+    }
+    
+    .back-link {
+        display: block;
+        text-align: center;
+        margin-top: 24px;
+        color: #667eea;
+        text-decoration: none;
+        font-size: 14px;
+    }
+    
+    .back-link:hover {
+        text-decoration: underline;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="claim-container">
+    {% if error %}
+    <!-- Error State -->
+    <div class="error-card">
+        <div class="icon">❌</div>
+        <h2>Unable to Claim Permission</h2>
+        <p>{{ error }}</p>
+        <a href="/" class="back-link">← Return to Home</a>
+    </div>
+    
+    {% else %}
+    <!-- Claim Card -->
+    <div class="claim-card">
+        <div class="claim-header">
+            <div class="claim-icon">🎫</div>
+            <h1>Claim Your Permission</h1>
+            <p>Authenticate with your passkey to claim access</p>
+        </div>
+        
+        <div class="claim-body">
+            <!-- Permission Details -->
+            <div class="permission-details">
+                <div class="detail-row">
+                    <span class="detail-label">Site</span>
+                    <span class="detail-value">{{ site_domain }}</span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">Permission</span>
+                    <span class="permission-badge">{{ permission_level }}</span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">Valid For</span>
+                    <span class="detail-value">{{ expiry_days }} days</span>
+                </div>
+            </div>
+            
+            <!-- Privacy Notice -->
+            <div class="privacy-notice">
+                <span class="icon">🔒</span>
+                <p>
+                    <strong>Privacy-First:</strong> Your email was used only to deliver this link and is not stored.
+                    This permission will be tied to your passkey, not your email address.
+                </p>
+            </div>
+            
+            <!-- Claim Button (shown initially) -->
+            <div id="claim-form">
+                <button class="claim-btn" onclick="claimPermission()">
+                    <span>🔑</span>
+                    <span>Authenticate & Claim Permission</span>
+                </button>
+            </div>
+            
+            <!-- Loading State -->
+            <div id="claim-loading" class="claim-status loading">
+                <div class="spinner"></div>
+                <p>Authenticating with passkey...</p>
+            </div>
+            
+            <!-- Success State -->
+            <div id="claim-success" class="claim-status success">
+                <div class="icon">✅</div>
+                <h3>Credentials Claimed!</h3>
+                <div id="success-details">
+                    <p>Your <strong>{{ permission_level }}</strong> access to <strong>{{ site_domain }}</strong> has been stored in your wallet.</p>
+                </div>
+                <div id="credentials-list" style="background: #d1fae5; border-radius: 8px; padding: 12px; margin: 16px 0; text-align: left; font-size: 13px;">
+                    <!-- Populated by JS -->
+                </div>
+                <a href="{{ redirect_url }}" class="claim-btn" style="margin-top: 20px; text-decoration: none;">
+                    Continue to {{ site_domain }} →
+                </a>
+            </div>
+            
+            <!-- Error State -->
+            <div id="claim-error" class="claim-status error">
+                <div class="icon">❌</div>
+                <h3>Claim Failed</h3>
+                <p id="claim-error-message"></p>
+                <button class="claim-btn" onclick="resetClaim()" style="margin-top: 20px; background: #6b7280;">
+                    Try Again
+                </button>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+{% if not error %}
+<script nonce="{{ csp_nonce }}">
+const CLAIM_TOKEN = "{{ token }}";
+const SITE_DOMAIN = "{{ site_domain }}";
+const REDIRECT_URL = "{{ redirect_url }}";
+
+async function claimPermission() {
+    const formDiv = document.getElementById('claim-form');
+    const loadingDiv = document.getElementById('claim-loading');
+    const successDiv = document.getElementById('claim-success');
+    const errorDiv = document.getElementById('claim-error');
+    
+    // Show loading
+    formDiv.style.display = 'none';
+    loadingDiv.classList.add('show');
+    
+    try {
+        // Step 1: Get passkey credential ID
+        // Use wallet if already unlocked (no re-passkey needed)
+        // Only prompt for passkey if wallet is locked or not available
+        let passkeyCredentialId;
+        
+        // Check if wallet is already unlocked (user authenticated today)
+        if (window.globalLemmaWallet) {
+            const info = await window.globalLemmaWallet.getWalletInfo();
+            
+            if (info.isUnlocked && info.passkeyCredentialId) {
+                // Wallet already unlocked - use existing passkey ID
+                passkeyCredentialId = info.passkeyCredentialId;
+                console.log('✅ Using existing wallet session (no passkey prompt needed)');
+            } else if (info.hasPasskey) {
+                // Wallet exists but locked - unlock it (one passkey prompt)
+                console.log('🔓 Wallet locked, requesting unlock...');
+                const unlockResult = await window.globalLemmaWallet.unlock();
+                if (unlockResult.success) {
+                    // Get passkey ID from unlocked wallet
+                    const walletInfo = await window.globalLemmaWallet.getWalletInfo();
+                    passkeyCredentialId = walletInfo.passkeyCredentialId;
+                    console.log('✅ Wallet unlocked');
+                } else {
+                    throw new Error('Wallet unlock failed');
+                }
+            }
+        }
+        
+        // Fallback: No wallet or wallet doesn't have passkey - do fresh WebAuthn
+        if (!passkeyCredentialId) {
+            console.log('ℹ️ No wallet session, using WebAuthn...');
+            
+            if (!window.PublicKeyCredential) {
+                throw new Error('Your browser does not support passkeys. Please use a modern browser.');
+            }
+            
+            try {
+                // First, try to get existing credential
+                const getOptions = {
+                    publicKey: {
+                        challenge: new Uint8Array(32),
+                        timeout: 60000,
+                        userVerification: 'preferred',
+                        rpId: window.location.hostname
+                    }
+                };
+                
+                // Generate random challenge
+                crypto.getRandomValues(getOptions.publicKey.challenge);
+                
+                try {
+                    const assertion = await navigator.credentials.get(getOptions);
+                    passkeyCredentialId = btoa(String.fromCharCode(...new Uint8Array(assertion.rawId)));
+                    console.log('✅ Used existing passkey');
+                } catch (getError) {
+                    console.log('ℹ️ No existing passkey, creating new one...');
+                    
+                    // Create new passkey
+                    const createOptions = {
+                        publicKey: {
+                            challenge: getOptions.publicKey.challenge,
+                            rp: {
+                                name: 'Lemma',
+                                id: window.location.hostname
+                            },
+                            user: {
+                                id: new Uint8Array(16),
+                                name: `user@${SITE_DOMAIN}`,
+                                displayName: `User on ${SITE_DOMAIN}`
+                            },
+                            pubKeyCredParams: [
+                                { type: 'public-key', alg: -7 },   // ES256
+                                { type: 'public-key', alg: -257 }  // RS256
+                            ],
+                            authenticatorSelection: {
+                                authenticatorAttachment: 'platform',
+                                userVerification: 'preferred',
+                                residentKey: 'preferred'
+                            },
+                            timeout: 60000,
+                            attestation: 'none'
+                        }
+                    };
+                    
+                    // Generate random user ID
+                    crypto.getRandomValues(createOptions.publicKey.user.id);
+                    
+                    const credential = await navigator.credentials.create(createOptions);
+                    passkeyCredentialId = btoa(String.fromCharCode(...new Uint8Array(credential.rawId)));
+                    console.log('✅ Created new passkey');
+                }
+            } catch (webauthnError) {
+                console.error('WebAuthn error:', webauthnError);
+                throw new Error('Passkey authentication failed. Please try again.');
+            }
+        }
+        
+        // Step 2: Claim the permission with passkey credential
+        const response = await fetch('/api/v1/iam/claim-permission', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                token: CLAIM_TOKEN,
+                passkey_credential_id: passkeyCredentialId
+            })
+        });
+        
+        const result = await response.json();
+        
+        if (!result.success) {
+            throw new Error(result.error || 'Failed to claim permission');
+        }
+        
+        // Step 3: Store credentials in wallet
+        const credentialsStored = [];
+        
+        if (window.globalLemmaWallet) {
+            // Store Permission Lemma
+            if (result.permission_lemma) {
+                await window.globalLemmaWallet.storeCredential(result.permission_lemma);
+                credentialsStored.push('🎫 Site Permission');
+                console.log('✅ Permission stored in wallet');
+            }
+            
+            // Store Email Lemma (if issued)
+            if (result.email_lemma) {
+                await window.globalLemmaWallet.storeCredential(result.email_lemma);
+                credentialsStored.push('📧 Email Verification');
+                console.log('✅ EmailLemma stored in wallet');
+            }
+        } else {
+            console.log('⚠️ Wallet not ready, credentials returned but not stored locally');
+            credentialsStored.push('🎫 Site Permission (returned)');
+            if (result.email_lemma) {
+                credentialsStored.push('📧 Email Verification (returned)');
+            }
+        }
+        
+        // Update success UI with credentials list
+        const credentialsList = document.getElementById('credentials-list');
+        if (credentialsList) {
+            let html = '<strong>Stored in your wallet:</strong><ul style="margin: 8px 0 0; padding-left: 20px;">';
+            credentialsStored.forEach(cred => {
+                html += `<li>${cred}</li>`;
+            });
+            html += '</ul>';
+            if (result.email_lemma) {
+                const email = result.email_lemma.credentialSubject?.email || result.email_lemma.claims?.email;
+                if (email) {
+                    html += `<div style="margin-top: 8px; padding-top: 8px; border-top: 1px solid #a7f3d0;">`;
+                    html += `<strong>Verified email:</strong> ${email}`;
+                    html += `<br><span style="font-size: 11px; color: #065f46;">This proof is stored only in YOUR wallet, not on Lemma servers.</span>`;
+                    html += `</div>`;
+                }
+            }
+            credentialsList.innerHTML = html;
+        }
+        
+        // Show success
+        loadingDiv.classList.remove('show');
+        successDiv.classList.add('show');
+        
+        // Auto-redirect after 4 seconds (longer to show credentials)
+        setTimeout(() => {
+            window.location.href = REDIRECT_URL;
+        }, 4000);
+        
+    } catch (error) {
+        console.error('❌ Claim failed:', error);
+        loadingDiv.classList.remove('show');
+        document.getElementById('claim-error-message').textContent = error.message;
+        errorDiv.classList.add('show');
+    }
+}
+
+function resetClaim() {
+    document.getElementById('claim-form').style.display = 'block';
+    document.getElementById('claim-loading').classList.remove('show');
+    document.getElementById('claim-success').classList.remove('show');
+    document.getElementById('claim-error').classList.remove('show');
+}
+
+// Check if wallet is already unlocked on page load
+async function checkWalletState() {
+    if (window.globalLemmaWallet) {
+        try {
+            const info = await window.globalLemmaWallet.getWalletInfo();
+            const btn = document.querySelector('.claim-btn');
+            
+            if (info.isUnlocked && info.passkeyCredentialId) {
+                // Already unlocked - update button to reflect no passkey needed
+                if (btn) {
+                    btn.innerHTML = '<span>✅</span><span>Claim Permission (Wallet Unlocked)</span>';
+                }
+                console.log('✅ Wallet already unlocked - no passkey prompt will be needed');
+            } else if (info.hasPasskey) {
+                // Has passkey but locked
+                if (btn) {
+                    btn.innerHTML = '<span>🔑</span><span>Unlock Wallet & Claim</span>';
+                }
+                console.log('🔒 Wallet locked - one passkey prompt will be needed');
+            }
+        } catch (e) {
+            console.log('Could not check wallet state:', e);
+        }
+    }
+}
+
+// Run on page load
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', checkWalletState);
+} else {
+    checkWalletState();
+}
+</script>
+{% endif %}
+{% endblock %}

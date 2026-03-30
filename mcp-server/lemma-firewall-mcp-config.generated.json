@@ -1,0 +1,17 @@
+{
+    "mcpServers":  {
+                       "lemma-firewall":  {
+                                              "args":  [
+                                                           "/c",
+                                                           "node",
+                                                           "C:\\\\Users\\\\jedmc\\\\lemma-enterprise\\\\lemma-rebuild\\\\mcp-server\\\\index.js"
+                                                       ],
+                                              "env":  {
+                                                          "LEMMA_URL":  "https://lemma.id",
+                                                          "LEMMA_FIREWALL_REQUIRED_AUDIENCE":  "lemma-firewall",
+                                                          "LEMMA_AGENT_TOKEN":  "lm_agent_test_placeholder"
+                                                      },
+                                              "command":  "cmd"
+                                          }
+                   }
+}

@@ -1,0 +1,1403 @@
+{% extends "modern/layout.html" %}
+
+{% block title %}Lemma ID{% endblock %}
+{% block description %}Your secure identity across the web. One sign-in, everywhere.{% endblock %}
+
+{% block preload_scripts %}{% endblock %}
+
+{% block head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/wallet.css') }}?v=2">
+{% endblock %}
+
+{% block content %}
+<div class="wallet-container">
+    <header class="wallet-header">
+        <div class="wallet-logo">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120">
+                <defs>
+                    <linearGradient id="logoGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" stop-color="#667eea"/>
+                        <stop offset="100%" stop-color="#764ba2"/>
+                    </linearGradient>
+                </defs>
+                <g stroke="url(#logoGrad)" stroke-width="6" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                    <ellipse cx="60" cy="60" rx="38" ry="14" />
+                    <ellipse cx="60" cy="60" rx="38" ry="14" transform="rotate(90 60 60)" />
+                    <ellipse cx="60" cy="60" rx="38" ry="14" transform="rotate(45 60 60)" />
+                    <ellipse cx="60" cy="60" rx="38" ry="14" transform="rotate(-45 60 60)" />
+                </g>
+            </svg>
+        </div>
+        <h1>Lemma ID</h1>
+        <p>One sign-in, everywhere</p>
+    </header>
+
+    <!-- STATUS -->
+    <div id="wallet-status" class="wallet-status status-locked">
+        <div class="status-icon">🔒</div>
+        <div class="status-info">
+            <h3>Checking...</h3>
+            <p>Please wait</p>
+        </div>
+    </div>
+
+    <!-- LOCKED VIEW -->
+    <div id="locked-view">
+        <div class="card" style="text-align: center;">
+            <button id="unlock-btn" class="btn btn-primary btn-full" style="font-size: 1.1rem; padding: 16px;">
+                Sign In
+            </button>
+
+            <div id="no-wallet-msg" class="hidden" style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #e5e7eb;">
+                <p style="color: #6b7280; font-size: 0.9rem; margin-bottom: 12px;">New here?</p>
+                <button id="create-wallet-btn" class="btn btn-primary" style="margin-right: 8px;">Create Lemma ID</button>
+                <a href="/link" class="btn btn-secondary" style="text-decoration: none;">Add This Device</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- UNLOCKED VIEW -->
+    <div id="unlocked-view" class="hidden">
+        
+        <!-- SIGN OUT BUTTON -->
+        <div class="card">
+            <button id="lock-btn" class="btn btn-danger btn-full">
+                Sign Out Everywhere
+            </button>
+            <p style="text-align: center; color: #6b7280; font-size: 0.8rem; margin: 12px 0 0;">
+                Signs you out on all sites and all devices
+            </p>
+        </div>
+
+        <!-- ADD DEVICE -->
+        <div class="card">
+            <h2><span class="icon">📱</span> Add Another Device</h2>
+
+            <div class="link-tabs">
+                <button id="tab-send" class="link-tab active">Send to Device</button>
+                <button id="tab-receive" class="link-tab">Receive from Device</button>
+            </div>
+
+            <!-- SEND TAB -->
+            <div id="send-content">
+                <p style="color: #6b7280; font-size: 0.9rem; margin-bottom: 16px;">
+                    Scan this QR code on your other device to add it.
+                </p>
+                <button id="show-qr-btn" class="btn btn-primary btn-full">Generate QR Code</button>
+                
+                <div id="qr-display" class="qr-display hidden">
+                    <div class="qr-box">
+                        <div id="qr-container"></div>
+                    </div>
+                    <div id="qr-timer" class="qr-timer">Expires in 5:00</div>
+                    <div id="link-options" class="hidden"></div>
+                    <button id="hide-qr-btn" class="btn btn-secondary" style="margin-top: 16px;">Close</button>
+                </div>
+            </div>
+
+            <!-- RECEIVE TAB -->
+            <div id="receive-content" class="hidden">
+                <p style="color: #6b7280; font-size: 0.9rem; margin-bottom: 16px;">
+                    Paste the code from your other device to add this one.
+                </p>
+                <textarea id="receive-code" class="link-input" placeholder="Paste code here..."></textarea>
+                <button id="link-device-btn" class="btn btn-primary btn-full" style="margin-top: 12px;">Add This Device</button>
+                <div id="receive-status" class="hidden" style="margin-top: 12px;"></div>
+            </div>
+        </div>
+
+        <!-- SETTINGS -->
+        <div class="card">
+            <h2><span class="icon">&#9881;</span> Settings</h2>
+            
+            <div class="setting-row">
+                <div>
+                    <div class="setting-label">Session duration</div>
+                    <div class="setting-description">How long until you need to unlock again</div>
+                </div>
+                <div class="setting-control">
+                    <select id="session-duration-select">
+                        <option value="4">4 hours</option>
+                        <option value="8">8 hours</option>
+                        <option value="12">12 hours</option>
+                        <option value="24" selected>24 hours</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <!-- AIM: AGENTIC INTELLIGENCE MONITOR -->
+        <div class="card">
+            <h2><span class="icon">🤖</span> AIM (Agentic Intelligence Monitor)</h2>
+            <p style="color: #6b7280; font-size: 0.9rem; margin-bottom: 16px;">
+                Linked agents appear here with their recent actions. Use kill to revoke an agent immediately.
+            </p>
+            <div style="display:flex; justify-content: space-between; align-items:center; margin-bottom:10px;">
+                <div id="agent-ops-badge" class="info-box" style="padding:6px 10px;">Loading agents...</div>
+                <button id="refresh-agent-ops-btn" class="btn btn-secondary">Refresh</button>
+            </div>
+            <div id="agent-ops-content">
+                <div class="info-box">Loading agent activity...</div>
+            </div>
+            <div style="display:flex; gap:8px; margin-top:12px;">
+                <button id="open-control-plane-btn" class="btn btn-primary">Open Control Plane</button>
+                <a href="/developer/agent-delegation" class="btn btn-secondary" style="text-decoration:none; display:inline-block;">Advanced Controls</a>
+            </div>
+        </div>
+
+        <!-- CONTROL PLANE ROUTING -->
+        <div class="card">
+            <h2><span class="icon">🧭</span> Control Plane Routing</h2>
+            <p style="color: #6b7280; font-size: 0.9rem; margin-bottom: 14px;">
+                Hosted Lemma UI is API-backed and can be disabled. In federated mode, launch routes to your external UI.
+            </p>
+            <div class="setting-row">
+                <div>
+                    <div class="setting-label">Enable hosted Lemma control UI</div>
+                    <div class="setting-description">If off and no federated URL is configured, launch is blocked by server policy.</div>
+                </div>
+                <div class="setting-control">
+                    <input id="control-plane-hosted-toggle" type="checkbox" checked />
+                </div>
+            </div>
+            <div class="setting-row">
+                <div>
+                    <div class="setting-label">Routing mode</div>
+                    <div class="setting-description">Hosted on lemma.id or federated external control plane.</div>
+                </div>
+                <div class="setting-control">
+                    <select id="control-plane-mode-select">
+                        <option value="hosted">Hosted (lemma.id)</option>
+                        <option value="federated">Federated (external URL)</option>
+                    </select>
+                </div>
+            </div>
+            <div class="setting-row">
+                <div>
+                    <div class="setting-label">External control plane URL</div>
+                    <div class="setting-description">Used when routing mode is federated.</div>
+                </div>
+                <div class="setting-control" style="max-width: 380px; width: 100%;">
+                    <input id="control-plane-url-input" type="url" placeholder="https://control.yourcompany.com" style="width: 100%; padding: 8px;" />
+                </div>
+            </div>
+            <div style="display: flex; gap: 8px; margin-top: 12px;">
+                <button id="save-control-plane-btn" class="btn btn-secondary">Save Routing</button>
+            </div>
+            <div id="control-plane-status" class="hidden" style="margin-top: 10px;"></div>
+        </div>
+
+        <!-- DANGER ZONE -->
+        <div class="card" style="border-color: #fecaca;">
+            <h2 style="color: #dc2626;"><span class="icon">&#9888;</span> Danger Zone</h2>
+            <button id="clear-wallet-btn" class="btn btn-secondary btn-full" style="color: #dc2626; border-color: #fecaca;">
+                Remove From This Device
+            </button>
+            <p style="text-align: center; color: #9ca3af; font-size: 0.75rem; margin: 8px 0 0;">
+                Removes your Lemma ID from this device only
+            </p>
+        </div>
+    </div>
+</div>
+
+<script src="/static/js/lemma-wallet.js?v=2473" nonce="{{ csp_nonce }}"></script>
+<script src="/static/js/qrcode.min.js" nonce="{{ csp_nonce }}"></script>
+<script nonce="{{ csp_nonce }}">
+let wallet = null;
+let qrTimerInterval = null;
+
+function escapeHtml(value) {
+    return String(value)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
+// BroadcastChannel for instant cross-tab session sync (same-device, same-origin)
+// This enables instant lock detection across tabs without polling
+let sessionChannel = null;
+try {
+    sessionChannel = new BroadcastChannel('lemma-session');
+    console.log('[Session] BroadcastChannel initialized for cross-tab sync');
+} catch (e) {
+    console.warn('[Session] BroadcastChannel not supported:', e.message);
+}
+
+// Broadcast session state change to other tabs/windows on same origin
+function broadcastSessionChange(type, walletId) {
+    if (sessionChannel) {
+        sessionChannel.postMessage({
+            type: type,
+            walletId: walletId,
+            timestamp: Date.now(),
+            source: 'wallet_simple'
+        });
+        console.log(`[Session] Broadcast ${type} to other tabs`);
+    }
+}
+
+// Listen for session changes from other tabs
+if (sessionChannel) {
+    sessionChannel.onmessage = (event) => {
+        const { type, walletId, source } = event.data || {};
+        console.log(`[Session] Received ${type} from ${source}`);
+
+        if (type === 'LOCK') {
+            // Another tab locked - refresh our state
+            console.log('[Session] Another tab locked the wallet, refreshing state...');
+            checkWalletState();
+        } else if (type === 'UNLOCK') {
+            // Another tab unlocked - refresh our state
+            console.log('[Session] Another tab unlocked the wallet, refreshing state...');
+            checkWalletState();
+        }
+    };
+}
+
+// Initialize wallet
+async function initWallet() {
+    wallet = new LemmaWallet();
+    await wallet.init();
+    return wallet;
+}
+
+// Update status display
+function updateStatusDisplay(isUnlocked, message, submessage) {
+    const statusEl = document.getElementById('wallet-status');
+    const iconEl = statusEl.querySelector('.status-icon');
+    const titleEl = statusEl.querySelector('h3');
+    const subtitleEl = statusEl.querySelector('p');
+    
+    statusEl.className = `wallet-status ${isUnlocked ? 'status-unlocked' : 'status-locked'}`;
+    iconEl.textContent = isUnlocked ? '🔓' : '🔒';
+    titleEl.textContent = message;
+    subtitleEl.textContent = submessage;
+}
+
+// Show/hide views
+function showLockedView() {
+    document.getElementById('locked-view').classList.remove('hidden');
+    document.getElementById('unlocked-view').classList.add('hidden');
+}
+
+function showUnlockedView() {
+    document.getElementById('locked-view').classList.add('hidden');
+    document.getElementById('unlocked-view').classList.remove('hidden');
+}
+
+// Track if we've ever had a valid global session (for cross-device lock detection)
+let hadGlobalSession = localStorage.getItem('lemma_had_global_session') === 'true';
+
+// Check global session and sync if needed
+async function syncGlobalSession(walletId) {
+    if (!walletId) return { valid: false };
+    
+    try {
+        const response = await fetch('/api/wallet/global-session', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ wallet_id: walletId })
+        });
+        
+        if (!response.ok) return { valid: false, error: true };
+        return await response.json();
+    } catch (e) {
+        console.warn('Global session check failed:', e);
+        return { valid: false, error: true };
+    }
+}
+
+// Set global session after unlock (requires unlock_token from server-verified auth)
+async function setGlobalSession(walletId, unlockToken) {
+    if (!walletId) return false;
+    
+    // If no unlock_token provided, try to get from wallet's session
+    if (!unlockToken && wallet?.session?.serverUnlockToken) {
+        unlockToken = wallet.session.serverUnlockToken;
+    }
+    
+    if (!unlockToken) {
+        console.warn('Cannot set global session - no unlock_token available');
+        console.log('(User needs to use server-verified passkey auth)');
+        return false;
+    }
+    
+    try {
+        const response = await fetch('/api/wallet/set-session', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({
+                wallet_id: walletId,
+                unlock_token: unlockToken,
+                unlocked_at: Date.now()
+            })
+        });
+        
+        if (response.ok) {
+            hadGlobalSession = true;
+            localStorage.setItem('lemma_had_global_session', 'true');
+            console.log('Global session set with unlock_token');
+            return true;
+        } else {
+            const error = await response.json();
+            console.warn('set-session failed:', error.error);
+            return false;
+        }
+    } catch (e) {
+        console.warn('Failed to set global session:', e);
+        return false;
+    }
+}
+
+// Cross-device lock detection (runs on tab visibility change)
+async function checkCrossDeviceLock() {
+    console.log('[CrossDevice] checkCrossDeviceLock starting...');
+    await initWallet();
+    const info = await wallet.getWalletInfo();
+    
+    console.log('[CrossDevice] info:', { isUnlocked: info.isUnlocked, walletId: info.walletId?.substring(0, 8) });
+    console.log('[CrossDevice] hadGlobalSession:', hadGlobalSession);
+    
+    if (!info.isUnlocked || !info.walletId) {
+        console.log('[CrossDevice] Early return - not unlocked or no walletId');
+        return;
+    }
+    
+    // Only check if we previously HAD a global session
+    // This prevents false positive locks on first unlock
+    if (!hadGlobalSession) {
+        console.log('[CrossDevice] Early return - hadGlobalSession is false');
+        return;
+    }
+    
+    const globalSession = await syncGlobalSession(info.walletId);
+    console.log('[CrossDevice] globalSession result:', globalSession);
+    
+    // If we HAD a global session but now it's invalid, we were locked from another device
+    if (!globalSession.valid && !globalSession.error) {
+        console.log('[CrossDevice] Wallet locked on another device - clearing local session');
+        await wallet.lock();
+        hadGlobalSession = false;
+        localStorage.removeItem('lemma_had_global_session');
+        await checkWalletState();
+    } else {
+        console.log('[CrossDevice] Session still valid or error occurred');
+    }
+}
+
+// Check wallet state and update UI (does NOT auto-lock - that's checkCrossDeviceLock's job)
+async function checkWalletState() {
+    try {
+        await initWallet();
+        const info = await wallet.getWalletInfo();
+        
+        if (info.isUnlocked) {
+            // Verify global session exists for cross-device sync
+            // (signal-unlock sets this during wallet.unlock() on lemma.id)
+            if (info.walletId) {
+                const globalSession = await syncGlobalSession(info.walletId);
+                if (globalSession.valid) {
+                    hadGlobalSession = true;
+                    localStorage.setItem('lemma_had_global_session', 'true');
+                }
+            }
+            
+            updateStatusDisplay(true, 'Signed In', 'Your Lemma ID is active');
+            showUnlockedView();
+            return true;
+        }
+        
+        // CROSS-DEVICE SYNC: If local shows locked but we have walletId,
+        // check global session - user may have unlocked on another device
+        if (!info.isUnlocked && info.walletId) {
+            console.log('[CrossDevice] Local locked but have wallet - checking global session...');
+            const globalSession = await syncGlobalSession(info.walletId);
+            
+            if (globalSession.valid && globalSession.session) {
+                console.log('[CrossDevice] Global session valid! Auto-unlocking local wallet...');
+                
+                // Set local session from global session
+                const expiresAt = (globalSession.session.expires_at || globalSession.session.expiresAt) * 1000;
+                const unlockedAt = globalSession.session.unlocked_at || globalSession.session.unlockedAt || Date.now();
+                
+                // Update wallet's local session state
+                wallet.session = {
+                    isUnlocked: true,
+                    unlockedAt: unlockedAt,
+                    expiresAt: expiresAt,
+                    walletId: info.walletId,
+                    source: 'global_sync'
+                };
+                await wallet._put('session', { id: 'current', ...wallet.session });
+                
+                // Mark that we have a global session
+                hadGlobalSession = true;
+                localStorage.setItem('lemma_had_global_session', 'true');
+                
+                updateStatusDisplay(true, 'Signed In', 'Synced from another device');
+                showUnlockedView();
+                return true;
+            }
+        }
+        
+        // Not signed in - show appropriate state
+        if (info.hasPasskey) {
+            updateStatusDisplay(false, 'Signed Out', 'Sign in to continue');
+            document.getElementById('no-wallet-msg').classList.add('hidden');
+            document.getElementById('unlock-btn').classList.remove('hidden');
+            showLockedView();
+        } else if (info.hasWalletSecret) {
+            updateStatusDisplay(false, 'Device Added', 'Create a passkey to secure it');
+            document.getElementById('unlock-btn').textContent = 'Create Passkey';
+            document.getElementById('no-wallet-msg').classList.add('hidden');
+            showLockedView();
+        } else {
+            updateStatusDisplay(false, 'Welcome', 'Create your Lemma ID or add this device');
+            document.getElementById('unlock-btn').classList.add('hidden');
+            document.getElementById('no-wallet-msg').classList.remove('hidden');
+            showLockedView();
+        }
+        return false;
+    } catch (e) {
+        console.error('Wallet check failed:', e);
+        updateStatusDisplay(false, 'Error', e.message);
+        showLockedView();
+        return false;
+    }
+}
+
+// Unlock wallet - local passkey verification + signal-unlock for cross-device SSO
+// wallet.unlock() handles the full flow:
+//   1. Local passkey verification (browser biometrics)
+//   2. /api/wallet/signal-unlock call (stores global session + publishes SSE event + sets cookies)
+async function unlockWallet() {
+    const btn = document.getElementById('unlock-btn');
+    const origText = btn.textContent;
+    
+    try {
+        btn.textContent = 'Authenticating...';
+        btn.disabled = true;
+        
+        await initWallet();
+        
+        // Check if we need to create passkey (linked wallet without passkey)
+        const info = await wallet.getWalletInfo();
+        if (info.hasWalletSecret && !info.hasPasskey) {
+            // New device linked - create passkey with server verification
+            await wallet.registerPasskey();
+        } else {
+            // Local passkey unlock + signal-unlock for cross-device SSO
+            await wallet.unlock();
+        }
+        
+        // signal-unlock already stored the global session, so mark it locally
+        hadGlobalSession = true;
+        localStorage.setItem('lemma_had_global_session', 'true');
+        
+        // Check for redirect flow
+        const redirectParams = getRedirectParams();
+        if (redirectParams) {
+            await handleRedirectReturn(redirectParams.returnUrl);
+            return;
+        }
+
+        const nowUnlocked = await checkWalletState();
+        if (nowUnlocked) {
+            await loadControlPlanePreferences();
+            await loadAgentOps();
+        }
+
+        // Broadcast unlock to other tabs on same device (instant, no polling needed)
+        const updatedInfo = await wallet.getWalletInfo();
+        broadcastSessionChange('UNLOCK', updatedInfo.walletId);
+        
+        // Connect SSE for instant cross-device lock detection
+        connectCrossDeviceSSE(updatedInfo.walletId);
+
+    } catch (e) {
+        console.error('Unlock failed:', e);
+        updateStatusDisplay(false, 'Unlock Failed', e.message);
+    } finally {
+        btn.textContent = origText;
+        btn.disabled = false;
+    }
+}
+
+// Lock wallet
+async function lockWallet() {
+    try {
+        console.log('[Lock] Starting lock...');
+        
+        // Disconnect SSE FIRST to avoid race condition:
+        // wallet.lock() → clear-session → SSE session_invalidated → SSE handler double-locks
+        disconnectCrossDeviceSSE();
+        
+        await initWallet();
+        const info = await wallet.getWalletInfo();
+        console.log('[Lock] walletId:', info.walletId);
+        await wallet.lock();
+        console.log('[Lock] wallet.lock() completed');
+        // Clear global session flag since we just locked
+        hadGlobalSession = false;
+        localStorage.removeItem('lemma_had_global_session');
+
+        // Broadcast lock to other tabs on same device (instant, no polling needed)
+        broadcastSessionChange('LOCK', info.walletId);
+
+        await checkWalletState();
+        setAgentOpsBadge('Sign in to view agents', true);
+        const agentOpsContainer = document.getElementById('agent-ops-content');
+        if (agentOpsContainer) {
+            agentOpsContainer.innerHTML = '<div class="info-box">Sign in to view linked agents and controls.</div>';
+        }
+    } catch (e) {
+        console.error('Lock failed:', e);
+    }
+}
+
+// ============================================================
+// SSE: Instant cross-device lock/unlock detection
+// ============================================================
+// Connects to the SSE event stream on lemma.id for real-time
+// session_invalidated and session_restored events.
+// This replaces polling with instant push notifications.
+// ============================================================
+
+let sseConnection = null;
+let sseReconnectAttempts = 0;
+let sseWalletId = null;
+
+function connectCrossDeviceSSE(walletId) {
+    if (!walletId) return;
+    if (typeof EventSource === 'undefined') {
+        console.log('[SSE] EventSource not supported - using polling fallback');
+        return;
+    }
+    
+    // Already connected for this wallet
+    if (sseConnection && sseConnection.readyState !== EventSource.CLOSED && sseWalletId === walletId) {
+        return;
+    }
+    
+    // Close existing connection if any
+    disconnectCrossDeviceSSE();
+    sseWalletId = walletId;
+    
+    try {
+        sseConnection = new EventSource('/api/events/revocations');
+        
+        // --- Session invalidated: another device locked the wallet ---
+        sseConnection.addEventListener('session_invalidated', async (event) => {
+            try {
+                const data = JSON.parse(event.data);
+                if (data.wallet_id !== sseWalletId) return;
+                
+                console.log('[SSE] Wallet locked on another device (instant detection)');
+                await wallet.lock();
+                hadGlobalSession = false;
+                localStorage.removeItem('lemma_had_global_session');
+                disconnectCrossDeviceSSE();
+                await checkWalletState();
+            } catch (e) {
+                console.warn('[SSE] Failed to process session_invalidated:', e);
+            }
+        });
+        
+        // --- Session restored: another device unlocked the wallet ---
+        sseConnection.addEventListener('session_restored', async (event) => {
+            try {
+                const data = JSON.parse(event.data);
+                if (data.wallet_id !== sseWalletId) return;
+                
+                console.log('[SSE] Wallet unlocked on another device (instant detection)');
+                
+                // Only auto-unlock if we're currently locked and have the wallet secret
+                await initWallet();
+                const info = await wallet.getWalletInfo();
+                if (!info.isUnlocked && info.hasWalletSecret) {
+                    const expiresAt = data.expires_at 
+                        ? data.expires_at * 1000 
+                        : Date.now() + 24 * 60 * 60 * 1000;
+                    
+                    // Set local session from SSE event
+                    wallet.session = {
+                        isUnlocked: true,
+                        unlockedAt: Date.now(),
+                        expiresAt: expiresAt,
+                        walletId: sseWalletId,
+                        source: 'sse_sync'
+                    };
+                    await wallet._put('session', { id: 'current', ...wallet.session });
+                    
+                    hadGlobalSession = true;
+                    localStorage.setItem('lemma_had_global_session', 'true');
+                    
+                    console.log('[SSE] Auto-unlocked local wallet from remote session');
+                    updateStatusDisplay(true, 'Signed In', 'Synced from another device');
+                    showUnlockedView();
+                }
+            } catch (e) {
+                console.warn('[SSE] Failed to process session_restored:', e);
+            }
+        });
+        
+        sseConnection.addEventListener('connected', () => {
+            sseReconnectAttempts = 0;
+            console.log('[SSE] Connected - instant cross-device detection active for wallet', sseWalletId?.substring(0, 8) + '...');
+        });
+        
+        sseConnection.addEventListener('error', () => {
+            if (sseConnection && sseConnection.readyState === EventSource.CLOSED) {
+                reconnectCrossDeviceSSE();
+            }
+        });
+        
+    } catch (e) {
+        console.warn('[SSE] Failed to connect:', e);
+    }
+}
+
+function reconnectCrossDeviceSSE() {
+    const maxAttempts = 5;
+    if (sseReconnectAttempts >= maxAttempts) {
+        console.warn('[SSE] Max reconnect attempts reached - using polling fallback');
+        return;
+    }
+    sseReconnectAttempts++;
+    const delay = Math.min(1000 * Math.pow(2, sseReconnectAttempts), 30000);
+    console.log(`[SSE] Reconnecting in ${delay}ms (attempt ${sseReconnectAttempts}/${maxAttempts})`);
+    setTimeout(() => connectCrossDeviceSSE(sseWalletId), delay);
+}
+
+function disconnectCrossDeviceSSE() {
+    if (sseConnection) {
+        sseConnection.close();
+        sseConnection = null;
+    }
+    sseReconnectAttempts = 0;
+}
+
+// Create new wallet
+async function createWallet() {
+    const btn = document.getElementById('create-wallet-btn');
+    const origText = btn.textContent;
+    
+    try {
+        btn.textContent = 'Creating...';
+        btn.disabled = true;
+        
+        await initWallet();
+        await wallet.registerPasskey();
+        await checkWalletState();
+        
+    } catch (e) {
+        console.error('Create wallet failed:', e);
+        updateStatusDisplay(false, 'Creation Failed', e.message);
+    } finally {
+        btn.textContent = origText;
+        btn.disabled = false;
+    }
+}
+
+// Tab switching
+function showTab(tab) {
+    const sendTab = document.getElementById('tab-send');
+    const receiveTab = document.getElementById('tab-receive');
+    const sendContent = document.getElementById('send-content');
+    const receiveContent = document.getElementById('receive-content');
+    
+    if (tab === 'send') {
+        sendTab.classList.add('active');
+        receiveTab.classList.remove('active');
+        sendContent.classList.remove('hidden');
+        receiveContent.classList.add('hidden');
+    } else {
+        receiveTab.classList.add('active');
+        sendTab.classList.remove('active');
+        receiveContent.classList.remove('hidden');
+        sendContent.classList.add('hidden');
+    }
+    
+    hideQR();
+}
+
+// Show QR code - requires fresh passkey verification (handled by generateLinkCode)
+async function showQR() {
+    try {
+        await initWallet();
+        
+        // generateLinkCode() requires FRESH passkey verification for security
+        // It will prompt the user to verify their identity before generating the link
+        const result = await wallet.generateLinkCode();
+        
+        const qrContainer = document.getElementById('qr-container');
+        qrContainer.innerHTML = '';
+        
+        if (typeof QRCode !== 'undefined') {
+            new QRCode(qrContainer, {
+                text: result.qrUrl,
+                width: 200,
+                height: 200,
+                colorDark: '#000000',
+                colorLight: '#ffffff',
+                correctLevel: QRCode.CorrectLevel ? QRCode.CorrectLevel.M : 0  // Medium error correction (15%)
+            });
+        } else {
+            qrContainer.innerHTML = '<p style="color: #dc2626;">QR library not loaded</p>';
+        }
+        
+        // Show alternative methods for phone→PC linking
+        const linkOptionsEl = document.getElementById('link-options');
+        if (linkOptionsEl) {
+            linkOptionsEl.innerHTML = `
+                <p class="qr-instruction">Scan with your other device's camera</p>
+                <div class="link-copy-section">
+                    <p class="link-copy-label">Or copy link:</p>
+                    <div class="link-copy-row">
+                        <input type="text" id="link-url" value="${result.qrUrl}" readonly class="link-url-input">
+                        <button onclick="copyLinkUrl()" class="btn btn-secondary btn-copy">Copy</button>
+                    </div>
+                </div>
+            `;
+            linkOptionsEl.classList.remove('hidden');
+        }
+        
+        document.getElementById('qr-display').classList.remove('hidden');
+        document.getElementById('show-qr-btn').classList.add('hidden');
+        
+        let timeLeft = result.expiresIn || 300;
+        const timerEl = document.getElementById('qr-timer');
+
+        function formatTime(s) {
+            const m = Math.floor(s / 60);
+            const sec = s % 60;
+            return m > 0 ? `${m}:${String(sec).padStart(2, '0')}` : `${sec}s`;
+        }
+
+        if (qrTimerInterval) clearInterval(qrTimerInterval);
+        timerEl.textContent = `Expires in ${formatTime(timeLeft)}`;
+
+        qrTimerInterval = setInterval(() => {
+            timeLeft--;
+            timerEl.textContent = `Expires in ${formatTime(timeLeft)}`;
+            timerEl.classList.toggle('expiring', timeLeft <= 30);
+
+            if (timeLeft <= 0) {
+                hideQR();
+            }
+        }, 1000);
+        
+    } catch (e) {
+        console.error('QR generation failed:', e);
+        alert('Failed to generate QR code: ' + e.message);
+    }
+}
+
+// Copy link URL to clipboard
+async function copyLinkUrl() {
+    const input = document.getElementById('link-url');
+    try {
+        await navigator.clipboard.writeText(input.value);
+        const btn = input.nextElementSibling;
+        btn.textContent = 'Copied!';
+        setTimeout(() => btn.textContent = 'Copy', 2000);
+    } catch (e) {
+        input.select();
+        document.execCommand('copy');
+    }
+}
+
+// Hide QR code
+function hideQR() {
+    document.getElementById('qr-display').classList.add('hidden');
+    document.getElementById('show-qr-btn').classList.remove('hidden');
+    const linkOptions = document.getElementById('link-options');
+    if (linkOptions) linkOptions.classList.add('hidden');
+    
+    if (qrTimerInterval) {
+        clearInterval(qrTimerInterval);
+        qrTimerInterval = null;
+    }
+}
+
+// Link device (receive)
+async function linkDevice() {
+    const code = document.getElementById('receive-code').value.trim();
+    const statusEl = document.getElementById('receive-status');
+
+    function escapeHtml(value) {
+        return String(value)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
+    
+    if (!code) {
+        statusEl.innerHTML = '<div class="info-box" style="background: #fef2f2; border-color: #ef4444; color: #991b1b;">Please paste the transfer code</div>';
+        statusEl.classList.remove('hidden');
+        return;
+    }
+    
+    try {
+        statusEl.innerHTML = '<div class="info-box">Adding device...</div>';
+        statusEl.classList.remove('hidden');
+
+        await initWallet();
+        const result = await wallet.linkDevice({ qrData: code });
+
+        if (result.success) {
+            statusEl.innerHTML = '<div class="info-box" style="background: #ecfdf5; border-color: #10b981; color: #065f46;">Device added! Creating passkey...</div>';
+
+            // Create passkey for this device
+            await wallet.registerPasskey();
+            await checkWalletState();
+
+            statusEl.innerHTML = '<div class="info-box" style="background: #ecfdf5; border-color: #10b981; color: #065f46;">Device added successfully!</div>';
+        } else if (result.conflict) {
+            statusEl.innerHTML = '<div class="info-box" style="background: #fef3c7; border-color: #f59e0b; color: #92400e;">A different Lemma ID exists on this device. Remove it first to add a new one.</div>';
+        } else {
+            throw new Error(result.message || 'Link failed');
+        }
+    } catch (e) {
+        console.error('Link failed:', e);
+        const safeMessage = escapeHtml(e && e.message ? e.message : 'Link failed');
+        statusEl.innerHTML = '';
+        const errorBox = document.createElement('div');
+        errorBox.className = 'info-box';
+        errorBox.style.background = '#fef2f2';
+        errorBox.style.borderColor = '#ef4444';
+        errorBox.style.color = '#991b1b';
+        errorBox.textContent = safeMessage;
+        statusEl.appendChild(errorBox);
+    }
+}
+
+// Clear data from this device
+async function clearWallet() {
+    if (!confirm('Remove your Lemma ID from this device? You can add it back later from another device.')) {
+        return;
+    }
+    
+    try {
+        // Delete IndexedDB
+        await new Promise((resolve, reject) => {
+            const req = indexedDB.deleteDatabase('LemmaWallet');
+            req.onsuccess = resolve;
+            req.onerror = reject;
+            req.onblocked = resolve;
+        });
+        
+        // Clear cookies
+        document.cookie = 'lemma_wallet_session=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
+        document.cookie = 'lemma_wallet_csrf=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
+        
+        wallet = null;
+        location.reload();
+        
+    } catch (e) {
+        console.error('Clear failed:', e);
+        alert('Failed to clear wallet: ' + e.message);
+    }
+}
+
+// Session duration setting
+function saveSessionDuration() {
+    const value = document.getElementById('session-duration-select').value;
+    localStorage.setItem('lemma_session_hours', value);
+}
+
+function loadSessionDuration() {
+    const saved = localStorage.getItem('lemma_session_hours');
+    if (saved) {
+        document.getElementById('session-duration-select').value = saved;
+    }
+}
+
+function setControlPlaneStatus(message, ok = true) {
+    const statusEl = document.getElementById('control-plane-status');
+    if (!statusEl) return;
+    statusEl.classList.remove('hidden');
+    statusEl.innerHTML = '';
+    const box = document.createElement('div');
+    box.className = 'info-box';
+    box.style.background = ok ? '#ecfdf5' : '#fef2f2';
+    box.style.borderColor = ok ? '#10b981' : '#ef4444';
+    box.style.color = ok ? '#065f46' : '#991b1b';
+    box.textContent = message;
+    statusEl.appendChild(box);
+}
+
+function applyControlPlaneUiState(prefs) {
+    const hostedToggle = document.getElementById('control-plane-hosted-toggle');
+    const modeSelect = document.getElementById('control-plane-mode-select');
+    const externalInput = document.getElementById('control-plane-url-input');
+    if (!hostedToggle || !modeSelect || !externalInput) return;
+    const hostedEnabled = !!prefs.hosted_ui_enabled;
+    const mode = (prefs.control_plane_mode || 'hosted').toLowerCase();
+    hostedToggle.checked = hostedEnabled;
+    modeSelect.value = (mode === 'federated' ? 'federated' : 'hosted');
+    externalInput.value = prefs.external_control_plane_url || '';
+    const federated = modeSelect.value === 'federated';
+    externalInput.disabled = !federated;
+}
+
+async function loadControlPlanePreferences() {
+    try {
+        const resp = await fetch('/api/wallet/control-plane/preferences', {
+            method: 'GET',
+            credentials: 'include'
+        });
+        if (!resp.ok) {
+            return;
+        }
+        const data = await resp.json();
+        if (data.success && data.preferences) {
+            applyControlPlaneUiState(data.preferences);
+        }
+    } catch (e) {
+        console.warn('Failed to load control-plane preferences:', e.message);
+    }
+}
+
+async function saveControlPlanePreferences() {
+    const hostedToggle = document.getElementById('control-plane-hosted-toggle');
+    const modeSelect = document.getElementById('control-plane-mode-select');
+    const externalInput = document.getElementById('control-plane-url-input');
+    try {
+        const payload = {
+            hosted_ui_enabled: !!hostedToggle.checked,
+            control_plane_mode: String(modeSelect.value || 'hosted'),
+            external_control_plane_url: String(externalInput.value || '').trim()
+        };
+        const resp = await fetch('/api/wallet/control-plane/preferences', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify(payload)
+        });
+        const data = await resp.json();
+        if (!resp.ok || !data.success) {
+            throw new Error(data.error || 'Failed to save control-plane preferences');
+        }
+        applyControlPlaneUiState(data.preferences || payload);
+        setControlPlaneStatus('Control-plane routing saved.', true);
+    } catch (e) {
+        setControlPlaneStatus(`Save failed: ${e.message}`, false);
+    }
+}
+
+async function openControlPlane() {
+    try {
+        const resp = await fetch('/api/wallet/control-plane/launch', {
+            method: 'GET',
+            credentials: 'include'
+        });
+        const data = await resp.json();
+        if (!resp.ok || !data.success || !data.launch_url) {
+            throw new Error(data.message || data.error || 'Control-plane launch denied by server');
+        }
+        window.location.href = data.launch_url;
+    } catch (e) {
+        setControlPlaneStatus(`Launch blocked: ${e.message}`, false);
+    }
+}
+
+function setAgentOpsBadge(text, ok = true) {
+    const badge = document.getElementById('agent-ops-badge');
+    if (!badge) return;
+    badge.textContent = text;
+    badge.style.background = ok ? '#ecfdf5' : '#fef2f2';
+    badge.style.borderColor = ok ? '#10b981' : '#ef4444';
+    badge.style.color = ok ? '#065f46' : '#991b1b';
+}
+
+function renderAgentOps(agents, runtimes = []) {
+    const container = document.getElementById('agent-ops-content');
+    if (!container) return;
+    const runtimeList = Array.isArray(runtimes) ? runtimes : [];
+    const agentList = Array.isArray(agents) ? agents : [];
+    const runtimeSection = `
+        <div style="border:1px solid #dbeafe; border-radius:8px; padding:10px; background:#eff6ff;">
+            <div style="font-weight:600; margin-bottom:8px;">Lemma Firewall Runtimes</div>
+            ${
+                runtimeList.length
+                    ? `<div style="display:grid; gap:8px;">
+                        ${runtimeList.map((r) => {
+                            const isActive = !!r.active;
+                            const statusStyle = isActive ? 'color:#065f46;' : 'color:#92400e;';
+                            return `
+                                <div style="border:1px solid #bfdbfe; border-radius:6px; padding:8px; background:#fff;">
+                                    <div style="display:flex; justify-content:space-between; gap:12px; align-items:start;">
+                                        <div>
+                                            <div style="font-weight:600;">${escapeHtml(r.display_name || r.runtime_id || 'Runtime')}</div>
+                                            <div style="font-family:monospace; font-size:12px; color:#6b7280;">${escapeHtml(r.runtime_id || '')}</div>
+                                            <div style="font-size:12px; margin-top:4px; ${statusStyle}">Status: ${isActive ? 'active' : 'inactive'}</div>
+                                            <div style="font-size:12px; color:#6b7280;">Last connected: ${escapeHtml(r.last_connected_at ? new Date(r.last_connected_at).toLocaleString() : 'Never')}</div>
+                                        </div>
+                                        <div>
+                                            ${isActive
+                                                ? `<button class="btn btn-danger" data-action="kill-runtime" data-runtime-id="${escapeHtml(r.runtime_id || '')}">Kill Runtime</button>`
+                                                : '<button class="btn btn-secondary" disabled>Inactive</button>'}
+                                        </div>
+                                    </div>
+                                </div>
+                            `;
+                        }).join('')}
+                    </div>`
+                    : '<div class="info-box">No Lemma Firewall runtimes connected yet.</div>'
+            }
+        </div>
+    `;
+    const agentSection = `
+        <div style="margin-top:10px;">
+            <div style="font-weight:600; margin-bottom:8px;">Delegated Agents</div>
+            ${
+                agentList.length
+                    ? `<div style="display:grid; gap:8px;">
+                        ${agentList.map((a) => {
+                            const action = a.last_action || {};
+                            const statusClass = a.status === 'active' ? 'color:#065f46;' : 'color:#92400e;';
+                            const actionText = action.path ? `${action.method || 'GET'} ${action.path}` : 'No actions yet';
+                            const lastSeen = action.timestamp ? new Date(action.timestamp).toLocaleString() : 'Never';
+                            const usage = (a.max_operations !== null && a.max_operations !== undefined)
+                                ? `${a.use_count || 0}/${a.max_operations}`
+                                : `${a.use_count || 0}`;
+                            return `
+                                <div style="border:1px solid #e5e7eb; border-radius:8px; padding:10px;">
+                                    <div style="display:flex; justify-content:space-between; gap:12px; align-items:start;">
+                                        <div>
+                                            <div style="font-weight:600;">${escapeHtml(a.agent_name || 'Agent')}</div>
+                                            <div style="font-family:monospace; font-size:12px; color:#6b7280;">${escapeHtml(a.token_id || '')}</div>
+                                            <div style="font-size:12px; margin-top:4px; ${statusClass}">Status: ${escapeHtml(a.status || 'unknown')}</div>
+                                            <div style="font-size:12px; color:#6b7280; margin-top:4px;">Last action: ${escapeHtml(actionText)}</div>
+                                            <div style="font-size:12px; color:#6b7280;">Last seen: ${escapeHtml(lastSeen)}</div>
+                                            <div style="font-size:12px; color:#6b7280;">Usage: ${escapeHtml(String(usage))} | Deviations: ${escapeHtml(String(a.task_deviation_count || 0))}</div>
+                                        </div>
+                                        <div>
+                                            ${a.status === 'active'
+                                                ? `<button class="btn btn-danger" data-action="kill-agent" data-token-id="${escapeHtml(a.token_id || '')}">Kill Agent</button>`
+                                                : '<button class="btn btn-secondary" disabled>Inactive</button>'}
+                                        </div>
+                                    </div>
+                                </div>
+                            `;
+                        }).join('')}
+                    </div>`
+                    : '<div class="info-box">No delegated agent tokens yet.</div>'
+            }
+        </div>
+    `;
+    container.innerHTML = `
+        <div style="display:grid; gap:8px;">${runtimeSection}${agentSection}</div>
+    `;
+}
+
+async function loadAgentOps() {
+    try {
+        const [agentResp, runtimeResp] = await Promise.all([
+            fetch('/api/wallet/agents/overview?limit=25', {
+                method: 'GET',
+                credentials: 'include'
+            }),
+            fetch('/api/wallet/runtimes', {
+                method: 'GET',
+                credentials: 'include'
+            })
+        ]);
+        if (agentResp.status === 401 || runtimeResp.status === 401) {
+            setAgentOpsBadge('Sign in to view AIM', true);
+            const container = document.getElementById('agent-ops-content');
+            if (container) {
+                container.innerHTML = '<div class="info-box">Sign in to view Lemma Firewall runtimes and linked agents.</div>';
+            }
+            return;
+        }
+        const agentData = await agentResp.json();
+        const runtimeData = await runtimeResp.json();
+        if (!agentResp.ok || !runtimeResp.ok) {
+            const message = (agentData && (agentData.message || agentData.error))
+                || (runtimeData && (runtimeData.message || runtimeData.error))
+                || 'Could not load AIM data';
+            throw new Error(message);
+        }
+        const agents = (agentData && agentData.success) ? (agentData.agents || []) : [];
+        const runtimes = (runtimeData && runtimeData.success) ? (runtimeData.runtimes || []) : [];
+        const activeAgents = agents.filter((a) => a.status === 'active').length;
+        const activeRuntimes = runtimes.filter((r) => !!r.active).length;
+        setAgentOpsBadge(`${activeRuntimes}/${runtimes.length} runtimes, ${activeAgents}/${agents.length} agents active`, true);
+        renderAgentOps(agents, runtimes);
+    } catch (e) {
+        setAgentOpsBadge('Agent monitor unavailable', false);
+        const container = document.getElementById('agent-ops-content');
+        if (container) {
+            container.innerHTML = `<div class="info-box" style="background:#fef2f2; border-color:#ef4444; color:#991b1b;">${escapeHtml(e.message || 'Failed to load agent monitor')}</div>`;
+        }
+    }
+}
+
+async function killRuntime(runtimeId) {
+    if (!runtimeId) return;
+    if (!confirm('Kill this runtime now? This disables the Lemma Firewall runtime immediately.')) return;
+    try {
+        const resp = await fetch(`/api/wallet/runtimes/${encodeURIComponent(runtimeId)}/kill`, {
+            method: 'POST',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ reason: 'Killed from wallet AIM runtime monitor' })
+        });
+        const data = await resp.json();
+        if (!resp.ok || !data.success) {
+            throw new Error(data.error || data.message || 'Runtime kill failed');
+        }
+        setControlPlaneStatus(`Runtime ${runtimeId} killed.`, true);
+        await loadAgentOps();
+    } catch (e) {
+        setControlPlaneStatus(`Runtime kill failed: ${e.message}`, false);
+    }
+}
+
+async function killAgent(tokenId) {
+    if (!tokenId) return;
+    if (!confirm('Kill this agent now? This revokes its delegated credential immediately.')) return;
+    try {
+        const resp = await fetch(`/api/wallet/agents/${encodeURIComponent(tokenId)}/kill`, {
+            method: 'POST',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ reason: 'Killed from wallet operations monitor' })
+        });
+        const data = await resp.json();
+        if (!resp.ok || !data.success) {
+            throw new Error(data.error || data.message || 'Kill failed');
+        }
+        setControlPlaneStatus(`Agent ${tokenId} revoked.`, true);
+        await loadAgentOps();
+    } catch (e) {
+        setControlPlaneStatus(`Kill failed: ${e.message}`, false);
+    }
+}
+
+// Redirect flow helpers
+function getRedirectParams() {
+    const params = new URLSearchParams(window.location.search);
+    const returnUrl = params.get('return_url');
+    const redirectFlow = params.get('redirect_flow') === '1';
+    
+    if (returnUrl && redirectFlow) {
+        try {
+            new URL(returnUrl);
+            return { returnUrl };
+        } catch (e) {}
+    }
+    return null;
+}
+
+async function handleRedirectReturn(returnUrl) {
+    const info = await wallet.getWalletInfo();
+    let walletSecret = await wallet.getWalletSecret();
+    
+    if (!walletSecret) {
+        try { walletSecret = wallet.session?.walletSecret; } catch(e) {}
+    }
+    
+    if (!walletSecret) {
+        console.error('[Redirect] No wallet secret - cannot issue lemma');
+        return;
+    }
+    
+    // Extract the requesting site's domain from return URL
+    const siteDomain = new URL(returnUrl).hostname;
+    console.log('[Redirect] Issuing lemma for:', siteDomain);
+    
+    // PRIVACY: Derive PPID client-side, send only PPID to issuance API
+    // wallet_secret stays in the browser, never sent over the network
+    try {
+        const ppid = await wallet.derivePPID(siteDomain);
+        const issueResponse = await fetch('/api/wallet-auth/issue', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({
+                site_id: siteDomain,
+                ppid: ppid
+            })
+        });
+        
+        const issueData = await issueResponse.json();
+        
+        if (issueData.success && issueData.permission_lemma) {
+            console.log('[Redirect] Lemma issued for', siteDomain, '- PPID:', issueData.ppid?.substring(0, 20) + '...');
+            
+            // Send the SIGNED LEMMA back (not the wallet_secret!)
+            const url = new URL(returnUrl);
+            url.searchParams.set('lemma_unlocked', '1');
+            url.searchParams.set('lemma_credential', btoa(JSON.stringify({
+                lemma: issueData.permission_lemma,
+                ppid: issueData.ppid,
+                site_id: siteDomain
+            })));
+            
+            window.location.href = url.toString();
+            return;
+        } else {
+            console.error('[Redirect] Lemma issuance failed:', issueData.error);
+        }
+    } catch (e) {
+        console.error('[Redirect] Issuance API error:', e.message);
+    }
+    
+    // Fallback: redirect without lemma (site will show login)
+    const url = new URL(returnUrl);
+    url.searchParams.set('lemma_unlocked', '1');
+    window.location.href = url.toString();
+}
+
+async function encryptWalletData(data, keyBase64) {
+    const keyBytes = base64ToArrayBuffer(keyBase64);
+    const key = await crypto.subtle.importKey('raw', keyBytes, { name: 'AES-GCM' }, false, ['encrypt']);
+    const nonce = crypto.getRandomValues(new Uint8Array(12));
+    const dataBytes = new TextEncoder().encode(JSON.stringify(data));
+    const ciphertext = await crypto.subtle.encrypt({ name: 'AES-GCM', iv: nonce }, key, dataBytes);
+    const combined = new Uint8Array(nonce.length + ciphertext.byteLength);
+    combined.set(nonce, 0);
+    combined.set(new Uint8Array(ciphertext), nonce.length);
+    return arrayBufferToBase64(combined);
+}
+
+function base64ToArrayBuffer(base64) {
+    const standardBase64 = base64.replace(/-/g, '+').replace(/_/g, '/');
+    const padding = standardBase64.length % 4;
+    const paddedBase64 = padding ? standardBase64 + '='.repeat(4 - padding) : standardBase64;
+    const binary = atob(paddedBase64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    return bytes;
+}
+
+function arrayBufferToBase64(buffer) {
+    const bytes = buffer instanceof Uint8Array ? buffer : new Uint8Array(buffer);
+    let binary = '';
+    for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+    return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+// Initialize
+document.addEventListener('DOMContentLoaded', async () => {
+    loadSessionDuration();
+
+    // Handle logout: lock wallet + broadcast LOCK so bridge iframes on other sites get notified
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('logged_out') === '1') {
+        window.history.replaceState({}, '', window.location.pathname);
+        try {
+            await initWallet();
+            const info = await wallet.getWalletInfo();
+            if (info.walletId) {
+                await wallet.lock();
+                broadcastSessionChange('LOCK', info.walletId);
+                console.log('[Logout] Wallet locked + LOCK broadcast to other tabs/sites');
+            }
+        } catch (e) {
+            console.warn('[Logout] Could not lock wallet:', e.message);
+        }
+    }
+
+    // Check for redirect flow
+    const redirectParams = getRedirectParams();
+    if (redirectParams) {
+        updateStatusDisplay(false, 'Signing In...', `Returning to ${new URL(redirectParams.returnUrl).origin}`);
+    }
+
+    const isUnlocked = await checkWalletState();
+    if (isUnlocked) {
+        await loadControlPlanePreferences();
+        await loadAgentOps();
+    } else {
+        setAgentOpsBadge('Sign in to view agents', true);
+        const agentOpsContainer = document.getElementById('agent-ops-content');
+        if (agentOpsContainer) {
+            agentOpsContainer.innerHTML = '<div class="info-box">Sign in to view linked agents and controls.</div>';
+        }
+    }
+    
+    // Connect SSE for instant cross-device lock/unlock detection
+    // Works even when locked - detects remote unlock to auto-sign-in
+    try {
+        const info = await wallet.getWalletInfo();
+        if (info.walletId) {
+            connectCrossDeviceSSE(info.walletId);
+        }
+    } catch (e) {
+        console.warn('[App] Could not connect SSE on init:', e.message);
+    }
+    
+    // If redirect flow and already unlocked, redirect immediately
+    if (redirectParams && isUnlocked) {
+        console.log('[App] Wallet unlocked + redirect_flow detected - auto-redirecting back to:', redirectParams.returnUrl);
+        await handleRedirectReturn(redirectParams.returnUrl);
+        return;
+    } else if (redirectParams && !isUnlocked) {
+        console.log('[App] Redirect flow detected but wallet not unlocked yet - user needs to sign in');
+    }
+    
+    // CROSS-DEVICE LOCK DETECTION (polling fallback for when SSE is unavailable)
+    // SSE provides instant detection; this is a backup for network issues
+    document.addEventListener('visibilitychange', async () => {
+        if (document.visibilityState === 'visible') {
+            await checkCrossDeviceLock();
+        }
+    });
+    
+    // Optional: Long interval backup check (5 minutes)
+    // Only fires as fallback if SSE connection is down
+    setInterval(async () => {
+        if (document.visibilityState === 'visible') {
+            await checkCrossDeviceLock();
+        }
+    }, 300000); // 5 minutes
+    
+    // Event listeners
+    document.getElementById('unlock-btn').addEventListener('click', unlockWallet);
+    document.getElementById('create-wallet-btn').addEventListener('click', createWallet);
+    document.getElementById('lock-btn').addEventListener('click', lockWallet);
+    document.getElementById('tab-send').addEventListener('click', () => showTab('send'));
+    document.getElementById('tab-receive').addEventListener('click', () => showTab('receive'));
+    document.getElementById('show-qr-btn').addEventListener('click', showQR);
+    document.getElementById('hide-qr-btn').addEventListener('click', hideQR);
+    document.getElementById('link-device-btn').addEventListener('click', linkDevice);
+    document.getElementById('clear-wallet-btn').addEventListener('click', clearWallet);
+    document.getElementById('session-duration-select').addEventListener('change', saveSessionDuration);
+    const modeSelect = document.getElementById('control-plane-mode-select');
+    if (modeSelect) {
+        modeSelect.addEventListener('change', () => {
+            const externalInput = document.getElementById('control-plane-url-input');
+            if (externalInput) {
+                externalInput.disabled = modeSelect.value !== 'federated';
+            }
+        });
+    }
+    const saveCpBtn = document.getElementById('save-control-plane-btn');
+    if (saveCpBtn) saveCpBtn.addEventListener('click', saveControlPlanePreferences);
+    const openCpBtn = document.getElementById('open-control-plane-btn');
+    if (openCpBtn) openCpBtn.addEventListener('click', openControlPlane);
+    const refreshAgentOpsBtn = document.getElementById('refresh-agent-ops-btn');
+    if (refreshAgentOpsBtn) refreshAgentOpsBtn.addEventListener('click', loadAgentOps);
+    document.addEventListener('click', async (event) => {
+        const btn = event.target.closest('[data-action="kill-agent"]');
+        if (btn) {
+            await killAgent(btn.getAttribute('data-token-id') || '');
+            return;
+        }
+        const runtimeBtn = event.target.closest('[data-action="kill-runtime"]');
+        if (runtimeBtn) {
+            await killRuntime(runtimeBtn.getAttribute('data-runtime-id') || '');
+        }
+    });
+});
+</script>
+{% endblock %}

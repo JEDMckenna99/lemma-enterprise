@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Complete Recovery - Lemma.id</title>
+    <style>
+        body {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%);
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            margin: 0;
+            padding: 20px;
+        }
+        
+        .recovery-container {
+            background: white;
+            border-radius: 16px;
+            padding: 40px;
+            width: 100%;
+            max-width: 440px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+            text-align: center;
+        }
+        
+        .logo h1 {
+            font-size: 28px;
+            font-weight: 700;
+            margin: 0;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        .logo p {
+            color: #64748b;
+            margin: 8px 0 0;
+            font-size: 15px;
+        }
+        
+        .status-icon {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 32px auto;
+        }
+        
+        .status-icon.loading {
+            background: linear-gradient(135deg, rgba(102, 126, 234, 0.1), rgba(118, 75, 162, 0.1));
+        }
+        
+        .status-icon.success {
+            background: linear-gradient(135deg, #10b981, #059669);
+        }
+        
+        .status-icon.error {
+            background: linear-gradient(135deg, #ef4444, #dc2626);
+        }
+        
+        .status-icon svg {
+            width: 40px;
+            height: 40px;
+        }
+        
+        .status-title {
+            font-size: 20px;
+            font-weight: 600;
+            color: #1e293b;
+            margin: 0 0 8px;
+        }
+        
+        .status-message {
+            color: #64748b;
+            font-size: 15px;
+            margin: 0 0 24px;
+            line-height: 1.5;
+        }
+        
+        .site-info {
+            background: #f8fafc;
+            border-radius: 10px;
+            padding: 16px;
+            margin-bottom: 24px;
+            text-align: left;
+        }
+        
+        .site-info-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+        }
+        
+        .site-info-row:first-child { padding-top: 0; }
+        .site-info-row:last-child { padding-bottom: 0; }
+        
+        .site-info-label {
+            color: #64748b;
+            font-size: 14px;
+        }
+        
+        .site-info-value {
+            color: #1e293b;
+            font-weight: 500;
+            font-size: 14px;
+        }
+        
+        .action-btn {
+            width: 100%;
+            padding: 14px 24px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        
+        .action-btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 10px 20px -5px rgba(102, 126, 234, 0.4);
+        }
+        
+        .action-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .secondary-btn {
+            display: block;
+            margin-top: 16px;
+            color: #64748b;
+            text-decoration: none;
+            font-size: 14px;
+        }
+        
+        .secondary-btn:hover {
+            color: #667eea;
+        }
+        
+        .spinner {
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+        
+        #loading-state,
+        #error-state,
+        #success-state,
+        #confirm-state {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="recovery-container">
+        <div class="logo">
+            <h1>Lemma.id</h1>
+            <p>Account Recovery</p>
+        </div>
+        
+        <!-- Loading State -->
+        <div id="loading-state">
+            <div class="status-icon loading">
+                <svg class="spinner" viewBox="0 0 24 24" fill="none" stroke="#667eea" stroke-width="2">
+                    <circle cx="12" cy="12" r="10" stroke-opacity="0.25"></circle>
+                    <path d="M12 2a10 10 0 0 1 10 10" stroke-linecap="round"></path>
+                </svg>
+            </div>
+            <h2 class="status-title">Validating...</h2>
+            <p class="status-message">Please wait while we verify your recovery link.</p>
+        </div>
+        
+        <!-- Error State -->
+        <div id="error-state">
+            <div class="status-icon error">
+                <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <line x1="15" y1="9" x2="9" y2="15"></line>
+                    <line x1="9" y1="9" x2="15" y2="15"></line>
+                </svg>
+            </div>
+            <h2 class="status-title">Link Invalid</h2>
+            <p class="status-message" id="error-message">This recovery link is invalid or has expired.</p>
+            <a href="/recover" class="action-btn" style="text-decoration: none; display: inline-block;">
+                Request New Link
+            </a>
+        </div>
+        
+        <!-- Confirm State - identity verified, ready to restore -->
+        <div id="confirm-state">
+            <div class="status-icon loading">
+                <svg viewBox="0 0 24 24" fill="none" stroke="#667eea" stroke-width="2">
+                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+                    <polyline points="9 12 12 15 16 10" stroke-linecap="round" stroke-linejoin="round"></polyline>
+                </svg>
+            </div>
+            <h2 class="status-title">Identity Verified</h2>
+            <p class="status-message">Your API key and email have been confirmed. Click below to restore your admin access.</p>
+            
+            <div class="site-info">
+                <div class="site-info-row">
+                    <span class="site-info-label">Site ID</span>
+                    <span class="site-info-value" id="site-id-display">-</span>
+                </div>
+                <div class="site-info-row">
+                    <span class="site-info-label">Admin Email</span>
+                    <span class="site-info-value" id="email-display">-</span>
+                </div>
+            </div>
+            
+            <button class="action-btn" id="restore-btn">
+                Restore Admin Access
+            </button>
+            
+            <a href="/recover" class="secondary-btn">Cancel</a>
+        </div>
+        
+        <!-- Success State -->
+        <div id="success-state">
+            <div class="status-icon success">
+                <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
+                    <polyline points="20 6 9 17 4 12"></polyline>
+                </svg>
+            </div>
+            <h2 class="status-title">Admin Access Restored</h2>
+            <p class="status-message" id="success-message">Your admin lemma has been reissued. You can now access your developer dashboard.</p>
+            
+            <a href="/developer" class="action-btn" style="text-decoration: none; display: inline-block;">
+                Go to Developer Dashboard
+            </a>
+        </div>
+    </div>
+    
+    <!-- Load Lemma Wallet SDK -->
+    <script src="/static/js/lemma-wallet.js?v=2473" nonce="{{ csp_nonce }}"></script>
+    
+    <script nonce="{{ csp_nonce }}">
+        const token = '{{ token }}';
+        
+        const loadingState = document.getElementById('loading-state');
+        const errorState = document.getElementById('error-state');
+        const confirmState = document.getElementById('confirm-state');
+        const successState = document.getElementById('success-state');
+        
+        let siteData = null;
+        let wallet = null;
+        
+        function showError(message) {
+            loadingState.style.display = 'none';
+            confirmState.style.display = 'none';
+            document.getElementById('error-message').textContent = message;
+            errorState.style.display = 'block';
+        }
+        
+        // Step 1: Validate the recovery token
+        async function validateToken() {
+            loadingState.style.display = 'block';
+            
+            if (!token) {
+                showError('No recovery token provided.');
+                return;
+            }
+            
+            try {
+                // Initialize wallet SDK in parallel (non-blocking)
+                try {
+                    if (typeof LemmaWallet !== 'undefined') {
+                        wallet = new LemmaWallet({ siteId: 'lemma.id', debug: false });
+                        await wallet.init();
+                    }
+                } catch (e) {
+                    console.log('[Recovery] Wallet SDK init:', e.message);
+                }
+                
+                // Validate token with server
+                const response = await fetch('/api/recovery/validate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ token })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    siteData = data;
+                    loadingState.style.display = 'none';
+                    document.getElementById('site-id-display').textContent = data.site_id;
+                    document.getElementById('email-display').textContent = data.email;
+                    confirmState.style.display = 'block';
+                } else {
+                    showError(data.error || 'Invalid or expired token.');
+                }
+                
+            } catch (err) {
+                console.error('[Recovery] Validation error:', err);
+                showError('Failed to validate recovery link.');
+            }
+        }
+        
+        // Step 2: Complete recovery - issue admin lemma
+        async function restoreAccess() {
+            const btn = document.getElementById('restore-btn');
+            btn.disabled = true;
+            btn.textContent = 'Restoring...';
+            
+            try {
+                // Try to get wallet PPID if wallet is unlocked (optional)
+                let ppid = null;
+                try {
+                    if (wallet) {
+                        const authState = await wallet.getAuthState();
+                        if (authState.isUnlocked || (wallet.session && wallet.session.isUnlocked)) {
+                            ppid = await wallet.derivePPID('lemma.id');
+                            console.log('[Recovery] Wallet PPID:', ppid?.substring(0, 30) + '...');
+                        }
+                    }
+                } catch (e) {
+                    console.log('[Recovery] PPID derivation skipped:', e.message);
+                }
+                
+                // Call complete recovery - issues admin lemma directly
+                const response = await fetch('/api/recovery/complete', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify({
+                        token: token,
+                        ppid: ppid || ''
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (!data.success) {
+                    throw new Error(data.error || 'Recovery failed');
+                }
+                
+                console.log('[Recovery] Admin lemma issued:', data.credential_id);
+                
+                // Store credential in wallet if available
+                if (data.credential && wallet) {
+                    try {
+                        if (wallet.storeCredential) {
+                            await wallet.storeCredential(data.credential);
+                            console.log('[Recovery] Admin lemma stored in wallet');
+                        }
+                    } catch (e) {
+                        console.warn('[Recovery] Wallet store skipped:', e.message);
+                    }
+                }
+                
+                // Show success
+                confirmState.style.display = 'none';
+                successState.style.display = 'block';
+                
+            } catch (err) {
+                console.error('[Recovery] Restore error:', err);
+                alert(err.message || 'Recovery failed. Please try again.');
+                btn.disabled = false;
+                btn.textContent = 'Restore Admin Access';
+            }
+        }
+        
+        // Initialize
+        document.getElementById('restore-btn').addEventListener('click', restoreAccess);
+        validateToken();
+    </script>
+</body>
+</html>

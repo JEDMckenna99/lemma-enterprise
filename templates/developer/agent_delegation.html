@@ -1,0 +1,406 @@
+{% extends "developer/layout.html" %}
+{% set active_page = 'agent_delegation' %}
+
+{% block dev_content %}
+<div class="dev-header">
+    <div class="dev-header-row">
+        <div>
+            <h1 class="dev-title">Agent Delegation</h1>
+            <p class="dev-subtitle">Issue, monitor, and revoke delegated agent access</p>
+        </div>
+    </div>
+</div>
+
+<div class="dev-card">
+    <div class="dev-card-header">
+        <h2 class="dev-card-title">Delegated Tokens</h2>
+        <span class="dev-badge dev-badge-info" id="agent-status">Checking...</span>
+    </div>
+    <div class="dev-card-body">
+        <div id="agent-token-content">
+            <div class="dev-loading">
+                <div class="dev-spinner"></div>
+                <div>Checking wallet authentication...</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="dev-card">
+    <div class="dev-card-header">
+        <h2 class="dev-card-title">Agent Activity</h2>
+        <button class="dev-btn dev-btn-secondary dev-btn-sm" data-action="refresh-activity">Refresh</button>
+    </div>
+    <div class="dev-card-body">
+        <div class="agent-filters">
+            <label>Token</label>
+            <select id="activity-token-filter" class="dev-select">
+                <option value="">All tokens</option>
+            </select>
+
+            <label>Window</label>
+            <select id="activity-window" class="dev-select">
+                <option value="1">1 hour</option>
+                <option value="6">6 hours</option>
+                <option value="24" selected>24 hours</option>
+                <option value="72">72 hours</option>
+                <option value="168">7 days</option>
+            </select>
+
+            <label class="agent-fail-only">
+                <input type="checkbox" id="activity-failures-only">
+                Failures only
+            </label>
+            <button class="dev-btn dev-btn-primary dev-btn-sm" data-action="apply-activity">Apply</button>
+        </div>
+
+        <div id="agent-activity-container">
+            <div class="dev-loading">
+                <div class="dev-spinner"></div>
+                <div>Loading activity...</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.agent-token-section { display: flex; flex-direction: column; gap: 16px; }
+.agent-token-form { display: grid; gap: 12px; padding: 14px; border: 1px solid var(--dev-border); border-radius: 8px; }
+.agent-form-row { display: grid; grid-template-columns: 120px 1fr; gap: 10px; align-items: center; }
+.agent-scope-options { display: flex; gap: 16px; flex-wrap: wrap; }
+.agent-active-tokens { border-top: 1px solid var(--dev-border); padding-top: 12px; }
+.agent-token-item { display: flex; gap: 12px; align-items: center; justify-content: space-between; padding: 10px; border: 1px solid var(--dev-border); border-radius: 6px; margin-bottom: 8px; }
+.agent-token-meta { flex: 1; min-width: 0; }
+.agent-token-name { font-weight: 600; display: block; }
+.agent-token-id { font-family: monospace; font-size: 12px; color: var(--dev-text-muted); word-break: break-all; }
+.agent-token-details { font-size: 12px; color: var(--dev-text-muted); display: grid; gap: 2px; }
+.agent-generated { border: 1px solid var(--dev-border); border-radius: 8px; padding: 14px; }
+.agent-token-value { font-family: monospace; padding: 10px; background: var(--dev-bg-subtle); border-radius: 6px; word-break: break-all; margin-bottom: 10px; }
+.agent-filters { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 12px; }
+.agent-fail-only { display: flex; align-items: center; gap: 6px; }
+.agent-table { width: 100%; border-collapse: collapse; }
+.agent-table th, .agent-table td { text-align: left; font-size: 13px; padding: 8px; border-bottom: 1px solid var(--dev-border); }
+.agent-error { color: #b91c1c; font-size: 13px; }
+</style>
+
+<script nonce="{{ csp_nonce }}">
+let currentPpid = null;
+let activeTokens = [];
+
+document.addEventListener('DOMContentLoaded', async () => {
+    currentPpid = await getWalletPpid();
+    await loadAgentTokenPanel();
+    await loadAgentActivity();
+});
+
+async function getWalletPpid() {
+    if (typeof LemmaWallet === 'undefined') return null;
+    try {
+        const wallet = new LemmaWallet();
+        const authResult = await wallet.autoAuthenticate();
+        if (!authResult.authenticated) return null;
+        return await wallet.derivePPID('lemma.id');
+    } catch (e) {
+        return null;
+    }
+}
+
+function getAuthHeaders() {
+    if (typeof window.getLemmaAuthHeaders === 'function') {
+        return window.getLemmaAuthHeaders();
+    }
+    return {};
+}
+
+function formatDelegationIssueError(data, status) {
+    const code = String((data && data.error) || '').trim();
+    const detail = String((data && data.message) || '').trim();
+    if (code === 'wallet_unlock_required' || code === 'wallet_session_expired') {
+        return 'Wallet unlock is required for delegation. Open /unlock in this browser tab, then retry.';
+    }
+    if (code === 'ppid_required') {
+        return 'Delegation requires a valid lemma PPID. Refresh this page after wallet unlock and retry.';
+    }
+    if (code === 'admin_lemma_site_mismatch') {
+        return detail || 'Your admin credential does not match lemma.id. Reissue admin permission for lemma.id and refresh.';
+    }
+    if (code === 'site_ownership_mismatch') {
+        return 'Delegation is restricted to sites you own/administer. Check site binding and retry.';
+    }
+    if (code === 'insufficient_permission') {
+        return 'Admin permission is missing in this session. Refresh admin bootstrap state and retry.';
+    }
+    if (detail) {
+        return detail;
+    }
+    if (code) {
+        return `Issuance blocked: ${code}`;
+    }
+    return `Issuance failed (HTTP ${status || 'unknown'}).`;
+}
+
+async function loadAgentTokenPanel() {
+    const container = document.getElementById('agent-token-content');
+    const badge = document.getElementById('agent-status');
+    if (!currentPpid) {
+        badge.textContent = 'Wallet auth required';
+        badge.className = 'dev-badge dev-badge-warning';
+        container.innerHTML = '<div class="agent-error">Sign in with your wallet to manage delegated tokens.</div>';
+        return;
+    }
+
+    try {
+        const response = await fetch('/api/agent/credentials', { headers: getAuthHeaders() });
+        const data = await response.json();
+        if (!response.ok || !data.success) throw new Error(data.error || 'Failed to load tokens');
+
+        activeTokens = (data.credentials || []).filter((c) => c.status === 'active');
+        badge.textContent = activeTokens.length ? `${activeTokens.length} Active` : 'No active tokens';
+        badge.className = activeTokens.length ? 'dev-badge dev-badge-success' : 'dev-badge dev-badge-info';
+
+        container.innerHTML = `
+            <div class="agent-token-section">
+                <div class="agent-token-form">
+                    <div class="agent-form-row">
+                        <label for="agent-name">Agent Name</label>
+                        <input id="agent-name" class="dev-input" type="text" value="Cursor AI">
+                    </div>
+                    <div class="agent-form-row">
+                        <label for="agent-ttl">Duration</label>
+                        <select id="agent-ttl" class="dev-select">
+                            <option value="1">1 hour</option>
+                            <option value="4" selected>4 hours</option>
+                            <option value="8">8 hours</option>
+                            <option value="24">24 hours</option>
+                        </select>
+                    </div>
+                    <div class="agent-form-row">
+                        <label>Scope</label>
+                        <div class="agent-scope-options">
+                            <label><input type="checkbox" id="scope-read" checked disabled> Read</label>
+                            <label><input type="checkbox" id="scope-write" checked> Write</label>
+                            <label><input type="checkbox" id="scope-admin"> Admin</label>
+                        </div>
+                    </div>
+                    <div style="display:flex; gap:10px;">
+                        <button class="dev-btn dev-btn-primary dev-btn-sm" data-action="generate-token">Generate Token</button>
+                        <button class="dev-btn dev-btn-danger dev-btn-sm" data-action="revoke-all">Revoke All Active</button>
+                    </div>
+                </div>
+                <div class="agent-active-tokens">
+                    <h4>Active Tokens</h4>
+                    ${activeTokens.length ? activeTokens.map((c) => `
+                        <div class="agent-token-item">
+                            <div class="agent-token-meta">
+                                <span class="agent-token-name">${escapeHtml(c.agent_name || 'Agent')}</span>
+                                <span class="agent-token-id">${escapeHtml(c.token_id)}</span>
+                            </div>
+                            <div class="agent-token-details">
+                                <span>Expires: ${formatDate(c.expires_at)}</span>
+                                <span>Used: ${Number(c.use_count || 0)}</span>
+                            </div>
+                            <button class="dev-btn dev-btn-danger dev-btn-sm" data-action="revoke-token" data-token-id="${escapeHtml(c.token_id)}">Revoke</button>
+                        </div>
+                    `).join('') : '<div class="dev-empty-text">No active delegated tokens.</div>'}
+                </div>
+            </div>
+        `;
+
+        hydrateTokenFilter();
+    } catch (e) {
+        badge.textContent = 'Error';
+        badge.className = 'dev-badge dev-badge-warning';
+        container.innerHTML = `<div class="agent-error">${escapeHtml(e.message || 'Failed to load tokens')}</div>`;
+    }
+}
+
+function hydrateTokenFilter() {
+    const select = document.getElementById('activity-token-filter');
+    if (!select) return;
+    const selected = select.value;
+    select.innerHTML = '<option value="">All tokens</option>';
+    activeTokens.forEach((t) => {
+        const opt = document.createElement('option');
+        opt.value = t.token_id;
+        opt.textContent = `${t.agent_name || 'Agent'} (${t.token_id})`;
+        select.appendChild(opt);
+    });
+    if (selected) select.value = selected;
+}
+
+async function generateAgentToken() {
+    const scope = ['read'];
+    if (document.getElementById('scope-write')?.checked) scope.push('write');
+    if (document.getElementById('scope-admin')?.checked) scope.push('admin');
+    const adminCredential = window.lemmaCredential || null;
+    const payload = {
+        agent_name: document.getElementById('agent-name')?.value || 'AI Agent',
+        ttl_hours: parseInt(document.getElementById('agent-ttl')?.value || '4', 10),
+        scope,
+        intended_platform: 'lemma.id',
+        admin_credential: adminCredential
+    };
+
+    const response = await fetch('/api/agent/credentials/issue', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+    });
+    const data = await response.json();
+    if (!response.ok || !data.success) {
+        throw new Error(formatDelegationIssueError(data, response.status));
+    }
+
+    const token = data?.credential?.token || data?.token || '';
+    const tokenId = data?.credential?.token_id || data?.token_id || '';
+    const expires = data?.credential?.expires_at || data?.expires_at || '';
+    const container = document.getElementById('agent-token-content');
+
+    // Refresh token list first so the generated token panel is not overwritten by re-render
+    await loadAgentTokenPanel();
+
+    const refreshedContainer = document.getElementById('agent-token-content');
+
+    if (!token) {
+        refreshedContainer.insertAdjacentHTML('afterbegin', `
+            <div class="agent-generated" style="border-left:4px solid #f59e0b;">
+                <div><strong>Token created, but plaintext token not returned</strong></div>
+                <div style="font-size:12px; color: var(--dev-text-muted); margin-top:6px;">
+                    Token ID: ${escapeHtml(tokenId)} | Expires: ${formatDate(expires)}
+                </div>
+                <div style="font-size:12px; margin-top:8px;">
+                    Use <code>/api/agent/credentials/session-issue</code> while signed in to retrieve a new plaintext token.
+                </div>
+            </div>
+        `);
+        return;
+    }
+
+    refreshedContainer.insertAdjacentHTML('afterbegin', `
+        <div class="agent-generated">
+            <div><strong>New token generated (shown once)</strong></div>
+            <div class="agent-token-value" id="new-agent-token">${escapeHtml(token)}</div>
+            <div style="font-size:12px; color: var(--dev-text-muted);">Token ID: ${escapeHtml(tokenId)} | Expires: ${formatDate(expires)}</div>
+            <div style="font-size:12px; color:#b45309; margin-top:6px;">Copy now — this token may not be shown again.</div>
+            <div style="margin-top:10px;">
+                <button class="dev-btn dev-btn-primary dev-btn-sm" data-action="copy-new-token">Copy Token</button>
+            </div>
+        </div>
+    `);
+}
+
+async function revokeAgentToken(tokenId) {
+    const confirmed = confirm('Revoke this delegated token? The agent will lose access immediately.');
+    if (!confirmed) return;
+
+    const response = await fetch(`/api/agent/credentials/${encodeURIComponent(tokenId)}/revoke`, {
+        method: 'POST',
+        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason: 'Revoked from Agent Delegation tab' })
+    });
+    const data = await response.json();
+    if (!response.ok || !data.success) throw new Error(data.error || 'Failed to revoke token');
+    await loadAgentTokenPanel();
+    await loadAgentActivity();
+}
+
+async function revokeAllActiveTokens() {
+    if (!activeTokens.length) return;
+    const confirmed = confirm(`Revoke all active delegated tokens (${activeTokens.length})?`);
+    if (!confirmed) return;
+    for (const token of activeTokens) {
+        await revokeAgentToken(token.token_id);
+    }
+}
+
+async function loadAgentActivity() {
+    const container = document.getElementById('agent-activity-container');
+    container.innerHTML = '<div class="dev-loading"><div class="dev-spinner"></div><div>Loading activity...</div></div>';
+
+    try {
+        const tokenId = document.getElementById('activity-token-filter')?.value || '';
+        const hours = parseInt(document.getElementById('activity-window')?.value || '24', 10);
+        const failuresOnly = !!document.getElementById('activity-failures-only')?.checked;
+        const query = new URLSearchParams({ hours: String(hours), limit: '200' });
+        if (tokenId) query.set('token_id', tokenId);
+        if (failuresOnly) query.set('failures_only', 'true');
+
+        const response = await fetch(`/api/agent/monitor/events?${query.toString()}`, { headers: getAuthHeaders() });
+        const data = await response.json();
+        if (!response.ok || !data.success) throw new Error(data.error || 'Failed to load activity');
+
+        const events = data.events || [];
+        if (!events.length) {
+            container.innerHTML = '<div class="dev-empty-text">No agent activity found for selected filters.</div>';
+            return;
+        }
+
+        container.innerHTML = `
+            <table class="agent-table">
+                <thead>
+                    <tr>
+                        <th>Time</th>
+                        <th>Token</th>
+                        <th>Method</th>
+                        <th>Path</th>
+                        <th>Status</th>
+                        <th>Deviation</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${events.map((e) => `
+                        <tr>
+                            <td>${formatDate(e.timestamp || e.created_at)}</td>
+                            <td>${escapeHtml(e.token_id || '-')}</td>
+                            <td>${escapeHtml((e.method || 'GET').toUpperCase())}</td>
+                            <td>${escapeHtml(e.path || '-')}</td>
+                            <td>${escapeHtml(String(e.status_code ?? '-'))}</td>
+                            <td>${e.is_deviation ? 'yes' : 'no'}</td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+        `;
+    } catch (e) {
+        container.innerHTML = `<div class="agent-error">${escapeHtml(e.message || 'Failed to load activity')}</div>`;
+    }
+}
+
+function formatDate(value) {
+    if (!value) return '-';
+    const d = new Date(value);
+    if (Number.isNaN(d.getTime())) return '-';
+    return d.toLocaleString();
+}
+
+function escapeHtml(str) {
+    if (str === null || str === undefined) return '';
+    return String(str).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+document.addEventListener('click', async (e) => {
+    const target = e.target.closest('[data-action]');
+    if (!target) return;
+    const action = target.dataset.action;
+    try {
+        if (action === 'generate-token') {
+            await generateAgentToken();
+        } else if (action === 'revoke-token') {
+            await revokeAgentToken(target.dataset.tokenId);
+        } else if (action === 'revoke-all') {
+            await revokeAllActiveTokens();
+        } else if (action === 'apply-activity' || action === 'refresh-activity') {
+            await loadAgentActivity();
+        } else if (action === 'copy-new-token') {
+            const token = document.getElementById('new-agent-token')?.textContent || '';
+            if (token) await navigator.clipboard.writeText(token);
+        }
+    } catch (err) {
+        if (window.showToast) {
+            window.showToast('error', 'Agent Delegation', err.message || 'Action failed');
+        }
+    }
+});
+</script>
+{% endblock %}

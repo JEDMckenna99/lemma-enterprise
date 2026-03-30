@@ -1,0 +1,33 @@
+# Dockerfile.firewall — Standalone Lemma Firewall (AIM gateway) container.
+# Packages scripts/lemma_firewall.py with its api.authz dependencies as a
+# minimal Flask service that validates Lemma proofs and enforces per-API policy.
+
+FROM python:3.11-slim
+
+WORKDIR /app
+
+RUN pip install --no-cache-dir flask requests
+
+# api package root
+COPY api/__init__.py /app/api/__init__.py
+COPY api/trusted_issuers.py /app/api/trusted_issuers.py
+
+# authz sub-package
+COPY api/authz/ /app/api/authz/
+
+# action taxonomy (imported by firewall for local ops)
+COPY api/action_taxonomy.py /app/api/action_taxonomy.py
+
+# firewall script and default policy
+COPY scripts/lemma_firewall.py /app/lemma_firewall.py
+COPY scripts/lemma_firewall_policy.example.json /app/lemma_firewall_policy.example.json
+
+ENV PYTHONPATH=/app
+ENV LEMMA_BASE_URL=https://lemma.id
+ENV LEMMA_FIREWALL_POLICY_FILE=/app/lemma_firewall_policy.example.json
+ENV LEMMA_FIREWALL_HOST=0.0.0.0
+ENV LEMMA_FIREWALL_PORT=8787
+
+EXPOSE 8787
+
+ENTRYPOINT ["python", "/app/lemma_firewall.py"]

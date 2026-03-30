@@ -1,0 +1,1016 @@
+{% extends "modern/layout.html" %}
+
+{% block title %}Agent Ops - lemma.id{% endblock %}
+
+{% block head %}
+{{ super() }}
+<style>
+.ao-wrap{max-width:1080px;margin:28px auto;padding:0 18px 52px;}
+.ao-top{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:14px}
+.ao-brand{display:flex;gap:10px;align-items:center}
+.ao-brand h1{margin:0;font-size:21px;color:#0f172a}
+.ao-org{font-size:12px;color:#64748b}
+.ao-nav{display:flex;gap:8px;flex-wrap:wrap}
+.ao-nav a{padding:7px 11px;border:1px solid #cbd5e1;border-radius:9px;text-decoration:none;font-size:12px;font-weight:700;color:#1f2937;background:#fff}
+.ao-nav a.active{background:#4f46e5;color:#fff;border-color:#4338ca}
+.ao-btn{border:0;border-radius:9px;padding:8px 12px;background:#4f46e5;color:#fff;font-weight:700;cursor:pointer;text-decoration:none;display:inline-block}
+.ao-btn.sec{background:#fff;color:#334155;border:1px solid #cbd5e1}
+.ao-card{background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:16px;box-shadow:0 2px 4px rgba(15,23,42,.04)}
+.ao-grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.ao-k{font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:#64748b}
+.ao-v{font-size:20px;font-weight:700;color:#0f172a;margin-top:4px}
+.ao-sub{font-size:12px;color:#64748b;margin-top:3px}
+.ao-list{margin:8px 0 0;padding-left:16px;color:#334155;font-size:13px}
+.ao-list li{margin:3px 0}
+.ao-layout{display:grid;grid-template-columns:3fr 2fr;gap:14px}
+.ao-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.ao-col{display:grid;gap:9px}
+.ao-input,.ao-select,.ao-text{width:100%;box-sizing:border-box;border:1px solid #dbe3ee;border-radius:9px;padding:8px 10px;font-size:14px;background:#fff}
+.ao-text{min-height:96px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+.ao-checks{display:flex;gap:10px;flex-wrap:wrap;font-size:13px}
+.ao-preview{background:#0f172a;color:#e2e8f0;border-radius:10px;padding:10px;min-height:230px;font-size:12px;overflow:auto}
+.ao-table{width:100%;border-collapse:collapse}
+.ao-table th,.ao-table td{font-size:12px;padding:8px;border-bottom:1px solid #e2e8f0;text-align:left;vertical-align:top}
+.ao-table th{background:#f8fafc;color:#334155}
+.ao-badge{display:inline-block;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:700}
+.ao-valid{background:#dcfce7;color:#166534}
+.ao-revoked{background:#fee2e2;color:#991b1b}
+.ao-expired{background:#fef3c7;color:#92400e}
+.ao-note{font-size:12px;color:#64748b}
+.ao-danger{color:#b91c1c}
+.ao-status{margin:10px 0 0;font-size:12px;padding:8px 10px;border-radius:8px;background:#eef2ff;color:#3730a3;display:none}
+.ao-status.warn{display:block;background:#fef3c7;color:#92400e}
+.ao-status.err{display:block;background:#fee2e2;color:#991b1b}
+.ao-status.ok{display:block;background:#dcfce7;color:#166534}
+.ao-mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+.ao-modal{position:fixed;inset:0;background:rgba(2,6,23,.54);display:none;align-items:center;justify-content:center;z-index:999}
+.ao-modal.open{display:flex}
+.ao-modal-card{width:min(860px,92vw);max-height:84vh;overflow:auto;background:#fff;border-radius:12px;padding:14px;border:1px solid #cbd5e1}
+@media (max-width: 960px){.ao-grid3{grid-template-columns:1fr}.ao-layout{grid-template-columns:1fr}}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="ao-wrap">
+  <div class="ao-top">
+    <div class="ao-brand">
+      <h1>Agent Ops</h1>
+      <div class="ao-org">Your Organization{% if user_email %} ({{ user_email }}){% endif %}</div>
+    </div>
+    <div class="ao-row">
+      <a class="ao-btn sec" href="/logout">Logout</a>
+    </div>
+  </div>
+
+  <div class="ao-nav" style="margin-bottom:12px">
+    <a href="/developer" class="{% if screen == 'dashboard' %}active{% endif %}">Home</a>
+    <a href="/developer/issue-proof" class="{% if screen == 'issue_proof' %}active{% endif %}">Issue Proof</a>
+    <a href="/developer/proofs" class="{% if screen == 'proofs' %}active{% endif %}">Proofs</a>
+    <a href="/developer/settings" class="{% if screen == 'settings' %}active{% endif %}">Settings</a>
+  </div>
+
+  {% if screen == 'dashboard' %}
+  <div class="ao-grid3">
+    <div class="ao-card">
+      <div class="ao-k">Active Proofs</div>
+      <div class="ao-v" id="db-active-proofs">-</div>
+      <div class="ao-sub" id="db-expiring">expiring soon: -</div>
+    </div>
+    <div class="ao-card">
+      <div class="ao-k">Issuers</div>
+      <ul class="ao-list" id="db-issuers"><li>Loading...</li></ul>
+    </div>
+    <div class="ao-card">
+      <div class="ao-k">Agents</div>
+      <ul class="ao-list" id="db-agents"><li>Loading...</li></ul>
+    </div>
+  </div>
+  <div class="ao-layout" style="margin-top:14px">
+    <div class="ao-card">
+      <h2 style="margin:0 0 10px">Runtime Monitor & Controls</h2>
+      <div class="ao-row" style="margin-bottom:10px">
+        <input id="db-runtime-id" class="ao-input ao-mono" style="max-width:240px" value="runtime-default" placeholder="runtime id">
+        <input id="db-org-id" class="ao-input ao-mono" style="max-width:180px" value="org_default" placeholder="org id">
+        <select id="db-environment" class="ao-select" style="max-width:140px">
+          <option value="dev">dev</option>
+          <option value="staging">staging</option>
+          <option value="prod" selected>prod</option>
+        </select>
+        <button id="db-connect-runtime" class="ao-btn sec">Connect runtime</button>
+        <button id="db-recover-runtime" class="ao-btn sec">Recover runtime</button>
+        <button id="db-refresh-runtimes" class="ao-btn sec">Refresh</button>
+        <button id="db-kill-runtime" class="ao-btn sec">Kill runtime</button>
+      </div>
+      <div class="ao-status" id="db-runtime-status"></div>
+      <div style="overflow:auto">
+        <table class="ao-table">
+          <thead><tr><th>Runtime</th><th>Policy</th><th>State</th><th>Trust</th><th>Updated</th></tr></thead>
+          <tbody id="db-runtime-body"><tr><td colspan="5">Loading runtimes...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+    <div class="ao-card">
+      <h2 style="margin:0 0 10px">Policy Lifecycle</h2>
+      <div class="ao-col">
+        <input id="db-policy-id" class="ao-input ao-mono" value="runtime_default_v1" placeholder="policy profile id">
+        <input id="db-policy-version" class="ao-input ao-mono" value="v1" placeholder="policy version">
+        <div class="ao-row">
+          <button id="db-refresh-policies" class="ao-btn sec">Refresh</button>
+          <button id="db-publish-policy" class="ao-btn sec">Publish</button>
+          <button id="db-rollback-policy" class="ao-btn sec">Rollback</button>
+        </div>
+      </div>
+      <div class="ao-status" id="db-policy-status"></div>
+      <div style="overflow:auto;max-height:220px">
+        <table class="ao-table">
+          <thead><tr><th>Profile</th><th>Version</th><th>Status</th></tr></thead>
+          <tbody id="db-policy-body"><tr><td colspan="3">Loading policies...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  <div class="ao-card" style="margin-top:14px">
+    <h2 style="margin:0 0 10px">Decision Feed</h2>
+    <div class="ao-row" style="margin-bottom:10px">
+      <button id="db-refresh-decisions" class="ao-btn sec">Refresh</button>
+      <button id="db-export-decisions" class="ao-btn sec">Export incident bundle</button>
+      <button id="db-webhook-decisions" class="ao-btn sec">Send webhook</button>
+    </div>
+    <div class="ao-status" id="db-decision-status"></div>
+    <div style="overflow:auto">
+      <table class="ao-table">
+        <thead><tr><th>Time</th><th>Decision</th><th>Reason</th><th>Correlation</th><th>Path</th><th>Status</th><th>Action</th></tr></thead>
+        <tbody id="db-decision-body"><tr><td colspan="7">Loading decisions...</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+  <div style="margin-top:14px" class="ao-row">
+    <a class="ao-btn" href="/developer/issue-proof">Issue New Proof</a>
+    <a class="ao-btn sec" href="/developer/proofs">Open Proofs List</a>
+  </div>
+  {% endif %}
+
+  {% if screen == 'issue_proof' %}
+  <div class="ao-layout">
+    <div class="ao-card">
+      <h2 style="margin:0 0 8px">Issue Proof</h2>
+      <div class="ao-col">
+        <div class="ao-row">
+          <div style="min-width:200px;flex:1">
+            <div class="ao-note">Issuer</div>
+            <select id="f-issuer" class="ao-select"></select>
+          </div>
+          <div style="min-width:200px;flex:1">
+            <div class="ao-note">Agent ID / Runtime ID</div>
+            <input id="f-runtime" class="ao-input" placeholder="agent_runtime_01">
+          </div>
+          <div style="min-width:180px;flex:1">
+            <div class="ao-note">Task ID (optional)</div>
+            <input id="f-task" class="ao-input" placeholder="TASK-123">
+          </div>
+        </div>
+        <div>
+          <div class="ao-note">Scopes</div>
+          <div class="ao-checks">
+            <label><input type="checkbox" class="f-scope" value="file.read" checked> file.read</label>
+            <label><input type="checkbox" class="f-scope" value="file.write"> file.write</label>
+            <label><input type="checkbox" class="f-scope" value="shell.exec"> shell.exec</label>
+            <label><input type="checkbox" class="f-scope" value="api.call.*"> api.call.*</label>
+            <label><input type="checkbox" class="f-scope" value="admin.all"> admin.all</label>
+          </div>
+        </div>
+        <div>
+          <div class="ao-note">Resource Bounds (one per line)</div>
+          <textarea id="f-bounds" class="ao-text" placeholder="file.write:/repo/src/**&#10;no:*.env"></textarea>
+        </div>
+        <div class="ao-row">
+          <div style="min-width:200px;flex:1">
+            <div class="ao-note">Expires At</div>
+            <input id="f-expiry" type="datetime-local" class="ao-input">
+          </div>
+          <button type="button" class="ao-btn sec" data-expiry-mins="5">5 min</button>
+          <button type="button" class="ao-btn sec" data-expiry-mins="60">1 hour</button>
+          <button type="button" class="ao-btn sec" data-expiry-mins="1440">24 hours</button>
+        </div>
+        <div class="ao-row">
+          <div style="min-width:180px;flex:1">
+            <div class="ao-note">Trust State</div>
+            <input id="f-trust" class="ao-input" value="safe">
+          </div>
+          <div style="min-width:180px;flex:1">
+            <div class="ao-note">Taint Epoch</div>
+            <input id="f-taint" class="ao-input" value="0">
+          </div>
+        </div>
+        <div>
+          <div class="ao-note">Constraints (key=value per line)</div>
+          <textarea id="f-constraints" class="ao-text" placeholder="max_tokens=2000&#10;region=us-east-1"></textarea>
+        </div>
+        <div class="ao-row">
+          <button id="btn-issue-proof" class="ao-btn">Sign &amp; Issue Proof</button>
+          <span class="ao-note">Creates delegated proof credentials for runtime authorization.</span>
+        </div>
+      </div>
+    </div>
+    <div class="ao-card">
+      <h3 style="margin:0 0 8px">Live Preview</h3>
+      <pre id="issue-preview" class="ao-preview">{}</pre>
+    </div>
+  </div>
+  {% endif %}
+
+  {% if screen == 'proofs' %}
+  <div class="ao-card">
+    <h2 style="margin:0 0 10px">Proofs List</h2>
+    <div class="ao-row" style="margin-bottom:10px">
+      <input id="pf-search" class="ao-input" style="max-width:240px" placeholder="Search by agent or token">
+      <select id="pf-status" class="ao-select" style="max-width:160px">
+        <option value="all">All status</option>
+        <option value="active">Valid</option>
+        <option value="revoked">Revoked</option>
+        <option value="expired">Expired</option>
+      </select>
+      <button id="pf-refresh" class="ao-btn sec">Refresh</button>
+    </div>
+    <div style="overflow:auto">
+      <table class="ao-table">
+        <thead>
+          <tr><th>jti</th><th>Agent / Task</th><th>Scope</th><th>Issued / Expires</th><th>Status</th><th>Last seen</th><th>Actions</th></tr>
+        </thead>
+        <tbody id="pf-body"><tr><td colspan="7">Loading...</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+  {% endif %}
+
+  {% if screen == 'settings' %}
+  <div class="ao-card">
+    <h2 style="margin:0 0 10px">Settings</h2>
+    <div class="ao-col">
+      <div>
+        <div class="ao-note">Issuer keys</div>
+        <div class="ao-row">
+          <a class="ao-btn sec" href="/developer/external-api-keys">Manage API keys</a>
+          <a class="ao-btn sec" href="/developer/sites/lemma.id/keys">Manage site keys</a>
+        </div>
+        <ul class="ao-list" id="st-issuers"><li>Loading issuer registry...</li></ul>
+      </div>
+      <div>
+        <div class="ao-note">Revocation endpoint URL</div>
+        <div class="ao-row">
+          <input id="st-revocation-url" class="ao-input" readonly>
+          <button id="st-copy-rev-url" class="ao-btn sec">Copy</button>
+        </div>
+      </div>
+      <div>
+        <div class="ao-note">API keys for runtimes polling revocation</div>
+        <div class="ao-row">
+          <a class="ao-btn sec" href="/developer/external-api-keys">Open runtime API key manager</a>
+        </div>
+      </div>
+      <div>
+        <div class="ao-note">How to embed verifier</div>
+        <p class="ao-note">Use verifier middleware in your runtime: validate `X-Lemma-Proof` plus PoP, then poll revocation delta and fail closed when stale.</p>
+        <pre class="ao-preview" style="min-height:110px">while True:
+  delta = GET /api/authz/revocation/delta?since=cursor
+  if delta_is_stale: deny_all_privileged()
+  refresh_revocation_cache(delta)</pre>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+</div>
+
+<div id="ao-modal" class="ao-modal">
+  <div class="ao-modal-card">
+    <div class="ao-row" style="justify-content:space-between">
+      <h3 id="ao-modal-title" style="margin:0">Issued Proof</h3>
+      <button id="ao-close-modal" class="ao-btn sec">Close</button>
+    </div>
+    <pre id="ao-modal-json" class="ao-preview" style="margin-top:8px"></pre>
+    <div class="ao-row" style="margin-top:8px">
+      <button id="ao-copy-json" class="ao-btn sec">Copy JSON</button>
+      <button id="ao-download-proof" class="ao-btn sec">Download JSON</button>
+      <button id="ao-copy-curl" class="ao-btn sec">Copy curl command</button>
+    </div>
+  </div>
+</div>
+
+<script nonce="{{ csp_nonce }}">
+const CURRENT_SCREEN = "{{ screen }}";
+const pageState = { credentials: [], issuers: [], runtimes: [], policies: [], decisions: [], issuedPayload: null, modalType: "proof" };
+
+function authHeaders(extra) {
+  if (typeof window.getLemmaAuthHeaders === "function") return window.getLemmaAuthHeaders(extra || {});
+  return extra || {};
+}
+
+async function api(path, options) {
+  const opts = options || {};
+  const req = Object.assign({ credentials: "include", headers: Object.assign({}, authHeaders(), opts.headers || {}) }, opts);
+  const res = await fetch(path, req);
+  const txt = await res.text();
+  let data = {};
+  try { data = JSON.parse(txt); } catch (_e) { data = { raw: txt }; }
+  return { ok: res.ok, status: res.status, data };
+}
+
+function esc(v) {
+  return String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;" }[c]));
+}
+
+function runtimeContext() {
+  const runtimeEl = document.getElementById("db-runtime-id");
+  const orgEl = document.getElementById("db-org-id");
+  const envEl = document.getElementById("db-environment");
+  const runtimeId = runtimeEl ? String(runtimeEl.value || "").trim() : "runtime-default";
+  const orgId = orgEl ? String(orgEl.value || "").trim() : "org_default";
+  let environment = envEl ? String(envEl.value || "").trim().toLowerCase() : "prod";
+  if (!["dev", "staging", "prod"].includes(environment)) environment = "prod";
+  return { runtimeId: runtimeId || "runtime-default", orgId, environment };
+}
+
+function displayRuntimeId(rawId) {
+  const value = String(rawId || "").trim();
+  if (!value) return "-";
+  if (value === "lemma-firewall-default") return "runtime-default";
+  if (value.startsWith("lemma-firewall-")) return `runtime-${value.slice("lemma-firewall-".length)}`;
+  return value;
+}
+
+function runtimeIdForRequest(rawId) {
+  const value = String(rawId || "").trim();
+  if (!value) return "lemma-firewall-default";
+  if (value === "runtime-default") return "lemma-firewall-default";
+  if (value.startsWith("runtime-")) return `lemma-firewall-${value.slice("runtime-".length)}`;
+  return value;
+}
+
+function displayPolicyProfile(rawProfile) {
+  const value = String(rawProfile || "").trim();
+  if (!value) return "-";
+  if (value === "lemma_firewall_default_v1") return "runtime_default_v1";
+  return value;
+}
+
+function displayPath(rawPath) {
+  const pathValue = String(rawPath || "");
+  return pathValue.replace("/runtimes/lemma-firewall-", "/runtimes/runtime-");
+}
+
+function setStatus(id, level, message) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.className = "ao-status";
+  if (!message) {
+    el.textContent = "";
+    return;
+  }
+  if (level === "err") el.classList.add("err");
+  else if (level === "warn") el.classList.add("warn");
+  else if (level === "ok") el.classList.add("ok");
+  else el.classList.add("warn");
+  el.textContent = String(message || "");
+}
+
+function setModalType(type) {
+  const modalType = String(type || "proof");
+  pageState.modalType = modalType;
+  const title = document.getElementById("ao-modal-title");
+  const copyBtn = document.getElementById("ao-copy-json");
+  const dlBtn = document.getElementById("ao-download-proof");
+  const curlBtn = document.getElementById("ao-copy-curl");
+  if (!title || !copyBtn || !dlBtn || !curlBtn) return;
+  if (modalType === "incident_bundle") {
+    title.textContent = "Incident Bundle";
+    copyBtn.textContent = "Copy bundle JSON";
+    dlBtn.textContent = "Download bundle.json";
+    curlBtn.textContent = "Copy export curl";
+    curlBtn.style.display = "none";
+    return;
+  }
+  if (modalType === "decision_explain") {
+    title.textContent = "Decision Explain";
+    copyBtn.textContent = "Copy explain JSON";
+    dlBtn.textContent = "Download explain.json";
+    curlBtn.textContent = "Copy explain curl";
+    curlBtn.style.display = "none";
+    return;
+  }
+  title.textContent = "Issued Proof";
+  copyBtn.textContent = "Copy signed JSON";
+  dlBtn.textContent = "Download .proof";
+  curlBtn.textContent = "Copy curl command";
+  curlBtn.style.display = "";
+}
+
+function setDefaultExpiry(minutes) {
+  const dt = new Date(Date.now() + (minutes * 60 * 1000));
+  const yyyy = dt.getFullYear();
+  const mm = String(dt.getMonth() + 1).padStart(2, "0");
+  const dd = String(dt.getDate()).padStart(2, "0");
+  const hh = String(dt.getHours()).padStart(2, "0");
+  const mi = String(dt.getMinutes()).padStart(2, "0");
+  const input = document.getElementById("f-expiry");
+  if (input) input.value = `${yyyy}-${mm}-${dd}T${hh}:${mi}`;
+}
+
+async function loadIssuers() {
+  const res = await api("/api/authz/jwks");
+  if (!(res.ok && res.data?.success)) return [];
+  const keys = Array.isArray(res.data?.jwks?.keys) ? res.data.jwks.keys : [];
+  pageState.issuers = keys;
+  return keys;
+}
+
+async function loadCredentials() {
+  const res = await api("/api/agent/credentials");
+  if (!(res.ok && res.data?.success && Array.isArray(res.data?.credentials))) return [];
+  pageState.credentials = res.data.credentials;
+  return pageState.credentials;
+}
+
+function statusBadge(status) {
+  if (status === "revoked") return `<span class="ao-badge ao-revoked">Revoked</span>`;
+  if (status === "expired") return `<span class="ao-badge ao-expired">Expired</span>`;
+  return `<span class="ao-badge ao-valid">Valid</span>`;
+}
+
+async function initDashboard() {
+  const [creds, issuers] = await Promise.all([loadCredentials(), loadIssuers()]);
+  const active = creds.filter((c) => c.status === "active");
+  const expiringSoon = active.filter((c) => {
+    const ts = Date.parse(c.expires_at || "");
+    return Number.isFinite(ts) && ts < (Date.now() + (24 * 60 * 60 * 1000));
+  });
+  document.getElementById("db-active-proofs").textContent = String(active.length);
+  document.getElementById("db-expiring").textContent = `expiring soon: ${expiringSoon.length}`;
+
+  const issuerList = issuers.slice(0, 6).map((k) => `<li>${esc(k.kid || k.issuer || "issuer")}</li>`).join("");
+  document.getElementById("db-issuers").innerHTML = issuerList || "<li>No issuers found.</li>";
+
+  const names = [...new Set(active.map((c) => c.agent_name).filter(Boolean))].slice(0, 8);
+  document.getElementById("db-agents").innerHTML = names.length ? names.map((n) => `<li>${esc(n)}</li>`).join("") : "<li>No agents registered.</li>";
+
+  await Promise.all([loadDashboardRuntimes(), loadDashboardPolicies(), loadDashboardDecisions()]);
+  wireDashboardActions();
+}
+
+async function loadDashboardRuntimes() {
+  const { orgId, environment } = runtimeContext();
+  const res = await api(`/api/wallet/runtimes?org_id=${encodeURIComponent(orgId)}&environment=${encodeURIComponent(environment)}`);
+  const tbody = document.getElementById("db-runtime-body");
+  if (!(res.ok && res.data?.success && Array.isArray(res.data?.runtimes))) {
+    tbody.innerHTML = `<tr><td colspan="5">Runtime feed unavailable (${esc(res.data?.error || res.status)}).</td></tr>`;
+    setStatus("db-runtime-status", "err", "Unable to load runtimes. Check wallet session/unlock.");
+    return;
+  }
+  pageState.runtimes = res.data.runtimes;
+  if (!pageState.runtimes.length) {
+    tbody.innerHTML = `<tr><td colspan="5">No runtimes found in scope.</td></tr>`;
+    setStatus("db-runtime-status", "warn", "No runtimes found yet. Use onboarding to connect one.");
+    return;
+  }
+  tbody.innerHTML = pageState.runtimes.map((rt) => `
+    <tr>
+      <td class="ao-mono">${esc(displayRuntimeId(rt.runtime_id))}</td>
+      <td>${esc(displayPolicyProfile(rt.policy_profile))}</td>
+      <td>${rt.active ? '<span class="ao-badge ao-valid">active</span>' : '<span class="ao-badge ao-revoked">killed</span>'}</td>
+      <td>${esc(rt.trust_state || "clean_internal")}</td>
+      <td>${esc(rt.updated_at || rt.last_connected_at || "-")}</td>
+    </tr>
+  `).join("");
+  setStatus("db-runtime-status", "ok", `Loaded ${pageState.runtimes.length} runtime(s).`);
+}
+
+async function loadDashboardPolicies() {
+  const { orgId, environment } = runtimeContext();
+  const res = await api(`/api/wallet/runtimes/policies?org_id=${encodeURIComponent(orgId)}&environment=${encodeURIComponent(environment)}`);
+  const tbody = document.getElementById("db-policy-body");
+  if (!(res.ok && res.data?.success && Array.isArray(res.data?.policy_profiles))) {
+    tbody.innerHTML = `<tr><td colspan="3">Policy feed unavailable (${esc(res.data?.error || res.status)}).</td></tr>`;
+    setStatus("db-policy-status", "err", "Unable to load policy profiles.");
+    return;
+  }
+  pageState.policies = res.data.policy_profiles;
+  if (!pageState.policies.length) {
+    tbody.innerHTML = `<tr><td colspan="3">No policy profiles available.</td></tr>`;
+    setStatus("db-policy-status", "warn", "No policy profiles returned.");
+    return;
+  }
+  tbody.innerHTML = pageState.policies.map((p) => `
+    <tr>
+      <td class="ao-mono">${esc(displayPolicyProfile(p.policy_profile_id))}</td>
+      <td class="ao-mono">${esc(p.policy_version || p.published_version || "-")}</td>
+      <td>${esc(p.status || "active")}</td>
+    </tr>
+  `).join("");
+  setStatus("db-policy-status", "ok", `Loaded ${pageState.policies.length} profile(s).`);
+}
+
+async function loadDashboardDecisions() {
+  const { runtimeId, orgId, environment } = runtimeContext();
+  const query = new URLSearchParams({ runtime_id: runtimeIdForRequest(runtimeId), limit: "20", org_id: orgId, environment });
+  const res = await api(`/api/wallet/runtimes/decisions?${query.toString()}`);
+  const tbody = document.getElementById("db-decision-body");
+  if (!(res.ok && res.data?.success && Array.isArray(res.data?.decisions))) {
+    tbody.innerHTML = `<tr><td colspan="7">Decision feed unavailable (${esc(res.data?.error || res.status)}).</td></tr>`;
+    setStatus("db-decision-status", "err", "Unable to load decision feed.");
+    return;
+  }
+  pageState.decisions = res.data.decisions;
+  if (!pageState.decisions.length) {
+    tbody.innerHTML = `<tr><td colspan="7">No decisions yet for this runtime.</td></tr>`;
+    setStatus("db-decision-status", "warn", "No decisions yet in current scope.");
+    return;
+  }
+  tbody.innerHTML = pageState.decisions.map((d) => `
+    <tr>
+      <td>${esc(d.timestamp || "-")}</td>
+      <td>${String(d.decision || "").toLowerCase() === "allow" ? '<span class="ao-badge ao-valid">allow</span>' : '<span class="ao-badge ao-revoked">deny</span>'}</td>
+      <td>${esc(d.reason_code || "-")}</td>
+      <td class="ao-mono">${esc(d.request_correlation_id || "-")}</td>
+      <td class="ao-mono">${esc(displayPath(d.path || "-"))}</td>
+      <td>${esc(d.status_code || "-")}</td>
+      <td><button class="ao-btn sec" data-explain="${esc(d.decision_id || "")}">Explain</button></td>
+    </tr>
+  `).join("");
+  setStatus("db-decision-status", "ok", `Loaded ${pageState.decisions.length} decision(s).`);
+}
+
+function wireDashboardActions() {
+  const refreshRuntimes = document.getElementById("db-refresh-runtimes");
+  if (refreshRuntimes && !refreshRuntimes.dataset.bound) {
+    refreshRuntimes.dataset.bound = "1";
+    refreshRuntimes.addEventListener("click", async () => { await loadDashboardRuntimes(); });
+  }
+  const refreshPolicies = document.getElementById("db-refresh-policies");
+  if (refreshPolicies && !refreshPolicies.dataset.bound) {
+    refreshPolicies.dataset.bound = "1";
+    refreshPolicies.addEventListener("click", async () => { await loadDashboardPolicies(); });
+  }
+  const refreshDecisions = document.getElementById("db-refresh-decisions");
+  if (refreshDecisions && !refreshDecisions.dataset.bound) {
+    refreshDecisions.dataset.bound = "1";
+    refreshDecisions.addEventListener("click", async () => { await loadDashboardDecisions(); });
+  }
+
+  const connectRuntime = document.getElementById("db-connect-runtime");
+  if (connectRuntime && !connectRuntime.dataset.bound) {
+    connectRuntime.dataset.bound = "1";
+    connectRuntime.addEventListener("click", async () => {
+      const { runtimeId, orgId, environment } = runtimeContext();
+      const requestRuntimeId = runtimeIdForRequest(runtimeId);
+      const res = await api("/api/wallet/runtimes/bootstrap", {
+        method: "POST",
+        headers: Object.assign({ "Content-Type": "application/json" }, authHeaders()),
+        body: JSON.stringify({
+          runtime_id: requestRuntimeId,
+          agent_id: "main",
+          workspace_id: "default",
+          display_name: "Lemma Runtime",
+          policy_profile: "runtime_default_v1",
+          root_type: "passkey_root",
+          org_id: orgId,
+          environment,
+          control_plane_mode: "hosted",
+        }),
+      });
+      if (!(res.ok && res.data?.success)) {
+        setStatus("db-runtime-status", "err", `Connect failed: ${res.data?.error || res.status}`);
+        return;
+      }
+      setStatus("db-runtime-status", "ok", `Runtime ${runtimeId} connected.`);
+      await Promise.all([loadDashboardRuntimes(), loadDashboardDecisions()]);
+    });
+  }
+
+  const recoverRuntime = document.getElementById("db-recover-runtime");
+  if (recoverRuntime && !recoverRuntime.dataset.bound) {
+    recoverRuntime.dataset.bound = "1";
+    recoverRuntime.addEventListener("click", async () => {
+      const { runtimeId, orgId, environment } = runtimeContext();
+      const requestRuntimeId = runtimeIdForRequest(runtimeId);
+      const res = await api("/api/wallet/runtimes/bootstrap", {
+        method: "POST",
+        headers: Object.assign({ "Content-Type": "application/json" }, authHeaders()),
+        body: JSON.stringify({
+          runtime_id: requestRuntimeId,
+          agent_id: "main",
+          workspace_id: "default",
+          display_name: "Lemma Runtime (Recovered)",
+          policy_profile: "runtime_default_v1",
+          root_type: "passkey_root",
+          org_id: orgId,
+          environment,
+          kill_switch_enabled: true,
+          risk_defaults: { low: "proof_required", high: "step_up_required", critical: "deny_until_approved" },
+        }),
+      });
+      if (!(res.ok && res.data?.success)) {
+        setStatus("db-runtime-status", "err", `Recover failed: ${res.data?.error || res.status}`);
+        return;
+      }
+      setStatus("db-runtime-status", "ok", `Runtime ${runtimeId} recovered and active.`);
+      await Promise.all([loadDashboardRuntimes(), loadDashboardDecisions()]);
+    });
+  }
+
+  const killRuntime = document.getElementById("db-kill-runtime");
+  if (killRuntime && !killRuntime.dataset.bound) {
+    killRuntime.dataset.bound = "1";
+    killRuntime.addEventListener("click", async () => {
+      const { runtimeId, orgId, environment } = runtimeContext();
+      const res = await api(`/api/wallet/runtimes/${encodeURIComponent(runtimeIdForRequest(runtimeId))}/kill`, {
+        method: "POST",
+        headers: Object.assign({ "Content-Type": "application/json" }, authHeaders()),
+        body: JSON.stringify({ reason: "operator_dashboard_kill", org_id: orgId, environment }),
+      });
+      if (!(res.ok && res.data?.success)) {
+        setStatus("db-runtime-status", "err", `Kill failed: ${res.data?.error || res.status}`);
+        return;
+      }
+      setStatus("db-runtime-status", "ok", `Runtime ${runtimeId} killed.`);
+      await loadDashboardRuntimes();
+    });
+  }
+
+  const publishPolicy = document.getElementById("db-publish-policy");
+  if (publishPolicy && !publishPolicy.dataset.bound) {
+    publishPolicy.dataset.bound = "1";
+    publishPolicy.addEventListener("click", async () => {
+      const { orgId, environment } = runtimeContext();
+      const policyId = String(document.getElementById("db-policy-id").value || "").trim();
+      const policyVersion = String(document.getElementById("db-policy-version").value || "v1").trim();
+      const res = await api(`/api/wallet/runtimes/policies/${encodeURIComponent(policyId)}/publish`, {
+        method: "POST",
+        headers: Object.assign({ "Content-Type": "application/json" }, authHeaders()),
+        body: JSON.stringify({ policy_version: policyVersion, org_id: orgId, environment }),
+      });
+      if (!(res.ok && res.data?.success)) {
+        setStatus("db-policy-status", "err", `Publish failed: ${res.data?.error || res.status}`);
+        return;
+      }
+      setStatus("db-policy-status", "ok", `Published ${policyId}@${policyVersion}.`);
+      await loadDashboardPolicies();
+    });
+  }
+
+  const rollbackPolicy = document.getElementById("db-rollback-policy");
+  if (rollbackPolicy && !rollbackPolicy.dataset.bound) {
+    rollbackPolicy.dataset.bound = "1";
+    rollbackPolicy.addEventListener("click", async () => {
+      const { orgId, environment } = runtimeContext();
+      const policyId = String(document.getElementById("db-policy-id").value || "").trim();
+      const res = await api(`/api/wallet/runtimes/policies/${encodeURIComponent(policyId)}/rollback`, {
+        method: "POST",
+        headers: Object.assign({ "Content-Type": "application/json" }, authHeaders()),
+        body: JSON.stringify({ org_id: orgId, environment }),
+      });
+      if (!(res.ok && res.data?.success)) {
+        setStatus("db-policy-status", "err", `Rollback failed: ${res.data?.error || res.status}`);
+        return;
+      }
+      setStatus("db-policy-status", "ok", `Rolled back ${policyId}.`);
+      await loadDashboardPolicies();
+    });
+  }
+
+  const exportDecisions = document.getElementById("db-export-decisions");
+  if (exportDecisions && !exportDecisions.dataset.bound) {
+    exportDecisions.dataset.bound = "1";
+    exportDecisions.addEventListener("click", async () => {
+      const { runtimeId, orgId, environment } = runtimeContext();
+      const query = new URLSearchParams({ runtime_id: runtimeIdForRequest(runtimeId), limit: "100", format: "json", org_id: orgId, environment });
+      const res = await api(`/api/wallet/runtimes/decisions/export?${query.toString()}`);
+      if (!(res.ok && res.data?.success)) {
+        setStatus("db-decision-status", "err", `Export failed: ${res.data?.error || res.status}`);
+        return;
+      }
+      pageState.issuedPayload = res.data;
+      setModalType("incident_bundle");
+      openIssuedModal();
+      setStatus("db-decision-status", "ok", `Export bundle opened in modal.`);
+    });
+  }
+
+  const webhookDecisions = document.getElementById("db-webhook-decisions");
+  if (webhookDecisions && !webhookDecisions.dataset.bound) {
+    webhookDecisions.dataset.bound = "1";
+    webhookDecisions.addEventListener("click", async () => {
+      const { runtimeId, orgId, environment } = runtimeContext();
+      const destination = window.prompt("Webhook URL for decision export");
+      if (!destination) return;
+      const res = await api("/api/wallet/runtimes/decisions/webhook", {
+        method: "POST",
+        headers: Object.assign({ "Content-Type": "application/json" }, authHeaders()),
+        body: JSON.stringify({ runtime_id: runtimeIdForRequest(runtimeId), destination_url: destination, org_id: orgId, environment, limit: 100 }),
+      });
+      if (!(res.ok && res.data?.success)) {
+        setStatus("db-decision-status", "err", `Webhook failed: ${res.data?.error || res.status}`);
+        return;
+      }
+      setStatus("db-decision-status", "ok", `Webhook sent (${res.data?.count || 0} decisions).`);
+    });
+  }
+
+  const decisionBody = document.getElementById("db-decision-body");
+  if (decisionBody && !decisionBody.dataset.bound) {
+    decisionBody.dataset.bound = "1";
+    decisionBody.addEventListener("click", async (event) => {
+      const explainId = event.target.getAttribute("data-explain");
+      if (!explainId) return;
+      const decisionId = parseInt(explainId, 10);
+      if (!Number.isFinite(decisionId)) return;
+      const res = await api(`/api/wallet/runtimes/decisions/${encodeURIComponent(String(decisionId))}/explain`);
+      if (!(res.ok && res.data?.success)) {
+        setStatus("db-decision-status", "err", `Explain failed: ${res.data?.error || res.status}`);
+        return;
+      }
+      pageState.issuedPayload = res.data;
+      setModalType("decision_explain");
+      openIssuedModal();
+      const reason = String(res.data?.decision?.reason_code || res.data?.explanation?.reason_code || "unknown_reason");
+      setStatus("db-decision-status", "ok", `Explain loaded for decision ${decisionId}: ${reason}`);
+    });
+  }
+}
+
+function collectIssueFormData() {
+  const scopes = Array.from(document.querySelectorAll(".f-scope:checked")).map((n) => n.value);
+  const constraints = {};
+  String(document.getElementById("f-constraints").value || "").split("\n").forEach((line) => {
+    const trimmed = line.trim();
+    if (!trimmed || !trimmed.includes("=")) return;
+    const idx = trimmed.indexOf("=");
+    constraints[trimmed.slice(0, idx).trim()] = trimmed.slice(idx + 1).trim();
+  });
+  const resourceBounds = String(document.getElementById("f-bounds").value || "").split("\n").map((l) => l.trim()).filter(Boolean);
+  return {
+    version: 1,
+    issuer_id: document.getElementById("f-issuer").value || "default",
+    runtime_id: document.getElementById("f-runtime").value.trim(),
+    task_id: document.getElementById("f-task").value.trim() || null,
+    scope: scopes,
+    resource_bounds: resourceBounds,
+    expires_at: document.getElementById("f-expiry").value || null,
+    trust_state: document.getElementById("f-trust").value.trim() || "safe",
+    taint_epoch: document.getElementById("f-taint").value.trim() || "0",
+    constraints,
+  };
+}
+
+function normalizeScopesForIssue(scopeList) {
+  const out = new Set(["read"]);
+  const raw = Array.isArray(scopeList) ? scopeList : [];
+  if (raw.some((s) => s.includes("write") || s.includes("shell.exec"))) out.add("write");
+  if (raw.some((s) => s.includes("admin"))) out.add("admin");
+  if (raw.some((s) => s.includes("api.call"))) out.add("test");
+  return Array.from(out);
+}
+
+function parseBoundsToAllowedPaths(bounds) {
+  return bounds
+    .filter((b) => !b.startsWith("no:"))
+    .map((b) => {
+      const idx = b.indexOf(":");
+      if (idx === -1) return null;
+      const pathPart = b.slice(idx + 1).trim();
+      if (!pathPart.startsWith("/")) return null;
+      return pathPart;
+    })
+    .filter(Boolean);
+}
+
+function updateIssuePreview() {
+  const model = collectIssueFormData();
+  document.getElementById("issue-preview").textContent = JSON.stringify(model, null, 2);
+}
+
+async function issueProof() {
+  const model = collectIssueFormData();
+  if (!model.runtime_id) {
+    alert("Agent ID / Runtime ID is required.");
+    return;
+  }
+  const expiresTs = Date.parse(model.expires_at || "");
+  const ttlHours = Number.isFinite(expiresTs) ? Math.max(1, Math.min(24, Math.ceil((expiresTs - Date.now()) / (60 * 60 * 1000)))) : 1;
+  const scope = normalizeScopesForIssue(model.scope);
+  const allowedPaths = parseBoundsToAllowedPaths(model.resource_bounds);
+  const description = JSON.stringify({
+    issuer_id: model.issuer_id,
+    trust_state: model.trust_state,
+    taint_epoch: model.taint_epoch,
+    constraints: model.constraints,
+    resource_bounds: model.resource_bounds,
+  });
+
+  const payload = {
+    agent_name: model.runtime_id,
+    scope,
+    ttl_hours: ttlHours,
+    task: model.task_id || null,
+    allowed_paths: allowedPaths.length ? allowedPaths : null,
+    intended_platform: "lemma.id",
+    description,
+    admin_credential: window.lemmaCredential || null,
+  };
+
+  const res = await api("/api/agent/credentials/issue", {
+    method: "POST",
+    headers: Object.assign({ "Content-Type": "application/json" }, authHeaders()),
+    body: JSON.stringify(payload),
+  });
+  if (!(res.ok && res.data?.success)) {
+    alert(`Issue failed: ${res.data?.error || res.status}`);
+    return;
+  }
+
+  const signed = {
+    ...model,
+    issued_at: new Date().toISOString(),
+    jti: res.data?.credential?.token_id || null,
+    delegated_proof: res.data?.credential || null,
+  };
+  pageState.issuedPayload = signed;
+  setModalType("proof");
+  openIssuedModal();
+}
+
+function openIssuedModal() {
+  const modal = document.getElementById("ao-modal");
+  const pre = document.getElementById("ao-modal-json");
+  setModalType(pageState.modalType || "proof");
+  pre.textContent = JSON.stringify(pageState.issuedPayload || {}, null, 2);
+  modal.classList.add("open");
+}
+
+function closeIssuedModal() {
+  document.getElementById("ao-modal").classList.remove("open");
+}
+
+function copyText(value) {
+  return navigator.clipboard.writeText(String(value || ""));
+}
+
+function copyCurlCommand() {
+  if (pageState.modalType !== "proof") return;
+  const payload = pageState.issuedPayload || {};
+  const token = payload?.delegated_proof?.token || "<token>";
+  const cmd = `curl -H "X-Agent-Token: ${token}" https://lemma.id/api/agent/monitor/events?hours=1`;
+  copyText(cmd);
+}
+
+function downloadProof() {
+  const raw = JSON.stringify(pageState.issuedPayload || {}, null, 2);
+  const blob = new Blob([raw], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  const base = pageState.modalType === "proof"
+    ? (pageState.issuedPayload?.jti || "issued-proof")
+    : `${pageState.modalType || "incident-bundle"}-${new Date().toISOString().replace(/[:.]/g, "-")}`;
+  const ext = pageState.modalType === "proof" ? ".proof" : ".json";
+  a.download = `${base}${ext}`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+function renderProofRows() {
+  const tbody = document.getElementById("pf-body");
+  const query = String(document.getElementById("pf-search").value || "").toLowerCase();
+  const status = document.getElementById("pf-status").value;
+  const rows = pageState.credentials.filter((c) => {
+    const statusOk = status === "all" ? true : c.status === status;
+    const text = `${c.token_id || ""} ${c.agent_name || ""} ${c.task_description || ""}`.toLowerCase();
+    const queryOk = !query || text.includes(query);
+    return statusOk && queryOk;
+  });
+  if (!rows.length) {
+    tbody.innerHTML = `<tr><td colspan="7">No proofs found for filters.</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = rows.map((c) => `
+    <tr>
+      <td><button class="ao-btn sec" data-view="${esc(c.token_id)}">${esc(c.token_id)}</button></td>
+      <td>${esc(c.agent_name || "-")}<br><span class="ao-note">${esc(c.task_description || "-")}</span></td>
+      <td>${(c.scope || []).map((s) => `<span class="ao-badge ao-valid">${esc(s)}</span>`).join(" ") || "-"}</td>
+      <td>${esc(c.issued_at || "-")}<br>${esc(c.expires_at || "-")}</td>
+      <td>${statusBadge(c.status)}</td>
+      <td>${esc(c.last_used_at || "-")}</td>
+      <td>
+        <button class="ao-btn sec" data-reissue="${esc(c.token_id)}">Re-issue</button>
+        <button class="ao-btn sec" data-revoke="${esc(c.token_id)}">Revoke</button>
+      </td>
+    </tr>
+  `).join("");
+}
+
+async function revokeProof(tokenId) {
+  const res = await api(`/api/agent/credentials/${encodeURIComponent(tokenId)}/revoke`, {
+    method: "POST",
+    headers: Object.assign({ "Content-Type": "application/json" }, authHeaders()),
+    body: JSON.stringify({ reason: "developer_proofs_table_revoke" }),
+  });
+  if (!(res.ok && res.data?.success)) {
+    alert(`Revoke failed: ${res.data?.error || res.status}`);
+    return;
+  }
+  await initProofs();
+}
+
+function reissueFromProof(tokenId) {
+  const selected = pageState.credentials.find((c) => c.token_id === tokenId);
+  if (!selected) return;
+  sessionStorage.setItem("issueProofPrefill", JSON.stringify({
+    runtime_id: selected.agent_name || "",
+    task_id: selected.task_description || "",
+    scope: selected.scope || ["read"],
+  }));
+  window.location.href = "/developer/issue-proof";
+}
+
+async function initIssueProof() {
+  const issuers = await loadIssuers();
+  const selector = document.getElementById("f-issuer");
+  selector.innerHTML = issuers.map((i) => `<option value="${esc(i.kid || i.issuer || "issuer")}">${esc(i.kid || i.issuer || "issuer")}</option>`).join("") || `<option value="default">default</option>`;
+
+  const prefillRaw = sessionStorage.getItem("issueProofPrefill");
+  if (prefillRaw) {
+    try {
+      const p = JSON.parse(prefillRaw);
+      if (p.runtime_id) document.getElementById("f-runtime").value = p.runtime_id;
+      if (p.task_id) document.getElementById("f-task").value = p.task_id;
+      if (Array.isArray(p.scope)) {
+        document.querySelectorAll(".f-scope").forEach((n) => {
+          n.checked = p.scope.some((s) => String(s).toLowerCase().includes(String(n.value).split(".")[0]));
+        });
+      }
+    } catch (_e) {}
+    sessionStorage.removeItem("issueProofPrefill");
+  }
+  setDefaultExpiry(60);
+  updateIssuePreview();
+
+  document.querySelectorAll(".f-scope, #f-issuer, #f-runtime, #f-task, #f-bounds, #f-expiry, #f-trust, #f-taint, #f-constraints")
+    .forEach((el) => el.addEventListener("input", updateIssuePreview));
+  document.querySelectorAll("[data-expiry-mins]").forEach((btn) => btn.addEventListener("click", () => {
+    setDefaultExpiry(parseInt(btn.getAttribute("data-expiry-mins"), 10) || 60);
+    updateIssuePreview();
+  }));
+  document.getElementById("btn-issue-proof").addEventListener("click", issueProof);
+}
+
+async function initProofs() {
+  await loadCredentials();
+  renderProofRows();
+  document.getElementById("pf-search").addEventListener("input", renderProofRows);
+  document.getElementById("pf-status").addEventListener("change", renderProofRows);
+  document.getElementById("pf-refresh").addEventListener("click", async () => { await initProofs(); });
+  document.getElementById("pf-body").addEventListener("click", async (e) => {
+    const viewId = e.target.getAttribute("data-view");
+    const revokeId = e.target.getAttribute("data-revoke");
+    const reissueId = e.target.getAttribute("data-reissue");
+    if (viewId) {
+      const item = pageState.credentials.find((c) => c.token_id === viewId);
+      pageState.issuedPayload = item || {};
+      setModalType("proof");
+      openIssuedModal();
+    }
+    if (revokeId) await revokeProof(revokeId);
+    if (reissueId) reissueFromProof(reissueId);
+  });
+}
+
+async function initSettings() {
+  const input = document.getElementById("st-revocation-url");
+  input.value = `${window.location.origin}/api/authz/revocation/delta`;
+  document.getElementById("st-copy-rev-url").addEventListener("click", () => copyText(input.value));
+  const issuers = await loadIssuers();
+  document.getElementById("st-issuers").innerHTML = issuers.length
+    ? issuers.map((i) => `<li>${esc(i.kid || i.issuer || "issuer")}</li>`).join("")
+    : "<li>No issuers found.</li>";
+}
+
+function wireModal() {
+  setModalType("proof");
+  document.getElementById("ao-close-modal").addEventListener("click", closeIssuedModal);
+  document.getElementById("ao-copy-json").addEventListener("click", () => copyText(JSON.stringify(pageState.issuedPayload || {}, null, 2)));
+  document.getElementById("ao-download-proof").addEventListener("click", downloadProof);
+  document.getElementById("ao-copy-curl").addEventListener("click", copyCurlCommand);
+}
+
+async function init() {
+  wireModal();
+  if (CURRENT_SCREEN === "dashboard") await initDashboard();
+  if (CURRENT_SCREEN === "issue_proof") await initIssueProof();
+  if (CURRENT_SCREEN === "proofs") await initProofs();
+  if (CURRENT_SCREEN === "settings") await initSettings();
+}
+
+init();
+</script>
+{% endblock %}
+

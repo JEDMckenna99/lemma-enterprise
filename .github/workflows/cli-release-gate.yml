@@ -1,0 +1,64 @@
+name: CLI Release Gate
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "pyproject.toml"
+      - "scripts/lemma_cli.py"
+      - "scripts/lemma_firewall.py"
+      - "api/action_taxonomy.py"
+      - "tests/test_lemma_cli.py"
+      - "tests/test_developer_control_panel.py"
+      - "docs/CLI_RELEASE_CHECKLIST.md"
+      - "docs/CLI_PYPI_README.md"
+      - ".github/workflows/cli-release-gate.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "pyproject.toml"
+      - "scripts/lemma_cli.py"
+      - "scripts/lemma_firewall.py"
+      - "api/action_taxonomy.py"
+      - "tests/test_lemma_cli.py"
+      - "tests/test_developer_control_panel.py"
+      - "docs/CLI_RELEASE_CHECKLIST.md"
+      - "docs/CLI_PYPI_README.md"
+
+jobs:
+  cli-test-matrix:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.11", "3.12"]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install pytest requests build twine
+
+      - name: Run CLI unit tests
+        run: python -m pytest tests/test_lemma_cli.py -v
+
+      - name: Run developer control panel tests
+        run: python -m pytest tests/test_developer_control_panel.py -v
+
+      - name: Install package editable and verify entrypoint
+        run: |
+          python -m pip install -e . --no-deps
+          lemma --help
+
+      - name: Build and validate distributions
+        run: |
+          python -m build
+          python -m twine check dist/*

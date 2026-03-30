@@ -1,0 +1,77 @@
+name: Auth Launch Gate
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+  schedule:
+    - cron: "20 13 * * *"
+
+jobs:
+  auth-launch-gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      LEMMA_BASE_URL: https://lemma.id
+      LEMMA_PLATFORM_API_KEY: ${{ secrets.LEMMA_PLATFORM_API_KEY }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Verify required secret
+        run: |
+          if [ -z "${LEMMA_PLATFORM_API_KEY}" ]; then
+            echo "LEMMA_PLATFORM_API_KEY secret is required for strict auth launch gate."
+            exit 1
+          fi
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install requests
+
+      - name: Run default CLI+API proof regression bundle (MCP-free)
+        shell: pwsh
+        run: >
+          ./scripts/run_cli_api_proof_regression.ps1
+          -LemmaUrl "$env:LEMMA_BASE_URL"
+
+      - name: Run launch gate smoke
+        run: python scripts/launch_gate_smoke_ci.py
+
+      - name: Run Redis degrade gate checks
+        run: python scripts/redis_degrade_gate_check.py
+
+      - name: Generate and review auth scope matrix (strict)
+        run: |
+          python scripts/generate_auth_scope_matrix.py
+          python scripts/review_auth_scope_matrix.py --strict-state-changing
+
+      - name: Run proof exchange contract checks
+        run: python scripts/proof_exchange_contract_check.py
+
+      - name: Run auth scope matrix checks
+        run: python scripts/auth_scope_matrix_check.py
+
+      - name: Run strict post-deploy launch gate bundle
+        shell: pwsh
+        run: >
+          ./scripts/post_deploy_launch_gate.ps1
+          -BaseUrl "$env:LEMMA_BASE_URL"
+          -OutputDir "ops/evidence/launch"
+          -PlatformApiKey "$env:LEMMA_PLATFORM_API_KEY"
+          -StrictScopePolicy
+          -RequirePlatformApiKey
+
+      - name: Upload launch evidence artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: auth-launch-gate-evidence
+          path: ops/evidence/launch/*

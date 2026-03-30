@@ -1,0 +1,250 @@
+{% extends "developer/layout.html" %}
+{% set active_page = 'external_keys' %}
+{% block dev_content %}
+<div class="dev-header">
+    <h1 class="dev-title">External API Key Manager</h1>
+    <p class="dev-subtitle">Manage customer/external API keys and site registrations for Agent Ops integrations.</p>
+</div>
+
+<div class="dev-card" style="margin-bottom: 16px;">
+    <div class="dev-card-body" style="display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap;">
+        <div style="color:#64748b; font-size:14px;">
+            Use this for external/customer site onboarding keys. Internal admin site keys remain under per-site admin controls.
+        </div>
+        <button class="dev-btn dev-btn-primary" type="button" data-action="show-register-modal">Register Site + Issue Key</button>
+    </div>
+</div>
+
+<div class="dev-card">
+    <div class="dev-card-header">
+        <h2 class="dev-card-title">External Keys</h2>
+    </div>
+    <div class="dev-card-body" style="padding:0;">
+        <table class="table-enhanced" style="width:100%;">
+            <thead>
+                <tr>
+                    <th style="padding:12px 16px;">Name</th>
+                    <th>Site</th>
+                    <th>Key Hint</th>
+                    <th>Status</th>
+                    <th>Created</th>
+                    <th style="width:160px;">Actions</th>
+                </tr>
+            </thead>
+            <tbody id="external-keys-table">
+                <tr><td colspan="6" style="padding:40px; text-align:center;">Loading keys...</td></tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="panel-overlay" id="register-overlay" style="display:none;"></div>
+<div class="slide-panel" id="register-panel" style="width:460px;">
+    <div class="panel-header">
+        <h3 class="panel-title">Register External Site</h3>
+        <button class="panel-close" type="button" data-action="close-register-modal">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+        </button>
+    </div>
+    <div class="panel-body">
+        <form id="register-form">
+            <div class="panel-field" style="margin-bottom:12px;">
+                <label class="panel-field-label" for="reg-site-domain">Site Domain</label>
+                <input id="reg-site-domain" class="focus-ring" required placeholder="customer.example.com" style="width:100%; padding:10px 12px; border:1px solid #e2e8f0; border-radius:6px;">
+            </div>
+            <div class="panel-field" style="margin-bottom:12px;">
+                <label class="panel-field-label" for="reg-site-label">Site Label</label>
+                <input id="reg-site-label" class="focus-ring" placeholder="Customer Production" style="width:100%; padding:10px 12px; border:1px solid #e2e8f0; border-radius:6px;">
+            </div>
+            <div class="panel-field" style="margin-bottom:12px;">
+                <label class="panel-field-label" for="reg-env">Environment</label>
+                <select id="reg-env" class="focus-ring" style="width:100%; padding:10px 12px; border:1px solid #e2e8f0; border-radius:6px;">
+                    <option value="production">Production</option>
+                    <option value="staging">Staging</option>
+                    <option value="sandbox">Sandbox</option>
+                    <option value="development">Development</option>
+                </select>
+            </div>
+            <div class="panel-field" style="margin-bottom:12px;">
+                <label class="panel-field-label" for="reg-key-name">Key Name</label>
+                <input id="reg-key-name" class="focus-ring" placeholder="External Integration Key" style="width:100%; padding:10px 12px; border:1px solid #e2e8f0; border-radius:6px;">
+            </div>
+            <div class="panel-field" style="margin-bottom:12px;">
+                <label class="panel-field-label" for="reg-contact-email">Contact Email</label>
+                <input id="reg-contact-email" class="focus-ring" type="email" placeholder="ops@example.com" style="width:100%; padding:10px 12px; border:1px solid #e2e8f0; border-radius:6px;">
+            </div>
+        </form>
+    </div>
+    <div class="panel-footer">
+        <button class="dev-btn dev-btn-secondary" type="button" data-action="close-register-modal">Cancel</button>
+        <button class="dev-btn dev-btn-primary" type="button" data-action="submit-register">Register + Issue Key</button>
+    </div>
+</div>
+
+<div class="panel-overlay" id="new-key-overlay" style="display:none;">
+    <div style="position:fixed; top:50%; left:50%; transform:translate(-50%,-50%); background:#fff; border-radius:14px; width:560px; max-width:92vw; padding:24px; z-index:1002;">
+        <h3 style="margin:0 0 10px;">New External API Key</h3>
+        <p style="margin:0 0 14px; color:#64748b; font-size:14px;">Copy this now. Full value is shown once.</p>
+        <code id="new-external-key-value" style="display:block; white-space:normal; word-break:break-all; background:#111827; color:#22c55e; padding:14px; border-radius:8px; font-size:13px;"></code>
+        <div style="display:flex; gap:10px; margin-top:14px;">
+            <button class="dev-btn dev-btn-secondary" type="button" data-action="copy-new-external-key">Copy</button>
+            <button class="dev-btn dev-btn-primary" type="button" data-action="close-new-external-key">Done</button>
+        </div>
+    </div>
+</div>
+
+<script nonce="{{ csp_nonce }}">
+let externalKeys = [];
+let newExternalKey = '';
+
+function authHeaders() {
+    const base = (typeof window.getLemmaAuthHeaders === 'function')
+        ? window.getLemmaAuthHeaders({ 'Content-Type': 'application/json' })
+        : { 'Content-Type': 'application/json' };
+    return base;
+}
+
+function formatDate(value) {
+    if (!value) return '—';
+    try { return new Date(value).toLocaleString(); } catch { return value; }
+}
+
+function safe(value) {
+    if (!value) return '';
+    const div = document.createElement('div');
+    div.textContent = value;
+    return div.innerHTML;
+}
+
+async function loadExternalKeys() {
+    const tbody = document.getElementById('external-keys-table');
+    tbody.innerHTML = '<tr><td colspan="6" style="padding:32px; text-align:center;">Loading keys...</td></tr>';
+    try {
+        const resp = await fetch('/api/customer/api-keys', { method: 'GET', headers: authHeaders() });
+        const data = await resp.json();
+        if (!resp.ok || !data.success) throw new Error(data.error || 'Failed to load keys');
+        externalKeys = data.api_keys || [];
+        const siteMap = {};
+        (data.sites || []).forEach((s) => { if (s && s.site_id) siteMap[s.site_id] = s; });
+
+        if (!externalKeys.length) {
+            tbody.innerHTML = '<tr><td colspan="6" style="padding:40px; text-align:center; color:#64748b;">No external keys yet.</td></tr>';
+            return;
+        }
+        tbody.innerHTML = externalKeys.map((k) => {
+            const site = siteMap[k.site_id] || {};
+            const siteLabel = site.site_domain || k.site_id || '—';
+            const status = k.status || 'active';
+            return `
+                <tr>
+                    <td style="padding:12px 16px; font-weight:500;">${safe(k.name || 'External Key')}</td>
+                    <td>${safe(siteLabel)}</td>
+                    <td><code>...${safe(k.key_hint || '')}</code></td>
+                    <td><span class="status-badge ${status === 'active' ? 'active' : 'revoked'}">${safe(status)}</span></td>
+                    <td>${safe(formatDate(k.created_at))}</td>
+                    <td>
+                        <div style="display:flex; gap:8px;">
+                            <button class="dev-btn dev-btn-sm" type="button" data-action="rotate-key" data-site-id="${safe(k.site_id || '')}" data-key-hint="${safe(k.key_hint || '')}">Rotate</button>
+                            <button class="dev-btn dev-btn-sm dev-btn-danger" type="button" data-action="revoke-key" data-site-id="${safe(k.site_id || '')}" data-key-hint="${safe(k.key_hint || '')}">Revoke</button>
+                        </div>
+                    </td>
+                </tr>
+            `;
+        }).join('');
+    } catch (e) {
+        tbody.innerHTML = `<tr><td colspan="6" style="padding:32px; text-align:center; color:#dc2626;">${safe(e.message || 'Failed to load keys')}</td></tr>`;
+    }
+}
+
+async function submitRegister() {
+    const body = {
+        site_domain: document.getElementById('reg-site-domain').value.trim(),
+        site_label: document.getElementById('reg-site-label').value.trim(),
+        environment: document.getElementById('reg-env').value,
+        key_name: document.getElementById('reg-key-name').value.trim(),
+        contact_email: document.getElementById('reg-contact-email').value.trim()
+    };
+    if (!body.site_domain) {
+        if (window.showToast) window.showToast('error', 'Site domain required', '');
+        return;
+    }
+    const resp = await fetch('/api/customer/register-site', {
+        method: 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify(body)
+    });
+    const data = await resp.json();
+    if (!resp.ok || !data.success) throw new Error(data.error || 'Failed to register site');
+    newExternalKey = data.api_key || '';
+    document.getElementById('new-external-key-value').textContent = newExternalKey;
+    document.getElementById('new-key-overlay').style.display = 'block';
+    document.getElementById('register-overlay').style.display = 'none';
+    document.getElementById('register-panel').classList.remove('open');
+    document.getElementById('register-form').reset();
+}
+
+async function rotateExternalKey(siteId, keyHint) {
+    if (!siteId || !keyHint) return;
+    if (!confirm(`Rotate key ...${keyHint}?`)) return;
+    const resp = await fetch('/api/customer/api-keys/rotate', {
+        method: 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify({ site_id: siteId, key_hint: keyHint })
+    });
+    const data = await resp.json();
+    if (!resp.ok || !data.success) throw new Error(data.error || 'Failed to rotate key');
+    newExternalKey = data.new_api_key || '';
+    document.getElementById('new-external-key-value').textContent = newExternalKey;
+    document.getElementById('new-key-overlay').style.display = 'block';
+    await loadExternalKeys();
+}
+
+async function revokeExternalKey(siteId, keyHint) {
+    if (!siteId || !keyHint) return;
+    if (!confirm(`Revoke key ...${keyHint}? This cannot be undone.`)) return;
+    const resp = await fetch('/api/customer/api-keys', {
+        method: 'DELETE',
+        headers: authHeaders(),
+        body: JSON.stringify({ site_id: siteId, key_hint: keyHint })
+    });
+    const data = await resp.json();
+    if (!resp.ok || !data.success) throw new Error(data.error || 'Failed to revoke key');
+    await loadExternalKeys();
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    loadExternalKeys();
+});
+
+document.addEventListener('click', async (event) => {
+    const target = event.target.closest('[data-action]');
+    if (!target) return;
+    const action = target.dataset.action;
+    try {
+        if (action === 'show-register-modal') {
+            document.getElementById('register-overlay').style.display = 'block';
+            document.getElementById('register-panel').classList.add('open');
+        } else if (action === 'close-register-modal') {
+            document.getElementById('register-overlay').style.display = 'none';
+            document.getElementById('register-panel').classList.remove('open');
+        } else if (action === 'submit-register') {
+            await submitRegister();
+        } else if (action === 'rotate-key') {
+            await rotateExternalKey(target.dataset.siteId || '', target.dataset.keyHint || '');
+        } else if (action === 'revoke-key') {
+            await revokeExternalKey(target.dataset.siteId || '', target.dataset.keyHint || '');
+        } else if (action === 'copy-new-external-key') {
+            if (newExternalKey) await navigator.clipboard.writeText(newExternalKey);
+        } else if (action === 'close-new-external-key') {
+            document.getElementById('new-key-overlay').style.display = 'none';
+            newExternalKey = '';
+        }
+    } catch (e) {
+        if (window.showToast) window.showToast('error', 'External key operation failed', e.message || 'Unknown error');
+    }
+});
+</script>
+{% endblock %}

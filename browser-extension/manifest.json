@@ -1,0 +1,50 @@
+{
+  "manifest_version": 3,
+  "name": "Lemma DevTools",
+  "version": "1.0.0",
+  "description": "Developer tools for debugging Lemma credential verification processes",
+  "permissions": [
+    "activeTab",
+    "debugger",
+    "storage",
+    "scripting"
+  ],
+  "host_permissions": [
+    "http://localhost/*",
+    "https://localhost/*",
+    "https://*.lemma.id/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"],
+      "run_at": "document_start"
+    }
+  ],
+  "devtools_page": "devtools.html",
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Lemma DevTools",
+    "default_icon": {
+      "16": "icons/lemma-16.png",
+      "32": "icons/lemma-32.png",
+      "48": "icons/lemma-48.png",
+      "128": "icons/lemma-128.png"
+    }
+  },
+  "icons": {
+    "16": "icons/lemma-16.png",
+    "32": "icons/lemma-32.png",
+    "48": "icons/lemma-48.png",
+    "128": "icons/lemma-128.png"
+  },
+  "web_accessible_resources": [
+    {
+      "resources": ["injected.js", "lemma-detector.js"],
+      "matches": ["<all_urls>"]
+    }
+  ]
+} 
