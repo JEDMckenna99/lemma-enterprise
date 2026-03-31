@@ -458,6 +458,14 @@ def create_app():
     except Exception as e:
         logger.error(f"❌ Failed to register Authz Control Plane API: {e}")
 
+    # isHuman Network API (proof-of-humanity verification, site-blocks, revocation)
+    try:
+        from api.ishuman import ishuman_bp
+        app.register_blueprint(ishuman_bp)
+        logger.info("✅ isHuman Network API registered")
+    except Exception as e:
+        logger.error(f"❌ Failed to register isHuman Network API: {e}")
+
     # Optional background freshness client for local-first authz runtime state.
     try:
         from api.authz.freshness_client import start_background_freshness_client
@@ -819,6 +827,16 @@ def create_app():
         response.headers['Pragma'] = 'no-cache'
         response.headers['Expires'] = '0'
         response.headers['X-SDK-Version'] = '2.36.0'
+        response.headers['Access-Control-Allow-Origin'] = '*'
+        return response
+
+    @app.route('/sdk/ishuman-verifier.js')
+    def ishuman_verifier_sdk():
+        """Serve the isHuman verifier SDK with cache-busting headers."""
+        from flask import send_from_directory
+        response = send_from_directory('static/js', 'ishuman-verifier.js', mimetype='application/javascript')
+        response.headers['Cache-Control'] = 'public, max-age=3600'
+        response.headers['X-SDK-Version'] = '1.0.0'
         response.headers['Access-Control-Allow-Origin'] = '*'
         return response
 

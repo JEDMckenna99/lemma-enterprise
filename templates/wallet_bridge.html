@@ -961,7 +961,74 @@ window.addEventListener('message', async (event) => {
                     sessionRemaining: storeSession.timeRemaining
                 });
                 break;
-                
+
+            case 'GET_CREDENTIAL': {
+                // isHuman Network: return a single credential for the requesting site.
+                // If no per-site isHuman credential exists yet, derive one from the
+                // master proof via the server and cache it locally.
+                if (!wallet) await initWallet();
+
+                const ihSite = payload?.siteId || requestingSite;
+                const ihType = payload?.credentialType;  // e.g. 'isHuman'
+
+                // 1. Check for an existing per-site credential
+                let allCreds = (await wallet.getCredentials()).map(normalizeCredentialRecord);
+                let match = allCreds.find(c => {
+                    const cl = c.claims || c.credentialSubject || {};
+                    const boundSite = getCredentialSiteBinding(cl);
+                    if (ihType === 'isHuman' && !cl.isHuman) return false;
+                    return boundSite === ihSite;
+                });
+
+                if (match) {
+                    respond({ success: true, credential: match });
+                    break;
+                }
+
+                // 2. No per-site credential — look for the master isHuman proof
+                const master = allCreds.find(c => {
+                    const cl = c.claims || c.credentialSubject || {};
+                    const boundSite = getCredentialSiteBinding(cl);
+                    return cl.isHuman && (boundSite === 'lemma.id' || !boundSite);
+                });
+
+                if (!master) {
+                    respond({ success: false, error: 'no_ishuman_credential' });
+                    break;
+                }
+
+                // 3. Derive a per-site credential from the master via the server
+                try {
+                    const walletId = wallet.walletId || (await wallet.getWalletInfo?.())?.walletId || '';
+                    const deriveRes = await fetch('/api/ishuman/derive-site-proof', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            master_credential_id: master.id,
+                            wallet_id: walletId,
+                            target_site: ihSite,
+                        }),
+                    });
+                    const deriveData = await deriveRes.json();
+
+                    if (deriveData.success && deriveData.credential) {
+                        const derived = deriveData.credential;
+                        derived.packageType = derived.packageType || 'identity';
+                        await wallet.storeCredential(derived);
+                        clearCredentialsCache();
+                        console.log(` isHuman: derived site proof for ${ihSite}:`, derived.id);
+                        respond({ success: true, credential: derived });
+                    } else {
+                        console.warn(' isHuman: derivation failed:', deriveData.error);
+                        respond({ success: false, error: deriveData.error || 'derivation_failed' });
+                    }
+                } catch (deriveErr) {
+                    console.error(' isHuman: derivation request failed:', deriveErr);
+                    respond({ success: false, error: 'derivation_network_error' });
+                }
+                break;
+            }
+
             case 'GET_CREDENTIALS':
                 // Get credentials - SECURITY: Only return credentials for the requesting origin
                 // NOTE: Read operations allowed without active session (credentials are signed)

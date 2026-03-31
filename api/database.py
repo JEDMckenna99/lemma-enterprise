@@ -666,6 +666,80 @@ class SiteConfiguration(Base):
     updated_at = Column(DateTime, default=datetime.utcnow)
     updated_by = Column(String)
 
+
+class IsHumanVerification(Base):
+    """Tracks Stripe Identity verification sessions for isHuman proofs.
+
+    Each row represents one verification attempt. On success the issued
+    credential_id links the verification to the credential stored in the
+    user's wallet.
+    """
+    __tablename__ = 'ishuman_verifications'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    session_id = Column(String, unique=True, nullable=False)
+    stripe_session_id = Column(String, unique=True, nullable=False)
+    wallet_id = Column(String, index=True)
+    ppid = Column(String, index=True)
+    credential_id = Column(String, index=True)
+    status = Column(String, default='pending')  # pending, verified, failed, expired
+    created_at = Column(DateTime, default=datetime.utcnow)
+    verified_at = Column(DateTime)
+    issued_at = Column(DateTime)
+    expires_at = Column(DateTime)
+    metadata_json = Column(JSON, default=dict)
+
+
+class DerivedCredential(Base):
+    """Maps a master isHuman credential to its per-site derived credentials.
+
+    When a master is revoked the server iterates all rows with the
+    matching master_credential_id and adds every derived_credential_id
+    to the revocation Bloom filter.  No cross-site linkable identifier
+    is stored in the credential itself — only on the server.
+    """
+    __tablename__ = 'derived_credentials'
+    __table_args__ = (
+        UniqueConstraint('master_credential_id', 'target_site', name='uq_derived_master_site'),
+    )
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    master_credential_id = Column(String, nullable=False, index=True)
+    derived_credential_id = Column(String, nullable=False, unique=True)
+    wallet_id = Column(String, index=True)
+    target_site = Column(String, nullable=False)
+    derived_ppid = Column(String, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    revoked_at = Column(DateTime)
+    is_active = Column(Boolean, default=True)
+
+
+class SiteBlock(Base):
+    """Site-scoped PPID blocks for the isHuman network.
+
+    When a site believes a user is not acting in good faith it can
+    immediately block the PPID on its own domain.  This is the first
+    tier of the two-tier revocation model — fast, site-local, and
+    reversible.  Network-wide revocation is handled separately via
+    RevocationList after evidence review.
+    """
+    __tablename__ = 'site_blocks'
+    __table_args__ = (
+        UniqueConstraint('site_id', 'ppid', name='uq_site_blocks_site_ppid'),
+    )
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    site_id = Column(String, nullable=False, index=True)
+    ppid = Column(String, nullable=False, index=True)
+    reason = Column(String)
+    evidence_url = Column(String)
+    blocked_at = Column(DateTime, default=datetime.utcnow)
+    blocked_by = Column(String)
+    is_active = Column(Boolean, default=True)
+    network_revocation_requested = Column(Boolean, default=False)
+    network_revocation_status = Column(String)  # pending_review, approved, rejected
+
+
 def create_tables():
     """Create all database tables"""
     try:
