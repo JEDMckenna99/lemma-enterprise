@@ -45,6 +45,7 @@ Use wrapper actions for all recurring ops:
 ```powershell
 ./scripts/docker_power.ps1 smoke
 ./scripts/docker_power.ps1 ishuman-smoke
+./scripts/docker_power.ps1 env-sync -AppName lemma-enterprise -PreviewOnly
 ./scripts/docker_power.ps1 cli auth-status --api-base http://api:5000 --json
 ```
 

@@ -9,6 +9,7 @@ param(
         "health",
         "smoke",
         "ishuman-smoke",
+        "env-sync",
         "build-api",
         "build-all",
         "bench-build",
@@ -268,6 +269,17 @@ switch ($Action) {
     }
     "ishuman-smoke" {
         Invoke-IsHumanSmokeChecks
+    }
+    "env-sync" {
+        Write-Step "Syncing Heroku env into Docker-local env file"
+        $scriptPath = Join-Path $PSScriptRoot "sync_env_from_heroku.ps1"
+        if (-not (Test-Path $scriptPath)) {
+            throw "Missing sync script: $scriptPath"
+        }
+        & powershell -ExecutionPolicy Bypass -File $scriptPath @CliArgs
+        if ($LASTEXITCODE -ne 0) {
+            throw "sync_env_from_heroku.ps1 failed with exit code $LASTEXITCODE"
+        }
     }
     "build-api" {
         Write-Step "Building api image"

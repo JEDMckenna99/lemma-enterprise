@@ -75,6 +75,7 @@ Common actions:
 - `./scripts/docker_power.ps1 reset`
 - `./scripts/docker_power.ps1 scorecard`
 - `./scripts/docker_power.ps1 ishuman-smoke`
+- `./scripts/docker_power.ps1 env-sync -AppName lemma-enterprise -PreviewOnly`
 
 ## 7) isHuman network Docker smoke check
 
@@ -104,6 +105,14 @@ while still forcing Docker-safe local runtime values.
 ```powershell
 ./scripts/sync_env_from_heroku.ps1 -AppName lemma-enterprise -PreviewOnly
 ./scripts/sync_env_from_heroku.ps1 -AppName lemma-enterprise -OutputPath .env.docker.local
+Copy-Item .env.docker.local .env.docker -Force
+```
+
+Via `docker_power` wrapper:
+
+```powershell
+./scripts/docker_power.ps1 env-sync -AppName lemma-enterprise -PreviewOnly
+./scripts/docker_power.ps1 env-sync -AppName lemma-enterprise -OutputPath .env.docker.local
 Copy-Item .env.docker.local .env.docker -Force
 ```
 
