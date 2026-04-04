@@ -41,6 +41,7 @@ const BRIDGE_TIMEOUT_MS = 8000;
 // ========================================================================
 
 const _hexCache = new Map();
+const _sha256HexCache = new Map();
 
 function hexToBytes(hex) {
     if (!hex) return new Uint8Array(0);
@@ -59,6 +60,17 @@ async function sha256Digest(message) {
     const data = encoder.encode(message);
     const hash = await crypto.subtle.digest('SHA-256', data);
     return new Uint8Array(hash);
+}
+
+async function sha256HexText(value) {
+    const text = String(value || '');
+    if (!text) return '';
+    if (_sha256HexCache.has(text)) return _sha256HexCache.get(text);
+
+    const digest = await sha256Digest(text);
+    const hex = Array.from(digest).map((b) => b.toString(16).padStart(2, '0')).join('');
+    if (_sha256HexCache.size < 1024) _sha256HexCache.set(text, hex);
+    return hex;
 }
 
 function canonicalMessage(credential) {
@@ -202,9 +214,21 @@ class IsHumanVerifier {
             return this._result(false, credential.subject, 'expired', t0);
         }
 
-        // Step 4 — Bloom revocation
-        if (this._bloomFilter.size && this._bloomFilter.has(credential.id)) {
-            return this._result(false, credential.subject, 'revoked', t0);
+        // Step 4 — revocation membership (SHA-256 hashed IDs/PPIDs/wallet IDs)
+        if (this._bloomFilter.size) {
+            const revocationCandidates = [];
+            if (credential.id) revocationCandidates.push(credential.id);
+            if (credential.subject) revocationCandidates.push(credential.subject);
+            if (claims.walletId || claims.wallet_id) {
+                revocationCandidates.push(claims.walletId || claims.wallet_id);
+            }
+
+            for (const candidate of revocationCandidates) {
+                const candidateHash = await sha256HexText(candidate);
+                if (candidateHash && this._bloomFilter.has(candidateHash)) {
+                    return this._result(false, credential.subject, 'revoked', t0);
+                }
+            }
         }
 
         // Step 5 — Ed25519 signature

@@ -19,7 +19,6 @@ Flows
 
 from __future__ import annotations
 
-import hashlib
 import json
 import logging
 import os
@@ -108,6 +107,30 @@ def _require_site_api_key():
         db.close()
 
 
+def _derive_ppid_for_site(
+    *,
+    rp_id: str,
+    wallet_secret: Optional[str] = None,
+    wallet_id: Optional[str] = None,
+) -> str:
+    """Derive PPID using wallet secret when available.
+
+    Canonical derivation is wallet_secret + normalized site binding.
+    If wallet_secret is unavailable (legacy flow), fall back to wallet_id-based
+    derivation via the passkey path to preserve continuity.
+    """
+    from api.ppid import derive_ppid_from_wallet_secret, derive_ppid_from_passkey
+
+    if wallet_secret:
+        return derive_ppid_from_wallet_secret(wallet_secret, rp_id)
+
+    if wallet_id:
+        logger.warning("isHuman PPID fallback: deriving from wallet_id for rp=%s", rp_id)
+        return derive_ppid_from_passkey(wallet_id, rp_id)
+
+    raise ValueError("wallet_secret or wallet_id required for PPID derivation")
+
+
 # ---------------------------------------------------------------------------
 # 1. Start Verification
 # ---------------------------------------------------------------------------
@@ -129,6 +152,7 @@ def start_verification():
     """
     body = request.get_json(silent=True) or {}
     wallet_id = body.get("wallet_id")
+    wallet_secret = body.get("wallet_secret")
     if not wallet_id:
         return jsonify({"success": False, "error": "wallet_id required"}), 400
 
@@ -153,10 +177,22 @@ def start_verification():
     from api.database import SessionLocal, IsHumanVerification
     db = SessionLocal()
     try:
+        derived_ppid = None
+        if wallet_secret:
+            try:
+                derived_ppid = _derive_ppid_for_site(
+                    rp_id="lemma.id",
+                    wallet_secret=wallet_secret,
+                    wallet_id=wallet_id,
+                )
+            except Exception:
+                logger.exception("Failed pre-deriving PPID during isHuman start-verification")
+
         verification = IsHumanVerification(
             session_id=session_id,
             stripe_session_id=result["session_id"],
             wallet_id=wallet_id,
+            ppid=derived_ppid,
             status="pending",
             metadata_json={"return_url": return_url},
         )
@@ -165,6 +201,7 @@ def start_verification():
     except Exception:
         db.rollback()
         logger.exception("Failed to persist isHuman verification session")
+        return jsonify({"success": False, "error": "verification_session_persist_failed"}), 500
     finally:
         db.close()
 
@@ -224,9 +261,7 @@ def stripe_identity_webhook():
 
         if event_type == "identity.verification_session.verified":
             wallet_id = record.wallet_id or session_obj.get("metadata", {}).get("user_id", "")
-
-            from api.ppid import derive_ppid_from_wallet_secret
-            ppid = derive_ppid_from_wallet_secret(wallet_id, "lemma.id")
+            ppid = record.ppid or _derive_ppid_for_site(rp_id="lemma.id", wallet_id=wallet_id)
 
             credential = _issue_ishuman_credential(ppid, wallet_id)
 
@@ -657,6 +692,7 @@ def derive_site_proof():
     body = request.get_json(silent=True) or {}
     master_credential_id = body.get("master_credential_id")
     wallet_id = body.get("wallet_id")
+    wallet_secret = body.get("wallet_secret")
     target_site = body.get("target_site")
 
     if not master_credential_id or not wallet_id or not target_site:
@@ -709,15 +745,21 @@ def derive_site_proof():
         )
         if existing:
             # Re-issue the credential (same ID) so the caller can store it
-            from api.ppid import derive_ppid_from_wallet_secret
-            ppid = derive_ppid_from_wallet_secret(wallet_id, target_site)
+            ppid = _derive_ppid_for_site(
+                rp_id=target_site,
+                wallet_secret=wallet_secret,
+                wallet_id=wallet_id,
+            )
             credential = _issue_ishuman_credential(ppid, wallet_id, site_id=target_site)
             credential["id"] = existing.derived_credential_id
             return jsonify({"success": True, "credential": credential, "cached": True})
 
         # 3. Derive site-specific PPID
-        from api.ppid import derive_ppid_from_wallet_secret
-        site_ppid = derive_ppid_from_wallet_secret(wallet_id, target_site)
+        site_ppid = _derive_ppid_for_site(
+            rp_id=target_site,
+            wallet_secret=wallet_secret,
+            wallet_id=wallet_id,
+        )
 
         # 4. Issue per-site credential
         credential = _issue_ishuman_credential(site_ppid, wallet_id, site_id=target_site)
