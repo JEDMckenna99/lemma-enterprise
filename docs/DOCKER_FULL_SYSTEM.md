@@ -96,6 +96,28 @@ Optional Stripe Identity local config (only needed for full verification flow):
 - `STRIPE_IDENTITY_WEBHOOK_SECRET` (or legacy `STRIPE_WEBHOOK_SECRET`)
 - `ISHUMAN_RETURN_URL`
 
+## 8) Sync Heroku env into local Docker env
+
+Use this when you want local Docker to mirror production feature flags/secrets
+while still forcing Docker-safe local runtime values.
+
+```powershell
+./scripts/sync_env_from_heroku.ps1 -AppName lemma-enterprise -PreviewOnly
+./scripts/sync_env_from_heroku.ps1 -AppName lemma-enterprise -OutputPath .env.docker.local
+Copy-Item .env.docker.local .env.docker -Force
+```
+
+What the script does:
+
+- Pulls `heroku config -s` into `.env.heroku.snapshot`
+- Excludes runtime-only keys (`DATABASE_URL`, `REDIS_URL`, `PORT`, dyno metadata)
+- Applies local Docker overrides:
+  - `DATABASE_URL=postgresql://lemma:lemma@postgres:5432/lemma`
+  - `REDIS_URL=redis://redis:6379/0`
+  - `PORT=5000`
+  - `LEMMA_BASE_URL=http://api:5000`
+  - `ISHUMAN_RETURN_URL=http://localhost:5000/app`
+
 ## Notes
 
 - Environment values are loaded from `.env.docker`.
