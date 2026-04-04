@@ -74,6 +74,27 @@ Common actions:
 - `./scripts/docker_power.ps1 cli --help`
 - `./scripts/docker_power.ps1 reset`
 - `./scripts/docker_power.ps1 scorecard`
+- `./scripts/docker_power.ps1 ishuman-smoke`
+
+## 7) isHuman network Docker smoke check
+
+Run:
+
+```powershell
+./scripts/docker_power.ps1 ishuman-smoke
+```
+
+What it verifies:
+
+- `GET /api/ishuman/stats` is reachable and returns `network: "isHuman"`
+- `GET /api/ishuman/check` returns a valid response shape
+- `POST /api/ishuman/start-verification` rejects invalid payloads predictably
+
+Optional Stripe Identity local config (only needed for full verification flow):
+
+- `STRIPE_SECRET_KEY`
+- `STRIPE_IDENTITY_WEBHOOK_SECRET` (or legacy `STRIPE_WEBHOOK_SECRET`)
+- `ISHUMAN_RETURN_URL`
 
 ## Notes
 

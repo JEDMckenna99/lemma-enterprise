@@ -8,6 +8,7 @@ param(
         "migrate",
         "health",
         "smoke",
+        "ishuman-smoke",
         "build-api",
         "build-all",
         "bench-build",
@@ -126,6 +127,67 @@ function Invoke-SmokeChecks {
     $global:LASTEXITCODE = 0
 }
 
+function Invoke-IsHumanSmokeChecks {
+    Write-Step "Building api image for latest routes"
+    Invoke-DockerCompose -Args @("build", "api") | Out-Null
+
+    Start-CoreServices
+
+    Write-Step "isHuman stats endpoint smoke"
+    $statsRaw = $null
+    for ($i = 1; $i -le 15; $i++) {
+        try {
+            $statsRaw = & curl.exe -sS "http://localhost:5000/api/ishuman/stats"
+            if ($LASTEXITCODE -eq 0 -and $statsRaw) { break }
+        } catch {}
+        Start-Sleep -Seconds 2
+    }
+    if (-not $statsRaw) {
+        throw "Failed to read /api/ishuman/stats after retries"
+    }
+    $stats = $statsRaw | ConvertFrom-Json
+    if (-not $stats) {
+        throw "Invalid JSON from /api/ishuman/stats: $statsRaw"
+    }
+    if (
+        -not ($stats.PSObject.Properties.Name -contains "success") -or
+        -not $stats.success -or
+        -not ($stats.PSObject.Properties.Name -contains "network") -or
+        $stats.network -ne "isHuman"
+    ) {
+        throw "Unexpected /api/ishuman/stats payload: $statsRaw"
+    }
+    Write-Host $statsRaw
+
+    Write-Step "isHuman check endpoint smoke"
+    $checkRaw = Wait-HttpOk -Url "http://localhost:5000/api/ishuman/check?ppid=did:lemma:ppid_docker_smoke"
+    $check = $checkRaw | ConvertFrom-Json
+    if (-not $check) {
+        throw "Invalid JSON from /api/ishuman/check: $checkRaw"
+    }
+    if (
+        -not ($check.PSObject.Properties.Name -contains "success") -or
+        -not $check.success -or
+        -not ($check.PSObject.Properties.Name -contains "ppid") -or
+        -not $check.ppid
+    ) {
+        throw "Unexpected /api/ishuman/check payload: $checkRaw"
+    }
+    Write-Host $checkRaw
+
+    Write-Step "isHuman start-verification validation smoke"
+    $verifyBody = "{}"
+    $verifyRaw = & curl.exe -sS -X POST -H "Content-Type: application/json" -d $verifyBody "http://localhost:5000/api/ishuman/start-verification"
+    if ($LASTEXITCODE -ne 0) {
+        throw "curl failed for /api/ishuman/start-verification validation smoke"
+    }
+    $verify = $verifyRaw | ConvertFrom-Json
+    if ($verify.error -ne "wallet_id required") {
+        throw "Unexpected /api/ishuman/start-verification validation response: $verifyRaw"
+    }
+    Write-Host $verifyRaw
+}
+
 function Measure-Build {
     param(
         [Parameter(Mandatory = $true)]
@@ -203,6 +265,9 @@ switch ($Action) {
     }
     "smoke" {
         Invoke-SmokeChecks -IncludeMigrations
+    }
+    "ishuman-smoke" {
+        Invoke-IsHumanSmokeChecks
     }
     "build-api" {
         Write-Step "Building api image"
