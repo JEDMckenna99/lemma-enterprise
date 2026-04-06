@@ -1,7 +1,7 @@
 {% extends "modern/layout.html" %}
 
-{% block title %}lemma.id - Local-First Agent Firewall{% endblock %}
-{% block description %}Lemma Firewall: local-first containment for AI agents. Signed credentials verified in under 1ms. Taint epoch, revocation, kill switch. Zero per-request server calls.{% endblock %}
+{% block title %}lemma.id - isHuman Proof Network{% endblock %}
+{% block description %}isHuman by Lemma: verify people once with Stripe Identity, then prove locally with Ed25519-signed site-private credentials.{% endblock %}
 
 {% block head %}
     {{ super() }}
@@ -156,58 +156,45 @@
 <section class="hero">
     <div class="container" style="position: relative; z-index: 1;">
         <div style="max-width: 800px; margin: 0 auto; text-align: center;">
-            <p style="font-size: var(--font-size-sm); font-weight: 600; text-transform: uppercase; letter-spacing: 2px; color: var(--primary); margin-bottom: 16px;">Local-First Agent Containment</p>
-            <h1 style="font-size: clamp(2.5rem, 5vw, 3.5rem); line-height: 1.1; margin-bottom: 24px;">Contain Your Agents.<br>Verify Locally.</h1>
-            <p style="font-size: var(--font-size-xl); font-weight: 500; margin-bottom: var(--space-4); color: var(--gray-700);">The Lemma Firewall sits between your agent and the APIs it calls. Every action is verified locally via signed credentials. Zero server calls per request.</p>
-            <p style="font-size: var(--font-size-base); color: var(--gray-600); max-width: 600px; margin: 0 auto;">Issue a signed credential from the control plane. The local firewall verifies it in &lt;1ms via Ed25519 signature check. Scope, path, and method containment enforced locally. Taint epoch denies credentials after context poisoning. Revocation propagates in seconds. Kill switch included.</p>
+            <p style="font-size: var(--font-size-sm); font-weight: 600; text-transform: uppercase; letter-spacing: 2px; color: var(--primary); margin-bottom: 16px;">isHuman Proof Network</p>
+            <h1 style="font-size: clamp(2.5rem, 5vw, 3.5rem); line-height: 1.1; margin-bottom: 24px;">Verify Humans Once.<br>Prove Locally Everywhere.</h1>
+            <p style="font-size: var(--font-size-xl); font-weight: 500; margin-bottom: var(--space-4); color: var(--gray-700);">Users verify through Stripe Identity at lemma.id, then websites validate signed isHuman credentials locally in the browser.</p>
+            <p style="font-size: var(--font-size-base); color: var(--gray-600); max-width: 600px; margin: 0 auto;">Each site gets a derived, site-private PPID credential. Ed25519 signatures verify offline, revocation propagates quickly, and sites can enforce immediate local block decisions.</p>
             <div style="margin:20px auto 0;max-width:1120px;border:1px solid var(--gray-200);border-radius:16px;padding:16px;background:var(--white);box-shadow:0 10px 15px -3px rgb(0 0 0 / 0.1)">
-                <svg viewBox="0 0 1200 410" width="100%" role="img" aria-label="Lemma proof-first control plane diagram" style="font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,sans-serif">
-                    <rect x="22" y="54" width="226" height="126" rx="14" fill="#0A2540"></rect>
-                    <text x="38" y="84" fill="#e2e8f0" font-size="13" font-weight="700">Agent Runtime</text>
-                    <text x="38" y="112" fill="#e2e8f0" font-size="11">LLM + Prompt</text>
-                    <text x="38" y="152" fill="#cbd5e1" font-size="10">read • write • shell • exec • net • ingest</text>
-                    <text x="38" y="168" fill="#94a3b8" font-size="10">Connect Runtime (1 command)</text>
+                <svg viewBox="0 0 1200 360" width="100%" role="img" aria-label="isHuman verification and derivation flow" style="font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,sans-serif">
+                    <rect x="28" y="46" width="220" height="110" rx="14" fill="#0A2540"></rect>
+                    <text x="48" y="78" fill="#e2e8f0" font-size="13" font-weight="700">User Browser</text>
+                    <text x="48" y="104" fill="#cbd5e1" font-size="11">Starts verification once</text>
 
-                    <rect x="300" y="54" width="246" height="126" rx="14" fill="#64748B"></rect>
-                    <text x="320" y="84" fill="#f8fafc" font-size="13" font-weight="700">Proof Issuance</text>
-                    <text x="320" y="112" fill="#f8fafc" font-size="11">PPID-bound identity • taint_epoch=0</text>
-                    <text x="320" y="152" fill="#e2e8f0" font-size="10">low • high • critical</text>
+                    <rect x="300" y="46" width="220" height="110" rx="14" fill="#64748B"></rect>
+                    <text x="320" y="78" fill="#f8fafc" font-size="13" font-weight="700">Stripe Identity</text>
+                    <text x="320" y="104" fill="#e2e8f0" font-size="11">Human verification event</text>
 
-                    <rect x="598" y="54" width="560" height="126" rx="14" fill="#e2e8f0" stroke="#cbd5e1"></rect>
-                    <rect x="598" y="54" width="280" height="126" rx="14" fill="#10B981"></rect>
-                    <rect x="878" y="54" width="280" height="126" rx="14" fill="#3B82F6"></rect>
-                    <path d="M878 54 L878 180" stroke="#e2e8f0" stroke-width="2"></path>
-                    <text x="738" y="84" text-anchor="middle" fill="#ecfeff" font-size="13" font-weight="700">Per-Request Gateway</text>
-                    <text x="738" y="112" text-anchor="middle" fill="#ecfeff" font-size="11">Local Verifier (edge)</text>
-                    <text x="1018" y="112" text-anchor="middle" fill="#eff6ff" font-size="11">Hosted Control Plane (cloud)</text>
-                    <text x="878" y="166" text-anchor="middle" fill="#334155" font-size="10">X-Lemma-Credential header</text>
+                    <rect x="572" y="46" width="280" height="110" rx="14" fill="#10B981"></rect>
+                    <text x="592" y="78" fill="#ecfeff" font-size="13" font-weight="700">lemma.id isHuman API</text>
+                    <text x="592" y="104" fill="#d1fae5" font-size="11">Issues signed master credential</text>
 
-                    <path d="M248 116 L300 116" stroke="#0f172a" stroke-width="3" fill="none"></path>
-                    <path d="M546 116 L598 116" stroke="#0f172a" stroke-width="3" fill="none"></path>
+                    <rect x="904" y="46" width="268" height="110" rx="14" fill="#3B82F6"></rect>
+                    <text x="924" y="78" fill="#eff6ff" font-size="13" font-weight="700">Wallet + Bridge</text>
+                    <text x="924" y="104" fill="#dbeafe" font-size="11">Derives site-specific credential</text>
 
-                    <path d="M736 180 C648 222, 540 236, 424 246" stroke="#10B981" stroke-width="6" fill="none"></path>
-                    <path d="M878 180 C824 222, 732 236, 674 246" stroke="#F59E0B" stroke-width="5" fill="none" stroke-dasharray="10 8"></path>
-                    <path d="M1018 180 C1032 220, 1060 236, 1098 246" stroke="#EF4444" stroke-width="6" fill="none"></path>
+                    <path d="M248 101 L300 101" stroke="#0f172a" stroke-width="3" fill="none"></path>
+                    <path d="M520 101 L572 101" stroke="#0f172a" stroke-width="3" fill="none"></path>
+                    <path d="M852 101 L904 101" stroke="#0f172a" stroke-width="3" fill="none"></path>
 
-                    <rect x="286" y="246" width="258" height="66" rx="14" fill="#dcfce7" stroke="#86efac"></rect>
-                    <text x="415" y="272" text-anchor="middle" fill="#166534" font-size="12" font-weight="700">✅ ALLOW + Decision Log</text>
-                    <rect x="558" y="246" width="258" height="66" rx="14" fill="#fef3c7" stroke="#fcd34d"></rect>
-                    <text x="687" y="272" text-anchor="middle" fill="#92400e" font-size="12" font-weight="700">⚠ Taint Bump → Stale Denied</text>
-                    <rect x="830" y="246" width="328" height="66" rx="14" fill="#fee2e2" stroke="#fca5a5"></rect>
-                    <text x="994" y="272" text-anchor="middle" fill="#991b1b" font-size="12" font-weight="700">❌ Revocation / Kill Switch → token_revoked</text>
+                    <rect x="104" y="220" width="320" height="72" rx="14" fill="#dcfce7" stroke="#86efac"></rect>
+                    <text x="264" y="248" text-anchor="middle" fill="#166534" font-size="12" font-weight="700">Local verify: Ed25519 signature + expiry</text>
+                    <text x="264" y="270" text-anchor="middle" fill="#166534" font-size="11">No per-request server call required</text>
 
-                    <line x1="28" y1="350" x2="1168" y2="350" stroke="#cbd5e1" stroke-width="3"></line>
-                    <circle cx="28" cy="350" r="8" fill="#94a3b8"></circle><text x="28" y="374" text-anchor="middle" fill="#334155" font-size="9">t0</text>
-                    <circle cx="170" cy="350" r="8" fill="#10B981"></circle><text x="170" y="374" text-anchor="middle" fill="#334155" font-size="9">t1</text>
-                    <circle cx="312" cy="350" r="8" fill="#10B981"></circle><text x="312" y="374" text-anchor="middle" fill="#334155" font-size="9">t2</text>
-                    <circle cx="454" cy="350" r="8" fill="#10B981"></circle><text x="454" y="374" text-anchor="middle" fill="#334155" font-size="9">t3</text>
-                    <circle cx="596" cy="350" r="8" fill="#94a3b8"></circle><text x="596" y="374" text-anchor="middle" fill="#334155" font-size="9">t4</text>
-                    <circle cx="738" cy="350" r="8" fill="#F59E0B"></circle><text x="738" y="374" text-anchor="middle" fill="#334155" font-size="9">t5</text>
-                    <circle cx="880" cy="350" r="8" fill="#EF4444"></circle><text x="880" y="374" text-anchor="middle" fill="#334155" font-size="9">t6</text>
-                    <circle cx="1022" cy="350" r="8" fill="#EF4444"></circle><text x="1022" y="374" text-anchor="middle" fill="#334155" font-size="9">t7</text>
-                    <circle cx="1164" cy="350" r="8" fill="#EF4444"></circle><text x="1164" y="374" text-anchor="middle" fill="#334155" font-size="9">t8</text>
+                    <rect x="456" y="220" width="300" height="72" rx="14" fill="#fef3c7" stroke="#fcd34d"></rect>
+                    <text x="606" y="248" text-anchor="middle" fill="#92400e" font-size="12" font-weight="700">Site-level block: immediate</text>
+                    <text x="606" y="270" text-anchor="middle" fill="#92400e" font-size="11">Reason = site_block</text>
+
+                    <rect x="788" y="220" width="324" height="72" rx="14" fill="#fee2e2" stroke="#fca5a5"></rect>
+                    <text x="950" y="248" text-anchor="middle" fill="#991b1b" font-size="12" font-weight="700">Network revocation: approved path</text>
+                    <text x="950" y="270" text-anchor="middle" fill="#991b1b" font-size="11">Reason = network_revocation</text>
                 </svg>
-                <p style="margin:8px 0 0;text-align:center;font-size:12px;color:var(--gray-600)">Proof-First Control Plane • Same action. Different trust state. Instant containment.</p>
+                <p style="margin:8px 0 0;text-align:center;font-size:12px;color:var(--gray-600)">Verify once at lemma.id. Derive per site. Validate locally.</p>
             </div>
             
             <!-- Dynamic card: changes based on user's lemma status -->
@@ -223,13 +210,13 @@
                 <!-- No lemma state (shown by default, hidden when lemma found) -->
                 <div id="status-no-lemma" style="display: none; background: var(--gray-900); padding: 28px 40px; border-radius: 12px; box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2); max-width: 360px; margin: 0 auto; text-align: center; min-height: 120px;">
                     <p style="margin: 0 0 10px 0; font-size: var(--font-size-xl); color: var(--white); font-weight: 700;">
-                        Connect a Runtime
+                        Start isHuman Verification
                     </p>
                     <p style="margin: 0; font-size: var(--font-size-sm); color: var(--gray-400);">
-                        One command to register a runtime and turn on per-request authorization.
+                        Complete Stripe Identity once to receive reusable proof.
                     </p>
                     <p style="margin: 10px 0 0 0; font-size: var(--font-size-xs); color: var(--gray-500);">
-                        Hosted control plane + local checks
+                        Site-private credentials + local checks
                     </p>
                 </div>
                 
@@ -247,7 +234,7 @@
                     <!-- Signed in header -->
                     <div id="signin-header" style="opacity: 0; transform: translateY(10px); transition: all 0.3s ease-out 0.1s;">
                         <p style="margin: 0 0 16px 0; font-size: var(--font-size-xl); color: var(--white); font-weight: 700;">
-                            Agent Ops Connected
+                            isHuman Credential Ready
                         </p>
                     </div>
                     
@@ -262,17 +249,17 @@
                     <!-- Footer message -->
                     <div id="signin-details" style="opacity: 0; transform: translateY(10px); transition: all 0.3s ease-out 0.3s;">
                         <p style="margin: 16px 0 0 0; font-size: var(--font-size-xs); color: rgba(255,255,255,0.7);">
-                            Runtime controls are active
+                            Local proof checks are active
                         </p>
                     </div>
                 </div>
             </div>
             
             <div id="hero-buttons" style="margin-top: 48px; display: flex; gap: 16px; justify-content: center; flex-wrap: wrap;">
-                <a href="/app" class="btn btn-primary" id="hero-primary-btn">Open Agent Ops</a>
-                <a href="/demo" class="btn btn-primary">Try the Live Demo</a>
+                <a href="/app" class="btn btn-primary" id="hero-primary-btn">Get Verified</a>
+                <a href="/docs/ishuman" class="btn btn-primary">Integrate isHuman</a>
                 <a href="#how-it-works" class="btn btn-secondary">Learn More</a>
-                <a href="/developer" class="btn btn-secondary">Developer Platform</a>
+                <a href="/docs" class="btn btn-secondary">Documentation</a>
             </div>
             
             <!-- Trust indicators -->
@@ -281,14 +268,14 @@
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
                     </svg>
-                    <span>Proof-first by default</span>
+                    <span>Stripe Identity verification</span>
                 </div>
                 <div style="display: flex; align-items: center; gap: 8px;">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
                         <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
                     </svg>
-                    <span>Runtime kill switches</span>
+                    <span>Ed25519 local verification</span>
                 </div>
                 <div style="display: flex; align-items: center; gap: 8px;">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -296,7 +283,7 @@
                         <line x1="2" y1="12" x2="22" y2="12"/>
                         <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
                     </svg>
-                    <span>Decision logs + explainability</span>
+                    <span>Site-private PPIDs</span>
                 </div>
             </div>
         </div>
@@ -321,9 +308,8 @@
         
         function showSignedIn(cred) {
             const claims = cred.claims || cred.credentialSubject || {};
-            const email = claims.email || 'User';
-            const permissionId = claims.permissionId || claims.permission_level || 'access';
-            const displayName = claims.displayName || permissionId;
+            const email = claims.email || 'Verification complete';
+            const displayName = claims.isHuman ? 'isHuman: true' : 'Credential active';
             
             // Update UI
             document.getElementById('lemma-user-email').textContent = email;
@@ -381,8 +367,8 @@
             }, 50);
             
             // Update button
-            primaryBtn.textContent = 'Open Developer Platform';
-            primaryBtn.href = '/developer/platform';
+            primaryBtn.textContent = 'View isHuman Docs';
+            primaryBtn.href = '/docs/ishuman';
         }
         
         function showJoinBeta() {
@@ -430,58 +416,58 @@
     <div class="container">
         <div style="text-align: center; margin-bottom: 64px;">
             <h2>How Lemma.id Works</h2>
-            <p class="text-gray" style="max-width: 700px; margin: 16px auto 0;">Connect a runtime, enforce policy on every privileged request, and monitor or stop activity from one control plane.</p>
+            <p class="text-gray" style="max-width: 700px; margin: 16px auto 0;">Verify a person once, derive site-private credentials, and run local checks for each session.</p>
         </div>
         
         <!-- Step-by-step flow -->
         <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; max-width: 900px; margin: 0 auto 64px; text-align: center;">
             <div style="padding: 32px 24px;">
                 <div style="width: 56px; height: 56px; border-radius: 50%; background: var(--primary); color: white; font-size: 24px; font-weight: 700; display: flex; align-items: center; justify-content: center; margin: 0 auto 20px;">1</div>
-                <h3 style="font-size: var(--font-size-lg); margin-bottom: 8px;">Connect Runtime</h3>
-                <p style="color: var(--gray-600); font-size: var(--font-size-sm);">Run one command to register a runtime with Lemma.id and turn on proof-first defaults.</p>
+                <h3 style="font-size: var(--font-size-lg); margin-bottom: 8px;">Verify Once</h3>
+                <p style="color: var(--gray-600); font-size: var(--font-size-sm);">User completes Stripe Identity and receives a signed master isHuman credential.</p>
             </div>
             <div style="padding: 32px 24px;">
                 <div style="width: 56px; height: 56px; border-radius: 50%; background: var(--primary); color: white; font-size: 24px; font-weight: 700; display: flex; align-items: center; justify-content: center; margin: 0 auto 20px;">2</div>
-                <h3 style="font-size: var(--font-size-lg); margin-bottom: 8px;">Enforce Per Request</h3>
-                <p style="color: var(--gray-600); font-size: var(--font-size-sm);">The gateway checks proof, scope, audience, and runtime state before any privileged action runs.</p>
+                <h3 style="font-size: var(--font-size-lg); margin-bottom: 8px;">Derive Per Site</h3>
+                <p style="color: var(--gray-600); font-size: var(--font-size-sm);">Wallet bridge derives a site-bound credential using normalized hostname and wallet secret.</p>
             </div>
             <div style="padding: 32px 24px;">
                 <div style="width: 56px; height: 56px; border-radius: 50%; background: var(--primary); color: white; font-size: 24px; font-weight: 700; display: flex; align-items: center; justify-content: center; margin: 0 auto 20px;">3</div>
-                <h3 style="font-size: var(--font-size-lg); margin-bottom: 8px;">Monitor + Contain</h3>
-                <p style="color: var(--gray-600); font-size: var(--font-size-sm);">Track decisions live, investigate allow or deny results, and trigger kill switches to stop unsafe behavior immediately.</p>
+                <h3 style="font-size: var(--font-size-lg); margin-bottom: 8px;">Verify Locally</h3>
+                <p style="color: var(--gray-600); font-size: var(--font-size-sm);">Sites check signature, expiry, and revocation status in-browser with clear allow/deny reasons.</p>
             </div>
         </div>
         
         <!-- Feature cards -->
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 32px;">
             <div class="card">
-                <h3 class="card-title">Proof-Native Authorization</h3>
-                <p>Signed proofs and claim checks authorize sensitive actions, with compatibility paths only where policy allows them.</p>
+                <h3 class="card-title">Master + Derived Credentials</h3>
+                <p>Issue one master proof at lemma.id, then derive per-site credentials that preserve user privacy across domains.</p>
             </div>
             
             <div class="card">
-                <h3 class="card-title">PPID-Bound Identity</h3>
-                <p>Runtime controls and delegation are tied to pairwise identifiers (PPIDs), so identity stays site-specific instead of globally trackable.</p>
+                <h3 class="card-title">PPID-Bound Privacy</h3>
+                <p>Pairwise identifiers are derived per site, preventing simple cross-site correlation of user identity.</p>
             </div>
             
             <div class="card">
-                <h3 class="card-title">Runtime Policy Defaults</h3>
-                <p>Every connected runtime inherits a policy profile and risk defaults (`low`, `high`, `critical`) with server-side enforcement.</p>
+                <h3 class="card-title">Local Verification Path</h3>
+                <p>The SDK validates Ed25519 signatures, claims, and expiry without requiring a server call on each check.</p>
             </div>
             
             <div class="card">
-                <h3 class="card-title">Kill Switch Controls</h3>
-                <p>Revoke or kill runtime access instantly and deterministically in the request path.</p>
+                <h3 class="card-title">Site-Scoped Blocking</h3>
+                <p>Operators can block abuse immediately at the site level with deterministic check responses.</p>
             </div>
             
             <div class="card">
-                <h3 class="card-title">Decision Explainability</h3>
-                <p>See why a request was allowed or denied with decision logs, runtime context, and the policy snapshot used at the time.</p>
+                <h3 class="card-title">Network Revocation Review</h3>
+                <p>Escalate severe abuse to network-wide revocation through an evidence-backed admin approval flow.</p>
             </div>
             
             <div class="card">
-                <h3 class="card-title">Local-First + Hosted Control Plane</h3>
-                <p>Keep low-latency local verification where possible while using a hosted control plane for governance, revocation, and runtime operations.</p>
+                <h3 class="card-title">Simple Integration</h3>
+                <p>Add a script tag and call <code>verify()</code> to get a fast human verdict plus PPID for your local policies.</p>
             </div>
         </div>
     </div>
@@ -531,16 +517,16 @@
 <!-- CTA Section -->
 <section class="section" style="background: var(--gray-900); color: var(--white); padding: 80px 0;">
     <div class="container" style="text-align: center;">
-        <h2 style="color: var(--white); font-size: var(--font-size-3xl); margin-bottom: 20px;">Deploy Runtime Authorization Without Building It Yourself</h2>
-        <p style="color: var(--gray-400); font-size: var(--font-size-lg); margin-bottom: 48px; max-width: 600px; margin-left: auto; margin-right: auto;">Ship per-request authorization, runtime monitoring, and kill-switch controls without standing up a separate authz stack.</p>
+        <h2 style="color: var(--white); font-size: var(--font-size-3xl); margin-bottom: 20px;">Ship Proof-of-Humanity Without Building It Yourself</h2>
+        <p style="color: var(--gray-400); font-size: var(--font-size-lg); margin-bottom: 48px; max-width: 600px; margin-left: auto; margin-right: auto;">Launch reusable human verification, site-private derivation, and abuse controls with a production-ready SDK and API.</p>
         <div style="display: flex; gap: 20px; justify-content: center; flex-wrap: wrap;">
             <a href="/app" class="btn btn-primary" style="font-size: var(--font-size-lg); padding: 16px 32px;">
-                Open Agent Ops
+                Get Verified
             </a>
-            <a href="/docs" class="btn btn-secondary" style="background: transparent; border-color: var(--gray-600); color: var(--white);">View Docs</a>
+            <a href="/docs/ishuman" class="btn btn-secondary" style="background: transparent; border-color: var(--gray-600); color: var(--white);">View isHuman Docs</a>
         </div>
         <p style="color: var(--gray-500); font-size: var(--font-size-sm); margin-top: 24px;">
-            Proof-first • Site-specific identity • Runtime controls
+            Verify once • Derive per site • Verify locally
         </p>
     </div>
 </section>
