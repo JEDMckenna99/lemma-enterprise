@@ -31,6 +31,7 @@ If you need policy lifecycle, exports, or org-level controls:
 2. Proof-native checks enforce scope, resource, and risk at request time.
 3. Agent Ops controls provide kill switches, decision logs, exports, and alerts.
 4. Prompt-injection containment is modeled with trust-state and taint-epoch policy.
+5. isHuman verification issues reusable human credentials with site-private PPID derivation and two-tier revocation controls.
 
 ## Architecture And Security
 
@@ -52,6 +53,7 @@ If you need policy lifecycle, exports, or org-level controls:
 | [Quick Start: Simple Login](integration/QUICK_START_SIMPLE_LOGIN.md) | User-login quickstart, distinct from agent runtime auth |
 | [IAM-Only Integration](integration/IAM_ONLY_INTEGRATION_GUIDE.md) | IAM without Proof-of-Human |
 | [Permission Lemmas Guide](integration/PERMISSION_LEMMAS_IAM_DEVELOPER_GUIDE.md) | Complete IAM developer reference |
+| [isHuman Network Guide](https://lemma.id/docs/ishuman) | SDK and API reference for proof-of-humanity integration |
 | [KMS Setup Guide](operations/KMS_SETUP_GUIDE.md) | AWS KMS configuration for key management |
 | [CLI Release Checklist](operations/CLI_RELEASE_CHECKLIST.md) | Packaging and release workflow |
 | [Launch Status](status/GA_GATE_STATUS.md) | Current readiness snapshot |

@@ -487,6 +487,47 @@
     </div>
 </section>
 
+<!-- isHuman Network Section -->
+<section class="section" id="ishuman-network" style="background: var(--gray-50);">
+    <div class="container">
+        <div style="text-align: center; max-width: 860px; margin: 0 auto 56px;">
+            <p style="font-size: var(--font-size-sm); font-weight: 700; text-transform: uppercase; letter-spacing: 2px; color: var(--primary); margin-bottom: 12px;">Proof of Humanity</p>
+            <h2 style="margin-bottom: 16px;">One verification. Every site. Always local.</h2>
+            <p class="text-gray" style="max-width: 700px; margin: 0 auto;">isHuman gives users a reusable human proof while preserving site privacy. Verify once through Stripe Identity, then let sites verify locally with Ed25519-signed credentials and revocation freshness checks.</p>
+        </div>
+
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 24px; margin-bottom: 40px;">
+            <div class="card">
+                <h3 class="card-title">Verify Once</h3>
+                <p>Users complete one verification at lemma.id. We issue a signed master isHuman credential with clear expiry and issuer metadata.</p>
+            </div>
+            <div class="card">
+                <h3 class="card-title">Derive Per Site</h3>
+                <p>The wallet bridge derives a site-bound credential on first request, so each integration gets its own PPID and privacy boundary.</p>
+            </div>
+            <div class="card">
+                <h3 class="card-title">Two-Tier Revocation</h3>
+                <p>Sites can block instantly at the domain level, then escalate to evidence-based network revocation for coordinated abuse response.</p>
+            </div>
+        </div>
+
+        <div style="max-width: 860px; margin: 0 auto; border: 1px solid var(--gray-200); border-radius: 14px; background: var(--white); overflow: hidden;">
+            <div style="padding: 14px 18px; border-bottom: 1px solid var(--gray-200); font-size: var(--font-size-sm); color: var(--gray-600);">Integrate in two lines</div>
+            <pre style="margin: 0; padding: 18px; background: #0f172a; color: #e2e8f0; overflow-x: auto;"><code>&lt;script src="https://lemma.id/sdk/ishuman-verifier.js"&gt;&lt;/script&gt;
+&lt;script&gt;new IsHumanVerifier({ siteId: 'your-site-id' }).verify();&lt;/script&gt;</code></pre>
+        </div>
+
+        <div style="margin-top: 32px; display: flex; gap: 16px; justify-content: center; flex-wrap: wrap;">
+            <a href="/app" class="btn btn-primary">Get Verified</a>
+            <a href="/docs/ishuman" class="btn btn-secondary">Add to Your Site</a>
+        </div>
+
+        <p style="margin-top: 20px; text-align: center; color: var(--gray-600); font-size: var(--font-size-sm);">
+            Stripe Identity verified • Ed25519-signed • Site-private PPIDs
+        </p>
+    </div>
+</section>
+
 <!-- CTA Section -->
 <section class="section" style="background: var(--gray-900); color: var(--white); padding: 80px 0;">
     <div class="container" style="text-align: center;">

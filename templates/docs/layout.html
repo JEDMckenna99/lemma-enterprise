@@ -1,7 +1,7 @@
 {% extends "modern/layout.html" %}
 
-{% block title %}{{ page_title or 'Documentation' }} - lemma.id{% endblock %}
-{% block description %}{{ page_description or 'Lemma developer documentation - guides, API reference, and integration examples.' }}{% endblock %}
+{% block title %}{{ page_title or 'isHuman Documentation' }} - lemma.id{% endblock %}
+{% block description %}{{ page_description or 'isHuman developer documentation - SDK, API, verification flow, and revocation controls.' }}{% endblock %}
 
 {% block preload_scripts %}
 <!-- Docs pages skip wallet preload for faster LCP -->
@@ -23,8 +23,8 @@
 {% block content %}
 <div class="docs-hero">
     <div class="container">
-        <h1>{{ hero_title or 'Developer Documentation' }}</h1>
-        <p>{{ hero_subtitle or 'Everything you need to integrate Lemma into your platform' }}</p>
+        <h1>{{ hero_title or 'isHuman Documentation' }}</h1>
+        <p>{{ hero_subtitle or 'Everything you need to integrate isHuman into your platform.' }}</p>
         
         <!-- Docs Search -->
         <div class="docs-search-container">
@@ -57,42 +57,12 @@
         <aside class="docs-sidebar" id="docs-sidebar">
             <nav class="docs-nav">
                 <div class="nav-product-label">
-                    <a href="{{ url_for('docs_overview') }}" class="nav-product-link">Lemma Firewall</a>
+                    <a href="{{ url_for('docs_ishuman') }}" class="nav-product-link">isHuman Network</a>
                 </div>
+
                 <div class="nav-section">
-                    <div class="nav-title">Getting Started</div>
-                    <a href="{{ url_for('docs_overview') }}" class="nav-link {% if active_page == 'overview' %}active{% endif %}">Overview</a>
-                    <a href="{{ url_for('docs_quickstart') }}" class="nav-link {% if active_page == 'quickstart' %}active{% endif %}">Quick Start</a>
-                    <a href="{{ url_for('docs_installation') }}" class="nav-link {% if active_page == 'installation' %}active{% endif %}">Installation</a>
-                    <a href="{{ url_for('docs_cli') }}" class="nav-link {% if active_page == 'cli' %}active{% endif %}">CLI</a>
-                </div>
-                
-                <div class="nav-section">
-                    <div class="nav-title">Integration Guides</div>
-                    <a href="{{ url_for('docs_wallet_flow') }}" class="nav-link {% if active_page == 'wallet-flow' %}active{% endif %}">Wallet Redirect Flow</a>
-                    <a href="{{ url_for('docs_verification') }}" class="nav-link {% if active_page == 'verification' %}active{% endif %}">Credential Verification</a>
-                    <a href="{{ url_for('docs_permissions') }}" class="nav-link {% if active_page == 'permissions' %}active{% endif %}">Permissions & Roles</a>
-                </div>
-                
-                <div class="nav-section">
-                    <div class="nav-title">SDK Reference</div>
-                    <a href="{{ url_for('docs_sdk_js') }}" class="nav-link {% if active_page == 'sdk-js' %}active{% endif %}">JavaScript SDK</a>
-                    <a href="{{ url_for('docs_sdk_methods') }}" class="nav-link {% if active_page == 'sdk-methods' %}active{% endif %}">SDK Methods</a>
-                    <a href="{{ url_for('docs_sdk_events') }}" class="nav-link {% if active_page == 'sdk-events' %}active{% endif %}">Events & Callbacks</a>
-                </div>
-                
-                <div class="nav-section">
-                    <div class="nav-title">API Reference</div>
-                    <a href="{{ url_for('docs_api_auth') }}" class="nav-link {% if active_page == 'api-auth' %}active{% endif %}">Authentication API</a>
-                    <a href="{{ url_for('docs_api_verification') }}" class="nav-link {% if active_page == 'api-verification' %}active{% endif %}">Verification API</a>
-                    <a href="{{ url_for('docs_api_revocation') }}" class="nav-link {% if active_page == 'api-revocation' %}active{% endif %}">Revocation API</a>
-                </div>
-                
-                <div class="nav-section">
-                    <div class="nav-title">Resources</div>
-                    <a href="{{ url_for('docs_error_codes') }}" class="nav-link {% if active_page == 'errors' %}active{% endif %}">Error Codes</a>
-                    <a href="{{ url_for('docs_examples') }}" class="nav-link {% if active_page == 'examples' %}active{% endif %}">Code Examples</a>
-                    <a href="{{ url_for('docs_changelog') }}" class="nav-link {% if active_page == 'changelog' %}active{% endif %}">Changelog</a>
+                    <div class="nav-title">Product Docs</div>
+                    <a href="{{ url_for('docs_ishuman') }}" class="nav-link {% if active_page == 'ishuman' %}active{% endif %}">isHuman Network</a>
                 </div>
             </nav>
         </aside>
@@ -173,124 +143,14 @@ document.addEventListener('DOMContentLoaded', () => {
     const searchInput = document.getElementById('docs-search-input');
     const searchResults = document.getElementById('docs-search-results');
     
-    // Search index - comprehensive docs content
+    // Search index - public docs surface (isHuman only)
     const docsIndex = [
-        // Getting Started
         {
-            title: 'Overview',
-            url: '{{ url_for("docs_overview") }}',
-            category: 'getting-started',
-            keywords: 'overview introduction agent auth runtime proof-first x-lemma-credential agent ops controls monitoring kill switch',
-            excerpt: 'Learn how Lemma handles proof-first runtime auth, agent ops controls, monitoring, and containment.'
-        },
-        {
-            title: 'Quick Start',
-            url: '{{ url_for("docs_quickstart") }}',
-            category: 'getting-started',
-            keywords: 'quick start getting started tutorial bring your own runtime x-lemma-credential proof-first setup-firewall session start',
-            excerpt: 'Install the CLI, acquire a proof, and send X-Lemma-Credential from your own runtime.'
-        },
-        {
-            title: 'Installation',
-            url: '{{ url_for("docs_installation") }}',
-            category: 'getting-started',
-            keywords: 'install installation pipx lemma-cli runtime prerequisites lemma-firewall reference runtime proof file',
-            excerpt: 'Install lemma-cli, prepare your proof-first runtime, and choose the reference runtime path only when needed.'
-        },
-        {
-            title: 'CLI',
-            url: '{{ url_for("docs_cli") }}',
-            category: 'getting-started',
-            keywords: 'lemma cli command line pipx session start session status doctor fix setup-firewall login non-interactive',
-            excerpt: 'Use lemma-cli for wallet sessions, remediation, reference runtime setup, and machine-readable checks.'
-        },
-        // Integration Guides
-        {
-            title: 'Wallet Redirect Flow',
-            url: '{{ url_for("docs_wallet_flow") }}',
+            title: 'isHuman Network',
+            url: '{{ url_for("docs_ishuman") }}',
             category: 'integration',
-            keywords: 'wallet redirect flow authentication login user flow popup window oauth sso single sign-on',
-            excerpt: 'Implement the wallet redirect authentication flow. Guide users through secure credential verification via the Lemma wallet.'
-        },
-        {
-            title: 'Credential Verification',
-            url: '{{ url_for("docs_verification") }}',
-            category: 'integration',
-            keywords: 'verification verify credential proof validate token check authentication backend server',
-            excerpt: 'Server-side credential verification. Validate proofs and tokens returned from the Lemma wallet securely.'
-        },
-        {
-            title: 'Permissions & Roles',
-            url: '{{ url_for("docs_permissions") }}',
-            category: 'integration',
-            keywords: 'permissions roles access control authorization rbac admin user moderator custom roles',
-            excerpt: 'Implement role-based access control using Lemma permissions. Define custom roles and permission hierarchies.'
-        },
-        // SDK Reference
-        {
-            title: 'JavaScript SDK',
-            url: '{{ url_for("docs_sdk_js") }}',
-            category: 'sdk',
-            keywords: 'javascript sdk js client browser frontend react vue angular typescript',
-            excerpt: 'Complete JavaScript SDK reference. Initialize the client, configure options, and integrate with your frontend.'
-        },
-        {
-            title: 'SDK Methods',
-            url: '{{ url_for("docs_sdk_methods") }}',
-            category: 'sdk',
-            keywords: 'methods functions api startAuth verify getProof hasCredential checkPermission logout',
-            excerpt: 'Reference for all SDK methods including authentication, verification, and permission checking functions.'
-        },
-        {
-            title: 'Events & Callbacks',
-            url: '{{ url_for("docs_sdk_events") }}',
-            category: 'sdk',
-            keywords: 'events callbacks listeners hooks onAuth onError onReady state change async',
-            excerpt: 'Handle SDK events and callbacks. Listen for authentication state changes, errors, and verification results.'
-        },
-        // API Reference
-        {
-            title: 'Authentication API',
-            url: '{{ url_for("docs_api_auth") }}',
-            category: 'api',
-            keywords: 'authentication api auth x-lemma-credential exchange-proof compat bearer token protected routes',
-            excerpt: 'Use proof-first auth on protected routes and exchange proof for bearer tokens only for compatibility.'
-        },
-        {
-            title: 'Verification API',
-            url: '{{ url_for("docs_api_verification") }}',
-            category: 'api',
-            keywords: 'verification api verify proof credential validate backend server-side api endpoint post',
-            excerpt: 'Server-to-server verification API. Validate credential proofs and check verification status programmatically.'
-        },
-        {
-            title: 'Revocation API',
-            url: '{{ url_for("docs_api_revocation") }}',
-            category: 'api',
-            keywords: 'revocation api revoke credential invalidate cancel ban block suspend',
-            excerpt: 'Revoke and manage credential status. Check revocation lists and invalidate compromised credentials.'
-        },
-        // Resources
-        {
-            title: 'Error Codes',
-            url: '{{ url_for("docs_error_codes") }}',
-            category: 'resources',
-            keywords: 'error codes errors troubleshooting debug fix problems issues solutions',
-            excerpt: 'Complete list of error codes and their meanings. Troubleshoot integration issues with detailed explanations.'
-        },
-        {
-            title: 'Code Examples',
-            url: '{{ url_for("docs_examples") }}',
-            category: 'resources',
-            keywords: 'examples code samples snippets runtime express x-lemma-credential exchange-proof monitoring lemma-firewall',
-            excerpt: 'Ready-to-use runtime, server verification, compatibility, and monitoring examples for agent auth.'
-        },
-        {
-            title: 'Changelog',
-            url: '{{ url_for("docs_changelog") }}',
-            category: 'resources',
-            keywords: 'changelog updates releases version history changes new features',
-            excerpt: 'SDK and API changelog. Track version updates, new features, and breaking changes.'
+            keywords: 'ishuman proof of humanity stripe identity ppid site block network revoke local verification ed25519 sdk api',
+            excerpt: 'Integrate isHuman verification, site-private credential derivation, and two-tier revocation controls.'
         }
     ];
     
@@ -345,11 +205,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         
         const categoryLabels = {
-            'getting-started': 'Getting Started',
-            'integration': 'Integration',
-            'sdk': 'SDK',
-            'api': 'API',
-            'resources': 'Resources'
+            'integration': 'Product'
         };
         
         let html = results.map((doc, i) => `

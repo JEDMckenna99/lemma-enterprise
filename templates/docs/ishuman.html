@@ -1,0 +1,103 @@
+{% extends "docs/layout.html" %}
+{% set active_page = 'ishuman' %}
+{% set hero_title = 'isHuman Network' %}
+{% set hero_subtitle = 'Proof-of-humanity credentials with local verification and site-private identity boundaries.' %}
+
+{% block docs_content %}
+<div class="docs-section">
+    <h2>What is isHuman?</h2>
+    <p>isHuman is Lemma's proof-of-humanity network for websites and applications. A user verifies once through Stripe Identity, then receives an Ed25519-signed credential that can be reused across sites while preserving privacy via per-site PPIDs.</p>
+    <div class="callout callout--info">
+        <div class="callout-title">Core model</div>
+        <p>Master credential is issued for <code>lemma.id</code>. On third-party sites, the wallet bridge derives a site-specific credential on first request and stores it for later use.</p>
+    </div>
+</div>
+
+<div class="docs-section">
+    <h2>Verification Flow</h2>
+    <table class="docs-table">
+        <thead>
+            <tr><th>Step</th><th>Component</th><th>What happens</th></tr>
+        </thead>
+        <tbody>
+            <tr><td>1</td><td>User + Stripe Identity</td><td>User completes identity verification flow initiated from <code>/api/ishuman/start-verification</code>.</td></tr>
+            <tr><td>2</td><td>Stripe webhook</td><td><code>/api/webhooks/stripe-identity</code> receives <code>identity.verification_session.verified</code> and records verification state.</td></tr>
+            <tr><td>3</td><td>Credential issuance</td><td>Lemma issues a signed isHuman credential (<code>isHuman: true</code>) with issuer metadata and TTL.</td></tr>
+            <tr><td>4</td><td>Wallet bridge</td><td>Client requests credential through <code>/wallet/bridge</code>. If needed, bridge calls <code>/api/ishuman/derive-site-proof</code>.</td></tr>
+            <tr><td>5</td><td>Site verifier SDK</td><td><code>IsHumanVerifier</code> validates claim, expiry, revocation membership, and Ed25519 signature locally in browser.</td></tr>
+        </tbody>
+    </table>
+</div>
+
+<div class="docs-section" id="sdk-integration">
+    <h2>SDK Integration</h2>
+    <p>Basic integration uses the hosted SDK and calls <code>verify()</code> when you need a verdict.</p>
+    <div class="code-block">
+        <div class="code-header">
+            <span>HTML</span>
+            <button class="copy-btn">Copy</button>
+        </div>
+        <code>&lt;script src="https://lemma.id/sdk/ishuman-verifier.js"&gt;&lt;/script&gt;
+&lt;script&gt;
+  const verifier = new IsHumanVerifier({ siteId: 'your-site-id' });
+  const result = await verifier.verify();
+  // result: { human, ppid, reason, timeMs, error }
+&lt;/script&gt;</code>
+    </div>
+
+    <h3>Constructor options</h3>
+    <table class="docs-table">
+        <thead>
+            <tr><th>Option</th><th>Type</th><th>Default</th><th>Notes</th></tr>
+        </thead>
+        <tbody>
+            <tr><td><code>siteId</code></td><td>string</td><td><code>window.location.hostname</code></td><td>Registered site identifier used for bridge requests.</td></tr>
+            <tr><td><code>lemmaOrigin</code></td><td>string</td><td><code>https://lemma.id</code></td><td>Override for non-production testing environments.</td></tr>
+            <tr><td><code>debug</code></td><td>boolean</td><td><code>false</code></td><td>Enables SDK console logging.</td></tr>
+            <tr><td><code>isBlockedLocally</code></td><td>function</td><td><code>null</code></td><td>Optional local callback for site-level PPID block checks.</td></tr>
+        </tbody>
+    </table>
+
+    <h3><code>verify()</code> result</h3>
+    <p><code>verify()</code> returns <code>{ human: boolean, ppid: string | null, reason: string, timeMs: number, error: string | null }</code>.</p>
+    <p>Common reasons include <code>valid</code>, <code>no_credential</code>, <code>expired</code>, <code>revoked</code>, <code>invalid_signature</code>, and <code>site_blocked</code>.</p>
+</div>
+
+<div class="docs-section" id="api-reference">
+    <h2>isHuman API Reference</h2>
+    <table class="docs-table">
+        <thead>
+            <tr><th>Method</th><th>Path</th><th>Purpose</th><th>Auth</th></tr>
+        </thead>
+        <tbody>
+            <tr><td><code>POST</code></td><td><code>/api/ishuman/start-verification</code></td><td>Create Stripe Identity verification session.</td><td>None</td></tr>
+            <tr><td><code>GET</code></td><td><code>/api/ishuman/verification-status/&lt;session_id&gt;</code></td><td>Poll verification status and fetch credential payload when ready.</td><td>None</td></tr>
+            <tr><td><code>POST</code></td><td><code>/api/ishuman/site-block</code></td><td>Apply immediate site-level PPID block.</td><td><code>X-API-Key</code></td></tr>
+            <tr><td><code>POST</code></td><td><code>/api/ishuman/site-unblock</code></td><td>Remove site-scoped block.</td><td><code>X-API-Key</code></td></tr>
+            <tr><td><code>POST</code></td><td><code>/api/ishuman/network-revoke</code></td><td>Submit network-wide revocation request (pending review).</td><td><code>X-API-Key</code></td></tr>
+            <tr><td><code>POST</code></td><td><code>/api/ishuman/approve-revocation</code></td><td>Admin approval path for network revocation.</td><td>Admin credential</td></tr>
+            <tr><td><code>GET</code></td><td><code>/api/ishuman/check</code></td><td>Check site block and network revocation status for a PPID.</td><td>None</td></tr>
+            <tr><td><code>GET</code></td><td><code>/api/ishuman/site-blocks</code></td><td>List all active blocks for the authenticated site.</td><td><code>X-API-Key</code></td></tr>
+            <tr><td><code>GET</code></td><td><code>/api/ishuman/stats</code></td><td>Public network statistics.</td><td>None</td></tr>
+            <tr><td><code>POST</code></td><td><code>/api/ishuman/derive-site-proof</code></td><td>Derive or fetch cached site-specific credential from master proof.</td><td>None</td></tr>
+        </tbody>
+    </table>
+</div>
+
+<div class="docs-section">
+    <h2>Revocation and Abuse Controls</h2>
+    <h3>Tier 1: Site block (immediate)</h3>
+    <p>Each site can block a PPID instantly on its own domain using <code>/api/ishuman/site-block</code>.</p>
+    <h3>Tier 2: Network revocation (reviewed)</h3>
+    <p>Sites can request network action via <code>/api/ishuman/network-revoke</code>. Admin approval through <code>/api/ishuman/approve-revocation</code> revokes wallet, master credential, and derived credentials.</p>
+</div>
+
+<div class="docs-section">
+    <h2>Privacy Model (PPID by Site)</h2>
+    <ul>
+        <li>PPID derivation binds identity to wallet secret + normalized site hostname.</li>
+        <li>Derived credentials are site-specific; one site's PPID cannot be correlated directly by another site.</li>
+        <li>Wallet bridge and derivation paths preserve separation between internal site IDs and runtime hostname binding.</li>
+    </ul>
+</div>
+{% endblock %}

@@ -863,13 +863,13 @@ def create_app():
     # ==================== DOCUMENTATION ====================
     @app.route('/docs')
     def docs_overview():
-        """Documentation overview"""
-        return render_template('docs/overview.html')
+        """Public docs entrypoint."""
+        return redirect(url_for('docs_ishuman'), code=302)
 
     @app.route('/docs/overview')
     def docs_overview_alias():
-        """Canonical alias for docs overview."""
-        return redirect(url_for('docs_overview'), code=301)
+        """Legacy docs overview alias."""
+        return redirect(url_for('docs_ishuman'), code=301)
     
     @app.route('/docs/quickstart')
     def docs_quickstart():
@@ -900,6 +900,11 @@ def create_app():
     def docs_permissions():
         """Permissions and roles guide"""
         return render_template('docs/permissions.html')
+
+    @app.route('/docs/ishuman')
+    def docs_ishuman():
+        """isHuman network guide"""
+        return render_template('docs/ishuman.html')
     
     @app.route('/docs/sdk')
     def docs_sdk_js():

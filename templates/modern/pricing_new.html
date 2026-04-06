@@ -164,6 +164,60 @@
         line-height: 1.7;
         font-size: 16px;
     }
+
+    .ishuman-pricing {
+        max-width: 980px;
+        margin: 0 auto;
+        padding: 24px 20px 40px;
+    }
+
+    .ishuman-pricing h2 {
+        font-size: 30px;
+        margin: 0 0 12px 0;
+        color: var(--gray-900);
+        text-align: center;
+    }
+
+    .ishuman-pricing .intro {
+        text-align: center;
+        color: var(--gray-600);
+        margin: 0 auto 28px;
+        max-width: 700px;
+        line-height: 1.6;
+    }
+
+    .ishuman-pricing-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+        gap: 18px;
+    }
+
+    .ishuman-price-card {
+        border: 1px solid var(--gray-200);
+        border-radius: 12px;
+        padding: 22px;
+        background: var(--white);
+    }
+
+    .ishuman-price-card h3 {
+        margin: 0 0 10px 0;
+        font-size: var(--font-size-lg);
+        color: var(--gray-900);
+    }
+
+    .ishuman-price-card .price {
+        margin: 0 0 10px 0;
+        font-size: 28px;
+        font-weight: 700;
+        color: #059669;
+    }
+
+    .ishuman-price-card p {
+        margin: 0;
+        color: var(--gray-600);
+        line-height: 1.5;
+        font-size: 15px;
+    }
     
     @media (max-width: 768px) {
         .pricing-hero {
@@ -199,6 +253,28 @@
     <div class="pricing-cta">
         <a href="/login" class="btn btn-primary">Get Started Free</a>
         <a href="/docs" class="btn-secondary">Read the Docs</a>
+    </div>
+</div>
+
+<div class="ishuman-pricing">
+    <h2>isHuman Network Pricing</h2>
+    <p class="intro">Use isHuman to verify real people with site-private credentials. Pricing stays simple: pass-through verification cost, free SDK, and free integration during early access.</p>
+    <div class="ishuman-pricing-grid">
+        <div class="ishuman-price-card">
+            <h3>Human verification</h3>
+            <p class="price">$2.00 / person</p>
+            <p>Covers Stripe Identity verification cost passed through at checkout. No hidden platform fee on each verification.</p>
+        </div>
+        <div class="ishuman-price-card">
+            <h3>JavaScript SDK</h3>
+            <p class="price">Free</p>
+            <p>Embed <code>IsHumanVerifier</code> and run local credential checks in the browser without per-call charges.</p>
+        </div>
+        <div class="ishuman-price-card">
+            <h3>Site integration</h3>
+            <p class="price">Free in early access</p>
+            <p>Create API keys, use site block controls, and integrate check endpoints at no extra cost during early access.</p>
+        </div>
     </div>
 </div>
 
