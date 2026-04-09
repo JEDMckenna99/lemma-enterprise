@@ -63,10 +63,10 @@
   </div>
 
   <div class="ao-nav" style="margin-bottom:12px">
-    <a href="/developer" class="{% if screen == 'dashboard' %}active{% endif %}">Home</a>
-    <a href="/developer/issue-proof" class="{% if screen == 'issue_proof' %}active{% endif %}">Issue Proof</a>
-    <a href="/developer/proofs" class="{% if screen == 'proofs' %}active{% endif %}">Proofs</a>
-    <a href="/developer/settings" class="{% if screen == 'settings' %}active{% endif %}">Settings</a>
+    <a href="/admin/agent-ops" class="{% if screen == 'dashboard' %}active{% endif %}">Home</a>
+    <a href="/admin/agent-ops/issue-proof" class="{% if screen == 'issue_proof' %}active{% endif %}">Issue Proof</a>
+    <a href="/admin/agent-ops/proofs" class="{% if screen == 'proofs' %}active{% endif %}">Proofs</a>
+    <a href="/admin/agent-ops/settings" class="{% if screen == 'settings' %}active{% endif %}">Settings</a>
   </div>
 
   {% if screen == 'dashboard' %}
@@ -145,8 +145,8 @@
     </div>
   </div>
   <div style="margin-top:14px" class="ao-row">
-    <a class="ao-btn" href="/developer/issue-proof">Issue New Proof</a>
-    <a class="ao-btn sec" href="/developer/proofs">Open Proofs List</a>
+    <a class="ao-btn" href="/admin/agent-ops/issue-proof">Issue New Proof</a>
+    <a class="ao-btn sec" href="/admin/agent-ops/proofs">Open Proofs List</a>
   </div>
   {% endif %}
 
@@ -929,7 +929,7 @@ function reissueFromProof(tokenId) {
     task_id: selected.task_description || "",
     scope: selected.scope || ["read"],
   }));
-  window.location.href = "/developer/issue-proof";
+  window.location.href = "/admin/agent-ops/issue-proof";
 }
 
 async function initIssueProof() {

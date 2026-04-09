@@ -1,7 +1,7 @@
 // Lemma Service Worker - Minimal Implementation
 // This prevents service worker errors and provides basic caching
 
-const CACHE_NAME = 'lemma-v14';  // v2.48.0 - Exclude SSE + API from SW interception
+const CACHE_NAME = 'lemma-v15';  // v2.48.1 - Bypass developer/admin HTML surfaces
 const STATIC_ASSETS = [
   '/static/css/lemma.css',
   '/static/js/lemma-bot-shield-simple.js',
@@ -69,6 +69,17 @@ self.addEventListener('fetch', event => {
 
   // Skip API calls — these should always hit the network directly
   if (event.request.url.includes('/api/')) {
+    return;
+  }
+
+  // Never intercept dynamic developer/admin surfaces.
+  // These pages change often and must always reflect latest server routes/templates.
+  if (
+    event.request.url.includes('/developer') ||
+    event.request.url.includes('/admin') ||
+    event.request.url.includes('/dashboard') ||
+    event.request.url.includes('/platform')
+  ) {
     return;
   }
 

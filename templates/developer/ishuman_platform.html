@@ -1,0 +1,91 @@
+{% extends "modern/layout.html" %}
+
+{% block title %}isHuman Developer Platform - lemma.id{% endblock %}
+
+{% block head %}
+{{ super() }}
+<style>
+.devhub-wrap{max-width:1040px;margin:30px auto;padding:0 18px 54px;}
+.devhub-hero{background:#0f172a;color:#e2e8f0;border-radius:16px;padding:22px 20px;margin-bottom:16px}
+.devhub-hero h1{margin:0 0 10px;font-size:30px;color:#fff}
+.devhub-hero p{margin:0 0 12px;color:#cbd5e1;max-width:760px}
+.devhub-chip{display:inline-block;font-size:11px;font-weight:700;background:#1d4ed8;color:#dbeafe;padding:3px 8px;border-radius:999px;margin-right:6px}
+.devhub-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:12px}
+.devhub-card{background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:16px;box-shadow:0 2px 4px rgba(15,23,42,.04)}
+.devhub-card h2{margin:0 0 8px;font-size:18px;color:#0f172a}
+.devhub-card p{margin:0 0 12px;color:#475569;font-size:14px;line-height:1.45}
+.devhub-list{margin:0;padding-left:18px;color:#334155;font-size:13px}
+.devhub-list li{margin:4px 0}
+.devhub-actions{display:flex;gap:8px;flex-wrap:wrap}
+.devhub-btn{display:inline-block;text-decoration:none;padding:8px 11px;border-radius:9px;border:1px solid #cbd5e1;color:#1e293b;background:#fff;font-size:12px;font-weight:700}
+.devhub-btn.primary{background:#4f46e5;border-color:#4338ca;color:#fff}
+.devhub-note{margin-top:14px;font-size:12px;color:#64748b}
+@media (max-width: 760px){.devhub-hero h1{font-size:24px}}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="devhub-wrap">
+  <section class="devhub-hero">
+    <span class="devhub-chip">Public Developer Hub</span>
+    <span class="devhub-chip">isHuman Network</span>
+    <h1>Build with isHuman credentials</h1>
+    <p>
+      Integrate Stripe-verified proof-of-humanity into your app with site-private PPIDs, local verification,
+      and revocation-aware controls. Start with docs and SDK references, then wire API keys for your runtime.
+    </p>
+    <div class="devhub-actions">
+      <a class="devhub-btn primary" href="/docs/ishuman">Read isHuman guide</a>
+      <a class="devhub-btn" href="/docs/quickstart">Open quickstart</a>
+      <a class="devhub-btn" href="/sdk/ishuman-verifier.js">SDK script URL</a>
+    </div>
+  </section>
+
+  <div class="devhub-grid">
+    <section class="devhub-card">
+      <h2>1) Onboard</h2>
+      <p>Implement wallet bridge + verifier to request and validate site-bound credentials in browser.</p>
+      <ul class="devhub-list">
+        <li>Set `siteId` to your canonical hostname or registered site identity.</li>
+        <li>Use `verify()` before sensitive actions.</li>
+        <li>Fail closed on missing, expired, or revoked proofs.</li>
+      </ul>
+      <div class="devhub-actions" style="margin-top:10px">
+        <a class="devhub-btn" href="/docs/ishuman#sdk-integration">SDK integration</a>
+        <a class="devhub-btn" href="/docs/wallet-flow">Wallet flow</a>
+      </div>
+    </section>
+
+    <section class="devhub-card">
+      <h2>2) Operate</h2>
+      <p>Use the isHuman API surfaces for verification lifecycle, site blocks, and network revocation requests.</p>
+      <ul class="devhub-list">
+        <li>Start verification with `/api/ishuman/start-verification`.</li>
+        <li>Check status with `/api/ishuman/verification-status/&lt;session_id&gt;`.</li>
+        <li>Apply site-local abuse blocks with API keys.</li>
+      </ul>
+      <div class="devhub-actions" style="margin-top:10px">
+        <a class="devhub-btn" href="/docs/ishuman#api-reference">isHuman API reference</a>
+        <a class="devhub-btn" href="/docs/api/auth">Auth API docs</a>
+      </div>
+    </section>
+
+    <section class="devhub-card">
+      <h2>3) Manage Access</h2>
+      <p>Use authenticated key management for your runtime and site operations dashboards.</p>
+      <ul class="devhub-list">
+        <li>Runtime/customer keys are managed in the key manager.</li>
+        <li>Admin and wallet session are required for privileged actions.</li>
+        <li>Keep key scopes minimal and rotate regularly.</li>
+      </ul>
+      <div class="devhub-actions" style="margin-top:10px">
+        <a class="devhub-btn primary" href="/developer/external-api-keys">Open API key manager</a>
+      </div>
+    </section>
+  </div>
+
+  <p class="devhub-note">
+    Legacy internal consoles are restricted to admin-only routes and are not served on public developer paths.
+  </p>
+</div>
+{% endblock %}

@@ -604,7 +604,13 @@ def create_app():
     def service_worker():
         """Serve service worker from root for proper scope"""
         from flask import send_from_directory
-        return send_from_directory('static', 'sw.js', mimetype='application/javascript')
+        response = send_from_directory('static', 'sw.js', mimetype='application/javascript')
+        # Force browsers to revalidate the service worker file on each navigation,
+        # so route/template updates are applied without prolonged stale caching.
+        response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+        response.headers['Pragma'] = 'no-cache'
+        response.headers['Expires'] = '0'
+        return response
 
     @app.route('/wallet')
     def wallet():
@@ -1012,76 +1018,77 @@ def create_app():
     
     @app.route('/developer')
     def developer_overview():
-        """Developer Platform - MVP Agent Ops dashboard."""
-        logger.info("🚀 Serving developer platform")
-        return render_template('developer/agent_ops_mvp.html',
-            screen='dashboard',
+        """Public developer entrypoint redirects to isHuman hub."""
+        logger.info("↪️ Redirecting /developer to /developer/ishuman")
+        response = redirect('/developer/ishuman', code=302)
+        response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+        response.headers['Pragma'] = 'no-cache'
+        response.headers['Expires'] = '0'
+        response.headers['X-Lemma-Developer-Platform'] = 'ishuman-redirect-v1'
+        return response
+
+    @app.route('/developer/ishuman')
+    def developer_ishuman():
+        """Public isHuman developer platform entrypoint."""
+        logger.info("🚀 Serving isHuman developer platform")
+        return render_template(
+            'developer/ishuman_platform.html',
             user_email=request.headers.get('X-User-Email'),
             user_name=None,
             is_admin=request.headers.get('X-Permission-ID', '').lower() in ['super_admin', 'admin_access']
-        )
+        ), 200, {
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            'Pragma': 'no-cache',
+            'Expires': '0',
+            'X-Lemma-Developer-Platform': 'ishuman-public-v1'
+        }
 
     @app.route('/developer/platform')
     def developer_platform():
-        """Developer Platform - compatibility redirect to dashboard."""
-        logger.info("🚀 Serving developer platform (/developer/platform)")
+        """Compatibility redirect for older platform links."""
+        logger.info("↪️ Redirecting /developer/platform to /developer")
         return redirect('/developer')
 
     @app.route('/developer/issue-proof')
     def developer_issue_proof():
-        """Developer Platform - issue proof screen."""
-        logger.info("🪪 Serving developer issue proof screen")
-        return render_template('developer/agent_ops_mvp.html',
-            screen='issue_proof',
-            user_email=request.headers.get('X-User-Email'),
-            user_name=None,
-            is_admin=request.headers.get('X-Permission-ID', '').lower() in ['super_admin', 'admin_access']
-        )
+        """Retired public Agent Ops route kept as compatibility redirect."""
+        logger.info("↪️ Redirecting deprecated public Agent Ops route: /developer/issue-proof")
+        return redirect('/developer')
 
     @app.route('/developer/proofs')
     def developer_proofs():
-        """Developer Platform - proofs management screen."""
-        logger.info("📋 Serving developer proofs screen")
-        return render_template('developer/agent_ops_mvp.html',
-            screen='proofs',
-            user_email=request.headers.get('X-User-Email'),
-            user_name=None,
-            is_admin=request.headers.get('X-Permission-ID', '').lower() in ['super_admin', 'admin_access']
-        )
+        """Retired public Agent Ops route kept as compatibility redirect."""
+        logger.info("↪️ Redirecting deprecated public Agent Ops route: /developer/proofs")
+        return redirect('/developer')
 
     @app.route('/developer/settings')
     def developer_settings():
-        """Developer Platform - settings screen."""
-        logger.info("⚙️ Serving developer settings screen")
-        return render_template('developer/agent_ops_mvp.html',
-            screen='settings',
-            user_email=request.headers.get('X-User-Email'),
-            user_name=None,
-            is_admin=request.headers.get('X-Permission-ID', '').lower() in ['super_admin', 'admin_access']
-        )
+        """Retired public Agent Ops route kept as compatibility redirect."""
+        logger.info("↪️ Redirecting deprecated public Agent Ops route: /developer/settings")
+        return redirect('/developer')
     
     @app.route('/developer/sites')
     def developer_sites():
-        """Legacy sites page removed from customer UX."""
-        logger.info("🌐 Redirecting deprecated /developer/sites to Agent Ops API section")
-        return redirect('/developer/issue-proof')
+        """Legacy sites page removed from public UX."""
+        logger.info("🌐 Redirecting deprecated /developer/sites to /developer")
+        return redirect('/developer')
     
     @app.route('/developer/sites/new')
     def developer_sites_new():
-        """Legacy create-site route redirected to platform API section."""
-        return redirect('/developer/issue-proof')
+        """Legacy create-site route redirected to developer hub."""
+        return redirect('/developer')
     
     @app.route('/developer/sites/<site_id>')
     def developer_site_detail(site_id):
-        """Legacy site dashboard route redirected to Agent Ops API section."""
+        """Legacy site dashboard route redirected to developer hub."""
         logger.info("📊 Redirecting deprecated site dashboard route: %s", site_id)
-        return redirect('/developer/proofs')
+        return redirect('/developer')
     
     @app.route('/developer/sites/<site_id>/integration')
     def developer_site_integration(site_id):
-        """Legacy site integration route redirected to Agent Ops API section."""
+        """Legacy site integration route redirected to developer hub."""
         logger.info("🧩 Redirecting deprecated site integration route: %s", site_id)
-        return redirect('/developer/issue-proof')
+        return redirect('/developer')
     
     @app.route('/developer/sites/<site_id>/keys')
     def developer_site_keys(site_id):
@@ -1098,7 +1105,7 @@ def create_app():
     def developer_external_api_keys():
         """Developer Platform - external/customer API key manager."""
         logger.info("🔑 Serving external API key manager")
-        return render_template(
+        return _require_wallet_session(
             'developer/external_api_keys_mvp.html',
             user_email=request.headers.get('X-User-Email'),
             user_name=None,
@@ -1107,31 +1114,31 @@ def create_app():
     
     @app.route('/developer/sites/<site_id>/users')
     def developer_site_users(site_id):
-        """Legacy site users route redirected to Agent Ops section."""
+        """Legacy site users route redirected to developer hub."""
         logger.info("👥 Redirecting deprecated site users route: %s", site_id)
-        return redirect('/developer/proofs')
+        return redirect('/developer')
     
     @app.route('/developer/sites/<site_id>/permissions')
     def developer_site_permissions(site_id):
-        """Legacy site permissions route redirected to Agent Ops section."""
+        """Legacy site permissions route redirected to developer hub."""
         logger.info("🎫 Redirecting deprecated site permissions route: %s", site_id)
-        return redirect('/developer/proofs')
+        return redirect('/developer')
     
     @app.route('/developer/sites/<site_id>/settings')
     def developer_site_settings(site_id):
-        """Legacy site settings route redirected to platform settings section."""
+        """Legacy site settings route redirected to developer hub."""
         logger.info("⚙️ Redirecting deprecated site settings route: %s", site_id)
-        return redirect('/developer/settings')
+        return redirect('/developer')
     
     @app.route('/developer/usage')
     def developer_usage():
-        """Legacy usage route redirected to Agent Ops overview."""
-        return redirect('/developer/proofs')
+        """Legacy usage route redirected to developer hub."""
+        return redirect('/developer')
 
     @app.route('/developer/agent-delegation')
     def developer_agent_delegation():
-        """Legacy agent delegation route redirected to Agent Ops section."""
-        return redirect('/developer/proofs')
+        """Legacy agent delegation route redirected to developer hub."""
+        return redirect('/developer')
     
     @app.route('/developer/billing')
     def developer_billing():
@@ -1182,6 +1189,54 @@ def create_app():
             'Pragma': 'no-cache',
             'Expires': '0'
         }
+
+    @app.route('/admin/agent-ops')
+    def admin_agent_ops():
+        """Admin-only archived Agent Ops dashboard."""
+        logger.info("Serving admin archived Agent Ops dashboard")
+        return _require_wallet_session(
+            'developer/agent_ops_mvp.html',
+            screen='dashboard',
+            user_email=request.headers.get('X-User-Email'),
+            user_name=None,
+            is_admin=request.headers.get('X-Permission-ID', '').lower() in ['super_admin', 'admin_access']
+        )
+
+    @app.route('/admin/agent-ops/issue-proof')
+    def admin_agent_ops_issue_proof():
+        """Admin-only archived Agent Ops issue proof screen."""
+        logger.info("Serving admin archived Agent Ops issue proof")
+        return _require_wallet_session(
+            'developer/agent_ops_mvp.html',
+            screen='issue_proof',
+            user_email=request.headers.get('X-User-Email'),
+            user_name=None,
+            is_admin=request.headers.get('X-Permission-ID', '').lower() in ['super_admin', 'admin_access']
+        )
+
+    @app.route('/admin/agent-ops/proofs')
+    def admin_agent_ops_proofs():
+        """Admin-only archived Agent Ops proofs screen."""
+        logger.info("Serving admin archived Agent Ops proofs")
+        return _require_wallet_session(
+            'developer/agent_ops_mvp.html',
+            screen='proofs',
+            user_email=request.headers.get('X-User-Email'),
+            user_name=None,
+            is_admin=request.headers.get('X-Permission-ID', '').lower() in ['super_admin', 'admin_access']
+        )
+
+    @app.route('/admin/agent-ops/settings')
+    def admin_agent_ops_settings():
+        """Admin-only archived Agent Ops settings screen."""
+        logger.info("Serving admin archived Agent Ops settings")
+        return _require_wallet_session(
+            'developer/agent_ops_mvp.html',
+            screen='settings',
+            user_email=request.headers.get('X-User-Email'),
+            user_name=None,
+            is_admin=request.headers.get('X-Permission-ID', '').lower() in ['super_admin', 'admin_access']
+        )
 
     @app.route('/admin')
     def admin_dashboard():
