@@ -1,7 +1,7 @@
 {% extends "modern/layout.html" %}
 
 {% block title %}About - lemma.id{% endblock %}
-{% block description %}Lemma is building reusable human verification for the open web — verified locally, like a physical driver's license, with no phone-home to the issuer. Founded on the thesis that humanness can't be proven by CAPTCHA, but shouldn't require a centralized digital ID either.{% endblock %}
+{% block description %}Lemma is building reusable human verification for the open web — signed once, carried by the user, and verified locally on the hot path. Founded on the thesis that CAPTCHA is losing to automation, but the answer should not be a centralized digital ID system either.{% endblock %}
 
 {% block content %}
 
@@ -11,7 +11,7 @@
         <div style="max-width: 860px; margin: 0 auto; text-align: center;">
             <p style="font-size: var(--font-size-sm); font-weight: 600; text-transform: uppercase; letter-spacing: 2px; color: var(--primary); margin-bottom: 16px;">About Lemma</p>
             <h1 style="font-size: clamp(2.5rem, 5vw, 3.5rem); line-height: 1.1; margin-bottom: 24px;">Identity, the way it<br>should work on the web.</h1>
-            <p style="font-size: var(--font-size-xl); font-weight: 500; margin-bottom: var(--space-4); color: var(--gray-700);">CAPTCHA can't keep bots out. Centralized digital ID is becoming a surveillance system. Lemma is the open-web alternative — reusable human verification that works like a physical driver's license: verified locally, no phone-home to the issuer.</p>
+            <p style="font-size: var(--font-size-xl); font-weight: 500; margin-bottom: var(--space-4); color: var(--gray-700);">CAPTCHA is losing effectiveness against modern automation. Centralized digital ID concentrates too much visibility in one place. Lemma is the open-web alternative: reusable human verification with site-private identifiers and local verification on the access-decision path.</p>
         </div>
     </div>
 </section>
@@ -26,9 +26,9 @@
             </div>
 
             <div style="font-size: var(--font-size-lg); color: var(--gray-700); line-height: 1.7;">
-                <p style="margin-bottom: 24px;">CAPTCHA is broken. Modern bots solve image and text puzzles trivially, and CAPTCHA-solving farms operate at fractions of a cent per solve. Sites that need anti-bot signal — waitlists, ticketing, comments, dating, AI agent gating — increasingly know that what they're paying for stops humans more than it stops bots.</p>
+                <p style="margin-bottom: 24px;">CAPTCHA is losing the job it was hired to do. Modern bots solve many image and text puzzles reliably, and CAPTCHA-solving farms operate at fractions of a cent per solve. Sites that need anti-bot signal — waitlists, ticketing, comments, dating, AI agent gating — increasingly know that puzzle friction often stops humans more reliably than determined attackers.</p>
 
-                <p style="margin-bottom: 24px;">The proposed replacements — government digital ID stores, federated SSO, on-chain identity — share a common flaw. They all create a centralized record of who you are, when you presented your ID, and where you used it. That's a mass surveillance system in waiting, and it's why digital ID has hit such consistent public resistance in the US: REAL ID, ID.me's biometric controversy, both-party opposition to mandatory digital ID.</p>
+                <p style="margin-bottom: 24px;">The proposed replacements — government digital ID stores, federated SSO, on-chain identity — tend to create a new correlation point: who you are, when you presented your ID, and where you used it. That is why mandatory digital ID keeps meeting public resistance. The web needs a stronger human signal without turning every login, signup, or checkout into another identity-provider event.</p>
 
                 <p>Meanwhile, most websites won't pay $1–2 per user for full identity verification. So they accept abuse, build CAPTCHA arms-race tooling, or charge legitimate users to compensate. The web has been stuck between "no real verification" and "centralized identity surveillance" for over a decade.</p>
             </div>
@@ -48,9 +48,9 @@
             <div style="background: var(--white); border: 1px solid var(--gray-200); border-radius: 14px; padding: 32px;">
                 <p style="font-size: var(--font-size-lg); color: var(--gray-700); line-height: 1.7; margin-bottom: 20px;">A driver's license works because it's verified locally. When you show your license at a bar, the bar checks the holograms, photo, and signature on the spot. The DMV doesn't get a notification. The license sits in your wallet — you carry it, you decide when and where to present it.</p>
 
-                <p style="font-size: var(--font-size-lg); color: var(--gray-700); line-height: 1.7; margin-bottom: 20px;">Lemma applies that exact model to the web. An IDV provider verifies you once, in-context on whichever site you're on. The signed credential lives in your browser wallet. Sites validate the signature locally — Ed25519, site-private PPIDs, no round-trip to Lemma servers, no round-trip to the issuer.</p>
+                <p style="font-size: var(--font-size-lg); color: var(--gray-700); line-height: 1.7; margin-bottom: 20px;">Lemma applies that model to the web. A user verifies once with an IDV provider. Lemma issues a signed isHuman credential. The credential lives in the user's browser wallet, and sites can validate site-bound proofs locally with Ed25519 signatures, site-private PPIDs, and cached revocation data.</p>
 
-                <p style="font-size: var(--font-size-lg); color: var(--gray-700); line-height: 1.7;">The issuer signs once and never sees where you go. Lemma doesn't either. The user carries the credential.</p>
+                <p style="font-size: var(--font-size-lg); color: var(--gray-700); line-height: 1.7;">Lemma is not pretending the control plane disappears. Issuance, revocation, recovery, and first-time site proof setup still need infrastructure. The privacy win is narrower and practical: routine access decisions do not need a live callback to the original IDV provider, and credentials do not carry one stable cross-site identifier.</p>
             </div>
         </div>
     </div>
@@ -66,20 +66,20 @@
 
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 24px;">
             <div class="card">
-                <h3 class="card-title">Local-first</h3>
-                <p>Verification happens in the browser. Credentials live in the user's wallet, not on Lemma servers. Sites validate signatures locally without phoning home to anyone.</p>
+                <h3 class="card-title">Local hot path</h3>
+                <p>Credentials live in the user's browser wallet. After setup and revocation sync, sites can validate signatures locally instead of calling an identity provider for every access decision.</p>
             </div>
             <div class="card">
-                <h3 class="card-title">Multi-issuer</h3>
-                <p>Like Plaid for banks. Issuers compete on quality and price; Lemma is the neutral distribution layer. No single issuer becomes a monopoly. Stripe Identity today; Persona, Veriff, Yoti, Sumsub on roadmap.</p>
+                <h3 class="card-title">Multi-provider direction</h3>
+                <p>Stripe Identity is the current IDV provider; Lemma currently issues the signed isHuman credential. The long-term model is a neutral distribution layer where IDV providers compete on verification quality, coverage, and price.</p>
             </div>
             <div class="card">
-                <h3 class="card-title">No surveillance, by architecture</h3>
-                <p>By design, Lemma cannot accumulate cross-site behavioral data. The system structurally doesn't permit tracking users across the web — not as a policy promise, but as an architectural constraint enforced by code.</p>
+                <h3 class="card-title">Reduced correlation surface</h3>
+                <p>Site-private PPIDs keep credentials from exposing one global user identifier across the web. Lemma's goal is to minimize observable runtime use, not ask users to trust another identity provider's logging policy.</p>
             </div>
             <div class="card">
-                <h3 class="card-title">In-context, not on lemma.id</h3>
-                <p>Like Stripe for payments — sites embed the SDK and users verify in-flow on whichever site they're on. No detour to lemma.id, no central account creation, no hosted identity profile.</p>
+                <h3 class="card-title">In-context integration</h3>
+                <p>Like Stripe for payments, sites embed the SDK and can request proof in their own flow. Users keep a Lemma browser wallet, but relying sites do not need to become identity stores or send users through repeated KYC.</p>
             </div>
         </div>
     </div>
@@ -98,9 +98,9 @@
                 <h3 style="margin-bottom: 8px;">Jed McKenna</h3>
                 <p style="color: var(--primary); font-size: var(--font-size-sm); font-weight: 600; margin-bottom: 24px;">Founder &amp; CEO</p>
 
-                <p style="font-size: var(--font-size-lg); color: var(--gray-700); line-height: 1.7; margin-bottom: 20px;">Lemma started from a simple observation on the attacker side: modern scalping bots defeat CAPTCHA trivially. The puzzles slow down humans more than they slow down bots, and the bots have already won this round of the arms race. Humanness can't be proven by puzzle-solving anymore.</p>
+                <p style="font-size: var(--font-size-lg); color: var(--gray-700); line-height: 1.7; margin-bottom: 20px;">Lemma started from a simple observation on the attacker side: modern scalping bots treat CAPTCHA as a cost of doing business. The puzzles slow down humans, while determined attackers route around them with automation, cheap solving labor, and account farms. Humanness cannot depend on puzzle-solving alone.</p>
 
-                <p style="font-size: var(--font-size-lg); color: var(--gray-700); line-height: 1.7; margin-bottom: 20px;">The other thing that became obvious in parallel: the proposed solutions all looked like surveillance systems. Centralized digital ID, federated SSO with cross-site tracking, on-chain identity that broadcasts every interaction — none of these are the answer for the open web. The answer is closer to how a real driver's license works: signed once by the issuer, carried by the user, verified locally at the point of use.</p>
+                <p style="font-size: var(--font-size-lg); color: var(--gray-700); line-height: 1.7; margin-bottom: 20px;">The other thing that became obvious in parallel: many proposed solutions create a new place to watch identity use across the web. Centralized digital ID, federated SSO with broad visibility, on-chain identity that broadcasts interactions — none of these are the right default for ordinary websites. The better direction is closer to a driver's license: issued by a trusted party, carried by the user, checked at the point of use.</p>
 
                 <p style="font-size: var(--font-size-lg); color: var(--gray-700); line-height: 1.7;">Lemma is what I wished existed back then — a verification layer that works for sites without forcing them to become identity stores, and works for users without forcing them into a centralized identity database.</p>
             </div>
@@ -118,11 +118,11 @@
             </div>
 
             <div style="font-size: var(--font-size-lg); color: var(--gray-700); line-height: 1.7;">
-                <p style="margin-bottom: 24px;">The next decade of the web needs identity infrastructure that survives the centralized-digital-ID backlash, complies with EU eIDAS 2.0 unobservability requirements, resists AI bots that solve any puzzle a human can, and doesn't ask websites to become regulated KYC entities. None of the existing options check all four boxes.</p>
+                <p style="margin-bottom: 24px;">The next decade of the web needs identity infrastructure that is harder for AI-driven abuse to farm, more private than centralized account-provider callbacks, and lighter-weight than asking every website to become a regulated KYC operator. None of the existing defaults check all three boxes.</p>
 
                 <p style="margin-bottom: 24px;">Lemma is building those rails. The goal is for "verified human" to mean the same thing across the web, the way "EMV chip card" means the same thing across payment processors — a neutral, multi-issuer, locally-verified standard.</p>
 
-                <p>Stripe Identity is the current issuer. Persona, Veriff, Yoti, and Sumsub integrations on roadmap. Sites that need human-grade signal can integrate in two lines. Users carry one verification across the web. Issuers compete on the strength of their verification, not on lock-in.</p>
+                <p>Stripe Identity is the current IDV provider. Lemma issues the reusable isHuman credential and provides the wallet, SDK, and revocation infrastructure around it. Sites that need human-grade signal can add the SDK without storing identity documents themselves. Users carry one verification across the web, while relying sites see site-private proofs instead of a reusable global identity.</p>
             </div>
         </div>
     </div>
@@ -139,12 +139,12 @@
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 20px; max-width: 980px; margin: 0 auto;">
             <div style="background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 28px;">
                 <h3 style="color: var(--white); font-size: var(--font-size-lg); margin-bottom: 8px;">Verify yourself</h3>
-                <p style="color: var(--gray-400); margin-bottom: 20px; font-size: var(--font-size-sm);">Get an isHuman credential and carry it across every Lemma-enabled site.</p>
+                <p style="color: var(--gray-400); margin-bottom: 20px; font-size: var(--font-size-sm);">Get an isHuman credential and present site-private proofs across Lemma-enabled sites.</p>
                 <a href="/app" class="btn btn-primary" style="font-size: var(--font-size-sm); padding: 10px 20px;">Get verified</a>
             </div>
             <div style="background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 28px;">
                 <h3 style="color: var(--white); font-size: var(--font-size-lg); margin-bottom: 8px;">Add isHuman to your site</h3>
-                <p style="color: var(--gray-400); margin-bottom: 20px; font-size: var(--font-size-sm);">Two-line SDK integration. Block bots and improve account integrity at a few cents per verification.</p>
+                <p style="color: var(--gray-400); margin-bottom: 20px; font-size: var(--font-size-sm);">Hosted SDK integration. Add a stronger human signal without running your own KYC stack.</p>
                 <a href="/docs/ishuman" class="btn btn-primary" style="font-size: var(--font-size-sm); padding: 10px 20px;">View docs</a>
             </div>
             <div style="background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 28px;">
