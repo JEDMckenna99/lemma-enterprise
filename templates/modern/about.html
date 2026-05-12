@@ -1,0 +1,163 @@
+{% extends "modern/layout.html" %}
+
+{% block title %}About - lemma.id{% endblock %}
+{% block description %}Lemma is building reusable human verification for the open web — verified locally, like a physical driver's license, with no phone-home to the issuer. Founded on the thesis that humanness can't be proven by CAPTCHA, but shouldn't require a centralized digital ID either.{% endblock %}
+
+{% block content %}
+
+<!-- Hero -->
+<section class="hero">
+    <div class="container" style="position: relative; z-index: 1;">
+        <div style="max-width: 860px; margin: 0 auto; text-align: center;">
+            <p style="font-size: var(--font-size-sm); font-weight: 600; text-transform: uppercase; letter-spacing: 2px; color: var(--primary); margin-bottom: 16px;">About Lemma</p>
+            <h1 style="font-size: clamp(2.5rem, 5vw, 3.5rem); line-height: 1.1; margin-bottom: 24px;">Identity, the way it<br>should work on the web.</h1>
+            <p style="font-size: var(--font-size-xl); font-weight: 500; margin-bottom: var(--space-4); color: var(--gray-700);">CAPTCHA can't keep bots out. Centralized digital ID is becoming a surveillance system. Lemma is the open-web alternative — reusable human verification that works like a physical driver's license: verified locally, no phone-home to the issuer.</p>
+        </div>
+    </div>
+</section>
+
+<!-- The problem -->
+<section class="section" id="the-problem">
+    <div class="container">
+        <div style="max-width: 820px; margin: 0 auto;">
+            <div style="text-align: center; margin-bottom: 40px;">
+                <p style="font-size: var(--font-size-sm); font-weight: 700; text-transform: uppercase; letter-spacing: 2px; color: var(--primary); margin-bottom: 12px;">The problem</p>
+                <h2>The web has been stuck between two bad options</h2>
+            </div>
+
+            <div style="font-size: var(--font-size-lg); color: var(--gray-700); line-height: 1.7;">
+                <p style="margin-bottom: 24px;">CAPTCHA is broken. Modern bots solve image and text puzzles trivially, and CAPTCHA-solving farms operate at fractions of a cent per solve. Sites that need anti-bot signal — waitlists, ticketing, comments, dating, AI agent gating — increasingly know that what they're paying for stops humans more than it stops bots.</p>
+
+                <p style="margin-bottom: 24px;">The proposed replacements — government digital ID stores, federated SSO, on-chain identity — share a common flaw. They all create a centralized record of who you are, when you presented your ID, and where you used it. That's a mass surveillance system in waiting, and it's why digital ID has hit such consistent public resistance in the US: REAL ID, ID.me's biometric controversy, both-party opposition to mandatory digital ID.</p>
+
+                <p>Meanwhile, most websites won't pay $1–2 per user for full identity verification. So they accept abuse, build CAPTCHA arms-race tooling, or charge legitimate users to compensate. The web has been stuck between "no real verification" and "centralized identity surveillance" for over a decade.</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- The thesis -->
+<section class="section" id="thesis" style="background: var(--gray-50);">
+    <div class="container">
+        <div style="max-width: 820px; margin: 0 auto;">
+            <div style="text-align: center; margin-bottom: 40px;">
+                <p style="font-size: var(--font-size-sm); font-weight: 700; text-transform: uppercase; letter-spacing: 2px; color: var(--primary); margin-bottom: 12px;">The thesis</p>
+                <h2>Make digital ID work the way<br>physical ID works</h2>
+            </div>
+
+            <div style="background: var(--white); border: 1px solid var(--gray-200); border-radius: 14px; padding: 32px;">
+                <p style="font-size: var(--font-size-lg); color: var(--gray-700); line-height: 1.7; margin-bottom: 20px;">A driver's license works because it's verified locally. When you show your license at a bar, the bar checks the holograms, photo, and signature on the spot. The DMV doesn't get a notification. The license sits in your wallet — you carry it, you decide when and where to present it.</p>
+
+                <p style="font-size: var(--font-size-lg); color: var(--gray-700); line-height: 1.7; margin-bottom: 20px;">Lemma applies that exact model to the web. An IDV provider verifies you once, in-context on whichever site you're on. The signed credential lives in your browser wallet. Sites validate the signature locally — Ed25519, site-private PPIDs, no round-trip to Lemma servers, no round-trip to the issuer.</p>
+
+                <p style="font-size: var(--font-size-lg); color: var(--gray-700); line-height: 1.7;">The issuer signs once and never sees where you go. Lemma doesn't either. The user carries the credential.</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Four principles -->
+<section class="section" id="principles">
+    <div class="container">
+        <div style="text-align: center; margin-bottom: 56px;">
+            <p style="font-size: var(--font-size-sm); font-weight: 700; text-transform: uppercase; letter-spacing: 2px; color: var(--primary); margin-bottom: 12px;">Principles</p>
+            <h2>What makes Lemma different</h2>
+        </div>
+
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 24px;">
+            <div class="card">
+                <h3 class="card-title">Local-first</h3>
+                <p>Verification happens in the browser. Credentials live in the user's wallet, not on Lemma servers. Sites validate signatures locally without phoning home to anyone.</p>
+            </div>
+            <div class="card">
+                <h3 class="card-title">Multi-issuer</h3>
+                <p>Like Plaid for banks. Issuers compete on quality and price; Lemma is the neutral distribution layer. No single issuer becomes a monopoly. Stripe Identity today; Persona, Veriff, Yoti, Sumsub on roadmap.</p>
+            </div>
+            <div class="card">
+                <h3 class="card-title">No surveillance, by architecture</h3>
+                <p>By design, Lemma cannot accumulate cross-site behavioral data. The system structurally doesn't permit tracking users across the web — not as a policy promise, but as an architectural constraint enforced by code.</p>
+            </div>
+            <div class="card">
+                <h3 class="card-title">In-context, not on lemma.id</h3>
+                <p>Like Stripe for payments — sites embed the SDK and users verify in-flow on whichever site they're on. No detour to lemma.id, no central account creation, no hosted identity profile.</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Founder -->
+<section class="section" id="founder" style="background: var(--gray-50);">
+    <div class="container">
+        <div style="max-width: 820px; margin: 0 auto;">
+            <div style="text-align: center; margin-bottom: 40px;">
+                <p style="font-size: var(--font-size-sm); font-weight: 700; text-transform: uppercase; letter-spacing: 2px; color: var(--primary); margin-bottom: 12px;">Founder</p>
+                <h2>Why we're building this</h2>
+            </div>
+
+            <div style="background: var(--white); border: 1px solid var(--gray-200); border-radius: 14px; padding: 32px;">
+                <h3 style="margin-bottom: 8px;">Jed McKenna</h3>
+                <p style="color: var(--primary); font-size: var(--font-size-sm); font-weight: 600; margin-bottom: 24px;">Founder &amp; CEO</p>
+
+                <p style="font-size: var(--font-size-lg); color: var(--gray-700); line-height: 1.7; margin-bottom: 20px;">Lemma started from a simple observation on the attacker side: modern scalping bots defeat CAPTCHA trivially. The puzzles slow down humans more than they slow down bots, and the bots have already won this round of the arms race. Humanness can't be proven by puzzle-solving anymore.</p>
+
+                <p style="font-size: var(--font-size-lg); color: var(--gray-700); line-height: 1.7; margin-bottom: 20px;">The other thing that became obvious in parallel: the proposed solutions all looked like surveillance systems. Centralized digital ID, federated SSO with cross-site tracking, on-chain identity that broadcasts every interaction — none of these are the answer for the open web. The answer is closer to how a real driver's license works: signed once by the issuer, carried by the user, verified locally at the point of use.</p>
+
+                <p style="font-size: var(--font-size-lg); color: var(--gray-700); line-height: 1.7;">Lemma is what I wished existed back then — a verification layer that works for sites without forcing them to become identity stores, and works for users without forcing them into a centralized identity database.</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Where we're headed -->
+<section class="section" id="vision">
+    <div class="container">
+        <div style="max-width: 820px; margin: 0 auto;">
+            <div style="text-align: center; margin-bottom: 40px;">
+                <p style="font-size: var(--font-size-sm); font-weight: 700; text-transform: uppercase; letter-spacing: 2px; color: var(--primary); margin-bottom: 12px;">Where we're headed</p>
+                <h2>Identity rails for the open web</h2>
+            </div>
+
+            <div style="font-size: var(--font-size-lg); color: var(--gray-700); line-height: 1.7;">
+                <p style="margin-bottom: 24px;">The next decade of the web needs identity infrastructure that survives the centralized-digital-ID backlash, complies with EU eIDAS 2.0 unobservability requirements, resists AI bots that solve any puzzle a human can, and doesn't ask websites to become regulated KYC entities. None of the existing options check all four boxes.</p>
+
+                <p style="margin-bottom: 24px;">Lemma is building those rails. The goal is for "verified human" to mean the same thing across the web, the way "EMV chip card" means the same thing across payment processors — a neutral, multi-issuer, locally-verified standard.</p>
+
+                <p>Stripe Identity is the current issuer. Persona, Veriff, Yoti, and Sumsub integrations on roadmap. Sites that need human-grade signal can integrate in two lines. Users carry one verification across the web. Issuers compete on the strength of their verification, not on lock-in.</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Get involved -->
+<section class="section" id="get-involved" style="background: var(--gray-900); color: var(--white); padding: 80px 0;">
+    <div class="container">
+        <div style="text-align: center; margin-bottom: 48px;">
+            <h2 style="color: var(--white); font-size: var(--font-size-3xl); margin-bottom: 20px;">Three ways to get involved</h2>
+            <p style="color: var(--gray-400); font-size: var(--font-size-lg); max-width: 640px; margin: 0 auto;">Lemma is early. If any of this resonates, pick the closest fit and reach out.</p>
+        </div>
+
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 20px; max-width: 980px; margin: 0 auto;">
+            <div style="background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 28px;">
+                <h3 style="color: var(--white); font-size: var(--font-size-lg); margin-bottom: 8px;">Verify yourself</h3>
+                <p style="color: var(--gray-400); margin-bottom: 20px; font-size: var(--font-size-sm);">Get an isHuman credential and carry it across every Lemma-enabled site.</p>
+                <a href="/app" class="btn btn-primary" style="font-size: var(--font-size-sm); padding: 10px 20px;">Get verified</a>
+            </div>
+            <div style="background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 28px;">
+                <h3 style="color: var(--white); font-size: var(--font-size-lg); margin-bottom: 8px;">Add isHuman to your site</h3>
+                <p style="color: var(--gray-400); margin-bottom: 20px; font-size: var(--font-size-sm);">Two-line SDK integration. Block bots and improve account integrity at a few cents per verification.</p>
+                <a href="/docs/ishuman" class="btn btn-primary" style="font-size: var(--font-size-sm); padding: 10px 20px;">View docs</a>
+            </div>
+            <div style="background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 28px;">
+                <h3 style="color: var(--white); font-size: var(--font-size-lg); margin-bottom: 8px;">Become an issuer</h3>
+                <p style="color: var(--gray-400); margin-bottom: 20px; font-size: var(--font-size-sm);">IDV providers: distribute your product across consumer-web verticals your enterprise sales motion can't reach.</p>
+                <a href="/partners" class="btn btn-primary" style="font-size: var(--font-size-sm); padding: 10px 20px;">For IDV issuers</a>
+            </div>
+        </div>
+
+        <p style="text-align: center; margin-top: 40px; color: var(--gray-500); font-size: var(--font-size-sm);">
+            General inquiries: <a href="mailto:hello@lemma.id" style="color: var(--gray-300);">hello@lemma.id</a>
+        </p>
+    </div>
+</section>
+
+{% endblock %}

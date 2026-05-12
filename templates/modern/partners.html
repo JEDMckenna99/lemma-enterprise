@@ -1,0 +1,245 @@
+{% extends "modern/layout.html" %}
+
+{% block title %}For IDV Issuers - lemma.id{% endblock %}
+{% block description %}Lemma is the open-web distribution layer for reusable identity credentials. IDV issuers gain net-new verification volume from sites that today buy zero IDV, while keeping the customer relationship and the entire upsell.{% endblock %}
+
+{% block head %}
+    {{ super() }}
+    <style>
+        /* Data flow diagram (shared with homepage) */
+        .flow-row {
+            display: flex;
+            align-items: stretch;
+            gap: 8px;
+            flex-wrap: nowrap;
+            overflow-x: auto;
+            padding-bottom: 8px;
+        }
+        .flow-node {
+            flex: 1 1 0;
+            min-width: 168px;
+            background: var(--white);
+            border: 1px solid var(--gray-200);
+            border-radius: 12px;
+            padding: 20px 16px;
+            text-align: center;
+        }
+        .flow-node-icon {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: var(--primary);
+            color: white;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 12px;
+            font-size: 14px;
+        }
+        .flow-node h4 {
+            font-size: 15px;
+            margin-bottom: 8px;
+            color: var(--gray-900);
+        }
+        .flow-node p {
+            font-size: 13px;
+            color: var(--gray-600);
+            line-height: 1.5;
+        }
+        .flow-arrow {
+            display: flex;
+            align-items: center;
+            color: var(--gray-400);
+            font-size: 22px;
+            flex-shrink: 0;
+            padding: 0 4px;
+        }
+
+        @media (max-width: 768px) {
+            .flow-row {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            .flow-arrow {
+                justify-content: center;
+                transform: rotate(90deg);
+                padding: 4px 0;
+            }
+            .hero h1 { font-size: 2rem !important; }
+        }
+    </style>
+{% endblock %}
+
+{% block content %}
+
+<!-- Hero -->
+<section class="hero">
+    <div class="container" style="position: relative; z-index: 1;">
+        <div style="max-width: 860px; margin: 0 auto; text-align: center;">
+            <p style="font-size: var(--font-size-sm); font-weight: 600; text-transform: uppercase; letter-spacing: 2px; color: var(--primary); margin-bottom: 16px;">For IDV Issuers</p>
+            <h1 style="font-size: clamp(2.5rem, 5vw, 3.5rem); line-height: 1.1; margin-bottom: 24px;">Become an Issuer<br>in the isHuman Network.</h1>
+            <p style="font-size: var(--font-size-xl); font-weight: 500; margin-bottom: var(--space-4); color: var(--gray-700);">Lemma is to your IDV product what Plaid is to bank APIs — a consumer-web distribution layer for the reusable-credential model. You issue once; we distribute across sites your enterprise sales motion can't economically reach.</p>
+            <p style="font-size: var(--font-size-base); color: var(--gray-600); max-width: 640px; margin: 0 auto;">Stripe Identity is the current issuer. Persona, Veriff, Yoti, and Sumsub integrations on roadmap.</p>
+
+            <div style="margin-top: 40px; display: flex; gap: 16px; justify-content: center; flex-wrap: wrap;">
+                <a href="mailto:partners@lemma.id?subject=IDV%20Issuer%20Partnership%20Inquiry" class="btn btn-primary">Talk to us about issuance</a>
+                <a href="#how-it-works" class="btn btn-secondary">How it works</a>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- The pitch -->
+<section class="section" id="pitch">
+    <div class="container">
+        <div style="max-width: 820px; margin: 0 auto; text-align: center;">
+            <h2 style="margin-bottom: 24px;">A new category of IDV demand,<br>structurally non-competing</h2>
+            <p style="font-size: var(--font-size-lg); color: var(--gray-700); line-height: 1.65;">Most websites — waitlists, free-trial SaaS, ticketing, comments, dating, AI agent gating — never buy IDV because $1–2 per user can't be justified per signup. Lemma pools demand across many sites so a single issuance funds verification across the network. The net-new IDV volume comes from a population that today generates zero revenue.</p>
+        </div>
+    </div>
+</section>
+
+<!-- Four reasons -->
+<section class="section" id="why" style="background: var(--gray-50);">
+    <div class="container">
+        <div style="text-align: center; margin-bottom: 56px;">
+            <p style="font-size: var(--font-size-sm); font-weight: 700; text-transform: uppercase; letter-spacing: 2px; color: var(--primary); margin-bottom: 12px;">Four reasons</p>
+            <h2>Why this is good for the issuer specifically</h2>
+        </div>
+
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 24px;">
+            <div class="card">
+                <h3 class="card-title">Net-new verification volume</h3>
+                <p>Long-tail sites won't pay $1–2 per user for full IDV. Pooled across the network, they will pay a few cents per check. The issuer sees verification volume from a population that today generates zero.</p>
+            </div>
+            <div class="card">
+                <h3 class="card-title">You keep the upsell</h3>
+                <p>Lemma never participates in expansion revenue. The relying-site relationship belongs to the issuer; full IDV, age, KYB, AML, monitoring, manual review — all sold direct, full margin. Contractually carveable.</p>
+            </div>
+            <div class="card">
+                <h3 class="card-title">Recurring revenue via revocation</h3>
+                <p>Sites can challenge a credential at any time. Refresh and step-up checks generate a long tail of issuance events from a single onboarding — converting one-shot KYC into a continuously-priced trust signal.</p>
+            </div>
+            <div class="card">
+                <h3 class="card-title">No disintermediation, by architecture</h3>
+                <p>Lemma's local-first design structurally cannot accumulate the cross-site behavioral data needed to route around any single issuer. The non-compete is enforced by code, not legal language.</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- How it works (issuer's view) -->
+<section class="section" id="how-it-works">
+    <div class="container">
+        <div style="text-align: center; margin-bottom: 56px;">
+            <p style="font-size: var(--font-size-sm); font-weight: 700; text-transform: uppercase; letter-spacing: 2px; color: var(--primary); margin-bottom: 12px;">Issuer's role</p>
+            <h2>You sign once. The credential lives in the user's wallet.</h2>
+            <p class="text-gray" style="max-width: 720px; margin: 16px auto 0;">Verification happens in-context on whichever site the user is on, then the credential is stored locally. Sites verify it offline. You see the issuance event, then nothing — no cross-site behavior data to store, secure, or be subpoenaed for.</p>
+        </div>
+
+        <div class="flow-row">
+            <div class="flow-node">
+                <div class="flow-node-icon">1</div>
+                <h4>Site triggers verify</h4>
+                <p>Relying site embeds the SDK; user has no credential yet.</p>
+            </div>
+            <div class="flow-arrow" aria-hidden="true">→</div>
+            <div class="flow-node">
+                <div class="flow-node-icon">2</div>
+                <h4>Issuer flow runs in-flow</h4>
+                <p>SDK launches the issuer's verification flow on the relying site. No detour to lemma.id.</p>
+            </div>
+            <div class="flow-arrow" aria-hidden="true">→</div>
+            <div class="flow-node">
+                <div class="flow-node-icon">3</div>
+                <h4>Issuer signs credential</h4>
+                <p>Issuer's TTL, issuer metadata, and Ed25519 signature on the master credential.</p>
+            </div>
+            <div class="flow-arrow" aria-hidden="true">→</div>
+            <div class="flow-node">
+                <div class="flow-node-icon">4</div>
+                <h4>Wallet stores it locally</h4>
+                <p>Master credential lives in the user's browser wallet, not on Lemma servers.</p>
+            </div>
+            <div class="flow-arrow" aria-hidden="true">→</div>
+            <div class="flow-node">
+                <div class="flow-node-icon">5</div>
+                <h4>Sites verify locally</h4>
+                <p>Future sites validate signature + freshness in-browser, no round-trip to issuer or to Lemma.</p>
+            </div>
+        </div>
+
+        <div style="text-align: center; margin-top: 56px; max-width: 720px; margin-left: auto; margin-right: auto;">
+            <p style="color: var(--gray-700); font-size: var(--font-size-base);"><strong>Like a physical driver's license.</strong> The DMV signs once. The bar verifies locally. The DMV doesn't get notified at the moment of use. Lemma works the same way — issuers sign, sites verify, users carry the credential.</p>
+        </div>
+    </div>
+</section>
+
+<!-- Architecture moat -->
+<section class="section" id="architecture-moat" style="background: var(--gray-50);">
+    <div class="container">
+        <div style="max-width: 820px; margin: 0 auto;">
+            <div style="text-align: center; margin-bottom: 40px;">
+                <p style="font-size: var(--font-size-sm); font-weight: 700; text-transform: uppercase; letter-spacing: 2px; color: var(--primary); margin-bottom: 12px;">Architecture moat</p>
+                <h2>Lemma cannot become your competitor.<br>By design.</h2>
+            </div>
+
+            <div style="background: var(--white); border: 1px solid var(--gray-200); border-radius: 14px; padding: 32px;">
+                <p style="font-size: var(--font-size-lg); color: var(--gray-700); line-height: 1.65; margin-bottom: 20px;">Every issuer evaluating a partnership of this shape asks the same question: <em>what stops the aggregator from eventually routing to other issuers and replacing us?</em></p>
+                <p style="font-size: var(--font-size-lg); color: var(--gray-700); line-height: 1.65; margin-bottom: 20px;">A centralized aggregator with cross-site behavioral data could in principle disintermediate any single issuer. Lemma's local-first architecture structurally cannot — credentials live in the user's browser, verification happens in-browser, and Lemma servers never see the cross-site call patterns needed to route between issuers.</p>
+                <p style="font-size: var(--font-size-lg); color: var(--gray-700); line-height: 1.65;">It's the architectural equivalent of a contractual non-compete, except enforced by code.</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Issuer roadmap -->
+<section class="section" id="roadmap">
+    <div class="container">
+        <div style="text-align: center; margin-bottom: 56px;">
+            <p style="font-size: var(--font-size-sm); font-weight: 700; text-transform: uppercase; letter-spacing: 2px; color: var(--primary); margin-bottom: 12px;">Issuer roadmap</p>
+            <h2>Multi-issuer is the long-term moat</h2>
+            <p class="text-gray" style="max-width: 720px; margin: 16px auto 0;">A reusable credential issued by Issuer X is only valuable to relying sites that also accept Issuer X. Lemma's value is the multi-issuer aggregation — same logic as Plaid winning despite every bank having APIs.</p>
+        </div>
+
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; max-width: 920px; margin: 0 auto;">
+            <div class="card" style="border-color: var(--primary);">
+                <p style="font-size: var(--font-size-xs); font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--primary); margin-bottom: 8px;">Live</p>
+                <h3 class="card-title">Stripe Identity</h3>
+                <p>Current issuer. MVP integration shipping today.</p>
+            </div>
+            <div class="card">
+                <p style="font-size: var(--font-size-xs); font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--gray-500); margin-bottom: 8px;">Targeted</p>
+                <h3 class="card-title">Persona</h3>
+                <p>Mapped to Persona Connect. Strongest end-to-end fit for the consumer-web distribution layer.</p>
+            </div>
+            <div class="card">
+                <p style="font-size: var(--font-size-xs); font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--gray-500); margin-bottom: 8px;">Targeted</p>
+                <h3 class="card-title">Veriff</h3>
+                <p>Strong PLG fit; net-new anti-bot tier as a product line for their roadmap.</p>
+            </div>
+            <div class="card">
+                <p style="font-size: var(--font-size-xs); font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--gray-500); margin-bottom: 8px;">Open</p>
+                <h3 class="card-title">Yoti, Sumsub, iProov</h3>
+                <p>Adjacent issuers with reusable-credential strategies. Open to conversation.</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Contact CTA -->
+<section class="section" style="background: var(--gray-900); color: var(--white); padding: 80px 0;">
+    <div class="container" style="text-align: center;">
+        <h2 style="color: var(--white); font-size: var(--font-size-3xl); margin-bottom: 20px;">Issue once. Distribute everywhere.<br>Keep the customer.</h2>
+        <p style="color: var(--gray-400); font-size: var(--font-size-lg); margin-bottom: 48px; max-width: 640px; margin-left: auto; margin-right: auto;">If you're an IDV issuer and the consumer-web distribution thesis is interesting, send a note. We'll send a one-pager and schedule a 20-minute exploratory call.</p>
+        <div style="display: flex; gap: 20px; justify-content: center; flex-wrap: wrap;">
+            <a href="mailto:partners@lemma.id?subject=IDV%20Issuer%20Partnership%20Inquiry" class="btn btn-primary" style="font-size: var(--font-size-lg); padding: 16px 32px;">
+                Email partners@lemma.id
+            </a>
+            <a href="/" class="btn btn-secondary" style="background: transparent; border-color: var(--gray-600); color: var(--white);">Back to home</a>
+        </div>
+    </div>
+</section>
+
+{% endblock %}

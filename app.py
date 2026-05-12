@@ -596,9 +596,15 @@ def create_app():
 
     @app.route('/about')
     def about():
-        """About Lemma - Marketing page (alias for new visitors)"""
+        """About Lemma - Marketing page covering origin, thesis, principles, founder, and vision."""
         logger.info("📄 Serving about page")
-        return render_template('modern/index.html')
+        return render_template('modern/about.html')
+
+    @app.route('/partners')
+    def partners():
+        """Partners / For IDV Issuers - Marketing page targeting IDV provider partnerships"""
+        logger.info("📄 Serving partners page")
+        return render_template('modern/partners.html')
 
     @app.route('/lemma-sw.js')
     def service_worker():

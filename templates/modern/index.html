@@ -1,7 +1,7 @@
 {% extends "modern/layout.html" %}
 
 {% block title %}lemma.id - isHuman Proof Network{% endblock %}
-{% block description %}isHuman by Lemma: verify people once with Stripe Identity, then prove locally with Ed25519-signed site-private credentials.{% endblock %}
+{% block description %}isHuman by Lemma: verify people once with a trusted IDV issuer, then prove locally with Ed25519-signed site-private credentials. Like Stripe for payments — embed the SDK and users verify in-flow on any site.{% endblock %}
 
 {% block head %}
     {{ super() }}
@@ -150,6 +150,74 @@
         margin-bottom: 4px !important;
     }
 }
+
+/* Data flow diagram */
+.flow-row {
+    display: flex;
+    align-items: stretch;
+    gap: 8px;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding-bottom: 8px;
+}
+.flow-node {
+    flex: 1 1 0;
+    min-width: 168px;
+    background: var(--white);
+    border: 1px solid var(--gray-200);
+    border-radius: 12px;
+    padding: 20px 16px;
+    text-align: center;
+}
+.flow-node-icon {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: var(--primary);
+    color: white;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 12px;
+    font-size: 14px;
+}
+.flow-node h4 {
+    font-size: 15px;
+    margin-bottom: 8px;
+    color: var(--gray-900);
+}
+.flow-node p {
+    font-size: 13px;
+    color: var(--gray-600);
+    line-height: 1.5;
+}
+.flow-node code {
+    font-size: 12px;
+    background: var(--gray-100);
+    padding: 1px 6px;
+    border-radius: 4px;
+}
+.flow-arrow {
+    display: flex;
+    align-items: center;
+    color: var(--gray-400);
+    font-size: 22px;
+    flex-shrink: 0;
+    padding: 0 4px;
+}
+
+@media (max-width: 768px) {
+    .flow-row {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    .flow-arrow {
+        justify-content: center;
+        transform: rotate(90deg);
+        padding: 4px 0;
+    }
+}
 </style>
 
 <!-- Hero Section -->
@@ -158,8 +226,8 @@
         <div style="max-width: 800px; margin: 0 auto; text-align: center;">
             <p style="font-size: var(--font-size-sm); font-weight: 600; text-transform: uppercase; letter-spacing: 2px; color: var(--primary); margin-bottom: 16px;">isHuman Proof Network</p>
             <h1 style="font-size: clamp(2.5rem, 5vw, 3.5rem); line-height: 1.1; margin-bottom: 24px;">Verify Humans Once.<br>Prove Locally Everywhere.</h1>
-            <p style="font-size: var(--font-size-xl); font-weight: 500; margin-bottom: var(--space-4); color: var(--gray-700);">Users verify through Stripe Identity at lemma.id, then websites validate signed isHuman credentials locally in the browser.</p>
-            <p style="font-size: var(--font-size-base); color: var(--gray-600); max-width: 600px; margin: 0 auto;">Each site gets a derived, site-private PPID credential. Ed25519 signatures verify offline, revocation propagates quickly, and sites can enforce immediate local block decisions.</p>
+            <p style="font-size: var(--font-size-xl); font-weight: 500; margin-bottom: var(--space-4); color: var(--gray-700);">Like Stripe for payments — sites embed the Lemma SDK and users verify in-flow with a trusted IDV issuer. One verification, reusable across every Lemma-enabled site, validated locally in the browser with no phone-home.</p>
+            <p style="font-size: var(--font-size-base); color: var(--gray-600); max-width: 600px; margin: 0 auto;">Each site gets a derived, site-private PPID credential. Ed25519 signatures verify offline, revocation propagates quickly, and sites can enforce immediate local block decisions. Stripe Identity today; additional IDV issuers on roadmap.</p>
             <!-- Dynamic card: changes based on user's lemma status -->
             <!-- Fixed min-height prevents CLS when state changes -->
             <div id="lemma-status-card" style="margin-top: 32px; border-radius: 12px; min-height: 120px;">
@@ -176,7 +244,7 @@
                         Start isHuman Verification
                     </p>
                     <p style="margin: 0; font-size: var(--font-size-sm); color: var(--gray-400);">
-                        Complete Stripe Identity once to receive reusable proof.
+                        Complete identity verification once with a trusted IDV issuer to receive reusable proof.
                     </p>
                     <p style="margin: 10px 0 0 0; font-size: var(--font-size-xs); color: var(--gray-500);">
                         Site-private credentials + local checks
@@ -219,10 +287,10 @@
             </div>
             
             <div id="hero-buttons" style="margin-top: 48px; display: flex; gap: 16px; justify-content: center; flex-wrap: wrap;">
-                <a href="/app" class="btn btn-primary" id="hero-primary-btn">Get Verified</a>
-                <a href="/docs/ishuman" class="btn btn-primary">Integrate isHuman</a>
+                <a href="/docs/ishuman" class="btn btn-primary">Add to Your Site</a>
+                <a href="/partners" class="btn btn-primary">For IDV Issuers</a>
+                <a href="/app" class="btn btn-secondary" id="hero-primary-btn">Get Verified</a>
                 <a href="#how-it-works" class="btn btn-secondary">Learn More</a>
-                <a href="/docs" class="btn btn-secondary">Documentation</a>
             </div>
             
             <!-- Trust indicators -->
@@ -231,7 +299,7 @@
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
                     </svg>
-                    <span>Stripe Identity verification</span>
+                    <span>IDV-issuer verified (Stripe today)</span>
                 </div>
                 <div style="display: flex; align-items: center; gap: 8px;">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -387,7 +455,7 @@
             <div style="padding: 32px 24px;">
                 <div style="width: 56px; height: 56px; border-radius: 50%; background: var(--primary); color: white; font-size: 24px; font-weight: 700; display: flex; align-items: center; justify-content: center; margin: 0 auto 20px;">1</div>
                 <h3 style="font-size: var(--font-size-lg); margin-bottom: 8px;">Verify Once</h3>
-                <p style="color: var(--gray-600); font-size: var(--font-size-sm);">User completes Stripe Identity and receives a signed master isHuman credential.</p>
+                <p style="color: var(--gray-600); font-size: var(--font-size-sm);">In-context on any site, the user completes IDV (Stripe Identity today; more issuers on roadmap) and receives a signed master isHuman credential.</p>
             </div>
             <div style="padding: 32px 24px;">
                 <div style="width: 56px; height: 56px; border-radius: 50%; background: var(--primary); color: white; font-size: 24px; font-weight: 700; display: flex; align-items: center; justify-content: center; margin: 0 auto 20px;">2</div>
@@ -436,19 +504,144 @@
     </div>
 </section>
 
+<!-- Data Flow Diagram Section -->
+<section class="section" id="data-flow">
+    <div class="container">
+        <div style="text-align: center; margin-bottom: 64px;">
+            <p style="font-size: var(--font-size-sm); font-weight: 700; text-transform: uppercase; letter-spacing: 2px; color: var(--primary); margin-bottom: 12px;">Verification flow</p>
+            <h2>Verification Happens In-Context, Not On Lemma</h2>
+            <p class="text-gray" style="max-width: 760px; margin: 16px auto 0;">Users never have to travel to lemma.id. The SDK triggers verification in-flow on whichever site the user is on, the IDV provider runs there, and the signed credential lives in the user's browser wallet — not on a Lemma server.</p>
+        </div>
+
+        <!-- First-time flow -->
+        <div style="margin-bottom: 56px;">
+            <h3 style="margin-bottom: 24px; text-align: center;">First-time user, on any site</h3>
+            <div class="flow-row">
+                <div class="flow-node">
+                    <div class="flow-node-icon">1</div>
+                    <h4>User on any site</h4>
+                    <p>Site loads the lemma.id SDK and calls <code>verify()</code>.</p>
+                </div>
+                <div class="flow-arrow" aria-hidden="true">→</div>
+                <div class="flow-node">
+                    <div class="flow-node-icon">2</div>
+                    <h4>Browser wallet check</h4>
+                    <p>SDK checks the user's browser wallet for an existing isHuman credential.</p>
+                </div>
+                <div class="flow-arrow" aria-hidden="true">→</div>
+                <div class="flow-node">
+                    <div class="flow-node-icon">3</div>
+                    <h4>IDV issuer flow</h4>
+                    <p>None found. SDK launches in-context verification with an IDV issuer (Stripe Identity today).</p>
+                </div>
+                <div class="flow-arrow" aria-hidden="true">→</div>
+                <div class="flow-node">
+                    <div class="flow-node-icon">4</div>
+                    <h4>Wallet stores credential</h4>
+                    <p>Signed master credential is written to the user's browser wallet — not to Lemma servers.</p>
+                </div>
+                <div class="flow-arrow" aria-hidden="true">→</div>
+                <div class="flow-node">
+                    <div class="flow-node-icon">5</div>
+                    <h4>Site decision</h4>
+                    <p>Site receives a local Ed25519 verdict and a site-private PPID.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Returning user flow -->
+        <div>
+            <h3 style="margin-bottom: 24px; text-align: center;">Returning user — any Lemma-enabled site</h3>
+            <div class="flow-row">
+                <div class="flow-node">
+                    <div class="flow-node-icon">1</div>
+                    <h4>User on any site</h4>
+                    <p>SDK calls <code>verify()</code>.</p>
+                </div>
+                <div class="flow-arrow" aria-hidden="true">→</div>
+                <div class="flow-node">
+                    <div class="flow-node-icon">2</div>
+                    <h4>Browser wallet</h4>
+                    <p>Existing master credential is found locally.</p>
+                </div>
+                <div class="flow-arrow" aria-hidden="true">→</div>
+                <div class="flow-node">
+                    <div class="flow-node-icon">3</div>
+                    <h4>Derive site PPID</h4>
+                    <p>Wallet derives a site-private credential from the master + this hostname.</p>
+                </div>
+                <div class="flow-arrow" aria-hidden="true">→</div>
+                <div class="flow-node">
+                    <div class="flow-node-icon">4</div>
+                    <h4>Local verify</h4>
+                    <p>Ed25519 signature + revocation freshness checked entirely in-browser. No round-trip to Lemma.</p>
+                </div>
+                <div class="flow-arrow" aria-hidden="true">→</div>
+                <div class="flow-node">
+                    <div class="flow-node-icon">5</div>
+                    <h4>Site decision</h4>
+                    <p>Site receives verdict and PPID for local policy.</p>
+                </div>
+            </div>
+        </div>
+
+        <div style="text-align: center; margin-top: 56px; max-width: 720px; margin-left: auto; margin-right: auto;">
+            <p style="color: var(--gray-700); font-size: var(--font-size-base);"><strong>The wallet works like a physical driver's license.</strong> The DMV doesn't get a notification when you show your license at a bar. Lemma doesn't either. Issuers sign once; sites verify locally; users carry the credential.</p>
+        </div>
+    </div>
+</section>
+
+<!-- Use Cases Section -->
+<section class="section" id="use-cases" style="background: var(--gray-50);">
+    <div class="container">
+        <div style="text-align: center; margin-bottom: 56px;">
+            <p style="font-size: var(--font-size-sm); font-weight: 700; text-transform: uppercase; letter-spacing: 2px; color: var(--primary); margin-bottom: 12px;">Where isHuman fits</p>
+            <h2>Use cases that don't pencil out for full IDV</h2>
+            <p class="text-gray" style="max-width: 720px; margin: 16px auto 0;">Per-user IDV at $1–2 doesn't make sense for low-margin or high-volume flows. isHuman pools verification cost across many sites, so any site can have human-grade signal at a few cents per check.</p>
+        </div>
+
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 24px;">
+            <div class="card">
+                <h3 class="card-title">Waitlists &amp; free trials</h3>
+                <p>Block bot-funded list inflation and trial abuse without forcing $2 IDV on every signup.</p>
+            </div>
+            <div class="card">
+                <h3 class="card-title">Ticketing &amp; releases</h3>
+                <p>Stop scalper bots from buying inventory faster than humans. One reusable proof, not a CAPTCHA arms race.</p>
+            </div>
+            <div class="card">
+                <h3 class="card-title">Comments &amp; forums</h3>
+                <p>Reduce spam, sock-puppet networks, and brigading without storing PII on every relying site.</p>
+            </div>
+            <div class="card">
+                <h3 class="card-title">Dating &amp; social</h3>
+                <p>Suppress fake profiles and catfishing networks while keeping user identity site-private.</p>
+            </div>
+            <div class="card">
+                <h3 class="card-title">AI agent gating</h3>
+                <p>Distinguish human users from autonomous agents without requiring agents to identify themselves.</p>
+            </div>
+            <div class="card">
+                <h3 class="card-title">Account integrity</h3>
+                <p>Re-challenge suspicious accounts on demand using the doubt-and-refresh flow, with cost shifted onto the suspect transaction.</p>
+            </div>
+        </div>
+    </div>
+</section>
+
 <!-- isHuman Network Section -->
 <section class="section" id="ishuman-network" style="background: var(--gray-50);">
     <div class="container">
         <div style="text-align: center; max-width: 860px; margin: 0 auto 56px;">
             <p style="font-size: var(--font-size-sm); font-weight: 700; text-transform: uppercase; letter-spacing: 2px; color: var(--primary); margin-bottom: 12px;">Proof of Humanity</p>
             <h2 style="margin-bottom: 16px;">One verification. Every site. Always local.</h2>
-            <p class="text-gray" style="max-width: 700px; margin: 0 auto;">isHuman gives users a reusable human proof while preserving site privacy. Verify once through Stripe Identity, then let sites verify locally with Ed25519-signed credentials and revocation freshness checks.</p>
+            <p class="text-gray" style="max-width: 700px; margin: 0 auto;">isHuman gives users a reusable human proof while preserving site privacy. Verify once through any trusted IDV issuer, in-flow on any site, then let sites verify locally with Ed25519-signed credentials and revocation freshness checks.</p>
         </div>
 
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 24px; margin-bottom: 40px;">
             <div class="card">
                 <h3 class="card-title">Verify Once</h3>
-                <p>Users complete one verification at lemma.id. We issue a signed master isHuman credential with clear expiry and issuer metadata.</p>
+                <p>Users complete one IDV verification in-flow on whichever site they're on — no detour to lemma.id. The signed master credential is stored in the user's browser wallet.</p>
             </div>
             <div class="card">
                 <h3 class="card-title">Derive Per Site</h3>
@@ -472,7 +665,7 @@
         </div>
 
         <p style="margin-top: 20px; text-align: center; color: var(--gray-600); font-size: var(--font-size-sm);">
-            Stripe Identity verified • Ed25519-signed • Site-private PPIDs
+            IDV-issuer verified • Ed25519-signed • Site-private PPIDs
         </p>
     </div>
 </section>
