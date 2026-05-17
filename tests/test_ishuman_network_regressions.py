@@ -110,3 +110,42 @@ def test_ishuman_verifier_uses_sha256_revocation_membership():
 
     assert "sha256HexText(candidate)" in content
     assert "this._bloomFilter.has(candidateHash)" in content
+
+
+def test_ishuman_issue_signs_string_claims_but_returns_typed_claims(monkeypatch):
+    import json
+
+    captured = {}
+
+    class _Issuer:
+        def issue_credential(self, ppid, claims):
+            captured["ppid"] = ppid
+            captured["claims"] = claims
+            assert all(isinstance(value, str) for value in claims.values())
+            return json.dumps({
+                "id": "from_issuer",
+                "issuer": "did:lemma:" + ("a" * 64),
+                "subject": ppid,
+                "claims": claims,
+                "credentialSubject": claims,
+                "issuedAt": "1",
+                "expiresAt": "2",
+                "proof": {"signatureValue": "ab"},
+            })
+
+        def get_did(self):
+            return "did:lemma:" + ("a" * 64)
+
+        def get_public_key_hex(self):
+            return "a" * 64
+
+    monkeypatch.setattr("api.ishuman._get_ishuman_issuer", lambda: _Issuer())
+
+    from api.ishuman import _issue_ishuman_credential
+
+    credential = _issue_ishuman_credential("did:lemma:ppid_test", "wallet_test")
+
+    assert captured["claims"]["isHuman"] == "true"
+    assert credential["claims"]["isHuman"] is True
+    assert credential["credentialSubject"]["isHuman"] is True
+    assert credential["claims"]["siteId"] == "lemma.id"

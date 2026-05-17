@@ -78,9 +78,19 @@ def _issue_ishuman_credential(
         "expiresAt": str(now + ISHUMAN_CREDENTIAL_TTL_DAYS * 86400),
     }
 
-    credential_json = issuer.issue_credential(ppid, claims)
+    # The Rust issuer accepts string claim values. Keep the public credential
+    # shape typed, but sign over deterministic string forms that the browser
+    # verifier also canonicalizes before Ed25519 verification.
+    claims_for_issuer = {
+        key: ("true" if value is True else "false" if value is False else str(value))
+        for key, value in claims.items()
+    }
+
+    credential_json = issuer.issue_credential(ppid, claims_for_issuer)
     credential = json.loads(credential_json)
     credential["id"] = credential_id
+    credential["claims"] = claims
+    credential["credentialSubject"] = claims
 
     credential["issuerInfo"] = {
         "did": issuer.get_did(),

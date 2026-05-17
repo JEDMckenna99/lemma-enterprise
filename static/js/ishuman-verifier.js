@@ -76,7 +76,18 @@ async function sha256HexText(value) {
 function canonicalMessage(credential) {
     const claims = credential.claims || credential.credentialSubject || {};
     const sorted = {};
-    Object.keys(claims).sort().forEach(k => { sorted[k] = claims[k]; });
+    Object.keys(claims).sort().forEach(k => {
+        const value = claims[k];
+        if (value === true) {
+            sorted[k] = 'true';
+        } else if (value === false) {
+            sorted[k] = 'false';
+        } else if (Array.isArray(value) || (value && typeof value === 'object')) {
+            sorted[k] = JSON.stringify(value);
+        } else {
+            sorted[k] = value;
+        }
+    });
     return JSON.stringify({
         issuer: credential.issuer,
         subject: credential.subject,
