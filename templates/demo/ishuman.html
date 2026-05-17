@@ -33,7 +33,13 @@
 .ih-log div{border-bottom:1px solid #e2e8f0;padding:6px 0}
 .ih-log div:last-child{border-bottom:none}
 .ih-input{border:1px solid #cbd5e1;border-radius:9px;padding:9px;width:100%;font-size:13px}
+.ih-journey{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-top:14px}
+.ih-step{background:#fff;border:1px solid #dbeafe;border-radius:14px;padding:14px;color:#0f172a}
+.ih-step strong{display:block;margin-bottom:4px}
+.ih-link-card{display:flex;justify-content:space-between;align-items:center;gap:12px;border:1px solid #e2e8f0;border-radius:12px;padding:12px;background:#fff;margin-top:10px}
+.ih-link-card a{font-weight:800;color:#4f46e5;text-decoration:none}
 @media(max-width:900px){.ih-grid,.ih-site-grid{grid-template-columns:1fr}.ih-kv{grid-template-columns:1fr}}
+@media(max-width:900px){.ih-journey{grid-template-columns:1fr}}
 </style>
 {% endblock %}
 
@@ -52,6 +58,12 @@
       <button class="ih-btn secondary" id="ih-test-complete-btn">Test mode: complete verification</button>
       <button class="ih-btn secondary" id="ih-poll-btn">3. Poll and store master proof</button>
       <button class="ih-btn secondary" id="ih-verify-sites-btn">4. Verify both demo sites</button>
+    </div>
+    <div class="ih-journey">
+      <div class="ih-step"><strong>User</strong> Gets one reusable isHuman proof and keeps it in the browser wallet.</div>
+      <div class="ih-step"><strong>Ticketing Site</strong> Checks proof locally before allowing a protected ticket action.</div>
+      <div class="ih-step"><strong>SaaS Trial</strong> Checks the same human but receives a different PPID.</div>
+      <div class="ih-step"><strong>Operator</strong> Blocks one site PPID or escalates severe abuse for review.</div>
     </div>
   </section>
 
@@ -90,7 +102,15 @@
 
   <section class="ih-card" style="margin-top:14px">
     <h2>Relying Sites</h2>
-    <p class="ih-muted">Both sites call the real `IsHumanVerifier`, but each receives a different PPID for the same browser wallet.</p>
+    <p class="ih-muted">Use the embedded panels for a quick check, or open the separate Heroku apps to see how a real business page would interact with Lemma.</p>
+    <div class="ih-link-card">
+      <div><strong>Ticketing business demo</strong><div class="ih-muted">A ticket release page gates reservation behind isHuman.</div></div>
+      <a href="https://lemma-demo-tickets-1d3d7411af33.herokuapp.com" target="_blank" rel="noopener">Open site</a>
+    </div>
+    <div class="ih-link-card">
+      <div><strong>SaaS free-trial demo</strong><div class="ih-muted">A signup page gates trial creation behind isHuman.</div></div>
+      <a href="https://lemma-demo-trials-7090f46cae0d.herokuapp.com" target="_blank" rel="noopener">Open site</a>
+    </div>
     <div class="ih-site-grid">
       <div class="ih-site" data-site-panel="tickets">
         <h3>Ticketing Demo <span class="ih-pill" id="ih-tickets-pill">WAITING</span></h3>

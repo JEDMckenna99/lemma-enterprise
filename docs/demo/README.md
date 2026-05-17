@@ -94,3 +94,17 @@ Then:
 3. The demo marks the matching internal session verified, issues the real signed master `isHuman` credential, stores it in the wallet, and continues through the same verifier/PPID/site-block flow.
 
 This helper is guarded by `sk_test_` Stripe keys and an explicit demo token. Do not enable it with live Stripe keys.
+
+## Separate relying-site demo origins
+
+The cross-site demo also has two standalone Heroku apps that act as third-party relying sites:
+
+- Ticketing: `https://lemma-demo-tickets-1d3d7411af33.herokuapp.com`
+- Free trial: `https://lemma-demo-trials-7090f46cae0d.herokuapp.com`
+
+Both load the hosted verifier from `https://lemma.id/sdk/ishuman-verifier.js` and call `IsHumanVerifier` with distinct site bindings:
+
+- `tickets-demo.lemma.id`
+- `trials-demo.lemma.id`
+
+Use these after creating/storing a master proof through `https://lemma.id/demo/ishuman` to show real separate origins requesting site-private credentials from the Lemma wallet bridge.
