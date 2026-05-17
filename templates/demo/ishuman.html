@@ -1,0 +1,136 @@
+{% extends "modern/layout.html" %}
+
+{% block title %}isHuman Demo - lemma.id{% endblock %}
+{% block description %}Guided isHuman proof-of-humanity demo using real credential issuance, site-private PPIDs, local verification, and revocation controls.{% endblock %}
+
+{% block head %}
+{{ super() }}
+<style>
+.ih-demo{max-width:1280px;margin:0 auto;padding:24px 16px 56px}
+.ih-hero{background:linear-gradient(135deg,#0f172a,#1e293b);border-radius:18px;color:#e2e8f0;padding:28px;border:1px solid #334155}
+.ih-hero h1{margin:0 0 10px;color:#fff;font-size:34px}
+.ih-hero p{margin:0;color:#cbd5e1;max-width:880px}
+.ih-notice{margin-top:14px;border:1px solid #facc15;background:#fffbeb;color:#713f12;border-radius:12px;padding:12px;font-size:14px}
+.ih-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:18px}
+.ih-btn{border:none;border-radius:10px;padding:10px 14px;background:#4f46e5;color:#fff;font-weight:700;cursor:pointer}
+.ih-btn.secondary{background:#fff;color:#1e293b;border:1px solid #cbd5e1}
+.ih-btn.danger{background:#dc2626}
+.ih-btn:disabled{opacity:.55;cursor:not-allowed}
+.ih-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin-top:14px}
+.ih-card{background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:16px;box-shadow:0 2px 10px rgba(15,23,42,.04)}
+.ih-card h2{margin:0 0 8px;color:#0f172a;font-size:19px}
+.ih-muted{color:#64748b;font-size:13px}
+.ih-kv{display:grid;grid-template-columns:145px 1fr;gap:8px;margin-top:12px;font-size:13px}
+.ih-pill{display:inline-block;border:1px solid #cbd5e1;border-radius:999px;padding:4px 9px;font-size:12px;font-weight:800;background:#f8fafc;color:#334155}
+.ih-pill.ok{border-color:#86efac;background:#dcfce7;color:#166534}
+.ih-pill.warn{border-color:#facc15;background:#fef9c3;color:#854d0e}
+.ih-pill.deny{border-color:#fca5a5;background:#fee2e2;color:#991b1b}
+.ih-code{background:#0f172a;color:#dbeafe;border-radius:10px;padding:10px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;min-height:116px;overflow:auto;white-space:pre-wrap}
+.ih-site-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.ih-site{border:1px solid #e2e8f0;border-radius:12px;padding:12px;background:#f8fafc}
+.ih-site h3{margin:0 0 8px;color:#0f172a;font-size:16px}
+.ih-log{max-height:220px;overflow:auto;border:1px solid #e2e8f0;border-radius:10px;background:#f8fafc;padding:10px;font-size:12px}
+.ih-log div{border-bottom:1px solid #e2e8f0;padding:6px 0}
+.ih-log div:last-child{border-bottom:none}
+.ih-input{border:1px solid #cbd5e1;border-radius:9px;padding:9px;width:100%;font-size:13px}
+@media(max-width:900px){.ih-grid,.ih-site-grid{grid-template-columns:1fr}.ih-kv{grid-template-columns:1fr}}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="ih-demo" id="ishuman-demo">
+  <section class="ih-hero">
+    <p style="font-size:13px;font-weight:800;text-transform:uppercase;letter-spacing:1.6px;color:#93c5fd;margin-bottom:8px">isHuman Proof Network Demo</p>
+    <h1>Verify once. Prove locally across sites.</h1>
+    <p>This guided demo uses the actual Lemma isHuman infrastructure: Stripe Identity session creation, signed master credentials, wallet storage, site-private PPID derivation, local Ed25519 verification, site block controls, and network revocation review.</p>
+    <div class="ih-notice">
+      This demo uses Stripe Identity as the prototype IDV rail. Lemma provides the reusable credential, wallet, site-private PPID derivation, local verification, and revocation layer. Commercial deployment requires an approved IDV-provider path.
+    </div>
+    <div class="ih-actions">
+      <button class="ih-btn" id="ih-wallet-btn">1. Create or unlock wallet</button>
+      <button class="ih-btn secondary" id="ih-start-idv-btn">2. Start Stripe Identity demo rail</button>
+      <button class="ih-btn secondary" id="ih-test-complete-btn">Test mode: complete verification</button>
+      <button class="ih-btn secondary" id="ih-poll-btn">3. Poll and store master proof</button>
+      <button class="ih-btn secondary" id="ih-verify-sites-btn">4. Verify both demo sites</button>
+    </div>
+  </section>
+
+  <div class="ih-grid">
+    <section class="ih-card">
+      <h2>User Wallet <span class="ih-pill" id="ih-wallet-pill">WAITING</span></h2>
+      <p class="ih-muted">The master `isHuman` proof is stored in this browser wallet. Relying sites only receive derived, site-bound proofs.</p>
+      <div class="ih-kv">
+        <div>Wallet ID</div><div id="ih-wallet-id">-</div>
+        <div>Master proof</div><div id="ih-master-id">-</div>
+        <div>Issuer</div><div id="ih-master-issuer">-</div>
+        <div>Expires</div><div id="ih-master-expiry">-</div>
+      </div>
+      <div class="ih-code" id="ih-master-json" style="margin-top:12px">{}</div>
+    </section>
+
+    <section class="ih-card">
+      <h2>Network Console <span class="ih-pill" id="ih-network-pill">READY</span></h2>
+      <p class="ih-muted">Demo-safe server wrapper around site blocks and network revocation review. Site API keys stay server-side.</p>
+      <div class="ih-actions">
+        <button class="ih-btn secondary" id="ih-refresh-status-btn">Refresh status</button>
+        <button class="ih-btn secondary" id="ih-network-request-btn">Request network review</button>
+      </div>
+      <div style="margin-top:10px">
+        <input class="ih-input" id="ih-admin-token" type="password" placeholder="Optional demo admin token for live network revocation">
+      </div>
+      <div style="margin-top:10px">
+        <input class="ih-input" id="ih-test-token" type="password" placeholder="Optional test-mode token for automated Stripe test completion">
+      </div>
+      <div class="ih-actions">
+        <button class="ih-btn danger" id="ih-network-approve-btn">Approve network revocation</button>
+      </div>
+      <div class="ih-code" id="ih-network-json" style="margin-top:12px">{}</div>
+    </section>
+  </div>
+
+  <section class="ih-card" style="margin-top:14px">
+    <h2>Relying Sites</h2>
+    <p class="ih-muted">Both sites call the real `IsHumanVerifier`, but each receives a different PPID for the same browser wallet.</p>
+    <div class="ih-site-grid">
+      <div class="ih-site" data-site-panel="tickets">
+        <h3>Ticketing Demo <span class="ih-pill" id="ih-tickets-pill">WAITING</span></h3>
+        <div class="ih-kv">
+          <div>Site binding</div><div id="ih-tickets-site">tickets-demo.lemma.id</div>
+          <div>PPID</div><div id="ih-tickets-ppid">-</div>
+          <div>Reason</div><div id="ih-tickets-reason">-</div>
+          <div>Latency</div><div id="ih-tickets-latency">-</div>
+        </div>
+        <div class="ih-actions">
+          <button class="ih-btn secondary" id="ih-verify-tickets-btn">Verify ticketing</button>
+          <button class="ih-btn danger" id="ih-block-tickets-btn">Block ticketing PPID</button>
+          <button class="ih-btn secondary" id="ih-unblock-tickets-btn">Unblock</button>
+        </div>
+      </div>
+      <div class="ih-site" data-site-panel="trials">
+        <h3>Free Trial Demo <span class="ih-pill" id="ih-trials-pill">WAITING</span></h3>
+        <div class="ih-kv">
+          <div>Site binding</div><div id="ih-trials-site">trials-demo.lemma.id</div>
+          <div>PPID</div><div id="ih-trials-ppid">-</div>
+          <div>Reason</div><div id="ih-trials-reason">-</div>
+          <div>Latency</div><div id="ih-trials-latency">-</div>
+        </div>
+        <div class="ih-actions">
+          <button class="ih-btn secondary" id="ih-verify-trials-btn">Verify free trial</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="ih-card" style="margin-top:14px">
+    <h2>Demo Log</h2>
+    <div class="ih-log" id="ih-log"></div>
+  </section>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script src="/static/js/lemma-wallet.js?v=2473" nonce="{{ csp_nonce }}"></script>
+<script src="/sdk/ishuman-verifier.js" nonce="{{ csp_nonce }}"></script>
+<script src="/static/js/demo/ishuman-demo.js" nonce="{{ csp_nonce }}"></script>
+{% endblock %}

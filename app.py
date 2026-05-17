@@ -466,6 +466,14 @@ def create_app():
     except Exception as e:
         logger.error(f"❌ Failed to register isHuman Network API: {e}")
 
+    # isHuman guided demo (thin wrapper around real issuance + verifier flows)
+    try:
+        from api.ishuman_demo import ishuman_demo_bp
+        app.register_blueprint(ishuman_demo_bp)
+        logger.info("✅ isHuman Demo registered")
+    except Exception as e:
+        logger.error(f"❌ Failed to register isHuman Demo: {e}")
+
     # Optional background freshness client for local-first authz runtime state.
     try:
         from api.authz.freshness_client import start_background_freshness_client

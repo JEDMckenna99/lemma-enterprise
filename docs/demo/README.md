@@ -36,3 +36,61 @@ The public `/demo` route demonstrates proof-constrained authorization with live 
 3. Run at least one allowed action and verify decision returns `allow`.
 4. Click **Ingest External Docs** then retry with previous proof to observe stale deny behavior.
 5. Click **Revoke Proof** and confirm next action attempt is denied.
+
+---
+
+# isHuman Demo
+
+## What this proves
+
+The public `/demo/ishuman` route demonstrates reusable proof-of-humanity using the actual isHuman stack:
+
+- `POST /api/ishuman/start-verification` starts the Stripe Identity prototype IDV rail.
+- `GET /api/ishuman/verification-status/<session_id>` returns the signed master `isHuman` credential after webhook completion.
+- The browser wallet stores the master credential locally.
+- `IsHumanVerifier` requests site-specific credentials through `/wallet/bridge`.
+- `/api/ishuman/derive-site-proof` derives different PPIDs for `tickets-demo.lemma.id` and `trials-demo.lemma.id`.
+- Demo wrappers under `/api/demo/ishuman/*` apply site-local blocks and token-gated network revocation drills without exposing demo site API keys.
+
+## Required environment variables
+
+- `STRIPE_SECRET_KEY`: Stripe account key with Identity enabled.
+- `STRIPE_IDENTITY_WEBHOOK_SECRET`: webhook secret for `/api/webhooks/stripe-identity`.
+- `ISHUMAN_RETURN_URL`: optional default return URL. The demo passes `/demo/ishuman?verification_return=true` explicitly.
+- `LEMMA_ISHUMAN_DEMO_ADMIN_TOKEN`: optional. Required only for the live **Approve network revocation** button.
+- `LEMMA_ISHUMAN_DEMO_ALLOW_TEST_VERIFY=true`: optional. Enables the guarded Stripe test-mode completion helper.
+- `LEMMA_ISHUMAN_DEMO_TEST_TOKEN`: optional but required when test-mode completion is enabled. Pass this in the demo UI or as `X-Demo-Test-Token`.
+
+## Recording checklist
+
+1. Load `/demo/ishuman`.
+2. Click **Create or unlock wallet** and complete the passkey prompt.
+3. Click **Start Stripe Identity demo rail** and complete the Stripe Identity flow.
+4. Return to the demo and click **Poll and store master proof** if it does not run automatically.
+5. Click **Verify both demo sites** and show the two different PPIDs.
+6. Click **Block ticketing PPID** and show ticketing denied while free trial remains valid.
+7. Click **Request network review** to show the reviewed escalation path.
+8. Optional: enter `LEMMA_ISHUMAN_DEMO_ADMIN_TOKEN`, click **Approve network revocation**, and show both sites denied after revocation sync.
+
+## Demo language guardrail
+
+Use: "This demo uses Stripe Identity as the prototype IDV rail."
+
+Do not use: "Stripe-approved", "Stripe-backed network", or "Stripe partnership" unless a provider agreement is in place.
+
+## Automated Stripe test-mode path
+
+For a fully automated test-mode recording, configure a Stripe test key plus:
+
+```bash
+LEMMA_ISHUMAN_DEMO_ALLOW_TEST_VERIFY=true
+LEMMA_ISHUMAN_DEMO_TEST_TOKEN=<random local/demo secret>
+```
+
+Then:
+
+1. Click **Start Stripe Identity demo rail** to create a real Stripe test-mode VerificationSession.
+2. Enter the test token and click **Test mode: complete verification**.
+3. The demo marks the matching internal session verified, issues the real signed master `isHuman` credential, stores it in the wallet, and continues through the same verifier/PPID/site-block flow.
+
+This helper is guarded by `sk_test_` Stripe keys and an explicit demo token. Do not enable it with live Stripe keys.

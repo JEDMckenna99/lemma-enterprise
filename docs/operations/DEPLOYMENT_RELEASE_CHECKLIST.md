@@ -4,6 +4,11 @@ Use this checklist for each production deployment to `lemma.id`.
 
 ## 1) Pre-Deploy
 
+- Confirm environment safety for the target Heroku app:
+  - Staging:
+    - `powershell -ExecutionPolicy Bypass -File scripts/check_heroku_env_parity.ps1 -AppName <staging-app> -Environment staging -LocalEnvFile .env.local`
+  - Production:
+    - `powershell -ExecutionPolicy Bypass -File scripts/check_heroku_env_parity.ps1 -AppName <production-app> -Environment production`
 - Confirm launch-gate blockers addressed in code:
   - `api/passkey_auth.py` (algorithm placeholder removed)
   - `api/wallet_revocation.py` (immediate revocation sync path)
