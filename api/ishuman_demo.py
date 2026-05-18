@@ -215,7 +215,8 @@ def ishuman_demo_status():
 
 @ishuman_demo_bp.route("/api/demo/ishuman/site-block", methods=["POST"])
 def ishuman_demo_site_block():
-    from api.database import SessionLocal, SiteBlock
+    from api.database import SessionLocal
+    from api.site_ppid_revocation import revoke_site_bound_ppid
 
     body = request.get_json(silent=True) or {}
     slug = body.get("site_slug", "tickets")
@@ -230,25 +231,26 @@ def ishuman_demo_site_block():
 
     db = SessionLocal()
     try:
-        existing = db.query(SiteBlock).filter_by(site_id=site.site_id, ppid=ppid, is_active=True).first()
-        if existing:
-            block = existing
-        else:
-            block = SiteBlock(
-                site_id=site.site_id,
-                ppid=ppid,
-                reason=reason,
-                blocked_by=site.admin_email,
-            )
-            db.add(block)
-        db.commit()
+        from api.database import SiteBlock
+
+        result = revoke_site_bound_ppid(
+            db,
+            site_id=site.site_id,
+            ppid=ppid,
+            reason=reason,
+            revoked_by=site.admin_email or "demo",
+            site_domain=site.site_domain,
+            blocked_by=site.admin_email,
+        )
+        block = db.query(SiteBlock).filter_by(site_id=site.site_id, ppid=ppid, is_active=True).first()
         return jsonify({
             "success": True,
             "site_id": site.site_id,
             "site_domain": site.site_domain,
             "ppid": ppid,
-            "reason": block.reason,
-            "blocked_at": block.blocked_at.isoformat() if block.blocked_at else None,
+            "reason": getattr(block, "reason", reason),
+            "blocked_at": block.blocked_at.isoformat() if block and block.blocked_at else None,
+            "revocation_synced": result.get("event_published", False),
         })
     except Exception:
         db.rollback()
@@ -288,7 +290,8 @@ def ishuman_demo_site_unblock():
 
 @ishuman_demo_bp.route("/api/demo/ishuman/network-revoke-request", methods=["POST"])
 def ishuman_demo_network_revoke_request():
-    from api.database import SessionLocal, SiteBlock
+    from api.database import SessionLocal
+    from api.site_ppid_revocation import revoke_site_bound_ppid
 
     body = request.get_json(silent=True) or {}
     slug = body.get("site_slug", "tickets")
@@ -304,20 +307,18 @@ def ishuman_demo_network_revoke_request():
 
     db = SessionLocal()
     try:
-        block = db.query(SiteBlock).filter_by(site_id=site.site_id, ppid=ppid, is_active=True).first()
-        if not block:
-            block = SiteBlock(
-                site_id=site.site_id,
-                ppid=ppid,
-                reason=reason,
-                evidence_url=evidence_url,
-                blocked_by=site.admin_email,
-            )
-            db.add(block)
-        block.network_revocation_requested = True
-        block.network_revocation_status = "pending_review"
-        block.evidence_url = evidence_url
-        db.commit()
+        revoke_site_bound_ppid(
+            db,
+            site_id=site.site_id,
+            ppid=ppid,
+            reason=reason,
+            revoked_by=site.admin_email or "demo",
+            site_domain=site.site_domain,
+            blocked_by=site.admin_email,
+            evidence_url=evidence_url,
+            network_revocation_requested=True,
+            network_revocation_status="pending_review",
+        )
         return jsonify({
             "success": True,
             "status": "pending_review",

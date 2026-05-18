@@ -402,13 +402,39 @@ def revoke_site_user(site_id, ppid):
         conn.commit()
         cursor.close()
         conn.close()
+
+        canonical_revocation = None
+        try:
+            from api.database import SessionLocal, Site
+            from api.site_ppid_revocation import revoke_site_bound_ppid
+
+            db = SessionLocal()
+            try:
+                site = db.query(Site).filter_by(site_id=site_id).first()
+                canonical_revocation = revoke_site_bound_ppid(
+                    db,
+                    site_id=site_id,
+                    ppid=ppid,
+                    reason='developer_site_user_revoke',
+                    revoked_by=_actor_ppid_for_audit(),
+                    site_domain=getattr(site, 'site_domain', None) if site else None,
+                    blocked_by=_actor_ppid_for_audit(),
+                )
+            finally:
+                db.close()
+        except Exception as revoke_err:
+            logger.warning(
+                "IAM user revoked in site DB but canonical PPID revocation failed: %s",
+                revoke_err,
+            )
         
         logger.info(f"Revoked user {ppid[:20]}... from site {site_id} (permissions: {revoked_permissions})")
         
         return jsonify({
             'success': True,
             'message': f'User revoked successfully',
-            'revoked_permissions': revoked_permissions
+            'revoked_permissions': revoked_permissions,
+            'canonical_ppid_revocation': canonical_revocation,
         })
         
     except Exception as e:

@@ -117,16 +117,22 @@ def sync_revocations_to_bloom():
                 logger.debug("No revocations to sync")
                 return
             
-            # Add each to Bloom filter
+            from api.site_ppid_revocation import keys_for_revocation_row
+
             count = 0
+            seen_keys: set[str] = set()
             for revocation in revoked_list:
-                try:
-                    _global_verifier.revoke_credential(revocation.lemma_id)
-                    count += 1
-                except Exception as e:
-                    logger.warning(f"Failed to add {revocation.lemma_id} to Bloom filter: {e}")
-            
-            logger.info(f"✅ Synced {count} revocations to Bloom filter")
+                for key in keys_for_revocation_row(revocation):
+                    if key in seen_keys:
+                        continue
+                    seen_keys.add(key)
+                    try:
+                        _global_verifier.revoke_credential(key)
+                        count += 1
+                    except Exception as e:
+                        logger.warning(f"Failed to add {key} to Bloom filter: {e}")
+
+            logger.info(f"✅ Synced {count} revocation keys to Bloom filter")
             
         finally:
             session.close()

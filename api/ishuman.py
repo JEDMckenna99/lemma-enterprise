@@ -141,6 +141,40 @@ def _derive_ppid_for_site(
     raise ValueError("wallet_secret or wallet_id required for PPID derivation")
 
 
+def _deny_if_derivation_revoked(
+    db,
+    *,
+    master_credential_id: str,
+    wallet_id: str,
+    wallet_secret: Optional[str],
+    target_site: str,
+) -> Optional[str]:
+    """Return an error code if derivation must be denied for revocation/block."""
+    from api.revocation_verifier import is_credential_revoked
+    from api.site_ppid_revocation import is_site_ppid_blocked, resolve_site_by_domain
+
+    if is_credential_revoked(master_credential_id):
+        return "master_credential_revoked"
+
+    try:
+        site_ppid = _derive_ppid_for_site(
+            rp_id=target_site,
+            wallet_secret=wallet_secret,
+            wallet_id=wallet_id,
+        )
+    except ValueError:
+        return "ppid_derivation_failed"
+
+    if is_credential_revoked(site_ppid):
+        return "site_ppid_revoked"
+
+    site = resolve_site_by_domain(db, target_site)
+    if site and is_site_ppid_blocked(db, site_id=site.site_id, ppid=site_ppid):
+        return "site_ppid_blocked"
+
+    return None
+
+
 # ---------------------------------------------------------------------------
 # 1. Start Verification
 # ---------------------------------------------------------------------------
@@ -382,40 +416,37 @@ def site_block():
 
     reason = body.get("reason", "")
 
-    from api.database import SessionLocal, SiteBlock
+    from api.database import SessionLocal
+    from api.site_ppid_revocation import revoke_site_bound_ppid
+
     db = SessionLocal()
     try:
-        existing = (
-            db.query(SiteBlock)
-            .filter_by(site_id=site.site_id, ppid=ppid, is_active=True)
-            .first()
-        )
-        if existing:
-            return jsonify({
-                "success": True,
-                "message": "PPID already blocked on this site",
-                "block_id": existing.id,
-            })
-
-        block = SiteBlock(
+        result = revoke_site_bound_ppid(
+            db,
             site_id=site.site_id,
             ppid=ppid,
             reason=reason,
+            revoked_by=site.admin_email or "site_api",
+            site_domain=getattr(site, "site_domain", None),
             blocked_by=site.admin_email,
         )
-        db.add(block)
-        db.commit()
 
         logger.info(
             "Site block created: site=%s ppid=%s reason=%s",
             site.site_id, ppid[:40], reason[:80],
         )
 
+        message = "PPID blocked on this site"
+        if not result.get("block_created") and not result.get("revocation_created"):
+            message = "PPID already blocked on this site"
+
         return jsonify({
             "success": True,
-            "block_id": block.id,
+            "message": message,
+            "block_id": result.get("block_id"),
             "site_id": site.site_id,
             "ppid": ppid,
+            "revocation_synced": result.get("event_published", False),
         })
     except Exception:
         db.rollback()
@@ -501,32 +532,24 @@ def network_revoke():
     if not ppid and not credential_id:
         return jsonify({"success": False, "error": "ppid or credential_id required"}), 400
 
-    from api.database import SessionLocal, SiteBlock
+    from api.database import SessionLocal
+    from api.site_ppid_revocation import revoke_site_bound_ppid
+
     db = SessionLocal()
     try:
-        # Ensure site block exists first (tier 1 must precede tier 2)
-        existing_block = (
-            db.query(SiteBlock)
-            .filter_by(site_id=site.site_id, ppid=ppid, is_active=True)
-            .first()
-        )
-        if not existing_block:
-            block = SiteBlock(
+        if ppid:
+            revoke_site_bound_ppid(
+                db,
                 site_id=site.site_id,
                 ppid=ppid,
                 reason=reason,
-                evidence_url=evidence_url,
+                revoked_by=site.admin_email or "site_api",
+                site_domain=getattr(site, "site_domain", None),
                 blocked_by=site.admin_email,
+                evidence_url=evidence_url,
                 network_revocation_requested=True,
                 network_revocation_status="pending_review",
             )
-            db.add(block)
-        else:
-            existing_block.network_revocation_requested = True
-            existing_block.network_revocation_status = "pending_review"
-            existing_block.evidence_url = evidence_url or existing_block.evidence_url
-
-        db.commit()
 
         logger.info(
             "Network revocation requested: site=%s ppid=%s credential=%s",
@@ -742,6 +765,16 @@ def derive_site_proof():
         )
         if wallet_revoked:
             return jsonify({"success": False, "error": "wallet_revoked"}), 403
+
+        deny_reason = _deny_if_derivation_revoked(
+            db,
+            master_credential_id=master_credential_id,
+            wallet_id=wallet_id,
+            wallet_secret=wallet_secret,
+            target_site=target_site,
+        )
+        if deny_reason:
+            return jsonify({"success": False, "error": deny_reason}), 403
 
         # 2. Check if derivation already exists
         existing = (

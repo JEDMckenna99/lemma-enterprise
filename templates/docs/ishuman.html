@@ -86,10 +86,15 @@
 
 <div class="docs-section">
     <h2>Revocation and Abuse Controls</h2>
-    <h3>Tier 1: Site block (immediate)</h3>
-    <p>Each site can block a PPID instantly on its own domain using <code>/api/ishuman/site-block</code>.</p>
+    <p>Revocation is tiered. Do not rely on the abuser's browser or wallet to enforce a ban.</p>
+    <h3>Tier 0: Immediate site deny (customer app)</h3>
+    <p>Your app should stop the current session immediately (for example end the session, deny the action, or return 403) while Lemma propagates canonical revocation.</p>
+    <h3>Tier 1: Site-bound PPID revocation (immediate, canonical)</h3>
+    <p>Call <code>POST /api/ishuman/site-block</code> with your site API key. Lemma writes both a <code>SiteBlock</code> row and a canonical <code>RevocationList</code> entry for the site-bound PPID, then publishes Bloom sync so verifiers reject that PPID across devices on your site.</p>
+    <p>You can also revoke IAM users via <code>POST /api/developer/sites/&lt;site_id&gt;/users/&lt;ppid&gt;/revoke</code>, which now triggers the same canonical PPID revocation path.</p>
+    <p>For local-first verification with <code>ishuman-verifier.js</code>, either call <code>GET /api/ishuman/check</code> server-side or provide <code>isBlockedLocally(ppid)</code> backed by your own synced block list.</p>
     <h3>Tier 2: Network revocation (reviewed)</h3>
-    <p>Sites can request network action via <code>/api/ishuman/network-revoke</code>. Admin approval through <code>/api/ishuman/approve-revocation</code> revokes wallet, master credential, and derived credentials.</p>
+    <p>Sites can request network action via <code>POST /api/ishuman/network-revoke</code> (tier 1 block is applied immediately). Admin approval through <code>POST /api/ishuman/approve-revocation</code> revokes wallet, master credential, and all derived credentials network-wide.</p>
 </div>
 
 <div class="docs-section">

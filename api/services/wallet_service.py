@@ -3518,70 +3518,38 @@ def revoke_user():
         
         if not site_id:
             return jsonify({'success': False, 'error': 'site_id required'}), 400
-        
-        # Add PPID to revocation list with revocation_type='user'
-        from api.database import get_db, RevocationList
-        from datetime import datetime
-        
+
+        from api.database import get_db
+        from api.site_ppid_revocation import revoke_site_bound_ppid
+
         db = get_db()
         try:
-            # Check if already revoked
-            existing = db.query(RevocationList).filter(
-                RevocationList.ppid == ppid,
-                RevocationList.site_id == site_id
-            ).first()
-            
-            if existing:
-                return jsonify({
-                    'success': True,
-                    'already_revoked': True,
-                    'message': 'User already revoked for this site'
-                })
-            
-            # Create new revocation entry
-            revocation = RevocationList(
-                lemma_id=f"ppid:{ppid}",  # Use ppid: prefix to distinguish
-                credential_id=f"ppid:{ppid}",
-                ppid=ppid,
+            result = revoke_site_bound_ppid(
+                db,
                 site_id=site_id,
-                revocation_type='user',  # User-level revocation
+                ppid=ppid,
                 reason=reason,
-                revoked_at=datetime.utcnow(),
-                revoked_by='api'
+                revoked_by='api',
             )
-            
-            db.add(revocation)
-            db.commit()
-            
+
+            already_revoked = not result.get("block_created") and not result.get("revocation_created")
             logger.info(f"🚫 User revoked: PPID {ppid[:12]}... for site {site_id}")
 
-            # Publish event-driven revocation sync so connected clients/sites
-            # can invalidate stale caches without waiting for hourly refresh.
-            event_published = False
-            try:
-                from api.revocation_sync import trigger_revocation_sync
-                event_published = bool(trigger_revocation_sync(
-                    credential_id=f"ppid:{ppid}",
-                    revocation_type='user',
-                    site_id=site_id,
-                ))
-                if event_published:
-                    logger.info("✅ User revocation event published for site=%s ppid=%s", site_id, ppid[:16])
-                else:
-                    logger.warning("⚠️ User revocation event not published (event bus unavailable)")
-            except Exception as sync_err:
-                logger.warning("⚠️ User revocation sync trigger failed: %s", sync_err)
-            
             return jsonify({
                 'success': True,
+                'already_revoked': already_revoked,
                 'ppid': ppid,
                 'site_id': site_id,
                 'revocation_type': 'user',
-                'event_published': event_published,
-                'message': 'User revoked across all devices for this site.',
+                'event_published': result.get('event_published', False),
+                'message': (
+                    'User already revoked for this site'
+                    if already_revoked
+                    else 'User revoked across all devices for this site.'
+                ),
                 'note': 'Connected clients can receive revocation events immediately; hourly sync remains fallback.'
             })
-            
+
         finally:
             db.close()
             
