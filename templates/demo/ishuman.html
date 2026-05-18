@@ -62,7 +62,7 @@
   <section class="ih-hero">
     <p style="font-size:13px;font-weight:800;text-transform:uppercase;letter-spacing:1.6px;color:#93c5fd;margin-bottom:8px">isHuman Proof Network Demo</p>
     <h1>Verify once. Prove locally across sites.</h1>
-    <p>Follow one user across two businesses. The user verifies once, carries a private human proof in their browser wallet, and each business checks that proof locally without storing ID documents.</p>
+    <p>Follow one user across two customer sites. The user verifies once, carries a private human proof in their browser wallet, and each business checks that proof at the protected action without storing ID documents.</p>
     <div class="ih-notice">
       This demo uses Stripe Identity as the prototype IDV rail. Lemma provides the reusable credential, wallet, site-private PPID derivation, local verification, and revocation layer. Commercial deployment requires an approved IDV-provider path.
     </div>
@@ -75,10 +75,22 @@
     </div>
     <div class="ih-journey">
       <div class="ih-step"><strong>User</strong> Gets one reusable isHuman proof and keeps it in the browser wallet.</div>
-      <div class="ih-step"><strong>Ticketing Site</strong> Checks proof locally before allowing a protected ticket action.</div>
-      <div class="ih-step"><strong>SaaS Trial</strong> Checks the same human but receives a different PPID.</div>
+      <div class="ih-step"><strong>Ticketing Site</strong> Calls the hosted verifier when the user reserves tickets.</div>
+      <div class="ih-step"><strong>SaaS Trial</strong> Calls the same verifier when the user starts a trial.</div>
       <div class="ih-step"><strong>Operator</strong> Blocks one site PPID or escalates severe abuse for review.</div>
     </div>
+  </section>
+
+  <section class="ih-card" style="margin-top:14px">
+    <h2>What is actually used</h2>
+    <p class="ih-muted">The customer sites load the hosted Lemma verifier script, request a credential through the Lemma wallet bridge, and receive a small decision object. The demo uses Stripe test mode only for the initial IDV rail.</p>
+    <div class="ih-code" style="margin-top:12px">&lt;script src="https://lemma.id/sdk/ishuman-verifier.js"&gt;&lt;/script&gt;
+const result = await new IsHumanVerifier({
+  siteId: "tickets-demo.lemma.id",
+  lemmaOrigin: "https://lemma.id"
+}).verify();
+
+// result: { human, ppid, reason, timeMs }</div>
   </section>
 
   <section class="ih-card" style="margin-top:14px">

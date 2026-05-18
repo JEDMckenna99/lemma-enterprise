@@ -2,9 +2,9 @@
 """Record an automated isHuman E2E demo artifact.
 
 The local environment does not need browser drivers for this script. It runs the
-deployed Heroku isHuman flow via HTTP, then renders a short visual recording
-from the real results. The output is suitable for a quick investor/operator
-sanity check that the live system can issue, derive, block, and revoke.
+deployed isHuman flow via HTTP, then renders a short customer-site walkthrough
+from the real results. The output is suitable for checking that issuance,
+site-private derivation, block, and revoke all work before a live demo.
 """
 
 from __future__ import annotations
@@ -247,7 +247,7 @@ def draw_browser_scene(
     # Page hero.
     draw.rounded_rectangle((58, 110, WIDTH - 58, 230), radius=18, fill=BG)
     draw.text((88, 134), title, fill=(255, 255, 255), font=title_font)
-    draw.text((90, 184), "Real Heroku APIs exercised during recording", fill=(203, 213, 225), font=small_font)
+    draw.text((90, 184), "Customer-site interaction using the hosted Lemma verifier", fill=(203, 213, 225), font=small_font)
     pill_w = 250
     draw.rounded_rectangle((WIDTH - 88 - pill_w, 138, WIDTH - 88, 178), radius=20, fill=(220, 252, 231), outline=(134, 239, 172))
     draw.text((WIDTH - 70 - pill_w, 146), status, fill=status_color, font=small_font)
@@ -296,7 +296,7 @@ def render_video(results: dict, output_dir: Path) -> tuple[Path, Path]:
                 f"Master proof stored in browser wallet: {short(results['master_credential_id'], 15)}",
                 "Alex can reuse the proof without repeated CAPTCHA or full IDV.",
             ],
-            "IDV Provider Role",
+            "What the IDV enables",
             [
                 f"PASS verification status: {results['status']}",
                 f"PASS Stripe session: {short(results['stripe_session_id'], 12)}",
@@ -307,13 +307,13 @@ def render_video(results: dict, output_dir: Path) -> tuple[Path, Path]:
         draw_browser_scene(
             "https://lemma-demo-tickets-1d3d7411af33.herokuapp.com",
             "Ticketing site gates a high-abuse action",
-            "Business Page",
+            "Customer Action",
             [
-                "A fan clicks Reserve tickets on a separate Heroku app.",
-                "The page loads the hosted Lemma verifier SDK.",
-                "The business asks for a human verdict before the high-abuse action.",
+                "A fan clicks Reserve tickets on a customer site.",
+                "The page calls https://lemma.id/sdk/ishuman-verifier.js.",
+                "The business receives a verdict before checkout continues.",
             ],
-            "Business Receives",
+            "What the site receives",
             [
                 "ALLOW human=true",
                 f"PPID {short(tickets['ppid'], 22)}",
@@ -324,13 +324,13 @@ def render_video(results: dict, output_dir: Path) -> tuple[Path, Path]:
         draw_browser_scene(
             "https://lemma-demo-trials-7090f46cae0d.herokuapp.com",
             "SaaS trial sees the same human privately",
-            "Business Page",
+            "Customer Action",
             [
                 "The same user starts a free trial on a second business site.",
                 "The user does not repeat full IDV.",
-                "The SaaS business still gets a high-confidence human signal.",
+                "The SaaS page calls the same hosted Lemma verifier.",
             ],
-            "Privacy Boundary",
+            "What changes per site",
             [
                 "ALLOW human=true",
                 f"PPID {short(trials['ppid'], 22)}",
@@ -341,13 +341,13 @@ def render_video(results: dict, output_dir: Path) -> tuple[Path, Path]:
         draw_browser_scene(
             "https://lemma.id/demo/ishuman",
             "Business blocks abuse without storing PII",
-            "Ticketing Operator",
+            "Business Operator",
             [
                 "The ticketing site sees bot-like behavior from its local PPID.",
                 f"Blocked site PPID: {short(tickets['ppid'], 22)}",
                 "The block is scoped to that business first.",
             ],
-            "Business Control",
+            "What the business controls",
             [
                 f"PASS site block: {results['site_block']['success']}",
                 f"PASS scoped site: {results['site_block']['site_id']}",

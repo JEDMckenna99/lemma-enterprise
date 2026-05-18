@@ -16,28 +16,30 @@ def _content():
         return {
             "eyebrow": "SaaS free trial",
             "headline": "Start a 14-day Pro workspace trial",
-            "subhead": "Lemma runs before account creation, so the business gets a reusable human signal without collecting identity documents.",
+            "subhead": "Create a workspace without another CAPTCHA or full ID check.",
             "primary": "Start free trial",
-            "protected": "Trial creation protected by isHuman",
-            "success": "Trial workspace created for verified human",
+            "protected": "Trial creation requires a human proof.",
+            "success": "Trial workspace created",
             "risk": "Stops free-trial farms, promo abuse, and fake account swarms.",
             "business_value": "The SaaS company gets a stronger human signal without asking every trial user to upload ID documents.",
             "user_value": "The user reuses the same wallet proof and avoids another CAPTCHA or full IDV flow.",
             "form": "Work email",
             "placeholder": "founder@example.com",
+            "action": "create a workspace",
         }
     return {
         "eyebrow": "Ticket release",
         "headline": "Reserve 2 tickets for the sold-out drop",
-        "subhead": "The ticketing site gates the high-abuse action with Lemma instead of another CAPTCHA puzzle.",
+        "subhead": "Join the drop without another bot puzzle.",
         "primary": "Reserve tickets",
-        "protected": "Checkout queue protected by isHuman",
-        "success": "Reservation held for verified human",
+        "protected": "Reservation requires a human proof.",
+        "success": "Reservation held",
         "risk": "Stops account farms and scripted reservation attempts before checkout.",
         "business_value": "The ticketing business can reduce scalper automation without forcing every fan through another puzzle.",
         "user_value": "The fan proves humanness from their wallet instead of solving a brittle CAPTCHA at drop time.",
         "form": "Fan email",
         "placeholder": "fan@example.com",
+        "action": "reserve tickets",
     }
 
 
@@ -56,30 +58,37 @@ def index():
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{SITE_NAME}</title>
   <style>
-    body {{ font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; margin: 0; background: #eef2ff; color: #0f172a; }}
-    header {{ background:#fff;border-bottom:1px solid #e2e8f0;padding:16px 24px;display:flex;justify-content:space-between;align-items:center }}
+    body {{ font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; margin: 0; background: #f8fafc; color: #0f172a; }}
+    header {{ background:#fff;border-bottom:1px solid #e2e8f0;padding:16px 28px;display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;z-index:5 }}
     header strong {{ font-size:18px }}
-    main {{ max-width: 1080px; margin: 0 auto; padding: 32px 18px; }}
-    .hero {{ display:grid;grid-template-columns:1.2fr .8fr;gap:18px;align-items:stretch }}
-    .panel {{ background: #fff; border: 1px solid #e2e8f0; border-radius: 18px; padding: 26px; box-shadow:0 10px 28px rgba(15,23,42,.08) }}
-    .dark {{ background: #0f172a; color: #e2e8f0; border-color:#334155 }}
-    .dark h1 {{ color:#fff }}
-    h1 {{ margin:0 0 10px;font-size:42px;line-height:1.05 }}
-    .muted {{ color:#64748b }}
-    .dark .muted {{ color:#cbd5e1 }}
-    .field {{ margin-top:18px }}
+    nav {{ display:flex;gap:18px;color:#64748b;font-size:14px }}
+    main {{ max-width: 1120px; margin: 0 auto; padding: 34px 18px; }}
+    .hero {{ display:grid;grid-template-columns:1.15fr .85fr;gap:22px;align-items:start }}
+    .panel {{ background: #fff; border: 1px solid #e2e8f0; border-radius: 18px; padding: 28px; box-shadow:0 10px 28px rgba(15,23,42,.07) }}
+    .product {{ min-height: 420px; }}
+    h1 {{ margin:0 0 12px;font-size:48px;line-height:1.02;letter-spacing:-1px }}
+    h2 {{ margin:0 0 10px }}
+    .muted {{ color:#64748b;line-height:1.55 }}
+    .field {{ margin-top:20px }}
     label {{ display:block;font-size:13px;font-weight:800;margin-bottom:6px;color:#334155 }}
     input {{ width:100%;box-sizing:border-box;border:1px solid #cbd5e1;border-radius:10px;padding:12px;font-size:15px }}
-    button {{ border: 0; background: #4f46e5; color: #fff; border-radius: 10px; padding: 12px 16px; font-weight: 800; cursor: pointer; margin-top:16px }}
+    button {{ border: 0; background: #4f46e5; color: #fff; border-radius: 10px; padding: 13px 16px; font-weight: 800; cursor: pointer; margin-top:16px;width:100%;font-size:15px }}
+    button:disabled {{ opacity:.7;cursor:not-allowed }}
     .secondary {{ background:#fff;color:#1e293b;border:1px solid #cbd5e1 }}
     .pill {{ display: inline-block; border: 1px solid #cbd5e1; border-radius: 999px; padding: 4px 9px; font-size: 12px; font-weight: 800; background: #f8fafc; }}
     .ok {{ border-color: #86efac; background: #dcfce7; color: #166534; }}
     .deny {{ border-color: #fca5a5; background: #fee2e2; color: #991b1b; }}
+    .warn {{ border-color:#facc15;background:#fef9c3;color:#854d0e }}
     .decision {{ margin-top:18px;border:1px solid #dbeafe;background:#eff6ff;border-radius:12px;padding:14px }}
-    .grid {{ display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:16px }}
-    .value-grid {{ display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-top:16px }}
+    .grid {{ display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:18px }}
+    .value-grid {{ display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-top:18px }}
     .mini {{ background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:16px }}
     .mini h3 {{ margin:0 0 6px;font-size:16px }}
+    .result {{ margin-top:16px;border-radius:14px;padding:18px;background:#0f172a;color:#e2e8f0;min-height:120px }}
+    .result strong {{ color:#fff }}
+    .tiny {{ font-size:12px;color:#94a3b8;margin-top:10px }}
+    details {{ margin-top:18px }}
+    summary {{ cursor:pointer;font-weight:800;color:#334155 }}
     pre {{ background: #0f172a; color: #dbeafe; padding: 12px; border-radius: 10px; overflow: auto; }}
     @media(max-width:850px){{ .hero,.grid,.value-grid{{grid-template-columns:1fr}} }}
   </style>
@@ -87,27 +96,32 @@ def index():
 <body>
   <header>
     <strong>{SITE_NAME}</strong>
-    <span class="pill">Lemma-enabled business site</span>
+    <nav><span>Product</span><span>Pricing</span><span>Support</span></nav>
   </header>
   <main>
     <section class="hero">
-      <div class="panel dark">
-        <p style="font-size:12px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;color:#93c5fd;margin:0 0 8px">{copy["eyebrow"]}</p>
+      <div class="panel product">
+        <p style="font-size:12px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;color:#4f46e5;margin:0 0 8px">{copy["eyebrow"]}</p>
         <h1>{copy["headline"]}</h1>
         <p class="muted">{copy["subhead"]}</p>
-        <div class="decision">
-          <strong>{copy["protected"]}</strong>
-          <p style="margin:6px 0 0;color:#334155">The site asks Lemma for a local verdict and a site-private PPID. It does not receive government ID data.</p>
-        </div>
-      </div>
-      <div class="panel">
-        <h2>Customer Action</h2>
-        <p class="muted">{copy["risk"]}</p>
         <div class="field">
           <label>{copy["form"]}</label>
           <input value="{copy["placeholder"]}" aria-label="{copy["form"]}">
         </div>
         <button id="verify-btn">{copy["primary"]}</button>
+        <p class="tiny">{copy["protected"]} If the wallet has no reusable proof yet, the user can verify once at Lemma.</p>
+        <div class="result" id="decision-card">
+          <strong>Waiting for protected action</strong>
+          <p class="tiny">When the user clicks, this site calls the Lemma SDK and receives only a verdict, a site-private ID, and a reason.</p>
+        </div>
+      </div>
+      <div class="panel">
+        <h2>What this business gets</h2>
+        <p class="muted">{copy["risk"]}</p>
+        <div class="decision">
+          <strong>No ID documents stored here.</strong>
+          <p style="margin:6px 0 0;color:#334155">The site does not see the user's passport, selfie, or global identity. It sees a private site ID it can use for local policy.</p>
+        </div>
         <button class="secondary" onclick="window.open('{LEMMA_ORIGIN}/demo/ishuman','_blank')">Open Lemma wallet/demo</button>
       </div>
     </section>
@@ -136,17 +150,22 @@ def index():
         <p class="muted">The IDV provider powers the original trusted check; Lemma makes the resulting proof reusable across sites.</p>
       </div>
     </section>
-    <section class="mini">
+    <details class="mini">
+      <summary>Developer result object</summary>
       <pre id="result">{{}}</pre>
-    </section>
+    </details>
   </main>
   <script src="{LEMMA_ORIGIN}/sdk/ishuman-verifier.js"></script>
   <script>
     const pill = document.getElementById('status-pill');
     const result = document.getElementById('result');
+    const decisionCard = document.getElementById('decision-card');
     document.getElementById('verify-btn').addEventListener('click', async () => {{
+      const button = document.getElementById('verify-btn');
+      button.disabled = true;
       pill.textContent = 'CHECKING';
       pill.className = 'pill';
+      decisionCard.innerHTML = '<strong>Checking Lemma wallet...</strong><p class="tiny">The customer site is requesting a local isHuman verdict.</p>';
       try {{
         const verifier = new IsHumanVerifier({{
           siteId: '{SITE_ID}',
@@ -160,12 +179,18 @@ def index():
         document.getElementById('decision-copy').textContent = response.human
           ? '{copy["success"]}. PPID: ' + (response.ppid || '').slice(0, 28) + '...'
           : 'Action blocked. Reason: ' + response.reason;
+        decisionCard.innerHTML = response.human
+          ? '<strong>{copy["success"]}</strong><p class="tiny">Business received human=true and a site-private ID. The protected action can continue.</p>'
+          : '<strong>Action blocked</strong><p class="tiny">Reason: ' + response.reason + '. If the user has no proof yet, they verify once with Lemma.</p>';
         result.textContent = JSON.stringify(response, null, 2);
       }} catch (err) {{
         pill.textContent = 'ERROR';
         pill.className = 'pill deny';
         document.getElementById('decision-copy').textContent = 'Verification failed: ' + err.message;
+        decisionCard.innerHTML = '<strong>Verification unavailable</strong><p class="tiny">' + err.message + '</p>';
         result.textContent = JSON.stringify({{ error: err.message }}, null, 2);
+      }} finally {{
+        button.disabled = false;
       }}
     }});
   </script>
