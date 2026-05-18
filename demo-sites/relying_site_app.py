@@ -23,6 +23,8 @@ def _content():
             "risk": "Stops free-trial farms, promo abuse, and fake account swarms.",
             "business_value": "The SaaS company gets a stronger human signal without asking every trial user to upload ID documents.",
             "user_value": "The user reuses the same wallet proof and avoids another CAPTCHA or full IDV flow.",
+            "abuse_signal": "Example abuse signal: 40 trial workspaces from one browser pattern in 3 minutes.",
+            "response": "Lemma response: block this site-private human ID and require fresh IDV before another trial.",
             "form": "Work email",
             "placeholder": "founder@example.com",
             "action": "create a workspace",
@@ -37,6 +39,8 @@ def _content():
         "risk": "Stops account farms and scripted reservation attempts before checkout.",
         "business_value": "The ticketing business can reduce scalper automation without forcing every fan through another puzzle.",
         "user_value": "The fan proves humanness from their wallet instead of solving a brittle CAPTCHA at drop time.",
+        "abuse_signal": "Example abuse signal: queue timing and reservation attempts faster than a human can perform.",
+        "response": "Lemma response: block this site-private human ID and require fresh IDV before another reservation.",
         "form": "Fan email",
         "placeholder": "fan@example.com",
         "action": "reserve tickets",
@@ -80,6 +84,8 @@ def index():
     .deny {{ border-color: #fca5a5; background: #fee2e2; color: #991b1b; }}
     .warn {{ border-color:#facc15;background:#fef9c3;color:#854d0e }}
     .decision {{ margin-top:18px;border:1px solid #dbeafe;background:#eff6ff;border-radius:12px;padding:14px }}
+    .abuse {{ margin-top:16px;border:1px solid #fed7aa;background:#fff7ed;border-radius:12px;padding:14px;color:#7c2d12 }}
+    .abuse strong {{ display:block;margin-bottom:4px }}
     .grid {{ display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:18px }}
     .value-grid {{ display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-top:18px }}
     .mini {{ background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:16px }}
@@ -121,6 +127,11 @@ def index():
         <div class="decision">
           <strong>No ID documents stored here.</strong>
           <p style="margin:6px 0 0;color:#334155">The site does not see the user's passport, selfie, or global identity. It sees a private site ID it can use for local policy.</p>
+        </div>
+        <div class="abuse">
+          <strong>When behavior looks automated</strong>
+          <p style="margin:0 0 8px">{copy["abuse_signal"]}</p>
+          <p style="margin:0">{copy["response"]}</p>
         </div>
         <button class="secondary" onclick="window.open('{LEMMA_ORIGIN}/demo/ishuman','_blank')">Open Lemma wallet/demo</button>
       </div>

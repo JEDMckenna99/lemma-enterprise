@@ -30,8 +30,9 @@ def test_ishuman_demo_page_loads_expected_assets(ishuman_demo_client):
     body = resp.get_data(as_text=True)
 
     assert resp.status_code == 200
-    assert "Reusable human verification for high-abuse web actions." in body
+    assert "Bot defense should punish abusive humans, not whole networks." in body
     assert "What Lemma does" in body
+    assert "From IP bans to human accountability" in body
     assert "Exact customer-site integration" in body
     assert "/sdk/ishuman-verifier.js" in body
     assert "/static/js/demo/ishuman-demo.js" in body

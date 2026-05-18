@@ -51,7 +51,15 @@
 .log div{border-bottom:1px solid #e2e8f0;padding:6px 0}
 .log div:last-child{border-bottom:0}
 .input{border:1px solid #cbd5e1;border-radius:10px;padding:10px;width:100%;font-size:13px;margin-top:10px}
+.accountability{background:#111827;color:#e5e7eb;border-color:#374151}
+.accountability h2{color:#fff}
+.accountability .muted{color:#cbd5e1}
+.accountability-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px}
+.accountability-box{border:1px solid #374151;border-radius:16px;padding:18px;background:#0f172a}
+.accountability-box h3{margin:0 0 8px;color:#fff}
+.accountability-box ul{margin:0;padding-left:18px;color:#d1d5db}
 @media(max-width:900px){.steps,.demo-grid,.result-grid,.compare{grid-template-columns:1fr}.business-link{align-items:flex-start;flex-direction:column}}
+@media(max-width:900px){.accountability-grid{grid-template-columns:1fr}}
 </style>
 {% endblock %}
 
@@ -59,8 +67,8 @@
 <div class="demo-page" id="ishuman-demo">
   <section class="hero">
     <p class="eyebrow">isHuman Proof Network</p>
-    <h1>Reusable human verification for high-abuse web actions.</h1>
-    <p>Lemma lets a user verify once, keep a human proof in their browser wallet, and present private site-specific proof when a business needs to know they are a real person.</p>
+    <h1>Bot defense should punish abusive humans, not whole networks.</h1>
+    <p>Lemma gives businesses a reusable human proof and a way to reimpose real IDV pressure when behavior looks non-human, instead of banning IPs, ISPs, VPNs, or broad device fingerprints.</p>
     <div class="hero-actions">
       <button class="btn" id="ih-wallet-btn">Create or unlock wallet</button>
       <button class="btn secondary" id="ih-start-idv-btn">Start test IDV flow</button>
@@ -71,7 +79,7 @@
 
   <section class="section">
     <h2>What Lemma does</h2>
-    <p class="muted">It turns one trusted identity verification into a reusable, locally checkable human proof. Businesses get a simple verdict and a private site ID, not the user's raw identity documents.</p>
+    <p class="muted">It turns one trusted identity verification into a reusable, locally checkable human proof. Businesses can allow real users, block abusive site-private IDs, and force a fresh IDV challenge when behavior stops looking human.</p>
     <div class="steps">
       <div class="step">
         <div class="step-num">1</div>
@@ -85,8 +93,33 @@
       </div>
       <div class="step">
         <div class="step-num">3</div>
-        <h3>Site gets a private verdict</h3>
-        <p class="muted">The site receives `human`, `ppid`, `reason`, and timing. Each site gets a different private ID.</p>
+        <h3>Abuse triggers accountability</h3>
+        <p class="muted">The site can block the private ID, request a fresh IDV challenge, or escalate confirmed abuse for network revocation.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="section accountability">
+    <h2>From IP bans to human accountability</h2>
+    <p class="muted">Today, bot defense usually punishes infrastructure. Lemma lets a business respond at the human-proof layer.</p>
+    <div class="accountability-grid">
+      <div class="accountability-box">
+        <h3>Current bot defense</h3>
+        <ul>
+          <li>Detect bot-like behavior.</li>
+          <li>Ban IPs, ISPs, VPNs, devices, or regions.</li>
+          <li>Real users get caught in the blast radius.</li>
+          <li>Attackers rotate infrastructure and come back.</li>
+        </ul>
+      </div>
+      <div class="accountability-box">
+        <h3>With Lemma</h3>
+        <ul>
+          <li>Detect bot-like behavior.</li>
+          <li>Block the site-private human proof.</li>
+          <li>Require a fresh IDV challenge to continue.</li>
+          <li>Escalate confirmed abuse to network revocation.</li>
+        </ul>
       </div>
     </div>
   </section>
@@ -114,8 +147,8 @@
           </div>
         </div>
         <div class="path-item">
-          <strong>Operator controls</strong>
-          <p class="muted">After verification, block the ticketing PPID locally or escalate to network review.</p>
+          <strong>Operator response</strong>
+          <p class="muted">If behavior looks automated, block the ticketing PPID and require fresh verification instead of banning an ISP or proxy range.</p>
           <div class="hero-actions" style="margin-top:10px">
             <button class="btn secondary" id="ih-verify-sites-btn">Verify both sites</button>
             <button class="btn danger" id="ih-block-tickets-btn">Block ticketing PPID</button>
@@ -161,16 +194,18 @@
         <h3>Without Lemma</h3>
         <ul>
           <li>CAPTCHA slows real users and is cheap for attackers.</li>
+          <li>IP/ISP bans create collateral damage.</li>
           <li>Full IDV is too expensive for most signups and trials.</li>
-          <li>Businesses either tolerate abuse or store risky PII.</li>
+          <li>Attackers rotate proxies and accounts.</li>
         </ul>
       </div>
       <div class="good">
         <h3>With Lemma</h3>
         <ul>
           <li>Users reuse one human proof across sites.</li>
-          <li>Businesses get a human verdict without identity documents.</li>
-          <li>Operators can block locally or escalate severe abuse.</li>
+          <li>Businesses block private human IDs, not whole networks.</li>
+          <li>Suspicious users can be forced through fresh IDV.</li>
+          <li>Confirmed abuse can revoke the reusable proof.</li>
         </ul>
       </div>
     </div>

@@ -289,20 +289,20 @@ def render_video(results: dict, output_dir: Path) -> tuple[Path, Path]:
     frames = [
         draw_browser_scene(
             "https://lemma.id/demo/ishuman",
-            "One user, one proof, many sites",
-            "User Benefit",
+            "Bot defense at the human layer",
+            "Why this matters",
             [
-                "Alex verifies once with the prototype Stripe Identity rail.",
+                "Current defenses ban IPs, ISPs, VPNs, and devices.",
+                "That creates collateral damage while attackers rotate infrastructure.",
+                "Lemma lets sites challenge the human proof behind the behavior.",
+            ],
+            "Reusable Human Proof",
+            [
                 f"Master proof stored in browser wallet: {short(results['master_credential_id'], 15)}",
-                "Alex can reuse the proof without repeated CAPTCHA or full IDV.",
-            ],
-            "What the IDV enables",
-            [
                 f"PASS verification status: {results['status']}",
-                f"PASS Stripe session: {short(results['stripe_session_id'], 12)}",
-                "The original IDV check becomes a reusable trust signal.",
+                "Fresh IDV can be reimposed when behavior looks non-human.",
             ],
-            "MASTER PROOF READY",
+            "HUMAN ACCOUNTABILITY",
         ),
         draw_browser_scene(
             "https://lemma-demo-tickets-1d3d7411af33.herokuapp.com",
@@ -311,7 +311,7 @@ def render_video(results: dict, output_dir: Path) -> tuple[Path, Path]:
             [
                 "A fan clicks Reserve tickets on a customer site.",
                 "The page calls https://lemma.id/sdk/ishuman-verifier.js.",
-                "The business receives a verdict before checkout continues.",
+                "The business receives a human verdict before checkout continues.",
             ],
             "What the site receives",
             [
@@ -340,18 +340,18 @@ def render_video(results: dict, output_dir: Path) -> tuple[Path, Path]:
         ),
         draw_browser_scene(
             "https://lemma.id/demo/ishuman",
-            "Business blocks abuse without storing PII",
+            "Suspicious behavior triggers proof challenge",
             "Business Operator",
             [
-                "The ticketing site sees bot-like behavior from its local PPID.",
+                "The ticketing site sees behavior faster than a human can perform.",
                 f"Blocked site PPID: {short(tickets['ppid'], 22)}",
-                "The block is scoped to that business first.",
+                "The site blocks the private ID instead of banning an ISP.",
             ],
             "What the business controls",
             [
                 f"PASS site block: {results['site_block']['success']}",
                 f"PASS scoped site: {results['site_block']['site_id']}",
-                "No government ID data stored by the business.",
+                "Next step can require fresh IDV to continue.",
             ],
             "SITE BLOCK ACTIVE",
         ),
@@ -362,7 +362,7 @@ def render_video(results: dict, output_dir: Path) -> tuple[Path, Path]:
             [
                 "Site block is immediate and reversible.",
                 "Severe abuse can be escalated with evidence.",
-                "IDV-backed proof can support ongoing trust, not one-off KYC.",
+                "Confirmed abuse can burn the reusable human proof.",
             ],
             "Network Trust Result",
             [
@@ -379,14 +379,14 @@ def render_video(results: dict, output_dir: Path) -> tuple[Path, Path]:
             "Stakeholder Value",
             [
                 "User: one reusable proof, fewer CAPTCHA/IDV repeats.",
-                "Business: human signal without storing identity documents.",
-                "IDV provider: reusable demand layer for lower-margin web flows.",
+                "Business: challenge abusive humans, not whole networks.",
+                "IDV provider: reusable demand plus re-verification events.",
             ],
             "Investor Takeaway",
             [
                 "PASS one IDV check creates value across multiple sites",
                 "PASS privacy boundary shown by different PPIDs",
-                "PASS abuse controls shown by block and revocation",
+                "PASS bot cost shifts from proxy rotation to verified-human burn",
             ],
             "NETWORK THESIS PROVEN",
             PURPLE,
