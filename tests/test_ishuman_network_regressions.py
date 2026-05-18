@@ -112,6 +112,24 @@ def test_ishuman_verifier_uses_sha256_revocation_membership():
     assert "this._bloomFilter.has(candidateHash)" in content
 
 
+def test_ishuman_verifier_waits_for_bridge_ready_and_uses_payload_site_id():
+    sdk_path = os.path.join(
+        os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+        "static",
+        "js",
+        "ishuman-verifier.js",
+    )
+    with open(sdk_path, "r", encoding="utf-8") as handle:
+        content = handle.read()
+
+    assert "WALLET_BRIDGE_READY" in content
+    assert "_bridgeReadyPromise" in content
+    assert "await Promise.race" in content
+    assert "payload: {" in content
+    assert "siteId: this.siteId" in content
+    assert "credentialType: 'isHuman'" in content
+
+
 def test_ishuman_issue_signs_string_claims_but_returns_typed_claims(monkeypatch):
     import json
 

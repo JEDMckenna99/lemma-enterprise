@@ -184,6 +184,8 @@ class IsHumanVerifier {
         this._bloomFilter = new Set();
         this._bloomSyncedAt = 0;
         this._messageListener = null;
+        this._bridgeReadyPromise = null;
+        this._resolveBridgeReady = null;
 
         this._initPromise = this._init();
     }
@@ -316,6 +318,10 @@ class IsHumanVerifier {
     _setupBridge() {
         if (this._bridgeIframe) return;
 
+        this._bridgeReadyPromise = new Promise((resolve) => {
+            this._resolveBridgeReady = resolve;
+        });
+
         const iframe = document.createElement('iframe');
         iframe.src = `${this.lemmaOrigin}${BRIDGE_PATH}`;
         iframe.style.cssText = 'display:none;width:0;height:0;border:0;position:absolute';
@@ -325,12 +331,19 @@ class IsHumanVerifier {
 
         this._messageListener = (event) => {
             if (event.origin !== this.lemmaOrigin) return;
+            if (event.data?.type === 'WALLET_BRIDGE_READY') {
+                this._bridgeReady = true;
+                if (this._resolveBridgeReady) this._resolveBridgeReady(event.data);
+                if (this.debug) console.log('[isHuman] bridge ready', event.data);
+                return;
+            }
             this._handleBridgeMessage(event.data);
         };
         window.addEventListener('message', this._messageListener);
 
         iframe.addEventListener('load', () => {
             this._bridgeReady = true;
+            if (this._resolveBridgeReady) this._resolveBridgeReady({ ready: true, source: 'iframe_load' });
             if (this.debug) console.log('[isHuman] bridge iframe loaded');
         });
     }
@@ -349,9 +362,23 @@ class IsHumanVerifier {
     }
 
     _requestCredentialFromBridge() {
-        return new Promise((resolve, reject) => {
+        return new Promise(async (resolve, reject) => {
             if (!this._bridgeIframe || !this._bridgeIframe.contentWindow) {
                 return reject(new Error('Bridge iframe not available'));
+            }
+
+            if (!this._bridgeReady) {
+                try {
+                    await Promise.race([
+                        this._bridgeReadyPromise,
+                        new Promise((_, timeoutReject) => setTimeout(
+                            () => timeoutReject(new Error('Bridge ready timeout')),
+                            BRIDGE_TIMEOUT_MS,
+                        )),
+                    ]);
+                } catch (err) {
+                    return reject(err);
+                }
             }
 
             const requestId = `ih_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
@@ -373,8 +400,10 @@ class IsHumanVerifier {
             this._bridgeIframe.contentWindow.postMessage({
                 type: 'GET_CREDENTIAL',
                 requestId,
-                siteId: this.siteId,
-                credentialType: 'isHuman',
+                payload: {
+                    siteId: this.siteId,
+                    credentialType: 'isHuman',
+                },
             }, this.lemmaOrigin);
         });
     }
