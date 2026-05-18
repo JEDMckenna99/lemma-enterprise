@@ -30,10 +30,11 @@ def test_ishuman_demo_page_loads_expected_assets(ishuman_demo_client):
     body = resp.get_data(as_text=True)
 
     assert resp.status_code == 200
-    assert "Verify once. Prove locally across sites." in body
+    assert "Reusable human verification for high-abuse web actions." in body
+    assert "What Lemma does" in body
+    assert "Exact customer-site integration" in body
     assert "/sdk/ishuman-verifier.js" in body
     assert "/static/js/demo/ishuman-demo.js" in body
-    assert "Commercial deployment requires an approved IDV-provider path" in body
 
 
 def test_ishuman_demo_config_seeds_sites_without_exposing_api_keys(
