@@ -38,8 +38,22 @@
 .ih-step strong{display:block;margin-bottom:4px}
 .ih-link-card{display:flex;justify-content:space-between;align-items:center;gap:12px;border:1px solid #e2e8f0;border-radius:12px;padding:12px;background:#fff;margin-top:10px}
 .ih-link-card a{font-weight:800;color:#4f46e5;text-decoration:none}
+.ih-stakeholders{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-top:14px}
+.ih-stakeholder{background:#fff;border:1px solid #dbeafe;border-radius:14px;padding:16px;color:#0f172a}
+.ih-stakeholder h3{margin:0 0 8px;font-size:16px;color:#0f172a}
+.ih-stakeholder ul{margin:0;padding-left:18px;color:#334155;font-size:13px}
+.ih-stakeholder li{margin:5px 0}
+.ih-compare{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px}
+.ih-compare-box{border-radius:14px;padding:16px;border:1px solid #e2e8f0;background:#fff}
+.ih-compare-box.bad{border-color:#fecaca;background:#fef2f2;color:#7f1d1d}
+.ih-compare-box.good{border-color:#86efac;background:#f0fdf4;color:#14532d}
+.ih-compare-box h3{margin:0 0 8px;font-size:16px}
+.ih-compare-box ul{margin:0;padding-left:18px;font-size:13px}
+.ih-summary{margin-top:14px;background:#0f172a;color:#e2e8f0;border-radius:16px;padding:20px;border:1px solid #334155}
+.ih-summary h2{margin:0 0 8px;color:#fff}
+.ih-summary p{margin:0;color:#cbd5e1}
 @media(max-width:900px){.ih-grid,.ih-site-grid{grid-template-columns:1fr}.ih-kv{grid-template-columns:1fr}}
-@media(max-width:900px){.ih-journey{grid-template-columns:1fr}}
+@media(max-width:900px){.ih-journey,.ih-stakeholders,.ih-compare{grid-template-columns:1fr}}
 </style>
 {% endblock %}
 
@@ -48,7 +62,7 @@
   <section class="ih-hero">
     <p style="font-size:13px;font-weight:800;text-transform:uppercase;letter-spacing:1.6px;color:#93c5fd;margin-bottom:8px">isHuman Proof Network Demo</p>
     <h1>Verify once. Prove locally across sites.</h1>
-    <p>This guided demo uses the actual Lemma isHuman infrastructure: Stripe Identity session creation, signed master credentials, wallet storage, site-private PPID derivation, local Ed25519 verification, site block controls, and network revocation review.</p>
+    <p>Follow one user across two businesses. The user verifies once, carries a private human proof in their browser wallet, and each business checks that proof locally without storing ID documents.</p>
     <div class="ih-notice">
       This demo uses Stripe Identity as the prototype IDV rail. Lemma provides the reusable credential, wallet, site-private PPID derivation, local verification, and revocation layer. Commercial deployment requires an approved IDV-provider path.
     </div>
@@ -64,6 +78,58 @@
       <div class="ih-step"><strong>Ticketing Site</strong> Checks proof locally before allowing a protected ticket action.</div>
       <div class="ih-step"><strong>SaaS Trial</strong> Checks the same human but receives a different PPID.</div>
       <div class="ih-step"><strong>Operator</strong> Blocks one site PPID or escalates severe abuse for review.</div>
+    </div>
+  </section>
+
+  <section class="ih-card" style="margin-top:14px">
+    <h2>Why each party should care</h2>
+    <div class="ih-stakeholders">
+      <div class="ih-stakeholder">
+        <h3>User</h3>
+        <ul>
+          <li>Verify once instead of repeating CAPTCHA or ID checks.</li>
+          <li>Keep the credential in a browser wallet they control.</li>
+          <li>Show different private site IDs to different businesses.</li>
+        </ul>
+      </div>
+      <div class="ih-stakeholder">
+        <h3>Business</h3>
+        <ul>
+          <li>Receive a simple human verdict before high-abuse actions.</li>
+          <li>Avoid storing passports, selfies, or raw IDV data.</li>
+          <li>Block a bad site-private ID instantly if trust is broken.</li>
+        </ul>
+      </div>
+      <div class="ih-stakeholder">
+        <h3>IDV Provider</h3>
+        <ul>
+          <li>One verification becomes useful across many web flows.</li>
+          <li>Reach customers that cannot justify full IDV per signup.</li>
+          <li>Enable reuse without observing every site presentation.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section class="ih-card" style="margin-top:14px">
+    <h2>Business before and after</h2>
+    <div class="ih-compare">
+      <div class="ih-compare-box bad">
+        <h3>Without Lemma</h3>
+        <ul>
+          <li>CAPTCHA slows real users while attackers route around it.</li>
+          <li>Full IDV is too expensive and invasive for most flows.</li>
+          <li>Businesses either tolerate abuse or store risky PII.</li>
+        </ul>
+      </div>
+      <div class="ih-compare-box good">
+        <h3>With Lemma</h3>
+        <ul>
+          <li>Sites get `human`, `privateSiteId`, and `reason`.</li>
+          <li>Proof checks run locally after setup.</li>
+          <li>Operators can block locally or escalate severe abuse.</li>
+        </ul>
+      </div>
     </div>
   </section>
 
@@ -139,6 +205,11 @@
         </div>
       </div>
     </div>
+  </section>
+
+  <section class="ih-summary">
+    <h2>Investor takeaway</h2>
+    <p>Lemma turns one trusted IDV check into a reusable, private, locally verifiable human proof that many businesses can use without becoming identity stores.</p>
   </section>
 
   <section class="ih-card" style="margin-top:14px">

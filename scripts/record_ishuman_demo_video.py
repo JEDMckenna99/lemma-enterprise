@@ -289,18 +289,18 @@ def render_video(results: dict, output_dir: Path) -> tuple[Path, Path]:
     frames = [
         draw_browser_scene(
             "https://lemma.id/demo/ishuman",
-            "User gets one reusable human proof",
-            "User Experience",
+            "One user, one proof, many sites",
+            "User Benefit",
             [
-                "The user verifies once with the prototype Stripe Identity rail.",
+                "Alex verifies once with the prototype Stripe Identity rail.",
                 f"Master proof stored in browser wallet: {short(results['master_credential_id'], 15)}",
-                "No relying business receives raw IDV data.",
+                "Alex can reuse the proof without repeated CAPTCHA or full IDV.",
             ],
-            "Lemma Network",
+            "IDV Provider Role",
             [
                 f"PASS verification status: {results['status']}",
                 f"PASS Stripe session: {short(results['stripe_session_id'], 12)}",
-                "Signed isHuman credential issued by Lemma.",
+                "The original IDV check becomes a reusable trust signal.",
             ],
             "MASTER PROOF READY",
         ),
@@ -311,13 +311,13 @@ def render_video(results: dict, output_dir: Path) -> tuple[Path, Path]:
             [
                 "A fan clicks Reserve tickets on a separate Heroku app.",
                 "The page loads the hosted Lemma verifier SDK.",
-                "The business asks for a human verdict before checkout.",
+                "The business asks for a human verdict before the high-abuse action.",
             ],
-            "Local Decision",
+            "Business Receives",
             [
                 "ALLOW human=true",
                 f"PPID {short(tickets['ppid'], 22)}",
-                f"Site binding {tickets['siteId']}",
+                "No passport, selfie, or global user ID.",
             ],
             "TICKETING ALLOW",
         ),
@@ -328,13 +328,13 @@ def render_video(results: dict, output_dir: Path) -> tuple[Path, Path]:
             [
                 "The same user starts a free trial on a second business site.",
                 "The user does not repeat full IDV.",
-                "The site gets its own private identifier.",
+                "The SaaS business still gets a high-confidence human signal.",
             ],
-            "Local Decision",
+            "Privacy Boundary",
             [
                 "ALLOW human=true",
                 f"PPID {short(trials['ppid'], 22)}",
-                "PPIDs differ across the two businesses.",
+                "Ticketing and SaaS receive different private site IDs.",
             ],
             "TRIAL ALLOW",
         ),
@@ -345,9 +345,9 @@ def render_video(results: dict, output_dir: Path) -> tuple[Path, Path]:
             [
                 "The ticketing site sees bot-like behavior from its local PPID.",
                 f"Blocked site PPID: {short(tickets['ppid'], 22)}",
-                "The SaaS trial PPID remains separate.",
+                "The block is scoped to that business first.",
             ],
-            "Operator Console",
+            "Business Control",
             [
                 f"PASS site block: {results['site_block']['success']}",
                 f"PASS scoped site: {results['site_block']['site_id']}",
@@ -362,9 +362,9 @@ def render_video(results: dict, output_dir: Path) -> tuple[Path, Path]:
             [
                 "Site block is immediate and reversible.",
                 "Severe abuse can be escalated with evidence.",
-                "Network revocation is a reviewed action, not a silent site coercion.",
+                "IDV-backed proof can support ongoing trust, not one-off KYC.",
             ],
-            "Revocation Result",
+            "Network Trust Result",
             [
                 f"PASS review status: {results['network_review']['status']}",
                 f"PASS approved: {results['network_approve']['success']}",
@@ -372,6 +372,24 @@ def render_video(results: dict, output_dir: Path) -> tuple[Path, Path]:
             ],
             "NETWORK REVOKED",
             RED,
+        ),
+        draw_browser_scene(
+            "https://lemma.id",
+            "Why Lemma matters to each party",
+            "Stakeholder Value",
+            [
+                "User: one reusable proof, fewer CAPTCHA/IDV repeats.",
+                "Business: human signal without storing identity documents.",
+                "IDV provider: reusable demand layer for lower-margin web flows.",
+            ],
+            "Investor Takeaway",
+            [
+                "PASS one IDV check creates value across multiple sites",
+                "PASS privacy boundary shown by different PPIDs",
+                "PASS abuse controls shown by block and revocation",
+            ],
+            "NETWORK THESIS PROVEN",
+            PURPLE,
         ),
     ]
 

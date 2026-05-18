@@ -21,6 +21,8 @@ def _content():
             "protected": "Trial creation protected by isHuman",
             "success": "Trial workspace created for verified human",
             "risk": "Stops free-trial farms, promo abuse, and fake account swarms.",
+            "business_value": "The SaaS company gets a stronger human signal without asking every trial user to upload ID documents.",
+            "user_value": "The user reuses the same wallet proof and avoids another CAPTCHA or full IDV flow.",
             "form": "Work email",
             "placeholder": "founder@example.com",
         }
@@ -32,6 +34,8 @@ def _content():
         "protected": "Checkout queue protected by isHuman",
         "success": "Reservation held for verified human",
         "risk": "Stops account farms and scripted reservation attempts before checkout.",
+        "business_value": "The ticketing business can reduce scalper automation without forcing every fan through another puzzle.",
+        "user_value": "The fan proves humanness from their wallet instead of solving a brittle CAPTCHA at drop time.",
         "form": "Fan email",
         "placeholder": "fan@example.com",
     }
@@ -73,9 +77,11 @@ def index():
     .deny {{ border-color: #fca5a5; background: #fee2e2; color: #991b1b; }}
     .decision {{ margin-top:18px;border:1px solid #dbeafe;background:#eff6ff;border-radius:12px;padding:14px }}
     .grid {{ display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:16px }}
+    .value-grid {{ display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-top:16px }}
     .mini {{ background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:16px }}
+    .mini h3 {{ margin:0 0 6px;font-size:16px }}
     pre {{ background: #0f172a; color: #dbeafe; padding: 12px; border-radius: 10px; overflow: auto; }}
-    @media(max-width:850px){{ .hero,.grid{{grid-template-columns:1fr}} }}
+    @media(max-width:850px){{ .hero,.grid,.value-grid{{grid-template-columns:1fr}} }}
   </style>
 </head>
 <body>
@@ -114,6 +120,20 @@ def index():
       <div class="mini">
         <h2>What the site receives</h2>
         <p class="muted">A boolean verdict, a site-private PPID, and a reason code.</p>
+      </div>
+    </section>
+    <section class="value-grid">
+      <div class="mini">
+        <h3>User benefit</h3>
+        <p class="muted">{copy["user_value"]}</p>
+      </div>
+      <div class="mini">
+        <h3>Business benefit</h3>
+        <p class="muted">{copy["business_value"]}</p>
+      </div>
+      <div class="mini">
+        <h3>IDV provider role</h3>
+        <p class="muted">The IDV provider powers the original trusted check; Lemma makes the resulting proof reusable across sites.</p>
       </div>
     </section>
     <section class="mini">
