@@ -30,6 +30,14 @@ def prod_test_site_id() -> str:
     return (os.getenv("LEMMA_ISHUMAN_PROD_TEST_SITE_ID") or DEFAULT_SITE_ID).strip()
 
 
+def prod_test_site_ppid() -> str:
+    return (os.getenv("LEMMA_ISHUMAN_PROD_TEST_SITE_PPID") or "").strip()
+
+
+def prod_test_master_credential_id() -> str:
+    return (os.getenv("LEMMA_ISHUMAN_PROD_TEST_MASTER_CREDENTIAL_ID") or "").strip()
+
+
 def generate_wallet_secret() -> str:
     return secrets.token_hex(32)
 

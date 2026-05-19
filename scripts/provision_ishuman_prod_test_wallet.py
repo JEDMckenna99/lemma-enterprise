@@ -136,6 +136,8 @@ def main() -> int:
     print(f"  heroku config:set LEMMA_ISHUMAN_PROD_TEST_WALLET_ID={wallet_id} -a lemma-enterprise")
     print(f"  heroku config:set LEMMA_ISHUMAN_PROD_TEST_WALLET_SECRET=<secret> -a lemma-enterprise")
     print(f"  heroku config:set LEMMA_ISHUMAN_PROD_TEST_TARGET_SITE={target_site} -a lemma-enterprise")
+    print(f"  heroku config:set LEMMA_ISHUMAN_PROD_TEST_MASTER_CREDENTIAL_ID={master_id} -a lemma-enterprise")
+    print(f"  heroku config:set LEMMA_ISHUMAN_PROD_TEST_SITE_PPID={site_ppid} -a lemma-enterprise")
     if args.print_secret:
         print(f"\nGenerated/used wallet_secret={wallet_secret}")
     else:

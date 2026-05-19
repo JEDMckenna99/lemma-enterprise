@@ -29,7 +29,16 @@ export LEMMA_ISHUMAN_DEMO_TEST_TOKEN=<from heroku config>
 python scripts/provision_ishuman_prod_test_wallet.py --base-url https://lemma.id --print-secret
 ```
 
-Save `master_credential_id` from the manifest (optional env `LEMMA_ISHUMAN_PROD_TEST_MASTER_CREDENTIAL_ID`).
+Save manifest values to Heroku (recommended):
+
+```bash
+heroku config:set \
+  LEMMA_ISHUMAN_PROD_TEST_MASTER_CREDENTIAL_ID=<from manifest> \
+  LEMMA_ISHUMAN_PROD_TEST_SITE_PPID=<from manifest> \
+  -a lemma-enterprise
+```
+
+`SITE_PPID` must come from prod provisioning — do not derive locally unless `LEMMA_PPID_ROOT_KEY` matches production.
 
 ## Run revocation smoke
 

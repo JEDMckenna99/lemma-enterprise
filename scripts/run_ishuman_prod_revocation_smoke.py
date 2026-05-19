@@ -24,9 +24,11 @@ import requests
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from api.ppid import derive_ppid_from_wallet_secret, canonicalize_rp_id  # noqa: E402
+from api.ppid import canonicalize_rp_id, derive_ppid_from_wallet_secret  # noqa: E402
 from scripts.ishuman_prod_test_wallet import (  # noqa: E402
+    prod_test_master_credential_id,
     prod_test_site_id,
+    prod_test_site_ppid,
     prod_test_target_site,
     prod_test_wallet_id,
     require_prod_test_secret,
@@ -72,7 +74,12 @@ def main() -> int:
     wallet_secret = require_prod_test_secret()
     site_id = prod_test_site_id()
     target_site = canonicalize_rp_id(prod_test_target_site())
-    site_ppid = derive_ppid_from_wallet_secret(wallet_secret, target_site)
+    site_ppid = prod_test_site_ppid() or derive_ppid_from_wallet_secret(wallet_secret, target_site)
+    if not prod_test_site_ppid():
+        print(
+            "WARNING: LEMMA_ISHUMAN_PROD_TEST_SITE_PPID not set; "
+            "local PPID derivation may not match prod unless LEMMA_PPID_ROOT_KEY matches.",
+        )
 
     api_key = _load_site_api_key(site_id)
     headers = {"X-API-Key": api_key, "Content-Type": "application/json"}
@@ -124,7 +131,7 @@ def main() -> int:
     results.append(_step("site-unblock synthetic", r.ok and r.json().get("success"), str(r.json())))
 
     # Block fixture site PPID and deny derive
-    master_id = args.master_credential_id
+    master_id = args.master_credential_id or prod_test_master_credential_id()
     if not master_id:
         # Resolve latest verified master for fixture wallet
         proc = subprocess.run(
