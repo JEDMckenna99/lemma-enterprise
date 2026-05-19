@@ -382,7 +382,19 @@ def ishuman_demo_test_complete_verification():
         if not wallet_id:
             return jsonify({"success": False, "error": "wallet_id_missing"}), 400
 
-        ppid = record.ppid or _derive_ppid_for_site(rp_id="lemma.id", wallet_id=wallet_id)
+        wallet_secret = (body.get("wallet_secret") or "").strip() or os.getenv(
+            "LEMMA_ISHUMAN_PROD_TEST_WALLET_SECRET", ""
+        )
+        if record.ppid:
+            ppid = record.ppid
+        elif wallet_secret:
+            ppid = _derive_ppid_for_site(
+                rp_id="lemma.id",
+                wallet_secret=wallet_secret,
+                wallet_id=wallet_id,
+            )
+        else:
+            ppid = _derive_ppid_for_site(rp_id="lemma.id", wallet_id=wallet_id)
         credential = _issue_ishuman_credential(ppid, wallet_id)
 
         record.status = "verified"

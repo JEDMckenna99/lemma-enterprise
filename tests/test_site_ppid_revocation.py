@@ -217,6 +217,40 @@ def test_derive_site_proof_denies_site_ppid_bloom_revocation(
 
 
 @pytest.mark.unit
+def test_check_ppid_reports_site_ppid_revoked_from_revocation_list(
+    ishuman_client,
+    fake_ishuman_db_session_factory,
+    monkeypatch,
+):
+    from api.database import RevocationList
+
+    db = fake_ishuman_db_session_factory
+    ppid = "did:lemma:ppid_revoke_check_001"
+    db.store.data[RevocationList.__name__].append(
+        RevocationList(
+            lemma_id=ppid,
+            credential_id=ppid,
+            ppid=ppid,
+            site_id="site_test_001",
+            lemma_type="ishuman",
+            revocation_type="user",
+            revoked_by="test",
+            reason="test",
+        )
+    )
+    monkeypatch.setattr("api.database.SessionLocal", db.session_local)
+    monkeypatch.setattr("api.revocation_verifier.is_credential_revoked", lambda _cid: False)
+
+    resp = ishuman_client.get(
+        f"/api/ishuman/check?ppid={ppid}&site_id=site_test_001",
+    )
+    payload = resp.get_json()
+    assert resp.status_code == 200
+    assert payload["blocked"] is True
+    assert payload["reason"] == "site_ppid_revoked"
+
+
+@pytest.mark.unit
 def test_sync_revocations_to_bloom_includes_ppid_and_wallet_keys(
     fake_ishuman_db_session_factory,
     monkeypatch,

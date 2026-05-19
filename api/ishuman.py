@@ -610,7 +610,25 @@ def check_ppid():
         finally:
             db.close()
 
-    # Check network-wide revocation (Bloom filter)
+    # Canonical site-user revocation rows (DB source of truth; complements Bloom)
+    if not result["blocked"]:
+        from api.database import SessionLocal, RevocationList
+        db = SessionLocal()
+        try:
+            revoke_query = db.query(RevocationList).filter_by(
+                ppid=ppid,
+                revocation_type="user",
+            )
+            if site_id:
+                revoke_query = revoke_query.filter_by(site_id=site_id)
+            user_revoke = revoke_query.first()
+            if user_revoke:
+                result["blocked"] = True
+                result["reason"] = "site_ppid_revoked"
+        finally:
+            db.close()
+
+    # Network-wide / Bloom revocation (credential, PPID, wallet_id)
     if not result["blocked"]:
         try:
             from api.revocation_verifier import is_credential_revoked
