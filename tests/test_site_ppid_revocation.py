@@ -217,6 +217,42 @@ def test_derive_site_proof_denies_site_ppid_bloom_revocation(
 
 
 @pytest.mark.unit
+def test_revoke_site_bound_ppid_reactivates_inactive_site_block(
+    fake_ishuman_db_session_factory,
+    monkeypatch,
+):
+    from api.database import SiteBlock
+    from api.site_ppid_revocation import revoke_site_bound_ppid
+
+    db = fake_ishuman_db_session_factory
+    session = db.session_local()
+    inactive = SiteBlock(
+        site_id="site_test_001",
+        ppid="did:lemma:ppid_reactivate_001",
+        reason="old",
+        blocked_by="test",
+        is_active=False,
+    )
+    db.store.data[SiteBlock.__name__].append(inactive)
+    monkeypatch.setattr(
+        "api.revocation_sync.trigger_revocation_sync",
+        lambda credential_id, credential_type="unknown", site_id=None: True,
+    )
+
+    result = revoke_site_bound_ppid(
+        session,
+        site_id="site_test_001",
+        ppid="did:lemma:ppid_reactivate_001",
+        reason="reactivated",
+        revoked_by="test",
+    )
+
+    assert result["block_created"] is True
+    assert len(db.store.data[SiteBlock.__name__]) == 1
+    assert db.store.data[SiteBlock.__name__][0].is_active is True
+
+
+@pytest.mark.unit
 def test_check_ppid_reports_site_ppid_revoked_from_revocation_list(
     ishuman_client,
     fake_ishuman_db_session_factory,

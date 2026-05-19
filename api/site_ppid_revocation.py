@@ -105,7 +105,7 @@ def revoke_site_bound_ppid(
 
     block = (
         db.query(SiteBlock)
-        .filter_by(site_id=site_id, ppid=ppid, is_active=True)
+        .filter_by(site_id=site_id, ppid=ppid)
         .first()
     )
     block_created = False
@@ -120,6 +120,9 @@ def revoke_site_bound_ppid(
             network_revocation_status=network_revocation_status,
         )
         db.add(block)
+        block_created = True
+    elif not block.is_active:
+        block.is_active = True
         block_created = True
     else:
         if reason:
