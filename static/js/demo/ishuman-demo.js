@@ -680,12 +680,20 @@
     }
 
     try {
-      if (state.masterCredentialId || state.sessionId) await initWallet();
-      if (state.sessionId && new URLSearchParams(window.location.search).has('verification_return')) {
+      const isVerificationReturn =
+        state.sessionId && new URLSearchParams(window.location.search).has('verification_return');
+      if (isVerificationReturn) {
+        await initWallet();
         await pollAndStoreMaster();
-      } else if (state.walletId || state.masterCredentialId) {
+      } else if (state.masterCredentialId || state.sessionId) {
         await refreshStatus();
-        if (state.masterCredentialId) setDemoReady(true);
+        setDemoReady(true);
+        setPill('ih-wallet-pill', 'CACHED', 'ok');
+        const status = $('ih-wizard-status');
+        if (status) {
+          status.textContent =
+            'Master proof cached locally. Click Run 3-minute demo or Create or unlock wallet to use it.';
+        }
       }
     } catch (err) {
       log('Startup check skipped', err.message);
