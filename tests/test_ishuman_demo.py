@@ -36,8 +36,8 @@ def test_ishuman_demo_page_loads_expected_assets(ishuman_demo_client):
     assert "What sites never see" in body
     assert "Operator console" in body
     assert "ih-network-pill" in body
-    assert "/reserve" in body
-    assert "/start-trial" in body
+    assert "lemma-demo-tickets" in body
+    assert "lemma-demo-trials" in body
     assert "What Lemma does" in body
     assert "From IP bans to human accountability" in body
     assert "/sdk/ishuman-verifier.js" in body

@@ -154,8 +154,8 @@ def ishuman_demo_config():
         "server_test_token_configured": bool(os.getenv("LEMMA_ISHUMAN_DEMO_TEST_TOKEN")),
         "server_admin_token_configured": bool(os.getenv("LEMMA_ISHUMAN_DEMO_ADMIN_TOKEN")),
         "customer_site_urls": {
-            "tickets": "https://lemma-demo-tickets-1d3d7411af33.herokuapp.com/reserve",
-            "trials": "https://lemma-demo-trials-7090f46cae0d.herokuapp.com/start-trial",
+            "tickets": "https://lemma-demo-tickets-1d3d7411af33.herokuapp.com",
+            "trials": "https://lemma-demo-trials-7090f46cae0d.herokuapp.com",
         },
         "copy": {
             "stripe_notice": (
