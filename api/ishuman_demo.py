@@ -123,14 +123,23 @@ def _public_record(record) -> dict:
     }
 
 
+def _demo_page_context() -> dict:
+    """Server-only demo tokens for /demo/ishuman (never exposed on other routes)."""
+    return {
+        "demo_sites": list(DEMO_SITES.values()),
+        "network_revoke_configured": bool(os.getenv("LEMMA_ISHUMAN_DEMO_ADMIN_TOKEN")),
+        "demo_test_verify_enabled": os.getenv("LEMMA_ISHUMAN_DEMO_ALLOW_TEST_VERIFY", "").lower() == "true",
+        "demo_test_token_configured": bool(os.getenv("LEMMA_ISHUMAN_DEMO_TEST_TOKEN")),
+        "demo_admin_token_configured": bool(os.getenv("LEMMA_ISHUMAN_DEMO_ADMIN_TOKEN")),
+        "demo_test_token": os.getenv("LEMMA_ISHUMAN_DEMO_TEST_TOKEN", ""),
+        "demo_admin_token": os.getenv("LEMMA_ISHUMAN_DEMO_ADMIN_TOKEN", ""),
+    }
+
+
 @ishuman_demo_bp.route("/demo/ishuman")
 def ishuman_demo_page():
     """Guided public demo for reusable proof-of-humanity."""
-    return render_template(
-        "demo/ishuman.html",
-        demo_sites=list(DEMO_SITES.values()),
-        network_revoke_configured=bool(os.getenv("LEMMA_ISHUMAN_DEMO_ADMIN_TOKEN")),
-    )
+    return render_template("demo/ishuman.html", **_demo_page_context())
 
 
 @ishuman_demo_bp.route("/api/demo/ishuman/config", methods=["GET"])
@@ -141,6 +150,13 @@ def ishuman_demo_config():
         "sites": sites,
         "stripe_demo_rail": True,
         "network_revoke_configured": bool(os.getenv("LEMMA_ISHUMAN_DEMO_ADMIN_TOKEN")),
+        "test_verify_enabled": os.getenv("LEMMA_ISHUMAN_DEMO_ALLOW_TEST_VERIFY", "").lower() == "true",
+        "server_test_token_configured": bool(os.getenv("LEMMA_ISHUMAN_DEMO_TEST_TOKEN")),
+        "server_admin_token_configured": bool(os.getenv("LEMMA_ISHUMAN_DEMO_ADMIN_TOKEN")),
+        "customer_site_urls": {
+            "tickets": "https://lemma-demo-tickets-1d3d7411af33.herokuapp.com/reserve",
+            "trials": "https://lemma-demo-trials-7090f46cae0d.herokuapp.com/start-trial",
+        },
         "copy": {
             "stripe_notice": (
                 "This demo uses Stripe Identity as the prototype IDV rail. "
@@ -333,6 +349,161 @@ def ishuman_demo_network_revoke_request():
         db.close()
 
 
+def _require_demo_test_verify(*, require_token_header: bool = True) -> tuple[dict | None, tuple | None]:
+    """Return (None, error_response) when test-verify guards pass."""
+    if os.getenv("LEMMA_ISHUMAN_DEMO_ALLOW_TEST_VERIFY", "").lower() != "true":
+        return None, (jsonify({"success": False, "error": "test_verify_disabled"}), 403)
+    stripe_key = os.getenv("STRIPE_SECRET_KEY", "")
+    if not stripe_key.startswith("sk_test_"):
+        return None, (jsonify({"success": False, "error": "stripe_test_key_required"}), 403)
+    if require_token_header:
+        expected = os.getenv("LEMMA_ISHUMAN_DEMO_TEST_TOKEN")
+        provided = request.headers.get("X-Demo-Test-Token") or ""
+        if not expected or provided != expected:
+            return None, (jsonify({"success": False, "error": "demo_test_token_required"}), 403)
+    return {}, None
+
+
+def _complete_demo_test_session(
+    *,
+    session_id: str = "",
+    stripe_session_id: str = "",
+    wallet_secret: str = "",
+) -> tuple[dict, int]:
+    """Shared test-complete logic for demo endpoints."""
+    from api.database import IsHumanVerification, SessionLocal
+    from api.ishuman import _derive_ppid_for_site, _issue_ishuman_credential
+
+    if not session_id and not stripe_session_id:
+        return {"success": False, "error": "session_id or stripe_session_id required"}, 400
+
+    db = SessionLocal()
+    try:
+        query = db.query(IsHumanVerification)
+        record = (
+            query.filter_by(session_id=session_id).first()
+            if session_id
+            else query.filter_by(stripe_session_id=stripe_session_id).first()
+        )
+        if not record:
+            return {"success": False, "error": "session_not_found"}, 404
+
+        wallet_id = record.wallet_id
+        if not wallet_id:
+            return {"success": False, "error": "wallet_id_missing"}, 400
+
+        secret = (wallet_secret or "").strip() or os.getenv("LEMMA_ISHUMAN_PROD_TEST_WALLET_SECRET", "")
+        if record.ppid:
+            ppid = record.ppid
+        elif secret:
+            ppid = _derive_ppid_for_site(
+                rp_id="lemma.id",
+                wallet_secret=secret,
+                wallet_id=wallet_id,
+            )
+        else:
+            ppid = _derive_ppid_for_site(rp_id="lemma.id", wallet_id=wallet_id)
+        credential = _issue_ishuman_credential(ppid, wallet_id)
+
+        record.status = "verified"
+        record.verified_at = datetime.utcnow()
+        record.ppid = ppid
+        record.credential_id = credential.get("id")
+        record.issued_at = datetime.utcnow()
+        record.expires_at = datetime.utcfromtimestamp(
+            int((credential.get("claims") or {}).get("expiresAt", int(time.time())))
+        )
+        record.metadata_json = {
+            **(record.metadata_json or {}),
+            "credential_issuer_did": credential.get("issuerInfo", {}).get("did"),
+            "demo_test_completed": True,
+        }
+        db.commit()
+
+        return {
+            "success": True,
+            "session_id": record.session_id,
+            "stripe_session_id": record.stripe_session_id,
+            "credential_id": record.credential_id,
+            "ppid": record.ppid,
+            "credential": credential,
+            "mode": "stripe_test_demo_completion",
+        }, 200
+    except Exception:
+        db.rollback()
+        raise
+    finally:
+        db.close()
+
+
+def _start_demo_verification_session(
+    *,
+    wallet_id: str,
+    wallet_secret: str = "",
+    return_url: str = "",
+) -> tuple[dict, int]:
+    """Create a pending isHuman verification session for demo test mode."""
+    import secrets as _secrets
+
+    from billing.stripe_manager import StripeManager
+    from api.database import IsHumanVerification, SessionLocal
+    from api.ishuman import _derive_ppid_for_site
+
+    if not wallet_id:
+        return {"success": False, "error": "wallet_id required"}, 400
+
+    return_url = return_url or os.getenv(
+        "ISHUMAN_RETURN_URL",
+        "https://lemma.id/demo/ishuman",
+    )
+
+    mgr = StripeManager()
+    result = mgr.create_identity_verification_session(
+        user_id=wallet_id,
+        return_url=return_url,
+    )
+    if not result.get("success"):
+        return {"success": False, "error": result.get("error", "stripe_error")}, 502
+
+    session_id = f"ishuman_sess_{_secrets.token_urlsafe(16)}"
+    db = SessionLocal()
+    try:
+        derived_ppid = None
+        if wallet_secret:
+            try:
+                derived_ppid = _derive_ppid_for_site(
+                    rp_id="lemma.id",
+                    wallet_secret=wallet_secret,
+                    wallet_id=wallet_id,
+                )
+            except Exception:
+                pass
+
+        verification = IsHumanVerification(
+            session_id=session_id,
+            stripe_session_id=result["session_id"],
+            wallet_id=wallet_id,
+            ppid=derived_ppid,
+            status="pending",
+            metadata_json={"return_url": return_url, "demo_verify_once": True},
+        )
+        db.add(verification)
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+    finally:
+        db.close()
+
+    return {
+        "success": True,
+        "session_id": session_id,
+        "stripe_session_id": result["session_id"],
+        "client_secret": result.get("client_secret"),
+        "url": result.get("url"),
+    }, 200
+
+
 @ishuman_demo_bp.route("/api/demo/ishuman/test-complete-verification", methods=["POST"])
 def ishuman_demo_test_complete_verification():
     """Complete a Stripe test-mode isHuman session for automated demos.
@@ -346,78 +517,190 @@ def ishuman_demo_test_complete_verification():
     verified webhook state transition so test-mode demos can run end-to-end
     without manual document upload.
     """
-    if os.getenv("LEMMA_ISHUMAN_DEMO_ALLOW_TEST_VERIFY", "").lower() != "true":
-        return jsonify({"success": False, "error": "test_verify_disabled"}), 403
-
-    stripe_key = os.getenv("STRIPE_SECRET_KEY", "")
-    if not stripe_key.startswith("sk_test_"):
-        return jsonify({"success": False, "error": "stripe_test_key_required"}), 403
-
-    expected = os.getenv("LEMMA_ISHUMAN_DEMO_TEST_TOKEN")
-    provided = request.headers.get("X-Demo-Test-Token") or ""
-    if not expected or provided != expected:
-        return jsonify({"success": False, "error": "demo_test_token_required"}), 403
+    _guards, err = _require_demo_test_verify()
+    if err:
+        return err
 
     body = request.get_json(silent=True) or {}
     session_id = (body.get("session_id") or "").strip()
     stripe_session_id = (body.get("stripe_session_id") or "").strip()
-    if not session_id and not stripe_session_id:
-        return jsonify({"success": False, "error": "session_id or stripe_session_id required"}), 400
+    wallet_secret = (body.get("wallet_secret") or "").strip()
+    payload, status = _complete_demo_test_session(
+        session_id=session_id,
+        stripe_session_id=stripe_session_id,
+        wallet_secret=wallet_secret,
+    )
+    return jsonify(payload), status
 
+
+@ishuman_demo_bp.route("/api/demo/ishuman/verify-once-test-mode", methods=["POST"])
+def ishuman_demo_verify_once_test_mode():
+    """Chain start-verification + test-complete using server-side demo token only."""
+    _guards, err = _require_demo_test_verify(require_token_header=False)
+    if err:
+        return err
+
+    body = request.get_json(silent=True) or {}
+    wallet_id = (body.get("wallet_id") or "").strip() or os.getenv("LEMMA_ISHUMAN_PROD_TEST_WALLET_ID", "")
+    wallet_secret = (body.get("wallet_secret") or "").strip() or os.getenv(
+        "LEMMA_ISHUMAN_PROD_TEST_WALLET_SECRET", ""
+    )
+    return_url = (body.get("return_url") or "").strip()
+
+    if not wallet_id:
+        return jsonify({"success": False, "error": "wallet_id required"}), 400
+
+    start_payload, start_status = _start_demo_verification_session(
+        wallet_id=wallet_id,
+        wallet_secret=wallet_secret,
+        return_url=return_url,
+    )
+    if start_status != 200:
+        return jsonify(start_payload), start_status
+
+    complete_payload, complete_status = _complete_demo_test_session(
+        session_id=start_payload["session_id"],
+        wallet_secret=wallet_secret,
+    )
+    if complete_status != 200:
+        return jsonify(complete_payload), complete_status
+
+    return jsonify({
+        "success": True,
+        "session_id": complete_payload["session_id"],
+        "credential_id": complete_payload["credential_id"],
+        "credential": complete_payload["credential"],
+        "ppid": complete_payload["ppid"],
+        "stripe_session_id": complete_payload.get("stripe_session_id"),
+        "mode": "verify_once_test_mode",
+    })
+
+
+@ishuman_demo_bp.route("/api/demo/ishuman/probe-derive", methods=["POST"])
+def ishuman_demo_probe_derive():
+    """Server-side derive probe — proves enforcement is not UI-only."""
     from api.database import IsHumanVerification, SessionLocal
-    from api.ishuman import _derive_ppid_for_site, _issue_ishuman_credential
+    from api.ishuman import _deny_if_derivation_revoked
 
+    body = request.get_json(silent=True) or {}
+    slug = (body.get("site_slug") or "tickets").strip().lower()
+    spec, site = _site_for_slug(slug)
+    if not site:
+        return jsonify({"success": False, "error": "unknown demo site"}), 404
+
+    wallet_id = (body.get("wallet_id") or "").strip() or os.getenv("LEMMA_ISHUMAN_PROD_TEST_WALLET_ID", "")
+    wallet_secret = (body.get("wallet_secret") or "").strip() or os.getenv(
+        "LEMMA_ISHUMAN_PROD_TEST_WALLET_SECRET", ""
+    )
+    master_credential_id = (body.get("master_credential_id") or "").strip() or os.getenv(
+        "LEMMA_ISHUMAN_PROD_TEST_MASTER_CREDENTIAL_ID", ""
+    )
+
+    if not wallet_id or not master_credential_id:
+        return jsonify({
+            "success": False,
+            "error": "wallet_id and master_credential_id required (or set prod test env)",
+        }), 400
+
+    target_site = spec["site_domain"]
     db = SessionLocal()
     try:
-        query = db.query(IsHumanVerification)
-        record = (
-            query.filter_by(session_id=session_id).first()
-            if session_id
-            else query.filter_by(stripe_session_id=stripe_session_id).first()
+        master = (
+            db.query(IsHumanVerification)
+            .filter_by(credential_id=master_credential_id, wallet_id=wallet_id, status="verified")
+            .first()
         )
-        if not record:
-            return jsonify({"success": False, "error": "session_not_found"}), 404
+        if not master:
+            return jsonify({
+                "success": True,
+                "allowed": False,
+                "http_status": 404,
+                "error": "master_credential_not_found",
+            })
 
-        wallet_id = record.wallet_id
-        if not wallet_id:
-            return jsonify({"success": False, "error": "wallet_id_missing"}), 400
-
-        wallet_secret = (body.get("wallet_secret") or "").strip() or os.getenv(
-            "LEMMA_ISHUMAN_PROD_TEST_WALLET_SECRET", ""
+        deny_reason = _deny_if_derivation_revoked(
+            db,
+            master_credential_id=master_credential_id,
+            wallet_id=wallet_id,
+            wallet_secret=wallet_secret or None,
+            target_site=target_site,
         )
-        if record.ppid:
-            ppid = record.ppid
-        elif wallet_secret:
-            ppid = _derive_ppid_for_site(
-                rp_id="lemma.id",
-                wallet_secret=wallet_secret,
-                wallet_id=wallet_id,
-            )
-        else:
-            ppid = _derive_ppid_for_site(rp_id="lemma.id", wallet_id=wallet_id)
-        credential = _issue_ishuman_credential(ppid, wallet_id)
-
-        record.status = "verified"
-        record.verified_at = datetime.utcnow()
-        record.ppid = ppid
-        record.credential_id = credential.get("id")
-        record.issued_at = datetime.utcnow()
-        record.expires_at = datetime.utcfromtimestamp(int((credential.get("claims") or {}).get("expiresAt", int(time.time()))))
-        record.metadata_json = {
-            **(record.metadata_json or {}),
-            "credential_issuer_did": credential.get("issuerInfo", {}).get("did"),
-            "demo_test_completed": True,
-        }
-        db.commit()
+        if deny_reason:
+            return jsonify({
+                "success": True,
+                "allowed": False,
+                "http_status": 403,
+                "error": deny_reason,
+                "site_domain": target_site,
+            })
 
         return jsonify({
             "success": True,
-            "session_id": record.session_id,
-            "stripe_session_id": record.stripe_session_id,
-            "credential_id": record.credential_id,
-            "ppid": record.ppid,
-            "credential": credential,
-            "mode": "stripe_test_demo_completion",
+            "allowed": True,
+            "http_status": 200,
+            "error": None,
+            "site_domain": target_site,
+        })
+    finally:
+        db.close()
+
+
+@ishuman_demo_bp.route("/api/demo/ishuman/force-reverify", methods=["POST"])
+def ishuman_demo_force_reverify():
+    """Demo-only: block ticketing PPID and clear derived credential for fresh IDV."""
+    from api.database import DerivedCredential, SessionLocal
+    from api.site_ppid_revocation import revoke_site_bound_ppid
+
+    body = request.get_json(silent=True) or {}
+    ppid = (body.get("ppid") or "").strip()
+    master_credential_id = (body.get("master_credential_id") or "").strip()
+    wallet_id = (body.get("wallet_id") or "").strip()
+
+    if not ppid:
+        return jsonify({"success": False, "error": "ppid required"}), 400
+
+    _spec, site = _site_for_slug("tickets")
+    if not site:
+        return jsonify({"success": False, "error": "unknown demo site"}), 404
+
+    db = SessionLocal()
+    try:
+        result = revoke_site_bound_ppid(
+            db,
+            site_id=site.site_id,
+            ppid=ppid,
+            reason=(body.get("reason") or "Demo: force fresh IDV on ticketing").strip(),
+            revoked_by=site.admin_email or "demo",
+            site_domain=site.site_domain,
+            blocked_by=site.admin_email,
+        )
+
+        cleared_derived_ids = []
+        if master_credential_id:
+            derived_rows = (
+                db.query(DerivedCredential)
+                .filter_by(
+                    master_credential_id=master_credential_id,
+                    target_site=site.site_domain,
+                    is_active=True,
+                )
+                .all()
+            )
+            for row in derived_rows:
+                row.is_active = False
+                row.revoked_at = datetime.utcnow()
+                cleared_derived_ids.append(row.derived_credential_id)
+            db.commit()
+
+        return jsonify({
+            "success": True,
+            "site_id": site.site_id,
+            "site_domain": site.site_domain,
+            "ppid": ppid,
+            "revocation_synced": result.get("event_published", False),
+            "cleared_derived_credential_ids": cleared_derived_ids,
+            "reverify_required": True,
+            "wallet_id": wallet_id,
         })
     except Exception:
         db.rollback()

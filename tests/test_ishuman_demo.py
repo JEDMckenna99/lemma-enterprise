@@ -31,11 +31,18 @@ def test_ishuman_demo_page_loads_expected_assets(ishuman_demo_client):
 
     assert resp.status_code == 200
     assert "Bot defense should punish abusive humans, not whole networks." in body
+    assert "Run 3-minute demo" in body
+    assert "Abuse response" in body
+    assert "What sites never see" in body
+    assert "Operator console" in body
+    assert "ih-network-pill" in body
+    assert "/reserve" in body
+    assert "/start-trial" in body
     assert "What Lemma does" in body
     assert "From IP bans to human accountability" in body
-    assert "Exact customer-site integration" in body
     assert "/sdk/ishuman-verifier.js" in body
     assert "/static/js/demo/ishuman-demo.js" in body
+    assert "/static/css/demo/ishuman-demo.css" in body
 
 
 def test_ishuman_demo_config_seeds_sites_without_exposing_api_keys(
@@ -236,5 +243,41 @@ def test_ishuman_demo_js_uses_real_verifier_with_two_site_bindings():
     assert "tickets-demo.lemma.id" in js
     assert "trials-demo.lemma.id" in js
     assert "lemmaOrigin: window.location.origin" in js
+    assert "runGuidedDemo" in js
+    assert "/api/demo/ishuman/verify-once-test-mode" in js
+    assert "/api/demo/ishuman/probe-derive" in js
+    assert "/api/demo/ishuman/force-reverify" in js
     assert "/api/ishuman/start-verification" in js
     assert "/api/ishuman/verification-status/" in js
+
+
+def test_ishuman_demo_verify_once_requires_test_mode(ishuman_demo_client):
+    resp = ishuman_demo_client.post(
+        "/api/demo/ishuman/verify-once-test-mode",
+        json={"wallet_id": "wallet_demo_001"},
+    )
+    payload = resp.get_json()
+    assert resp.status_code == 403
+    assert payload["error"] == "test_verify_disabled"
+
+
+def test_ishuman_demo_probe_derive_requires_credentials(ishuman_demo_client):
+    ishuman_demo_client.get("/api/demo/ishuman/config")
+    resp = ishuman_demo_client.post(
+        "/api/demo/ishuman/probe-derive",
+        json={"site_slug": "tickets"},
+    )
+    payload = resp.get_json()
+    assert resp.status_code == 400
+    assert "wallet_id" in payload["error"]
+
+
+def test_ishuman_demo_force_reverify_requires_ppid(ishuman_demo_client):
+    ishuman_demo_client.get("/api/demo/ishuman/config")
+    resp = ishuman_demo_client.post(
+        "/api/demo/ishuman/force-reverify",
+        json={},
+    )
+    payload = resp.get_json()
+    assert resp.status_code == 400
+    assert payload["error"] == "ppid required"
