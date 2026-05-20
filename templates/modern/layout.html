@@ -40,6 +40,7 @@ h1{color:#1e293b;font-weight:600;line-height:1.25;margin-bottom:16px;font-size:4
     <script nonce="{{ csp_nonce }}">
         document.getElementById('main-css').onload = function() { this.media = 'all'; };
         document.getElementById('polish-css').onload = function() { this.media = 'all'; };
+        window.LEMMA_CROSS_SITE_LOCK_ENABLED = {{ 'true' if cross_site_lock_enabled else 'false' }};
     </script>
     <noscript>
         <link rel="stylesheet" href="{{ url_for('static', filename='css/lemma.css') }}?v=20250121">

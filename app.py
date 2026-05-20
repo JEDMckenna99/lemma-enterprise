@@ -61,6 +61,23 @@ def create_app():
         """Make CSP nonce available to all templates."""
         return {'csp_nonce': getattr(g, 'csp_nonce', '')}
 
+    @app.context_processor
+    def inject_wallet_feature_flags():
+        """Expose wallet feature flags to all templates.
+
+        ``LEMMA_CROSS_SITE_LOCK_ENABLED`` controls the network overhead of the
+        cross-site / cross-device lock-propagation layer (SSE heartbeat to
+        ``lemma.id``, global-session polling, bridge auto-checks). The 24h
+        IndexedDB session that gives "one passkey per day" on a single domain
+        is *not* affected by this flag — it always works locally.
+
+        Default ``true`` to preserve existing behavior; set to ``false`` on
+        environments where lemma.id is not yet acting as a third-party login
+        provider, to drop the cross-site sync overhead.
+        """
+        flag = os.getenv('LEMMA_CROSS_SITE_LOCK_ENABLED', 'true').strip().lower()
+        return {'cross_site_lock_enabled': flag in ('1', 'true', 'yes', 'on')}
+
     # ================================================================================
     # SECURITY HEADERS - Industry standard protection
     # ================================================================================

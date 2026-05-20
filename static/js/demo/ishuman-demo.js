@@ -184,28 +184,53 @@
     }
   }
 
-  async function initWallet() {
+  async function adoptCurrentWalletState(source) {
+    const walletIdRecord = await state.wallet._get('passkey', 'walletId');
+    const secretRecord = await state.wallet._get('secrets', 'master');
+    state.walletId = walletIdRecord?.value || state.wallet.session?.walletId || '';
+    state.walletSecret = secretRecord?.secret || state.wallet.session?.walletSecret || '';
+    const wid = $('ih-wallet-id');
+    if (wid) wid.textContent = short(state.walletId);
+    if (state.walletId) {
+      setPill('ih-wallet-pill', 'UNLOCKED', 'ok');
+      log('Wallet ready', `${source} · ${short(state.walletId)}`);
+    } else {
+      setPill('ih-wallet-pill', 'LOCKED', 'deny');
+    }
+  }
+
+  async function initWallet({ force = false } = {}) {
     if (!window.LemmaWallet) throw new Error('LemmaWallet SDK not loaded');
     state.wallet = state.wallet || new window.LemmaWallet();
     await state.wallet.init();
 
-    let auth;
-    try {
-      auth = await state.wallet.registerPasskey();
-    } catch (err) {
-      log('Wallet registration failed, trying unlock', err.message);
-      auth = await state.wallet.unlock();
+    if (!force && typeof state.wallet.isUnlocked === 'function' && state.wallet.isUnlocked()) {
+      await adoptCurrentWalletState('cached session');
+      return { success: true, cached: true, walletId: state.walletId };
     }
 
-    const walletIdRecord = await state.wallet._get('passkey', 'walletId');
-    const secretRecord = await state.wallet._get('secrets', 'master');
-    state.walletId = auth?.walletId || walletIdRecord?.value || state.wallet.session?.walletId || '';
-    state.walletSecret = auth?.walletSecret || secretRecord?.secret || state.wallet.session?.walletSecret || '';
+    const existingPasskey = await state.wallet._get('passkey', 'primary');
+    let auth;
+    if (existingPasskey && existingPasskey.credentialId) {
+      auth = await state.wallet.unlock();
+    } else {
+      try {
+        auth = await state.wallet.registerPasskey();
+      } catch (err) {
+        log('Wallet registration failed, trying unlock', err.message);
+        auth = await state.wallet.unlock();
+      }
+    }
 
-    const wid = $('ih-wallet-id');
-    if (wid) wid.textContent = short(state.walletId);
-    setPill('ih-wallet-pill', state.walletId ? 'UNLOCKED' : 'LOCKED', state.walletId ? 'ok' : 'deny');
-    log('Wallet ready', short(state.walletId));
+    await adoptCurrentWalletState('passkey');
+    if (!state.walletId && auth?.walletId) {
+      state.walletId = auth.walletId;
+      const wid = $('ih-wallet-id');
+      if (wid) wid.textContent = short(state.walletId);
+    }
+    if (!state.walletSecret && auth?.walletSecret) {
+      state.walletSecret = auth.walletSecret;
+    }
     return auth;
   }
 

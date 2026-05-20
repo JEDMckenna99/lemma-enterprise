@@ -875,6 +875,13 @@ class LemmaWallet {
      * @private
      */
     async _checkGlobalSession(walletId, options = {}) {
+        // Honor the cross-site lock feature flag. When disabled, treat global
+        // session as "valid" so callers fall back to the local 24h IDB session
+        // and never make a network call.
+        if (typeof window !== 'undefined' && window.LEMMA_CROSS_SITE_LOCK_ENABLED === false) {
+            return { valid: true, reason: 'cross_site_lock_disabled' };
+        }
+
         const now = Date.now();
         const cache = this._globalSessionCache;
         const forceRefresh = options.force === true;
@@ -1511,6 +1518,16 @@ class LemmaWallet {
             return;
         }
 
+        // Cross-site lock propagation (SSE + global-session polling) is the
+        // most network-expensive part of the wallet. When the deployment has
+        // not yet enabled lemma.id as a third-party login provider, this
+        // overhead has marginal utility — local 24h session expiry is still
+        // enforced. Gate the heartbeat on a server-injected feature flag.
+        if (typeof window !== 'undefined' && window.LEMMA_CROSS_SITE_LOCK_ENABLED === false) {
+            console.log('[Lemma] Cross-site lock disabled (LEMMA_CROSS_SITE_LOCK_ENABLED=false) — skipping SSE/polling heartbeat');
+            return;
+        }
+
         // Clear any existing heartbeat
         if (this._heartbeatInterval) {
             clearInterval(this._heartbeatInterval);
@@ -2135,8 +2152,24 @@ class LemmaWallet {
      * session via the central bridge. If they do, it returns success without
      * prompting for a new passkey (ONE PASSKEY PER DAY flow).
      */
-    async registerPasskey() {
+    async registerPasskey(options = {}) {
         await this.init();
+
+        // SMART CHECK (any host): if init() already restored a valid 24h
+        // session, don't prompt for passkey again — the user is already
+        // authenticated for the rest of the day. Pass { force: true } to
+        // require an explicit re-authentication.
+        if (!options.force && this.isUnlocked && this.isUnlocked()) {
+            console.log('[Lemma] registerPasskey(): reusing valid restored session');
+            return {
+                success: true,
+                method: 'restored_session',
+                cached: true,
+                walletId: this.session.walletId,
+                walletSecret: this.session.walletSecret,
+                expiresAt: this.session.expiresAt
+            };
+        }
 
         // ============================================================
         // THIRD-PARTY SITES: Use local lemma verification (v2.45.0)
@@ -2356,6 +2389,24 @@ class LemmaWallet {
      */
     async unlock(options = {}) {
         await this.init();
+
+        // SMART CHECK (any host): if a valid 24h session was restored from
+        // IndexedDB by init(), don't prompt for passkey again. This honors the
+        // "one passkey per day" promise on lemma.id, not just on third-party
+        // sites. Callers can pass { force: true } to require a fresh passkey
+        // (e.g. for sensitive operations like exporting the wallet secret).
+        if (!options.force && this.isUnlocked && this.isUnlocked()) {
+            console.log('[Lemma] unlock(): reusing valid restored session, skipping passkey prompt');
+            return {
+                success: true,
+                method: 'restored_session',
+                cached: true,
+                walletId: this.session.walletId,
+                walletSecret: this.session.walletSecret,
+                expiresAt: this.session.expiresAt,
+                source: this.session.source || 'local'
+            };
+        }
 
         // SMART CHECK: On third-party sites, check bridge session first
         // If user already unlocked on lemma.id today, don't prompt for passkey
@@ -2715,17 +2766,22 @@ class LemmaWallet {
             };
         }
 
-        // Check if unlocked today (same calendar day)
-        const unlockedDate = new Date(this.session.unlockedAt);
-        const today = new Date();
-        const isToday = unlockedDate.toDateString() === today.toDateString();
-            
+        // 24h rolling window — "unlocked today" means within the last
+        // getSessionDurationMs() (default 24h), not the same calendar day.
+        // The previous calendar-day check broke shortly after midnight even
+        // when the session had hours of remaining TTL.
+        const sessionMs = (typeof getSessionDurationMs === 'function')
+            ? getSessionDurationMs()
+            : 24 * 60 * 60 * 1000;
+        const unlockedAt = this.session.unlockedAt || 0;
+        const isWithinRollingWindow = unlockedAt > 0 && (Date.now() - unlockedAt) < sessionMs;
+
         return {
-            state: isToday ? AUTH_STATE.UNLOCKED_TODAY : AUTH_STATE.UNLOCKED,
+            state: isWithinRollingWindow ? AUTH_STATE.UNLOCKED_TODAY : AUTH_STATE.UNLOCKED,
             authenticated: true,
             unlockedAt: this.session.unlockedAt,
             expiresAt: this.session.expiresAt,
-            unlockedToday: isToday,
+            unlockedToday: isWithinRollingWindow,
             timeRemaining: this.session.expiresAt - Date.now()
         };
     }
