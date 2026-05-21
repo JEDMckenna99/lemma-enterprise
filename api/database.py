@@ -7,7 +7,18 @@ import logging
 import psycopg2
 from datetime import datetime
 from typing import Optional, List, Dict, Any
-from sqlalchemy import create_engine, Column, String, DateTime, Boolean, Integer, Text, JSON, UniqueConstraint
+from sqlalchemy import (
+    create_engine,
+    Column,
+    String,
+    DateTime,
+    Boolean,
+    Integer,
+    Text,
+    JSON,
+    LargeBinary,
+    UniqueConstraint,
+)
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, Session
 from dataclasses import dataclass, asdict
@@ -581,6 +592,18 @@ class Passkey(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     last_used_at = Column(DateTime)
     is_active = Column(Boolean, default=True)
+
+
+class WalletSigningKey(Base):
+    """Ed25519 public key registered for wallet-scoped API assertions."""
+    __tablename__ = 'wallet_signing_keys'
+
+    wallet_id = Column(String(128), primary_key=True)
+    pubkey = Column(LargeBinary, nullable=False)
+    algorithm = Column(String(32), nullable=False, default='ed25519')
+    created_at = Column(DateTime, default=datetime.utcnow)
+    last_used_at = Column(DateTime)
+    revoked_at = Column(DateTime)
 
 
 class WalletSession(Base):
