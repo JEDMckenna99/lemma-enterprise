@@ -193,6 +193,26 @@ def main() -> int:
     r = requests.get(f"{base}/api/health", timeout=30)
     results.append(_step("health", r.status_code == 200, f"HTTP {r.status_code}"))
 
+    # Demo prod-guard (Phase 4): test-verify must fail closed on production
+    for path, label in (
+        ("/api/demo/ishuman/verify-once-test-mode", "verify-once blocked on prod"),
+        ("/api/demo/ishuman/test-complete-verification", "test-complete blocked on prod"),
+    ):
+        r = requests.post(
+            f"{base}{path}",
+            json={"wallet_id": wallet_id, "session_id": "ishuman_sess_smoke_guard"},
+            timeout=30,
+        )
+        data = r.json() if r.headers.get("content-type", "").startswith("application/json") else {}
+        err = (data.get("error") or "") if isinstance(data, dict) else ""
+        guard_ok = r.status_code == 403 and err in {
+            "test_verify_disabled",
+            "prod_test_verify_forbidden",
+            "demo_test_token_required",
+            "stripe_test_key_required",
+        }
+        results.append(_step(label, guard_ok, f"HTTP {r.status_code} error={err or r.text[:120]}"))
+
     # Signed bloom snapshot (Phase 3)
     r = requests.get(f"{base}/api/revocation/bloom-filter", timeout=30)
     bloom_data = r.json() if r.ok else {}

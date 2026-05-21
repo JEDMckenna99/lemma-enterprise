@@ -76,6 +76,7 @@
 
     <div class="wizard-strip">
       <div class="hero-actions" style="margin-top:0">
+        <p class="muted" id="ih-test-verify-disabled" hidden>Test verify is disabled on this environment.</p>
         <button class="btn" id="ih-run-guided-demo" type="button">Run 3-minute demo</button>
         <button class="btn secondary" id="ih-wallet-btn" type="button">Create or unlock wallet</button>
       </div>
@@ -314,7 +315,7 @@ const result = await new IsHumanVerifier({
       </div>
       <div class="code" id="ih-master-json">{}</div>
     </details>
-    <details>
+    <details id="ih-operator-console">
       <summary>Operator console</summary>
       <p class="muted">Override tokens only if server env is not configured. Standard flow uses server-side demo tokens.</p>
       <input class="input" id="ih-test-token" type="password" placeholder="Test-mode token (optional override)" autocomplete="off">

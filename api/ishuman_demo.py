@@ -125,14 +125,15 @@ def _public_record(record) -> dict:
 
 def _demo_page_context() -> dict:
     """Server-only demo tokens for /demo/ishuman (never exposed on other routes)."""
+    is_production = os.getenv("ENVIRONMENT", "").lower() == "production"
     return {
         "demo_sites": list(DEMO_SITES.values()),
         "network_revoke_configured": bool(os.getenv("LEMMA_ISHUMAN_DEMO_ADMIN_TOKEN")),
         "demo_test_verify_enabled": os.getenv("LEMMA_ISHUMAN_DEMO_ALLOW_TEST_VERIFY", "").lower() == "true",
         "demo_test_token_configured": bool(os.getenv("LEMMA_ISHUMAN_DEMO_TEST_TOKEN")),
         "demo_admin_token_configured": bool(os.getenv("LEMMA_ISHUMAN_DEMO_ADMIN_TOKEN")),
-        "demo_test_token": os.getenv("LEMMA_ISHUMAN_DEMO_TEST_TOKEN", ""),
-        "demo_admin_token": os.getenv("LEMMA_ISHUMAN_DEMO_ADMIN_TOKEN", ""),
+        "demo_test_token": "" if is_production else os.getenv("LEMMA_ISHUMAN_DEMO_TEST_TOKEN", ""),
+        "demo_admin_token": "" if is_production else os.getenv("LEMMA_ISHUMAN_DEMO_ADMIN_TOKEN", ""),
     }
 
 
@@ -351,6 +352,8 @@ def ishuman_demo_network_revoke_request():
 
 def _require_demo_test_verify(*, require_token_header: bool = True) -> tuple[dict | None, tuple | None]:
     """Return (None, error_response) when test-verify guards pass."""
+    if os.getenv("ENVIRONMENT", "").lower() == "production":
+        return None, (jsonify({"success": False, "error": "prod_test_verify_forbidden"}), 403)
     if os.getenv("LEMMA_ISHUMAN_DEMO_ALLOW_TEST_VERIFY", "").lower() != "true":
         return None, (jsonify({"success": False, "error": "test_verify_disabled"}), 403)
     stripe_key = os.getenv("STRIPE_SECRET_KEY", "")
@@ -468,7 +471,7 @@ def ishuman_demo_test_complete_verification():
 @ishuman_demo_bp.route("/api/demo/ishuman/verify-once-test-mode", methods=["POST"])
 def ishuman_demo_verify_once_test_mode():
     """Chain start-verification + test-complete using server-side demo token only."""
-    _guards, err = _require_demo_test_verify(require_token_header=False)
+    _guards, err = _require_demo_test_verify(require_token_header=True)
     if err:
         return err
 

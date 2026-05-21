@@ -4,14 +4,19 @@ on:
   workflow_dispatch:
   pull_request:
     paths:
+      - "app.py"
       - "api/ishuman.py"
+      - "api/ishuman_demo.py"
       - "api/revocation_api.py"
       - "api/bloom_snapshot.py"
       - "api/revocation_sync.py"
       - "api/ppid.py"
       - "api/database.py"
       - "static/js/ishuman-verifier.js"
+      - "static/js/lemma-wallet.js"
+      - "static/js/demo/ishuman-demo.js"
       - "templates/wallet_bridge.html"
+      - "templates/demo/ishuman.html"
       - "tests/conftest.py"
       - "tests/test_ishuman_*.py"
       - "tests/test_wallet_bridge_ishuman_flow.py"
@@ -21,14 +26,19 @@ on:
     branches:
       - main
     paths:
+      - "app.py"
       - "api/ishuman.py"
+      - "api/ishuman_demo.py"
       - "api/revocation_api.py"
       - "api/bloom_snapshot.py"
       - "api/revocation_sync.py"
       - "api/ppid.py"
       - "api/database.py"
       - "static/js/ishuman-verifier.js"
+      - "static/js/lemma-wallet.js"
+      - "static/js/demo/ishuman-demo.js"
       - "templates/wallet_bridge.html"
+      - "templates/demo/ishuman.html"
       - "tests/conftest.py"
       - "tests/test_ishuman_*.py"
       - "tests/test_wallet_bridge_ishuman_flow.py"
@@ -66,6 +76,8 @@ jobs:
           tests/test_ishuman_issuance_branching.py
           tests/test_ishuman_issuance_integration.py
           tests/test_ishuman_bloom_snapshot.py
+          tests/test_wallet_bridge_origin_enforcement.py
+          tests/test_ishuman_demo.py
           tests/test_site_ppid_revocation.py
           tests/test_wallet_bridge_ishuman_flow.py
           -m "unit or integration or browser"

@@ -118,6 +118,25 @@
     return data;
   }
 
+  function applyTestVerifyGate() {
+    const enabled = !!(state.config && state.config.test_verify_enabled);
+    const notice = $('ih-test-verify-disabled');
+    const guided = $('ih-run-guided-demo');
+    const operatorConsole = $('ih-operator-console');
+    const testIds = [
+      'ih-start-idv-btn',
+      'ih-test-complete-btn',
+      'ih-force-reverify-btn',
+    ];
+    if (notice) notice.hidden = enabled;
+    if (guided) guided.hidden = !enabled;
+    if (operatorConsole) operatorConsole.hidden = !enabled;
+    for (const id of testIds) {
+      const el = $(id);
+      if (el) el.hidden = !enabled;
+    }
+  }
+
   async function loadConfig() {
     state.config = await requestJson('/api/demo/ishuman/config');
     const root = $('ishuman-demo');
@@ -125,6 +144,7 @@
       state.serverTestToken = root.dataset.serverTestToken || '';
       state.serverAdminToken = root.dataset.serverAdminToken || '';
     }
+    applyTestVerifyGate();
     const netJson = $('ih-network-json');
     if (netJson) netJson.textContent = pretty(state.config);
     log('Demo config loaded', `${state.config.sites.length} sites`);

@@ -3,11 +3,29 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
+import pytest
+from flask import Flask
+
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 
 from check_env_parity import parse_env_lines, validate  # noqa: E402
+
+
+@pytest.fixture(name="ishuman_demo_client")
+def fixture_ishuman_demo_client(monkeypatch):
+    from api.ishuman_demo import ishuman_demo_bp
+
+    app = Flask(
+        __name__,
+        template_folder=str(ROOT / "templates"),
+        static_folder=str(ROOT / "static"),
+    )
+    app.config["TESTING"] = True
+    app.register_blueprint(ishuman_demo_bp)
+    with app.test_client() as client:
+        yield client
 
 
 def _base_env(**overrides):
@@ -69,6 +87,22 @@ def test_production_rejects_demo_test_helper():
     errors, _warnings = validate(env, "production")
 
     assert any("must not enable" in err for err in errors)
+
+
+def test_verify_once_runtime_requires_demo_token_header(ishuman_demo_client, monkeypatch):
+    """Runtime guard: verify-once must require X-Demo-Test-Token when test mode is enabled."""
+    monkeypatch.setenv("ENVIRONMENT", "staging")
+    monkeypatch.setenv("LEMMA_ISHUMAN_DEMO_ALLOW_TEST_VERIFY", "true")
+    monkeypatch.setenv("LEMMA_ISHUMAN_DEMO_TEST_TOKEN", "parity-token")
+    monkeypatch.setenv("STRIPE_SECRET_KEY", "sk_test_123")
+
+    resp = ishuman_demo_client.post(
+        "/api/demo/ishuman/verify-once-test-mode",
+        json={"wallet_id": "wallet_demo_001"},
+    )
+    payload = resp.get_json()
+    assert resp.status_code == 403
+    assert payload["error"] == "demo_test_token_required"
 
 
 def test_production_accepts_live_key_and_disabled_test_helper():

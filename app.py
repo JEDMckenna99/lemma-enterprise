@@ -738,10 +738,7 @@ def create_app():
         response = render_template('wallet_bridge.html')
         
         return response, 200, {
-            # Allow embedding from any HTTPS origin
-            'X-Frame-Options': 'ALLOWALL',
-            
-            # HARDENED CSP for bridge security
+            # HARDENED CSP for bridge security (frame-ancestors is authoritative)
             # - Only self scripts with nonce (no external JS)
             # - Only self connections (except revocation sync)
             # - No eval, no dynamic code
@@ -764,8 +761,33 @@ def create_app():
             'ETag': '"bridge-v3.5.0-fix-sync-check"',
 
             # Additional cache hints
-            'Vary': 'Accept-Encoding'
+            'Vary': 'Accept-Encoding',
+            'Referrer-Policy': 'no-referrer',
         }
+
+    @app.route('/api/wallet/bridge-audit', methods=['POST'])
+    def wallet_bridge_audit():
+        """Best-effort denial telemetry from bridge postMessage (no PII, no auth)."""
+        import time
+        from flask import request
+
+        if not hasattr(app, '_bridge_audit_buckets'):
+            app._bridge_audit_buckets = {}
+
+        ip = (request.headers.get('X-Forwarded-For') or request.remote_addr or 'unknown').split(',')[0].strip()
+        now = time.time()
+        bucket = app._bridge_audit_buckets.setdefault(ip, [])
+        bucket[:] = [t for t in bucket if now - t < 60.0]
+        if len(bucket) >= 60:
+            return '', 429
+        bucket.append(now)
+
+        raw = request.get_data(as_text=True) or ''
+        if len(raw) > 256:
+            raw = raw[:256]
+        if raw:
+            logger.warning("bridge_audit ip=%s body=%s", ip, raw)
+        return '', 204
 
     # ================================================================================
     # HIGH-SECURITY: Fresh Authentication Verification API

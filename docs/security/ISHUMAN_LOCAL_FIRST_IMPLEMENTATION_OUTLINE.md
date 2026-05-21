@@ -26,7 +26,7 @@ Single checklist for hardening the isHuman wallet + verifier stack into a local-
 | 1     | P1       | Wallet identity Ed25519 + endpoint auth             | complete (2026-05-20) |
 | 2     | P2       | Per-site signing keys + per-presentation challenges | complete (2026-05-21) |
 | 3     | P3       | Signed + timestamped Bloom revocation               | complete (2026-05-21) |
-| 4     | P4       | Bridge hardening + demo prod-guard                  | not started           |
+| 4     | P4       | Bridge hardening + demo prod-guard                  | complete (2026-05-21) |
 | 5     | P5       | PRF-encrypted at-rest storage                       | not started           |
 | 6     | P6       | Local-first verifier (one call per session)         | not started           |
 | 7     | P7       | Multi-issuer trust list + rotation                  | not started           |
@@ -164,9 +164,41 @@ Single checklist for hardening the isHuman wallet + verifier stack into a local-
 
 ## Phase 4 — Bridge hardening + demo prod-guard (P4)
 
-**Status:** not started
+**Status:** complete (2026-05-21)
 
-Planned work: strict origin/control hardening and demo safety controls.
+### 4.1 Bridge postMessage hardening
+
+**Implemented**
+
+- `templates/wallet_bridge.html`:
+  - `event.source === window.parent` before processing inbound RPC
+  - `postToParent()` uses captured parent origin (falls back to `*` only for initial `WALLET_BRIDGE_READY`)
+  - `reportBridgeDenial()` + beacon to `/api/wallet/bridge-audit`
+- `static/js/lemma-wallet.js`: `isLemmaTrustedOrigin()` exact-match (replaces substring `includes('lemma.id')`); response `type` validation
+- `static/js/ishuman-verifier.js`: bridge `event.source` + expected response `type` checks
+- `app.py` `/wallet/bridge`: removed `X-Frame-Options: ALLOWALL`; added `Referrer-Policy: no-referrer`; `POST /api/wallet/bridge-audit` (rate-limited, no PII)
+
+### 4.2 Demo prod-guard
+
+**Implemented**
+
+- `api/ishuman_demo.py`:
+  - `_require_demo_test_verify()` hard-denies when `ENVIRONMENT=production`
+  - `verify-once-test-mode` requires `X-Demo-Test-Token`
+  - Production `/demo/ishuman` omits demo tokens from HTML
+- `static/js/demo/ishuman-demo.js`: hides guided demo + operator test controls when `test_verify_enabled` is false
+
+### 4.3 Tests + CI + smoke
+
+- `tests/test_wallet_bridge_origin_enforcement.py`
+- Extended `tests/test_ishuman_demo.py`, `tests/test_env_parity.py`
+- `.github/workflows/ishuman-issuance-tests.yml` includes Phase 4 paths/tests
+- `scripts/run_ishuman_prod_revocation_smoke.py` adds prod demo-guard steps (11/11 target)
+
+### 4.4 Validation evidence
+
+- Local: `pytest tests/test_wallet_bridge_origin_enforcement.py tests/test_ishuman_demo.py tests/test_env_parity.py -v` — 38 passed
+- Production deploy + smoke: see prod-validation notes after Heroku release
 
 ---
 

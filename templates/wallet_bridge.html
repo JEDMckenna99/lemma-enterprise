@@ -111,10 +111,47 @@ function getHostnameFromOrigin(origin) {
     }
 }
 
+/** Parent origin observed from a validated inbound postMessage (exact target for notifications). */
+let _knownParentOrigin = null;
+
+function reportBridgeDenial(reason, origin) {
+    const safeOrigin = String(origin || '').slice(0, 128);
+    console.warn('[Lemma bridge] denial:', reason, safeOrigin);
+    try {
+        const body = JSON.stringify({ reason: String(reason || '').slice(0, 64), origin: safeOrigin });
+        if (navigator.sendBeacon) {
+            navigator.sendBeacon('/api/wallet/bridge-audit', body);
+        }
+    } catch (e) {
+        /* best-effort telemetry */
+    }
+}
+
+/**
+ * Notify parent window. WALLET_BRIDGE_READY uses '*' (parent unknown at init);
+ * subsequent notifications use the captured parent origin when available.
+ */
+function postToParent(message, forceWildcard) {
+    if (window.parent === window) return;
+    const target = (!forceWildcard && _knownParentOrigin) ? _knownParentOrigin : '*';
+    window.parent.postMessage(message, target);
+}
+
 function isLemmaInfrastructureSite(site) {
     if (!site) return false;
     const normalized = site.toLowerCase();
     return normalized === 'lemma.id' || normalized.endsWith('.lemma.id');
+}
+
+const PRESENTATION_PREFIX = 'lemma:site-presentation:v1';
+
+function buildPresentationPayload({ nonceB64, credentialId, timestampSec }) {
+    return new TextEncoder().encode([
+        PRESENTATION_PREFIX,
+        String(nonceB64 || '').trim(),
+        String(credentialId || '').trim(),
+        String(timestampSec || ''),
+    ].join('\n'));
 }
 
 // ============================================
@@ -421,13 +458,13 @@ async function checkSession(options = {}) {
                         cache.session = { value: null, ts: 0, promise: null };
 
                         if (window.parent !== window) {
-                            window.parent.postMessage({
+                            postToParent({
                                 type: 'SESSION_INVALIDATED',
                                 reason: 'global_session_invalid',
                                 walletId: session.walletId || null,
                                 timestamp: Date.now(),
                                 instant: false
-                            }, '*');
+                            });
                         }
 
                         session = null;
@@ -624,9 +661,20 @@ window.addEventListener('message', async (event) => {
     
     // Basic origin validation (client-side only, no server call)
     if (!isOriginAllowed(origin)) {
-        console.warn(' Message from unauthorized origin:', origin);
+        reportBridgeDenial('origin_not_allowed', origin);
         return;
     }
+
+    if (window.parent === window) {
+        return;
+    }
+
+    if (!event.source || event.source !== window.parent) {
+        reportBridgeDenial('source_mismatch', origin);
+        return;
+    }
+
+    _knownParentOrigin = origin;
     
     const { type, payload, requestId } = event.data || {};
     
@@ -785,13 +833,13 @@ window.addEventListener('message', async (event) => {
 
                     // Notify parent immediately so host app can react without waiting.
                     if (window.parent !== window) {
-                        window.parent.postMessage({
+                        postToParent({
                             type: 'SESSION_INVALIDATED',
                             reason: 'lock',
                             walletId: lockWalletId || null,
                             timestamp: Date.now(),
                             instant: true
-                        }, '*');
+                        });
                     }
 
                     respond({
@@ -971,6 +1019,35 @@ window.addEventListener('message', async (event) => {
 
                 const ihSite = payload?.siteId || requestingSite;
                 const ihType = payload?.credentialType;  // e.g. 'isHuman'
+                const challengeNonce = String(payload?.nonce || '').trim();
+                if (!challengeNonce) {
+                    respond({ success: false, error: 'presentation_nonce_required' });
+                    break;
+                }
+                const challengeTs = Number(payload?.challengeTimestamp || 0);
+                if (challengeTs && Math.abs(Date.now() - challengeTs) > (5 * 60 * 1000)) {
+                    respond({ success: false, error: 'presentation_nonce_stale' });
+                    break;
+                }
+
+                const siteKeys = await wallet.deriveSiteSigningKeypair(ihSite);
+                const siteSigningPubkey = siteKeys.publicKeyB64;
+
+                const signPresentation = async (credential) => {
+                    const timestampSec = Math.floor(Date.now() / 1000);
+                    const payloadBytes = buildPresentationPayload({
+                        nonceB64: challengeNonce,
+                        credentialId: credential?.id || '',
+                        timestampSec,
+                    });
+                    const signature = await siteKeys.keypair.sign(payloadBytes);
+                    return {
+                        credential,
+                        presentation_signature: window.LemmaKeys.base64urlEncode(signature),
+                        presentation_timestamp: timestampSec,
+                        presentation_nonce: challengeNonce,
+                    };
+                };
 
                 // 1. Check for an existing per-site credential
                 let allCreds = (await wallet.getCredentials()).map(normalizeCredentialRecord);
@@ -981,8 +1058,9 @@ window.addEventListener('message', async (event) => {
                     return boundSite === ihSite;
                 });
 
-                if (match) {
-                    respond({ success: true, credential: match });
+                if (match && (match.claims?.site_signing_pubkey || match.credentialSubject?.site_signing_pubkey)) {
+                    const signed = await signPresentation(match);
+                    respond({ success: true, ...signed });
                     break;
                 }
 
@@ -1008,7 +1086,7 @@ window.addEventListener('message', async (event) => {
                         {
                             master_credential_id: master.id,
                             target_site: ihSite,
-                            site_signing_pubkey: '',
+                            site_signing_pubkey: siteSigningPubkey,
                         },
                     );
                     const deriveRes = await fetch('/api/ishuman/derive-site-proof', {
@@ -1019,7 +1097,7 @@ window.addEventListener('message', async (event) => {
                             wallet_id: walletId,
                             wallet_secret: walletSecret,
                             target_site: ihSite,
-                            site_signing_pubkey: '',
+                            site_signing_pubkey: siteSigningPubkey,
                             wallet_assertion: walletAssertion,
                         }),
                     });
@@ -1031,7 +1109,8 @@ window.addEventListener('message', async (event) => {
                         await wallet.storeCredential(derived);
                         clearCredentialsCache();
                         console.log(` isHuman: derived site proof for ${ihSite}:`, derived.id);
-                        respond({ success: true, credential: derived });
+                        const signed = await signPresentation(derived);
+                        respond({ success: true, ...signed });
                     } else {
                         console.warn(' isHuman: derivation failed:', deriveData.error);
                         respond({ success: false, error: deriveData.error || 'derivation_failed' });
@@ -1709,13 +1788,13 @@ try {
             // This is the key optimization: instant notification, no polling
             if (window.parent !== window) {
                 console.log(' Forwarding LOCK to parent via postMessage');
-                window.parent.postMessage({
+                postToParent({
                     type: 'SESSION_INVALIDATED',
                     reason: 'lock',
                     walletId: walletId,
                     timestamp: Date.now(),
                     instant: true  // Flag that this came via BroadcastChannel
-                }, '*');
+                });
             }
 
             // Also invalidate local session cache
@@ -1724,12 +1803,12 @@ try {
             // Wallet was unlocked in another tab - notify parent to refresh
             if (window.parent !== window) {
                 console.log(' Forwarding UNLOCK to parent via postMessage');
-                window.parent.postMessage({
+                postToParent({
                     type: 'SESSION_RESTORED',
                     walletId: walletId,
                     timestamp: Date.now(),
                     instant: true
-                }, '*');
+                });
             }
 
             // Clear session cache to force fresh check
@@ -1792,7 +1871,7 @@ try {
 
     // Notify parent that bridge is ready with session info
     if (window.parent !== window) {
-        window.parent.postMessage({
+        postToParent({
             type: 'WALLET_BRIDGE_READY',
             ready: ready,
             version: '2.4',
@@ -1816,7 +1895,7 @@ try {
             },
             // If no session, include unlock URL for SDK to redirect
             unlockUrl: session.needsUnlock ? 'https://lemma.id/wallet/unlock' : null
-        }, '*');
+        }, true);
     }
 })();
 </script>

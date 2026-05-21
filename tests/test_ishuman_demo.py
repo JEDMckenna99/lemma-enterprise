@@ -261,6 +261,69 @@ def test_ishuman_demo_verify_once_requires_test_mode(ishuman_demo_client):
     assert payload["error"] == "test_verify_disabled"
 
 
+def test_ishuman_demo_verify_once_requires_token_header(ishuman_demo_client, monkeypatch):
+    monkeypatch.setenv("LEMMA_ISHUMAN_DEMO_ALLOW_TEST_VERIFY", "true")
+    monkeypatch.setenv("LEMMA_ISHUMAN_DEMO_TEST_TOKEN", "test-token")
+    monkeypatch.setenv("STRIPE_SECRET_KEY", "sk_test_123")
+
+    resp = ishuman_demo_client.post(
+        "/api/demo/ishuman/verify-once-test-mode",
+        json={"wallet_id": "wallet_demo_001"},
+    )
+    payload = resp.get_json()
+    assert resp.status_code == 403
+    assert payload["error"] == "demo_test_token_required"
+
+
+def test_ishuman_demo_test_complete_blocked_when_environment_is_production(
+    ishuman_demo_client,
+    monkeypatch,
+):
+    monkeypatch.setenv("ENVIRONMENT", "production")
+    monkeypatch.setenv("LEMMA_ISHUMAN_DEMO_ALLOW_TEST_VERIFY", "true")
+    monkeypatch.setenv("LEMMA_ISHUMAN_DEMO_TEST_TOKEN", "test-token")
+    monkeypatch.setenv("STRIPE_SECRET_KEY", "sk_test_123")
+
+    resp = ishuman_demo_client.post(
+        "/api/demo/ishuman/test-complete-verification",
+        headers={"X-Demo-Test-Token": "test-token"},
+        json={"session_id": "ishuman_sess_demo_001"},
+    )
+    payload = resp.get_json()
+    assert resp.status_code == 403
+    assert payload["error"] == "prod_test_verify_forbidden"
+
+
+def test_ishuman_demo_page_omits_tokens_on_production(ishuman_demo_client, monkeypatch):
+    monkeypatch.setenv("ENVIRONMENT", "production")
+    monkeypatch.setenv("LEMMA_ISHUMAN_DEMO_TEST_TOKEN", "super-secret-test-token")
+    monkeypatch.setenv("LEMMA_ISHUMAN_DEMO_ADMIN_TOKEN", "super-secret-admin-token")
+
+    resp = ishuman_demo_client.get("/demo/ishuman")
+    body = resp.get_data(as_text=True)
+    assert resp.status_code == 200
+    assert "super-secret-test-token" not in body
+    assert "super-secret-admin-token" not in body
+
+
+def test_ishuman_demo_test_complete_requires_stripe_test_key_when_flag_enabled(
+    ishuman_demo_client,
+    monkeypatch,
+):
+    monkeypatch.setenv("LEMMA_ISHUMAN_DEMO_ALLOW_TEST_VERIFY", "true")
+    monkeypatch.setenv("LEMMA_ISHUMAN_DEMO_TEST_TOKEN", "test-token")
+    monkeypatch.setenv("STRIPE_SECRET_KEY", "sk_live_should_fail")
+
+    resp = ishuman_demo_client.post(
+        "/api/demo/ishuman/test-complete-verification",
+        headers={"X-Demo-Test-Token": "test-token"},
+        json={"session_id": "ishuman_sess_demo_001"},
+    )
+    payload = resp.get_json()
+    assert resp.status_code == 403
+    assert payload["error"] == "stripe_test_key_required"
+
+
 def test_ishuman_demo_probe_derive_requires_credentials(ishuman_demo_client):
     ishuman_demo_client.get("/api/demo/ishuman/config")
     resp = ishuman_demo_client.post(

@@ -28,8 +28,12 @@
  * 
  * The wallet is unlocked locally via passkey (no server call).
  * Sites can issue their own lemmas to be stored in the wallet.
- * Lemmas can be presented to any site for local verification.
  */
+
+/** Exact-match trusted Lemma origins for bridge postMessage (no substring matching). */
+function isLemmaTrustedOrigin(origin) {
+    return origin === 'https://lemma.id' || origin === 'https://www.lemma.id';
+}
 
 // IIFE to avoid global scope pollution (fixes Cloudflare Rocket Loader issues)
 (function() {
@@ -665,7 +669,7 @@ class LemmaWallet {
         
         window.addEventListener('message', async (event) => {
             // Only accept messages from lemma.id
-            if (!event.origin.includes('lemma.id')) return;
+            if (!isLemmaTrustedOrigin(event.origin)) return;
             
             // Handle session invalidation (lock) events
             if (event.data?.type === 'SESSION_INVALIDATED') {
@@ -2491,6 +2495,26 @@ class LemmaWallet {
         };
     }
 
+    async deriveSiteSigningKeypair(siteDomain) {
+        if (!this.isUnlocked || !this.isUnlocked()) {
+            throw new Error('Wallet must be unlocked to derive site signing key');
+        }
+        const keys = this._getLemmaKeys();
+        const canonicalSite = keys.canonicalizeSiteDomain(siteDomain || window.location.hostname || '');
+        const secret = this.session?.walletSecret;
+        if (!secret) {
+            const secretRecord = await this._get('secrets', 'master');
+            if (!secretRecord?.secret) throw new Error('wallet_secret unavailable');
+            this.session.walletSecret = secretRecord.secret;
+        }
+        const keypair = await keys.deriveSiteSigningKeypair(this.session.walletSecret, canonicalSite);
+        return {
+            keypair,
+            canonicalSite,
+            publicKeyB64: keys.base64urlEncode(keypair.publicKey),
+        };
+    }
+
     // ========================================
     // LOCAL PASSKEY UNLOCK (No Server!)
     // ========================================
@@ -3344,7 +3368,7 @@ class LemmaWallet {
             };
             const timeoutId = setTimeout(() => finish(!!this._bridgeReady), maxWaitMs);
             const handler = (event) => {
-                if (event.origin === 'https://lemma.id' && event.data?.type === 'WALLET_BRIDGE_READY') {
+                if (isLemmaTrustedOrigin(event.origin) && event.data?.type === 'WALLET_BRIDGE_READY') {
                     this._bridgeReady = true;
                     finish(true);
                 }
@@ -3383,7 +3407,7 @@ class LemmaWallet {
                 }, 5000);
 
                 const handler = (event) => {
-                    if (event.origin === 'https://lemma.id' &&
+                    if (isLemmaTrustedOrigin(event.origin) &&
                         event.data?.type === 'WALLET_BRIDGE_READY') {
                         this._bridgeReady = true;
                         clearTimeout(timeoutId);
@@ -3404,7 +3428,7 @@ class LemmaWallet {
             // so it can become ready later (e.g., slow network)
             if (!this._bridgeReady) {
                 const lateHandler = (event) => {
-                    if (event.origin === 'https://lemma.id' &&
+                    if (isLemmaTrustedOrigin(event.origin) &&
                         event.data?.type === 'WALLET_BRIDGE_READY') {
                         this._bridgeReady = true;
                         window.removeEventListener('message', lateHandler);
@@ -3432,9 +3456,10 @@ class LemmaWallet {
             }, timeout);
             
             const handler = (event) => {
-                if (!event.origin.includes('lemma.id')) return;
+                if (!isLemmaTrustedOrigin(event.origin)) return;
                 const response = event.data;
                 if (response.requestId !== requestId) return;
+                if (response.type && response.type !== `${type}_response`) return;
                 
                 clearTimeout(timeoutId);
                 window.removeEventListener('message', handler);
@@ -3474,7 +3499,7 @@ class LemmaWallet {
 
         const handler = (event) => {
             // Only accept messages from lemma.id
-            if (!event.origin.includes('lemma.id')) return;
+            if (!isLemmaTrustedOrigin(event.origin)) return;
 
             const { type, walletId, reason, instant } = event.data || {};
 
@@ -6388,6 +6413,7 @@ class LemmaWallet {
                 // Wait for bridge to be ready
                 await new Promise((resolve) => {
                     const handler = (event) => {
+                        if (!isLemmaTrustedOrigin(event.origin)) return;
                         if (event.data?.type === 'WALLET_BRIDGE_READY') {
                             window.removeEventListener('message', handler);
                             resolve();
@@ -6403,13 +6429,14 @@ class LemmaWallet {
                 const requestId = `sync_${Date.now()}`;
                 
                 const handler = (event) => {
-                    if (event.data?.requestId === requestId) {
-                        window.removeEventListener('message', handler);
-                        if (event.data.success) {
-                            console.log(' Credential synced to central wallet:', credential.id);
-                        }
-                        resolve(event.data);
+                    if (!isLemmaTrustedOrigin(event.origin)) return;
+                    if (event.data?.requestId !== requestId) return;
+                    if (event.data?.type && event.data.type !== 'STORE_CREDENTIAL_response') return;
+                    window.removeEventListener('message', handler);
+                    if (event.data.success) {
+                        console.log(' Credential synced to central wallet:', credential.id);
                     }
+                    resolve(event.data);
                 };
                 
                 window.addEventListener('message', handler);
@@ -6726,6 +6753,7 @@ class LemmaWallet {
                 // Wait for bridge to be ready
                 await new Promise((resolve) => {
                     const handler = (event) => {
+                        if (!isLemmaTrustedOrigin(event.origin)) return;
                         if (event.data?.type === 'WALLET_BRIDGE_READY') {
                             window.removeEventListener('message', handler);
                             resolve();
@@ -6740,10 +6768,11 @@ class LemmaWallet {
                 const requestId = `get_${Date.now()}`;
                 
                 const handler = (event) => {
-                    if (event.data?.requestId === requestId) {
-                        window.removeEventListener('message', handler);
-                        resolve(event.data.credentials || []);
-                    }
+                    if (!isLemmaTrustedOrigin(event.origin)) return;
+                    if (event.data?.requestId !== requestId) return;
+                    if (event.data?.type && event.data.type !== 'GET_CREDENTIALS_response') return;
+                    window.removeEventListener('message', handler);
+                    resolve(event.data.credentials || []);
                 };
                 
                 window.addEventListener('message', handler);

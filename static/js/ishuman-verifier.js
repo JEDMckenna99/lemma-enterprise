@@ -485,12 +485,13 @@ class IsHumanVerifier {
         this._messageListener = (event) => {
             if (event.origin !== this.lemmaOrigin) return;
             if (event.data?.type === 'WALLET_BRIDGE_READY') {
+                if (event.source && event.source !== this._bridgeIframe?.contentWindow) return;
                 this._bridgeReady = true;
                 if (this._resolveBridgeReady) this._resolveBridgeReady(event.data);
                 if (this.debug) console.log('[isHuman] bridge ready', event.data);
                 return;
             }
-            this._handleBridgeMessage(event.data);
+            this._handleBridgeMessage(event.data, event);
         };
         window.addEventListener('message', this._messageListener);
 
@@ -505,13 +506,15 @@ class IsHumanVerifier {
     // Bridge communication
     // ------------------------------------------------------------------
 
-    _handleBridgeMessage(data) {
+    _handleBridgeMessage(data, event) {
         if (!data || !data.requestId) return;
-        const resolver = this._pendingRequests.get(data.requestId);
-        if (resolver) {
-            this._pendingRequests.delete(data.requestId);
-            resolver(data);
-        }
+        if (event?.source && event.source !== this._bridgeIframe?.contentWindow) return;
+        const pending = this._pendingRequests.get(data.requestId);
+        if (!pending) return;
+        const expectedType = pending.expectedType;
+        if (expectedType && data.type && data.type !== expectedType) return;
+        this._pendingRequests.delete(data.requestId);
+        pending.resolver(data);
     }
 
     _requestCredentialFromBridge() {
@@ -543,16 +546,19 @@ class IsHumanVerifier {
 
             const challengeNonce = randomNonceB64(32);
             const challengeTimestamp = Date.now();
-            this._pendingRequests.set(requestId, (response) => {
-                clearTimeout(timeout);
-                if (response.error) {
-                    resolve(null);
-                } else {
-                    resolve({
-                        ...response,
-                        challenge_nonce: challengeNonce,
-                    });
-                }
+            this._pendingRequests.set(requestId, {
+                expectedType: 'GET_CREDENTIAL_response',
+                resolver: (response) => {
+                    clearTimeout(timeout);
+                    if (response.error) {
+                        resolve(null);
+                    } else {
+                        resolve({
+                            ...response,
+                            challenge_nonce: challengeNonce,
+                        });
+                    }
+                },
             });
             this._bridgeIframe.contentWindow.postMessage({
                 type: 'GET_CREDENTIAL',
