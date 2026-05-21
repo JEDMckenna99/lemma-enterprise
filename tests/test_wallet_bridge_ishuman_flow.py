@@ -23,8 +23,9 @@ def test_get_credential_checks_site_bound_match_before_derivation(wallet_bridge_
     assert "let match = allCreds.find(c => {" in wallet_bridge_source
     assert "const boundSite = getCredentialSiteBinding(cl);" in wallet_bridge_source
     assert "return boundSite === ihSite;" in wallet_bridge_source
-    assert "if (match) {" in wallet_bridge_source
-    assert "respond({ success: true, credential: match });" in wallet_bridge_source
+    assert "if (match && (match.claims?.site_signing_pubkey || match.credentialSubject?.site_signing_pubkey)) {" in wallet_bridge_source
+    assert "const signed = await signPresentation(match);" in wallet_bridge_source
+    assert "respond({ success: true, ...signed });" in wallet_bridge_source
 
 
 @pytest.mark.browser
@@ -37,15 +38,25 @@ def test_get_credential_requires_master_when_site_credential_missing(wallet_brid
 @pytest.mark.browser
 def test_get_credential_derives_site_proof_and_stores_it(wallet_bridge_source):
     assert "fetch('/api/ishuman/derive-site-proof'" in wallet_bridge_source
+    assert "const siteKeys = await wallet.deriveSiteSigningKeypair(ihSite);" in wallet_bridge_source
     assert "wallet.buildWalletAssertion" in wallet_bridge_source
     assert "wallet_assertion: walletAssertion" in wallet_bridge_source
     assert '"master_credential_id": master.id' not in wallet_bridge_source
     assert "master_credential_id: master.id," in wallet_bridge_source
     assert "target_site: ihSite," in wallet_bridge_source
-    assert "site_signing_pubkey: ''" in wallet_bridge_source
+    assert "site_signing_pubkey: siteSigningPubkey" in wallet_bridge_source
     assert "if (deriveData.success && deriveData.credential) {" in wallet_bridge_source
     assert "await wallet.storeCredential(derived);" in wallet_bridge_source
-    assert "respond({ success: true, credential: derived });" in wallet_bridge_source
+    assert "presentation_signature" in wallet_bridge_source
+    assert "presentation_timestamp" in wallet_bridge_source
+
+
+@pytest.mark.browser
+def test_bridge_loads_wallet_at_rest_crypto_before_wallet(wallet_bridge_source):
+    assert "wallet-at-rest-crypto.js" in wallet_bridge_source
+    crypto_idx = wallet_bridge_source.index("wallet-at-rest-crypto.js")
+    wallet_idx = wallet_bridge_source.index("lemma-wallet.js")
+    assert crypto_idx < wallet_idx
 
 
 @pytest.mark.browser

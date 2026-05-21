@@ -49,7 +49,7 @@ if (typeof window !== 'undefined' && window.LemmaWallet) {
 // ============================================
 
 const WALLET_DB_NAME = 'LemmaWallet';
-const WALLET_DB_VERSION = 4;  // v4: Added profiles for multiple identities
+const WALLET_DB_VERSION = 5;  // v5: PRF-encrypted at-rest envelopes for sensitive stores
 const DEFAULT_SESSION_HOURS = 24;
 const DEFAULT_PROFILE_ID = 'default';
 
@@ -79,7 +79,7 @@ const AUTH_STATE = {
 class LemmaWallet {
     // SDK version - check with LemmaWallet.VERSION
     // v2.32.0: Redirect-only architecture - removed popup flow for simpler, consistent UX
-    static VERSION = '2.50.1';  // Lock propagation fix: resolve walletId for SSE events across tabs/devices
+    static VERSION = '2.51.0';  // Phase 5: PRF-derived encrypted at-rest IndexedDB storage
     
     constructor(options = {}) {
         this.db = null;
@@ -115,6 +115,9 @@ class LemmaWallet {
         this._isClearingSession = false;
         this._walletSigningKey = null;
         this._signingKeyRegistered = false;
+        /** @type {CryptoKey|null} Phase 5 PRF-derived AES-GCM key (memory only) */
+        this._atRestKey = null;
+        this._atRestKeyReady = false;
     }
     
     /** @private Log only when debug is enabled */
@@ -1885,6 +1888,11 @@ class LemmaWallet {
                 if (!db.objectStoreNames.contains('profiles')) {
                     db.createObjectStore('profiles', { keyPath: 'id' });
                 }
+
+                // v5: Wallet storage metadata (PRF/migration flags; no secrets)
+                if (!db.objectStoreNames.contains('wallet_meta')) {
+                    db.createObjectStore('wallet_meta', { keyPath: 'id' });
+                }
             };
         });
 
@@ -2252,13 +2260,19 @@ class LemmaWallet {
         
         console.log('[Lemma] Creating local passkey (privacy-preserving design)');
         const challenge = crypto.getRandomValues(new Uint8Array(32));
-        
+        const rpId = this._getRpIdForWebAuthn();
+        const mod = this._walletAtRest();
+        let prfExtensions = {};
+        if (mod?.isPrfSupported?.()) {
+            prfExtensions = await mod.buildRegistrationPrfExtensions(walletId.value, rpId);
+        }
+
         const credential = await navigator.credentials.create({
             publicKey: {
                 challenge: challenge,
                 rp: {
                     name: 'Lemma Wallet',
-                    id: window.location.hostname
+                    id: rpId
                 },
                 user: {
                     id: new TextEncoder().encode(walletId.value),
@@ -2273,6 +2287,7 @@ class LemmaWallet {
                     userVerification: 'required',
                     residentKey: 'preferred'
                 },
+                extensions: prfExtensions,
                 timeout: 60000
             }
         });
@@ -2280,16 +2295,22 @@ class LemmaWallet {
         // Extract and store public key locally (never sent to server)
         const publicKeyData = this._extractPublicKey(credential.response);
         
+        const prfBound = await this._bindAtRestKeyFromCredential(credential, walletId.value);
         const passkeyRecord = {
             id: 'primary',
             credentialId: this._bufferToBase64url(credential.rawId),
             publicKey: publicKeyData.publicKey,
             algorithm: publicKeyData.algorithm,
-            createdAt: Date.now()
+            createdAt: Date.now(),
+            prfEnabled: prfBound,
+            prfSaltRpId: rpId,
         };
 
         await this._put('passkey', passkeyRecord);
         console.log('[Lemma]  Passkey created locally (server never sees it)');
+        if (prfBound) {
+            await this._migratePlaintextStores();
+        }
 
         // Get wallet secret for PPID derivation
         // CRITICAL: Check multiple sources for the secret (profiles, secrets, session)
@@ -2617,17 +2638,21 @@ class LemmaWallet {
         // Get passkey signature (browser prompts biometric)
         // The browser ALREADY verifies the user - if credentials.get() succeeds,
         // the user has been authenticated by their device biometrics
+        let walletIdRecord = await this._get('passkey', 'walletId');
+        const rpId = this._getRpIdForWebAuthn();
+        const getOptions = await this._publicKeyOptionsWithPrf({
+            challenge: challenge,
+            rpId: rpId,
+            allowCredentials: [{
+                id: this._base64urlToBuffer(passkey.credentialId),
+                type: 'public-key'
+            }],
+            userVerification: 'required',
+            timeout: 60000
+        }, walletIdRecord?.value);
+
         const credential = await navigator.credentials.get({
-            publicKey: {
-                challenge: challenge,
-                rpId: window.location.hostname,
-                allowCredentials: [{
-                    id: this._base64urlToBuffer(passkey.credentialId),
-                    type: 'public-key'
-                }],
-                userVerification: 'required',
-                timeout: 60000
-            }
+            publicKey: getOptions
         });
 
         // If we get here, the browser has verified the user via biometrics
@@ -2639,7 +2664,6 @@ class LemmaWallet {
         console.log(' Browser verified user via biometrics');
 
         // Get wallet ID (create and store if missing)
-        let walletIdRecord = await this._get('passkey', 'walletId');
         if (!walletIdRecord?.value) {
             const newWalletId = 'wallet_' + this._generateId();
             walletIdRecord = { id: 'walletId', value: newWalletId };
@@ -2647,6 +2671,16 @@ class LemmaWallet {
             console.log('[Lemma] Created wallet ID:', newWalletId);
         }
         const walletId = walletIdRecord.value;
+
+        const prfBound = await this._bindAtRestKeyFromCredential(credential, walletId);
+        if (prfBound) {
+            await this._migratePlaintextStores();
+        } else {
+            const meta = await this._getWalletMeta();
+            if (meta.migrationComplete) {
+                throw new Error('prf_required_for_encrypted_storage');
+            }
+        }
 
         // Get wallet secret for PPID derivation
         // CRITICAL: Check multiple sources (device linking stores in profiles)
@@ -4860,7 +4894,123 @@ class LemmaWallet {
         }
     }
 
-    async _get(storeName, key) {
+    _walletAtRest() {
+        return window.WalletAtRestCrypto || null;
+    }
+
+    _isSensitiveStore(storeName) {
+        const stores = this._walletAtRest()?.SENSITIVE_STORES || ['secrets', 'profiles', 'session', 'lemmas'];
+        return stores.includes(storeName);
+    }
+
+    _getRpIdForWebAuthn() {
+        const host = (typeof window !== 'undefined' && window.location.hostname) || '';
+        if (host === 'lemma.id' || host === 'www.lemma.id' || host.endsWith('.lemma.id')) {
+            return 'lemma.id';
+        }
+        return host || 'lemma.id';
+    }
+
+    async _getWalletMeta() {
+        try {
+            return await this._getRaw('wallet_meta', 'storage') || { id: 'storage' };
+        } catch (_) {
+            return { id: 'storage' };
+        }
+    }
+
+    async _setWalletMeta(patch) {
+        const current = await this._getWalletMeta();
+        await this._putRaw('wallet_meta', { ...current, ...patch, id: 'storage' });
+    }
+
+    async _publicKeyOptionsWithPrf(baseOptions, walletId) {
+        const mod = this._walletAtRest();
+        if (!mod?.isPrfSupported?.()) return baseOptions;
+        const prfExt = await mod.buildAuthenticationPrfExtensions(walletId, this._getRpIdForWebAuthn());
+        return {
+            ...baseOptions,
+            extensions: { ...(baseOptions.extensions || {}), ...prfExt },
+        };
+    }
+
+    async _bindAtRestKeyFromCredential(credential, walletId) {
+        const mod = this._walletAtRest();
+        if (!mod) return false;
+        const prfBytes = mod.extractPrfBytes(credential);
+        if (!prfBytes) {
+            console.warn('[Lemma] prf_unavailable: authenticator did not return PRF output');
+            return false;
+        }
+        this._atRestKey = await mod.importStorageKey(prfBytes);
+        this._atRestKeyReady = true;
+        await this._setWalletMeta({
+            prfEnabled: true,
+            prfSaltRpId: this._getRpIdForWebAuthn(),
+        });
+        return true;
+    }
+
+    async _encryptStoredValue(storeName, value) {
+        if (!this._isSensitiveStore(storeName)) return value;
+        const mod = this._walletAtRest();
+        if (!this._atRestKey || !mod) {
+            const meta = await this._getWalletMeta();
+            if (meta.migrationComplete) {
+                throw new Error('storage_key_unavailable');
+            }
+            if (this._canPersistWalletSecret()) {
+                return value;
+            }
+            throw new Error('storage_key_unavailable');
+        }
+        const recordId = value?.id || value?.did || 'record';
+        return mod.encryptEnvelope(this._atRestKey, storeName, recordId, value);
+    }
+
+    async _decryptStoredValue(raw) {
+        const mod = this._walletAtRest();
+        if (!mod?.isEncryptedEnvelope(raw)) return raw;
+        if (!this._atRestKey) {
+            throw new Error('envelope_invalid');
+        }
+        return mod.decryptEnvelope(this._atRestKey, raw);
+    }
+
+    async _migratePlaintextStores() {
+        const mod = this._walletAtRest();
+        if (!this._atRestKey || !mod) return;
+        const meta = await this._getWalletMeta();
+        if (meta.migrationComplete) return;
+
+        const master = await this._getRaw('secrets', 'master');
+        if (master && !mod.isEncryptedEnvelope(master)) {
+            await this._put('secrets', master);
+        }
+
+        for (const profile of await this._getAllRaw('profiles')) {
+            if (profile && !mod.isEncryptedEnvelope(profile)) {
+                await this._put('profiles', profile);
+            }
+        }
+
+        for (const sess of await this._getAllRaw('session')) {
+            if (sess && !mod.isEncryptedEnvelope(sess)) {
+                await this._put('session', sess);
+            }
+        }
+
+        for (const lemma of await this._getAllRaw('lemmas')) {
+            if (lemma && !mod.isEncryptedEnvelope(lemma)) {
+                await this._put('lemmas', lemma);
+            }
+        }
+
+        await this._setWalletMeta({ migrationComplete: true, migratedAt: Date.now() });
+        console.log('[Lemma] At-rest storage migration complete');
+    }
+
+    async _getRaw(storeName, key) {
         return this._withDbRetry(`_get(${storeName})`, () => new Promise((resolve, reject) => {
             const tx = this.db.transaction(storeName, 'readonly');
             const store = tx.objectStore(storeName);
@@ -4870,7 +5020,13 @@ class LemmaWallet {
         }));
     }
 
-    async _getAll(storeName) {
+    async _get(storeName, key) {
+        const raw = await this._getRaw(storeName, key);
+        if (!raw || !this._isSensitiveStore(storeName)) return raw;
+        return this._decryptStoredValue(raw);
+    }
+
+    async _getAllRaw(storeName) {
         return this._withDbRetry(`_getAll(${storeName})`, () => new Promise((resolve, reject) => {
             const tx = this.db.transaction(storeName, 'readonly');
             const store = tx.objectStore(storeName);
@@ -4880,7 +5036,25 @@ class LemmaWallet {
         }));
     }
 
-    async _put(storeName, value) {
+    async _getAll(storeName) {
+        const rows = await this._getAllRaw(storeName);
+        if (!this._isSensitiveStore(storeName)) return rows;
+        const out = [];
+        for (const row of rows) {
+            if (!row) {
+                out.push(row);
+                continue;
+            }
+            try {
+                out.push(await this._decryptStoredValue(row));
+            } catch (err) {
+                console.warn('[Lemma] Skipping undecryptable record in', storeName, err.message);
+            }
+        }
+        return out;
+    }
+
+    async _putRaw(storeName, value) {
         return this._withDbRetry(`_put(${storeName})`, () => new Promise((resolve, reject) => {
             const tx = this.db.transaction(storeName, 'readwrite');
             const store = tx.objectStore(storeName);
@@ -4888,6 +5062,11 @@ class LemmaWallet {
             request.onsuccess = () => resolve(request.result);
             request.onerror = () => reject(request.error);
         }));
+    }
+
+    async _put(storeName, value) {
+        const stored = await this._encryptStoredValue(storeName, value);
+        return this._putRaw(storeName, stored);
     }
 
     async _delete(storeName, key) {
@@ -5661,17 +5840,20 @@ class LemmaWallet {
         
         try {
             // Force biometric/PIN verification - userVerification: 'required'
+            const walletIdRecord = await this._get('passkey', 'walletId');
+            const getOptions = await this._publicKeyOptionsWithPrf({
+                challenge: challenge,
+                rpId: this._getRpIdForWebAuthn(),
+                allowCredentials: [{
+                    id: this._base64urlToBuffer(passkey.credentialId),
+                    type: 'public-key'
+                }],
+                userVerification: 'required',
+                timeout: 60000
+            }, walletIdRecord?.value);
+
             const credential = await navigator.credentials.get({
-                publicKey: {
-                    challenge: challenge,
-                    rpId: window.location.hostname,
-                    allowCredentials: [{
-                        id: this._base64urlToBuffer(passkey.credentialId),
-                        type: 'public-key'
-                    }],
-                    userVerification: 'required',  // MUST verify user (FaceID/TouchID/PIN)
-                    timeout: 60000
-                }
+                publicKey: getOptions
             });
             
             if (!credential) {
@@ -5679,9 +5861,8 @@ class LemmaWallet {
             }
             
             console.log('[Lemma]  Fresh passkey verification successful');
-            
-            const walletIdRecord = await this._get('passkey', 'walletId');
-            
+            await this._bindAtRestKeyFromCredential(credential, walletIdRecord?.value);
+
             return {
                 success: true,
                 walletId: walletIdRecord?.value || null,

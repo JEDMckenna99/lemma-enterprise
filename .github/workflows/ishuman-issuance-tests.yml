@@ -14,6 +14,9 @@ on:
       - "api/database.py"
       - "static/js/ishuman-verifier.js"
       - "static/js/lemma-wallet.js"
+      - "static/js/wallet-at-rest-crypto.js"
+      - "static/js/lemma-passkey.js"
+      - "api/passkey_auth.py"
       - "static/js/demo/ishuman-demo.js"
       - "templates/wallet_bridge.html"
       - "templates/demo/ishuman.html"
@@ -36,6 +39,9 @@ on:
       - "api/database.py"
       - "static/js/ishuman-verifier.js"
       - "static/js/lemma-wallet.js"
+      - "static/js/wallet-at-rest-crypto.js"
+      - "static/js/lemma-passkey.js"
+      - "api/passkey_auth.py"
       - "static/js/demo/ishuman-demo.js"
       - "templates/wallet_bridge.html"
       - "templates/demo/ishuman.html"
@@ -79,6 +85,7 @@ jobs:
           tests/test_wallet_bridge_origin_enforcement.py
           tests/test_ishuman_demo.py
           tests/test_site_ppid_revocation.py
+          tests/test_wallet_prf_storage.py
           tests/test_wallet_bridge_ishuman_flow.py
           -m "unit or integration or browser"
           -v

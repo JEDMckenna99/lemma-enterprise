@@ -170,6 +170,15 @@ class LemmaPasskey {
     // HELPER METHODS
     // ============================================
 
+    _preparePrfExtensions(extensions) {
+        if (!extensions || !extensions.prf) return extensions;
+        const prf = { ...extensions.prf };
+        if (prf.eval?.first && typeof prf.eval.first === 'string') {
+            prf.eval = { ...prf.eval, first: this._base64urlToBuffer(prf.eval.first) };
+        }
+        return { ...extensions, prf };
+    }
+
     _prepareRegistrationOptions(options) {
         // Convert base64url strings to ArrayBuffers
         return {
@@ -182,7 +191,8 @@ class LemmaPasskey {
             excludeCredentials: (options.excludeCredentials || []).map(cred => ({
                 ...cred,
                 id: this._base64urlToBuffer(cred.id)
-            }))
+            })),
+            extensions: this._preparePrfExtensions(options.extensions),
         };
     }
 
@@ -193,7 +203,8 @@ class LemmaPasskey {
             allowCredentials: (options.allowCredentials || []).map(cred => ({
                 ...cred,
                 id: this._base64urlToBuffer(cred.id)
-            }))
+            })),
+            extensions: this._preparePrfExtensions(options.extensions),
         };
     }
 
@@ -229,6 +240,10 @@ class LemmaPasskey {
         // Include transports if available
         if (credential.response.getTransports) {
             serialized.transports = credential.response.getTransports();
+        }
+
+        if (typeof credential.getClientExtensionResults === 'function') {
+            serialized.clientExtensionResults = credential.getClientExtensionResults();
         }
 
         return serialized;

@@ -13,6 +13,7 @@ import os
 import json
 import base64
 import secrets
+import hashlib
 import logging
 from datetime import datetime, timedelta
 from functools import wraps
@@ -62,6 +63,37 @@ ALLOWED_ORIGIN_SUFFIXES = [
     os.getenv('LEMMA_ALLOWED_ORIGIN_SUFFIXES', '.lemma.id').split(',')
     if s.strip()
 ]
+
+
+def _prf_extension_options(subject_id: str | None) -> dict:
+    """Request WebAuthn PRF eval for wallet at-rest key derivation (client-side only)."""
+    uid = (subject_id or "anonymous").strip()
+    material = f"lemma:wallet:prf:v1:{RP_ID}:{uid}".encode("utf-8")
+    salt = hashlib.sha256(material).digest()
+    salt_b64 = base64.urlsafe_b64encode(salt).decode("utf-8").rstrip("=")
+    return {
+        "prf": {
+            "eval": {
+                "first": salt_b64,
+            }
+        }
+    }
+
+
+def _merge_prf_extensions(options_dict: dict, subject_id: str | None) -> dict:
+    merged = dict(options_dict or {})
+    extensions = dict(merged.get("extensions") or {})
+    extensions.update(_prf_extension_options(subject_id))
+    merged["extensions"] = extensions
+    return merged
+
+
+def _credential_reports_prf(credential: dict | None) -> bool:
+    if not credential or not isinstance(credential, dict):
+        return False
+    ext = credential.get("clientExtensionResults") or {}
+    results = (ext.get("prf") or {}).get("results") or {}
+    return bool(results.get("first"))
 
 
 def _is_origin_allowed(origin: str) -> bool:
@@ -354,9 +386,13 @@ def passkey_register_begin():
         
         logger.info(f"🔐 Passkey registration started for {user_email}")
         
+        options_dict = json.loads(options_to_json(options))
+        options_dict = _merge_prf_extensions(options_dict, user_id)
+
         return jsonify({
             'success': True,
-            'options': json.loads(options_to_json(options))
+            'options': options_dict,
+            'prf_requested': True,
         })
         
     except Exception as e:
@@ -469,10 +505,12 @@ def passkey_register_complete():
             'credential_id': passkey.credential_id,
             'public_key': passkey.public_key,  # For local verification
             'message': 'Passkey registered successfully',
+            'prf_output_present': _credential_reports_prf(credential),
             'wallet_storage': {
                 'credentialId': passkey.credential_id,
                 'publicKey': passkey.public_key,
-                'algorithm': passkey_algorithm
+                'algorithm': passkey_algorithm,
+                'prfEnabled': _credential_reports_prf(credential),
             }
         })
         
@@ -536,10 +574,14 @@ def passkey_authenticate_begin():
         
         logger.info(f"🔐 Passkey authentication started")
         
+        options_dict = json.loads(options_to_json(options))
+        options_dict = _merge_prf_extensions(options_dict, user_id)
+
         return jsonify({
             'success': True,
-            'options': json.loads(options_to_json(options)),
-            'challenge_key': challenge_key
+            'options': options_dict,
+            'challenge_key': challenge_key,
+            'prf_requested': True,
         })
         
     except Exception as e:

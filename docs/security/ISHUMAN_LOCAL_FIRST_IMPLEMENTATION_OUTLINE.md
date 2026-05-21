@@ -27,7 +27,7 @@ Single checklist for hardening the isHuman wallet + verifier stack into a local-
 | 2     | P2       | Per-site signing keys + per-presentation challenges | complete (2026-05-21) |
 | 3     | P3       | Signed + timestamped Bloom revocation               | complete (2026-05-21) |
 | 4     | P4       | Bridge hardening + demo prod-guard                  | complete (2026-05-21) |
-| 5     | P5       | PRF-encrypted at-rest storage                       | not started           |
+| 5     | P5       | PRF-encrypted at-rest storage                       | complete (2026-05-21) |
 | 6     | P6       | Local-first verifier (one call per session)         | not started           |
 | 7     | P7       | Multi-issuer trust list + rotation                  | not started           |
 
@@ -208,9 +208,35 @@ Single checklist for hardening the isHuman wallet + verifier stack into a local-
 
 ## Phase 5 — PRF-encrypted at-rest storage (P5)
 
-**Status:** not started
+**Status:** complete (2026-05-21)
 
-Planned work: WebAuthn PRF-derived storage key and encrypted IDB migration.
+### 5.1 PRF-derived storage key plumbing
+
+**Implemented**
+
+- New [static/js/wallet-at-rest-crypto.js](static/js/wallet-at-rest-crypto.js):
+  - `buildRegistrationPrfExtensions` / `buildAuthenticationPrfExtensions`
+  - `extractPrfBytes`, `importStorageKey`
+  - AES-GCM envelope `enc_v1` via `encryptEnvelope` / `decryptEnvelope`
+- [static/js/lemma-wallet.js](static/js/lemma-wallet.js) (v5 IDB):
+  - Binds PRF output on `registerPasskey`, `unlock`, and `_requireFreshPasskeyAuth`
+  - Lazy migration from plaintext sensitive stores (`secrets`, `profiles`, `session`, `lemmas`)
+  - `wallet_meta` tracks `prfEnabled` / `migrationComplete`
+- [api/passkey_auth.py](api/passkey_auth.py) + [static/js/lemma-passkey.js](static/js/lemma-passkey.js):
+  - Server passkey begin endpoints merge PRF `extensions`
+  - Client forwards PRF salts and `clientExtensionResults`
+
+### 5.2 Acceptance criteria
+
+- Sensitive wallet records encrypt at rest when PRF output is available.
+- Legacy plaintext records migrate once after successful PRF unlock.
+- Encrypted stores fail closed without PRF key (`envelope_invalid` / `prf_required_for_encrypted_storage`).
+- Bridge credential store/get paths continue via wallet abstraction (no bridge rewrite required).
+
+### 5.3 Validation evidence
+
+- Local: `pytest tests/test_wallet_prf_storage.py tests/test_wallet_bridge_ishuman_flow.py -v`
+- Production deploy + smoke: see post-deploy notes after Heroku release.
 
 ---
 
@@ -235,3 +261,4 @@ Planned work: trust-list signature verification and issuer rotation protocol.
 - Unit + integration coverage for each phase.
 - Production smoke checks for revocation and customer-site flow.
 - Keep PPID/site-binding guardrails fail-closed.
+
