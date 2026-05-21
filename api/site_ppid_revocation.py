@@ -158,6 +158,12 @@ def revoke_site_bound_ppid(
 
     if commit:
         db.commit()
+        try:
+            from api.bloom_snapshot import invalidate_bloom_filter_cache
+
+            invalidate_bloom_filter_cache()
+        except Exception:
+            pass
 
     event_published = False
     if commit and not skip_bloom_sync:

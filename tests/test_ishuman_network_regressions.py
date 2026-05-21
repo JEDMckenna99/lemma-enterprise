@@ -139,6 +139,50 @@ def test_ishuman_verifier_waits_for_bridge_ready_and_uses_payload_site_id():
     assert "payload: {" in content
     assert "siteId: this.siteId" in content
     assert "credentialType: 'isHuman'" in content
+    assert "nonce: challengeNonce" in content
+    assert "challengeTimestamp" in content
+
+
+def test_ishuman_verifier_requires_signed_bloom_snapshot_checks():
+    sdk_path = os.path.join(
+        os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+        "static",
+        "js",
+        "ishuman-verifier.js",
+    )
+    with open(sdk_path, "r", encoding="utf-8") as handle:
+        content = handle.read()
+
+    assert "verifyBloomSnapshot" in content
+    assert "revocation_data_untrusted" in content
+    assert "snapshot_invalid_signature" in content
+    assert "snapshot_stale" in content
+    assert "DEFAULT_MAX_BLOOM_STALENESS_SECONDS" in content
+
+
+def test_ishuman_verifier_requires_presentation_signature_checks():
+    sdk_path = os.path.join(
+        os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+        "static",
+        "js",
+        "ishuman-verifier.js",
+    )
+    with open(sdk_path, "r", encoding="utf-8") as handle:
+        content = handle.read()
+
+    assert "missing_presentation_signature" in content
+    assert "invalid_presentation_signature" in content
+    assert "MAX_PRESENTATION_STALENESS_SECONDS" in content
+
+
+def test_site_signing_pubkey_validator_rejects_invalid_values():
+    from api.ishuman import _normalize_site_signing_pubkey
+
+    assert _normalize_site_signing_pubkey("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")
+    with pytest.raises(ValueError):
+        _normalize_site_signing_pubkey("")
+    with pytest.raises(ValueError):
+        _normalize_site_signing_pubkey("not-base64")
 
 
 def test_ishuman_issue_signs_string_claims_but_returns_typed_claims(monkeypatch):

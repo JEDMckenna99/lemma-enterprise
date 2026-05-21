@@ -140,6 +140,12 @@ class RevocationEventBus:
             
             if success:
                 logger.info(f"✅ Bloom filter updated for {credential_id} in {sync_time_ms:.2f}ms")
+                try:
+                    from api.bloom_snapshot import invalidate_bloom_filter_cache
+
+                    invalidate_bloom_filter_cache()
+                except Exception:
+                    pass
             else:
                 logger.warning(f"⚠️ Bloom filter sync failed for {credential_id}")
                 
@@ -186,6 +192,13 @@ class RevocationEventBus:
             logger.info(f"   Type: {credential_type}")
             logger.info(f"   Site: {scope}")
             logger.info(f"   Channel: {self.REVOCATION_CHANNEL}")
+
+            try:
+                from api.bloom_snapshot import invalidate_bloom_filter_cache
+
+                invalidate_bloom_filter_cache()
+            except Exception:
+                pass
             
             return True
             

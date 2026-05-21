@@ -24,9 +24,15 @@ import requests
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+from api.bloom_snapshot import verify_bloom_snapshot, verify_snapshot_matches_payload  # noqa: E402
 from api.ppid import canonicalize_rp_id, derive_ppid_from_wallet_secret  # noqa: E402
 from api.wallet_authn import issue_wallet_challenge  # noqa: E402
-from api.wallet_keys import build_wallet_assertion, register_self_signature  # noqa: E402
+from api.wallet_keys import (  # noqa: E402
+    build_wallet_assertion,
+    derive_wallet_signing_keypair,
+    pubkey_to_b64url,
+    register_self_signature,
+)
 from scripts.ishuman_prod_test_wallet import (  # noqa: E402
     prod_test_master_credential_id,
     prod_test_site_id,
@@ -129,6 +135,32 @@ def main() -> int:
     r = requests.get(f"{base}/api/health", timeout=30)
     results.append(_step("health", r.status_code == 200, f"HTTP {r.status_code}"))
 
+    # Signed bloom snapshot (Phase 3)
+    r = requests.get(f"{base}/api/revocation/bloom-filter", timeout=30)
+    bloom_data = r.json() if r.ok else {}
+    snapshot = bloom_data.get("snapshot") or {}
+    hashed_ids = bloom_data.get("hashed_revoked_ids") or []
+    bloom_ok = (
+        r.status_code == 200
+        and bloom_data.get("success")
+        and snapshot.get("signature")
+        and snapshot.get("sequence_number") is not None
+        and snapshot.get("generated_at")
+    )
+    if bloom_ok:
+        trust_ok, trust_reason = verify_bloom_snapshot(snapshot)
+        payload_ok, payload_reason = verify_snapshot_matches_payload(
+            snapshot,
+            hashed_revoked_ids=hashed_ids,
+        )
+        bloom_ok = trust_ok and payload_ok
+        bloom_detail = (
+            f"seq={snapshot.get('sequence_number')} trust={trust_reason} payload={payload_reason}"
+        )
+    else:
+        bloom_detail = f"HTTP {r.status_code} {str(bloom_data)[:180]}"
+    results.append(_step("signed bloom snapshot", bloom_ok, bloom_detail))
+
     # Site-block synthetic PPID
     r = requests.post(
         f"{base}/api/ishuman/site-block",
@@ -201,12 +233,14 @@ def main() -> int:
     results.append(_step("site-block fixture site_ppid", r.ok and block_data.get("success"), str(block_data)))
 
     if master_id:
+        _priv, pub = derive_wallet_signing_keypair(wallet_secret)
+        site_signing_pubkey = pubkey_to_b64url(pub)
         derive_body = {
             "master_credential_id": master_id,
             "wallet_id": wallet_id,
             "wallet_secret": wallet_secret,
             "target_site": target_site,
-            "site_signing_pubkey": "",
+            "site_signing_pubkey": site_signing_pubkey,
         }
         derive_body["wallet_assertion"] = _derive_assertion(base, wallet_id, wallet_secret, derive_body)
         r = requests.post(

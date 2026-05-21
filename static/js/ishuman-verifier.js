@@ -35,6 +35,10 @@ const LEMMA_ORIGIN = 'https://lemma.id';
 const BRIDGE_PATH = '/wallet/bridge';
 const BLOOM_SYNC_INTERVAL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 const BRIDGE_TIMEOUT_MS = 8000;
+const PRESENTATION_PREFIX = 'lemma:site-presentation:v1';
+const MAX_PRESENTATION_STALENESS_SECONDS = 120;
+const BLOOM_SNAPSHOT_PREFIX = 'lemma:bloom-snapshot:v1';
+const DEFAULT_MAX_BLOOM_STALENESS_SECONDS = 900;
 
 // ========================================================================
 // Hex / crypto helpers (self-contained — no dependency on LemmaVerifier)
@@ -55,9 +59,25 @@ function hexToBytes(hex) {
     return bytes;
 }
 
+function base64urlToBytes(text) {
+    const raw = String(text || '').trim();
+    if (!raw) return new Uint8Array(0);
+    const padded = raw.replace(/-/g, '+').replace(/_/g, '/')
+        + '='.repeat((4 - (raw.length % 4)) % 4);
+    const bin = atob(padded);
+    const out = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i += 1) out[i] = bin.charCodeAt(i);
+    return out;
+}
+
 async function sha256Digest(message) {
     const encoder = new TextEncoder();
     const data = encoder.encode(message);
+    const hash = await crypto.subtle.digest('SHA-256', data);
+    return new Uint8Array(hash);
+}
+
+async function sha256DigestBytes(data) {
     const hash = await crypto.subtle.digest('SHA-256', data);
     return new Uint8Array(hash);
 }
@@ -95,6 +115,90 @@ function canonicalMessage(credential) {
         issuedAt: credential.issuedAt,
         expiresAt: credential.expiresAt,
     });
+}
+
+function buildPresentationPayload({ nonceB64, credentialId, timestampSec }) {
+    return new TextEncoder().encode([
+        PRESENTATION_PREFIX,
+        String(nonceB64 || '').trim(),
+        String(credentialId || '').trim(),
+        String(timestampSec || ''),
+    ].join('\n'));
+}
+
+function buildBloomSignatureMessage(snapshot) {
+    return new TextEncoder().encode([
+        BLOOM_SNAPSHOT_PREFIX,
+        String(snapshot.sequence_number || ''),
+        String(snapshot.content_hash || ''),
+        String(snapshot.generated_at_unix || ''),
+        String(snapshot.valid_until_unix || ''),
+    ].join('\n'));
+}
+
+function parseIssuerPubkeyHex(snapshot) {
+    const direct = String(snapshot.issuer_pubkey || '').trim();
+    if (direct.length === 64) return direct;
+    const did = String(snapshot.issuer_did || '');
+    const fromDid = did.replace('did:lemma:', '').substring(0, 64);
+    return fromDid.length === 64 ? fromDid : '';
+}
+
+async function verifyBloomSnapshot(snapshot, hashedRevokedIds) {
+    if (!snapshot || typeof snapshot !== 'object') {
+        return { ok: false, reason: 'snapshot_missing' };
+    }
+
+    const required = ['sequence_number', 'generated_at_unix', 'valid_until_unix', 'content_hash', 'signature'];
+    for (const key of required) {
+        if (snapshot[key] === undefined || snapshot[key] === null || snapshot[key] === '') {
+            return { ok: false, reason: `snapshot_${key}_missing` };
+        }
+    }
+
+    const nowSec = Math.floor(Date.now() / 1000);
+    const generatedAt = Number(snapshot.generated_at_unix);
+    const validUntil = Number(snapshot.valid_until_unix);
+    const maxStale = Number(snapshot.max_staleness_seconds || DEFAULT_MAX_BLOOM_STALENESS_SECONDS);
+
+    if (nowSec < generatedAt) return { ok: false, reason: 'snapshot_not_yet_valid' };
+    if (nowSec > validUntil) return { ok: false, reason: 'snapshot_expired' };
+    if (nowSec - generatedAt > maxStale) return { ok: false, reason: 'snapshot_stale' };
+
+    const canonicalBody = JSON.stringify({
+        count: hashedRevokedIds.length,
+        hashed_revoked_ids: hashedRevokedIds,
+    });
+    const expectedHash = await sha256HexText(canonicalBody);
+    if (expectedHash !== String(snapshot.content_hash || '')) {
+        return { ok: false, reason: 'snapshot_content_hash_mismatch' };
+    }
+    if (snapshot.count === undefined || snapshot.count === null) {
+        return { ok: false, reason: 'snapshot_count_missing' };
+    }
+    if (Number(snapshot.count) !== hashedRevokedIds.length) {
+        return { ok: false, reason: 'snapshot_count_mismatch' };
+    }
+
+    const pubHex = parseIssuerPubkeyHex(snapshot);
+    if (!pubHex) return { ok: false, reason: 'snapshot_issuer_pubkey_missing' };
+
+    const messageHash = await sha256DigestBytes(buildBloomSignatureMessage(snapshot));
+    const valid = await verifyEd25519(
+        hexToBytes(pubHex),
+        messageHash,
+        base64urlToBytes(snapshot.signature),
+    );
+    if (!valid) return { ok: false, reason: 'snapshot_invalid_signature' };
+
+    return { ok: true, reason: 'ok' };
+}
+
+function randomNonceB64(length = 32) {
+    const bytes = crypto.getRandomValues(new Uint8Array(length));
+    let str = '';
+    for (let i = 0; i < bytes.length; i += 1) str += String.fromCharCode(bytes[i]);
+    return btoa(str).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
 }
 
 // ========================================================================
@@ -183,6 +287,8 @@ class IsHumanVerifier {
         this._pendingRequests = new Map();
         this._bloomFilter = new Set();
         this._bloomSyncedAt = 0;
+        this._bloomTrusted = false;
+        this._bloomSnapshot = null;
         this._messageListener = null;
         this._bridgeReadyPromise = null;
         this._resolveBridgeReady = null;
@@ -204,13 +310,14 @@ class IsHumanVerifier {
         await this._initPromise;
 
         // Step 1 — ask the wallet bridge for an isHuman credential
-        let credential;
+        let bridgeResult;
         try {
-            credential = await this._requestCredentialFromBridge();
+            bridgeResult = await this._requestCredentialFromBridge();
         } catch (err) {
             return this._result(false, null, 'bridge_unavailable', t0, err.message);
         }
 
+        const credential = bridgeResult?.credential || null;
         if (!credential) {
             return this._result(false, null, 'no_credential', t0);
         }
@@ -228,6 +335,10 @@ class IsHumanVerifier {
         }
 
         // Step 4 — revocation membership (SHA-256 hashed IDs/PPIDs/wallet IDs)
+        if (!this._bloomTrusted) {
+            return this._result(false, credential?.subject || null, 'revocation_data_untrusted', t0);
+        }
+
         if (this._bloomFilter.size) {
             const revocationCandidates = [];
             if (credential.id) revocationCandidates.push(credential.id);
@@ -268,7 +379,49 @@ class IsHumanVerifier {
             return this._result(false, credential.subject, 'verification_error', t0, err.message);
         }
 
-        // Step 6 — site-level block check (LOCAL — no network call to lemma.id)
+        // Step 6 — bridge presentation signature over verifier nonce
+        try {
+            const claims = credential.claims || credential.credentialSubject || {};
+            const siteSigningPubkey = claims.site_signing_pubkey || claims.siteSigningPubkey;
+            const presentationSignature = bridgeResult?.presentation_signature || '';
+            const presentationTimestamp = Number(bridgeResult?.presentation_timestamp || 0);
+            const presentationNonce = bridgeResult?.presentation_nonce || '';
+
+            if (!siteSigningPubkey) {
+                return this._result(false, credential.subject, 'missing_site_signing_pubkey', t0);
+            }
+            if (!presentationSignature || !presentationTimestamp || !presentationNonce) {
+                return this._result(false, credential.subject, 'missing_presentation_signature', t0);
+            }
+
+            const nowSec = Math.floor(Date.now() / 1000);
+            if (Math.abs(nowSec - presentationTimestamp) > MAX_PRESENTATION_STALENESS_SECONDS) {
+                return this._result(false, credential.subject, 'presentation_stale', t0);
+            }
+            if (presentationNonce !== bridgeResult.challenge_nonce) {
+                return this._result(false, credential.subject, 'presentation_nonce_mismatch', t0);
+            }
+
+            const presentationPayload = buildPresentationPayload({
+                nonceB64: presentationNonce,
+                credentialId: credential.id || '',
+                timestampSec: presentationTimestamp,
+            });
+            const presentationDigest = await sha256DigestBytes(presentationPayload);
+            const presentationValid = await verifyEd25519(
+                base64urlToBytes(siteSigningPubkey),
+                presentationDigest,
+                base64urlToBytes(presentationSignature),
+            );
+
+            if (!presentationValid) {
+                return this._result(false, credential.subject, 'invalid_presentation_signature', t0);
+            }
+        } catch (err) {
+            return this._result(false, credential.subject, 'presentation_verification_error', t0, err.message);
+        }
+
+        // Step 7 — site-level block check (LOCAL — no network call to lemma.id)
         // Sites manage their own block lists.  The optional callback lets the
         // site check its own database without breaking the local-first model.
         if (this.isBlockedLocally && credential.subject) {
@@ -388,21 +541,27 @@ class IsHumanVerifier {
                 reject(new Error('Bridge timeout'));
             }, BRIDGE_TIMEOUT_MS);
 
+            const challengeNonce = randomNonceB64(32);
+            const challengeTimestamp = Date.now();
             this._pendingRequests.set(requestId, (response) => {
                 clearTimeout(timeout);
                 if (response.error) {
                     resolve(null);
                 } else {
-                    resolve(response.credential || null);
+                    resolve({
+                        ...response,
+                        challenge_nonce: challengeNonce,
+                    });
                 }
             });
-
             this._bridgeIframe.contentWindow.postMessage({
                 type: 'GET_CREDENTIAL',
                 requestId,
                 payload: {
                     siteId: this.siteId,
                     credentialType: 'isHuman',
+                    nonce: challengeNonce,
+                    challengeTimestamp,
                 },
             }, this.lemmaOrigin);
         });
@@ -414,29 +573,64 @@ class IsHumanVerifier {
 
     async _syncBloom() {
         const now = Date.now();
-        if (this._bloomFilter.size && (now - this._bloomSyncedAt) < BLOOM_SYNC_INTERVAL_MS) {
+        if (
+            this._bloomTrusted
+            && this._bloomFilter.size
+            && (now - this._bloomSyncedAt) < BLOOM_SYNC_INTERVAL_MS
+        ) {
             return;
         }
 
         try {
             const res = await fetch(`${this.lemmaOrigin}/api/revocation/bloom-filter`);
             const data = await res.json();
-            if (data.success && data.hashed_revoked_ids) {
-                this._bloomFilter = new Set(data.hashed_revoked_ids);
+            const snapshot = data.snapshot || {
+                sequence_number: data.sequence_number,
+                generated_at_unix: data.generated_at_unix,
+                valid_until_unix: data.valid_until_unix,
+                content_hash: data.content_hash,
+                issuer_did: data.issuer_did,
+                issuer_pubkey: data.issuer_pubkey,
+                signature: data.signature,
+                count: data.count,
+                max_staleness_seconds: data.max_bloom_staleness_seconds,
+            };
+            const hashedIds = Array.isArray(data.hashed_revoked_ids) ? data.hashed_revoked_ids : [];
+
+            if (data.success && hashedIds.length >= 0 && snapshot.signature) {
+                const trust = await verifyBloomSnapshot(snapshot, hashedIds);
+                if (!trust.ok) {
+                    this._bloomTrusted = false;
+                    this._bloomSnapshot = null;
+                    if (this.debug) console.warn('[isHuman] bloom snapshot rejected:', trust.reason);
+                    return;
+                }
+                this._bloomFilter = new Set(hashedIds);
                 this._bloomSyncedAt = now;
+                this._bloomTrusted = true;
+                this._bloomSnapshot = snapshot;
                 try {
                     localStorage.setItem('ishuman_bloom', JSON.stringify({
-                        ids: data.hashed_revoked_ids,
+                        ids: hashedIds,
                         ts: now,
+                        snapshot,
                     }));
                 } catch { /* quota exceeded — ignore */ }
+            } else {
+                this._bloomTrusted = false;
             }
         } catch {
+            this._bloomTrusted = false;
             try {
                 const cached = JSON.parse(localStorage.getItem('ishuman_bloom') || '{}');
-                if (cached.ids) {
-                    this._bloomFilter = new Set(cached.ids);
-                    this._bloomSyncedAt = cached.ts || 0;
+                if (cached.ids && cached.snapshot) {
+                    const trust = await verifyBloomSnapshot(cached.snapshot, cached.ids);
+                    if (trust.ok) {
+                        this._bloomFilter = new Set(cached.ids);
+                        this._bloomSyncedAt = cached.ts || 0;
+                        this._bloomTrusted = true;
+                        this._bloomSnapshot = cached.snapshot;
+                    }
                 }
             } catch { /* ignore */ }
         }

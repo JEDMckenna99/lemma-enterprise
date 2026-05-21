@@ -61,6 +61,7 @@ def get_revocation_list():
 _BLOOM_CACHE = {
     "built_at": 0.0,
     "count": None,
+    "sequence": None,
     "payload": None,
 }
 
@@ -173,12 +174,21 @@ def get_bloom_filter():
             logger.error(f"❌ Failed to query revocations: {e}")
             revoked_ids = []  # Fail safe - return empty list
         
+        from api.bloom_snapshot import (
+            fetch_revocation_sequence_number,
+            sign_bloom_snapshot,
+            verify_snapshot_matches_payload,
+        )
+
+        sequence_number = fetch_revocation_sequence_number()
+
         # Cache to avoid rebuilding on every request
         cache_ttl_seconds = int(os.getenv("LEMMA_REVOCATION_FILTER_CACHE_TTL_SECONDS", "60"))
         now_ts = time.time()
         if (
             _BLOOM_CACHE["payload"] is not None
             and _BLOOM_CACHE["count"] == len(revoked_ids)
+            and _BLOOM_CACHE["sequence"] == sequence_number
             and (now_ts - _BLOOM_CACHE["built_at"]) < cache_ttl_seconds
         ):
             return jsonify(_BLOOM_CACHE["payload"]), 200
@@ -241,19 +251,42 @@ def get_bloom_filter():
                 # Non-fatal: keep serving hashed set even if bloom generation fails.
                 logger.warning(f"⚠️ Bloom filter generation failed, serving hashed set only: {e}", exc_info=True)
 
+        snapshot = sign_bloom_snapshot(
+            hashed_revoked_ids=hashed_revoked_ids,
+            sequence_number=sequence_number,
+            generated_at=datetime.utcnow(),
+        )
+        ok_payload, payload_reason = verify_snapshot_matches_payload(
+            snapshot,
+            hashed_revoked_ids=hashed_revoked_ids,
+        )
+        if not ok_payload:
+            logger.error("Bloom snapshot self-check failed: %s", payload_reason)
+            return jsonify({"success": False, "error": "bloom_snapshot_build_failed"}), 500
+
         response = {
             'success': True,
             # Backwards-compatible payload (exact membership, no false positives)
             'filter_type': 'global_sha256',  # SHA-256 hashed IDs for privacy
             'hashed_revoked_ids': hashed_revoked_ids,  # SHA-256 hex hashes (client hashes locally to check)
             'count': len(hashed_revoked_ids),
-            'version': int(time.time()),  # timestamp version (monotonic-enough for caching)
-            'valid_until': valid_until.isoformat(),
+            'version': sequence_number,
+            'generated_at': snapshot.get('generated_at'),
+            'sequence_number': sequence_number,
+            'valid_until': snapshot.get('valid_until') or valid_until.isoformat(),
             'sync_interval_days': 7,
             'privacy_mechanism': 'sha256_web_crypto',  # Web Crypto API provides one-way hashing
             'message': 'Global revocation list (SHA-256 hashed) - client hashes credential ID locally using Web Crypto API to check',
             'hash_algorithm': 'SHA-256',
             'client_implementation': 'crypto.subtle.digest',
+            # Phase 3 signed envelope
+            'snapshot': snapshot,
+            'issuer_did': snapshot.get('issuer_did'),
+            'issuer_pubkey': snapshot.get('issuer_pubkey'),
+            'signature': snapshot.get('signature'),
+            'content_hash': snapshot.get('content_hash'),
+            'algorithm': snapshot.get('algorithm'),
+            'max_bloom_staleness_seconds': snapshot.get('max_staleness_seconds'),
             # New Bloom payload (compact, false positives possible)
             'bloom_filter': bloom_meta,
             'filter_bytes': bloom_filter_b64,
@@ -263,6 +296,7 @@ def get_bloom_filter():
 
         _BLOOM_CACHE["built_at"] = now_ts
         _BLOOM_CACHE["count"] = len(revoked_ids)
+        _BLOOM_CACHE["sequence"] = sequence_number
         _BLOOM_CACHE["payload"] = response
 
         return jsonify(response), 200
