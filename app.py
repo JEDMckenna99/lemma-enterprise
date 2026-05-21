@@ -99,16 +99,16 @@ def create_app():
         # Prevent MIME type sniffing
         response.headers['X-Content-Type-Options'] = 'nosniff'
         
-        # Prevent clickjacking - but allow for wallet bridge (needs to be embedded in iframes)
-        # The bridge route sets its own X-Frame-Options to ALLOWALL
+        # Prevent clickjacking — bridge route relies on CSP frame-ancestors instead of XFO
         if 'X-Frame-Options' not in response.headers:
             response.headers['X-Frame-Options'] = 'DENY'
         
         # XSS Protection (legacy but still useful)
         response.headers['X-XSS-Protection'] = '1; mode=block'
         
-        # Referrer Policy - Don't leak URLs to third parties
-        response.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
+        # Referrer Policy - Don't leak URLs to third parties (routes may override, e.g. bridge)
+        if 'Referrer-Policy' not in response.headers:
+            response.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
         
         # Permissions Policy - Disable unnecessary browser features
         response.headers['Permissions-Policy'] = 'geolocation=(), microphone=(), camera=()'

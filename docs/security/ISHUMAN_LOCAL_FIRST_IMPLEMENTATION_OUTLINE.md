@@ -198,7 +198,11 @@ Single checklist for hardening the isHuman wallet + verifier stack into a local-
 ### 4.4 Validation evidence
 
 - Local: `pytest tests/test_wallet_bridge_origin_enforcement.py tests/test_ishuman_demo.py tests/test_env_parity.py -v` — 38 passed
-- Production deploy + smoke: see prod-validation notes after Heroku release
+- Production deploy:
+  - Heroku app `lemma-enterprise` release `v2075` (`Deploy 5e811266`)
+- Production smoke (`scripts/run_ishuman_prod_revocation_smoke.py` against `https://lemma.id`):
+  - Result: **11/11 passed** (includes demo prod-guard steps `verify-once blocked` / `test-complete blocked`)
+- Note: Heroku `ENVIRONMENT` is currently `staging`; runtime `prod_test_verify_forbidden` engages when `ENVIRONMENT=production`. Demo token DOM omission follows the same flag.
 
 ---
 
