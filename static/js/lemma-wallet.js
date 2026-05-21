@@ -109,6 +109,8 @@ class LemmaWallet {
         this._debug = options.debug === true || this._logLevel === 'debug';
         this._installSdkLogGate();
         this._isClearingSession = false;
+        this._walletSigningKey = null;
+        this._signingKeyRegistered = false;
     }
     
     /** @private Log only when debug is enabled */
@@ -2367,11 +2369,125 @@ class LemmaWallet {
             }
         }
 
+        this._registerSigningKeyIfNeeded().catch((err) => {
+            console.warn('[Lemma] Wallet signing key registration skipped:', err?.message || err);
+        });
+
         return {
             success: true,
             credentialId: passkeyRecord.credentialId,
             walletId: walletId.value,
             walletSecret: walletSecret.secret  // Return for immediate use
+        };
+    }
+
+    // ========================================
+    // WALLET ED25519 SIGNING (Phase 1)
+    // ========================================
+
+    _getLemmaKeys() {
+        if (typeof window === 'undefined' || !window.LemmaKeys) {
+            throw new Error('LemmaKeys helpers not loaded (include /static/js/lemma-keys.js)');
+        }
+        return window.LemmaKeys;
+    }
+
+    async _deriveWalletSigningKey() {
+        if (this._walletSigningKey) return this._walletSigningKey;
+        if (!this.isUnlocked || !this.isUnlocked()) {
+            throw new Error('Wallet must be unlocked to derive signing key');
+        }
+        const secret = this.session?.walletSecret;
+        if (!secret) {
+            const secretRecord = await this._get('secrets', 'master');
+            if (!secretRecord?.secret) throw new Error('wallet_secret unavailable');
+            this.session.walletSecret = secretRecord.secret;
+        }
+        const keys = this._getLemmaKeys();
+        const keypair = await keys.deriveWalletSigningKeypair(this.session.walletSecret);
+        this._walletSigningKey = keypair;
+        return keypair;
+    }
+
+    async getWalletSigningPubkey() {
+        const keypair = await this._deriveWalletSigningKey();
+        const keys = this._getLemmaKeys();
+        return keys.base64urlEncode(keypair.publicKey);
+    }
+
+    async _registerSigningKeyIfNeeded() {
+        if (this._signingKeyRegistered) return { success: true, cached: true };
+        if (!this.isUnlocked || !this.isUnlocked()) return { success: false, skipped: true };
+        const walletId = this.session?.walletId;
+        if (!walletId) return { success: false, skipped: true };
+
+        const keys = this._getLemmaKeys();
+        const keypair = await this._deriveWalletSigningKey();
+        const pubkeyB64 = keys.base64urlEncode(keypair.publicKey);
+        const registerPayload = keys.buildRegisterPayload({ walletId, pubkeyB64 });
+        const signature = await keypair.sign(registerPayload);
+
+        const response = await fetch('/api/wallet/register-signing-key', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({
+                wallet_id: walletId,
+                pubkey: pubkeyB64,
+                signature: keys.base64urlEncode(signature),
+            }),
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok || data.success === false) {
+            throw new Error(data.error || `register-signing-key failed (${response.status})`);
+        }
+        this._signingKeyRegistered = true;
+        return data;
+    }
+
+    async requestWalletChallenge() {
+        if (!this.isUnlocked || !this.isUnlocked()) {
+            throw new Error('Wallet must be unlocked to request challenge');
+        }
+        const walletId = this.session?.walletId;
+        if (!walletId) throw new Error('wallet_id unavailable');
+
+        const response = await fetch('/api/wallet/challenge', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ wallet_id: walletId }),
+        });
+        const data = await response.json();
+        if (!response.ok || !data.nonce) {
+            throw new Error(data.error || `wallet challenge failed (${response.status})`);
+        }
+        return data;
+    }
+
+    async buildWalletAssertion(fieldNames, fieldValues = {}) {
+        if (!this.isUnlocked || !this.isUnlocked()) {
+            throw new Error('Wallet must be unlocked to build assertion');
+        }
+        await this._registerSigningKeyIfNeeded();
+        const challenge = await this.requestWalletChallenge();
+        const walletId = this.session.walletId;
+        const keys = this._getLemmaKeys();
+        const orderedFields = (fieldNames || []).map((name) => {
+            const key = String(name || '').trim();
+            const raw = fieldValues[key] ?? fieldValues[name] ?? '';
+            return [key, raw == null ? '' : String(raw)];
+        });
+        const payload = keys.buildAssertionPayload({
+            walletId,
+            nonceB64: challenge.nonce,
+            fields: orderedFields,
+        });
+        const keypair = await this._deriveWalletSigningKey();
+        const signature = await keypair.sign(payload);
+        return {
+            nonce: challenge.nonce,
+            signature: keys.base64urlEncode(signature),
         };
     }
 
@@ -2605,6 +2721,10 @@ class LemmaWallet {
             this.startSessionHeartbeat(300000); // 5 minute backup (primary is tab focus)
         }
 
+        this._registerSigningKeyIfNeeded().catch((err) => {
+            console.warn('[Lemma] Wallet signing key registration skipped:', err?.message || err);
+        });
+
         return {
             success: true,
             expiresAt: this.session.expiresAt,
@@ -2645,6 +2765,8 @@ class LemmaWallet {
             expiresAt: null,
             walletSecret: null
         };
+        this._walletSigningKey = null;
+        this._signingKeyRegistered = false;
         await this._delete('session', 'current');
         console.log('[Lemma] Lock: local session cleared');
         

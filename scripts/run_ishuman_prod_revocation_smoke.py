@@ -25,6 +25,8 @@ import requests
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from api.ppid import canonicalize_rp_id, derive_ppid_from_wallet_secret  # noqa: E402
+from api.wallet_authn import issue_wallet_challenge, register_wallet_signing_key  # noqa: E402
+from api.wallet_keys import build_wallet_assertion, register_self_signature  # noqa: E402
 from scripts.ishuman_prod_test_wallet import (  # noqa: E402
     prod_test_master_credential_id,
     prod_test_site_id,
@@ -55,6 +57,49 @@ def _load_site_api_key(site_id: str) -> str:
         if line.startswith("lm_"):
             return line
     raise RuntimeError(f"Could not load API key for site {site_id}")
+
+
+def _ensure_wallet_registered(base: str, wallet_id: str, wallet_secret: str) -> None:
+    pubkey_b64, sig_b64 = register_self_signature(wallet_id, wallet_secret)
+    local = register_wallet_signing_key(
+        wallet_id=wallet_id,
+        pubkey_b64=pubkey_b64,
+        signature_b64=sig_b64,
+    )
+    if not local.ok:
+        raise RuntimeError(f"local register_wallet_signing_key failed: {local.error}")
+    r = requests.post(
+        f"{base}/api/wallet/register-signing-key",
+        json={"wallet_id": wallet_id, "pubkey": pubkey_b64, "signature": sig_b64},
+        timeout=30,
+    )
+    if r.status_code not in (200, 403):
+        raise RuntimeError(f"prod register-signing-key failed: HTTP {r.status_code} {r.text[:200]}")
+
+
+def _derive_assertion(base: str, wallet_id: str, wallet_secret: str, body: dict) -> dict:
+    _ensure_wallet_registered(base, wallet_id, wallet_secret)
+    challenge = issue_wallet_challenge(wallet_id=wallet_id)
+    remote = requests.post(
+        f"{base}/api/wallet/challenge",
+        json={"wallet_id": wallet_id},
+        timeout=30,
+    )
+    if remote.ok and remote.json().get("nonce"):
+        challenge = remote.json()
+    field_names = ["master_credential_id", "target_site", "site_signing_pubkey"]
+    field_values = {
+        key: "" if body.get(key) is None else str(body.get(key, ""))
+        for key in field_names
+    }
+    assertion = build_wallet_assertion(
+        wallet_id=wallet_id,
+        wallet_secret=wallet_secret,
+        field_names=field_names,
+        field_values=field_values,
+        nonce_b64=challenge["nonce"],
+    )
+    return {"nonce": assertion.nonce, "signature": assertion.signature}
 
 
 def _step(name: str, ok: bool, detail: str) -> dict:
@@ -163,14 +208,17 @@ def main() -> int:
     results.append(_step("site-block fixture site_ppid", r.ok and block_data.get("success"), str(block_data)))
 
     if master_id:
+        derive_body = {
+            "master_credential_id": master_id,
+            "wallet_id": wallet_id,
+            "wallet_secret": wallet_secret,
+            "target_site": target_site,
+            "site_signing_pubkey": "",
+        }
+        derive_body["wallet_assertion"] = _derive_assertion(base, wallet_id, wallet_secret, derive_body)
         r = requests.post(
             f"{base}/api/ishuman/derive-site-proof",
-            json={
-                "master_credential_id": master_id,
-                "wallet_id": wallet_id,
-                "wallet_secret": wallet_secret,
-                "target_site": target_site,
-            },
+            json=derive_body,
             timeout=30,
         )
         denied = r.status_code == 403 and (r.json().get("error") or "") in {

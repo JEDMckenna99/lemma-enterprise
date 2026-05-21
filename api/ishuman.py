@@ -57,6 +57,7 @@ def _issue_ishuman_credential(
     ppid: str,
     wallet_id: Optional[str] = None,
     site_id: Optional[str] = None,
+    site_signing_pubkey: Optional[str] = None,
 ) -> dict:
     """Sign and return a new isHuman credential for *ppid*.
 
@@ -77,6 +78,8 @@ def _issue_ishuman_credential(
         "issuedAt": str(now),
         "expiresAt": str(now + ISHUMAN_CREDENTIAL_TTL_DAYS * 86400),
     }
+    if site_signing_pubkey:
+        claims["site_signing_pubkey"] = site_signing_pubkey
 
     # The Rust issuer accepts string claim values. Keep the public credential
     # shape typed, but sign over deterministic string forms that the browser
@@ -123,22 +126,27 @@ def _derive_ppid_for_site(
     wallet_secret: Optional[str] = None,
     wallet_id: Optional[str] = None,
 ) -> str:
-    """Derive PPID using wallet secret when available.
+    """Derive PPID from wallet_secret + normalized site binding only."""
+    from api.ppid import derive_ppid_from_wallet_secret
 
-    Canonical derivation is wallet_secret + normalized site binding.
-    If wallet_secret is unavailable (legacy flow), fall back to wallet_id-based
-    derivation via the passkey path to preserve continuity.
-    """
-    from api.ppid import derive_ppid_from_wallet_secret, derive_ppid_from_passkey
+    if not wallet_secret:
+        raise ValueError("wallet_secret required for canonical PPID derivation")
+    return derive_ppid_from_wallet_secret(wallet_secret, rp_id)
 
-    if wallet_secret:
-        return derive_ppid_from_wallet_secret(wallet_secret, rp_id)
 
-    if wallet_id:
-        logger.warning("isHuman PPID fallback: deriving from wallet_id for rp=%s", rp_id)
-        return derive_ppid_from_passkey(wallet_id, rp_id)
+def _require_wallet_assertion(body: dict, *, field_names: list[str]) -> tuple:
+    """Verify wallet_assertion on protected endpoints; return (error_response, None) or (None, ok)."""
+    from api.wallet_authn import assertion_error_response, verify_assertion_from_body
 
-    raise ValueError("wallet_secret or wallet_id required for PPID derivation")
+    wallet_id = str(body.get("wallet_id") or "").strip()
+    result, _fields = verify_assertion_from_body(
+        body,
+        wallet_id=wallet_id,
+        field_names=field_names,
+    )
+    if not result.ok:
+        return assertion_error_response(result), None
+    return None, wallet_id
 
 
 def _deny_if_derivation_revoked(
@@ -179,26 +187,17 @@ def _deny_if_derivation_revoked(
 # 1. Start Verification
 # ---------------------------------------------------------------------------
 
-@ishuman_bp.route("/api/ishuman/start-verification", methods=["POST"])
-@cross_origin()
-def start_verification():
-    """Create a Stripe Identity session for a new isHuman verification.
-
-    Request body::
-
-        {
-            "wallet_id": "...",       // browser wallet id
-            "return_url": "..."       // optional, defaults to lemma.id/app
-        }
-
-    Returns ``client_secret`` that the frontend uses to mount the Stripe
-    Identity modal.
-    """
-    body = request.get_json(silent=True) or {}
+def start_verification_for_body(body: dict) -> tuple[dict, int]:
+    """Run start-verification logic for a JSON body (shared with demo routes)."""
+    body = body or {}
     wallet_id = body.get("wallet_id")
     wallet_secret = body.get("wallet_secret")
     if not wallet_id:
-        return jsonify({"success": False, "error": "wallet_id required"}), 400
+        return {"success": False, "error": "wallet_id required"}, 400
+
+    err, _wid = _require_wallet_assertion(body, field_names=["return_url"])
+    if err:
+        return err[0].get_json(), err[1]
 
     return_url = body.get(
         "return_url",
@@ -214,7 +213,7 @@ def start_verification():
 
     if not result.get("success"):
         logger.error("Stripe Identity session creation failed: %s", result)
-        return jsonify({"success": False, "error": result.get("error", "stripe_error")}), 502
+        return {"success": False, "error": result.get("error", "stripe_error")}, 502
 
     session_id = f"ishuman_sess_{secrets.token_urlsafe(16)}"
 
@@ -245,19 +244,39 @@ def start_verification():
     except Exception:
         db.rollback()
         logger.exception("Failed to persist isHuman verification session")
-        return jsonify({"success": False, "error": "verification_session_persist_failed"}), 500
+        return {"success": False, "error": "verification_session_persist_failed"}, 500
     finally:
         db.close()
 
     logger.info("isHuman verification started: %s (stripe=%s)", session_id, result["session_id"])
 
-    return jsonify({
+    return {
         "success": True,
         "session_id": session_id,
         "stripe_session_id": result["session_id"],
         "client_secret": result["client_secret"],
         "url": result.get("url"),
-    })
+    }, 200
+
+
+@ishuman_bp.route("/api/ishuman/start-verification", methods=["POST"])
+@cross_origin()
+def start_verification():
+    """Create a Stripe Identity session for a new isHuman verification.
+
+    Request body::
+
+        {
+            "wallet_id": "...",       // browser wallet id
+            "return_url": "..."       // optional, defaults to lemma.id/app
+        }
+
+    Returns ``client_secret`` that the frontend uses to mount the Stripe
+    Identity modal.
+    """
+    body = request.get_json(silent=True) or {}
+    payload, status = start_verification_for_body(body)
+    return jsonify(payload), status
 
 
 # ---------------------------------------------------------------------------
@@ -745,12 +764,23 @@ def derive_site_proof():
     wallet_id = body.get("wallet_id")
     wallet_secret = body.get("wallet_secret")
     target_site = body.get("target_site")
+    site_signing_pubkey = (body.get("site_signing_pubkey") or "").strip()
 
     if not master_credential_id or not wallet_id or not target_site:
         return jsonify({
             "success": False,
             "error": "master_credential_id, wallet_id, and target_site required",
         }), 400
+
+    if not wallet_secret:
+        return jsonify({"success": False, "error": "wallet_secret required"}), 400
+
+    err, _wid = _require_wallet_assertion(
+        body,
+        field_names=["master_credential_id", "target_site", "site_signing_pubkey"],
+    )
+    if err:
+        return err
 
     from api.ppid import canonicalize_rp_id
     target_site = canonicalize_rp_id(target_site)
@@ -811,7 +841,12 @@ def derive_site_proof():
                 wallet_secret=wallet_secret,
                 wallet_id=wallet_id,
             )
-            credential = _issue_ishuman_credential(ppid, wallet_id, site_id=target_site)
+            credential = _issue_ishuman_credential(
+                ppid,
+                wallet_id,
+                site_id=target_site,
+                site_signing_pubkey=site_signing_pubkey or None,
+            )
             credential["id"] = existing.derived_credential_id
             return jsonify({"success": True, "credential": credential, "cached": True})
 
@@ -823,7 +858,12 @@ def derive_site_proof():
         )
 
         # 4. Issue per-site credential
-        credential = _issue_ishuman_credential(site_ppid, wallet_id, site_id=target_site)
+        credential = _issue_ishuman_credential(
+            site_ppid,
+            wallet_id,
+            site_id=target_site,
+            site_signing_pubkey=site_signing_pubkey or None,
+        )
 
         # 5. Record the mapping
         derived = DerivedCredential(

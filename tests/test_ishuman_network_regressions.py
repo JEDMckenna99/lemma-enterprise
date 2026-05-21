@@ -1,6 +1,7 @@
 import os
 import sys
 
+import pytest
 from flask import Flask
 
 
@@ -16,7 +17,7 @@ def _app_with_ishuman():
     return app
 
 
-def test_start_verification_fails_closed_when_persistence_fails(monkeypatch):
+def test_start_verification_fails_closed_when_persistence_fails(monkeypatch, attach_wallet_assertion):
     # Needed because monkeypatching api.database imports the module.
     monkeypatch.setenv("DATABASE_URL", "sqlite:///:memory:")
     app = _app_with_ishuman()
@@ -44,12 +45,26 @@ def test_start_verification_fails_closed_when_persistence_fails(monkeypatch):
         def close(self):
             return None
 
+    from api.wallet_authn import Result
+
     monkeypatch.setattr("api.database.SessionLocal", lambda: _FailingDbSession())
+    monkeypatch.setattr(
+        "api.wallet_authn.register_wallet_signing_key",
+        lambda **kwargs: Result(True),
+    )
+    monkeypatch.setattr(
+        "api.wallet_authn.verify_assertion_from_body",
+        lambda body, **kwargs: (Result(True), {}),
+    )
 
     with app.test_client() as client:
         resp = client.post(
             "/api/ishuman/start-verification",
-            json={"wallet_id": "wallet_test_abc"},
+            json=attach_wallet_assertion(
+                {"wallet_id": "wallet_test_abc", "return_url": "https://lemma.id/app"},
+                ["return_url"],
+                wallet_secret="ab" * 32,
+            ),
         )
     assert resp.status_code == 500
     payload = resp.get_json()
@@ -78,24 +93,20 @@ def test_ppid_derivation_prefers_wallet_secret(monkeypatch):
     assert "example.com" in ppid
 
 
-def test_ppid_derivation_falls_back_to_wallet_id(monkeypatch):
+def test_ppid_derivation_requires_wallet_secret(monkeypatch):
     from api.ishuman import _derive_ppid_for_site
 
     monkeypatch.setattr(
         "api.ppid.derive_ppid_from_wallet_secret",
         lambda wallet_secret, rp_id: f"secret::{wallet_secret}::{rp_id}",
     )
-    monkeypatch.setattr(
-        "api.ppid.derive_ppid_from_passkey",
-        lambda passkey_credential_id, rp_id: f"passkey::{passkey_credential_id}::{rp_id}",
-    )
 
-    ppid = _derive_ppid_for_site(
-        rp_id="lemma.id",
-        wallet_secret=None,
-        wallet_id="wallet_id_123",
-    )
-    assert ppid == "passkey::wallet_id_123::lemma.id"
+    with pytest.raises(ValueError, match="wallet_secret required"):
+        _derive_ppid_for_site(
+            rp_id="lemma.id",
+            wallet_secret=None,
+            wallet_id="wallet_id_123",
+        )
 
 
 def test_ishuman_verifier_uses_sha256_revocation_membership():

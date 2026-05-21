@@ -436,74 +436,6 @@ def _complete_demo_test_session(
         db.close()
 
 
-def _start_demo_verification_session(
-    *,
-    wallet_id: str,
-    wallet_secret: str = "",
-    return_url: str = "",
-) -> tuple[dict, int]:
-    """Create a pending isHuman verification session for demo test mode."""
-    import secrets as _secrets
-
-    from billing.stripe_manager import StripeManager
-    from api.database import IsHumanVerification, SessionLocal
-    from api.ishuman import _derive_ppid_for_site
-
-    if not wallet_id:
-        return {"success": False, "error": "wallet_id required"}, 400
-
-    return_url = return_url or os.getenv(
-        "ISHUMAN_RETURN_URL",
-        "https://lemma.id/demo/ishuman",
-    )
-
-    mgr = StripeManager()
-    result = mgr.create_identity_verification_session(
-        user_id=wallet_id,
-        return_url=return_url,
-    )
-    if not result.get("success"):
-        return {"success": False, "error": result.get("error", "stripe_error")}, 502
-
-    session_id = f"ishuman_sess_{_secrets.token_urlsafe(16)}"
-    db = SessionLocal()
-    try:
-        derived_ppid = None
-        if wallet_secret:
-            try:
-                derived_ppid = _derive_ppid_for_site(
-                    rp_id="lemma.id",
-                    wallet_secret=wallet_secret,
-                    wallet_id=wallet_id,
-                )
-            except Exception:
-                pass
-
-        verification = IsHumanVerification(
-            session_id=session_id,
-            stripe_session_id=result["session_id"],
-            wallet_id=wallet_id,
-            ppid=derived_ppid,
-            status="pending",
-            metadata_json={"return_url": return_url, "demo_verify_once": True},
-        )
-        db.add(verification)
-        db.commit()
-    except Exception:
-        db.rollback()
-        raise
-    finally:
-        db.close()
-
-    return {
-        "success": True,
-        "session_id": session_id,
-        "stripe_session_id": result["session_id"],
-        "client_secret": result.get("client_secret"),
-        "url": result.get("url"),
-    }, 200
-
-
 @ishuman_demo_bp.route("/api/demo/ishuman/test-complete-verification", methods=["POST"])
 def ishuman_demo_test_complete_verification():
     """Complete a Stripe test-mode isHuman session for automated demos.
@@ -550,11 +482,14 @@ def ishuman_demo_verify_once_test_mode():
     if not wallet_id:
         return jsonify({"success": False, "error": "wallet_id required"}), 400
 
-    start_payload, start_status = _start_demo_verification_session(
-        wallet_id=wallet_id,
-        wallet_secret=wallet_secret,
-        return_url=return_url,
-    )
+    from api.ishuman import start_verification_for_body
+
+    start_body = dict(body)
+    start_body.setdefault("wallet_id", wallet_id)
+    start_body.setdefault("wallet_secret", wallet_secret)
+    if return_url:
+        start_body["return_url"] = return_url
+    start_payload, start_status = start_verification_for_body(start_body)
     if start_status != 200:
         return jsonify(start_payload), start_status
 
@@ -580,9 +515,16 @@ def ishuman_demo_verify_once_test_mode():
 def ishuman_demo_probe_derive():
     """Server-side derive probe — proves enforcement is not UI-only."""
     from api.database import IsHumanVerification, SessionLocal
-    from api.ishuman import _deny_if_derivation_revoked
+    from api.ishuman import _deny_if_derivation_revoked, _require_wallet_assertion
 
     body = request.get_json(silent=True) or {}
+    err, _wid = _require_wallet_assertion(
+        body,
+        field_names=["site_slug", "master_credential_id"],
+    )
+    if err:
+        return err
+
     slug = (body.get("site_slug") or "tickets").strip().lower()
     spec, site = _site_for_slug(slug)
     if not site:
@@ -649,9 +591,17 @@ def ishuman_demo_probe_derive():
 def ishuman_demo_force_reverify():
     """Demo-only: block ticketing PPID and clear derived credential for fresh IDV."""
     from api.database import DerivedCredential, SessionLocal
+    from api.ishuman import _require_wallet_assertion
     from api.site_ppid_revocation import revoke_site_bound_ppid
 
     body = request.get_json(silent=True) or {}
+    err, _wid = _require_wallet_assertion(
+        body,
+        field_names=["ppid", "master_credential_id"],
+    )
+    if err:
+        return err
+
     ppid = (body.get("ppid") or "").strip()
     master_credential_id = (body.get("master_credential_id") or "").strip()
     wallet_id = (body.get("wallet_id") or "").strip()

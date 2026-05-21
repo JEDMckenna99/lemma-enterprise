@@ -250,12 +250,16 @@
 
   async function startIdentityVerification() {
     const { walletId, walletSecret } = await getWalletContext();
+    if (!state.wallet) await initWallet();
+    const returnUrl = `${window.location.origin}${window.location.pathname}?verification_return=true`;
+    const walletAssertion = await state.wallet.buildWalletAssertion(['return_url'], { return_url: returnUrl });
     const payload = await requestJson('/api/ishuman/start-verification', {
       method: 'POST',
       body: JSON.stringify({
         wallet_id: walletId,
         wallet_secret: walletSecret,
-        return_url: `${window.location.origin}${window.location.pathname}?verification_return=true`,
+        return_url: returnUrl,
+        wallet_assertion: walletAssertion,
       }),
     });
 
@@ -297,10 +301,18 @@
 
   async function verifyOnceTestMode() {
     const { walletId, walletSecret } = await getWalletContext();
+    if (!state.wallet) await initWallet();
+    const returnUrl = `${window.location.origin}${window.location.pathname}?verification_return=true`;
+    const walletAssertion = await state.wallet.buildWalletAssertion(['return_url'], { return_url: returnUrl });
     const payload = await requestJson('/api/demo/ishuman/verify-once-test-mode', {
       method: 'POST',
       headers: demoHeaders(),
-      body: JSON.stringify({ wallet_id: walletId, wallet_secret: walletSecret }),
+      body: JSON.stringify({
+        wallet_id: walletId,
+        wallet_secret: walletSecret,
+        return_url: returnUrl,
+        wallet_assertion: walletAssertion,
+      }),
     });
 
     state.sessionId = payload.session_id;
@@ -432,6 +444,11 @@
 
   async function probeDerive(slug) {
     const { walletId, walletSecret } = await getWalletContext();
+    if (!state.wallet) await initWallet();
+    const walletAssertion = await state.wallet.buildWalletAssertion(
+      ['site_slug', 'master_credential_id'],
+      { site_slug: slug, master_credential_id: state.masterCredentialId },
+    );
     const payload = await requestJson('/api/demo/ishuman/probe-derive', {
       method: 'POST',
       body: JSON.stringify({
@@ -439,6 +456,7 @@
         wallet_id: walletId,
         wallet_secret: walletSecret,
         master_credential_id: state.masterCredentialId,
+        wallet_assertion: walletAssertion,
       }),
     });
     const el = $('ih-abuse-derive');
@@ -548,12 +566,18 @@
     if (!result.ppid) throw new Error('Ticketing PPID unavailable');
     const { walletId } = await getWalletContext();
 
+    if (!state.wallet) await initWallet();
+    const walletAssertion = await state.wallet.buildWalletAssertion(
+      ['ppid', 'master_credential_id'],
+      { ppid: result.ppid, master_credential_id: state.masterCredentialId },
+    );
     const payload = await requestJson('/api/demo/ishuman/force-reverify', {
       method: 'POST',
       body: JSON.stringify({
         ppid: result.ppid,
         wallet_id: walletId,
         master_credential_id: state.masterCredentialId,
+        wallet_assertion: walletAssertion,
       }),
     });
 

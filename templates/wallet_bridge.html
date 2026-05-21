@@ -18,7 +18,8 @@
     -->
 </head>
 <body>
-<script src="/static/js/lemma-wallet.js?v=2473" nonce="{{ csp_nonce }}"></script>
+<script src="/static/js/lemma-keys.js?v=1" nonce="{{ csp_nonce }}"></script>
+<script src="/static/js/lemma-wallet.js?v=2474" nonce="{{ csp_nonce }}"></script>
 <script nonce="{{ csp_nonce }}">
 /**
  * Lemma Wallet Bridge v2.0
@@ -1002,6 +1003,14 @@ window.addEventListener('message', async (event) => {
                     const walletId = wallet.walletId || (await wallet.getWalletInfo?.())?.walletId || '';
                     const secretRecord = await wallet._get('secrets', 'master');
                     const walletSecret = secretRecord?.secret || wallet.session?.walletSecret || '';
+                    const walletAssertion = await wallet.buildWalletAssertion(
+                        ['master_credential_id', 'target_site', 'site_signing_pubkey'],
+                        {
+                            master_credential_id: master.id,
+                            target_site: ihSite,
+                            site_signing_pubkey: '',
+                        },
+                    );
                     const deriveRes = await fetch('/api/ishuman/derive-site-proof', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
@@ -1010,6 +1019,8 @@ window.addEventListener('message', async (event) => {
                             wallet_id: walletId,
                             wallet_secret: walletSecret,
                             target_site: ihSite,
+                            site_signing_pubkey: '',
+                            wallet_assertion: walletAssertion,
                         }),
                     });
                     const deriveData = await deriveRes.json();

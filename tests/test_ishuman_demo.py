@@ -268,8 +268,8 @@ def test_ishuman_demo_probe_derive_requires_credentials(ishuman_demo_client):
         json={"site_slug": "tickets"},
     )
     payload = resp.get_json()
-    assert resp.status_code == 400
-    assert "wallet_id" in payload["error"]
+    assert resp.status_code == 403
+    assert payload["code"] == "wallet_assertion_required"
 
 
 def test_ishuman_demo_force_reverify_requires_ppid(ishuman_demo_client):
@@ -279,5 +279,5 @@ def test_ishuman_demo_force_reverify_requires_ppid(ishuman_demo_client):
         json={},
     )
     payload = resp.get_json()
-    assert resp.status_code == 400
-    assert payload["error"] == "ppid required"
+    assert resp.status_code == 403
+    assert payload["code"] == "wallet_assertion_required"

@@ -49,6 +49,57 @@ def wallet_seed() -> dict[str, str]:
 
 
 @pytest.fixture
+def attach_wallet_assertion(wallet_seed):
+    """Attach a valid wallet_assertion to an API request body."""
+
+    def _attach(body: dict, field_names: list[str], *, wallet_id: str | None = None, wallet_secret: str | None = None):
+        from api.wallet_authn import issue_wallet_challenge, register_wallet_signing_key
+        from api.wallet_keys import build_wallet_assertion, register_self_signature
+
+        wid = (wallet_id or body.get("wallet_id") or wallet_seed["wallet_id"]).strip()
+        secret = (wallet_secret or body.get("wallet_secret") or wallet_seed["wallet_secret"]).strip()
+        pubkey_b64, sig_b64 = register_self_signature(wid, secret)
+        reg = register_wallet_signing_key(
+            wallet_id=wid,
+            pubkey_b64=pubkey_b64,
+            signature_b64=sig_b64,
+        )
+        assert reg.ok, reg.error
+
+        challenge = issue_wallet_challenge(wallet_id=wid)
+        field_values = {}
+        for name in field_names:
+            key = str(name or "").strip()
+            raw = body.get(key, body.get(name))
+            field_values[key] = "" if raw is None else str(raw)
+
+        assertion = build_wallet_assertion(
+            wallet_id=wid,
+            wallet_secret=secret,
+            field_names=field_names,
+            field_values=field_values,
+            nonce_b64=challenge["nonce"],
+        )
+        out = dict(body)
+        out.setdefault("wallet_id", wid)
+        if secret:
+            out.setdefault("wallet_secret", secret)
+        out["wallet_assertion"] = {
+            "nonce": assertion.nonce,
+            "signature": assertion.signature,
+        }
+        return out
+
+    return _attach
+
+
+
+# Assertion field lists for wallet Ed25519 endpoint auth (Phase 1)
+DERIVE_ASSERTION_FIELDS = ["master_credential_id", "target_site", "site_signing_pubkey"]
+START_ASSERTION_FIELDS = ["return_url"]
+
+
+@pytest.fixture
 def make_ishuman_verification() -> Callable[..., Any]:
     from api.database import IsHumanVerification
 

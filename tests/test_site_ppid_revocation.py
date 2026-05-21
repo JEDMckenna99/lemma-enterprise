@@ -4,6 +4,8 @@ from datetime import datetime, timedelta
 
 import pytest
 
+from tests.wallet_test_helpers import DERIVE_ASSERTION_FIELDS
+
 
 def _seed_site(db_factory, *, site_id="site_test_001", domain="example.com", api_key="test_api_key"):
     from api.database import Site
@@ -91,6 +93,7 @@ def test_derive_site_proof_denies_active_site_block(
     fake_ishuman_db_session_factory,
     make_ishuman_verification,
     monkeypatch,
+    attach_wallet_assertion,
 ):
     from api.database import SiteBlock
 
@@ -121,12 +124,16 @@ def test_derive_site_proof_denies_active_site_block(
 
     resp = ishuman_client.post(
         "/api/ishuman/derive-site-proof",
-        json={
-            "master_credential_id": "ishuman_master_block_001",
-            "wallet_id": "wallet_test_001",
-            "wallet_secret": "ab" * 32,
-            "target_site": "example.com",
-        },
+        json=attach_wallet_assertion(
+            {
+                "master_credential_id": "ishuman_master_block_001",
+                "wallet_id": "wallet_test_001",
+                "wallet_secret": "ab" * 32,
+                "target_site": "example.com",
+                "site_signing_pubkey": "",
+            },
+            DERIVE_ASSERTION_FIELDS,
+        ),
     )
 
     assert resp.status_code == 403
@@ -139,6 +146,7 @@ def test_derive_site_proof_denies_master_credential_bloom_revocation(
     fake_ishuman_db_session_factory,
     make_ishuman_verification,
     monkeypatch,
+    attach_wallet_assertion,
 ):
     db = fake_ishuman_db_session_factory
     _seed_site(db)
@@ -162,12 +170,16 @@ def test_derive_site_proof_denies_master_credential_bloom_revocation(
 
     resp = ishuman_client.post(
         "/api/ishuman/derive-site-proof",
-        json={
-            "master_credential_id": "ishuman_master_bloom_001",
-            "wallet_id": "wallet_test_001",
-            "wallet_secret": "ab" * 32,
-            "target_site": "example.com",
-        },
+        json=attach_wallet_assertion(
+            {
+                "master_credential_id": "ishuman_master_bloom_001",
+                "wallet_id": "wallet_test_001",
+                "wallet_secret": "ab" * 32,
+                "target_site": "example.com",
+                "site_signing_pubkey": "",
+            },
+            DERIVE_ASSERTION_FIELDS,
+        ),
     )
 
     assert resp.status_code == 403
@@ -180,6 +192,7 @@ def test_derive_site_proof_denies_site_ppid_bloom_revocation(
     fake_ishuman_db_session_factory,
     make_ishuman_verification,
     monkeypatch,
+    attach_wallet_assertion,
 ):
     db = fake_ishuman_db_session_factory
     _seed_site(db)
@@ -204,12 +217,16 @@ def test_derive_site_proof_denies_site_ppid_bloom_revocation(
 
     resp = ishuman_client.post(
         "/api/ishuman/derive-site-proof",
-        json={
-            "master_credential_id": "ishuman_master_ppid_bloom_001",
-            "wallet_id": "wallet_test_001",
-            "wallet_secret": "ab" * 32,
-            "target_site": "example.com",
-        },
+        json=attach_wallet_assertion(
+            {
+                "master_credential_id": "ishuman_master_ppid_bloom_001",
+                "wallet_id": "wallet_test_001",
+                "wallet_secret": "ab" * 32,
+                "target_site": "example.com",
+                "site_signing_pubkey": "",
+            },
+            DERIVE_ASSERTION_FIELDS,
+        ),
     )
 
     assert resp.status_code == 403
