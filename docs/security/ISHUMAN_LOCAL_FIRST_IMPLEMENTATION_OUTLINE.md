@@ -235,8 +235,11 @@ Single checklist for hardening the isHuman wallet + verifier stack into a local-
 
 ### 5.3 Validation evidence
 
-- Local: `pytest tests/test_wallet_prf_storage.py tests/test_wallet_bridge_ishuman_flow.py -v`
-- Production deploy + smoke: see post-deploy notes after Heroku release.
+- Local: `pytest tests/test_wallet_prf_storage.py tests/test_wallet_bridge_ishuman_flow.py -v` — 14 passed
+- Production deploy:
+  - Heroku app `lemma-enterprise` release `v2079` (`Deploy 0df5526b`)
+- Production smoke (`scripts/run_ishuman_prod_revocation_smoke.py` against `https://lemma.id`):
+  - Result: **11/11 passed** (revocation + signed bloom + demo prod-guard unchanged)
 
 ---
 
