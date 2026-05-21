@@ -99,8 +99,8 @@ def create_app():
         # Prevent MIME type sniffing
         response.headers['X-Content-Type-Options'] = 'nosniff'
         
-        # Prevent clickjacking — bridge route relies on CSP frame-ancestors instead of XFO
-        if 'X-Frame-Options' not in response.headers:
+        # Prevent clickjacking — /wallet/bridge uses CSP frame-ancestors for embed policy
+        if request.path != '/wallet/bridge' and 'X-Frame-Options' not in response.headers:
             response.headers['X-Frame-Options'] = 'DENY'
         
         # XSS Protection (legacy but still useful)
