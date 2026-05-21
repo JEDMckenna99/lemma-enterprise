@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import platform
 import subprocess
 import sys
 import time
@@ -43,6 +44,59 @@ from scripts.ishuman_prod_test_wallet import (  # noqa: E402
 )
 
 
+def _run_heroku(args: list[str]) -> subprocess.CompletedProcess[str]:
+    """Run Heroku CLI (shell=True on Windows when heroku is a shim)."""
+    if platform.system() == "Windows":
+        return subprocess.run(
+            subprocess.list2cmdline(args),
+            capture_output=True,
+            text=True,
+            shell=True,
+        )
+    return subprocess.run(args, capture_output=True, text=True)
+
+
+def _load_fixture_site_ppid(wallet_id: str, target_site: str) -> str:
+    """Resolve fixture site PPID from prod DB when env is unset."""
+    proc = _run_heroku(
+        [
+            "heroku",
+            "pg:psql",
+            "-a",
+            "lemma-enterprise",
+            "-t",
+            "-A",
+            "-c",
+            (
+                "SELECT derived_ppid FROM derived_credentials "
+                f"WHERE wallet_id='{wallet_id}' AND target_site='{target_site}' "
+                "AND is_active=true ORDER BY derived_at DESC LIMIT 1;"
+            ),
+        ],
+    )
+    for line in proc.stdout.splitlines():
+        line = line.strip()
+        if line.startswith("did:lemma:ppid_"):
+            return line
+    return ""
+
+
+def _load_ppid_root_key() -> str:
+    env_key = os.getenv("LEMMA_PPID_ROOT_KEY", "").strip()
+    if env_key:
+        return env_key
+    try:
+        proc = _run_heroku(
+            ["heroku", "config:get", "LEMMA_PPID_ROOT_KEY", "-a", "lemma-enterprise"],
+        )
+    except FileNotFoundError:
+        return ""
+    key = (proc.stdout or "").strip()
+    if key:
+        os.environ["LEMMA_PPID_ROOT_KEY"] = key
+    return key
+
+
 def _load_site_api_key(site_id: str) -> str:
     env_key = os.getenv("LEMMA_ISHUMAN_PROD_TEST_SITE_API_KEY", "").strip()
     if env_key:
@@ -57,7 +111,7 @@ def _load_site_api_key(site_id: str) -> str:
         "-c",
         f"SELECT api_key FROM sites WHERE site_id='{site_id}';",
     ]
-    proc = subprocess.run(cmd, capture_output=True, text=True)
+    proc = _run_heroku(cmd)
     for line in proc.stdout.splitlines():
         line = line.strip()
         if line.startswith("lm_"):
@@ -118,12 +172,16 @@ def main() -> int:
     wallet_secret = require_prod_test_secret()
     site_id = prod_test_site_id()
     target_site = canonicalize_rp_id(prod_test_target_site())
-    site_ppid = prod_test_site_ppid() or derive_ppid_from_wallet_secret(wallet_secret, target_site)
-    if not prod_test_site_ppid():
-        print(
-            "WARNING: LEMMA_ISHUMAN_PROD_TEST_SITE_PPID not set; "
-            "local PPID derivation may not match prod unless LEMMA_PPID_ROOT_KEY matches.",
-        )
+    site_ppid = prod_test_site_ppid() or _load_fixture_site_ppid(wallet_id, target_site)
+    if not site_ppid:
+        if _load_ppid_root_key():
+            site_ppid = derive_ppid_from_wallet_secret(wallet_secret, target_site)
+        else:
+            print(
+                "WARNING: fixture site PPID unavailable — set LEMMA_ISHUMAN_PROD_TEST_SITE_PPID "
+                "or ensure heroku CLI can query derived_credentials.",
+            )
+            site_ppid = derive_ppid_from_wallet_secret(wallet_secret, target_site)
 
     api_key = _load_site_api_key(site_id)
     headers = {"X-API-Key": api_key, "Content-Type": "application/json"}
@@ -204,7 +262,7 @@ def main() -> int:
     master_id = args.master_credential_id or prod_test_master_credential_id()
     if not master_id:
         # Resolve latest verified master for fixture wallet
-        proc = subprocess.run(
+        proc = _run_heroku(
             [
                 "heroku",
                 "pg:psql",
@@ -215,8 +273,6 @@ def main() -> int:
                 "-c",
                 f"SELECT credential_id FROM ishuman_verifications WHERE wallet_id='{wallet_id}' AND status='verified' ORDER BY verified_at DESC LIMIT 1;",
             ],
-            capture_output=True,
-            text=True,
         )
         for line in proc.stdout.splitlines():
             if line.startswith("ishuman_master_"):

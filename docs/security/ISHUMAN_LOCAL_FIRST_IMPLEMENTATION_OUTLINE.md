@@ -155,7 +155,10 @@ Single checklist for hardening the isHuman wallet + verifier stack into a local-
 - Local tests:
   - `pytest tests/test_ishuman_bloom_snapshot.py tests/test_ishuman_network_regressions.py tests/test_site_ppid_revocation.py -v`
   - Result: 23 passed.
-- Production deploy + smoke: see prod-validation notes after Heroku release.
+- Production deploy:
+  - Heroku app `lemma-enterprise` release `v2074` (`Deploy f48f321f`).
+- Production smoke (`scripts/run_ishuman_prod_revocation_smoke.py` against `https://lemma.id`):
+  - Result: **9/9 passed** (includes signed bloom snapshot `seq=161 trust=ok payload=ok` and derive deny `403 site_ppid_blocked`).
 
 ---
 
