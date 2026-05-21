@@ -28,6 +28,7 @@ What lemma.id CANNOT see:
 """
 
 from flask import Blueprint, request, jsonify, make_response
+from flask_cors import cross_origin
 import time
 import os
 import secrets
@@ -1289,6 +1290,47 @@ def exchange_redirect_token():
         return response, 500
     finally:
         db_session.close()
+
+
+# ---------------------------------------------------------------------------
+# Wallet Ed25519 signing key registration (local-first hardening)
+# ---------------------------------------------------------------------------
+
+@wallet_session_sync_bp.route("/api/wallet/challenge", methods=["POST"])
+@cross_origin()
+def wallet_challenge():
+    """Issue a short-lived nonce for wallet assertion signing."""
+    from api.wallet_authn import issue_wallet_challenge
+
+    body = request.get_json(silent=True) or {}
+    wallet_id = (body.get("wallet_id") or "").strip()
+    payload = issue_wallet_challenge(wallet_id=wallet_id)
+    response = jsonify(payload)
+    response.headers.update(_cors_headers(request.headers.get("Origin")))
+    return response
+
+
+@wallet_session_sync_bp.route("/api/wallet/register-signing-key", methods=["POST"])
+@cross_origin()
+def wallet_register_signing_key():
+    """Register wallet Ed25519 public key (self-signed registration proof)."""
+    from api.wallet_authn import register_wallet_signing_key
+
+    body = request.get_json(silent=True) or {}
+    result = register_wallet_signing_key(
+        wallet_id=(body.get("wallet_id") or "").strip(),
+        pubkey_b64=(body.get("pubkey") or "").strip(),
+        signature_b64=(body.get("signature") or "").strip(),
+    )
+    if not result.ok:
+        return jsonify({
+            "success": False,
+            "error": result.error,
+            "code": result.code,
+        }), 403
+    response = jsonify({"success": True, "registered": True})
+    response.headers.update(_cors_headers(request.headers.get("Origin")))
+    return response
 
 
 # ============================================================

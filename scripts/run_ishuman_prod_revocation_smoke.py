@@ -25,7 +25,7 @@ import requests
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from api.ppid import canonicalize_rp_id, derive_ppid_from_wallet_secret  # noqa: E402
-from api.wallet_authn import issue_wallet_challenge, register_wallet_signing_key  # noqa: E402
+from api.wallet_authn import issue_wallet_challenge  # noqa: E402
 from api.wallet_keys import build_wallet_assertion, register_self_signature  # noqa: E402
 from scripts.ishuman_prod_test_wallet import (  # noqa: E402
     prod_test_master_credential_id,
@@ -61,13 +61,6 @@ def _load_site_api_key(site_id: str) -> str:
 
 def _ensure_wallet_registered(base: str, wallet_id: str, wallet_secret: str) -> None:
     pubkey_b64, sig_b64 = register_self_signature(wallet_id, wallet_secret)
-    local = register_wallet_signing_key(
-        wallet_id=wallet_id,
-        pubkey_b64=pubkey_b64,
-        signature_b64=sig_b64,
-    )
-    if not local.ok:
-        raise RuntimeError(f"local register_wallet_signing_key failed: {local.error}")
     r = requests.post(
         f"{base}/api/wallet/register-signing-key",
         json={"wallet_id": wallet_id, "pubkey": pubkey_b64, "signature": sig_b64},
