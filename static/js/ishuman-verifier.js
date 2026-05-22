@@ -45,7 +45,9 @@ const MAX_SESSION_TTL_SECONDS = 900;
 const SESSION_STORAGE_KEY = 'ishuman_session_v1';
 const SESSION_EXPIRY_SKEW_SECONDS = 5;
 const BLOOM_SNAPSHOT_PREFIX = 'lemma:bloom-snapshot:v1';
+const TRUST_LIST_PREFIX = 'lemma:issuer-trust-list:v1';
 const DEFAULT_MAX_BLOOM_STALENESS_SECONDS = 900;
+const TRUST_LIST_STORAGE_KEY = 'ishuman_trust_list';
 
 // ========================================================================
 // Hex / crypto helpers (self-contained — no dependency on LemmaVerifier)
@@ -215,6 +217,120 @@ function buildBloomSignatureMessage(snapshot) {
     ].join('\n'));
 }
 
+function buildTrustListSignatureMessage(trustList) {
+    return new TextEncoder().encode([
+        TRUST_LIST_PREFIX,
+        String(trustList.version || ''),
+        String(trustList.content_hash || ''),
+        String(trustList.generated_at_unix || ''),
+        String(trustList.valid_until_unix || ''),
+    ].join('\n'));
+}
+
+function normalizeDid(did) {
+    return String(did || '')
+        .trim()
+        .split('#', 1)[0]
+        .split('?', 1)[0]
+        .replace(/\/+$/, '')
+        .toLowerCase();
+}
+
+function extractDidPubkeyHex(did) {
+    const text = String(did || '').trim();
+    if (!text.startsWith('did:lemma:')) return '';
+    const maybeHex = text.replace('did:lemma:', '').substring(0, 64).toLowerCase();
+    if (maybeHex.length !== 64) return '';
+    return /^[0-9a-f]+$/.test(maybeHex) ? maybeHex : '';
+}
+
+function computeTrustListContentHash(issuers) {
+    const canonical = (Array.isArray(issuers) ? issuers : [])
+        .map((row) => ({
+            did: String(row?.did || '').trim(),
+            pubkey: String(row?.pubkey || '').trim().toLowerCase(),
+            key_id: String(row?.key_id || '').trim(),
+            status: String(row?.status || '').trim().toLowerCase(),
+            valid_from_unix: Number(row?.valid_from_unix || 0),
+            valid_until_unix: Number(row?.valid_until_unix || 0),
+            priority: Number(row?.priority || 0),
+        }))
+        .sort((a, b) => (
+            a.did.localeCompare(b.did)
+            || String(b.priority).localeCompare(String(a.priority))
+            || a.key_id.localeCompare(b.key_id)
+        ));
+    return sha256HexText(JSON.stringify(canonical));
+}
+
+async function verifySignedTrustList(trustList) {
+    if (!trustList || typeof trustList !== 'object') {
+        return { ok: false, reason: 'trust_list_missing', issuers: new Map() };
+    }
+    const required = [
+        'version',
+        'generated_at_unix',
+        'valid_until_unix',
+        'content_hash',
+        'signer_pubkey',
+        'signature',
+        'issuers',
+    ];
+    for (const key of required) {
+        if (trustList[key] === undefined || trustList[key] === null || trustList[key] === '') {
+            return { ok: false, reason: `trust_list_${key}_missing`, issuers: new Map() };
+        }
+    }
+    const nowSec = Math.floor(Date.now() / 1000);
+    if (nowSec < Number(trustList.generated_at_unix)) {
+        return { ok: false, reason: 'trust_list_not_yet_valid', issuers: new Map() };
+    }
+    if (nowSec > Number(trustList.valid_until_unix)) {
+        return { ok: false, reason: 'trust_list_expired', issuers: new Map() };
+    }
+    if (!Array.isArray(trustList.issuers) || trustList.issuers.length === 0) {
+        return { ok: false, reason: 'trust_list_issuers_missing', issuers: new Map() };
+    }
+
+    const expectedHash = await computeTrustListContentHash(trustList.issuers);
+    if (expectedHash !== String(trustList.content_hash || '')) {
+        return { ok: false, reason: 'trust_list_content_hash_mismatch', issuers: new Map() };
+    }
+
+    let trustValid = false;
+    try {
+        trustValid = await verifyEd25519(
+            hexToBytes(String(trustList.signer_pubkey || '').toLowerCase()),
+            await sha256DigestBytes(buildTrustListSignatureMessage(trustList)),
+            base64urlToBytes(String(trustList.signature || '')),
+        );
+    } catch {
+        return { ok: false, reason: 'trust_list_malformed', issuers: new Map() };
+    }
+    if (!trustValid) {
+        return { ok: false, reason: 'trust_list_invalid_signature', issuers: new Map() };
+    }
+
+    const issuers = new Map();
+    for (const row of trustList.issuers) {
+        const did = normalizeDid(row?.did || '');
+        const pubkey = String(row?.pubkey || '').trim().toLowerCase();
+        const status = String(row?.status || 'active').toLowerCase();
+        const validFrom = Number(row?.valid_from_unix || 0);
+        const validUntil = Number(row?.valid_until_unix || 0);
+        if (!did || pubkey.length !== 64 || !/^[0-9a-f]+$/.test(pubkey)) continue;
+        if (status === 'revoked') continue;
+        if (validFrom && nowSec < validFrom) continue;
+        if (validUntil && nowSec > validUntil) continue;
+        if (!issuers.has(did)) issuers.set(did, new Set());
+        issuers.get(did).add(pubkey);
+    }
+    if (!issuers.size) {
+        return { ok: false, reason: 'trust_list_no_active_issuers', issuers };
+    }
+    return { ok: true, reason: 'ok', issuers };
+}
+
 function parseIssuerPubkeyHex(snapshot) {
     const direct = String(snapshot.issuer_pubkey || '').trim();
     if (direct.length === 64) return direct;
@@ -223,7 +339,7 @@ function parseIssuerPubkeyHex(snapshot) {
     return fromDid.length === 64 ? fromDid : '';
 }
 
-async function verifyBloomSnapshot(snapshot, hashedRevokedIds) {
+async function verifyBloomSnapshot(snapshot, hashedRevokedIds, trustedIssuers) {
     if (!snapshot || typeof snapshot !== 'object') {
         return { ok: false, reason: 'snapshot_missing' };
     }
@@ -261,6 +377,11 @@ async function verifyBloomSnapshot(snapshot, hashedRevokedIds) {
 
     const pubHex = parseIssuerPubkeyHex(snapshot);
     if (!pubHex) return { ok: false, reason: 'snapshot_issuer_pubkey_missing' };
+    const issuerDid = normalizeDid(snapshot.issuer_did || '');
+    const trustedKeys = trustedIssuers?.get(issuerDid);
+    if (!issuerDid || !trustedKeys || !trustedKeys.has(pubHex.toLowerCase())) {
+        return { ok: false, reason: 'snapshot_issuer_untrusted' };
+    }
 
     const messageHash = await sha256DigestBytes(buildBloomSignatureMessage(snapshot));
     const valid = await verifyEd25519(
@@ -368,6 +489,8 @@ class IsHumanVerifier {
         this._bloomSyncedAt = 0;
         this._bloomTrusted = false;
         this._bloomSnapshot = null;
+        this._trustListTrusted = false;
+        this._trustedIssuers = new Map();
         this._session = null;
         this._messageListener = null;
         this._bridgeReadyPromise = null;
@@ -389,7 +512,7 @@ class IsHumanVerifier {
         const t0 = performance.now();
         await this._initPromise;
 
-        if (!this._bloomTrusted) {
+        if (!this._bloomTrusted || !this._trustListTrusted) {
             return this._result(false, null, 'revocation_data_untrusted', t0);
         }
 
@@ -825,15 +948,22 @@ class IsHumanVerifier {
                 return { ok: false, ppid: credential.subject, reason: 'missing_signature' };
             }
 
-            const issuerDid = credential.issuer || '';
-            const pubKeyHex = issuerDid.replace('did:lemma:', '').substring(0, 64);
-            const messageHash = await sha256Digest(canonicalMessage(credential));
-            const valid = await verifyEd25519(
-                hexToBytes(pubKeyHex),
-                messageHash,
-                hexToBytes(sigHex),
-            );
+            const issuerDid = normalizeDid(credential.issuer || credential.issuerInfo?.did || '');
+            const trustedKeys = this._trustedIssuers.get(issuerDid);
+            if (!issuerDid || !trustedKeys || trustedKeys.size === 0) {
+                return { ok: false, ppid: credential.subject, reason: 'untrusted_issuer' };
+            }
 
+            const messageHash = await sha256Digest(canonicalMessage(credential));
+            let valid = false;
+            for (const pubKeyHex of trustedKeys) {
+                valid = await verifyEd25519(
+                    hexToBytes(pubKeyHex),
+                    messageHash,
+                    hexToBytes(sigHex),
+                );
+                if (valid) break;
+            }
             if (!valid) {
                 return { ok: false, ppid: credential.subject, reason: 'invalid_signature' };
             }
@@ -904,6 +1034,7 @@ class IsHumanVerifier {
         try {
             const res = await fetch(`${this.lemmaOrigin}/api/revocation/bloom-filter`);
             const data = await res.json();
+            const trustList = data.trust_list || null;
             const snapshot = data.snapshot || {
                 sequence_number: data.sequence_number,
                 generated_at_unix: data.generated_at_unix,
@@ -918,7 +1049,18 @@ class IsHumanVerifier {
             const hashedIds = Array.isArray(data.hashed_revoked_ids) ? data.hashed_revoked_ids : [];
 
             if (data.success && hashedIds.length >= 0 && snapshot.signature) {
-                const trust = await verifyBloomSnapshot(snapshot, hashedIds);
+                const trustListResult = await verifySignedTrustList(trustList);
+                if (!trustListResult.ok) {
+                    this._bloomTrusted = false;
+                    this._trustListTrusted = false;
+                    this._bloomSnapshot = null;
+                    this._trustedIssuers = new Map();
+                    if (this.debug) console.warn('[isHuman] trust list rejected:', trustListResult.reason);
+                    return;
+                }
+                this._trustedIssuers = trustListResult.issuers;
+                this._trustListTrusted = true;
+                const trust = await verifyBloomSnapshot(snapshot, hashedIds, this._trustedIssuers);
                 if (!trust.ok) {
                     this._bloomTrusted = false;
                     this._bloomSnapshot = null;
@@ -945,21 +1087,37 @@ class IsHumanVerifier {
                         ts: now,
                         snapshot,
                     }));
+                    localStorage.setItem(TRUST_LIST_STORAGE_KEY, JSON.stringify({
+                        trust_list: trustList,
+                        ts: now,
+                    }));
                 } catch { /* quota exceeded — ignore */ }
             } else {
                 this._bloomTrusted = false;
+                this._trustListTrusted = false;
             }
         } catch {
             this._bloomTrusted = false;
+            this._trustListTrusted = false;
             try {
                 const cached = JSON.parse(localStorage.getItem('ishuman_bloom') || '{}');
-                if (cached.ids && cached.snapshot) {
-                    const trust = await verifyBloomSnapshot(cached.snapshot, cached.ids);
-                    if (trust.ok) {
-                        this._bloomFilter = new Set(cached.ids);
-                        this._bloomSyncedAt = cached.ts || 0;
-                        this._bloomTrusted = true;
-                        this._bloomSnapshot = cached.snapshot;
+                const trustCached = JSON.parse(localStorage.getItem(TRUST_LIST_STORAGE_KEY) || '{}');
+                if (cached.ids && cached.snapshot && trustCached.trust_list) {
+                    const trustListResult = await verifySignedTrustList(trustCached.trust_list);
+                    if (trustListResult.ok) {
+                        const trust = await verifyBloomSnapshot(
+                            cached.snapshot,
+                            cached.ids,
+                            trustListResult.issuers,
+                        );
+                        if (trust.ok) {
+                            this._trustedIssuers = trustListResult.issuers;
+                            this._trustListTrusted = true;
+                            this._bloomFilter = new Set(cached.ids);
+                            this._bloomSyncedAt = cached.ts || 0;
+                            this._bloomTrusted = true;
+                            this._bloomSnapshot = cached.snapshot;
+                        }
                     }
                 }
             } catch { /* ignore */ }

@@ -131,6 +131,7 @@ def test_bloom_filter_endpoint_returns_signed_snapshot(revocation_client, monkey
     assert data["snapshot"]["signature"]
     assert data["sequence_number"] == 99
     from api.bloom_snapshot import verify_bloom_snapshot, verify_snapshot_matches_payload
+    from api.issuer_trust_list import verify_signed_trust_list
 
     ok, reason = verify_bloom_snapshot(data["snapshot"])
     assert ok, reason
@@ -139,6 +140,8 @@ def test_bloom_filter_endpoint_returns_signed_snapshot(revocation_client, monkey
         hashed_revoked_ids=data["hashed_revoked_ids"],
     )
     assert ok_payload, payload_reason
+    trust_ok, trust_reason = verify_signed_trust_list(data["trust_list"])
+    assert trust_ok, trust_reason
 
 
 @pytest.mark.unit

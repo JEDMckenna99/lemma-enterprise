@@ -88,5 +88,6 @@ jobs:
           tests/test_wallet_prf_storage.py
           tests/test_wallet_bridge_ishuman_flow.py
           tests/test_ishuman_verifier_session_cache.py
+          tests/test_issuer_trust_list.py
           -m "unit or integration or browser"
           -v

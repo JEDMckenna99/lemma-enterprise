@@ -18,6 +18,20 @@ logger = logging.getLogger(__name__)
 revocation_api = Blueprint('revocation_api', __name__)
 
 
+@revocation_api.route('/api/issuer/trust-list', methods=['GET'])
+@cross_origin()
+def get_issuer_trust_list():
+    """Return signed issuer trust-list for local verifier trust decisions."""
+    try:
+        from api.issuer_trust_list import build_signed_trust_list
+
+        payload = build_signed_trust_list()
+        return jsonify({"success": True, "trust_list": payload}), 200
+    except Exception as exc:
+        logger.error("Issuer trust-list error: %s", exc)
+        return jsonify({"success": False, "error": "trust_list_unavailable"}), 500
+
+
 @revocation_api.route('/api/v1/revocation/list', methods=['GET'])
 @cross_origin()
 def get_revocation_list():
@@ -179,6 +193,7 @@ def get_bloom_filter():
             sign_bloom_snapshot,
             verify_snapshot_matches_payload,
         )
+        from api.issuer_trust_list import build_signed_trust_list
 
         sequence_number = fetch_revocation_sequence_number()
 
@@ -256,6 +271,7 @@ def get_bloom_filter():
             sequence_number=sequence_number,
             generated_at=datetime.utcnow(),
         )
+        trust_list = build_signed_trust_list()
         ok_payload, payload_reason = verify_snapshot_matches_payload(
             snapshot,
             hashed_revoked_ids=hashed_revoked_ids,
@@ -287,6 +303,8 @@ def get_bloom_filter():
             'content_hash': snapshot.get('content_hash'),
             'algorithm': snapshot.get('algorithm'),
             'max_bloom_staleness_seconds': snapshot.get('max_staleness_seconds'),
+            # Phase 7 signed issuer trust list (for multi-issuer verification + rotation)
+            'trust_list': trust_list,
             # New Bloom payload (compact, false positives possible)
             'bloom_filter': bloom_meta,
             'filter_bytes': bloom_filter_b64,

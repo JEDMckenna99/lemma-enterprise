@@ -29,7 +29,7 @@ Single checklist for hardening the isHuman wallet + verifier stack into a local-
 | 4     | P4       | Bridge hardening + demo prod-guard                  | complete (2026-05-21) |
 | 5     | P5       | PRF-encrypted at-rest storage                       | complete (2026-05-21) |
 | 6     | P6       | Local-first verifier (one call per session)         | complete (2026-05-21) |
-| 7     | P7       | Multi-issuer trust list + rotation                  | not started           |
+| 7     | P7       | Multi-issuer trust list + rotation                  | complete (2026-05-21) |
 
 
 ---
@@ -298,9 +298,59 @@ Single checklist for hardening the isHuman wallet + verifier stack into a local-
 
 ## Phase 7 — Multi-issuer trust list and key rotation (P7)
 
-**Status:** not started
+**Status:** complete (2026-05-21)
 
-Planned work: trust-list signature verification and issuer rotation protocol.
+### 7.1 Signed trust-list envelope (API)
+
+**Implemented**
+
+- Added `api/issuer_trust_list.py`:
+  - `build_signed_trust_list`, `verify_signed_trust_list`
+  - canonical signing message `lemma:issuer-trust-list:v1` with `version`, `content_hash`, `generated_at_unix`, `valid_until_unix`
+  - trust-list includes per-issuer key records:
+    - `did`, `pubkey`, `key_id`, `status`, `valid_from_unix`, `valid_until_unix`, `priority`
+  - supports explicit rotation input via `LEMMA_TRUST_ROTATION_KEYS_JSON`
+- Updated `api/revocation_api.py`:
+  - `/api/revocation/bloom-filter` now includes signed `trust_list`
+  - new `/api/issuer/trust-list` endpoint returns signed trust-list directly
+
+### 7.2 Verifier trust enforcement + key rotation
+
+**Implemented**
+
+- `static/js/ishuman-verifier.js`:
+  - validates signed trust-list envelope via `verifySignedTrustList()`
+  - rejects untrusted/tampered trust-list (`trust_list_invalid_signature`, hash mismatch, expiry)
+  - verifies bloom snapshot signer against trusted issuer keys (`snapshot_issuer_untrusted`)
+  - verifies credential signatures against active trusted keys for the issuer DID (multi-key rotation support)
+  - persists trust-list locally (`ishuman_trust_list`) for local-first fallback with signature re-check
+- Verify path fails closed unless both revocation snapshot and trust-list are trusted.
+
+### 7.3 Tests + CI + smoke
+
+**Implemented**
+
+- New `tests/test_issuer_trust_list.py` — trust-list sign/verify/tamper coverage
+- Extended:
+  - `tests/test_ishuman_bloom_snapshot.py` — bloom endpoint now asserts signed trust-list validity
+  - `tests/test_ishuman_network_regressions.py` — static checks for trust-list enforcement in verifier
+- `.github/workflows/ishuman-issuance-tests.yml` now includes `tests/test_issuer_trust_list.py`
+- `scripts/run_ishuman_prod_revocation_smoke.py` adds `phase7-trust-list-shape` step
+
+### 7.4 Acceptance criteria
+
+- Verifier accepts credentials and bloom snapshots only from issuers present in a valid signed trust-list.
+- Trust-list signature and content hash are validated locally before use.
+- Multiple active/retiring keys per issuer DID are supported for rotation windows.
+- Missing/tampered/expired trust-list causes fail-closed verifier behavior.
+
+### 7.5 Validation evidence
+
+- Local tests:
+  - `pytest tests/test_issuer_trust_list.py tests/test_ishuman_bloom_snapshot.py tests/test_ishuman_network_regressions.py tests/test_ishuman_verifier_session_cache.py -v`
+  - Result: pending local run.
+- Production smoke target:
+  - `python scripts/run_ishuman_prod_revocation_smoke.py` → includes `phase7-trust-list-shape` (13/13 target).
 
 ---
 

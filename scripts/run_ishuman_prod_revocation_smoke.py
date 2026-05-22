@@ -258,6 +258,28 @@ def main() -> int:
             phase6_detail = f"sdk fetch failed: {exc}"
     results.append(_step("phase6-session-shape", phase6_ok, phase6_detail))
 
+    # Phase 7: signed trust-list + verifier trust enforcement markers
+    phase7_ok = False
+    phase7_detail = "skipped"
+    trust_list = bloom_data.get("trust_list") or {}
+    if bloom_ok and trust_list:
+        try:
+            from api.issuer_trust_list import verify_signed_trust_list
+
+            trust_ok, trust_reason = verify_signed_trust_list(trust_list)
+            sdk = requests.get(f"{base}/sdk/ishuman-verifier.js", timeout=30)
+            sdk_text = sdk.text if sdk.ok else ""
+            has_prefix = "lemma:issuer-trust-list:v1" in sdk_text
+            has_enforce = "snapshot_issuer_untrusted" in sdk_text and "verifySignedTrustList" in sdk_text
+            phase7_ok = trust_ok and sdk.status_code == 200 and has_prefix and has_enforce
+            phase7_detail = (
+                f"trust={trust_reason} sdk HTTP {sdk.status_code} "
+                f"prefix={has_prefix} enforce={has_enforce}"
+            )
+        except Exception as exc:
+            phase7_detail = f"phase7 check failed: {exc}"
+    results.append(_step("phase7-trust-list-shape", phase7_ok, phase7_detail))
+
     # Site-block synthetic PPID
     r = requests.post(
         f"{base}/api/ishuman/site-block",
