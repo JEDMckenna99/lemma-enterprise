@@ -145,6 +145,10 @@ function isLemmaInfrastructureSite(site) {
 }
 
 const PRESENTATION_PREFIX = 'lemma:site-presentation:v1';
+const SESSION_PRESENTATION_PREFIX = 'lemma:site-session-presentation:v1';
+const DEFAULT_SESSION_TTL_SECONDS = 300;
+const MIN_SESSION_TTL_SECONDS = 60;
+const MAX_SESSION_TTL_SECONDS = 900;
 
 function buildPresentationPayload({ nonceB64, credentialId, timestampSec }) {
     return new TextEncoder().encode([
@@ -152,6 +156,29 @@ function buildPresentationPayload({ nonceB64, credentialId, timestampSec }) {
         String(nonceB64 || '').trim(),
         String(credentialId || '').trim(),
         String(timestampSec || ''),
+    ].join('\n'));
+}
+
+function buildSessionPresentationPayload({
+    sessionId,
+    siteId,
+    credentialId,
+    subject,
+    sessionNonceB64,
+    bloomSequence,
+    issuedAtUnix,
+    expiresAtUnix,
+}) {
+    return new TextEncoder().encode([
+        SESSION_PRESENTATION_PREFIX,
+        String(sessionId || '').trim(),
+        String(siteId || '').trim(),
+        String(credentialId || '').trim(),
+        String(subject || '').trim(),
+        String(sessionNonceB64 || '').trim(),
+        String(bloomSequence ?? ''),
+        String(issuedAtUnix ?? ''),
+        String(expiresAtUnix ?? ''),
     ].join('\n'));
 }
 
@@ -1111,6 +1138,135 @@ window.addEventListener('message', async (event) => {
                         clearCredentialsCache();
                         console.log(` isHuman: derived site proof for ${ihSite}:`, derived.id);
                         const signed = await signPresentation(derived);
+                        respond({ success: true, ...signed });
+                    } else {
+                        console.warn(' isHuman: derivation failed:', deriveData.error);
+                        respond({ success: false, error: deriveData.error || 'derivation_failed' });
+                    }
+                } catch (deriveErr) {
+                    console.error(' isHuman: derivation request failed:', deriveErr);
+                    respond({ success: false, error: 'derivation_network_error' });
+                }
+                break;
+            }
+
+            case 'GET_SESSION_PRESENTATION': {
+                if (!wallet) await initWallet();
+
+                const ihSite = payload?.siteId || requestingSite;
+                const ihType = payload?.credentialType;
+                const sessionNonce = String(payload?.sessionNonce || '').trim();
+                if (!sessionNonce) {
+                    respond({ success: false, error: 'session_nonce_required' });
+                    break;
+                }
+                const bloomSequence = Number(payload?.bloomSequence);
+                if (!Number.isFinite(bloomSequence) || bloomSequence < 0) {
+                    respond({ success: false, error: 'bloom_sequence_required' });
+                    break;
+                }
+
+                const requestedTtl = Number(payload?.sessionTtlSec || DEFAULT_SESSION_TTL_SECONDS);
+                const sessionTtlSec = Math.min(
+                    MAX_SESSION_TTL_SECONDS,
+                    Math.max(MIN_SESSION_TTL_SECONDS, requestedTtl || DEFAULT_SESSION_TTL_SECONDS),
+                );
+
+                const siteKeys = await wallet.deriveSiteSigningKeypair(ihSite);
+                const siteSigningPubkey = siteKeys.publicKeyB64;
+
+                const signSessionPresentation = async (credential) => {
+                    const issuedAtUnix = Math.floor(Date.now() / 1000);
+                    const expiresAtUnix = issuedAtUnix + sessionTtlSec;
+                    const sessionId = window.LemmaKeys.base64urlEncode(
+                        crypto.getRandomValues(new Uint8Array(16)),
+                    );
+                    const assertion = {
+                        session_id: sessionId,
+                        site_id: ihSite,
+                        credential_id: credential?.id || '',
+                        subject: credential?.subject || '',
+                        session_nonce: sessionNonce,
+                        bloom_sequence: bloomSequence,
+                        issued_at_unix: issuedAtUnix,
+                        expires_at_unix: expiresAtUnix,
+                    };
+                    const payloadBytes = buildSessionPresentationPayload({
+                        sessionId: assertion.session_id,
+                        siteId: assertion.site_id,
+                        credentialId: assertion.credential_id,
+                        subject: assertion.subject,
+                        sessionNonceB64: assertion.session_nonce,
+                        bloomSequence: assertion.bloom_sequence,
+                        issuedAtUnix: assertion.issued_at_unix,
+                        expiresAtUnix: assertion.expires_at_unix,
+                    });
+                    const signature = await siteKeys.keypair.sign(payloadBytes);
+                    return {
+                        credential,
+                        session_assertion: assertion,
+                        session_signature: window.LemmaKeys.base64urlEncode(signature),
+                    };
+                };
+
+                let allCreds = (await wallet.getCredentials()).map(normalizeCredentialRecord);
+                let match = allCreds.find(c => {
+                    const cl = c.claims || c.credentialSubject || {};
+                    const boundSite = getCredentialSiteBinding(cl);
+                    if (ihType === 'isHuman' && !cl.isHuman) return false;
+                    return boundSite === ihSite;
+                });
+
+                if (match && (match.claims?.site_signing_pubkey || match.credentialSubject?.site_signing_pubkey)) {
+                    const signed = await signSessionPresentation(match);
+                    respond({ success: true, ...signed });
+                    break;
+                }
+
+                const master = allCreds.find(c => {
+                    const cl = c.claims || c.credentialSubject || {};
+                    const boundSite = getCredentialSiteBinding(cl);
+                    return cl.isHuman && (boundSite === 'lemma.id' || !boundSite);
+                });
+
+                if (!master) {
+                    respond({ success: false, error: 'no_ishuman_credential' });
+                    break;
+                }
+
+                try {
+                    const walletId = wallet.walletId || (await wallet.getWalletInfo?.())?.walletId || '';
+                    const secretRecord = await wallet._get('secrets', 'master');
+                    const walletSecret = secretRecord?.secret || wallet.session?.walletSecret || '';
+                    const walletAssertion = await wallet.buildWalletAssertion(
+                        ['master_credential_id', 'target_site', 'site_signing_pubkey'],
+                        {
+                            master_credential_id: master.id,
+                            target_site: ihSite,
+                            site_signing_pubkey: siteSigningPubkey,
+                        },
+                    );
+                    const deriveRes = await fetch('/api/ishuman/derive-site-proof', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            master_credential_id: master.id,
+                            wallet_id: walletId,
+                            wallet_secret: walletSecret,
+                            target_site: ihSite,
+                            site_signing_pubkey: siteSigningPubkey,
+                            wallet_assertion: walletAssertion,
+                        }),
+                    });
+                    const deriveData = await deriveRes.json();
+
+                    if (deriveData.success && deriveData.credential) {
+                        const derived = deriveData.credential;
+                        derived.packageType = derived.packageType || 'identity';
+                        await wallet.storeCredential(derived);
+                        clearCredentialsCache();
+                        console.log(` isHuman: derived site proof for ${ihSite}:`, derived.id);
+                        const signed = await signSessionPresentation(derived);
                         respond({ success: true, ...signed });
                     } else {
                         console.warn(' isHuman: derivation failed:', deriveData.error);

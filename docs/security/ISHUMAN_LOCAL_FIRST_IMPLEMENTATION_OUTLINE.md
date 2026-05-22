@@ -28,7 +28,7 @@ Single checklist for hardening the isHuman wallet + verifier stack into a local-
 | 3     | P3       | Signed + timestamped Bloom revocation               | complete (2026-05-21) |
 | 4     | P4       | Bridge hardening + demo prod-guard                  | complete (2026-05-21) |
 | 5     | P5       | PRF-encrypted at-rest storage                       | complete (2026-05-21) |
-| 6     | P6       | Local-first verifier (one call per session)         | not started           |
+| 6     | P6       | Local-first verifier (one call per session)         | complete (2026-05-21) |
 | 7     | P7       | Multi-issuer trust list + rotation                  | not started           |
 
 
@@ -245,9 +245,54 @@ Single checklist for hardening the isHuman wallet + verifier stack into a local-
 
 ## Phase 6 — Local-first verifier (one call per session) (P6)
 
-**Status:** not started
+**Status:** complete (2026-05-21)
 
-Planned work: session presentation token cache and zero-network steady-state verifier path.
+### 6.1 Bridge-issued session presentation
+
+**Implemented**
+
+- [templates/wallet_bridge.html](templates/wallet_bridge.html):
+  - `GET_SESSION_PRESENTATION` RPC mints Ed25519-signed `session_assertion` + `session_signature`
+  - Canonical message `lemma:site-session-presentation:v1` (session id, site, credential, subject, nonce, bloom sequence, issued/expiry)
+  - TTL clamped to `[60, 900]` seconds (default 300)
+  - Reuses existing per-site credential resolution + `derive-site-proof` fallback
+  - `GET_CREDENTIAL` unchanged for backwards compatibility
+
+### 6.2 Verifier session cache + snapshot-driven bloom
+
+**Implemented**
+
+- [static/js/ishuman-verifier.js](static/js/ishuman-verifier.js) (v1.1.0):
+  - First `verify()` in a tab: bloom sync (if stale) + `GET_SESSION_PRESENTATION` bridge call
+  - Steady-state `verify()`: re-validates cached session locally (`session_valid`) — no HTTP, no bridge
+  - `sessionStorage` key `ishuman_session_v1`; `invalidateSession()` for explicit logout
+  - Bloom refresh tied to `snapshot.max_staleness_seconds` (removed 7-day skip)
+  - Session invalidated when bloom `sequence_number` changes
+  - Legacy fallback: if bridge lacks `GET_SESSION_PRESENTATION`, uses per-nonce `GET_CREDENTIAL` path
+
+### 6.3 Tests + CI + smoke
+
+**Implemented**
+
+- `tests/test_ishuman_verifier_session_cache.py` — session constants, RPC, signature verify, bloom invalidation
+- Extended `tests/test_wallet_bridge_ishuman_flow.py`, `tests/test_ishuman_network_regressions.py`
+- `.github/workflows/ishuman-issuance-tests.yml` includes `test_ishuman_verifier_session_cache.py`
+- `scripts/run_ishuman_prod_revocation_smoke.py` adds `phase6-session-shape` step (12/12 target)
+
+### 6.4 Acceptance criteria
+
+- Steady-state `verify()` makes zero network calls and zero bridge round-trips while session TTL valid and bloom sequence unchanged.
+- Session assertion is Ed25519-signed by per-site key (Phase 2 “sign everything” preserved).
+- Session expires by `expires_at_unix`; bloom sequence bump clears cache (fail-closed).
+- First-visit `derive-site-proof` flow unchanged.
+
+### 6.5 Validation evidence
+
+- Local tests:
+  - `pytest tests/test_ishuman_verifier_session_cache.py tests/test_wallet_bridge_ishuman_flow.py tests/test_ishuman_network_regressions.py tests/test_ishuman_bloom_snapshot.py tests/test_site_ppid_revocation.py -v`
+  - Result: **39 passed**.
+- Production deploy: pending (run Heroku deploy, then smoke).
+- Production smoke target: `python scripts/run_ishuman_prod_revocation_smoke.py` → **12/12** (includes `phase6-session-shape` SDK string check).
 
 ---
 
@@ -264,4 +309,3 @@ Planned work: trust-list signature verification and issuer rotation protocol.
 - Unit + integration coverage for each phase.
 - Production smoke checks for revocation and customer-site flow.
 - Keep PPID/site-binding guardrails fail-closed.
-

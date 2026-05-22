@@ -20,8 +20,10 @@
  *   </script>
  *
  * Zero server calls on the verification hot path after initial Bloom sync.
+ * Phase 6: one signed session presentation per tab session; steady-state verify()
+ * re-validates locally with no bridge round-trip and no network calls.
  *
- * @version 1.0.0
+ * @version 1.1.0
  */
 
 (function () {
@@ -33,10 +35,15 @@ if (typeof window !== 'undefined' && window.IsHumanVerifier) {
 
 const LEMMA_ORIGIN = 'https://lemma.id';
 const BRIDGE_PATH = '/wallet/bridge';
-const BLOOM_SYNC_INTERVAL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 const BRIDGE_TIMEOUT_MS = 8000;
 const PRESENTATION_PREFIX = 'lemma:site-presentation:v1';
 const MAX_PRESENTATION_STALENESS_SECONDS = 120;
+const SESSION_PRESENTATION_PREFIX = 'lemma:site-session-presentation:v1';
+const DEFAULT_SESSION_TTL_SECONDS = 300;
+const MIN_SESSION_TTL_SECONDS = 60;
+const MAX_SESSION_TTL_SECONDS = 900;
+const SESSION_STORAGE_KEY = 'ishuman_session_v1';
+const SESSION_EXPIRY_SKEW_SECONDS = 5;
 const BLOOM_SNAPSHOT_PREFIX = 'lemma:bloom-snapshot:v1';
 const DEFAULT_MAX_BLOOM_STALENESS_SECONDS = 900;
 
@@ -124,6 +131,78 @@ function buildPresentationPayload({ nonceB64, credentialId, timestampSec }) {
         String(credentialId || '').trim(),
         String(timestampSec || ''),
     ].join('\n'));
+}
+
+function buildSessionPresentationPayload({
+    sessionId,
+    siteId,
+    credentialId,
+    subject,
+    sessionNonceB64,
+    bloomSequence,
+    issuedAtUnix,
+    expiresAtUnix,
+}) {
+    return new TextEncoder().encode([
+        SESSION_PRESENTATION_PREFIX,
+        String(sessionId || '').trim(),
+        String(siteId || '').trim(),
+        String(credentialId || '').trim(),
+        String(subject || '').trim(),
+        String(sessionNonceB64 || '').trim(),
+        String(bloomSequence ?? ''),
+        String(issuedAtUnix ?? ''),
+        String(expiresAtUnix ?? ''),
+    ].join('\n'));
+}
+
+async function verifySessionAssertion(assertion, signatureB64, sitePubkeyB64, expectedBloomSequence) {
+    if (!assertion || typeof assertion !== 'object') {
+        return { ok: false, reason: 'session_assertion_missing' };
+    }
+    const required = [
+        'session_id',
+        'site_id',
+        'credential_id',
+        'subject',
+        'session_nonce',
+        'bloom_sequence',
+        'issued_at_unix',
+        'expires_at_unix',
+    ];
+    for (const key of required) {
+        if (assertion[key] === undefined || assertion[key] === null || assertion[key] === '') {
+            return { ok: false, reason: `session_${key}_missing` };
+        }
+    }
+
+    const nowSec = Math.floor(Date.now() / 1000);
+    const expiresAt = Number(assertion.expires_at_unix);
+    if (nowSec >= expiresAt - SESSION_EXPIRY_SKEW_SECONDS) {
+        return { ok: false, reason: 'session_expired' };
+    }
+    if (Number(assertion.bloom_sequence) !== Number(expectedBloomSequence)) {
+        return { ok: false, reason: 'session_bloom_sequence_mismatch' };
+    }
+
+    const payload = buildSessionPresentationPayload({
+        sessionId: assertion.session_id,
+        siteId: assertion.site_id,
+        credentialId: assertion.credential_id,
+        subject: assertion.subject,
+        sessionNonceB64: assertion.session_nonce,
+        bloomSequence: assertion.bloom_sequence,
+        issuedAtUnix: assertion.issued_at_unix,
+        expiresAtUnix: assertion.expires_at_unix,
+    });
+    const digest = await sha256DigestBytes(payload);
+    const valid = await verifyEd25519(
+        base64urlToBytes(sitePubkeyB64),
+        digest,
+        base64urlToBytes(signatureB64),
+    );
+    if (!valid) return { ok: false, reason: 'invalid_session_signature' };
+    return { ok: true, reason: 'ok' };
 }
 
 function buildBloomSignatureMessage(snapshot) {
@@ -289,6 +368,7 @@ class IsHumanVerifier {
         this._bloomSyncedAt = 0;
         this._bloomTrusted = false;
         this._bloomSnapshot = null;
+        this._session = null;
         this._messageListener = null;
         this._bridgeReadyPromise = null;
         this._resolveBridgeReady = null;
@@ -309,12 +389,24 @@ class IsHumanVerifier {
         const t0 = performance.now();
         await this._initPromise;
 
-        // Step 1 — ask the wallet bridge for an isHuman credential
+        if (!this._bloomTrusted) {
+            return this._result(false, null, 'revocation_data_untrusted', t0);
+        }
+
+        const cached = await this._verifyFromCachedSession(t0);
+        if (cached !== null) {
+            return cached;
+        }
+
         let bridgeResult;
         try {
-            bridgeResult = await this._requestCredentialFromBridge();
+            bridgeResult = await this._requestSessionFromBridge();
         } catch (err) {
             return this._result(false, null, 'bridge_unavailable', t0, err.message);
+        }
+
+        if (bridgeResult?.use_legacy_presentation) {
+            return this._verifyWithLegacyPresentation(bridgeResult, t0);
         }
 
         const credential = bridgeResult?.credential || null;
@@ -322,120 +414,33 @@ class IsHumanVerifier {
             return this._result(false, null, 'no_credential', t0);
         }
 
-        // Step 2 — check isHuman claim
-        const claims = credential.claims || credential.credentialSubject || {};
-        if (!claims.isHuman) {
-            return this._result(false, null, 'not_ishuman', t0);
+        const core = await this._verifyCredentialCore(credential, t0);
+        if (!core.ok) {
+            return this._result(false, core.ppid, core.reason, t0, core.error);
         }
 
-        // Step 3 — expiry
-        const expiresAt = parseInt(credential.expiresAt || claims.expiresAt || '0', 10);
-        if (expiresAt && Math.floor(Date.now() / 1000) >= expiresAt) {
-            return this._result(false, credential.subject, 'expired', t0);
+        const sessionCheck = await this._verifySessionFromBridgeResult(bridgeResult, credential);
+        if (!sessionCheck.ok) {
+            return this._result(false, credential.subject, sessionCheck.reason, t0, sessionCheck.error);
         }
 
-        // Step 4 — revocation membership (SHA-256 hashed IDs/PPIDs/wallet IDs)
-        if (!this._bloomTrusted) {
-            return this._result(false, credential?.subject || null, 'revocation_data_untrusted', t0);
-        }
-
-        if (this._bloomFilter.size) {
-            const revocationCandidates = [];
-            if (credential.id) revocationCandidates.push(credential.id);
-            if (credential.subject) revocationCandidates.push(credential.subject);
-            if (claims.walletId || claims.wallet_id) {
-                revocationCandidates.push(claims.walletId || claims.wallet_id);
-            }
-
-            for (const candidate of revocationCandidates) {
-                const candidateHash = await sha256HexText(candidate);
-                if (candidateHash && this._bloomFilter.has(candidateHash)) {
-                    return this._result(false, credential.subject, 'revoked', t0);
-                }
-            }
-        }
-
-        // Step 5 — Ed25519 signature
-        try {
-            const sigHex = credential.proof?.signatureValue;
-            if (!sigHex) {
-                return this._result(false, credential.subject, 'missing_signature', t0);
-            }
-
-            const issuerDid = credential.issuer || '';
-            const pubKeyHex = issuerDid.replace('did:lemma:', '').substring(0, 64);
-
-            const messageHash = await sha256Digest(canonicalMessage(credential));
-            const valid = await verifyEd25519(
-                hexToBytes(pubKeyHex),
-                messageHash,
-                hexToBytes(sigHex),
-            );
-
-            if (!valid) {
-                return this._result(false, credential.subject, 'invalid_signature', t0);
-            }
-        } catch (err) {
-            return this._result(false, credential.subject, 'verification_error', t0, err.message);
-        }
-
-        // Step 6 — bridge presentation signature over verifier nonce
-        try {
-            const claims = credential.claims || credential.credentialSubject || {};
-            const siteSigningPubkey = claims.site_signing_pubkey || claims.siteSigningPubkey;
-            const presentationSignature = bridgeResult?.presentation_signature || '';
-            const presentationTimestamp = Number(bridgeResult?.presentation_timestamp || 0);
-            const presentationNonce = bridgeResult?.presentation_nonce || '';
-
-            if (!siteSigningPubkey) {
-                return this._result(false, credential.subject, 'missing_site_signing_pubkey', t0);
-            }
-            if (!presentationSignature || !presentationTimestamp || !presentationNonce) {
-                return this._result(false, credential.subject, 'missing_presentation_signature', t0);
-            }
-
-            const nowSec = Math.floor(Date.now() / 1000);
-            if (Math.abs(nowSec - presentationTimestamp) > MAX_PRESENTATION_STALENESS_SECONDS) {
-                return this._result(false, credential.subject, 'presentation_stale', t0);
-            }
-            if (presentationNonce !== bridgeResult.challenge_nonce) {
-                return this._result(false, credential.subject, 'presentation_nonce_mismatch', t0);
-            }
-
-            const presentationPayload = buildPresentationPayload({
-                nonceB64: presentationNonce,
-                credentialId: credential.id || '',
-                timestampSec: presentationTimestamp,
-            });
-            const presentationDigest = await sha256DigestBytes(presentationPayload);
-            const presentationValid = await verifyEd25519(
-                base64urlToBytes(siteSigningPubkey),
-                presentationDigest,
-                base64urlToBytes(presentationSignature),
-            );
-
-            if (!presentationValid) {
-                return this._result(false, credential.subject, 'invalid_presentation_signature', t0);
-            }
-        } catch (err) {
-            return this._result(false, credential.subject, 'presentation_verification_error', t0, err.message);
-        }
-
-        // Step 7 — site-level block check (LOCAL — no network call to lemma.id)
-        // Sites manage their own block lists.  The optional callback lets the
-        // site check its own database without breaking the local-first model.
-        if (this.isBlockedLocally && credential.subject) {
-            try {
-                const blocked = await Promise.resolve(this.isBlockedLocally(credential.subject));
-                if (blocked) {
-                    return this._result(false, credential.subject, 'site_blocked', t0);
-                }
-            } catch {
-                // Non-fatal — site block check failure should not reject valid credentials
-            }
-        }
+        this._persistSession({
+            siteId: this.siteId,
+            credential,
+            session_assertion: bridgeResult.session_assertion,
+            session_signature: bridgeResult.session_signature,
+            session_nonce: bridgeResult.session_nonce,
+            bloom_sequence: Number(this._bloomSnapshot?.sequence_number ?? 0),
+        });
 
         return this._result(true, credential.subject, 'valid', t0);
+    }
+
+    /**
+     * Clear cached session presentation (e.g. on site logout).
+     */
+    invalidateSession() {
+        this._clearSessionCache();
     }
 
     /**
@@ -456,6 +461,7 @@ class IsHumanVerifier {
             this._bridgeIframe.parentNode.removeChild(this._bridgeIframe);
         }
         this._bridgeReady = false;
+        this._session = null;
     }
 
     // ------------------------------------------------------------------
@@ -573,19 +579,327 @@ class IsHumanVerifier {
         });
     }
 
+    _requestSessionFromBridge() {
+        return new Promise(async (resolve, reject) => {
+            if (!this._bridgeIframe || !this._bridgeIframe.contentWindow) {
+                return reject(new Error('Bridge iframe not available'));
+            }
+
+            if (!this._bridgeReady) {
+                try {
+                    await Promise.race([
+                        this._bridgeReadyPromise,
+                        new Promise((_, timeoutReject) => setTimeout(
+                            () => timeoutReject(new Error('Bridge ready timeout')),
+                            BRIDGE_TIMEOUT_MS,
+                        )),
+                    ]);
+                } catch (err) {
+                    return reject(err);
+                }
+            }
+
+            const requestId = `ih_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+            const timeout = setTimeout(() => {
+                this._pendingRequests.delete(requestId);
+                reject(new Error('Bridge timeout'));
+            }, BRIDGE_TIMEOUT_MS);
+
+            const sessionNonce = randomNonceB64(32);
+            const bloomSequence = Number(this._bloomSnapshot?.sequence_number ?? 0);
+            this._pendingRequests.set(requestId, {
+                expectedType: 'GET_SESSION_PRESENTATION_response',
+                resolver: async (response) => {
+                    clearTimeout(timeout);
+                    const errText = String(response.error || '');
+                    if (errText.includes('Unknown message type')) {
+                        try {
+                            const legacy = await this._requestCredentialFromBridge();
+                            resolve({ use_legacy_presentation: true, ...legacy });
+                        } catch (legacyErr) {
+                            reject(legacyErr);
+                        }
+                        return;
+                    }
+                    if (response.error || response.success === false) {
+                        resolve(null);
+                        return;
+                    }
+                    resolve({
+                        ...response,
+                        session_nonce: sessionNonce,
+                    });
+                },
+            });
+            this._bridgeIframe.contentWindow.postMessage({
+                type: 'GET_SESSION_PRESENTATION',
+                requestId,
+                payload: {
+                    siteId: this.siteId,
+                    credentialType: 'isHuman',
+                    sessionNonce,
+                    bloomSequence,
+                    sessionTtlSec: DEFAULT_SESSION_TTL_SECONDS,
+                },
+            }, this.lemmaOrigin);
+        });
+    }
+
+    async _verifyFromCachedSession(t0) {
+        const session = this._loadSessionCache();
+        if (!session) return null;
+
+        const credential = session.credential;
+        if (!credential) {
+            this._clearSessionCache();
+            return null;
+        }
+
+        const claims = credential.claims || credential.credentialSubject || {};
+        const siteSigningPubkey = claims.site_signing_pubkey || claims.siteSigningPubkey;
+        if (!siteSigningPubkey) {
+            this._clearSessionCache();
+            return null;
+        }
+
+        const bloomSequence = Number(this._bloomSnapshot?.sequence_number ?? 0);
+        const sessionCheck = await verifySessionAssertion(
+            session.session_assertion,
+            session.session_signature,
+            siteSigningPubkey,
+            bloomSequence,
+        );
+        if (!sessionCheck.ok) {
+            this._clearSessionCache();
+            return null;
+        }
+
+        const core = await this._verifyCredentialCore(credential, t0);
+        if (!core.ok) {
+            this._clearSessionCache();
+            return this._result(false, core.ppid, core.reason, t0, core.error);
+        }
+
+        const blocked = await this._checkSiteBlocked(credential.subject);
+        if (blocked) {
+            return this._result(false, credential.subject, 'site_blocked', t0);
+        }
+
+        return this._result(true, credential.subject, 'session_valid', t0);
+    }
+
+    async _verifyWithLegacyPresentation(bridgeResult, t0) {
+        const credential = bridgeResult?.credential || null;
+        if (!credential) {
+            return this._result(false, null, 'no_credential', t0);
+        }
+
+        const core = await this._verifyCredentialCore(credential, t0);
+        if (!core.ok) {
+            return this._result(false, core.ppid, core.reason, t0, core.error);
+        }
+
+        try {
+            const claims = credential.claims || credential.credentialSubject || {};
+            const siteSigningPubkey = claims.site_signing_pubkey || claims.siteSigningPubkey;
+            const presentationSignature = bridgeResult?.presentation_signature || '';
+            const presentationTimestamp = Number(bridgeResult?.presentation_timestamp || 0);
+            const presentationNonce = bridgeResult?.presentation_nonce || '';
+
+            if (!siteSigningPubkey) {
+                return this._result(false, credential.subject, 'missing_site_signing_pubkey', t0);
+            }
+            if (!presentationSignature || !presentationTimestamp || !presentationNonce) {
+                return this._result(false, credential.subject, 'missing_presentation_signature', t0);
+            }
+
+            const nowSec = Math.floor(Date.now() / 1000);
+            if (Math.abs(nowSec - presentationTimestamp) > MAX_PRESENTATION_STALENESS_SECONDS) {
+                return this._result(false, credential.subject, 'presentation_stale', t0);
+            }
+            if (presentationNonce !== bridgeResult.challenge_nonce) {
+                return this._result(false, credential.subject, 'presentation_nonce_mismatch', t0);
+            }
+
+            const presentationPayload = buildPresentationPayload({
+                nonceB64: presentationNonce,
+                credentialId: credential.id || '',
+                timestampSec: presentationTimestamp,
+            });
+            const presentationDigest = await sha256DigestBytes(presentationPayload);
+            const presentationValid = await verifyEd25519(
+                base64urlToBytes(siteSigningPubkey),
+                presentationDigest,
+                base64urlToBytes(presentationSignature),
+            );
+
+            if (!presentationValid) {
+                return this._result(false, credential.subject, 'invalid_presentation_signature', t0);
+            }
+        } catch (err) {
+            return this._result(false, credential.subject, 'presentation_verification_error', t0, err.message);
+        }
+
+        const blocked = await this._checkSiteBlocked(credential.subject);
+        if (blocked) {
+            return this._result(false, credential.subject, 'site_blocked', t0);
+        }
+
+        return this._result(true, credential.subject, 'valid', t0);
+    }
+
+    async _verifySessionFromBridgeResult(bridgeResult, credential) {
+        try {
+            const claims = credential.claims || credential.credentialSubject || {};
+            const siteSigningPubkey = claims.site_signing_pubkey || claims.siteSigningPubkey;
+            if (!siteSigningPubkey) {
+                return { ok: false, reason: 'missing_site_signing_pubkey' };
+            }
+
+            const assertion = bridgeResult?.session_assertion;
+            const signature = bridgeResult?.session_signature || '';
+            if (!assertion || !signature) {
+                return { ok: false, reason: 'missing_session_presentation' };
+            }
+
+            if (assertion.session_nonce !== bridgeResult.session_nonce) {
+                return { ok: false, reason: 'session_nonce_mismatch' };
+            }
+
+            const bloomSequence = Number(this._bloomSnapshot?.sequence_number ?? 0);
+            const sessionCheck = await verifySessionAssertion(
+                assertion,
+                signature,
+                siteSigningPubkey,
+                bloomSequence,
+            );
+            if (!sessionCheck.ok) {
+                return { ok: false, reason: sessionCheck.reason };
+            }
+
+            const blocked = await this._checkSiteBlocked(credential.subject);
+            if (blocked) {
+                return { ok: false, reason: 'site_blocked' };
+            }
+
+            return { ok: true, reason: 'ok' };
+        } catch (err) {
+            return { ok: false, reason: 'session_verification_error', error: err.message };
+        }
+    }
+
+    async _verifyCredentialCore(credential, t0) {
+        const claims = credential.claims || credential.credentialSubject || {};
+        if (!claims.isHuman) {
+            return { ok: false, ppid: null, reason: 'not_ishuman' };
+        }
+
+        const expiresAt = parseInt(credential.expiresAt || claims.expiresAt || '0', 10);
+        if (expiresAt && Math.floor(Date.now() / 1000) >= expiresAt) {
+            return { ok: false, ppid: credential.subject, reason: 'expired' };
+        }
+
+        if (!this._bloomTrusted) {
+            return { ok: false, ppid: credential?.subject || null, reason: 'revocation_data_untrusted' };
+        }
+
+        if (this._bloomFilter.size) {
+            const revocationCandidates = [];
+            if (credential.id) revocationCandidates.push(credential.id);
+            if (credential.subject) revocationCandidates.push(credential.subject);
+            if (claims.walletId || claims.wallet_id) {
+                revocationCandidates.push(claims.walletId || claims.wallet_id);
+            }
+
+            for (const candidate of revocationCandidates) {
+                const candidateHash = await sha256HexText(candidate);
+                if (candidateHash && this._bloomFilter.has(candidateHash)) {
+                    return { ok: false, ppid: credential.subject, reason: 'revoked' };
+                }
+            }
+        }
+
+        try {
+            const sigHex = credential.proof?.signatureValue;
+            if (!sigHex) {
+                return { ok: false, ppid: credential.subject, reason: 'missing_signature' };
+            }
+
+            const issuerDid = credential.issuer || '';
+            const pubKeyHex = issuerDid.replace('did:lemma:', '').substring(0, 64);
+            const messageHash = await sha256Digest(canonicalMessage(credential));
+            const valid = await verifyEd25519(
+                hexToBytes(pubKeyHex),
+                messageHash,
+                hexToBytes(sigHex),
+            );
+
+            if (!valid) {
+                return { ok: false, ppid: credential.subject, reason: 'invalid_signature' };
+            }
+        } catch (err) {
+            return { ok: false, ppid: credential.subject, reason: 'verification_error', error: err.message };
+        }
+
+        return { ok: true, ppid: credential.subject, reason: 'ok' };
+    }
+
+    async _checkSiteBlocked(ppid) {
+        if (!this.isBlockedLocally || !ppid) return false;
+        try {
+            return !!(await Promise.resolve(this.isBlockedLocally(ppid)));
+        } catch {
+            return false;
+        }
+    }
+
+    _loadSessionCache() {
+        if (this._session && this._session.siteId === this.siteId) {
+            return this._session;
+        }
+        try {
+            const raw = sessionStorage.getItem(SESSION_STORAGE_KEY);
+            if (!raw) return null;
+            const parsed = JSON.parse(raw);
+            if (!parsed || parsed.siteId !== this.siteId) return null;
+            this._session = parsed;
+            return parsed;
+        } catch {
+            return null;
+        }
+    }
+
+    _persistSession(session) {
+        this._session = session;
+        try {
+            sessionStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(session));
+        } catch { /* quota exceeded — ignore */ }
+    }
+
+    _clearSessionCache() {
+        this._session = null;
+        try {
+            sessionStorage.removeItem(SESSION_STORAGE_KEY);
+        } catch { /* ignore */ }
+    }
+
     // ------------------------------------------------------------------
     // Bloom filter
     // ------------------------------------------------------------------
 
     async _syncBloom() {
         const now = Date.now();
-        if (
-            this._bloomTrusted
-            && this._bloomFilter.size
-            && (now - this._bloomSyncedAt) < BLOOM_SYNC_INTERVAL_MS
-        ) {
+        const snapshotAgeSec = this._bloomSnapshot
+            ? Math.floor((now / 1000) - Number(this._bloomSnapshot.generated_at_unix || 0))
+            : Number.MAX_SAFE_INTEGER;
+        const maxAgeSec = Number(
+            this._bloomSnapshot?.max_staleness_seconds || DEFAULT_MAX_BLOOM_STALENESS_SECONDS,
+        );
+        if (this._bloomTrusted && this._bloomFilter.size && snapshotAgeSec < maxAgeSec) {
             return;
         }
+
+        const prevSequence = this._bloomSnapshot?.sequence_number;
 
         try {
             const res = await fetch(`${this.lemmaOrigin}/api/revocation/bloom-filter`);
@@ -610,6 +924,16 @@ class IsHumanVerifier {
                     this._bloomSnapshot = null;
                     if (this.debug) console.warn('[isHuman] bloom snapshot rejected:', trust.reason);
                     return;
+                }
+                const newSequence = snapshot.sequence_number;
+                if (
+                    prevSequence !== undefined
+                    && prevSequence !== null
+                    && newSequence !== undefined
+                    && newSequence !== null
+                    && Number(prevSequence) !== Number(newSequence)
+                ) {
+                    this._clearSessionCache();
                 }
                 this._bloomFilter = new Set(hashedIds);
                 this._bloomSyncedAt = now;

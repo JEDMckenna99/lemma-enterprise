@@ -65,3 +65,24 @@ def test_bridge_enforces_site_binding_on_store_and_verify(wallet_bridge_source):
     assert "Cannot store credentials for other sites" in wallet_bridge_source
     assert "case 'VERIFY_CREDENTIAL':" in wallet_bridge_source
     assert "Cannot verify credentials for other sites" in wallet_bridge_source
+
+
+@pytest.mark.browser
+def test_bridge_handles_get_session_presentation(wallet_bridge_source):
+    assert "case 'GET_SESSION_PRESENTATION':" in wallet_bridge_source
+    assert "SESSION_PRESENTATION_PREFIX = 'lemma:site-session-presentation:v1'" in wallet_bridge_source
+    assert "buildSessionPresentationPayload" in wallet_bridge_source
+    assert "session_assertion" in wallet_bridge_source
+    assert "session_signature" in wallet_bridge_source
+    assert "await siteKeys.keypair.sign(payloadBytes)" in wallet_bridge_source
+    assert "Math.min(" in wallet_bridge_source
+    assert "MAX_SESSION_TTL_SECONDS" in wallet_bridge_source
+    assert "MIN_SESSION_TTL_SECONDS" in wallet_bridge_source
+    assert "bloom_sequence_required" in wallet_bridge_source
+
+
+@pytest.mark.browser
+def test_bridge_preserves_get_credential_for_backwards_compat(wallet_bridge_source):
+    assert "case 'GET_CREDENTIAL':" in wallet_bridge_source
+    assert "presentation_signature" in wallet_bridge_source
+    assert "signPresentation" in wallet_bridge_source

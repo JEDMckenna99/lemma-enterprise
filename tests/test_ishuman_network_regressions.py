@@ -160,6 +160,26 @@ def test_ishuman_verifier_requires_signed_bloom_snapshot_checks():
     assert "DEFAULT_MAX_BLOOM_STALENESS_SECONDS" in content
 
 
+def test_ishuman_verifier_uses_session_cache_on_repeat_verify():
+    sdk_path = os.path.join(
+        os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+        "static",
+        "js",
+        "ishuman-verifier.js",
+    )
+    with open(sdk_path, "r", encoding="utf-8") as handle:
+        content = handle.read()
+
+    assert "_verifyFromCachedSession" in content
+    assert "session_valid" in content
+    assert "_requestSessionFromBridge" in content
+    assert "GET_SESSION_PRESENTATION" in content
+    verify_idx = content.index("async verify()")
+    cached_idx = content.index("_verifyFromCachedSession", verify_idx)
+    bridge_idx = content.index("_requestSessionFromBridge", verify_idx)
+    assert cached_idx < bridge_idx
+
+
 def test_ishuman_verifier_requires_presentation_signature_checks():
     sdk_path = os.path.join(
         os.path.dirname(os.path.dirname(os.path.abspath(__file__))),

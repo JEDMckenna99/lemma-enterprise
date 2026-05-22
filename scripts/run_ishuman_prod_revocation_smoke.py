@@ -239,6 +239,25 @@ def main() -> int:
         bloom_detail = f"HTTP {r.status_code} {str(bloom_data)[:180]}"
     results.append(_step("signed bloom snapshot", bloom_ok, bloom_detail))
 
+    # Phase 6: deployed verifier exposes session presentation RPC + bloom epoch fields
+    phase6_ok = False
+    phase6_detail = "skipped"
+    if bloom_ok and snapshot.get("sequence_number") is not None:
+        max_stale = snapshot.get("max_staleness_seconds")
+        try:
+            sdk = requests.get(f"{base}/sdk/ishuman-verifier.js", timeout=30)
+            sdk_text = sdk.text if sdk.ok else ""
+            has_prefix = "lemma:site-session-presentation:v1" in sdk_text
+            has_rpc = "GET_SESSION_PRESENTATION" in sdk_text
+            phase6_ok = sdk.status_code == 200 and has_prefix and has_rpc and max_stale is not None
+            phase6_detail = (
+                f"sdk HTTP {sdk.status_code} prefix={has_prefix} rpc={has_rpc} "
+                f"max_staleness={max_stale}"
+            )
+        except requests.RequestException as exc:
+            phase6_detail = f"sdk fetch failed: {exc}"
+    results.append(_step("phase6-session-shape", phase6_ok, phase6_detail))
+
     # Site-block synthetic PPID
     r = requests.post(
         f"{base}/api/ishuman/site-block",
