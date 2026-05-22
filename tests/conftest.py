@@ -196,6 +196,9 @@ class _FakeQuery:
             if all(getattr(row, key, None) == value for key, value in self._filters.items())
         ]
 
+    def filter(self, *_args, **_kwargs):
+        return self
+
     def count(self):
         return len(self.all())
 

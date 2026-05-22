@@ -1029,7 +1029,7 @@ def approve_network_revocation():
             from api.revocation_sync import get_event_bus
             bus = get_event_bus()
             for rid in revoked_ids:
-                bus.publish_revocation(rid, reason=reason)
+                bus.publish_revocation(rid, credential_type="ishuman")
         except Exception as exc:
             logger.warning("Bloom sync publish failed (non-fatal): %s", exc)
 

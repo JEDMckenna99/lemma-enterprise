@@ -234,6 +234,80 @@ def test_derive_site_proof_denies_site_ppid_bloom_revocation(
 
 
 @pytest.mark.unit
+def test_approve_network_revocation_publishes_ishuman_events_without_reason_kwarg(
+    ishuman_client,
+    fake_ishuman_db_session_factory,
+    make_ishuman_verification,
+    make_derived_credential,
+    monkeypatch,
+):
+    from api.authz_engine import AuthzPrincipal
+    from api.database import DerivedCredential, IsHumanVerification, RevocationList
+
+    db = fake_ishuman_db_session_factory
+    db.store.data[IsHumanVerification.__name__].append(
+        make_ishuman_verification(
+            credential_id="ishuman_master_revoke_001",
+            wallet_id="wallet_revoke_001",
+            status="verified",
+            ppid="did:lemma:ppid_master_revoke",
+        )
+    )
+    db.store.data[DerivedCredential.__name__].append(
+        make_derived_credential(
+            master_credential_id="ishuman_master_revoke_001",
+            derived_credential_id="ishuman_site_revoke_001",
+            wallet_id="wallet_revoke_001",
+            target_site="example.com",
+            derived_ppid="did:lemma:ppid_site_revoke",
+        )
+    )
+    monkeypatch.setattr("api.database.SessionLocal", db.session_local)
+    monkeypatch.setattr(
+        "api.authz_engine.extract_user_lemma_principal",
+        lambda _headers: (
+            AuthzPrincipal(
+                principal_type="user_lemma",
+                auth_method="lemma_header",
+                ppid="did:lemma:ppid_admin",
+                credential_id="admin_cred_001",
+                permission_id="admin_access",
+                scope=["admin"],
+                site_binding="lemma.id",
+            ),
+            None,
+        ),
+    )
+
+    published = []
+
+    class FakeBus:
+        def publish_revocation(self, credential_id, credential_type="unknown", site_id=None):
+            published.append((credential_id, credential_type, site_id))
+            return True
+
+    monkeypatch.setattr("api.revocation_sync.get_event_bus", lambda: FakeBus())
+
+    resp = ishuman_client.post(
+        "/api/ishuman/approve-revocation",
+        json={"wallet_id": "wallet_revoke_001", "reason": "confirmed automation"},
+        headers={"X-Lemma-Credential": "{}"},
+    )
+    payload = resp.get_json()
+
+    assert resp.status_code == 200
+    assert payload["success"] is True
+    assert payload["total_revoked"] == 3
+    assert {event[0] for event in published} == {
+        "wallet_revoke_001",
+        "ishuman_master_revoke_001",
+        "ishuman_site_revoke_001",
+    }
+    assert all(event[1] == "ishuman" for event in published)
+    assert len(db.store.data[RevocationList.__name__]) == 3
+
+
+@pytest.mark.unit
 def test_revoke_site_bound_ppid_reactivates_inactive_site_block(
     fake_ishuman_db_session_factory,
     monkeypatch,
