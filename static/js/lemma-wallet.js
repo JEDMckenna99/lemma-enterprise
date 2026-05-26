@@ -2150,6 +2150,10 @@ class LemmaWallet {
                 console.log('[Lemma] Session expired - was valid until:', new Date(storedSession.expiresAt).toISOString());
             }
         } catch (e) {
+            if (this._isEncryptedStorageLockedError(e)) {
+                console.log('[Lemma] _checkSessionState: encrypted session is locked until passkey unlock');
+                return;
+            }
             console.warn('[Lemma] _checkSessionState error:', e);
         }
     }
@@ -4977,6 +4981,13 @@ class LemmaWallet {
         return mod.decryptEnvelope(this._atRestKey, raw);
     }
 
+    _isEncryptedStorageLockedError(error) {
+        const message = String(error?.message || error || '');
+        return message === 'envelope_invalid'
+            || message === 'storage_key_unavailable'
+            || message === 'prf_required_for_encrypted_storage';
+    }
+
     async _migratePlaintextStores() {
         const mod = this._walletAtRest();
         if (!this._atRestKey || !mod) return;
@@ -5039,6 +5050,10 @@ class LemmaWallet {
     async _getAll(storeName) {
         const rows = await this._getAllRaw(storeName);
         if (!this._isSensitiveStore(storeName)) return rows;
+        const mod = this._walletAtRest();
+        if (!this._atRestKey && mod?.isEncryptedEnvelope && rows.some((row) => mod.isEncryptedEnvelope(row))) {
+            return [];
+        }
         const out = [];
         for (const row of rows) {
             if (!row) {
@@ -5482,17 +5497,29 @@ class LemmaWallet {
         await this.init();
 
         const passkey = await this._get('passkey', 'primary');
-        const lemmas = await this._getAll('lemmas');
         const issuers = await this._getAll('issuers');
-        const secretRecord = await this._get('secrets', 'master');
         const walletIdRecord = await this._get('passkey', 'walletId');
         const activeProfileRecord = await this._get('passkey', 'activeProfile');
+        const lockedEncryptedStorage = { value: false };
+        const readLockedSafe = async (fallback, reader) => {
+            try {
+                return await reader();
+            } catch (error) {
+                if (this._isEncryptedStorageLockedError(error)) {
+                    lockedEncryptedStorage.value = true;
+                    return fallback;
+                }
+                throw error;
+            }
+        };
+        const lemmas = await readLockedSafe([], () => this._getAll('lemmas'));
+        const secretRecord = await readLockedSafe(null, () => this._get('secrets', 'master'));
         
         // Also check profile for secret (device linking stores here)
         let secretSource = secretRecord?.source || 'stored';
         let profileSecret = null;
         if (activeProfileRecord?.value) {
-            const profile = await this._get('profiles', activeProfileRecord.value);
+            const profile = await readLockedSafe(null, () => this._get('profiles', activeProfileRecord.value));
             profileSecret = profile?.secret;
             if (profileSecret && !secretRecord?.secret) {
                 secretSource = 'profile_only';
@@ -5514,7 +5541,8 @@ class LemmaWallet {
             issuerCount: issuers.length,
             passkeyCredentialId: passkey?.credentialId || null,
             secretSource: secretSource,
-            linkedFrom: secretRecord?.linkedFrom || null
+            linkedFrom: secretRecord?.linkedFrom || null,
+            encryptedStorageLocked: lockedEncryptedStorage.value
         };
     }
     
