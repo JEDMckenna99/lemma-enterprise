@@ -20,6 +20,8 @@ def _default_test_env() -> None:
     """Provide safe defaults so API modules can import in tests."""
     os.environ.setdefault("DATABASE_URL", "sqlite:///:memory:")
     os.environ.setdefault("LEMMA_PPID_ROOT_KEY", "x" * 32)
+    os.environ.setdefault("LEMMA_IDENTITY_ROOT_PEPPER_V1", "y" * 32)
+    os.environ.setdefault("LEMMA_PERSON_ROOT_SALT_V1", "z" * 32)
 
 
 @pytest.fixture(name="ishuman_test_app")

@@ -376,6 +376,8 @@ def _complete_demo_test_session(
     """Shared test-complete logic for demo endpoints."""
     from api.database import IsHumanVerification, SessionLocal
     from api.ishuman import _derive_ppid_for_site, _issue_ishuman_credential
+    from api.identity_person import material_from_test_fixture, resolve_or_create_person_from_material
+    from api.ppid import derive_ppid_from_person_root_hash
 
     if not session_id and not stripe_session_id:
         return {"success": False, "error": "session_id or stripe_session_id required"}, 400
@@ -396,17 +398,38 @@ def _complete_demo_test_session(
             return {"success": False, "error": "wallet_id_missing"}, 400
 
         secret = (wallet_secret or "").strip() or os.getenv("LEMMA_ISHUMAN_PROD_TEST_WALLET_SECRET", "")
+        ppid = None
+        ppid_derivation = None
         if record.ppid:
             ppid = record.ppid
-        elif secret:
+            ppid_derivation = (record.metadata_json or {}).get("ppid_derivation") or (
+                "person_root_v1" if record.lemma_person_id else None
+            )
+        else:
+            material = material_from_test_fixture(
+                stripe_session_id=record.stripe_session_id,
+                document_number=f"demo_{wallet_id[-8:]}",
+            )
+            resolved = resolve_or_create_person_from_material(db, material=material, wallet_id=wallet_id)
+            ppid = derive_ppid_from_person_root_hash(resolved.person_root_hash, "lemma.id")
+            record.lemma_person_id = resolved.person_id
+            record.document_root_hash = resolved.document_root_hash
+            record.root_version = "v1"
+            record.confidence_level = resolved.confidence_level
+            ppid_derivation = "person_root_v1"
+        if ppid is None and secret:
             ppid = _derive_ppid_for_site(
                 rp_id="lemma.id",
                 wallet_secret=secret,
                 wallet_id=wallet_id,
             )
-        else:
-            ppid = _derive_ppid_for_site(rp_id="lemma.id", wallet_id=wallet_id)
-        credential = _issue_ishuman_credential(ppid, wallet_id)
+        if ppid is None:
+            return {"success": False, "error": "ppid_derivation_failed"}, 500
+        credential = _issue_ishuman_credential(
+            ppid,
+            wallet_id,
+            ppid_derivation=ppid_derivation,
+        )
 
         record.status = "verified"
         record.verified_at = datetime.utcnow()
@@ -420,6 +443,7 @@ def _complete_demo_test_session(
             **(record.metadata_json or {}),
             "credential_issuer_did": credential.get("issuerInfo", {}).get("did"),
             "demo_test_completed": True,
+            "ppid_derivation": ppid_derivation or (record.metadata_json or {}).get("ppid_derivation"),
         }
         db.commit()
 

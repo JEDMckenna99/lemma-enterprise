@@ -5,7 +5,11 @@ from datetime import datetime, timedelta
 
 import pytest
 
-from tests.wallet_test_helpers import DERIVE_ASSERTION_FIELDS, START_ASSERTION_FIELDS
+from tests.wallet_test_helpers import (
+    DERIVE_ASSERTION_FIELDS,
+    SITE_SIGNING_PUBKEY_B64,
+    START_ASSERTION_FIELDS,
+)
 
 
 @pytest.mark.unit
@@ -50,7 +54,7 @@ def test_derive_site_proof_cache_miss_creates_new_mapping(
                 "wallet_id": "wallet_test_001",
                 "wallet_secret": "ab" * 32,
                 "target_site": "Example.com",
-                "site_signing_pubkey": "",
+                "site_signing_pubkey": SITE_SIGNING_PUBKEY_B64,
             },
             DERIVE_ASSERTION_FIELDS,
         ),
@@ -119,7 +123,7 @@ def test_derive_site_proof_cached_reuses_existing_credential_id(
                 "wallet_id": "wallet_test_001",
                 "wallet_secret": "ab" * 32,
                 "target_site": "example.com",
-                "site_signing_pubkey": "",
+                "site_signing_pubkey": SITE_SIGNING_PUBKEY_B64,
             },
             DERIVE_ASSERTION_FIELDS,
         ),
@@ -161,10 +165,21 @@ def test_no_master_then_master_issued_then_site_derived(
             "data": {"object": {"id": "vs_branch_123", "metadata": {"user_id": "wallet_test_001"}}},
         },
     )
-    monkeypatch.setattr(
-        "api.ishuman._derive_ppid_for_site",
-        lambda **kwargs: f"did:lemma:ppid::{kwargs['rp_id']}::{kwargs.get('wallet_id')}",
-    )
+
+    def _fake_complete(db, record, *, wallet_id, stripe_session_id):
+        from api.identity_person import material_from_test_fixture, resolve_or_create_person_from_material
+        from api.ppid import derive_ppid_from_person_root_hash
+        from api.ishuman import _issue_ishuman_credential
+
+        material = material_from_test_fixture(stripe_session_id=stripe_session_id)
+        resolved = resolve_or_create_person_from_material(db, material=material, wallet_id=wallet_id)
+        ppid = derive_ppid_from_person_root_hash(resolved.person_root_hash, "lemma.id")
+        record.lemma_person_id = resolved.person_id
+        record.document_root_hash = resolved.document_root_hash
+        record.ppid = ppid
+        return _issue_ishuman_credential(ppid, wallet_id, ppid_derivation="person_root_v1")
+
+    monkeypatch.setattr("api.ishuman._complete_verified_ishuman_from_stripe", _fake_complete)
 
     def _issue(_ppid, _wallet_id=None, site_id=None, **kwargs):
         if site_id:
@@ -209,7 +224,7 @@ def test_no_master_then_master_issued_then_site_derived(
                 "wallet_id": "wallet_test_001",
                 "wallet_secret": "ab" * 32,
                 "target_site": "customer-a.example",
-                "site_signing_pubkey": "",
+                "site_signing_pubkey": SITE_SIGNING_PUBKEY_B64,
             },
             DERIVE_ASSERTION_FIELDS,
         ),

@@ -47,6 +47,7 @@ def canonicalize_rp_id(rp_id: str) -> str:
     """
     Canonicalize relying party identifier.
     Accepts domain or URL. Returns a stable lowercase host string.
+    Aligns with client ``canonicalizeSiteDomain`` (strip www, port, path).
     """
     rp_id = (rp_id or "").strip().lower()
     if not rp_id:
@@ -56,10 +57,18 @@ def canonicalize_rp_id(rp_id: str) -> str:
     if "://" in rp_id:
         parsed = urlparse(rp_id)
         if parsed.hostname:
-            return parsed.hostname.lower()
+            rp_id = parsed.hostname.lower()
+        else:
+            rp_id = rp_id.split("://", 1)[-1]
 
     # Strip path if someone passed "example.com/path"
-    return rp_id.split("/")[0]
+    host = rp_id.split("/")[0]
+    # Strip port
+    if ":" in host and not host.startswith("["):
+        host = host.rsplit(":", 1)[0]
+    if host.startswith("www."):
+        host = host[4:]
+    return host or "unknown"
 
 
 # =============================================================================
@@ -95,11 +104,23 @@ def derive_master_secret_from_passkey(passkey_credential_id: str) -> bytes:
     return hmac.new(root_key, passkey_credential_id.encode("utf-8"), hashlib.sha256).digest()
 
 
+def derive_ppid_from_person_root(person_root: bytes, rp_id: str) -> str:
+    """Derive site PPID from stable Lemma person root (post Stripe IDV)."""
+    from api.identity_roots import derive_ppid_from_person_root_bytes
+
+    return derive_ppid_from_person_root_bytes(person_root, rp_id)
+
+
+def derive_ppid_from_person_root_hash(person_root_hash_hex: str, rp_id: str) -> str:
+    """Derive PPID from stored person_root_hash (64 hex chars)."""
+    return derive_ppid_from_person_root(bytes.fromhex(person_root_hash_hex), rp_id)
+
+
 def derive_ppid_from_wallet_secret(wallet_secret: str, rp_id: str) -> str:
     """
     Derive PPID for a user at a relying party using wallet secret.
     
-    This is the PRIMARY method for wallet-first authentication.
+    Legacy wallet-first authentication (pre person-root isHuman).
     
     Args:
         wallet_secret: The wallet's master secret

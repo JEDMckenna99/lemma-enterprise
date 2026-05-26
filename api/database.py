@@ -690,6 +690,53 @@ class SiteConfiguration(Base):
     updated_by = Column(String)
 
 
+class LemmaPerson(Base):
+    """Stable Lemma identity for a verified human (person-root backed)."""
+    __tablename__ = 'lemma_persons'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    person_id = Column(String, unique=True, nullable=False, index=True)
+    person_root_hash = Column(String(64), nullable=False, index=True)
+    root_version = Column(String, default='v1', nullable=False)
+    primary_wallet_id = Column(String, index=True)
+    status = Column(String, default='active')
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class LemmaDocumentRoot(Base):
+    """Maps a Stripe-derived document root to a LemmaPerson."""
+    __tablename__ = 'lemma_document_roots'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    document_root_hash = Column(String(64), unique=True, nullable=False, index=True)
+    lemma_person_id = Column(String, nullable=False, index=True)
+    root_version = Column(String, default='v1', nullable=False)
+    provider = Column(String, default='stripe_identity')
+    stripe_verification_session_id = Column(String, index=True)
+    stripe_verification_report_id = Column(String)
+    document_country = Column(String(8))
+    document_type = Column(String(32))
+    confidence_level = Column(String(32))
+    created_at = Column(DateTime, default=datetime.utcnow)
+    revoked_at = Column(DateTime)
+
+
+class LemmaWalletBinding(Base):
+    """Links a wallet_id to a LemmaPerson after verified IDV."""
+    __tablename__ = 'lemma_wallet_bindings'
+    __table_args__ = (
+        UniqueConstraint('wallet_id', name='uq_lemma_wallet_bindings_wallet'),
+    )
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    wallet_id = Column(String, nullable=False, index=True)
+    lemma_person_id = Column(String, nullable=False, index=True)
+    binding_status = Column(String, default='active')
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
 class IsHumanVerification(Base):
     """Tracks Stripe Identity verification sessions for isHuman proofs.
 
@@ -705,6 +752,10 @@ class IsHumanVerification(Base):
     wallet_id = Column(String, index=True)
     ppid = Column(String, index=True)
     credential_id = Column(String, index=True)
+    lemma_person_id = Column(String, index=True)
+    document_root_hash = Column(String(64), index=True)
+    root_version = Column(String, default='v1')
+    confidence_level = Column(String)
     status = Column(String, default='pending')  # pending, verified, failed, expired
     created_at = Column(DateTime, default=datetime.utcnow)
     verified_at = Column(DateTime)

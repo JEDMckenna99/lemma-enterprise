@@ -11,7 +11,12 @@ on:
       - "api/bloom_snapshot.py"
       - "api/revocation_sync.py"
       - "api/ppid.py"
+      - "api/identity_roots.py"
+      - "api/identity_person.py"
+      - "api/config.py"
+      - "billing/stripe_manager.py"
       - "api/database.py"
+      - "migrations/024_identity_roots.sql"
       - "static/js/ishuman-verifier.js"
       - "static/js/lemma-wallet.js"
       - "static/js/wallet-at-rest-crypto.js"
@@ -36,7 +41,12 @@ on:
       - "api/bloom_snapshot.py"
       - "api/revocation_sync.py"
       - "api/ppid.py"
+      - "api/identity_roots.py"
+      - "api/identity_person.py"
+      - "api/config.py"
+      - "billing/stripe_manager.py"
       - "api/database.py"
+      - "migrations/024_identity_roots.sql"
       - "static/js/ishuman-verifier.js"
       - "static/js/lemma-wallet.js"
       - "static/js/wallet-at-rest-crypto.js"
@@ -75,10 +85,14 @@ jobs:
         env:
           DATABASE_URL: sqlite:///:memory:
           LEMMA_PPID_ROOT_KEY: xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+          LEMMA_IDENTITY_ROOT_PEPPER_V1: yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy
+          LEMMA_PERSON_ROOT_SALT_V1: zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz
         run: >
           python -m pytest
           tests/test_ishuman_network_regressions.py
+          tests/test_identity_roots.py
           tests/test_ishuman_ppid_normalization.py
+          tests/test_ishuman_person_root_derivation.py
           tests/test_ishuman_issuance_branching.py
           tests/test_ishuman_issuance_integration.py
           tests/test_ishuman_bloom_snapshot.py

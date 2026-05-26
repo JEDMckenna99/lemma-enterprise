@@ -5,7 +5,7 @@ Stripe manager for Lemma.id platform
 import stripe
 import os
 import logging
-from typing import Dict, Any
+from typing import Any, Dict, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -190,3 +190,49 @@ class StripeManager:
                 'error': 'session_retrieval_failed',
                 'message': str(e)
             }
+
+    def _stripe_api_key_for_identity_sensitive(self) -> Optional[str]:
+        """Prefer restricted Identity key for DOB / document number fields."""
+        restricted = os.getenv('STRIPE_IDENTITY_RESTRICTED_KEY') or os.getenv('STRIPE_RESTRICTED_KEY')
+        if restricted and restricted.startswith('rk_'):
+            return restricted
+        stripe_key = os.getenv('STRIPE_SECRET_KEY')
+        if stripe_key and stripe_key not in ('sk_test_placeholder',):
+            return stripe_key
+        return None
+
+    def retrieve_identity_root_material(self, session_id: str):
+        """
+        Retrieve a verified VerificationSession with fields required for document-root v1.
+
+        Returns the Stripe VerificationSession object or None on failure.
+        """
+        api_key = self._stripe_api_key_for_identity_sensitive()
+        if not api_key:
+            logger.error("No Stripe API key for identity root material retrieval")
+            return None
+
+        expand = [
+            'verified_outputs.dob',
+            'verified_outputs.id_number',
+            'last_verification_report',
+            'last_verification_report.document.number',
+        ]
+        try:
+            session = stripe.identity.VerificationSession.retrieve(
+                session_id,
+                expand=expand,
+                api_key=api_key,
+            )
+            logger.info(
+                "Retrieved identity root material for %s status=%s",
+                session_id,
+                getattr(session, 'status', None),
+            )
+            return session
+        except stripe.error.StripeError as e:
+            logger.error("Failed to retrieve identity root material for %s: %s", session_id, e)
+            return None
+        except Exception as e:
+            logger.error("Unexpected error retrieving identity root material: %s", e)
+            return None

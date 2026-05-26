@@ -19,6 +19,7 @@ Flows
 
 from __future__ import annotations
 
+import base64
 import json
 import logging
 import os
@@ -58,6 +59,7 @@ def _issue_ishuman_credential(
     wallet_id: Optional[str] = None,
     site_id: Optional[str] = None,
     site_signing_pubkey: Optional[str] = None,
+    ppid_derivation: Optional[str] = None,
 ) -> dict:
     """Sign and return a new isHuman credential for *ppid*.
 
@@ -80,6 +82,8 @@ def _issue_ishuman_credential(
     }
     if site_signing_pubkey:
         claims["site_signing_pubkey"] = site_signing_pubkey
+    if ppid_derivation:
+        claims["ppidDerivation"] = ppid_derivation
 
     # The Rust issuer accepts string claim values. Keep the public credential
     # shape typed, but sign over deterministic string forms that the browser
@@ -125,13 +129,76 @@ def _derive_ppid_for_site(
     rp_id: str,
     wallet_secret: Optional[str] = None,
     wallet_id: Optional[str] = None,
+    lemma_person_id: Optional[str] = None,
+    db=None,
 ) -> str:
-    """Derive PPID from wallet_secret + normalized site binding only."""
+    """Derive site PPID from person-root (preferred) or wallet_secret (legacy)."""
+    if lemma_person_id and db is not None:
+        from api.identity_person import load_person_root_bytes
+        from api.ppid import derive_ppid_from_person_root
+
+        person_root = load_person_root_bytes(db, lemma_person_id)
+        return derive_ppid_from_person_root(person_root, rp_id)
+
     from api.ppid import derive_ppid_from_wallet_secret
 
     if not wallet_secret:
-        raise ValueError("wallet_secret required for canonical PPID derivation")
+        raise ValueError("wallet_secret or lemma_person_id required for PPID derivation")
     return derive_ppid_from_wallet_secret(wallet_secret, rp_id)
+
+
+def _derive_master_ppid_for_person(db, lemma_person_id: str) -> str:
+    return _derive_ppid_for_site(rp_id="lemma.id", lemma_person_id=lemma_person_id, db=db)
+
+
+def _complete_verified_ishuman_from_stripe(
+    db,
+    record,
+    *,
+    wallet_id: str,
+    stripe_session_id: str,
+) -> Optional[dict]:
+    """
+    Resolve document/person roots from Stripe and issue master isHuman credential.
+
+    Returns credential dict on success, None on root material failure.
+    """
+    from api.identity_roots import IdentityRootMaterialError
+    from api.identity_person import process_verified_stripe_identity
+    from api.ppid import derive_ppid_from_person_root_hash
+
+    try:
+        resolved, _session = process_verified_stripe_identity(
+            db,
+            stripe_session_id=stripe_session_id,
+            wallet_id=wallet_id,
+        )
+    except IdentityRootMaterialError as exc:
+        logger.error(
+            "Identity root material unavailable for stripe session %s: %s",
+            stripe_session_id,
+            exc,
+        )
+        record.status = "failed"
+        record.metadata_json = {
+            **(record.metadata_json or {}),
+            "root_error": str(exc),
+        }
+        return None
+
+    ppid = derive_ppid_from_person_root_hash(resolved.person_root_hash, "lemma.id")
+    record.lemma_person_id = resolved.person_id
+    record.document_root_hash = resolved.document_root_hash
+    record.root_version = "v1"
+    record.confidence_level = resolved.confidence_level
+
+    credential = _issue_ishuman_credential(
+        ppid,
+        wallet_id,
+        ppid_derivation="person_root_v1",
+    )
+    record.ppid = ppid
+    return credential
 
 
 def _require_wallet_assertion(body: dict, *, field_names: list[str]) -> tuple:
@@ -156,6 +223,7 @@ def _deny_if_derivation_revoked(
     wallet_id: str,
     wallet_secret: Optional[str],
     target_site: str,
+    lemma_person_id: Optional[str] = None,
 ) -> Optional[str]:
     """Return an error code if derivation must be denied for revocation/block."""
     from api.revocation_verifier import is_credential_revoked
@@ -169,6 +237,8 @@ def _deny_if_derivation_revoked(
             rp_id=target_site,
             wallet_secret=wallet_secret,
             wallet_id=wallet_id,
+            lemma_person_id=lemma_person_id,
+            db=db,
         )
     except ValueError:
         return "ppid_derivation_failed"
@@ -181,6 +251,20 @@ def _deny_if_derivation_revoked(
         return "site_ppid_blocked"
 
     return None
+
+
+def _normalize_site_signing_pubkey(pubkey: str) -> str:
+    value = str(pubkey or "").strip()
+    if not value:
+        raise ValueError("site_signing_pubkey required")
+    padded = value + ("=" * (-len(value) % 4))
+    try:
+        decoded = base64.urlsafe_b64decode(padded.encode("ascii"))
+    except Exception as exc:
+        raise ValueError("site_signing_pubkey invalid") from exc
+    if len(decoded) != 32:
+        raise ValueError("site_signing_pubkey invalid length")
+    return value
 
 
 # ---------------------------------------------------------------------------
@@ -324,25 +408,34 @@ def stripe_identity_webhook():
 
         if event_type == "identity.verification_session.verified":
             wallet_id = record.wallet_id or session_obj.get("metadata", {}).get("user_id", "")
-            ppid = record.ppid or _derive_ppid_for_site(rp_id="lemma.id", wallet_id=wallet_id)
 
-            credential = _issue_ishuman_credential(ppid, wallet_id)
+            credential = _complete_verified_ishuman_from_stripe(
+                db,
+                record,
+                wallet_id=wallet_id,
+                stripe_session_id=stripe_session_id,
+            )
+            if not credential:
+                db.commit()
+                return jsonify({"received": True}), 200
 
             record.status = "verified"
             record.verified_at = datetime.utcnow()
-            record.ppid = ppid
             record.credential_id = credential.get("id")
             record.issued_at = datetime.utcnow()
             record.expires_at = datetime.utcnow() + timedelta(days=ISHUMAN_CREDENTIAL_TTL_DAYS)
             record.metadata_json = {
                 **(record.metadata_json or {}),
                 "credential_issuer_did": credential.get("issuerInfo", {}).get("did"),
+                "ppid_derivation": "person_root_v1",
             }
             db.commit()
 
             logger.info(
-                "isHuman credential issued: ppid=%s credential_id=%s",
-                ppid[:40], credential.get("id"),
+                "isHuman credential issued: ppid=%s credential_id=%s person=%s",
+                (record.ppid or "")[:40],
+                credential.get("id"),
+                record.lemma_person_id,
             )
 
         elif event_type in (
@@ -394,9 +487,19 @@ def verification_status(session_id: str):
 
             # Re-issue the credential so the client can store it
             try:
-                credential = _issue_ishuman_credential(record.ppid, record.wallet_id)
+                meta = record.metadata_json or {}
+                ppid_deriv = meta.get("ppid_derivation") or (
+                    "person_root_v1" if record.lemma_person_id else None
+                )
+                credential = _issue_ishuman_credential(
+                    record.ppid,
+                    record.wallet_id,
+                    ppid_derivation=ppid_deriv,
+                )
                 credential["id"] = record.credential_id
                 resp["credential"] = credential
+                if record.lemma_person_id:
+                    resp["lemma_person_id"] = record.lemma_person_id
             except Exception:
                 logger.exception("Failed to re-issue credential for polling")
 
@@ -764,7 +867,7 @@ def derive_site_proof():
     wallet_id = body.get("wallet_id")
     wallet_secret = body.get("wallet_secret")
     target_site = body.get("target_site")
-    site_signing_pubkey = (body.get("site_signing_pubkey") or "").strip()
+    site_signing_pubkey_raw = (body.get("site_signing_pubkey") or "").strip()
 
     if not master_credential_id or not wallet_id or not target_site:
         return jsonify({
@@ -774,6 +877,10 @@ def derive_site_proof():
 
     if not wallet_secret:
         return jsonify({"success": False, "error": "wallet_secret required"}), 400
+    try:
+        site_signing_pubkey = _normalize_site_signing_pubkey(site_signing_pubkey_raw)
+    except ValueError as exc:
+        return jsonify({"success": False, "error": str(exc)}), 400
 
     err, _wid = _require_wallet_assertion(
         body,
@@ -814,15 +921,20 @@ def derive_site_proof():
         if wallet_revoked:
             return jsonify({"success": False, "error": "wallet_revoked"}), 403
 
+        person_id = getattr(master, "lemma_person_id", None)
+
         deny_reason = _deny_if_derivation_revoked(
             db,
             master_credential_id=master_credential_id,
             wallet_id=wallet_id,
             wallet_secret=wallet_secret,
             target_site=target_site,
+            lemma_person_id=person_id,
         )
         if deny_reason:
             return jsonify({"success": False, "error": deny_reason}), 403
+
+        ppid_derivation = "person_root_v1" if person_id else None
 
         # 2. Check if derivation already exists
         existing = (
@@ -840,12 +952,15 @@ def derive_site_proof():
                 rp_id=target_site,
                 wallet_secret=wallet_secret,
                 wallet_id=wallet_id,
+                lemma_person_id=person_id,
+                db=db,
             )
             credential = _issue_ishuman_credential(
                 ppid,
                 wallet_id,
                 site_id=target_site,
                 site_signing_pubkey=site_signing_pubkey or None,
+                ppid_derivation=ppid_derivation,
             )
             credential["id"] = existing.derived_credential_id
             return jsonify({"success": True, "credential": credential, "cached": True})
@@ -855,6 +970,8 @@ def derive_site_proof():
             rp_id=target_site,
             wallet_secret=wallet_secret,
             wallet_id=wallet_id,
+            lemma_person_id=person_id,
+            db=db,
         )
 
         # 4. Issue per-site credential
@@ -863,6 +980,7 @@ def derive_site_proof():
             wallet_id,
             site_id=target_site,
             site_signing_pubkey=site_signing_pubkey or None,
+            ppid_derivation=ppid_derivation,
         )
 
         # 5. Record the mapping

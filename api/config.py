@@ -92,6 +92,10 @@ class LemmaSecrets:
         
         # PPID Root Key - for deriving pairwise identifiers
         self.ppid_root_key = get_required_secret('LEMMA_PPID_ROOT_KEY', min_length=32)
+
+        # Stripe document-root pepper and person-root HKDF salt
+        self.identity_root_pepper = get_required_secret('LEMMA_IDENTITY_ROOT_PEPPER_V1', min_length=32)
+        self.person_root_salt = get_required_secret('LEMMA_PERSON_ROOT_SALT_V1', min_length=32)
         
         # Billing HMAC Secret - for billing data integrity
         self.billing_hmac_secret = get_required_secret('LEMMA_BILLING_HMAC_SECRET', min_length=32)
@@ -182,6 +186,14 @@ def get_network_auth_key() -> str:
 
 def get_ppid_root_key() -> str:
     return get_secrets().ppid_root_key
+
+
+def get_identity_root_pepper() -> str:
+    return get_secrets().identity_root_pepper
+
+
+def get_person_root_salt() -> str:
+    return get_secrets().person_root_salt
 
 def get_billing_hmac_secret() -> str:
     return get_secrets().billing_hmac_secret

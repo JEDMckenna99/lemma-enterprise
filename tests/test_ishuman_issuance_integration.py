@@ -5,7 +5,11 @@ from datetime import datetime, timedelta
 
 import pytest
 
-from tests.wallet_test_helpers import DERIVE_ASSERTION_FIELDS, START_ASSERTION_FIELDS
+from tests.wallet_test_helpers import (
+    DERIVE_ASSERTION_FIELDS,
+    SITE_SIGNING_PUBKEY_B64,
+    START_ASSERTION_FIELDS,
+)
 
 
 @pytest.mark.integration
@@ -91,16 +95,30 @@ def test_webhook_verified_updates_master_record(
             "data": {"object": {"id": "vs_integration_002", "metadata": {"user_id": "wallet_test_001"}}},
         },
     )
-    monkeypatch.setattr(
-        "api.ishuman._derive_ppid_for_site",
-        lambda **_kwargs: "did:lemma:ppid_webhook_001",
-    )
+    def _fake_complete(db, record, *, wallet_id, stripe_session_id):
+        from api.identity_person import material_from_test_fixture, resolve_or_create_person_from_material
+        from api.ppid import derive_ppid_from_person_root_hash
+        from api.ishuman import _issue_ishuman_credential
+
+        material = material_from_test_fixture(stripe_session_id=stripe_session_id)
+        resolved = resolve_or_create_person_from_material(db, material=material, wallet_id=wallet_id)
+        ppid = derive_ppid_from_person_root_hash(resolved.person_root_hash, "lemma.id")
+        record.lemma_person_id = resolved.person_id
+        record.document_root_hash = resolved.document_root_hash
+        record.ppid = ppid
+        return _issue_ishuman_credential(ppid, wallet_id, ppid_derivation="person_root_v1")
+
+    monkeypatch.setattr("api.ishuman._complete_verified_ishuman_from_stripe", _fake_complete)
     monkeypatch.setattr(
         "api.ishuman._issue_ishuman_credential",
         lambda ppid, wallet_id=None, site_id=None, **kwargs: {
             "id": "ishuman_master_integration_001",
             "issuerInfo": {"did": "did:lemma:issuer:test"},
-            "claims": {"isHuman": True, "siteId": site_id or "lemma.id"},
+            "claims": {
+                "isHuman": True,
+                "siteId": site_id or "lemma.id",
+                "ppidDerivation": kwargs.get("ppid_derivation"),
+            },
             "subject": ppid,
         },
     )
@@ -114,7 +132,9 @@ def test_webhook_verified_updates_master_record(
 
     row = db.store.data[IsHumanVerification.__name__][0]
     assert row.status == "verified"
-    assert row.ppid == "did:lemma:ppid_webhook_001"
+    assert row.ppid and row.ppid.startswith("did:lemma:ppid_")
+    assert row.lemma_person_id
+    assert row.document_root_hash
     assert row.credential_id == "ishuman_master_integration_001"
     assert row.verified_at is not None
     assert row.issued_at is not None
@@ -179,7 +199,7 @@ def test_derive_site_proof_error_paths(
                 "wallet_id": "wallet_test_001",
                 "wallet_secret": "ab" * 32,
                 "target_site": "example.com",
-                "site_signing_pubkey": "",
+                "site_signing_pubkey": SITE_SIGNING_PUBKEY_B64,
             },
             DERIVE_ASSERTION_FIELDS,
         ),
@@ -195,7 +215,7 @@ def test_derive_site_proof_error_paths(
                 "wallet_id": "wallet_test_001",
                 "wallet_secret": "ab" * 32,
                 "target_site": "",
-                "site_signing_pubkey": "",
+                "site_signing_pubkey": SITE_SIGNING_PUBKEY_B64,
             },
             DERIVE_ASSERTION_FIELDS,
         ),
@@ -219,7 +239,7 @@ def test_derive_site_proof_error_paths(
                 "wallet_id": "wallet_test_001",
                 "wallet_secret": "ab" * 32,
                 "target_site": "example.com",
-                "site_signing_pubkey": "",
+                "site_signing_pubkey": SITE_SIGNING_PUBKEY_B64,
             },
             DERIVE_ASSERTION_FIELDS,
         ),
@@ -246,7 +266,7 @@ def test_derive_site_proof_error_paths(
                 "wallet_id": "wallet_test_001",
                 "wallet_secret": "ab" * 32,
                 "target_site": "example.com",
-                "site_signing_pubkey": "",
+                "site_signing_pubkey": SITE_SIGNING_PUBKEY_B64,
             },
             DERIVE_ASSERTION_FIELDS,
         ),
@@ -296,7 +316,7 @@ def test_derive_site_proof_persists_derived_mapping(
                 "wallet_id": "wallet_test_001",
                 "wallet_secret": "ab" * 32,
                 "target_site": "customer.example",
-                "site_signing_pubkey": "",
+                "site_signing_pubkey": SITE_SIGNING_PUBKEY_B64,
             },
             DERIVE_ASSERTION_FIELDS,
         ),

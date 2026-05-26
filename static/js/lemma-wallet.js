@@ -5166,6 +5166,46 @@ class LemmaWallet {
      *     // Backend checks if ppid exists -> sign in, else -> create account
      * }
      */
+
+    /**
+     * Use server-issued isHuman credential subject when available (person-root backed).
+     * @private
+     */
+    async _derivePPIDFromIsHumanCredential(siteId) {
+        const normalizeSite = (value) => String(value || '').trim().toLowerCase()
+            .replace(/^www\./, '')
+            .replace(/:\d+$/, '');
+        const target = normalizeSite(siteId);
+        if (!target) return null;
+
+        try {
+            const lemmas = await this._getAll('lemmas');
+            const candidates = lemmas.filter((lemma) => {
+                const claims = lemma.claims || lemma.credentialSubject || {};
+                if (!claims.isHuman) return false;
+                const lemmaSite = normalizeSite(
+                    claims.siteId || claims.site_id || claims.siteDomain || claims.site_domain || claims.domain || ''
+                );
+                if (!lemmaSite) return false;
+                return lemmaSite === target || target.endsWith('.' + lemmaSite);
+            });
+            candidates.sort((a, b) => Number(b.issuanceDate || b.issuedAt || 0) - Number(a.issuanceDate || a.issuedAt || 0));
+            for (const lemma of candidates) {
+                const claims = lemma.claims || lemma.credentialSubject || {};
+                const personRoot = claims.ppidDerivation === 'person_root_v1'
+                    || claims.verificationMethod === 'stripe_identity';
+                if (!personRoot) continue;
+                const ppid = lemma.subject || claims.ppid || claims.id || claims.subject;
+                if (ppid && String(ppid).startsWith('did:lemma:ppid_')) {
+                    return String(ppid);
+                }
+            }
+        } catch (_) {
+            return null;
+        }
+        return null;
+    }
+
     async derivePPID(siteId) {
         await this.init();
         
@@ -5182,6 +5222,11 @@ class LemmaWallet {
         siteId = siteId.toLowerCase()
             .replace(/^www\./, '')
             .replace(/:\d+$/, '');
+
+        const ppidFromIsHuman = await this._derivePPIDFromIsHumanCredential(siteId);
+        if (ppidFromIsHuman) {
+            return ppidFromIsHuman;
+        }
 
         // Third-party-safe path: if a valid lemma is already present for this site,
         // use its bound subject PPID and avoid wallet_secret usage entirely.
