@@ -81,7 +81,7 @@ const AUTH_STATE = {
 class LemmaWallet {
     // SDK version - check with LemmaWallet.VERSION
     // v2.32.0: Redirect-only architecture - removed popup flow for simpler, consistent UX
-    static VERSION = '2.57.0';  // v2.57: popup-first site proof issuance helpers
+    static VERSION = '2.58.0';  // v2.58: tolerate encrypted secret reads when session walletSecret is present
     
     constructor(options = {}) {
         this.db = null;

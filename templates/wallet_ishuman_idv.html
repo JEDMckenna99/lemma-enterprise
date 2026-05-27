@@ -98,7 +98,7 @@
 
     <script src="/static/js/lemma-keys.js?v=2" nonce="{{ csp_nonce }}"></script>
     <script src="/static/js/wallet-at-rest-crypto.js?v=1" nonce="{{ csp_nonce }}"></script>
-    <script src="/static/js/lemma-wallet.js?v=2534" nonce="{{ csp_nonce }}"></script>
+    <script src="/static/js/lemma-wallet.js?v=2535" nonce="{{ csp_nonce }}"></script>
     <script nonce="{{ csp_nonce }}">
         const SESSION_KEY = 'ishuman_idv_popup_session_id';
         const params = new URLSearchParams(window.location.search);
@@ -208,10 +208,29 @@
         }
 
         async function adoptWalletState() {
-            const walletIdRecord = await wallet._get('passkey', 'walletId');
-            const secretRecord = await wallet._get('secrets', 'master');
+            let walletIdRecord = null;
+            try {
+                walletIdRecord = await wallet._get('passkey', 'walletId');
+            } catch (err) {
+                console.warn('[isHuman IDV] walletId read failed:', err.message);
+            }
             walletId = walletIdRecord?.value || wallet.session?.walletId || '';
-            walletSecret = secretRecord?.secret || wallet.session?.walletSecret || '';
+            walletSecret = wallet.session?.walletSecret || '';
+            if (!walletSecret) {
+                try {
+                    const secretRecord = await wallet._get('secrets', 'master');
+                    walletSecret = secretRecord?.secret || '';
+                } catch (err) {
+                    const msg = String(err?.message || err || '');
+                    if (msg === 'envelope_invalid'
+                        || msg === 'storage_key_unavailable'
+                        || msg === 'prf_required_for_encrypted_storage') {
+                        console.warn('[isHuman IDV] secret encrypted; relying on session walletSecret');
+                    } else {
+                        throw err;
+                    }
+                }
+            }
         }
 
         async function ensureWalletUnlocked() {

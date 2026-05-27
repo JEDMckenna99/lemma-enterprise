@@ -305,10 +305,22 @@
   }
 
   async function adoptCurrentWalletState(source) {
-    const walletIdRecord = await state.wallet._get('passkey', 'walletId');
-    const secretRecord = await state.wallet._get('secrets', 'master');
+    let walletIdRecord = null;
+    try {
+      walletIdRecord = await state.wallet._get('passkey', 'walletId');
+    } catch (err) {
+      log('Wallet id read skipped', err.message);
+    }
     state.walletId = walletIdRecord?.value || state.wallet.session?.walletId || '';
-    state.walletSecret = secretRecord?.secret || state.wallet.session?.walletSecret || '';
+    state.walletSecret = state.wallet.session?.walletSecret || '';
+    if (!state.walletSecret) {
+      try {
+        const secretRecord = await state.wallet._get('secrets', 'master');
+        state.walletSecret = secretRecord?.secret || '';
+      } catch (err) {
+        if (!isEncryptedWalletLockedError(err)) throw err;
+      }
+    }
     const wid = $('ih-wallet-id');
     if (wid) wid.textContent = short(state.walletId);
     if (state.walletId) {
@@ -369,12 +381,24 @@
   async function getWalletContext() {
     if (!state.wallet) await initWallet();
     if (!state.walletId) {
-      const walletIdRecord = await state.wallet._get('passkey', 'walletId');
-      state.walletId = walletIdRecord?.value || state.wallet.session?.walletId || '';
+      try {
+        const walletIdRecord = await state.wallet._get('passkey', 'walletId');
+        state.walletId = walletIdRecord?.value || state.wallet.session?.walletId || '';
+      } catch (err) {
+        if (!isEncryptedWalletLockedError(err)) throw err;
+        state.walletId = state.wallet.session?.walletId || '';
+      }
     }
     if (!state.walletSecret) {
-      const secretRecord = await state.wallet._get('secrets', 'master');
-      state.walletSecret = secretRecord?.secret || state.wallet.session?.walletSecret || '';
+      state.walletSecret = state.wallet.session?.walletSecret || '';
+      if (!state.walletSecret) {
+        try {
+          const secretRecord = await state.wallet._get('secrets', 'master');
+          state.walletSecret = secretRecord?.secret || '';
+        } catch (err) {
+          if (!isEncryptedWalletLockedError(err)) throw err;
+        }
+      }
     }
     if (!state.walletId) throw new Error('Create or unlock the wallet first');
     return { walletId: state.walletId, walletSecret: state.walletSecret };

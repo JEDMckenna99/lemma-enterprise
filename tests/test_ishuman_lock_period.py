@@ -77,7 +77,7 @@ def test_verifier_site_vc_cache(verifier_source):
     assert "_verifyFromSiteVcCache" in verifier_source
     assert "'vc_valid'" in verifier_source
     assert "isHumanIssuance: true" in verifier_source
-    assert "BRIDGE_PATH = '/wallet/bridge?v=1.4.0'" in verifier_source
+    assert "BRIDGE_PATH = '/wallet/bridge?v=1.4.1'" in verifier_source
     assert "_issueSiteProofViaPopup" in verifier_source
     assert "_applyIssuedSiteProof" in verifier_source
     assert "ISHUMAN_SITE_PROOF_ISSUED" in verifier_source
@@ -123,6 +123,6 @@ def test_wallet_pages_use_current_wallet_bundle():
     for path in wallet_pages:
         source = path.read_text(encoding="utf-8")
         assert "lemma-wallet.js?v=2476" not in source
-        assert "lemma-wallet.js') }}?v=2534" in source or "lemma-wallet.js?v=2534" in source
+        assert "lemma-wallet.js') }}?v=2535" in source or "lemma-wallet.js?v=2535" in source
         assert "lemma-keys.js?v=1" not in source
         assert "lemma-keys.js') }}?v=2" in source or "lemma-keys.js?v=2" in source
