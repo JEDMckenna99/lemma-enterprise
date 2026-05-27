@@ -55,9 +55,33 @@
     el.className = `pill${tone ? ` ${tone}` : ''}`;
   }
 
-  function setWizardStep(_n, statusText) {
+  function setWizardStep(step, statusText) {
     const statusEl = $('ih-wizard-status');
+    const labelEl = $('ih-wizard-step-label');
+    const shell = $('ih-wizard-shell');
+    if (shell) shell.hidden = false;
     if (statusEl && statusText) statusEl.textContent = statusText;
+    if (labelEl) {
+      labelEl.textContent = step > 0 ? `Step ${step} of ${WIZARD_TOTAL}` : 'Demo complete';
+    }
+    document.querySelectorAll('.wizard-dot').forEach((dot) => {
+      const dotStep = Number(dot.dataset.step || 0);
+      dot.classList.remove('active', 'done');
+      if (step > 0 && dotStep < step) dot.classList.add('done');
+      else if (dotStep === step) dot.classList.add('active');
+    });
+  }
+
+  function setDemoReadyBanner(visible) {
+    const banner = $('ih-demo-ready-banner');
+    if (banner) banner.hidden = !visible;
+  }
+
+  function scrollToPanel(id) {
+    const el = $(id);
+    if (el && el.scrollIntoView) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
   }
 
   function setDebugJson(payload) {
@@ -79,6 +103,7 @@
           state.masterCredential = master;
           state.masterCredentialId = master.id;
           renderMaster(master);
+          setDemoReadyBanner(true);
         } else {
           setPill('ih-wallet-pill', state.walletId ? 'NO PROOF YET' : 'LOCKED', state.walletId ? 'warn' : 'deny');
         }
@@ -93,6 +118,7 @@
     state.wizardRunning = running;
     const ids = [
       'ih-run-guided-demo',
+      'ih-run-guided-demo-hero',
       'ih-wallet-btn',
       'ih-verify-sites-btn',
       'ih-block-tickets-btn',
@@ -109,8 +135,13 @@
       const el = $(id);
       if (el) el.disabled = running;
     }
-    const runBtn = $('ih-run-guided-demo');
-    if (runBtn) runBtn.textContent = running ? 'Running demo…' : 'Run 3-minute demo';
+    const label = running ? 'Running demo…' : 'Run 3-minute demo';
+    for (const id of ['ih-run-guided-demo', 'ih-run-guided-demo-hero']) {
+      const runBtn = $(id);
+      if (runBtn) runBtn.textContent = label;
+    }
+    const shell = $('ih-wizard-shell');
+    if (shell && !running && !state.masterCredentialId) shell.hidden = true;
   }
 
   function demoHeaders() {
@@ -143,7 +174,7 @@
   function applyTestVerifyGate() {
     const enabled = !!(state.config && state.config.test_verify_enabled);
     const notice = $('ih-test-verify-disabled');
-    const guided = $('ih-run-guided-demo');
+    const guidedIds = ['ih-run-guided-demo', 'ih-run-guided-demo-hero'];
     const operatorConsole = $('ih-operator-console');
     const testIds = [
       'ih-start-idv-btn',
@@ -152,7 +183,10 @@
       'ih-poll-btn',
     ];
     if (notice) notice.hidden = enabled;
-    if (guided) guided.hidden = !enabled;
+    for (const id of guidedIds) {
+      const el = $(id);
+      if (el) el.hidden = !enabled;
+    }
     if (operatorConsole) operatorConsole.hidden = !enabled;
     for (const id of testIds) {
       const el = $(id);
@@ -376,7 +410,8 @@
         claims,
       });
     }
-    setPill('ih-wallet-pill', 'MASTER READY', 'ok');
+    setPill('ih-wallet-pill', 'PROOF READY', 'ok');
+    setDemoReadyBanner(true);
   }
 
   function verifierFor(slug) {
@@ -412,6 +447,13 @@
   function renderSite(slug, result) {
     const tone = result.human ? 'ok' : (result.reason === 'site_blocked' || result.reason === 'revoked' ? 'deny' : 'warn');
     setPill(`ih-${slug}-pill`, result.human ? 'HUMAN' : 'DENY', tone);
+    const card = $(`ih-${slug}-card`);
+    if (card) {
+      card.classList.remove('is-human', 'is-deny', 'is-pending');
+      if (result.human) card.classList.add('is-human');
+      else if (result.reason === 'site_blocked' || result.reason === 'revoked') card.classList.add('is-deny');
+      else card.classList.add('is-pending');
+    }
     const ppidEl = $(`ih-${slug}-ppid`);
     if (ppidEl) ppidEl.textContent = result.ppid || '-';
     const reasonEl = $(`ih-${slug}-reason`);
@@ -462,10 +504,10 @@
     const el = $('ih-abuse-derive');
     if (el) {
       if (payload.allowed) {
-        el.textContent = 'Server derive: allowed';
+        el.textContent = 'Server enforcement: allowed';
         el.className = 'abuse-outcome';
       } else {
-        el.textContent = `Server derive: blocked (${payload.error})`;
+        el.textContent = `Server enforcement: blocked (${payload.error})`;
         el.className = 'abuse-outcome deny';
       }
     }
@@ -606,6 +648,7 @@
   async function runGuidedDemo() {
     if (state.wizardRunning) return;
     setWizardBusy(true);
+    scrollToPanel('ih-demo-cockpit');
     try {
       setWizardStep(1, 'Unlocking wallet…');
       await initWallet();
@@ -616,7 +659,8 @@
       setWizardStep(3, 'Verifying both customer sites…');
       await verifyBothSites();
 
-      setWizardStep(4, 'Blocking abusive ticketing PPID…');
+      setWizardStep(4, 'Blocking abusive ticketing ID…');
+      scrollToPanel('ih-abuse-panel');
       await blockTickets();
 
       setWizardStep(5, 'Pause — site block is scoped to ticketing only…');
@@ -637,6 +681,7 @@
       await approveNetworkRevocation();
 
       setWizardStep(0, 'Demo complete — both sites denied at network layer.');
+      setDemoReadyBanner(true);
       log('Guided demo complete');
     } catch (err) {
       log('Wizard stopped', err.message);
@@ -663,8 +708,7 @@
     const netJson = $('ih-master-json');
     if (netJson) netJson.textContent = pretty(payload);
     if (state.masterCredentialId) {
-      const status = $('ih-wizard-status');
-      if (status) status.textContent = 'Master proof ready — open abuse demo or customer sites.';
+      setDemoReadyBanner(true);
     }
     return payload;
   }
@@ -673,7 +717,7 @@
     const el = $(id);
     if (!el) return;
     el.addEventListener('click', async () => {
-      if (state.wizardRunning && id !== 'ih-run-guided-demo') return;
+      if (state.wizardRunning && id !== 'ih-run-guided-demo' && id !== 'ih-run-guided-demo-hero') return;
       el.disabled = true;
       try {
         await fn();
@@ -690,6 +734,7 @@
   async function boot() {
     await loadConfig();
     bind('ih-run-guided-demo', runGuidedDemo);
+    bind('ih-run-guided-demo-hero', runGuidedDemo);
     bind('ih-wallet-btn', initWallet);
     bind('ih-start-idv-btn', startIdentityVerification);
     bind('ih-test-complete-btn', completeTestModeVerification);

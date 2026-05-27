@@ -30,10 +30,14 @@ def test_ishuman_demo_page_loads_expected_assets(ishuman_demo_client):
     body = resp.get_data(as_text=True)
 
     assert resp.status_code == 200
-    assert "Verify once. Prove human on every site." in body
-    assert "Try the customer sites" in body
+    assert "Bot defense should punish abusive humans, not whole networks." in body
+    assert "Live demo cockpit" in body
+    assert "From IP bans to human accountability" in body
+    assert "Why businesses care" in body
     assert "autoProvision: true" in body
-    assert "Abuse response demo" in body
+    assert "Abuse response" in body
+    assert "ih-wizard-progress" in body
+    assert "ih-demo-ready-banner" in body
     assert "ih-network-pill" in body
     assert "lemma-demo-tickets" in body
     assert "lemma-demo-trials" in body
