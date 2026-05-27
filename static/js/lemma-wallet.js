@@ -81,7 +81,7 @@ const AUTH_STATE = {
 class LemmaWallet {
     // SDK version - check with LemmaWallet.VERSION
     // v2.32.0: Redirect-only architecture - removed popup flow for simpler, consistent UX
-    static VERSION = '2.55.0';  // v2.55: require PRF unlock when isHuman cache is missing
+    static VERSION = '2.56.0';  // v2.56: detect encrypted rows even when metadata is stale
     
     constructor(options = {}) {
         this.db = null;
@@ -5283,8 +5283,6 @@ class LemmaWallet {
     async _encryptedStorageNeedsAtRestKey() {
         const mod = this._walletAtRest();
         if (!mod?.isEncryptedEnvelope) return false;
-        const meta = await this._getWalletMeta();
-        if (!meta?.migrationComplete) return false;
         if (this._atRestKey) return false;
         const stores = ['lemmas', 'secrets', 'session', 'profiles'];
         for (const storeName of stores) {
@@ -5292,6 +5290,10 @@ class LemmaWallet {
             if (rows.some((row) => mod.isEncryptedEnvelope(row))) {
                 return true;
             }
+        }
+        const meta = await this._getWalletMeta();
+        if (meta?.migrationComplete) {
+            return true;
         }
         return false;
     }

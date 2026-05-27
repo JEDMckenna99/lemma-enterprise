@@ -65,6 +65,7 @@ def test_wallet_daily_unlock_helpers(wallet_source):
     assert "hasIsHumanMasterInCache" in wallet_source
     assert "localStorage.setItem(ISHUMAN_LOCK_STORAGE_KEY" in wallet_source
     assert "request.onblocked" in wallet_source
+    assert "rows.some((row) => mod.isEncryptedEnvelope(row))" in wallet_source
 
 
 @pytest.mark.browser
@@ -111,6 +112,6 @@ def test_wallet_pages_use_current_wallet_bundle():
     for path in wallet_pages:
         source = path.read_text(encoding="utf-8")
         assert "lemma-wallet.js?v=2476" not in source
-        assert "lemma-wallet.js') }}?v=2532" in source or "lemma-wallet.js?v=2532" in source
+        assert "lemma-wallet.js') }}?v=2533" in source or "lemma-wallet.js?v=2533" in source
         assert "lemma-keys.js?v=1" not in source
         assert "lemma-keys.js') }}?v=2" in source or "lemma-keys.js?v=2" in source
