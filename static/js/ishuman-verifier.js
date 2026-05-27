@@ -255,22 +255,26 @@ function extractDidPubkeyHex(did) {
 }
 
 function computeTrustListContentHash(issuers) {
-    const canonical = (Array.isArray(issuers) ? issuers : [])
-        .map((row) => ({
-            did: String(row?.did || '').trim(),
-            pubkey: String(row?.pubkey || '').trim().toLowerCase(),
-            key_id: String(row?.key_id || '').trim(),
-            status: String(row?.status || '').trim().toLowerCase(),
-            valid_from_unix: Number(row?.valid_from_unix || 0),
-            valid_until_unix: Number(row?.valid_until_unix || 0),
-            priority: Number(row?.priority || 0),
-        }))
-        .sort((a, b) => (
-            a.did.localeCompare(b.did)
-            || String(b.priority).localeCompare(String(a.priority))
-            || a.key_id.localeCompare(b.key_id)
-        ));
-    return sha256HexText(JSON.stringify(canonical));
+    const canonicalEntries = (Array.isArray(issuers) ? issuers : []).map((row) => ({
+        did: String(row?.did || '').trim(),
+        pubkey: String(row?.pubkey || '').trim().toLowerCase(),
+        key_id: String(row?.key_id || '').trim(),
+        status: String(row?.status || 'active').trim().toLowerCase(),
+        valid_from_unix: Number(row?.valid_from_unix || 0),
+        valid_until_unix: Number(row?.valid_until_unix || 0),
+        priority: Number(row?.priority || 0),
+    }));
+    // Match api/issuer_trust_list.py json.dumps(..., sort_keys=True, separators=(",", ":"))
+    const canonical = JSON.stringify(
+        canonicalEntries.map((entry) => {
+            const sorted = {};
+            for (const key of Object.keys(entry).sort()) {
+                sorted[key] = entry[key];
+            }
+            return sorted;
+        }),
+    );
+    return sha256HexText(canonical);
 }
 
 async function verifySignedTrustList(trustList) {
