@@ -12,6 +12,7 @@ IDV_HTML = ROOT / "templates" / "wallet_ishuman_idv.html"
 POPUP_HTML = ROOT / "templates" / "wallet_popup.html"
 WALLET_UNLOCK_HTML = ROOT / "templates" / "wallet_unlock.html"
 RECOVER_COMPLETE_HTML = ROOT / "templates" / "recover_complete.html"
+MODERN_LAYOUT_HTML = ROOT / "templates" / "modern" / "layout.html"
 
 
 @pytest.fixture(name="wallet_source")
@@ -92,8 +93,9 @@ def test_wallet_pages_use_current_wallet_bundle():
         POPUP_HTML,
         WALLET_UNLOCK_HTML,
         RECOVER_COMPLETE_HTML,
+        MODERN_LAYOUT_HTML,
     ]
     for path in wallet_pages:
         source = path.read_text(encoding="utf-8")
         assert "lemma-wallet.js?v=2476" not in source
-        assert "lemma-wallet.js?v=2530" in source
+        assert "lemma-wallet.js') }}?v=2530" in source or "lemma-wallet.js?v=2530" in source
