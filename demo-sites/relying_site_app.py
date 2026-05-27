@@ -169,7 +169,7 @@ def index():
         <button id="verify-btn">{copy["primary"]}</button>
         <div class="verdict" id="decision-card">
           <strong>What happens when you click</strong>
-          <p class="tiny">This page calls <code>IsHumanVerifier.verify()</code> with <code>autoProvision: true</code>. If your browser wallet has no Lemma proof yet, a Lemma popup opens for wallet unlock + one-time IDV. The site only receives <code>human</code>, a site-private <code>ppid</code>, and <code>reason</code>.</p>
+          <p class="tiny">On load, the SDK checks your existing Lemma proof in the background. IDV opens only the first time you verify without a credential.</p>
         </div>
       </section>
       <aside class="card">
@@ -190,43 +190,73 @@ def index():
       </aside>
     </div>
   </main>
-  <script src="{LEMMA_ORIGIN}/sdk/ishuman-verifier.js?v=1.2.2"></script>
+  <script src="{LEMMA_ORIGIN}/sdk/ishuman-verifier.js?v=1.2.3"></script>
   <script>
     const pill = document.getElementById('status-pill');
     const result = document.getElementById('result');
     const decisionCard = document.getElementById('decision-card');
     const decisionCopy = document.getElementById('decision-copy');
+    const verifier = new IsHumanVerifier({{
+      siteId: '{SITE_ID}',
+      lemmaOrigin: '{LEMMA_ORIGIN}',
+      autoProvision: true,
+      debug: true,
+    }});
 
-    document.getElementById('verify-btn').addEventListener('click', async () => {{
-      const button = document.getElementById('verify-btn');
-      button.disabled = true;
-      pill.textContent = 'CHECKING';
-      pill.className = 'pill checking';
-      decisionCard.innerHTML = '<strong>Checking Lemma wallet…</strong><p class="tiny">If no human proof exists yet, Lemma opens a popup to complete IDV once.</p>';
+    function renderVerifyResponse(response, {{ checking = false }} = {{}}) {{
+      if (checking) {{
+        pill.textContent = 'CHECKING';
+        pill.className = 'pill checking';
+        decisionCard.innerHTML = '<strong>Checking Lemma wallet…</strong><p class="tiny">Using your existing human proof when available. IDV opens only if you have never completed verification.</p>';
+        return;
+      }}
+      pill.textContent = response.human ? 'HUMAN' : (response.reason === 'wallet_locked' ? 'LOCKED' : 'DENY');
+      pill.className = 'pill ' + (response.human ? 'ok' : (response.reason === 'wallet_locked' ? 'checking' : 'deny'));
+      decisionCopy.textContent = response.human
+        ? '{copy["success"]}. PPID: ' + (response.ppid || '').slice(0, 28) + '…'
+        : (response.reason === 'wallet_locked'
+          ? 'Wallet locked — unlock with passkey to reuse your existing proof.'
+          : 'Blocked. Reason: ' + response.reason);
+      decisionCard.innerHTML = response.human
+        ? '<strong>{copy["success"]}</strong><p class="tiny">human=true · reason=' + response.reason + ' · ' + response.timeMs.toFixed(0) + 'ms · site-private PPID issued.</p>'
+        : '<strong>' + (response.reason === 'wallet_locked' ? 'Unlock wallet to continue' : 'Action blocked') + '</strong><p class="tiny">reason=' + response.reason + (response.reason === 'idv_cancelled' ? ' — complete verification in the Lemma popup to continue.' : '') + '</p>';
+      result.textContent = JSON.stringify(response, null, 2);
+    }}
+
+    async function runVerify({{ allowProvision = false }} = {{}}) {{
+      renderVerifyResponse({{ human: false, reason: 'checking' }}, {{ checking: true }});
       try {{
-        const verifier = new IsHumanVerifier({{
-          siteId: '{SITE_ID}',
-          lemmaOrigin: '{LEMMA_ORIGIN}',
-          autoProvision: true,
-          debug: true,
-        }});
-        const response = await verifier.verify();
-        verifier.destroy();
-        pill.textContent = response.human ? 'HUMAN' : 'DENY';
-        pill.className = 'pill ' + (response.human ? 'ok' : 'deny');
-        decisionCopy.textContent = response.human
-          ? '{copy["success"]}. PPID: ' + (response.ppid || '').slice(0, 28) + '…'
-          : 'Blocked. Reason: ' + response.reason;
-        decisionCard.innerHTML = response.human
-          ? '<strong>{copy["success"]}</strong><p class="tiny">human=true · reason=' + response.reason + ' · ' + response.timeMs.toFixed(0) + 'ms · site-private PPID issued.</p>'
-          : '<strong>Action blocked</strong><p class="tiny">reason=' + response.reason + (response.reason === 'idv_cancelled' ? ' — complete verification in the Lemma popup to continue.' : '') + '</p>';
-        result.textContent = JSON.stringify(response, null, 2);
+        const response = allowProvision
+          ? await verifier.verify()
+          : await verifier.probe();
+        renderVerifyResponse(response);
+        return response;
       }} catch (err) {{
         pill.textContent = 'ERROR';
         pill.className = 'pill deny';
         decisionCopy.textContent = 'Verification failed: ' + err.message;
         decisionCard.innerHTML = '<strong>Verification unavailable</strong><p class="tiny">' + err.message + '</p>';
         result.textContent = JSON.stringify({{ error: err.message }}, null, 2);
+        return null;
+      }}
+    }}
+
+    // Background check on load — reuses cached session or unlocks wallet, never opens IDV.
+    runVerify({{ allowProvision: false }}).then((response) => {{
+      if (response && !response.human && response.reason === 'wallet_locked') {{
+        pill.textContent = 'UNLOCK';
+        decisionCopy.textContent = 'Existing proof found. Click the button once to unlock your wallet with passkey.';
+      }} else if (response && !response.human) {{
+        pill.textContent = 'READY';
+        decisionCopy.textContent = 'No human proof yet. Click the button to verify once via Lemma IDV.';
+      }}
+    }});
+
+    document.getElementById('verify-btn').addEventListener('click', async () => {{
+      const button = document.getElementById('verify-btn');
+      button.disabled = true;
+      try {{
+        await runVerify({{ allowProvision: true }});
       }} finally {{
         button.disabled = false;
       }}

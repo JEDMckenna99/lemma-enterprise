@@ -688,7 +688,7 @@ async function ensureWalletDecryptionReady() {
     }
     try {
         console.log(' Bridge: encrypted credentials present but PRF key missing — unlocking wallet');
-        await wallet.unlock();
+        await wallet.unlock({ prfRebind: true });
         clearCredentialsCache();
         cache.session = { value: null, ts: 0, promise: null };
         return { ok: true };
@@ -904,7 +904,10 @@ window.addEventListener('message', async (event) => {
                 // Full passkey unlock (biometric required)
                 if (!wallet) await initWallet();
                 try {
-                    const unlockResult = await wallet.unlock();
+                    const unlockResult = await wallet.unlock({
+                        force: !!payload?.force,
+                        prfRebind: !!payload?.prfRebind,
+                    });
                     const newSession = await checkSession({ force: true });
                     respond({ 
                         success: true,
@@ -1124,7 +1127,12 @@ window.addEventListener('message', async (event) => {
                 });
 
                 if (!master) {
-                    respond({ success: false, error: 'no_ishuman_credential' });
+                    const likelyLocked = typeof wallet._encryptedStorageNeedsAtRestKey === 'function'
+                        && await wallet._encryptedStorageNeedsAtRestKey();
+                    respond({
+                        success: false,
+                        error: likelyLocked ? 'wallet_locked' : 'no_ishuman_credential',
+                    });
                     break;
                 }
 
@@ -1260,7 +1268,12 @@ window.addEventListener('message', async (event) => {
                 });
 
                 if (!master) {
-                    respond({ success: false, error: 'no_ishuman_credential' });
+                    const likelyLocked = typeof wallet._encryptedStorageNeedsAtRestKey === 'function'
+                        && await wallet._encryptedStorageNeedsAtRestKey();
+                    respond({
+                        success: false,
+                        error: likelyLocked ? 'wallet_locked' : 'no_ishuman_credential',
+                    });
                     break;
                 }
 
@@ -1295,7 +1308,7 @@ window.addEventListener('message', async (event) => {
                         derived.packageType = derived.packageType || 'identity';
                         await wallet.storeCredential(derived);
                         clearCredentialsCache();
-                        console.log(` isHuman: derived site proof for ${ihSite}:`, derived.id);
+                        console.log(` isHuman: derived site session proof for ${ihSite}:`, derived.id);
                         const signed = await signSessionPresentation(derived);
                         respond({ success: true, ...signed });
                     } else {

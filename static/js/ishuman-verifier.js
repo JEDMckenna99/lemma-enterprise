@@ -26,7 +26,7 @@
  * Optional `autoProvision: true` opens a Lemma-hosted popup to unlock the wallet
  * and complete IDV when no master isHuman proof is present yet.
  *
- * @version 1.2.2
+ * @version 1.2.3
  */
 
 (function () {
@@ -56,7 +56,6 @@ const IDV_POPUP_TIMEOUT_MS = 10 * 60 * 1000;
 const PROVISIONABLE_REASONS = new Set([
     'no_credential',
     'no_ishuman_credential',
-    'wallet_locked',
 ]);
 
 // ========================================================================
@@ -532,17 +531,34 @@ class IsHumanVerifier {
 
         const autoProvision = options.autoProvision ?? this.autoProvision;
         let result = await this._verifyOnce(t0);
+
+        // Wallet locked with existing encrypted credentials — unlock bridge only, never IDV.
+        if (!result.human && result.reason === 'wallet_locked') {
+            const unlocked = await this._unlockBridge();
+            if (unlocked) {
+                result = await this._verifyOnce(t0);
+            }
+        }
+
         if (!result.human && autoProvision && PROVISIONABLE_REASONS.has(result.reason)) {
             const provisionResult = await this._provisionViaPopup();
             if (provisionResult.ok) {
                 this.invalidateSession();
                 await this._syncBridgeAfterIdv(provisionResult.detail);
                 result = await this._verifyOnce(t0);
-            } else if (result.reason === 'no_credential') {
+            } else if (PROVISIONABLE_REASONS.has(result.reason)) {
                 result = this._result(false, null, 'idv_cancelled', t0);
             }
         }
         return result;
+    }
+
+    /**
+     * Background credential check — uses cached session when valid, unlocks wallet if
+     * needed, but never opens the IDV popup.
+     */
+    async probe() {
+        return this.verify({ autoProvision: false });
     }
 
     async _verifyOnce(t0) {
@@ -783,12 +799,22 @@ class IsHumanVerifier {
             if (detail.sessionData?.isUnlocked) {
                 await this._sendBridgeRequest('SET_LOCAL_SESSION', { session: detail.sessionData });
             }
-            const unlockResult = await this._sendBridgeRequest('WALLET_UNLOCK', {}, 60000);
-            if (this.debug) {
-                console.log('[isHuman] bridge unlock after IDV', unlockResult?.success ? 'ok' : unlockResult?.error);
-            }
+            await this._unlockBridge();
         } catch (err) {
             if (this.debug) console.warn('[isHuman] bridge sync after IDV failed:', err.message);
+        }
+    }
+
+    async _unlockBridge() {
+        try {
+            const unlockResult = await this._sendBridgeRequest('WALLET_UNLOCK', { prfRebind: true }, 60000);
+            if (this.debug) {
+                console.log('[isHuman] bridge unlock', unlockResult?.success ? 'ok' : unlockResult?.error);
+            }
+            return !!unlockResult?.success;
+        } catch (err) {
+            if (this.debug) console.warn('[isHuman] bridge unlock failed:', err.message);
+            return false;
         }
     }
 
@@ -1073,12 +1099,16 @@ class IsHumanVerifier {
         }
     }
 
+    _sessionStorageKey() {
+        return `${SESSION_STORAGE_KEY}:${this.siteId}`;
+    }
+
     _loadSessionCache() {
         if (this._session && this._session.siteId === this.siteId) {
             return this._session;
         }
         try {
-            const raw = sessionStorage.getItem(SESSION_STORAGE_KEY);
+            const raw = sessionStorage.getItem(this._sessionStorageKey());
             if (!raw) return null;
             const parsed = JSON.parse(raw);
             if (!parsed || parsed.siteId !== this.siteId) return null;
@@ -1092,14 +1122,14 @@ class IsHumanVerifier {
     _persistSession(session) {
         this._session = session;
         try {
-            sessionStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(session));
+            sessionStorage.setItem(this._sessionStorageKey(), JSON.stringify(session));
         } catch { /* quota exceeded — ignore */ }
     }
 
     _clearSessionCache() {
         this._session = null;
         try {
-            sessionStorage.removeItem(SESSION_STORAGE_KEY);
+            sessionStorage.removeItem(this._sessionStorageKey());
         } catch { /* ignore */ }
     }
 

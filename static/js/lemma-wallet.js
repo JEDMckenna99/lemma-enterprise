@@ -2648,6 +2648,10 @@ class LemmaWallet {
         // the user has been authenticated by their device biometrics
         let walletIdRecord = await this._get('passkey', 'walletId');
         const rpId = this._getRpIdForWebAuthn();
+        const needsPrfRebind = await this._encryptedStorageNeedsAtRestKey();
+        const userVerification = (options.prfRebind || (needsPrfRebind && this.isUnlocked && this.isUnlocked()))
+            ? 'preferred'
+            : 'required';
         const getOptions = await this._publicKeyOptionsWithPrf({
             challenge: challenge,
             rpId: rpId,
@@ -2655,7 +2659,7 @@ class LemmaWallet {
                 id: this._base64urlToBuffer(passkey.credentialId),
                 type: 'public-key'
             }],
-            userVerification: 'required',
+            userVerification,
             timeout: 60000
         }, walletIdRecord?.value);
 
