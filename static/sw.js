@@ -1,7 +1,7 @@
 // Lemma Service Worker - Minimal Implementation
 // This prevents service worker errors and provides basic caching
 
-const CACHE_NAME = 'lemma-v16';  // v16 - bypass wallet/demo popup routes
+const CACHE_NAME = 'lemma-v17';  // v17 - refresh wallet SDK cache after daily unlock changes
 const STATIC_ASSETS = [
   '/static/css/lemma.css',
   '/static/js/lemma-bot-shield-simple.js',

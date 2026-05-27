@@ -53,6 +53,7 @@ const WALLET_DB_VERSION = 6;  // v6: ishuman_cache plaintext store for lock-peri
 const DEFAULT_SESSION_HOURS = 24;
 const DEFAULT_PROFILE_ID = 'default';
 const ISHUMAN_LOCK_STORAGE_KEY = 'lemma_ishuman_lock:v1';
+const ISHUMAN_LOCK_LEGACY_SESSION_KEY = 'lemma_ishuman_lock:v1'; // sessionStorage migration
 
 // Get user's session duration preference (stored in localStorage by wallet settings page)
 function getSessionDurationMs() {
@@ -80,7 +81,7 @@ const AUTH_STATE = {
 class LemmaWallet {
     // SDK version - check with LemmaWallet.VERSION
     // v2.32.0: Redirect-only architecture - removed popup flow for simpler, consistent UX
-    static VERSION = '2.52.0';  // v6: isHuman lock-period bundle + ishuman_cache store
+    static VERSION = '2.53.0';  // v2.53: daily unlock bundle in localStorage + bridge credential sync
     
     constructor(options = {}) {
         this.db = null;
@@ -2202,19 +2203,17 @@ class LemmaWallet {
             }
         }
 
-        if (options.isHumanIssuance && this._isLemmaDomain() && !options.force) {
-            if (this.isIsHumanLockValid()) {
-                await this._restoreIsHumanLockBundleIfValid();
-                if (this.isUnlocked && this.isUnlocked()) {
-                    return {
-                        success: true,
-                        method: 'ishuman_lock_bundle',
-                        cached: true,
-                        walletId: this.session.walletId,
-                        walletSecret: this.session.walletSecret,
-                        expiresAt: this.session.expiresAt,
-                    };
-                }
+        if (this._isLemmaDomain() && !options.force && this.isIsHumanLockValid()) {
+            await this._restoreIsHumanLockBundleIfValid();
+            if (this.isUnlocked && this.isUnlocked()) {
+                return {
+                    success: true,
+                    method: 'daily_unlock_bundle',
+                    cached: true,
+                    walletId: this.session.walletId,
+                    walletSecret: this.session.walletSecret,
+                    expiresAt: this.session.expiresAt,
+                };
             }
         }
 
@@ -2589,14 +2588,26 @@ class LemmaWallet {
     }
 
     _readIsHumanLockBundleRaw() {
-        if (typeof sessionStorage === 'undefined') return null;
         try {
-            const raw = sessionStorage.getItem(ISHUMAN_LOCK_STORAGE_KEY);
-            if (!raw) return null;
-            return JSON.parse(raw);
+            if (typeof localStorage !== 'undefined') {
+                const raw = localStorage.getItem(ISHUMAN_LOCK_STORAGE_KEY);
+                if (raw) return JSON.parse(raw);
+            }
+            if (typeof sessionStorage !== 'undefined') {
+                const legacy = sessionStorage.getItem(ISHUMAN_LOCK_LEGACY_SESSION_KEY);
+                if (legacy) {
+                    const parsed = JSON.parse(legacy);
+                    if (parsed && typeof localStorage !== 'undefined') {
+                        localStorage.setItem(ISHUMAN_LOCK_STORAGE_KEY, legacy);
+                        sessionStorage.removeItem(ISHUMAN_LOCK_LEGACY_SESSION_KEY);
+                    }
+                    return parsed;
+                }
+            }
         } catch {
             return null;
         }
+        return null;
     }
 
     isIsHumanLockValid() {
@@ -2607,7 +2618,7 @@ class LemmaWallet {
     }
 
     async _persistIsHumanLockBundle() {
-        if (!this._isLemmaDomain() || typeof sessionStorage === 'undefined') return;
+        if (!this._isLemmaDomain()) return;
         if (!this.session?.isUnlocked || !this.session?.walletSecret) return;
         const passkey = await this._get('passkey', 'primary').catch(() => null);
         const bundle = {
@@ -2619,17 +2630,23 @@ class LemmaWallet {
             hasPasskey: !!(passkey && passkey.credentialId),
         };
         try {
-            sessionStorage.setItem(ISHUMAN_LOCK_STORAGE_KEY, JSON.stringify(bundle));
-            console.log('[Lemma] isHuman lock-period bundle persisted');
+            if (typeof localStorage !== 'undefined') {
+                localStorage.setItem(ISHUMAN_LOCK_STORAGE_KEY, JSON.stringify(bundle));
+            }
+            console.log('[Lemma] Daily unlock bundle persisted (24h)');
         } catch (e) {
-            console.warn('[Lemma] Failed to persist isHuman lock bundle:', e.message);
+            console.warn('[Lemma] Failed to persist daily unlock bundle:', e.message);
         }
     }
 
     _clearIsHumanLockBundle() {
-        if (typeof sessionStorage === 'undefined') return;
         try {
-            sessionStorage.removeItem(ISHUMAN_LOCK_STORAGE_KEY);
+            if (typeof localStorage !== 'undefined') {
+                localStorage.removeItem(ISHUMAN_LOCK_STORAGE_KEY);
+            }
+            if (typeof sessionStorage !== 'undefined') {
+                sessionStorage.removeItem(ISHUMAN_LOCK_LEGACY_SESSION_KEY);
+            }
         } catch { /* ignore */ }
     }
 
@@ -2647,17 +2664,38 @@ class LemmaWallet {
             expiresAt,
             walletId: bundle.walletId,
             walletSecret: bundle.walletSecret,
-            source: 'ishuman_lock_bundle',
+            source: 'daily_unlock_bundle',
         };
         this._isHumanLockRestored = true;
-        console.log('[Lemma] isHuman lock-period bundle restored');
+        console.log('[Lemma] Daily unlock bundle restored');
         return true;
     }
 
+    async _persistDailyUnlockIfLemmaDomain() {
+        if (this._isLemmaDomain() && this.session?.isUnlocked && this.session?.walletSecret) {
+            await this._persistIsHumanLockBundle();
+        }
+    }
+
     async _finalizeIsHumanIssuance(options = {}) {
+        await this._persistDailyUnlockIfLemmaDomain();
         if (!options.isHumanIssuance) return;
-        await this._persistIsHumanLockBundle();
         await this.syncIsHumanCacheFromWallet();
+    }
+
+    applySessionFromSync(incomingSession, walletSecret) {
+        if (!incomingSession?.isUnlocked) return false;
+        const secret = walletSecret || incomingSession.walletSecret || this.session?.walletSecret;
+        if (!secret || !incomingSession.walletId) return false;
+        this.session = {
+            isUnlocked: true,
+            unlockedAt: incomingSession.unlockedAt || Date.now(),
+            expiresAt: incomingSession.expiresAt || (Date.now() + getSessionDurationMs()),
+            walletId: incomingSession.walletId,
+            walletSecret: secret,
+            source: incomingSession.source || 'sdk_sync',
+        };
+        return true;
     }
 
     async _putIsHumanCacheRecord(credential) {
@@ -2696,6 +2734,23 @@ class LemmaWallet {
         } catch {
             return [];
         }
+    }
+
+    async applyIsHumanCredentialsToCache(credentials) {
+        if (!Array.isArray(credentials)) return { applied: 0 };
+        let applied = 0;
+        for (const cred of credentials) {
+            if (cred && this._isIsHumanCredentialRecord(cred)) {
+                await this._putIsHumanCacheRecord(cred);
+                applied += 1;
+            }
+        }
+        return { applied };
+    }
+
+    async exportIsHumanCredentialsForBridge() {
+        await this.syncIsHumanCacheFromWallet();
+        return this.getIsHumanCredentialsFromCache();
     }
 
     async ensureIsHumanIssuanceReady(options = {}) {
@@ -2737,18 +2792,18 @@ class LemmaWallet {
     async unlock(options = {}) {
         await this.init();
 
-        if (options.isHumanIssuance && this._isLemmaDomain() && !options.force) {
+        if (this._isLemmaDomain() && !options.force) {
             if (this.isIsHumanLockValid()) {
                 await this._restoreIsHumanLockBundleIfValid();
                 if (this.isUnlocked && this.isUnlocked()) {
                     return {
                         success: true,
-                        method: 'ishuman_lock_bundle',
+                        method: 'daily_unlock_bundle',
                         cached: true,
                         walletId: this.session.walletId,
                         walletSecret: this.session.walletSecret,
                         expiresAt: this.session.expiresAt,
-                        source: 'ishuman_lock_bundle',
+                        source: 'daily_unlock_bundle',
                     };
                 }
             }

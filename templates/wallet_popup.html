@@ -152,7 +152,7 @@
 
     <script src="/static/js/lemma-keys.js?v=1" nonce="{{ csp_nonce }}"></script>
     <script src="/static/js/wallet-at-rest-crypto.js?v=1" nonce="{{ csp_nonce }}"></script>
-    <script src="/static/js/lemma-wallet.js?v=2476" nonce="{{ csp_nonce }}"></script>
+    <script src="/static/js/lemma-wallet.js?v=2530" nonce="{{ csp_nonce }}"></script>
     <script nonce="{{ csp_nonce }}">
         let wallet = null;
         const params = new URLSearchParams(window.location.search);
@@ -171,10 +171,13 @@
                 
                 const info = await wallet.getWalletInfo();
                 
-                if (info.isUnlocked || (isHumanIssuance && wallet.isIsHumanLockValid && wallet.isIsHumanLockValid())) {
+                if (info.isUnlocked || (wallet.isIsHumanLockValid && wallet.isIsHumanLockValid())) {
+                    if (!info.isUnlocked && wallet.isIsHumanLockValid && wallet.isIsHumanLockValid()) {
+                        await wallet._restoreIsHumanLockBundleIfValid();
+                    }
                     // Already unlocked!
                     showStatus('✅ Wallet is already unlocked!', 'success');
-                    setTimeout(() => sendSuccessAndClose(), 1000);
+                    setTimeout(() => sendSuccessAndClose(), 200);
                 } else if (info.hasPasskey) {
                     // Has passkey, just needs to unlock
                     showStatus('Enter your passkey to unlock', 'info');
@@ -243,6 +246,14 @@
                 // Get full session info to help bridge sync
                 const sessionInfo = wallet?.session || {};
                 const walletSecret = await wallet?.getWalletSecret?.() || null;
+                let isHumanCredentials = [];
+                if (isHumanIssuance && typeof wallet?.exportIsHumanCredentialsForBridge === 'function') {
+                    try {
+                        isHumanCredentials = await wallet.exportIsHumanCredentialsForBridge();
+                    } catch (err) {
+                        console.warn('[Lemma] isHuman credential export for bridge failed:', err.message);
+                    }
+                }
                 
                 window.opener.postMessage({
                     type: 'LEMMA_UNLOCK_SUCCESS',
@@ -254,8 +265,9 @@
                         expiresAt: sessionInfo.expiresAt,
                         walletId: sessionInfo.walletId
                     },
-                    // Include wallet secret so third-party can immediately use it
-                    walletSecret: walletSecret
+                    // Include wallet secret so third-party bridge can decrypt/sync
+                    walletSecret: walletSecret,
+                    isHumanCredentials,
                 }, '*');
             }
             window.close();

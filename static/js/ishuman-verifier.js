@@ -26,7 +26,7 @@
  * Optional `autoProvision: true` opens a Lemma-hosted popup to unlock the wallet
  * and complete IDV when no master isHuman proof is present yet.
  *
- * @version 1.3.0
+ * @version 1.3.1
  */
 
 (function () {
@@ -833,6 +833,7 @@ class IsHumanVerifier {
         await this._syncBridgeAfterUnlock({
             sessionData: detail.sessionData,
             walletSecret: detail.walletSecret,
+            isHumanCredentials: detail.isHumanCredentials || [],
         });
     }
 
@@ -1348,12 +1349,22 @@ class IsHumanVerifier {
     async _syncBridgeAfterUnlock(detail = {}) {
         try {
             const sessionData = detail.sessionData;
+            const walletSecret = detail.walletSecret || sessionData?.walletSecret || null;
+            const isHumanCredentials = detail.isHumanCredentials || [];
             if (sessionData?.isUnlocked) {
-                await this._sendBridgeRequest('SET_LOCAL_SESSION', { session: sessionData });
+                await this._sendBridgeRequest('SET_LOCAL_SESSION', {
+                    session: sessionData,
+                    walletSecret,
+                    isHumanCredentials,
+                });
             }
-            const unlockResult = await this._sendBridgeRequest('WALLET_UNLOCK', { isHumanIssuance: true }, 60000);
-            if (this.debug) {
-                console.log('[isHuman] bridge unlock', unlockResult?.success ? 'ok' : unlockResult?.error);
+            const needsBridgeUnlock = !sessionData?.isUnlocked
+                || (!isHumanCredentials.length && this._hasProvisionedMaster());
+            if (needsBridgeUnlock) {
+                const unlockResult = await this._sendBridgeRequest('WALLET_UNLOCK', { isHumanIssuance: true }, 60000);
+                if (this.debug) {
+                    console.log('[isHuman] bridge unlock', unlockResult?.success ? 'ok' : unlockResult?.error);
+                }
             }
         } catch (err) {
             if (this.debug) console.warn('[isHuman] bridge unlock sync failed:', err.message);

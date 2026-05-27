@@ -98,7 +98,7 @@
 
     <script src="/static/js/lemma-keys.js?v=1" nonce="{{ csp_nonce }}"></script>
     <script src="/static/js/wallet-at-rest-crypto.js?v=1" nonce="{{ csp_nonce }}"></script>
-    <script src="/static/js/lemma-wallet.js?v=2476" nonce="{{ csp_nonce }}"></script>
+    <script src="/static/js/lemma-wallet.js?v=2530" nonce="{{ csp_nonce }}"></script>
     <script nonce="{{ csp_nonce }}">
         const SESSION_KEY = 'ishuman_idv_popup_session_id';
         const params = new URLSearchParams(window.location.search);
@@ -171,6 +171,14 @@
                 try {
                     const sessionInfo = wallet.session || {};
                     const secret = walletSecret || await wallet.getWalletSecret?.().catch(() => null);
+                    let isHumanCredentials = [];
+                    if (typeof wallet.exportIsHumanCredentialsForBridge === 'function') {
+                        try {
+                            isHumanCredentials = await wallet.exportIsHumanCredentialsForBridge();
+                        } catch (exportErr) {
+                            console.warn('[isHuman IDV] credential export for bridge failed:', exportErr.message);
+                        }
+                    }
                     detail = {
                         ...(detail || {}),
                         walletId: sessionInfo.walletId || walletId,
@@ -181,6 +189,7 @@
                             walletId: sessionInfo.walletId || walletId,
                         },
                         walletSecret: secret,
+                        isHumanCredentials,
                     };
                     broadcastUnlock();
                 } catch (err) {

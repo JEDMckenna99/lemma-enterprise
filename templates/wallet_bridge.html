@@ -20,7 +20,7 @@
 <body>
 <script src="/static/js/lemma-keys.js?v=1" nonce="{{ csp_nonce }}"></script>
 <script src="/static/js/wallet-at-rest-crypto.js?v=1" nonce="{{ csp_nonce }}"></script>
-<script src="/static/js/lemma-wallet.js?v=2476" nonce="{{ csp_nonce }}"></script>
+<script src="/static/js/lemma-wallet.js?v=2530" nonce="{{ csp_nonce }}"></script>
 <script nonce="{{ csp_nonce }}">
 /**
  * Lemma Wallet Bridge v2.0
@@ -843,11 +843,25 @@ window.addEventListener('message', async (event) => {
                 if (!wallet) await initWallet();
 
                 const incomingSession = payload?.session;
+                const incomingSecret = payload?.walletSecret || payload?.wallet_secret || '';
 
                 if (incomingSession && incomingSession.isUnlocked) {
                     console.log(' SET_LOCAL_SESSION: Receiving session from SDK');
 
-                    // Store session in bridge's IndexedDB
+                    if (typeof wallet.applySessionFromSync === 'function') {
+                        wallet.applySessionFromSync(incomingSession, incomingSecret);
+                    } else {
+                        wallet.session = {
+                            isUnlocked: true,
+                            unlockedAt: incomingSession.unlockedAt || Date.now(),
+                            expiresAt: incomingSession.expiresAt,
+                            walletId: incomingSession.walletId,
+                            walletSecret: incomingSecret || undefined,
+                            source: 'sdk_sync',
+                        };
+                    }
+
+                    // Store session metadata in bridge IndexedDB when possible (non-fatal if encrypted)
                     const sessionToStore = {
                         id: 'current',
                         isUnlocked: true,
@@ -856,17 +870,34 @@ window.addEventListener('message', async (event) => {
                         walletId: incomingSession.walletId,
                         source: 'sdk_sync'
                     };
-                    await wallet._put('session', sessionToStore);
-
-                    // IMPORTANT: Store wallet_id separately for global-session lookups
-                    // This is critical for the global-session fallback when cookies are blocked
-                    if (incomingSession.walletId) {
-                        await wallet._put('passkey', { id: 'walletId', value: incomingSession.walletId });
-                        console.log(' Wallet ID stored for global-session lookups');
+                    try {
+                        await wallet._put('session', sessionToStore);
+                    } catch (sessionErr) {
+                        console.warn(' SET_LOCAL_SESSION: encrypted session store skipped:', sessionErr.message);
                     }
 
-                    // Clear session cache so next check uses fresh data
+                    if (incomingSession.walletId) {
+                        try {
+                            await wallet._put('passkey', { id: 'walletId', value: incomingSession.walletId });
+                        } catch (passkeyErr) {
+                            console.warn(' SET_LOCAL_SESSION: walletId store skipped:', passkeyErr.message);
+                        }
+                    }
+
+                    if (typeof wallet._persistIsHumanLockBundle === 'function') {
+                        await wallet._persistIsHumanLockBundle();
+                    }
+
+                    const incomingCreds = payload?.isHumanCredentials || payload?.ishuman_credentials || [];
+                    if (incomingCreds.length && typeof wallet.applyIsHumanCredentialsToCache === 'function') {
+                        const applied = await wallet.applyIsHumanCredentialsToCache(incomingCreds);
+                        console.log(` SET_LOCAL_SESSION: synced ${applied.applied} isHuman credential(s) to bridge cache`);
+                    } else if (typeof wallet.syncIsHumanCacheFromWallet === 'function') {
+                        await wallet.syncIsHumanCacheFromWallet();
+                    }
+
                     cache.session = { value: null, ts: 0, promise: null };
+                    clearCredentialsCache();
 
                     console.log(' Session synced from SDK - bridge now has valid session');
                     respond({ success: true, sessionSet: true });
@@ -941,11 +972,24 @@ window.addEventListener('message', async (event) => {
                 break;
                 
             case 'WALLET_UNLOCK':
-                // Full passkey unlock (biometric required)
+                // Full passkey unlock (biometric required) unless daily bundle valid
                 if (!wallet) await initWallet();
                 try {
+                    if (typeof wallet.isIsHumanLockValid === 'function' && wallet.isIsHumanLockValid()) {
+                        await wallet._restoreIsHumanLockBundleIfValid();
+                    }
+                    if (wallet.isUnlocked && wallet.isUnlocked()) {
+                        const newSession = await checkSession({ force: true });
+                        respond({
+                            success: true,
+                            method: 'daily_unlock_bundle',
+                            cached: true,
+                            session: newSession,
+                        });
+                        break;
+                    }
                     const unlockResult = await wallet.unlock({
-                        isHumanIssuance: !!payload?.isHumanIssuance,
+                        isHumanIssuance: payload?.isHumanIssuance !== false,
                     });
                     const newSession = await checkSession({ force: true });
                     respond({ 

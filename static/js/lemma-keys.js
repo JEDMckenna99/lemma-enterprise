@@ -13,6 +13,7 @@
     const WALLET_SIGNING_KEY_INFO = 'wallet-signing-key-v1';
     const ASSERTION_PREFIX = 'lemma:wallet-assertion:v1';
     const REGISTER_PREFIX = 'lemma:register-signing-key:v1';
+    const SITE_SIGNING_KEY_INFO_PREFIX = 'site-signing-key-v1:';
 
     let _webCryptoEd25519 = null;
     let _nobleEd25519 = null;
@@ -130,6 +131,38 @@
         return ed25519FromSeed(seed);
     }
 
+    function canonicalizeSiteDomain(siteDomain) {
+        const input = String(siteDomain || '').trim().toLowerCase();
+        if (!input) {
+            throw new Error('site domain required');
+        }
+        let host = input;
+        try {
+            if (host.includes('://')) {
+                host = new URL(host).hostname.toLowerCase();
+            }
+        } catch {
+            host = input;
+        }
+        host = host.split('/')[0].split(':')[0].replace(/^www\./, '').trim();
+        if (!host || host === 'unknown') {
+            throw new Error('invalid site domain');
+        }
+        return host;
+    }
+
+    async function deriveSiteSigningKeypair(walletSecretHex, siteDomain) {
+        const ikm = hexToBytes(walletSecretHex);
+        const canonicalDomain = canonicalizeSiteDomain(siteDomain);
+        const seed = await hkdfSha256(
+            ikm,
+            WALLET_SIGNING_KEY_DOMAIN,
+            `${SITE_SIGNING_KEY_INFO_PREFIX}${canonicalDomain}`,
+            32,
+        );
+        return ed25519FromSeed(seed);
+    }
+
     function buildAssertionPayload({ walletId, nonceB64, fields }) {
         const lines = [
             ASSERTION_PREFIX,
@@ -163,8 +196,11 @@
     const LemmaKeys = {
         WALLET_SIGNING_KEY_DOMAIN,
         WALLET_SIGNING_KEY_INFO,
+        SITE_SIGNING_KEY_INFO_PREFIX,
         hkdfSha256,
         deriveWalletSigningKeypair,
+        deriveSiteSigningKeypair,
+        canonicalizeSiteDomain,
         buildAssertionPayload,
         buildRegisterPayload,
         base64urlEncode,

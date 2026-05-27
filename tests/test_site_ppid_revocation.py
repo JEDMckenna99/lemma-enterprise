@@ -4,7 +4,7 @@ from datetime import datetime, timedelta
 
 import pytest
 
-from tests.wallet_test_helpers import DERIVE_ASSERTION_FIELDS
+from tests.wallet_test_helpers import DERIVE_ASSERTION_FIELDS, SITE_SIGNING_PUBKEY_B64
 
 
 def _seed_site(db_factory, *, site_id="site_test_001", domain="example.com", api_key="test_api_key"):
@@ -130,7 +130,7 @@ def test_derive_site_proof_denies_active_site_block(
                 "wallet_id": "wallet_test_001",
                 "wallet_secret": "ab" * 32,
                 "target_site": "example.com",
-                "site_signing_pubkey": "",
+                "site_signing_pubkey": SITE_SIGNING_PUBKEY_B64,
             },
             DERIVE_ASSERTION_FIELDS,
         ),
@@ -176,7 +176,7 @@ def test_derive_site_proof_denies_master_credential_bloom_revocation(
                 "wallet_id": "wallet_test_001",
                 "wallet_secret": "ab" * 32,
                 "target_site": "example.com",
-                "site_signing_pubkey": "",
+                "site_signing_pubkey": SITE_SIGNING_PUBKEY_B64,
             },
             DERIVE_ASSERTION_FIELDS,
         ),
@@ -223,7 +223,7 @@ def test_derive_site_proof_denies_site_ppid_bloom_revocation(
                 "wallet_id": "wallet_test_001",
                 "wallet_secret": "ab" * 32,
                 "target_site": "example.com",
-                "site_signing_pubkey": "",
+                "site_signing_pubkey": SITE_SIGNING_PUBKEY_B64,
             },
             DERIVE_ASSERTION_FIELDS,
         ),
@@ -241,8 +241,8 @@ def test_approve_network_revocation_publishes_ishuman_events_without_reason_kwar
     make_derived_credential,
     monkeypatch,
 ):
-    from api.authz_engine import AuthzPrincipal
     from api.database import DerivedCredential, IsHumanVerification, RevocationList
+    from api.authz_engine import AuthzPrincipal
 
     db = fake_ishuman_db_session_factory
     db.store.data[IsHumanVerification.__name__].append(
@@ -283,14 +283,23 @@ def test_approve_network_revocation_publishes_ishuman_events_without_reason_kwar
 
     class FakeBus:
         def publish_revocation(self, credential_id, credential_type="unknown", site_id=None):
-            published.append((credential_id, credential_type, site_id))
+            published.append(
+                {
+                    "credential_id": credential_id,
+                    "credential_type": credential_type,
+                    "site_id": site_id,
+                }
+            )
             return True
 
     monkeypatch.setattr("api.revocation_sync.get_event_bus", lambda: FakeBus())
 
     resp = ishuman_client.post(
         "/api/ishuman/approve-revocation",
-        json={"wallet_id": "wallet_revoke_001", "reason": "confirmed automation"},
+        json={
+            "wallet_id": "wallet_revoke_001",
+            "reason": "confirmed automation",
+        },
         headers={"X-Lemma-Credential": "{}"},
     )
     payload = resp.get_json()
@@ -298,12 +307,12 @@ def test_approve_network_revocation_publishes_ishuman_events_without_reason_kwar
     assert resp.status_code == 200
     assert payload["success"] is True
     assert payload["total_revoked"] == 3
-    assert {event[0] for event in published} == {
+    assert {event["credential_id"] for event in published} == {
         "wallet_revoke_001",
         "ishuman_master_revoke_001",
         "ishuman_site_revoke_001",
     }
-    assert all(event[1] == "ishuman" for event in published)
+    assert all(event["credential_type"] == "ishuman" for event in published)
     assert len(db.store.data[RevocationList.__name__]) == 3
 
 

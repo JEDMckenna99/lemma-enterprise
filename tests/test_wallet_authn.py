@@ -14,7 +14,7 @@ from api.wallet_keys import (
     pubkey_to_b64url,
     register_self_signature,
 )
-from tests.wallet_test_helpers import DERIVE_ASSERTION_FIELDS
+from tests.wallet_test_helpers import DERIVE_ASSERTION_FIELDS, SITE_SIGNING_PUBKEY_B64
 
 
 @pytest.fixture
@@ -59,7 +59,7 @@ def test_register_then_assert_then_replay_fails(
         "wallet_id": wallet_fixture["wallet_id"],
         "master_credential_id": "ishuman_master_x",
         "target_site": "example.com",
-        "site_signing_pubkey": "",
+        "site_signing_pubkey": SITE_SIGNING_PUBKEY_B64,
     }
     assertion = build_wallet_assertion(
         wallet_id=wallet_fixture["wallet_id"],
@@ -99,7 +99,7 @@ def test_assert_with_unregistered_wallet_fails(wallet_fixture, fake_ishuman_db_s
         "wallet_id": wallet_fixture["wallet_id"],
         "master_credential_id": "x",
         "target_site": "example.com",
-        "site_signing_pubkey": "",
+        "site_signing_pubkey": SITE_SIGNING_PUBKEY_B64,
         "wallet_assertion": {
             "nonce": challenge["nonce"],
             "signature": "AAAA",
@@ -126,7 +126,7 @@ def test_assert_with_bad_signature_fails(
         "wallet_id": wallet_fixture["wallet_id"],
         "master_credential_id": "x",
         "target_site": "example.com",
-        "site_signing_pubkey": "",
+        "site_signing_pubkey": SITE_SIGNING_PUBKEY_B64,
         "wallet_assertion": {"nonce": challenge["nonce"], "signature": "AAAA"},
     }
     result, _ = verify_assertion_from_body(
@@ -150,7 +150,7 @@ def test_assert_with_field_tampering_fails(
         "wallet_id": wallet_fixture["wallet_id"],
         "master_credential_id": "ishuman_master_x",
         "target_site": "example.com",
-        "site_signing_pubkey": "",
+        "site_signing_pubkey": SITE_SIGNING_PUBKEY_B64,
     }
     assertion = build_wallet_assertion(
         wallet_id=wallet_fixture["wallet_id"],
