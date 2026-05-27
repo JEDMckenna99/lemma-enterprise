@@ -894,8 +894,10 @@ def create_app():
         """Serve the isHuman verifier SDK with cache-busting headers."""
         from flask import send_from_directory
         response = send_from_directory('static/js', 'ishuman-verifier.js', mimetype='application/javascript')
-        response.headers['Cache-Control'] = 'public, max-age=3600'
-        response.headers['X-SDK-Version'] = '1.0.0'
+        response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+        response.headers['Pragma'] = 'no-cache'
+        response.headers['Expires'] = '0'
+        response.headers['X-SDK-Version'] = '1.2.0'
         response.headers['Access-Control-Allow-Origin'] = '*'
         return response
 
