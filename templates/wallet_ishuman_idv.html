@@ -98,7 +98,7 @@
 
     <script src="/static/js/lemma-keys.js?v=2" nonce="{{ csp_nonce }}"></script>
     <script src="/static/js/wallet-at-rest-crypto.js?v=1" nonce="{{ csp_nonce }}"></script>
-    <script src="/static/js/lemma-wallet.js?v=2531" nonce="{{ csp_nonce }}"></script>
+    <script src="/static/js/lemma-wallet.js?v=2532" nonce="{{ csp_nonce }}"></script>
     <script nonce="{{ csp_nonce }}">
         const SESSION_KEY = 'ishuman_idv_popup_session_id';
         const params = new URLSearchParams(window.location.search);
@@ -226,7 +226,18 @@
             })) {
                 return true;
             }
-            const creds = await wallet.getCredentials();
+            let creds = [];
+            try {
+                creds = await wallet.getCredentials();
+            } catch (err) {
+                const message = String(err?.message || err || '');
+                if (message === 'envelope_invalid'
+                    || message === 'storage_key_unavailable'
+                    || message === 'prf_required_for_encrypted_storage') {
+                    throw new Error('Unlock wallet with passkey to read encrypted human proof.');
+                }
+                throw err;
+            }
             return creds.some((c) => {
                 const cl = c.claims || c.credentialSubject || {};
                 const site = cl.siteId || cl.site_id || cl.siteDomain || cl.site_domain || '';

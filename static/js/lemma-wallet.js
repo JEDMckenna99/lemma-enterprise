@@ -81,7 +81,7 @@ const AUTH_STATE = {
 class LemmaWallet {
     // SDK version - check with LemmaWallet.VERSION
     // v2.32.0: Redirect-only architecture - removed popup flow for simpler, consistent UX
-    static VERSION = '2.54.0';  // v2.54: fail fast when wallet IndexedDB upgrade is blocked
+    static VERSION = '2.55.0';  // v2.55: require PRF unlock when isHuman cache is missing
     
     constructor(options = {}) {
         this.db = null;
@@ -2744,6 +2744,11 @@ class LemmaWallet {
         }
     }
 
+    async hasIsHumanMasterInCache() {
+        const cached = await this.getIsHumanCredentialsFromCache();
+        return cached.some((credential) => this._isIsHumanMasterRecord(credential));
+    }
+
     async applyIsHumanCredentialsToCache(credentials) {
         if (!Array.isArray(credentials)) return { applied: 0 };
         let applied = 0;
@@ -2763,20 +2768,38 @@ class LemmaWallet {
 
     async ensureIsHumanIssuanceReady(options = {}) {
         await this.init();
+        let forcePasskeyForEncryptedCache = false;
         if (this.isIsHumanLockValid()) {
             await this._restoreIsHumanLockBundleIfValid();
             if (this.isUnlocked && this.isUnlocked()) {
-                return { ready: true, method: 'ishuman_lock_bundle' };
+                if (await this.hasIsHumanMasterInCache()) {
+                    return { ready: true, method: 'ishuman_lock_bundle_cache' };
+                }
+                const needsAtRestKey = await this._encryptedStorageNeedsAtRestKey();
+                if (!needsAtRestKey || this._atRestKey) {
+                    await this.syncIsHumanCacheFromWallet().catch(() => ({ synced: 0 }));
+                    return { ready: true, method: 'ishuman_lock_bundle' };
+                }
+                forcePasskeyForEncryptedCache = true;
             }
         }
         if (this.isUnlocked && this.isUnlocked()) {
             const needsAtRestKey = await this._encryptedStorageNeedsAtRestKey();
             if (!needsAtRestKey || this._atRestKey) {
+                await this.syncIsHumanCacheFromWallet().catch(() => ({ synced: 0 }));
                 return { ready: true, method: 'restored_session' };
             }
+            if (await this.hasIsHumanMasterInCache()) {
+                return { ready: true, method: 'restored_session_cache' };
+            }
+            forcePasskeyForEncryptedCache = true;
         }
         const existingPasskey = await this._get('passkey', 'primary');
-        const issuanceOpts = { ...options, isHumanIssuance: true };
+        const issuanceOpts = {
+            ...options,
+            isHumanIssuance: true,
+            force: options.force || forcePasskeyForEncryptedCache,
+        };
         if (existingPasskey && existingPasskey.credentialId) {
             await this.unlock(issuanceOpts);
         } else {

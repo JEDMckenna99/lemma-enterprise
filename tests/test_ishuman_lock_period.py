@@ -62,6 +62,7 @@ def test_bridge_ishuman_issuance_probe(bridge_source):
 def test_wallet_daily_unlock_helpers(wallet_source):
     assert "exportIsHumanCredentialsForBridge" in wallet_source
     assert "applyIsHumanCredentialsToCache" in wallet_source
+    assert "hasIsHumanMasterInCache" in wallet_source
     assert "localStorage.setItem(ISHUMAN_LOCK_STORAGE_KEY" in wallet_source
     assert "request.onblocked" in wallet_source
 
@@ -91,6 +92,13 @@ def test_unlock_popup_ishuman_flag():
 
 
 @pytest.mark.browser
+def test_idv_popup_handles_encrypted_master_without_raw_error():
+    idv_html = IDV_HTML.read_text(encoding="utf-8")
+    assert "Unlock wallet with passkey to read encrypted human proof." in idv_html
+    assert "envelope_invalid" in idv_html
+
+
+@pytest.mark.browser
 def test_wallet_pages_use_current_wallet_bundle():
     wallet_pages = [
         BRIDGE_HTML,
@@ -103,6 +111,6 @@ def test_wallet_pages_use_current_wallet_bundle():
     for path in wallet_pages:
         source = path.read_text(encoding="utf-8")
         assert "lemma-wallet.js?v=2476" not in source
-        assert "lemma-wallet.js') }}?v=2531" in source or "lemma-wallet.js?v=2531" in source
+        assert "lemma-wallet.js') }}?v=2532" in source or "lemma-wallet.js?v=2532" in source
         assert "lemma-keys.js?v=1" not in source
         assert "lemma-keys.js') }}?v=2" in source or "lemma-keys.js?v=2" in source
