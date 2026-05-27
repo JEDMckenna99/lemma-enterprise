@@ -55,16 +55,38 @@
     el.className = `pill${tone ? ` ${tone}` : ''}`;
   }
 
-  function setWizardStep(n, statusText) {
-    const stepEl = $('ih-wizard-step');
+  function setWizardStep(_n, statusText) {
     const statusEl = $('ih-wizard-status');
-    if (stepEl) stepEl.textContent = n > WIZARD_TOTAL ? 'Complete' : `Step ${n}/${WIZARD_TOTAL}`;
     if (statusEl && statusText) statusEl.textContent = statusText;
   }
 
-  function setDemoReady(visible) {
-    const banner = $('ih-demo-ready');
-    if (banner) banner.classList.toggle('visible', !!visible);
+  function setDebugJson(payload) {
+    const json = $('ih-master-json');
+    if (json) json.textContent = pretty(payload);
+  }
+
+  async function refreshWalletStatus() {
+    try {
+      await initWallet({ force: false });
+      if (state.wallet) {
+        const creds = await state.wallet.getCredentials();
+        const master = creds.find((c) => {
+          const cl = c.claims || c.credentialSubject || {};
+          const site = cl.siteId || cl.site_id || cl.siteDomain || cl.site_domain || '';
+          return cl.isHuman && (site === 'lemma.id' || !site);
+        });
+        if (master) {
+          state.masterCredential = master;
+          state.masterCredentialId = master.id;
+          renderMaster(master);
+        } else {
+          setPill('ih-wallet-pill', state.walletId ? 'NO PROOF YET' : 'LOCKED', state.walletId ? 'warn' : 'deny');
+        }
+      }
+    } catch (err) {
+      setPill('ih-wallet-pill', 'NOT READY', 'warn');
+      log('Wallet status check skipped', err.message);
+    }
   }
 
   function setWizardBusy(running) {
@@ -127,6 +149,7 @@
       'ih-start-idv-btn',
       'ih-test-complete-btn',
       'ih-force-reverify-btn',
+      'ih-poll-btn',
     ];
     if (notice) notice.hidden = enabled;
     if (guided) guided.hidden = !enabled;
@@ -145,28 +168,8 @@
       state.serverAdminToken = root.dataset.serverAdminToken || '';
     }
     applyTestVerifyGate();
-    const netJson = $('ih-network-json');
-    if (netJson) netJson.textContent = pretty(state.config);
     log('Demo config loaded', `${state.config.sites.length} sites`);
     updatePpidCompare();
-    await loadStats();
-  }
-
-  async function loadStats() {
-    try {
-      const stats = await requestJson('/api/ishuman/stats');
-      const el = $('ih-stats-body');
-      if (!el) return;
-      el.textContent = [
-        `Verifications: ${stats.total_verifications ?? 0}`,
-        `Active site blocks: ${stats.active_site_blocks ?? 0}`,
-        `Network revocations: ${stats.network_revocations ?? 0}`,
-        `IDV cost: $${stats.verification_cost_usd ?? 2}`,
-      ].join(' · ');
-    } catch (err) {
-      const el = $('ih-stats-body');
-      if (el) el.textContent = 'Stats unavailable';
-    }
   }
 
   function updateIntegrationLatency() {
@@ -291,7 +294,7 @@
       window.location.href = payload.url;
       return;
     }
-    const netJson = $('ih-network-json');
+    const netJson = $('ih-master-json');
     if (netJson) netJson.textContent = pretty(payload);
   }
 
@@ -300,7 +303,7 @@
     if (!state.wallet) await initWallet();
 
     const payload = await requestJson(`/api/ishuman/verification-status/${encodeURIComponent(state.sessionId)}`);
-    const netJson = $('ih-network-json');
+    const netJson = $('ih-master-json');
     if (netJson) netJson.textContent = pretty(payload);
     log('Verification status checked', payload.status);
 
@@ -314,7 +317,6 @@
     localStorage.setItem('ishuman_demo_master_id', state.masterCredentialId);
     await state.wallet.storeCredential(payload.credential);
     renderMaster(payload.credential);
-    setDemoReady(true);
     await refreshStatus();
     return payload;
   }
@@ -345,10 +347,8 @@
       await state.wallet.storeCredential(payload.credential);
     }
     renderMaster(payload.credential);
-    setDemoReady(true);
     log('One-click test verify complete', short(payload.credential_id));
-    const netJson = $('ih-network-json');
-    if (netJson) netJson.textContent = pretty(payload);
+    setDebugJson(payload);
     return payload;
   }
 
@@ -367,10 +367,6 @@
     const claims = credential?.claims || credential?.credentialSubject || {};
     const mid = $('ih-master-id');
     if (mid) mid.textContent = short(credential?.id);
-    const iss = $('ih-master-issuer');
-    if (iss) iss.textContent = short(credential?.issuer || credential?.issuerInfo?.did);
-    const exp = $('ih-master-expiry');
-    if (exp) exp.textContent = claims.expiresAt || credential?.expiresAt || '-';
     const json = $('ih-master-json');
     if (json) {
       json.textContent = pretty({
@@ -388,15 +384,13 @@
       siteId: SITE_IDS[slug],
       lemmaOrigin: window.location.origin,
       debug: true,
+      autoProvision: true,
       isBlockedLocally: (ppid) => state.localBlocks[slug].has(ppid),
     });
   }
 
   async function verifySite(slug) {
     if (!window.IsHumanVerifier) throw new Error('IsHumanVerifier SDK not loaded');
-    if (!state.walletId && !state.masterCredentialId) {
-      throw new Error('Create wallet and complete verification first');
-    }
     const verifier = verifierFor(slug);
     const result = await verifier.verify();
     verifier.destroy();
@@ -435,30 +429,16 @@
 
   async function refreshAbuseChecks() {
     const ppid = state.results.tickets?.ppid;
-    const siteCheck = $('ih-abuse-site-check');
-    const globalCheck = $('ih-abuse-global-check');
-    if (!ppid) {
-      if (siteCheck) siteCheck.textContent = 'Run verify on ticketing first';
-      if (globalCheck) globalCheck.textContent = '';
-      return;
-    }
+    if (!ppid) return;
     try {
       const withSite = await fetchCheck(ppid, 'site_demo_tickets');
-      if (siteCheck) {
-        siteCheck.textContent = withSite.blocked
-          ? `check(site_id): blocked — ${withSite.reason}`
-          : 'check(site_id): not blocked';
-        siteCheck.className = `abuse-outcome${withSite.blocked ? ' deny' : ''}`;
-      }
-      const noSite = await fetchCheck(ppid, '');
-      if (globalCheck) {
-        globalCheck.textContent = noSite.blocked
-          ? `check(global): blocked — ${noSite.reason}`
-          : 'check(global): not blocked';
-        globalCheck.className = `abuse-outcome${noSite.blocked ? ' deny' : ''}`;
+      const deriveEl = $('ih-abuse-derive');
+      if (deriveEl && withSite.blocked) {
+        deriveEl.textContent = `check(site_id): blocked — ${withSite.reason}`;
+        deriveEl.className = 'abuse-outcome deny';
       }
     } catch (err) {
-      if (siteCheck) siteCheck.textContent = `Check failed: ${err.message}`;
+      log('Abuse check failed', err.message);
     }
   }
 
@@ -505,7 +485,7 @@
       }),
     });
     state.localBlocks.tickets.add(result.ppid);
-    const netJson = $('ih-network-json');
+    const netJson = $('ih-master-json');
     if (netJson) netJson.textContent = pretty(payload);
     log('Ticketing site block applied', short(result.ppid));
 
@@ -528,7 +508,7 @@
       body: JSON.stringify({ site_slug: 'tickets', ppid }),
     });
     state.localBlocks.tickets.delete(ppid);
-    const netJson = $('ih-network-json');
+    const netJson = $('ih-master-json');
     if (netJson) netJson.textContent = pretty(payload);
     log('Ticketing site block removed', short(ppid));
     await verifySite('tickets');
@@ -548,7 +528,7 @@
       }),
     });
     setPill('ih-network-pill', 'PENDING REVIEW', 'warn');
-    const netJson = $('ih-network-json');
+    const netJson = $('ih-master-json');
     if (netJson) netJson.textContent = pretty(payload);
     log('Network revocation review requested', short(result.ppid));
     const outcome = $('ih-abuse-network-outcome');
@@ -570,7 +550,7 @@
       }),
     });
     setPill('ih-network-pill', 'REVOKED', 'deny');
-    const netJson = $('ih-network-json');
+    const netJson = $('ih-master-json');
     if (netJson) netJson.textContent = pretty(payload);
     log('Network revocation approved', `${payload.total_revoked} IDs`);
     const outcome = $('ih-abuse-network-outcome');
@@ -656,17 +636,12 @@
       setWizardStep(7, 'Approving network revocation…');
       await approveNetworkRevocation();
 
-      setWizardStep(8, 'Demo complete — both sites denied at network layer.');
-      const summary = $('ih-wizard-summary');
-      if (summary) {
-        summary.textContent = 'Guided demo finished: verify once → two PPIDs → site block → trials still human → network revoke → both DENY.';
-        summary.style.display = 'block';
-      }
+      setWizardStep(0, 'Demo complete — both sites denied at network layer.');
       log('Guided demo complete');
     } catch (err) {
       log('Wizard stopped', err.message);
       setWizardStep(0, `Stopped: ${err.message}. Open Operator console or Demo log for details.`);
-      const netJson = $('ih-network-json');
+      const netJson = $('ih-master-json');
       if (netJson) netJson.textContent = pretty(err.payload || { error: err.message });
       throw err;
     } finally {
@@ -685,9 +660,12 @@
       const slug = siteIdToSlug[block.site_id];
       if (slug && block.ppid) state.localBlocks[slug].add(block.ppid);
     }
-    const netJson = $('ih-network-json');
+    const netJson = $('ih-master-json');
     if (netJson) netJson.textContent = pretty(payload);
-    if (state.masterCredentialId) setDemoReady(true);
+    if (state.masterCredentialId) {
+      const status = $('ih-wizard-status');
+      if (status) status.textContent = 'Master proof ready — open abuse demo or customer sites.';
+    }
     return payload;
   }
 
@@ -701,7 +679,7 @@
         await fn();
       } catch (err) {
         log('Error', err.message);
-        const netJson = $('ih-network-json');
+        const netJson = $('ih-master-json');
         if (netJson) netJson.textContent = pretty(err.payload || { error: err.message });
       } finally {
         if (!state.wizardRunning) el.disabled = false;
@@ -731,22 +709,6 @@
       await approveNetworkRevocation();
     });
     bind('ih-force-reverify-btn', forceFreshIdv);
-    bind('ih-stats-refresh-btn', loadStats);
-
-    const copyTickets = $('ih-copy-tickets-ppid');
-    const copyTrials = $('ih-copy-trials-ppid');
-    if (copyTickets) {
-      copyTickets.addEventListener('click', () => {
-        const el = $('ih-tickets-ppid');
-        if (el) copyText(el.textContent);
-      });
-    }
-    if (copyTrials) {
-      copyTrials.addEventListener('click', () => {
-        const el = $('ih-trials-ppid');
-        if (el) copyText(el.textContent);
-      });
-    }
 
     try {
       const isVerificationReturn =
@@ -754,14 +716,11 @@
       if (isVerificationReturn) {
         await initWallet();
         await pollAndStoreMaster();
-      } else if (state.masterCredentialId || state.sessionId) {
-        await refreshStatus();
-        setDemoReady(true);
-        setPill('ih-wallet-pill', 'CACHED', 'ok');
-        const status = $('ih-wizard-status');
-        if (status) {
-          status.textContent =
-            'Master proof cached locally. Click Run 3-minute demo or Create or unlock wallet to use it.';
+      } else {
+        await refreshWalletStatus();
+        if (state.masterCredentialId || state.sessionId) {
+          await refreshStatus();
+          setPill('ih-wallet-pill', 'CACHED', 'ok');
         }
       }
     } catch (err) {

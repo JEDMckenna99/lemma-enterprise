@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="referrer" content="no-referrer">
+    <title>Verify once with Lemma</title>
+    <style nonce="{{ csp_nonce }}">
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #0f172a;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            color: #e2e8f0;
+        }
+        .card {
+            background: #fff;
+            color: #0f172a;
+            border-radius: 20px;
+            padding: 32px 28px;
+            max-width: 420px;
+            width: 100%;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.35);
+        }
+        .eyebrow {
+            font-size: 11px;
+            font-weight: 800;
+            letter-spacing: 1.4px;
+            text-transform: uppercase;
+            color: #4f46e5;
+            margin-bottom: 8px;
+        }
+        h1 { font-size: 1.35rem; margin-bottom: 8px; line-height: 1.25; }
+        p { color: #64748b; font-size: 0.92rem; line-height: 1.55; margin-bottom: 18px; }
+        .site-chip {
+            display: inline-block;
+            background: #eff6ff;
+            border: 1px solid #bfdbfe;
+            color: #1e40af;
+            border-radius: 999px;
+            padding: 4px 10px;
+            font-size: 12px;
+            font-weight: 700;
+            margin-bottom: 14px;
+        }
+        .status {
+            padding: 14px;
+            border-radius: 12px;
+            margin-bottom: 16px;
+            font-size: 0.88rem;
+            line-height: 1.45;
+        }
+        .status.loading { background: #fef9c3; color: #854d0e; }
+        .status.success { background: #dcfce7; color: #166534; }
+        .status.error { background: #fee2e2; color: #991b1b; }
+        .status.info { background: #eff6ff; color: #1e40af; }
+        .btn {
+            display: block;
+            width: 100%;
+            padding: 14px 18px;
+            border: none;
+            border-radius: 12px;
+            font-size: 0.95rem;
+            font-weight: 700;
+            cursor: pointer;
+            margin-bottom: 10px;
+        }
+        .btn-primary { background: #4f46e5; color: #fff; }
+        .btn-secondary { background: #f1f5f9; color: #334155; }
+        .btn:disabled { opacity: 0.65; cursor: not-allowed; }
+        .steps { margin: 14px 0 18px; padding-left: 18px; color: #475569; font-size: 0.85rem; line-height: 1.55; }
+        .hidden { display: none !important; }
+    </style>
+</head>
+<body>
+    <div class="card" id="ishuman-idv-root"
+         data-test-verify-enabled="{{ 'true' if demo_test_verify_enabled else 'false' }}"
+         data-server-test-token="{{ demo_test_token }}">
+        <p class="eyebrow">Lemma isHuman</p>
+        <h1>Verify once, reuse everywhere</h1>
+        <p id="intro-copy">Create or unlock your browser wallet, complete a one-time identity check, and reuse the proof on any Lemma-enabled site.</p>
+        <div class="site-chip" id="site-chip">Requesting site</div>
+        <ol class="steps">
+            <li>Unlock wallet with passkey (stored only on this device)</li>
+            <li>Complete IDV once — master proof stays in your wallet</li>
+            <li>Return to the site — no documents shared with the business</li>
+        </ol>
+        <div id="status" class="status info">Preparing…</div>
+        <div id="actions">
+            <button id="primary-btn" class="btn btn-primary hidden" type="button">Continue</button>
+            <button id="cancel-btn" class="btn btn-secondary" type="button">Cancel</button>
+        </div>
+    </div>
+
+    <script src="/static/js/lemma-keys.js?v=1" nonce="{{ csp_nonce }}"></script>
+    <script src="/static/js/lemma-wallet.js?v=2476" nonce="{{ csp_nonce }}"></script>
+    <script nonce="{{ csp_nonce }}">
+        const SESSION_KEY = 'ishuman_idv_popup_session_id';
+        const params = new URLSearchParams(window.location.search);
+        const openerOrigin = params.get('origin') || '*';
+        const requestingSite = params.get('site_id') || 'customer site';
+        const isVerificationReturn = params.has('verification_return');
+        const root = document.getElementById('ishuman-idv-root');
+        const testVerifyEnabled = root.dataset.testVerifyEnabled === 'true';
+        const serverTestToken = root.dataset.serverTestToken || '';
+
+        let wallet = null;
+        let walletId = '';
+        let walletSecret = '';
+        let sessionId = localStorage.getItem(SESSION_KEY) || '';
+
+        document.getElementById('site-chip').textContent = requestingSite;
+
+        function setStatus(message, tone) {
+            const el = document.getElementById('status');
+            el.textContent = message;
+            el.className = 'status ' + (tone || 'info');
+        }
+
+        function demoHeaders() {
+            const headers = {};
+            if (serverTestToken) headers['X-Demo-Test-Token'] = serverTestToken;
+            return headers;
+        }
+
+        async function requestJson(url, options) {
+            const res = await fetch(url, {
+                ...options,
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...(options && options.headers ? options.headers : {}),
+                },
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) {
+                throw new Error(data.error || data.message || `HTTP ${res.status}`);
+            }
+            return data;
+        }
+
+        function notifyOpener(type, detail) {
+            if (!window.opener) return;
+            const target = openerOrigin && openerOrigin !== '*' ? openerOrigin : '*';
+            window.opener.postMessage({ type, detail: detail || {} }, target);
+        }
+
+        function closeWith(type, detail) {
+            notifyOpener(type, detail);
+            window.close();
+        }
+
+        async function adoptWalletState() {
+            const walletIdRecord = await wallet._get('passkey', 'walletId');
+            const secretRecord = await wallet._get('secrets', 'master');
+            walletId = walletIdRecord?.value || wallet.session?.walletId || '';
+            walletSecret = secretRecord?.secret || wallet.session?.walletSecret || '';
+        }
+
+        async function ensureWalletUnlocked() {
+            wallet = wallet || new LemmaWallet();
+            await wallet.init();
+
+            if (typeof wallet.isUnlocked === 'function' && wallet.isUnlocked()) {
+                await adoptWalletState();
+                return;
+            }
+
+            const existingPasskey = await wallet._get('passkey', 'primary');
+            if (existingPasskey && existingPasskey.credentialId) {
+                setStatus('Unlock your wallet with passkey…', 'loading');
+                await wallet.unlock();
+            } else {
+                setStatus('Create a passkey for your wallet…', 'loading');
+                try {
+                    await wallet.registerPasskey();
+                } catch (err) {
+                    await wallet.unlock();
+                }
+            }
+            await adoptWalletState();
+            if (!walletId) throw new Error('Wallet unlock failed');
+        }
+
+        async function hasMasterProof() {
+            const creds = await wallet.getCredentials();
+            return creds.some((c) => {
+                const cl = c.claims || c.credentialSubject || {};
+                const site = cl.siteId || cl.site_id || cl.siteDomain || cl.site_domain || '';
+                return cl.isHuman && (site === 'lemma.id' || !site);
+            });
+        }
+
+        async function storeMasterFromStatus(payload) {
+            if (!payload || payload.status !== 'verified' || !payload.credential) {
+                throw new Error(payload?.status ? `Verification ${payload.status}` : 'Credential not ready');
+            }
+            await wallet.storeCredential(payload.credential);
+            localStorage.removeItem(SESSION_KEY);
+        }
+
+        async function pollAndStoreMaster() {
+            if (!sessionId) throw new Error('Missing verification session');
+            setStatus('Waiting for verification to complete…', 'loading');
+            const payload = await requestJson(`/api/ishuman/verification-status/${encodeURIComponent(sessionId)}`);
+            await storeMasterFromStatus(payload);
+            return payload;
+        }
+
+        async function verifyOnceTestMode() {
+            const returnUrl = `${window.location.origin}/wallet/ishuman-idv?${params.toString()}&verification_return=true`;
+            const walletAssertion = await wallet.buildWalletAssertion(['return_url'], { return_url: returnUrl });
+            const payload = await requestJson('/api/demo/ishuman/verify-once-test-mode', {
+                method: 'POST',
+                headers: demoHeaders(),
+                body: JSON.stringify({
+                    wallet_id: walletId,
+                    wallet_secret: walletSecret,
+                    return_url: returnUrl,
+                    wallet_assertion: walletAssertion,
+                }),
+            });
+            sessionId = payload.session_id;
+            localStorage.setItem(SESSION_KEY, sessionId);
+            if (payload.credential) {
+                await wallet.storeCredential(payload.credential);
+                localStorage.removeItem(SESSION_KEY);
+            }
+            return payload;
+        }
+
+        async function startStripeVerification() {
+            const returnUrl = `${window.location.origin}/wallet/ishuman-idv?${params.toString()}&verification_return=true`;
+            const walletAssertion = await wallet.buildWalletAssertion(['return_url'], { return_url: returnUrl });
+            const payload = await requestJson('/api/ishuman/start-verification', {
+                method: 'POST',
+                body: JSON.stringify({
+                    wallet_id: walletId,
+                    wallet_secret: walletSecret,
+                    return_url: returnUrl,
+                    wallet_assertion: walletAssertion,
+                }),
+            });
+            sessionId = payload.session_id;
+            localStorage.setItem(SESSION_KEY, sessionId);
+            if (payload.url) {
+                window.location.href = payload.url;
+                return null;
+            }
+            throw new Error('Stripe verification URL missing');
+        }
+
+        async function runVerification() {
+            setStatus('Checking wallet…', 'loading');
+            await ensureWalletUnlocked();
+
+            if (await hasMasterProof()) {
+                setStatus('Human proof already in wallet.', 'success');
+                setTimeout(() => closeWith('ISHUMAN_IDV_COMPLETE', { reason: 'already_provisioned' }), 600);
+                return;
+            }
+
+            if (isVerificationReturn && sessionId) {
+                await pollAndStoreMaster();
+                setStatus('Human proof stored in wallet.', 'success');
+                setTimeout(() => closeWith('ISHUMAN_IDV_COMPLETE', { reason: 'verified' }), 600);
+                return;
+            }
+
+            if (testVerifyEnabled && serverTestToken) {
+                setStatus('Completing demo verification…', 'loading');
+                await verifyOnceTestMode();
+                setStatus('Human proof stored in wallet.', 'success');
+                setTimeout(() => closeWith('ISHUMAN_IDV_COMPLETE', { reason: 'test_verify' }), 600);
+                return;
+            }
+
+            setStatus('Opening Stripe Identity…', 'loading');
+            await startStripeVerification();
+        }
+
+        document.getElementById('cancel-btn').addEventListener('click', () => {
+            closeWith('ISHUMAN_IDV_CANCELLED', { reason: 'user_cancelled' });
+        });
+
+        document.getElementById('primary-btn').addEventListener('click', async () => {
+            const btn = document.getElementById('primary-btn');
+            btn.disabled = true;
+            try {
+                await runVerification();
+            } catch (err) {
+                setStatus(err.message || 'Verification failed', 'error');
+                btn.disabled = false;
+            }
+        });
+
+        (async function boot() {
+            if (!window.opener) {
+                setStatus('Open this page from a customer site action, not directly.', 'error');
+                document.getElementById('cancel-btn').textContent = 'Close';
+                return;
+            }
+
+            if (isVerificationReturn && sessionId) {
+                document.getElementById('primary-btn').classList.add('hidden');
+                try {
+                    await runVerification();
+                } catch (err) {
+                    setStatus(err.message || 'Could not finish verification', 'error');
+                    document.getElementById('primary-btn').classList.remove('hidden');
+                    document.getElementById('primary-btn').textContent = 'Try again';
+                }
+                return;
+            }
+
+            setStatus('Ready when you are.', 'info');
+            document.getElementById('primary-btn').classList.remove('hidden');
+            document.getElementById('primary-btn').textContent = testVerifyEnabled
+                ? 'Unlock wallet & verify (demo)'
+                : 'Unlock wallet & verify';
+        })();
+    </script>
+</body>
+</html>

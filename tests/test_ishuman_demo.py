@@ -30,19 +30,28 @@ def test_ishuman_demo_page_loads_expected_assets(ishuman_demo_client):
     body = resp.get_data(as_text=True)
 
     assert resp.status_code == 200
-    assert "Bot defense should punish abusive humans, not whole networks." in body
-    assert "Run 3-minute demo" in body
-    assert "Abuse response" in body
-    assert "What sites never see" in body
-    assert "Operator console" in body
+    assert "Verify once. Prove human on every site." in body
+    assert "Try the customer sites" in body
+    assert "autoProvision: true" in body
+    assert "Abuse response demo" in body
     assert "ih-network-pill" in body
     assert "lemma-demo-tickets" in body
     assert "lemma-demo-trials" in body
-    assert "What Lemma does" in body
-    assert "From IP bans to human accountability" in body
+    assert "/wallet/ishuman-idv" not in body
     assert "/sdk/ishuman-verifier.js" in body
     assert "/static/js/demo/ishuman-demo.js" in body
     assert "/static/css/demo/ishuman-demo.css" in body
+
+
+def test_ishuman_idv_popup_page_loads(ishuman_demo_client):
+    resp = ishuman_demo_client.get("/wallet/ishuman-idv?origin=https%3A%2F%2Fexample.com&site_id=tickets-demo.lemma.id")
+    body = resp.get_data(as_text=True)
+
+    assert resp.status_code == 200
+    assert "Verify once, reuse everywhere" in body
+    assert "lemma-keys.js" in body
+    assert "lemma-wallet.js" in body
+    assert "ISHUMAN_IDV_COMPLETE" in body
 
 
 def test_ishuman_demo_config_seeds_sites_without_exposing_api_keys(
@@ -243,6 +252,7 @@ def test_ishuman_demo_js_uses_real_verifier_with_two_site_bindings():
     assert "tickets-demo.lemma.id" in js
     assert "trials-demo.lemma.id" in js
     assert "lemmaOrigin: window.location.origin" in js
+    assert "autoProvision: true" in js
     assert "runGuidedDemo" in js
     assert "/api/demo/ishuman/verify-once-test-mode" in js
     assert "/api/demo/ishuman/probe-derive" in js

@@ -22,6 +22,7 @@ DEFAULT_SITES = {
 
 SDK_PATTERN = re.compile(r"ishuman-verifier\.js", re.I)
 SITE_ID_PATTERN = re.compile(r"siteId\s*:\s*['\"]([^'\"]+)['\"]")
+AUTO_PROVISION_PATTERN = re.compile(r"autoProvision\s*:\s*true", re.I)
 
 
 def fetch(url: str, timeout: int = 30) -> tuple[int, str]:
@@ -54,6 +55,9 @@ def check_site(name: str, spec: dict) -> list[str]:
         errors.append(
             f"{name}: siteId {match.group(1)!r} != expected {expected_site_id!r}"
         )
+
+    if not AUTO_PROVISION_PATTERN.search(body):
+        errors.append(f"{name}: page missing autoProvision: true ({url})")
 
     return errors
 

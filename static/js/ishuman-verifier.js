@@ -23,7 +23,10 @@
  * Phase 6: one signed session presentation per tab session; steady-state verify()
  * re-validates locally with no bridge round-trip and no network calls.
  *
- * @version 1.1.0
+ * Optional `autoProvision: true` opens a Lemma-hosted popup to unlock the wallet
+ * and complete IDV when no master isHuman proof is present yet.
+ *
+ * @version 1.2.0
  */
 
 (function () {
@@ -48,6 +51,13 @@ const BLOOM_SNAPSHOT_PREFIX = 'lemma:bloom-snapshot:v1';
 const TRUST_LIST_PREFIX = 'lemma:issuer-trust-list:v1';
 const DEFAULT_MAX_BLOOM_STALENESS_SECONDS = 900;
 const TRUST_LIST_STORAGE_KEY = 'ishuman_trust_list';
+const IDV_POPUP_PATH = '/wallet/ishuman-idv';
+const IDV_POPUP_TIMEOUT_MS = 10 * 60 * 1000;
+const PROVISIONABLE_REASONS = new Set([
+    'no_credential',
+    'no_ishuman_credential',
+    'wallet_locked',
+]);
 
 // ========================================================================
 // Hex / crypto helpers (self-contained — no dependency on LemmaVerifier)
@@ -475,12 +485,16 @@ class IsHumanVerifier {
      * @param {Function} [config.isBlockedLocally] — optional sync/async callback: (ppid) => bool.
      *        Sites should use their own database to check PPID blocks rather
      *        than round-tripping to lemma.id.  This keeps verification fully local.
+     * @param {boolean} [config.autoProvision] — open Lemma IDV popup when no master proof exists.
+     * @param {string}  [config.idvPopupPath] — override popup path (default /wallet/ishuman-idv).
      */
     constructor(config = {}) {
         this.siteId = config.siteId || window.location.hostname;
         this.lemmaOrigin = config.lemmaOrigin || LEMMA_ORIGIN;
         this.debug = !!config.debug;
         this.isBlockedLocally = config.isBlockedLocally || null;
+        this.autoProvision = !!config.autoProvision;
+        this.idvPopupPath = config.idvPopupPath || IDV_POPUP_PATH;
 
         this._bridgeReady = false;
         this._bridgeIframe = null;
@@ -508,10 +522,25 @@ class IsHumanVerifier {
      *
      * @returns {Promise<{human: boolean, ppid: string|null, reason: string, timeMs: number}>}
      */
-    async verify() {
+    async verify(options = {}) {
         const t0 = performance.now();
         await this._initPromise;
 
+        const autoProvision = options.autoProvision ?? this.autoProvision;
+        let result = await this._verifyOnce(t0);
+        if (!result.human && autoProvision && PROVISIONABLE_REASONS.has(result.reason)) {
+            const provisioned = await this._provisionViaPopup();
+            if (provisioned) {
+                this.invalidateSession();
+                result = await this._verifyOnce(t0);
+            } else if (result.reason === 'no_credential') {
+                result = this._result(false, null, 'idv_cancelled', t0);
+            }
+        }
+        return result;
+    }
+
+    async _verifyOnce(t0) {
         if (!this._bloomTrusted || !this._trustListTrusted) {
             return this._result(false, null, 'revocation_data_untrusted', t0);
         }
@@ -532,9 +561,10 @@ class IsHumanVerifier {
             return this._verifyWithLegacyPresentation(bridgeResult, t0);
         }
 
+        const bridgeReason = this._mapBridgeError(bridgeResult?.error);
         const credential = bridgeResult?.credential || null;
         if (!credential) {
-            return this._result(false, null, 'no_credential', t0);
+            return this._result(false, null, bridgeReason || 'no_credential', t0);
         }
 
         const core = await this._verifyCredentialCore(credential, t0);
@@ -745,7 +775,7 @@ class IsHumanVerifier {
                         return;
                     }
                     if (response.error || response.success === false) {
-                        resolve(null);
+                        resolve({ error: errText || response.error || 'bridge_error' });
                         return;
                     }
                     resolve({
@@ -1127,6 +1157,60 @@ class IsHumanVerifier {
     // ------------------------------------------------------------------
     // Result helper
     // ------------------------------------------------------------------
+
+    _mapBridgeError(errorText) {
+        const err = String(errorText || '').trim().toLowerCase();
+        if (!err) return 'no_credential';
+        if (err.includes('no_ishuman_credential')) return 'no_credential';
+        if (err.includes('wallet_locked')) return 'wallet_locked';
+        if (err.includes('derivation')) return 'derivation_failed';
+        return 'no_credential';
+    }
+
+    _provisionViaPopup() {
+        return new Promise((resolve) => {
+            const popupUrl = new URL(`${this.lemmaOrigin}${this.idvPopupPath}`);
+            popupUrl.searchParams.set('origin', window.location.origin);
+            popupUrl.searchParams.set('site_id', this.siteId);
+
+            const width = 480;
+            const height = 640;
+            const left = Math.max(0, Math.round(window.screenX + (window.outerWidth - width) / 2));
+            const top = Math.max(0, Math.round(window.screenY + (window.outerHeight - height) / 2));
+            const popup = window.open(
+                popupUrl.toString(),
+                'lemma_ishuman_idv',
+                `popup=yes,width=${width},height=${height},left=${left},top=${top}`,
+            );
+
+            if (!popup) {
+                if (this.debug) console.warn('[isHuman] IDV popup blocked by browser');
+                resolve(false);
+                return;
+            }
+
+            let settled = false;
+            const finish = (value) => {
+                if (settled) return;
+                settled = true;
+                window.removeEventListener('message', onMessage);
+                clearTimeout(timeoutId);
+                resolve(value);
+            };
+
+            const onMessage = (event) => {
+                if (event.origin !== this.lemmaOrigin) return;
+                if (event.data?.type === 'ISHUMAN_IDV_COMPLETE') {
+                    finish(true);
+                } else if (event.data?.type === 'ISHUMAN_IDV_CANCELLED') {
+                    finish(false);
+                }
+            };
+
+            const timeoutId = setTimeout(() => finish(false), IDV_POPUP_TIMEOUT_MS);
+            window.addEventListener('message', onMessage);
+        });
+    }
 
     _result(human, ppid, reason, t0, error) {
         const timeMs = performance.now() - t0;

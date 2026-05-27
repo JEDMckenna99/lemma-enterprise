@@ -143,6 +143,21 @@ def ishuman_demo_page():
     return render_template("demo/ishuman.html", **_demo_page_context())
 
 
+@ishuman_demo_bp.route("/wallet/ishuman-idv")
+def ishuman_idv_popup():
+    """Popup flow: unlock wallet + complete IDV when a customer site has no master proof."""
+    ctx = _demo_page_context()
+    return render_template(
+        "wallet_ishuman_idv.html",
+        demo_test_verify_enabled=ctx["demo_test_verify_enabled"],
+        demo_test_token=ctx["demo_test_token"],
+    ), 200, {
+        "Cache-Control": "no-cache, no-store, must-revalidate",
+        "Pragma": "no-cache",
+        "Expires": "0",
+    }
+
+
 @ishuman_demo_bp.route("/api/demo/ishuman/config", methods=["GET"])
 def ishuman_demo_config():
     sites = ensure_demo_sites()
