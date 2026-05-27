@@ -113,25 +113,64 @@
     if (json) json.textContent = pretty(payload);
   }
 
+  async function findLocalMasterCredential() {
+    if (!state.wallet) return null;
+    if (typeof state.wallet.getIsHumanCredentialsFromCache === 'function') {
+      const cached = await state.wallet.getIsHumanCredentialsFromCache();
+      const fromCache = cached.find((c) => {
+        const cl = c.claims || c.credentialSubject || {};
+        const site = cl.siteId || cl.site_id || cl.siteDomain || cl.site_domain || '';
+        return cl.isHuman && (site === 'lemma.id' || !site);
+      });
+      if (fromCache) return fromCache;
+    }
+    const creds = await state.wallet.getCredentials();
+    return creds.find((c) => {
+      const cl = c.claims || c.credentialSubject || {};
+      const site = cl.siteId || cl.site_id || cl.siteDomain || cl.site_domain || '';
+      return cl.isHuman && (site === 'lemma.id' || !site);
+    }) || null;
+  }
+
+  function isEncryptedWalletLockedError(err) {
+    const message = String(err?.message || err || '');
+    return message === 'envelope_invalid'
+      || message === 'storage_key_unavailable'
+      || message === 'prf_required_for_encrypted_storage';
+  }
+
   async function refreshWalletStatus() {
     try {
       await initWallet({ force: false });
-      if (state.wallet) {
-        const creds = await state.wallet.getCredentials();
-        const master = creds.find((c) => {
-          const cl = c.claims || c.credentialSubject || {};
-          const site = cl.siteId || cl.site_id || cl.siteDomain || cl.site_domain || '';
-          return cl.isHuman && (site === 'lemma.id' || !site);
-        });
-        if (master) {
-          state.masterCredential = master;
-          state.masterCredentialId = master.id;
-          renderMaster(master);
+      if (!state.wallet) return;
+
+      let master = null;
+      try {
+        master = await findLocalMasterCredential();
+      } catch (err) {
+        if (isEncryptedWalletLockedError(err) && state.masterCredentialId) {
+          setPill('ih-wallet-pill', 'PROOF ON SERVER', 'ok');
           setDemoReadyBanner(true);
-        } else {
-          setPill('ih-wallet-pill', state.walletId ? 'NO PROOF YET' : 'LOCKED', state.walletId ? 'warn' : 'deny');
+          return;
         }
+        throw err;
       }
+
+      if (master) {
+        state.masterCredential = master;
+        state.masterCredentialId = master.id;
+        localStorage.setItem('ishuman_demo_master_id', state.masterCredentialId);
+        renderMaster(master);
+        return;
+      }
+
+      if (state.masterCredentialId) {
+        setPill('ih-wallet-pill', 'PROOF ON SERVER', 'ok');
+        setDemoReadyBanner(true);
+        return;
+      }
+
+      setPill('ih-wallet-pill', state.walletId ? 'NO PROOF YET' : 'LOCKED', state.walletId ? 'warn' : 'deny');
     } catch (err) {
       setPill('ih-wallet-pill', 'NOT READY', 'warn');
       log('Wallet status check skipped', err.message);
@@ -283,36 +322,48 @@
   async function initWallet({ force = false } = {}) {
     if (!window.LemmaWallet) throw new Error('LemmaWallet SDK not loaded');
     state.wallet = state.wallet || new window.LemmaWallet();
-    await state.wallet.init();
 
-    if (!force && typeof state.wallet.isUnlocked === 'function' && state.wallet.isUnlocked()) {
-      await adoptCurrentWalletState('cached session');
-      return { success: true, cached: true, walletId: state.walletId };
-    }
-
-    const existingPasskey = await state.wallet._get('passkey', 'primary');
-    let auth;
-    if (existingPasskey && existingPasskey.credentialId) {
-      auth = await state.wallet.unlock();
+    let readyMethod = 'passkey';
+    if (typeof state.wallet.ensureIsHumanIssuanceReady === 'function') {
+      const ready = await state.wallet.ensureIsHumanIssuanceReady({
+        isHumanIssuance: true,
+        force,
+      });
+      if (!ready.ready) {
+        throw new Error('Wallet unlock failed');
+      }
+      readyMethod = ready.method || readyMethod;
     } else {
-      try {
-        auth = await state.wallet.registerPasskey();
-      } catch (err) {
-        log('Wallet registration failed, trying unlock', err.message);
-        auth = await state.wallet.unlock();
+      await state.wallet.init();
+      const existingPasskey = await state.wallet._get('passkey', 'primary');
+      let auth;
+      if (existingPasskey && existingPasskey.credentialId) {
+        auth = await state.wallet.unlock({ force, isHumanIssuance: true });
+      } else {
+        try {
+          auth = await state.wallet.registerPasskey({ isHumanIssuance: true });
+        } catch (err) {
+          log('Wallet registration failed, trying unlock', err.message);
+          auth = await state.wallet.unlock({ force, isHumanIssuance: true });
+        }
+      }
+      if (!auth?.success && auth?.needsRedirect) {
+        throw new Error(auth.message || 'Wallet unlock failed');
       }
     }
 
-    await adoptCurrentWalletState('passkey');
-    if (!state.walletId && auth?.walletId) {
-      state.walletId = auth.walletId;
+    await adoptCurrentWalletState(readyMethod);
+    const authWalletId = state.wallet.session?.walletId;
+    const authSecret = state.wallet.session?.walletSecret;
+    if (!state.walletId && authWalletId) {
+      state.walletId = authWalletId;
       const wid = $('ih-wallet-id');
       if (wid) wid.textContent = short(state.walletId);
     }
-    if (!state.walletSecret && auth?.walletSecret) {
-      state.walletSecret = auth.walletSecret;
+    if (!state.walletSecret && authSecret) {
+      state.walletSecret = authSecret;
     }
-    return auth;
+    return { success: true, walletId: state.walletId, method: readyMethod };
   }
 
   async function getWalletContext() {
@@ -669,6 +720,39 @@
     return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
+  async function ensureMasterForDemo() {
+    const status = await refreshStatus();
+    if (status.master?.status === 'verified') {
+      state.masterCredentialId = status.master.credential_id || state.masterCredentialId;
+      if (state.masterCredentialId) {
+        localStorage.setItem('ishuman_demo_master_id', state.masterCredentialId);
+      }
+      setPill('ih-wallet-pill', 'PROOF READY', 'ok');
+      setDemoReadyBanner(true);
+      log('Using verified master proof from server', short(state.masterCredentialId));
+      return status;
+    }
+
+    try {
+      const localMaster = await findLocalMasterCredential();
+      if (localMaster) {
+        state.masterCredential = localMaster;
+        state.masterCredentialId = localMaster.id;
+        localStorage.setItem('ishuman_demo_master_id', state.masterCredentialId);
+        renderMaster(localMaster);
+        return { master: { status: 'verified', credential_id: localMaster.id } };
+      }
+    } catch (err) {
+      if (!isEncryptedWalletLockedError(err)) throw err;
+    }
+
+    if (state.config?.test_verify_enabled) {
+      return verifyOnceTestMode();
+    }
+
+    throw new Error('No verified master proof yet. Complete verification on a demo site, or use Stripe Identity from the operator console.');
+  }
+
   async function runGuidedDemo() {
     if (state.wizardRunning) return;
     setWizardBusy(true);
@@ -677,8 +761,8 @@
       setWizardStep(1, 'Unlocking wallet…');
       await initWallet();
 
-      setWizardStep(2, 'One-click human proof (test mode)…');
-      await verifyOnceTestMode();
+      setWizardStep(2, 'Confirming human proof…');
+      await ensureMasterForDemo();
 
       setWizardStep(3, 'Verifying both customer sites…');
       await verifyBothSites();
