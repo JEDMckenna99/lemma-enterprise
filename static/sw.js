@@ -1,7 +1,7 @@
 // Lemma Service Worker - Minimal Implementation
 // This prevents service worker errors and provides basic caching
 
-const CACHE_NAME = 'lemma-v15';  // v2.48.1 - Bypass developer/admin HTML surfaces
+const CACHE_NAME = 'lemma-v16';  // v16 - bypass wallet/demo popup routes
 const STATIC_ASSETS = [
   '/static/css/lemma.css',
   '/static/js/lemma-bot-shield-simple.js',
@@ -79,6 +79,16 @@ self.addEventListener('fetch', event => {
     event.request.url.includes('/admin') ||
     event.request.url.includes('/dashboard') ||
     event.request.url.includes('/platform')
+  ) {
+    return;
+  }
+
+  // Wallet + demo popup flows must bypass the SW (popups, bridge iframes, unlock).
+  if (
+    event.request.url.includes('/wallet/') ||
+    event.request.url.includes('/unlock') ||
+    event.request.url.includes('/link') ||
+    event.request.url.includes('/demo/ishuman')
   ) {
     return;
   }

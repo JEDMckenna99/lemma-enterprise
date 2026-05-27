@@ -97,6 +97,7 @@
     </div>
 
     <script src="/static/js/lemma-keys.js?v=1" nonce="{{ csp_nonce }}"></script>
+    <script src="/static/js/wallet-at-rest-crypto.js?v=1" nonce="{{ csp_nonce }}"></script>
     <script src="/static/js/lemma-wallet.js?v=2476" nonce="{{ csp_nonce }}"></script>
     <script nonce="{{ csp_nonce }}">
         const SESSION_KEY = 'ishuman_idv_popup_session_id';
@@ -170,16 +171,27 @@
             }
 
             const existingPasskey = await wallet._get('passkey', 'primary');
-            if (existingPasskey && existingPasskey.credentialId) {
-                setStatus('Unlock your wallet with passkey…', 'loading');
-                await wallet.unlock();
-            } else {
-                setStatus('Create a passkey for your wallet…', 'loading');
-                try {
-                    await wallet.registerPasskey();
-                } catch (err) {
+            try {
+                if (existingPasskey && existingPasskey.credentialId) {
+                    setStatus('Unlock your wallet with passkey…', 'loading');
                     await wallet.unlock();
+                } else {
+                    setStatus('Create a passkey for your wallet…', 'loading');
+                    try {
+                        await wallet.registerPasskey();
+                    } catch (err) {
+                        await wallet.unlock();
+                    }
                 }
+            } catch (err) {
+                const msg = String(err?.message || err || 'Wallet unlock failed');
+                if (msg.includes('prf_required_for_encrypted_storage') || msg.includes('envelope_invalid')) {
+                    throw new Error(
+                        'This wallet uses encrypted storage and needs passkey PRF support. '
+                        + 'Try Chrome or Edge on desktop, then unlock again.',
+                    );
+                }
+                throw err;
             }
             await adoptWalletState();
             if (!walletId) throw new Error('Wallet unlock failed');

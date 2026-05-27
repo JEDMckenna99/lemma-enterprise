@@ -50,6 +50,7 @@ def test_ishuman_idv_popup_page_loads(ishuman_demo_client):
     assert resp.status_code == 200
     assert "Verify once, reuse everywhere" in body
     assert "lemma-keys.js" in body
+    assert "wallet-at-rest-crypto.js" in body
     assert "lemma-wallet.js" in body
     assert "ISHUMAN_IDV_COMPLETE" in body
 
