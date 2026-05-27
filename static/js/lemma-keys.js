@@ -107,12 +107,28 @@
     async function ed25519FromSeed(seedBytes) {
         const noble = await loadNobleEd25519();
         if (noble) {
+            if (noble.etc && typeof noble.etc.sha512Sync !== 'function') {
+                noble.etc.sha512Async = async (...messages) => {
+                    const total = messages.reduce((sum, msg) => sum + msg.length, 0);
+                    const merged = new Uint8Array(total);
+                    let offset = 0;
+                    for (const msg of messages) {
+                        merged.set(msg, offset);
+                        offset += msg.length;
+                    }
+                    const digest = await crypto.subtle.digest('SHA-512', merged);
+                    return new Uint8Array(digest);
+                };
+            }
             const publicKey = await noble.getPublicKeyAsync(seedBytes);
+            const signer = typeof noble.signAsync === 'function'
+                ? noble.signAsync.bind(noble)
+                : noble.sign.bind(noble);
             return {
                 publicKey,
                 async sign(messageBytes) {
                     const digest = await sha256Bytes(messageBytes);
-                    return noble.sign(digest, seedBytes);
+                    return signer(digest, seedBytes);
                 },
             };
         }

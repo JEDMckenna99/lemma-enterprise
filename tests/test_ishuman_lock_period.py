@@ -95,6 +95,13 @@ def test_idv_popup_issues_site_proof_via_wallet():
 
 
 @pytest.mark.browser
+def test_lemma_keys_uses_async_noble_ed25519_signing():
+    keys_js = (ROOT / "static" / "js" / "lemma-keys.js").read_text(encoding="utf-8")
+    assert "signAsync" in keys_js
+    assert "sha512Async" in keys_js
+
+
+@pytest.mark.browser
 def test_unlock_popup_ishuman_flag():
     popup_html = POPUP_HTML.read_text(encoding="utf-8")
     assert "isHumanIssuance" in popup_html
@@ -125,4 +132,5 @@ def test_wallet_pages_use_current_wallet_bundle():
         assert "lemma-wallet.js?v=2476" not in source
         assert "lemma-wallet.js') }}?v=2535" in source or "lemma-wallet.js?v=2535" in source
         assert "lemma-keys.js?v=1" not in source
-        assert "lemma-keys.js') }}?v=2" in source or "lemma-keys.js?v=2" in source
+        assert "lemma-keys.js?v=2" not in source
+        assert "lemma-keys.js') }}?v=3" in source or "lemma-keys.js?v=3" in source
