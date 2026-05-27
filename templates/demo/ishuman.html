@@ -5,228 +5,236 @@
 
 {% block head %}
 {{ super() }}
-<link rel="stylesheet" href="/static/css/demo/ishuman-demo.css">
+<link rel="stylesheet" href="/static/css/demo/ishuman-demo.css?v=2">
 {% endblock %}
 
 {% block content %}
 <div class="demo-page" id="ishuman-demo"
   data-server-test-token="{{ demo_test_token }}"
   data-server-admin-token="{{ demo_admin_token }}">
-  <section class="hero">
-    <p class="eyebrow">isHuman proof network</p>
-    <h1>Bot defense should punish abusive humans, not whole networks.</h1>
-    <p class="hero-lead">Verify once, reuse everywhere. Block abusive site-private IDs instead of whole IP ranges — or revoke network-wide when abuse is confirmed.</p>
-    <div class="hero-actions">
-      <button class="btn btn-lg" id="ih-run-guided-demo-hero" type="button" hidden>Run 3-minute demo</button>
-      <a class="btn secondary btn-lg" href="https://lemma-demo-tickets-1d3d7411af33.herokuapp.com" target="_blank" rel="noopener">Open ticketing site</a>
-      <a class="btn secondary btn-lg" href="https://lemma-demo-trials-7090f46cae0d.herokuapp.com" target="_blank" rel="noopener">Open trials site</a>
-    </div>
-    <div class="flow-strip">
-      <div class="flow-step"><span>1</span><div><strong>Verify once</strong><p>Human proof in the browser wallet.</p></div></div>
-      <div class="flow-step"><span>2</span><div><strong>Check at action time</strong><p>Tickets or trial — popup if needed, milliseconds if not.</p></div></div>
-      <div class="flow-step"><span>3</span><div><strong>Block or revoke</strong><p>Site-scoped block, fresh verification, or network revoke.</p></div></div>
-    </div>
-  </section>
 
-  <section class="panel demo-cockpit" id="ih-demo-cockpit">
-    <div class="panel-head demo-cockpit-head">
-      <div>
-        <h2>Live demo cockpit</h2>
-        <p class="muted">Run the guided path or open a customer site and click the protected action.</p>
-      </div>
-      <button class="btn" id="ih-run-guided-demo" type="button" hidden>Run 3-minute demo</button>
-    </div>
+  <header class="demo-intro">
+    <p class="demo-eyebrow">isHuman proof network</p>
+    <h1 class="demo-title">Bot defense should punish abusive humans, not whole networks.</h1>
+    <p class="demo-lead">Follow the steps below — verify once, prove human on two demo sites, then block or revoke at the human-proof layer.</p>
+  </header>
 
-    <div class="demo-ready-banner" id="ih-demo-ready-banner" hidden>
-      <strong>Human proof ready</strong>
-      <span>Open a customer site or continue with the abuse response demo below.</span>
-    </div>
+  <div class="demo-workflow" id="ih-demo-workflow">
 
-    <p class="muted notice" id="ih-test-verify-disabled" hidden>Automated test verification is disabled here. Complete identity verification via the customer sites first.</p>
-
-    <div class="wizard-shell" id="ih-wizard-shell" hidden>
-      <div class="wizard-meta">
-        <span class="wizard-step-label" id="ih-wizard-step-label">Step 1 of 7</span>
-        <span class="muted" id="ih-wizard-status">Starting…</span>
+    <!-- Step 1 -->
+    <section class="workflow-step is-active" id="ih-step-1" data-step="1">
+      <div class="workflow-rail">
+        <span class="workflow-num">1</span>
+        <span class="workflow-line" aria-hidden="true"></span>
       </div>
-      <div class="wizard-progress" id="ih-wizard-progress" aria-hidden="true">
-        <span class="wizard-dot" data-step="1"></span>
-        <span class="wizard-dot" data-step="2"></span>
-        <span class="wizard-dot" data-step="3"></span>
-        <span class="wizard-dot" data-step="4"></span>
-        <span class="wizard-dot" data-step="5"></span>
-        <span class="wizard-dot" data-step="6"></span>
-        <span class="wizard-dot" data-step="7"></span>
-      </div>
-    </div>
-
-    <div class="wallet-bar">
-      <div class="wallet-stat">
-        <div class="label">Wallet</div>
-        <div class="value"><span class="pill" id="ih-wallet-pill">CHECKING</span></div>
-      </div>
-      <div class="wallet-stat">
-        <div class="label">Human proof</div>
-        <div class="value mono" id="ih-master-id">—</div>
-      </div>
-      <div class="wallet-actions">
-        <button class="btn secondary" id="ih-wallet-btn" type="button">Unlock wallet</button>
-        <button class="btn secondary" id="ih-verify-sites-btn" type="button">Check both sites</button>
-      </div>
-    </div>
-
-    <div class="site-cards">
-      <article class="site-card" id="ih-tickets-card">
-        <div class="site-card-head">
-          <h3>Ticketing drop</h3>
-          <span class="pill" id="ih-tickets-pill">—</span>
+      <div class="workflow-body">
+        <div class="workflow-head">
+          <div>
+            <h2>Verify once</h2>
+            <p class="demo-muted">Unlock the browser wallet and store a reusable human proof.</p>
+          </div>
+          <button class="demo-btn demo-btn-primary" id="ih-run-guided-demo" type="button" hidden>Run full demo</button>
+          <button class="demo-btn demo-btn-primary" id="ih-run-guided-demo-hero" type="button" hidden>Run full demo</button>
         </div>
-        <p class="muted">Reserve tickets behind a human check.</p>
-        <dl class="kv">
-          <dt>Site ID</dt><dd id="ih-tickets-ppid">—</dd>
-          <dt>Reason</dt><dd id="ih-tickets-reason">—</dd>
-          <dt>Latency</dt><dd id="ih-tickets-latency">—</dd>
-        </dl>
-        <div class="card-actions">
-          <a class="btn" href="https://lemma-demo-tickets-1d3d7411af33.herokuapp.com" target="_blank" rel="noopener">Open site</a>
-          <button class="btn secondary" id="ih-verify-tickets-btn" type="button">Verify here</button>
-        </div>
-      </article>
-      <article class="site-card" id="ih-trials-card">
-        <div class="site-card-head">
-          <h3>SaaS free trial</h3>
-          <span class="pill" id="ih-trials-pill">—</span>
-        </div>
-        <p class="muted">Start a trial without another CAPTCHA.</p>
-        <dl class="kv">
-          <dt>Site ID</dt><dd id="ih-trials-ppid">—</dd>
-          <dt>Reason</dt><dd id="ih-trials-reason">—</dd>
-          <dt>Latency</dt><dd id="ih-trials-latency">—</dd>
-        </dl>
-        <div class="card-actions">
-          <a class="btn" href="https://lemma-demo-trials-7090f46cae0d.herokuapp.com" target="_blank" rel="noopener">Open site</a>
-          <button class="btn secondary" id="ih-verify-trials-btn" type="button">Verify here</button>
-        </div>
-      </article>
-    </div>
 
-    <div class="ppid-compare">
-      <strong>Same human, different site-private IDs</strong>
-      <div class="ppid-compare-grid">
-        <div><div class="muted">Ticketing</div><div class="ppid-val" id="ih-tickets-ppid-compare">—</div></div>
-        <div class="ppid-diff" id="ih-ppid-diff">Verify both sites to compare</div>
-        <div><div class="muted">Trials</div><div class="ppid-val" id="ih-trials-ppid-compare">—</div></div>
-      </div>
-    </div>
-  </section>
+        <p class="demo-notice" id="ih-test-verify-disabled" hidden>Test-mode automation is off. Complete verification on a customer site first.</p>
 
-  <section class="panel abuse-panel" id="ih-abuse-panel">
-    <div class="panel-head">
-      <h2>Abuse response</h2>
-      <p class="muted">Site block stays scoped. Network revoke removes the reusable proof everywhere.</p>
-    </div>
-    <div class="abuse-grid">
-      <div class="abuse-card">
-        <h3>1 · Site block</h3>
-        <p class="muted">Block abusive ticketing ID only.</p>
-        <button class="btn danger" id="ih-abuse-block-btn" type="button">Block ticketing</button>
-        <div class="abuse-outcome" id="ih-abuse-block-outcome">Expected: tickets denied · site_blocked</div>
-        <div class="abuse-outcome" id="ih-abuse-derive">Server enforcement: —</div>
-      </div>
-      <div class="abuse-card">
-        <h3>2 · Scoped check</h3>
-        <p class="muted">Trials should stay human after a ticketing block.</p>
-        <button class="btn secondary" id="ih-abuse-verify-trials-btn" type="button">Verify trials</button>
-        <div class="abuse-outcome" id="ih-abuse-scoped-outcome">Trials should remain human</div>
-        <button class="btn secondary" id="ih-unblock-tickets-btn" type="button">Unblock ticketing</button>
-      </div>
-      <div class="abuse-card">
-        <h3>3 · Network revoke</h3>
-        <p class="muted">Status: <span class="pill" id="ih-network-pill">WAITING</span></p>
-        <button class="btn danger" id="ih-abuse-network-btn" type="button">Revoke network-wide</button>
-        <div class="abuse-outcome" id="ih-abuse-network-outcome">Expected: both denied · revoked</div>
-      </div>
-    </div>
-  </section>
-
-  <details class="panel learn-panel">
-    <summary><h2>Why Lemma</h2><span class="muted">Problem framing for buyers</span></summary>
-    <div class="learn-body">
-      <div class="panel-head">
-        <h3>From IP bans to human accountability</h3>
-        <p class="muted">Today, bot defense usually punishes infrastructure. Lemma lets a business respond at the human-proof layer.</p>
-      </div>
-      <div class="accountability-grid">
-        <div class="accountability-box bad">
-          <h3>Current bot defense</h3>
-          <ul>
-            <li>Detect bot-like behavior.</li>
-            <li>Ban IPs, ISPs, VPNs, devices, or regions.</li>
-            <li>Real users get caught in the blast radius.</li>
-            <li>Attackers rotate infrastructure and come back.</li>
-          </ul>
+        <div class="demo-ready-banner" id="ih-demo-ready-banner" hidden>
+          <strong>Human proof ready</strong>
+          <span>Continue to step 2 or run the full demo.</span>
         </div>
-        <div class="accountability-box good">
-          <h3>With Lemma</h3>
-          <ul>
-            <li>Detect bot-like behavior.</li>
-            <li>Block the site-private human proof.</li>
-            <li>Require a fresh identity check to continue.</li>
-            <li>Escalate confirmed abuse to network revocation.</li>
-          </ul>
+
+        <div class="wizard-shell" id="ih-wizard-shell" hidden>
+          <div class="wizard-meta">
+            <span class="wizard-step-label" id="ih-wizard-step-label">Step 1 of 7</span>
+            <span class="demo-muted" id="ih-wizard-status">Starting…</span>
+          </div>
+          <div class="wizard-progress" id="ih-wizard-progress" aria-hidden="true">
+            <span class="wizard-dot" data-step="1"></span>
+            <span class="wizard-dot" data-step="2"></span>
+            <span class="wizard-dot" data-step="3"></span>
+            <span class="wizard-dot" data-step="4"></span>
+            <span class="wizard-dot" data-step="5"></span>
+            <span class="wizard-dot" data-step="6"></span>
+            <span class="wizard-dot" data-step="7"></span>
+          </div>
+        </div>
+
+        <div class="status-row">
+          <div class="status-card">
+            <span class="status-label">Wallet</span>
+            <span class="demo-pill" id="ih-wallet-pill">CHECKING</span>
+          </div>
+          <div class="status-card status-card-wide">
+            <span class="status-label">Human proof</span>
+            <span class="status-mono" id="ih-master-id">—</span>
+          </div>
+        </div>
+
+        <div class="action-row">
+          <button class="demo-btn demo-btn-secondary" id="ih-wallet-btn" type="button">Unlock wallet</button>
         </div>
       </div>
-      <div class="panel-head" style="margin-top: 18px;">
-        <h3>Why businesses care</h3>
+    </section>
+
+    <!-- Step 2 -->
+    <section class="workflow-step" id="ih-step-2" data-step="2">
+      <div class="workflow-rail">
+        <span class="workflow-num">2</span>
+        <span class="workflow-line" aria-hidden="true"></span>
       </div>
+      <div class="workflow-body" id="ih-demo-cockpit">
+        <div class="workflow-head">
+          <div>
+            <h2>Prove human on customer sites</h2>
+            <p class="demo-muted">Open a demo site and click the protected action, or verify from this page.</p>
+          </div>
+          <button class="demo-btn demo-btn-secondary" id="ih-verify-sites-btn" type="button">Check both sites</button>
+        </div>
+
+        <div class="site-cards">
+          <article class="site-card" id="ih-tickets-card">
+            <div class="site-card-top">
+              <div>
+                <h3>Ticketing drop</h3>
+                <p class="demo-muted">Reserve tickets behind a human check.</p>
+              </div>
+              <span class="demo-pill" id="ih-tickets-pill">—</span>
+            </div>
+            <div class="result-row">
+              <div><span class="result-label">Site ID</span><span class="result-value" id="ih-tickets-ppid">—</span></div>
+              <div><span class="result-label">Reason</span><span class="result-value" id="ih-tickets-reason">—</span></div>
+              <div><span class="result-label">Latency</span><span class="result-value" id="ih-tickets-latency">—</span></div>
+            </div>
+            <div class="action-row">
+              <a class="demo-btn demo-btn-primary" href="https://lemma-demo-tickets-1d3d7411af33.herokuapp.com" target="_blank" rel="noopener">Open ticketing site</a>
+              <button class="demo-btn demo-btn-secondary" id="ih-verify-tickets-btn" type="button">Verify here</button>
+            </div>
+          </article>
+
+          <article class="site-card" id="ih-trials-card">
+            <div class="site-card-top">
+              <div>
+                <h3>SaaS free trial</h3>
+                <p class="demo-muted">Start a trial without another CAPTCHA.</p>
+              </div>
+              <span class="demo-pill" id="ih-trials-pill">—</span>
+            </div>
+            <div class="result-row">
+              <div><span class="result-label">Site ID</span><span class="result-value" id="ih-trials-ppid">—</span></div>
+              <div><span class="result-label">Reason</span><span class="result-value" id="ih-trials-reason">—</span></div>
+              <div><span class="result-label">Latency</span><span class="result-value" id="ih-trials-latency">—</span></div>
+            </div>
+            <div class="action-row">
+              <a class="demo-btn demo-btn-primary" href="https://lemma-demo-trials-7090f46cae0d.herokuapp.com" target="_blank" rel="noopener">Open trials site</a>
+              <button class="demo-btn demo-btn-secondary" id="ih-verify-trials-btn" type="button">Verify here</button>
+            </div>
+          </article>
+        </div>
+
+        <div class="ppid-compare">
+          <p class="ppid-compare-title">Same human, different site-private IDs</p>
+          <div class="ppid-compare-grid">
+            <div class="ppid-slot">
+              <span class="result-label">Ticketing</span>
+              <span class="ppid-val" id="ih-tickets-ppid-compare">—</span>
+            </div>
+            <div class="ppid-diff" id="ih-ppid-diff">Verify both sites</div>
+            <div class="ppid-slot">
+              <span class="result-label">Trials</span>
+              <span class="ppid-val" id="ih-trials-ppid-compare">—</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Step 3 -->
+    <section class="workflow-step" id="ih-step-3" data-step="3">
+      <div class="workflow-rail">
+        <span class="workflow-num">3</span>
+      </div>
+      <div class="workflow-body" id="ih-abuse-panel">
+        <div class="workflow-head">
+          <div>
+            <h2>Respond to abuse</h2>
+            <p class="demo-muted">Block one site, confirm the other stays human, then revoke network-wide if needed.</p>
+          </div>
+        </div>
+
+        <div class="abuse-flow">
+          <div class="abuse-step">
+            <h3>Site block</h3>
+            <p class="demo-muted">Ticketing only — trials should stay human.</p>
+            <button class="demo-btn demo-btn-danger" id="ih-abuse-block-btn" type="button">Block ticketing</button>
+            <p class="abuse-outcome" id="ih-abuse-block-outcome">Expected: tickets denied</p>
+            <p class="abuse-outcome" id="ih-abuse-derive">Server enforcement: —</p>
+          </div>
+          <div class="abuse-arrow" aria-hidden="true">→</div>
+          <div class="abuse-step">
+            <h3>Scoped check</h3>
+            <p class="demo-muted">Confirm trials still passes.</p>
+            <button class="demo-btn demo-btn-secondary" id="ih-abuse-verify-trials-btn" type="button">Verify trials</button>
+            <p class="abuse-outcome" id="ih-abuse-scoped-outcome">Trials should remain human</p>
+            <button class="demo-btn demo-btn-secondary demo-btn-quiet" id="ih-unblock-tickets-btn" type="button">Unblock ticketing</button>
+          </div>
+          <div class="abuse-arrow" aria-hidden="true">→</div>
+          <div class="abuse-step">
+            <h3>Network revoke</h3>
+            <p class="demo-muted">Status: <span class="demo-pill" id="ih-network-pill">WAITING</span></p>
+            <button class="demo-btn demo-btn-danger" id="ih-abuse-network-btn" type="button">Revoke everywhere</button>
+            <p class="abuse-outcome" id="ih-abuse-network-outcome">Expected: both denied</p>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <details class="demo-details">
+    <summary>Why Lemma · integration · operator tools</summary>
+    <div class="demo-details-body">
+      <h3>From IP bans to human accountability</h3>
       <div class="compare-grid">
         <div class="compare-box bad">
-          <h3>Without Lemma</h3>
+          <h4>Current bot defense</h4>
           <ul>
-            <li>CAPTCHA slows real users and is cheap for attackers.</li>
-            <li>IP and ISP bans create collateral damage.</li>
-            <li>Full identity verification is too expensive for most signups and trials.</li>
-            <li>Attackers rotate proxies and accounts.</li>
+            <li>Ban IPs, ISPs, VPNs, and regions.</li>
+            <li>Real users caught in the blast radius.</li>
+            <li>Attackers rotate infrastructure.</li>
           </ul>
         </div>
         <div class="compare-box good">
-          <h3>With Lemma</h3>
+          <h4>With Lemma</h4>
           <ul>
-            <li>Users reuse one human proof across sites.</li>
-            <li>Businesses block private human IDs, not whole networks.</li>
-            <li>Suspicious users can be forced through fresh verification.</li>
-            <li>Confirmed abuse can revoke the reusable proof everywhere.</li>
+            <li>Block site-private human proofs.</li>
+            <li>Require fresh verification.</li>
+            <li>Revoke network-wide when confirmed.</li>
           </ul>
         </div>
       </div>
-    </div>
-  </details>
 
-  <details class="panel tech-panel">
-    <summary><h2>Integration &amp; operator</h2><span class="muted">Two-line snippet, debug tools</span></summary>
-    <div class="tech-body">
-      <div class="panel-head">
-        <h3>What each business receives</h3>
-        <p class="muted">A human verdict, site-scoped private ID, and reason code. No passport, selfie, or cross-site user identifier.</p>
-      </div>
+      <h3>Integration snippet</h3>
+      <p class="demo-muted">A human verdict, site-scoped private ID, and reason — no passport or cross-site user ID.</p>
       <div class="code-block">&lt;script src="https://lemma.id/sdk/ishuman-verifier.js"&gt;&lt;/script&gt;
 const result = await new IsHumanVerifier({
   siteId: 'tickets-demo.lemma.id',
   autoProvision: true,
 }).verify();
 // { human, ppid, reason, timeMs }</div>
-      <p class="muted" id="ih-integration-latency">Last verify: —</p>
-      <input class="input" id="ih-test-token" type="password" placeholder="Test token override (optional)" autocomplete="off">
-      <input class="input" id="ih-admin-token" type="password" placeholder="Admin token override (optional)" autocomplete="off">
-      <div class="btn-row" id="ih-operator-console">
-        <button class="btn secondary" id="ih-start-idv-btn" type="button">Start Stripe Identity</button>
-        <button class="btn secondary" id="ih-test-complete-btn" type="button">Complete test verification</button>
-        <button class="btn secondary" id="ih-poll-btn" type="button">Poll / store proof</button>
-        <button class="btn secondary" id="ih-refresh-status-btn" type="button">Refresh status</button>
-        <button class="btn danger" id="ih-force-reverify-btn" type="button">Force fresh verification</button>
+      <p class="demo-muted" id="ih-integration-latency">Last verify: —</p>
+
+      <h3>Operator console</h3>
+      <input class="demo-input" id="ih-test-token" type="password" placeholder="Test token override (optional)" autocomplete="off">
+      <input class="demo-input" id="ih-admin-token" type="password" placeholder="Admin token override (optional)" autocomplete="off">
+      <div class="action-row" id="ih-operator-console">
+        <button class="demo-btn demo-btn-secondary" id="ih-start-idv-btn" type="button">Start Stripe Identity</button>
+        <button class="demo-btn demo-btn-secondary" id="ih-test-complete-btn" type="button">Complete test verification</button>
+        <button class="demo-btn demo-btn-secondary" id="ih-poll-btn" type="button">Poll / store proof</button>
+        <button class="demo-btn demo-btn-secondary" id="ih-refresh-status-btn" type="button">Refresh status</button>
+        <button class="demo-btn demo-btn-danger" id="ih-force-reverify-btn" type="button">Force fresh verification</button>
       </div>
       <div class="code-block" id="ih-master-json">{}</div>
-      <div class="log" id="ih-log"></div>
+      <div class="demo-log" id="ih-log"></div>
     </div>
   </details>
 </div>
@@ -237,5 +245,5 @@ const result = await new IsHumanVerifier({
 <script src="/static/js/lemma-keys.js?v=1" nonce="{{ csp_nonce }}"></script>
 <script src="/static/js/lemma-wallet.js?v=2476" nonce="{{ csp_nonce }}"></script>
 <script src="/sdk/ishuman-verifier.js?v=1.3.0" nonce="{{ csp_nonce }}"></script>
-<script src="/static/js/demo/ishuman-demo.js" nonce="{{ csp_nonce }}"></script>
+<script src="/static/js/demo/ishuman-demo.js?v=2" nonce="{{ csp_nonce }}"></script>
 {% endblock %}

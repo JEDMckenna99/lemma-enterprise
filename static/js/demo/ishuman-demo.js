@@ -52,7 +52,30 @@
     const el = $(id);
     if (!el) return;
     el.textContent = label;
-    el.className = `pill${tone ? ` ${tone}` : ''}`;
+    el.className = `demo-pill${tone ? ` ${tone}` : ''}`;
+  }
+
+  function setWorkflowHighlight(workflowStep) {
+    for (let i = 1; i <= 3; i += 1) {
+      const el = $(`ih-step-${i}`);
+      if (!el) continue;
+      el.classList.remove('is-active', 'is-done');
+      if (workflowStep > 0 && i < workflowStep) el.classList.add('is-done');
+      else if (i === workflowStep) el.classList.add('is-active');
+    }
+    if (workflowStep === 0) {
+      for (let i = 1; i <= 3; i += 1) {
+        const el = $(`ih-step-${i}`);
+        if (el) el.classList.add('is-done');
+      }
+    }
+  }
+
+  function workflowStepForWizard(wizardStep) {
+    if (wizardStep <= 0) return 0;
+    if (wizardStep <= 2) return 1;
+    if (wizardStep === 3) return 2;
+    return 3;
   }
 
   function setWizardStep(step, statusText) {
@@ -70,6 +93,7 @@
       if (step > 0 && dotStep < step) dot.classList.add('done');
       else if (dotStep === step) dot.classList.add('active');
     });
+    setWorkflowHighlight(workflowStepForWizard(step));
   }
 
   function setDemoReadyBanner(visible) {
@@ -135,7 +159,7 @@
       const el = $(id);
       if (el) el.disabled = running;
     }
-    const label = running ? 'Running demo…' : 'Run 3-minute demo';
+    const label = running ? 'Running demo…' : 'Run full demo';
     for (const id of ['ih-run-guided-demo', 'ih-run-guided-demo-hero']) {
       const runBtn = $(id);
       if (runBtn) runBtn.textContent = label;
@@ -732,6 +756,7 @@
   }
 
   async function boot() {
+    setWorkflowHighlight(1);
     await loadConfig();
     bind('ih-run-guided-demo', runGuidedDemo);
     bind('ih-run-guided-demo-hero', runGuidedDemo);

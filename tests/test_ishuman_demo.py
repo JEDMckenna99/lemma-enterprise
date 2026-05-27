@@ -31,11 +31,13 @@ def test_ishuman_demo_page_loads_expected_assets(ishuman_demo_client):
 
     assert resp.status_code == 200
     assert "Bot defense should punish abusive humans, not whole networks." in body
-    assert "Live demo cockpit" in body
+    assert "Verify once" in body
+    assert "Prove human on customer sites" in body
+    assert "Respond to abuse" in body
+    assert "demo-workflow" in body
     assert "From IP bans to human accountability" in body
-    assert "Why businesses care" in body
     assert "autoProvision: true" in body
-    assert "Abuse response" in body
+    assert "ih-step-1" in body
     assert "ih-wizard-progress" in body
     assert "ih-demo-ready-banner" in body
     assert "ih-network-pill" in body
