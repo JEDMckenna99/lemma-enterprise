@@ -81,7 +81,7 @@ const AUTH_STATE = {
 class LemmaWallet {
     // SDK version - check with LemmaWallet.VERSION
     // v2.32.0: Redirect-only architecture - removed popup flow for simpler, consistent UX
-    static VERSION = '2.53.0';  // v2.53: daily unlock bundle in localStorage + bridge credential sync
+    static VERSION = '2.54.0';  // v2.54: fail fast when wallet IndexedDB upgrade is blocked
     
     constructor(options = {}) {
         this.db = null;
@@ -1833,9 +1833,17 @@ class LemmaWallet {
             const request = indexedDB.open(WALLET_DB_NAME, WALLET_DB_VERSION);
 
             request.onerror = () => reject(request.error);
+            request.onblocked = () => {
+                reject(new Error('Wallet database update is blocked. Close other lemma.id tabs and retry.'));
+            };
             
             request.onsuccess = async () => {
                 this.db = request.result;
+                this.db.onversionchange = () => {
+                    console.warn('[Lemma] Wallet database version changed; closing old connection');
+                    this.db.close();
+                    this._initialized = false;
+                };
                 this._initialized = true;
                 await this._checkSessionState();
                 if (this._isLemmaDomain()) {

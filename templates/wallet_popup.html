@@ -152,7 +152,7 @@
 
     <script src="/static/js/lemma-keys.js?v=2" nonce="{{ csp_nonce }}"></script>
     <script src="/static/js/wallet-at-rest-crypto.js?v=1" nonce="{{ csp_nonce }}"></script>
-    <script src="/static/js/lemma-wallet.js?v=2530" nonce="{{ csp_nonce }}"></script>
+    <script src="/static/js/lemma-wallet.js?v=2531" nonce="{{ csp_nonce }}"></script>
     <script nonce="{{ csp_nonce }}">
         let wallet = null;
         const params = new URLSearchParams(window.location.search);
@@ -167,7 +167,13 @@
             
             try {
                 wallet = new LemmaWallet();
-                await wallet.init();
+                await Promise.race([
+                    wallet.init(),
+                    new Promise((_, reject) => setTimeout(
+                        () => reject(new Error('Wallet status check timed out. Close other lemma.id tabs and retry.')),
+                        8000,
+                    )),
+                ]);
                 
                 const info = await wallet.getWalletInfo();
                 

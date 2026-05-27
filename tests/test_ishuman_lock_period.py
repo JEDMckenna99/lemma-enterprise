@@ -63,6 +63,7 @@ def test_wallet_daily_unlock_helpers(wallet_source):
     assert "exportIsHumanCredentialsForBridge" in wallet_source
     assert "applyIsHumanCredentialsToCache" in wallet_source
     assert "localStorage.setItem(ISHUMAN_LOCK_STORAGE_KEY" in wallet_source
+    assert "request.onblocked" in wallet_source
 
 
 @pytest.mark.browser
@@ -86,6 +87,7 @@ def test_unlock_popup_ishuman_flag():
     assert "isHumanIssuance" in popup_html
     assert "ishuman" in popup_html
     assert "isHumanCredentials" in popup_html
+    assert "Wallet status check timed out" in popup_html
 
 
 @pytest.mark.browser
@@ -101,6 +103,6 @@ def test_wallet_pages_use_current_wallet_bundle():
     for path in wallet_pages:
         source = path.read_text(encoding="utf-8")
         assert "lemma-wallet.js?v=2476" not in source
-        assert "lemma-wallet.js') }}?v=2530" in source or "lemma-wallet.js?v=2530" in source
+        assert "lemma-wallet.js') }}?v=2531" in source or "lemma-wallet.js?v=2531" in source
         assert "lemma-keys.js?v=1" not in source
         assert "lemma-keys.js') }}?v=2" in source or "lemma-keys.js?v=2" in source
