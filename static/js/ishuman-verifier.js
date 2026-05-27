@@ -26,7 +26,7 @@
  * Optional `autoProvision: true` opens a Lemma-hosted popup to unlock the wallet
  * and complete IDV when no master isHuman proof is present yet.
  *
- * @version 1.2.0
+ * @version 1.2.2
  */
 
 (function () {
@@ -533,9 +533,10 @@ class IsHumanVerifier {
         const autoProvision = options.autoProvision ?? this.autoProvision;
         let result = await this._verifyOnce(t0);
         if (!result.human && autoProvision && PROVISIONABLE_REASONS.has(result.reason)) {
-            const provisioned = await this._provisionViaPopup();
-            if (provisioned) {
+            const provisionResult = await this._provisionViaPopup();
+            if (provisionResult.ok) {
                 this.invalidateSession();
+                await this._syncBridgeAfterIdv(provisionResult.detail);
                 result = await this._verifyOnce(t0);
             } else if (result.reason === 'no_credential') {
                 result = this._result(false, null, 'idv_cancelled', t0);
@@ -734,6 +735,61 @@ class IsHumanVerifier {
                 },
             }, this.lemmaOrigin);
         });
+    }
+
+    _sendBridgeRequest(type, payload = {}, timeoutMs = BRIDGE_TIMEOUT_MS) {
+        return new Promise(async (resolve, reject) => {
+            if (!this._bridgeIframe || !this._bridgeIframe.contentWindow) {
+                return reject(new Error('Bridge iframe not available'));
+            }
+
+            if (!this._bridgeReady) {
+                try {
+                    await Promise.race([
+                        this._bridgeReadyPromise,
+                        new Promise((_, timeoutReject) => setTimeout(
+                            () => timeoutReject(new Error('Bridge ready timeout')),
+                            BRIDGE_TIMEOUT_MS,
+                        )),
+                    ]);
+                } catch (err) {
+                    return reject(err);
+                }
+            }
+
+            const requestId = `ih_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+            const timeout = setTimeout(() => {
+                this._pendingRequests.delete(requestId);
+                reject(new Error('Bridge timeout'));
+            }, timeoutMs);
+
+            this._pendingRequests.set(requestId, {
+                expectedType: `${type}_response`,
+                resolver: (response) => {
+                    clearTimeout(timeout);
+                    resolve(response);
+                },
+            });
+            this._bridgeIframe.contentWindow.postMessage({
+                type,
+                requestId,
+                payload,
+            }, this.lemmaOrigin);
+        });
+    }
+
+    async _syncBridgeAfterIdv(detail = {}) {
+        try {
+            if (detail.sessionData?.isUnlocked) {
+                await this._sendBridgeRequest('SET_LOCAL_SESSION', { session: detail.sessionData });
+            }
+            const unlockResult = await this._sendBridgeRequest('WALLET_UNLOCK', {}, 60000);
+            if (this.debug) {
+                console.log('[isHuman] bridge unlock after IDV', unlockResult?.success ? 'ok' : unlockResult?.error);
+            }
+        } catch (err) {
+            if (this.debug) console.warn('[isHuman] bridge sync after IDV failed:', err.message);
+        }
     }
 
     _requestSessionFromBridge() {
@@ -1189,7 +1245,7 @@ class IsHumanVerifier {
 
             if (!popup) {
                 if (this.debug) console.warn('[isHuman] IDV popup blocked by browser');
-                resolve(false);
+                resolve({ ok: false, detail: null });
                 return;
             }
 
@@ -1205,13 +1261,13 @@ class IsHumanVerifier {
             const onMessage = (event) => {
                 if (event.origin !== this.lemmaOrigin) return;
                 if (event.data?.type === 'ISHUMAN_IDV_COMPLETE') {
-                    finish(true);
+                    finish({ ok: true, detail: event.data.detail || {} });
                 } else if (event.data?.type === 'ISHUMAN_IDV_CANCELLED') {
-                    finish(false);
+                    finish({ ok: false, detail: event.data.detail || null });
                 }
             };
 
-            const timeoutId = setTimeout(() => finish(false), IDV_POPUP_TIMEOUT_MS);
+            const timeoutId = setTimeout(() => finish({ ok: false, detail: null }), IDV_POPUP_TIMEOUT_MS);
             window.addEventListener('message', onMessage);
         });
     }

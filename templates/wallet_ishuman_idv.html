@@ -149,7 +149,44 @@
             window.opener.postMessage({ type, detail: detail || {} }, target);
         }
 
-        function closeWith(type, detail) {
+        let sessionChannel = null;
+        try {
+            sessionChannel = new BroadcastChannel('lemma-session');
+        } catch (e) {
+            console.warn('[isHuman IDV] BroadcastChannel unavailable:', e.message);
+        }
+
+        function broadcastUnlock() {
+            if (!sessionChannel || !walletId) return;
+            sessionChannel.postMessage({
+                type: 'UNLOCK',
+                walletId,
+                timestamp: Date.now(),
+                source: 'ishuman_idv',
+            });
+        }
+
+        async function closeWith(type, detail) {
+            if (type === 'ISHUMAN_IDV_COMPLETE' && wallet) {
+                try {
+                    const sessionInfo = wallet.session || {};
+                    const secret = walletSecret || await wallet.getWalletSecret?.().catch(() => null);
+                    detail = {
+                        ...(detail || {}),
+                        walletId: sessionInfo.walletId || walletId,
+                        sessionData: {
+                            isUnlocked: sessionInfo.isUnlocked,
+                            unlockedAt: sessionInfo.unlockedAt,
+                            expiresAt: sessionInfo.expiresAt,
+                            walletId: sessionInfo.walletId || walletId,
+                        },
+                        walletSecret: secret,
+                    };
+                    broadcastUnlock();
+                } catch (err) {
+                    console.warn('[isHuman IDV] close sync failed:', err.message);
+                }
+            }
             notifyOpener(type, detail);
             window.close();
         }

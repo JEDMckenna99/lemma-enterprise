@@ -679,6 +679,24 @@ async function getCredentialsCached(filterType, requestingSite, showAll) {
     return await promise;
 }
 
+async function ensureWalletDecryptionReady() {
+    if (!wallet) await initWallet();
+    const needsKey = typeof wallet._encryptedStorageNeedsAtRestKey === 'function'
+        && await wallet._encryptedStorageNeedsAtRestKey();
+    if (!needsKey || wallet._atRestKey) {
+        return { ok: true };
+    }
+    try {
+        console.log(' Bridge: encrypted credentials present but PRF key missing — unlocking wallet');
+        await wallet.unlock();
+        clearCredentialsCache();
+        cache.session = { value: null, ts: 0, promise: null };
+        return { ok: true };
+    } catch (err) {
+        return { ok: false, error: err?.message || 'wallet_locked' };
+    }
+}
+
 // ============================================
 // MESSAGE HANDLER - CROSS-SITE COMMUNICATION
 // ============================================
@@ -1045,6 +1063,12 @@ window.addEventListener('message', async (event) => {
                 // master proof via the server and cache it locally.
                 if (!wallet) await initWallet();
 
+                const cryptoReady = await ensureWalletDecryptionReady();
+                if (!cryptoReady.ok) {
+                    respond({ success: false, error: 'wallet_locked', message: cryptoReady.error });
+                    break;
+                }
+
                 const ihSite = payload?.siteId || requestingSite;
                 const ihType = payload?.credentialType;  // e.g. 'isHuman'
                 const challengeNonce = String(payload?.nonce || '').trim();
@@ -1152,6 +1176,12 @@ window.addEventListener('message', async (event) => {
 
             case 'GET_SESSION_PRESENTATION': {
                 if (!wallet) await initWallet();
+
+                const cryptoReady = await ensureWalletDecryptionReady();
+                if (!cryptoReady.ok) {
+                    respond({ success: false, error: 'wallet_locked', message: cryptoReady.error });
+                    break;
+                }
 
                 const ihSite = payload?.siteId || requestingSite;
                 const ihType = payload?.credentialType;
@@ -1957,6 +1987,15 @@ try {
             // Also invalidate local session cache
             cache.session = { value: null, ts: 0, promise: null };
         } else if (type === 'UNLOCK') {
+            if (!wallet) await initWallet();
+            try {
+                await ensureWalletDecryptionReady();
+            } catch (unlockErr) {
+                console.warn(' Bridge UNLOCK sync failed:', unlockErr.message);
+            }
+            cache.session = { value: null, ts: 0, promise: null };
+            clearCredentialsCache();
+
             // Wallet was unlocked in another tab - notify parent to refresh
             if (window.parent !== window) {
                 console.log(' Forwarding UNLOCK to parent via postMessage');
@@ -1968,8 +2007,7 @@ try {
                 });
             }
 
-            // Clear session cache to force fresh check
-            cache.session = { value: null, ts: 0, promise: null };
+            // Clear session cache to force fresh check (credentials cache cleared above)
         }
     };
 } catch (e) {

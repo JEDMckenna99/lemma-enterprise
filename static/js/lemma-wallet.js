@@ -2561,16 +2561,20 @@ class LemmaWallet {
         // sites. Callers can pass { force: true } to require a fresh passkey
         // (e.g. for sensitive operations like exporting the wallet secret).
         if (!options.force && this.isUnlocked && this.isUnlocked()) {
-            console.log('[Lemma] unlock(): reusing valid restored session, skipping passkey prompt');
-            return {
-                success: true,
-                method: 'restored_session',
-                cached: true,
-                walletId: this.session.walletId,
-                walletSecret: this.session.walletSecret,
-                expiresAt: this.session.expiresAt,
-                source: this.session.source || 'local'
-            };
+            const needsAtRestKey = await this._encryptedStorageNeedsAtRestKey();
+            if (!needsAtRestKey || this._atRestKey) {
+                console.log('[Lemma] unlock(): reusing valid restored session, skipping passkey prompt');
+                return {
+                    success: true,
+                    method: 'restored_session',
+                    cached: true,
+                    walletId: this.session.walletId,
+                    walletSecret: this.session.walletSecret,
+                    expiresAt: this.session.expiresAt,
+                    source: this.session.source || 'local'
+                };
+            }
+            console.log('[Lemma] unlock(): session valid but PRF key missing — refreshing passkey for decryption');
         }
 
         // SMART CHECK: On third-party sites, check bridge session first
@@ -4986,6 +4990,22 @@ class LemmaWallet {
         return message === 'envelope_invalid'
             || message === 'storage_key_unavailable'
             || message === 'prf_required_for_encrypted_storage';
+    }
+
+    async _encryptedStorageNeedsAtRestKey() {
+        const mod = this._walletAtRest();
+        if (!mod?.isEncryptedEnvelope) return false;
+        const meta = await this._getWalletMeta();
+        if (!meta?.migrationComplete) return false;
+        if (this._atRestKey) return false;
+        const stores = ['lemmas', 'secrets', 'session', 'profiles'];
+        for (const storeName of stores) {
+            const rows = await this._getAllRaw(storeName);
+            if (rows.some((row) => mod.isEncryptedEnvelope(row))) {
+                return true;
+            }
+        }
+        return false;
     }
 
     async _migratePlaintextStores() {
