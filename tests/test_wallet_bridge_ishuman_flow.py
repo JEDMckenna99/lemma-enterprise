@@ -36,19 +36,16 @@ def test_get_credential_requires_master_when_site_credential_missing(wallet_brid
 
 
 @pytest.mark.browser
-def test_get_credential_derives_site_proof_and_stores_it(wallet_bridge_source):
-    assert "fetch('/api/ishuman/derive-site-proof'" in wallet_bridge_source
-    assert "siteKeys = await wallet.deriveSiteSigningKeypair(ihSite);" in wallet_bridge_source
-    assert "wallet.buildWalletAssertion" in wallet_bridge_source
-    assert "wallet_assertion: walletAssertion" in wallet_bridge_source
-    assert '"master_credential_id": master.id' not in wallet_bridge_source
-    assert "master_credential_id: master.id," in wallet_bridge_source
-    assert "target_site: ihSite," in wallet_bridge_source
-    assert "site_signing_pubkey: siteSigningPubkey" in wallet_bridge_source
-    assert "if (deriveData.success && deriveData.credential) {" in wallet_bridge_source
-    assert "await wallet.storeCredential(derived);" in wallet_bridge_source
-    assert "presentation_signature" in wallet_bridge_source
-    assert "presentation_timestamp" in wallet_bridge_source
+def test_get_credential_returns_site_proof_required_when_site_credential_missing(wallet_bridge_source):
+    assert "error: 'site_proof_required'" in wallet_bridge_source
+    assert "Site proof not cached; use lemma.id issuance popup" in wallet_bridge_source
+    assert "fetch('/api/ishuman/derive-site-proof'" not in wallet_bridge_source
+
+
+@pytest.mark.browser
+def test_get_session_presentation_returns_site_proof_required_when_site_credential_missing(wallet_bridge_source):
+    assert "case 'GET_SESSION_PRESENTATION':" in wallet_bridge_source
+    assert wallet_bridge_source.count("error: 'site_proof_required'") >= 2
 
 
 @pytest.mark.browser

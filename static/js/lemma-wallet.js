@@ -81,7 +81,7 @@ const AUTH_STATE = {
 class LemmaWallet {
     // SDK version - check with LemmaWallet.VERSION
     // v2.32.0: Redirect-only architecture - removed popup flow for simpler, consistent UX
-    static VERSION = '2.56.0';  // v2.56: detect encrypted rows even when metadata is stale
+    static VERSION = '2.57.0';  // v2.57: popup-first site proof issuance helpers
     
     constructor(options = {}) {
         this.db = null;
@@ -2764,6 +2764,171 @@ class LemmaWallet {
     async exportIsHumanCredentialsForBridge() {
         await this.syncIsHumanCacheFromWallet();
         return this.getIsHumanCredentialsFromCache();
+    }
+
+    _getCredentialSiteBinding(claims) {
+        if (!claims || typeof claims !== 'object') return '';
+        return claims.siteId || claims.site_id || claims.siteDomain || claims.site_domain || '';
+    }
+
+    _siteCredentialHasSigningKey(credential) {
+        const cl = credential?.claims || credential?.credentialSubject || {};
+        return !!(cl.site_signing_pubkey || cl.siteSigningPubkey);
+    }
+
+    async findIsHumanSiteCredential(targetSite) {
+        const keys = this._getLemmaKeys();
+        const canonicalSite = keys.canonicalizeSiteDomain(targetSite || '');
+        const allCreds = await this.exportIsHumanCredentialsForBridge();
+        return allCreds.find((credential) => {
+            const cl = credential.claims || credential.credentialSubject || {};
+            if (!cl.isHuman) return false;
+            return this._getCredentialSiteBinding(cl) === canonicalSite
+                && this._siteCredentialHasSigningKey(credential);
+        }) || null;
+    }
+
+    async findIsHumanMasterCredential() {
+        const cached = await this.getIsHumanCredentialsFromCache();
+        const fromCache = cached.find((credential) => this._isIsHumanMasterRecord(credential));
+        if (fromCache) return fromCache;
+        if (!this.isUnlocked || !this.isUnlocked()) return null;
+        let creds = [];
+        try {
+            creds = await this.getCredentials();
+        } catch (err) {
+            if (this._isEncryptedStorageLockedError(err)) return null;
+            throw err;
+        }
+        return creds.find((credential) => this._isIsHumanMasterRecord(credential)) || null;
+    }
+
+    async deriveAndStoreSiteProof(targetSite) {
+        await this.ensureIsHumanIssuanceReady({ isHumanIssuance: true });
+        const keys = this._getLemmaKeys();
+        const canonicalSite = keys.canonicalizeSiteDomain(targetSite || '');
+
+        const existing = await this.findIsHumanSiteCredential(canonicalSite);
+        if (existing) return existing;
+
+        const master = await this.findIsHumanMasterCredential();
+        if (!master) {
+            throw new Error('no_ishuman_credential');
+        }
+
+        const siteKeys = await this.deriveSiteSigningKeypair(canonicalSite);
+        const siteSigningPubkey = siteKeys.publicKeyB64;
+        const walletId = this.session?.walletId || '';
+        let walletSecret = this.session?.walletSecret || '';
+        if (!walletSecret) {
+            const secretRecord = await this._get('secrets', 'master');
+            walletSecret = secretRecord?.secret || '';
+        }
+        if (!walletId || !walletSecret) {
+            throw new Error('wallet_locked');
+        }
+
+        const walletAssertion = await this.buildWalletAssertion(
+            ['master_credential_id', 'target_site', 'site_signing_pubkey'],
+            {
+                master_credential_id: master.id,
+                target_site: canonicalSite,
+                site_signing_pubkey: siteSigningPubkey,
+            },
+        );
+
+        const deriveRes = await fetch('/api/ishuman/derive-site-proof', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({
+                master_credential_id: master.id,
+                wallet_id: walletId,
+                wallet_secret: walletSecret,
+                target_site: canonicalSite,
+                site_signing_pubkey: siteSigningPubkey,
+                wallet_assertion: walletAssertion,
+            }),
+        });
+        const deriveData = await deriveRes.json();
+        if (!deriveRes.ok || !deriveData.success || !deriveData.credential) {
+            throw new Error(deriveData.error || deriveData.message || 'derivation_failed');
+        }
+
+        const derived = deriveData.credential;
+        derived.packageType = derived.packageType || 'identity';
+        await this.storeCredential(derived);
+        await this._putIsHumanCacheRecord(derived);
+        await this._finalizeIsHumanIssuance({ isHumanIssuance: true });
+        return derived;
+    }
+
+    async signSiteSessionPresentation({
+        credential,
+        siteId,
+        sessionNonce,
+        bloomSequence,
+        sessionTtlSec,
+    }) {
+        const SESSION_PRESENTATION_PREFIX = 'lemma:site-session-presentation:v1';
+        const MIN_SESSION_TTL_SECONDS = 60;
+        const MAX_SESSION_TTL_SECONDS = 24 * 60 * 60;
+        const DEFAULT_SESSION_TTL_SECONDS = 24 * 60 * 60;
+
+        const keys = this._getLemmaKeys();
+        const canonicalSite = keys.canonicalizeSiteDomain(siteId || '');
+        const siteKeys = await this.deriveSiteSigningKeypair(canonicalSite);
+        const requestedTtl = Number(sessionTtlSec || DEFAULT_SESSION_TTL_SECONDS);
+        const sessionTtl = Math.min(
+            MAX_SESSION_TTL_SECONDS,
+            Math.max(MIN_SESSION_TTL_SECONDS, requestedTtl || DEFAULT_SESSION_TTL_SECONDS),
+        );
+        const issuedAtUnix = Math.floor(Date.now() / 1000);
+        const expiresAtUnix = issuedAtUnix + sessionTtl;
+        const sessionId = keys.base64urlEncode(crypto.getRandomValues(new Uint8Array(16)));
+        const assertion = {
+            session_id: sessionId,
+            site_id: canonicalSite,
+            credential_id: credential?.id || '',
+            subject: credential?.subject || '',
+            session_nonce: sessionNonce,
+            bloom_sequence: bloomSequence,
+            issued_at_unix: issuedAtUnix,
+            expires_at_unix: expiresAtUnix,
+        };
+        const payloadBytes = new TextEncoder().encode([
+            SESSION_PRESENTATION_PREFIX,
+            String(assertion.session_id || '').trim(),
+            String(assertion.site_id || '').trim(),
+            String(assertion.credential_id || '').trim(),
+            String(assertion.subject || '').trim(),
+            String(assertion.session_nonce || '').trim(),
+            String(assertion.bloom_sequence ?? ''),
+            String(assertion.issued_at_unix ?? ''),
+            String(assertion.expires_at_unix ?? ''),
+        ].join('\n'));
+        const signature = await siteKeys.keypair.sign(payloadBytes);
+        return {
+            credential,
+            session_assertion: assertion,
+            session_signature: keys.base64urlEncode(signature),
+        };
+    }
+
+    async issueSiteProofPackage({
+        siteId,
+        sessionNonce,
+        bloomSequence,
+        sessionTtlSec,
+    }) {
+        const credential = await this.deriveAndStoreSiteProof(siteId);
+        return this.signSiteSessionPresentation({
+            credential,
+            siteId,
+            sessionNonce,
+            bloomSequence,
+            sessionTtlSec,
+        });
     }
 
     async ensureIsHumanIssuanceReady(options = {}) {

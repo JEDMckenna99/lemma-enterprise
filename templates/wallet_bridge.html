@@ -20,7 +20,7 @@
 <body>
 <script src="/static/js/lemma-keys.js?v=2" nonce="{{ csp_nonce }}"></script>
 <script src="/static/js/wallet-at-rest-crypto.js?v=1" nonce="{{ csp_nonce }}"></script>
-<script src="/static/js/lemma-wallet.js?v=2533" nonce="{{ csp_nonce }}"></script>
+<script src="/static/js/lemma-wallet.js?v=2534" nonce="{{ csp_nonce }}"></script>
 <script nonce="{{ csp_nonce }}">
 /**
  * Lemma Wallet Bridge v2.0
@@ -1212,7 +1212,7 @@ window.addEventListener('message', async (event) => {
                     break;
                 }
 
-                // 2. No per-site credential — look for the master isHuman proof
+                // 2. No per-site credential cached — popup must issue it (top-level lemma.id context)
                 const master = allCreds.find(c => {
                     const cl = c.claims || c.credentialSubject || {};
                     const boundSite = getCredentialSiteBinding(cl);
@@ -1224,49 +1224,11 @@ window.addEventListener('message', async (event) => {
                     break;
                 }
 
-                // 3. Derive a per-site credential from the master via the server
-                try {
-                    const walletId = wallet.walletId || (await wallet.getWalletInfo?.())?.walletId || '';
-                    const secretRecord = await wallet._get('secrets', 'master');
-                    const walletSecret = secretRecord?.secret || wallet.session?.walletSecret || '';
-                    const walletAssertion = await wallet.buildWalletAssertion(
-                        ['master_credential_id', 'target_site', 'site_signing_pubkey'],
-                        {
-                            master_credential_id: master.id,
-                            target_site: ihSite,
-                            site_signing_pubkey: siteSigningPubkey,
-                        },
-                    );
-                    const deriveRes = await fetch('/api/ishuman/derive-site-proof', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            master_credential_id: master.id,
-                            wallet_id: walletId,
-                            wallet_secret: walletSecret,
-                            target_site: ihSite,
-                            site_signing_pubkey: siteSigningPubkey,
-                            wallet_assertion: walletAssertion,
-                        }),
-                    });
-                    const deriveData = await deriveRes.json();
-
-                    if (deriveData.success && deriveData.credential) {
-                        const derived = deriveData.credential;
-                        derived.packageType = derived.packageType || 'identity';
-                        await wallet.storeCredential(derived);
-                        clearCredentialsCache();
-                        console.log(` isHuman: derived site proof for ${ihSite}:`, derived.id);
-                        const signed = await signPresentation(derived);
-                        respond({ success: true, ...signed });
-                    } else {
-                        console.warn(' isHuman: derivation failed:', deriveData.error);
-                        respond({ success: false, error: deriveData.error || 'derivation_failed' });
-                    }
-                } catch (deriveErr) {
-                    console.error(' isHuman: derivation request failed:', deriveErr);
-                    respond({ success: false, error: 'derivation_network_error' });
-                }
+                respond({
+                    success: false,
+                    error: 'site_proof_required',
+                    message: 'Site proof not cached; use lemma.id issuance popup',
+                });
                 break;
             }
 
@@ -1370,48 +1332,11 @@ window.addEventListener('message', async (event) => {
                     break;
                 }
 
-                try {
-                    const walletId = wallet.walletId || (await wallet.getWalletInfo?.())?.walletId || '';
-                    const secretRecord = await wallet._get('secrets', 'master');
-                    const walletSecret = secretRecord?.secret || wallet.session?.walletSecret || '';
-                    const walletAssertion = await wallet.buildWalletAssertion(
-                        ['master_credential_id', 'target_site', 'site_signing_pubkey'],
-                        {
-                            master_credential_id: master.id,
-                            target_site: ihSite,
-                            site_signing_pubkey: siteSigningPubkey,
-                        },
-                    );
-                    const deriveRes = await fetch('/api/ishuman/derive-site-proof', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            master_credential_id: master.id,
-                            wallet_id: walletId,
-                            wallet_secret: walletSecret,
-                            target_site: ihSite,
-                            site_signing_pubkey: siteSigningPubkey,
-                            wallet_assertion: walletAssertion,
-                        }),
-                    });
-                    const deriveData = await deriveRes.json();
-
-                    if (deriveData.success && deriveData.credential) {
-                        const derived = deriveData.credential;
-                        derived.packageType = derived.packageType || 'identity';
-                        await wallet.storeCredential(derived);
-                        clearCredentialsCache();
-                        console.log(` isHuman: derived site proof for ${ihSite}:`, derived.id);
-                        const signed = await signSessionPresentation(derived);
-                        respond({ success: true, ...signed });
-                    } else {
-                        console.warn(' isHuman: derivation failed:', deriveData.error);
-                        respond({ success: false, error: deriveData.error || 'derivation_failed' });
-                    }
-                } catch (deriveErr) {
-                    console.error(' isHuman: derivation request failed:', deriveErr);
-                    respond({ success: false, error: 'derivation_network_error' });
-                }
+                respond({
+                    success: false,
+                    error: 'site_proof_required',
+                    message: 'Site proof not cached; use lemma.id issuance popup',
+                });
                 break;
             }
 

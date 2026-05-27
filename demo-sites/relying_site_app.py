@@ -178,8 +178,9 @@ def index():
         <p style="margin:12px 0 6px">Decision <span class="pill" id="status-pill">WAITING</span></p>
         <p class="muted" id="decision-copy">Click the protected action to run the SDK.</p>
         <ol class="how">
-          <li>SDK checks Lemma wallet via hidden bridge iframe.</li>
-          <li>No master proof → IDV popup on lemma.id.</li>
+          <li>SDK checks local site proof cache first.</li>
+          <li>Missing site proof → Lemma popup issues it from your master credential.</li>
+          <li>No master proof yet → one-time IDV in the popup, then site proof.</li>
           <li>Proof exists → local Ed25519 verify in milliseconds.</li>
           <li>Business never sees passport, selfie, or cross-site ID.</li>
         </ol>
@@ -190,7 +191,7 @@ def index():
       </aside>
     </div>
   </main>
-  <script src="{LEMMA_ORIGIN}/sdk/ishuman-verifier.js?v=1.3.4"></script>
+  <script src="{LEMMA_ORIGIN}/sdk/ishuman-verifier.js?v=1.4.0"></script>
   <script>
     const pill = document.getElementById('status-pill');
     const result = document.getElementById('result');
@@ -254,7 +255,7 @@ def index():
       button.disabled = true;
       pill.textContent = 'CHECKING';
       pill.className = 'pill checking';
-      decisionCard.innerHTML = '<strong>Checking Lemma wallet…</strong><p class="tiny">If no human proof exists yet, Lemma opens a popup to complete IDV once. Returning visitors reuse a cached session or wallet unlock only.</p>';
+      decisionCard.innerHTML = '<strong>Checking Lemma wallet…</strong><p class="tiny">If a site proof is missing, Lemma opens a popup on lemma.id to issue it from your master credential. IDV runs only once if you have no master proof yet.</p>';
       try {{
         if (backgroundVerifier) {{
           backgroundVerifier.destroy();

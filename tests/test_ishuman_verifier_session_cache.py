@@ -72,6 +72,14 @@ def test_verifier_fails_closed_when_session_signature_invalid(verifier_source):
 
 
 @pytest.mark.browser
+def test_verifier_opens_popup_for_missing_site_proof(verifier_source):
+    assert "_issueSiteProofViaPopup" in verifier_source
+    assert "issue_mode', 'site_proof'" in verifier_source
+    assert "ISHUMAN_SITE_PROOF_ISSUED" in verifier_source
+    assert "_applyIssuedSiteProof" in verifier_source
+
+
+@pytest.mark.browser
 def test_verifier_uses_site_vc_cache_on_repeat_verify(verifier_source):
     assert "_verifyFromSiteVcCache" in verifier_source
     assert "'session_valid'" in verifier_source

@@ -61,6 +61,9 @@ def test_bridge_ishuman_issuance_probe(bridge_source):
 @pytest.mark.browser
 def test_wallet_daily_unlock_helpers(wallet_source):
     assert "exportIsHumanCredentialsForBridge" in wallet_source
+    assert "issueSiteProofPackage" in wallet_source
+    assert "deriveAndStoreSiteProof" in wallet_source
+    assert "signSiteSessionPresentation" in wallet_source
     assert "applyIsHumanCredentialsToCache" in wallet_source
     assert "hasIsHumanMasterInCache" in wallet_source
     assert "localStorage.setItem(ISHUMAN_LOCK_STORAGE_KEY" in wallet_source
@@ -74,13 +77,21 @@ def test_verifier_site_vc_cache(verifier_source):
     assert "_verifyFromSiteVcCache" in verifier_source
     assert "'vc_valid'" in verifier_source
     assert "isHumanIssuance: true" in verifier_source
-    assert "BRIDGE_PATH = '/wallet/bridge?v=1.3.4'" in verifier_source
+    assert "BRIDGE_PATH = '/wallet/bridge?v=1.4.0'" in verifier_source
+    assert "_issueSiteProofViaPopup" in verifier_source
+    assert "_applyIssuedSiteProof" in verifier_source
+    assert "ISHUMAN_SITE_PROOF_ISSUED" in verifier_source
+    assert "site_proof_required" in verifier_source
 
 
 @pytest.mark.browser
-def test_idv_popup_uses_ensure_ishuman_issuance():
+def test_idv_popup_issues_site_proof_via_wallet():
     idv_html = IDV_HTML.read_text(encoding="utf-8")
     assert "ensureIsHumanIssuanceReady" in idv_html
+    assert "issueSiteProofPackage" in idv_html
+    assert "ISHUMAN_SITE_PROOF_ISSUED" in idv_html
+    assert "issue_mode" in idv_html
+    assert "site_proof" in idv_html
 
 
 @pytest.mark.browser
@@ -112,6 +123,6 @@ def test_wallet_pages_use_current_wallet_bundle():
     for path in wallet_pages:
         source = path.read_text(encoding="utf-8")
         assert "lemma-wallet.js?v=2476" not in source
-        assert "lemma-wallet.js') }}?v=2533" in source or "lemma-wallet.js?v=2533" in source
+        assert "lemma-wallet.js') }}?v=2534" in source or "lemma-wallet.js?v=2534" in source
         assert "lemma-keys.js?v=1" not in source
         assert "lemma-keys.js') }}?v=2" in source or "lemma-keys.js?v=2" in source

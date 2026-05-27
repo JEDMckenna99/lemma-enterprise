@@ -98,12 +98,18 @@
 
     <script src="/static/js/lemma-keys.js?v=2" nonce="{{ csp_nonce }}"></script>
     <script src="/static/js/wallet-at-rest-crypto.js?v=1" nonce="{{ csp_nonce }}"></script>
-    <script src="/static/js/lemma-wallet.js?v=2533" nonce="{{ csp_nonce }}"></script>
+    <script src="/static/js/lemma-wallet.js?v=2534" nonce="{{ csp_nonce }}"></script>
     <script nonce="{{ csp_nonce }}">
         const SESSION_KEY = 'ishuman_idv_popup_session_id';
         const params = new URLSearchParams(window.location.search);
         const openerOrigin = params.get('origin') || '*';
         const requestingSite = params.get('site_id') || 'customer site';
+        const issueMode = params.get('issue_mode') || '';
+        const requestNonce = params.get('request_nonce') || '';
+        const clientSessionNonce = params.get('session_nonce') || '';
+        const bloomSequence = Number(params.get('bloom_sequence') || 0);
+        const sessionTtlSec = Number(params.get('session_ttl_sec') || (24 * 60 * 60));
+        const isSiteProofIssue = issueMode === 'site_proof' && !!clientSessionNonce;
         const isVerificationReturn = params.has('verification_return');
         const root = document.getElementById('ishuman-idv-root');
         const testVerifyEnabled = root.dataset.testVerifyEnabled === 'true';
@@ -167,7 +173,8 @@
         }
 
         async function closeWith(type, detail) {
-            if (type === 'ISHUMAN_IDV_COMPLETE' && wallet) {
+            const syncTypes = new Set(['ISHUMAN_IDV_COMPLETE', 'ISHUMAN_SITE_PROOF_ISSUED']);
+            if (syncTypes.has(type) && wallet) {
                 try {
                     const sessionInfo = wallet.session || {};
                     const secret = walletSecret || await wallet.getWalletSecret?.().catch(() => null);
@@ -304,7 +311,50 @@
             throw new Error('Stripe verification URL missing');
         }
 
+        async function issueSiteProofAndClose() {
+            setStatus('Issuing site proof…', 'loading');
+            await ensureWalletUnlocked();
+
+            if (!(await hasMasterProof())) {
+                if (isVerificationReturn && sessionId) {
+                    await pollAndStoreMaster();
+                } else if (testVerifyEnabled && serverTestToken) {
+                    setStatus('Completing demo verification…', 'loading');
+                    await verifyOnceTestMode();
+                } else {
+                    setStatus('Complete identity verification once, then we issue your site proof.', 'info');
+                    document.getElementById('primary-btn').classList.remove('hidden');
+                    document.getElementById('primary-btn').textContent = testVerifyEnabled
+                        ? 'Unlock wallet & verify (demo)'
+                        : 'Unlock wallet & verify';
+                    return false;
+                }
+            }
+
+            const pkg = await wallet.issueSiteProofPackage({
+                siteId: requestingSite,
+                sessionNonce: clientSessionNonce,
+                bloomSequence,
+                sessionTtlSec,
+            });
+
+            setStatus('Site proof ready.', 'success');
+            setTimeout(() => closeWith('ISHUMAN_SITE_PROOF_ISSUED', {
+                credential: pkg.credential,
+                session_assertion: pkg.session_assertion,
+                session_signature: pkg.session_signature,
+                session_nonce: clientSessionNonce,
+                request_nonce: requestNonce,
+                reason: 'site_proof_issued',
+            }), 400);
+            return true;
+        }
+
         async function runVerification() {
+            if (isSiteProofIssue) {
+                return issueSiteProofAndClose();
+            }
+
             setStatus('Checking wallet…', 'loading');
             await ensureWalletUnlocked();
 
@@ -352,6 +402,23 @@
             if (!window.opener) {
                 setStatus('Open this page from a customer site action, not directly.', 'error');
                 document.getElementById('cancel-btn').textContent = 'Close';
+                return;
+            }
+
+            if (isSiteProofIssue) {
+                document.getElementById('intro-copy').textContent =
+                    'Lemma issues a site-scoped human proof from your wallet. Passkey unlock is once per day; IDV runs only if you have no master proof yet.';
+                document.getElementById('primary-btn').classList.add('hidden');
+                try {
+                    const done = await runVerification();
+                    if (!done) {
+                        setStatus('Ready when you are.', 'info');
+                    }
+                } catch (err) {
+                    setStatus(err.message || 'Could not issue site proof', 'error');
+                    document.getElementById('primary-btn').classList.remove('hidden');
+                    document.getElementById('primary-btn').textContent = 'Try again';
+                }
                 return;
             }
 

@@ -26,7 +26,7 @@
  * Optional `autoProvision: true` opens a Lemma-hosted popup to unlock the wallet
  * and complete IDV when no master isHuman proof is present yet.
  *
- * @version 1.3.4
+ * @version 1.4.0
  */
 
 (function () {
@@ -37,7 +37,7 @@ if (typeof window !== 'undefined' && window.IsHumanVerifier) {
 }
 
 const LEMMA_ORIGIN = 'https://lemma.id';
-const BRIDGE_PATH = '/wallet/bridge?v=1.3.4';
+const BRIDGE_PATH = '/wallet/bridge?v=1.4.0';
 const BRIDGE_TIMEOUT_MS = 8000;
 const PRESENTATION_PREFIX = 'lemma:site-presentation:v1';
 const MAX_PRESENTATION_STALENESS_SECONDS = 120;
@@ -554,32 +554,24 @@ class IsHumanVerifier {
             return result;
         }
 
-        const needsIdv = result.reason === 'no_ishuman_credential'
-            || (result.reason === 'no_credential' && !this._hasProvisionedMaster());
-        const needsUnlock = result.reason === 'wallet_locked'
-            || (result.reason === 'no_credential' && this._hasProvisionedMaster());
+        const popupReasons = new Set([
+            'no_credential',
+            'wallet_locked',
+            'no_ishuman_credential',
+            'site_proof_required',
+        ]);
 
-        if (needsUnlock) {
-            result = await this._verifyOnce(t0);
-            if (result.human) {
+        if (popupReasons.has(result.reason)) {
+            const issued = await this._issueSiteProofViaPopup();
+            if (issued.ok) {
                 this._markProvisionedMaster();
-                return result;
-            }
-            const unlocked = await this._unlockViaPopup();
-            if (unlocked) {
-                result = await this._verifyOnce(t0);
-            } else if (result.reason === 'wallet_locked' || this._hasProvisionedMaster()) {
-                result = this._result(false, null, 'unlock_cancelled', t0);
-            }
-        } else if (needsIdv) {
-            const provisionResult = await this._provisionViaPopup();
-            if (provisionResult.ok) {
-                this._markProvisionedMaster();
-                this.invalidateSession();
-                await this._syncBridgeAfterIdv(provisionResult.detail);
-                result = await this._verifyOnce(t0);
+                await this._syncBridgeAfterIdv(issued.detail);
+                result = await this._applyIssuedSiteProof(issued.detail, t0);
+                if (!result.human) {
+                    result = await this._verifyOnce(t0);
+                }
             } else {
-                result = this._result(false, null, 'idv_cancelled', t0);
+                result = this._result(false, null, issued.reason || 'idv_cancelled', t0);
             }
         }
 
@@ -1294,8 +1286,105 @@ class IsHumanVerifier {
         if (!err) return 'no_credential';
         if (err.includes('no_ishuman_credential')) return 'no_ishuman_credential';
         if (err.includes('wallet_locked')) return 'wallet_locked';
+        if (err.includes('site_proof_required')) return 'site_proof_required';
         if (err.includes('derivation')) return 'derivation_failed';
         return 'no_credential';
+    }
+
+    async _applyIssuedSiteProof(detail, t0) {
+        const credential = detail?.credential || null;
+        if (!credential) {
+            return this._result(false, null, 'no_credential', t0);
+        }
+
+        const core = await this._verifyCredentialCore(credential, t0);
+        if (!core.ok) {
+            return this._result(false, core.ppid, core.reason, t0, core.error);
+        }
+
+        const sessionNonce = detail?.session_nonce || '';
+        const bridgeResult = {
+            session_assertion: detail?.session_assertion,
+            session_signature: detail?.session_signature,
+            session_nonce: sessionNonce,
+        };
+        const sessionCheck = await this._verifySessionFromBridgeResult(bridgeResult, credential);
+        if (!sessionCheck.ok) {
+            return this._result(false, credential.subject, sessionCheck.reason, t0, sessionCheck.error);
+        }
+
+        this._persistSession({
+            siteId: this.siteId,
+            credential,
+            session_assertion: detail.session_assertion,
+            session_signature: detail.session_signature,
+            session_nonce: sessionNonce,
+            bloom_sequence: Number(this._bloomSnapshot?.sequence_number ?? 0),
+        });
+
+        return this._result(true, credential.subject, 'valid', t0);
+    }
+
+    _issueSiteProofViaPopup() {
+        return new Promise((resolve) => {
+            const requestNonce = randomNonceB64(16);
+            const sessionNonce = randomNonceB64(32);
+            const bloomSequence = Number(this._bloomSnapshot?.sequence_number ?? 0);
+
+            const popupUrl = new URL(`${this.lemmaOrigin}${this.idvPopupPath}`);
+            popupUrl.searchParams.set('origin', window.location.origin);
+            popupUrl.searchParams.set('site_id', this.siteId);
+            popupUrl.searchParams.set('issue_mode', 'site_proof');
+            popupUrl.searchParams.set('request_nonce', requestNonce);
+            popupUrl.searchParams.set('session_nonce', sessionNonce);
+            popupUrl.searchParams.set('bloom_sequence', String(bloomSequence));
+            popupUrl.searchParams.set('session_ttl_sec', String(this.sessionTtlSec));
+
+            const width = 480;
+            const height = 640;
+            const left = Math.max(0, Math.round(window.screenX + (window.outerWidth - width) / 2));
+            const top = Math.max(0, Math.round(window.screenY + (window.outerHeight - height) / 2));
+            const popup = window.open(
+                popupUrl.toString(),
+                'lemma_ishuman_idv',
+                `popup=yes,width=${width},height=${height},left=${left},top=${top}`,
+            );
+
+            if (!popup) {
+                if (this.debug) console.warn('[isHuman] site proof popup blocked by browser');
+                resolve({ ok: false, reason: 'popup_blocked', detail: null });
+                return;
+            }
+
+            let settled = false;
+            const finish = (value) => {
+                if (settled) return;
+                settled = true;
+                window.removeEventListener('message', onMessage);
+                clearTimeout(timeoutId);
+                resolve(value);
+            };
+
+            const onMessage = (event) => {
+                if (event.origin !== this.lemmaOrigin) return;
+                if (event.data?.type === 'ISHUMAN_SITE_PROOF_ISSUED') {
+                    const detail = event.data.detail || {};
+                    if (detail.request_nonce && detail.request_nonce !== requestNonce) {
+                        if (this.debug) console.warn('[isHuman] popup request nonce mismatch');
+                        return;
+                    }
+                    finish({ ok: true, detail });
+                } else if (event.data?.type === 'ISHUMAN_IDV_CANCELLED') {
+                    finish({ ok: false, reason: 'idv_cancelled', detail: event.data.detail || null });
+                }
+            };
+
+            const timeoutId = setTimeout(
+                () => finish({ ok: false, reason: 'idv_timeout', detail: null }),
+                IDV_POPUP_TIMEOUT_MS,
+            );
+            window.addEventListener('message', onMessage);
+        });
     }
 
     _unlockViaPopup() {
