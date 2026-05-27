@@ -190,7 +190,7 @@ def index():
       </aside>
     </div>
   </main>
-  <script src="{LEMMA_ORIGIN}/sdk/ishuman-verifier.js?v=1.3.1"></script>
+  <script src="{LEMMA_ORIGIN}/sdk/ishuman-verifier.js?v=1.3.2"></script>
   <script>
     const pill = document.getElementById('status-pill');
     const result = document.getElementById('result');
