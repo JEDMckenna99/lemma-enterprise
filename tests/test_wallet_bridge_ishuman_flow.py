@@ -38,7 +38,7 @@ def test_get_credential_requires_master_when_site_credential_missing(wallet_brid
 @pytest.mark.browser
 def test_get_credential_derives_site_proof_and_stores_it(wallet_bridge_source):
     assert "fetch('/api/ishuman/derive-site-proof'" in wallet_bridge_source
-    assert "const siteKeys = await wallet.deriveSiteSigningKeypair(ihSite);" in wallet_bridge_source
+    assert "siteKeys = await wallet.deriveSiteSigningKeypair(ihSite);" in wallet_bridge_source
     assert "wallet.buildWalletAssertion" in wallet_bridge_source
     assert "wallet_assertion: walletAssertion" in wallet_bridge_source
     assert '"master_credential_id": master.id' not in wallet_bridge_source
