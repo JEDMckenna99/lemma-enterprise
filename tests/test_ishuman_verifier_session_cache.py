@@ -16,9 +16,9 @@ def fixture_verifier_source() -> str:
 @pytest.mark.browser
 def test_verifier_defines_session_constants(verifier_source):
     assert "SESSION_PRESENTATION_PREFIX = 'lemma:site-session-presentation:v1'" in verifier_source
-    assert "DEFAULT_SESSION_TTL_SECONDS = 300" in verifier_source
+    assert "DEFAULT_SESSION_TTL_SECONDS = 24 * 60 * 60" in verifier_source
     assert "MIN_SESSION_TTL_SECONDS = 60" in verifier_source
-    assert "MAX_SESSION_TTL_SECONDS = 900" in verifier_source
+    assert "MAX_SESSION_TTL_SECONDS = 24 * 60 * 60" in verifier_source
     assert "SESSION_STORAGE_KEY = 'ishuman_session_v1'" in verifier_source
 
 
@@ -28,7 +28,8 @@ def test_verifier_requests_session_presentation_on_first_verify(verifier_source)
     assert "type: 'GET_SESSION_PRESENTATION'" in verifier_source
     assert "sessionNonce" in verifier_source
     assert "bloomSequence" in verifier_source
-    assert "sessionTtlSec: DEFAULT_SESSION_TTL_SECONDS" in verifier_source
+    assert "sessionTtlSec:" in verifier_source
+    assert "this.sessionTtlSec" in verifier_source
 
 
 @pytest.mark.browser
@@ -53,7 +54,7 @@ def test_verifier_bloom_sync_is_snapshot_driven(verifier_source):
 @pytest.mark.browser
 def test_verifier_invalidates_session_on_bloom_sequence_change(verifier_source):
     assert "_clearSessionCache" in verifier_source
-    assert "sessionStorage.removeItem(SESSION_STORAGE_KEY)" in verifier_source
+    assert "localStorage.removeItem(key)" in verifier_source
     assert "Number(prevSequence) !== Number(newSequence)" in verifier_source
 
 
@@ -67,5 +68,5 @@ def test_verifier_fails_closed_when_session_signature_invalid(verifier_source):
 def test_verifier_uses_session_cache_on_repeat_verify(verifier_source):
     assert "_verifyFromCachedSession" in verifier_source
     assert "'session_valid'" in verifier_source
-    assert "sessionStorage.setItem(SESSION_STORAGE_KEY" in verifier_source
+    assert "localStorage.setItem(key, JSON.stringify(session))" in verifier_source
     assert "invalidateSession" in verifier_source
