@@ -200,41 +200,23 @@
 
         async function ensureWalletUnlocked() {
             wallet = wallet || new LemmaWallet();
-            await wallet.init();
-
-            if (typeof wallet.isUnlocked === 'function' && wallet.isUnlocked()) {
-                await adoptWalletState();
-                return;
-            }
-
-            const existingPasskey = await wallet._get('passkey', 'primary');
-            try {
-                if (existingPasskey && existingPasskey.credentialId) {
-                    setStatus('Unlock your wallet with passkey…', 'loading');
-                    await wallet.unlock();
-                } else {
-                    setStatus('Create a passkey for your wallet…', 'loading');
-                    try {
-                        await wallet.registerPasskey();
-                    } catch (err) {
-                        await wallet.unlock();
-                    }
-                }
-            } catch (err) {
-                const msg = String(err?.message || err || 'Wallet unlock failed');
-                if (msg.includes('prf_required_for_encrypted_storage') || msg.includes('envelope_invalid')) {
-                    throw new Error(
-                        'This wallet uses encrypted storage and needs passkey PRF support. '
-                        + 'Try Chrome or Edge on desktop, then unlock again.',
-                    );
-                }
-                throw err;
+            const result = await wallet.ensureIsHumanIssuanceReady({ isHumanIssuance: true });
+            if (!result.ready) {
+                throw new Error('Wallet unlock failed');
             }
             await adoptWalletState();
             if (!walletId) throw new Error('Wallet unlock failed');
         }
 
         async function hasMasterProof() {
+            const cached = await wallet.getIsHumanCredentialsFromCache?.().catch(() => []) || [];
+            if (cached.some((c) => {
+                const cl = c.claims || c.credentialSubject || {};
+                const site = cl.siteId || cl.site_id || cl.siteDomain || cl.site_domain || '';
+                return cl.isHuman && (site === 'lemma.id' || !site);
+            })) {
+                return true;
+            }
             const creds = await wallet.getCredentials();
             return creds.some((c) => {
                 const cl = c.claims || c.credentialSubject || {};

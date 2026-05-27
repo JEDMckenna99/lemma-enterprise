@@ -20,6 +20,13 @@ def test_verifier_defines_session_constants(verifier_source):
     assert "MIN_SESSION_TTL_SECONDS = 60" in verifier_source
     assert "MAX_SESSION_TTL_SECONDS = 24 * 60 * 60" in verifier_source
     assert "SESSION_STORAGE_KEY = 'ishuman_session_v1'" in verifier_source
+    assert "SITE_VC_STORAGE_KEY = 'ishuman_site_vc:v1'" in verifier_source
+
+
+@pytest.mark.browser
+def test_verifier_site_vc_cache_helpers(verifier_source):
+    assert "_verifyFromSiteVcCache" in verifier_source
+    assert "checkStatus" in verifier_source
 
 
 @pytest.mark.browser
@@ -61,12 +68,13 @@ def test_verifier_invalidates_session_on_bloom_sequence_change(verifier_source):
 @pytest.mark.browser
 def test_verifier_fails_closed_when_session_signature_invalid(verifier_source):
     assert "'invalid_session_signature'" in verifier_source
-    assert "_verifyFromCachedSession" in verifier_source
+    assert "_verifyFromSiteVcCache" in verifier_source
 
 
 @pytest.mark.browser
-def test_verifier_uses_session_cache_on_repeat_verify(verifier_source):
-    assert "_verifyFromCachedSession" in verifier_source
+def test_verifier_uses_site_vc_cache_on_repeat_verify(verifier_source):
+    assert "_verifyFromSiteVcCache" in verifier_source
     assert "'session_valid'" in verifier_source
+    assert "'vc_valid'" in verifier_source
     assert "localStorage.setItem(key, JSON.stringify(session))" in verifier_source
     assert "invalidateSession" in verifier_source

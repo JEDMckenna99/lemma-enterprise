@@ -155,6 +155,9 @@
     <script src="/static/js/lemma-wallet.js?v=2476" nonce="{{ csp_nonce }}"></script>
     <script nonce="{{ csp_nonce }}">
         let wallet = null;
+        const params = new URLSearchParams(window.location.search);
+        const isHumanIssuance = params.get('ishuman') === '1';
+        const issuanceOpts = () => (isHumanIssuance ? { isHumanIssuance: true } : {});
         
         // PRIVACY: Don't display or log referrer
         // The popup just unlocks the wallet, doesn't track which site requested it
@@ -168,7 +171,7 @@
                 
                 const info = await wallet.getWalletInfo();
                 
-                if (info.isUnlocked) {
+                if (info.isUnlocked || (isHumanIssuance && wallet.isIsHumanLockValid && wallet.isIsHumanLockValid())) {
                     // Already unlocked!
                     showStatus('✅ Wallet is already unlocked!', 'success');
                     setTimeout(() => sendSuccessAndClose(), 1000);
@@ -199,7 +202,7 @@
             document.getElementById('unlock-btn').disabled = true;
             
             try {
-                const result = await wallet.unlock();
+                const result = await wallet.unlock(issuanceOpts());
                 
                 if (result.success) {
                     showStatus('✅ Wallet unlocked!', 'success');
@@ -219,7 +222,7 @@
             document.getElementById('register-btn').disabled = true;
             
             try {
-                const result = await wallet.registerPasskey();
+                const result = await wallet.registerPasskey(issuanceOpts());
                 
                 if (result.success) {
                     showStatus('✅ Passkey created and wallet unlocked!', 'success');

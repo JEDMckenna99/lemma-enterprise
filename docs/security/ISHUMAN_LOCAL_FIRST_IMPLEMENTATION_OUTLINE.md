@@ -258,17 +258,29 @@ Single checklist for hardening the isHuman wallet + verifier stack into a local-
   - Reuses existing per-site credential resolution + `derive-site-proof` fallback
   - `GET_CREDENTIAL` unchanged for backwards compatibility
 
-### 6.2 Verifier session cache + snapshot-driven bloom
+### 6.2 Verifier site VC cache + snapshot-driven bloom
 
 **Implemented**
 
-- [static/js/ishuman-verifier.js](static/js/ishuman-verifier.js) (v1.1.0):
+- [static/js/ishuman-verifier.js](static/js/ishuman-verifier.js) (v1.3.0):
   - First `verify()` in a tab: bloom sync (if stale) + `GET_SESSION_PRESENTATION` bridge call
-  - Steady-state `verify()`: re-validates cached session locally (`session_valid`) — no HTTP, no bridge
-  - `sessionStorage` key `ishuman_session_v1`; `invalidateSession()` for explicit logout
+  - Steady-state `verify()` / `checkStatus()`: re-validates cached site VC locally (`session_valid` or `vc_valid`) — no HTTP, no bridge
+  - `localStorage` keys `ishuman_site_vc:v1:{siteId}` (primary) and legacy `ishuman_session_v1:{siteId}`; `invalidateSession()` for explicit logout
   - Bloom refresh tied to `snapshot.max_staleness_seconds` (removed 7-day skip)
   - Session invalidated when bloom `sequence_number` changes
   - Legacy fallback: if bridge lacks `GET_SESSION_PRESENTATION`, uses per-nonce `GET_CREDENTIAL` path
+
+### 6.2b isHuman lock-period issuance (2026-05)
+
+**Implemented**
+
+- [static/js/lemma-wallet.js](static/js/lemma-wallet.js) (v2.52.0):
+  - Tab-scoped `sessionStorage` lock bundle `lemma_ishuman_lock:v1` after isHuman passkey unlock (24h rolling TTL)
+  - Plaintext `ishuman_cache` IndexedDB store for bridge reads without re-passkey while lock valid
+  - `ensureIsHumanIssuanceReady({ isHumanIssuance: true })` for IDV popup / bridge issuance
+- [templates/wallet_bridge.html](templates/wallet_bridge.html):
+  - `probeIsHumanIssuanceReady()` + `getIsHumanCredentialsForBridge()` cache-first credential resolution
+  - `WALLET_UNLOCK` accepts `isHumanIssuance` flag from verifier SDK
 
 ### 6.3 Tests + CI + smoke
 

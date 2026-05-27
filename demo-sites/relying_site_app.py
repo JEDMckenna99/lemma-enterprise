@@ -169,7 +169,7 @@ def index():
         <button id="verify-btn">{copy["primary"]}</button>
         <div class="verdict" id="decision-card">
           <strong>What happens when you click</strong>
-          <p class="tiny">This page calls <code>IsHumanVerifier.verify()</code> with <code>autoProvision: true</code>. If your browser wallet has no Lemma proof yet, a Lemma popup opens for wallet unlock + one-time IDV. The site only receives <code>human</code>, a site-private <code>ppid</code>, and <code>reason</code>.</p>
+          <p class="tiny">IDV runs once. Passkey unlocks your wallet once per day on lemma.id. After that, this site checks your Lemma-signed credential locally — no repeat IDV on return visits.</p>
         </div>
       </section>
       <aside class="card">
@@ -190,7 +190,7 @@ def index():
       </aside>
     </div>
   </main>
-  <script src="{LEMMA_ORIGIN}/sdk/ishuman-verifier.js?v=1.2.3"></script>
+  <script src="{LEMMA_ORIGIN}/sdk/ishuman-verifier.js?v=1.3.0"></script>
   <script>
     const pill = document.getElementById('status-pill');
     const result = document.getElementById('result');
@@ -218,8 +218,8 @@ def index():
       }} else if (!silent) {{
         decisionCopy.textContent = 'Blocked. Reason: ' + response.reason;
         decisionCard.innerHTML = '<strong>Action blocked</strong><p class="tiny">reason=' + response.reason + (response.reason === 'idv_cancelled' ? ' — complete verification in the Lemma popup to continue.' : '') + '</p>';
-      }} else if (response.reason === 'session_valid') {{
-        decisionCopy.textContent = 'Returning visitor — verified from local session cache.';
+      }} else if (response.reason === 'session_valid' || response.reason === 'vc_valid') {{
+        decisionCopy.textContent = 'Returning visitor — verified from local credential cache.';
       }} else {{
         decisionCopy.textContent = 'Click the protected action to verify (IDV runs once per browser).';
       }}

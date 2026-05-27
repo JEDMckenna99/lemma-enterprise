@@ -689,6 +689,36 @@ async function probeWalletDecryptionReady() {
     return { ok: false, error: 'wallet_locked', needsUnlock: true };
 }
 
+async function probeIsHumanIssuanceReady() {
+    if (!wallet) await initWallet();
+    if (typeof wallet.isIsHumanLockValid === 'function' && wallet.isIsHumanLockValid()) {
+        if (!wallet.isUnlocked || !wallet.isUnlocked()) {
+            await wallet._restoreIsHumanLockBundleIfValid();
+        }
+        if (wallet.isUnlocked && wallet.isUnlocked()) {
+            return { ok: true, source: 'ishuman_lock_bundle' };
+        }
+    }
+    return probeWalletDecryptionReady();
+}
+
+async function getIsHumanCredentialsForBridge() {
+    if (!wallet) await initWallet();
+    const cached = (await wallet.getIsHumanCredentialsFromCache()).map(normalizeCredentialRecord);
+    if (cached.length) {
+        return cached;
+    }
+    const needsKey = typeof wallet._encryptedStorageNeedsAtRestKey === 'function'
+        && await wallet._encryptedStorageNeedsAtRestKey();
+    if (needsKey && !wallet._atRestKey) {
+        return [];
+    }
+    return (await wallet.getCredentials()).map(normalizeCredentialRecord).filter((c) => {
+        const cl = c.claims || c.credentialSubject || {};
+        return !!cl.isHuman;
+    });
+}
+
 async function ensureWalletDecryptionReady() {
     if (!wallet) await initWallet();
     const needsKey = typeof wallet._encryptedStorageNeedsAtRestKey === 'function'
@@ -914,7 +944,9 @@ window.addEventListener('message', async (event) => {
                 // Full passkey unlock (biometric required)
                 if (!wallet) await initWallet();
                 try {
-                    const unlockResult = await wallet.unlock();
+                    const unlockResult = await wallet.unlock({
+                        isHumanIssuance: !!payload?.isHumanIssuance,
+                    });
                     const newSession = await checkSession({ force: true });
                     respond({ 
                         success: true,
@@ -1073,7 +1105,7 @@ window.addEventListener('message', async (event) => {
                 // master proof via the server and cache it locally.
                 if (!wallet) await initWallet();
 
-                const cryptoReady = await probeWalletDecryptionReady();
+                const cryptoReady = await probeIsHumanIssuanceReady();
                 if (!cryptoReady.ok) {
                     respond({ success: false, error: 'wallet_locked', message: cryptoReady.error });
                     break;
@@ -1112,7 +1144,7 @@ window.addEventListener('message', async (event) => {
                 };
 
                 // 1. Check for an existing per-site credential
-                let allCreds = (await wallet.getCredentials()).map(normalizeCredentialRecord);
+                let allCreds = await getIsHumanCredentialsForBridge();
                 let match = allCreds.find(c => {
                     const cl = c.claims || c.credentialSubject || {};
                     const boundSite = getCredentialSiteBinding(cl);
@@ -1187,7 +1219,7 @@ window.addEventListener('message', async (event) => {
             case 'GET_SESSION_PRESENTATION': {
                 if (!wallet) await initWallet();
 
-                const cryptoReady = await probeWalletDecryptionReady();
+                const cryptoReady = await probeIsHumanIssuanceReady();
                 if (!cryptoReady.ok) {
                     respond({ success: false, error: 'wallet_locked', message: cryptoReady.error });
                     break;
@@ -1249,7 +1281,7 @@ window.addEventListener('message', async (event) => {
                     };
                 };
 
-                let allCreds = (await wallet.getCredentials()).map(normalizeCredentialRecord);
+                let allCreds = await getIsHumanCredentialsForBridge();
                 let match = allCreds.find(c => {
                     const cl = c.claims || c.credentialSubject || {};
                     const boundSite = getCredentialSiteBinding(cl);

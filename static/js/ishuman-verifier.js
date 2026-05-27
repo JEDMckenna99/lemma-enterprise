@@ -26,7 +26,7 @@
  * Optional `autoProvision: true` opens a Lemma-hosted popup to unlock the wallet
  * and complete IDV when no master isHuman proof is present yet.
  *
- * @version 1.2.3
+ * @version 1.3.0
  */
 
 (function () {
@@ -46,6 +46,7 @@ const DEFAULT_SESSION_TTL_SECONDS = 24 * 60 * 60;
 const MIN_SESSION_TTL_SECONDS = 60;
 const MAX_SESSION_TTL_SECONDS = 24 * 60 * 60;
 const SESSION_STORAGE_KEY = 'ishuman_session_v1';
+const SITE_VC_STORAGE_KEY = 'ishuman_site_vc:v1';
 const SESSION_EXPIRY_SKEW_SECONDS = 5;
 const BLOOM_SNAPSHOT_PREFIX = 'lemma:bloom-snapshot:v1';
 const TRUST_LIST_PREFIX = 'lemma:issuer-trust-list:v1';
@@ -59,6 +60,10 @@ const PROVISIONED_STORAGE_KEY = 'ishuman_master_provisioned_v1';
 
 function sessionCacheKey(siteId) {
     return `${SESSION_STORAGE_KEY}:${siteId || ''}`;
+}
+
+function siteVcCacheKey(siteId) {
+    return `${SITE_VC_STORAGE_KEY}:${siteId || ''}`;
 }
 
 // ========================================================================
@@ -555,6 +560,11 @@ class IsHumanVerifier {
             || (result.reason === 'no_credential' && this._hasProvisionedMaster());
 
         if (needsUnlock) {
+            result = await this._verifyOnce(t0);
+            if (result.human) {
+                this._markProvisionedMaster();
+                return result;
+            }
             const unlocked = await this._unlockViaPopup();
             if (unlocked) {
                 result = await this._verifyOnce(t0);
@@ -591,7 +601,7 @@ class IsHumanVerifier {
             return this._result(false, null, 'revocation_data_untrusted', t0);
         }
 
-        const cached = await this._verifyFromCachedSession(t0);
+        const cached = await this._verifyFromSiteVcCache(t0);
         if (cached !== null) {
             return cached;
         }
@@ -892,31 +902,12 @@ class IsHumanVerifier {
         });
     }
 
-    async _verifyFromCachedSession(t0) {
+    async _verifyFromSiteVcCache(t0) {
         const session = this._loadSessionCache();
         if (!session) return null;
 
         const credential = session.credential;
         if (!credential) {
-            this._clearSessionCache();
-            return null;
-        }
-
-        const claims = credential.claims || credential.credentialSubject || {};
-        const siteSigningPubkey = claims.site_signing_pubkey || claims.siteSigningPubkey;
-        if (!siteSigningPubkey) {
-            this._clearSessionCache();
-            return null;
-        }
-
-        const bloomSequence = Number(this._bloomSnapshot?.sequence_number ?? 0);
-        const sessionCheck = await verifySessionAssertion(
-            session.session_assertion,
-            session.session_signature,
-            siteSigningPubkey,
-            bloomSequence,
-        );
-        if (!sessionCheck.ok) {
             this._clearSessionCache();
             return null;
         }
@@ -932,7 +923,22 @@ class IsHumanVerifier {
             return this._result(false, credential.subject, 'site_blocked', t0);
         }
 
-        return this._result(true, credential.subject, 'session_valid', t0);
+        const claims = credential.claims || credential.credentialSubject || {};
+        const siteSigningPubkey = claims.site_signing_pubkey || claims.siteSigningPubkey;
+        if (session.session_assertion && session.session_signature && siteSigningPubkey) {
+            const bloomSequence = Number(this._bloomSnapshot?.sequence_number ?? 0);
+            const sessionCheck = await verifySessionAssertion(
+                session.session_assertion,
+                session.session_signature,
+                siteSigningPubkey,
+                bloomSequence,
+            );
+            if (sessionCheck.ok) {
+                return this._result(true, credential.subject, 'session_valid', t0);
+            }
+        }
+
+        return this._result(true, credential.subject, 'vc_valid', t0);
     }
 
     async _verifyWithLegacyPresentation(bridgeResult, t0) {
@@ -1111,24 +1117,28 @@ class IsHumanVerifier {
         if (this._session && this._session.siteId === this.siteId) {
             return this._session;
         }
-        const key = sessionCacheKey(this.siteId);
-        try {
-            const raw = localStorage.getItem(key);
-            if (!raw) return null;
-            const parsed = JSON.parse(raw);
-            if (!parsed || parsed.siteId !== this.siteId) return null;
-            this._session = parsed;
-            return parsed;
-        } catch {
-            return null;
+        const keys = [siteVcCacheKey(this.siteId), sessionCacheKey(this.siteId)];
+        for (const key of keys) {
+            try {
+                const raw = localStorage.getItem(key);
+                if (!raw) continue;
+                const parsed = JSON.parse(raw);
+                if (!parsed || parsed.siteId !== this.siteId) continue;
+                this._session = parsed;
+                return parsed;
+            } catch {
+                continue;
+            }
         }
+        return null;
     }
 
     _persistSession(session) {
         this._session = session;
-        const key = sessionCacheKey(this.siteId);
+        const key = siteVcCacheKey(this.siteId);
         try {
             localStorage.setItem(key, JSON.stringify(session));
+            localStorage.setItem(sessionCacheKey(this.siteId), JSON.stringify(session));
         } catch { /* quota exceeded — ignore */ }
     }
 
@@ -1138,12 +1148,13 @@ class IsHumanVerifier {
             if (clearAll) {
                 for (let i = localStorage.length - 1; i >= 0; i -= 1) {
                     const key = localStorage.key(i);
-                    if (key && key.startsWith(`${SESSION_STORAGE_KEY}:`)) {
+                    if (key && (key.startsWith(`${SESSION_STORAGE_KEY}:`) || key.startsWith(`${SITE_VC_STORAGE_KEY}:`))) {
                         localStorage.removeItem(key);
                     }
                 }
                 return;
             }
+            localStorage.removeItem(siteVcCacheKey(this.siteId));
             localStorage.removeItem(sessionCacheKey(this.siteId));
         } catch { /* ignore */ }
     }
@@ -1290,6 +1301,7 @@ class IsHumanVerifier {
         return new Promise((resolve) => {
             const popupUrl = new URL(`${this.lemmaOrigin}${UNLOCK_POPUP_PATH}`);
             popupUrl.searchParams.set('origin', window.location.origin);
+            popupUrl.searchParams.set('ishuman', '1');
 
             const width = 420;
             const height = 560;
@@ -1339,7 +1351,7 @@ class IsHumanVerifier {
             if (sessionData?.isUnlocked) {
                 await this._sendBridgeRequest('SET_LOCAL_SESSION', { session: sessionData });
             }
-            const unlockResult = await this._sendBridgeRequest('WALLET_UNLOCK', {}, 60000);
+            const unlockResult = await this._sendBridgeRequest('WALLET_UNLOCK', { isHumanIssuance: true }, 60000);
             if (this.debug) {
                 console.log('[isHuman] bridge unlock', unlockResult?.success ? 'ok' : unlockResult?.error);
             }
