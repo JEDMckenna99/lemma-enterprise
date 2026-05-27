@@ -1168,7 +1168,17 @@ window.addEventListener('message', async (event) => {
                     break;
                 }
 
-                const siteKeys = await wallet.deriveSiteSigningKeypair(ihSite);
+                let siteKeys;
+                try {
+                    siteKeys = await wallet.deriveSiteSigningKeypair(ihSite);
+                } catch (keyErr) {
+                    const message = keyErr?.message || 'wallet_locked';
+                    if (message.includes('wallet_secret unavailable') || message.includes('Wallet must be unlocked')) {
+                        respond({ success: false, error: 'wallet_locked', message });
+                        break;
+                    }
+                    throw keyErr;
+                }
                 const siteSigningPubkey = siteKeys.publicKeyB64;
 
                 const signPresentation = async (credential) => {

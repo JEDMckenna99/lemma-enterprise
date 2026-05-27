@@ -54,6 +54,8 @@ def test_bridge_ishuman_issuance_probe(bridge_source):
     assert "isHumanIssuance: payload?.isHumanIssuance !== false" in bridge_source
     assert "applyIsHumanCredentialsToCache" in bridge_source
     assert "isHumanCredentials" in bridge_source
+    assert "error: 'wallet_locked'" in bridge_source
+    assert "wallet_secret unavailable" in bridge_source
 
 
 @pytest.mark.browser
@@ -69,7 +71,7 @@ def test_verifier_site_vc_cache(verifier_source):
     assert "_verifyFromSiteVcCache" in verifier_source
     assert "'vc_valid'" in verifier_source
     assert "isHumanIssuance: true" in verifier_source
-    assert "BRIDGE_PATH = '/wallet/bridge?v=1.3.2'" in verifier_source
+    assert "BRIDGE_PATH = '/wallet/bridge?v=1.3.3'" in verifier_source
 
 
 @pytest.mark.browser
