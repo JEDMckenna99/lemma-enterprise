@@ -26,7 +26,7 @@
  * Optional `autoProvision: true` opens a Lemma-hosted popup to unlock the wallet
  * and complete IDV when no master isHuman proof is present yet.
  *
- * @version 1.4.3
+ * @version 1.4.4
  */
 
 (function () {
@@ -37,7 +37,7 @@ if (typeof window !== 'undefined' && window.IsHumanVerifier) {
 }
 
 const LEMMA_ORIGIN = 'https://lemma.id';
-const BRIDGE_PATH = '/wallet/bridge?v=1.4.3';
+const BRIDGE_PATH = '/wallet/bridge?v=1.4.4';
 const BRIDGE_TIMEOUT_MS = 8000;
 const PRESENTATION_PREFIX = 'lemma:site-presentation:v1';
 const MAX_PRESENTATION_STALENESS_SECONDS = 120;
@@ -559,6 +559,7 @@ class IsHumanVerifier {
             'wallet_locked',
             'no_ishuman_credential',
             'site_proof_required',
+            'legacy_credential_format',
         ]);
 
         if (popupReasons.has(result.reason)) {
@@ -906,6 +907,17 @@ class IsHumanVerifier {
             return null;
         }
 
+        // Legacy credentials issued before the browser-canonical signature
+        // (proof.signatureValueWeb) was added cannot be verified locally.
+        // Treat them as a cache miss so the verifier re-issues via popup.
+        if (!credential.proof || !credential.proof.signatureValueWeb) {
+            if (this.debug) {
+                console.warn('[isHuman] discarding cached credential without signatureValueWeb');
+            }
+            this._clearSessionCache();
+            return null;
+        }
+
         const core = await this._verifyCredentialCore(credential, t0);
         if (!core.ok) {
             this._clearSessionCache();
@@ -1073,14 +1085,16 @@ class IsHumanVerifier {
         }
 
         try {
-            // Prefer the browser-canonical signature (signatureValueWeb) added
-            // by the server alongside the native Rust signature. The Rust
-            // signature in signatureValue uses a binary concat format that
-            // the JS verifier cannot reproduce.
-            const sigHex = credential.proof?.signatureValueWeb
-                || credential.proof?.signatureValue;
+            // The Rust binary-concat signature in proof.signatureValue cannot
+            // be reproduced in JS — only the parallel browser-canonical
+            // signature (proof.signatureValueWeb) is locally verifiable.
+            const sigHex = credential.proof?.signatureValueWeb;
             if (!sigHex) {
-                return { ok: false, ppid: credential.subject, reason: 'missing_signature' };
+                return {
+                    ok: false,
+                    ppid: credential.subject,
+                    reason: 'legacy_credential_format',
+                };
             }
 
             const issuerDid = normalizeDid(credential.issuer || credential.issuerInfo?.did || '');

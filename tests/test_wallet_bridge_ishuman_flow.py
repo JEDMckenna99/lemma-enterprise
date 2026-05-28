@@ -23,7 +23,11 @@ def test_get_credential_checks_site_bound_match_before_derivation(wallet_bridge_
     assert "let match = allCreds.find(c => {" in wallet_bridge_source
     assert "const boundSite = getCredentialSiteBinding(cl);" in wallet_bridge_source
     assert "return boundSite === ihSite;" in wallet_bridge_source
-    assert "if (match && (match.claims?.site_signing_pubkey || match.credentialSubject?.site_signing_pubkey)) {" in wallet_bridge_source
+    # Match must also carry the browser-canonical signature so the verifier
+    # can validate it locally; legacy creds are intentionally skipped.
+    assert "matchHasBrowserSig" in wallet_bridge_source
+    assert "match.claims?.site_signing_pubkey || match.credentialSubject?.site_signing_pubkey" in wallet_bridge_source
+    assert "&& matchHasBrowserSig)" in wallet_bridge_source
     assert "const signed = await signPresentation(match);" in wallet_bridge_source
     assert "respond({ success: true, ...signed });" in wallet_bridge_source
 
@@ -36,10 +40,13 @@ def test_get_credential_requires_master_when_site_credential_missing(wallet_brid
 
 
 @pytest.mark.browser
-def test_get_credential_returns_site_proof_required_when_site_credential_missing(wallet_bridge_source):
-    assert "error: 'site_proof_required'" in wallet_bridge_source
-    assert "Site proof not cached; use lemma.id issuance popup" in wallet_bridge_source
-    assert "fetch('/api/ishuman/derive-site-proof'" not in wallet_bridge_source
+def test_bridge_refuses_legacy_cached_credentials_without_browser_signature(wallet_bridge_source):
+    """Legacy isHuman credentials lacking proof.signatureValueWeb cannot be
+    verified by the browser verifier; the bridge must treat them as missing
+    and force a popup re-issue against the upgraded issuer."""
+    assert "matchHasBrowserSig" in wallet_bridge_source
+    assert "sessionMatchHasBrowserSig" in wallet_bridge_source
+    assert "signatureValueWeb" in wallet_bridge_source
 
 
 @pytest.mark.browser

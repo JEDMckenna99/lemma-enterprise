@@ -77,8 +77,9 @@ def test_verifier_site_vc_cache(verifier_source):
     assert "_verifyFromSiteVcCache" in verifier_source
     assert "'vc_valid'" in verifier_source
     assert "isHumanIssuance: true" in verifier_source
-    assert "BRIDGE_PATH = '/wallet/bridge?v=1.4.3'" in verifier_source
+    assert "BRIDGE_PATH = '/wallet/bridge?v=1.4.4'" in verifier_source
     assert "signatureValueWeb" in verifier_source
+    assert "legacy_credential_format" in verifier_source
     assert "result.credential" in verifier_source or "result.presentation" in verifier_source or "credential: cred" in verifier_source
     assert "_issueSiteProofViaPopup" in verifier_source
     assert "_applyIssuedSiteProof" in verifier_source

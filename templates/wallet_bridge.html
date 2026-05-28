@@ -1206,7 +1206,14 @@ window.addEventListener('message', async (event) => {
                     return boundSite === ihSite;
                 });
 
-                if (match && (match.claims?.site_signing_pubkey || match.credentialSubject?.site_signing_pubkey)) {
+                // Browser verifier requires proof.signatureValueWeb. Older
+                // cached credentials (pre-2026-05-27) carry only the Rust
+                // binary-concat signatureValue and would always fail local
+                // verification, so treat them as missing and force a popup
+                // re-issue against the upgraded /api/ishuman/derive-site-proof.
+                const matchHasBrowserSig = !!(match && match.proof
+                    && (match.proof.signatureValueWeb || match.proof.signatureValueWeb === ''));
+                if (match && (match.claims?.site_signing_pubkey || match.credentialSubject?.site_signing_pubkey) && matchHasBrowserSig) {
                     const signed = await signPresentation(match);
                     respond({ success: true, ...signed });
                     break;
@@ -1315,7 +1322,11 @@ window.addEventListener('message', async (event) => {
                     return boundSite === ihSite;
                 });
 
-                if (match && (match.claims?.site_signing_pubkey || match.credentialSubject?.site_signing_pubkey)) {
+                // Require proof.signatureValueWeb for browser verification;
+                // pre-upgrade cached credentials must be re-issued.
+                const sessionMatchHasBrowserSig = !!(match && match.proof
+                    && (match.proof.signatureValueWeb || match.proof.signatureValueWeb === ''));
+                if (match && (match.claims?.site_signing_pubkey || match.credentialSubject?.site_signing_pubkey) && sessionMatchHasBrowserSig) {
                     const signed = await signSessionPresentation(match);
                     respond({ success: true, ...signed });
                     break;
