@@ -965,33 +965,33 @@ def create_app():
     
     @app.route('/docs/quickstart')
     def docs_quickstart():
-        """Quick start guide"""
-        return render_template('docs/quickstart.html')
+        """Legacy Agent Ops quickstart alias."""
+        return redirect(url_for('docs_ishuman'), code=301)
     
     @app.route('/docs/installation')
     def docs_installation():
-        """Installation guide"""
-        return render_template('docs/installation.html')
+        """Legacy Agent Ops installation alias."""
+        return redirect(url_for('docs_ishuman'), code=301)
 
     @app.route('/docs/cli')
     def docs_cli():
-        """Lemma CLI guide"""
-        return render_template('docs/cli.html')
+        """Legacy Agent Ops CLI alias."""
+        return redirect(url_for('docs_ishuman'), code=301)
     
     @app.route('/docs/wallet-flow')
     def docs_wallet_flow():
-        """Wallet redirect flow guide"""
-        return render_template('docs/wallet-flow.html')
+        """Legacy wallet-flow alias."""
+        return redirect(url_for('docs_ishuman'), code=301)
     
     @app.route('/docs/verification')
     def docs_verification():
-        """Credential verification guide"""
-        return render_template('docs/verification.html')
+        """Legacy verification guide alias."""
+        return redirect(url_for('docs_ishuman'), code=301)
     
     @app.route('/docs/permissions')
     def docs_permissions():
-        """Permissions and roles guide"""
-        return render_template('docs/permissions.html')
+        """Legacy permissions guide alias."""
+        return redirect(url_for('docs_ishuman'), code=301)
 
     @app.route('/docs/ishuman')
     def docs_ishuman():
@@ -1000,53 +1000,53 @@ def create_app():
     
     @app.route('/docs/sdk')
     def docs_sdk_js():
-        """JavaScript SDK reference"""
-        return render_template('docs/sdk-js.html')
+        """Legacy SDK docs alias."""
+        return redirect(url_for('docs_ishuman'), code=301)
     
     @app.route('/docs/sdk/methods')
     def docs_sdk_methods():
-        """SDK methods reference"""
-        return render_template('docs/sdk-methods.html')
+        """Legacy SDK methods alias."""
+        return redirect(url_for('docs_ishuman'), code=301)
     
     @app.route('/docs/sdk/events')
     def docs_sdk_events():
-        """SDK events and callbacks"""
-        return render_template('docs/sdk-events.html')
+        """Legacy SDK events alias."""
+        return redirect(url_for('docs_ishuman'), code=301)
     
     @app.route('/docs/api/auth')
     def docs_api_auth():
-        """Authentication API reference"""
-        return render_template('docs/api-auth.html')
+        """Legacy auth API alias."""
+        return redirect(url_for('docs_ishuman'), code=301)
     
     @app.route('/docs/api/verification')
     def docs_api_verification():
-        """Verification API reference"""
-        return render_template('docs/api-verification.html')
+        """Legacy verification API alias."""
+        return redirect(url_for('docs_ishuman'), code=301)
     
     @app.route('/docs/api/revocation')
     def docs_api_revocation():
-        """Revocation API reference"""
-        return render_template('docs/api-revocation.html')
+        """Legacy revocation API alias."""
+        return redirect(url_for('docs_ishuman'), code=301)
     
     @app.route('/docs/errors')
     def docs_error_codes():
-        """Error codes reference"""
-        return render_template('docs/errors.html')
+        """Legacy error docs alias."""
+        return redirect(url_for('docs_ishuman'), code=301)
     
     @app.route('/docs/examples')
     def docs_examples():
-        """Code examples"""
-        return render_template('docs/examples.html')
+        """Legacy examples alias."""
+        return redirect(url_for('docs_ishuman'), code=301)
     
     @app.route('/docs/changelog')
     def docs_changelog():
-        """Changelog"""
-        return render_template('docs/changelog.html')
+        """Legacy changelog alias."""
+        return redirect(url_for('docs_ishuman'), code=301)
     
     @app.route('/docs/setup')
     def docs_setup():
-        """Personalized code generator - client-side auth handles everything"""
-        return render_template('modern/docs_setup.html')
+        """Legacy setup generator alias."""
+        return redirect(url_for('docs_ishuman'), code=301)
     
     @app.route('/docs/iam')
     def docs_iam_legacy():
@@ -1096,7 +1096,12 @@ def create_app():
 
     @app.route('/demo')
     def public_demo_playground():
-        """Public interactive proof-constrained authorization playground."""
+        """Public demo entrypoint: isHuman is the core product demo."""
+        return redirect('/demo/ishuman', code=302)
+
+    @app.route('/demo/firewall')
+    def public_firewall_demo_playground():
+        """Deprecated Agent Ops / Lemma Firewall demo retained as a legacy deep link."""
         return render_template(
             'demo/index.html',
             demo_runtime_id=(os.environ.get('LEMMA_DEMO_PUBLIC_RUNTIME_ID') or 'lemma-firewall-demo-runtime').strip() or 'lemma-firewall-demo-runtime',

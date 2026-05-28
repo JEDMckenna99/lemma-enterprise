@@ -1,7 +1,7 @@
 {% extends "modern/layout.html" %}
 
-{% block title %}Pricing - lemma.id | Free During Early Access{% endblock %}
-{% block description %}lemma.id is free during early access. Privacy-preserving identity verification for your platform.{% endblock %}
+{% block title %}Pricing - lemma.id | isHuman Early Access{% endblock %}
+{% block description %}isHuman by Lemma is free to integrate during early access, with Stripe Identity verification cost passed through per verified person.{% endblock %}
 
 {% block head %}
 {{ super() }}
@@ -247,12 +247,12 @@
 {% block content %}
 <div class="pricing-hero">
     <div class="early-access-badge">Early Access</div>
-    <h1>Free</h1>
-    <p class="subtitle">lemma.id is free while we're in early access.</p>
-    <p class="description">Full platform access. No credit card. No limits. We're focused on building the best identity verification platform - pricing comes later.</p>
+    <h1>Free to integrate</h1>
+    <p class="subtitle">Add isHuman during early access with no platform fee.</p>
+    <p class="description">Relying sites get the SDK, dashboard, API keys, local checks, and abuse controls free during early access. First-time human verification uses Stripe Identity pass-through pricing.</p>
     <div class="pricing-cta">
-        <a href="/login" class="btn btn-primary">Get Started Free</a>
-        <a href="/docs" class="btn-secondary">Read the Docs</a>
+        <a href="/docs/ishuman" class="btn btn-primary">Add isHuman</a>
+        <a href="/demo/ishuman" class="btn-secondary">See Demo</a>
     </div>
 </div>
 
@@ -279,15 +279,15 @@
 </div>
 
 <div class="features-included">
-    <h2>Everything included, no restrictions</h2>
+    <h2>Everything included for early access integrations</h2>
     <div class="features-grid">
         <div class="feature-item">
             <div class="feature-check">✓</div>
-            <div class="feature-text">Unlimited users</div>
+            <div class="feature-text">Site registration and API keys</div>
         </div>
         <div class="feature-item">
             <div class="feature-check">✓</div>
-            <div class="feature-text">Unlimited verifications</div>
+            <div class="feature-text">Unlimited local proof checks</div>
         </div>
         <div class="feature-item">
             <div class="feature-check">✓</div>
@@ -319,7 +319,7 @@
 <div class="future-note">
     <div class="future-note-inner">
         <h3>What happens when early access ends?</h3>
-        <p>We'll introduce simple, affordable pricing with generous free tiers. Early access users will be grandfathered with the best rates. Our architecture means we don't have per-user server costs - so we can stay dramatically cheaper than traditional auth providers.</p>
+        <p>We'll introduce simple, affordable pricing for hosted platform features, with generous free tiers and clear pass-through IDV costs. Local verification remains the core cost advantage: routine checks do not require a paid server call.</p>
     </div>
 </div>
 {% endblock %}
