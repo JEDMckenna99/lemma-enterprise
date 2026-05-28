@@ -20,6 +20,7 @@ import pytest
 ROOT = Path(__file__).resolve().parents[1]
 VERIFIER_JS = ROOT / "static" / "js" / "ishuman-verifier.js"
 ISHUMAN_DEMO_PY = ROOT / "api" / "ishuman_demo.py"
+SITE_PPID_REVOCATION_PY = ROOT / "api" / "site_ppid_revocation.py"
 
 
 @pytest.fixture(name="verifier_source")
@@ -30,6 +31,11 @@ def fixture_verifier_source() -> str:
 @pytest.fixture(name="demo_source")
 def fixture_demo_source() -> str:
     return ISHUMAN_DEMO_PY.read_text(encoding="utf-8")
+
+
+@pytest.fixture(name="site_ppid_revocation_source")
+def fixture_site_ppid_revocation_source() -> str:
+    return SITE_PPID_REVOCATION_PY.read_text(encoding="utf-8")
 
 
 @pytest.mark.browser
@@ -54,21 +60,25 @@ def test_demo_test_mode_resets_revocations(demo_source):
     assert "revocation_reset" in demo_source
 
 
-def test_clear_wallet_revocations_helper_signature(demo_source):
+def test_clear_wallet_revocations_helper_signature(site_ppid_revocation_source):
     """Helper must drop RevocationList wallet/credential/user entries AND
     deactivate the corresponding SiteBlock rows AND invalidate the Bloom
-    cache, so the next bloom-filter fetch reflects the cleared state."""
-    tree = ast.parse(demo_source)
+    cache, so the next bloom-filter fetch reflects the cleared state.
+
+    The helper now lives in api/site_ppid_revocation.py and is shared by the
+    production Stripe Identity webhook and the demo test-mode IDV endpoint.
+    """
+    tree = ast.parse(site_ppid_revocation_source)
     func = next(
         (
             node for node in ast.walk(tree)
             if isinstance(node, ast.FunctionDef)
-            and node.name == "_clear_wallet_revocations_for_demo"
+            and node.name == "clear_amnesty_eligible_wallet_revocations"
         ),
         None,
     )
-    assert func is not None, "helper missing"
-    source = ast.get_source_segment(demo_source, func) or ""
+    assert func is not None, "shared helper missing"
+    source = ast.get_source_segment(site_ppid_revocation_source, func) or ""
     assert "RevocationList" in source
     assert "SiteBlock" in source
     assert "DerivedCredential" in source
@@ -78,8 +88,17 @@ def test_clear_wallet_revocations_helper_signature(demo_source):
     assert "revocation_type == \"user\"" in source
 
 
-def test_demo_helper_returns_counts(demo_source):
+def test_demo_helper_returns_counts(site_ppid_revocation_source):
     """Caller must be able to surface how many entries were cleared."""
-    assert "\"cleared_revocation_entries\"" in demo_source
-    assert "\"cleared_site_blocks\"" in demo_source
-    assert "\"reactivated_derived_credentials\"" in demo_source
+    assert "\"cleared_revocation_entries\"" in site_ppid_revocation_source
+    assert "\"cleared_site_blocks\"" in site_ppid_revocation_source
+    assert "\"reactivated_derived_credentials\"" in site_ppid_revocation_source
+
+
+def test_production_stripe_webhook_calls_amnesty_helper():
+    """The production Stripe Identity webhook must invoke the shared helper
+    so successful real IDV restores amnesty-eligible access without a
+    separate manual / governance step."""
+    source = (ROOT / "api" / "ishuman.py").read_text(encoding="utf-8")
+    assert "clear_amnesty_eligible_wallet_revocations" in source
+    assert "stripe_identity_verified" in source

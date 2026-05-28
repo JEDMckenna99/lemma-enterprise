@@ -5,6 +5,10 @@ Tier-1 enforcement:
 - SiteBlock (site-scoped deny list)
 - RevocationList with revocation_type='user' and raw site-bound PPID
 - Bloom sync via revocation_sync (raw PPID as the revocation key)
+
+Also exports `clear_amnesty_eligible_wallet_revocations`, the helper called
+from both the production Stripe Identity webhook and the demo test-mode IDV
+endpoint to lift revocations after a wallet owner has re-proved identity.
 """
 
 from __future__ import annotations
@@ -16,6 +20,147 @@ from typing import Any, Optional
 logger = logging.getLogger(__name__)
 
 LEMMA_TYPE_ISHUMAN = "ishuman"
+
+
+def clear_amnesty_eligible_wallet_revocations(
+    db,
+    *,
+    wallet_id: str,
+    new_master_credential_id: str = "",
+    reason: str = "fresh_idv_reset",
+) -> dict:
+    """Clear amnesty-eligible revocation state for a wallet.
+
+    Called after a wallet owner has re-proved identity by either:
+      * completing a fresh Stripe Identity check (production), or
+      * signing a wallet_assertion proving wallet ownership (demo recovery)
+
+    Policy:
+      * Per-credential revocations for old credentials owned by this wallet
+        are cleared (the new master supersedes them).
+      * Site-scoped PPID blocks (`revocation_type='user'` with a `site_id`)
+        are cleared and the matching SiteBlock rows deactivated. The site
+        remains free to re-block the PPID immediately if its anti-abuse
+        policy still requires it; the network does not litigate that.
+      * Wallet-level kill rows (`revocation_type='wallet'`) for THIS wallet
+        are cleared. A future hardening pass should carve out an
+        `is_amnesty_eligible=False` subset for governance-approved
+        coordinated-fraud kills so they survive this reset.
+
+    Returns a counts dict for the caller to surface in logs / responses.
+    """
+    from api.database import (
+        RevocationList,
+        SiteBlock,
+        DerivedCredential,
+        IsHumanVerification,
+    )
+
+    logger.info(
+        "[amnesty-reset] start wallet_id=%s new_master=%s reason=%s",
+        wallet_id,
+        (new_master_credential_id or "")[:30],
+        reason,
+    )
+
+    derived_rows = db.query(DerivedCredential).filter_by(wallet_id=wallet_id).all()
+    derived_ppids = sorted({row.derived_ppid for row in derived_rows if row.derived_ppid})
+    derived_cred_ids = sorted({
+        row.derived_credential_id for row in derived_rows if row.derived_credential_id
+    })
+    logger.info(
+        "[amnesty-reset] derived_credentials=%d ppids=%d",
+        len(derived_rows), len(derived_ppids),
+    )
+
+    masters = db.query(IsHumanVerification).filter_by(wallet_id=wallet_id).all()
+    stale_master_cred_ids = sorted({
+        m.credential_id for m in masters
+        if m.credential_id and m.credential_id != new_master_credential_id
+    })
+
+    # Mark prior masters as 'superseded' so the new master is the only
+    # status='verified' row and derive-site-proof picks it up unambiguously.
+    superseded_masters = 0
+    for old_master in masters:
+        if (
+            old_master.credential_id
+            and old_master.credential_id != new_master_credential_id
+            and old_master.status in ("revoked", "verified")
+        ):
+            old_master.status = "superseded"
+            superseded_masters += 1
+
+    cleared_entries = 0
+    rl_query = db.query(RevocationList)
+    cleared_entries += rl_query.filter(
+        RevocationList.wallet_id == wallet_id,
+        RevocationList.revocation_type == "wallet",
+    ).delete(synchronize_session=False)
+    if stale_master_cred_ids:
+        cleared_entries += rl_query.filter(
+            RevocationList.credential_id.in_(stale_master_cred_ids),
+            RevocationList.revocation_type == "credential",
+        ).delete(synchronize_session=False)
+    if derived_cred_ids:
+        cleared_entries += rl_query.filter(
+            RevocationList.credential_id.in_(derived_cred_ids),
+            RevocationList.revocation_type == "credential",
+        ).delete(synchronize_session=False)
+    if derived_ppids:
+        cleared_entries += rl_query.filter(
+            RevocationList.ppid.in_(derived_ppids),
+            RevocationList.revocation_type == "user",
+        ).delete(synchronize_session=False)
+
+    site_blocks_cleared = 0
+    if derived_ppids:
+        site_blocks_cleared = db.query(SiteBlock).filter(
+            SiteBlock.ppid.in_(derived_ppids),
+            SiteBlock.is_active == True,  # noqa: E712
+        ).update({"is_active": False}, synchronize_session=False)
+
+    derived_reactivated = 0
+    if derived_cred_ids:
+        derived_reactivated = db.query(DerivedCredential).filter(
+            DerivedCredential.derived_credential_id.in_(derived_cred_ids),
+            DerivedCredential.is_active == False,  # noqa: E712
+        ).update({"is_active": True, "revoked_at": None}, synchronize_session=False)
+
+    db.commit()
+
+    try:
+        from api.bloom_snapshot import invalidate_bloom_filter_cache
+        invalidate_bloom_filter_cache()
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Bloom cache invalidation failed: %s", exc)
+
+    try:
+        from api.revocation_sync import get_event_bus
+        bus = get_event_bus()
+        if hasattr(bus, "publish_revocation_clear"):
+            bus.publish_revocation_clear(wallet_id, reason=reason)
+    except Exception:
+        pass
+
+    summary = {
+        "wallet_id": wallet_id,
+        "cleared_revocation_entries": int(cleared_entries),
+        "cleared_site_blocks": int(site_blocks_cleared),
+        "reactivated_derived_credentials": int(derived_reactivated),
+        "superseded_master_records": int(superseded_masters),
+        "derived_ppids_cleared": derived_ppids,
+        "reason": reason,
+    }
+    logger.info(
+        "[amnesty-reset] done wallet_id=%s rev=%d site_blocks=%d reactivated=%d superseded=%d",
+        wallet_id,
+        summary["cleared_revocation_entries"],
+        summary["cleared_site_blocks"],
+        summary["reactivated_derived_credentials"],
+        summary["superseded_master_records"],
+    )
+    return summary
 
 
 def effective_revocation_keys(

@@ -514,128 +514,18 @@ def _clear_wallet_revocations_for_demo(
     new_master_credential_id: str,
     reason: str = "demo_fresh_idv_reset",
 ) -> dict:
-    """Demo-only: lift all revocation state for a wallet after a fresh IDV.
+    """Demo-only thin wrapper preserved for backward compatibility.
 
-    Production semantics differ. A real network-wide revocation, once approved
-    by Lemma governance, should NOT auto-lift just because the user re-runs
-    IDV — that would defeat the deterrent. Instead production lifts only:
-      * site-scoped blocks if the site chooses to grant amnesty, and
-      * per-credential revocations of credentials that are now superseded
-        (the new master proves identity continuity).
-    The demo version below is the simpler "clear everything" reset because the
-    test-mode IDV is a stand-in and demos benefit from showing the full
-    re-entry loop end to end.
-
-    Returns counts of rows touched so the caller can surface them.
+    Delegates to the shared production helper now used by both the Stripe
+    Identity webhook and the demo test-mode IDV endpoint.
     """
-    from api.database import RevocationList, SiteBlock, DerivedCredential, IsHumanVerification
-
-    logger.info(
-        "[demo-reset] start wallet_id=%s new_master=%s reason=%s",
-        wallet_id,
-        (new_master_credential_id or "")[:30],
-        reason,
+    from api.site_ppid_revocation import clear_amnesty_eligible_wallet_revocations
+    return clear_amnesty_eligible_wallet_revocations(
+        db,
+        wallet_id=wallet_id,
+        new_master_credential_id=new_master_credential_id,
+        reason=reason,
     )
-
-    derived_rows = db.query(DerivedCredential).filter_by(wallet_id=wallet_id).all()
-    derived_ppids = sorted({row.derived_ppid for row in derived_rows if row.derived_ppid})
-    derived_cred_ids = sorted({row.derived_credential_id for row in derived_rows if row.derived_credential_id})
-    logger.info(
-        "[demo-reset] derived_credentials=%d ppids=%d",
-        len(derived_rows), len(derived_ppids),
-    )
-
-    masters = db.query(IsHumanVerification).filter_by(wallet_id=wallet_id).all()
-    stale_master_cred_ids = sorted({
-        m.credential_id for m in masters
-        if m.credential_id and m.credential_id != new_master_credential_id
-    })
-
-    # Mark the prior (now-revoked) master records as 'superseded' so they're
-    # auditable but don't conflict with the new verified record on subsequent
-    # /api/ishuman/derive-site-proof lookups (which filter by status=verified).
-    superseded_masters = 0
-    for old_master in masters:
-        if (
-            old_master.credential_id
-            and old_master.credential_id != new_master_credential_id
-            and old_master.status in ("revoked", "verified")
-        ):
-            old_master.status = "superseded"
-            superseded_masters += 1
-
-    cleared_entries = 0
-    rl_query = db.query(RevocationList)
-    cleared_entries += rl_query.filter(
-        RevocationList.wallet_id == wallet_id,
-        RevocationList.revocation_type == "wallet",
-    ).delete(synchronize_session=False)
-    if stale_master_cred_ids:
-        cleared_entries += rl_query.filter(
-            RevocationList.credential_id.in_(stale_master_cred_ids),
-            RevocationList.revocation_type == "credential",
-        ).delete(synchronize_session=False)
-    if derived_cred_ids:
-        cleared_entries += rl_query.filter(
-            RevocationList.credential_id.in_(derived_cred_ids),
-            RevocationList.revocation_type == "credential",
-        ).delete(synchronize_session=False)
-    if derived_ppids:
-        cleared_entries += rl_query.filter(
-            RevocationList.ppid.in_(derived_ppids),
-            RevocationList.revocation_type == "user",
-        ).delete(synchronize_session=False)
-
-    site_blocks_cleared = 0
-    if derived_ppids:
-        site_blocks_cleared = db.query(SiteBlock).filter(
-            SiteBlock.ppid.in_(derived_ppids),
-            SiteBlock.is_active == True,  # noqa: E712 — SQLA filter
-        ).update({"is_active": False}, synchronize_session=False)
-
-    derived_reactivated = 0
-    if derived_cred_ids:
-        derived_reactivated = db.query(DerivedCredential).filter(
-            DerivedCredential.derived_credential_id.in_(derived_cred_ids),
-            DerivedCredential.is_active == False,  # noqa: E712
-        ).update({"is_active": True, "revoked_at": None}, synchronize_session=False)
-
-    db.commit()
-
-    # Invalidate the in-process Bloom cache so the next /api/revocation/bloom-filter
-    # call rebuilds with the cleared revocation rows excluded.
-    try:
-        from api.bloom_snapshot import invalidate_bloom_filter_cache
-        invalidate_bloom_filter_cache()
-    except Exception as exc:  # noqa: BLE001
-        logger.warning("Bloom cache invalidation failed: %s", exc)
-
-    try:
-        from api.revocation_sync import get_event_bus
-        bus = get_event_bus()
-        # Best-effort: signal listeners that revocations were cleared.
-        if hasattr(bus, "publish_revocation_clear"):
-            bus.publish_revocation_clear(wallet_id, reason=reason)
-    except Exception:
-        pass
-
-    summary = {
-        "wallet_id": wallet_id,
-        "cleared_revocation_entries": int(cleared_entries),
-        "cleared_site_blocks": int(site_blocks_cleared),
-        "reactivated_derived_credentials": int(derived_reactivated),
-        "superseded_master_records": int(superseded_masters),
-        "derived_ppids_cleared": derived_ppids,
-    }
-    logger.info(
-        "[demo-reset] done wallet_id=%s revocation_entries=%d site_blocks=%d reactivated=%d superseded=%d",
-        wallet_id,
-        summary["cleared_revocation_entries"],
-        summary["cleared_site_blocks"],
-        summary["reactivated_derived_credentials"],
-        summary["superseded_master_records"],
-    )
-    return summary
 
 
 @ishuman_demo_bp.route("/api/demo/ishuman/verify-once-test-mode", methods=["POST"])

@@ -504,6 +504,25 @@ def stripe_identity_webhook():
                 record.lemma_person_id,
             )
 
+            # Successful real IDV is the network's amnesty signal: lift any
+            # prior amnesty-eligible revocations for this wallet so the user
+            # can rejoin sites that previously blocked them. The IDV cost
+            # (Stripe Identity + real document) is the deterrent; refusing
+            # to ever let a human back in is not.
+            try:
+                from api.site_ppid_revocation import clear_amnesty_eligible_wallet_revocations
+                clear_amnesty_eligible_wallet_revocations(
+                    db,
+                    wallet_id=wallet_id,
+                    new_master_credential_id=credential.get("id") or "",
+                    reason="stripe_identity_verified",
+                )
+            except Exception:  # noqa: BLE001
+                logger.exception(
+                    "Failed to clear amnesty-eligible revocations after Stripe Identity verified for wallet %s",
+                    wallet_id,
+                )
+
         elif event_type in (
             "identity.verification_session.requires_input",
             "identity.verification_session.canceled",
