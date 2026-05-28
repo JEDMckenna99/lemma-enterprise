@@ -275,6 +275,12 @@
 
         async function storeMasterFromStatus(payload) {
             if (!payload || payload.status !== 'verified' || !payload.credential) {
+                // Clear the dead session so retries don't keep polling it.
+                const terminal = ['failed', 'canceled', 'requires_input', 'expired'];
+                if (payload && terminal.includes(payload.status)) {
+                    sessionId = '';
+                    localStorage.removeItem(SESSION_KEY);
+                }
                 throw new Error(payload?.status ? `Verification ${payload.status}` : 'Credential not ready');
             }
             await wallet.storeCredential(payload.credential);
@@ -375,19 +381,40 @@
             setStatus('Starting fresh identity check…', 'loading');
             await ensureWalletUnlocked();
 
-            // Force a brand-new IDV regardless of any existing master, then
-            // derive a site proof against the fresh credential.
+            // 1. If we returned from a previous Stripe Identity attempt, try
+            //    to use that session first — but if it failed/expired, fall
+            //    through to a fresh verification path instead of throwing.
+            let masterIssued = false;
             if (isVerificationReturn && sessionId) {
-                await pollAndStoreMaster();
-            } else if (testVerifyEnabled && serverTestToken) {
-                setStatus('Completing demo verification…', 'loading');
-                await verifyOnceTestMode();
-            } else {
-                setStatus('Opening Stripe Identity…', 'loading');
-                await startStripeVerification();
-                return false;
+                try {
+                    await pollAndStoreMaster();
+                    masterIssued = true;
+                } catch (err) {
+                    console.warn(
+                        '[isHuman IDV] previous verification session unusable, starting fresh:',
+                        err?.message || err,
+                    );
+                    sessionId = '';
+                    localStorage.removeItem(SESSION_KEY);
+                    setStatus('Previous attempt did not complete — starting fresh.', 'info');
+                }
             }
 
+            // 2. No usable existing session — start a brand-new IDV.
+            if (!masterIssued) {
+                if (testVerifyEnabled && serverTestToken) {
+                    setStatus('Completing demo verification…', 'loading');
+                    await verifyOnceTestMode();
+                    masterIssued = true;
+                } else {
+                    setStatus('Opening Stripe Identity…', 'loading');
+                    await startStripeVerification();
+                    return false;
+                }
+            }
+
+            // 3. Derive a fresh site proof from the newly-issued master and
+            //    post it back to the customer site.
             const pkg = await wallet.issueSiteProofPackage({
                 siteId: requestingSite,
                 sessionNonce: clientSessionNonce,
