@@ -210,13 +210,19 @@
         }
 
         async function adoptWalletState() {
+            // Prefer the live session walletId: it's the one the wallet
+            // assertion + /api/wallet/challenge nonce are bound to. The
+            // passkey/walletId IndexedDB record can lag (e.g. after a
+            // re-registration or a stale daily-unlock bundle) and using it
+            // here was causing /api/ishuman/start-verification to return
+            // 403 wallet_id does not match challenge.
             let walletIdRecord = null;
             try {
                 walletIdRecord = await wallet._get('passkey', 'walletId');
             } catch (err) {
                 console.warn('[isHuman IDV] walletId read failed:', err.message);
             }
-            walletId = walletIdRecord?.value || wallet.session?.walletId || '';
+            walletId = wallet.session?.walletId || walletIdRecord?.value || '';
             walletSecret = wallet.session?.walletSecret || '';
             if (!walletSecret) {
                 try {
