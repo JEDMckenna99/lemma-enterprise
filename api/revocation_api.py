@@ -152,14 +152,20 @@ def get_bloom_filter():
             
             revoked_ids = [row[0] for row in cursor.fetchall()]
             
-            # ALSO get revoked PPIDs for user-level revocation (all devices on one site)
-            # When a PPID is in the bloom filter, ALL credentials for that user are revoked
+            # User-level (PPID) revocations are SITE-SCOPED. Site A blocking
+            # a PPID must not cause Site B's verifier to reject the same human.
+            # Only PPIDs from rows WITHOUT a site_id (i.e. network-wide PPID
+            # kills, rare and governance-approved) belong in the global Bloom.
+            # Per-site PPID blocks are queried separately via the site_blocks
+            # endpoint or the SDK's isBlockedLocally callback.
             cursor.execute("""
                 SELECT DISTINCT ppid
                 FROM revocation_list
-                WHERE ppid IS NOT NULL AND revocation_type = 'user'
+                WHERE ppid IS NOT NULL
+                  AND revocation_type = 'user'
+                  AND (site_id IS NULL OR site_id = '')
             """)
-            
+
             revoked_ppids = [row[0] for row in cursor.fetchall()]
             
             # ALSO get revoked wallet_ids for global revocation (all sites, all devices)
