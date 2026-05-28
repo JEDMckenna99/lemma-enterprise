@@ -540,6 +540,19 @@ def _clear_wallet_revocations_for_demo(
         if m.credential_id and m.credential_id != new_master_credential_id
     })
 
+    # Mark the prior (now-revoked) master records as 'superseded' so they're
+    # auditable but don't conflict with the new verified record on subsequent
+    # /api/ishuman/derive-site-proof lookups (which filter by status=verified).
+    superseded_masters = 0
+    for old_master in masters:
+        if (
+            old_master.credential_id
+            and old_master.credential_id != new_master_credential_id
+            and old_master.status in ("revoked", "verified")
+        ):
+            old_master.status = "superseded"
+            superseded_masters += 1
+
     cleared_entries = 0
     rl_query = db.query(RevocationList)
     cleared_entries += rl_query.filter(
@@ -600,6 +613,7 @@ def _clear_wallet_revocations_for_demo(
         "cleared_revocation_entries": int(cleared_entries),
         "cleared_site_blocks": int(site_blocks_cleared),
         "reactivated_derived_credentials": int(derived_reactivated),
+        "superseded_master_records": int(superseded_masters),
         "derived_ppids_cleared": derived_ppids,
     }
 

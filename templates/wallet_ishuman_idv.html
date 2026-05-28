@@ -98,7 +98,7 @@
 
     <script src="/static/js/lemma-keys.js?v=3" nonce="{{ csp_nonce }}"></script>
     <script src="/static/js/wallet-at-rest-crypto.js?v=1" nonce="{{ csp_nonce }}"></script>
-    <script src="/static/js/lemma-wallet.js?v=2535" nonce="{{ csp_nonce }}"></script>
+    <script src="/static/js/lemma-wallet.js?v=2536" nonce="{{ csp_nonce }}"></script>
     <script nonce="{{ csp_nonce }}">
         const SESSION_KEY = 'ishuman_idv_popup_session_id';
         const params = new URLSearchParams(window.location.search);
@@ -454,7 +454,9 @@
             try {
                 await runVerification();
             } catch (err) {
-                setStatus(err.message || 'Verification failed', 'error');
+                console.error('[isHuman IDV] primary action failed:', err);
+                const detail = err?.message || err?.toString() || 'Verification failed';
+                setStatus(detail, 'error');
                 btn.disabled = false;
             }
         });
@@ -479,7 +481,9 @@
                         setStatus('Ready when you are.', 'info');
                     }
                 } catch (err) {
-                    setStatus(err.message || 'Could not complete fresh verification', 'error');
+                    console.error('[isHuman IDV] fresh_idv failed:', err);
+                    const detail = err?.message || err?.toString() || 'Could not complete fresh verification';
+                    setStatus(detail, 'error');
                     document.getElementById('primary-btn').classList.remove('hidden');
                     document.getElementById('primary-btn').textContent = 'Try again';
                 }

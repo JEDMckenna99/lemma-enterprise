@@ -77,7 +77,7 @@ def test_verifier_site_vc_cache(verifier_source):
     assert "_verifyFromSiteVcCache" in verifier_source
     assert "'vc_valid'" in verifier_source
     assert "isHumanIssuance: true" in verifier_source
-    assert "BRIDGE_PATH = '/wallet/bridge?v=1.5.1'" in verifier_source
+    assert "BRIDGE_PATH = '/wallet/bridge?v=1.5.2'" in verifier_source
     assert "signatureValueWeb" in verifier_source
     assert "legacy_credential_format" in verifier_source
     assert "_hydrateBloomFromCache" in verifier_source
@@ -124,6 +124,18 @@ def test_idv_popup_issues_site_proof_via_wallet():
 
 
 @pytest.mark.browser
+def test_wallet_prefers_newest_credential_after_fresh_idv(wallet_source):
+    """After fresh IDV the wallet cache holds both the old and new master.
+    Lookups must prefer the most-recently-issued credential or the
+    server-side derive-site-proof will 404 on the stale master_credential_id.
+    """
+    assert "_sortCredentialsNewestFirst" in wallet_source
+    assert "_credentialIssuedAtSeconds" in wallet_source
+    assert "this._sortCredentialsNewestFirst(matches)[0]" in wallet_source
+    assert "this._sortCredentialsNewestFirst(cachedMasters)[0]" in wallet_source
+
+
+@pytest.mark.browser
 def test_idv_popup_supports_fresh_idv_mode():
     idv_html = IDV_HTML.read_text(encoding="utf-8")
     assert "fresh_idv" in idv_html
@@ -167,7 +179,7 @@ def test_wallet_pages_use_current_wallet_bundle():
     for path in wallet_pages:
         source = path.read_text(encoding="utf-8")
         assert "lemma-wallet.js?v=2476" not in source
-        assert "lemma-wallet.js') }}?v=2535" in source or "lemma-wallet.js?v=2535" in source
+        assert "lemma-wallet.js') }}?v=2536" in source or "lemma-wallet.js?v=2536" in source
         assert "lemma-keys.js?v=1" not in source
         assert "lemma-keys.js?v=2" not in source
         assert "lemma-keys.js') }}?v=3" in source or "lemma-keys.js?v=3" in source

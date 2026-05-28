@@ -81,7 +81,7 @@ const AUTH_STATE = {
 class LemmaWallet {
     // SDK version - check with LemmaWallet.VERSION
     // v2.32.0: Redirect-only architecture - removed popup flow for simpler, consistent UX
-    static VERSION = '2.58.0';  // v2.58: tolerate encrypted secret reads when session walletSecret is present
+    static VERSION = '2.59.0';  // v2.59: prefer newest credential after fresh IDV re-issue
     
     constructor(options = {}) {
         this.db = null;
@@ -2776,22 +2776,49 @@ class LemmaWallet {
         return !!(cl.site_signing_pubkey || cl.siteSigningPubkey);
     }
 
+    _credentialIssuedAtSeconds(credential) {
+        if (!credential) return 0;
+        const claims = credential.claims || credential.credentialSubject || {};
+        const fromClaims = Number(claims.issuedAt || claims.issued_at || 0);
+        if (Number.isFinite(fromClaims) && fromClaims > 0) return fromClaims;
+        const fromTopLevel = Number(credential.issuanceDate || credential.issuedAt || 0);
+        if (Number.isFinite(fromTopLevel) && fromTopLevel > 0) return fromTopLevel;
+        const fromCachedAt = Number(credential.cachedAt || 0);
+        return Number.isFinite(fromCachedAt) ? Math.floor(fromCachedAt / 1000) : 0;
+    }
+
+    _sortCredentialsNewestFirst(credentials) {
+        return [...(credentials || [])].sort(
+            (a, b) => this._credentialIssuedAtSeconds(b) - this._credentialIssuedAtSeconds(a),
+        );
+    }
+
     async findIsHumanSiteCredential(targetSite) {
         const keys = this._getLemmaKeys();
         const canonicalSite = keys.canonicalizeSiteDomain(targetSite || '');
         const allCreds = await this.exportIsHumanCredentialsForBridge();
-        return allCreds.find((credential) => {
+        // Prefer the most recently issued site credential. After a fresh
+        // IDV / re-derivation, the wallet's plaintext cache will contain
+        // both the old (revoked) and new credential for the same site; the
+        // server-side IsHumanVerification status flips to "revoked" on the
+        // old one, so `/api/ishuman/derive-site-proof` would 404 if we used
+        // the stale entry.
+        const matches = allCreds.filter((credential) => {
             const cl = credential.claims || credential.credentialSubject || {};
             if (!cl.isHuman) return false;
             return this._getCredentialSiteBinding(cl) === canonicalSite
                 && this._siteCredentialHasSigningKey(credential);
-        }) || null;
+        });
+        if (!matches.length) return null;
+        return this._sortCredentialsNewestFirst(matches)[0];
     }
 
     async findIsHumanMasterCredential() {
         const cached = await this.getIsHumanCredentialsFromCache();
-        const fromCache = cached.find((credential) => this._isIsHumanMasterRecord(credential));
-        if (fromCache) return fromCache;
+        const cachedMasters = cached.filter((credential) => this._isIsHumanMasterRecord(credential));
+        if (cachedMasters.length) {
+            return this._sortCredentialsNewestFirst(cachedMasters)[0];
+        }
         if (!this.isUnlocked || !this.isUnlocked()) return null;
         let creds = [];
         try {
@@ -2800,7 +2827,9 @@ class LemmaWallet {
             if (this._isEncryptedStorageLockedError(err)) return null;
             throw err;
         }
-        return creds.find((credential) => this._isIsHumanMasterRecord(credential)) || null;
+        const masters = creds.filter((credential) => this._isIsHumanMasterRecord(credential));
+        if (!masters.length) return null;
+        return this._sortCredentialsNewestFirst(masters)[0];
     }
 
     async deriveAndStoreSiteProof(targetSite) {
