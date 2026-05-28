@@ -1156,14 +1156,25 @@ def _verify_session_assertion_server(
 @ishuman_bp.route("/api/ishuman/verify-presentation", methods=["POST"])
 @cross_origin()
 def verify_presentation():
-    """Re-verify a presentation bundle returned by ishuman-verifier.js `verify()`.
+    """OPTIONAL convenience endpoint — re-verify a presentation bundle server-side.
 
-    Relying sites pass the `result.presentation` blob from the SDK here so their
-    backend can independently confirm:
-      1. The credential signature (browser-canonical) was produced by a trusted issuer
-      2. The site-bound session assertion is signed by the credential's site key
-      3. The credential is not revoked (server-side Bloom check)
-      4. The credential's siteId binding matches the expected site
+    Relying sites do **not** need to call this endpoint. The recommended path is
+    purely local verification on the relying site's own backend using the
+    signed trust list + Bloom snapshot from ``GET /api/revocation/bloom-filter``
+    (cached for up to ``max_bloom_staleness_seconds``). See
+    ``examples/relying_site_offline_verify.py`` for a drop-in implementation.
+
+    Privacy / cost trade-off when this endpoint IS called:
+      * lemma.id observes the PPID, site_id, and timing for every request.
+      * Calls scale linearly with the relying site's traffic.
+      * Local verification leaks none of this and incurs zero per-request cost.
+
+    What gets re-checked when this endpoint is called:
+      1. The credential's browser-canonical Ed25519 signature was produced by a
+         trusted issuer (against the live trust list)
+      2. The credential is bound to the expected site_id
+      3. The credential is not expired and not revoked (server-side Bloom check)
+      4. The site-bound session assertion is signed by the credential's site key
 
     Request body::
 
