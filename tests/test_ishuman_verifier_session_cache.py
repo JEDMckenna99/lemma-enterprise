@@ -80,6 +80,24 @@ def test_verifier_opens_popup_for_missing_site_proof(verifier_source):
 
 
 @pytest.mark.browser
+def test_verifier_lazy_bridge_and_cached_bloom_for_fast_cache_hits(verifier_source):
+    """Cache-hit fast path: don't load the bridge iframe or block on network.
+
+    The Bloom snapshot must be hydrated from localStorage during _init() so a
+    cached verify() can complete without waiting for /api/revocation/bloom-filter.
+    The bridge iframe is created lazily — only when a bridge round-trip is
+    actually issued.
+    """
+    assert "_hydrateBloomFromCache" in verifier_source
+    assert "this._bloomNetworkRefresh = this._syncBloom()" in verifier_source
+    occurrences = verifier_source.count("this._setupBridge();")
+    assert occurrences >= 3, (
+        "Expected lazy bridge setup in _requestCredentialFromBridge, "
+        "_sendBridgeRequest, and _requestSessionFromBridge"
+    )
+
+
+@pytest.mark.browser
 def test_verifier_uses_site_vc_cache_on_repeat_verify(verifier_source):
     assert "_verifyFromSiteVcCache" in verifier_source
     assert "'session_valid'" in verifier_source

@@ -514,20 +514,25 @@
   }
 
   function verifierFor(slug) {
-    return new window.IsHumanVerifier({
+    if (!state.verifiers) state.verifiers = {};
+    if (state.verifiers[slug]) return state.verifiers[slug];
+    state.verifiers[slug] = new window.IsHumanVerifier({
       siteId: SITE_IDS[slug],
       lemmaOrigin: window.location.origin,
       debug: true,
       autoProvision: true,
       isBlockedLocally: (ppid) => state.localBlocks[slug].has(ppid),
     });
+    return state.verifiers[slug];
   }
 
   async function verifySite(slug) {
     if (!window.IsHumanVerifier) throw new Error('IsHumanVerifier SDK not loaded');
+    // Reuse the verifier across calls so the cached Bloom snapshot and
+    // bridge iframe persist — repeat verifications hit the local cache in
+    // ~10–30 ms instead of paying the iframe/bloom bootstrap cost every time.
     const verifier = verifierFor(slug);
     const result = await verifier.verify();
-    verifier.destroy();
     state.results[slug] = result;
     if (Number.isFinite(result.timeMs)) state.lastVerifyMs[slug] = result.timeMs;
     renderSite(slug, result);

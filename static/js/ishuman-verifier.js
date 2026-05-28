@@ -26,7 +26,7 @@
  * Optional `autoProvision: true` opens a Lemma-hosted popup to unlock the wallet
  * and complete IDV when no master isHuman proof is present yet.
  *
- * @version 1.4.4
+ * @version 1.4.5
  */
 
 (function () {
@@ -37,7 +37,7 @@ if (typeof window !== 'undefined' && window.IsHumanVerifier) {
 }
 
 const LEMMA_ORIGIN = 'https://lemma.id';
-const BRIDGE_PATH = '/wallet/bridge?v=1.4.4';
+const BRIDGE_PATH = '/wallet/bridge?v=1.4.5';
 const BRIDGE_TIMEOUT_MS = 8000;
 const PRESENTATION_PREFIX = 'lemma:site-presentation:v1';
 const MAX_PRESENTATION_STALENESS_SECONDS = 120;
@@ -672,12 +672,56 @@ class IsHumanVerifier {
     // ------------------------------------------------------------------
 
     async _init() {
-        this._setupBridge();
-        await this._syncBloom();
+        // Eagerly hydrate the Bloom snapshot + trust list from localStorage so
+        // the cache-hit fast path can proceed without waiting for the network.
+        // The fresh network fetch still runs (in the background) below to pick
+        // up new revocations, but it no longer blocks initialisation.
+        const cacheOk = await this._hydrateBloomFromCache();
         await detectWebCryptoEd25519();
+        if (cacheOk) {
+            this._bloomNetworkRefresh = this._syncBloom().catch(() => {});
+            return;
+        }
+        // No usable cached snapshot — must wait for the network fetch.
+        await this._syncBloom();
+    }
+
+    async _hydrateBloomFromCache() {
+        try {
+            const cached = JSON.parse(localStorage.getItem('ishuman_bloom') || '{}');
+            const trustCached = JSON.parse(localStorage.getItem(TRUST_LIST_STORAGE_KEY) || '{}');
+            if (!cached.ids || !cached.snapshot || !trustCached.trust_list) return false;
+            const snapshot = cached.snapshot;
+            const nowSec = Math.floor(Date.now() / 1000);
+            const generatedAt = Number(snapshot.generated_at_unix || 0);
+            const maxStaleness = Number(
+                snapshot.max_staleness_seconds || DEFAULT_MAX_BLOOM_STALENESS_SECONDS,
+            );
+            if (!generatedAt || nowSec - generatedAt >= maxStaleness) return false;
+            const trustListResult = await verifySignedTrustList(trustCached.trust_list);
+            if (!trustListResult.ok) return false;
+            const bloomCheck = await verifyBloomSnapshot(
+                snapshot,
+                cached.ids,
+                trustListResult.issuers,
+            );
+            if (!bloomCheck.ok) return false;
+            this._trustedIssuers = trustListResult.issuers;
+            this._trustListTrusted = true;
+            this._bloomFilter = new Set(cached.ids);
+            this._bloomSyncedAt = cached.ts || Date.now();
+            this._bloomTrusted = true;
+            this._bloomSnapshot = snapshot;
+            return true;
+        } catch {
+            return false;
+        }
     }
 
     _setupBridge() {
+        // Lazy: only create the hidden bridge iframe (which loads
+        // lemma-wallet.js + lemma-keys.js, ~80 KB) when a bridge round-trip
+        // is actually needed. Cache-hit verifications skip this entirely.
         if (this._bridgeIframe) return;
 
         this._bridgeReadyPromise = new Promise((resolve) => {
@@ -728,6 +772,7 @@ class IsHumanVerifier {
 
     _requestCredentialFromBridge() {
         return new Promise(async (resolve, reject) => {
+            this._setupBridge();
             if (!this._bridgeIframe || !this._bridgeIframe.contentWindow) {
                 return reject(new Error('Bridge iframe not available'));
             }
@@ -784,6 +829,7 @@ class IsHumanVerifier {
 
     _sendBridgeRequest(type, payload = {}, timeoutMs = BRIDGE_TIMEOUT_MS) {
         return new Promise(async (resolve, reject) => {
+            this._setupBridge();
             if (!this._bridgeIframe || !this._bridgeIframe.contentWindow) {
                 return reject(new Error('Bridge iframe not available'));
             }
@@ -833,6 +879,7 @@ class IsHumanVerifier {
 
     _requestSessionFromBridge() {
         return new Promise(async (resolve, reject) => {
+            this._setupBridge();
             if (!this._bridgeIframe || !this._bridgeIframe.contentWindow) {
                 return reject(new Error('Bridge iframe not available'));
             }

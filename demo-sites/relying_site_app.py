@@ -191,21 +191,28 @@ def index():
       </aside>
     </div>
   </main>
-  <script src="{LEMMA_ORIGIN}/sdk/ishuman-verifier.js?v=1.4.4"></script>
+  <script src="{LEMMA_ORIGIN}/sdk/ishuman-verifier.js?v=1.4.5"></script>
   <script>
     const pill = document.getElementById('status-pill');
     const result = document.getElementById('result');
     const decisionCard = document.getElementById('decision-card');
     const decisionCopy = document.getElementById('decision-copy');
-    let backgroundVerifier = null;
-
+    // Single long-lived verifier per site — reuses cached Bloom snapshot and
+    // bridge iframe, so repeat verifications hit the local cache in ~10–30 ms.
+    let sharedVerifier = null;
     function makeVerifier(autoProvision) {{
-      return new IsHumanVerifier({{
+      if (sharedVerifier && sharedVerifier.autoProvision === autoProvision) {{
+        return sharedVerifier;
+      }}
+      if (sharedVerifier) sharedVerifier.destroy();
+      sharedVerifier = new IsHumanVerifier({{
         siteId: '{SITE_ID}',
         lemmaOrigin: '{LEMMA_ORIGIN}',
         autoProvision,
         debug: true,
       }});
+      sharedVerifier.autoProvision = autoProvision;
+      return sharedVerifier;
     }}
 
     function applyVerdict(response, {{ silent = false }} = {{}}) {{
@@ -231,8 +238,8 @@ def index():
       pill.textContent = 'CHECKING';
       pill.className = 'pill checking';
       try {{
-        backgroundVerifier = makeVerifier(false);
-        const response = await backgroundVerifier.checkStatus();
+        const verifier = makeVerifier(false);
+        const response = await verifier.checkStatus();
         if (response.human) {{
           applyVerdict(response, {{ silent: true }});
         }} else {{
@@ -257,13 +264,8 @@ def index():
       pill.className = 'pill checking';
       decisionCard.innerHTML = '<strong>Checking Lemma wallet…</strong><p class="tiny">If a site proof is missing, Lemma opens a popup on lemma.id to issue it from your master credential. IDV runs only once if you have no master proof yet.</p>';
       try {{
-        if (backgroundVerifier) {{
-          backgroundVerifier.destroy();
-          backgroundVerifier = null;
-        }}
         const verifier = makeVerifier(true);
         const response = await verifier.verify();
-        verifier.destroy();
         applyVerdict(response);
       }} catch (err) {{
         pill.textContent = 'ERROR';
