@@ -26,7 +26,7 @@
  * Optional `autoProvision: true` opens a Lemma-hosted popup to unlock the wallet
  * and complete IDV when no master isHuman proof is present yet.
  *
- * @version 1.5.5
+ * @version 1.5.6
  */
 
 (function () {
@@ -37,7 +37,7 @@ if (typeof window !== 'undefined' && window.IsHumanVerifier) {
 }
 
 const LEMMA_ORIGIN = 'https://lemma.id';
-const BRIDGE_PATH = '/wallet/bridge?v=1.5.5';
+const BRIDGE_PATH = '/wallet/bridge?v=1.5.6';
 const BRIDGE_TIMEOUT_MS = 8000;
 const PRESENTATION_PREFIX = 'lemma:site-presentation:v1';
 const MAX_PRESENTATION_STALENESS_SECONDS = 120;
@@ -52,6 +52,12 @@ const BLOOM_SNAPSHOT_PREFIX = 'lemma:bloom-snapshot:v1';
 const TRUST_LIST_PREFIX = 'lemma:issuer-trust-list:v1';
 const DEFAULT_MAX_BLOOM_STALENESS_SECONDS = 900;
 const TRUST_LIST_STORAGE_KEY = 'ishuman_trust_list';
+// Clock skew tolerance (seconds). Browsers' clocks routinely drift by tens of
+// seconds vs. the server clock; without a skew window we reject perfectly
+// valid trust lists / bloom snapshots whenever generated_at_unix is slightly
+// in the future. 300 s (5 min) is the conventional window for signed time
+// windows in identity / OAuth specs.
+const TIME_SKEW_SECONDS = 300;
 const IDV_POPUP_PATH = '/wallet/ishuman-idv';
 const UNLOCK_POPUP_PATH = '/wallet/popup';
 const IDV_POPUP_TIMEOUT_MS = 10 * 60 * 1000;
@@ -303,10 +309,10 @@ async function verifySignedTrustList(trustList) {
         }
     }
     const nowSec = Math.floor(Date.now() / 1000);
-    if (nowSec < Number(trustList.generated_at_unix)) {
+    if (nowSec + TIME_SKEW_SECONDS < Number(trustList.generated_at_unix)) {
         return { ok: false, reason: 'trust_list_not_yet_valid', issuers: new Map() };
     }
-    if (nowSec > Number(trustList.valid_until_unix)) {
+    if (nowSec - TIME_SKEW_SECONDS > Number(trustList.valid_until_unix)) {
         return { ok: false, reason: 'trust_list_expired', issuers: new Map() };
     }
     if (!Array.isArray(trustList.issuers) || trustList.issuers.length === 0) {
@@ -341,8 +347,8 @@ async function verifySignedTrustList(trustList) {
         const validUntil = Number(row?.valid_until_unix || 0);
         if (!did || pubkey.length !== 64 || !/^[0-9a-f]+$/.test(pubkey)) continue;
         if (status === 'revoked') continue;
-        if (validFrom && nowSec < validFrom) continue;
-        if (validUntil && nowSec > validUntil) continue;
+        if (validFrom && (nowSec + TIME_SKEW_SECONDS) < validFrom) continue;
+        if (validUntil && (nowSec - TIME_SKEW_SECONDS) > validUntil) continue;
         if (!issuers.has(did)) issuers.set(did, new Set());
         issuers.get(did).add(pubkey);
     }
@@ -377,9 +383,11 @@ async function verifyBloomSnapshot(snapshot, hashedRevokedIds, trustedIssuers) {
     const validUntil = Number(snapshot.valid_until_unix);
     const maxStale = Number(snapshot.max_staleness_seconds || DEFAULT_MAX_BLOOM_STALENESS_SECONDS);
 
-    if (nowSec < generatedAt) return { ok: false, reason: 'snapshot_not_yet_valid' };
-    if (nowSec > validUntil) return { ok: false, reason: 'snapshot_expired' };
-    if (nowSec - generatedAt > maxStale) return { ok: false, reason: 'snapshot_stale' };
+    if (nowSec + TIME_SKEW_SECONDS < generatedAt) return { ok: false, reason: 'snapshot_not_yet_valid' };
+    if (nowSec - TIME_SKEW_SECONDS > validUntil) return { ok: false, reason: 'snapshot_expired' };
+    // staleness check stays strict: even with clock skew, a snapshot older
+    // than max_staleness_seconds + the skew tolerance is genuinely stale.
+    if (nowSec - generatedAt > maxStale + TIME_SKEW_SECONDS) return { ok: false, reason: 'snapshot_stale' };
 
     const canonicalBody = JSON.stringify({
         count: hashedRevokedIds.length,

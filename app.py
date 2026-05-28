@@ -758,7 +758,7 @@ def create_app():
             # Bridge HTML is static; all dynamic state is in IndexedDB
             # ETag allows revalidation on version updates
             'Cache-Control': 'public, max-age=31536000, immutable',
-            'ETag': '"bridge-v3.10.5-postreset-bloomseq"',
+            'ETag': '"bridge-v3.10.6-clock-skew-tolerance"',
 
             # Additional cache hints
             'Vary': 'Accept-Encoding',
@@ -897,7 +897,7 @@ def create_app():
         response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
         response.headers['Pragma'] = 'no-cache'
         response.headers['Expires'] = '0'
-        response.headers['X-SDK-Version'] = '1.5.5'
+        response.headers['X-SDK-Version'] = '1.5.6'
         response.headers['Access-Control-Allow-Origin'] = '*'
         return response
 
