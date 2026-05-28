@@ -20,6 +20,7 @@ Flows
 from __future__ import annotations
 
 import base64
+import hashlib
 import json
 import logging
 import os
@@ -52,6 +53,60 @@ def _get_ishuman_issuer():
     """Return the platform-wide isHuman credential issuer (KMS-backed)."""
     from api.issuer_management import get_issuer_manager
     return get_issuer_manager().get_federated_issuer()
+
+
+def _browser_canonical_message(credential: dict) -> bytes:
+    """Build the exact canonical message format used by ishuman-verifier.js.
+
+    Mirrors `canonicalMessage(credential)` in static/js/ishuman-verifier.js:
+    JSON.stringify({issuer, subject, claims: sorted, issuedAt, expiresAt})
+    with JSON.stringify default separators and undefined-key omission.
+    """
+    claims = credential.get("claims") or credential.get("credentialSubject") or {}
+    sorted_claims: dict = {}
+    for key in sorted(claims.keys()):
+        value = claims[key]
+        if value is True:
+            sorted_claims[key] = "true"
+        elif value is False:
+            sorted_claims[key] = "false"
+        elif isinstance(value, (list, dict)):
+            sorted_claims[key] = json.dumps(value, separators=(",", ":"), ensure_ascii=False)
+        else:
+            sorted_claims[key] = value
+
+    payload: dict = {
+        "issuer": credential.get("issuer"),
+        "subject": credential.get("subject"),
+        "claims": sorted_claims,
+    }
+    # JS canonicalMessage references credential.issuedAt / credential.expiresAt
+    # (top-level). The Rust serializer renames these to issuanceDate /
+    # expirationDate, so the legacy JS keys are typically absent and omitted
+    # by JSON.stringify. Match that behaviour: only include when present.
+    if credential.get("issuedAt") is not None:
+        payload["issuedAt"] = credential["issuedAt"]
+    if credential.get("expiresAt") is not None:
+        payload["expiresAt"] = credential["expiresAt"]
+
+    return json.dumps(payload, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+
+
+def _sign_with_issuer_for_browser(credential: dict, issuer) -> str:
+    """Sign the browser-canonical SHA-256 digest with the issuer's Ed25519 key.
+
+    Returns hex-encoded 64-byte signature compatible with
+    static/js/ishuman-verifier.js _verifyCredentialCore signature check.
+    """
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+
+    seed = bytes(issuer.signing_key_bytes())
+    if len(seed) != 32:
+        raise ValueError("issuer signing key seed must be 32 bytes")
+    sk = Ed25519PrivateKey.from_private_bytes(seed)
+    message = _browser_canonical_message(credential)
+    digest = hashlib.sha256(message).digest()
+    return sk.sign(digest).hex()
 
 
 def _issue_ishuman_credential(
@@ -105,6 +160,17 @@ def _issue_ishuman_credential(
         "name": "Lemma isHuman Network",
         "verified": True,
     }
+
+    # Add a parallel signature in the browser-verifier canonical format so the
+    # JS isHuman verifier can locally verify credentials without bridging back
+    # to the Rust crypto engine. The native Rust signature stays in
+    # proof.signatureValue for server-side verification compatibility.
+    try:
+        browser_sig_hex = _sign_with_issuer_for_browser(credential, issuer)
+        proof = credential.setdefault("proof", {})
+        proof["signatureValueWeb"] = browser_sig_hex
+    except Exception as exc:  # noqa: BLE001 — non-fatal: server still has Rust sig
+        logger.warning("Failed to add browser-format signature to credential: %s", exc)
 
     return credential
 
