@@ -507,9 +507,113 @@ def ishuman_demo_test_complete_verification():
     return jsonify(payload), status
 
 
+def _clear_wallet_revocations_for_demo(
+    db,
+    *,
+    wallet_id: str,
+    new_master_credential_id: str,
+    reason: str = "demo_fresh_idv_reset",
+) -> dict:
+    """Demo-only: lift all revocation state for a wallet after a fresh IDV.
+
+    Production semantics differ. A real network-wide revocation, once approved
+    by Lemma governance, should NOT auto-lift just because the user re-runs
+    IDV — that would defeat the deterrent. Instead production lifts only:
+      * site-scoped blocks if the site chooses to grant amnesty, and
+      * per-credential revocations of credentials that are now superseded
+        (the new master proves identity continuity).
+    The demo version below is the simpler "clear everything" reset because the
+    test-mode IDV is a stand-in and demos benefit from showing the full
+    re-entry loop end to end.
+
+    Returns counts of rows touched so the caller can surface them.
+    """
+    from api.database import RevocationList, SiteBlock, DerivedCredential, IsHumanVerification
+
+    derived_rows = db.query(DerivedCredential).filter_by(wallet_id=wallet_id).all()
+    derived_ppids = sorted({row.derived_ppid for row in derived_rows if row.derived_ppid})
+    derived_cred_ids = sorted({row.derived_credential_id for row in derived_rows if row.derived_credential_id})
+
+    masters = db.query(IsHumanVerification).filter_by(wallet_id=wallet_id).all()
+    stale_master_cred_ids = sorted({
+        m.credential_id for m in masters
+        if m.credential_id and m.credential_id != new_master_credential_id
+    })
+
+    cleared_entries = 0
+    rl_query = db.query(RevocationList)
+    cleared_entries += rl_query.filter(
+        RevocationList.wallet_id == wallet_id,
+        RevocationList.revocation_type == "wallet",
+    ).delete(synchronize_session=False)
+    if stale_master_cred_ids:
+        cleared_entries += rl_query.filter(
+            RevocationList.credential_id.in_(stale_master_cred_ids),
+            RevocationList.revocation_type == "credential",
+        ).delete(synchronize_session=False)
+    if derived_cred_ids:
+        cleared_entries += rl_query.filter(
+            RevocationList.credential_id.in_(derived_cred_ids),
+            RevocationList.revocation_type == "credential",
+        ).delete(synchronize_session=False)
+    if derived_ppids:
+        cleared_entries += rl_query.filter(
+            RevocationList.ppid.in_(derived_ppids),
+            RevocationList.revocation_type == "user",
+        ).delete(synchronize_session=False)
+
+    site_blocks_cleared = 0
+    if derived_ppids:
+        site_blocks_cleared = db.query(SiteBlock).filter(
+            SiteBlock.ppid.in_(derived_ppids),
+            SiteBlock.is_active == True,  # noqa: E712 — SQLA filter
+        ).update({"is_active": False}, synchronize_session=False)
+
+    derived_reactivated = 0
+    if derived_cred_ids:
+        derived_reactivated = db.query(DerivedCredential).filter(
+            DerivedCredential.derived_credential_id.in_(derived_cred_ids),
+            DerivedCredential.is_active == False,  # noqa: E712
+        ).update({"is_active": True, "revoked_at": None}, synchronize_session=False)
+
+    db.commit()
+
+    # Invalidate the in-process Bloom cache so the next /api/revocation/bloom-filter
+    # call rebuilds with the cleared revocation rows excluded.
+    try:
+        from api.bloom_snapshot import invalidate_bloom_filter_cache
+        invalidate_bloom_filter_cache()
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Bloom cache invalidation failed: %s", exc)
+
+    try:
+        from api.revocation_sync import get_event_bus
+        bus = get_event_bus()
+        # Best-effort: signal listeners that revocations were cleared.
+        if hasattr(bus, "publish_revocation_clear"):
+            bus.publish_revocation_clear(wallet_id, reason=reason)
+    except Exception:
+        pass
+
+    return {
+        "wallet_id": wallet_id,
+        "cleared_revocation_entries": int(cleared_entries),
+        "cleared_site_blocks": int(site_blocks_cleared),
+        "reactivated_derived_credentials": int(derived_reactivated),
+        "derived_ppids_cleared": derived_ppids,
+    }
+
+
 @ishuman_demo_bp.route("/api/demo/ishuman/verify-once-test-mode", methods=["POST"])
 def ishuman_demo_verify_once_test_mode():
-    """Chain start-verification + test-complete using server-side demo token only."""
+    """Chain start-verification + test-complete using server-side demo token only.
+
+    In demo, this is also the entry point for the "fresh IDV" re-entry flow
+    after a revocation. When the request includes ``reset_revocations: true``
+    the endpoint additionally clears any prior wallet-level revocations and
+    site blocks for the wallet, so the user can rejoin sites that previously
+    blocked them. Production would gate the reset behind governance.
+    """
     _guards, err = _require_demo_test_verify(require_token_header=True)
     if err:
         return err
@@ -520,6 +624,7 @@ def ishuman_demo_verify_once_test_mode():
         "LEMMA_ISHUMAN_PROD_TEST_WALLET_SECRET", ""
     )
     return_url = (body.get("return_url") or "").strip()
+    reset_revocations = bool(body.get("reset_revocations", True))
 
     if not wallet_id:
         return jsonify({"success": False, "error": "wallet_id required"}), 400
@@ -542,6 +647,23 @@ def ishuman_demo_verify_once_test_mode():
     if complete_status != 200:
         return jsonify(complete_payload), complete_status
 
+    reset_summary = None
+    if reset_revocations:
+        from api.database import SessionLocal
+        db = SessionLocal()
+        try:
+            reset_summary = _clear_wallet_revocations_for_demo(
+                db,
+                wallet_id=wallet_id,
+                new_master_credential_id=complete_payload["credential_id"],
+                reason="demo_fresh_idv_reset",
+            )
+        except Exception:
+            db.rollback()
+            logger.exception("Demo revocation reset failed")
+        finally:
+            db.close()
+
     return jsonify({
         "success": True,
         "session_id": complete_payload["session_id"],
@@ -550,6 +672,7 @@ def ishuman_demo_verify_once_test_mode():
         "ppid": complete_payload["ppid"],
         "stripe_session_id": complete_payload.get("stripe_session_id"),
         "mode": "verify_once_test_mode",
+        "revocation_reset": reset_summary,
     })
 
 

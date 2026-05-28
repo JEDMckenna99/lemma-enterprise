@@ -26,7 +26,7 @@
  * Optional `autoProvision: true` opens a Lemma-hosted popup to unlock the wallet
  * and complete IDV when no master isHuman proof is present yet.
  *
- * @version 1.5.0
+ * @version 1.5.1
  */
 
 (function () {
@@ -37,7 +37,7 @@ if (typeof window !== 'undefined' && window.IsHumanVerifier) {
 }
 
 const LEMMA_ORIGIN = 'https://lemma.id';
-const BRIDGE_PATH = '/wallet/bridge?v=1.5.0';
+const BRIDGE_PATH = '/wallet/bridge?v=1.5.1';
 const BRIDGE_TIMEOUT_MS = 8000;
 const PRESENTATION_PREFIX = 'lemma:site-presentation:v1';
 const MAX_PRESENTATION_STALENESS_SECONDS = 120;
@@ -1312,7 +1312,8 @@ class IsHumanVerifier {
     // Bloom filter
     // ------------------------------------------------------------------
 
-    async _syncBloom() {
+    async _syncBloom(options = {}) {
+        const force = !!options.force;
         const now = Date.now();
         const snapshotAgeSec = this._bloomSnapshot
             ? Math.floor((now / 1000) - Number(this._bloomSnapshot.generated_at_unix || 0))
@@ -1320,7 +1321,7 @@ class IsHumanVerifier {
         const maxAgeSec = Number(
             this._bloomSnapshot?.max_staleness_seconds || DEFAULT_MAX_BLOOM_STALENESS_SECONDS,
         );
-        if (this._bloomTrusted && this._bloomFilter.size && snapshotAgeSec < maxAgeSec) {
+        if (!force && this._bloomTrusted && this._bloomFilter.size && snapshotAgeSec < maxAgeSec) {
             return;
         }
 
@@ -1437,6 +1438,22 @@ class IsHumanVerifier {
         const credential = detail?.credential || null;
         if (!credential) {
             return this._result(false, null, 'no_credential', t0);
+        }
+
+        // The popup just (re-)issued this credential server-side. If the
+        // popup ran in fresh_idv mode after a revocation, the server cleared
+        // the prior revocation rows — but our in-memory Bloom snapshot is
+        // pre-reset and would still flag this credential as revoked. Force a
+        // fresh /api/revocation/bloom-filter fetch before verifying.
+        const wasFreshIdv = detail?.reason === 'fresh_idv_complete'
+            || detail?.refresh_reason === 'revoked'
+            || detail?.refresh_reason === 'site_blocked';
+        if (wasFreshIdv) {
+            try {
+                await this._syncBloom({ force: true });
+            } catch (err) {
+                if (this.debug) console.warn('[isHuman] forced bloom refresh failed:', err.message);
+            }
         }
 
         const core = await this._verifyCredentialCore(credential, t0);
