@@ -129,3 +129,116 @@ def test_canonical_message_matches_server_helper():
         },
     }
     assert _browser_canonical_message(credential) == _canonical_message_python(credential)
+
+
+def test_verify_presentation_endpoint_round_trip(monkeypatch):
+    """The /api/ishuman/verify-presentation endpoint accepts a presentation bundle and validates it."""
+    pytest.importorskip("flask")
+    pytest.importorskip("api.ishuman")
+
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+    from flask import Flask
+
+    from api import ishuman as ishuman_module
+    from api.ishuman import (
+        _browser_canonical_message,
+        _sign_with_issuer_for_browser,
+        ishuman_bp,
+    )
+
+    seed = b"\x22" * 32
+    sk = Ed25519PrivateKey.from_private_bytes(seed)
+    pk_hex = sk.public_key().public_bytes_raw().hex()
+    issuer_did = f"did:lemma:{pk_hex}"
+
+    class _FakeIssuer:
+        def signing_key_bytes(self):
+            return seed
+
+        def get_did(self):
+            return issuer_did
+
+        def get_public_key_hex(self):
+            return pk_hex
+
+    credential = {
+        "id": "ishuman_site_test123",
+        "issuer": issuer_did,
+        "subject": "did:lemma:ppid_demo",
+        "claims": {
+            "isHuman": True,
+            "siteId": "tickets-demo.lemma.id",
+            "issuedAt": "1700000000",
+            "expiresAt": str(2_000_000_000),
+            "packageType": "identity",
+            "verificationMethod": "stripe_identity",
+        },
+        "credentialSubject": {
+            "isHuman": True,
+            "siteId": "tickets-demo.lemma.id",
+            "issuedAt": "1700000000",
+            "expiresAt": str(2_000_000_000),
+            "packageType": "identity",
+            "verificationMethod": "stripe_identity",
+        },
+        "issuerInfo": {"did": issuer_did, "publicKey": pk_hex},
+        "proof": {
+            "type": "Ed25519Signature2020",
+            "verificationMethod": issuer_did,
+            "signatureValueWeb": _sign_with_issuer_for_browser(
+                {
+                    "issuer": issuer_did,
+                    "subject": "did:lemma:ppid_demo",
+                    "claims": {
+                        "isHuman": True,
+                        "siteId": "tickets-demo.lemma.id",
+                        "issuedAt": "1700000000",
+                        "expiresAt": str(2_000_000_000),
+                        "packageType": "identity",
+                        "verificationMethod": "stripe_identity",
+                    },
+                },
+                _FakeIssuer(),
+            ),
+        },
+    }
+
+    # Bypass external trust list / revocation lookups for this isolated test.
+    monkeypatch.setattr(
+        "api.trusted_issuers.is_trusted_issuer",
+        lambda did: did == issuer_did,
+        raising=False,
+    )
+    import sys, types
+    fake_rev = types.SimpleNamespace(is_credential_revoked=lambda _cid: False)
+    monkeypatch.setitem(sys.modules, "api.revocation_verifier", fake_rev)
+
+    app = Flask(__name__)
+    app.register_blueprint(ishuman_bp)
+    client = app.test_client()
+
+    response = client.post(
+        "/api/ishuman/verify-presentation",
+        json={
+            "site_id": "tickets-demo.lemma.id",
+            "credential": credential,
+        },
+    )
+    assert response.status_code == 200, response.get_json()
+    data = response.get_json()
+    assert data["success"] is True
+    assert data["human"] is True
+    assert data["ppid"] == "did:lemma:ppid_demo"
+    assert data["site_id"] == "tickets-demo.lemma.id"
+    assert data["session_status"] == "absent"
+
+    # A tampered claim should now fail signature verification.
+    tampered = json.loads(json.dumps(credential))
+    tampered["claims"]["siteId"] = "evil.example.com"
+    tampered["credentialSubject"]["siteId"] = "evil.example.com"
+    bad = client.post(
+        "/api/ishuman/verify-presentation",
+        json={"site_id": "evil.example.com", "credential": tampered},
+    )
+    assert bad.status_code == 400
+    assert bad.get_json()["error"] == "invalid_signature"

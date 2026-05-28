@@ -1076,6 +1076,214 @@ def derive_site_proof():
 
 
 # ---------------------------------------------------------------------------
+# 8b. Re-verify a presentation bundle (relying-site backend helper)
+# ---------------------------------------------------------------------------
+
+
+def _verify_session_assertion_server(
+    assertion: dict,
+    signature_b64url: str,
+    site_pubkey_b64url: str,
+    expected_site_id: str,
+    expected_bloom_sequence: Optional[int],
+) -> tuple[bool, str]:
+    """Verify the site-bound session assertion (mirrors verifySessionAssertion in JS)."""
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
+    from cryptography.exceptions import InvalidSignature
+
+    required = (
+        "session_id",
+        "site_id",
+        "credential_id",
+        "subject",
+        "session_nonce",
+        "bloom_sequence",
+        "issued_at_unix",
+        "expires_at_unix",
+    )
+    for key in required:
+        value = assertion.get(key)
+        if value in (None, ""):
+            return False, f"session_{key}_missing"
+
+    try:
+        expires_at = int(assertion["expires_at_unix"])
+    except (TypeError, ValueError):
+        return False, "session_expires_at_invalid"
+    if int(time.time()) >= expires_at - 5:
+        return False, "session_expired"
+
+    if expected_site_id and str(assertion["site_id"]) != str(expected_site_id):
+        return False, "session_site_id_mismatch"
+
+    if expected_bloom_sequence is not None:
+        try:
+            if int(assertion["bloom_sequence"]) != int(expected_bloom_sequence):
+                return False, "session_bloom_sequence_mismatch"
+        except (TypeError, ValueError):
+            return False, "session_bloom_sequence_invalid"
+
+    SESSION_PRESENTATION_PREFIX = "lemma:site-session-presentation:v1"
+    payload_lines = [
+        SESSION_PRESENTATION_PREFIX,
+        str(assertion["session_id"]).strip(),
+        str(assertion["site_id"]).strip(),
+        str(assertion["credential_id"]).strip(),
+        str(assertion["subject"]).strip(),
+        str(assertion["session_nonce"]).strip(),
+        str(assertion["bloom_sequence"]),
+        str(assertion["issued_at_unix"]),
+        str(assertion["expires_at_unix"]),
+    ]
+    message = "\n".join(payload_lines).encode("utf-8")
+
+    try:
+        pubkey_bytes = base64.urlsafe_b64decode(
+            site_pubkey_b64url + "=" * ((4 - len(site_pubkey_b64url) % 4) % 4)
+        )
+        signature_bytes = base64.urlsafe_b64decode(
+            signature_b64url + "=" * ((4 - len(signature_b64url) % 4) % 4)
+        )
+        Ed25519PublicKey.from_public_bytes(pubkey_bytes).verify(signature_bytes, message)
+    except InvalidSignature:
+        return False, "invalid_session_signature"
+    except Exception as exc:  # noqa: BLE001
+        return False, f"session_verify_error:{exc}"
+
+    return True, "ok"
+
+
+@ishuman_bp.route("/api/ishuman/verify-presentation", methods=["POST"])
+@cross_origin()
+def verify_presentation():
+    """Re-verify a presentation bundle returned by ishuman-verifier.js `verify()`.
+
+    Relying sites pass the `result.presentation` blob from the SDK here so their
+    backend can independently confirm:
+      1. The credential signature (browser-canonical) was produced by a trusted issuer
+      2. The site-bound session assertion is signed by the credential's site key
+      3. The credential is not revoked (server-side Bloom check)
+      4. The credential's siteId binding matches the expected site
+
+    Request body::
+
+        {
+            "site_id": "tickets-demo.lemma.id",          # expected site binding
+            "credential": { ... },                        # full VC with proof.signatureValueWeb
+            "session_assertion": { ... },                 # optional
+            "session_signature": "<base64url>",           # optional
+            "session_nonce": "<base64url>",               # optional
+            "bloom_sequence": 0                           # optional, snapshot binding
+        }
+    """
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
+    from cryptography.exceptions import InvalidSignature
+
+    body = request.get_json(silent=True) or {}
+    credential = body.get("credential")
+    if not isinstance(credential, dict):
+        return jsonify({"success": False, "error": "credential_required"}), 400
+
+    expected_site_id = (body.get("site_id") or "").strip()
+    proof = credential.get("proof") or {}
+    sig_hex = (proof.get("signatureValueWeb") or proof.get("signatureValue") or "").strip()
+    if not sig_hex:
+        return jsonify({"success": False, "error": "missing_signature"}), 400
+
+    issuer_did = (credential.get("issuer") or (credential.get("issuerInfo") or {}).get("did") or "").strip()
+    issuer_pubkey_hex = ((credential.get("issuerInfo") or {}).get("publicKey") or "").strip()
+    if not issuer_did:
+        return jsonify({"success": False, "error": "missing_issuer"}), 400
+
+    try:
+        from api.trusted_issuers import is_trusted_issuer
+        if not is_trusted_issuer(issuer_did):
+            return jsonify({"success": False, "error": "untrusted_issuer"}), 403
+    except Exception:
+        logger.warning("Trust list check unavailable; proceeding with embedded pubkey")
+
+    if not issuer_pubkey_hex and issuer_did.startswith("did:lemma:"):
+        issuer_pubkey_hex = issuer_did.split(":", 2)[2]
+    if not issuer_pubkey_hex:
+        return jsonify({"success": False, "error": "issuer_pubkey_missing"}), 400
+
+    try:
+        pubkey_bytes = bytes.fromhex(issuer_pubkey_hex)
+        signature_bytes = bytes.fromhex(sig_hex)
+    except ValueError:
+        return jsonify({"success": False, "error": "malformed_signature"}), 400
+
+    try:
+        message = _browser_canonical_message(credential)
+        digest = hashlib.sha256(message).digest()
+        Ed25519PublicKey.from_public_bytes(pubkey_bytes).verify(signature_bytes, digest)
+    except InvalidSignature:
+        return jsonify({"success": False, "error": "invalid_signature"}), 400
+    except Exception as exc:  # noqa: BLE001
+        return jsonify({"success": False, "error": f"verify_error:{exc}"}), 400
+
+    claims = credential.get("claims") or credential.get("credentialSubject") or {}
+    if not claims.get("isHuman"):
+        return jsonify({"success": False, "error": "not_ishuman"}), 400
+    bound_site = claims.get("siteId") or claims.get("site_id") or claims.get("siteDomain") or ""
+    if expected_site_id and bound_site and bound_site != expected_site_id:
+        return jsonify({"success": False, "error": "site_id_mismatch", "bound_site": bound_site}), 400
+
+    try:
+        expires_at = int(claims.get("expiresAt") or 0)
+        if expires_at and expires_at < int(time.time()):
+            return jsonify({"success": False, "error": "expired"}), 400
+    except (TypeError, ValueError):
+        pass
+
+    credential_id = credential.get("id") or ""
+    if credential_id:
+        try:
+            from api.revocation_verifier import is_credential_revoked
+            if is_credential_revoked(credential_id):
+                return jsonify({"success": False, "error": "revoked"}), 400
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Revocation check unavailable: %s", exc)
+
+    session_assertion = body.get("session_assertion") or None
+    session_signature = (body.get("session_signature") or "").strip()
+    session_status = "absent"
+    session_reason = "ok"
+    if session_assertion and session_signature:
+        site_pubkey = claims.get("site_signing_pubkey") or claims.get("siteSigningPubkey") or ""
+        if not site_pubkey:
+            session_status = "skipped"
+            session_reason = "credential_missing_site_signing_pubkey"
+        else:
+            ok, reason = _verify_session_assertion_server(
+                assertion=session_assertion,
+                signature_b64url=session_signature,
+                site_pubkey_b64url=site_pubkey,
+                expected_site_id=expected_site_id or bound_site,
+                expected_bloom_sequence=body.get("bloom_sequence"),
+            )
+            session_status = "valid" if ok else "invalid"
+            session_reason = reason
+            if not ok:
+                return jsonify({
+                    "success": False,
+                    "error": session_reason,
+                    "session_status": session_status,
+                }), 400
+
+    return jsonify({
+        "success": True,
+        "human": True,
+        "ppid": credential.get("subject"),
+        "credential_id": credential_id,
+        "site_id": bound_site,
+        "issuer": issuer_did,
+        "session_status": session_status,
+        "session_reason": session_reason,
+    })
+
+
+# ---------------------------------------------------------------------------
 # 9. Approve network revocation (admin action)
 # ---------------------------------------------------------------------------
 

@@ -26,7 +26,7 @@
  * Optional `autoProvision: true` opens a Lemma-hosted popup to unlock the wallet
  * and complete IDV when no master isHuman proof is present yet.
  *
- * @version 1.4.2
+ * @version 1.4.3
  */
 
 (function () {
@@ -37,7 +37,7 @@ if (typeof window !== 'undefined' && window.IsHumanVerifier) {
 }
 
 const LEMMA_ORIGIN = 'https://lemma.id';
-const BRIDGE_PATH = '/wallet/bridge?v=1.4.2';
+const BRIDGE_PATH = '/wallet/bridge?v=1.4.3';
 const BRIDGE_TIMEOUT_MS = 8000;
 const PRESENTATION_PREFIX = 'lemma:site-presentation:v1';
 const MAX_PRESENTATION_STALENESS_SECONDS = 120;
@@ -625,16 +625,17 @@ class IsHumanVerifier {
             return this._result(false, credential.subject, sessionCheck.reason, t0, sessionCheck.error);
         }
 
-        this._persistSession({
+        const session = {
             siteId: this.siteId,
             credential,
             session_assertion: bridgeResult.session_assertion,
             session_signature: bridgeResult.session_signature,
             session_nonce: bridgeResult.session_nonce,
             bloom_sequence: Number(this._bloomSnapshot?.sequence_number ?? 0),
-        });
+        };
+        this._persistSession(session);
 
-        return this._result(true, credential.subject, 'valid', t0);
+        return this._result(true, credential.subject, 'valid', t0, null, session);
     }
 
     /**
@@ -927,11 +928,11 @@ class IsHumanVerifier {
                 bloomSequence,
             );
             if (sessionCheck.ok) {
-                return this._result(true, credential.subject, 'session_valid', t0);
+                return this._result(true, credential.subject, 'session_valid', t0, null, session);
             }
         }
 
-        return this._result(true, credential.subject, 'vc_valid', t0);
+        return this._result(true, credential.subject, 'vc_valid', t0, null, session);
     }
 
     async _verifyWithLegacyPresentation(bridgeResult, t0) {
@@ -991,7 +992,13 @@ class IsHumanVerifier {
             return this._result(false, credential.subject, 'site_blocked', t0);
         }
 
-        return this._result(true, credential.subject, 'valid', t0);
+        return this._result(true, credential.subject, 'valid', t0, null, {
+            credential,
+            session_assertion: null,
+            session_signature: null,
+            session_nonce: null,
+            bloom_sequence: Number(this._bloomSnapshot?.sequence_number ?? 0),
+        });
     }
 
     async _verifySessionFromBridgeResult(bridgeResult, credential) {
@@ -1318,16 +1325,17 @@ class IsHumanVerifier {
             return this._result(false, credential.subject, sessionCheck.reason, t0, sessionCheck.error);
         }
 
-        this._persistSession({
+        const session = {
             siteId: this.siteId,
             credential,
             session_assertion: detail.session_assertion,
             session_signature: detail.session_signature,
             session_nonce: sessionNonce,
             bloom_sequence: Number(this._bloomSnapshot?.sequence_number ?? 0),
-        });
+        };
+        this._persistSession(session);
 
-        return this._result(true, credential.subject, 'valid', t0);
+        return this._result(true, credential.subject, 'valid', t0, null, session);
     }
 
     _issueSiteProofViaPopup() {
@@ -1510,12 +1518,43 @@ class IsHumanVerifier {
         });
     }
 
-    _result(human, ppid, reason, t0, error) {
+    _result(human, ppid, reason, t0, error, presentation) {
         const timeMs = performance.now() - t0;
         if (this.debug) {
             console.log(`[isHuman] ${human ? 'PASS' : 'FAIL'} reason=${reason} time=${timeMs.toFixed(1)}ms ppid=${ppid || '-'}`);
         }
-        return { human, ppid: ppid || null, reason, timeMs, error: error || null };
+        const result = {
+            human,
+            ppid: ppid || null,
+            reason,
+            timeMs,
+            error: error || null,
+            credential: null,
+            presentation: null,
+        };
+        if (human && presentation && typeof presentation === 'object') {
+            const cred = presentation.credential || null;
+            const assertion = presentation.session_assertion || null;
+            const signature = presentation.session_signature || null;
+            const nonce = presentation.session_nonce || null;
+            const bloomSequence = Number.isFinite(Number(presentation.bloom_sequence))
+                ? Number(presentation.bloom_sequence)
+                : Number(this._bloomSnapshot?.sequence_number ?? 0);
+            if (cred) {
+                result.credential = cred;
+                result.presentation = {
+                    siteId: this.siteId,
+                    credential: cred,
+                    session_assertion: assertion,
+                    session_signature: signature,
+                    session_nonce: nonce,
+                    bloom_sequence: bloomSequence,
+                    issuer_did: cred.issuer || cred.issuerInfo?.did || null,
+                    issuer_pubkey: cred.issuerInfo?.publicKey || null,
+                };
+            }
+        }
+        return result;
     }
 }
 
