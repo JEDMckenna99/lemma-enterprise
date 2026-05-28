@@ -26,7 +26,7 @@
  * Optional `autoProvision: true` opens a Lemma-hosted popup to unlock the wallet
  * and complete IDV when no master isHuman proof is present yet.
  *
- * @version 1.5.4
+ * @version 1.5.5
  */
 
 (function () {
@@ -37,7 +37,7 @@ if (typeof window !== 'undefined' && window.IsHumanVerifier) {
 }
 
 const LEMMA_ORIGIN = 'https://lemma.id';
-const BRIDGE_PATH = '/wallet/bridge?v=1.5.4';
+const BRIDGE_PATH = '/wallet/bridge?v=1.5.5';
 const BRIDGE_TIMEOUT_MS = 8000;
 const PRESENTATION_PREFIX = 'lemma:site-presentation:v1';
 const MAX_PRESENTATION_STALENESS_SECONDS = 120;
@@ -1467,9 +1467,28 @@ class IsHumanVerifier {
             session_signature: detail?.session_signature,
             session_nonce: sessionNonce,
         };
-        const sessionCheck = await this._verifySessionFromBridgeResult(bridgeResult, credential);
+        let sessionCheck = await this._verifySessionFromBridgeResult(bridgeResult, credential);
+        // The popup signs the session_assertion against a specific Bloom
+        // sequence. If that sequence drifted between popup-sign and
+        // SDK-verify (e.g. another network revocation landed, or the popup
+        // and the SDK saw different post-reset snapshots), one extra forced
+        // refresh + retry will sync them. We do NOT fall through into a
+        // fresh-IDV loop on this reason — it's a transient race, not a
+        // revoked credential.
+        if (!sessionCheck.ok && sessionCheck.reason === 'session_bloom_sequence_mismatch') {
+            try {
+                await this._syncBloom({ force: true });
+            } catch { /* fall through to original failure */ }
+            sessionCheck = await this._verifySessionFromBridgeResult(bridgeResult, credential);
+        }
         if (!sessionCheck.ok) {
-            return this._result(false, credential.subject, sessionCheck.reason, t0, sessionCheck.error);
+            // Don't recurse back into the popup-trigger set on a bloom
+            // mismatch — it would spin into a popup loop. Surface the
+            // mismatch as a distinct reason instead.
+            const reason = sessionCheck.reason === 'session_bloom_sequence_mismatch'
+                ? 'session_bloom_sequence_mismatch'
+                : sessionCheck.reason;
+            return this._result(false, credential.subject, reason, t0, sessionCheck.error);
         }
 
         const session = {

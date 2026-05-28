@@ -419,12 +419,39 @@
                 }
             }
 
+            // 2.5. The server just cleared this wallet's revocations as part
+            //      of the fresh IDV reset, which rebuilds the Bloom snapshot
+            //      and bumps its sequence_number. The URL-supplied bloom
+            //      sequence is pre-reset; fetch the latest so the session
+            //      assertion is signed with the same sequence the SDK will
+            //      verify against after its own force-refresh. Without this
+            //      the SDK rejects the session with
+            //      session_bloom_sequence_mismatch and loops back into IDV.
+            let effectiveBloomSeq = bloomSequence;
+            try {
+                const blRes = await fetch('/api/revocation/bloom-filter', {
+                    credentials: 'omit',
+                    cache: 'no-store',
+                });
+                const blData = await blRes.json();
+                const fresh = Number(
+                    (blData && blData.snapshot && blData.snapshot.sequence_number)
+                    ?? blData?.sequence_number
+                    ?? 0,
+                );
+                if (Number.isFinite(fresh) && fresh > 0) {
+                    effectiveBloomSeq = fresh;
+                }
+            } catch (err) {
+                console.warn('[isHuman IDV] could not refresh bloom sequence:', err?.message);
+            }
+
             // 3. Derive a fresh site proof from the newly-issued master and
             //    post it back to the customer site.
             const pkg = await wallet.issueSiteProofPackage({
                 siteId: requestingSite,
                 sessionNonce: clientSessionNonce,
-                bloomSequence,
+                bloomSequence: effectiveBloomSeq,
                 sessionTtlSec,
             });
 
