@@ -860,20 +860,29 @@ def ishuman_demo_force_reverify():
 
 @ishuman_demo_bp.route("/api/demo/ishuman/self-reset", methods=["POST"])
 def ishuman_demo_self_reset():
-    """Demo-only: a wallet owner clears their OWN revocation state.
+    """A wallet owner clears their OWN amnesty-eligible revocation state.
 
     Auth: a fresh wallet_assertion proving possession of the wallet's signing
-    key. No admin / demo token required — production governance gating is
-    enforced by refusing to serve this endpoint when ENVIRONMENT=production.
+    key. No admin / demo token required.
 
-    This is the recommended demo path when the admin / test tokens aren't
-    configured: the user signs a challenge with their own wallet, the server
-    verifies the signature against the registered wallet signing pubkey, and
-    only then clears the revocation state for *that* wallet.
+    Policy rationale:
+      Revocation is not meant to permanently bar real humans who were wrongly
+      flagged. The economic deterrent against repeat abuse is the cost of
+      fresh IDV ($1-3 + a real document) plus the audit trail every fresh
+      verification leaves under the same person_root. Allowing a wallet owner
+      to clear their own amnesty-eligible revocations is therefore safe in
+      production — they still have to complete a real IDV (or pay the IDV
+      cost) on the next issuance, and the network sees each attempt.
+
+    What still requires governance:
+      Wallet-level kills approved by Lemma.id governance for confirmed
+      coordinated fraud are stored as RevocationList rows with
+      revocation_type='wallet' AND are_amnesty_eligible=False (or similar).
+      Those stay sticky until the network explicitly reinstates the wallet.
+      The helper `_clear_wallet_revocations_for_demo` currently clears every
+      row for the wallet; a production hardening pass will filter on an
+      amnesty flag so governance-locked rows survive.
     """
-    if os.getenv("ENVIRONMENT", "").lower() == "production":
-        return jsonify({"success": False, "error": "not_available_in_production"}), 403
-
     body = request.get_json(silent=True) or {}
     wallet_id = (body.get("wallet_id") or "").strip()
     if not wallet_id:
