@@ -858,6 +858,58 @@ def ishuman_demo_force_reverify():
         db.close()
 
 
+@ishuman_demo_bp.route("/api/demo/ishuman/self-reset", methods=["POST"])
+def ishuman_demo_self_reset():
+    """Demo-only: a wallet owner clears their OWN revocation state.
+
+    Auth: a fresh wallet_assertion proving possession of the wallet's signing
+    key. No admin / demo token required — production governance gating is
+    enforced by refusing to serve this endpoint when ENVIRONMENT=production.
+
+    This is the recommended demo path when the admin / test tokens aren't
+    configured: the user signs a challenge with their own wallet, the server
+    verifies the signature against the registered wallet signing pubkey, and
+    only then clears the revocation state for *that* wallet.
+    """
+    if os.getenv("ENVIRONMENT", "").lower() == "production":
+        return jsonify({"success": False, "error": "not_available_in_production"}), 403
+
+    body = request.get_json(silent=True) or {}
+    wallet_id = (body.get("wallet_id") or "").strip()
+    if not wallet_id:
+        return jsonify({"success": False, "error": "wallet_id required"}), 400
+
+    from api.ishuman import _require_wallet_assertion
+    err, _wid = _require_wallet_assertion(body, field_names=["wallet_id"])
+    if err:
+        return err
+
+    from api.database import SessionLocal, IsHumanVerification
+
+    db = SessionLocal()
+    try:
+        latest_master = (
+            db.query(IsHumanVerification)
+            .filter_by(wallet_id=wallet_id, status="verified")
+            .order_by(IsHumanVerification.verified_at.desc())
+            .first()
+        )
+        latest_master_id = latest_master.credential_id if latest_master else ""
+        summary = _clear_wallet_revocations_for_demo(
+            db,
+            wallet_id=wallet_id,
+            new_master_credential_id=latest_master_id,
+            reason="demo_self_reset",
+        )
+        return jsonify({"success": True, **summary})
+    except Exception as exc:  # noqa: BLE001
+        db.rollback()
+        logger.exception("Demo self-reset failed for %s", wallet_id)
+        return jsonify({"success": False, "error": f"reset_failed:{exc}"}), 500
+    finally:
+        db.close()
+
+
 @ishuman_demo_bp.route("/api/demo/ishuman/reset-wallet", methods=["POST"])
 def ishuman_demo_reset_wallet():
     """Demo-only manual escape hatch: clear all revocation state for a wallet
