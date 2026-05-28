@@ -530,9 +530,20 @@ def _clear_wallet_revocations_for_demo(
     """
     from api.database import RevocationList, SiteBlock, DerivedCredential, IsHumanVerification
 
+    logger.info(
+        "[demo-reset] start wallet_id=%s new_master=%s reason=%s",
+        wallet_id,
+        (new_master_credential_id or "")[:30],
+        reason,
+    )
+
     derived_rows = db.query(DerivedCredential).filter_by(wallet_id=wallet_id).all()
     derived_ppids = sorted({row.derived_ppid for row in derived_rows if row.derived_ppid})
     derived_cred_ids = sorted({row.derived_credential_id for row in derived_rows if row.derived_credential_id})
+    logger.info(
+        "[demo-reset] derived_credentials=%d ppids=%d",
+        len(derived_rows), len(derived_ppids),
+    )
 
     masters = db.query(IsHumanVerification).filter_by(wallet_id=wallet_id).all()
     stale_master_cred_ids = sorted({
@@ -608,7 +619,7 @@ def _clear_wallet_revocations_for_demo(
     except Exception:
         pass
 
-    return {
+    summary = {
         "wallet_id": wallet_id,
         "cleared_revocation_entries": int(cleared_entries),
         "cleared_site_blocks": int(site_blocks_cleared),
@@ -616,6 +627,15 @@ def _clear_wallet_revocations_for_demo(
         "superseded_master_records": int(superseded_masters),
         "derived_ppids_cleared": derived_ppids,
     }
+    logger.info(
+        "[demo-reset] done wallet_id=%s revocation_entries=%d site_blocks=%d reactivated=%d superseded=%d",
+        wallet_id,
+        summary["cleared_revocation_entries"],
+        summary["cleared_site_blocks"],
+        summary["reactivated_derived_credentials"],
+        summary["superseded_master_records"],
+    )
+    return summary
 
 
 @ishuman_demo_bp.route("/api/demo/ishuman/verify-once-test-mode", methods=["POST"])
@@ -834,6 +854,56 @@ def ishuman_demo_force_reverify():
     except Exception:
         db.rollback()
         raise
+    finally:
+        db.close()
+
+
+@ishuman_demo_bp.route("/api/demo/ishuman/reset-wallet", methods=["POST"])
+def ishuman_demo_reset_wallet():
+    """Demo-only manual escape hatch: clear all revocation state for a wallet
+    without requiring a fresh IDV cycle. Lets a demo operator unstick the
+    system when the popup loop didn't reach `_clear_wallet_revocations_for_demo`
+    cleanly.
+
+    Token-gated by LEMMA_ISHUMAN_DEMO_ADMIN_TOKEN (X-Demo-Admin-Token). Returns
+    counts of rows cleared so the caller can confirm the reset landed.
+    """
+    expected = os.getenv("LEMMA_ISHUMAN_DEMO_ADMIN_TOKEN")
+    provided = request.headers.get("X-Demo-Admin-Token") or ""
+    if not expected or provided != expected:
+        return jsonify({
+            "success": False,
+            "error": "demo_admin_token_required",
+            "message": "Set LEMMA_ISHUMAN_DEMO_ADMIN_TOKEN and pass X-Demo-Admin-Token.",
+        }), 403
+
+    body = request.get_json(silent=True) or {}
+    wallet_id = (body.get("wallet_id") or "").strip()
+    if not wallet_id:
+        return jsonify({"success": False, "error": "wallet_id required"}), 400
+
+    from api.database import SessionLocal, IsHumanVerification
+
+    db = SessionLocal()
+    try:
+        latest_master = (
+            db.query(IsHumanVerification)
+            .filter_by(wallet_id=wallet_id, status="verified")
+            .order_by(IsHumanVerification.verified_at.desc())
+            .first()
+        )
+        latest_master_id = latest_master.credential_id if latest_master else ""
+        summary = _clear_wallet_revocations_for_demo(
+            db,
+            wallet_id=wallet_id,
+            new_master_credential_id=latest_master_id,
+            reason="demo_manual_reset",
+        )
+        return jsonify({"success": True, **summary})
+    except Exception as exc:  # noqa: BLE001
+        db.rollback()
+        logger.exception("Demo reset-wallet failed for %s", wallet_id)
+        return jsonify({"success": False, "error": f"reset_failed:{exc}"}), 500
     finally:
         db.close()
 
