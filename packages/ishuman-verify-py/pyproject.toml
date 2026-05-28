@@ -1,0 +1,41 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "lemma-ishuman-verify"
+version = "1.0.0"
+description = "Local-first isHuman presentation verifier for relying-site backends. Verifies signed VC + site-bound session presentations with no per-request calls to lemma.id."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "Apache-2.0" }
+authors = [{ name = "Lemma", email = "hello@lemma.id" }]
+keywords = [
+  "lemma",
+  "ishuman",
+  "verifier",
+  "ed25519",
+  "privacy",
+  "ppid",
+  "identity",
+  "human-verification",
+]
+classifiers = [
+  "License :: OSI Approved :: Apache Software License",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3 :: Only",
+  "Topic :: Security :: Cryptography",
+  "Topic :: Internet :: WWW/HTTP",
+  "Intended Audience :: Developers",
+]
+dependencies = [
+  "cryptography>=42.0.0",
+]
+
+[project.urls]
+Homepage = "https://lemma.id/docs/ishuman"
+Documentation = "https://lemma.id/docs/ishuman"
+Repository = "https://github.com/JEDMckenna99/lemma-enterprise"
+
+[tool.setuptools]
+py-modules = ["lemma_ishuman_verify"]
