@@ -105,11 +105,13 @@
         const openerOrigin = params.get('origin') || '*';
         const requestingSite = params.get('site_id') || 'customer site';
         const issueMode = params.get('issue_mode') || '';
+        const refreshReason = params.get('refresh_reason') || '';
         const requestNonce = params.get('request_nonce') || '';
         const clientSessionNonce = params.get('session_nonce') || '';
         const bloomSequence = Number(params.get('bloom_sequence') || 0);
         const sessionTtlSec = Number(params.get('session_ttl_sec') || (24 * 60 * 60));
         const isSiteProofIssue = issueMode === 'site_proof' && !!clientSessionNonce;
+        const isFreshIdv = issueMode === 'fresh_idv' && !!clientSessionNonce;
         const isVerificationReturn = params.has('verification_return');
         const root = document.getElementById('ishuman-idv-root');
         const testVerifyEnabled = root.dataset.testVerifyEnabled === 'true';
@@ -369,7 +371,47 @@
             return true;
         }
 
+        async function runFreshIdvAndClose() {
+            setStatus('Starting fresh identity check…', 'loading');
+            await ensureWalletUnlocked();
+
+            // Force a brand-new IDV regardless of any existing master, then
+            // derive a site proof against the fresh credential.
+            if (isVerificationReturn && sessionId) {
+                await pollAndStoreMaster();
+            } else if (testVerifyEnabled && serverTestToken) {
+                setStatus('Completing demo verification…', 'loading');
+                await verifyOnceTestMode();
+            } else {
+                setStatus('Opening Stripe Identity…', 'loading');
+                await startStripeVerification();
+                return false;
+            }
+
+            const pkg = await wallet.issueSiteProofPackage({
+                siteId: requestingSite,
+                sessionNonce: clientSessionNonce,
+                bloomSequence,
+                sessionTtlSec,
+            });
+
+            setStatus('Fresh verification complete. Re-entry granted.', 'success');
+            setTimeout(() => closeWith('ISHUMAN_SITE_PROOF_ISSUED', {
+                credential: pkg.credential,
+                session_assertion: pkg.session_assertion,
+                session_signature: pkg.session_signature,
+                session_nonce: clientSessionNonce,
+                request_nonce: requestNonce,
+                reason: 'fresh_idv_complete',
+                refresh_reason: refreshReason,
+            }), 400);
+            return true;
+        }
+
         async function runVerification() {
+            if (isFreshIdv) {
+                return runFreshIdvAndClose();
+            }
             if (isSiteProofIssue) {
                 return issueSiteProofAndClose();
             }
@@ -421,6 +463,26 @@
             if (!window.opener) {
                 setStatus('Open this page from a customer site action, not directly.', 'error');
                 document.getElementById('cancel-btn').textContent = 'Close';
+                return;
+            }
+
+            if (isFreshIdv) {
+                const reasonLabel = refreshReason === 'site_blocked'
+                    ? 'This site asked you to re-verify before continuing.'
+                    : 'Your previous verification was revoked.';
+                document.getElementById('intro-copy').textContent =
+                    `${reasonLabel} Complete a fresh identity check to regain access. The site never sees your documents.`;
+                document.getElementById('primary-btn').classList.add('hidden');
+                try {
+                    const done = await runVerification();
+                    if (!done) {
+                        setStatus('Ready when you are.', 'info');
+                    }
+                } catch (err) {
+                    setStatus(err.message || 'Could not complete fresh verification', 'error');
+                    document.getElementById('primary-btn').classList.remove('hidden');
+                    document.getElementById('primary-btn').textContent = 'Try again';
+                }
                 return;
             }
 

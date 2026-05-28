@@ -26,7 +26,7 @@
  * Optional `autoProvision: true` opens a Lemma-hosted popup to unlock the wallet
  * and complete IDV when no master isHuman proof is present yet.
  *
- * @version 1.4.5
+ * @version 1.5.0
  */
 
 (function () {
@@ -37,7 +37,7 @@ if (typeof window !== 'undefined' && window.IsHumanVerifier) {
 }
 
 const LEMMA_ORIGIN = 'https://lemma.id';
-const BRIDGE_PATH = '/wallet/bridge?v=1.4.5';
+const BRIDGE_PATH = '/wallet/bridge?v=1.5.0';
 const BRIDGE_TIMEOUT_MS = 8000;
 const PRESENTATION_PREFIX = 'lemma:site-presentation:v1';
 const MAX_PRESENTATION_STALENESS_SECONDS = 120;
@@ -528,7 +528,60 @@ class IsHumanVerifier {
         this._bridgeReadyPromise = null;
         this._resolveBridgeReady = null;
 
+        // Cross-tab site-block invalidation: when any tab on the same origin
+        // posts a SITE_BLOCK_UPDATE for this site, the cached session is
+        // invalidated immediately so the next verify() rechecks.
+        this._setupBlockBroadcastChannel();
+
         this._initPromise = this._init();
+    }
+
+    _setupBlockBroadcastChannel() {
+        try {
+            if (typeof BroadcastChannel !== 'function') return;
+            this._blockChannel = new BroadcastChannel('lemma-ishuman-blocks');
+            this._blockChannel.onmessage = (event) => {
+                const data = event.data || {};
+                if (data.type !== 'SITE_BLOCK_UPDATE' && data.type !== 'NETWORK_REVOCATION') return;
+                if (data.siteId && data.siteId !== this.siteId) return;
+                if (this.debug) {
+                    console.log('[isHuman] block broadcast received:', data);
+                }
+                this._clearSessionCache();
+                if (data.type === 'NETWORK_REVOCATION') {
+                    // Refresh the Bloom snapshot in the background; the next
+                    // verify() will rebuild the trust state from the fresh
+                    // snapshot rather than the cached one.
+                    this._bloomTrusted = false;
+                    this._bloomSnapshot = null;
+                    this._bloomFilter = new Set();
+                    this._bloomNetworkRefresh = this._syncBloom().catch(() => {});
+                }
+            };
+        } catch { /* BroadcastChannel unavailable — non-fatal */ }
+    }
+
+    /**
+     * Broadcast a site-block or network-revocation event so other tabs on
+     * the same origin (using the same SDK) invalidate their cached sessions.
+     * Sites can call this after triggering a block via their backend.
+     */
+    static broadcastBlockUpdate(payload = {}) {
+        try {
+            if (typeof BroadcastChannel !== 'function') return false;
+            const ch = new BroadcastChannel('lemma-ishuman-blocks');
+            ch.postMessage({
+                type: payload.type || 'SITE_BLOCK_UPDATE',
+                siteId: payload.siteId || null,
+                ppid: payload.ppid || null,
+                timestamp: Date.now(),
+                ...payload,
+            });
+            ch.close();
+            return true;
+        } catch {
+            return false;
+        }
     }
 
     // ------------------------------------------------------------------
@@ -560,10 +613,22 @@ class IsHumanVerifier {
             'no_ishuman_credential',
             'site_proof_required',
             'legacy_credential_format',
+            // A revoked credential is not a permanent block — it triggers a
+            // fresh IDV (or fresh test verification in the demo) so the user
+            // can regain access. The popup runs in 'fresh_idv' mode below.
+            'revoked',
+            'site_blocked',
         ]);
 
         if (popupReasons.has(result.reason)) {
-            const issued = await this._issueSiteProofViaPopup();
+            const needsFreshIdv = result.reason === 'revoked' || result.reason === 'site_blocked';
+            // Clear the locally cached site VC so the recovered credential
+            // (with a fresh credential_id, signature, and session) replaces it.
+            this._clearSessionCache();
+            const issued = await this._issueSiteProofViaPopup({
+                freshIdv: needsFreshIdv,
+                refreshReason: result.reason,
+            });
             if (issued.ok) {
                 this._markProvisionedMaster();
                 await this._syncBridgeAfterIdv(issued.detail);
@@ -662,6 +727,10 @@ class IsHumanVerifier {
         }
         if (this._bridgeIframe && this._bridgeIframe.parentNode) {
             this._bridgeIframe.parentNode.removeChild(this._bridgeIframe);
+        }
+        if (this._blockChannel) {
+            try { this._blockChannel.close(); } catch { /* ignore */ }
+            this._blockChannel = null;
         }
         this._bridgeReady = false;
         this._session = null;
@@ -1399,7 +1468,7 @@ class IsHumanVerifier {
         return this._result(true, credential.subject, 'valid', t0, null, session);
     }
 
-    _issueSiteProofViaPopup() {
+    _issueSiteProofViaPopup(options = {}) {
         return new Promise((resolve) => {
             const requestNonce = randomNonceB64(16);
             const sessionNonce = randomNonceB64(32);
@@ -1408,7 +1477,14 @@ class IsHumanVerifier {
             const popupUrl = new URL(`${this.lemmaOrigin}${this.idvPopupPath}`);
             popupUrl.searchParams.set('origin', window.location.origin);
             popupUrl.searchParams.set('site_id', this.siteId);
-            popupUrl.searchParams.set('issue_mode', 'site_proof');
+            // 'fresh_idv' forces the popup to run a brand-new identity check
+            // (or the test-mode mock in demo) and re-issue a credential after
+            // a revocation. 'site_proof' keeps the existing master and just
+            // derives a fresh per-site credential.
+            popupUrl.searchParams.set('issue_mode', options.freshIdv ? 'fresh_idv' : 'site_proof');
+            if (options.refreshReason) {
+                popupUrl.searchParams.set('refresh_reason', String(options.refreshReason));
+            }
             popupUrl.searchParams.set('request_nonce', requestNonce);
             popupUrl.searchParams.set('session_nonce', sessionNonce);
             popupUrl.searchParams.set('bloom_sequence', String(bloomSequence));

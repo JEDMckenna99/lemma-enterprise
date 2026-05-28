@@ -77,15 +77,40 @@ def test_verifier_site_vc_cache(verifier_source):
     assert "_verifyFromSiteVcCache" in verifier_source
     assert "'vc_valid'" in verifier_source
     assert "isHumanIssuance: true" in verifier_source
-    assert "BRIDGE_PATH = '/wallet/bridge?v=1.4.5'" in verifier_source
+    assert "BRIDGE_PATH = '/wallet/bridge?v=1.5.0'" in verifier_source
     assert "signatureValueWeb" in verifier_source
     assert "legacy_credential_format" in verifier_source
     assert "_hydrateBloomFromCache" in verifier_source
+    assert "broadcastBlockUpdate" in verifier_source
+    assert "fresh_idv" in verifier_source
     assert "result.credential" in verifier_source or "result.presentation" in verifier_source or "credential: cred" in verifier_source
     assert "_issueSiteProofViaPopup" in verifier_source
     assert "_applyIssuedSiteProof" in verifier_source
     assert "ISHUMAN_SITE_PROOF_ISSUED" in verifier_source
     assert "site_proof_required" in verifier_source
+
+
+@pytest.mark.browser
+def test_verifier_routes_revocation_to_fresh_idv_flow(verifier_source):
+    """A revoked credential must open the popup in fresh_idv mode so the user
+    can regain access by completing a new identity check, rather than being
+    permanently blocked."""
+    assert "'revoked'," in verifier_source
+    assert "'site_blocked'," in verifier_source
+    assert "freshIdv: needsFreshIdv" in verifier_source
+    assert "options.freshIdv ? 'fresh_idv' : 'site_proof'" in verifier_source
+    assert "refresh_reason" in verifier_source
+
+
+@pytest.mark.browser
+def test_verifier_broadcasts_site_block_updates_cross_tab(verifier_source):
+    """A per-site block in one tab must invalidate cached sessions in other
+    tabs on the same origin immediately, without waiting for the next poll."""
+    assert "lemma-ishuman-blocks" in verifier_source
+    assert "BroadcastChannel" in verifier_source
+    assert "broadcastBlockUpdate" in verifier_source
+    assert "SITE_BLOCK_UPDATE" in verifier_source
+    assert "NETWORK_REVOCATION" in verifier_source
 
 
 @pytest.mark.browser
@@ -96,6 +121,14 @@ def test_idv_popup_issues_site_proof_via_wallet():
     assert "ISHUMAN_SITE_PROOF_ISSUED" in idv_html
     assert "issue_mode" in idv_html
     assert "site_proof" in idv_html
+
+
+@pytest.mark.browser
+def test_idv_popup_supports_fresh_idv_mode():
+    idv_html = IDV_HTML.read_text(encoding="utf-8")
+    assert "fresh_idv" in idv_html
+    assert "runFreshIdvAndClose" in idv_html
+    assert "Complete a fresh identity check" in idv_html
 
 
 @pytest.mark.browser

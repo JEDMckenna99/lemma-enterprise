@@ -631,6 +631,17 @@
       }),
     });
     state.localBlocks.tickets.add(result.ppid);
+    // Instant cross-tab propagation: any IsHumanVerifier on the same origin
+    // listening on the 'lemma-ishuman-blocks' BroadcastChannel will drop its
+    // cached session and re-check on next verify().
+    if (window.IsHumanVerifier && window.IsHumanVerifier.broadcastBlockUpdate) {
+      window.IsHumanVerifier.broadcastBlockUpdate({
+        type: 'SITE_BLOCK_UPDATE',
+        siteId: SITE_IDS.tickets,
+        ppid: result.ppid,
+        reason: 'demo_site_block',
+      });
+    }
     const netJson = $('ih-master-json');
     if (netJson) netJson.textContent = pretty(payload);
     log('Ticketing site block applied', short(result.ppid));
@@ -701,8 +712,17 @@
     log('Network revocation approved', `${payload.total_revoked} IDs`);
     const outcome = $('ih-abuse-network-outcome');
     if (outcome) {
-      outcome.textContent = `Both sites DENY · revoked (${payload.total_revoked} IDs)`;
+      outcome.textContent = `Both sites DENY · revoked (${payload.total_revoked} IDs) — user can re-enter by completing fresh IDV.`;
       outcome.className = 'abuse-outcome deny';
+    }
+    // Broadcast to all listening tabs/origins so cached sessions invalidate.
+    if (window.IsHumanVerifier && window.IsHumanVerifier.broadcastBlockUpdate) {
+      window.IsHumanVerifier.broadcastBlockUpdate({
+        type: 'NETWORK_REVOCATION',
+        walletId: state.walletId,
+        masterCredentialId: state.masterCredentialId,
+        reason: 'demo_network_revocation',
+      });
     }
     await verifyBothSites();
   }

@@ -184,6 +184,16 @@
             <p class="demo-muted">Status: <span class="demo-pill" id="ih-network-pill">WAITING</span></p>
             <button class="demo-btn demo-btn-danger" id="ih-abuse-network-btn" type="button">Revoke everywhere</button>
             <p class="abuse-outcome" id="ih-abuse-network-outcome">Expected: both denied</p>
+            <p class="demo-notice demo-notice-small">
+              Demo: revokes immediately. <strong>Production</strong>: this action would be
+              queued for Lemma.id governance review (signed evidence package, multi-party
+              approval) before the network-wide Bloom filter rebuilds.
+            </p>
+            <p class="demo-notice demo-notice-small">
+              Revocation is <strong>not</strong> a permanent block. The user can regain
+              access by completing a fresh identity check — the popup will prompt them
+              automatically on their next attempt.
+            </p>
           </div>
         </div>
       </div>
@@ -244,6 +254,6 @@ const result = await new IsHumanVerifier({
 {{ super() }}
 <script src="/static/js/lemma-keys.js?v=3" nonce="{{ csp_nonce }}"></script>
 <script src="/static/js/lemma-wallet.js?v=2535" nonce="{{ csp_nonce }}"></script>
-<script src="/sdk/ishuman-verifier.js?v=1.4.5" nonce="{{ csp_nonce }}"></script>
-<script src="/static/js/demo/ishuman-demo.js?v=5" nonce="{{ csp_nonce }}"></script>
+<script src="/sdk/ishuman-verifier.js?v=1.5.0" nonce="{{ csp_nonce }}"></script>
+<script src="/static/js/demo/ishuman-demo.js?v=6" nonce="{{ csp_nonce }}"></script>
 {% endblock %}
