@@ -1,7 +1,8 @@
 {% extends "modern/layout.html" %}
+{% set is_public_page = true %}
 
 {% block title %}Pricing - lemma.id | Early Access{% endblock %}
-{% block description %}lemma.id is free to integrate during early access, with Stripe Identity verification cost passed through per verified person.{% endblock %}
+{% block description %}lemma.id is free to integrate during early access. Stripe Identity verification is pass-through at $2/person. Local proof checks require no paid server call.{% endblock %}
 
 {% block head %}
 {{ super() }}
@@ -249,43 +250,37 @@
     <div class="early-access-badge">Early Access</div>
     <h1>Free to integrate</h1>
     <p class="subtitle">Add lemma.id during early access with no platform fee.</p>
-    <p class="description">Relying sites get the SDK, dashboard, API keys, local checks, and abuse controls free during early access. First-time human verification uses Stripe Identity pass-through pricing.</p>
+    <p class="description">Relying sites get the SDK, dashboard, API keys, local checks, and abuse controls free during early access. IDV is pass-through only when a user needs first-time verification.</p>
     <div class="pricing-cta">
-        <a href="/docs/ishuman" class="btn btn-primary">Get started</a>
-        <a href="/demo/ishuman" class="btn-secondary">See Demo</a>
+        <a href="/docs" class="btn btn-primary">Add to your site</a>
+        <a href="/demo" class="btn-secondary">See Demo</a>
     </div>
 </div>
 
 <div class="ishuman-pricing">
-    <h2>lemma.id pricing</h2>
-    <p class="intro">Use lemma.id to verify real people with site-private credentials. Pricing stays simple: pass-through IDV cost, free local proof checks, and free integration during early access.</p>
+    <h2>Early access pricing</h2>
+    <p class="intro">Three separate concepts — don't mix them up:</p>
+    <ul style="max-width: 720px; margin: 0 auto 32px; padding-left: 24px; color: var(--gray-700); line-height: 1.8; font-size: var(--font-size-base);">
+        <li><strong>IDV verification</strong> (paid, pass-through): first-time identity check via Stripe Identity — currently $2/person. The relying site or user pays at checkout; lemma.id adds no platform fee.</li>
+        <li><strong>Local proof check</strong> (free): routine <code>verify()</code> calls that validate an existing credential in-browser — no paid server call per check.</li>
+        <li><strong>Site integration</strong> (free in early access): API keys, dashboard, site-block controls, and hosted platform features.</li>
+    </ul>
+    <p class="intro" style="margin-bottom: 24px;"><strong>Recommended use:</strong> trigger IDV only on suspicious or high-risk actions, not every signup. Users who already hold a credential reuse it for free local checks.</p>
     <div class="ishuman-pricing-grid">
         <div class="ishuman-price-card">
-            <h3>IDV verification (first-time)</h3>
+            <h3>IDV verification</h3>
             <p class="price">$2.00 / person</p>
-            <p>Stripe Identity pass-through at checkout, paid by the relying site at cost. No Lemma platform fee on each IDV event.</p>
+            <p>Stripe Identity pass-through for <strong>first-time</strong> verification only. No lemma.id platform fee on each IDV event.</p>
         </div>
         <div class="ishuman-price-card">
-            <h3>JavaScript SDK</h3>
+            <h3>Local proof check</h3>
             <p class="price">Free</p>
-            <p>Embed <code>IsHumanVerifier</code> and run <strong>local proof checks</strong> in the browser without per-call charges (distinct from paid IDV).</p>
+            <p>Embed <code>IsHumanVerifier</code> and validate existing credentials in the browser. No per-check server call or metered fee.</p>
         </div>
         <div class="ishuman-price-card">
             <h3>Site integration</h3>
             <p class="price">Free in early access</p>
-            <p>Create API keys, use site block controls, and integrate check endpoints at no extra cost during early access.</p>
-        </div>
-    </div>
-
-    <div class="future-note" style="margin-top: 40px;">
-        <div class="future-note-inner">
-            <h3>Early access pricing — how costs work</h3>
-            <ul style="margin: 16px 0 0 0; padding-left: 20px; color: var(--gray-700); line-height: 1.7; font-size: var(--font-size-base);">
-                <li><strong>Existing verified user:</strong> local proof checks are free (no server call per check).</li>
-                <li><strong>First-time IDV verification:</strong> Stripe Identity pass-through, currently about $2/person, paid by the relying site at cost.</li>
-                <li><strong>Site integration:</strong> free during early access (API keys, blocks, dashboard).</li>
-                <li><strong>Recommended use:</strong> trigger IDV only on suspicious or high-risk actions, not every signup.</li>
-            </ul>
+            <p>API keys, site-block controls, developer dashboard, and check endpoints at no extra cost during early access.</p>
         </div>
     </div>
 </div>

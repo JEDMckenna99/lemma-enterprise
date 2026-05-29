@@ -1,4 +1,5 @@
 {% extends "modern/layout.html" %}
+{% set is_public_page = true %}
 
 {% block title %}{{ page_title or 'Documentation' }} - lemma.id{% endblock %}
 {% block description %}{{ page_description or 'lemma.id developer documentation - SDK, API, verification flow, and revocation controls.' }}{% endblock %}
@@ -23,7 +24,7 @@
 {% block content %}
 <div class="docs-hero">
     <div class="container">
-        <h1>{{ hero_title or 'lemma.id documentation' }}</h1>
+        <h1>{{ hero_title or 'lemma.id Documentation' }}</h1>
         <p>{{ hero_subtitle or 'Everything you need to integrate lemma.id into your platform.' }}</p>
         
         <!-- Docs Search -->
@@ -62,7 +63,7 @@
 
                 <div class="nav-section">
                     <div class="nav-title">Product Docs</div>
-                    <a href="{{ url_for('docs_ishuman') }}" class="nav-link {% if active_page == 'ishuman' %}active{% endif %}">lemma.id</a>
+                    <a href="{{ url_for('docs_ishuman') }}" class="nav-link {% if active_page == 'ishuman' %}active{% endif %}">Documentation</a>
                 </div>
             </nav>
         </aside>
@@ -146,7 +147,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Search index - public docs surface (isHuman only)
     const docsIndex = [
         {
-            title: 'lemma.id',
+            title: 'lemma.id Documentation',
             url: '{{ url_for("docs_ishuman") }}',
             category: 'integration',
             keywords: 'ishuman proof of humanity stripe identity ppid site block network revoke local verification ed25519 sdk api',

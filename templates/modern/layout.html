@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}lemma.id - enforcement layer for bot abuse{% endblock %}</title>
-    <meta name="description" content="{% block description %}Identity-rooted enforcement for bot abuse and ban evasion. Bind accounts to a verified person, block site-private PPIDs, and require fresh IDV when abuse is confirmed.{% endblock %}">
+    <title>{% block title %}lemma.id - Enforcement for Bot Abuse{% endblock %}</title>
+    <meta name="description" content="{% block description %}lemma.id gives websites an identity-rooted enforcement layer for bot abuse, fraud, and ban evasion. Bind accounts to a verified person and make bans stick.{% endblock %}">
     
     <!-- Favicon -->
     <link rel="icon" href="{{ url_for('static', filename='img/lemma_logo.svg') }}" type="image/svg+xml">
@@ -49,7 +49,7 @@ h1{color:#1e293b;font-weight:600;line-height:1.25;margin-bottom:16px;font-size:4
     
     {% block head %}{% endblock %}
 </head>
-<body>
+<body data-public-page="{% if is_public_page %}true{% else %}false{% endif %}">
     <!-- Navigation Header -->
     <header class="nav-header">
         <nav class="nav-container">
@@ -69,19 +69,27 @@ h1{color:#1e293b;font-weight:600;line-height:1.25;margin-bottom:16px;font-size:4
             <!-- Navigation Links - toggleable on mobile -->
             <div class="nav-center" id="nav-center">
                 <a href="/" class="nav-link" id="nav-product">Product</a>
-                <a href="/demo/ishuman" class="nav-link">Demo</a>
+                <a href="/demo" class="nav-link">Demo</a>
                 <a href="/docs" class="nav-link">Docs</a>
                 <a href="/pricing" class="nav-link" id="nav-pricing">Pricing</a>
                 <a href="/partners" class="nav-link">Partners</a>
                 <a href="/about" class="nav-link">About</a>
+                {% if not is_public_page %}
+                <a href="/admin" class="nav-link" id="nav-admin" style="display:none;">Admin</a>
+                {% endif %}
             </div>
             
-            <!-- Right Side - User State (hidden until auth state resolves) -->
-            <div class="nav-right" id="nav-auth-slot" style="visibility:hidden;">
-                <div id="nav-dashboard-marketing" style="display:none; align-items:center;">
-                    <a href="/developer" class="btn btn-secondary">Dashboard</a>
+            <!-- Right Side - User State -->
+            <div class="nav-right">
+                {% if is_public_page %}
+                <!-- Public marketing pages: no internal dropdown -->
+                <a href="/developer" class="btn btn-secondary" id="public-dashboard-link" style="display:none;">Dashboard</a>
+                <div id="auth-buttons" style="display:flex; gap:12px; align-items:center;">
+                    <a href="/login" class="btn btn-secondary">Sign In</a>
+                    <a href="/register" class="btn btn-primary">Get Started</a>
                 </div>
-                <!-- User dropdown (hidden by default, shown by JS if authenticated) -->
+                {% else %}
+                <!-- App pages: full user dropdown -->
                 <div class="user-dropdown" id="user-dropdown" style="display:none;">
                     <button class="user-dropdown-toggle" id="user-dropdown-toggle" aria-expanded="false">
                         <span class="user-avatar" id="user-avatar">
@@ -95,25 +103,24 @@ h1{color:#1e293b;font-weight:600;line-height:1.25;margin-bottom:16px;font-size:4
                     <div class="user-dropdown-menu" id="userDropdownMenu">
                         <div class="dropdown-header">
                             <div class="dropdown-user-info">
-                                <div class="dropdown-user-name" id="dropdown-email">Customer Account</div>
+                                <div class="dropdown-user-name" id="dropdown-email">Account</div>
                                 <div class="dropdown-user-role" id="dropdown-role">Customer</div>
                             </div>
                         </div>
                         <div class="dropdown-divider"></div>
                         <a href="/wallet" class="dropdown-item">My Wallet</a>
-                        <a href="/developer" class="dropdown-item">Developer Dashboard</a>
-                        <a href="/developer/external-api-keys" class="dropdown-item">API Keys</a>
+                        <a href="/developer" class="dropdown-item" id="dev-dashboard-link" style="display:none;">Developer Dashboard</a>
+                        <a href="/developer/external-api-keys" class="dropdown-item" id="api-keys-link" style="display:none;">API Keys</a>
                         <a href="/admin" class="dropdown-item admin-item" id="admin-dropdown-link" style="display:none;">Admin Panel</a>
                         <div class="dropdown-divider"></div>
                         <a href="#" class="dropdown-item logout-item" id="logout-btn">Sign Out</a>
                     </div>
                 </div>
-                
-                <!-- Auth buttons (shown by default, hidden by JS if authenticated) -->
                 <div id="auth-buttons" style="display:flex; gap:12px; align-items:center;">
                     <a href="/login" class="btn btn-secondary">Sign In</a>
                     <a href="/register" class="btn btn-primary">Get Started</a>
                 </div>
+                {% endif %}
             </div>
         </nav>
     </header>
@@ -490,33 +497,39 @@ h1{color:#1e293b;font-weight:600;line-height:1.25;margin-bottom:16px;font-size:4
 
                 // Shared auth helpers/auto-attach are initialized globally above.
 
-                function isMarketingPath() {
-                    const p = window.location.pathname;
-                    return !/^\/(developer|admin|wallet|app)(\/|$)/.test(p);
-                }
-
-                function revealNavAuthSlot() {
-                    const slot = document.getElementById('nav-auth-slot');
-                    if (slot) slot.style.visibility = 'visible';
-                }
+                const isPublicPage = document.body.dataset.publicPage === 'true';
 
                 function setLoggedOutUI() {
                     const userDropdown = document.getElementById('user-dropdown');
                     const authButtons = document.getElementById('auth-buttons');
-                    const navDashboard = document.getElementById('nav-dashboard-marketing');
+                    const publicDashboard = document.getElementById('public-dashboard-link');
                     if (userDropdown) userDropdown.style.display = 'none';
                     if (authButtons) authButtons.style.display = 'flex';
-                    if (navDashboard) navDashboard.style.display = 'none';
+                    if (publicDashboard) publicDashboard.style.display = 'none';
 
+                    const navAdmin = document.getElementById('nav-admin');
                     const adminDropdown = document.getElementById('admin-dropdown-link');
+                    if (navAdmin) navAdmin.style.display = 'none';
                     if (adminDropdown) adminDropdown.style.display = 'none';
+
+                    const devDashboardLink = document.getElementById('dev-dashboard-link');
+                    const apiKeysLink = document.getElementById('api-keys-link');
+                    if (devDashboardLink) devDashboardLink.style.display = 'none';
+                    if (apiKeysLink) apiKeysLink.style.display = 'none';
 
                     const pricingLink = document.getElementById('nav-pricing');
                     if (pricingLink) pricingLink.style.display = 'block';
 
                     delete window.lemmaCredential;
                     delete window.lemmaAuth;
-                    revealNavAuthSlot();
+                }
+
+                function isDeveloperAccount(normalized, claims) {
+                    const accountType = (normalized?.accountType || claims.accountType || '').toLowerCase();
+                    const permissionId = (normalized?.permissionId || claims.permissionId || '').toLowerCase();
+                    if (['customer', 'developer', 'admin'].includes(accountType)) return true;
+                    if (['admin_access', 'super_admin', 'admin', 'superadmin', 'site_admin'].includes(permissionId)) return true;
+                    return normalized?.isAdmin === true;
                 }
 
                 function handleLockedState() {
@@ -617,18 +630,15 @@ h1{color:#1e293b;font-weight:600;line-height:1.25;margin-bottom:16px;font-size:4
                         console.log('🔐 Auth: Found credential', { id: cred.id, normalized });
                     }
                     
-                    // Show authenticated UI (marketing: Dashboard only; app areas: full menu)
+                    // Show authenticated UI
                     const userDropdown = document.getElementById('user-dropdown');
                     const authButtons = document.getElementById('auth-buttons');
-                    const navDashboard = document.getElementById('nav-dashboard-marketing');
-                    const onMarketing = isMarketingPath();
-                    if (onMarketing) {
-                        if (userDropdown) userDropdown.style.display = 'none';
-                        if (navDashboard) navDashboard.style.display = 'flex';
+                    const publicDashboard = document.getElementById('public-dashboard-link');
+                    if (isPublicPage) {
                         if (authButtons) authButtons.style.display = 'none';
+                        if (publicDashboard) publicDashboard.style.display = 'inline-flex';
                     } else {
                         if (userDropdown) userDropdown.style.display = 'block';
-                        if (navDashboard) navDashboard.style.display = 'none';
                         if (authButtons) authButtons.style.display = 'none';
                     }
                     
@@ -663,8 +673,16 @@ h1{color:#1e293b;font-weight:600;line-height:1.25;margin-bottom:16px;font-size:4
                         claims.accountType === 'admin'
                     );
                     
-                    if (isAdmin && !onMarketing) {
+                    const showDeveloperNav = isDeveloperAccount(normalized, claims);
+                    const devDashboardLink = document.getElementById('dev-dashboard-link');
+                    const apiKeysLink = document.getElementById('api-keys-link');
+                    if (devDashboardLink) devDashboardLink.style.display = showDeveloperNav ? 'flex' : 'none';
+                    if (apiKeysLink) apiKeysLink.style.display = showDeveloperNav ? 'flex' : 'none';
+
+                    if (isAdmin) {
+                        const navAdmin = document.getElementById('nav-admin');
                         const adminDropdown = document.getElementById('admin-dropdown-link');
+                        if (navAdmin) navAdmin.style.display = 'block';
                         if (adminDropdown) adminDropdown.style.display = 'block';
 
                         // Keep server-side wallet session warm so /admin route gate
@@ -674,9 +692,9 @@ h1{color:#1e293b;font-weight:600;line-height:1.25;margin-bottom:16px;font-size:4
                         });
                     }
                     
-                    // Hide pricing for authenticated users
+                    // Hide pricing for authenticated users on app pages only
                     const pricingLink = document.getElementById('nav-pricing');
-                    if (pricingLink) pricingLink.style.display = 'none';
+                    if (pricingLink && !isPublicPage) pricingLink.style.display = 'none';
                     
                     // Store credential globally for API calls
                     window.lemmaCredential = cred;
@@ -692,14 +710,12 @@ h1{color:#1e293b;font-weight:600;line-height:1.25;margin-bottom:16px;font-size:4
                     setLoggedOutUI();
                     // Credential-first policy: do not auto-issue via PPID fallback here.
                 }
-                revealNavAuthSlot();
             } catch (error) {
                 // Log error for debugging (not completely silent)
                 console.warn('🔐 Auth init warning:', error.message);
                 if (localStorage.getItem('lemma_debug_auth') === 'true') {
                     console.error('🔐 Auth init error details:', error);
                 }
-                revealNavAuthSlot();
             }
         }
         
