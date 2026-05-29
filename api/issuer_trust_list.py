@@ -226,10 +226,16 @@ def verify_signed_trust_list(payload: dict[str, Any], *, now_unix: int | None = 
         if payload.get(key) in (None, ""):
             return False, f"trust_list_{key}_missing"
 
+    # Clock-skew tolerance (seconds). Mirrors the browser verifier
+    # (ishuman-verifier.js TIME_SKEW_SECONDS = 300): client/server clocks
+    # routinely drift, so a freshly-signed list whose generated_at_unix is a few
+    # seconds ahead of the verifier's clock must not be rejected. 300 s is the
+    # conventional window for signed time bounds in identity / OAuth specs.
+    _TIME_SKEW_SECONDS = 300
     now = int(now_unix if now_unix is not None else time.time())
-    if now < int(payload["generated_at_unix"]):
+    if now + _TIME_SKEW_SECONDS < int(payload["generated_at_unix"]):
         return False, "trust_list_not_yet_valid"
-    if now > int(payload["valid_until_unix"]):
+    if now - _TIME_SKEW_SECONDS > int(payload["valid_until_unix"]):
         return False, "trust_list_expired"
 
     if not isinstance(payload.get("issuers"), list) or not payload["issuers"]:
