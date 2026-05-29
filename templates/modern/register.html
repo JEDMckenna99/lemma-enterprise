@@ -1,7 +1,7 @@
 {% extends "modern/layout.html" %}
 
 {% block title %}Create Account - lemma.id{% endblock %}
-{% block description %}Create your Lemma Shield account and get API keys to protect your website in minutes.{% endblock %}
+{% block description %}Create your lemma.id developer account and get API keys to add identity-rooted abuse enforcement to your site in minutes.{% endblock %}
 
 {% block head %}
     {{ super() }}
@@ -424,10 +424,10 @@
     <div class="register-container">
         <div class="register-card">
             <div class="register-header">
-                <div class="register-icon">🛡️</div>
-                <h1 class="register-title">Join Lemma Shield</h1>
+                <div class="register-icon"><img src="{{ url_for('static', filename='img/lemma_logo.svg') }}" alt="" width="40" height="40" style="display:block;"></div>
+                <h1 class="register-title">Create your lemma.id account</h1>
                 <p class="register-subtitle">
-                    Protect your website from bots with cryptographic verification. Get started in under 2 minutes.
+                    Add identity-rooted abuse enforcement to your site with site-private PPIDs and local verification. Get started in under 2 minutes.
                 </p>
                 
                 <div class="features-preview">
@@ -453,7 +453,7 @@
             </div>
 
             <div class="success-message" id="successMessage">
-                <strong>Welcome to Lemma Shield!</strong> Your API key is ready to use.
+                <strong>Welcome to lemma.id!</strong> Your API key is ready to use.
             </div>
 
             <form id="registerForm">

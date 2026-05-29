@@ -1,7 +1,7 @@
 {% extends "modern/layout.html" %}
 
-{% block title %}{{ page_title or 'isHuman Documentation' }} - lemma.id{% endblock %}
-{% block description %}{{ page_description or 'isHuman developer documentation - SDK, API, verification flow, and revocation controls.' }}{% endblock %}
+{% block title %}{{ page_title or 'Documentation' }} - lemma.id{% endblock %}
+{% block description %}{{ page_description or 'lemma.id developer documentation - SDK, API, verification flow, and revocation controls.' }}{% endblock %}
 
 {% block preload_scripts %}
 <!-- Docs pages skip wallet preload for faster LCP -->
@@ -23,8 +23,8 @@
 {% block content %}
 <div class="docs-hero">
     <div class="container">
-        <h1>{{ hero_title or 'isHuman Documentation' }}</h1>
-        <p>{{ hero_subtitle or 'Everything you need to integrate isHuman into your platform.' }}</p>
+        <h1>{{ hero_title or 'lemma.id documentation' }}</h1>
+        <p>{{ hero_subtitle or 'Everything you need to integrate lemma.id into your platform.' }}</p>
         
         <!-- Docs Search -->
         <div class="docs-search-container">
@@ -57,12 +57,12 @@
         <aside class="docs-sidebar" id="docs-sidebar">
             <nav class="docs-nav">
                 <div class="nav-product-label">
-                    <a href="{{ url_for('docs_ishuman') }}" class="nav-product-link">isHuman Network</a>
+                    <a href="{{ url_for('docs_ishuman') }}" class="nav-product-link">lemma.id</a>
                 </div>
 
                 <div class="nav-section">
                     <div class="nav-title">Product Docs</div>
-                    <a href="{{ url_for('docs_ishuman') }}" class="nav-link {% if active_page == 'ishuman' %}active{% endif %}">isHuman Network</a>
+                    <a href="{{ url_for('docs_ishuman') }}" class="nav-link {% if active_page == 'ishuman' %}active{% endif %}">lemma.id</a>
                 </div>
             </nav>
         </aside>
@@ -146,11 +146,11 @@ document.addEventListener('DOMContentLoaded', () => {
     // Search index - public docs surface (isHuman only)
     const docsIndex = [
         {
-            title: 'isHuman Network',
+            title: 'lemma.id',
             url: '{{ url_for("docs_ishuman") }}',
             category: 'integration',
             keywords: 'ishuman proof of humanity stripe identity ppid site block network revoke local verification ed25519 sdk api',
-            excerpt: 'Integrate isHuman verification, site-private credential derivation, and two-tier revocation controls.'
+            excerpt: 'Integrate lemma.id verification, site-private credential derivation, and two-tier revocation controls.'
         }
     ];
     

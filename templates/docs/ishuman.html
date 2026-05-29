@@ -1,12 +1,35 @@
 {% extends "docs/layout.html" %}
 {% set active_page = 'ishuman' %}
-{% set hero_title = 'isHuman Network' %}
+{% set hero_title = 'lemma.id documentation' %}
 {% set hero_subtitle = 'Proof-of-humanity credentials with local verification and site-private identity boundaries.' %}
 
 {% block docs_content %}
+<div class="docs-section" id="quickstart">
+    <h2>5-minute quickstart</h2>
+    <ol style="line-height: 1.8; color: var(--gray-700);">
+        <li><strong>Create a site</strong> in the developer dashboard and register your hostname.</li>
+        <li><strong>Add the SDK</strong> script tag to your page (see below).</li>
+        <li><strong>Call <code>verify()</code></strong> when you need a human verdict (e.g. signup, checkout, or on suspicion).</li>
+        <li><strong>Read the result:</strong> <code>{ human, ppid, reason, timeMs, error }</code>.</li>
+        <li><strong>Store <code>ppid</code></strong> on your user or account record for enforcement.</li>
+        <li><strong>Block the PPID</strong> via <code>POST /api/ishuman/site-block</code> when abuse is confirmed (do not rely on the user's browser alone).</li>
+    </ol>
+    <div class="code-block" style="margin-top: 16px;">
+        <div class="code-header">
+            <span>HTML</span>
+            <button class="copy-btn">Copy</button>
+        </div>
+        <code>&lt;script src="https://lemma.id/sdk/ishuman-verifier.js"&gt;&lt;/script&gt;
+&lt;script&gt;
+  const result = await new IsHumanVerifier({ siteId: 'your-site-id' }).verify();
+  // { human, ppid, reason, timeMs, error }
+&lt;/script&gt;</code>
+    </div>
+</div>
+
 <div class="docs-section">
-    <h2>What is isHuman?</h2>
-    <p>isHuman is Lemma's proof-of-humanity network for websites and applications. A user verifies once through Stripe Identity, then receives an Ed25519-signed credential that can be reused across sites while preserving privacy via per-site PPIDs.</p>
+    <h2>What is lemma.id?</h2>
+    <p>lemma.id is Lemma's enforcement layer for websites and applications. A user verifies once through Stripe Identity, then receives an Ed25519-signed credential that can be reused across sites while preserving privacy via per-site PPIDs.</p>
     <div class="callout callout--info">
         <div class="callout-title">Core model</div>
         <p>Master credential is issued for <code>lemma.id</code>. On third-party sites, the wallet bridge derives a site-specific credential on first request and stores it for later use.</p>
@@ -22,7 +45,7 @@
         <tbody>
             <tr><td>1</td><td>User + Stripe Identity</td><td>User completes identity verification flow initiated from <code>/api/ishuman/start-verification</code>.</td></tr>
             <tr><td>2</td><td>Stripe webhook</td><td><code>/api/webhooks/stripe-identity</code> receives <code>identity.verification_session.verified</code> and records verification state.</td></tr>
-            <tr><td>3</td><td>Credential issuance</td><td>Lemma issues a signed isHuman credential (<code>isHuman: true</code>) with issuer metadata and TTL.</td></tr>
+            <tr><td>3</td><td>Credential issuance</td><td>Lemma issues a signed human-proof credential (<code>isHuman: true</code> claim) with issuer metadata and TTL.</td></tr>
             <tr><td>4</td><td>Wallet bridge</td><td>Client requests credential through <code>/wallet/bridge</code>. If needed, bridge calls <code>/api/ishuman/derive-site-proof</code>.</td></tr>
             <tr><td>5</td><td>Site verifier SDK</td><td><code>IsHumanVerifier</code> validates claim, expiry, revocation membership, and Ed25519 signature locally in browser.</td></tr>
         </tbody>
@@ -64,7 +87,7 @@
 </div>
 
 <div class="docs-section" id="api-reference">
-    <h2>isHuman API Reference</h2>
+    <h2>API reference</h2>
     <table class="docs-table">
         <thead>
             <tr><th>Method</th><th>Path</th><th>Purpose</th><th>Auth</th></tr>

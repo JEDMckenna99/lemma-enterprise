@@ -1,6 +1,6 @@
 {% extends "modern/layout.html" %}
 
-{% block title %}isHuman Developer Platform - lemma.id{% endblock %}
+{% block title %}Developer Platform - lemma.id{% endblock %}
 
 {% block head %}
 {{ super() }}
@@ -28,14 +28,14 @@
 <div class="devhub-wrap">
   <section class="devhub-hero">
     <span class="devhub-chip">Public Developer Hub</span>
-    <span class="devhub-chip">isHuman Network</span>
-    <h1>Build with isHuman credentials</h1>
+    <span class="devhub-chip">lemma.id</span>
+    <h1>Build with lemma.id credentials</h1>
     <p>
       Integrate Stripe-verified proof-of-humanity into your app with site-private PPIDs, local verification,
       and revocation-aware controls. Start with docs and SDK references, then wire API keys for your runtime.
     </p>
     <div class="devhub-actions">
-      <a class="devhub-btn primary" href="/docs/ishuman">Read isHuman guide</a>
+      <a class="devhub-btn primary" href="/docs/ishuman">Read integration guide</a>
       <a class="devhub-btn" href="/docs/ishuman#sdk-integration">Open SDK quickstart</a>
       <a class="devhub-btn" href="/sdk/ishuman-verifier.js">SDK script URL</a>
     </div>
@@ -58,14 +58,14 @@
 
     <section class="devhub-card">
       <h2>2) Operate</h2>
-      <p>Use the isHuman API surfaces for verification lifecycle, site blocks, and network revocation requests.</p>
+      <p>Use the lemma.id API surfaces for verification lifecycle, site blocks, and network revocation requests.</p>
       <ul class="devhub-list">
         <li>Start verification with `/api/ishuman/start-verification`.</li>
         <li>Check status with `/api/ishuman/verification-status/&lt;session_id&gt;`.</li>
         <li>Apply site-local abuse blocks with API keys.</li>
       </ul>
       <div class="devhub-actions" style="margin-top:10px">
-        <a class="devhub-btn" href="/docs/ishuman#api-reference">isHuman API reference</a>
+        <a class="devhub-btn" href="/docs/ishuman#api-reference">API reference</a>
         <a class="devhub-btn" href="/docs/api/auth">Auth API docs</a>
       </div>
     </section>

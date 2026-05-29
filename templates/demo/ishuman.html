@@ -1,6 +1,6 @@
 {% extends "modern/layout.html" %}
 
-{% block title %}isHuman Demo - lemma.id{% endblock %}
+{% block title %}Demo - lemma.id{% endblock %}
 {% block description %}See how Lemma lets users verify once and prove they are human across customer sites — without repeated CAPTCHA, IP bans, or storing ID documents on each site.{% endblock %}
 
 {% block head %}
@@ -14,9 +14,10 @@
   data-server-admin-token="{{ demo_admin_token }}">
 
   <header class="demo-intro">
-    <p class="demo-eyebrow">isHuman proof network</p>
+    <p class="demo-eyebrow">lemma.id demo</p>
     <h1 class="demo-title">Bot defense should punish abusive humans, not whole networks.</h1>
-    <p class="demo-lead">Follow the steps below — verify once, prove human on two demo sites, then block or revoke at the human-proof layer.</p>
+    <p class="demo-lead">This demo shows the core lemma.id enforcement loop: one human proof produces different private IDs for different sites. A site can block its own PPID without affecting other sites. Severe abuse can be escalated to network-wide revocation.</p>
+    <p class="demo-muted" style="margin-top: 12px;">Follow the steps below — verify once, prove human on two demo sites, then block or revoke at the human-proof layer. Expand <strong>Developer details</strong> in each step for status labels and technical output.</p>
   </header>
 
   <div class="demo-workflow" id="ih-demo-workflow">
@@ -44,6 +45,8 @@
           <span>Continue to step 2 or run the full demo.</span>
         </div>
 
+        <details class="demo-dev-details">
+          <summary>Developer details</summary>
         <div class="wizard-shell" id="ih-wizard-shell" hidden>
           <div class="wizard-meta">
             <span class="wizard-step-label" id="ih-wizard-step-label">Step 1 of 7</span>
@@ -74,6 +77,7 @@
         <div class="action-row">
           <button class="demo-btn demo-btn-secondary" id="ih-wallet-btn" type="button">Unlock wallet</button>
         </div>
+        </details>
       </div>
     </section>
 
@@ -92,6 +96,8 @@
           <button class="demo-btn demo-btn-secondary" id="ih-verify-sites-btn" type="button">Check both sites</button>
         </div>
 
+        <details class="demo-dev-details">
+          <summary>Developer details</summary>
         <div class="site-cards">
           <article class="site-card" id="ih-tickets-card">
             <div class="site-card-top">
@@ -146,6 +152,7 @@
             </div>
           </div>
         </div>
+        </details>
       </div>
     </section>
 
@@ -162,6 +169,8 @@
           </div>
         </div>
 
+        <details class="demo-dev-details">
+          <summary>Developer details</summary>
         <div class="abuse-flow">
           <div class="abuse-step">
             <h3>Site block</h3>
@@ -196,6 +205,7 @@
             </p>
           </div>
         </div>
+        </details>
       </div>
     </section>
   </div>
