@@ -96,9 +96,9 @@
         </div>
     </div>
 
-    <script src="/static/js/lemma-keys.js?v=3" nonce="{{ csp_nonce }}"></script>
+    <script src="/static/js/lemma-keys.js?v=4" nonce="{{ csp_nonce }}"></script>
     <script src="/static/js/wallet-at-rest-crypto.js?v=1" nonce="{{ csp_nonce }}"></script>
-    <script src="/static/js/lemma-wallet.js?v=2536" nonce="{{ csp_nonce }}"></script>
+    <script src="/static/js/lemma-wallet.js?v=2537" nonce="{{ csp_nonce }}"></script>
     <script nonce="{{ csp_nonce }}">
         const SESSION_KEY = 'ishuman_idv_popup_session_id';
         const params = new URLSearchParams(window.location.search);
@@ -311,6 +311,7 @@
                     wallet_id: walletId,
                     wallet_secret: walletSecret,
                     return_url: returnUrl,
+                    enc_pubkey: await encPubkeyForStart(),
                     wallet_assertion: walletAssertion,
                 }),
             });
@@ -323,6 +324,20 @@
             return payload;
         }
 
+        // v2 (Phase 1.1): the wallet's X25519 encryption pubkey, so the server
+        // can seal person-root seed envelopes to it at IDV completion. Best
+        // effort; the server ignores it unless the feature flag is enabled.
+        async function encPubkeyForStart() {
+            try {
+                if (typeof wallet.getEncryptionPublicKeyB64 === 'function') {
+                    return await wallet.getEncryptionPublicKeyB64();
+                }
+            } catch (err) {
+                console.warn('[isHuman IDV] enc pubkey derivation failed:', err?.message || err);
+            }
+            return '';
+        }
+
         async function startStripeVerification() {
             const returnUrl = `${window.location.origin}/wallet/ishuman-idv?${params.toString()}&verification_return=true`;
             const walletAssertion = await wallet.buildWalletAssertion(['return_url'], { return_url: returnUrl });
@@ -332,6 +347,7 @@
                     wallet_id: walletId,
                     wallet_secret: walletSecret,
                     return_url: returnUrl,
+                    enc_pubkey: await encPubkeyForStart(),
                     wallet_assertion: walletAssertion,
                 }),
             });
@@ -362,6 +378,15 @@
                         : 'Unlock wallet & verify';
                     return false;
                 }
+            }
+
+            // v2 (Phase 1.1): pull + open person-root seed envelopes so site
+            // signing keys derive from wallet_local_seed. No-op when the flag is
+            // off or this wallet predates the feature (falls back to wallet_secret).
+            try {
+                await wallet.fetchAndStoreSeedEnvelopes?.();
+            } catch (err) {
+                console.warn('[isHuman IDV] seed envelope fetch failed:', err?.message || err);
             }
 
             const pkg = await wallet.issueSiteProofPackage({
