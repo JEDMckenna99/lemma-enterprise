@@ -76,7 +76,14 @@ def create_app():
         provider, to drop the cross-site sync overhead.
         """
         flag = os.getenv('LEMMA_CROSS_SITE_LOCK_ENABLED', 'true').strip().lower()
-        return {'cross_site_lock_enabled': flag in ('1', 'true', 'yes', 'on')}
+        # ``LEMMA_DISABLE_BRIDGE_IFRAME`` (Phase 2) routes verification through the
+        # popup-only flow on lemma-rendered pages. Third-party relying sites opt
+        # in per-site via ``new IsHumanVerifier({ disableBridge: true })``.
+        bridge_flag = os.getenv('LEMMA_DISABLE_BRIDGE_IFRAME', 'false').strip().lower()
+        return {
+            'cross_site_lock_enabled': flag in ('1', 'true', 'yes', 'on'),
+            'disable_bridge_iframe': bridge_flag in ('1', 'true', 'yes', 'on'),
+        }
 
     # ================================================================================
     # SECURITY HEADERS - Industry standard protection
