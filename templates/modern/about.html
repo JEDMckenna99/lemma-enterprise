@@ -1,7 +1,7 @@
 {% extends "modern/layout.html" %}
 
 {% block title %}About - lemma.id{% endblock %}
-{% block description %}Lemma is building reusable human verification for the open web — signed once, carried by the user, and verified locally on the hot path. Founded on the thesis that CAPTCHA is losing to automation, but the answer should not be a centralized digital ID system either.{% endblock %}
+{% block description %}Lemma is building the enforcement layer for bot defense. Fraud is an economic problem: bans fail when the next account is free. Lemma roots accounts in a verified person so abuse can't rotate cheap resources to return — without centralized identity surveillance.{% endblock %}
 
 {% block content %}
 
@@ -10,8 +10,8 @@
     <div class="container" style="position: relative; z-index: 1;">
         <div style="max-width: 860px; margin: 0 auto; text-align: center;">
             <p style="font-size: var(--font-size-sm); font-weight: 600; text-transform: uppercase; letter-spacing: 2px; color: var(--primary); margin-bottom: 16px;">About Lemma</p>
-            <h1 style="font-size: clamp(2.5rem, 5vw, 3.5rem); line-height: 1.1; margin-bottom: 24px;">Identity, the way it<br>should work on the web.</h1>
-            <p style="font-size: var(--font-size-xl); font-weight: 500; margin-bottom: var(--space-4); color: var(--gray-700);">CAPTCHA is losing effectiveness against modern automation. Centralized digital ID concentrates too much visibility in one place. Lemma is the open-web alternative: reusable human verification with site-private identifiers and local verification on the access-decision path.</p>
+            <h1 style="font-size: clamp(2.5rem, 5vw, 3.5rem); line-height: 1.1; margin-bottom: 24px;">Fraud is an economic<br>problem, not a tech one.</h1>
+            <p style="font-size: var(--font-size-xl); font-weight: 500; margin-bottom: var(--space-4); color: var(--gray-700);">The industry can already detect abuse. What it can't do is make a ban stick when the next account is free. Lemma is the enforcement layer: root accounts in a verified person so blocked users can't rotate cheap resources to come back — without building a centralized identity surveillance system.</p>
         </div>
     </div>
 </section>
@@ -22,15 +22,15 @@
         <div style="max-width: 820px; margin: 0 auto;">
             <div style="text-align: center; margin-bottom: 40px;">
                 <p style="font-size: var(--font-size-sm); font-weight: 700; text-transform: uppercase; letter-spacing: 2px; color: var(--primary); margin-bottom: 12px;">The problem</p>
-                <h2>The web has been stuck between two bad options</h2>
+                <h2>Detection is solved. Enforcement isn't.</h2>
             </div>
 
             <div style="font-size: var(--font-size-lg); color: var(--gray-700); line-height: 1.7;">
-                <p style="margin-bottom: 24px;">CAPTCHA is losing the job it was hired to do. Modern bots solve many image and text puzzles reliably, and CAPTCHA-solving farms operate at fractions of a cent per solve. Sites that need anti-bot signal — waitlists, ticketing, comments, dating, AI agent gating — increasingly know that puzzle friction often stops humans more reliably than determined attackers.</p>
+                <p style="margin-bottom: 24px;">Fraud and abuse are economic problems, not detection problems. Trust &amp; safety teams have had good signal for years — device fingerprints, velocity, behavior. What they lack is a durable consequence. A ban is only as strong as the cost of the next account, and that cost is close to zero: a fresh email, a new SIM, a residential proxy. Detection without enforcement is theater.</p>
 
-                <p style="margin-bottom: 24px;">The proposed replacements — government digital ID stores, federated SSO, on-chain identity — tend to create a new correlation point: who you are, when you presented your ID, and where you used it. That is why mandatory digital ID keeps meeting public resistance. The web needs a stronger human signal without turning every login, signup, or checkout into another identity-provider event.</p>
+                <p style="margin-bottom: 24px;">The most expensive thing for an attacker to rotate is a real, verified identity. Lemma roots an account-level identifier in a person, so a blocked user can't mint a clean new identity by swapping cheap infrastructure. We don't try to make a new identity impossible — we make it cost real money, which is enough to break the economics of most abuse.</p>
 
-                <p>Meanwhile, most websites won't pay $1–2 per user for full identity verification. So they accept abuse, build CAPTCHA arms-race tooling, or charge legitimate users to compensate. The web has been stuck between "no real verification" and "centralized identity surveillance" for over a decade.</p>
+                <p>And it does this without the centralized surveillance trade-off. Government digital ID, federated SSO, and on-chain identity all create a new correlation point — who you are, when you presented your ID, and where you used it. Lemma keeps sites seeing only site-private pseudonymous IDs, never one global identifier. The web has been stuck between "no real accountability" and "centralized identity surveillance" — Lemma is the enforcement layer that needs neither.</p>
             </div>
         </div>
     </div>
@@ -48,7 +48,7 @@
             <div style="background: var(--white); border: 1px solid var(--gray-200); border-radius: 14px; padding: 32px;">
                 <p style="font-size: var(--font-size-lg); color: var(--gray-700); line-height: 1.7; margin-bottom: 20px;">A driver's license works because it's verified locally. When you show your license at a bar, the bar checks the holograms, photo, and signature on the spot. The DMV doesn't get a notification. The license sits in your wallet — you carry it, you decide when and where to present it.</p>
 
-                <p style="font-size: var(--font-size-lg); color: var(--gray-700); line-height: 1.7; margin-bottom: 20px;">Lemma applies that model to the web. A user verifies once with an IDV provider. Lemma issues a signed isHuman credential. The credential lives in the user's browser wallet, and sites can validate site-bound proofs locally with Ed25519 signatures, site-private PPIDs, and cached revocation data.</p>
+                <p style="font-size: var(--font-size-lg); color: var(--gray-700); line-height: 1.7; margin-bottom: 20px;">Lemma applies that model to the web. A user verifies once with an IDV provider. Lemma issues a signed isHuman credential. The credential lives in the user's browser wallet, and sites can validate site-bound proofs locally with Ed25519 signatures, site-private PPIDs, and cached revocation data. Because that proof is rooted in a verified person, a site can block an abuser and require fresh verification to return — and the same human can't rotate around it with a new email or device.</p>
 
                 <p style="font-size: var(--font-size-lg); color: var(--gray-700); line-height: 1.7;">Lemma is not pretending the control plane disappears. Issuance, revocation, recovery, and first-time site proof setup still need infrastructure. The privacy win is narrower and practical: routine access decisions do not need a live callback to the original IDV provider, and credentials do not carry one stable cross-site identifier.</p>
             </div>

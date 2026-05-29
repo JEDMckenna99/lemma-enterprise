@@ -1,7 +1,7 @@
 {% extends "modern/layout.html" %}
 
-{% block title %}lemma.id - isHuman Proof Network{% endblock %}
-{% block description %}isHuman by Lemma: verify people once with a trusted IDV issuer, then prove locally with Ed25519-signed site-private credentials. Like Stripe for payments — embed the SDK and users verify in-flow on any site.{% endblock %}
+{% block title %}lemma.id - Enforcement for Bot Defense{% endblock %}
+{% block description %}isHuman by Lemma: detection is solved, enforcement isn't. Bind accounts to a verified person so a banned user can't rotate cheap resources to come back. Step-up IDV only on suspicion, site-private PPIDs, local Ed25519 verification.{% endblock %}
 
 {% block head %}
     {{ super() }}
@@ -225,9 +225,9 @@
     <div class="container" style="position: relative; z-index: 1;">
         <div style="max-width: 800px; margin: 0 auto; text-align: center;">
             <p style="font-size: var(--font-size-sm); font-weight: 600; text-transform: uppercase; letter-spacing: 2px; color: var(--primary); margin-bottom: 16px;">isHuman Proof Network</p>
-            <h1 style="font-size: clamp(2.5rem, 5vw, 3.5rem); line-height: 1.1; margin-bottom: 24px;">Verify Humans Once.<br>Prove Locally Everywhere.</h1>
-            <p style="font-size: var(--font-size-xl); font-weight: 500; margin-bottom: var(--space-4); color: var(--gray-700);">Like Stripe for payments — sites embed the Lemma SDK and users verify in-flow with a trusted IDV issuer. One verification, reusable across every Lemma-enabled site, validated locally in the browser with no phone-home.</p>
-            <p style="font-size: var(--font-size-base); color: var(--gray-600); max-width: 600px; margin: 0 auto;">Each site gets a derived, site-private PPID credential. Ed25519 signatures verify offline, revocation propagates quickly, and sites can enforce immediate local block decisions. Stripe Identity today; additional IDV issuers on roadmap.</p>
+            <h1 style="font-size: clamp(2.5rem, 5vw, 3.5rem); line-height: 1.1; margin-bottom: 24px;">Detection is easy.<br>Enforcement is the problem.</h1>
+            <p style="font-size: var(--font-size-xl); font-weight: 500; margin-bottom: var(--space-4); color: var(--gray-700);">Bot defense already detects abuse — it just can't make it stick. Bans fail because a fresh email, SIM, or proxy costs an attacker nothing. isHuman ties accounts to a verified person, so when you block abuse you can require fresh identity verification the same human can't cheaply rotate around.</p>
+            <p style="font-size: var(--font-size-base); color: var(--gray-600); max-width: 600px; margin: 0 auto;">Most users never see verification — it triggers only when your systems already suspect abuse, so the cost lands on the bad actor, not your legitimate users. Site-private PPIDs keep identities uncorrelated across sites, and Ed25519 proofs verify locally in the browser.</p>
             <!-- Dynamic card: changes based on user's lemma status -->
             <!-- Fixed min-height prevents CLS when state changes -->
             <div id="lemma-status-card" style="margin-top: 32px; border-radius: 12px; min-height: 120px;">
@@ -300,14 +300,14 @@
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
                     </svg>
-                    <span>IDV-issuer verified (Stripe today)</span>
+                    <span>Raises the cost of the next account</span>
                 </div>
                 <div style="display: flex; align-items: center; gap: 8px;">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
                         <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
                     </svg>
-                    <span>Ed25519 local verification</span>
+                    <span>Detection stays yours — enforcement gets teeth</span>
                 </div>
                 <div style="display: flex; align-items: center; gap: 8px;">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -315,7 +315,7 @@
                         <line x1="2" y1="12" x2="22" y2="12"/>
                         <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
                     </svg>
-                    <span>Site-private PPIDs</span>
+                    <span>Friction only on suspicion</span>
                 </div>
             </div>
         </div>
@@ -447,26 +447,26 @@
 <section class="section" id="how-it-works">
     <div class="container">
         <div style="text-align: center; margin-bottom: 64px;">
-            <h2>How Lemma.id Works</h2>
-            <p class="text-gray" style="max-width: 700px; margin: 16px auto 0;">Verify a person once, derive site-private credentials, and run local checks for each session.</p>
+            <h2>How isHuman Works</h2>
+            <p class="text-gray" style="max-width: 700px; margin: 16px auto 0;">Detection is solved. isHuman adds the missing enforcement layer: bind accounts to a verified person, then make a banned user pay to come back.</p>
         </div>
         
         <!-- Step-by-step flow -->
         <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; max-width: 900px; margin: 0 auto 64px; text-align: center;">
             <div style="padding: 32px 24px;">
                 <div style="width: 56px; height: 56px; border-radius: 50%; background: var(--primary); color: white; font-size: 24px; font-weight: 700; display: flex; align-items: center; justify-content: center; margin: 0 auto 20px;">1</div>
-                <h3 style="font-size: var(--font-size-lg); margin-bottom: 8px;">Verify Once</h3>
-                <p style="color: var(--gray-600); font-size: var(--font-size-sm);">In-context on any site, the user completes IDV (Stripe Identity today; more issuers on roadmap) and receives a signed master isHuman credential.</p>
+                <h3 style="font-size: var(--font-size-lg); margin-bottom: 8px;">Bind</h3>
+                <p style="color: var(--gray-600); font-size: var(--font-size-sm);">Accounts link to a verified-person root, exposed to your site only as a site-private PPID. One human, one root — across resets and resource rotations.</p>
             </div>
             <div style="padding: 32px 24px;">
                 <div style="width: 56px; height: 56px; border-radius: 50%; background: var(--primary); color: white; font-size: 24px; font-weight: 700; display: flex; align-items: center; justify-content: center; margin: 0 auto 20px;">2</div>
-                <h3 style="font-size: var(--font-size-lg); margin-bottom: 8px;">Derive Per Site</h3>
-                <p style="color: var(--gray-600); font-size: var(--font-size-sm);">Wallet bridge derives a site-bound credential using normalized hostname and wallet secret.</p>
+                <h3 style="font-size: var(--font-size-lg); margin-bottom: 8px;">Detect</h3>
+                <p style="color: var(--gray-600); font-size: var(--font-size-sm);">Your existing fraud and abuse tooling flags bad behavior. isHuman doesn't replace your detection — it gives your decisions teeth.</p>
             </div>
             <div style="padding: 32px 24px;">
                 <div style="width: 56px; height: 56px; border-radius: 50%; background: var(--primary); color: white; font-size: 24px; font-weight: 700; display: flex; align-items: center; justify-content: center; margin: 0 auto 20px;">3</div>
-                <h3 style="font-size: var(--font-size-lg); margin-bottom: 8px;">Verify Locally</h3>
-                <p style="color: var(--gray-600); font-size: var(--font-size-sm);">Sites check signature, expiry, and revocation status in-browser with clear allow/deny reasons.</p>
+                <h3 style="font-size: var(--font-size-lg); margin-bottom: 8px;">Enforce</h3>
+                <p style="color: var(--gray-600); font-size: var(--font-size-sm);">Block the person and require fresh IDV to return. Swapping email, SIM, or IP won't mint a clean new account.</p>
             </div>
         </div>
         
@@ -587,7 +587,7 @@
         </div>
 
         <div style="text-align: center; margin-top: 56px; max-width: 720px; margin-left: auto; margin-right: auto;">
-            <p style="color: var(--gray-700); font-size: var(--font-size-base);"><strong>The wallet works like a physical driver's license.</strong> The DMV doesn't get a notification when you show your license at a bar. Lemma doesn't either. Issuers sign once; sites verify locally; users carry the credential.</p>
+            <p style="color: var(--gray-700); font-size: var(--font-size-base);"><strong>The wallet works like a physical driver's license:</strong> issuers sign once, sites verify locally, and users carry the credential. Sites can't correlate you with each other — each sees only a site-private PPID. The issuer can recognize the same person across re-verification, and that's exactly what makes a ban enforceable.</p>
         </div>
     </div>
 </section>
@@ -597,35 +597,39 @@
     <div class="container">
         <div style="text-align: center; margin-bottom: 56px;">
             <p style="font-size: var(--font-size-sm); font-weight: 700; text-transform: uppercase; letter-spacing: 2px; color: var(--primary); margin-bottom: 12px;">Where isHuman fits</p>
-            <h2>Use cases that don't pencil out for full IDV</h2>
-            <p class="text-gray" style="max-width: 720px; margin: 16px auto 0;">Per-user IDV at $1–2 doesn't make sense for low-margin or high-volume flows. isHuman pools verification cost across many sites, so any site can have human-grade signal at a few cents per check.</p>
+            <h2>Bans that actually stick</h2>
+            <p class="text-gray" style="max-width: 720px; margin: 16px auto 0;">Wherever a ban is only as good as the cost of the next account. isHuman binds accounts to a verified person, so blocked users can't rotate cheap resources to return.</p>
         </div>
 
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 24px;">
             <div class="card">
-                <h3 class="card-title">Waitlists &amp; free trials</h3>
-                <p>Block bot-funded list inflation and trial abuse without forcing $2 IDV on every signup.</p>
-            </div>
-            <div class="card">
-                <h3 class="card-title">Ticketing &amp; releases</h3>
-                <p>Stop scalper bots from buying inventory faster than humans. One reusable proof, not a CAPTCHA arms race.</p>
-            </div>
-            <div class="card">
-                <h3 class="card-title">Comments &amp; forums</h3>
-                <p>Reduce spam, sock-puppet networks, and brigading without storing PII on every relying site.</p>
+                <h3 class="card-title">Marketplaces</h3>
+                <p>Stop banned sellers and scammers from re-listing under a fresh account the moment you remove them.</p>
             </div>
             <div class="card">
                 <h3 class="card-title">Dating &amp; social</h3>
-                <p>Suppress fake profiles and catfishing networks while keeping user identity site-private.</p>
+                <p>Break up repeat catfish, harassment, and ban-evasion rings — while keeping identity site-private.</p>
             </div>
             <div class="card">
-                <h3 class="card-title">AI agent gating</h3>
-                <p>Distinguish human users from autonomous agents without requiring agents to identify themselves.</p>
+                <h3 class="card-title">Gaming</h3>
+                <p>Make cheaters and smurfs pay to rebuild after every ban instead of starting over for free.</p>
             </div>
             <div class="card">
-                <h3 class="card-title">Account integrity</h3>
-                <p>Re-challenge suspicious accounts on demand using the doubt-and-refresh flow, with cost shifted onto the suspect transaction.</p>
+                <h3 class="card-title">Reviews &amp; UGC</h3>
+                <p>Dismantle coordinated fake-review and sock-puppet networks that rebuild faster than you can remove them.</p>
             </div>
+            <div class="card">
+                <h3 class="card-title">Fintech &amp; rewards</h3>
+                <p>Shut down bonus abuse and multi-accounting by tying each enrollment to one verified person.</p>
+            </div>
+            <div class="card">
+                <h3 class="card-title">Ticketing &amp; releases</h3>
+                <p>Raise the cost for scalpers who treat CAPTCHA as a line item and farm accounts at scale.</p>
+            </div>
+        </div>
+
+        <div style="max-width: 720px; margin: 40px auto 0; padding: 20px 24px; border: 1px solid var(--gray-200); border-radius: 12px; background: var(--white);">
+            <p style="margin: 0; color: var(--gray-600); font-size: var(--font-size-sm); line-height: 1.6;"><strong style="color: var(--gray-900);">What isHuman does and doesn't do.</strong> It raises the cost of a fresh identity from roughly zero to the cost of passing IDV again. That breaks the economics of high-volume, low-value abuse. It is not designed to stop a funded attacker willing to buy a verified identity for a single high-value target — it's designed to make everyday abuse stop paying.</p>
         </div>
     </div>
 </section>
@@ -634,9 +638,9 @@
 <section class="section" id="ishuman-network" style="background: var(--gray-50);">
     <div class="container">
         <div style="text-align: center; max-width: 860px; margin: 0 auto 56px;">
-            <p style="font-size: var(--font-size-sm); font-weight: 700; text-transform: uppercase; letter-spacing: 2px; color: var(--primary); margin-bottom: 12px;">Proof of Humanity</p>
-            <h2 style="margin-bottom: 16px;">One verification. Every site. Always local.</h2>
-            <p class="text-gray" style="max-width: 700px; margin: 0 auto;">isHuman gives users a reusable human proof while preserving site privacy. Verify once through any trusted IDV issuer, in-flow on any site, then let sites verify locally with Ed25519-signed credentials and revocation freshness checks.</p>
+            <p style="font-size: var(--font-size-sm); font-weight: 700; text-transform: uppercase; letter-spacing: 2px; color: var(--primary); margin-bottom: 12px;">The network effect</p>
+            <h2 style="margin-bottom: 16px;">Enforcement that compounds across sites</h2>
+            <p class="text-gray" style="max-width: 700px; margin: 0 auto;">Every site gets standalone value on day one — no network required. But because the person-root is shared, a verified human carries their proof across Lemma-enabled sites, and confirmed network-wide abuse can be revoked everywhere at once. The same identity can't simply start fresh somewhere else either.</p>
         </div>
 
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 24px; margin-bottom: 40px;">
@@ -675,8 +679,8 @@
 <!-- CTA Section -->
 <section class="section" style="background: var(--gray-900); color: var(--white); padding: 80px 0;">
     <div class="container" style="text-align: center;">
-        <h2 style="color: var(--white); font-size: var(--font-size-3xl); margin-bottom: 20px;">Ship Proof-of-Humanity Without Building It Yourself</h2>
-        <p style="color: var(--gray-400); font-size: var(--font-size-lg); margin-bottom: 48px; max-width: 600px; margin-left: auto; margin-right: auto;">Launch reusable human verification, site-private derivation, and abuse controls with a production-ready SDK and API.</p>
+        <h2 style="color: var(--white); font-size: var(--font-size-3xl); margin-bottom: 20px;">Give Your Bans Teeth</h2>
+        <p style="color: var(--gray-400); font-size: var(--font-size-lg); margin-bottom: 48px; max-width: 600px; margin-left: auto; margin-right: auto;">Add identity-rooted enforcement, step-up IDV on suspicion, and site-private privacy with a production-ready SDK and API — without running your own KYC stack.</p>
         <div style="display: flex; gap: 20px; justify-content: center; flex-wrap: wrap;">
             <a href="/app" class="btn btn-primary" style="font-size: var(--font-size-lg); padding: 16px 32px;">
                 Get Verified
@@ -685,7 +689,7 @@
             <a href="/docs/ishuman" class="btn btn-secondary" style="background: transparent; border-color: var(--gray-600); color: var(--white);">View isHuman Docs</a>
         </div>
         <p style="color: var(--gray-500); font-size: var(--font-size-sm); margin-top: 24px;">
-            Verify once • Derive per site • Verify locally
+            Bind • Detect • Enforce
         </p>
     </div>
 </section>
