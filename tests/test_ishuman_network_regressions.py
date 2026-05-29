@@ -101,7 +101,7 @@ def test_ppid_derivation_requires_wallet_secret(monkeypatch):
         lambda wallet_secret, rp_id: f"secret::{wallet_secret}::{rp_id}",
     )
 
-    with pytest.raises(ValueError, match="wallet_secret required"):
+    with pytest.raises(ValueError, match="wallet_secret or lemma_person_id required"):
         _derive_ppid_for_site(
             rp_id="lemma.id",
             wallet_secret=None,
@@ -187,14 +187,54 @@ def test_ishuman_verifier_uses_session_cache_on_repeat_verify():
     with open(sdk_path, "r", encoding="utf-8") as handle:
         content = handle.read()
 
-    assert "_verifyFromCachedSession" in content
-    assert "session_valid" in content
+    assert "_verifyFromSiteVcCache" in content
     assert "_requestSessionFromBridge" in content
     assert "GET_SESSION_PRESENTATION" in content
-    verify_idx = content.index("async verify()")
-    cached_idx = content.index("_verifyFromCachedSession", verify_idx)
+    verify_idx = content.index("async _verifyOnce(")
+    cached_idx = content.index("_verifyFromSiteVcCache", verify_idx)
     bridge_idx = content.index("_requestSessionFromBridge", verify_idx)
     assert cached_idx < bridge_idx
+
+
+def test_ishuman_verifier_supports_popup_only_bridge_disable():
+    """Phase 2: LEMMA_DISABLE_BRIDGE_IFRAME routes verify() through the popup."""
+    sdk_path = os.path.join(
+        os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+        "static",
+        "js",
+        "ishuman-verifier.js",
+    )
+    with open(sdk_path, "r", encoding="utf-8") as handle:
+        content = handle.read()
+
+    assert "LEMMA_DISABLE_BRIDGE_IFRAME" in content
+    assert "_disableBridge" in content
+    # _setupBridge must short-circuit when the bridge is disabled.
+    setup_idx = content.index("_setupBridge() {")
+    guard_idx = content.index("if (this._disableBridge) return;", setup_idx)
+    next_method_idx = content.index("_handleBridgeMessage", setup_idx)
+    assert setup_idx < guard_idx < next_method_idx
+    # popup-only mode signals site_proof_required on a cache miss.
+    assert "site_proof_required" in content
+
+
+def test_ishuman_wallet_gates_daily_unlock_bundle_behind_bridge_flag():
+    """Phase 2.2: the daily-unlock bundle is disabled in popup-only mode."""
+    wallet_path = os.path.join(
+        os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+        "static",
+        "js",
+        "lemma-wallet.js",
+    )
+    with open(wallet_path, "r", encoding="utf-8") as handle:
+        content = handle.read()
+
+    assert "_isHumanLockDisabled" in content
+    assert "LEMMA_DISABLE_BRIDGE_IFRAME" in content
+    # isIsHumanLockValid must bail out when the lock is disabled.
+    valid_idx = content.index("isIsHumanLockValid() {")
+    guard_idx = content.index("if (this._isHumanLockDisabled()) return false;", valid_idx)
+    assert valid_idx < guard_idx
 
 
 def test_ishuman_verifier_requires_presentation_signature_checks():

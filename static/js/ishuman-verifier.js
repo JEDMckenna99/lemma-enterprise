@@ -514,6 +514,16 @@ class IsHumanVerifier {
         this.isBlockedLocally = config.isBlockedLocally || null;
         this.autoProvision = !!config.autoProvision;
         this.idvPopupPath = config.idvPopupPath || IDV_POPUP_PATH;
+        // v2 (Phase 2): when the bridge iframe is disabled, all credential and
+        // session requests go through the popup-only flow. The hidden
+        // lemma.id bridge iframe is never created. Defaults from config or the
+        // server-rendered window.LEMMA_DISABLE_BRIDGE_IFRAME flag.
+        this._disableBridge = (
+            config.disableBridge === true
+            || (typeof window !== 'undefined'
+                && (window.LEMMA_DISABLE_BRIDGE_IFRAME === true
+                    || window.LEMMA_DISABLE_BRIDGE_IFRAME === 'true'))
+        );
         this.sessionTtlSec = Math.min(
             MAX_SESSION_TTL_SECONDS,
             Math.max(
@@ -672,6 +682,12 @@ class IsHumanVerifier {
             return cached;
         }
 
+        // v2 (Phase 2): popup-only mode. On a cache miss, skip the bridge and
+        // signal the verify() loop to issue a fresh site proof via the popup.
+        if (this._disableBridge) {
+            return this._result(false, null, 'site_proof_required', t0);
+        }
+
         let bridgeResult;
         try {
             bridgeResult = await this._requestSessionFromBridge();
@@ -796,6 +812,9 @@ class IsHumanVerifier {
     }
 
     _setupBridge() {
+        // v2 (Phase 2): in popup-only mode the hidden bridge iframe is never
+        // created; every credential/session request flows through the popup.
+        if (this._disableBridge) return;
         // Lazy: only create the hidden bridge iframe (which loads
         // lemma-wallet.js + lemma-keys.js, ~80 KB) when a bridge round-trip
         // is actually needed. Cache-hit verifications skip this entirely.
@@ -1630,6 +1649,8 @@ class IsHumanVerifier {
     }
 
     async _syncBridgeAfterUnlock(detail = {}) {
+        // v2 (Phase 2): no bridge iframe to sync in popup-only mode.
+        if (this._disableBridge) return;
         try {
             const sessionData = detail.sessionData;
             const walletSecret = detail.walletSecret || sessionData?.walletSecret || null;

@@ -42,6 +42,19 @@ def _demo_api_key(site_id: str) -> str:
     return f"lm_demo_{site_id}_{secrets.token_urlsafe(18)}"
 
 
+def _demo_enabled() -> bool:
+    """Single source of truth for whether demo affordances are active.
+
+    Demo endpoints, demo tokens, and test-verify rails are enabled on every
+    environment EXCEPT production. The intended v2 topology runs the demo on a
+    dedicated staging app (``ENVIRONMENT=staging``) while ``lemma-enterprise``
+    stays on ``ENVIRONMENT=production`` and serves real customers only.
+
+    See docs/operations/ENVIRONMENT_CONFIG.md for the full env-var contract.
+    """
+    return os.getenv("ENVIRONMENT", "").strip().lower() != "production"
+
+
 def ensure_demo_sites() -> list[dict]:
     """Create or refresh demo relying-site records."""
     from api.database import SessionLocal, Site
@@ -125,15 +138,15 @@ def _public_record(record) -> dict:
 
 def _demo_page_context() -> dict:
     """Server-only demo tokens for /demo/ishuman (never exposed on other routes)."""
-    is_production = os.getenv("ENVIRONMENT", "").lower() == "production"
+    demo_enabled = _demo_enabled()
     return {
         "demo_sites": list(DEMO_SITES.values()),
         "network_revoke_configured": bool(os.getenv("LEMMA_ISHUMAN_DEMO_ADMIN_TOKEN")),
         "demo_test_verify_enabled": os.getenv("LEMMA_ISHUMAN_DEMO_ALLOW_TEST_VERIFY", "").lower() == "true",
         "demo_test_token_configured": bool(os.getenv("LEMMA_ISHUMAN_DEMO_TEST_TOKEN")),
         "demo_admin_token_configured": bool(os.getenv("LEMMA_ISHUMAN_DEMO_ADMIN_TOKEN")),
-        "demo_test_token": "" if is_production else os.getenv("LEMMA_ISHUMAN_DEMO_TEST_TOKEN", ""),
-        "demo_admin_token": "" if is_production else os.getenv("LEMMA_ISHUMAN_DEMO_ADMIN_TOKEN", ""),
+        "demo_test_token": os.getenv("LEMMA_ISHUMAN_DEMO_TEST_TOKEN", "") if demo_enabled else "",
+        "demo_admin_token": os.getenv("LEMMA_ISHUMAN_DEMO_ADMIN_TOKEN", "") if demo_enabled else "",
     }
 
 
@@ -367,7 +380,7 @@ def ishuman_demo_network_revoke_request():
 
 def _require_demo_test_verify(*, require_token_header: bool = True) -> tuple[dict | None, tuple | None]:
     """Return (None, error_response) when test-verify guards pass."""
-    if os.getenv("ENVIRONMENT", "").lower() == "production":
+    if not _demo_enabled():
         return None, (jsonify({"success": False, "error": "prod_test_verify_forbidden"}), 403)
     if os.getenv("LEMMA_ISHUMAN_DEMO_ALLOW_TEST_VERIFY", "").lower() != "true":
         return None, (jsonify({"success": False, "error": "test_verify_disabled"}), 403)

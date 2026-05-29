@@ -51,9 +51,12 @@ def resolve_or_create_person_from_material(
 ) -> ResolvedLemmaPerson:
     from api.database import LemmaDocumentRoot, LemmaPerson, LemmaWalletBinding
 
+    from api.identity_roots import active_root_version
+
+    root_version = active_root_version()
     claims = build_document_root_claims(material)
-    document_root_hash = derive_document_root_hash(claims)
-    person_root_hash = derive_person_root_hash(document_root_hash)
+    document_root_hash = derive_document_root_hash(claims, root_version)
+    person_root_hash = derive_person_root_hash(document_root_hash, root_version)
 
     existing_link = db.query(LemmaDocumentRoot).filter_by(document_root_hash=document_root_hash).first()
     created_person = False
@@ -68,7 +71,7 @@ def resolve_or_create_person_from_material(
         person = LemmaPerson(
             person_id=_new_person_id(),
             person_root_hash=person_root_hash,
-            root_version="v1",
+            root_version=root_version,
             primary_wallet_id=wallet_id,
             status="active",
         )
@@ -79,7 +82,7 @@ def resolve_or_create_person_from_material(
         link = LemmaDocumentRoot(
             document_root_hash=document_root_hash,
             lemma_person_id=person_id,
-            root_version="v1",
+            root_version=root_version,
             provider="stripe_identity",
             stripe_verification_session_id=material.stripe_session_id,
             stripe_verification_report_id=material.stripe_report_id,

@@ -185,7 +185,7 @@ def test_ishuman_demo_test_complete_verifies_pending_session_when_guarded(
     )
     monkeypatch.setattr(
         "api.ishuman._issue_ishuman_credential",
-        lambda ppid, wallet_id=None, site_id=None: {
+        lambda ppid, wallet_id=None, site_id=None, **kwargs: {
             "id": "ishuman_master_test_complete",
             "issuerInfo": {"did": "did:lemma:issuer:test"},
             "claims": {"isHuman": True, "siteId": site_id or "lemma.id", "expiresAt": "4102444800"},
@@ -205,7 +205,11 @@ def test_ishuman_demo_test_complete_verifies_pending_session_when_guarded(
     assert payload["credential_id"] == "ishuman_master_test_complete"
     row = fake_ishuman_db_session_factory.store.data[IsHumanVerification.__name__][0]
     assert row.status == "verified"
-    assert row.ppid == "did:lemma:ppid_test_complete"
+    # The demo completion path derives a real person-root PPID from the test
+    # fixture (no longer the monkeypatched _derive_ppid_for_site), so assert the
+    # canonical did:lemma:ppid_<hex> shape rather than a brittle literal.
+    assert row.ppid.startswith("did:lemma:ppid_")
+    assert len(row.ppid) == len("did:lemma:ppid_") + 64
 
 
 def test_ishuman_demo_network_approve_revokes_demo_wallet_when_token_matches(

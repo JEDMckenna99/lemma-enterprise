@@ -2570,11 +2570,201 @@ class LemmaWallet {
             if (!secretRecord?.secret) throw new Error('wallet_secret unavailable');
             this.session.walletSecret = secretRecord.secret;
         }
-        const keypair = await keys.deriveSiteSigningKeypair(this.session.walletSecret, canonicalSite);
+        // v2 (Phase 1.1): post-IDV wallets derive site signing keys from the
+        // person-root wallet_local_seed when present and the flag is on. Pre-IDV
+        // and default deployments stay on wallet_secret (unchanged behavior).
+        const useSeed = this._isHumanUsePersonRootSeeds() && this.session?.walletLocalSeed;
+        const signingSecretHex = useSeed ? this.session.walletLocalSeed : this.session.walletSecret;
+        const keypair = await keys.deriveSiteSigningKeypair(signingSecretHex, canonicalSite);
         return {
             keypair,
             canonicalSite,
             publicKeyB64: keys.base64urlEncode(keypair.publicKey),
+        };
+    }
+
+    /**
+     * v2 (Phase 1.1) feature flag. Default OFF -> existing wallet_secret path.
+     */
+    _isHumanUsePersonRootSeeds() {
+        return (
+            typeof window !== 'undefined'
+            && (window.LEMMA_ISHUMAN_USE_PERSON_ROOT_SEEDS === true
+                || window.LEMMA_ISHUMAN_USE_PERSON_ROOT_SEEDS === 'true')
+        );
+    }
+
+    /**
+     * Derive the wallet's X25519 encryption public key (base64url). Posted at
+     * IDV start so the server can seal person-root seed envelopes to it.
+     */
+    async getEncryptionPublicKeyB64() {
+        let secret = this.session?.walletSecret;
+        if (!secret) {
+            const secretRecord = await this._get('secrets', 'master');
+            secret = secretRecord?.secret;
+        }
+        if (!secret) throw new Error('wallet_secret unavailable');
+        const keys = this._getLemmaKeys();
+        const { publicKey } = await keys.deriveEncryptionKeypair(secret);
+        return keys.base64urlEncode(publicKey);
+    }
+
+    /**
+     * Fetch + open the sealed person-root seed envelopes and stash the derived
+     * wallet_local_seed / person_root_proxy in the session. No-op unless the
+     * feature flag is on and the wallet is unlocked + verified.
+     */
+    async fetchAndStoreSeedEnvelopes() {
+        if (!this._isHumanUsePersonRootSeeds()) return null;
+        const walletId = this.session?.walletId;
+        let secret = this.session?.walletSecret;
+        if (!secret) {
+            const secretRecord = await this._get('secrets', 'master');
+            secret = secretRecord?.secret;
+        }
+        if (!walletId || !secret) return null;
+
+        const walletAssertion = await this.buildWalletAssertion(['wallet_id'], { wallet_id: walletId });
+        const res = await fetch('/api/ishuman/seed-envelope', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ wallet_id: walletId, wallet_assertion: walletAssertion }),
+        });
+        if (!res.ok) return null;
+        const data = await res.json().catch(() => null);
+        if (!data || !data.success) return null;
+
+        const keys = this._getLemmaKeys();
+        const { privateKey } = await keys.deriveEncryptionKeypair(secret);
+        const toHex = (bytes) => Array.from(bytes).map((b) => b.toString(16).padStart(2, '0')).join('');
+        const walletLocalSeed = await keys.openSealedEnvelope(
+            privateKey, keys.base64urlDecode(data.wallet_seed_envelope),
+        );
+        const personRootProxy = await keys.openSealedEnvelope(
+            privateKey, keys.base64urlDecode(data.person_root_proxy_envelope),
+        );
+        this.session.walletLocalSeed = toHex(walletLocalSeed);
+        this.session.personRootProxy = toHex(personRootProxy);
+        return { ok: true, seedVersion: data.seed_version };
+    }
+
+    // ========================================
+    // Phase 4.2 — QR cross-device transfer
+    // ========================================
+
+    /**
+     * NEW device: mint an ephemeral transfer target. Returns the QR payload to
+     * display ({ transfer_id, new_device_enc_pubkey }) and keeps the transient
+     * private key in memory for the later claim.
+     */
+    async beginDeviceTransfer() {
+        const keys = this._getLemmaKeys();
+        const { privateKey, publicKey } = await keys.generateEncryptionKeypair();
+        const idBytes = crypto.getRandomValues(new Uint8Array(24));
+        const transferId = 'transfer_' + keys.base64urlEncode(idBytes);
+        this._pendingDeviceTransfer = { transferId, privateKey };
+        return {
+            transferId,
+            newDeviceEncPubkeyB64: keys.base64urlEncode(publicKey),
+            qrPayload: JSON.stringify({
+                v: 1,
+                transfer_id: transferId,
+                new_device_enc_pubkey: keys.base64urlEncode(publicKey),
+            }),
+        };
+    }
+
+    /**
+     * OLD device: scanned the new device's QR. Reseal the person-root seeds to
+     * the new device's key and deposit the bundle under a wallet-signed,
+     * key-bound, 60s one-time relay entry.
+     */
+    async depositDeviceTransfer({ transferId, newDeviceEncPubkeyB64, masterCredentialId } = {}) {
+        if (!transferId || !newDeviceEncPubkeyB64) {
+            throw new Error('transferId and newDeviceEncPubkeyB64 required');
+        }
+        await this.fetchAndStoreSeedEnvelopes();
+        const seedHex = this.session?.walletLocalSeed;
+        const proxyHex = this.session?.personRootProxy;
+        if (!seedHex || !proxyHex) {
+            throw new Error('seed material unavailable; cannot transfer');
+        }
+        const keys = this._getLemmaKeys();
+        const recipientPub = keys.base64urlDecode(newDeviceEncPubkeyB64);
+        const sealedSeed = await keys.sealEnvelope(recipientPub, keys.hexToBytes(seedHex));
+        const sealedProxy = await keys.sealEnvelope(recipientPub, keys.hexToBytes(proxyHex));
+
+        const walletId = this.session?.walletId;
+        const body = {
+            action: 'deposit',
+            wallet_id: walletId,
+            transfer_id: transferId,
+            new_device_enc_pubkey: newDeviceEncPubkeyB64,
+        };
+        const walletAssertion = await this.buildWalletAssertion(
+            ['transfer_id', 'new_device_enc_pubkey'],
+            { transfer_id: transferId, new_device_enc_pubkey: newDeviceEncPubkeyB64 },
+        );
+        body.wallet_assertion = walletAssertion;
+        body.bundle = {
+            sealed_wallet_seed: keys.base64urlEncode(sealedSeed),
+            sealed_person_root_proxy: keys.base64urlEncode(sealedProxy),
+            master_credential_id: masterCredentialId || null,
+        };
+        const res = await fetch('/api/wallet/sync-device', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify(body),
+        });
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            throw new Error(`device transfer deposit failed: ${err.error || res.status}`);
+        }
+        return res.json();
+    }
+
+    /**
+     * NEW device: claim a deposited transfer (one-time) and open the resealed
+     * seeds with the transient private key minted in beginDeviceTransfer().
+     */
+    async claimDeviceTransfer(transferId) {
+        const pending = this._pendingDeviceTransfer;
+        const id = transferId || pending?.transferId;
+        if (!id || !pending?.privateKey || pending.transferId !== id) {
+            throw new Error('no matching pending device transfer');
+        }
+        const res = await fetch('/api/wallet/sync-device', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ action: 'claim', transfer_id: id }),
+        });
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            throw new Error(`device transfer claim failed: ${err.error || res.status}`);
+        }
+        const data = await res.json();
+        const bundle = data.bundle || {};
+        const keys = this._getLemmaKeys();
+        const toHex = (bytes) => Array.from(bytes).map((b) => b.toString(16).padStart(2, '0')).join('');
+        const seed = await keys.openSealedEnvelope(
+            pending.privateKey, keys.base64urlDecode(bundle.sealed_wallet_seed),
+        );
+        const proxy = await keys.openSealedEnvelope(
+            pending.privateKey, keys.base64urlDecode(bundle.sealed_person_root_proxy),
+        );
+        this.session = this.session || {};
+        this.session.walletId = data.wallet_id || this.session.walletId;
+        this.session.walletLocalSeed = toHex(seed);
+        this.session.personRootProxy = toHex(proxy);
+        this._pendingDeviceTransfer = null;
+        return {
+            ok: true,
+            walletId: data.wallet_id,
+            masterCredentialId: bundle.master_credential_id || null,
         };
     }
 
@@ -2593,6 +2783,20 @@ class LemmaWallet {
         const cl = credential.claims || credential.credentialSubject || {};
         const site = cl.siteId || cl.site_id || cl.siteDomain || cl.site_domain || '';
         return site === 'lemma.id' || !site;
+    }
+
+    /**
+     * v2 (Phase 2.2): when the bridge iframe is disabled, the persistent
+     * "one passkey per day" lock bundle is also disabled. Each popup
+     * invocation does its own passkey check instead, removing the
+     * localStorage bundle that caused envelope_invalid / stale-state bugs.
+     */
+    _isHumanLockDisabled() {
+        return (
+            typeof window !== 'undefined'
+            && (window.LEMMA_DISABLE_BRIDGE_IFRAME === true
+                || window.LEMMA_DISABLE_BRIDGE_IFRAME === 'true')
+        );
     }
 
     _readIsHumanLockBundleRaw() {
@@ -2619,6 +2823,7 @@ class LemmaWallet {
     }
 
     isIsHumanLockValid() {
+        if (this._isHumanLockDisabled()) return false;
         const bundle = this._readIsHumanLockBundleRaw();
         if (!bundle || bundle.v !== 1) return false;
         const expiresAt = Number(bundle.expiresAt || 0);
@@ -2626,6 +2831,7 @@ class LemmaWallet {
     }
 
     async _persistIsHumanLockBundle() {
+        if (this._isHumanLockDisabled()) return;
         if (!this._isLemmaDomain()) return;
         if (!this.session?.isUnlocked || !this.session?.walletSecret) return;
         const passkey = await this._get('passkey', 'primary').catch(() => null);
@@ -2659,6 +2865,7 @@ class LemmaWallet {
     }
 
     async _restoreIsHumanLockBundleIfValid() {
+        if (this._isHumanLockDisabled()) return false;
         const bundle = this._readIsHumanLockBundleRaw();
         if (!bundle || bundle.v !== 1) return false;
         const expiresAt = Number(bundle.expiresAt || 0);
@@ -2840,10 +3047,11 @@ class LemmaWallet {
         const existing = await this.findIsHumanSiteCredential(canonicalSite);
         if (existing) return existing;
 
+        // v2 (Phase 1.2): the master credential is an optional hint. If the
+        // local copy is missing, the server falls back to our latest verified
+        // record, so we omit master_credential_id rather than failing closed.
         const master = await this.findIsHumanMasterCredential();
-        if (!master) {
-            throw new Error('no_ishuman_credential');
-        }
+        const masterId = master?.id || '';
 
         const siteKeys = await this.deriveSiteSigningKeypair(canonicalSite);
         const siteSigningPubkey = siteKeys.publicKeyB64;
@@ -2857,27 +3065,40 @@ class LemmaWallet {
             throw new Error('wallet_locked');
         }
 
+        // Bind master_credential_id into the signed assertion only when present
+        // so the wallet and server agree on the signed field set (see
+        // api/ishuman.py derive_site_proof).
+        const assertionFieldNames = masterId
+            ? ['master_credential_id', 'target_site', 'site_signing_pubkey']
+            : ['target_site', 'site_signing_pubkey'];
+        const assertionFieldValues = {
+            target_site: canonicalSite,
+            site_signing_pubkey: siteSigningPubkey,
+        };
+        if (masterId) {
+            assertionFieldValues.master_credential_id = masterId;
+        }
         const walletAssertion = await this.buildWalletAssertion(
-            ['master_credential_id', 'target_site', 'site_signing_pubkey'],
-            {
-                master_credential_id: master.id,
-                target_site: canonicalSite,
-                site_signing_pubkey: siteSigningPubkey,
-            },
+            assertionFieldNames,
+            assertionFieldValues,
         );
+
+        const deriveBody = {
+            wallet_id: walletId,
+            wallet_secret: walletSecret,
+            target_site: canonicalSite,
+            site_signing_pubkey: siteSigningPubkey,
+            wallet_assertion: walletAssertion,
+        };
+        if (masterId) {
+            deriveBody.master_credential_id = masterId;
+        }
 
         const deriveRes = await fetch('/api/ishuman/derive-site-proof', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             credentials: 'include',
-            body: JSON.stringify({
-                master_credential_id: master.id,
-                wallet_id: walletId,
-                wallet_secret: walletSecret,
-                target_site: canonicalSite,
-                site_signing_pubkey: siteSigningPubkey,
-                wallet_assertion: walletAssertion,
-            }),
+            body: JSON.stringify(deriveBody),
         });
         const deriveData = await deriveRes.json();
         if (!deriveRes.ok || !deriveData.success || !deriveData.credential) {
@@ -2890,6 +3111,45 @@ class LemmaWallet {
         await this._putIsHumanCacheRecord(derived);
         await this._finalizeIsHumanIssuance({ isHumanIssuance: true });
         return derived;
+    }
+
+    /**
+     * v2 (Phase 1.3): re-fetch a freshly signed master credential for an
+     * already-verified wallet without running a new IDV. Used by the recovery
+     * flow when the local master copy was lost (cleared storage, new device).
+     */
+    async reissueMasterCredential() {
+        await this.ensureIsHumanIssuanceReady({ isHumanIssuance: true });
+        const walletId = this.session?.walletId || '';
+        if (!walletId) {
+            throw new Error('wallet_locked');
+        }
+
+        const walletAssertion = await this.buildWalletAssertion(
+            ['wallet_id'],
+            { wallet_id: walletId },
+        );
+
+        const res = await fetch('/api/ishuman/reissue-master', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({
+                wallet_id: walletId,
+                wallet_assertion: walletAssertion,
+            }),
+        });
+        const data = await res.json();
+        if (!res.ok || !data.success || !data.credential) {
+            throw new Error(data.error || data.message || 'reissue_failed');
+        }
+
+        const master = data.credential;
+        master.packageType = master.packageType || 'identity';
+        await this.storeCredential(master);
+        await this._putIsHumanCacheRecord(master);
+        await this._finalizeIsHumanIssuance({ isHumanIssuance: true });
+        return master;
     }
 
     async signSiteSessionPresentation({

@@ -47,28 +47,58 @@ class StripeIdentityRootMaterial:
     stripe_report_id: Optional[str] = None
 
 
-def _get_identity_root_pepper() -> bytes:
-    try:
-        from api.config import get_identity_root_pepper
+def active_root_version() -> str:
+    """The pepper/salt version new IDVs derive under (Phase 3.1).
 
-        return get_identity_root_pepper().encode("utf-8")
-    except Exception:
-        key = os.environ.get("LEMMA_IDENTITY_ROOT_PEPPER_V1")
-        if key and len(key) >= 32:
-            return key.encode("utf-8")
-        return b"lemma_dev_identity_root_pepper_change_me_32b"
+    Defaults to ``v1`` so existing deployments are unchanged. Operators rotate by
+    provisioning ``LEMMA_IDENTITY_ROOT_PEPPER_<VER>`` + ``LEMMA_PERSON_ROOT_SALT_<VER>``
+    and setting ``LEMMA_ACTIVE_ROOT_VERSION``.
+    """
+    return (os.environ.get("LEMMA_ACTIVE_ROOT_VERSION") or PERSON_ROOT_VERSION).strip()
 
 
-def _get_person_root_salt() -> bytes:
-    try:
-        from api.config import get_person_root_salt
+def _is_v1(version: str) -> bool:
+    return (version or "").strip().upper() == "V1"
 
-        return get_person_root_salt().encode("utf-8")
-    except Exception:
-        key = os.environ.get("LEMMA_PERSON_ROOT_SALT_V1")
-        if key and len(key) >= 32:
-            return key.encode("utf-8")
-        return b"lemma_dev_person_root_salt_change_me_32bytes"
+
+def _get_identity_root_pepper(version: str | None = None) -> bytes:
+    version = version or active_root_version()
+    # V1 preserves legacy resolution (api.config -> env -> dev default) so the
+    # pinned cryptographic invariants stay byte-stable across this refactor.
+    if _is_v1(version):
+        try:
+            from api.config import get_identity_root_pepper
+
+            return get_identity_root_pepper().encode("utf-8")
+        except Exception:
+            key = os.environ.get("LEMMA_IDENTITY_ROOT_PEPPER_V1")
+            if key and len(key) >= 32:
+                return key.encode("utf-8")
+            return b"lemma_dev_identity_root_pepper_change_me_32b"
+    env_key = f"LEMMA_IDENTITY_ROOT_PEPPER_{version.strip().upper()}"
+    val = os.environ.get(env_key)
+    if not val or len(val) < 32:
+        raise IdentityRootError(f"missing or short pepper: {env_key}")
+    return val.encode("utf-8")
+
+
+def _get_person_root_salt(version: str | None = None) -> bytes:
+    version = version or active_root_version()
+    if _is_v1(version):
+        try:
+            from api.config import get_person_root_salt
+
+            return get_person_root_salt().encode("utf-8")
+        except Exception:
+            key = os.environ.get("LEMMA_PERSON_ROOT_SALT_V1")
+            if key and len(key) >= 32:
+                return key.encode("utf-8")
+            return b"lemma_dev_person_root_salt_change_me_32bytes"
+    env_key = f"LEMMA_PERSON_ROOT_SALT_{version.strip().upper()}"
+    val = os.environ.get(env_key)
+    if not val or len(val) < 32:
+        raise IdentityRootError(f"missing or short salt: {env_key}")
+    return val.encode("utf-8")
 
 
 def canonical_json_bytes(payload: dict[str, Any]) -> bytes:
@@ -130,26 +160,26 @@ def build_document_root_claims(material: StripeIdentityRootMaterial) -> dict[str
     return claims
 
 
-def derive_document_root_hash(claims: dict[str, Any]) -> str:
-    pepper = _get_identity_root_pepper()
+def derive_document_root_hash(claims: dict[str, Any], version: str | None = None) -> str:
+    pepper = _get_identity_root_pepper(version)
     digest = hmac.new(pepper, canonical_json_bytes(claims), hashlib.sha256).hexdigest()
     return digest
 
 
-def derive_person_root_bytes(document_root_hash: str) -> bytes:
+def derive_person_root_bytes(document_root_hash: str, version: str | None = None) -> bytes:
     if not document_root_hash or len(document_root_hash) != 64:
         raise IdentityRootError("document_root_hash must be 64 hex chars")
     ikm = bytes.fromhex(document_root_hash)
     return HKDF(
         algorithm=hashes.SHA256(),
         length=32,
-        salt=_get_person_root_salt(),
+        salt=_get_person_root_salt(version),
         info=PERSON_ROOT_HKDF_INFO,
     ).derive(ikm)
 
 
-def derive_person_root_hash(document_root_hash: str) -> str:
-    return derive_person_root_bytes(document_root_hash).hex()
+def derive_person_root_hash(document_root_hash: str, version: str | None = None) -> str:
+    return derive_person_root_bytes(document_root_hash, version).hex()
 
 
 def _site_ppid_message(rp_id: str) -> bytes:
@@ -168,8 +198,8 @@ def derive_ppid_from_person_root_bytes(person_root: bytes, rp_id: str) -> str:
     return f"did:lemma:ppid_{ppid}"
 
 
-def derive_ppid_from_document_root_hash(document_root_hash: str, rp_id: str) -> str:
-    person_root = derive_person_root_bytes(document_root_hash)
+def derive_ppid_from_document_root_hash(document_root_hash: str, rp_id: str, version: str | None = None) -> str:
+    person_root = derive_person_root_bytes(document_root_hash, version)
     return derive_ppid_from_person_root_bytes(person_root, rp_id)
 
 
@@ -233,6 +263,6 @@ def extract_root_material_from_stripe_session(session: Any) -> StripeIdentityRoo
     )
 
 
-def document_root_hash_from_material(material: StripeIdentityRootMaterial) -> str:
+def document_root_hash_from_material(material: StripeIdentityRootMaterial, version: str | None = None) -> str:
     claims = build_document_root_claims(material)
-    return derive_document_root_hash(claims)
+    return derive_document_root_hash(claims, version)

@@ -191,7 +191,10 @@ def test_derive_site_proof_error_paths(
     db = fake_ishuman_db_session_factory
     monkeypatch.setattr("api.database.SessionLocal", db.session_local)
 
-    not_found = ishuman_client.post(
+    # Phase 1.2: an unknown master hint with NO verified record for the wallet
+    # now falls back and fails closed as wallet_not_verified (the old
+    # master_credential_not_found 404 path was removed).
+    not_verified = ishuman_client.post(
         "/api/ishuman/derive-site-proof",
         json=attach_wallet_assertion(
             {
@@ -204,8 +207,8 @@ def test_derive_site_proof_error_paths(
             DERIVE_ASSERTION_FIELDS,
         ),
     )
-    assert not_found.status_code == 404
-    assert not_found.get_json()["error"] == "master_credential_not_found"
+    assert not_verified.status_code == 403
+    assert not_verified.get_json()["error"] == "wallet_not_verified"
 
     invalid_site = ishuman_client.post(
         "/api/ishuman/derive-site-proof",

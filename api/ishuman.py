@@ -252,11 +252,21 @@ def _complete_verified_ishuman_from_stripe(
         }
         return None
 
+    from api.identity_roots import active_root_version
+
     ppid = derive_ppid_from_person_root_hash(resolved.person_root_hash, "lemma.id")
     record.lemma_person_id = resolved.person_id
     record.document_root_hash = resolved.document_root_hash
-    record.root_version = "v1"
+    record.root_version = active_root_version()
     record.confidence_level = resolved.confidence_level
+
+    # v2 (Phase 1.1): seal person-root seed envelopes for the wallet, if it
+    # posted an encryption pubkey at IDV start. Best-effort and feature-flagged;
+    # a failure here must never block credential issuance.
+    try:
+        _maybe_store_seed_envelopes(record, wallet_id, resolved.person_root_hash)
+    except Exception:
+        logger.exception("Seed-envelope generation failed (non-fatal) for wallet %s", wallet_id)
 
     credential = _issue_ishuman_credential(
         ppid,
@@ -265,6 +275,53 @@ def _complete_verified_ishuman_from_stripe(
     )
     record.ppid = ppid
     return credential
+
+
+def _maybe_store_seed_envelopes(record, wallet_id: str, person_root_hash: str) -> None:
+    """Derive + seal wallet_local_seed and person_root_proxy onto *record*.
+
+    No-op unless LEMMA_ISHUMAN_USE_PERSON_ROOT_SEEDS is enabled and the wallet
+    posted a valid X25519 ``enc_pubkey`` at start-verification.
+    """
+    from api.seed_envelope import (
+        SEED_VERSION,
+        derive_person_root_proxy,
+        derive_wallet_local_seed,
+        seal_envelope,
+        use_person_root_seeds_enabled,
+    )
+
+    if not use_person_root_seeds_enabled():
+        return
+    enc_pubkey_b64 = ((record.metadata_json or {}).get("enc_pubkey") or "").strip()
+    if not enc_pubkey_b64:
+        return
+    try:
+        recipient_pub = _b64url_decode_32(enc_pubkey_b64)
+    except ValueError:
+        logger.warning("Invalid enc_pubkey for wallet %s; skipping seed envelopes", wallet_id)
+        return
+
+    person_root = bytes.fromhex(person_root_hash)
+    wallet_local_seed = derive_wallet_local_seed(person_root, wallet_id)
+    person_root_proxy = derive_person_root_proxy(person_root)
+
+    record.wallet_seed_envelope = seal_envelope(recipient_pub, wallet_local_seed)
+    record.person_root_proxy_envelope = seal_envelope(recipient_pub, person_root_proxy)
+    record.seed_version = SEED_VERSION
+
+
+def _b64url_decode_32(value: str) -> bytes:
+    """Decode a base64url (or standard base64) 32-byte X25519 public key."""
+    raw = value.strip()
+    pad = "=" * ((4 - len(raw) % 4) % 4)
+    try:
+        decoded = base64.urlsafe_b64decode(raw + pad)
+    except Exception:
+        decoded = base64.b64decode(raw + pad)
+    if len(decoded) != 32:
+        raise ValueError("encryption pubkey must decode to 32 bytes")
+    return decoded
 
 
 def _require_wallet_assertion(body: dict, *, field_names: list[str]) -> tuple:
@@ -381,13 +438,21 @@ def start_verification_for_body(body: dict) -> tuple[dict, int]:
             except Exception:
                 logger.exception("Failed pre-deriving PPID during isHuman start-verification")
 
+        # v2 (Phase 1.1): the wallet may post a one-time X25519 encryption
+        # pubkey so the server can seal person-root seed envelopes at IDV
+        # completion. Stored as metadata; ignored unless the feature is enabled.
+        verification_metadata = {"return_url": return_url}
+        enc_pubkey = (body.get("enc_pubkey") or "").strip()
+        if enc_pubkey:
+            verification_metadata["enc_pubkey"] = enc_pubkey
+
         verification = IsHumanVerification(
             session_id=session_id,
             stripe_session_id=result["session_id"],
             wallet_id=wallet_id,
             ppid=derived_ppid,
             status="pending",
-            metadata_json={"return_url": return_url},
+            metadata_json=verification_metadata,
         )
         db.add(verification)
         db.commit()
@@ -948,16 +1013,19 @@ def derive_site_proof():
     5. Returns the per-site credential for the bridge to store
     """
     body = request.get_json(silent=True) or {}
-    master_credential_id = body.get("master_credential_id")
+    # v2 (Phase 1.2): master_credential_id is now an OPTIONAL hint. When absent
+    # we fall back to the wallet's latest verified record, so a wallet that lost
+    # its local master copy can still derive site proofs.
+    master_credential_id = (body.get("master_credential_id") or "").strip()
     wallet_id = body.get("wallet_id")
     wallet_secret = body.get("wallet_secret")
     target_site = body.get("target_site")
     site_signing_pubkey_raw = (body.get("site_signing_pubkey") or "").strip()
 
-    if not master_credential_id or not wallet_id or not target_site:
+    if not wallet_id or not target_site:
         return jsonify({
             "success": False,
-            "error": "master_credential_id, wallet_id, and target_site required",
+            "error": "wallet_id and target_site required",
         }), 400
 
     if not wallet_secret:
@@ -967,9 +1035,14 @@ def derive_site_proof():
     except ValueError as exc:
         return jsonify({"success": False, "error": str(exc)}), 400
 
+    # Bind master_credential_id into the signed assertion only when supplied so
+    # the wallet and server agree on the signed field set in both modes.
+    assertion_fields = ["target_site", "site_signing_pubkey"]
+    if master_credential_id:
+        assertion_fields = ["master_credential_id"] + assertion_fields
     err, _wid = _require_wallet_assertion(
         body,
-        field_names=["master_credential_id", "target_site", "site_signing_pubkey"],
+        field_names=assertion_fields,
     )
     if err:
         return err
@@ -985,14 +1058,28 @@ def derive_site_proof():
     )
     db = SessionLocal()
     try:
-        # 1. Verify master credential is valid
-        master = (
-            db.query(IsHumanVerification)
-            .filter_by(credential_id=master_credential_id, wallet_id=wallet_id, status="verified")
-            .first()
-        )
+        # 1. Resolve the master credential. Prefer the body's hint; otherwise
+        #    fall back to the wallet's latest verified record (Phase 1.2).
+        master = None
+        if master_credential_id:
+            master = (
+                db.query(IsHumanVerification)
+                .filter_by(credential_id=master_credential_id, wallet_id=wallet_id, status="verified")
+                .first()
+            )
         if not master:
-            return jsonify({"success": False, "error": "master_credential_not_found"}), 404
+            master = (
+                db.query(IsHumanVerification)
+                .filter_by(wallet_id=wallet_id, status="verified")
+                .order_by(IsHumanVerification.verified_at.desc())
+                .first()
+            )
+        if not master:
+            return jsonify({"success": False, "error": "wallet_not_verified"}), 403
+
+        # Bind the resolved credential id for the rest of the flow (revocation
+        # checks, derived-credential mapping) regardless of how it was found.
+        master_credential_id = master.credential_id
 
         if master.expires_at and master.expires_at < datetime.utcnow():
             return jsonify({"success": False, "error": "master_credential_expired"}), 403
@@ -1092,6 +1179,247 @@ def derive_site_proof():
         return jsonify({"success": False, "error": "derivation_failed"}), 500
     finally:
         db.close()
+
+
+# ---------------------------------------------------------------------------
+# 8a. Reissue a fresh master credential for an already-verified wallet
+# ---------------------------------------------------------------------------
+
+
+def _reissue_limit_per_day() -> int:
+    try:
+        return max(1, int(os.getenv("LEMMA_ISHUMAN_REISSUE_LIMIT_PER_DAY", "5")))
+    except (TypeError, ValueError):
+        return 5
+
+
+@ishuman_bp.route("/api/ishuman/reissue-master", methods=["POST"])
+@cross_origin()
+def reissue_master_credential():
+    """Reissue a fresh master credential for an already-verified wallet.
+
+    Auth: a wallet_assertion proving possession of the wallet's signing key.
+    No fresh IDV required — the wallet was already verified, we just hand back
+    a freshly signed master. The previously issued master id is revoked so a
+    leaked local copy cannot be replayed.
+
+    Body: ``{ wallet_id, wallet_assertion: { nonce, signature } }``
+    Returns: ``{ success: true, credential: <new master VC>, old_credential_id }``
+    """
+    body = request.get_json(silent=True) or {}
+    wallet_id = (body.get("wallet_id") or "").strip()
+    if not wallet_id:
+        return jsonify({"success": False, "error": "wallet_id required"}), 400
+
+    err, _wid = _require_wallet_assertion(body, field_names=["wallet_id"])
+    if err:
+        return err
+
+    # Per-wallet/day rate limit (env-tunable). Checked at call time so the
+    # limit can be tuned per deploy and exercised deterministically in tests.
+    from api.rate_limiter import check_rate_limit
+
+    if not check_rate_limit(f"ishuman_reissue:{wallet_id}", _reissue_limit_per_day(), 86400):
+        return jsonify({"success": False, "error": "reissue_rate_limited"}), 429
+
+    from api.database import SessionLocal, IsHumanVerification, RevocationList
+    from api.bloom_snapshot import invalidate_bloom_filter_cache
+
+    db = SessionLocal()
+    try:
+        verified = (
+            db.query(IsHumanVerification)
+            .filter_by(wallet_id=wallet_id, status="verified")
+            .order_by(IsHumanVerification.verified_at.desc())
+            .first()
+        )
+        if not verified:
+            return jsonify({"success": False, "error": "wallet_not_verified"}), 404
+
+        old_id = verified.credential_id
+        ppid_derivation = (verified.metadata_json or {}).get("ppid_derivation")
+        new_credential = _issue_ishuman_credential(
+            verified.ppid,
+            wallet_id,
+            ppid_derivation=ppid_derivation,
+        )
+        verified.credential_id = new_credential["id"]
+        verified.metadata_json = {
+            **(verified.metadata_json or {}),
+            "reissued_from": old_id,
+            "reissued_at": int(time.time()),
+        }
+
+        # Revoke the superseded master id so leaked copies cannot be replayed.
+        if old_id and old_id != new_credential["id"]:
+            db.add(RevocationList(
+                lemma_id=old_id,
+                credential_id=old_id,
+                lemma_type="ishuman",
+                revocation_type="credential",
+                revoked_by="reissue_master",
+                reason="superseded by reissue",
+            ))
+        db.commit()
+        invalidate_bloom_filter_cache()
+
+        logger.info("Reissued master for wallet=%s old=%s new=%s",
+                    wallet_id, str(old_id)[:30], str(new_credential["id"])[:30])
+        return jsonify({
+            "success": True,
+            "credential": new_credential,
+            "old_credential_id": old_id,
+        })
+    except Exception:
+        db.rollback()
+        logger.exception("Failed to reissue master credential")
+        return jsonify({"success": False, "error": "reissue_failed"}), 500
+    finally:
+        db.close()
+
+
+@ishuman_bp.route("/api/ishuman/seed-envelope", methods=["POST"])
+@cross_origin()
+def get_seed_envelope():
+    """Return the wallet's sealed person-root seed envelopes (Phase 1.1).
+
+    Auth: a wallet_assertion proving possession of the wallet's signing key.
+    The envelopes are sealed to the X25519 pubkey the wallet posted at IDV
+    start; only that wallet can open them. Returns base64url ciphertext only.
+
+    Body: ``{ wallet_id, wallet_assertion: { nonce, signature } }``
+    """
+    from api.seed_envelope import use_person_root_seeds_enabled
+
+    if not use_person_root_seeds_enabled():
+        return jsonify({"success": False, "error": "seed_envelopes_disabled"}), 404
+
+    body = request.get_json(silent=True) or {}
+    wallet_id = (body.get("wallet_id") or "").strip()
+    if not wallet_id:
+        return jsonify({"success": False, "error": "wallet_id required"}), 400
+
+    err, _wid = _require_wallet_assertion(body, field_names=["wallet_id"])
+    if err:
+        return err
+
+    from api.database import SessionLocal, IsHumanVerification
+
+    db = SessionLocal()
+    try:
+        verified = (
+            db.query(IsHumanVerification)
+            .filter_by(wallet_id=wallet_id, status="verified")
+            .order_by(IsHumanVerification.verified_at.desc())
+            .first()
+        )
+        if not verified:
+            return jsonify({"success": False, "error": "wallet_not_verified"}), 404
+        if not verified.wallet_seed_envelope or not verified.person_root_proxy_envelope:
+            return jsonify({"success": False, "error": "seed_envelope_unavailable"}), 404
+
+        def _b64(blob) -> str:
+            return base64.urlsafe_b64encode(bytes(blob)).decode("ascii").rstrip("=")
+
+        return jsonify({
+            "success": True,
+            "seed_version": verified.seed_version or "v1",
+            "wallet_seed_envelope": _b64(verified.wallet_seed_envelope),
+            "person_root_proxy_envelope": _b64(verified.person_root_proxy_envelope),
+        })
+    finally:
+        db.close()
+
+
+# ---------------------------------------------------------------------------
+# 8a. QR-based cross-device wallet transfer relay (Phase 4.2)
+# ---------------------------------------------------------------------------
+
+_DEVICE_TRANSFER_TTL_SECONDS = 60
+
+
+def _device_transfer_key(transfer_id: str) -> str:
+    return f"wallet:device-transfer:{transfer_id}"
+
+
+@ishuman_bp.route("/api/wallet/sync-device", methods=["POST"])
+@cross_origin()
+def wallet_sync_device():
+    """QR-based cross-device wallet transfer relay (Phase 4.2).
+
+    The server never holds plaintext person-root seeds, so it cannot reseal
+    envelopes itself. Instead this is a short-lived (60s), one-time *relay*
+    keyed by a random ``transfer_id`` that the NEW device proposes — together
+    with a transient X25519 public key — in its QR code:
+
+      * ``deposit`` (old device): scans the new device's QR, opens its own
+        Phase 1.1 seed envelopes, reseals them to ``new_device_enc_pubkey``,
+        and proves wallet ownership with a wallet_assertion signed over both
+        ``transfer_id`` and ``new_device_enc_pubkey`` (binding the authorization
+        to that specific target key). The server stores only the opaque,
+        already-encrypted bundle.
+      * ``claim`` (new device): redeems ``transfer_id`` exactly once and opens
+        the bundle with its transient private key.
+
+    Body (deposit): ``{ action, wallet_id, transfer_id, new_device_enc_pubkey,
+    bundle, wallet_assertion }``
+    Body (claim):   ``{ action, transfer_id }``
+    """
+    from auth.redis_store import delete as redis_delete
+    from auth.redis_store import get as redis_get
+    from auth.redis_store import store as redis_store
+
+    body = request.get_json(silent=True) or {}
+    action = (body.get("action") or "").strip().lower()
+
+    if action == "deposit":
+        wallet_id = (body.get("wallet_id") or "").strip()
+        transfer_id = (body.get("transfer_id") or "").strip()
+        new_device_enc_pubkey = (body.get("new_device_enc_pubkey") or "").strip()
+        if not wallet_id or not transfer_id or not new_device_enc_pubkey:
+            return jsonify({"success": False, "error": "missing_transfer_fields"}), 400
+        if len(transfer_id) < 16:
+            return jsonify({"success": False, "error": "weak_transfer_id"}), 400
+
+        # The old device authorizes resealing to THIS new-device key.
+        err, _wid = _require_wallet_assertion(
+            body, field_names=["transfer_id", "new_device_enc_pubkey"]
+        )
+        if err:
+            return err
+
+        bundle = body.get("bundle")
+        if not isinstance(bundle, dict) or not bundle:
+            return jsonify({"success": False, "error": "bundle_required"}), 400
+
+        redis_store(
+            _device_transfer_key(transfer_id),
+            {
+                "wallet_id": wallet_id,
+                "new_device_enc_pubkey": new_device_enc_pubkey,
+                "bundle": bundle,
+            },
+            ttl_seconds=_DEVICE_TRANSFER_TTL_SECONDS,
+        )
+        return jsonify({"success": True, "expires_in": _DEVICE_TRANSFER_TTL_SECONDS})
+
+    if action == "claim":
+        transfer_id = (body.get("transfer_id") or "").strip()
+        if not transfer_id:
+            return jsonify({"success": False, "error": "transfer_id required"}), 400
+        entry = redis_get(_device_transfer_key(transfer_id))
+        if not entry:
+            return jsonify({"success": False, "error": "transfer_not_found"}), 404
+        # One-time: burn before returning so a replay cannot re-claim.
+        if not redis_delete(_device_transfer_key(transfer_id)):
+            return jsonify({"success": False, "error": "transfer_already_claimed"}), 409
+        return jsonify({
+            "success": True,
+            "wallet_id": entry.get("wallet_id"),
+            "bundle": entry.get("bundle"),
+        })
+
+    return jsonify({"success": False, "error": "unknown_action"}), 400
 
 
 # ---------------------------------------------------------------------------

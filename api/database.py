@@ -755,13 +755,20 @@ class IsHumanVerification(Base):
     lemma_person_id = Column(String, index=True)
     document_root_hash = Column(String(64), index=True)
     root_version = Column(String, default='v1')
+    # v2 (Phase 3.2 scaffold): which IDV issuer produced this verification.
+    # Defaults to stripe_identity; multi-issuer integration is deferred.
+    issuer_id = Column(String, default='stripe_identity', index=True)
     confidence_level = Column(String)
-    status = Column(String, default='pending')  # pending, verified, failed, expired
+    status = Column(String, default='pending')  # pending, verified, failed, expired, revoked, superseded
     created_at = Column(DateTime, default=datetime.utcnow)
     verified_at = Column(DateTime)
     issued_at = Column(DateTime)
     expires_at = Column(DateTime)
     metadata_json = Column(JSON, default=dict)
+    # v2 (Phase 1.1): server-sealed envelopes for person-root seed delivery.
+    wallet_seed_envelope = Column(LargeBinary)
+    person_root_proxy_envelope = Column(LargeBinary)
+    seed_version = Column(String)
 
 
 class DerivedCredential(Base):
