@@ -37,15 +37,36 @@ logger = logging.getLogger(__name__)
 
 revocation_events_bp = Blueprint('revocation_events', __name__)
 
+
+def _redis_conn_kwargs(url: str, *, pubsub: bool = False) -> dict:
+    """
+    Hardened Redis connection kwargs for Heroku Redis (keepalive + health checks
+    survive the 300s idle cull; ssl.CERT_NONE for the self-signed rediss:// cert;
+    small bounded pool to respect the shared 20-connection Mini cap).
+
+    pubsub=True omits socket_timeout so blocking pubsub.listen() is not interrupted.
+    """
+    import ssl as _ssl
+    kwargs = dict(
+        decode_responses=True,
+        socket_connect_timeout=5,
+        socket_keepalive=True,
+        health_check_interval=30,
+        max_connections=int(os.environ.get('LEMMA_SSE_REDIS_MAX_CONNECTIONS', '3')),
+    )
+    if not pubsub:
+        kwargs['socket_timeout'] = 5
+    if url and url.startswith('rediss://'):
+        kwargs['ssl_cert_reqs'] = _ssl.CERT_NONE
+    return kwargs
+
+
 # Redis connection for pub/sub
 try:
     import redis
     REDIS_URL = os.getenv('REDISCLOUD_URL') or os.getenv('REDIS_URL')
     if REDIS_URL:
-        if REDIS_URL.startswith('rediss://'):
-            redis_client = redis.from_url(REDIS_URL, decode_responses=True, ssl_cert_reqs=None)
-        else:
-            redis_client = redis.from_url(REDIS_URL, decode_responses=True)
+        redis_client = redis.from_url(REDIS_URL, **_redis_conn_kwargs(REDIS_URL))
         redis_client.ping()
         REDIS_AVAILABLE = True
         logger.info("SSE revocation events: Redis available")
@@ -177,11 +198,8 @@ def generate_sse_events():
     
     # Create a separate Redis connection for pub/sub (required by redis-py)
     try:
-        if REDIS_URL.startswith('rediss://'):
-            pubsub_redis = redis.from_url(REDIS_URL, decode_responses=True, ssl_cert_reqs=None)
-        else:
-            pubsub_redis = redis.from_url(REDIS_URL, decode_responses=True)
-        
+        pubsub_redis = redis.from_url(REDIS_URL, **_redis_conn_kwargs(REDIS_URL, pubsub=True))
+
         pubsub = pubsub_redis.pubsub()
         pubsub.subscribe(REVOCATION_CHANNEL, SESSION_CHANNEL)
         

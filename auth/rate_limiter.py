@@ -165,10 +165,23 @@ def create_limiter(app):
 
     storage_uri = _redis_storage_uri()
 
+    # Bound + harden the limiter's Redis pool. Heroku Redis Mini caps the whole
+    # app at 20 connections shared across every Redis consumer and worker, so keep
+    # this pool small and resilient to the provider's 300s idle-connection cull.
+    storage_options = {}
+    if storage_uri.startswith(('redis://', 'rediss://')):
+        storage_options = {
+            "max_connections": int(os.environ.get('LEMMA_LIMITER_REDIS_MAX_CONNECTIONS', '4')),
+            "socket_connect_timeout": 5,
+            "socket_keepalive": True,
+            "health_check_interval": 30,
+        }
+
     limiter = Limiter(
         key_func=get_client_identifier,
         app=app,
         storage_uri=storage_uri,
+        storage_options=storage_options,
         default_limits=["1000 per hour", "100 per minute"],  # Global defaults
         strategy="fixed-window",  # Simple and predictable
         headers_enabled=True,  # Add X-RateLimit-* headers to responses

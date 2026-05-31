@@ -50,16 +50,32 @@ def get_redis_client():
             raise Exception("REDIS_URL not set in environment")
         
         logger.info(f"🔗 Connecting to Redis...")
-        
-        # Parse URL and connect (disable SSL verification for Heroku self-signed certs)
-        _redis_client = redis.from_url(
-            redis_url,
+
+        from redis.backoff import ExponentialBackoff
+        from redis.retry import Retry
+        from redis.exceptions import (
+            ConnectionError as RedisConnectionError,
+            TimeoutError as RedisTimeoutError,
+        )
+
+        # Parse URL and connect (disable SSL verification for Heroku self-signed certs).
+        # Bounded pool + retry/backoff keep us resilient to the shared 20-connection
+        # Mini cap and the provider's 300s idle-connection cull.
+        conn_kwargs = dict(
             decode_responses=True,  # Return strings instead of bytes
             socket_connect_timeout=5,
+            socket_timeout=5,
             socket_keepalive=True,
             health_check_interval=30,
-            ssl_cert_reqs=None  # Disable SSL certificate verification (Heroku uses self-signed certs)
+            max_connections=int(os.getenv('LEMMA_DB_REDIS_MAX_CONNECTIONS', '6')),
+            retry=Retry(ExponentialBackoff(cap=1.0, base=0.1), retries=3),
+            retry_on_error=[RedisConnectionError, RedisTimeoutError],
         )
+        if redis_url.startswith('rediss://'):
+            import ssl
+            conn_kwargs['ssl_cert_reqs'] = ssl.CERT_NONE  # Heroku uses self-signed certs
+
+        _redis_client = redis.from_url(redis_url, **conn_kwargs)
         
         # Test connection
         _redis_client.ping()
