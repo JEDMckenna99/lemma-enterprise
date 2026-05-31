@@ -81,7 +81,7 @@ const AUTH_STATE = {
 class LemmaWallet {
     // SDK version - check with LemmaWallet.VERSION
     // v2.32.0: Redirect-only architecture - removed popup flow for simpler, consistent UX
-    static VERSION = '2.59.0';  // v2.59: prefer newest credential after fresh IDV re-issue
+    static VERSION = '2.60.0';  // v2.60: popup-only honors LEMMA_DISABLE_BRIDGE_IFRAME (no central-wallet iframe / CSP fix)
     
     constructor(options = {}) {
         this.db = null;
@@ -2792,6 +2792,18 @@ class LemmaWallet {
      * localStorage bundle that caused envelope_invalid / stale-state bugs.
      */
     _isHumanLockDisabled() {
+        return this._bridgeIframeDisabled();
+    }
+
+    /**
+     * v2 (Phase 2): popup-only mode. When LEMMA_DISABLE_BRIDGE_IFRAME is set,
+     * the wallet must never create the hidden lemma.id/wallet/bridge iframe.
+     * This avoids frame-src CSP violations on lemma-rendered pages served from
+     * non-lemma.id origins (e.g. the Heroku app domain) where the "am I on
+     * lemma.id?" hostname check is false and would otherwise route through the
+     * central-wallet bridge.
+     */
+    _bridgeIframeDisabled() {
         return (
             typeof window !== 'undefined'
             && (window.LEMMA_DISABLE_BRIDGE_IFRAME === true
@@ -4166,6 +4178,11 @@ class LemmaWallet {
      * @private
      */
     async _sendBridgeMessage(type, payload, timeout = 5000) {
+        // Popup-only mode: never create the bridge iframe. Callers treat a
+        // non-success result as "no bridge" and fall back to the local session.
+        if (this._bridgeIframeDisabled()) {
+            return { success: false, valid: false, disabled: true, error: 'bridge_disabled' };
+        }
         // Check if bridge iframe exists
         let bridge = document.querySelector('iframe[src*="/wallet/bridge"]');
         
@@ -7428,6 +7445,10 @@ class LemmaWallet {
      * This ensures credentials are visible at lemma.id/wallet
      */
     async _syncToCentralWallet(credential) {
+        // Popup-only mode: skip the central-wallet iframe sync (best-effort only).
+        if (this._bridgeIframeDisabled()) {
+            return { success: false, skipped: 'bridge_disabled' };
+        }
         try {
             // Find or create bridge iframe
             let bridge = document.getElementById('lemma-wallet-bridge');
@@ -7769,6 +7790,10 @@ class LemmaWallet {
      * Get credentials from central lemma.id wallet via bridge
      */
     async _getFromCentralWallet(type = null) {
+        // Popup-only mode: no central-wallet iframe; rely on local credentials.
+        if (this._bridgeIframeDisabled()) {
+            return [];
+        }
         try {
             let bridge = document.getElementById('lemma-wallet-bridge');
             
