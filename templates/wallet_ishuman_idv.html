@@ -111,6 +111,9 @@
         const issueMode = params.get('issue_mode') || '';
         const refreshReason = params.get('refresh_reason') || '';
         const requestNonce = params.get('request_nonce') || '';
+        // IDV provider rail: 'didit' selects the didit hosted flow; anything
+        // else (or absent) uses the default Stripe Identity rail server-side.
+        const idvProvider = (params.get('idv_provider') || '').trim().toLowerCase();
         const clientSessionNonce = params.get('session_nonce') || '';
         const bloomSequence = Number(params.get('bloom_sequence') || 0);
         const sessionTtlSec = Number(params.get('session_ttl_sec') || (24 * 60 * 60));
@@ -342,26 +345,31 @@
             return '';
         }
 
-        async function startStripeVerification() {
+        async function startHostedVerification() {
             const returnUrl = `${window.location.origin}/wallet/ishuman-idv?${params.toString()}&verification_return=true`;
             const walletAssertion = await wallet.buildWalletAssertion(['return_url'], { return_url: returnUrl });
+            const startBody = {
+                wallet_id: walletId,
+                wallet_secret: walletSecret,
+                return_url: returnUrl,
+                enc_pubkey: await encPubkeyForStart(),
+                wallet_assertion: walletAssertion,
+            };
+            // Only send a provider hint when explicitly selected; the server
+            // defaults to Stripe Identity otherwise.
+            if (idvProvider) startBody.provider = idvProvider;
             const payload = await requestJson('/api/ishuman/start-verification', {
                 method: 'POST',
-                body: JSON.stringify({
-                    wallet_id: walletId,
-                    wallet_secret: walletSecret,
-                    return_url: returnUrl,
-                    enc_pubkey: await encPubkeyForStart(),
-                    wallet_assertion: walletAssertion,
-                }),
+                body: JSON.stringify(startBody),
             });
             sessionId = payload.session_id;
             localStorage.setItem(SESSION_KEY, sessionId);
             if (payload.url) {
+                // Both Stripe Identity and didit use a hosted redirect flow.
                 window.location.href = payload.url;
                 return null;
             }
-            throw new Error('Stripe verification URL missing');
+            throw new Error('Verification URL missing');
         }
 
         async function issueSiteProofAndClose() {
@@ -442,8 +450,8 @@
                     await verifyOnceTestMode();
                     masterIssued = true;
                 } else {
-                    setStatus('Opening Stripe Identity…', 'loading');
-                    await startStripeVerification();
+                    setStatus(idvProvider === 'didit' ? 'Opening identity check…' : 'Opening Stripe Identity…', 'loading');
+                    await startHostedVerification();
                     return false;
                 }
             }
@@ -529,8 +537,8 @@
                 return;
             }
 
-            setStatus('Opening Stripe Identity…', 'loading');
-            await startStripeVerification();
+            setStatus(idvProvider === 'didit' ? 'Opening identity check…' : 'Opening Stripe Identity…', 'loading');
+            await startHostedVerification();
         }
 
         document.getElementById('cancel-btn').addEventListener('click', () => {

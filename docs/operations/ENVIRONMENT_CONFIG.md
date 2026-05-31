@@ -58,6 +58,29 @@ value, including `staging` and unset, enables them.**
 | `STRIPE_SECRET_KEY`     | Stripe API key. Test-verify rails require an `sk_test_` key.| `sk_live_...`      | `sk_test_...`      |
 | `STRIPE_WEBHOOK_SECRET` | Verifies `identity.verification_session.*` webhook signatures.| live secret       | test secret        |
 
+### Didit Identity (second IDV rail — Phase 3.2)
+
+Didit is an optional upstream IDV provider that feeds the *same* document-root
+issuance pipeline as Stripe. Lemma remains the sole credential issuer; didit
+never signs credentials. The rail is **off by default** and only activates when
+both the API key and workflow id are present.
+
+| Variable                          | What it does                                                                       | If missing                                    |
+| --------------------------------- | ---------------------------------------------------------------------------------- | --------------------------------------------- |
+| `LEMMA_ISHUMAN_DIDIT_ENABLED`     | `"true"` selects didit as a *selectable* provider (still requires key+workflow).   | Didit rail disabled; `provider=didit` -> 400. |
+| `DIDIT_API_KEY`                   | `x-api-key` for `POST /v3/session/` (hosted verification session creation).        | `is_ishuman_didit_enabled()` returns false.   |
+| `DIDIT_WORKFLOW_ID`               | Didit workflow that defines the verification steps.                                | `is_ishuman_didit_enabled()` returns false.   |
+| `DIDIT_WEBHOOK_SECRET`            | HMAC secret for verifying `X-Signature-V2` on `/api/webhooks/didit-identity`.      | Webhook verification fails closed (401).      |
+| `DIDIT_API_BASE`                  | Base URL for the didit API. Default `https://verification.didit.me`.               | Defaults to production didit.                 |
+| `LEMMA_IDENTITY_ROOT_PEPPER_DIDIT_V1` | Optional per-issuer pepper isolation (Phase 3.2 Option A).                     | Falls back to the shared `LEMMA_IDENTITY_ROOT_PEPPER_V1`. |
+
+> Provider namespacing: `provider` is part of the signed `document_root` claim
+> set, so the same physical document verified through didit derives a *distinct*
+> person_root/PPID from the Stripe rail. This is intentional isolation, not a
+> bug. Because the didit rail ships flag-off with no prior users, the optional
+> per-issuer pepper can be provisioned at any time before first didit issuance
+> without a migration.
+
 ### Demo / test rails (only meaningful when `ENVIRONMENT != production`)
 
 | Variable                            | What it does                                                       |

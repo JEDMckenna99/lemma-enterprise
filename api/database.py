@@ -748,7 +748,12 @@ class IsHumanVerification(Base):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     session_id = Column(String, unique=True, nullable=False)
-    stripe_session_id = Column(String, unique=True, nullable=False)
+    # Nullable so non-Stripe issuers (e.g. didit) can omit it; their provider
+    # session id is stored in provider_session_id instead.
+    stripe_session_id = Column(String, unique=True, nullable=True)
+    # v2 (Phase 3.2): generic upstream IDV session id for any issuer. The didit
+    # webhook looks up records by this column (Stripe keys on stripe_session_id).
+    provider_session_id = Column(String, index=True)
     wallet_id = Column(String, index=True)
     ppid = Column(String, index=True)
     credential_id = Column(String, index=True)

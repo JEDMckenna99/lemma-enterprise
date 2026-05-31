@@ -48,13 +48,14 @@ def resolve_or_create_person_from_material(
     *,
     material: StripeIdentityRootMaterial,
     wallet_id: Optional[str],
+    provider: str = "stripe_identity",
 ) -> ResolvedLemmaPerson:
     from api.database import LemmaDocumentRoot, LemmaPerson, LemmaWalletBinding
 
     from api.identity_roots import active_root_version
 
     root_version = active_root_version()
-    claims = build_document_root_claims(material)
+    claims = build_document_root_claims(material, provider)
     document_root_hash = derive_document_root_hash(claims, root_version)
     person_root_hash = derive_person_root_hash(document_root_hash, root_version)
 
@@ -83,7 +84,7 @@ def resolve_or_create_person_from_material(
             document_root_hash=document_root_hash,
             lemma_person_id=person_id,
             root_version=root_version,
-            provider="stripe_identity",
+            provider=provider,
             stripe_verification_session_id=material.stripe_session_id,
             stripe_verification_report_id=material.stripe_report_id,
             document_country=claims.get("country"),
@@ -164,6 +165,30 @@ def process_verified_stripe_identity(
 
     resolved = resolve_person_from_stripe_session(db, stripe_session=session, wallet_id=wallet_id)
     return resolved, session
+
+
+def process_verified_didit_identity(
+    db,
+    *,
+    decision: dict,
+    wallet_id: Optional[str],
+) -> ResolvedLemmaPerson:
+    """Resolve a LemmaPerson from a verified didit decision payload.
+
+    Unlike the Stripe path there is no server-side re-fetch: the didit webhook
+    already carries the (HMAC-authenticated) ``decision`` object, so we build
+    root material directly from it. Raises IdentityRootMaterialError on
+    missing/invalid fields (fail closed).
+    """
+    from api.identity_roots import extract_root_material_from_didit_decision
+
+    material = extract_root_material_from_didit_decision(decision)
+    return resolve_or_create_person_from_material(
+        db,
+        material=material,
+        wallet_id=wallet_id,
+        provider="didit",
+    )
 
 
 def material_from_test_fixture(**kwargs) -> StripeIdentityRootMaterial:

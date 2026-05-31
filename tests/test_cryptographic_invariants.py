@@ -85,6 +85,56 @@ def test_document_root_canonicalization_is_stable(monkeypatch):
 
 
 @pytest.mark.unit
+def test_didit_document_root_canonicalization_is_stable(monkeypatch):
+    """Didit decision -> document_root_hash, byte-exact (Phase 3.2 Option A).
+
+    provider='didit' yields a DISTINCT document_root from the same physical
+    document under Stripe, which is the intended provider-namespaced isolation.
+    """
+    import api.identity_roots as ir
+    from api.identity_roots import (
+        build_document_root_claims,
+        derive_document_root_hash,
+        extract_root_material_from_didit_decision,
+    )
+
+    monkeypatch.setattr(ir, "_get_identity_root_pepper", lambda *a, **k: FIXED_PEPPER)
+
+    decision = {
+        "id_verifications": [
+            {
+                "node_id": "id_verification_1",
+                "status": "Approved",
+                "document_type": "Identity Card",
+                "document_number": "SAMPLE-DOC-12345",
+                "first_name": "Jane",
+                "last_name": "Doe",
+                "date_of_birth": "1990-01-01",
+                "issuing_state": "ESP",
+            }
+        ]
+    }
+    material = extract_root_material_from_didit_decision(decision)
+    claims = build_document_root_claims(material, provider="didit")
+
+    assert claims == {
+        "schema": "lemma.identity.document-root.v1",
+        "provider": "didit",
+        "country": "ES",
+        "document_type": "id_card",
+        "document_number": "SAMPLEDOC12345",
+        "date_of_birth": "1990-01-01",
+    }
+
+    digest = derive_document_root_hash(claims)
+    assert digest == "83f8ae39fc27a7ac1894daebb1a929069dfcc8661b377c2112bfd8f76cb86be5"
+
+    # provider isolation: same document under stripe -> different root.
+    stripe_claims = build_document_root_claims(material, provider="stripe_identity")
+    assert derive_document_root_hash(stripe_claims) != digest
+
+
+@pytest.mark.unit
 def test_browser_canonical_message_byte_pin():
     """Python _browser_canonical_message must match the JS canonicalMessage()."""
     from api.ishuman import _browser_canonical_message

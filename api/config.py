@@ -113,6 +113,17 @@ class LemmaSecrets:
         self.stripe_secret_key = get_optional_secret('STRIPE_SECRET_KEY')
         self.stripe_publishable_key = get_optional_secret('STRIPE_PUBLISHABLE_KEY')
         self.stripe_webhook_secret = get_optional_secret('STRIPE_WEBHOOK_SECRET')
+
+        # Didit IDV rail (optional - second IDV provider; see
+        # docs/architecture/OPERATIONAL_HARDENING.md Phase 3.2). Gated behind
+        # LEMMA_ISHUMAN_DIDIT_ENABLED so it is fully inert until configured.
+        self.didit_api_key = get_optional_secret('DIDIT_API_KEY')
+        self.didit_webhook_secret = get_optional_secret('DIDIT_WEBHOOK_SECRET')
+        self.didit_workflow_id = get_optional_secret('DIDIT_WORKFLOW_ID')
+        self.didit_api_base = get_optional_secret('DIDIT_API_BASE', 'https://verification.didit.me')
+        self.ishuman_didit_enabled = (
+            get_optional_secret('LEMMA_ISHUMAN_DIDIT_ENABLED', 'false') or 'false'
+        ).strip().lower() in ('1', 'true', 'yes', 'on')
         
         # AWS KMS (optional - falls back to memory storage)
         self.aws_access_key = get_optional_secret('AWS_ACCESS_KEY_ID')
@@ -209,3 +220,32 @@ def get_stripe_secret_key() -> str:
 
 def get_redis_url() -> str:
     return get_secrets().redis_url
+
+
+# ============================================
+# DIDIT IDV RAIL (Phase 3.2 second issuer)
+# ============================================
+
+def get_didit_api_key() -> str:
+    return get_secrets().didit_api_key
+
+def get_didit_webhook_secret() -> str:
+    return get_secrets().didit_webhook_secret
+
+def get_didit_workflow_id() -> str:
+    return get_secrets().didit_workflow_id
+
+def get_didit_api_base() -> str:
+    return get_secrets().didit_api_base
+
+def is_ishuman_didit_enabled() -> bool:
+    """True only when the didit IDV rail is explicitly enabled AND configured.
+
+    Returns False unless LEMMA_ISHUMAN_DIDIT_ENABLED is truthy and the minimum
+    didit credentials (api key + workflow id) are present, so the rail is inert
+    by default and degrades closed on partial configuration.
+    """
+    s = get_secrets()
+    if not s.ishuman_didit_enabled:
+        return False
+    return bool(s.didit_api_key and s.didit_workflow_id)

@@ -61,8 +61,19 @@ def _is_v1(version: str) -> bool:
     return (version or "").strip().upper() == "V1"
 
 
-def _get_identity_root_pepper(version: str | None = None) -> bytes:
+def _get_identity_root_pepper(version: str | None = None, issuer: str | None = None) -> bytes:
     version = version or active_root_version()
+    # Per-issuer pepper isolation (Phase 3.2 Option A). Applied only for
+    # non-Stripe issuers and only when an issuer-namespaced pepper is explicitly
+    # provisioned (>=32 bytes); otherwise we fall through to the shared
+    # version-based resolution so dev and existing Stripe deploys are unchanged
+    # and the pinned cryptographic invariants stay byte-stable.
+    issuer_norm = (issuer or "").strip().lower()
+    if issuer_norm and issuer_norm != "stripe_identity":
+        ns_key = f"LEMMA_IDENTITY_ROOT_PEPPER_{issuer_norm.upper()}_{version.strip().upper()}"
+        ns_val = os.environ.get(ns_key)
+        if ns_val and len(ns_val) >= 32:
+            return ns_val.encode("utf-8")
     # V1 preserves legacy resolution (api.config -> env -> dev default) so the
     # pinned cryptographic invariants stay byte-stable across this refactor.
     if _is_v1(version):
@@ -144,10 +155,21 @@ def format_dob_from_stripe(dob: Any) -> str:
     return f"{year:04d}-{month:02d}-{day:02d}"
 
 
-def build_document_root_claims(material: StripeIdentityRootMaterial) -> dict[str, Any]:
+def build_document_root_claims(
+    material: StripeIdentityRootMaterial,
+    provider: str = "stripe_identity",
+) -> dict[str, Any]:
+    """Build the canonical document-root claim set.
+
+    ``provider`` is part of the signed claim set, so the same physical document
+    verified through different IDV rails (e.g. ``stripe_identity`` vs ``didit``)
+    derives a distinct document_root and therefore a distinct person_root/PPID
+    (Phase 3.2 Option A: provider-namespaced identities). Defaults to
+    ``stripe_identity`` so the pinned Stripe invariants stay byte-stable.
+    """
     claims: dict[str, Any] = {
         "schema": DOCUMENT_ROOT_SCHEMA,
-        "provider": "stripe_identity",
+        "provider": provider,
         "country": normalize_country(material.country),
         "document_type": normalize_document_type(material.document_type),
         "document_number": normalize_document_number(material.document_number),
@@ -161,7 +183,7 @@ def build_document_root_claims(material: StripeIdentityRootMaterial) -> dict[str
 
 
 def derive_document_root_hash(claims: dict[str, Any], version: str | None = None) -> str:
-    pepper = _get_identity_root_pepper(version)
+    pepper = _get_identity_root_pepper(version, issuer=claims.get("provider"))
     digest = hmac.new(pepper, canonical_json_bytes(claims), hashlib.sha256).hexdigest()
     return digest
 
@@ -263,6 +285,96 @@ def extract_root_material_from_stripe_session(session: Any) -> StripeIdentityRoo
     )
 
 
-def document_root_hash_from_material(material: StripeIdentityRootMaterial, version: str | None = None) -> str:
-    claims = build_document_root_claims(material)
+# ---------------------------------------------------------------------------
+# Didit IDV rail (Phase 3.2 second issuer)
+# ---------------------------------------------------------------------------
+
+# Map didit's human-readable document_type labels onto Lemma's canonical enum
+# ({driving_license, passport, id_card}). Unmapped types fail closed downstream
+# via normalize_document_type.
+_DIDIT_DOCTYPE_MAP = {
+    "passport": "passport",
+    "identity card": "id_card",
+    "id card": "id_card",
+    "national id": "id_card",
+    "national identity card": "id_card",
+    "id_card": "id_card",
+    "driver's license": "driving_license",
+    "drivers license": "driving_license",
+    "driving license": "driving_license",
+    "driving licence": "driving_license",
+    "driver's licence": "driving_license",
+    "driving_license": "driving_license",
+}
+
+
+def map_didit_document_type(value: str) -> str:
+    key = (value or "").strip().lower()
+    mapped = _DIDIT_DOCTYPE_MAP.get(key)
+    if not mapped:
+        raise IdentityRootMaterialError(f"unsupported didit document_type: {value!r}")
+    return mapped
+
+
+def map_didit_country(value: str) -> str:
+    from api.iso_country_codes import alpha3_to_alpha2
+
+    alpha2 = alpha3_to_alpha2(value)
+    if not alpha2:
+        raise IdentityRootMaterialError(f"unrecognized didit issuing country: {value!r}")
+    return alpha2
+
+
+def _normalize_didit_dob(value: Any) -> str:
+    raw = str(value or "").strip()
+    if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", raw):
+        raise IdentityRootMaterialError("didit date_of_birth must be YYYY-MM-DD")
+    return raw
+
+
+def extract_root_material_from_didit_decision(decision: dict[str, Any]) -> StripeIdentityRootMaterial:
+    """Parse a verified didit ``decision`` payload into document-root material.
+
+    Reads the first approved entry of ``id_verifications[]`` (the V3 plural
+    schema). Maps didit's alpha-3 issuing country and human-readable document
+    type onto Lemma's canonical forms. Raises ``IdentityRootMaterialError`` when
+    the decision is missing required fields or is not approved (fail closed).
+    """
+    if not isinstance(decision, dict):
+        raise IdentityRootMaterialError("didit decision must be an object")
+
+    id_verifications = decision.get("id_verifications") or []
+    if not isinstance(id_verifications, list) or not id_verifications:
+        raise IdentityRootMaterialError("didit decision missing id_verifications")
+
+    idv = next(
+        (v for v in id_verifications if str((v or {}).get("status", "")).strip().lower() == "approved"),
+        None,
+    )
+    if idv is None:
+        raise IdentityRootMaterialError("no approved didit id_verification")
+
+    country = map_didit_country(idv.get("issuing_state") or idv.get("issuing_country") or "")
+    document_type = map_didit_document_type(idv.get("document_type") or "")
+    document_number = str(idv.get("document_number") or "")
+    if not document_number:
+        raise IdentityRootMaterialError("didit id_verification missing document_number")
+    dob = _normalize_didit_dob(idv.get("date_of_birth"))
+
+    return StripeIdentityRootMaterial(
+        country=country,
+        document_type=document_type,
+        document_number=document_number,
+        date_of_birth=dob,
+        stripe_session_id=None,
+        stripe_report_id=None,
+    )
+
+
+def document_root_hash_from_material(
+    material: StripeIdentityRootMaterial,
+    version: str | None = None,
+    provider: str = "stripe_identity",
+) -> str:
+    claims = build_document_root_claims(material, provider)
     return derive_document_root_hash(claims, version)

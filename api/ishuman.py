@@ -277,6 +277,231 @@ def _complete_verified_ishuman_from_stripe(
     return credential
 
 
+def _complete_verified_ishuman_from_didit(
+    db,
+    record,
+    *,
+    wallet_id: str,
+    decision: dict,
+) -> Optional[dict]:
+    """Resolve document/person roots from a didit decision and issue the master VC.
+
+    Parallel to _complete_verified_ishuman_from_stripe, but the decision is the
+    (already HMAC-authenticated) didit webhook payload rather than a re-fetched
+    Stripe session. Lemma still signs the credential with its own issuer key.
+    Returns the credential dict on success, None on root material failure.
+    """
+    from api.identity_roots import IdentityRootMaterialError, active_root_version
+    from api.identity_person import process_verified_didit_identity
+    from api.ppid import derive_ppid_from_person_root_hash
+
+    try:
+        resolved = process_verified_didit_identity(
+            db,
+            decision=decision,
+            wallet_id=wallet_id,
+        )
+    except IdentityRootMaterialError as exc:
+        logger.error("Identity root material unavailable for didit decision: %s", exc)
+        record.status = "failed"
+        record.metadata_json = {
+            **(record.metadata_json or {}),
+            "root_error": str(exc),
+        }
+        return None
+
+    ppid = derive_ppid_from_person_root_hash(resolved.person_root_hash, "lemma.id")
+    record.lemma_person_id = resolved.person_id
+    record.document_root_hash = resolved.document_root_hash
+    record.root_version = active_root_version()
+    record.confidence_level = resolved.confidence_level
+
+    try:
+        _maybe_store_seed_envelopes(record, wallet_id, resolved.person_root_hash)
+    except Exception:
+        logger.exception("Seed-envelope generation failed (non-fatal) for wallet %s", wallet_id)
+
+    credential = _issue_ishuman_credential(
+        ppid,
+        wallet_id,
+        ppid_derivation="person_root_v1",
+    )
+    record.ppid = ppid
+    return credential
+
+
+def revoke_wallet_network_wide(
+    db,
+    *,
+    wallet_id: Optional[str] = None,
+    master_credential_id: Optional[str] = None,
+    reason: str = "network revocation",
+    revoked_by: str = "admin",
+) -> dict:
+    """Revoke a wallet's master + derived isHuman credentials network-wide.
+
+    Shared core for the admin approve-revocation route and the didit risk feed
+    (Phase 2 / M3). Creates wallet/credential RevocationList rows, marks rows
+    revoked, commits, and publishes events so the Bloom snapshot rebuilds.
+
+    Raises ValueError if the wallet cannot be resolved.
+    """
+    from api.database import (
+        DerivedCredential, IsHumanVerification, RevocationList, SiteBlock,
+    )
+
+    if not wallet_id and master_credential_id:
+        master = db.query(IsHumanVerification).filter_by(
+            credential_id=master_credential_id
+        ).first()
+        if master:
+            wallet_id = master.wallet_id
+    if not wallet_id:
+        raise ValueError("could not resolve wallet_id")
+
+    revoked_ids: list[str] = []
+
+    existing_wallet_revoke = (
+        db.query(RevocationList)
+        .filter_by(wallet_id=wallet_id, revocation_type="wallet")
+        .first()
+    )
+    if not existing_wallet_revoke:
+        db.add(RevocationList(
+            lemma_id=f"wallet_revoke_{wallet_id[:32]}_{int(time.time())}",
+            credential_id=None,
+            lemma_type="ishuman",
+            wallet_id=wallet_id,
+            revocation_type="wallet",
+            revoked_by=revoked_by,
+            reason=reason,
+        ))
+        revoked_ids.append(wallet_id)
+
+    masters = db.query(IsHumanVerification).filter_by(
+        wallet_id=wallet_id, status="verified"
+    ).all()
+    for m in masters:
+        if m.credential_id:
+            db.add(RevocationList(
+                lemma_id=m.credential_id,
+                credential_id=m.credential_id,
+                lemma_type="ishuman",
+                revocation_type="credential",
+                revoked_by=revoked_by,
+                reason=reason,
+            ))
+            revoked_ids.append(m.credential_id)
+            m.status = "revoked"
+
+    derived_rows = db.query(DerivedCredential).filter_by(
+        wallet_id=wallet_id, is_active=True
+    ).all()
+    for d in derived_rows:
+        db.add(RevocationList(
+            lemma_id=d.derived_credential_id,
+            credential_id=d.derived_credential_id,
+            lemma_type="ishuman",
+            revocation_type="credential",
+            revoked_by=revoked_by,
+            reason=reason,
+        ))
+        revoked_ids.append(d.derived_credential_id)
+        d.is_active = False
+        d.revoked_at = datetime.utcnow()
+
+    pending_blocks = (
+        db.query(SiteBlock)
+        .filter_by(network_revocation_status="pending_review")
+        .filter(
+            SiteBlock.ppid.in_(
+                [d.derived_ppid for d in derived_rows] +
+                [m.ppid for m in masters if m.ppid]
+            )
+        )
+        .all()
+    )
+    for b in pending_blocks:
+        b.network_revocation_status = "approved"
+
+    db.commit()
+
+    try:
+        from api.revocation_sync import get_event_bus
+        bus = get_event_bus()
+        for rid in revoked_ids:
+            bus.publish_revocation(rid, credential_type="ishuman")
+    except Exception as exc:
+        logger.warning("Bloom sync publish failed (non-fatal): %s", exc)
+
+    return {
+        "wallet_id": wallet_id,
+        "revoked_credential_ids": revoked_ids,
+        "master_count": len(masters),
+        "derived_count": len(derived_rows),
+    }
+
+
+def _handle_didit_risk_event(webhook_type: str, status: str, body: dict) -> None:
+    """Map a didit ongoing risk event to a network revocation (Phase 2 / M3).
+
+    didit's continuous monitoring (block, AML hit, fraud transaction) is an
+    authoritative downstream signal: when a previously-verified human is blocked
+    or flagged, we revoke their Lemma credential network-wide so every relying
+    site enforces it locally via the Bloom snapshot — with no per-request didit
+    calls and no PII leaving didit.
+
+    Correlation: didit echoes our ``vendor_data`` (the IsHumanVerification id /
+    wallet) on session events; user-entity events carry the consolidated user.
+    We resolve the wallet via vendor_data or provider_session_id.
+    """
+    # Only act on terminal/negative signals. APPROVED transitions are no-ops.
+    negative = status in ("blocked", "declined", "rejected", "suspended")
+    is_risk_family = webhook_type in (
+        "user.status.updated", "user.data.updated", "data.updated",
+        "transaction.status.updated", "transaction.created",
+    )
+    if not (is_risk_family and negative):
+        return
+
+    vendor_data = body.get("vendor_data") or ""
+    session_id = body.get("session_id") or ""
+
+    from api.database import SessionLocal, IsHumanVerification
+    db = SessionLocal()
+    try:
+        record = None
+        if session_id:
+            record = db.query(IsHumanVerification).filter_by(
+                provider_session_id=session_id
+            ).first()
+        if not record and vendor_data:
+            record = (
+                db.query(IsHumanVerification).filter_by(session_id=vendor_data).first()
+                or db.query(IsHumanVerification).filter_by(wallet_id=vendor_data).first()
+            )
+        if not record or not record.wallet_id:
+            logger.warning(
+                "Didit risk event (%s/%s) could not be correlated to a wallet",
+                webhook_type, status,
+            )
+            return
+
+        result = revoke_wallet_network_wide(
+            db,
+            wallet_id=record.wallet_id,
+            reason=f"didit_risk:{webhook_type}:{status}",
+            revoked_by="didit_risk_feed",
+        )
+        logger.info(
+            "Didit risk feed revoked wallet=%s total=%d (%s/%s)",
+            record.wallet_id[:20], len(result["revoked_credential_ids"]),
+            webhook_type, status,
+        )
+    finally:
+        db.close()
+
+
 def _maybe_store_seed_envelopes(record, wallet_id: str, person_root_hash: str) -> None:
     """Derive + seal wallet_local_seed and person_root_proxy onto *record*.
 
@@ -411,17 +636,36 @@ def start_verification_for_body(body: dict) -> tuple[dict, int]:
         os.getenv("ISHUMAN_RETURN_URL", "https://lemma.id/app"),
     )
 
-    from billing.stripe_manager import StripeManager
-    mgr = StripeManager()
-    result = mgr.create_identity_verification_session(
-        user_id=wallet_id,
-        return_url=return_url,
-    )
+    # Provider routing (Phase 3.2). Defaults to stripe_identity so existing
+    # behavior is unchanged. The didit rail is only selectable when explicitly
+    # enabled + configured; a didit request on an unconfigured deploy fails
+    # closed rather than silently falling back.
+    provider = (body.get("provider") or "stripe_identity").strip().lower()
+    if provider == "didit":
+        from api.config import is_ishuman_didit_enabled
+        if not is_ishuman_didit_enabled():
+            return {"success": False, "error": "didit_not_enabled"}, 400
+        from billing.didit_manager import DiditManager
+        result = DiditManager().create_identity_verification_session(
+            user_id=wallet_id,
+            return_url=return_url,
+        )
+        if not result.get("success"):
+            logger.error("Didit session creation failed: %s", result)
+            return {"success": False, "error": result.get("error", "didit_error")}, 502
+    else:
+        provider = "stripe_identity"
+        from billing.stripe_manager import StripeManager
+        mgr = StripeManager()
+        result = mgr.create_identity_verification_session(
+            user_id=wallet_id,
+            return_url=return_url,
+        )
+        if not result.get("success"):
+            logger.error("Stripe Identity session creation failed: %s", result)
+            return {"success": False, "error": result.get("error", "stripe_error")}, 502
 
-    if not result.get("success"):
-        logger.error("Stripe Identity session creation failed: %s", result)
-        return {"success": False, "error": result.get("error", "stripe_error")}, 502
-
+    provider_session_id = result["session_id"]
     session_id = f"ishuman_sess_{secrets.token_urlsafe(16)}"
 
     from api.database import SessionLocal, IsHumanVerification
@@ -448,7 +692,11 @@ def start_verification_for_body(body: dict) -> tuple[dict, int]:
 
         verification = IsHumanVerification(
             session_id=session_id,
-            stripe_session_id=result["session_id"],
+            # Stripe keeps its dedicated column for back-compat; all providers
+            # also populate the generic provider_session_id used for lookups.
+            stripe_session_id=provider_session_id if provider == "stripe_identity" else None,
+            provider_session_id=provider_session_id,
+            issuer_id=provider,
             wallet_id=wallet_id,
             ppid=derived_ppid,
             status="pending",
@@ -463,15 +711,26 @@ def start_verification_for_body(body: dict) -> tuple[dict, int]:
     finally:
         db.close()
 
-    logger.info("isHuman verification started: %s (stripe=%s)", session_id, result["session_id"])
+    logger.info(
+        "isHuman verification started: %s (provider=%s session=%s)",
+        session_id,
+        provider,
+        provider_session_id,
+    )
 
-    return {
+    response: dict = {
         "success": True,
         "session_id": session_id,
-        "stripe_session_id": result["session_id"],
-        "client_secret": result["client_secret"],
+        "provider": provider,
+        "provider_session_id": provider_session_id,
         "url": result.get("url"),
-    }, 200
+    }
+    # Preserve the Stripe response shape (client_secret + stripe_session_id) so
+    # existing Stripe Identity frontends keep working unchanged.
+    if provider == "stripe_identity":
+        response["stripe_session_id"] = provider_session_id
+        response["client_secret"] = result.get("client_secret")
+    return response, 200
 
 
 @ishuman_bp.route("/api/ishuman/start-verification", methods=["POST"])
@@ -600,6 +859,127 @@ def stripe_identity_webhook():
     except Exception:
         db.rollback()
         logger.exception("Error processing Stripe Identity webhook")
+        return jsonify({"error": "processing_failed"}), 500
+    finally:
+        db.close()
+
+
+# ---------------------------------------------------------------------------
+# 2a. Didit Identity Webhook (Phase 3.2 second IDV rail)
+# ---------------------------------------------------------------------------
+
+@ishuman_bp.route("/api/webhooks/didit-identity", methods=["POST"])
+def didit_identity_webhook():
+    """Receive didit verification webhooks (X-Signature-V2 authenticated).
+
+    On an ``Approved`` ``status.updated`` event we resolve the document/person
+    roots from the carried decision and issue a Lemma-signed isHuman credential.
+    Ongoing risk events (user.status.updated BLOCKED, data.updated AML) are
+    routed to the revocation handler (Phase 2 / M3).
+    """
+    from api.config import is_ishuman_didit_enabled
+    if not is_ishuman_didit_enabled():
+        return jsonify({"error": "didit_not_enabled"}), 404
+
+    from billing.didit_manager import DiditManager, DiditWebhookError
+
+    try:
+        body = DiditManager().verify_webhook(
+            request.data,
+            x_signature_v2=request.headers.get("X-Signature-V2"),
+            x_timestamp=request.headers.get("X-Timestamp"),
+        )
+    except DiditWebhookError as exc:
+        logger.warning("Didit webhook verification failed: %s", exc)
+        return jsonify({"error": "invalid_signature"}), 401
+
+    webhook_type = str(body.get("webhook_type") or "").strip().lower()
+    status = str(body.get("status") or "").strip().lower()
+    session_id = body.get("session_id") or ""
+    event_id = body.get("event_id") or ""
+
+    logger.info(
+        "Didit webhook: type=%s status=%s session=%s event=%s",
+        webhook_type, status, session_id, event_id,
+    )
+
+    # Ongoing risk / monitoring events drive network revocation (M3).
+    if webhook_type in ("user.status.updated", "user.data.updated", "data.updated",
+                        "transaction.status.updated", "transaction.created"):
+        try:
+            _handle_didit_risk_event(webhook_type, status, body)
+        except Exception:
+            logger.exception("Didit risk event handling failed (non-fatal)")
+        return jsonify({"received": True}), 200
+
+    if webhook_type and webhook_type != "status.updated":
+        # Unhandled event family; acknowledge so didit does not retry.
+        return jsonify({"received": True}), 200
+
+    from api.database import SessionLocal, IsHumanVerification
+    db = SessionLocal()
+    try:
+        record = db.query(IsHumanVerification).filter_by(
+            provider_session_id=session_id
+        ).first()
+        if not record:
+            logger.warning("No verification record for didit session %s", session_id)
+            return jsonify({"received": True}), 200
+
+        # Idempotency: a re-delivered Approved event must not re-issue.
+        if status == "approved" and record.status == "verified":
+            return jsonify({"received": True}), 200
+
+        if status == "approved":
+            decision = body.get("decision") or {}
+            wallet_id = record.wallet_id or ""
+            credential = _complete_verified_ishuman_from_didit(
+                db, record, wallet_id=wallet_id, decision=decision,
+            )
+            if not credential:
+                db.commit()
+                return jsonify({"received": True}), 200
+
+            record.status = "verified"
+            record.verified_at = datetime.utcnow()
+            record.credential_id = credential.get("id")
+            record.issued_at = datetime.utcnow()
+            record.expires_at = datetime.utcnow() + timedelta(days=ISHUMAN_CREDENTIAL_TTL_DAYS)
+            record.metadata_json = {
+                **(record.metadata_json or {}),
+                "credential_issuer_did": credential.get("issuerInfo", {}).get("did"),
+                "ppid_derivation": "person_root_v1",
+            }
+            db.commit()
+
+            logger.info(
+                "isHuman credential issued via didit: ppid=%s credential_id=%s person=%s",
+                (record.ppid or "")[:40], credential.get("id"), record.lemma_person_id,
+            )
+
+            try:
+                from api.site_ppid_revocation import clear_amnesty_eligible_wallet_revocations
+                clear_amnesty_eligible_wallet_revocations(
+                    db,
+                    wallet_id=wallet_id,
+                    new_master_credential_id=credential.get("id") or "",
+                    reason="didit_verified",
+                )
+            except Exception:
+                logger.exception(
+                    "Failed to clear amnesty-eligible revocations after didit verified for wallet %s",
+                    wallet_id,
+                )
+
+        elif status in ("declined", "expired", "abandoned"):
+            record.status = "failed" if status == "declined" else status
+            db.commit()
+
+        return jsonify({"received": True}), 200
+
+    except Exception:
+        db.rollback()
+        logger.exception("Error processing didit webhook")
         return jsonify({"error": "processing_failed"}), 500
     finally:
         db.close()
@@ -1683,116 +2063,31 @@ def approve_network_revocation():
     if not wallet_id and not master_credential_id:
         return jsonify({"success": False, "error": "wallet_id or master_credential_id required"}), 400
 
-    from api.database import (
-        SessionLocal, DerivedCredential, RevocationList, SiteBlock,
-        IsHumanVerification,
-    )
+    from api.database import SessionLocal
     db = SessionLocal()
     try:
-        revoked_ids = []
-
-        # Resolve wallet_id from master if only master_credential_id provided
-        if not wallet_id and master_credential_id:
-            master = db.query(IsHumanVerification).filter_by(
-                credential_id=master_credential_id
-            ).first()
-            if master:
-                wallet_id = master.wallet_id
-
-        if not wallet_id:
-            return jsonify({"success": False, "error": "could not resolve wallet_id"}), 400
-
-        # Step 1: Wallet-level revocation (bridge enforcement)
-        existing_wallet_revoke = (
-            db.query(RevocationList)
-            .filter_by(wallet_id=wallet_id, revocation_type="wallet")
-            .first()
-        )
-        if not existing_wallet_revoke:
-            wallet_revoke = RevocationList(
-                lemma_id=f"wallet_revoke_{wallet_id[:32]}_{int(time.time())}",
-                credential_id=None,
-                lemma_type="ishuman",
-                wallet_id=wallet_id,
-                revocation_type="wallet",
-                revoked_by="admin",
-                reason=reason,
-            )
-            db.add(wallet_revoke)
-            revoked_ids.append(wallet_id)
-
-        # Step 2: Revoke master credential(s)
-        masters = db.query(IsHumanVerification).filter_by(
-            wallet_id=wallet_id, status="verified"
-        ).all()
-        for m in masters:
-            if m.credential_id:
-                master_revoke = RevocationList(
-                    lemma_id=m.credential_id,
-                    credential_id=m.credential_id,
-                    lemma_type="ishuman",
-                    revocation_type="credential",
-                    revoked_by="admin",
-                    reason=reason,
-                )
-                db.add(master_revoke)
-                revoked_ids.append(m.credential_id)
-                m.status = "revoked"
-
-        # Step 3: Revoke ALL derived per-site credentials
-        derived_rows = db.query(DerivedCredential).filter_by(
-            wallet_id=wallet_id, is_active=True
-        ).all()
-        for d in derived_rows:
-            derived_revoke = RevocationList(
-                lemma_id=d.derived_credential_id,
-                credential_id=d.derived_credential_id,
-                lemma_type="ishuman",
-                revocation_type="credential",
-                revoked_by="admin",
-                reason=reason,
-            )
-            db.add(derived_revoke)
-            revoked_ids.append(d.derived_credential_id)
-            d.is_active = False
-            d.revoked_at = datetime.utcnow()
-
-        # Step 4: Update any pending site-block network revocation requests
-        pending_blocks = (
-            db.query(SiteBlock)
-            .filter_by(network_revocation_status="pending_review")
-            .filter(
-                SiteBlock.ppid.in_(
-                    [d.derived_ppid for d in derived_rows] +
-                    [m.ppid for m in masters if m.ppid]
-                )
-            )
-            .all()
-        )
-        for b in pending_blocks:
-            b.network_revocation_status = "approved"
-
-        db.commit()
-
-        # Step 5: Publish revocation event to rebuild Bloom filter
         try:
-            from api.revocation_sync import get_event_bus
-            bus = get_event_bus()
-            for rid in revoked_ids:
-                bus.publish_revocation(rid, credential_type="ishuman")
-        except Exception as exc:
-            logger.warning("Bloom sync publish failed (non-fatal): %s", exc)
+            result = revoke_wallet_network_wide(
+                db,
+                wallet_id=wallet_id,
+                master_credential_id=master_credential_id,
+                reason=reason,
+                revoked_by="admin",
+            )
+        except ValueError as exc:
+            return jsonify({"success": False, "error": str(exc)}), 400
 
         logger.info(
             "Network revocation approved: wallet=%s master_count=%d derived_count=%d total_revoked=%d",
-            wallet_id[:20], len(masters), len(derived_rows), len(revoked_ids),
+            result["wallet_id"][:20], result["master_count"], result["derived_count"],
+            len(result["revoked_credential_ids"]),
         )
 
         return jsonify({
             "success": True,
-            "wallet_id": wallet_id,
-            "revoked_credential_ids": revoked_ids,
-            "total_revoked": len(revoked_ids),
+            "wallet_id": result["wallet_id"],
+            "revoked_credential_ids": result["revoked_credential_ids"],
+            "total_revoked": len(result["revoked_credential_ids"]),
         })
 
     except Exception:
