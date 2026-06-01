@@ -6,7 +6,7 @@
 
 {% block head %}
 {{ super() }}
-<link rel="stylesheet" href="/static/css/demo/ishuman-demo.css?v=2">
+<link rel="stylesheet" href="/static/css/demo/ishuman-demo.css?v=3">
 {% endblock %}
 
 {% block content %}
@@ -19,6 +19,10 @@
     <h1 class="demo-title">Bot defense should punish abusive humans, not whole networks.</h1>
     <p class="demo-lead">Follow the steps below — verify once, prove human on two demo sites, then block or revoke at the human-proof layer.</p>
     <p class="demo-lead demo-intro-summary">This demo shows the core lemma.id enforcement loop: one human proof produces different private IDs for different sites. A site can block its own PPID without affecting other sites. Severe abuse can be escalated to network-wide revocation.</p>
+    <div class="demo-intro-actions">
+      <button class="demo-btn demo-btn-ghost-danger" id="ih-clear-lemma-id-btn" type="button">Clear my lemma.id</button>
+      <span class="demo-muted">Wipes the master human proof + all site-derived IDs from this browser and signals customer sites to drop cached sessions.</span>
+    </div>
   </header>
 
   <div class="demo-workflow" id="ih-demo-workflow">
@@ -257,7 +261,7 @@ const result = await new IsHumanVerifier({
 {% block scripts %}
 {{ super() }}
 <script src="/static/js/lemma-keys.js?v=4" nonce="{{ csp_nonce }}"></script>
-<script src="/static/js/lemma-wallet.js?v=2538" nonce="{{ csp_nonce }}"></script>
+<script src="/static/js/lemma-wallet.js?v=2539" nonce="{{ csp_nonce }}"></script>
 <script src="/sdk/ishuman-verifier.js?v=1.5.6" nonce="{{ csp_nonce }}"></script>
-<script src="/static/js/demo/ishuman-demo.js?v=8" nonce="{{ csp_nonce }}"></script>
+<script src="/static/js/demo/ishuman-demo.js?v=9" nonce="{{ csp_nonce }}"></script>
 {% endblock %}

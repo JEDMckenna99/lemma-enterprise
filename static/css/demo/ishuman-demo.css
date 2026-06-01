@@ -306,6 +306,32 @@
   padding: 8px 12px;
 }
 
+.demo-page .demo-btn-ghost-danger {
+  background: #fff;
+  color: #dc2626;
+  border: 1px solid #fecaca;
+  font-size: 13px;
+  padding: 8px 14px;
+}
+
+.demo-page .demo-btn-ghost-danger:hover {
+  background: #fef2f2;
+  border-color: #fca5a5;
+}
+
+.demo-intro-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 14px;
+}
+
+.demo-intro-actions .demo-muted {
+  font-size: 12px;
+  max-width: 480px;
+}
+
 .demo-page .demo-btn:disabled {
   opacity: 0.55;
   cursor: not-allowed;
@@ -466,31 +492,6 @@
 .abuse-outcome.deny {
   color: var(--demo-deny);
   font-weight: 700;
-}
-
-.demo-dev-details {
-  margin-top: 16px;
-  border: 1px dashed var(--demo-line);
-  border-radius: 10px;
-  padding: 0 14px;
-  background: rgba(15, 23, 42, 0.02);
-}
-
-.demo-dev-details summary {
-  cursor: pointer;
-  padding: 12px 0;
-  font-weight: 600;
-  font-size: 13px;
-  color: var(--demo-muted);
-  list-style: none;
-}
-
-.demo-dev-details summary::-webkit-details-marker {
-  display: none;
-}
-
-.demo-dev-details > *:not(summary) {
-  padding-bottom: 12px;
 }
 
 .demo-details {

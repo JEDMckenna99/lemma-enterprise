@@ -541,6 +541,112 @@
     window.addEventListener('message', onMessage);
   }
 
+  // Full demo reset: wipe the lemma.id (master human proof) and every
+  // site-derived proof from this browser's lemma.id wallet, clear the demo +
+  // SDK caches, and signal any open customer-site tabs to drop their cached
+  // sessions. After this the user re-runs "Create my lemma.id" from scratch.
+  async function clearLemmaId() {
+    const confirmed = window.confirm(
+      'Clear your lemma.id?\n\n'
+      + 'This wipes the master human proof and every site-derived ID from this '
+      + 'browser (the lemma.id wallet) and tells open customer-site tabs to drop '
+      + 'their cached sessions. You will need to run "Create my lemma.id" again.',
+    );
+    if (!confirmed) return;
+
+    setPill('ih-wallet-pill', 'CLEARING', 'warn');
+    log('Clearing lemma.id', 'wiping local wallet + signaling customer sites');
+
+    // 1. Best-effort server reset of this wallet's revocation state so a
+    //    re-created lemma.id starts clean. Needs a wallet assertion while the
+    //    wallet is still live, so do it before wiping IndexedDB.
+    try {
+      if (state.walletId && state.wallet && state.wallet.buildWalletAssertion) {
+        const assertion = await state.wallet
+          .buildWalletAssertion(['wallet_id'], { wallet_id: state.walletId })
+          .catch(() => null);
+        if (assertion) {
+          await requestJson('/api/demo/ishuman/self-reset', {
+            method: 'POST',
+            body: JSON.stringify({ wallet_id: state.walletId, wallet_assertion: assertion }),
+          }).catch((err) => log('Server self-reset skipped', err.message));
+        }
+      }
+    } catch (err) {
+      log('Server reset skipped', err.message);
+    }
+
+    // 2. Tell open customer-site tabs (running the SDK) to invalidate cached
+    //    sessions and refresh their Bloom snapshot.
+    if (window.IsHumanVerifier && window.IsHumanVerifier.broadcastBlockUpdate) {
+      for (const slug of SITE_SLUGS) {
+        window.IsHumanVerifier.broadcastBlockUpdate({
+          type: 'NETWORK_REVOCATION',
+          siteId: SITE_IDS[slug],
+          walletId: state.walletId,
+          reason: 'demo_clear_lemma_id',
+        });
+      }
+    }
+
+    // 3. Wipe the lemma.id wallet IndexedDB (master proof, derived site proofs,
+    //    passkey, wallet secret, at-rest key material, isHuman cache). Close the
+    //    live connection first so deleteDatabase isn't blocked.
+    try {
+      if (state.wallet && state.wallet.db && typeof state.wallet.db.close === 'function') {
+        state.wallet.db.close();
+      }
+    } catch { /* ignore */ }
+    await new Promise((resolve) => {
+      try {
+        const req = indexedDB.deleteDatabase('LemmaWallet');
+        req.onsuccess = resolve;
+        req.onerror = resolve;
+        req.onblocked = resolve;
+      } catch {
+        resolve();
+      }
+    });
+
+    // 4. Clear lemma.id-origin localStorage tied to the proof, the demo, and
+    //    the SDK (daily-unlock bundle, master id, popup session, provisioned
+    //    flag, bloom + trust caches, and any per-site session/VC caches).
+    try {
+      const prefixes = ['ishuman_session_v1:', 'ishuman_site_vc:v1:'];
+      for (let i = localStorage.length - 1; i >= 0; i -= 1) {
+        const key = localStorage.key(i);
+        if (key && prefixes.some((p) => key.startsWith(p))) localStorage.removeItem(key);
+      }
+      [
+        'lemma_ishuman_lock:v1',
+        'ishuman_demo_master_id',
+        'ishuman_demo_session_id',
+        'ishuman_idv_popup_session_id',
+        'ishuman_master_provisioned_v1',
+        'ishuman_bloom',
+        'ishuman_trust_list',
+      ].forEach((k) => localStorage.removeItem(k));
+    } catch (err) {
+      log('Local storage clear partial', err.message);
+    }
+
+    // 5. Reset in-memory demo state + UI.
+    state.wallet = null;
+    state.walletId = null;
+    state.walletSecret = null;
+    state.masterCredential = null;
+    state.masterCredentialId = '';
+    state.sessionId = '';
+    state.results = {};
+    for (const slug of SITE_SLUGS) state.localBlocks[slug].clear();
+
+    const wid = $('ih-wallet-id');
+    if (wid) wid.textContent = '-';
+    setDemoReadyBanner(false);
+    setPill('ih-wallet-pill', 'CLEARED', 'warn');
+    log('lemma.id cleared', 'run "Create my lemma.id" to start fresh');
+  }
+
   async function pollAndStoreMaster() {
     if (!state.sessionId) throw new Error('No demo verification session. Start the identity check first.');
     if (!state.wallet) await initWallet();
@@ -1005,6 +1111,7 @@
     bind('ih-run-guided-demo-hero', runGuidedDemo);
     bind('ih-wallet-btn', initWallet);
     bind('ih-create-lemma-id-btn', createLemmaIdViaPopup);
+    bind('ih-clear-lemma-id-btn', clearLemmaId);
     bind('ih-start-idv-btn', startIdentityVerification);
     bind('ih-test-complete-btn', completeTestModeVerification);
     bind('ih-poll-btn', pollAndStoreMaster);

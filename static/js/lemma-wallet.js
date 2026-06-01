@@ -120,6 +120,8 @@ class LemmaWallet {
         /** @type {CryptoKey|null} Phase 5 PRF-derived AES-GCM key (memory only) */
         this._atRestKey = null;
         this._atRestKeyReady = false;
+        /** @type {string|null} Raw PRF key material (base64url) for the 24h daily-unlock bundle */
+        this._atRestKeyRaw = null;
     }
     
     /** @private Log only when debug is enabled */
@@ -2854,6 +2856,10 @@ class LemmaWallet {
             expiresAt: this.session.expiresAt,
             walletSecret: this.session.walletSecret,
             hasPasskey: !!(passkey && passkey.credentialId),
+            // PRF-derived at-rest key material (raw, base64url). Lets a restored
+            // bundle decrypt/encrypt the credential store without a fresh passkey
+            // for the 24h window. Only present once a passkey unlock has bound it.
+            atRestKeyB64: this._atRestKeyRaw || null,
         };
         try {
             if (typeof localStorage !== 'undefined') {
@@ -2894,6 +2900,23 @@ class LemmaWallet {
             source: 'daily_unlock_bundle',
         };
         this._isHumanLockRestored = true;
+        // Re-import the PRF-derived at-rest key from the bundle so encrypted
+        // credential reads/writes work without a fresh passkey for the 24h
+        // window. This is what makes "one passkey per day" cover the master
+        // storage and every per-site proof derivation in the IDV popups.
+        if (!this._atRestKey && bundle.atRestKeyB64) {
+            try {
+                const mod = this._walletAtRest();
+                if (mod) {
+                    const raw = new Uint8Array(mod.base64urlToBuffer(bundle.atRestKeyB64));
+                    this._atRestKey = await mod.importStorageKey(raw);
+                    this._atRestKeyReady = true;
+                    this._atRestKeyRaw = bundle.atRestKeyB64;
+                }
+            } catch (e) {
+                console.warn('[Lemma] Could not restore at-rest key from bundle:', e.message);
+            }
+        }
         console.log('[Lemma] Daily unlock bundle restored');
         return true;
     }
@@ -5711,6 +5734,17 @@ class LemmaWallet {
         }
         this._atRestKey = await mod.importStorageKey(prfBytes);
         this._atRestKeyReady = true;
+        // Stash the raw 32-byte PRF key material so the daily-unlock bundle can
+        // carry it for 24h. The bundle already persists walletSecret in plaintext
+        // localStorage for the same window, so this does not weaken the at-rest
+        // posture — it just lets ONE passkey/day cover every encrypted read/write
+        // (master storage + per-site proof derivation) instead of re-prompting on
+        // each fresh popup page load that lacks the in-memory CryptoKey.
+        try {
+            this._atRestKeyRaw = mod.bufferToBase64url(prfBytes.slice(0, 32));
+        } catch (e) {
+            this._atRestKeyRaw = null;
+        }
         await this._setWalletMeta({
             prfEnabled: true,
             prfSaltRpId: this._getRpIdForWebAuthn(),
