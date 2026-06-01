@@ -146,8 +146,12 @@ def create_app():
                 "media-src 'self' blob:; "
                 # API connections
                 "connect-src 'self' https://lemma.id https://*.stripe.com https://api.stripe.com; "
-                # Iframes: only Stripe and Cloudflare
-                "frame-src 'self' https://*.stripe.com https://challenges.cloudflare.com; "
+                # Iframes: Stripe, Cloudflare, and the first-party isHuman demo
+                # relying sites (the /demo/ishuman "Clear my lemma.id" flow mounts
+                # their /lemma-clear page in a hidden iframe to wipe per-site cache).
+                "frame-src 'self' https://*.stripe.com https://challenges.cloudflare.com "
+                    "https://lemma-demo-tickets-1d3d7411af33.herokuapp.com "
+                    "https://lemma-demo-trials-7090f46cae0d.herokuapp.com; "
                 # Block plugins (Flash, etc)
                 "object-src 'none'; "
                 # Prevent base tag hijacking

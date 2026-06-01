@@ -39,6 +39,50 @@ def health():
     return {"success": True, "site_id": SITE_ID, "site_name": SITE_NAME}
 
 
+@app.get("/lemma-clear")
+def lemma_clear():
+    """Same-origin storage wipe, designed to be embedded as a hidden iframe by
+    the lemma.id demo hub's "Clear my lemma.id" button.
+
+    Browser same-origin policy prevents lemma.id JS from touching this site's
+    IndexedDB/localStorage directly. By framing this page (which runs in THIS
+    origin), the demo hub can ask us to clear our own cached isHuman session +
+    site proof, then we postMessage confirmation back to the parent.
+    """
+    html = f"""<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Clear</title></head>
+<body>
+<script>
+(function () {{
+  var siteId = {SITE_ID!r};
+  function wipe() {{
+    var cleared = 0;
+    try {{
+      for (var i = localStorage.length - 1; i >= 0; i -= 1) {{
+        var key = localStorage.key(i);
+        if (key && (key.indexOf('ishuman') === 0 || key.indexOf('lemma') === 0 || key.indexOf('lemma_ishuman') === 0)) {{
+          localStorage.removeItem(key);
+          cleared += 1;
+        }}
+      }}
+    }} catch (e) {{}}
+    try {{ sessionStorage.clear(); }} catch (e) {{}}
+    try {{ indexedDB.deleteDatabase('LemmaWallet'); }} catch (e) {{}}
+    return cleared;
+  }}
+  var cleared = wipe();
+  try {{
+    if (window.parent && window.parent !== window) {{
+      window.parent.postMessage({{ type: 'LEMMA_CLEAR_DONE', siteId: siteId, cleared: cleared }}, '*');
+    }}
+  }} catch (e) {{}}
+}})();
+</script>
+Cleared.
+</body></html>"""
+    return Response(html, mimetype="text/html")
+
+
 @app.get("/")
 def index():
     copy = _content()

@@ -541,6 +541,45 @@
     window.addEventListener('message', onMessage);
   }
 
+  // Cross-origin storage wipe for the customer demo sites. lemma.id JS cannot
+  // reach another origin's IndexedDB/localStorage, so for each site we mount a
+  // hidden iframe of its /lemma-clear page (served from that origin); the page
+  // clears its own storage and posts LEMMA_CLEAR_DONE back. We resolve on that
+  // signal or a timeout so a missing/old site never hangs the reset.
+  async function clearCustomerSiteCaches() {
+    const urls = (state.config && state.config.customer_site_urls) || {};
+    const origins = SITE_SLUGS.map((slug) => urls[slug]).filter(Boolean);
+    if (!origins.length) {
+      log('Customer-site clear skipped', 'no customer_site_urls in config');
+      return;
+    }
+    await Promise.all(origins.map((origin) => new Promise((resolve) => {
+      let settled = false;
+      const iframe = document.createElement('iframe');
+      iframe.style.display = 'none';
+      iframe.setAttribute('aria-hidden', 'true');
+      const finish = (note) => {
+        if (settled) return;
+        settled = true;
+        window.removeEventListener('message', onMessage);
+        try { iframe.remove(); } catch { /* ignore */ }
+        if (note) log('Customer site cache cleared', note);
+        resolve();
+      };
+      const onMessage = (event) => {
+        if (event.origin !== origin) return;
+        if (event.data && event.data.type === 'LEMMA_CLEAR_DONE') {
+          finish(`${origin.replace('https://', '')} (${event.data.cleared || 0} keys)`);
+        }
+      };
+      window.addEventListener('message', onMessage);
+      iframe.src = `${origin}/lemma-clear`;
+      iframe.onerror = () => finish(`${origin} (load error)`);
+      document.body.appendChild(iframe);
+      setTimeout(() => finish(`${origin} (timeout)`), 3000);
+    })));
+  }
+
   // Full demo reset: wipe the lemma.id (master human proof) and every
   // site-derived proof from this browser's lemma.id wallet, clear the demo +
   // SDK caches, and signal any open customer-site tabs to drop their cached
@@ -576,8 +615,10 @@
       log('Server reset skipped', err.message);
     }
 
-    // 2. Tell open customer-site tabs (running the SDK) to invalidate cached
-    //    sessions and refresh their Bloom snapshot.
+    // 2a. Tell open customer-site tabs ON THE SAME ORIGIN (running the SDK) to
+    //     invalidate cached sessions + refresh Bloom. NOTE: BroadcastChannel is
+    //     origin-scoped, so this only reaches lemma.id tabs, not the customer
+    //     demo origins — those are handled by the cross-origin iframe wipe below.
     if (window.IsHumanVerifier && window.IsHumanVerifier.broadcastBlockUpdate) {
       for (const slug of SITE_SLUGS) {
         window.IsHumanVerifier.broadcastBlockUpdate({
@@ -588,6 +629,13 @@
         });
       }
     }
+
+    // 2b. Clear the cached site proof / session that the demo tickets + trials
+    //     sites stored in THEIR OWN origin storage. Same-origin policy forbids
+    //     lemma.id from touching another origin's IndexedDB/localStorage, so we
+    //     embed each site's /lemma-clear page in a hidden iframe — it runs in
+    //     that origin and wipes its own storage, then posts confirmation back.
+    await clearCustomerSiteCaches();
 
     // 3. Wipe the lemma.id wallet IndexedDB (master proof, derived site proofs,
     //    passkey, wallet secret, at-rest key material, isHuman cache). Close the
