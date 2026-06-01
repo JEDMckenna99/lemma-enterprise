@@ -700,20 +700,42 @@ def start_verification_for_body(body: dict) -> tuple[dict, int]:
         if enc_pubkey:
             verification_metadata["enc_pubkey"] = enc_pubkey
 
-        verification = IsHumanVerification(
-            session_id=session_id,
-            # Stripe keeps its dedicated column for back-compat; all providers
-            # also populate the generic provider_session_id used for lookups.
-            stripe_session_id=provider_session_id if provider == "stripe_identity" else None,
-            provider_session_id=provider_session_id,
-            issuer_id=provider,
-            wallet_id=wallet_id,
-            ppid=derived_ppid,
-            status="pending",
-            metadata_json=verification_metadata,
+        # Dedup: the provider can reuse one hosted session across repeated
+        # start-verification calls (e.g. the user re-clicks before redirect).
+        # Reuse the existing in-flight row for this provider session + wallet so
+        # the hosted session maps to exactly ONE local record — otherwise the
+        # webhook only flips the first sibling to verified and a client polling
+        # the other sibling sees 'pending' forever.
+        existing = (
+            db.query(IsHumanVerification)
+            .filter(
+                IsHumanVerification.provider_session_id == provider_session_id,
+                IsHumanVerification.wallet_id == wallet_id,
+            )
+            .order_by(IsHumanVerification.created_at.desc())
+            .first()
         )
-        db.add(verification)
-        db.commit()
+        if existing and existing.status not in ("verified", "failed", "expired", "canceled"):
+            existing.metadata_json = {**(existing.metadata_json or {}), **verification_metadata}
+            if derived_ppid and not existing.ppid:
+                existing.ppid = derived_ppid
+            db.commit()
+            session_id = existing.session_id
+        else:
+            verification = IsHumanVerification(
+                session_id=session_id,
+                # Stripe keeps its dedicated column for back-compat; all providers
+                # also populate the generic provider_session_id used for lookups.
+                stripe_session_id=provider_session_id if provider == "stripe_identity" else None,
+                provider_session_id=provider_session_id,
+                issuer_id=provider,
+                wallet_id=wallet_id,
+                ppid=derived_ppid,
+                status="pending",
+                metadata_json=verification_metadata,
+            )
+            db.add(verification)
+            db.commit()
     except Exception:
         db.rollback()
         logger.exception("Failed to persist isHuman verification session")
@@ -1014,6 +1036,41 @@ def verification_status(session_id: str):
         record = db.query(IsHumanVerification).filter_by(session_id=session_id).first()
         if not record:
             return jsonify({"success": False, "error": "session_not_found"}), 404
+
+        # Duplicate-session resolution. The same provider (Didit) hosted session
+        # can map to more than one local verification row — e.g. when
+        # start-verification is called twice for one hosted flow, both rows share
+        # the same provider_session_id. The webhook only flips the FIRST matching
+        # row to verified, so a client polling a sibling row would see 'pending'
+        # forever even though the master credential was already issued. If the
+        # polled row isn't verified yet, fall back to any verified sibling for the
+        # same provider session (then the same wallet) and serve its credential.
+        if record.status != "verified" or not record.credential_id:
+            sibling = None
+            if record.provider_session_id:
+                sibling = (
+                    db.query(IsHumanVerification)
+                    .filter(
+                        IsHumanVerification.provider_session_id == record.provider_session_id,
+                        IsHumanVerification.status == "verified",
+                        IsHumanVerification.credential_id.isnot(None),
+                    )
+                    .order_by(IsHumanVerification.verified_at.desc())
+                    .first()
+                )
+            if not sibling and record.wallet_id:
+                sibling = (
+                    db.query(IsHumanVerification)
+                    .filter(
+                        IsHumanVerification.wallet_id == record.wallet_id,
+                        IsHumanVerification.status == "verified",
+                        IsHumanVerification.credential_id.isnot(None),
+                    )
+                    .order_by(IsHumanVerification.verified_at.desc())
+                    .first()
+                )
+            if sibling:
+                record = sibling
 
         resp: dict = {
             "success": True,

@@ -303,9 +303,31 @@
         async function pollAndStoreMaster() {
             if (!sessionId) throw new Error('Missing verification session');
             setStatus('Waiting for verification to complete…', 'loading');
-            const payload = await requestJson(`/api/ishuman/verification-status/${encodeURIComponent(sessionId)}`);
-            await storeMasterFromStatus(payload);
-            return payload;
+            // The IDV provider's webhook (which issues the master server-side)
+            // can land a few seconds after the hosted redirect returns here, so
+            // poll with backoff instead of failing on the first 'pending'. A
+            // terminal status (failed/expired/etc.) stops early.
+            const terminalStatuses = ['failed', 'canceled', 'cancelled', 'requires_input', 'expired', 'declined', 'abandoned'];
+            const maxAttempts = 20;   // ~45s total
+            const delayMs = 2300;
+            let payload = null;
+            for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+                payload = await requestJson(`/api/ishuman/verification-status/${encodeURIComponent(sessionId)}`);
+                if (payload && payload.status === 'verified' && payload.credential) {
+                    await storeMasterFromStatus(payload);
+                    return payload;
+                }
+                if (payload && terminalStatuses.includes(payload.status)) {
+                    sessionId = '';
+                    localStorage.removeItem(SESSION_KEY);
+                    throw new Error(`Verification ${payload.status}`);
+                }
+                if (attempt < maxAttempts - 1) {
+                    setStatus('Finalizing your verification…', 'loading');
+                    await new Promise((resolve) => setTimeout(resolve, delayMs));
+                }
+            }
+            throw new Error('Verification is still finalizing — close this window and click “Create my lemma.id” again in a moment.');
         }
 
         async function verifyOnceTestMode() {
