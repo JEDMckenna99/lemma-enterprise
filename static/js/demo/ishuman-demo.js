@@ -457,7 +457,7 @@
 
     state.sessionId = payload.session_id;
     localStorage.setItem('ishuman_demo_session_id', state.sessionId);
-    log('Stripe Identity session started', short(payload.stripe_session_id));
+    log('Identity verification session started', short(payload.provider_session_id || payload.stripe_session_id));
 
     if (payload.url) {
       window.location.href = payload.url;
@@ -467,8 +467,82 @@
     if (netJson) netJson.textContent = pretty(payload);
   }
 
+  // Open the Lemma IDV popup ON lemma.id (treating lemma.id as the requesting
+  // site) to create the master human proof — the user's "lemma.id" — in the
+  // lemma.id wallet via the identity check flow. This is the exact same popup
+  // customer sites use; here the demo page itself is the opener, which is why
+  // the popup must work for an origin of lemma.id. The per-site PPIDs (tickets,
+  // trials, lemma.id) are all derived from this one master proof.
+  async function syncMasterFromServer() {
+    if (!state.walletId) return false;
+    const status = await refreshStatus().catch(() => null);
+    if (status?.master?.status === 'verified' && status.master.credential_id) {
+      state.masterCredentialId = status.master.credential_id;
+      localStorage.setItem('ishuman_demo_master_id', state.masterCredentialId);
+      setPill('ih-wallet-pill', 'PROOF READY', 'ok');
+      setDemoReadyBanner(true);
+      return true;
+    }
+    return false;
+  }
+
+  function createLemmaIdViaPopup() {
+    const popupUrl = new URL(`${window.location.origin}/wallet/ishuman-idv`);
+    // The demo page is the opener; lemma.id is the requesting site. No
+    // issue_mode → the popup runs its generic verify flow: unlock with passkey,
+    // run the identity check if no master proof exists yet, store the master,
+    // then signal completion.
+    popupUrl.searchParams.set('origin', window.location.origin);
+    popupUrl.searchParams.set('site_id', 'lemma.id');
+
+    const width = 480;
+    const height = 660;
+    const left = Math.max(0, Math.round(window.screenX + (window.outerWidth - width) / 2));
+    const top = Math.max(0, Math.round(window.screenY + (window.outerHeight - height) / 2));
+    const popup = window.open(
+      popupUrl.toString(),
+      'lemma_ishuman_idv',
+      `popup=yes,width=${width},height=${height},left=${left},top=${top}`,
+    );
+    if (!popup) {
+      setPill('ih-wallet-pill', 'POPUP BLOCKED', 'warn');
+      log('Identity popup blocked', 'Allow popups for lemma.id and retry');
+      return;
+    }
+
+    setPill('ih-wallet-pill', 'VERIFYING', 'warn');
+    log('Opened identity check popup for lemma.id');
+
+    let settled = false;
+    const finish = async (outcome) => {
+      if (settled) return;
+      settled = true;
+      window.removeEventListener('message', onMessage);
+      clearInterval(closedTimer);
+      log('Identity check popup closed', outcome);
+      // The master is created server-side at IDV completion, so server status
+      // is the source of truth even if the cross-origin postMessage was
+      // dropped after the hosted redirect. Refresh local + server state.
+      await refreshWalletStatus().catch(() => {});
+      await syncMasterFromServer().catch(() => {});
+    };
+    const onMessage = (event) => {
+      if (event.origin !== window.location.origin) return;
+      const type = event.data && event.data.type;
+      if (type === 'ISHUMAN_IDV_COMPLETE' || type === 'ISHUMAN_SITE_PROOF_ISSUED') {
+        finish('completed');
+      } else if (type === 'ISHUMAN_IDV_CANCELLED') {
+        finish('cancelled');
+      }
+    };
+    const closedTimer = setInterval(() => {
+      if (popup.closed) finish('closed');
+    }, 800);
+    window.addEventListener('message', onMessage);
+  }
+
   async function pollAndStoreMaster() {
-    if (!state.sessionId) throw new Error('No demo verification session. Start Stripe Identity first.');
+    if (!state.sessionId) throw new Error('No demo verification session. Start the identity check first.');
     if (!state.wallet) await initWallet();
 
     const payload = await requestJson(`/api/ishuman/verification-status/${encodeURIComponent(state.sessionId)}`);
@@ -522,13 +596,13 @@
   }
 
   async function completeTestModeVerification() {
-    if (!state.sessionId) throw new Error('No demo verification session. Start Stripe Identity first.');
+    if (!state.sessionId) throw new Error('No demo verification session. Start the identity check first.');
     await requestJson('/api/demo/ishuman/test-complete-verification', {
       method: 'POST',
       headers: demoHeaders(),
       body: JSON.stringify({ session_id: state.sessionId }),
     });
-    log('Stripe test-mode session completed');
+    log('Test-mode verification session completed');
     await pollAndStoreMaster();
   }
 
@@ -835,7 +909,7 @@
       return verifyOnceTestMode();
     }
 
-    throw new Error('No verified master proof yet. Complete verification on a demo site, or use Stripe Identity from the operator console.');
+    throw new Error('No verified master proof yet. Complete verification on a demo site, or start an identity check from the operator console.');
   }
 
   async function runGuidedDemo() {
@@ -930,6 +1004,7 @@
     bind('ih-run-guided-demo', runGuidedDemo);
     bind('ih-run-guided-demo-hero', runGuidedDemo);
     bind('ih-wallet-btn', initWallet);
+    bind('ih-create-lemma-id-btn', createLemmaIdViaPopup);
     bind('ih-start-idv-btn', startIdentityVerification);
     bind('ih-test-complete-btn', completeTestModeVerification);
     bind('ih-poll-btn', pollAndStoreMaster);

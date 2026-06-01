@@ -74,8 +74,10 @@
         </div>
 
         <div class="action-row">
+          <button class="demo-btn demo-btn-primary" id="ih-create-lemma-id-btn" type="button">Create my lemma.id</button>
           <button class="demo-btn demo-btn-secondary" id="ih-wallet-btn" type="button">Unlock wallet</button>
         </div>
+        <p class="demo-muted" id="ih-create-lemma-id-hint">Runs the one-time identity check in a Lemma popup and stores your lemma.id — the master human proof every site-private ID is derived from.</p>
       </div>
     </section>
 
@@ -239,7 +241,7 @@ const result = await new IsHumanVerifier({
       <input class="demo-input" id="ih-test-token" type="password" placeholder="Test token override (optional)" autocomplete="off">
       <input class="demo-input" id="ih-admin-token" type="password" placeholder="Admin token override (optional)" autocomplete="off">
       <div class="action-row" id="ih-operator-console">
-        <button class="demo-btn demo-btn-secondary" id="ih-start-idv-btn" type="button">Start Stripe Identity</button>
+        <button class="demo-btn demo-btn-secondary" id="ih-start-idv-btn" type="button">Start identity check</button>
         <button class="demo-btn demo-btn-secondary" id="ih-test-complete-btn" type="button">Complete test verification</button>
         <button class="demo-btn demo-btn-secondary" id="ih-poll-btn" type="button">Poll / store proof</button>
         <button class="demo-btn demo-btn-secondary" id="ih-refresh-status-btn" type="button">Refresh status</button>
@@ -257,5 +259,5 @@ const result = await new IsHumanVerifier({
 <script src="/static/js/lemma-keys.js?v=4" nonce="{{ csp_nonce }}"></script>
 <script src="/static/js/lemma-wallet.js?v=2538" nonce="{{ csp_nonce }}"></script>
 <script src="/sdk/ishuman-verifier.js?v=1.5.6" nonce="{{ csp_nonce }}"></script>
-<script src="/static/js/demo/ishuman-demo.js?v=7" nonce="{{ csp_nonce }}"></script>
+<script src="/static/js/demo/ishuman-demo.js?v=8" nonce="{{ csp_nonce }}"></script>
 {% endblock %}
