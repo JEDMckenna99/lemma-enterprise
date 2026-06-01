@@ -141,8 +141,7 @@
 
   async function refreshWalletStatus() {
     try {
-      await initWallet({ force: false });
-      if (!state.wallet) return;
+      if (!(await initWalletPassive())) return;
 
       let master = null;
       try {
@@ -170,7 +169,15 @@
         return;
       }
 
-      setPill('ih-wallet-pill', state.walletId ? 'NO PROOF YET' : 'LOCKED', state.walletId ? 'warn' : 'deny');
+      // No proof yet. Distinguish a usable wallet (walletId known, possibly with
+      // a restored 24h session) from a brand-new/locked one. We do NOT prompt a
+      // passkey here — that only happens when the user issues a proof.
+      if (!state.walletId) {
+        setPill('ih-wallet-pill', 'LOCKED', 'deny');
+      } else {
+        const unlocked = !!(state.wallet?.isUnlocked && state.wallet.isUnlocked());
+        setPill('ih-wallet-pill', unlocked ? 'READY' : 'NO PROOF YET', 'warn');
+      }
     } catch (err) {
       setPill('ih-wallet-pill', 'NOT READY', 'warn');
       log('Wallet status check skipped', err.message);
@@ -376,6 +383,35 @@
       state.walletSecret = authSecret;
     }
     return { success: true, walletId: state.walletId, method: readyMethod };
+  }
+
+  // Passive wallet bootstrap for STATUS DISPLAY only. This must never prompt a
+  // passkey: it opens IndexedDB, silently restores a valid 24h unlock bundle
+  // (init() does this on lemma.id), and resolves walletId/secret from the
+  // session + plaintext stores. The passkey is reserved for issuing a
+  // PPID-derived proof from the wallet secret, and is reused for 24h once done.
+  async function initWalletPassive() {
+    if (!window.LemmaWallet) return false;
+    state.wallet = state.wallet || new window.LemmaWallet();
+    await state.wallet.init();
+    let walletId = state.wallet.session?.walletId || '';
+    if (!walletId) {
+      try {
+        const rec = await state.wallet._get('passkey', 'walletId');
+        walletId = rec?.value || '';
+      } catch (err) {
+        if (!isEncryptedWalletLockedError(err)) log('Wallet id read skipped', err.message);
+      }
+    }
+    if (walletId) {
+      state.walletId = walletId;
+      const wid = $('ih-wallet-id');
+      if (wid) wid.textContent = short(state.walletId);
+    }
+    if (!state.walletSecret && state.wallet.session?.walletSecret) {
+      state.walletSecret = state.wallet.session.walletSecret;
+    }
+    return true;
   }
 
   async function getWalletContext() {
