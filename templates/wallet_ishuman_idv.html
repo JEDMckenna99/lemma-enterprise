@@ -559,7 +559,14 @@
         });
 
         (async function boot() {
-            if (!window.opener) {
+            // A cross-origin IDV round-trip (e.g. Didit) can sever window.opener
+            // when the provider redirects the popup back here. In that case we must
+            // still finish the in-flight flow (store the master, derive/issue the
+            // site proof) and self-close — the opener is only needed for the live
+            // postMessage hand-off, which notifyOpener() already no-ops without.
+            // So only block a truly context-free direct open: no opener AND no flow.
+            const hasFlowContext = isFreshIdv || isSiteProofIssue || (isVerificationReturn && sessionId);
+            if (!window.opener && !hasFlowContext) {
                 setStatus('Open this page from a customer site action, not directly.', 'error');
                 document.getElementById('cancel-btn').textContent = 'Close';
                 return;
