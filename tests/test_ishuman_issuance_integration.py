@@ -23,13 +23,15 @@ def test_start_verification_persists_pending_session(
 
     db = fake_ishuman_db_session_factory
     monkeypatch.setattr("api.database.SessionLocal", db.session_local)
+    # Didit is the default IDV rail (it replaced Stripe Identity), so a start
+    # request with no explicit provider must route to didit.
+    monkeypatch.setattr("api.config.is_ishuman_didit_enabled", lambda: True)
     monkeypatch.setattr(
-        "billing.stripe_manager.StripeManager.create_identity_verification_session",
-        lambda self, user_id, return_url: {
+        "billing.didit_manager.DiditManager.create_identity_verification_session",
+        lambda self, user_id, return_url, callback_url=None: {
             "success": True,
-            "session_id": "vs_integration_001",
-            "client_secret": "cs_integration_001",
-            "url": "https://verify.stripe.test/session",
+            "session_id": "didit_integration_001",
+            "url": "https://verify.didit.test/session",
         },
     )
     monkeypatch.setattr(
@@ -51,12 +53,19 @@ def test_start_verification_persists_pending_session(
     payload = resp.get_json()
     assert resp.status_code == 200
     assert payload["success"] is True
-    assert payload["stripe_session_id"] == "vs_integration_001"
+    assert payload["provider"] == "didit"
+    assert payload["provider_session_id"] == "didit_integration_001"
+    # Didit is a hosted redirect; no Stripe client_secret/session shape.
+    assert "client_secret" not in payload
+    assert "stripe_session_id" not in payload
 
     rows = db.store.data[IsHumanVerification.__name__]
     assert len(rows) == 1
     assert rows[0].session_id == payload["session_id"]
     assert rows[0].wallet_id == "wallet_test_001"
+    assert rows[0].issuer_id == "didit"
+    assert rows[0].provider_session_id == "didit_integration_001"
+    assert rows[0].stripe_session_id is None
     assert rows[0].ppid == "did:lemma:ppid_start_001"
     assert rows[0].status == "pending"
     assert rows[0].metadata_json["return_url"] == "https://customer.example/return"

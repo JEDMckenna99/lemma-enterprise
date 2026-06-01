@@ -115,12 +115,19 @@ def _issue_ishuman_credential(
     site_id: Optional[str] = None,
     site_signing_pubkey: Optional[str] = None,
     ppid_derivation: Optional[str] = None,
+    verification_method: str = "didit",
 ) -> dict:
     """Sign and return a new isHuman credential for *ppid*.
 
     If *site_id* is provided, the credential is bound to that site
     (per-site derived proof).  Otherwise it is the master proof bound
     to ``lemma.id``.
+
+    *verification_method* records which IDV rail established the underlying
+    proof of personhood (``didit`` is the standard rail; ``stripe_identity``
+    is retained only for legacy records). It is derived from the verification
+    record's ``issuer_id`` so derived/reissued credentials stay consistent
+    with how the human was originally verified.
     """
     issuer = _get_ishuman_issuer()
     now = int(time.time())
@@ -129,7 +136,7 @@ def _issue_ishuman_credential(
 
     claims: dict = {
         "isHuman": True,
-        "verificationMethod": "stripe_identity",
+        "verificationMethod": (verification_method or "didit"),
         "packageType": "identity",
         "siteId": site_id or "lemma.id",
         "issuedAt": str(now),
@@ -272,6 +279,7 @@ def _complete_verified_ishuman_from_stripe(
         ppid,
         wallet_id,
         ppid_derivation="person_root_v1",
+        verification_method="stripe_identity",
     )
     record.ppid = ppid
     return credential
@@ -325,6 +333,7 @@ def _complete_verified_ishuman_from_didit(
         ppid,
         wallet_id,
         ppid_derivation="person_root_v1",
+        verification_method="didit",
     )
     record.ppid = ppid
     return credential
@@ -636,12 +645,24 @@ def start_verification_for_body(body: dict) -> tuple[dict, int]:
         os.getenv("ISHUMAN_RETURN_URL", "https://lemma.id/app"),
     )
 
-    # Provider routing (Phase 3.2). Defaults to stripe_identity so existing
-    # behavior is unchanged. The didit rail is only selectable when explicitly
-    # enabled + configured; a didit request on an unconfigured deploy fails
-    # closed rather than silently falling back.
-    provider = (body.get("provider") or "stripe_identity").strip().lower()
-    if provider == "didit":
+    # Provider routing. isHuman verification runs on Didit, which replaced
+    # Stripe Identity as the IDV rail. Didit is the default and fails closed if
+    # unconfigured (never silently substitutes another provider). Stripe Identity
+    # is retained only as an explicit, opt-in legacy escape hatch
+    # (provider="stripe_identity") and is no longer the default path.
+    provider = (body.get("provider") or "didit").strip().lower()
+    if provider == "stripe_identity":
+        from billing.stripe_manager import StripeManager
+        mgr = StripeManager()
+        result = mgr.create_identity_verification_session(
+            user_id=wallet_id,
+            return_url=return_url,
+        )
+        if not result.get("success"):
+            logger.error("Stripe Identity session creation failed: %s", result)
+            return {"success": False, "error": result.get("error", "stripe_error")}, 502
+    else:
+        provider = "didit"
         from api.config import is_ishuman_didit_enabled
         if not is_ishuman_didit_enabled():
             return {"success": False, "error": "didit_not_enabled"}, 400
@@ -653,17 +674,6 @@ def start_verification_for_body(body: dict) -> tuple[dict, int]:
         if not result.get("success"):
             logger.error("Didit session creation failed: %s", result)
             return {"success": False, "error": result.get("error", "didit_error")}, 502
-    else:
-        provider = "stripe_identity"
-        from billing.stripe_manager import StripeManager
-        mgr = StripeManager()
-        result = mgr.create_identity_verification_session(
-            user_id=wallet_id,
-            return_url=return_url,
-        )
-        if not result.get("success"):
-            logger.error("Stripe Identity session creation failed: %s", result)
-            return {"success": False, "error": result.get("error", "stripe_error")}, 502
 
     provider_session_id = result["session_id"]
     session_id = f"ishuman_sess_{secrets.token_urlsafe(16)}"
@@ -1025,6 +1035,7 @@ def verification_status(session_id: str):
                     record.ppid,
                     record.wallet_id,
                     ppid_derivation=ppid_deriv,
+                    verification_method=(record.issuer_id or "didit"),
                 )
                 credential["id"] = record.credential_id
                 resp["credential"] = credential
@@ -1513,6 +1524,7 @@ def derive_site_proof():
                 site_id=target_site,
                 site_signing_pubkey=site_signing_pubkey or None,
                 ppid_derivation=ppid_derivation,
+                verification_method=(getattr(master, "issuer_id", None) or "didit"),
             )
             credential["id"] = existing.derived_credential_id
             return jsonify({"success": True, "credential": credential, "cached": True})
@@ -1533,6 +1545,7 @@ def derive_site_proof():
             site_id=target_site,
             site_signing_pubkey=site_signing_pubkey or None,
             ppid_derivation=ppid_derivation,
+            verification_method=(getattr(master, "issuer_id", None) or "didit"),
         )
 
         # 5. Record the mapping
@@ -1622,6 +1635,7 @@ def reissue_master_credential():
             verified.ppid,
             wallet_id,
             ppid_derivation=ppid_derivation,
+            verification_method=(verified.issuer_id or "didit"),
         )
         verified.credential_id = new_credential["id"]
         verified.metadata_json = {

@@ -22,13 +22,15 @@ def test_start_verification_fails_closed_when_persistence_fails(monkeypatch, att
     monkeypatch.setenv("DATABASE_URL", "sqlite:///:memory:")
     app = _app_with_ishuman()
 
+    # Default IDV rail is didit (it replaced Stripe Identity); enable it and
+    # mock a successful session so the flow reaches the persistence step.
+    monkeypatch.setattr("api.config.is_ishuman_didit_enabled", lambda: True)
     monkeypatch.setattr(
-        "billing.stripe_manager.StripeManager.create_identity_verification_session",
-        lambda self, user_id, return_url: {
+        "billing.didit_manager.DiditManager.create_identity_verification_session",
+        lambda self, user_id, return_url, callback_url=None: {
             "success": True,
-            "session_id": "vs_test_123",
-            "client_secret": "cs_test_123",
-            "url": "https://verify.stripe.test/session",
+            "session_id": "didit_test_123",
+            "url": "https://verify.didit.test/session",
         },
     )
 
