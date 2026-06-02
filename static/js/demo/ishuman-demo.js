@@ -148,7 +148,7 @@
         master = await findLocalMasterCredential();
       } catch (err) {
         if (isEncryptedWalletLockedError(err) && state.masterCredentialId) {
-          setPill('ih-wallet-pill', 'PROOF ON SERVER', 'ok');
+          setPill('ih-lemma-status', 'READY', 'ok');
           setDemoReadyBanner(true);
           return;
         }
@@ -164,7 +164,7 @@
       }
 
       if (state.masterCredentialId) {
-        setPill('ih-wallet-pill', 'PROOF ON SERVER', 'ok');
+        setPill('ih-lemma-status', 'READY', 'ok');
         setDemoReadyBanner(true);
         return;
       }
@@ -173,13 +173,13 @@
       // a restored 24h session) from a brand-new/locked one. We do NOT prompt a
       // passkey here — that only happens when the user issues a proof.
       if (!state.walletId) {
-        setPill('ih-wallet-pill', 'LOCKED', 'deny');
+        setPill('ih-lemma-status', 'NONE', 'warn');
       } else {
         const unlocked = !!(state.wallet?.isUnlocked && state.wallet.isUnlocked());
-        setPill('ih-wallet-pill', unlocked ? 'READY' : 'NO PROOF YET', 'warn');
+        setPill('ih-lemma-status', unlocked ? 'UNLOCKED' : 'LOCKED', unlocked ? 'ok' : 'deny');
       }
     } catch (err) {
-      setPill('ih-wallet-pill', 'NOT READY', 'warn');
+      setPill('ih-lemma-status', 'NONE', 'warn');
       log('Wallet status check skipped', err.message);
     }
   }
@@ -331,10 +331,10 @@
     const wid = $('ih-wallet-id');
     if (wid) wid.textContent = short(state.walletId);
     if (state.walletId) {
-      setPill('ih-wallet-pill', 'UNLOCKED', 'ok');
+      setPill('ih-lemma-status', 'UNLOCKED', 'ok');
       log('Wallet ready', `${source} · ${short(state.walletId)}`);
     } else {
-      setPill('ih-wallet-pill', 'LOCKED', 'deny');
+      setPill('ih-lemma-status', 'LOCKED', 'deny');
     }
   }
 
@@ -479,7 +479,7 @@
     if (status?.master?.status === 'verified' && status.master.credential_id) {
       state.masterCredentialId = status.master.credential_id;
       localStorage.setItem('ishuman_demo_master_id', state.masterCredentialId);
-      setPill('ih-wallet-pill', 'PROOF READY', 'ok');
+      setPill('ih-lemma-status', 'READY', 'ok');
       setDemoReadyBanner(true);
       return true;
     }
@@ -505,12 +505,12 @@
       `popup=yes,width=${width},height=${height},left=${left},top=${top}`,
     );
     if (!popup) {
-      setPill('ih-wallet-pill', 'POPUP BLOCKED', 'warn');
+      setPill('ih-lemma-status', 'POPUP BLOCKED', 'warn');
       log('Identity popup blocked', 'Allow popups for lemma.id and retry');
       return;
     }
 
-    setPill('ih-wallet-pill', 'VERIFYING', 'warn');
+    setPill('ih-lemma-status', 'VERIFYING', 'warn');
     log('Opened identity check popup for lemma.id');
 
     let settled = false;
@@ -593,7 +593,7 @@
     );
     if (!confirmed) return;
 
-    setPill('ih-wallet-pill', 'CLEARING', 'warn');
+    setPill('ih-lemma-status', 'CLEARING', 'warn');
     log('Clearing lemma.id', 'wiping local wallet + signaling customer sites');
 
     // 1. Best-effort server reset of this wallet's revocation state so a
@@ -691,7 +691,7 @@
     const wid = $('ih-wallet-id');
     if (wid) wid.textContent = '-';
     setDemoReadyBanner(false);
-    setPill('ih-wallet-pill', 'CLEARED', 'warn');
+    setPill('ih-lemma-status', 'CLEARED', 'warn');
     log('lemma.id cleared', 'run "Create my lemma.id" to start fresh');
   }
 
@@ -705,7 +705,7 @@
     log('Verification status checked', payload.status);
 
     if (payload.status !== 'verified' || !payload.credential) {
-      setPill('ih-wallet-pill', String(payload.status || 'PENDING').toUpperCase(), 'warn');
+      setPill('ih-lemma-status', String(payload.status || 'PENDING').toUpperCase(), 'warn');
       return payload;
     }
 
@@ -773,7 +773,7 @@
         claims,
       });
     }
-    setPill('ih-wallet-pill', 'PROOF READY', 'ok');
+    setPill('ih-lemma-status', 'READY', 'ok');
     setDemoReadyBanner(true);
   }
 
@@ -1040,7 +1040,7 @@
       if (state.masterCredentialId) {
         localStorage.setItem('ishuman_demo_master_id', state.masterCredentialId);
       }
-      setPill('ih-wallet-pill', 'PROOF READY', 'ok');
+      setPill('ih-lemma-status', 'READY', 'ok');
       setDemoReadyBanner(true);
       log('Using verified master proof from server', short(state.masterCredentialId));
       return status;
@@ -1189,7 +1189,7 @@
         await refreshWalletStatus();
         if (state.masterCredentialId || state.sessionId) {
           await refreshStatus();
-          setPill('ih-wallet-pill', 'CACHED', 'ok');
+          setPill('ih-lemma-status', 'READY', 'ok');
         }
       }
     } catch (err) {

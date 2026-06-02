@@ -39,15 +39,14 @@
             <h2>Verify once</h2>
             <p class="demo-muted">Unlock the browser wallet and store a reusable human proof.</p>
           </div>
-          <button class="demo-btn demo-btn-primary" id="ih-run-guided-demo" type="button" hidden>Run full demo</button>
-          <button class="demo-btn demo-btn-primary" id="ih-run-guided-demo-hero" type="button" hidden>Run full demo</button>
+          <button class="demo-btn demo-btn-primary" id="ih-create-lemma-id-btn" type="button">Create my lemma.id</button>
         </div>
 
         <p class="demo-notice" id="ih-test-verify-disabled" hidden>Test-mode automation is off. Complete verification on a customer site first.</p>
 
         <div class="demo-ready-banner" id="ih-demo-ready-banner" hidden>
-          <strong>Human proof ready</strong>
-          <span>Continue to step 2 or run the full demo.</span>
+          <strong>lemma.id ready</strong>
+          <span>Continue to step 2.</span>
         </div>
 
         <div class="wizard-shell" id="ih-wizard-shell" hidden>
@@ -67,18 +66,13 @@
         </div>
 
         <div class="status-row">
-          <div class="status-card">
-            <span class="status-label">Wallet</span>
-            <span class="demo-pill" id="ih-wallet-pill">CHECKING</span>
-          </div>
           <div class="status-card status-card-wide">
-            <span class="status-label">Human proof</span>
-            <span class="status-mono" id="ih-master-id">—</span>
+            <span class="status-label">lemma.id status</span>
+            <span class="demo-pill" id="ih-lemma-status">CHECKING</span>
           </div>
         </div>
 
         <div class="action-row">
-          <button class="demo-btn demo-btn-primary" id="ih-create-lemma-id-btn" type="button">Create my lemma.id</button>
           <button class="demo-btn demo-btn-secondary" id="ih-wallet-btn" type="button">Unlock wallet</button>
         </div>
         <p class="demo-muted" id="ih-create-lemma-id-hint">Runs the one-time identity check in a Lemma popup and stores your lemma.id — the master human proof every site-private ID is derived from.</p>
@@ -263,5 +257,5 @@ const result = await new IsHumanVerifier({
 <script src="/static/js/lemma-keys.js?v=4" nonce="{{ csp_nonce }}"></script>
 <script src="/static/js/lemma-wallet.js?v=2541" nonce="{{ csp_nonce }}"></script>
 <script src="/sdk/ishuman-verifier.js?v=1.5.6" nonce="{{ csp_nonce }}"></script>
-<script src="/static/js/demo/ishuman-demo.js?v=10" nonce="{{ csp_nonce }}"></script>
+<script src="/static/js/demo/ishuman-demo.js?v=11" nonce="{{ csp_nonce }}"></script>
 {% endblock %}
