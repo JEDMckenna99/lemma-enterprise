@@ -13,6 +13,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from flask import jsonify
+from sqlalchemy.exc import IntegrityError
 
 from auth.redis_store import delete as redis_delete
 from auth.redis_store import get as redis_get
@@ -134,7 +135,28 @@ def register_wallet_signing_key(
                 last_used_at=datetime.utcnow(),
             )
         )
-        db.commit()
+        try:
+            db.commit()
+        except IntegrityError:
+            # Concurrent registration: the wallet page and the IDV popup can both
+            # call register-signing-key in the same instant, so two requests pass
+            # the "no existing row" check and race to INSERT the same wallet_id
+            # primary key. Treat this as idempotent: re-read the winning row and
+            # accept it when the public key matches (which it must, since the key
+            # is deterministically derived from the wallet secret).
+            db.rollback()
+            winner = db.query(WalletSigningKey).filter_by(wallet_id=wallet_id).first()
+            if winner and not winner.revoked_at and bytes(winner.pubkey) == pubkey_bytes:
+                winner.last_used_at = datetime.utcnow()
+                db.commit()
+                return Result(True)
+            if winner and winner.revoked_at:
+                return Result(False, "wallet_pubkey_mismatch", "wallet signing key revoked")
+            return Result(
+                False,
+                "wallet_pubkey_mismatch",
+                "wallet already registered with a different public key",
+            )
         return Result(True)
     except Exception:
         db.rollback()
