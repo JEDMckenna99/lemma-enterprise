@@ -69,9 +69,11 @@ def resolve_or_create_person_from_material(
             raise RuntimeError("document_root linked to missing lemma_person")
         person_id = person.person_id
     else:
+        from api.column_crypto import encrypt_column
+
         person = LemmaPerson(
             person_id=_new_person_id(),
-            person_root_hash=person_root_hash,
+            person_root_hash=encrypt_column(person_root_hash),
             root_version=root_version,
             primary_wallet_id=wallet_id,
             status="active",
@@ -139,10 +141,12 @@ def resolve_person_from_stripe_session(
 def load_person_root_bytes(db, lemma_person_id: str) -> bytes:
     from api.database import LemmaPerson
 
+    from api.column_crypto import decrypt_column
+
     person = db.query(LemmaPerson).filter_by(person_id=lemma_person_id).first()
     if not person or not person.person_root_hash:
         raise ValueError("lemma_person not found")
-    return bytes.fromhex(person.person_root_hash)
+    return bytes.fromhex(decrypt_column(person.person_root_hash))
 
 
 def process_verified_stripe_identity(

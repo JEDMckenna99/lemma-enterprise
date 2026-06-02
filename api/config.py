@@ -249,3 +249,40 @@ def is_ishuman_didit_enabled() -> bool:
     if not s.ishuman_didit_enabled:
         return False
     return bool(s.didit_api_key and s.didit_workflow_id)
+
+
+def _env_truthy(name: str, default: bool) -> bool:
+    raw = os.environ.get(name)
+    if raw is None:
+        return default
+    return raw.strip().lower() in ("1", "true", "yes", "on")
+
+
+def is_ishuman_pull_fallback_enabled() -> bool:
+    """Whether status-poll may actively pull a didit decision to issue.
+
+    Webhook is the fast path; this guarantees issuance completes even if a
+    webhook is delayed or dropped. Enabled by default whenever the didit rail is
+    configured; set LEMMA_ISHUMAN_PULL_FALLBACK=0 to disable.
+    """
+    if not is_ishuman_didit_enabled():
+        return False
+    return _env_truthy("LEMMA_ISHUMAN_PULL_FALLBACK", True)
+
+
+def ppid_require_person_root() -> bool:
+    """Fail closed instead of deriving a divergent legacy wallet-secret PPID.
+
+    The canonical PPID is derived from the server-side person root. A legacy
+    fallback path derives a DIFFERENT identifier from the wallet secret, which
+    silently breaks account continuity. When this is on, authoritative
+    (non-provisional) server-side derivation refuses to fall back to the
+    wallet-secret path.
+
+    Default ON: derivation now resolves the person root from the wallet binding
+    for any verified wallet, so issuance/derive flows always take the canonical
+    path. Only genuinely pre-IDV provisional callers (which pass
+    provisional=True) may still use the wallet-secret path. Set
+    LEMMA_PPID_REQUIRE_PERSON_ROOT=0 to restore the legacy permissive behavior.
+    """
+    return _env_truthy("LEMMA_PPID_REQUIRE_PERSON_ROOT", True)

@@ -18,6 +18,8 @@ from sqlalchemy import (
     JSON,
     LargeBinary,
     UniqueConstraint,
+    Index,
+    text,
 )
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, Session
@@ -712,7 +714,9 @@ class LemmaPerson(Base):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     person_id = Column(String, unique=True, nullable=False, index=True)
-    person_root_hash = Column(String(64), nullable=False, index=True)
+    # Encrypted at rest (api.column_crypto): the no-secret PPID-enumeration key.
+    # Widened for the AES-GCM envelope; legacy 64-hex rows remain readable.
+    person_root_hash = Column(String(255), nullable=False, index=True)
     root_version = Column(String, default='v1', nullable=False)
     primary_wallet_id = Column(String, index=True)
     status = Column(String, default='active')
@@ -761,6 +765,23 @@ class IsHumanVerification(Base):
     user's wallet.
     """
     __tablename__ = 'ishuman_verifications'
+    __table_args__ = (
+        # One local verification row per (provider hosted session, wallet). The
+        # provider can reuse a hosted session across repeated start-verification
+        # calls; without this the webhook only flips the FIRST sibling to
+        # verified and a client polling the other sibling sees 'pending' forever.
+        # Partial so rows that legitimately omit either column (older Stripe rows
+        # before backfill, NULL provider session) are unconstrained. See
+        # migrations/028_ishuman_provider_session_unique.sql.
+        Index(
+            'uq_ishuman_provider_session_wallet',
+            'provider_session_id', 'wallet_id',
+            unique=True,
+            postgresql_where=text(
+                'provider_session_id IS NOT NULL AND wallet_id IS NOT NULL'
+            ),
+        ),
+    )
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     session_id = Column(String, unique=True, nullable=False)
@@ -774,7 +795,9 @@ class IsHumanVerification(Base):
     ppid = Column(String, index=True)
     credential_id = Column(String, index=True)
     lemma_person_id = Column(String, index=True)
-    document_root_hash = Column(String(64), index=True)
+    # Encrypted at rest (api.column_crypto): reference copy of the document root.
+    # Not a lookup key here, so safe to encrypt. Widened for the AES-GCM envelope.
+    document_root_hash = Column(String(255), index=True)
     root_version = Column(String, default='v1')
     # v2 (Phase 3.2 scaffold): which IDV issuer produced this verification.
     # Defaults to stripe_identity; multi-issuer integration is deferred.

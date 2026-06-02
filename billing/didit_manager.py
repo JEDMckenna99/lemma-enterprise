@@ -200,6 +200,49 @@ class DiditManager:
             "status": data.get("status"),
         }
 
+    def retrieve_session_decision(self, session_id: str) -> Dict[str, Any]:
+        """Fetch a session's decision payload directly from didit (pull fallback).
+
+        The webhook is the fast path for issuance, but webhook delivery is
+        outside our control (provider drops/delays, transient misconfig). This
+        lets the status-poll endpoint actively pull the authenticated decision so
+        a user who completed IDV is never stranded without a credential just
+        because a webhook never landed. Returns ``{"success": bool, ...}``; the
+        ``decision`` field mirrors the shape the webhook delivers so it can feed
+        the same ``_complete_verified_ishuman_from_didit`` issuance path.
+
+        Docs: https://docs.didit.me/identity-verification/api-reference/retrieve-session
+        """
+        if not self.enabled:
+            return {"success": False, "error": "didit_not_configured"}
+        if not session_id:
+            return {"success": False, "error": "session_id required"}
+
+        url = f"{self.api_base}/v3/session/{session_id}/decision/"
+        try:
+            resp = requests.get(
+                url,
+                headers={
+                    "accept": "application/json",
+                    "x-api-key": self.api_key,
+                },
+                timeout=_SESSION_TIMEOUT_SECONDS,
+            )
+        except requests.RequestException as exc:
+            logger.error("Didit decision fetch failed: %s", exc)
+            return {"success": False, "error": "didit_request_failed", "message": str(exc)}
+
+        if resp.status_code != 200:
+            logger.warning(
+                "Didit decision fetch non-200: %s %s", resp.status_code, resp.text[:300]
+            )
+            return {"success": False, "error": "didit_decision_unavailable",
+                    "status_code": resp.status_code}
+
+        decision = resp.json() if resp.content else {}
+        status = str(decision.get("status") or "").strip().lower()
+        return {"success": True, "status": status, "decision": decision}
+
     def verify_webhook(
         self,
         raw_body: bytes,

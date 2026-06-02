@@ -32,6 +32,9 @@ from typing import Optional
 import stripe
 from flask import Blueprint, request, jsonify
 from flask_cors import cross_origin
+from sqlalchemy.exc import IntegrityError
+
+from api.column_crypto import encrypt_column
 
 logger = logging.getLogger(__name__)
 
@@ -197,6 +200,25 @@ def _require_site_api_key():
         db.close()
 
 
+def _resolve_person_id_for_wallet(db, wallet_id: Optional[str]) -> Optional[str]:
+    """Resolve the canonical lemma_person_id for a wallet via its IDV binding.
+
+    Every wallet that completed IDV has a LemmaWalletBinding (created in
+    resolve_or_create_person_from_material). Resolving through it means any
+    verified wallet takes the canonical person-root PPID path even if the
+    immediate caller did not thread lemma_person_id through.
+    """
+    if not wallet_id or db is None:
+        return None
+    try:
+        from api.database import LemmaWalletBinding
+
+        binding = db.query(LemmaWalletBinding).filter_by(wallet_id=wallet_id).first()
+        return getattr(binding, "lemma_person_id", None) if binding else None
+    except Exception:
+        return None
+
+
 def _derive_ppid_for_site(
     *,
     rp_id: str,
@@ -204,19 +226,53 @@ def _derive_ppid_for_site(
     wallet_id: Optional[str] = None,
     lemma_person_id: Optional[str] = None,
     db=None,
+    provisional: bool = False,
 ) -> str:
-    """Derive site PPID from person-root (preferred) or wallet_secret (legacy)."""
-    if lemma_person_id and db is not None:
-        from api.identity_person import load_person_root_bytes
-        from api.ppid import derive_ppid_from_person_root
+    """Derive site PPID from the person-root (canonical) path.
 
-        person_root = load_person_root_bytes(db, lemma_person_id)
-        return derive_ppid_from_person_root(person_root, rp_id)
+    The person-root path is the sole authoritative derivation: it is what issued
+    credentials are bound to. The legacy wallet-secret path produces a DIFFERENT
+    identifier, so using it after a person root exists silently mints a divergent
+    identity (breaking account continuity).
 
+    Convergence: when a db handle is available we resolve the person identity
+    from the explicit ``lemma_person_id`` OR the wallet's IDV binding, so any
+    verified wallet derives via person-root automatically. The wallet-secret
+    path is reachable only for ``provisional`` callers (genuinely pre-IDV, where
+    no person root exists yet) or when LEMMA_PPID_REQUIRE_PERSON_ROOT is disabled.
+    Otherwise we fail closed rather than mint a divergent identity.
+    """
+    if db is not None:
+        if not lemma_person_id:
+            lemma_person_id = _resolve_person_id_for_wallet(db, wallet_id)
+        if lemma_person_id:
+            from api.identity_person import load_person_root_bytes
+            from api.ppid import derive_ppid_from_person_root
+
+            person_root = load_person_root_bytes(db, lemma_person_id)
+            return derive_ppid_from_person_root(person_root, rp_id)
+    elif lemma_person_id:
+        # lemma_person_id supplied without a db handle: cannot load the person
+        # root, so fall through to the fail-closed / provisional handling below.
+        pass
+
+    from api.config import ppid_require_person_root
     from api.ppid import derive_ppid_from_wallet_secret
 
+    if ppid_require_person_root() and not provisional:
+        raise ValueError(
+            "person-root PPID required but unavailable; refusing legacy "
+            "wallet-secret derivation that would mint a divergent identity"
+        )
     if not wallet_secret:
         raise ValueError("wallet_secret or lemma_person_id required for PPID derivation")
+    logger.warning(
+        "Deriving PPID via legacy wallet-secret path for site=%s (provisional=%s); "
+        "this yields a different identifier than the canonical person-root PPID "
+        "and should only happen pre-IDV",
+        rp_id,
+        provisional,
+    )
     return derive_ppid_from_wallet_secret(wallet_secret, rp_id)
 
 
@@ -263,7 +319,7 @@ def _complete_verified_ishuman_from_stripe(
 
     ppid = derive_ppid_from_person_root_hash(resolved.person_root_hash, "lemma.id")
     record.lemma_person_id = resolved.person_id
-    record.document_root_hash = resolved.document_root_hash
+    record.document_root_hash = encrypt_column(resolved.document_root_hash)
     record.root_version = active_root_version()
     record.confidence_level = resolved.confidence_level
 
@@ -320,7 +376,7 @@ def _complete_verified_ishuman_from_didit(
 
     ppid = derive_ppid_from_person_root_hash(resolved.person_root_hash, "lemma.id")
     record.lemma_person_id = resolved.person_id
-    record.document_root_hash = resolved.document_root_hash
+    record.document_root_hash = encrypt_column(resolved.document_root_hash)
     record.root_version = active_root_version()
     record.confidence_level = resolved.confidence_level
 
@@ -337,6 +393,74 @@ def _complete_verified_ishuman_from_didit(
     )
     record.ppid = ppid
     return credential
+
+
+def _maybe_pull_issue_didit(db, record) -> bool:
+    """Pull-based issuance fallback for the status-poll endpoint.
+
+    The didit webhook is the fast path, but if it is delayed or never delivered
+    the user has completed (often paid for) IDV yet has no credential. Here we
+    actively fetch the authenticated decision from didit and run the SAME
+    issuance path the webhook uses. Returns True when the record ends up verified
+    with a credential. Best-effort: never raises out of the poll handler.
+    """
+    from api.config import is_ishuman_pull_fallback_enabled
+
+    if record.status == "verified" and record.credential_id:
+        return True
+    if not is_ishuman_pull_fallback_enabled():
+        return False
+    if (record.issuer_id or "") != "didit":
+        return False
+    if not record.provider_session_id or not record.wallet_id:
+        return False
+
+    try:
+        from billing.didit_manager import DiditManager
+        result = DiditManager().retrieve_session_decision(record.provider_session_id)
+    except Exception:
+        logger.exception(
+            "Didit decision pull failed for session %s", record.provider_session_id
+        )
+        return False
+
+    if not result.get("success") or result.get("status") != "approved":
+        return False
+
+    decision = result.get("decision") or {}
+    try:
+        credential = _complete_verified_ishuman_from_didit(
+            db, record, wallet_id=record.wallet_id, decision=decision,
+        )
+    except Exception:
+        db.rollback()
+        logger.exception(
+            "Pull-fallback issuance failed for session %s", record.provider_session_id
+        )
+        return False
+
+    if not credential:
+        # _complete_* may have marked the record failed (bad root material).
+        db.commit()
+        return False
+
+    record.status = "verified"
+    record.verified_at = datetime.utcnow()
+    record.credential_id = credential.get("id")
+    record.issued_at = datetime.utcnow()
+    record.expires_at = datetime.utcnow() + timedelta(days=ISHUMAN_CREDENTIAL_TTL_DAYS)
+    record.metadata_json = {
+        **(record.metadata_json or {}),
+        "credential_issuer_did": credential.get("issuerInfo", {}).get("did"),
+        "ppid_derivation": "person_root_v1",
+        "issued_via": "pull_fallback",
+    }
+    db.commit()
+    logger.info(
+        "isHuman credential issued via didit pull-fallback: credential_id=%s session=%s",
+        credential.get("id"), record.provider_session_id,
+    )
+    return True
 
 
 def revoke_wallet_network_wide(
@@ -684,10 +808,15 @@ def start_verification_for_body(body: dict) -> tuple[dict, int]:
         derived_ppid = None
         if wallet_secret:
             try:
+                # Pre-IDV: no person root exists yet, so this is an explicitly
+                # provisional placeholder PPID. It is overwritten with the
+                # canonical person-root PPID at issuance and is never used as an
+                # authoritative identity.
                 derived_ppid = _derive_ppid_for_site(
                     rp_id="lemma.id",
                     wallet_secret=wallet_secret,
                     wallet_id=wallet_id,
+                    provisional=True,
                 )
             except Exception:
                 logger.exception("Failed pre-deriving PPID during isHuman start-verification")
@@ -735,7 +864,31 @@ def start_verification_for_body(body: dict) -> tuple[dict, int]:
                 metadata_json=verification_metadata,
             )
             db.add(verification)
-            db.commit()
+            try:
+                db.commit()
+            except IntegrityError:
+                # Lost a concurrent race to create the row for this
+                # (provider_session_id, wallet_id): the unique index
+                # (migration 028) rejected the duplicate insert. Recover by
+                # reusing the row the winner created so both callers map to the
+                # single canonical record instead of erroring out.
+                db.rollback()
+                winner = (
+                    db.query(IsHumanVerification)
+                    .filter(
+                        IsHumanVerification.provider_session_id == provider_session_id,
+                        IsHumanVerification.wallet_id == wallet_id,
+                    )
+                    .order_by(IsHumanVerification.created_at.desc())
+                    .first()
+                )
+                if not winner:
+                    raise
+                winner.metadata_json = {**(winner.metadata_json or {}), **verification_metadata}
+                if derived_ppid and not winner.ppid:
+                    winner.ppid = derived_ppid
+                db.commit()
+                session_id = winner.session_id
     except Exception:
         db.rollback()
         logger.exception("Failed to persist isHuman verification session")
@@ -1072,6 +1225,15 @@ def verification_status(session_id: str):
             if sibling:
                 record = sibling
 
+        # Pull-based issuance fallback: if the polled (and any sibling) row is
+        # still unverified, the webhook may simply not have landed. Actively pull
+        # the didit decision and issue so the user is never stranded post-IDV.
+        if record.status != "verified" or not record.credential_id:
+            try:
+                _maybe_pull_issue_didit(db, record)
+            except Exception:
+                logger.exception("Pull-fallback attempt errored (non-fatal)")
+
         resp: dict = {
             "success": True,
             "status": record.status,
@@ -1102,6 +1264,122 @@ def verification_status(session_id: str):
                 logger.exception("Failed to re-issue credential for polling")
 
         return jsonify(resp)
+    finally:
+        db.close()
+
+
+# ---------------------------------------------------------------------------
+# 2c. Right-to-erasure (wallet owner permanently deletes their lemma.id)
+# ---------------------------------------------------------------------------
+
+@ishuman_bp.route("/api/ishuman/erase", methods=["POST"])
+@cross_origin()
+def erase_identity():
+    """Permanently erase the caller's lemma.id (right-to-erasure).
+
+    Auth: a fresh wallet_assertion proving control of the wallet's signing key.
+
+    Effect (irreversible):
+      * Revokes the wallet's master + derived credentials network-wide so every
+        relying site enforces it via the Bloom snapshot.
+      * Scrubs and tombstones the wallet's verification rows (drops document /
+        person linkage, PPIDs, and sealed seed envelopes).
+      * Removes the wallet -> person binding.
+      * If no other wallet remains bound to the person, deletes the person root
+        and its document-root mappings so the underlying identity anchor — the
+        single value from which every site PPID is derivable — is destroyed.
+
+    This is the server-side counterpart to the client 'Clear my lemma.id' (which
+    only wipes browser storage) and satisfies erasure obligations for the
+    IDV-derived identity data Lemma holds.
+    """
+    body = request.get_json(silent=True) or {}
+    wallet_id = (body.get("wallet_id") or "").strip()
+    if not wallet_id:
+        return jsonify({"success": False, "error": "wallet_id required"}), 400
+
+    err, _wid = _require_wallet_assertion(body, field_names=["wallet_id"])
+    if err:
+        return err[0].get_json(), err[1]
+
+    from api.database import (
+        SessionLocal, IsHumanVerification, LemmaWalletBinding,
+        LemmaPerson, LemmaDocumentRoot,
+    )
+
+    db = SessionLocal()
+    try:
+        # 1) Network-wide revocation first (safe direction; continue even if
+        #    there is nothing to revoke).
+        revoked = {"revoked_credential_ids": []}
+        try:
+            revoked = revoke_wallet_network_wide(
+                db,
+                wallet_id=wallet_id,
+                reason="user_erasure",
+                revoked_by="wallet_owner",
+            )
+        except ValueError:
+            pass
+
+        # 2) Identify every person this wallet is linked to.
+        person_ids: set[str] = set()
+        for b in db.query(LemmaWalletBinding).filter_by(wallet_id=wallet_id).all():
+            if b.lemma_person_id:
+                person_ids.add(b.lemma_person_id)
+        for v in db.query(IsHumanVerification).filter_by(wallet_id=wallet_id).all():
+            if v.lemma_person_id:
+                person_ids.add(v.lemma_person_id)
+
+        # 3) Scrub + tombstone the wallet's verification rows.
+        scrubbed = 0
+        for v in db.query(IsHumanVerification).filter_by(wallet_id=wallet_id).all():
+            v.status = "erased"
+            v.document_root_hash = None
+            v.lemma_person_id = None
+            v.ppid = None
+            v.credential_id = None
+            v.wallet_seed_envelope = None
+            v.person_root_proxy_envelope = None
+            v.seed_version = None
+            v.metadata_json = {"erased": True, "erased_at": datetime.utcnow().isoformat()}
+            scrubbed += 1
+
+        # 4) Remove the wallet -> person binding.
+        db.query(LemmaWalletBinding).filter_by(wallet_id=wallet_id).delete()
+
+        # 5) Destroy the person anchor only when no other wallet still depends
+        #    on it (a person may legitimately have multiple devices/wallets).
+        persons_deleted = 0
+        for pid in person_ids:
+            remaining = (
+                db.query(LemmaWalletBinding)
+                .filter(LemmaWalletBinding.lemma_person_id == pid)
+                .count()
+            )
+            if remaining == 0:
+                db.query(LemmaDocumentRoot).filter_by(lemma_person_id=pid).delete()
+                db.query(LemmaPerson).filter_by(person_id=pid).delete()
+                persons_deleted += 1
+
+        db.commit()
+
+        logger.info(
+            "isHuman erasure complete for wallet=%s (scrubbed=%d persons_deleted=%d revoked=%d)",
+            wallet_id[:20], scrubbed, persons_deleted,
+            len(revoked.get("revoked_credential_ids", [])),
+        )
+        return jsonify({
+            "success": True,
+            "wallet_id": wallet_id,
+            "revoked_credential_ids": revoked.get("revoked_credential_ids", []),
+            "verifications_scrubbed": scrubbed,
+            "persons_deleted": persons_deleted,
+        })
+    except Exception as exc:  # noqa: BLE001
+        db.rollback()
+        logger.exception("isHuman erasure failed for wallet %s", wallet_id)
+        return jsonify({"success": False, "error": f"erase_failed:{exc}"}), 500
     finally:
         db.close()
 
@@ -1542,6 +1820,11 @@ def derive_site_proof():
             return jsonify({"success": False, "error": "wallet_revoked"}), 403
 
         person_id = getattr(master, "lemma_person_id", None)
+        if not person_id:
+            # Legacy masters may predate the person_id column; resolve the
+            # canonical identity from the wallet binding so derivation stays on
+            # the person-root path instead of falling back to wallet-secret.
+            person_id = _resolve_person_id_for_wallet(db, wallet_id)
 
         deny_reason = _deny_if_derivation_revoked(
             db,

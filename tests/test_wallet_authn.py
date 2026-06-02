@@ -197,6 +197,50 @@ def test_register_idempotent_for_same_pubkey(
     assert first.ok and second.ok
 
 
+def test_register_concurrent_insert_is_idempotent(
+    wallet_fixture,
+    fake_ishuman_db_session_factory,
+    monkeypatch,
+):
+    """Two requests can pass the no-existing-row check and race the INSERT
+    against the wallet_signing_keys PK. The loser's commit raises
+    IntegrityError; registration must treat the matching-pubkey winner as a
+    success instead of bubbling a 500 (the live register-signing-key bug).
+    """
+    from sqlalchemy.exc import IntegrityError
+
+    from tests.conftest import _FakeDbSession
+
+    monkeypatch.setattr(
+        "api.database.SessionLocal", fake_ishuman_db_session_factory.session_local
+    )
+
+    calls = {"n": 0}
+    real_commit = _FakeDbSession.commit
+
+    def flaky_commit(self):
+        calls["n"] += 1
+        if calls["n"] == 1:
+            # Simulate the concurrent INSERT winning the PK first.
+            raise IntegrityError("INSERT INTO wallet_signing_keys", {}, Exception("dup"))
+        return real_commit(self)
+
+    monkeypatch.setattr(_FakeDbSession, "commit", flaky_commit)
+
+    pubkey_b64, sig_b64 = register_self_signature(
+        wallet_fixture["wallet_id"],
+        wallet_fixture["wallet_secret"],
+    )
+    result = register_wallet_signing_key(
+        wallet_id=wallet_fixture["wallet_id"],
+        pubkey_b64=pubkey_b64,
+        signature_b64=sig_b64,
+    )
+
+    assert result.ok, (result.code, result.error)
+    assert calls["n"] >= 1
+
+
 def test_register_replace_pubkey_blocked_in_phase1(
     wallet_fixture,
     fake_ishuman_db_session_factory,

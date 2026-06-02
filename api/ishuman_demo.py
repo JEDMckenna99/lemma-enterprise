@@ -440,8 +440,10 @@ def _complete_demo_test_session(
             )
             resolved = resolve_or_create_person_from_material(db, material=material, wallet_id=wallet_id)
             ppid = derive_ppid_from_person_root_hash(resolved.person_root_hash, "lemma.id")
+            from api.column_crypto import encrypt_column
+
             record.lemma_person_id = resolved.person_id
-            record.document_root_hash = resolved.document_root_hash
+            record.document_root_hash = encrypt_column(resolved.document_root_hash)
             record.root_version = "v1"
             record.confidence_level = resolved.confidence_level
             ppid_derivation = "person_root_v1"
@@ -450,6 +452,7 @@ def _complete_demo_test_session(
                 rp_id="lemma.id",
                 wallet_secret=secret,
                 wallet_id=wallet_id,
+                provisional=True,
             )
         if ppid is None:
             return {"success": False, "error": "ppid_derivation_failed"}, 500

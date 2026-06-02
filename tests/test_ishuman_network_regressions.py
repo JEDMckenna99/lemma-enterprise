@@ -86,10 +86,13 @@ def test_ppid_derivation_prefers_wallet_secret(monkeypatch):
         lambda passkey_credential_id, rp_id: f"passkey::{passkey_credential_id}::{rp_id}",
     )
 
+    # Provisional (pre-IDV) derivation: no person root exists yet, so the
+    # wallet-secret path is the expected source.
     ppid = _derive_ppid_for_site(
         rp_id="example.com",
         wallet_secret="deadbeef" * 8,
         wallet_id="wallet_fallback_should_not_be_used",
+        provisional=True,
     )
     assert ppid.startswith("secret::")
     assert "example.com" in ppid
@@ -108,6 +111,7 @@ def test_ppid_derivation_requires_wallet_secret(monkeypatch):
             rp_id="lemma.id",
             wallet_secret=None,
             wallet_id="wallet_id_123",
+            provisional=True,
         )
 
 
