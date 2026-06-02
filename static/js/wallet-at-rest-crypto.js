@@ -113,6 +113,106 @@
         return JSON.parse(new TextDecoder().decode(plaintext));
     }
 
+    // -----------------------------------------------------------------------
+    // Device wrap key — protects the 24h unlock bundle written to localStorage.
+    //
+    // The daily-unlock bundle has to persist the wallet secret + at-rest key so
+    // the user only does ONE passkey per day. Writing those to localStorage in
+    // cleartext defeats the at-rest encryption for that window. Instead we wrap
+    // the sensitive payload with a NON-EXTRACTABLE AES-GCM CryptoKey kept in a
+    // dedicated IndexedDB: JS can use it to encrypt/decrypt but can never read
+    // its bytes, so a full storage dump (XSS, extension, disk) yields ciphertext
+    // — not the secret.
+    // -----------------------------------------------------------------------
+
+    const WRAP_DB_NAME = 'LemmaWalletWrap';
+    const WRAP_DB_VERSION = 1;
+    const WRAP_STORE = 'keys';
+    const WRAP_KEY_ID = 'device-unlock-wrap:v1';
+    const WRAP_ENVELOPE_VERSION = 'wrap_v1';
+
+    function _openWrapDb() {
+        return new Promise((resolve, reject) => {
+            const req = indexedDB.open(WRAP_DB_NAME, WRAP_DB_VERSION);
+            req.onupgradeneeded = () => {
+                const db = req.result;
+                if (!db.objectStoreNames.contains(WRAP_STORE)) {
+                    db.createObjectStore(WRAP_STORE);
+                }
+            };
+            req.onsuccess = () => resolve(req.result);
+            req.onerror = () => reject(req.error);
+        });
+    }
+
+    function _idbGet(db, store, key) {
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction(store, 'readonly');
+            const req = tx.objectStore(store).get(key);
+            req.onsuccess = () => resolve(req.result);
+            req.onerror = () => reject(req.error);
+        });
+    }
+
+    function _idbPut(db, store, key, value) {
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction(store, 'readwrite');
+            const req = tx.objectStore(store).put(value, key);
+            req.onsuccess = () => resolve(true);
+            req.onerror = () => reject(req.error);
+        });
+    }
+
+    async function getDeviceWrapKey() {
+        if (typeof indexedDB === 'undefined' || !window.crypto?.subtle) return null;
+        let db;
+        try {
+            db = await _openWrapDb();
+        } catch {
+            return null;
+        }
+        try {
+            const existing = await _idbGet(db, WRAP_STORE, WRAP_KEY_ID);
+            if (existing instanceof CryptoKey) return existing;
+            // extractable:false => the raw key never leaves the browser's secure
+            // key store; structured-clone persists the handle, not the material.
+            const key = await crypto.subtle.generateKey(
+                { name: 'AES-GCM', length: 256 },
+                false,
+                ['encrypt', 'decrypt'],
+            );
+            await _idbPut(db, WRAP_STORE, WRAP_KEY_ID, key);
+            return key;
+        } catch {
+            return null;
+        } finally {
+            try { db.close(); } catch { /* ignore */ }
+        }
+    }
+
+    async function wrapBundle(plaintextObj) {
+        const key = await getDeviceWrapKey();
+        if (!key) return null;
+        const iv = crypto.getRandomValues(new Uint8Array(12));
+        const data = new TextEncoder().encode(JSON.stringify(plaintextObj));
+        const ciphertext = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, data);
+        return {
+            __wrap: WRAP_ENVELOPE_VERSION,
+            iv: bufferToBase64url(iv),
+            ciphertext: bufferToBase64url(ciphertext),
+        };
+    }
+
+    async function unwrapBundle(envelope) {
+        if (!envelope || envelope.__wrap !== WRAP_ENVELOPE_VERSION) return null;
+        const key = await getDeviceWrapKey();
+        if (!key) return null;
+        const iv = new Uint8Array(base64urlToBuffer(envelope.iv));
+        const ciphertext = base64urlToBuffer(envelope.ciphertext);
+        const plaintext = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, ciphertext);
+        return JSON.parse(new TextDecoder().decode(plaintext));
+    }
+
     window.WalletAtRestCrypto = {
         ENVELOPE_VERSION,
         PRF_SALT_PREFIX,
@@ -128,5 +228,8 @@
         decryptEnvelope,
         bufferToBase64url,
         base64urlToBuffer,
+        getDeviceWrapKey,
+        wrapBundle,
+        unwrapBundle,
     };
 })();

@@ -2490,6 +2490,17 @@ class LemmaWallet {
         const walletId = this.session?.walletId;
         if (!walletId) return { success: false, skipped: true };
 
+        // Dedupe concurrent callers (e.g. buildWalletAssertion fired from both
+        // the wallet page and the IDV popup): share a single in-flight request
+        // so we don't race two INSERTs against the wallet_signing_keys PK.
+        if (this._registerSigningKeyInFlight) return this._registerSigningKeyInFlight;
+        this._registerSigningKeyInFlight = this._registerSigningKeyNow(walletId).finally(() => {
+            this._registerSigningKeyInFlight = null;
+        });
+        return this._registerSigningKeyInFlight;
+    }
+
+    async _registerSigningKeyNow(walletId) {
         const keys = this._getLemmaKeys();
         const keypair = await this._deriveWalletSigningKey();
         const pubkeyB64 = keys.base64urlEncode(keypair.publicKey);
@@ -2794,7 +2805,17 @@ class LemmaWallet {
      * localStorage bundle that caused envelope_invalid / stale-state bugs.
      */
     _isHumanLockDisabled() {
-        return this._bridgeIframeDisabled();
+        // The 24h unlock bundle is a SAME-ORIGIN localStorage feature on
+        // lemma.id and is independent of the cross-origin bridge iframe. It must
+        // NOT be tied to LEMMA_DISABLE_BRIDGE_IFRAME (popup-only mode): doing so
+        // disabled the bundle on the IDV popup + demo page, forcing a fresh
+        // passkey on every action (one before IDV, one after). Honor only a
+        // dedicated opt-out so "one passkey per 24h" survives popup-only mode.
+        return (
+            typeof window !== 'undefined'
+            && (window.LEMMA_DISABLE_DAILY_UNLOCK === true
+                || window.LEMMA_DISABLE_DAILY_UNLOCK === 'true')
+        );
     }
 
     /**
@@ -2841,7 +2862,11 @@ class LemmaWallet {
         const bundle = this._readIsHumanLockBundleRaw();
         if (!bundle || bundle.v !== 1) return false;
         const expiresAt = Number(bundle.expiresAt || 0);
-        return expiresAt > Date.now() && !!bundle.walletSecret && !!bundle.walletId;
+        // Secret lives either in the encrypted envelope (bundle.sec) or, for a
+        // legacy bundle, as plaintext (bundle.walletSecret). Either counts here;
+        // the actual decryption happens in the async restore path.
+        const hasSecret = !!bundle.sec || !!bundle.walletSecret;
+        return expiresAt > Date.now() && hasSecret && !!bundle.walletId;
     }
 
     async _persistIsHumanLockBundle() {
@@ -2849,23 +2874,43 @@ class LemmaWallet {
         if (!this._isLemmaDomain()) return;
         if (!this.session?.isUnlocked || !this.session?.walletSecret) return;
         const passkey = await this._get('passkey', 'primary').catch(() => null);
+        // Non-sensitive metadata stays in cleartext so isIsHumanLockValid() can
+        // gate synchronously without touching crypto.
         const bundle = {
             v: 1,
             walletId: this.session.walletId,
             unlockedAt: this.session.unlockedAt || Date.now(),
             expiresAt: this.session.expiresAt,
-            walletSecret: this.session.walletSecret,
             hasPasskey: !!(passkey && passkey.credentialId),
-            // PRF-derived at-rest key material (raw, base64url). Lets a restored
-            // bundle decrypt/encrypt the credential store without a fresh passkey
-            // for the 24h window. Only present once a passkey unlock has bound it.
+        };
+        // Sensitive material: the wallet secret and the PRF-derived at-rest key.
+        // These are wrapped with a non-extractable device key (see
+        // wallet-at-rest-crypto.js) so they never sit in JS-readable storage.
+        const sensitive = {
+            walletSecret: this.session.walletSecret,
             atRestKeyB64: this._atRestKeyRaw || null,
         };
         try {
+            const mod = this._walletAtRest();
+            let wrapped = null;
+            if (mod && typeof mod.wrapBundle === 'function') {
+                wrapped = await mod.wrapBundle(sensitive);
+            }
+            if (wrapped) {
+                bundle.sec = wrapped;
+                bundle.secured = true;
+            } else {
+                // Degraded fallback (no WebCrypto/IndexedDB): keep the legacy
+                // plaintext fields so the 24h unlock still functions, but warn.
+                bundle.walletSecret = sensitive.walletSecret;
+                bundle.atRestKeyB64 = sensitive.atRestKeyB64;
+                bundle.secured = false;
+                console.warn('[Lemma] Unlock bundle stored unencrypted (device wrap key unavailable)');
+            }
             if (typeof localStorage !== 'undefined') {
                 localStorage.setItem(ISHUMAN_LOCK_STORAGE_KEY, JSON.stringify(bundle));
             }
-            console.log('[Lemma] Daily unlock bundle persisted (24h)');
+            console.log('[Lemma] Daily unlock bundle persisted (24h)' + (bundle.secured ? ' [encrypted]' : ''));
         } catch (e) {
             console.warn('[Lemma] Failed to persist daily unlock bundle:', e.message);
         }
@@ -2887,35 +2932,68 @@ class LemmaWallet {
         const bundle = this._readIsHumanLockBundleRaw();
         if (!bundle || bundle.v !== 1) return false;
         const expiresAt = Number(bundle.expiresAt || 0);
-        if (expiresAt <= Date.now() || !bundle.walletSecret || !bundle.walletId) {
+        if (expiresAt <= Date.now() || !bundle.walletId) {
             this._clearIsHumanLockBundle();
             return false;
         }
+
+        // Recover the sensitive material. Prefer the encrypted envelope (sec),
+        // unwrapped with the non-extractable device key; fall back to a legacy
+        // plaintext bundle for one migration cycle.
+        let walletSecret = bundle.walletSecret || null;
+        let atRestKeyB64 = bundle.atRestKeyB64 || null;
+        if (bundle.sec) {
+            try {
+                const mod = this._walletAtRest();
+                const unwrapped = (mod && typeof mod.unwrapBundle === 'function')
+                    ? await mod.unwrapBundle(bundle.sec)
+                    : null;
+                if (unwrapped) {
+                    walletSecret = unwrapped.walletSecret || null;
+                    atRestKeyB64 = unwrapped.atRestKeyB64 || null;
+                }
+            } catch (e) {
+                console.warn('[Lemma] Could not unwrap unlock bundle:', e.message);
+            }
+        }
+        if (!walletSecret) {
+            // Envelope undecryptable (e.g. wrap key cleared/rotated) or empty:
+            // require a fresh passkey unlock rather than proceeding without a
+            // secret.
+            this._clearIsHumanLockBundle();
+            return false;
+        }
+
         this.session = {
             isUnlocked: true,
             unlockedAt: Number(bundle.unlockedAt || Date.now()),
             expiresAt,
             walletId: bundle.walletId,
-            walletSecret: bundle.walletSecret,
+            walletSecret,
             source: 'daily_unlock_bundle',
         };
         this._isHumanLockRestored = true;
-        // Re-import the PRF-derived at-rest key from the bundle so encrypted
-        // credential reads/writes work without a fresh passkey for the 24h
-        // window. This is what makes "one passkey per day" cover the master
-        // storage and every per-site proof derivation in the IDV popups.
-        if (!this._atRestKey && bundle.atRestKeyB64) {
+        // Re-import the PRF-derived at-rest key so encrypted credential
+        // reads/writes work without a fresh passkey for the 24h window. This is
+        // what makes "one passkey per day" cover the master storage and every
+        // per-site proof derivation in the IDV popups.
+        if (!this._atRestKey && atRestKeyB64) {
             try {
                 const mod = this._walletAtRest();
                 if (mod) {
-                    const raw = new Uint8Array(mod.base64urlToBuffer(bundle.atRestKeyB64));
+                    const raw = new Uint8Array(mod.base64urlToBuffer(atRestKeyB64));
                     this._atRestKey = await mod.importStorageKey(raw);
                     this._atRestKeyReady = true;
-                    this._atRestKeyRaw = bundle.atRestKeyB64;
+                    this._atRestKeyRaw = atRestKeyB64;
                 }
             } catch (e) {
                 console.warn('[Lemma] Could not restore at-rest key from bundle:', e.message);
             }
+        }
+        // Opportunistically upgrade a legacy plaintext bundle to the encrypted
+        // form now that the secret is in memory.
+        if (!bundle.sec) {
+            try { await this._persistIsHumanLockBundle(); } catch { /* ignore */ }
         }
         console.log('[Lemma] Daily unlock bundle restored');
         return true;
