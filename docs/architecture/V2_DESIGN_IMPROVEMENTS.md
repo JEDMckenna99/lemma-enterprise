@@ -308,14 +308,21 @@ Rate-limit: at most 5 reissues per wallet per day (env-tunable). Standard `Flask
 
 ### 2.1 Remove the bridge iframe — ✅ DONE
 
-**Status:** Completed. The cross-origin bridge iframe, its `/wallet/bridge` route,
-the `/api/wallet/bridge-audit` telemetry endpoint, `templates/wallet_bridge.html`,
-and all bridge code paths in `static/js/ishuman-verifier.js` and
-`static/js/lemma-wallet.js` were removed. Verification and cross-site flows are
-popup-only. `lemma-wallet.js` retains inert IAM wrappers (`checkBridgeSession`,
-`_sendBridgeMessage`, etc.) that short-circuit via a hardwired
-`_bridgeIframeDisabled()` so legacy callers degrade to the local session instead
-of throwing; these can be fully excised in a follow-up cleanup.
+**Status:** Completed (incl. follow-up cleanup). The cross-origin bridge iframe,
+its `/wallet/bridge` route, the `/api/wallet/bridge-audit` telemetry endpoint,
+`templates/wallet_bridge.html`, and all bridge code paths in
+`static/js/ishuman-verifier.js` and `static/js/lemma-wallet.js` were removed.
+Verification and cross-site flows are popup-only.
+
+The follow-up cleanup (`lemma-wallet.js` v2.62.0) then excised the inert bridge
+IAM plumbing entirely: the private message sender, the session/central-wallet
+sync helpers, and the dead `_bridgeIframeDisabled()`/legacy validators were
+deleted, along with the now-dead admin-bootstrap sync call. The public IAM
+helpers (`checkBridgeSession`, `extendBridgeSession`, `requireFreshAuth`,
+`getAuthFreshness`, `ensureAuthenticated`, `getSessionState`) are retained as
+non-breaking API surface and return a static `bridge_disabled` result so callers
+degrade to the local session / unlock-redirect. The same-origin
+`SESSION_INVALIDATED` listener is kept as a defensive exact-origin guard.
 
 **Problem (historical):** The `<iframe src="lemma.id/wallet/bridge">` model was designed before Chrome's storage partitioning rolled out. Today a third-party iframe of lemma.id cannot reliably see the wallet's storage. The popup-first design we deployed works around this, but the bridge still exists as a fallback, and both code paths can drift (we've hit several bugs from divergence).
 

@@ -33,7 +33,10 @@ def test_lemma_wallet_uses_exact_origin_helper(wallet_js_source):
 def test_bridge_iframe_fully_removed(wallet_js_source):
     # The hidden cross-origin bridge iframe must never be created again.
     assert "/wallet/bridge" not in wallet_js_source
-    assert "_bridgeIframeDisabled()" in wallet_js_source
+    # Phase 2.1 cleanup: the inert bridge plumbing was excised entirely.
+    assert "_sendBridgeMessage" not in wallet_js_source
+    assert "_syncToCentralWallet" not in wallet_js_source
+    assert "_getFromCentralWallet" not in wallet_js_source
 
     app_source = (ROOT / "app.py").read_text(encoding="utf-8")
     assert "@app.route('/wallet/bridge')" not in app_source

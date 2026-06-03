@@ -1,17 +1,17 @@
 {
   "version": "1.0.0",
-  "timestamp": "2026-06-03T21:16:12.009Z",
+  "timestamp": "2026-06-03T21:52:07.439Z",
   "baseUrl": "https://cdn.lemma.id/",
   "javascript": {
     "lemma-wallet": {
       "original": {
         "path": "js/lemma-wallet.js",
-        "size": 331057
+        "size": 331948
       },
       "minified": {
         "path": "js/lemma-wallet.min.js",
-        "size": 176362,
-        "integrity": "sha384-cU7Ts59yLjE3IGs+qTJvyyH6JPwH6EI5A9ANrLU64UHW1lNEIatpFKNXNo9mKAth",
+        "size": 167408,
+        "integrity": "sha384-AWLG34HANsFQFQQOjiWn6AjIO4ncIUoXoqKaRo8CEbPEJHa3fdXRbye5DpfwMoSN",
         "compression": {
           "gzip": "js/lemma-wallet.min.js.gz",
           "brotli": "js/lemma-wallet.min.js.br"

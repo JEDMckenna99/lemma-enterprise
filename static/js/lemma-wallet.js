@@ -81,7 +81,7 @@ const AUTH_STATE = {
 class LemmaWallet {
     // SDK version - check with LemmaWallet.VERSION
     // v2.32.0: Redirect-only architecture - removed popup flow for simpler, consistent UX
-    static VERSION = '2.61.0';  // v2.61: Phase 2.1 — cross-origin bridge iframe removed entirely (popup-only)
+    static VERSION = '2.62.0';  // v2.62: Phase 2.1 cleanup — excised the inert bridge IAM plumbing and dead central-wallet/validator helpers (popup-only)
     
     constructor(options = {}) {
         this.db = null;
@@ -666,9 +666,9 @@ class LemmaWallet {
     }
     
     /**
-     * Set up listener for lock events from bridge iframe
-     * When user locks on lemma.id, third-party sites should know immediately
-     * Listens for SESSION_INVALIDATED events from the bridge
+     * Defensive same-origin postMessage listener for SESSION_INVALIDATED events.
+     * Phase 2.1: the bridge iframe was removed, but this exact-origin guard is
+     * retained so any trusted lemma.id lock signal still clears the local session.
      */
     _setupLockEventListener() {
         if (this._lockEventListenerSetup) return;
@@ -1231,10 +1231,6 @@ class LemmaWallet {
                         };
                         await this._put('session', { id: 'current', ...this.session });
 
-                    // IMPORTANT: Sync session to bridge so it can serve future requests
-                    // The bridge has a separate IndexedDB and needs the wallet_id for global-session checks
-                    await this._syncSessionToBridge(this.session);
-
                     this._autoStartHeartbeat();
 
                     return {
@@ -1281,9 +1277,6 @@ class LemmaWallet {
                     };
                     await this._put('session', { id: 'current', ...this.session });
 
-                    // Sync session to bridge
-                    await this._syncSessionToBridge(this.session);
-
                     this._autoStartHeartbeat();
 
                     return {
@@ -1299,41 +1292,8 @@ class LemmaWallet {
             }
         }
                     
-        // Fallback: Check bridge session and issue lemma via bridge
-        // (works on desktop, may fail on mobile Safari)
-        const session = await this.checkBridgeSession();
-        
-        if (session.valid) {
-            console.log('[Lemma] Redirect: bridge session valid - requesting lemma issuance...');
-            
-            const siteId = window.location.hostname;
-            try {
-                const issueResult = await this._sendBridgeMessage('ISSUE_LEMMA', { siteId });
-                if (issueResult?.success && issueResult.lemma) {
-                    await this.storeCredential(issueResult.lemma);
-                    
-                    return {
-                        success: true,
-                        authenticated: true,
-                        walletId: session.walletId,
-                        ppid: issueResult.ppid,
-                        lemma: issueResult.lemma,
-                        message: 'Authenticated via bridge-issued lemma'
-                    };
-                }
-            } catch (e) {
-                console.warn('[Lemma] Bridge ISSUE_LEMMA failed:', e.message);
-            }
-            
-            // Bridge issuance failed but session is valid
-            return {
-                success: true,
-                authenticated: true,
-                walletId: session.walletId,
-                message: 'Authenticated via bridge session (lemma pending)'
-            };
-        }
-        
+        // Phase 2.1: the bridge was removed; there is no cross-origin session to
+        // fall back to here. Establishing a session is popup-only / first-party now.
         console.log('[Lemma] Redirect return but could not establish session');
         return {
                             success: false,
@@ -1464,31 +1424,6 @@ class LemmaWallet {
         return true;
     }
     
-    /**
-     * DEPRECATED: Legacy bridge validation method.
-     * Kept for backward compatibility but no longer used in main flow.
-     * @private
-     */
-    async _legacyBridgeValidation() {
-        if (!this._isLemmaDomain()) {
-            try {
-                const bridgeSession = await this.checkBridgeSession();
-                if (!bridgeSession.valid) {
-                    console.log('[Lemma] Session invalidated by bridge (legacy check)');
-                    this.session = { isUnlocked: false };
-                    await this._delete('session', 'current');
-                    this._notifySessionExpired({ reason: 'bridge_invalid' });
-                    return false;
-                }
-            } catch (e) {
-                console.warn('[Lemma] Could not verify session with bridge:', e.message);
-                // If bridge fails, trust local session
-            }
-        }
-        
-        return true;
-    }
-
     /**
      * Get CSRF token from cookie (for double-submit CSRF protection)
      * @returns {string|null} CSRF token or null if not set
@@ -2818,16 +2753,6 @@ class LemmaWallet {
         );
     }
 
-    /**
-     * Phase 2.1: the cross-origin wallet bridge iframe was removed entirely.
-     * All cross-site flows are popup-only now, so the wallet never creates the
-     * hidden central-wallet iframe. This is hardwired (no longer a runtime
-     * flag) — the bridge message senders below all short-circuit here.
-     */
-    _bridgeIframeDisabled() {
-        return true;
-    }
-
     _readIsHumanLockBundleRaw() {
         try {
             if (typeof localStorage !== 'undefined') {
@@ -3735,33 +3660,22 @@ class LemmaWallet {
             }
         } else {
             // Third-party sites cannot directly manage lemma.id cookies reliably.
-            // Route lock through the bridge (lemma.id origin) so cross-device/site signoff propagates.
+            // Phase 2.1: the bridge was removed, so make a best-effort direct call
+            // to lemma.id (may be blocked by CORS) so cross-device signoff can propagate.
             try {
-                console.log('[Lemma] Lock: forwarding lock to bridge for global signoff...');
-                const bridgeResp = await this._sendBridgeMessage('LOCK_SESSION', { walletId }, 8000);
-                if (bridgeResp?.success) {
-                    console.log('[Lemma]  Bridge lock propagated globally');
+                const directResp = await fetch('https://lemma.id/api/wallet/clear-session', {
+                    method: 'POST',
+                    credentials: 'include',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(walletId ? { wallet_id: walletId } : {})
+                });
+                if (directResp.ok) {
+                    console.log('[Lemma]  Direct lock call succeeded');
                 } else {
-                    console.warn('[Lemma] Bridge lock returned non-success:', bridgeResp?.error || bridgeResp);
+                    console.warn('[Lemma] Direct lock returned', directResp.status);
                 }
-            } catch (bridgeErr) {
-                console.warn('[Lemma] Bridge lock path failed:', bridgeErr.message);
-                // Best-effort fallback: attempt direct call to lemma.id (may be blocked by CORS policy).
-                try {
-                    const directResp = await fetch('https://lemma.id/api/wallet/clear-session', {
-                        method: 'POST',
-                        credentials: 'include',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(walletId ? { wallet_id: walletId } : {})
-                    });
-                    if (directResp.ok) {
-                        console.log('[Lemma]  Direct fallback lock call succeeded');
-                    } else {
-                        console.warn('[Lemma] Direct fallback lock returned', directResp.status);
-                    }
-                } catch (directErr) {
-                    console.warn('[Lemma] Direct fallback lock failed:', directErr.message);
-                }
+            } catch (directErr) {
+                console.warn('[Lemma] Direct lock failed:', directErr.message);
             }
         }
     }
@@ -3884,7 +3798,10 @@ class LemmaWallet {
      * @returns {Promise<Object>} Session state from bridge
      */
     async checkBridgeSession() {
-        return this._sendBridgeMessage('CHECK_SESSION', {});
+        // Phase 2.1: the cross-origin bridge was removed. Cross-site session
+        // sharing is popup-only now, so report no bridge session and let callers
+        // fall back to the local session / unlock redirect.
+        return { success: false, valid: false, disabled: true, error: 'bridge_disabled' };
     }
 
     /**
@@ -3894,7 +3811,8 @@ class LemmaWallet {
      * @returns {Promise<Object>} Extension result
      */
     async extendBridgeSession() {
-        return this._sendBridgeMessage('EXTEND_SESSION', {});
+        // Phase 2.1: bridge removed — session extension is popup-only now.
+        return { success: false, disabled: true, error: 'bridge_disabled' };
     }
 
     // ========================================
@@ -3926,8 +3844,9 @@ class LemmaWallet {
             return this._localFreshAuth(maxAgeMs);
         }
         
-        // For third-party sites, use bridge
-        return this._sendBridgeMessage('REQUIRE_FRESH_AUTH', { maxAgeMs });
+        // Phase 2.1: bridge removed — fresh auth on third-party sites is
+        // popup-only; signal that it is unavailable from here.
+        return { success: false, fresh: false, disabled: true, error: 'bridge_disabled' };
     }
 
     /**
@@ -3967,8 +3886,9 @@ class LemmaWallet {
             };
         }
         
-        // For third-party sites, use bridge
-        return this._sendBridgeMessage('GET_AUTH_FRESHNESS', {});
+        // Phase 2.1: bridge removed — freshness on third-party sites is
+        // popup-only; report unavailable from here.
+        return { success: false, authenticated: false, fresh: false, disabled: true, error: 'bridge_disabled' };
     }
 
     /**
@@ -4242,17 +4162,6 @@ class LemmaWallet {
     }
 
     /**
-     * Phase 2.1: the cross-origin bridge iframe was removed. This is now an
-     * inert no-op kept so the cross-site IAM helpers (checkBridgeSession,
-     * extendBridgeSession, lock propagation, revocation sync, etc.) degrade to
-     * the local session instead of throwing. It never creates an iframe.
-     * @private
-     */
-    async _sendBridgeMessage(type, payload, timeout = 5000) {
-        return { success: false, valid: false, disabled: true, error: 'bridge_disabled' };
-    }
-
-    /**
      * Emit session-related events for apps to listen to
      * @private
      */
@@ -4277,39 +4186,6 @@ class LemmaWallet {
             this._sessionCallbacks = {};
         }
         this._sessionCallbacks[eventName] = callback;
-    }
-
-    /**
-     * Sync session to the bridge iframe
-     * This is critical for cross-site unlock to work - the bridge has a separate
-     * IndexedDB (lemma.id origin) and needs the wallet_id to check global sessions.
-     * @private
-     */
-    async _syncSessionToBridge(session) {
-        if (this._isLemmaDomain()) {
-            // On lemma.id, bridge isn't needed
-            return;
-        }
-
-        try {
-            console.log('[Lemma] Syncing session to bridge...');
-            const result = await this._sendBridgeMessage('SET_LOCAL_SESSION', {
-                session: {
-                    isUnlocked: session.isUnlocked,
-                    unlockedAt: session.unlockedAt,
-                    expiresAt: session.expiresAt,
-                    walletId: session.walletId
-                }
-            }, 5000);
-
-            if (result?.success) {
-                console.log('[Lemma]  Session synced to bridge');
-            } else {
-                console.warn('[Lemma] Bridge session sync failed:', result?.error);
-            }
-        } catch (e) {
-            console.warn('[Lemma] Bridge session sync error:', e.message);
-        }
     }
 
     // ========================================
@@ -4713,25 +4589,10 @@ class LemmaWallet {
             return { success: false, error: 'credentialId required' };
         }
         
-        // On third-party sites, use bridge
+        // Phase 2.1: bridge removed — third-party sites cannot revoke directly
+        // against lemma.id; revocation is first-party / popup-only now.
         if (this._isThirdPartySite()) {
-            try {
-                const result = await this._sendBridgeMessage('REVOKE_CREDENTIAL', {
-                    credentialId,
-                    reason
-                });
-                
-                if (result.success) {
-                    console.log(` Credential revoked: ${credentialId}`);
-                    console.log(`   Server revoked: ${result.serverRevoked}`);
-                    console.log(`   Bloom filter: ${result.addedToBloomFilter}`);
-                }
-                
-                return result;
-            } catch (e) {
-                console.error('Bridge revoke failed:', e);
-                return { success: false, error: e.message };
-            }
+            return { success: false, disabled: true, error: 'bridge_disabled' };
         }
         
         // On lemma.id, revoke directly
@@ -4797,18 +4658,9 @@ class LemmaWallet {
      * Call this after revoking to ensure propagation
      */
     async triggerRevocationSync() {
-        // Sync our own list
+        // Sync our own list. Phase 2.1: bridge removed, so there is no
+        // cross-origin sync to forward; third-party sites sync locally only.
         const result = await this.syncRevocations();
-        
-        // On third-party sites, also tell the bridge to sync
-        if (this._isThirdPartySite()) {
-            try {
-                await this._sendBridgeMessage('SYNC_REVOCATIONS', {});
-            } catch (e) {
-                console.warn('Bridge sync failed:', e);
-            }
-        }
-        
         return result;
     }
 
@@ -7293,7 +7145,7 @@ class LemmaWallet {
 
     /**
      * Store credential (backwards compatible alias for storeLemma)
-     * Automatically syncs to central lemma.id wallet via bridge if on third-party site
+     * Phase 2.1: bridge removed — credentials are stored locally only.
      */
     async storeCredential(credential) {
         await this.init();
@@ -7345,28 +7197,14 @@ class LemmaWallet {
         }
         console.log(' Credential stored locally:', lemma.id);
         
-        // If on third-party site, also sync to central lemma.id wallet via bridge
-        if (!window.location.hostname.includes('lemma.id') && 
-            !window.location.hostname.includes('localhost')) {
-            await this._syncToCentralWallet(lemma);
-        }
-        
+        // Phase 2.1: the central-wallet bridge iframe was removed. Credentials
+        // live in the local wallet; cross-site visibility is popup-only now.
         return { success: true, id: lemma.id };
     }
     
     /**
-     * Sync credential to central lemma.id wallet via iframe bridge
-     * This ensures credentials are visible at lemma.id/wallet
-     */
-    async _syncToCentralWallet(credential) {
-        // Phase 2.1: the central-wallet bridge iframe was removed. Credentials
-        // live in the local wallet; cross-site visibility is popup-only now.
-        return { success: false, skipped: 'bridge_removed' };
-    }
-
-    /**
      * Get credentials (backwards compatible alias for getLemmas)
-     * On third-party sites, also checks central wallet via bridge
+     * Phase 2.1: bridge removed — only local credentials are returned.
      * @param {string} type - Optional filter by packageType ('permission', 'identity', etc)
      */
     async getCredentials(type = null) {
@@ -7423,24 +7261,6 @@ class LemmaWallet {
         };
 
         let lemmas = (await this._getAll('lemmas')).map(normalizeCredentialRecord);
-        
-        // On third-party sites, also fetch from central wallet
-        if (!window.location.hostname.includes('lemma.id') && 
-            !window.location.hostname.includes('localhost')) {
-            try {
-                const centralCreds = (await this._getFromCentralWallet(type)).map(normalizeCredentialRecord);
-                
-                // Merge: add central creds not in local
-                const localIds = new Set(lemmas.map(l => l.id));
-                for (const cred of centralCreds) {
-                    if (!localIds.has(cred.id)) {
-                        lemmas.push(cred);
-                    }
-                }
-            } catch (e) {
-                console.warn(' Could not fetch from central wallet:', e.message);
-            }
-        }
         
         if (type) {
             return lemmas.filter(l => {
@@ -7641,15 +7461,6 @@ class LemmaWallet {
         return false;
     }
     
-    /**
-     * Get credentials from central lemma.id wallet via bridge
-     */
-    async _getFromCentralWallet(type = null) {
-        // Phase 2.1: the central-wallet bridge iframe was removed. Only local
-        // credentials are available; cross-site reads are popup-only now.
-        return [];
-    }
-
     /**
      * Remove credential (backwards compatible alias)
      */

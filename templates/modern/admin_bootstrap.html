@@ -287,22 +287,10 @@ document.getElementById('bootstrap-form').addEventListener('submit', async (e) =
         console.log('=== STORING CREDENTIAL ===');
         console.log('Credential to store:', credentialToStore);
         
-        // Store credential in wallet
+        // Store credential in wallet. Phase 2.1: the cross-origin bridge was
+        // removed, so credentials are stored locally only (popup-only cross-site).
         const storeResult = await wallet.storeCredential(credentialToStore);
 
-        // Ensure customer-site bridge reads the same newly issued credential.
-        // On lemma.id, local storage and bridge storage should align, but this
-        // explicit sync removes timing/context ambiguity for third-party retrieval.
-        let bridgeSyncResult = null;
-        if (typeof wallet._syncToCentralWallet === 'function') {
-            try {
-                bridgeSyncResult = await wallet._syncToCentralWallet(credentialToStore);
-                console.log('Bridge sync result:', bridgeSyncResult);
-            } catch (syncError) {
-                console.warn('Bridge sync failed (non-fatal):', syncError?.message || syncError);
-            }
-        }
-        
         console.log('=== STORAGE RESULT ===');
         console.log('Store result:', storeResult);
         
@@ -331,7 +319,6 @@ document.getElementById('bootstrap-form').addEventListener('submit', async (e) =
         document.getElementById('credential-json').textContent = JSON.stringify({
             credential: credentialToStore,
             storeResult: storeResult,
-            bridgeSyncResult: bridgeSyncResult,
             verificationCheck: {
                 foundInWallet: permissionCreds.some(c => c.id === credentialToStore.id),
                 totalPermissionCreds: permissionCreds.length,
