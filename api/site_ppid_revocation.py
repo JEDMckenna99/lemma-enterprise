@@ -47,6 +47,15 @@ def clear_amnesty_eligible_wallet_revocations(
         `is_amnesty_eligible=False` subset for governance-approved
         coordinated-fraud kills so they survive this reset.
 
+    Cross-device recovery: site PPIDs are derived from the deterministic
+    person-root, so the *same* site PPID can be blocked on a prior device's
+    wallet yet re-derived identically on a new wallet after recovery. We resolve
+    the LemmaPerson for the re-verifying wallet and gather every wallet bound to
+    that person, so the site-scoped clears below cover blocks placed against any
+    of the person's devices -- not just the wallet that happens to complete this
+    IDV. Wallet-level kill clearing stays scoped to THIS wallet (a kill on an old
+    device's wallet_id cannot block a freshly recovered wallet anyway).
+
     Returns a counts dict for the caller to surface in logs / responses.
     """
     from api.database import (
@@ -54,16 +63,45 @@ def clear_amnesty_eligible_wallet_revocations(
         SiteBlock,
         DerivedCredential,
         IsHumanVerification,
+        LemmaWalletBinding,
     )
 
+    # Resolve the person and every wallet bound to them so site-scoped amnesty
+    # spans devices (deterministic person-root PPIDs are identical across the
+    # person's wallets). Falls back to the single wallet when no binding exists.
+    person_id = None
+    wallet_ids = {wallet_id} if wallet_id else set()
+    binding = (
+        db.query(LemmaWalletBinding).filter_by(wallet_id=wallet_id).first()
+        if wallet_id
+        else None
+    )
+    if binding and binding.lemma_person_id:
+        person_id = binding.lemma_person_id
+        for sibling in (
+            db.query(LemmaWalletBinding)
+            .filter_by(lemma_person_id=person_id)
+            .all()
+        ):
+            if sibling.wallet_id:
+                wallet_ids.add(sibling.wallet_id)
+
     logger.info(
-        "[amnesty-reset] start wallet_id=%s new_master=%s reason=%s",
+        "[amnesty-reset] start wallet_id=%s person_id=%s person_wallets=%d new_master=%s reason=%s",
         wallet_id,
+        person_id,
+        len(wallet_ids),
         (new_master_credential_id or "")[:30],
         reason,
     )
 
-    derived_rows = db.query(DerivedCredential).filter_by(wallet_id=wallet_id).all()
+    derived_rows = (
+        db.query(DerivedCredential)
+        .filter(DerivedCredential.wallet_id.in_(wallet_ids))
+        .all()
+        if wallet_ids
+        else []
+    )
     derived_ppids = sorted({row.derived_ppid for row in derived_rows if row.derived_ppid})
     derived_cred_ids = sorted({
         row.derived_credential_id for row in derived_rows if row.derived_credential_id
@@ -145,6 +183,8 @@ def clear_amnesty_eligible_wallet_revocations(
 
     summary = {
         "wallet_id": wallet_id,
+        "person_id": person_id,
+        "person_wallets": len(wallet_ids),
         "cleared_revocation_entries": int(cleared_entries),
         "cleared_site_blocks": int(site_blocks_cleared),
         "reactivated_derived_credentials": int(derived_reactivated),

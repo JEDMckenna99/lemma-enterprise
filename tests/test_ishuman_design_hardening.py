@@ -9,6 +9,7 @@ Covers:
 """
 from __future__ import annotations
 
+from datetime import datetime
 from types import SimpleNamespace
 
 import pytest
@@ -260,3 +261,139 @@ def test_erase_requires_wallet_id(ishuman_client):
     resp = ishuman_client.post("/api/ishuman/erase", json={})
     assert resp.status_code == 400
     assert resp.get_json()["error"] == "wallet_id required"
+
+
+# ---------------------------------------------------------------------------
+# Cross-device amnesty (gap #1): site blocks lift for the re-verifying PERSON,
+# not just the single wallet that completes the re-IDV.
+# ---------------------------------------------------------------------------
+
+@pytest.fixture
+def amnesty_db():
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import sessionmaker
+    from api.database import (
+        LemmaPerson,
+        LemmaWalletBinding,
+        DerivedCredential,
+        SiteBlock,
+        RevocationList,
+        IsHumanVerification,
+    )
+
+    engine = create_engine("sqlite:///:memory:")
+    for model in (
+        LemmaPerson,
+        LemmaWalletBinding,
+        DerivedCredential,
+        SiteBlock,
+        RevocationList,
+        IsHumanVerification,
+    ):
+        model.__table__.create(bind=engine, checkfirst=True)
+    session = sessionmaker(bind=engine)()
+    try:
+        yield session
+    finally:
+        session.close()
+
+
+def _seed_blocked_person(db, *, with_binding_for_new=True):
+    """A person verified on wallet_old, with a site block on their site PPID.
+
+    wallet_new is a freshly recovered device: it has NO derived credentials of
+    its own, only a binding to the same person.
+    """
+    from api.database import (
+        LemmaPerson,
+        LemmaWalletBinding,
+        DerivedCredential,
+        SiteBlock,
+        RevocationList,
+    )
+
+    blocked_ppid = "did:lemma:ppid_crossdevice"
+    db.add(
+        LemmaPerson(
+            person_id="person_A",
+            person_root_hash="ab" * 32,
+            root_version="v1",
+            status="active",
+        )
+    )
+    db.add(LemmaWalletBinding(wallet_id="wallet_old", lemma_person_id="person_A"))
+    if with_binding_for_new:
+        db.add(LemmaWalletBinding(wallet_id="wallet_new", lemma_person_id="person_A"))
+    db.add(
+        DerivedCredential(
+            master_credential_id="m_old",
+            derived_credential_id="d_old",
+            wallet_id="wallet_old",
+            target_site="site1.example",
+            derived_ppid=blocked_ppid,
+            is_active=False,
+            revoked_at=datetime.utcnow(),
+        )
+    )
+    db.add(SiteBlock(site_id="site_1", ppid=blocked_ppid, is_active=True))
+    db.add(
+        RevocationList(
+            lemma_id=blocked_ppid,
+            credential_id=blocked_ppid,
+            ppid=blocked_ppid,
+            site_id="site_1",
+            lemma_type="ishuman",
+            revocation_type="user",
+            revoked_by="site",
+            reason="abuse",
+        )
+    )
+    db.commit()
+    return blocked_ppid
+
+
+@pytest.mark.integration
+def test_amnesty_lifts_site_block_cross_device(amnesty_db):
+    """Re-IDV on a brand-new wallet (no derived creds of its own) must lift the
+    site block placed against the person's deterministic PPID on a prior device."""
+    from api.site_ppid_revocation import clear_amnesty_eligible_wallet_revocations
+    from api.database import SiteBlock, RevocationList
+
+    blocked_ppid = _seed_blocked_person(amnesty_db, with_binding_for_new=True)
+
+    summary = clear_amnesty_eligible_wallet_revocations(
+        amnesty_db, wallet_id="wallet_new"
+    )
+
+    assert summary["person_id"] == "person_A"
+    assert summary["person_wallets"] == 2
+    assert summary["cleared_site_blocks"] == 1
+    block = amnesty_db.query(SiteBlock).filter_by(ppid=blocked_ppid).first()
+    assert block is not None and block.is_active is False
+    assert (
+        amnesty_db.query(RevocationList)
+        .filter_by(ppid=blocked_ppid, revocation_type="user")
+        .first()
+        is None
+    )
+
+
+@pytest.mark.integration
+def test_amnesty_without_binding_stays_wallet_scoped(amnesty_db):
+    """Control: with no person binding for the new wallet, the prior device's
+    block is NOT visible -- demonstrating why the person-scoped resolution is the
+    fix rather than incidental behavior."""
+    from api.site_ppid_revocation import clear_amnesty_eligible_wallet_revocations
+    from api.database import SiteBlock
+
+    blocked_ppid = _seed_blocked_person(amnesty_db, with_binding_for_new=False)
+
+    summary = clear_amnesty_eligible_wallet_revocations(
+        amnesty_db, wallet_id="wallet_new"
+    )
+
+    assert summary["person_id"] is None
+    assert summary["person_wallets"] == 1
+    assert summary["cleared_site_blocks"] == 0
+    block = amnesty_db.query(SiteBlock).filter_by(ppid=blocked_ppid).first()
+    assert block is not None and block.is_active is True
