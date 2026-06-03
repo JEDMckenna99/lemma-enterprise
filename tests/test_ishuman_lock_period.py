@@ -159,8 +159,8 @@ def test_wallet_pages_use_current_wallet_bundle():
     ]
     for path in wallet_pages:
         source = path.read_text(encoding="utf-8")
-        assert "lemma-wallet.js?v=2540" not in source
-        assert "lemma-wallet.js') }}?v=2541" in source or "lemma-wallet.js?v=2541" in source
+        assert "lemma-wallet.js?v=2541" not in source
+        assert "lemma-wallet.js') }}?v=2542" in source or "lemma-wallet.js?v=2542" in source
         assert "lemma-keys.js?v=2" not in source
         assert "lemma-keys.js?v=3" not in source
         assert "lemma-keys.js') }}?v=4" in source or "lemma-keys.js?v=4" in source
