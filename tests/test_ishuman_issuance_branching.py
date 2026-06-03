@@ -195,6 +195,11 @@ def test_no_master_then_master_issued_then_site_derived(
                 "wallet_id": "wallet_test_001",
                 "wallet_secret": "ab" * 32,
                 "return_url": "https://lemma.id/app",
+                # Didit is the default rail and fails closed when unconfigured.
+                # This test simulates the legacy Stripe Identity rail end-to-end
+                # (StripeManager + stripe webhook + _complete_verified_ishuman_from_stripe),
+                # so explicitly opt into the retained stripe_identity escape hatch.
+                "provider": "stripe_identity",
             },
             START_ASSERTION_FIELDS,
         ),

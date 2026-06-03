@@ -70,8 +70,13 @@ class TestRateLimiterConfiguration:
     def test_credential_issue_limit_is_hourly(self):
         """Credential issuance is expensive, should be hourly limited."""
         from auth.rate_limiter import credential_issue_limit
+        from flask import Flask
 
-        limit = credential_issue_limit()
+        app = Flask(__name__)
+        # credential_issue_limit() is principal-aware and reads request headers,
+        # so it must be evaluated inside a request context.
+        with app.test_request_context():
+            limit = credential_issue_limit()
         assert "hour" in limit.lower(), "Credential issuance should be hourly limited"
 
     def test_get_client_identifier_uses_forwarded_for(self):
@@ -514,7 +519,9 @@ class TestAuthIntegration:
             content = f.read()
 
         assert 'from auth.rate_limiter import rate_limit' in content
-        assert '@rate_limit(credential_issue_limit)' in content
+        # The decorator now takes an explicit principal-aware key_func, so match
+        # the call prefix rather than the exact single-arg form.
+        assert '@rate_limit(credential_issue_limit' in content
 
 
 # ============================================

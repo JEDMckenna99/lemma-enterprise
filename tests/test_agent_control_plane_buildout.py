@@ -48,6 +48,9 @@ def test_workload_root_allows_non_ppid_continuity(monkeypatch):
     }
     monkeypatch.setattr("api.authz.verifier._decode_proof", lambda _raw: payload)
     monkeypatch.setattr("api.authz.verifier._validate_chain_signatures", lambda *_args, **_kwargs: True)
+    # Per-link issuer trust is verified separately from chain continuity; stub it
+    # so this test isolates the workload_root non-ppid continuity behavior.
+    monkeypatch.setattr("api.trusted_issuers.verify_credential_with_trust", lambda _link: {"valid": True})
     decision = evaluate_proof_native(headers={"X-Lemma-Proof": "x"}, method="GET", path="/api/test", required_scope="read")
     assert decision.allowed is True
 

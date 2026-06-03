@@ -258,10 +258,9 @@ class LemmaVerifier {
             await this.initPromise;
         }
         
-        // No crypto backend available — cannot verify locally
+        // Fallback to server if nothing is ready
         if (!this.ready && !this.wasm && !this.ed25519 && !this._useWebCrypto) {
-            return this._createResult(false, 'no_crypto_backend', startTime,
-                'No local crypto backend available (WASM, WebCrypto, or noble_ed25519 required)');
+            return await this._verifyServerSide(credential);
         }
         
         try {
@@ -423,7 +422,58 @@ class LemmaVerifier {
         };
     }
     
-    // Server-side verification removed — all verification is local-first.
+    /**
+     * Server-side verification fallback
+     */
+    async _verifyServerSide(credential) {
+        const startTime = performance.now();
+        
+        try {
+            const nonce = this._generateNonce();
+            const response = await fetch(`${this.apiBase}/api/sdk/verify-permission-lemma`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    credential,
+                    nonce,
+                    site_domain: window.location.hostname,
+                    timestamp: Date.now()
+                })
+            });
+            
+            const result = await response.json();
+            const timeMs = performance.now() - startTime;
+            
+            this.stats.totalVerifications++;
+            this.stats.serverFallbacks++;
+            
+            return {
+                verified: result.verified,
+                reason: result.verified ? 'valid' : 'server_rejected',
+                method: 'server_side',
+                verification_time_ms: timeMs,
+                cost: 0.001,
+                server_calls: 1
+            };
+            
+        } catch (error) {
+            return {
+                verified: false,
+                reason: 'server_error',
+                method: 'server_side',
+                error: error.message
+            };
+        }
+    }
+    
+    /**
+     * Generate nonce
+     */
+    _generateNonce() {
+        const array = new Uint8Array(32);
+        crypto.getRandomValues(array);
+        return Array.from(array).map(b => b.toString(16).padStart(2, '0')).join('');
+    }
     
     /**
      * Sync bloom filter from server

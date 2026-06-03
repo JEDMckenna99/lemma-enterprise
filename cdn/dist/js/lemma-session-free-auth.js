@@ -80,8 +80,8 @@ class SessionFreeAuth {
                             console.log(`[SessionFreeAuth] Cache invalidated for ${credential_id} (type: ${credential_type}, site: ${site_id || 'global'})`);
                         }
                         
-                        this.wallet.syncRevocationLists().catch(e => {
-                            if (this.debug) console.warn('[SessionFreeAuth] Bloom filter sync failed:', e);
+                        this.wallet.syncRevocations().catch(e => {
+                            if (this.debug) console.warn('[SessionFreeAuth] Revocation sync failed:', e);
                         });
                     } else {
                         if (this.debug) {
@@ -190,7 +190,7 @@ class SessionFreeAuth {
         setInterval(() => {
             const age = Date.now() - this.lastSync;
             if (age > this.syncInterval) {
-                this.wallet.syncRevocationLists().then(() => {
+                this.wallet.syncRevocations().then(() => {
                     this.lastSync = Date.now();
                     if (this.debug) {
                         console.log('🔄 Periodic Bloom filter sync complete');

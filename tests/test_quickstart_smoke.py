@@ -42,9 +42,12 @@ def test_scope_normalization_aliases():
     assert normalize_scopes(["super_admin", "read"]) == ["admin", "read"]
 
 
-def test_session_token_roundtrip_and_tamper_detection():
+def test_session_token_roundtrip_and_tamper_detection(monkeypatch):
     sm = _load_session_manager()
-    sm._is_session_revoked = lambda *_args, **_kwargs: False
+    # Use monkeypatch so the stub is restored after the test; a bare attribute
+    # assignment here would leak into other tests that exercise the real
+    # _is_session_revoked (e.g. redis degradation fail-closed checks).
+    monkeypatch.setattr(sm, "_is_session_revoked", lambda *_args, **_kwargs: False)
 
     token = sm.generate_session_token("wallet_test", 1700000000000)
     data = sm.validate_session_token(token)

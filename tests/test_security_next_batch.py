@@ -184,8 +184,9 @@ def test_complete_identity_verification_accepts_untracked_session_id(monkeypatch
 
 def test_signal_unlock_origin_substring_bypass(monkeypatch):
     """
-    Risk check #2/#4: origin checks using substring allow attacker-controlled
-    origins containing 'lemma.id'.
+    Risk check #2/#4 (positive control): origin checks must use exact host
+    matching, not substring. An attacker-controlled origin that merely contains
+    'lemma.id' (e.g. 'lemma.id.attacker.example') must be rejected.
     """
     app = _app_with_wallet_session_sync(monkeypatch)
 
@@ -197,6 +198,6 @@ def test_signal_unlock_origin_substring_bypass(monkeypatch):
             headers={"Origin": "https://lemma.id.attacker.example"},
             json={"wallet_id": "wallet_attack_test"},
         )
-        assert resp.status_code == 200
-        assert resp.get_json()["success"] is True
+        assert resp.status_code == 403
+        assert resp.get_json().get("success") is not True
 

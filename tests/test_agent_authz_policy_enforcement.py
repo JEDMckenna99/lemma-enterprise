@@ -23,6 +23,14 @@ def _make_test_app():
     def _bootstrap(site_id):
         return jsonify({"success": True, "site_id": site_id}), 200
 
+    # Compat-bearer admin route (auth_mode defaults to compat_bearer) used to
+    # exercise scope/principal/decision-header logic without the proof_required
+    # mode gate that critical routes like bootstrap-admin now enforce.
+    @app.route("/api/developer/sites/<site_id>/keys", methods=["POST"])
+    @require_agent_or_user_auth()
+    def _create_key(site_id):
+        return jsonify({"success": True, "site_id": site_id}), 200
+
     @app.route("/api/auth/introspect", methods=["POST"])
     @require_agent_or_user_auth()
     def _introspect():
@@ -58,7 +66,7 @@ def test_user_lemma_missing_scope_rejected_by_policy(monkeypatch):
     monkeypatch.setattr(agent_credentials, "_validate_request_api_key", lambda api_key: (False, {}))
 
     with app.test_client() as client:
-        resp = client.post("/api/developer/sites/lemma.id/bootstrap-admin")
+        resp = client.post("/api/developer/sites/lemma.id/keys")
         assert resp.status_code == 403
         payload = resp.get_json()
         assert payload["error"] == "missing_scope"
@@ -163,7 +171,7 @@ def test_agent_token_allow_sets_decision_headers(monkeypatch):
     monkeypatch.setattr(agent_credentials, "_validate_request_api_key", lambda api_key: (False, {}))
 
     with app.test_client() as client:
-        resp = client.post("/api/developer/sites/lemma.id/bootstrap-admin", headers={"X-Agent-Token": "lm_agent_test"})
+        resp = client.post("/api/developer/sites/lemma.id/keys", headers={"X-Agent-Token": "lm_agent_test"})
         assert resp.status_code == 200
         assert resp.headers.get("X-Lemma-Decision-Id")
         assert resp.headers.get("X-Lemma-Decision-Signature")
@@ -176,7 +184,7 @@ def test_agent_token_invalid_includes_decision_receipt(monkeypatch):
     monkeypatch.setattr(agent_credentials, "_validate_request_api_key", lambda api_key: (False, {}))
 
     with app.test_client() as client:
-        resp = client.post("/api/developer/sites/lemma.id/bootstrap-admin", headers={"X-Agent-Token": "lm_agent_bad"})
+        resp = client.post("/api/developer/sites/lemma.id/keys", headers={"X-Agent-Token": "lm_agent_bad"})
         assert resp.status_code == 401
         payload = resp.get_json()
         assert payload["error"] == "invalid_token"

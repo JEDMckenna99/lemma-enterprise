@@ -33,7 +33,26 @@ def test_permission_verification_denies_when_canonically_revoked(monkeypatch):
         def is_revoked(self, _credential_id):
             return False
 
-    monkeypatch.setenv("LEMMA_API_KEY", "test_key")
+    # The endpoint now authenticates via a signed credential principal (the old
+    # LEMMA_API_KEY bearer contract was retired). Stub the principal extraction
+    # so the request reaches the canonical revocation guard under test.
+    from api.authz_engine import AuthzPrincipal
+
+    monkeypatch.setattr(
+        "auth.decorators.extract_user_lemma_principal",
+        lambda headers: (
+            AuthzPrincipal(
+                principal_type="user_lemma",
+                auth_method="lemma_header",
+                ppid="did:lemma:ppid_" + ("a" * 64),
+                credential_id="cred_revoked_2",
+                permission_id="read",
+                scope=["read"],
+                site_binding="lemma.id",
+            ),
+            None,
+        ),
+    )
     monkeypatch.setattr(permission_verification, "is_nonce_fresh", lambda _nonce: True)
     monkeypatch.setattr(permission_verification, "get_global_verifier", lambda: _Verifier())
     monkeypatch.setattr(permission_verification, "is_credential_revoked", lambda _cid: True)

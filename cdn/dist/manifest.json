@@ -1,17 +1,17 @@
 {
   "version": "1.0.0",
-  "timestamp": "2026-02-09T17:46:22.645Z",
+  "timestamp": "2026-06-03T15:39:57.605Z",
   "baseUrl": "https://cdn.lemma.id/",
   "javascript": {
     "lemma-wallet": {
       "original": {
         "path": "js/lemma-wallet.js",
-        "size": 255930
+        "size": 344699
       },
       "minified": {
         "path": "js/lemma-wallet.min.js",
-        "size": 126429,
-        "integrity": "sha384-mpDVjEMZMM48ydKZ+6J+HbDrJZeYio8C/6Gaee4vyDLc0cVQJXrD+6gU+BRRpQd7",
+        "size": 183752,
+        "integrity": "sha384-pJlTfo333JBi+zmlYjLfYFi514xWd23XcTq6r/OwN876LIFbaZCOEjtlTzFg6WNA",
         "compression": {
           "gzip": "js/lemma-wallet.min.js.gz",
           "brotli": "js/lemma-wallet.min.js.br"
@@ -21,12 +21,12 @@
     "lemma-session-free-auth": {
       "original": {
         "path": "js/lemma-session-free-auth.js",
-        "size": 13287
+        "size": 13277
       },
       "minified": {
         "path": "js/lemma-session-free-auth.min.js",
-        "size": 6020,
-        "integrity": "sha384-ufMjft4TVqjtt1UaawpLp2oX7dmzeAg00VUGCgffoSTDU0KzTNwtNPQOtHVd5KQ4",
+        "size": 6010,
+        "integrity": "sha384-aBbIAcmQ4cgtmvYsWRFZznTnDVK7Vbb+LAFBfjdzPH12EjGyAo7gk4UghmU4orjT",
         "compression": {
           "gzip": "js/lemma-session-free-auth.min.js.gz",
           "brotli": "js/lemma-session-free-auth.min.js.br"
