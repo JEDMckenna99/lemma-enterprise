@@ -43,9 +43,10 @@ def clear_amnesty_eligible_wallet_revocations(
         remains free to re-block the PPID immediately if its anti-abuse
         policy still requires it; the network does not litigate that.
       * Wallet-level kill rows (`revocation_type='wallet'`) for THIS wallet
-        are cleared. A future hardening pass should carve out an
-        `is_amnesty_eligible=False` subset for governance-approved
-        coordinated-fraud kills so they survive this reset.
+        are cleared -- EXCEPT rows marked `is_amnesty_eligible=False`, which are
+        governance-approved coordinated-fraud kills that survive re-IDV and stay
+        sticky until the network explicitly reinstates the subject. The same
+        carve-out applies to site blocks and user/credential revocations below.
 
     Cross-device recovery: site PPIDs are derived from the deterministic
     person-root, so the *same* site PPID can be blocked on a prior device's
@@ -129,26 +130,34 @@ def clear_amnesty_eligible_wallet_revocations(
             old_master.status = "superseded"
             superseded_masters += 1
 
+    # Governance carve-out (gap #2): rows marked is_amnesty_eligible=False are
+    # coordinated-fraud kills approved by Lemma.id governance. A fresh IDV must
+    # NOT lift them; they stay sticky until the network explicitly reinstates the
+    # subject. `.isnot(False)` keeps legacy rows (TRUE / NULL) eligible.
     cleared_entries = 0
     rl_query = db.query(RevocationList)
     cleared_entries += rl_query.filter(
         RevocationList.wallet_id == wallet_id,
         RevocationList.revocation_type == "wallet",
+        RevocationList.is_amnesty_eligible.isnot(False),
     ).delete(synchronize_session=False)
     if stale_master_cred_ids:
         cleared_entries += rl_query.filter(
             RevocationList.credential_id.in_(stale_master_cred_ids),
             RevocationList.revocation_type == "credential",
+            RevocationList.is_amnesty_eligible.isnot(False),
         ).delete(synchronize_session=False)
     if derived_cred_ids:
         cleared_entries += rl_query.filter(
             RevocationList.credential_id.in_(derived_cred_ids),
             RevocationList.revocation_type == "credential",
+            RevocationList.is_amnesty_eligible.isnot(False),
         ).delete(synchronize_session=False)
     if derived_ppids:
         cleared_entries += rl_query.filter(
             RevocationList.ppid.in_(derived_ppids),
             RevocationList.revocation_type == "user",
+            RevocationList.is_amnesty_eligible.isnot(False),
         ).delete(synchronize_session=False)
 
     site_blocks_cleared = 0
@@ -156,6 +165,7 @@ def clear_amnesty_eligible_wallet_revocations(
         site_blocks_cleared = db.query(SiteBlock).filter(
             SiteBlock.ppid.in_(derived_ppids),
             SiteBlock.is_active == True,  # noqa: E712
+            SiteBlock.is_amnesty_eligible.isnot(False),
         ).update({"is_active": False}, synchronize_session=False)
 
     derived_reactivated = 0
@@ -271,6 +281,7 @@ def revoke_site_bound_ppid(
     evidence_url: Optional[str] = None,
     network_revocation_requested: bool = False,
     network_revocation_status: Optional[str] = None,
+    amnesty_eligible: bool = True,
     skip_bloom_sync: bool = False,
     commit: bool = True,
 ) -> dict:
@@ -279,6 +290,13 @@ def revoke_site_bound_ppid(
 
     Writes SiteBlock + RevocationList (user scope) and publishes Bloom sync
     using the raw PPID so server and client verifiers agree.
+
+    ``amnesty_eligible=False`` marks this as a governance-approved coordinated-
+    fraud kill: a subsequent fresh IDV will NOT lift it (see
+    clear_amnesty_eligible_wallet_revocations). Setting it False is sticky --
+    re-revoking an existing eligible block with amnesty_eligible=False escalates
+    it, but an ordinary site re-block never silently downgrades a governance kill
+    back to eligible.
     """
     from api.database import SiteBlock, RevocationList
 
@@ -303,12 +321,15 @@ def revoke_site_bound_ppid(
             evidence_url=evidence_url,
             network_revocation_requested=network_revocation_requested,
             network_revocation_status=network_revocation_status,
+            is_amnesty_eligible=amnesty_eligible,
         )
         db.add(block)
         block_created = True
     elif not block.is_active:
         block.is_active = True
         block_created = True
+        if not amnesty_eligible:
+            block.is_amnesty_eligible = False
     else:
         if reason:
             block.reason = reason
@@ -318,6 +339,10 @@ def revoke_site_bound_ppid(
             block.network_revocation_requested = True
         if network_revocation_status:
             block.network_revocation_status = network_revocation_status
+        # Escalation only: a governance kill (False) is sticky and never
+        # downgraded back to eligible by an ordinary re-block.
+        if not amnesty_eligible:
+            block.is_amnesty_eligible = False
 
     existing_revoke = (
         db.query(RevocationList)
@@ -337,9 +362,13 @@ def revoke_site_bound_ppid(
                 revoked_by=revoked_by,
                 reason=reason or "site_ppid_revocation",
                 revoked_at=datetime.utcnow(),
+                is_amnesty_eligible=amnesty_eligible,
             )
         )
         revocation_created = True
+    elif not amnesty_eligible and existing_revoke.is_amnesty_eligible is not False:
+        # Escalate an existing eligible user-scope revocation to a sticky kill.
+        existing_revoke.is_amnesty_eligible = False
 
     if commit:
         db.commit()

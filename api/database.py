@@ -519,6 +519,13 @@ class RevocationList(Base):
     revoked_at = Column(DateTime, default=datetime.utcnow)
     reason = Column(String)  # Reason for revocation
     bloom_filter_updated = Column(Boolean, default=False)  # For efficient offline checking
+    # When False, a fresh IDV does NOT lift this row (governance-approved
+    # coordinated-fraud kills stay sticky until explicitly reinstated). Defaults
+    # True so ordinary site/user revocations remain amnesty-eligible. See
+    # clear_amnesty_eligible_wallet_revocations + migration 030.
+    is_amnesty_eligible = Column(
+        Boolean, nullable=False, default=True, server_default=text('true')
+    )
 
 class SiteUser(Base):
     """Site-specific user registry for IAM subnet management"""
@@ -863,6 +870,12 @@ class SiteBlock(Base):
     is_active = Column(Boolean, default=True)
     network_revocation_requested = Column(Boolean, default=False)
     network_revocation_status = Column(String)  # pending_review, approved, rejected
+    # When False, a fresh IDV does NOT deactivate this block (governance-approved
+    # coordinated-fraud kills survive re-verification). Defaults True so ordinary
+    # site self-blocks stay amnesty-eligible. See migration 030.
+    is_amnesty_eligible = Column(
+        Boolean, nullable=False, default=True, server_default=text('true')
+    )
 
 
 def create_tables():

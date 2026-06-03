@@ -3638,7 +3638,10 @@ def revoke_wallet():
                     'message': 'Wallet already revoked globally'
                 })
             
-            # Create new revocation entry
+            # Create new revocation entry. Admin/governance bans are sticky
+            # (is_amnesty_eligible=False) so a fresh IDV cannot self-lift a
+            # coordinated-fraud kill; owner self-revocations stay amnesty-eligible
+            # so the owner can recover by re-proving identity.
             revocation = RevocationList(
                 lemma_id=f"wallet:{wallet_id}",
                 credential_id=f"wallet:{wallet_id}",
@@ -3646,7 +3649,8 @@ def revoke_wallet():
                 revocation_type='wallet',  # Wallet-level revocation (all sites)
                 reason=reason,
                 revoked_at=datetime.utcnow(),
-                revoked_by='owner' if is_owner else 'admin'
+                revoked_by='owner' if is_owner else 'admin',
+                is_amnesty_eligible=bool(is_owner),
             )
             
             db.add(revocation)

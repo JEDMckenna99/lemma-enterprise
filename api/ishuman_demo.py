@@ -905,6 +905,9 @@ def ishuman_demo_approve_network_revocation():
             return jsonify({"success": False, "error": "could not resolve wallet_id"}), 400
 
         revoked_ids = []
+        # Governance-approved coordinated-fraud kill: mark every row sticky
+        # (is_amnesty_eligible=False) so a subsequent fresh IDV cannot self-lift
+        # it. Ordinary site self-blocks stay eligible (default True).
         existing_wallet_revoke = db.query(RevocationList).filter_by(wallet_id=wallet_id, revocation_type="wallet").first()
         if not existing_wallet_revoke:
             db.add(RevocationList(
@@ -915,8 +918,11 @@ def ishuman_demo_approve_network_revocation():
                 revocation_type="wallet",
                 revoked_by="demo_admin",
                 reason=reason,
+                is_amnesty_eligible=False,
             ))
             revoked_ids.append(wallet_id)
+        elif existing_wallet_revoke.is_amnesty_eligible is not False:
+            existing_wallet_revoke.is_amnesty_eligible = False
 
         masters = db.query(IsHumanVerification).filter_by(wallet_id=wallet_id, status="verified").all()
         for master in masters:
@@ -928,6 +934,7 @@ def ishuman_demo_approve_network_revocation():
                     revocation_type="credential",
                     revoked_by="demo_admin",
                     reason=reason,
+                    is_amnesty_eligible=False,
                 ))
                 revoked_ids.append(master.credential_id)
                 master.status = "revoked"
@@ -941,6 +948,7 @@ def ishuman_demo_approve_network_revocation():
                 revocation_type="credential",
                 revoked_by="demo_admin",
                 reason=reason,
+                is_amnesty_eligible=False,
             ))
             revoked_ids.append(row.derived_credential_id)
             row.is_active = False
@@ -951,6 +959,7 @@ def ishuman_demo_approve_network_revocation():
         for block in db.query(SiteBlock).filter_by(network_revocation_status="pending_review").all():
             if block.site_id in demo_site_ids and block.ppid in demo_ppids:
                 block.network_revocation_status = "approved"
+                block.is_amnesty_eligible = False
 
         db.commit()
 
