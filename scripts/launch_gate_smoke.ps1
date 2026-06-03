@@ -61,7 +61,6 @@ Write-Output ""
 # Read-only checks for core availability and revocation data.
 $readChecks = @(
     "$BaseUrl/",
-    "$BaseUrl/wallet/bridge",
     "$BaseUrl/api/revocation/bloom-filter",
     "$BaseUrl/api/v1/revocation/list"
 )
@@ -81,14 +80,7 @@ foreach ($endpoint in $readChecks) {
 
 Write-Output ""
 
-# Bridge security headers
-$bridgeHead = Invoke-WebRequest -Uri "$BaseUrl/wallet/bridge" -Method Head -UseBasicParsing
-Write-Output "HEAD $BaseUrl/wallet/bridge -> $($bridgeHead.StatusCode)"
-Write-Output "  Cache-Control=$($bridgeHead.Headers['Cache-Control'])"
-Write-Output "  X-Frame-Options=$($bridgeHead.Headers['X-Frame-Options'])"
-Write-Output "  Content-Security-Policy=$($bridgeHead.Headers['Content-Security-Policy'])"
-
-Write-Output ""
+# Phase 2.1: the /wallet/bridge iframe endpoint was removed (popup-only verify).
 
 # Expected-failure checks to verify guardrails without mutating production data.
 $expectedFailureChecks = @(

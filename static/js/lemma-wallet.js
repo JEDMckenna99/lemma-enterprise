@@ -81,7 +81,7 @@ const AUTH_STATE = {
 class LemmaWallet {
     // SDK version - check with LemmaWallet.VERSION
     // v2.32.0: Redirect-only architecture - removed popup flow for simpler, consistent UX
-    static VERSION = '2.60.0';  // v2.60: popup-only honors LEMMA_DISABLE_BRIDGE_IFRAME (no central-wallet iframe / CSP fix)
+    static VERSION = '2.61.0';  // v2.61: Phase 2.1 — cross-origin bridge iframe removed entirely (popup-only)
     
     constructor(options = {}) {
         this.db = null;
@@ -2819,19 +2819,13 @@ class LemmaWallet {
     }
 
     /**
-     * v2 (Phase 2): popup-only mode. When LEMMA_DISABLE_BRIDGE_IFRAME is set,
-     * the wallet must never create the hidden lemma.id/wallet/bridge iframe.
-     * This avoids frame-src CSP violations on lemma-rendered pages served from
-     * non-lemma.id origins (e.g. the Heroku app domain) where the "am I on
-     * lemma.id?" hostname check is false and would otherwise route through the
-     * central-wallet bridge.
+     * Phase 2.1: the cross-origin wallet bridge iframe was removed entirely.
+     * All cross-site flows are popup-only now, so the wallet never creates the
+     * hidden central-wallet iframe. This is hardwired (no longer a runtime
+     * flag) — the bridge message senders below all short-circuit here.
      */
     _bridgeIframeDisabled() {
-        return (
-            typeof window !== 'undefined'
-            && (window.LEMMA_DISABLE_BRIDGE_IFRAME === true
-                || window.LEMMA_DISABLE_BRIDGE_IFRAME === 'true')
-        );
+        return true;
     }
 
     _readIsHumanLockBundleRaw() {
@@ -4248,206 +4242,14 @@ class LemmaWallet {
     }
 
     /**
-     * Wait briefly for bridge readiness signal when iframe exists but hasn't
-     * posted WALLET_BRIDGE_READY yet.
-     * @private
-     */
-    async _waitForBridgeReady(maxWaitMs = 2000) {
-        if (this._bridgeReady) return true;
-        return new Promise((resolve) => {
-            let done = false;
-            const finish = (ready) => {
-                if (done) return;
-                done = true;
-                clearTimeout(timeoutId);
-                window.removeEventListener('message', handler);
-                resolve(ready);
-            };
-            const timeoutId = setTimeout(() => finish(!!this._bridgeReady), maxWaitMs);
-            const handler = (event) => {
-                if (isLemmaTrustedOrigin(event.origin) && event.data?.type === 'WALLET_BRIDGE_READY') {
-                    this._bridgeReady = true;
-                    finish(true);
-                }
-            };
-            window.addEventListener('message', handler);
-        });
-    }
-
-    /**
-     * Send message to bridge iframe and get response
+     * Phase 2.1: the cross-origin bridge iframe was removed. This is now an
+     * inert no-op kept so the cross-site IAM helpers (checkBridgeSession,
+     * extendBridgeSession, lock propagation, revocation sync, etc.) degrade to
+     * the local session instead of throwing. It never creates an iframe.
      * @private
      */
     async _sendBridgeMessage(type, payload, timeout = 5000) {
-        // Popup-only mode: never create the bridge iframe. Callers treat a
-        // non-success result as "no bridge" and fall back to the local session.
-        if (this._bridgeIframeDisabled()) {
-            return { success: false, valid: false, disabled: true, error: 'bridge_disabled' };
-        }
-        // Check if bridge iframe exists
-        let bridge = document.querySelector('iframe[src*="/wallet/bridge"]');
-        
-        if (!bridge) {
-            // Create bridge iframe if needed
-            console.log('[Lemma] Creating bridge iframe...');
-            bridge = document.createElement('iframe');
-            bridge.src = 'https://lemma.id/wallet/bridge';
-            bridge.style.cssText = 'display:none;width:0;height:0;border:none;';
-            bridge.id = 'lemma-bridge';
-            document.body.appendChild(bridge);
-            
-            // Wait for WALLET_BRIDGE_READY message (not just onload)
-            // 5s timeout to handle slower connections + SW cache misses
-            this._bridgeReady = false;
-            await new Promise((resolve) => {
-                const timeoutId = setTimeout(() => {
-                    window.removeEventListener('message', handler);
-                    if (!this._bridgeReady) {
-                        console.warn('[Lemma] Bridge ready timeout (5s) - bridge may not have loaded');
-                    }
-                    resolve();
-                }, 5000);
-
-                const handler = (event) => {
-                    if (isLemmaTrustedOrigin(event.origin) &&
-                        event.data?.type === 'WALLET_BRIDGE_READY') {
-                        this._bridgeReady = true;
-                        clearTimeout(timeoutId);
-                        window.removeEventListener('message', handler);
-                        console.log('[Lemma] Bridge ready, session:', event.data.session?.valid ? 'active' : 'none');
-                        resolve();
-                    }
-                };
-
-                window.addEventListener('message', handler);
-            });
-
-            // Set up persistent listener for instant session invalidation (via BroadcastChannel)
-            // This enables instant lock detection when user locks wallet in another tab
-            this._setupSessionInvalidationListener();
-            
-            // If bridge didn't signal ready, set up a background listener
-            // so it can become ready later (e.g., slow network)
-            if (!this._bridgeReady) {
-                const lateHandler = (event) => {
-                    if (isLemmaTrustedOrigin(event.origin) &&
-                        event.data?.type === 'WALLET_BRIDGE_READY') {
-                        this._bridgeReady = true;
-                        window.removeEventListener('message', lateHandler);
-                        console.log('[Lemma] Bridge became ready (late load)');
-                    }
-                };
-                window.addEventListener('message', lateHandler);
-            }
-        }
-        
-        // If bridge never signaled ready, don't attempt postMessage
-        // (it would fail with origin mismatch since iframe is still at about:blank)
-        if (!this._bridgeReady) {
-            const becameReady = await this._waitForBridgeReady(2500);
-            if (!becameReady) {
-                throw new Error('Bridge not ready (still loading or blocked)');
-            }
-        }
-        
-        return new Promise((resolve, reject) => {
-            const requestId = crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2);
-            const timeoutId = setTimeout(() => {
-                window.removeEventListener('message', handler);
-                reject(new Error(`Bridge response timeout for ${type}`));
-            }, timeout);
-            
-            const handler = (event) => {
-                if (!isLemmaTrustedOrigin(event.origin)) return;
-                const response = event.data;
-                if (response.requestId !== requestId) return;
-                if (response.type && response.type !== `${type}_response`) return;
-                
-                clearTimeout(timeoutId);
-                window.removeEventListener('message', handler);
-                resolve(response);
-            };
-            
-            window.addEventListener('message', handler);
-            
-            // Guard: Ensure bridge contentWindow is accessible before posting
-            if (bridge.contentWindow) {
-                try {
-                    bridge.contentWindow.postMessage({ type, payload, requestId }, 'https://lemma.id');
-                } catch (e) {
-                    console.warn('[Lemma] Bridge postMessage failed:', e.message);
-                    clearTimeout(timeoutId);
-                    window.removeEventListener('message', handler);
-                    reject(new Error('Bridge not ready'));
-                }
-            } else {
-                console.warn('[Lemma] Bridge contentWindow not available');
-                clearTimeout(timeoutId);
-                window.removeEventListener('message', handler);
-                reject(new Error('Bridge not ready'));
-            }
-        });
-    }
-
-    /**
-     * Set up persistent listener for session invalidation messages from bridge
-     * This enables instant lock detection via BroadcastChannel (same-device sync)
-     * @private
-     */
-    _setupSessionInvalidationListener() {
-        // Only set up once
-        if (this._sessionInvalidationListenerActive) return;
-        this._sessionInvalidationListenerActive = true;
-
-        const handler = (event) => {
-            // Only accept messages from lemma.id
-            if (!isLemmaTrustedOrigin(event.origin)) return;
-
-            const { type, walletId, reason, instant } = event.data || {};
-
-            if (type === 'SESSION_INVALIDATED') {
-                console.log(`[Lemma] Session invalidated via bridge (instant: ${instant}, reason: ${reason})`);
-
-                // Clear in-memory session immediately
-                if (this.session) {
-                    this.session.isUnlocked = false;
-                    this.session.expiresAt = 0;
-                    this.session.walletSecret = null;
-                }
-
-                // CRITICAL: Clear IndexedDB session so it doesn't persist across reloads
-                // This ensures the lock signal truly invalidates the cached session
-                // NOTE: We only clear the SESSION, not the secrets. The secrets remain
-                // so re-authentication is faster. The bridge will refuse to provide
-                // them anyway when locked, so this is safe.
-                (async () => {
-                    try {
-                        await this._delete('session', 'current');
-                        console.log('[Lemma] IndexedDB session cleared (lock propagated)');
-                    } catch (e) {
-                        console.warn('[Lemma] Failed to clear IndexedDB session:', e.message);
-                    }
-                })();
-
-                // Emit event for app to handle (e.g., show login prompt, redirect)
-                this._emitSessionEvent('session_invalidated', {
-                    walletId,
-                    reason,
-                    instant: !!instant
-                });
-            } else if (type === 'SESSION_RESTORED') {
-                console.log(`[Lemma] Session restored via bridge (instant: ${instant})`);
-
-                // Emit event for app to refresh state
-                this._emitSessionEvent('session_restored', {
-                    walletId,
-                    instant: !!instant
-                });
-            }
-        };
-
-        window.addEventListener('message', handler);
-        console.log('[Lemma] Session invalidation listener active (instant lock detection enabled)');
+        return { success: false, valid: false, disabled: true, error: 'bridge_disabled' };
     }
 
     /**
@@ -7557,68 +7359,9 @@ class LemmaWallet {
      * This ensures credentials are visible at lemma.id/wallet
      */
     async _syncToCentralWallet(credential) {
-        // Popup-only mode: skip the central-wallet iframe sync (best-effort only).
-        if (this._bridgeIframeDisabled()) {
-            return { success: false, skipped: 'bridge_disabled' };
-        }
-        try {
-            // Find or create bridge iframe
-            let bridge = document.getElementById('lemma-wallet-bridge');
-            
-            if (!bridge) {
-                // Create bridge iframe
-                bridge = document.createElement('iframe');
-                bridge.id = 'lemma-wallet-bridge';
-                bridge.src = 'https://lemma.id/wallet/bridge';
-                bridge.style.cssText = 'position:absolute;width:0;height:0;border:0;visibility:hidden;';
-                document.body.appendChild(bridge);
-                
-                // Wait for bridge to be ready
-                await new Promise((resolve) => {
-                    const handler = (event) => {
-                        if (!isLemmaTrustedOrigin(event.origin)) return;
-                        if (event.data?.type === 'WALLET_BRIDGE_READY') {
-                            window.removeEventListener('message', handler);
-                            resolve();
-                        }
-                    };
-                    window.addEventListener('message', handler);
-                    setTimeout(resolve, 3000); // Timeout after 3s
-                });
-            }
-            
-            // Send credential to bridge
-            return new Promise((resolve) => {
-                const requestId = `sync_${Date.now()}`;
-                
-                const handler = (event) => {
-                    if (!isLemmaTrustedOrigin(event.origin)) return;
-                    if (event.data?.requestId !== requestId) return;
-                    if (event.data?.type && event.data.type !== 'STORE_CREDENTIAL_response') return;
-                    window.removeEventListener('message', handler);
-                    if (event.data.success) {
-                        console.log(' Credential synced to central wallet:', credential.id);
-                    }
-                    resolve(event.data);
-                };
-                
-                window.addEventListener('message', handler);
-                
-                bridge.contentWindow.postMessage({
-                    type: 'STORE_CREDENTIAL',
-                    payload: { credential },
-                    requestId
-                }, 'https://lemma.id');
-                
-                setTimeout(() => {
-                    window.removeEventListener('message', handler);
-                    resolve({ success: false, error: 'timeout' });
-                }, 5000);
-            });
-            
-        } catch (e) {
-            console.warn(' Could not sync to central wallet:', e.message);
-        }
+        // Phase 2.1: the central-wallet bridge iframe was removed. Credentials
+        // live in the local wallet; cross-site visibility is popup-only now.
+        return { success: false, skipped: 'bridge_removed' };
     }
 
     /**
@@ -7902,64 +7645,9 @@ class LemmaWallet {
      * Get credentials from central lemma.id wallet via bridge
      */
     async _getFromCentralWallet(type = null) {
-        // Popup-only mode: no central-wallet iframe; rely on local credentials.
-        if (this._bridgeIframeDisabled()) {
-            return [];
-        }
-        try {
-            let bridge = document.getElementById('lemma-wallet-bridge');
-            
-            if (!bridge) {
-                // Create bridge iframe
-                bridge = document.createElement('iframe');
-                bridge.id = 'lemma-wallet-bridge';
-                bridge.src = 'https://lemma.id/wallet/bridge';
-                bridge.style.cssText = 'position:absolute;width:0;height:0;border:0;visibility:hidden;';
-                document.body.appendChild(bridge);
-                
-                // Wait for bridge to be ready
-                await new Promise((resolve) => {
-                    const handler = (event) => {
-                        if (!isLemmaTrustedOrigin(event.origin)) return;
-                        if (event.data?.type === 'WALLET_BRIDGE_READY') {
-                            window.removeEventListener('message', handler);
-                            resolve();
-                        }
-                    };
-                    window.addEventListener('message', handler);
-                    setTimeout(resolve, 3000);
-                });
-            }
-            
-            return new Promise((resolve) => {
-                const requestId = `get_${Date.now()}`;
-                
-                const handler = (event) => {
-                    if (!isLemmaTrustedOrigin(event.origin)) return;
-                    if (event.data?.requestId !== requestId) return;
-                    if (event.data?.type && event.data.type !== 'GET_CREDENTIALS_response') return;
-                    window.removeEventListener('message', handler);
-                    resolve(event.data.credentials || []);
-                };
-                
-                window.addEventListener('message', handler);
-                
-                bridge.contentWindow.postMessage({
-                    type: 'GET_CREDENTIALS',
-                    payload: { type },
-                    requestId
-                }, 'https://lemma.id');
-                
-                setTimeout(() => {
-                    window.removeEventListener('message', handler);
-                    resolve([]);
-                }, 3000);
-            });
-            
-        } catch (e) {
-            console.warn(' Could not get from central wallet:', e.message);
-            return [];
-        }
+        // Phase 2.1: the central-wallet bridge iframe was removed. Only local
+        // credentials are available; cross-site reads are popup-only now.
+        return [];
     }
 
     /**

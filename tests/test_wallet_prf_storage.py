@@ -12,7 +12,6 @@ CRYPTO_JS = ROOT / "static" / "js" / "wallet-at-rest-crypto.js"
 WALLET_JS = ROOT / "static" / "js" / "lemma-wallet.js"
 PASSKEY_JS = ROOT / "static" / "js" / "lemma-passkey.js"
 PASSKEY_API = ROOT / "api" / "passkey_auth.py"
-WALLET_BRIDGE = ROOT / "templates" / "wallet_bridge.html"
 
 
 @pytest.fixture(name="crypto_js")
@@ -78,14 +77,6 @@ def test_prf_salt_derivation_is_stable():
     salt_b64 = base64.urlsafe_b64encode(salt).decode("utf-8").rstrip("=")
     assert len(salt) == 32
     assert salt_b64
-
-
-@pytest.mark.unit
-def test_bridge_flow_still_uses_wallet_store_credential():
-    # Guard the actual bridge source (not a sibling test file): the ishuman
-    # issuance flow must persist issued credentials via wallet.storeCredential.
-    source = WALLET_BRIDGE.read_text(encoding="utf-8")
-    assert "wallet.storeCredential" in source
 
 
 @pytest.mark.unit

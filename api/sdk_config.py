@@ -16,17 +16,14 @@ SDK_CONFIG = {
     'version': '2.36.0',
     'features': {
         'centralWallet': True,
-        'bridgeEnabled': True,
         'offlineVerification': True,
         'revocationChecks': True,
     },
     'endpoints': {
-        'bridge': '/wallet/bridge',
         'issue': '/api/wallet-auth/issue',
         'revocationList': '/api/v1/revocation/list',
     },
     'settings': {
-        'bridgeTimeout': 5000,
         'verificationCacheMinutes': 5,
         'autoRefreshCredentials': True,
         'debugMode': False,

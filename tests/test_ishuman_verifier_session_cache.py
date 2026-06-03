@@ -30,12 +30,14 @@ def test_verifier_site_vc_cache_helpers(verifier_source):
 
 
 @pytest.mark.browser
-def test_verifier_requests_session_presentation_on_first_verify(verifier_source):
-    assert "_requestSessionFromBridge" in verifier_source
-    assert "type: 'GET_SESSION_PRESENTATION'" in verifier_source
-    assert "sessionNonce" in verifier_source
-    assert "bloomSequence" in verifier_source
-    assert "sessionTtlSec:" in verifier_source
+def test_verifier_requests_session_presentation_via_popup_on_first_verify(verifier_source):
+    # Phase 2.1: the bridge iframe is gone. On a cache miss the verifier issues
+    # a fresh site proof through the Lemma-hosted popup, carrying the session
+    # nonce / bloom sequence / ttl so the popup can sign a session presentation.
+    assert "_issueSiteProofViaPopup" in verifier_source
+    assert "'session_nonce'" in verifier_source
+    assert "'bloom_sequence'" in verifier_source
+    assert "'session_ttl_sec'" in verifier_source
     assert "this.sessionTtlSec" in verifier_source
 
 
@@ -81,21 +83,18 @@ def test_verifier_opens_popup_for_missing_site_proof(verifier_source):
 
 
 @pytest.mark.browser
-def test_verifier_lazy_bridge_and_cached_bloom_for_fast_cache_hits(verifier_source):
-    """Cache-hit fast path: don't load the bridge iframe or block on network.
+def test_verifier_cached_bloom_for_fast_cache_hits_and_no_bridge(verifier_source):
+    """Cache-hit fast path: no iframe, no network block.
 
     The Bloom snapshot must be hydrated from localStorage during _init() so a
     cached verify() can complete without waiting for /api/revocation/bloom-filter.
-    The bridge iframe is created lazily — only when a bridge round-trip is
-    actually issued.
+    Phase 2.1: the bridge iframe path is gone entirely — a cache miss returns
+    'site_proof_required' so verify() routes to the popup.
     """
     assert "_hydrateBloomFromCache" in verifier_source
     assert "this._bloomNetworkRefresh = this._syncBloom()" in verifier_source
-    occurrences = verifier_source.count("this._setupBridge();")
-    assert occurrences >= 3, (
-        "Expected lazy bridge setup in _requestCredentialFromBridge, "
-        "_sendBridgeRequest, and _requestSessionFromBridge"
-    )
+    assert "_setupBridge" not in verifier_source
+    assert "'site_proof_required'" in verifier_source
 
 
 @pytest.mark.browser

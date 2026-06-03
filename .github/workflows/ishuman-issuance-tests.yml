@@ -23,11 +23,10 @@ on:
       - "static/js/lemma-passkey.js"
       - "api/passkey_auth.py"
       - "static/js/demo/ishuman-demo.js"
-      - "templates/wallet_bridge.html"
       - "templates/demo/ishuman.html"
       - "tests/conftest.py"
       - "tests/test_ishuman_*.py"
-      - "tests/test_wallet_bridge_ishuman_flow.py"
+      - "tests/test_wallet_bridge_origin_enforcement.py"
       - "pytest.ini"
       - ".github/workflows/ishuman-issuance-tests.yml"
   push:
@@ -53,11 +52,10 @@ on:
       - "static/js/lemma-passkey.js"
       - "api/passkey_auth.py"
       - "static/js/demo/ishuman-demo.js"
-      - "templates/wallet_bridge.html"
       - "templates/demo/ishuman.html"
       - "tests/conftest.py"
       - "tests/test_ishuman_*.py"
-      - "tests/test_wallet_bridge_ishuman_flow.py"
+      - "tests/test_wallet_bridge_origin_enforcement.py"
       - "pytest.ini"
 
 jobs:
@@ -100,7 +98,6 @@ jobs:
           tests/test_ishuman_demo.py
           tests/test_site_ppid_revocation.py
           tests/test_wallet_prf_storage.py
-          tests/test_wallet_bridge_ishuman_flow.py
           tests/test_ishuman_verifier_session_cache.py
           tests/test_issuer_trust_list.py
           -m "unit or integration or browser"

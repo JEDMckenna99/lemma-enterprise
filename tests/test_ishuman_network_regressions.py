@@ -129,7 +129,9 @@ def test_ishuman_verifier_uses_sha256_revocation_membership():
     assert "this._bloomFilter.has(candidateHash)" in content
 
 
-def test_ishuman_verifier_waits_for_bridge_ready_and_uses_payload_site_id():
+def test_ishuman_verifier_popup_carries_site_id():
+    # Phase 2.1: no bridge iframe — the popup carries the site id so the IDV
+    # flow can derive and issue a per-site proof.
     sdk_path = os.path.join(
         os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
         "static",
@@ -139,14 +141,9 @@ def test_ishuman_verifier_waits_for_bridge_ready_and_uses_payload_site_id():
     with open(sdk_path, "r", encoding="utf-8") as handle:
         content = handle.read()
 
-    assert "WALLET_BRIDGE_READY" in content
-    assert "_bridgeReadyPromise" in content
-    assert "await Promise.race" in content
-    assert "payload: {" in content
-    assert "siteId: this.siteId" in content
-    assert "credentialType: 'isHuman'" in content
-    assert "nonce: challengeNonce" in content
-    assert "challengeTimestamp" in content
+    assert "_issueSiteProofViaPopup" in content
+    assert "popupUrl.searchParams.set('site_id', this.siteId)" in content
+    assert "ISHUMAN_SITE_PROOF_ISSUED" in content
 
 
 def test_ishuman_verifier_requires_signed_bloom_snapshot_checks():
@@ -183,7 +180,7 @@ def test_ishuman_verifier_requires_signed_trust_list_checks():
     assert "this._trustListTrusted" in content
 
 
-def test_ishuman_verifier_uses_session_cache_on_repeat_verify():
+def test_ishuman_verifier_uses_session_cache_before_popup():
     sdk_path = os.path.join(
         os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
         "static",
@@ -194,16 +191,16 @@ def test_ishuman_verifier_uses_session_cache_on_repeat_verify():
         content = handle.read()
 
     assert "_verifyFromSiteVcCache" in content
-    assert "_requestSessionFromBridge" in content
-    assert "GET_SESSION_PRESENTATION" in content
+    assert "site_proof_required" in content
+    # The local cache must be consulted before signalling the popup path.
     verify_idx = content.index("async _verifyOnce(")
     cached_idx = content.index("_verifyFromSiteVcCache", verify_idx)
-    bridge_idx = content.index("_requestSessionFromBridge", verify_idx)
-    assert cached_idx < bridge_idx
+    proof_idx = content.index("'site_proof_required'", verify_idx)
+    assert cached_idx < proof_idx
 
 
-def test_ishuman_verifier_supports_popup_only_bridge_disable():
-    """Phase 2: LEMMA_DISABLE_BRIDGE_IFRAME routes verify() through the popup."""
+def test_ishuman_verifier_is_popup_only_no_bridge():
+    """Phase 2.1: the bridge iframe was removed entirely; verify() is popup-only."""
     sdk_path = os.path.join(
         os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
         "static",
@@ -213,19 +210,17 @@ def test_ishuman_verifier_supports_popup_only_bridge_disable():
     with open(sdk_path, "r", encoding="utf-8") as handle:
         content = handle.read()
 
-    assert "LEMMA_DISABLE_BRIDGE_IFRAME" in content
-    assert "_disableBridge" in content
-    # _setupBridge must short-circuit when the bridge is disabled.
-    setup_idx = content.index("_setupBridge() {")
-    guard_idx = content.index("if (this._disableBridge) return;", setup_idx)
-    next_method_idx = content.index("_handleBridgeMessage", setup_idx)
-    assert setup_idx < guard_idx < next_method_idx
+    assert "_setupBridge" not in content
+    assert "_requestSessionFromBridge" not in content
+    assert "BRIDGE_PATH" not in content
+    assert "GET_SESSION_PRESENTATION" not in content
     # popup-only mode signals site_proof_required on a cache miss.
     assert "site_proof_required" in content
+    assert "_issueSiteProofViaPopup" in content
 
 
-def test_ishuman_wallet_gates_daily_unlock_bundle_behind_bridge_flag():
-    """Phase 2.2: the daily-unlock bundle is disabled in popup-only mode."""
+def test_ishuman_wallet_gates_daily_unlock_bundle():
+    """Phase 2.2: the daily-unlock bundle has its own dedicated opt-out."""
     wallet_path = os.path.join(
         os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
         "static",
@@ -236,26 +231,11 @@ def test_ishuman_wallet_gates_daily_unlock_bundle_behind_bridge_flag():
         content = handle.read()
 
     assert "_isHumanLockDisabled" in content
-    assert "LEMMA_DISABLE_BRIDGE_IFRAME" in content
+    assert "LEMMA_DISABLE_DAILY_UNLOCK" in content
     # isIsHumanLockValid must bail out when the lock is disabled.
     valid_idx = content.index("isIsHumanLockValid() {")
     guard_idx = content.index("if (this._isHumanLockDisabled()) return false;", valid_idx)
     assert valid_idx < guard_idx
-
-
-def test_ishuman_verifier_requires_presentation_signature_checks():
-    sdk_path = os.path.join(
-        os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-        "static",
-        "js",
-        "ishuman-verifier.js",
-    )
-    with open(sdk_path, "r", encoding="utf-8") as handle:
-        content = handle.read()
-
-    assert "missing_presentation_signature" in content
-    assert "invalid_presentation_signature" in content
-    assert "MAX_PRESENTATION_STALENESS_SECONDS" in content
 
 
 def test_site_signing_pubkey_validator_rejects_invalid_values():

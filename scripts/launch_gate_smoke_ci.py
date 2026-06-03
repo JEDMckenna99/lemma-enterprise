@@ -46,7 +46,6 @@ def main() -> int:
     # Required availability and revocation data endpoints.
     get_endpoints = [
         f"{BASE_URL}/",
-        f"{BASE_URL}/wallet/bridge",
         f"{BASE_URL}/api/health",
         f"{BASE_URL}/api/revocation/bloom-filter",
         f"{BASE_URL}/api/v1/revocation/list",
@@ -75,25 +74,8 @@ def main() -> int:
     health_payload = json.loads(health_content)
     assert_true("status" in health_payload, "health/check payload missing status")
 
-    # Bridge header presence checks (values can evolve; presence is required).
-    bridge_url = f"{BASE_URL}/wallet/bridge"
-    status, _, headers = request(bridge_url, method="HEAD")
-    print(f"HEAD {bridge_url} -> {status}")
-    assert_true(status == 200, "Bridge HEAD endpoint is not healthy")
-    required_headers = ["cache-control", "content-security-policy"]
-    for name in required_headers:
-        value = headers.get(name)
-        print(f"  {name}={value}")
-        assert_true(bool(value), f"Missing required header: {name}")
-
-    # X-Frame-Options is optional when CSP frame-ancestors is enforced.
-    xfo = headers.get("x-frame-options")
-    print(f"  x-frame-options={xfo}")
-    csp = headers.get("content-security-policy", "")
-    assert_true(
-        "frame-ancestors" in csp.lower(),
-        "CSP frame-ancestors directive missing on bridge endpoint",
-    )
+    # Phase 2.1: the /wallet/bridge iframe endpoint was removed; verification is
+    # popup-only now, so there is no bridge header smoke check.
 
     # Expected-failure / guardrail checks with no auth context.
     no_session_status, _, _ = request(f"{BASE_URL}/api/wallet/session-sync", method="POST", body=b"{}")

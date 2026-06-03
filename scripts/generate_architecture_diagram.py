@@ -38,14 +38,6 @@ NODES = {
         "stores": ["passkey", "secrets", "lemmas", "revocations", "session", "profiles"],
         "boundary": "client"
     },
-    "bridge": {
-        "id": "bridge",
-        "label": "Wallet Bridge",
-        "type": "client",
-        "description": "Cross-origin iframe for SSO session sharing",
-        "files": ["templates/wallet_bridge.html"],
-        "boundary": "client"
-    },
     "crypto_wasm": {
         "id": "crypto_wasm",
         "label": "Crypto Engine (WASM)",
@@ -131,40 +123,6 @@ EDGES = [
         "flow": "auth",
         "data": "JWT or session cookie",
         "privacy": "Identifies wallet_id, not user identity"
-    },
-    
-    # Cross-site SSO flow
-    {
-        "from": "site",
-        "to": "bridge",
-        "label": "3. Load bridge iframe",
-        "flow": "sso",
-        "data": "iframe src=lemma.id/wallet/bridge",
-        "privacy": "Site origin visible to bridge"
-    },
-    {
-        "from": "bridge",
-        "to": "wallet",
-        "label": "4. Check IndexedDB",
-        "flow": "sso",
-        "data": "Read session, secrets",
-        "privacy": "Same-origin access only"
-    },
-    {
-        "from": "wallet",
-        "to": "bridge",
-        "label": "5. Return auth state",
-        "flow": "sso",
-        "data": "{authenticated, walletSecret, expiresAt}",
-        "privacy": "walletSecret enables PPID derivation"
-    },
-    {
-        "from": "bridge",
-        "to": "site",
-        "label": "6. postMessage response",
-        "flow": "sso",
-        "data": "{authenticated, walletSecret}",
-        "privacy": "Site receives secret for local PPID derivation"
     },
     
     # PPID derivation (local)
@@ -270,7 +228,7 @@ BOUNDARIES = [
     {
         "id": "client",
         "label": "Client-Side (Private)",
-        "nodes": ["wallet", "bridge", "crypto_wasm", "device_b"],
+        "nodes": ["wallet", "crypto_wasm", "device_b"],
         "color": "#d4edda",
         "description": "Data stays on user's device"
     },
@@ -392,7 +350,7 @@ def generate_mermaid():
         "    classDef storage fill:#e2e3e5,stroke:#6c757d,stroke-width:2px",
         "    classDef external fill:#fff3cd,stroke:#ffc107,stroke-width:2px",
         "",
-        "    class wallet,bridge,crypto_wasm,device_b client",
+        "    class wallet,crypto_wasm,device_b client",
         "    class backend server",
         "    class postgres,redis storage",
         "    class site external"
@@ -590,9 +548,6 @@ def generate_c4_dsl():
         "            wallet = container \"User Wallet\" \"IndexedDB\" \"Browser Storage\" {",
         "                tags \"Client\"",
         "            }",
-        "            bridge = container \"Wallet Bridge\" \"Cross-origin SSO\" \"HTML/JS\" {",
-        "                tags \"Client\"",
-        "            }",
         "            backend = container \"Lemma Backend\" \"Flask API\" \"Python\" {",
         "                tags \"Server\"",
         "            }",
@@ -615,8 +570,6 @@ def generate_c4_dsl():
         "        # Relationships",
         "        user -> wallet \"Unlocks via passkey\"",
         "        wallet -> backend \"Passkey auth\"",
-        "        thirdPartySite -> bridge \"Loads iframe\"",
-        "        bridge -> wallet \"Reads session\"",
         "        wallet -> backend \"Syncs revocation bloom\"",
         "        backend -> postgres \"Reads/writes\"",
         "        backend -> redis \"Session storage\"",

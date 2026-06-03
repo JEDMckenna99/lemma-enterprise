@@ -96,10 +96,6 @@
         </div>
     </div>
 
-    <script nonce="{{ csp_nonce }}">
-        // v2 (Phase 2/2.2): popup-only flow disables the daily-unlock lock bundle.
-        window.LEMMA_DISABLE_BRIDGE_IFRAME = {{ 'true' if disable_bridge_iframe else 'false' }};
-    </script>
     <script src="/static/js/lemma-keys.js?v=4" nonce="{{ csp_nonce }}"></script>
     <script src="/static/js/wallet-at-rest-crypto.js?v=2" nonce="{{ csp_nonce }}"></script>
     <script src="/static/js/lemma-wallet.js?v=2541" nonce="{{ csp_nonce }}"></script>

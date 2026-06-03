@@ -6,11 +6,10 @@
  * proof-of-humanity network.
  *
  * How it works:
- *   1. Embeds a hidden iframe pointing at lemma.id/wallet/bridge
- *   2. Asks the wallet bridge for the user's isHuman credential for this site
- *   3. Verifies the credential locally (Ed25519 + expiry + Bloom revocation)
- *   4. Optionally checks site-specific PPID blocks via the isHuman API
- *   5. Returns a simple result: { human: true/false, ppid: "..." }
+ *   1. Serves cached per-site session presentations locally (Ed25519 + expiry + Bloom revocation)
+ *   2. On a cache miss (with autoProvision), opens a Lemma-hosted popup to issue a fresh site proof
+ *   3. Optionally checks site-specific PPID blocks via the isHuman API
+ *   4. Returns a simple result: { human: true/false, ppid: "..." }
  *
  * Integration (two lines):
  *   <script src="https://lemma.id/sdk/ishuman-verifier.js"></script>
@@ -20,8 +19,8 @@
  *   </script>
  *
  * Zero server calls on the verification hot path after initial Bloom sync.
- * Phase 6: one signed session presentation per tab session; steady-state verify()
- * re-validates locally with no bridge round-trip and no network calls.
+ * Popup-only (Phase 2.1): one signed session presentation per tab session;
+ * steady-state verify() re-validates locally with no iframe and no network calls.
  *
  * Optional `autoProvision: true` opens a Lemma-hosted popup to unlock the wallet
  * and complete IDV when no master isHuman proof is present yet.
@@ -37,10 +36,6 @@ if (typeof window !== 'undefined' && window.IsHumanVerifier) {
 }
 
 const LEMMA_ORIGIN = 'https://lemma.id';
-const BRIDGE_PATH = '/wallet/bridge?v=1.5.6';
-const BRIDGE_TIMEOUT_MS = 8000;
-const PRESENTATION_PREFIX = 'lemma:site-presentation:v1';
-const MAX_PRESENTATION_STALENESS_SECONDS = 120;
 const SESSION_PRESENTATION_PREFIX = 'lemma:site-session-presentation:v1';
 const DEFAULT_SESSION_TTL_SECONDS = 24 * 60 * 60;
 const MIN_SESSION_TTL_SECONDS = 60;
@@ -147,15 +142,6 @@ function canonicalMessage(credential) {
         issuedAt: credential.issuedAt,
         expiresAt: credential.expiresAt,
     });
-}
-
-function buildPresentationPayload({ nonceB64, credentialId, timestampSec }) {
-    return new TextEncoder().encode([
-        PRESENTATION_PREFIX,
-        String(nonceB64 || '').trim(),
-        String(credentialId || '').trim(),
-        String(timestampSec || ''),
-    ].join('\n'));
 }
 
 function buildSessionPresentationPayload({
@@ -514,16 +500,6 @@ class IsHumanVerifier {
         this.isBlockedLocally = config.isBlockedLocally || null;
         this.autoProvision = !!config.autoProvision;
         this.idvPopupPath = config.idvPopupPath || IDV_POPUP_PATH;
-        // v2 (Phase 2): when the bridge iframe is disabled, all credential and
-        // session requests go through the popup-only flow. The hidden
-        // lemma.id bridge iframe is never created. Defaults from config or the
-        // server-rendered window.LEMMA_DISABLE_BRIDGE_IFRAME flag.
-        this._disableBridge = (
-            config.disableBridge === true
-            || (typeof window !== 'undefined'
-                && (window.LEMMA_DISABLE_BRIDGE_IFRAME === true
-                    || window.LEMMA_DISABLE_BRIDGE_IFRAME === 'true'))
-        );
         this.sessionTtlSec = Math.min(
             MAX_SESSION_TTL_SECONDS,
             Math.max(
@@ -532,9 +508,6 @@ class IsHumanVerifier {
             ),
         );
 
-        this._bridgeReady = false;
-        this._bridgeIframe = null;
-        this._pendingRequests = new Map();
         this._bloomFilter = new Set();
         this._bloomSyncedAt = 0;
         this._bloomTrusted = false;
@@ -542,9 +515,6 @@ class IsHumanVerifier {
         this._trustListTrusted = false;
         this._trustedIssuers = new Map();
         this._session = null;
-        this._messageListener = null;
-        this._bridgeReadyPromise = null;
-        this._resolveBridgeReady = null;
 
         // Cross-tab site-block invalidation: when any tab on the same origin
         // posts a SITE_BLOCK_UPDATE for this site, the cached session is
@@ -649,7 +619,6 @@ class IsHumanVerifier {
             });
             if (issued.ok) {
                 this._markProvisionedMaster();
-                await this._syncBridgeAfterIdv(issued.detail);
                 result = await this._applyIssuedSiteProof(issued.detail, t0);
                 if (!result.human) {
                     result = await this._verifyOnce(t0);
@@ -682,50 +651,9 @@ class IsHumanVerifier {
             return cached;
         }
 
-        // v2 (Phase 2): popup-only mode. On a cache miss, skip the bridge and
-        // signal the verify() loop to issue a fresh site proof via the popup.
-        if (this._disableBridge) {
-            return this._result(false, null, 'site_proof_required', t0);
-        }
-
-        let bridgeResult;
-        try {
-            bridgeResult = await this._requestSessionFromBridge();
-        } catch (err) {
-            return this._result(false, null, 'bridge_unavailable', t0, err.message);
-        }
-
-        if (bridgeResult?.use_legacy_presentation) {
-            return this._verifyWithLegacyPresentation(bridgeResult, t0);
-        }
-
-        const bridgeReason = this._mapBridgeError(bridgeResult?.error);
-        const credential = bridgeResult?.credential || null;
-        if (!credential) {
-            return this._result(false, null, bridgeReason || 'no_credential', t0);
-        }
-
-        const core = await this._verifyCredentialCore(credential, t0);
-        if (!core.ok) {
-            return this._result(false, core.ppid, core.reason, t0, core.error);
-        }
-
-        const sessionCheck = await this._verifySessionFromBridgeResult(bridgeResult, credential);
-        if (!sessionCheck.ok) {
-            return this._result(false, credential.subject, sessionCheck.reason, t0, sessionCheck.error);
-        }
-
-        const session = {
-            siteId: this.siteId,
-            credential,
-            session_assertion: bridgeResult.session_assertion,
-            session_signature: bridgeResult.session_signature,
-            session_nonce: bridgeResult.session_nonce,
-            bloom_sequence: Number(this._bloomSnapshot?.sequence_number ?? 0),
-        };
-        this._persistSession(session);
-
-        return this._result(true, credential.subject, 'valid', t0, null, session);
+        // Popup-only (Phase 2.1): on a cache miss, signal the verify() loop to
+        // issue a fresh site proof via the Lemma-hosted popup.
+        return this._result(false, null, 'site_proof_required', t0);
     }
 
     /**
@@ -743,20 +671,13 @@ class IsHumanVerifier {
     }
 
     /**
-     * Destroy the bridge iframe and clean up listeners.
+     * Clean up listeners and cross-tab channels.
      */
     destroy() {
-        if (this._messageListener) {
-            window.removeEventListener('message', this._messageListener);
-        }
-        if (this._bridgeIframe && this._bridgeIframe.parentNode) {
-            this._bridgeIframe.parentNode.removeChild(this._bridgeIframe);
-        }
         if (this._blockChannel) {
             try { this._blockChannel.close(); } catch { /* ignore */ }
             this._blockChannel = null;
         }
-        this._bridgeReady = false;
         this._session = null;
     }
 
@@ -811,235 +732,6 @@ class IsHumanVerifier {
         }
     }
 
-    _setupBridge() {
-        // v2 (Phase 2): in popup-only mode the hidden bridge iframe is never
-        // created; every credential/session request flows through the popup.
-        if (this._disableBridge) return;
-        // Lazy: only create the hidden bridge iframe (which loads
-        // lemma-wallet.js + lemma-keys.js, ~80 KB) when a bridge round-trip
-        // is actually needed. Cache-hit verifications skip this entirely.
-        if (this._bridgeIframe) return;
-
-        this._bridgeReadyPromise = new Promise((resolve) => {
-            this._resolveBridgeReady = resolve;
-        });
-
-        const iframe = document.createElement('iframe');
-        iframe.src = `${this.lemmaOrigin}${BRIDGE_PATH}`;
-        iframe.style.cssText = 'display:none;width:0;height:0;border:0;position:absolute';
-        iframe.setAttribute('aria-hidden', 'true');
-        document.body.appendChild(iframe);
-        this._bridgeIframe = iframe;
-
-        this._messageListener = (event) => {
-            if (event.origin !== this.lemmaOrigin) return;
-            if (event.data?.type === 'WALLET_BRIDGE_READY') {
-                if (event.source && event.source !== this._bridgeIframe?.contentWindow) return;
-                this._bridgeReady = true;
-                if (this._resolveBridgeReady) this._resolveBridgeReady(event.data);
-                if (this.debug) console.log('[isHuman] bridge ready', event.data);
-                return;
-            }
-            this._handleBridgeMessage(event.data, event);
-        };
-        window.addEventListener('message', this._messageListener);
-
-        iframe.addEventListener('load', () => {
-            this._bridgeReady = true;
-            if (this._resolveBridgeReady) this._resolveBridgeReady({ ready: true, source: 'iframe_load' });
-            if (this.debug) console.log('[isHuman] bridge iframe loaded');
-        });
-    }
-
-    // ------------------------------------------------------------------
-    // Bridge communication
-    // ------------------------------------------------------------------
-
-    _handleBridgeMessage(data, event) {
-        if (!data || !data.requestId) return;
-        if (event?.source && event.source !== this._bridgeIframe?.contentWindow) return;
-        const pending = this._pendingRequests.get(data.requestId);
-        if (!pending) return;
-        const expectedType = pending.expectedType;
-        if (expectedType && data.type && data.type !== expectedType) return;
-        this._pendingRequests.delete(data.requestId);
-        pending.resolver(data);
-    }
-
-    _requestCredentialFromBridge() {
-        return new Promise(async (resolve, reject) => {
-            this._setupBridge();
-            if (!this._bridgeIframe || !this._bridgeIframe.contentWindow) {
-                return reject(new Error('Bridge iframe not available'));
-            }
-
-            if (!this._bridgeReady) {
-                try {
-                    await Promise.race([
-                        this._bridgeReadyPromise,
-                        new Promise((_, timeoutReject) => setTimeout(
-                            () => timeoutReject(new Error('Bridge ready timeout')),
-                            BRIDGE_TIMEOUT_MS,
-                        )),
-                    ]);
-                } catch (err) {
-                    return reject(err);
-                }
-            }
-
-            const requestId = `ih_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-
-            const timeout = setTimeout(() => {
-                this._pendingRequests.delete(requestId);
-                reject(new Error('Bridge timeout'));
-            }, BRIDGE_TIMEOUT_MS);
-
-            const challengeNonce = randomNonceB64(32);
-            const challengeTimestamp = Date.now();
-            this._pendingRequests.set(requestId, {
-                expectedType: 'GET_CREDENTIAL_response',
-                resolver: (response) => {
-                    clearTimeout(timeout);
-                    if (response.error) {
-                        resolve(null);
-                    } else {
-                        resolve({
-                            ...response,
-                            challenge_nonce: challengeNonce,
-                        });
-                    }
-                },
-            });
-            this._bridgeIframe.contentWindow.postMessage({
-                type: 'GET_CREDENTIAL',
-                requestId,
-                payload: {
-                    siteId: this.siteId,
-                    credentialType: 'isHuman',
-                    nonce: challengeNonce,
-                    challengeTimestamp,
-                },
-            }, this.lemmaOrigin);
-        });
-    }
-
-    _sendBridgeRequest(type, payload = {}, timeoutMs = BRIDGE_TIMEOUT_MS) {
-        return new Promise(async (resolve, reject) => {
-            this._setupBridge();
-            if (!this._bridgeIframe || !this._bridgeIframe.contentWindow) {
-                return reject(new Error('Bridge iframe not available'));
-            }
-
-            if (!this._bridgeReady) {
-                try {
-                    await Promise.race([
-                        this._bridgeReadyPromise,
-                        new Promise((_, timeoutReject) => setTimeout(
-                            () => timeoutReject(new Error('Bridge ready timeout')),
-                            BRIDGE_TIMEOUT_MS,
-                        )),
-                    ]);
-                } catch (err) {
-                    return reject(err);
-                }
-            }
-
-            const requestId = `ih_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-            const timeout = setTimeout(() => {
-                this._pendingRequests.delete(requestId);
-                reject(new Error('Bridge timeout'));
-            }, timeoutMs);
-
-            this._pendingRequests.set(requestId, {
-                expectedType: `${type}_response`,
-                resolver: (response) => {
-                    clearTimeout(timeout);
-                    resolve(response);
-                },
-            });
-            this._bridgeIframe.contentWindow.postMessage({
-                type,
-                requestId,
-                payload,
-            }, this.lemmaOrigin);
-        });
-    }
-
-    async _syncBridgeAfterIdv(detail = {}) {
-        await this._syncBridgeAfterUnlock({
-            sessionData: detail.sessionData,
-            walletSecret: detail.walletSecret,
-            isHumanCredentials: detail.isHumanCredentials || [],
-        });
-    }
-
-    _requestSessionFromBridge() {
-        return new Promise(async (resolve, reject) => {
-            this._setupBridge();
-            if (!this._bridgeIframe || !this._bridgeIframe.contentWindow) {
-                return reject(new Error('Bridge iframe not available'));
-            }
-
-            if (!this._bridgeReady) {
-                try {
-                    await Promise.race([
-                        this._bridgeReadyPromise,
-                        new Promise((_, timeoutReject) => setTimeout(
-                            () => timeoutReject(new Error('Bridge ready timeout')),
-                            BRIDGE_TIMEOUT_MS,
-                        )),
-                    ]);
-                } catch (err) {
-                    return reject(err);
-                }
-            }
-
-            const requestId = `ih_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-            const timeout = setTimeout(() => {
-                this._pendingRequests.delete(requestId);
-                reject(new Error('Bridge timeout'));
-            }, BRIDGE_TIMEOUT_MS);
-
-            const sessionNonce = randomNonceB64(32);
-            const bloomSequence = Number(this._bloomSnapshot?.sequence_number ?? 0);
-            this._pendingRequests.set(requestId, {
-                expectedType: 'GET_SESSION_PRESENTATION_response',
-                resolver: async (response) => {
-                    clearTimeout(timeout);
-                    const errText = String(response.error || '');
-                    if (errText.includes('Unknown message type')) {
-                        try {
-                            const legacy = await this._requestCredentialFromBridge();
-                            resolve({ use_legacy_presentation: true, ...legacy });
-                        } catch (legacyErr) {
-                            reject(legacyErr);
-                        }
-                        return;
-                    }
-                    if (response.error || response.success === false) {
-                        resolve({ error: errText || response.error || 'bridge_error' });
-                        return;
-                    }
-                    resolve({
-                        ...response,
-                        session_nonce: sessionNonce,
-                    });
-                },
-            });
-            this._bridgeIframe.contentWindow.postMessage({
-                type: 'GET_SESSION_PRESENTATION',
-                requestId,
-                payload: {
-                    siteId: this.siteId,
-                    credentialType: 'isHuman',
-                    sessionNonce,
-                    bloomSequence,
-                    sessionTtlSec: this.sessionTtlSec,
-                },
-            }, this.lemmaOrigin);
-        });
-    }
-
     async _verifyFromSiteVcCache(t0) {
         const session = this._loadSessionCache();
         if (!session) return null;
@@ -1088,72 +780,6 @@ class IsHumanVerifier {
         }
 
         return this._result(true, credential.subject, 'vc_valid', t0, null, session);
-    }
-
-    async _verifyWithLegacyPresentation(bridgeResult, t0) {
-        const credential = bridgeResult?.credential || null;
-        if (!credential) {
-            return this._result(false, null, 'no_credential', t0);
-        }
-
-        const core = await this._verifyCredentialCore(credential, t0);
-        if (!core.ok) {
-            return this._result(false, core.ppid, core.reason, t0, core.error);
-        }
-
-        try {
-            const claims = credential.claims || credential.credentialSubject || {};
-            const siteSigningPubkey = claims.site_signing_pubkey || claims.siteSigningPubkey;
-            const presentationSignature = bridgeResult?.presentation_signature || '';
-            const presentationTimestamp = Number(bridgeResult?.presentation_timestamp || 0);
-            const presentationNonce = bridgeResult?.presentation_nonce || '';
-
-            if (!siteSigningPubkey) {
-                return this._result(false, credential.subject, 'missing_site_signing_pubkey', t0);
-            }
-            if (!presentationSignature || !presentationTimestamp || !presentationNonce) {
-                return this._result(false, credential.subject, 'missing_presentation_signature', t0);
-            }
-
-            const nowSec = Math.floor(Date.now() / 1000);
-            if (Math.abs(nowSec - presentationTimestamp) > MAX_PRESENTATION_STALENESS_SECONDS) {
-                return this._result(false, credential.subject, 'presentation_stale', t0);
-            }
-            if (presentationNonce !== bridgeResult.challenge_nonce) {
-                return this._result(false, credential.subject, 'presentation_nonce_mismatch', t0);
-            }
-
-            const presentationPayload = buildPresentationPayload({
-                nonceB64: presentationNonce,
-                credentialId: credential.id || '',
-                timestampSec: presentationTimestamp,
-            });
-            const presentationDigest = await sha256DigestBytes(presentationPayload);
-            const presentationValid = await verifyEd25519(
-                base64urlToBytes(siteSigningPubkey),
-                presentationDigest,
-                base64urlToBytes(presentationSignature),
-            );
-
-            if (!presentationValid) {
-                return this._result(false, credential.subject, 'invalid_presentation_signature', t0);
-            }
-        } catch (err) {
-            return this._result(false, credential.subject, 'presentation_verification_error', t0, err.message);
-        }
-
-        const blocked = await this._checkSiteBlocked(credential.subject);
-        if (blocked) {
-            return this._result(false, credential.subject, 'site_blocked', t0);
-        }
-
-        return this._result(true, credential.subject, 'valid', t0, null, {
-            credential,
-            session_assertion: null,
-            session_signature: null,
-            session_nonce: null,
-            bloom_sequence: Number(this._bloomSnapshot?.sequence_number ?? 0),
-        });
     }
 
     async _verifySessionFromBridgeResult(bridgeResult, credential) {
@@ -1451,16 +1077,6 @@ class IsHumanVerifier {
     // Result helper
     // ------------------------------------------------------------------
 
-    _mapBridgeError(errorText) {
-        const err = String(errorText || '').trim().toLowerCase();
-        if (!err) return 'no_credential';
-        if (err.includes('no_ishuman_credential')) return 'no_ishuman_credential';
-        if (err.includes('wallet_locked')) return 'wallet_locked';
-        if (err.includes('site_proof_required')) return 'site_proof_required';
-        if (err.includes('derivation')) return 'derivation_failed';
-        return 'no_credential';
-    }
-
     async _applyIssuedSiteProof(detail, t0) {
         const credential = detail?.credential || null;
         if (!credential) {
@@ -1628,9 +1244,6 @@ class IsHumanVerifier {
                 settled = true;
                 window.removeEventListener('message', onMessage);
                 clearTimeout(timeoutId);
-                if (value && detail) {
-                    await this._syncBridgeAfterUnlock(detail);
-                }
                 resolve(value);
             };
 
@@ -1646,33 +1259,6 @@ class IsHumanVerifier {
             const timeoutId = setTimeout(() => finish(false, null), UNLOCK_POPUP_TIMEOUT_MS);
             window.addEventListener('message', onMessage);
         });
-    }
-
-    async _syncBridgeAfterUnlock(detail = {}) {
-        // v2 (Phase 2): no bridge iframe to sync in popup-only mode.
-        if (this._disableBridge) return;
-        try {
-            const sessionData = detail.sessionData;
-            const walletSecret = detail.walletSecret || sessionData?.walletSecret || null;
-            const isHumanCredentials = detail.isHumanCredentials || [];
-            if (sessionData?.isUnlocked) {
-                await this._sendBridgeRequest('SET_LOCAL_SESSION', {
-                    session: sessionData,
-                    walletSecret,
-                    isHumanCredentials,
-                });
-            }
-            const needsBridgeUnlock = !sessionData?.isUnlocked
-                || (!isHumanCredentials.length && this._hasProvisionedMaster());
-            if (needsBridgeUnlock) {
-                const unlockResult = await this._sendBridgeRequest('WALLET_UNLOCK', { isHumanIssuance: true }, 60000);
-                if (this.debug) {
-                    console.log('[isHuman] bridge unlock', unlockResult?.success ? 'ok' : unlockResult?.error);
-                }
-            }
-        } catch (err) {
-            if (this.debug) console.warn('[isHuman] bridge unlock sync failed:', err.message);
-        }
     }
 
     _provisionViaPopup() {

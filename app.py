@@ -76,13 +76,8 @@ def create_app():
         provider, to drop the cross-site sync overhead.
         """
         flag = os.getenv('LEMMA_CROSS_SITE_LOCK_ENABLED', 'true').strip().lower()
-        # ``LEMMA_DISABLE_BRIDGE_IFRAME`` (Phase 2) routes verification through the
-        # popup-only flow on lemma-rendered pages. Third-party relying sites opt
-        # in per-site via ``new IsHumanVerifier({ disableBridge: true })``.
-        bridge_flag = os.getenv('LEMMA_DISABLE_BRIDGE_IFRAME', 'false').strip().lower()
         return {
             'cross_site_lock_enabled': flag in ('1', 'true', 'yes', 'on'),
-            'disable_bridge_iframe': bridge_flag in ('1', 'true', 'yes', 'on'),
         }
 
     # ================================================================================
@@ -106,8 +101,8 @@ def create_app():
         # Prevent MIME type sniffing
         response.headers['X-Content-Type-Options'] = 'nosniff'
         
-        # Prevent clickjacking — /wallet/bridge uses CSP frame-ancestors for embed policy
-        if request.path != '/wallet/bridge' and 'X-Frame-Options' not in response.headers:
+        # Prevent clickjacking
+        if 'X-Frame-Options' not in response.headers:
             response.headers['X-Frame-Options'] = 'DENY'
         
         # XSS Protection (legacy but still useful)
@@ -722,83 +717,9 @@ def create_app():
             return redirect(f'/unlock?{request.query_string.decode()}', code=302)
         return redirect('/unlock', code=301)
 
-    @app.route('/wallet/bridge')
-    def wallet_bridge():
-        """
-        Cross-origin wallet bridge v2.0 - LOCAL-FIRST authentication
-        
-        This page is loaded in an iframe by third-party sites to access the
-        user's central Lemma wallet via postMessage. NO server calls for verification.
-        
-        CACHING STRATEGY:
-        - Aggressive caching (1 year, immutable) for bridge HTML
-        - Bridge code is static - all state is in IndexedDB
-        - First load: 1 network call (this HTML)
-        - All subsequent loads: 0 network calls (from cache)
-        
-        SECURITY:
-        - Per-site credential isolation (sites only see their own credentials)
-        - Session-gated write operations
-        - Ed25519 signature verification (local WebCrypto)
-        """
-        logger.info("🌉 Serving wallet bridge v2.0 (local-first)")
-        
-        # Get nonce for this request (generated in before_request)
-        nonce = getattr(g, 'csp_nonce', '')
-        
-        response = render_template('wallet_bridge.html')
-        
-        return response, 200, {
-            # HARDENED CSP for bridge security (frame-ancestors is authoritative)
-            # - Only self scripts with nonce (no external JS)
-            # - Only self connections (except revocation sync)
-            # - No eval, no dynamic code
-            'Content-Security-Policy': (
-                "default-src 'none'; "
-                f"script-src 'self' 'nonce-{nonce}'; "  # Nonce for bridge inline script
-                "connect-src 'self' https://lemma.id; "
-                "style-src 'self' 'unsafe-inline'; "  # Inline styles for minimal bridge UI
-                "frame-ancestors https: http://localhost:* http://127.0.0.1:*; "
-                "base-uri 'none'; "
-                "form-action 'none'; "
-                "object-src 'none'; "
-                "upgrade-insecure-requests"
-            ),
-
-            # AGGRESSIVE CACHING - This is key to local-first!
-            # Bridge HTML is static; all dynamic state is in IndexedDB
-            # ETag allows revalidation on version updates
-            'Cache-Control': 'public, max-age=31536000, immutable',
-            'ETag': '"bridge-v3.10.6-clock-skew-tolerance"',
-
-            # Additional cache hints
-            'Vary': 'Accept-Encoding',
-            'Referrer-Policy': 'no-referrer',
-        }
-
-    @app.route('/api/wallet/bridge-audit', methods=['POST'])
-    def wallet_bridge_audit():
-        """Best-effort denial telemetry from bridge postMessage (no PII, no auth)."""
-        import time
-        from flask import request
-
-        if not hasattr(app, '_bridge_audit_buckets'):
-            app._bridge_audit_buckets = {}
-
-        ip = (request.headers.get('X-Forwarded-For') or request.remote_addr or 'unknown').split(',')[0].strip()
-        now = time.time()
-        bucket = app._bridge_audit_buckets.setdefault(ip, [])
-        bucket[:] = [t for t in bucket if now - t < 60.0]
-        if len(bucket) >= 60:
-            return '', 429
-        bucket.append(now)
-
-        raw = request.get_data(as_text=True) or ''
-        if len(raw) > 256:
-            raw = raw[:256]
-        if raw:
-            logger.warning("bridge_audit ip=%s body=%s", ip, raw)
-        return '', 204
+    # The cross-origin wallet bridge iframe and its denial telemetry endpoint
+    # were removed in Phase 2.1. Verification and cross-site session flows are
+    # popup-only now.
 
     # ================================================================================
     # HIGH-SECURITY: Fresh Authentication Verification API

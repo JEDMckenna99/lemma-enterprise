@@ -7,7 +7,6 @@ import pytest
 ROOT = Path(__file__).resolve().parents[1]
 WALLET_JS = ROOT / "static" / "js" / "lemma-wallet.js"
 VERIFIER_JS = ROOT / "static" / "js" / "ishuman-verifier.js"
-BRIDGE_HTML = ROOT / "templates" / "wallet_bridge.html"
 IDV_HTML = ROOT / "templates" / "wallet_ishuman_idv.html"
 POPUP_HTML = ROOT / "templates" / "wallet_popup.html"
 WALLET_UNLOCK_HTML = ROOT / "templates" / "wallet_unlock.html"
@@ -23,11 +22,6 @@ def fixture_wallet_source() -> str:
 @pytest.fixture(name="verifier_source")
 def fixture_verifier_source() -> str:
     return VERIFIER_JS.read_text(encoding="utf-8")
-
-
-@pytest.fixture(name="bridge_source")
-def fixture_bridge_source() -> str:
-    return BRIDGE_HTML.read_text(encoding="utf-8")
 
 
 @pytest.mark.browser
@@ -48,17 +42,6 @@ def test_wallet_lock_bundle_persist_and_restore(wallet_source):
 
 
 @pytest.mark.browser
-def test_bridge_ishuman_issuance_probe(bridge_source):
-    assert "probeIsHumanIssuanceReady" in bridge_source
-    assert "getIsHumanCredentialsForBridge" in bridge_source
-    assert "isHumanIssuance: payload?.isHumanIssuance !== false" in bridge_source
-    assert "applyIsHumanCredentialsToCache" in bridge_source
-    assert "isHumanCredentials" in bridge_source
-    assert "error: 'wallet_locked'" in bridge_source
-    assert "wallet_secret unavailable" in bridge_source
-
-
-@pytest.mark.browser
 def test_wallet_daily_unlock_helpers(wallet_source):
     assert "exportIsHumanCredentialsForBridge" in wallet_source
     assert "issueSiteProofPackage" in wallet_source
@@ -76,15 +59,13 @@ def test_verifier_site_vc_cache(verifier_source):
     assert "SITE_VC_STORAGE_KEY = 'ishuman_site_vc:v1'" in verifier_source
     assert "_verifyFromSiteVcCache" in verifier_source
     assert "'vc_valid'" in verifier_source
-    assert "isHumanIssuance: true" in verifier_source
-    assert "BRIDGE_PATH = '/wallet/bridge?v=1.5.6'" in verifier_source
     assert "TIME_SKEW_SECONDS" in verifier_source
     assert "signatureValueWeb" in verifier_source
     assert "legacy_credential_format" in verifier_source
     assert "_hydrateBloomFromCache" in verifier_source
     assert "broadcastBlockUpdate" in verifier_source
     assert "fresh_idv" in verifier_source
-    assert "result.credential" in verifier_source or "result.presentation" in verifier_source or "credential: cred" in verifier_source
+    assert "result.credential" in verifier_source or "credential: cred" in verifier_source
     assert "_issueSiteProofViaPopup" in verifier_source
     assert "_applyIssuedSiteProof" in verifier_source
     assert "ISHUMAN_SITE_PROOF_ISSUED" in verifier_source
@@ -170,7 +151,6 @@ def test_idv_popup_handles_encrypted_master_without_raw_error():
 @pytest.mark.browser
 def test_wallet_pages_use_current_wallet_bundle():
     wallet_pages = [
-        BRIDGE_HTML,
         IDV_HTML,
         POPUP_HTML,
         WALLET_UNLOCK_HTML,

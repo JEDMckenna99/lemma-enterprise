@@ -515,19 +515,6 @@ async function runLaunchGateQuickChecks() {
     });
 
     checks.push(async () => {
-        const r = await fetch('/wallet/bridge', { method: 'HEAD' });
-        const csp = r.headers.get('content-security-policy') || '';
-        const cache = r.headers.get('cache-control') || '';
-        const ok = r.ok && csp.includes('frame-ancestors') && cache.length > 0;
-        appendLaunchGateResult(
-            'Bridge Header Checks',
-            ok,
-            ok ? `HTTP ${r.status}, CSP and cache-control present` : `HTTP ${r.status}, missing expected headers`
-        );
-        return ok;
-    });
-
-    checks.push(async () => {
         const r = await fetch('/api/passkey/authenticate/begin', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },

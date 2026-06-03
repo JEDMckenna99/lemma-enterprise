@@ -24,7 +24,7 @@
     </div>
     <div class="callout callout--info">
         <div class="callout-title">Core model</div>
-        <p>The credential is rooted in a <strong>verified-person root</strong> derived from the IDV result. A master credential is issued for <code>lemma.id</code>; on third-party sites, the wallet bridge derives a site-specific credential (a per-site PPID) from that person root on first request and stores it for later use. Because the binding is to the person root — not to a wallet, email, or device — resetting any of those does not mint a fresh, clean identity.</p>
+        <p>The credential is rooted in a <strong>verified-person root</strong> derived from the IDV result. A master credential is issued for <code>lemma.id</code>; on third-party sites, a Lemma-hosted popup derives a site-specific credential (a per-site PPID) from that person root on first request and stores it for later use. Because the binding is to the person root — not to a wallet, email, or device — resetting any of those does not mint a fresh, clean identity.</p>
     </div>
 </div>
 
@@ -38,7 +38,7 @@
             <tr><td>1</td><td>User + IDV issuer</td><td>User completes a live identity check (liveness + document-to-selfie match) at a trusted IDV issuer, initiated from <code>/api/ishuman/start-verification</code>. Didit is the default issuer; Stripe Identity is supported as a legacy option.</td></tr>
             <tr><td>2</td><td>Issuer webhook</td><td>The issuer webhook (<code>/api/webhooks/didit-identity</code>, or <code>/api/webhooks/stripe-identity</code> for the legacy path) confirms an approved result and records verification state. Issuance fails closed on any non-approved decision.</td></tr>
             <tr><td>3</td><td>Credential issuance</td><td>Lemma derives the verified-person root and issues a signed verified-human credential (<code>isHuman: true</code> claim) with issuer metadata and TTL.</td></tr>
-            <tr><td>4</td><td>Wallet bridge</td><td>Client requests credential through <code>/wallet/bridge</code>. If needed, bridge calls <code>/api/ishuman/derive-site-proof</code>.</td></tr>
+            <tr><td>4</td><td>Site-proof popup</td><td>On a cache miss, the verifier opens a Lemma-hosted popup (<code>/wallet/ishuman-idv</code>) which derives a per-site proof via <code>/api/ishuman/derive-site-proof</code> and returns a signed session presentation.</td></tr>
             <tr><td>5</td><td>Site verifier SDK</td><td><code>IsHumanVerifier</code> validates claim, expiry, revocation membership, and Ed25519 signature locally in browser.</td></tr>
         </tbody>
     </table>
@@ -66,7 +66,7 @@
             <tr><th>Option</th><th>Type</th><th>Default</th><th>Notes</th></tr>
         </thead>
         <tbody>
-            <tr><td><code>siteId</code></td><td>string</td><td><code>window.location.hostname</code></td><td>Registered site identifier used for bridge requests.</td></tr>
+            <tr><td><code>siteId</code></td><td>string</td><td><code>window.location.hostname</code></td><td>Registered site identifier used for per-site proof derivation.</td></tr>
             <tr><td><code>lemmaOrigin</code></td><td>string</td><td><code>https://lemma.id</code></td><td>Override for non-production testing environments.</td></tr>
             <tr><td><code>debug</code></td><td>boolean</td><td><code>false</code></td><td>Enables SDK console logging.</td></tr>
             <tr><td><code>isBlockedLocally</code></td><td>function</td><td><code>null</code></td><td>Optional local callback for site-level PPID block checks.</td></tr>
@@ -118,7 +118,7 @@
         <li>Each site's PPID is derived from the <strong>verified-person root</strong> and the normalized site hostname (<code>PPID = HMAC(person_root, site_domain)</code>). Binding to the person root — not a wallet secret, email, or device — is what makes a ban survive resets and resource rotation.</li>
         <li>Derived credentials are site-specific and pairwise-unlinkable; one site's PPID cannot be correlated with another site's PPID.</li>
         <li>Relying sites receive only a human verdict and their own site-private PPID — never the user's name, ID document, date of birth, or other PII.</li>
-        <li>Wallet bridge and derivation paths preserve separation between the internal site identifier (<code>site_...</code>, used for ownership and database binding) and the normalized hostname (used for PPID derivation and runtime matching).</li>
+        <li>Issuance and derivation paths preserve separation between the internal site identifier (<code>site_...</code>, used for ownership and database binding) and the normalized hostname (used for PPID derivation and runtime matching).</li>
     </ul>
     <div class="callout callout--info">
         <div class="callout-title">What lemma.id can and can't see</div>
