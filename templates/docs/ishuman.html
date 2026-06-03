@@ -17,10 +17,14 @@
 
 <div class="docs-section">
     <h2>What is lemma.id?</h2>
-    <p>lemma.id is an identity-rooted enforcement layer for websites and applications. A user verifies once through Stripe Identity, then receives an Ed25519-signed credential that can be reused across sites while preserving privacy via per-site PPIDs.</p>
+    <p>lemma.id is an identity-rooted enforcement layer for websites and applications. A user verifies once through a trusted IDV issuer (Didit by default; Stripe Identity supported as a legacy option), then receives an Ed25519-signed credential that can be reused across sites while preserving privacy via per-site PPIDs.</p>
+    <div class="callout callout--info">
+        <div class="callout-title">Assurance</div>
+        <p>Credentials are issued only after a live identity check — liveness detection plus document-to-selfie matching. A bot, AI agent, or stolen ID image cannot obtain a credential, because a live human had to match a genuine government document at issuance.</p>
+    </div>
     <div class="callout callout--info">
         <div class="callout-title">Core model</div>
-        <p>Master credential is issued for <code>lemma.id</code>. On third-party sites, the wallet bridge derives a site-specific credential on first request and stores it for later use.</p>
+        <p>The credential is rooted in a <strong>verified-person root</strong> derived from the IDV result. A master credential is issued for <code>lemma.id</code>; on third-party sites, the wallet bridge derives a site-specific credential (a per-site PPID) from that person root on first request and stores it for later use. Because the binding is to the person root — not to a wallet, email, or device — resetting any of those does not mint a fresh, clean identity.</p>
     </div>
 </div>
 
@@ -31,9 +35,9 @@
             <tr><th>Step</th><th>Component</th><th>What happens</th></tr>
         </thead>
         <tbody>
-            <tr><td>1</td><td>User + Stripe Identity</td><td>User completes identity verification flow initiated from <code>/api/ishuman/start-verification</code>.</td></tr>
-            <tr><td>2</td><td>Stripe webhook</td><td><code>/api/webhooks/stripe-identity</code> receives <code>identity.verification_session.verified</code> and records verification state.</td></tr>
-            <tr><td>3</td><td>Credential issuance</td><td>Lemma issues a signed verified-human credential (<code>isHuman: true</code> claim) with issuer metadata and TTL.</td></tr>
+            <tr><td>1</td><td>User + IDV issuer</td><td>User completes a live identity check (liveness + document-to-selfie match) at a trusted IDV issuer, initiated from <code>/api/ishuman/start-verification</code>. Didit is the default issuer; Stripe Identity is supported as a legacy option.</td></tr>
+            <tr><td>2</td><td>Issuer webhook</td><td>The issuer webhook (<code>/api/webhooks/didit-identity</code>, or <code>/api/webhooks/stripe-identity</code> for the legacy path) confirms an approved result and records verification state. Issuance fails closed on any non-approved decision.</td></tr>
+            <tr><td>3</td><td>Credential issuance</td><td>Lemma derives the verified-person root and issues a signed verified-human credential (<code>isHuman: true</code> claim) with issuer metadata and TTL.</td></tr>
             <tr><td>4</td><td>Wallet bridge</td><td>Client requests credential through <code>/wallet/bridge</code>. If needed, bridge calls <code>/api/ishuman/derive-site-proof</code>.</td></tr>
             <tr><td>5</td><td>Site verifier SDK</td><td><code>IsHumanVerifier</code> validates claim, expiry, revocation membership, and Ed25519 signature locally in browser.</td></tr>
         </tbody>
@@ -81,7 +85,7 @@
             <tr><th>Method</th><th>Path</th><th>Purpose</th><th>Auth</th></tr>
         </thead>
         <tbody>
-            <tr><td><code>POST</code></td><td><code>/api/ishuman/start-verification</code></td><td>Create Stripe Identity verification session.</td><td>None</td></tr>
+            <tr><td><code>POST</code></td><td><code>/api/ishuman/start-verification</code></td><td>Create an IDV verification session (Didit by default; <code>provider=stripe_identity</code> for the legacy path).</td><td>None</td></tr>
             <tr><td><code>GET</code></td><td><code>/api/ishuman/verification-status/&lt;session_id&gt;</code></td><td>Poll verification status and fetch credential payload when ready.</td><td>None</td></tr>
             <tr><td><code>POST</code></td><td><code>/api/ishuman/site-block</code></td><td>Apply immediate site-level PPID block.</td><td><code>X-API-Key</code></td></tr>
             <tr><td><code>POST</code></td><td><code>/api/ishuman/site-unblock</code></td><td>Remove site-scoped block.</td><td><code>X-API-Key</code></td></tr>
@@ -111,9 +115,14 @@
 <div class="docs-section">
     <h2>Privacy Model (PPID by Site)</h2>
     <ul>
-        <li>PPID derivation binds identity to wallet secret + normalized site hostname.</li>
-        <li>Derived credentials are site-specific; one site's PPID cannot be correlated directly by another site.</li>
-        <li>Wallet bridge and derivation paths preserve separation between internal site IDs and runtime hostname binding.</li>
+        <li>Each site's PPID is derived from the <strong>verified-person root</strong> and the normalized site hostname (<code>PPID = HMAC(person_root, site_domain)</code>). Binding to the person root — not a wallet secret, email, or device — is what makes a ban survive resets and resource rotation.</li>
+        <li>Derived credentials are site-specific and pairwise-unlinkable; one site's PPID cannot be correlated with another site's PPID.</li>
+        <li>Relying sites receive only a human verdict and their own site-private PPID — never the user's name, ID document, date of birth, or other PII.</li>
+        <li>Wallet bridge and derivation paths preserve separation between the internal site identifier (<code>site_...</code>, used for ownership and database binding) and the normalized hostname (used for PPID derivation and runtime matching).</li>
     </ul>
+    <div class="callout callout--info">
+        <div class="callout-title">What lemma.id can and can't see</div>
+        <p>lemma.id holds the verified-person root that links a person's credentials for re-verification and revocation. It does <strong>not</strong> retain the raw ID document, and because verification runs locally in the browser, lemma.id does not observe which relying sites a user visits or when they verify. The person root is the deliberate, single correlation point that enables network-wide revocation; sites themselves remain unable to correlate users across domains.</p>
+    </div>
 </div>
 {% endblock %}

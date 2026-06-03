@@ -227,8 +227,8 @@
         <div style="max-width: 800px; margin: 0 auto; text-align: center;">
             <p style="font-size: var(--font-size-sm); font-weight: 600; text-transform: uppercase; letter-spacing: 2px; color: var(--primary); margin-bottom: 16px;">Enforcement for bot abuse &amp; ban evasion</p>
             <h1 style="font-size: clamp(2.5rem, 5vw, 3.5rem); line-height: 1.1; margin-bottom: 24px;">Make bans cost more<br>than a new email.</h1>
-            <p style="font-size: var(--font-size-xl); font-weight: 500; margin-bottom: var(--space-4); color: var(--gray-700);">lemma.id gives websites an identity-rooted enforcement layer for bot abuse, fraud, and ban evasion. Your existing systems detect suspicious behavior. lemma.id lets you bind risky accounts to a verified human, block site-private PPIDs, and require fresh IDV when abuse is confirmed.</p>
-            <p style="font-size: var(--font-size-base); color: var(--gray-600); max-width: 600px; margin: 0 auto;">Most users never see verification. Suspicious users do. Local signed proofs keep routine checks fast and private.</p>
+            <p style="font-size: var(--font-size-xl); font-weight: 500; margin-bottom: var(--space-4); color: var(--gray-700);">lemma.id gives websites an identity-rooted enforcement layer for bot abuse, fraud, and ban evasion. Your existing systems detect suspicious behavior. lemma.id lets you bind risky accounts to a live, document-verified human, block site-private PPIDs, and require fresh IDV when abuse is confirmed.</p>
+            <p style="font-size: var(--font-size-base); color: var(--gray-600); max-width: 600px; margin: 0 auto;">Credentials are only issued after a live identity check with liveness and document-to-selfie matching — so bots, AI agents, and stolen ID images can't earn one. Most users never see verification. Suspicious users do. Local signed proofs keep routine checks fast and private.</p>
             <!-- Dynamic card: changes based on user's lemma status -->
             <!-- Fixed min-height prevents CLS when state changes -->
             <div id="lemma-status-card" style="margin-top: 32px; border-radius: 12px; min-height: 120px;">
@@ -308,7 +308,7 @@
                         <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
                         <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
                     </svg>
-                    <span>Detection stays yours — enforcement gets teeth</span>
+                    <span>Liveness-checked humans, not bots or AI</span>
                 </div>
                 <div style="display: flex; align-items: center; gap: 8px;">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -509,6 +509,11 @@
         <!-- Feature cards -->
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 32px;">
             <div class="card">
+                <h3 class="card-title">Live, Verified Humans Only</h3>
+                <p>Proofs are issued only after a live identity check — liveness detection plus document-to-selfie matching at a trusted IDV issuer. Bots, AI agents, and stolen ID images can't obtain one.</p>
+            </div>
+
+            <div class="card">
                 <h3 class="card-title">Master + Derived Credentials</h3>
                 <p>Issue one master proof at lemma.id, then derive per-site credentials that preserve user privacy across domains.</p>
             </div>
@@ -569,7 +574,7 @@
                 <div class="flow-node">
                     <div class="flow-node-icon">3</div>
                     <h4>IDV issuer flow</h4>
-                    <p>None found. SDK launches in-context verification with an IDV issuer (Stripe Identity today).</p>
+                    <p>None found. SDK launches in-context verification with a trusted IDV issuer — a live check with liveness and document-to-selfie matching.</p>
                 </div>
                 <div class="flow-arrow" aria-hidden="true">→</div>
                 <div class="flow-node">
@@ -623,7 +628,8 @@
         </div>
 
         <div style="text-align: center; margin-top: 56px; max-width: 720px; margin-left: auto; margin-right: auto;">
-            <p style="color: var(--gray-700); font-size: var(--font-size-base);"><strong>The wallet works like a physical driver's license:</strong> issuers sign once, sites verify locally, and users carry the credential. Sites can't correlate you with each other — each sees only a site-private PPID. The issuer can recognize the same person across re-verification, and that's exactly what makes a ban enforceable.</p>
+            <p style="color: var(--gray-700); font-size: var(--font-size-base);"><strong>The wallet works like a physical driver's license:</strong> issuers sign once, sites verify locally, and users carry the credential. Sites can't correlate you with each other — each sees only a site-private PPID, never your name, document, or other PII. The issuer can recognize the same person across re-verification, and that's exactly what makes a ban enforceable.</p>
+            <p style="color: var(--gray-600); font-size: var(--font-size-sm); margin-top: 16px;"><strong>What lemma.id can and can't see.</strong> lemma.id holds the verified-person root that links your credentials for re-verification and revocation — but it does not store your raw ID document and, because checks run locally in the browser, it does not see which sites you visit or when you verify. Relying sites receive only a human verdict and a PPID scoped to their own domain.</p>
         </div>
     </div>
 </section>
@@ -677,6 +683,7 @@
             <p style="font-size: var(--font-size-sm); font-weight: 700; text-transform: uppercase; letter-spacing: 2px; color: var(--primary); margin-bottom: 12px;">The network effect</p>
             <h2 style="margin-bottom: 16px;">Enforcement that compounds across sites</h2>
             <p class="text-gray" style="max-width: 700px; margin: 0 auto;">Every site gets standalone value on day one — no network required. But because the person-root is shared, a verified human carries their proof across Lemma-enabled sites, and confirmed network-wide abuse can be revoked everywhere at once. The same identity can't simply start fresh somewhere else either.</p>
+            <p class="text-gray" style="max-width: 700px; margin: 16px auto 0; font-style: italic;">Proof-of-humanity is the first claim on this rails. The same wallet, person-root, and local-verification model are designed to carry additional privacy-preserving proofs over time — like age or one-account-per-person — without ever exposing the underlying identity.</p>
         </div>
 
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 24px; margin-bottom: 40px;">
