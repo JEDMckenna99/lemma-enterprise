@@ -147,6 +147,14 @@ def test_didit_webhook_verified_issues_master(
 
     monkeypatch.setattr("api.ishuman._complete_verified_ishuman_from_didit", _fake_complete)
 
+    purged = {}
+
+    def _fake_delete(self, session_id):
+        purged["session_id"] = session_id
+        return {"success": True, "status_code": 204}
+
+    monkeypatch.setattr("billing.didit_manager.DiditManager.delete_session", _fake_delete)
+
     resp = ishuman_client.post(
         "/api/webhooks/didit-identity",
         data=b"{}",
@@ -161,6 +169,9 @@ def test_didit_webhook_verified_issues_master(
     assert row.ppid == "did:lemma:ppid_didit_master"
     assert row.verified_at is not None
     assert row.metadata_json["credential_issuer_did"] == "did:lemma:issuer:test"
+    # process-and-purge: the upstream didit session is deleted after issuance.
+    assert purged["session_id"] == "didit_sess_002"
+    assert row.metadata_json["didit_purged_at"]
 
 
 @pytest.mark.integration

@@ -460,7 +460,66 @@ def _maybe_pull_issue_didit(db, record) -> bool:
         "isHuman credential issued via didit pull-fallback: credential_id=%s session=%s",
         credential.get("id"), record.provider_session_id,
     )
+    _purge_didit_session_after_issuance(db, record)
     return True
+
+
+def _purge_didit_session_after_issuance(db, record) -> None:
+    """Best-effort delete of the upstream didit session after durable issuance.
+
+    Didit "process-and-purge" data minimization: once Lemma has issued the
+    credential and committed the verified record, the raw IDV session (document
+    image, liveness, decision) at didit is no longer needed, so we delete it
+    from the upstream processor. This shrinks Lemma's third-party data exposure
+    and supports GDPR storage-limitation.
+
+    Invariants:
+      * Runs only after the verified record is committed (caller contract), so
+        a purge can never lose issuance state.
+      * Never raises and never affects the credential the caller already issued.
+      * Idempotent: skips if already purged; didit 404 counts as success.
+    """
+    from api.config import is_ishuman_didit_purge_enabled
+
+    if not is_ishuman_didit_purge_enabled():
+        return
+    if (getattr(record, "issuer_id", "") or "") != "didit":
+        return
+    session_id = getattr(record, "provider_session_id", "") or ""
+    if not session_id:
+        return
+    meta = record.metadata_json or {}
+    if meta.get("didit_purged_at"):
+        return
+
+    try:
+        from billing.didit_manager import DiditManager
+        result = DiditManager().delete_session(session_id)
+    except Exception:
+        logger.exception(
+            "Didit session purge raised (non-fatal) for session %s", session_id
+        )
+        return
+
+    if not result.get("success"):
+        logger.warning(
+            "Didit session purge unsuccessful for session %s: %s",
+            session_id, result.get("error"),
+        )
+        return
+
+    record.metadata_json = {
+        **meta,
+        "didit_purged_at": datetime.utcnow().isoformat() + "Z",
+    }
+    try:
+        db.commit()
+    except Exception:
+        db.rollback()
+        logger.exception(
+            "Failed to persist didit purge marker for session %s", session_id
+        )
+    logger.info("Purged upstream didit session %s after issuance", session_id)
 
 
 def revoke_wallet_network_wide(
@@ -1155,6 +1214,8 @@ def didit_identity_webhook():
                     "Failed to clear amnesty-eligible revocations after didit verified for wallet %s",
                     wallet_id,
                 )
+
+            _purge_didit_session_after_issuance(db, record)
 
         elif status in ("declined", "expired", "abandoned"):
             record.status = "failed" if status == "declined" else status

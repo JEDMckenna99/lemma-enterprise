@@ -56,7 +56,7 @@
             <li><strong>Bloom Filter Revocation:</strong> Revocation lists use probabilistic Bloom filters designed to reduce direct disclosure of specific revoked credential IDs</li>
             <li><strong>Pairwise Identifiers (PPIDs):</strong> Each user gets a unique identifier per site, which helps limit cross-site linkability</li>
             <li><strong>Client-Side Storage:</strong> Credentials are stored in the browser wallet for normal sign-in flows; server systems may retain minimal issuance/audit metadata.</li>
-            <li><strong>Zero-Knowledge Architecture:</strong> Your server verifies credentials without contacting Lemma.id - we don't know when or where users authenticate</li>
+            <li><strong>Local Return-Visit Verification:</strong> For routine sign-in checks, your server verifies credentials locally using Ed25519 signatures without contacting Lemma.id, so we do not observe those individual verification events. Initial identity verification (IDV) does involve our servers: we receive the verification outcome from the IDV provider and derive minimal, encrypted identifiers from it (we do not retain raw identity documents, face images, or your legal name).</li>
             <li><strong>No Third-Party Tracking:</strong> We do not sell or share your data with advertisers</li>
         </ul>
 

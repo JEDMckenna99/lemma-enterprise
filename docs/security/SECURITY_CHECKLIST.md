@@ -275,7 +275,7 @@ We follow responsible disclosure and will work with you to resolve issues.
 
 ## Compliance Notes
 
-- **GDPR**: No personal data stored on Lemma servers. All data client-side.
-- **CCPA**: Same as GDPR - no server-side data collection.
+- **GDPR**: Lemma is a data-minimized **controller** (likely joint controller with the IDV provider for the verification step). Relying sites receive only a site-private PPID and a boolean claim. Lemma does **not** store raw documents, face/selfie images, or legal name, but **does** store derived, re-identifiable pseudonymous data (document/person root hashes, PPIDs, wallet↔person bindings, revocation state) and logs IP/UA on some paths. Pseudonymous data is still personal data (GDPR Recital 26). Erasure is implemented via `POST /api/ishuman/erase`. See `docs/architecture/PRIVACY_ARCHITECTURE.md` for the authoritative, code-accurate data inventory. Do **not** claim "no personal data on Lemma servers."
+- **CCPA**: No sale of personal information. Same controller posture and data inventory as the GDPR note above.
 - **SOC 2**: In progress (server infrastructure only).
 - **PCI DSS**: Not applicable - no payment data handling.

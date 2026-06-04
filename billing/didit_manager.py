@@ -243,6 +243,65 @@ class DiditManager:
         status = str(decision.get("status") or "").strip().lower()
         return {"success": True, "status": status, "decision": decision}
 
+    def delete_session(self, session_id: str) -> Dict[str, Any]:
+        """Delete (purge) a verification session from didit.
+
+        Implements didit's "process-and-purge" data-minimization pattern: once
+        Lemma has issued the credential, the upstream IDV session (document
+        image, liveness, decision) is no longer needed and is removed from
+        didit. This is a soft delete on didit's side (sets ``deleted_at`` and
+        immediately hides the session and its feature records from the list and
+        decision endpoints); the row is hard-deleted once didit's configured
+        retention window expires.
+
+        Idempotent: both ``204 No Content`` (deleted) and ``404 Not Found``
+        (already deleted / unknown ``session_id``) are treated as success.
+        Never raises; the caller treats any failure as non-fatal so issuance is
+        never coupled to upstream purge availability.
+
+        Docs: https://docs.didit.me/console/data-retention (process-and-purge);
+        the documented purge call is ``DELETE /v3/session/{session_id}/``. If
+        your didit tenant uses the ``/v3/session/{session_id}/delete/`` route
+        instead, set ``DIDIT_DELETE_PATH_TEMPLATE`` accordingly.
+        """
+        if not self.enabled:
+            return {"success": False, "error": "didit_not_configured"}
+        if not session_id:
+            return {"success": False, "error": "session_id required"}
+
+        import os
+        path_template = (
+            os.environ.get("DIDIT_DELETE_PATH_TEMPLATE")
+            or "/v3/session/{session_id}/"
+        )
+        url = f"{self.api_base}{path_template.format(session_id=session_id)}"
+        try:
+            resp = requests.delete(
+                url,
+                headers={
+                    "accept": "application/json",
+                    "x-api-key": self.api_key,
+                },
+                timeout=_SESSION_TIMEOUT_SECONDS,
+            )
+        except requests.RequestException as exc:
+            logger.error("Didit session delete failed: %s", exc)
+            return {"success": False, "error": "didit_request_failed", "message": str(exc)}
+
+        # 200/202/204 => deleted; 404 => already gone / unknown (idempotent).
+        if resp.status_code in (200, 202, 204, 404):
+            return {"success": True, "status_code": resp.status_code}
+
+        logger.warning(
+            "Didit session delete non-success: %s %s",
+            resp.status_code, resp.text[:300],
+        )
+        return {
+            "success": False,
+            "error": "didit_delete_failed",
+            "status_code": resp.status_code,
+        }
+
     def verify_webhook(
         self,
         raw_body: bytes,

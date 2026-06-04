@@ -270,6 +270,22 @@ def is_ishuman_pull_fallback_enabled() -> bool:
     return _env_truthy("LEMMA_ISHUMAN_PULL_FALLBACK", True)
 
 
+def is_ishuman_didit_purge_enabled() -> bool:
+    """Whether to delete the upstream didit session after credential issuance.
+
+    Implements didit's "process-and-purge" data-minimization pattern
+    (https://docs.didit.me/console/data-retention): once Lemma has durably
+    issued the credential, the raw IDV session (document image, liveness,
+    decision) at didit is no longer needed and is deleted from the upstream
+    processor. Best-effort and non-fatal to issuance. Enabled by default
+    whenever the didit rail is configured; set LEMMA_ISHUMAN_DIDIT_PURGE=0 to
+    disable (e.g. to retain sessions for debugging in a staging environment).
+    """
+    if not is_ishuman_didit_enabled():
+        return False
+    return _env_truthy("LEMMA_ISHUMAN_DIDIT_PURGE", True)
+
+
 def ppid_require_person_root() -> bool:
     """Fail closed instead of deriving a divergent legacy wallet-secret PPID.
 
