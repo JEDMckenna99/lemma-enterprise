@@ -8,6 +8,32 @@
 
 ---
 
+## Status snapshot (as of 2026-06-03)
+
+Most of v2 is built and shipped. Verified against the codebase:
+
+
+| Item                                    | Status               | Evidence                                                                                                                                                                                                                                                                             |
+| --------------------------------------- | -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 1.1 Seed-envelope derivation            | 🟡 Built, flag-gated | `/api/ishuman/seed-envelope`, `_maybe_store_seed_envelopes`, `seed_version` col, wallet wired; gated by `LEMMA_ISHUMAN_USE_PERSON_ROOT_SEEDS` (default off) — confirm prod env state                                                                                                 |
+| 1.2 Optional `master_credential_id`     | ✅ Done               | derive-site-proof hint fallback + `wallet_not_verified`; `test_derive_site_proof.py`                                                                                                                                                                                                 |
+| 1.3 `/api/ishuman/reissue-master`       | ✅ Done               | endpoint + `test_ishuman_reissue_master.py`                                                                                                                                                                                                                                          |
+| 2.1 Remove bridge iframe                | ✅ Done               | bridge fully removed + cleanup (wallet v2.62.0)                                                                                                                                                                                                                                      |
+| 2.2 Drop daily-unlock bundle            | 🟢 Superseded        | Bundle is now encrypted (non-extractable device key) + fail-closed, which resolves the bug class 2.2 targeted without losing "1 passkey / 24h". Runtime opt-out `LEMMA_DISABLE_DAILY_UNLOCK` remains for validation. Invariants pinned by `tests/test_wallet_daily_unlock_bundle.py` |
+| 3.1 Pepper/salt rotation                | ✅ Done               | `LEMMA_ACTIVE_ROOT_VERSION`, versioned `_get_identity_root_pepper`, `test_identity_root_versioning.py`                                                                                                                                                                               |
+| 3.2 Multi-issuer                        | ✅ Done (live)        | Stripe + Didit; `issuer_id` (migrations 026/027); `billing/didit_manager.py`                                                                                                                                                                                                         |
+| 3.3 Bloom scaling (cascade)             | 🟡 Lib only          | `CascadedBloomFilter` in `lemma-crypto`; **not wired** into the Python revocation path (defer until >500K revocations)                                                                                                                                                               |
+| 4.1 Re-IDV recovery                     | ✅ Done               | `RECOVERY.md` + reissue/re-IDV                                                                                                                                                                                                                                                       |
+| 4.2 QR cross-device transfer            | ✅ Done               | `/api/wallet/sync-device`, `test_wallet_sync_device.py`                                                                                                                                                                                                                              |
+| 5.1 Pin crypto invariants               | ✅ Done               | `test_cryptographic_invariants.py`                                                                                                                                                                                                                                                   |
+| 5.2 / 5.3 Threat model / canonical spec | ✅ Done               | `THREAT_MODEL.md`, `CANONICAL_MESSAGES.md`                                                                                                                                                                                                                                           |
+| 6.1 / 6.2 Demo/prod split + env doc     | ✅ Done               | `lemma-staging` Heroku remote; `ENVIRONMENT_CONFIG.md`                                                                                                                                                                                                                               |
+
+
+Remaining work: rollout confirmation for **1.1** (env flag) and optional wiring for **3.3** (not urgent at current volume). **2.2** is superseded — see below.
+
+---
+
 ## 0. Codebase orientation
 
 Read these files first to internalize the current architecture:
@@ -109,11 +135,18 @@ If you're picking one item at a time, do them in this order:
 
 Each phase is independently shippable. Don't try to do all of them in one PR.
 
+> **Note (2026-06-03):** This ordering is historical. Per the Status snapshot above,
+> phases 1.2, 1.3, 2.1, 3.1, 3.2, 4.1, 4.2, 5.x, and 6.x are already implemented.
+> Phase 1.1 is built behind a flag; 3.3 exists in the crypto lib only; 2.2 is
+> superseded by the encrypted, fail-closed bundle.
+
 ---
 
 ## Phase 1 — Identity layer simplification
 
-### 1.1 Consolidate `wallet_secret` and `person_root` into a single derivation tree
+### 1.1 Consolidate `wallet_secret` and `person_root` into a single derivation tree — 🟡 BUILT (flag-gated)
+
+**Status:** Implemented end-to-end (server `/api/ishuman/seed-envelope` + `_maybe_store_seed_envelopes`, `seed_version` column, wallet client in `lemma-wallet.js`/`lemma-keys.js`, `test_ishuman_identity_derivation.py`). Gated by `LEMMA_ISHUMAN_USE_PERSON_ROOT_SEEDS` (default off). Remaining: confirm/plan the prod rollout of the flag and the legacy-path deprecation window.
 
 **Problem:** Today two parallel root secrets exist with overlapping responsibilities. Cross-wallet recovery is awkward; the trust-domain story is muddier than it needs to be; users get confused.
 
@@ -181,7 +214,9 @@ Mathematically the client-side PPID and server-side PPID are computed from the s
 
 **Risk:** Two derivation paths during migration window. Carefully namespaced (legacy uses `wallet_secret`, post-IDV uses `wallet_local_seed`). Cross-checks: server-derived and client-derived PPIDs must always match.
 
-### 1.2 Make `master_credential_id` optional in server flows
+### 1.2 Make `master_credential_id` optional in server flows — ✅ DONE
+
+**Status:** Implemented in `api/ishuman.py` (`/api/ishuman/derive-site-proof` uses hint-based lookup with fallback to the latest verified record, returning `wallet_not_verified` when none). Covered by `tests/test_derive_site_proof.py`.
 
 **Problem:** `/api/ishuman/derive-site-proof` requires `master_credential_id` in the body. The wallet's `findIsHumanMasterCredential()` is on the critical path. This couples the master VC to runtime correctness — a wallet that lost its local master copy can't issue site proofs even though the server has all needed state.
 
@@ -230,7 +265,9 @@ Update the wallet's `deriveAndStoreSiteProof` in `lemma-wallet.js` to omit `mast
 - Request with stale hint falls back to latest verified
 - Request for unverified wallet returns `wallet_not_verified`
 
-### 1.3 Add `/api/ishuman/reissue-master` endpoint
+### 1.3 Add `/api/ishuman/reissue-master` endpoint — ✅ DONE
+
+**Status:** Implemented (`reissue_master_credential` in `api/ishuman.py`). Covered by `tests/test_ishuman_reissue_master.py`.
 
 **Problem:** If a wallet loses its local master VC (clear IndexedDB, new device, etc.), there's no way to re-fetch it. Today the only "recovery" is re-IDV.
 
@@ -373,9 +410,36 @@ SDK.verify():
 
 **Risk:** Popup blockers. Mitigation: every popup open is on a user gesture (click handler), never auto-fire.
 
-### 2.2 Drop the daily-unlock bundle, use per-popup unlock
+### 2.2 Drop the daily-unlock bundle, use per-popup unlock — 🟢 SUPERSEDED
 
-**Problem:** "One passkey per day" persistence requires a `lemma_ishuman_lock:v1` localStorage bundle that survives reloads. This bundle has been the source of multiple bugs (`envelope_invalid`, stale state across storage partitioning, encrypted credential reads without PRF key).
+**Status:** Superseded — **do not implement as written.** The original justification
+(the localStorage bundle being a recurring source of `envelope_invalid` / stale-state
+bugs) was driven by an early *plaintext* bundle. The bundle is now:
+
+- **Encrypted at rest:** sensitive material (`walletSecret`, the PRF-derived at-rest
+key) is wrapped under a **non-extractable device key** (`wallet-at-rest-crypto.js`);
+only non-sensitive metadata stays cleartext for the synchronous validity gate.
+- **Fail-closed:** `_restoreIsHumanLockBundleIfValid()` clears the bundle and forces
+a fresh passkey whenever it is expired, missing a `walletId`, or whenever the
+encrypted envelope can't be unwrapped (e.g. wrap key rotated/cleared). It never
+proceeds without a recovered secret.
+
+Deleting the bundle (the 2.2 proposal) would re-introduce the exact double-prompt
+friction that `_isHumanLockDisabled()` was written to avoid (one passkey before IDV,
+one after), trading a hardened, working "one passkey per 24h" UX for a debt cleanup
+that is already largely paid.
+
+**Escape hatch (no code change needed):** the runtime flag `LEMMA_DISABLE_DAILY_UNLOCK`
+already disables the bundle end-to-end. If product ever wants to push toward per-popup
+unlock, validate the friction by setting that flag on staging/demo first — no deletion
+required.
+
+**Invariants pinned:** `tests/test_wallet_daily_unlock_bundle.py` guards the
+encrypted + fail-closed behavior (expiry / missing-walletId / undecryptable-envelope
+all clear and return false; a valid bundle restores the session and re-imports the
+at-rest key; the disabled flag short-circuits).
+
+**Historical problem (for context):** "One passkey per day" persistence requires a `lemma_ishuman_lock:v1` localStorage bundle that survives reloads. This bundle has been the source of multiple bugs (`envelope_invalid`, stale state across storage partitioning, encrypted credential reads without PRF key).
 
 **v2 design:** Each popup invocation does its own passkey check if needed. With `userVerification: "preferred"` and modern browser credential discovery, recently-authenticated users may not see a prompt at all (browser handles "I just passkey'd" silently).
 
@@ -397,7 +461,9 @@ In `templates/wallet_ishuman_idv.html`:
 
 ## Phase 3 — Operational hardening
 
-### 3.1 Design pepper/salt rotation
+### 3.1 Design pepper/salt rotation — ✅ DONE
+
+**Status:** Implemented in `api/identity_roots.py` (versioned `_get_identity_root_pepper(version, issuer)` + `LEMMA_ACTIVE_ROOT_VERSION`, `root_version` on records, migration 024). Covered by `tests/test_identity_root_versioning.py`.
 
 **Problem:** `LEMMA_IDENTITY_ROOT_PEPPER_V1` and `LEMMA_PERSON_ROOT_SALT_V1` are network-root secrets. If compromised, an attacker can compute `person_root` for any documents they know. No rotation path exists today.
 
@@ -444,9 +510,11 @@ A user verified pre-rotation has different PPIDs than post-rotation. To preserve
 
 This is a UX cost — sites must do the migration, or accept that rotation creates a discontinuity. Acceptable as an emergency operation, not a routine one.
 
-### 3.2 Multi-issuer trust list
+### 3.2 Multi-issuer trust list — ✅ DONE (live)
 
-**Problem:** Stripe Identity is the only configured IDV provider. Trust list architecture already supports multiple issuers but only one is integrated.
+**Status:** Implemented and live. Two issuers are integrated — Didit (default) and Stripe Identity (legacy) — with per-record `issuer_id` (migrations 026/027) and per-issuer root material (`billing/didit_manager.py`, `tests/test_ishuman_didit_issuance.py`, `tests/test_didit_`*). The original "defer" note below is historical.
+
+**Problem (historical):** Stripe Identity is the only configured IDV provider. Trust list architecture already supports multiple issuers but only one is integrated.
 
 **v2 design:**
 
@@ -460,7 +528,9 @@ This is a UX cost — sites must do the migration, or accept that rotation creat
 
 Defer until the first issuer is stable at production scale and there's a business case for redundancy.
 
-### 3.3 Bloom filter scaling
+### 3.3 Bloom filter scaling — 🟡 LIB ONLY
+
+**Status:** `CascadedBloomFilter` (Option A) is implemented in `lemma-crypto/src/bloom.rs` with tests, but it is **not wired** into the Python revocation publish/verify path — production still uses the single global Bloom. No action needed until revocation volume approaches the ~500K threshold below.
 
 **Problem:** Current Bloom is global, sized for ~100K capacity at 1e-6 FPR. Beyond ~1M revocations, false positives become operationally meaningful.
 
@@ -495,7 +565,9 @@ Simpler than cascaded; requires multi-issuer to be in production first.
 
 ## Phase 4 — Recovery & transfer
 
-### 4.1 Document re-IDV as the primary recovery path
+### 4.1 Document re-IDV as the primary recovery path — ✅ DONE
+
+**Status:** Documented in `docs/wallet/RECOVERY.md`; recovery is backed by reissue (1.3) + re-IDV.
 
 **Problem:** Re-IDV restores everything (post-Phase 1 changes), but it's undocumented and users don't know it's an option.
 
@@ -507,7 +579,9 @@ Simpler than cascaded; requires multi-issuer to be in production first.
 
 No code change required beyond ensuring Phase 1.3 (reissue master) is shipped — re-IDV + reissue gives the full recovery story.
 
-### 4.2 Explicit cross-device wallet transfer (QR-based)
+### 4.2 Explicit cross-device wallet transfer (QR-based) — ✅ DONE
+
+**Status:** Implemented (`/api/wallet/sync-device` in `api/ishuman.py`, reusing the seed-envelope machinery). Covered by `tests/test_wallet_sync_device.py`.
 
 **Problem:** `_processCredentialTransferToken` exists but is URL-fragment based. Not the primary UX. Best for users who explicitly want to transfer without re-IDV.
 
@@ -531,7 +605,9 @@ No code change required beyond ensuring Phase 1.3 (reissue master) is shipped �
 
 ## Phase 5 — Documentation & tests
 
-### 5.1 Pin cryptographic invariants in tests
+### 5.1 Pin cryptographic invariants in tests — ✅ DONE
+
+**Status:** Implemented in `tests/test_cryptographic_invariants.py` (plus the Rust suites under `lemma-crypto/tests/`).
 
 **Problem:** The system has crypto invariants enforced only by code. Refactoring can silently break them. Need lock-in.
 
@@ -578,7 +654,9 @@ def test_wallet_signing_key_derivation():
 
 These should be the first tests to break if anyone introduces a canonical-format-changing refactor. Each pinned value must be produced by running the live code once and copy-pasting.
 
-### 5.2 Threat model document
+### 5.2 Threat model document — ✅ DONE
+
+**Status:** Written at `docs/security/THREAT_MODEL.md`.
 
 **New file `docs/security/THREAT_MODEL.md`:**
 
@@ -649,7 +727,9 @@ Structure:
 
 Fill in details from current implementation. Make it living document; update with each Phase.
 
-### 5.3 Canonical message specification
+### 5.3 Canonical message specification — ✅ DONE
+
+**Status:** Written at `docs/cryptographic/CANONICAL_MESSAGES.md`.
 
 **New file `docs/cryptographic/CANONICAL_MESSAGES.md`:**
 
@@ -673,7 +753,9 @@ Third-party SDKs (Go, Rust) need this to produce verifiable signatures. Without 
 
 ## Phase 6 — Demo / production split
 
-### 6.1 Run two Heroku apps
+### 6.1 Run two Heroku apps — ✅ DONE
+
+**Status:** A separate `lemma-staging` Heroku app/remote exists alongside `lemma-enterprise` (production). Demo/staging semantics are split from production.
 
 **Problem:** `lemma-enterprise` Heroku app has `ENVIRONMENT=production`, which:
 
@@ -711,7 +793,9 @@ The demo subtree apps (`lemma-demo-tickets`, `lemma-demo-trials`) point at the *
 
 **Risk:** Operationally simple but takes a few hours to provision and verify.
 
-### 6.2 Document the env var contract
+### 6.2 Document the env var contract — ✅ DONE
+
+**Status:** Written at `docs/operations/ENVIRONMENT_CONFIG.md`.
 
 **New file `docs/operations/ENVIRONMENT_CONFIG.md`:**
 
