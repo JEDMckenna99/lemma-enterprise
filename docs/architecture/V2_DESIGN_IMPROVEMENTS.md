@@ -15,7 +15,7 @@ Most of v2 is built and shipped. Verified against the codebase:
 
 | Item                                    | Status               | Evidence                                                                                                                                                                                                                                                                             |
 | --------------------------------------- | -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| 1.1 Seed-envelope derivation            | 🟡 Built, flag-gated | `/api/ishuman/seed-envelope`, `_maybe_store_seed_envelopes`, `seed_version` col, wallet wired; gated by `LEMMA_ISHUMAN_USE_PERSON_ROOT_SEEDS` (default off) — confirm prod env state                                                                                                 |
+| 1.1 Seed-envelope derivation            | ✅ Live (prod+staging) | `/api/ishuman/seed-envelope`, `_maybe_store_seed_envelopes`, `seed_version` col, wallet wired. `LEMMA_ISHUMAN_USE_PERSON_ROOT_SEEDS=true` on prod+staging **and** the client global is now injected on every SDK page (`inject_wallet_feature_flags` → `window.LEMMA_ISHUMAN_USE_PERSON_ROOT_SEEDS`), so the seed path is active end-to-end. Self-gating per wallet (only wallets with a fetched envelope switch signing keys); coverage grows with re-IDV |
 | 1.2 Optional `master_credential_id`     | ✅ Done               | derive-site-proof hint fallback + `wallet_not_verified`; `test_derive_site_proof.py`                                                                                                                                                                                                 |
 | 1.3 `/api/ishuman/reissue-master`       | ✅ Done               | endpoint + `test_ishuman_reissue_master.py`                                                                                                                                                                                                                                          |
 | 2.1 Remove bridge iframe                | ✅ Done               | bridge fully removed + cleanup (wallet v2.62.0)                                                                                                                                                                                                                                      |
@@ -144,9 +144,16 @@ Each phase is independently shippable. Don't try to do all of them in one PR.
 
 ## Phase 1 — Identity layer simplification
 
-### 1.1 Consolidate `wallet_secret` and `person_root` into a single derivation tree — 🟡 BUILT (flag-gated)
+### 1.1 Consolidate `wallet_secret` and `person_root` into a single derivation tree — ✅ LIVE
 
-**Status:** Implemented end-to-end (server `/api/ishuman/seed-envelope` + `_maybe_store_seed_envelopes`, `seed_version` column, wallet client in `lemma-wallet.js`/`lemma-keys.js`, `test_ishuman_identity_derivation.py`). Gated by `LEMMA_ISHUMAN_USE_PERSON_ROOT_SEEDS` (default off). Remaining: confirm/plan the prod rollout of the flag and the legacy-path deprecation window.
+**Status:** Implemented and **active in production**. Server side (`/api/ishuman/seed-envelope` + `_maybe_store_seed_envelopes`, `seed_version` column, `test_ishuman_identity_derivation.py`) is enabled via `LEMMA_ISHUMAN_USE_PERSON_ROOT_SEEDS=true` on prod and staging. The previously-missing client half is now wired: `inject_wallet_feature_flags()` mirrors the server flag and every page that loads the wallet SDK (modern layout + the standalone IDV, popup, unlock, recover, and demo pages) emits `window.LEMMA_ISHUMAN_USE_PERSON_ROOT_SEEDS`, so `fetchAndStoreSeedEnvelopes()` and seed-derived site signing now run.
+
+Behavior notes confirmed during rollout:
+
+- **PPID is unaffected.** `derivePPID()` returns the subject baked into the server-issued person-root credential (`_derivePPIDFromIsHumanCredential` wins), so flipping the flag does not change the pairwise identifier a site sees.
+- **Self-gating per wallet.** `useSeed = flag && session.walletLocalSeed`; a wallet with no envelope keeps `wallet_secret`. Only wallets that complete the post-IDV `enc_pubkey` handshake switch their site signing key.
+- **Signing-key transition self-heals.** Switching to `walletLocalSeed` changes a wallet's site signing pubkey; already-issued credentials pin the old pubkey, so their session assertions go `invalid` until the next `derive_site_proof` re-issues with the current pubkey (one transient re-auth, worst case).
+- **Coverage grows with re-IDV.** Envelopes accrue only through the updated IDV popup, so older verifications gain seeds as users re-IDV (no forced backfill required).
 
 **Problem:** Today two parallel root secrets exist with overlapping responsibilities. Cross-wallet recovery is awkward; the trust-domain story is muddier than it needs to be; users get confused.
 
