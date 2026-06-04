@@ -76,8 +76,14 @@ def create_app():
         provider, to drop the cross-site sync overhead.
         """
         flag = os.getenv('LEMMA_CROSS_SITE_LOCK_ENABLED', 'true').strip().lower()
+        try:
+            from api.seed_envelope import use_person_root_seeds_enabled
+            seeds_enabled = use_person_root_seeds_enabled()
+        except Exception:
+            seeds_enabled = False
         return {
             'cross_site_lock_enabled': flag in ('1', 'true', 'yes', 'on'),
+            'ishuman_use_person_root_seeds': seeds_enabled,
         }
 
     # ================================================================================
