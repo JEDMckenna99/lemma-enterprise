@@ -22,7 +22,7 @@ Most of v2 is built and shipped. Verified against the codebase:
 | 2.2 Drop daily-unlock bundle            | 🟢 Superseded        | Bundle is now encrypted (non-extractable device key) + fail-closed, which resolves the bug class 2.2 targeted without losing "1 passkey / 24h". Runtime opt-out `LEMMA_DISABLE_DAILY_UNLOCK` remains for validation. Invariants pinned by `tests/test_wallet_daily_unlock_bundle.py` |
 | 3.1 Pepper/salt rotation                | ✅ Done               | `LEMMA_ACTIVE_ROOT_VERSION`, versioned `_get_identity_root_pepper`, `test_identity_root_versioning.py`                                                                                                                                                                               |
 | 3.2 Multi-issuer                        | ✅ Done (live)        | Stripe + Didit; `issuer_id` (migrations 026/027); `billing/didit_manager.py`                                                                                                                                                                                                         |
-| 3.3 Bloom scaling (cascade)             | 🟡 Lib only          | `CascadedBloomFilter` in `lemma-crypto`; **not wired** into the Python revocation path (defer until >500K revocations)                                                                                                                                                               |
+| 3.3 Bloom scaling (cascade)             | ⛔ Not viable as-is   | `lemma-crypto` `CascadedBloomFilter` is **not** the CRLite design (adds every item to every level) and hashes with BLAKE3 vs the live path's `sha256_dh32le`, so it cannot be wired or verified by the JS client. Deferred anyway until >500K revocations (prod <100). A real build = greenfield CRLite in pure Python + JS — see 3.3 below |
 | 4.1 Re-IDV recovery                     | ✅ Done               | `RECOVERY.md` + reissue/re-IDV                                                                                                                                                                                                                                                       |
 | 4.2 QR cross-device transfer            | ✅ Done               | `/api/wallet/sync-device`, `test_wallet_sync_device.py`                                                                                                                                                                                                                              |
 | 5.1 Pin crypto invariants               | ✅ Done               | `test_cryptographic_invariants.py`                                                                                                                                                                                                                                                   |
@@ -30,7 +30,7 @@ Most of v2 is built and shipped. Verified against the codebase:
 | 6.1 / 6.2 Demo/prod split + env doc     | ✅ Done               | `lemma-staging` Heroku remote; `ENVIRONMENT_CONFIG.md`                                                                                                                                                                                                                               |
 
 
-Remaining work: rollout confirmation for **1.1** (env flag) and optional wiring for **3.3** (not urgent at current volume). **2.2** is superseded — see below.
+Remaining work: none blocking. **1.1** is now live in prod (server flag + client injection). **3.3** is deferred until >500K revocations and, separately, the existing `lemma-crypto` cascade is not viable to wire (wrong algorithm + BLAKE3 vs `sha256_dh32le`) — see 3.3 below. **2.2** is superseded — see below.
 
 ---
 
@@ -136,9 +136,9 @@ If you're picking one item at a time, do them in this order:
 Each phase is independently shippable. Don't try to do all of them in one PR.
 
 > **Note (2026-06-03):** This ordering is historical. Per the Status snapshot above,
-> phases 1.2, 1.3, 2.1, 3.1, 3.2, 4.1, 4.2, 5.x, and 6.x are already implemented.
-> Phase 1.1 is built behind a flag; 3.3 exists in the crypto lib only; 2.2 is
-> superseded by the encrypted, fail-closed bundle.
+> phases 1.1, 1.2, 1.3, 2.1, 3.1, 3.2, 4.1, 4.2, 5.x, and 6.x are already implemented
+> (1.1 is now live in prod). 3.3 is deferred and its `lemma-crypto` cascade is not
+> viable to wire as-is; 2.2 is superseded by the encrypted, fail-closed bundle.
 
 ---
 
@@ -535,9 +535,19 @@ This is a UX cost — sites must do the migration, or accept that rotation creat
 
 Defer until the first issuer is stable at production scale and there's a business case for redundancy.
 
-### 3.3 Bloom filter scaling — 🟡 LIB ONLY
+### 3.3 Bloom filter scaling — ⛔ NOT VIABLE AS-IS (deferred)
 
-**Status:** `CascadedBloomFilter` (Option A) is implemented in `lemma-crypto/src/bloom.rs` with tests, but it is **not wired** into the Python revocation publish/verify path — production still uses the single global Bloom. No action needed until revocation volume approaches the ~500K threshold below.
+**Status:** Production uses a single global Bloom built in `api/revocation_api.py` (`_build_bloom_bitset_sha256_dh32le`, capacity 100K @ 1e-6 FPR), signed via `api/bloom_snapshot.py`, and queried client-side in `static/js/ishuman-verifier.js`. No action is needed at current volume (prod has well under 100 revocations), and — separately — the existing `lemma-crypto` artifact **cannot** simply be wired in.
+
+**Audit finding (2026-06): the `lemma-crypto` `CascadedBloomFilter` is not usable for this path.** Do not assume "lib exists ⇒ ready to wire." Three independent blockers:
+
+1. **It is not the CRLite cascade this section describes.** `CascadedBloomFilter::add` inserts every item into *every* level and `contains` returns "present if any level hits" (`lemma-crypto/src/bloom.rs`). That is a set of redundant filters, not the CRLite construction (Layer 2 = the false positives of Layer 1, with an even/odd-depth "not revoked" decision). It does not lower the effective false-positive rate, so it delivers none of Option A's benefit.
+2. **Hash-incompatible with the live path and the browser.** It hashes with **BLAKE3** (`utils.rs::generate_hash_values`), while both the Python publisher and the JS verifier use deterministic **`sha256_dh32le`** double-hashing. A browser verifier cannot reproduce BLAKE3 membership, so the artifact can never drive client-side verification.
+3. **No Python binding.** It is Rust with no PyO3/maturin binding compiled into the Heroku Python buildpack; using it from Flask would add a Rust toolchain to the Python deploy.
+
+**What a real Phase 3.3 requires (when volume justifies it):** a greenfield CRLite-style cascade implemented as **pure Python** (builder in/near `api/revocation_api.py`) plus a **JS** query in `ishuman-verifier.js`, both keyed on the existing `sha256_dh32le` hashing, with a new signed multi-layer envelope format in `api/bloom_snapshot.py` (sign over per-layer `m_bits/k_hashes/content_hash`), shipped **additively behind a flag** alongside the global Bloom and pinned by parity tests (Python build ↔ JS query). The Rust artifact should be treated as unrelated/legacy, not a starting point.
+
+**Decision criteria (unchanged):** build only when revocation volume exceeds ~500K. Until then the single global Bloom is correct and tiny.
 
 **Problem:** Current Bloom is global, sized for ~100K capacity at 1e-6 FPR. Beyond ~1M revocations, false positives become operationally meaningful.
 
