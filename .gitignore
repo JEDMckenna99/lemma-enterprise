@@ -86,3 +86,7 @@ docs/launch-evidence/
 
 # Cursor project state
 .cursor/
+
+# Generated artifact (regenerate via scripts/generate_auth_scope_matrix.py)
+docs/api/AUTH_SCOPE_MATRIX_V1.json
+
