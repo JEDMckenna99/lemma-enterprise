@@ -26,6 +26,10 @@
         <div class="callout-title">Core model</div>
         <p>The credential is rooted in a <strong>verified-person root</strong> derived from the IDV result. A master credential is issued for <code>lemma.id</code>; on third-party sites, a Lemma-hosted popup derives a site-specific credential (a per-site PPID) from that person root on first request and stores it for later use. Because the binding is to the person root — not to a wallet, email, or device — resetting any of those does not mint a fresh, clean identity.</p>
     </div>
+    <div class="callout callout--info">
+        <div class="callout-title">What your servers store: nothing sensitive</div>
+        <p>The live identity check runs at the IDV issuer, and <code>verify()</code> returns only <code>{ human, ppid }</code>. Your backend never receives the government ID, selfie, legal name, or date of birth — so you get an enforcement-grade human signal <strong>without running a KYC stack or holding the PII that makes identity verification a compliance and breach liability</strong>. Store the <code>ppid</code> on your user record; treat it as an opaque per-site identifier, not as sensitive identity data.</p>
+    </div>
 </div>
 
 <div class="docs-section">

@@ -227,7 +227,7 @@
         <div style="max-width: 800px; margin: 0 auto; text-align: center;">
             <p style="font-size: var(--font-size-sm); font-weight: 600; text-transform: uppercase; letter-spacing: 2px; color: var(--primary); margin-bottom: 16px;">Enforcement for bot abuse &amp; ban evasion</p>
             <h1 style="font-size: clamp(2.5rem, 5vw, 3.5rem); line-height: 1.1; margin-bottom: 24px;">Make bans cost more<br>than a new email.</h1>
-            <p style="font-size: var(--font-size-xl); font-weight: 500; margin-bottom: var(--space-4); color: var(--gray-700);">lemma.id gives websites an identity-rooted enforcement layer for bot abuse, fraud, and ban evasion. Your existing systems detect suspicious behavior. lemma.id lets you bind risky accounts to a live, document-verified human, block site-private PPIDs, and require fresh IDV when abuse is confirmed.</p>
+            <p style="font-size: var(--font-size-xl); font-weight: 500; margin-bottom: var(--space-4); color: var(--gray-700);">lemma.id gives websites an identity-rooted enforcement layer for bot abuse, fraud, and ban evasion. Your existing systems detect suspicious behavior. lemma.id lets you bind risky accounts to a live, document-verified human, block site-private PPIDs, and require fresh IDV when abuse is confirmed — all without your servers ever storing a customer's ID document, legal name, or date of birth.</p>
             <p style="font-size: var(--font-size-base); color: var(--gray-600); max-width: 600px; margin: 0 auto;">Credentials are only issued after a live identity check with liveness and document-to-selfie matching — so bots, AI agents, and stolen ID images can't earn one. Most users never see verification. Suspicious users do. Local signed proofs keep routine checks fast and private.</p>
             <!-- Dynamic card: changes based on user's lemma status -->
             <!-- Fixed min-height prevents CLS when state changes -->
@@ -317,6 +317,13 @@
                         <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
                     </svg>
                     <span>Friction only on suspicion</span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                        <line x1="9" y1="11" x2="15" y2="11"/>
+                    </svg>
+                    <span>No ID documents on your servers</span>
                 </div>
             </div>
         </div>
@@ -546,6 +553,32 @@
     </div>
 </section>
 
+<!-- Benefit: enforcement without the PII burden -->
+<section class="section" id="no-pii-burden" style="background: var(--white);">
+    <div class="container">
+        <div style="text-align: center; margin-bottom: 48px;">
+            <p style="font-size: var(--font-size-sm); font-weight: 700; text-transform: uppercase; letter-spacing: 2px; color: var(--primary); margin-bottom: 12px;">Identity-grade signal, none of the data liability</p>
+            <h2>Enforcement without becoming an identity store</h2>
+            <p class="text-gray" style="max-width: 740px; margin: 16px auto 0;">A verified-human signal strong enough to enforce bans shouldn't force you to hold the PII that makes identity verification a compliance and breach liability. The live identity check happens at the IDV issuer — your site receives only a human verdict and a site-private PPID.</p>
+        </div>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 24px; max-width: 960px; margin: 0 auto;">
+            <div class="card">
+                <h3 class="card-title">No ID documents on your servers</h3>
+                <p>Your backend never receives the government ID, selfie, legal name, or date of birth — so there's no new identity honeypot to secure, breach, or be subpoenaed for.</p>
+            </div>
+            <div class="card">
+                <h3 class="card-title">No KYC stack to run</h3>
+                <p>Skip building and maintaining your own identity-verification pipeline and provider integrations. Add a script tag and call <code>verify()</code>.</p>
+            </div>
+            <div class="card">
+                <h3 class="card-title">Only a verdict + a site-private ID</h3>
+                <p>Each site receives a human yes/no and a PPID scoped to its own domain — not a reusable global identity, and nothing it has to treat as sensitive identity data.</p>
+            </div>
+        </div>
+        <p style="text-align: center; margin-top: 32px; max-width: 720px; margin-left: auto; margin-right: auto; color: var(--gray-600); font-size: var(--font-size-sm);">lemma.id carries the verified-person root needed for re-verification and revocation, so your site stays out of the identity-data business entirely.</p>
+    </div>
+</section>
+
 <!-- Data Flow Diagram Section -->
 <section class="section" id="data-flow">
     <div class="container">
@@ -729,6 +762,7 @@
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 20px; max-width: 900px; margin: 0 auto;">
             <div class="card"><h3 class="card-title">Not bot detection</h3><p>Your existing tools find suspicious behavior. lemma.id makes the consequence stick.</p></div>
             <div class="card"><h3 class="card-title">Not a global public identity</h3><p>Each site sees only a site-private PPID — not one reusable ID across the web.</p></div>
+            <div class="card"><h3 class="card-title">Not an identity store you run</h3><p>Your servers never hold ID documents, names, or dates of birth — only a verdict and a site-private PPID. No KYC stack, no PII honeypot.</p></div>
             <div class="card"><h3 class="card-title">Not permanent punishment</h3><p>Enforcement is tiered: site block, fresh IDV, then network revocation for severe abuse.</p></div>
             <div class="card"><h3 class="card-title">Not a full fraud replacement</h3><p>Works alongside your risk stack — device fingerprinting, velocity rules, and behavior models.</p></div>
         </div>
@@ -740,7 +774,7 @@
 <section class="section" style="background: var(--gray-900); color: var(--white); padding: 80px 0;">
     <div class="container" style="text-align: center;">
         <h2 style="color: var(--white); font-size: var(--font-size-3xl); margin-bottom: 20px;">Give Your Bans Teeth</h2>
-        <p style="color: var(--gray-400); font-size: var(--font-size-lg); margin-bottom: 48px; max-width: 600px; margin-left: auto; margin-right: auto;">Add identity-rooted enforcement, step-up IDV on suspicion, and site-private privacy with a production-ready SDK and API — without running your own KYC stack.</p>
+        <p style="color: var(--gray-400); font-size: var(--font-size-lg); margin-bottom: 48px; max-width: 600px; margin-left: auto; margin-right: auto;">Add identity-rooted enforcement, step-up IDV on suspicion, and site-private privacy with a production-ready SDK and API — without running your own KYC stack or storing a single ID document.</p>
         <div style="display: flex; gap: 20px; justify-content: center; flex-wrap: wrap;">
             <a href="/app" class="btn btn-primary" style="font-size: var(--font-size-lg); padding: 16px 32px;">
                 Get Verified
