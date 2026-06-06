@@ -347,6 +347,7 @@ def _complete_verified_ishuman_from_didit(
     *,
     wallet_id: str,
     decision: dict,
+    workflow_id: Optional[str] = None,
 ) -> Optional[dict]:
     """Resolve document/person roots from a didit decision and issue the master VC.
 
@@ -355,11 +356,12 @@ def _complete_verified_ishuman_from_didit(
     Stripe session. Lemma still signs the credential with its own issuer key.
     Returns the credential dict on success, None on root material failure.
     """
-    from api.identity_roots import IdentityRootMaterialError, active_root_version
+    from api.identity_roots import IdentityRootMaterialError, active_root_version, validate_didit_workflow_id
     from api.identity_person import process_verified_didit_identity
     from api.ppid import derive_ppid_from_person_root_hash
 
     try:
+        validate_didit_workflow_id(workflow_id)
         resolved = process_verified_didit_identity(
             db,
             decision=decision,
@@ -428,9 +430,14 @@ def _maybe_pull_issue_didit(db, record) -> bool:
         return False
 
     decision = result.get("decision") or {}
+    workflow_id = decision.get("workflow_id") or result.get("workflow_id")
     try:
         credential = _complete_verified_ishuman_from_didit(
-            db, record, wallet_id=record.wallet_id, decision=decision,
+            db,
+            record,
+            wallet_id=record.wallet_id,
+            decision=decision,
+            workflow_id=workflow_id,
         )
     except Exception:
         db.rollback()
@@ -465,18 +472,16 @@ def _maybe_pull_issue_didit(db, record) -> bool:
 
 
 def _purge_didit_session_after_issuance(db, record) -> None:
-    """Best-effort delete of the upstream didit session after durable issuance.
+    """Best-effort delete of the upstream didit session after a terminal outcome.
 
-    Didit "process-and-purge" data minimization: once Lemma has issued the
-    credential and committed the verified record, the raw IDV session (document
-    image, liveness, decision) at didit is no longer needed, so we delete it
-    from the upstream processor. This shrinks Lemma's third-party data exposure
-    and supports GDPR storage-limitation.
+    Didit "process-and-purge" data minimization: once Lemma has durably recorded
+    the session outcome (credential issued, or declined/expired/abandoned), the
+    raw IDV session (document image, liveness, decision) at didit is no longer
+    needed, so we delete it from the upstream processor.
 
     Invariants:
-      * Runs only after the verified record is committed (caller contract), so
-        a purge can never lose issuance state.
-      * Never raises and never affects the credential the caller already issued.
+      * Runs only after the caller has committed the terminal record state.
+      * Never raises and never affects credentials the caller already issued.
       * Idempotent: skips if already purged; didit 404 counts as success.
     """
     from api.config import is_ishuman_didit_purge_enabled
@@ -1178,7 +1183,11 @@ def didit_identity_webhook():
             decision = body.get("decision") or {}
             wallet_id = record.wallet_id or ""
             credential = _complete_verified_ishuman_from_didit(
-                db, record, wallet_id=wallet_id, decision=decision,
+                db,
+                record,
+                wallet_id=wallet_id,
+                decision=decision,
+                workflow_id=body.get("workflow_id"),
             )
             if not credential:
                 db.commit()
@@ -1220,6 +1229,7 @@ def didit_identity_webhook():
         elif status in ("declined", "expired", "abandoned"):
             record.status = "failed" if status == "declined" else status
             db.commit()
+            _purge_didit_session_after_issuance(db, record)
 
         return jsonify({"received": True}), 200
 

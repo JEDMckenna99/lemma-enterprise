@@ -204,7 +204,7 @@ def test_pull_issue_issues_on_approved_decision(monkeypatch):
 
     monkeypatch.setattr(
         ish, "_complete_verified_ishuman_from_didit",
-        lambda db, record, *, wallet_id, decision: {
+        lambda db, record, *, wallet_id, decision, workflow_id=None: {
             "id": "ishuman_master_pulled",
             "issuerInfo": {"did": "did:lemma:issuer"},
         },

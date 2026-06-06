@@ -332,25 +332,56 @@ def _normalize_didit_dob(value: Any) -> str:
     return raw
 
 
+def _didit_feature_entry_approved(entry: Any) -> bool:
+    return str((entry or {}).get("status", "")).strip().lower() == "approved"
+
+
+def _require_approved_didit_feature_array(
+    decision: dict[str, Any],
+    key: str,
+    label: str,
+) -> None:
+    """Fail closed unless at least one entry in a V3 plural feature array is Approved."""
+    entries = decision.get(key)
+    if not isinstance(entries, list) or not entries:
+        raise IdentityRootMaterialError(f"didit decision missing {key}")
+    if not any(_didit_feature_entry_approved(v) for v in entries):
+        raise IdentityRootMaterialError(f"no approved didit {label}")
+
+
+def validate_didit_workflow_id(workflow_id: Optional[str]) -> None:
+    """Ensure the session used the configured proof-of-humanity Didit workflow."""
+    from api.config import get_didit_workflow_id
+
+    expected = (get_didit_workflow_id() or "").strip().lower()
+    if not expected:
+        return
+    actual = (workflow_id or "").strip().lower()
+    if actual != expected:
+        raise IdentityRootMaterialError(
+            f"didit workflow_id mismatch: expected {expected}, got {actual or '(missing)'}"
+        )
+
+
 def extract_root_material_from_didit_decision(decision: dict[str, Any]) -> StripeIdentityRootMaterial:
     """Parse a verified didit ``decision`` payload into document-root material.
 
-    Reads the first approved entry of ``id_verifications[]`` (the V3 plural
-    schema). Maps didit's alpha-3 issuing country and human-readable document
-    type onto Lemma's canonical forms. Raises ``IdentityRootMaterialError`` when
-    the decision is missing required fields or is not approved (fail closed).
+    Requires approved entries in ``id_verifications[]``, ``liveness_checks[]``,
+    and ``face_matches[]`` (the proof-of-humanity workflow). Maps didit's alpha-3
+    issuing country and human-readable document type onto Lemma's canonical forms.
+    Raises ``IdentityRootMaterialError`` when required fields are missing or any
+    feature is not approved (fail closed).
     """
     if not isinstance(decision, dict):
         raise IdentityRootMaterialError("didit decision must be an object")
 
-    id_verifications = decision.get("id_verifications") or []
-    if not isinstance(id_verifications, list) or not id_verifications:
-        raise IdentityRootMaterialError("didit decision missing id_verifications")
+    _require_approved_didit_feature_array(decision, "id_verifications", "id_verification")
+    _require_approved_didit_feature_array(decision, "liveness_checks", "liveness_check")
+    _require_approved_didit_feature_array(decision, "face_matches", "face_match")
 
-    idv = next(
-        (v for v in id_verifications if str((v or {}).get("status", "")).strip().lower() == "approved"),
-        None,
-    )
+    id_verifications = decision.get("id_verifications") or []
+
+    idv = next((v for v in id_verifications if _didit_feature_entry_approved(v)), None)
     if idv is None:
         raise IdentityRootMaterialError("no approved didit id_verification")
 

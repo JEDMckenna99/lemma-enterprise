@@ -112,7 +112,9 @@ def test_didit_document_root_canonicalization_is_stable(monkeypatch):
                 "date_of_birth": "1990-01-01",
                 "issuing_state": "ESP",
             }
-        ]
+        ],
+        "liveness_checks": [{"node_id": "liveness_1", "status": "Approved"}],
+        "face_matches": [{"node_id": "face_match_1", "status": "Approved"}],
     }
     material = extract_root_material_from_didit_decision(decision)
     claims = build_document_root_claims(material, provider="didit")

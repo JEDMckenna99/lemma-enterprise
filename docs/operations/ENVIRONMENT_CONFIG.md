@@ -69,7 +69,7 @@ both the API key and workflow id are present.
 | --------------------------------- | ---------------------------------------------------------------------------------- | --------------------------------------------- |
 | `LEMMA_ISHUMAN_DIDIT_ENABLED`     | `"true"` selects didit as a *selectable* provider (still requires key+workflow).   | Didit rail disabled; `provider=didit` -> 400. |
 | `DIDIT_API_KEY`                   | `x-api-key` for `POST /v3/session/` (hosted verification session creation).        | `is_ishuman_didit_enabled()` returns false.   |
-| `DIDIT_WORKFLOW_ID`               | Didit workflow that defines the verification steps.                                | `is_ishuman_didit_enabled()` returns false.   |
+| `DIDIT_WORKFLOW_ID`               | Didit workflow UUID for proof-of-humanity (ID verification + liveness + face match only). Production value: `668fbf42-cfb7-4774-9ecd-564c297d4a07`. | `is_ishuman_didit_enabled()` returns false.   |
 | `DIDIT_WEBHOOK_SECRET`            | HMAC secret for verifying `X-Signature-V2` on `/api/webhooks/didit-identity`.      | Webhook verification fails closed (401).      |
 | `DIDIT_API_BASE`                  | Base URL for the didit API. Default `https://verification.didit.me`.               | Defaults to production didit.                 |
 | `LEMMA_ISHUMAN_DIDIT_PURGE`       | Delete the upstream didit session after the credential is durably issued (process-and-purge data minimization). Default `"true"`; set `0` to retain sessions (e.g. staging debugging). | Defaults on; best-effort and non-fatal to issuance. |

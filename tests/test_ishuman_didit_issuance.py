@@ -14,6 +14,7 @@ from __future__ import annotations
 import pytest
 
 from tests.conftest import START_ASSERTION_FIELDS
+from tests.test_didit_root_material import PROOF_OF_HUMANITY_WORKFLOW_ID, _approved_poh_decision
 
 
 @pytest.mark.integration
@@ -125,16 +126,21 @@ def test_didit_webhook_verified_issues_master(
     monkeypatch.setattr("api.database.SessionLocal", db.session_local)
     monkeypatch.setattr("api.config.is_ishuman_didit_enabled", lambda: True)
     monkeypatch.setattr(
+        "api.config.get_didit_workflow_id",
+        lambda: PROOF_OF_HUMANITY_WORKFLOW_ID,
+    )
+    monkeypatch.setattr(
         "billing.didit_manager.DiditManager.verify_webhook",
         lambda self, raw, **kw: {
             "webhook_type": "status.updated",
             "status": "Approved",
             "session_id": "didit_sess_002",
-            "decision": {"id_verifications": [{"status": "Approved"}]},
+            "workflow_id": PROOF_OF_HUMANITY_WORKFLOW_ID,
+            "decision": _approved_poh_decision(),
         },
     )
 
-    def _fake_complete(db, record, *, wallet_id, decision):
+    def _fake_complete(db, record, *, wallet_id, decision, workflow_id=None):
         record.lemma_person_id = "person_didit_1"
         record.document_root_hash = "d" * 64
         record.ppid = "did:lemma:ppid_didit_master"
@@ -171,6 +177,58 @@ def test_didit_webhook_verified_issues_master(
     assert row.metadata_json["credential_issuer_did"] == "did:lemma:issuer:test"
     # process-and-purge: the upstream didit session is deleted after issuance.
     assert purged["session_id"] == "didit_sess_002"
+    assert row.metadata_json["didit_purged_at"]
+
+
+@pytest.mark.integration
+def test_didit_webhook_terminal_failure_purges_session(
+    ishuman_client,
+    fake_ishuman_db_session_factory,
+    make_ishuman_verification,
+    monkeypatch,
+):
+    from api.database import IsHumanVerification
+
+    db = fake_ishuman_db_session_factory
+    db.store.data["IsHumanVerification"].append(
+        make_ishuman_verification(
+            session_id="ishuman_sess_didit_fail",
+            stripe_session_id=None,
+            provider_session_id="didit_sess_fail",
+            issuer_id="didit",
+            wallet_id="wallet_test_001",
+            status="pending",
+        )
+    )
+    monkeypatch.setattr("api.database.SessionLocal", db.session_local)
+    monkeypatch.setattr("api.config.is_ishuman_didit_enabled", lambda: True)
+    monkeypatch.setattr(
+        "billing.didit_manager.DiditManager.verify_webhook",
+        lambda self, raw, **kw: {
+            "webhook_type": "status.updated",
+            "status": "Abandoned",
+            "session_id": "didit_sess_fail",
+        },
+    )
+
+    purged = {}
+
+    def _fake_delete(self, session_id):
+        purged["session_id"] = session_id
+        return {"success": True, "status_code": 204}
+
+    monkeypatch.setattr("billing.didit_manager.DiditManager.delete_session", _fake_delete)
+
+    resp = ishuman_client.post(
+        "/api/webhooks/didit-identity",
+        data=b"{}",
+        headers={"X-Signature-V2": "sig", "X-Timestamp": "1"},
+    )
+    assert resp.status_code == 200
+
+    row = db.store.data[IsHumanVerification.__name__][0]
+    assert row.status == "abandoned"
+    assert purged["session_id"] == "didit_sess_fail"
     assert row.metadata_json["didit_purged_at"]
 
 

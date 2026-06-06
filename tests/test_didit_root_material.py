@@ -13,7 +13,26 @@ from api.identity_roots import (
     extract_root_material_from_didit_decision,
     map_didit_country,
     map_didit_document_type,
+    validate_didit_workflow_id,
 )
+
+PROOF_OF_HUMANITY_WORKFLOW_ID = "668fbf42-cfb7-4774-9ecd-564c297d4a07"
+
+
+def _approved_poh_decision(**idv_overrides) -> dict:
+    idv = {
+        "status": "Approved",
+        "document_type": "Passport",
+        "document_number": "x 12-345 678",
+        "date_of_birth": "1985-03-12",
+        "issuing_state": "USA",
+        **idv_overrides,
+    }
+    return {
+        "id_verifications": [idv],
+        "liveness_checks": [{"status": "Approved", "method": "passive"}],
+        "face_matches": [{"status": "Approved", "score": 95}],
+    }
 
 
 @pytest.mark.unit
@@ -59,18 +78,11 @@ def test_document_type_unsupported_fails_closed():
 
 @pytest.mark.unit
 def test_extract_picks_approved_entry_and_normalizes():
-    decision = {
-        "id_verifications": [
-            {"status": "Declined", "document_type": "Passport"},
-            {
-                "status": "Approved",
-                "document_type": "Passport",
-                "document_number": "x 12-345 678",
-                "date_of_birth": "1985-03-12",
-                "issuing_state": "USA",
-            },
-        ]
-    }
+    decision = _approved_poh_decision()
+    decision["id_verifications"] = [
+        {"status": "Declined", "document_type": "Passport"},
+        decision["id_verifications"][0],
+    ]
     material = extract_root_material_from_didit_decision(decision)
     assert material.country == "US"
     assert material.document_type == "passport"
@@ -83,7 +95,8 @@ def test_extract_picks_approved_entry_and_normalizes():
 
 @pytest.mark.unit
 def test_extract_no_approved_entry_fails_closed():
-    decision = {"id_verifications": [{"status": "Declined"}]}
+    decision = _approved_poh_decision()
+    decision["id_verifications"] = [{"status": "Declined"}]
     with pytest.raises(IdentityRootMaterialError):
         extract_root_material_from_didit_decision(decision)
 
@@ -96,32 +109,64 @@ def test_extract_missing_id_verifications_fails_closed():
 
 @pytest.mark.unit
 def test_extract_missing_document_number_fails_closed():
-    decision = {
-        "id_verifications": [
-            {
-                "status": "Approved",
-                "document_type": "Passport",
-                "date_of_birth": "1985-03-12",
-                "issuing_state": "USA",
-            }
-        ]
-    }
+    decision = _approved_poh_decision(document_number="")
     with pytest.raises(IdentityRootMaterialError):
         extract_root_material_from_didit_decision(decision)
 
 
 @pytest.mark.unit
 def test_extract_bad_dob_fails_closed():
-    decision = {
-        "id_verifications": [
-            {
-                "status": "Approved",
-                "document_type": "Passport",
-                "document_number": "X12345678",
-                "date_of_birth": "12/03/1985",
-                "issuing_state": "USA",
-            }
-        ]
-    }
+    decision = _approved_poh_decision(date_of_birth="12/03/1985")
     with pytest.raises(IdentityRootMaterialError):
         extract_root_material_from_didit_decision(decision)
+
+
+@pytest.mark.unit
+def test_extract_missing_liveness_fails_closed():
+    decision = _approved_poh_decision()
+    decision["liveness_checks"] = []
+    with pytest.raises(IdentityRootMaterialError, match="liveness"):
+        extract_root_material_from_didit_decision(decision)
+
+
+@pytest.mark.unit
+def test_extract_declined_liveness_fails_closed():
+    decision = _approved_poh_decision()
+    decision["liveness_checks"] = [{"status": "Declined"}]
+    with pytest.raises(IdentityRootMaterialError, match="liveness"):
+        extract_root_material_from_didit_decision(decision)
+
+
+@pytest.mark.unit
+def test_extract_missing_face_match_fails_closed():
+    decision = _approved_poh_decision()
+    decision.pop("face_matches")
+    with pytest.raises(IdentityRootMaterialError, match="face_match"):
+        extract_root_material_from_didit_decision(decision)
+
+
+@pytest.mark.unit
+def test_extract_declined_face_match_fails_closed():
+    decision = _approved_poh_decision()
+    decision["face_matches"] = [{"status": "Declined"}]
+    with pytest.raises(IdentityRootMaterialError, match="face_match"):
+        extract_root_material_from_didit_decision(decision)
+
+
+@pytest.mark.unit
+def test_validate_workflow_id_matches_config(monkeypatch):
+    monkeypatch.setattr(
+        "api.config.get_didit_workflow_id",
+        lambda: PROOF_OF_HUMANITY_WORKFLOW_ID,
+    )
+    validate_didit_workflow_id(PROOF_OF_HUMANITY_WORKFLOW_ID)
+
+
+@pytest.mark.unit
+def test_validate_workflow_id_mismatch_fails_closed(monkeypatch):
+    monkeypatch.setattr(
+        "api.config.get_didit_workflow_id",
+        lambda: PROOF_OF_HUMANITY_WORKFLOW_ID,
+    )
+    with pytest.raises(IdentityRootMaterialError, match="workflow_id mismatch"):
+        validate_didit_workflow_id("wrong-workflow-id")
