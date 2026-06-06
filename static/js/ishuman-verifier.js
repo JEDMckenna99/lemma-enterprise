@@ -25,7 +25,14 @@
  * Optional `autoProvision: true` opens a Lemma-hosted popup to unlock the wallet
  * and complete IDV when no master isHuman proof is present yet.
  *
- * @version 1.5.6
+ * Attach the verified identity to your own logs:
+ *   const ih = new IsHumanVerifier({ siteId: 'your-site-id' });
+ *   await ih.verify({ autoProvision: true });        // once, at an entry point
+ *   const event = await ih.stamp({ action: 'post_comment' });
+ *   // -> { action: 'post_comment', lemma: { ppid, verified, ... } }
+ *   // POST `event` to YOUR backend. Lemma stores none of it.
+ *
+ * @version 1.6.0
  */
 
 (function () {
@@ -639,6 +646,102 @@ class IsHumanVerifier {
      */
     async checkStatus(options = {}) {
         return this.verify({ ...options, autoProvision: false });
+    }
+
+    /**
+     * Get the current user's verified PPID, or null if not verified.
+     *
+     * This is the simplest way to grab the site-scoped identifier at any point
+     * in your flows so you can associate it with an action in YOUR OWN system.
+     * By default it never opens a popup — it reads the cached session — so it's
+     * safe to call inline on a hot path. Pass { autoProvision: true } if you
+     * want it to trigger the Lemma popup when no proof exists yet.
+     *
+     * @returns {Promise<string|null>}
+     */
+    async getPPID(options = {}) {
+        const result = await this.verify({ autoProvision: false, ...options });
+        return result.human ? result.ppid : null;
+    }
+
+    /**
+     * Produce a compact, self-contained "verification stamp" describing the
+     * current user's isHuman status. This is the object you attach to your own
+     * logs / events. Lemma stores none of this — it lives entirely in your
+     * systems and you decide what to do with it.
+     *
+     * Shape:
+     *   {
+     *     verified:     boolean,       // was a valid human proof present?
+     *     ppid:         string|null,   // site-scoped pseudonymous id
+     *     reason:       string,        // verify() reason code
+     *     siteId:       string,
+     *     verifiedAt:   number,        // unix ms when this stamp was produced
+     *     expiresAt:    number|null,   // credential expiry (unix seconds)
+     *     credentialId: string|null,
+     *     proof:        object|null,   // signed presentation — only when
+     *                                  // { includeProof: true }
+     *   }
+     *
+     * `proof` (when requested) is the signed session presentation. You can
+     * store it as durable evidence and independently re-verify it later with
+     * the backend verifier (lemma-ishuman-verify.mjs / lemma_ishuman_verify.py)
+     * — no call back to lemma.id required.
+     *
+     * By default this does NOT open a popup. Pass { autoProvision: true } to
+     * verify-then-stamp at an entry point in your flow.
+     *
+     * @returns {Promise<Object>}
+     */
+    async getVerification(options = {}) {
+        const result = await this.verify({ autoProvision: false, ...options });
+        const credential = result.credential || null;
+        const claims = credential
+            ? (credential.claims || credential.credentialSubject || {})
+            : {};
+        const expiresAt = parseInt(
+            (credential && (credential.expiresAt || claims.expiresAt)) || '0',
+            10,
+        ) || null;
+        const stamp = {
+            verified: !!result.human,
+            ppid: result.ppid || null,
+            reason: result.reason,
+            siteId: this.siteId,
+            verifiedAt: Date.now(),
+            expiresAt,
+            credentialId: (credential && credential.id) || null,
+        };
+        if (options.includeProof) {
+            stamp.proof = result.presentation || null;
+        }
+        return stamp;
+    }
+
+    /**
+     * Attach a verification stamp to an arbitrary payload, returning a new
+     * object you can log, persist, or POST to your own backend. This is the
+     * one-liner for "associate the verified identity with any action".
+     *
+     *   const event = await ih.stamp({ action: 'checkout', amount: 4200 });
+     *   await fetch('/my/api/audit-log', {
+     *     method: 'POST',
+     *     headers: { 'Content-Type': 'application/json' },
+     *     body: JSON.stringify(event),
+     *   });
+     *   // event === { action: 'checkout', amount: 4200, lemma: { ppid, ... } }
+     *
+     * The verification data is merged under `options.key` (default 'lemma').
+     * Your original payload is never mutated. Nothing is sent to lemma.id.
+     *
+     * @param {Object} payload  your event/action object
+     * @param {Object} [options] { key?: string, includeProof?: bool, autoProvision?: bool }
+     * @returns {Promise<Object>}
+     */
+    async stamp(payload = {}, options = {}) {
+        const verification = await this.getVerification(options);
+        const key = options.key || 'lemma';
+        return { ...payload, [key]: verification };
     }
 
     async _verifyOnce(t0) {

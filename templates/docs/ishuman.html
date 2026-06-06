@@ -82,6 +82,83 @@
     <p>Common reasons include <code>valid</code>, <code>no_credential</code>, <code>expired</code>, <code>revoked</code>, <code>invalid_signature</code>, and <code>site_blocked</code>.</p>
 </div>
 
+<div class="docs-section" id="attach-to-your-logs">
+    <h2>Attach the verification to your own logs</h2>
+    <p>Once a user is verified, you usually want to associate their site-scoped PPID with actions you record &mdash; a comment, a checkout, a login, a moderation decision. The SDK gives you helpers to grab the verified identity at <strong>any point in your flow</strong> and attach it to anything you log. This data lives entirely in <strong>your</strong> systems &mdash; lemma.id stores none of it.</p>
+
+    <div class="callout callout--info">
+        <div class="callout-title">The pattern</div>
+        <p>Call <code>verify({ autoProvision: true })</code> once at an entry point (signup, login, first protected action). After that, <code>getPPID()</code>, <code>getVerification()</code>, and <code>stamp()</code> read the cached session with no popup and no network call &mdash; safe to drop inline anywhere.</p>
+    </div>
+
+    <h3>Helper methods</h3>
+    <table class="docs-table">
+        <thead>
+            <tr><th>Method</th><th>Returns</th><th>Notes</th></tr>
+        </thead>
+        <tbody>
+            <tr><td><code>getPPID(opts?)</code></td><td><code>Promise&lt;string | null&gt;</code></td><td>The verified PPID, or <code>null</code> if not verified. No popup by default.</td></tr>
+            <tr><td><code>getVerification(opts?)</code></td><td><code>Promise&lt;Stamp&gt;</code></td><td>A compact verification stamp (see shape below) you can log as-is.</td></tr>
+            <tr><td><code>stamp(payload, opts?)</code></td><td><code>Promise&lt;Object&gt;</code></td><td>Returns a copy of <code>payload</code> with the stamp merged in. Your payload is never mutated.</td></tr>
+        </tbody>
+    </table>
+    <p style="color: var(--gray-600); font-size: 14px;">Options: <code>{ key?: string (default <code>'lemma'</code>), includeProof?: boolean, autoProvision?: boolean }</code>. Pass <code>autoProvision: true</code> to verify-then-stamp at an entry point; otherwise these never open a popup.</p>
+
+    <h3>Stamp shape</h3>
+    <table class="docs-table">
+        <thead>
+            <tr><th>Field</th><th>Type</th><th>Meaning</th></tr>
+        </thead>
+        <tbody>
+            <tr><td><code>verified</code></td><td>boolean</td><td>Was a valid human proof present?</td></tr>
+            <tr><td><code>ppid</code></td><td>string \| null</td><td>Site-scoped pseudonymous identifier.</td></tr>
+            <tr><td><code>reason</code></td><td>string</td><td>The <code>verify()</code> reason code.</td></tr>
+            <tr><td><code>siteId</code></td><td>string</td><td>Your registered site identifier.</td></tr>
+            <tr><td><code>verifiedAt</code></td><td>number</td><td>Unix ms when the stamp was produced.</td></tr>
+            <tr><td><code>expiresAt</code></td><td>number \| null</td><td>Credential expiry (unix seconds).</td></tr>
+            <tr><td><code>credentialId</code></td><td>string \| null</td><td>The underlying credential id.</td></tr>
+            <tr><td><code>proof</code></td><td>object \| null</td><td>Signed presentation &mdash; only when <code>{ includeProof: true }</code>. Independently re-verifiable with the backend verifier; no call back to lemma.id.</td></tr>
+        </tbody>
+    </table>
+
+    <h3>Copy-paste</h3>
+    <div class="code-block">
+        <div class="code-header">
+            <span>JavaScript</span>
+            <button class="copy-btn">Copy</button>
+        </div>
+        <code>const ih = new IsHumanVerifier({ siteId: 'your-site-id' });
+
+// 1) Verify once at an entry point (this is the only call that may open a popup).
+await ih.verify({ autoProvision: true });
+
+// 2) Anywhere later in your flow, stamp an action and send it to YOUR backend.
+async function logAction(action, extra = {}) {
+  const event = await ih.stamp({ action, ...extra, at: Date.now() });
+  // event === { action, ..., at, lemma: { ppid, verified, reason, ... } }
+  await fetch('/my/api/audit-log', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(event),
+  });
+}
+
+await logAction('post_comment', { commentId: 123 });
+await logAction('checkout', { amountCents: 4200 });
+
+// Or just grab the id to store against your own user record:
+const ppid = await ih.getPPID();           // 'did:lemma:ppid_...' | null
+
+// Want durable, independently-verifiable evidence? Include the signed proof:
+const stampWithProof = await ih.getVerification({ includeProof: true });</code>
+    </div>
+
+    <div class="callout callout--info">
+        <div class="callout-title">You own the data</div>
+        <p>Treat the PPID as an opaque per-site key: store it on your user/account record and attach it to whatever events you already log. Because the PPID is stable per (person, site), it behaves like a durable user id for that user on your domain &mdash; ideal for activity history and, when needed, blocking via <a href="#revocation">Revocation</a>. The optional <code>proof</code> lets you keep cryptographic evidence that a given action came from a verified human, re-verifiable later with the <code>lemma-ishuman-verify</code> backend SDK &mdash; all without lemma.id ever seeing your logs.</p>
+    </div>
+</div>
+
 <div class="docs-section" id="api-reference">
     <h2>API Reference</h2>
     <table class="docs-table">
