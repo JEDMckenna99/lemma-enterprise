@@ -157,6 +157,39 @@ const stampWithProof = await ih.getVerification({ includeProof: true });</code>
         <div class="callout-title">You own the data</div>
         <p>Treat the PPID as an opaque per-site key: store it on your user/account record and attach it to whatever events you already log. Because the PPID is stable per (person, site), it behaves like a durable user id for that user on your domain &mdash; ideal for activity history and, when needed, blocking via <a href="#revocation">Revocation</a>. The optional <code>proof</code> lets you keep cryptographic evidence that a given action came from a verified human, re-verifiable later with the <code>lemma-ishuman-verify</code> backend SDK &mdash; all without lemma.id ever seeing your logs.</p>
     </div>
+
+    <h3>Re-verify a stored stamp on your backend</h3>
+    <p>If you captured the stamp with <code>{ includeProof: true }</code>, you can later confirm &mdash; entirely on your own infrastructure &mdash; that a logged action genuinely came from a verified human. <code>verifyStamp()</code> re-checks the signed proof <strong>and</strong> that the stamp's logged <code>ppid</code>/<code>credentialId</code> match it, so a tampered log row is rejected. lemma.id is contacted only to refresh the signed revocation snapshot (cached, ~15&nbsp;min), never per check.</p>
+    <div class="code-block">
+        <div class="code-header">
+            <span>Node.js / Deno / Workers</span>
+            <button class="copy-btn">Copy</button>
+        </div>
+        <code>import { createVerifier } from "https://lemma.id/sdk/lemma-ishuman-verify.mjs";
+
+const verifier = createVerifier({ siteId: "your-site-id" });
+
+// `row.lemma` is the stamp you stored from ih.stamp(..., { includeProof: true })
+const check = await verifier.verifyStamp(row.lemma);
+if (!check.ok) {
+  // reasons: invalid_signature | revoked | expired | stamp_ppid_mismatch | ...
+  flagSuspiciousLogRow(row, check.reason);
+}</code>
+    </div>
+    <div class="code-block">
+        <div class="code-header">
+            <span>Python</span>
+            <button class="copy-btn">Copy</button>
+        </div>
+        <code># curl -O https://lemma.id/sdk/lemma_ishuman_verify.py
+from lemma_ishuman_verify import VerificationContext
+
+ctx = VerificationContext(site_id="your-site-id")
+
+check = ctx.verify_stamp(row["lemma"])
+if not check.ok:
+    flag_suspicious_log_row(row, check.reason)</code>
+    </div>
 </div>
 
 <div class="docs-section" id="api-reference">

@@ -849,7 +849,7 @@ def create_app():
         from flask import send_from_directory
         response = send_from_directory('static/js', 'lemma-ishuman-verify.mjs', mimetype='application/javascript')
         response.headers['Cache-Control'] = 'public, max-age=300'
-        response.headers['X-SDK-Version'] = '1.0.0'
+        response.headers['X-SDK-Version'] = '1.1.0'
         response.headers['Access-Control-Allow-Origin'] = '*'
         return response
 
@@ -866,7 +866,7 @@ def create_app():
             'examples', 'relying_site_offline_verify.py', mimetype='text/x-python',
         )
         response.headers['Cache-Control'] = 'public, max-age=300'
-        response.headers['X-SDK-Version'] = '1.0.0'
+        response.headers['X-SDK-Version'] = '1.1.0'
         response.headers['Access-Control-Allow-Origin'] = '*'
         return response
 

@@ -22,7 +22,13 @@
  *   if (!result.ok) return new Response(result.reason, { status: 401 });
  *   const ppid = result.ppid;
  *
- * @version 1.0.0
+ *   // Or verify a stamp you stored earlier (from the browser SDK's
+ *   // stamp(payload, { includeProof: true })) — re-checks the signed proof
+ *   // AND that the stamp's logged ppid/credentialId match it:
+ *   const check = await verifier.verifyStamp(storedLogRow.lemma);
+ *   if (!check.ok) flagSuspiciousLogRow();
+ *
+ * @version 1.1.0
  */
 
 const SESSION_PRESENTATION_PREFIX = "lemma:site-session-presentation:v1";
@@ -358,12 +364,67 @@ export function createVerifier({
     };
   }
 
+  async function verifyStamp(stamp, { key = "lemma" } = {}) {
+    const unwrapped = unwrapStamp(stamp, key);
+    if (!unwrapped) return { ok: false, reason: "stamp_missing_proof" };
+    const { stamp: inner, presentation } = unwrapped;
+    const result = await verify(presentation);
+    if (!result.ok) return result;
+    // Bind the loggable fields to the cryptographically verified values so a
+    // tampered log row can't claim a different identity than the proof supports.
+    if (inner) {
+      if (inner.ppid && result.ppid && inner.ppid !== result.ppid) {
+        return {
+          ok: false,
+          reason: "stamp_ppid_mismatch",
+          ppid: result.ppid,
+          stampedPpid: inner.ppid,
+        };
+      }
+      if (
+        inner.credentialId && result.credentialId
+        && inner.credentialId !== result.credentialId
+      ) {
+        return { ok: false, reason: "stamp_credential_mismatch", credentialId: result.credentialId };
+      }
+    }
+    return result;
+  }
+
   async function refresh() {
     snapshot = null;
     await ensureFresh();
   }
 
-  return { verify, refresh };
+  return { verify, verifyStamp, refresh };
+}
+
+/**
+ * Normalize the many shapes a relying site might pass to verifyStamp into
+ * `{ stamp, presentation }`. Accepts:
+ *   - a raw presentation (has `.credential`)
+ *   - a stamp object from `getVerification({ includeProof: true })` (has `.proof`)
+ *   - a stamped event from `stamp(payload)` (has `[key]` with one of the above)
+ * @returns {{stamp: object|null, presentation: object}|null}
+ */
+function unwrapStamp(input, key = "lemma") {
+  if (!input || typeof input !== "object") return null;
+  if (input.credential && typeof input.credential === "object") {
+    return { stamp: null, presentation: input };
+  }
+  if (input.proof && typeof input.proof === "object") {
+    return { stamp: input, presentation: input.proof };
+  }
+  const inner = input[key];
+  if (inner && typeof inner === "object") {
+    if (inner.proof && typeof inner.proof === "object") {
+      return { stamp: inner, presentation: inner.proof };
+    }
+    if (inner.credential && typeof inner.credential === "object") {
+      return { stamp: inner, presentation: inner };
+    }
+  }
+  return null;
 }
 
 /**
@@ -374,7 +435,22 @@ export async function verifyPresentation(presentation, options) {
   return createVerifier(options).verify(presentation);
 }
 
+/**
+ * One-shot verify of a stamp produced by the browser SDK's
+ * `stamp(payload, { includeProof: true })` or `getVerification({ includeProof: true })`.
+ * Prefer `createVerifier().verifyStamp()` for long-running servers so the
+ * signed snapshot is cached across requests.
+ */
+export async function verifyStamp(stamp, options) {
+  return createVerifier(options).verifyStamp(stamp, options);
+}
+
 // CommonJS interop for Node.js require()
 if (typeof module !== "undefined" && typeof module.exports !== "undefined") {
-  module.exports = { createVerifier, verifyPresentation, browserCanonicalMessage };
+  module.exports = {
+    createVerifier,
+    verifyPresentation,
+    verifyStamp,
+    browserCanonicalMessage,
+  };
 }

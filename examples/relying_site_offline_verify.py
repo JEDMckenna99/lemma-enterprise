@@ -33,6 +33,13 @@ Example:
     if not result.ok:
         abort(401, result.reason)
     user_ppid = result.ppid
+
+    # Or re-verify a stamp you stored earlier (from the browser SDK's
+    # stamp(payload, includeProof=True)) — checks the signed proof AND that the
+    # logged ppid/credentialId match it:
+    check = ctx.verify_stamp(stored_log_row["lemma"])
+    if not check.ok:
+        flag_suspicious_log_row()
 """
 
 from __future__ import annotations
@@ -103,6 +110,29 @@ def _build_session_message(assertion: dict) -> bytes:
         str(assertion["expires_at_unix"]),
     ]
     return "\n".join(lines).encode("utf-8")
+
+
+def _unwrap_stamp(value, key: str = "lemma"):
+    """Normalize the shapes a relying site may pass to ``verify_stamp`` into
+    ``(stamp_or_None, presentation)``.
+
+    Accepts a raw presentation (has ``credential``), a stamp object from
+    ``getVerification(includeProof=True)`` (has ``proof``), or a stamped event
+    from ``stamp(payload)`` (has ``[key]`` holding one of the above).
+    """
+    if not isinstance(value, dict):
+        return None
+    if isinstance(value.get("credential"), dict):
+        return (None, value)
+    if isinstance(value.get("proof"), dict):
+        return (value, value["proof"])
+    inner = value.get(key)
+    if isinstance(inner, dict):
+        if isinstance(inner.get("proof"), dict):
+            return (inner, inner["proof"])
+        if isinstance(inner.get("credential"), dict):
+            return (inner, inner)
+    return None
 
 
 # ---------------------------------------------------------------------------
@@ -350,6 +380,34 @@ class VerificationContext:
             issuer_did=issuer_did,
             bound_site_id=bound_site,
         )
+
+    def verify_stamp(self, stamp: dict, *, key: str = "lemma") -> "VerificationContext.Result":
+        """Verify a stamp produced by the browser SDK's ``stamp(payload,
+        {includeProof: true})`` / ``getVerification({includeProof: true})``.
+
+        Re-checks the signed proof AND that the stamp's logged ``ppid`` /
+        ``credentialId`` match the cryptographically verified values, so a
+        tampered log row can't claim a different identity than its proof
+        supports. Accepts the full stamped event, the stamp object, or a raw
+        presentation.
+        """
+        unwrapped = _unwrap_stamp(stamp, key)
+        if unwrapped is None:
+            return self.Result(False, "stamp_missing_proof")
+        inner, presentation = unwrapped
+        result = self.verify(presentation)
+        if not result.ok:
+            return result
+        if inner:
+            stamped_ppid = inner.get("ppid")
+            if stamped_ppid and result.ppid and stamped_ppid != result.ppid:
+                return self.Result(False, "stamp_ppid_mismatch", ppid=result.ppid)
+            stamped_cred = inner.get("credentialId")
+            if stamped_cred and result.credential_id and stamped_cred != result.credential_id:
+                return self.Result(
+                    False, "stamp_credential_mismatch", credential_id=result.credential_id,
+                )
+        return result
 
 
 # ---------------------------------------------------------------------------
