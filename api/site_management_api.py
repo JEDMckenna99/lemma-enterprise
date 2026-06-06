@@ -3,6 +3,7 @@ Site Management API
 Handles site users (PPIDs), permission types, and API keys
 """
 
+import json
 import logging
 import secrets
 import hashlib
@@ -370,25 +371,34 @@ def revoke_site_user(site_id, ppid):
     try:
         from api.database import get_db_connection
         
+        reason = (request.get_json(silent=True) or {}).get('reason', '') if request.is_json else ''
+        revoked_meta = (
+            f'{{"revoked_at": "{datetime.now(timezone.utc).isoformat()}"'
+            + (f', "revoke_reason": {json.dumps(reason)}' if reason else '')
+            + '}'
+        )
+
         conn = get_db_connection(site_id)
         cursor = conn.cursor()
         
-        # Update user status
+        # Upsert + mark revoked. We intentionally do NOT 404 when the PPID is
+        # not already a stored "site user": operators routinely block a PPID
+        # pulled straight from their own logs, and the canonical tier-1
+        # revocation below is what actually enforces the block network-wide.
         cursor.execute("""
-            UPDATE site_users
-            SET status = 'revoked', metadata = COALESCE(metadata, '{}'::jsonb) || %s::jsonb
-            WHERE site_id = %s AND user_ppid = %s
+            INSERT INTO site_users (site_id, user_ppid, status, added_by, metadata)
+            VALUES (%s, %s, 'revoked', %s, %s::jsonb)
+            ON CONFLICT (site_id, user_ppid)
+            DO UPDATE SET
+                status = 'revoked',
+                metadata = COALESCE(site_users.metadata, '{}'::jsonb) || EXCLUDED.metadata
             RETURNING id
         """, (
-            f'{{"revoked_at": "{datetime.now(timezone.utc).isoformat()}"}}',
-            site_id, 
-            ppid
+            site_id,
+            ppid,
+            _actor_ppid_for_audit(),
+            revoked_meta,
         ))
-        
-        if cursor.rowcount == 0:
-            cursor.close()
-            conn.close()
-            return jsonify({'success': False, 'error': 'User not found'}), 404
         
         # Also revoke all their active permissions
         cursor.execute("""
@@ -415,7 +425,7 @@ def revoke_site_user(site_id, ppid):
                     db,
                     site_id=site_id,
                     ppid=ppid,
-                    reason='developer_site_user_revoke',
+                    reason=reason or 'developer_site_user_revoke',
                     revoked_by=_actor_ppid_for_audit(),
                     site_domain=getattr(site, 'site_domain', None) if site else None,
                     blocked_by=_actor_ppid_for_audit(),
@@ -439,6 +449,75 @@ def revoke_site_user(site_id, ppid):
         
     except Exception as e:
         logger.error(f"Failed to revoke user: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@site_management_bp.route('/api/developer/sites/<site_id>/users/<ppid>/unblock', methods=['POST'])
+@cross_origin()
+@require_agent_or_user_auth(required_scope='write')
+def unblock_site_user(site_id, ppid):
+    """Lift a site-scoped block for a PPID (inverse of /revoke).
+
+    Reverses tier-1 enforcement: deactivates the SiteBlock, removes the
+    canonical user-scope RevocationList row, and rebuilds the Bloom so verifiers
+    stop rejecting the PPID. Governance-approved coordinated-fraud kills are NOT
+    lifted by this route. The site_users row (if any) is set back to 'active'.
+    """
+    try:
+        from api.database import get_db_connection
+
+        canonical_clear = None
+        try:
+            from api.database import SessionLocal
+            from api.site_ppid_revocation import clear_site_bound_ppid
+
+            db = SessionLocal()
+            try:
+                canonical_clear = clear_site_bound_ppid(
+                    db,
+                    site_id=site_id,
+                    ppid=ppid,
+                    cleared_by=_actor_ppid_for_audit(),
+                )
+            finally:
+                db.close()
+        except Exception as clear_err:
+            logger.warning("Canonical PPID unblock failed: %s", clear_err)
+            return jsonify({'success': False, 'error': 'unblock_failed'}), 500
+
+        if canonical_clear and not canonical_clear.get('lifted') \
+                and canonical_clear.get('reason') == 'governance_kill_not_amnesty_eligible':
+            return jsonify({
+                'success': False,
+                'error': 'governance_kill',
+                'message': 'This PPID is under a network governance kill and cannot be unblocked from the site dashboard.',
+            }), 409
+
+        conn = get_db_connection(site_id)
+        cursor = conn.cursor()
+        cursor.execute("""
+            UPDATE site_users
+            SET status = 'active',
+                metadata = COALESCE(metadata, '{}'::jsonb) || %s::jsonb
+            WHERE site_id = %s AND user_ppid = %s
+        """, (
+            f'{{"unblocked_at": "{datetime.now(timezone.utc).isoformat()}"}}',
+            site_id,
+            ppid,
+        ))
+        conn.commit()
+        cursor.close()
+        conn.close()
+
+        logger.info(f"Unblocked user {ppid[:20]}... on site {site_id}")
+        return jsonify({
+            'success': True,
+            'message': 'User unblocked successfully',
+            'canonical_ppid_clear': canonical_clear,
+        })
+
+    except Exception as e:
+        logger.error(f"Failed to unblock user: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
 

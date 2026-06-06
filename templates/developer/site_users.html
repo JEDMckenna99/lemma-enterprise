@@ -43,10 +43,10 @@
             <line x1="12" y1="8" x2="12.01" y2="8"></line>
         </svg>
         <div>
-            <div style="font-weight: 600; color: #1e293b; margin-bottom: 4px;">For debugging only</div>
+            <div style="font-weight: 600; color: #1e293b; margin-bottom: 4px;">PPIDs are site-specific identifiers</div>
             <div style="font-size: 14px; color: #64748b;">
-                PPIDs are site-specific identifiers. Store PPID mappings in <strong>your own database</strong> to correlate with your internal user IDs.
-                Use the <a href="/developer/sites/{{ site_id }}/keys" style="color: #3b82f6; text-decoration: underline;">API</a> to integrate user revocation into your admin panel.
+                Store PPID mappings in <strong>your own database</strong> to correlate with your internal user IDs and track activity.
+                Block or unblock any PPID right here, or use the <a href="/developer/sites/{{ site_id }}/keys" style="color: #3b82f6; text-decoration: underline;">API</a> to wire revocation into your own admin panel.
             </div>
         </div>
     </div>
@@ -96,11 +96,12 @@
                     <th>Status</th>
                     <th>Last Seen</th>
                     <th>First Seen</th>
+                    <th style="text-align: right; padding-right: 16px;">Actions</th>
                 </tr>
             </thead>
             <tbody id="users-table-body">
                 <tr>
-                    <td colspan="4" style="text-align: center; padding: 40px;">
+                    <td colspan="5" style="text-align: center; padding: 40px;">
                         <div class="skeleton" style="width: 200px; height: 20px; margin: 0 auto;"></div>
                     </td>
                 </tr>
@@ -118,13 +119,24 @@
     </div>
 </div>
 
-<!-- API Example -->
+<!-- Block by PPID -->
 <div class="dev-card" style="margin-top: 24px;">
     <div class="dev-card-header">
-        <h2 class="dev-card-title">Revocation API</h2>
+        <h2 class="dev-card-title">Block a user by PPID</h2>
     </div>
     <div class="dev-card-body">
-        <p style="color: #64748b; margin-bottom: 16px;">Integrate revocation into your own admin panel:</p>
+        <p style="color: #64748b; margin-bottom: 16px;">
+            Paste a PPID from your own logs to block it immediately on this site. The block is site-scoped,
+            takes effect across the user's devices, and you can lift it again with Unblock in the table above.
+        </p>
+        <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 24px;">
+            <input type="text" id="block-ppid-input" placeholder="did:lemma:ppid_..." class="focus-ring"
+                   style="flex: 1; min-width: 280px; padding: 9px 12px; border: 1px solid #e2e8f0; border-radius: 6px; font-size: 14px; font-family: ui-monospace, monospace;">
+            <input type="text" id="block-reason-input" placeholder="Reason (optional)" class="focus-ring"
+                   style="flex: 1; min-width: 200px; padding: 9px 12px; border: 1px solid #e2e8f0; border-radius: 6px; font-size: 14px;">
+            <button class="dev-btn dev-btn-danger" id="block-ppid-btn" style="white-space: nowrap;">Block PPID</button>
+        </div>
+        <p style="color: #64748b; margin-bottom: 16px;">Or integrate revocation into your own admin panel:</p>
         <div style="background: #1e293b; border-radius: 8px; padding: 16px; overflow-x: auto;">
             <pre style="margin: 0; color: #e2e8f0; font-size: 13px; line-height: 1.5;"><code><span style="color: #94a3b8;"># Revoke a user by PPID</span>
 curl -X POST https://lemma.id/api/developer/sites/<span style="color: #fbbf24;">{{ site_id }}</span>/users/<span style="color: #fbbf24;">{ppid}</span>/revoke \
@@ -147,7 +159,76 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('prev-page').addEventListener('click', () => { currentPage--; loadUsers(); });
     document.getElementById('next-page').addEventListener('click', () => { currentPage++; loadUsers(); });
     document.getElementById('export-btn').addEventListener('click', exportUsers);
+    document.getElementById('block-ppid-btn').addEventListener('click', blockByPpidInput);
+    document.getElementById('block-ppid-input').addEventListener('keydown', (e) => { if (e.key === 'Enter') blockByPpidInput(); });
 });
+
+async function getAuthHeaders() {
+    return { 'Content-Type': 'application/json' };
+}
+
+async function blockByPpidInput() {
+    const input = document.getElementById('block-ppid-input');
+    const reasonInput = document.getElementById('block-reason-input');
+    const ppid = input.value.trim();
+    const reason = reasonInput.value.trim();
+    if (!ppid) {
+        if (window.showToast) showToast('error', 'PPID required', 'Paste a PPID to block.');
+        return;
+    }
+    const ok = await blockUser(ppid, reason);
+    if (ok) {
+        input.value = '';
+        reasonInput.value = '';
+    }
+}
+
+async function blockUser(ppid, reason) {
+    if (!confirm(`Block this PPID on ${SITE_ID}?\n\n${ppid}\n\nThe block is immediate and site-scoped.`)) return false;
+    try {
+        const response = await fetch(`/api/developer/sites/${SITE_ID}/users/${encodeURIComponent(ppid)}/revoke`, {
+            method: 'POST',
+            headers: await getAuthHeaders(),
+            body: JSON.stringify({ reason: reason || '' })
+        });
+        const data = await response.json();
+        if (!data.success) throw new Error(data.error || 'Block failed');
+        if (window.showToast) showToast('success', 'Blocked', 'PPID blocked on this site');
+        loadUsers();
+        loadStats();
+        return true;
+    } catch (e) {
+        console.error('Failed to block PPID:', e);
+        if (window.showToast) showToast('error', 'Error', e.message || 'Failed to block PPID');
+        return false;
+    }
+}
+
+async function unblockUser(ppid) {
+    if (!confirm(`Unblock this PPID on ${SITE_ID}?\n\n${ppid}\n\nThe user will be able to access this site again.`)) return false;
+    try {
+        const response = await fetch(`/api/developer/sites/${SITE_ID}/users/${encodeURIComponent(ppid)}/unblock`, {
+            method: 'POST',
+            headers: await getAuthHeaders()
+        });
+        const data = await response.json();
+        if (!data.success) {
+            if (data.error === 'governance_kill') {
+                if (window.showToast) showToast('error', 'Cannot unblock', data.message || 'This PPID is under a network governance kill.');
+                return false;
+            }
+            throw new Error(data.error || 'Unblock failed');
+        }
+        if (window.showToast) showToast('success', 'Unblocked', 'PPID unblocked on this site');
+        loadUsers();
+        loadStats();
+        return true;
+    } catch (e) {
+        console.error('Failed to unblock PPID:', e);
+        if (window.showToast) showToast('error', 'Error', e.message || 'Failed to unblock PPID');
+        return false;
+    }
+}
 
 async function loadStats() {
     try {
@@ -169,7 +250,7 @@ async function loadUsers() {
     const search = document.getElementById('search-input').value;
     const status = document.getElementById('status-filter').value;
     
-    tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; padding: 40px;"><div class="skeleton" style="width: 200px; height: 20px; margin: 0 auto;"></div></td></tr>';
+    tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 40px;"><div class="skeleton" style="width: 200px; height: 20px; margin: 0 auto;"></div></td></tr>';
     
     try {
         const params = new URLSearchParams({ page: currentPage, per_page: perPage, search, status });
@@ -181,7 +262,7 @@ async function loadUsers() {
         if (data.users.length === 0) {
             tbody.innerHTML = `
                 <tr>
-                    <td colspan="4" style="text-align: center; padding: 60px;">
+                    <td colspan="5" style="text-align: center; padding: 60px;">
                         <div style="color: #64748b;">
                             ${search || status !== 'all' ? 'No users match your filters' : 'No users have authenticated yet'}
                         </div>
@@ -215,6 +296,11 @@ async function loadUsers() {
                 </td>
                 <td style="color: #64748b; font-size: 13px;">${formatDate(user.last_seen)}</td>
                 <td style="color: #64748b; font-size: 13px;">${formatDate(user.added_at)}</td>
+                <td style="text-align: right; padding-right: 16px; white-space: nowrap;">
+                    ${user.status === 'revoked'
+                        ? `<button class="dev-btn dev-btn-secondary row-action-btn" data-unblock="${escapeHtml(user.ppid)}" style="padding: 5px 12px; font-size: 13px;">Unblock</button>`
+                        : `<button class="dev-btn dev-btn-danger row-action-btn" data-block="${escapeHtml(user.ppid)}" style="padding: 5px 12px; font-size: 13px;">Block</button>`}
+                </td>
             </tr>
         `).join('');
         
@@ -229,7 +315,7 @@ async function loadUsers() {
         
     } catch (e) {
         console.error('Failed to load users:', e);
-        tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; padding: 40px; color: #ef4444;">Failed to load users</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 40px; color: #ef4444;">Failed to load users</td></tr>';
     }
 }
 
@@ -237,12 +323,23 @@ function exportUsers() {
     window.location.href = `/api/developer/sites/${SITE_ID}/users/export`;
 }
 
-// Copy handler
+// Copy + row action handlers
 document.addEventListener('click', function(e) {
     const copyBtn = e.target.closest('[data-copy]');
     if (copyBtn && window.copyToClipboard) {
         copyToClipboard(copyBtn.dataset.copy, copyBtn);
         if (window.showToast) showToast('success', 'Copied!', 'PPID copied to clipboard');
+        return;
+    }
+    const blockBtn = e.target.closest('[data-block]');
+    if (blockBtn) {
+        blockUser(blockBtn.dataset.block, '');
+        return;
+    }
+    const unblockBtn = e.target.closest('[data-unblock]');
+    if (unblockBtn) {
+        unblockUser(unblockBtn.dataset.unblock);
+        return;
     }
 });
 

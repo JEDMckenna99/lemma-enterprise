@@ -405,6 +405,106 @@ def revoke_site_bound_ppid(
     }
 
 
+def clear_site_bound_ppid(
+    db,
+    *,
+    site_id: str,
+    ppid: str,
+    cleared_by: str = "api",
+    commit: bool = True,
+) -> dict:
+    """Reverse a tier-1 site block for a site-bound PPID (the inverse of
+    ``revoke_site_bound_ppid``).
+
+    Deactivates the ``SiteBlock`` row AND removes the canonical user-scope
+    ``RevocationList`` entry so server + client verifiers stop rejecting the
+    PPID once the Bloom is rebuilt. Governance-approved coordinated-fraud kills
+    (``is_amnesty_eligible=False``) are deliberately left in place — an ordinary
+    site unblock must not lift a network kill. The return dict reports whether
+    anything was actually lifted vs. blocked by a governance kill.
+    """
+    from api.database import SiteBlock, RevocationList
+
+    ppid = (ppid or "").strip()
+    if not ppid:
+        raise ValueError("ppid required")
+    if not site_id:
+        raise ValueError("site_id required")
+
+    # Governance carve-out: never lift a sticky kill via a site unblock.
+    governance_kill = (
+        db.query(SiteBlock)
+        .filter(
+            SiteBlock.site_id == site_id,
+            SiteBlock.ppid == ppid,
+            SiteBlock.is_active == True,  # noqa: E712
+            SiteBlock.is_amnesty_eligible.is_(False),
+        )
+        .first()
+    )
+    if governance_kill is not None:
+        return {
+            "site_id": site_id,
+            "ppid": ppid,
+            "lifted": False,
+            "reason": "governance_kill_not_amnesty_eligible",
+            "blocks_deactivated": 0,
+            "revocations_cleared": 0,
+        }
+
+    blocks_deactivated = (
+        db.query(SiteBlock)
+        .filter(
+            SiteBlock.site_id == site_id,
+            SiteBlock.ppid == ppid,
+            SiteBlock.is_active == True,  # noqa: E712
+            SiteBlock.is_amnesty_eligible.isnot(False),
+        )
+        .update({"is_active": False}, synchronize_session=False)
+    )
+
+    revocations_cleared = (
+        db.query(RevocationList)
+        .filter(
+            RevocationList.ppid == ppid,
+            RevocationList.site_id == site_id,
+            RevocationList.revocation_type == "user",
+            RevocationList.is_amnesty_eligible.isnot(False),
+        )
+        .delete(synchronize_session=False)
+    )
+
+    if commit:
+        db.commit()
+        try:
+            from api.bloom_snapshot import invalidate_bloom_filter_cache
+
+            invalidate_bloom_filter_cache()
+        except Exception:
+            pass
+        try:
+            from api.revocation_sync import get_event_bus
+
+            bus = get_event_bus()
+            if hasattr(bus, "publish_revocation_clear"):
+                bus.publish_revocation_clear(ppid, reason="site_unblock")
+        except Exception:
+            pass
+
+    logger.info(
+        "Site unblock: site=%s ppid=%s blocks=%d revocations=%d by=%s",
+        site_id, ppid[:40], blocks_deactivated, revocations_cleared, cleared_by,
+    )
+    return {
+        "site_id": site_id,
+        "ppid": ppid,
+        "lifted": bool(blocks_deactivated or revocations_cleared),
+        "reason": "ok",
+        "blocks_deactivated": int(blocks_deactivated),
+        "revocations_cleared": int(revocations_cleared),
+    }
+
+
 def sync_revocation_row_to_bloom(row: Any) -> int:
     """Add all effective keys for a revocation row to the global Bloom verifier."""
     from api.permission_verification import get_global_verifier, sync_single_revocation

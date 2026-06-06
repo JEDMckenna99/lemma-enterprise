@@ -119,6 +119,11 @@ ROUTE_AUTHZ_POLICY: dict[tuple[str, str], RouteAuthPolicy] = {
         allowed_principals=("user_lemma", "agent_token", "access_token", "api_key"),
         site_binding_required=True,
     ),
+    ("POST", "/api/developer/sites/<site_id>/users/<ppid>/unblock"): RouteAuthPolicy(
+        required_scope="admin",
+        allowed_principals=("user_lemma", "agent_token", "access_token", "api_key"),
+        site_binding_required=True,
+    ),
     ("GET", "/api/developer/sites/<site_id>/users/export"): RouteAuthPolicy(
         required_scope="read",
         allowed_principals=("user_lemma", "agent_token", "access_token", "api_key"),

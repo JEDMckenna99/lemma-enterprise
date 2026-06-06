@@ -38,6 +38,7 @@ def test_core_protected_route_coverage():
         ("POST", "/api/developer/sites/site_1/users"),
         ("PUT", "/api/developer/sites/site_1/users/did:lemma:ppid_abc"),
         ("POST", "/api/developer/sites/site_1/users/did:lemma:ppid_abc/revoke"),
+        ("POST", "/api/developer/sites/site_1/users/did:lemma:ppid_abc/unblock"),
         ("GET", "/api/developer/sites/site_1/permissions"),
         ("POST", "/api/developer/sites/site_1/permissions"),
         ("DELETE", "/api/developer/sites/site_1/permissions/admin_access"),

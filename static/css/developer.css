@@ -314,6 +314,17 @@
     background: rgba(102, 126, 234, 0.05);
 }
 
+.dev-btn-danger {
+    background: white;
+    color: #dc2626;
+    border: 1px solid #fca5a5;
+}
+
+.dev-btn-danger:hover {
+    background: #fef2f2;
+    border-color: #dc2626;
+}
+
 .dev-btn-sm {
     padding: 6px 14px;
     font-size: 13px;
