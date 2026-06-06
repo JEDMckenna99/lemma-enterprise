@@ -345,7 +345,7 @@ class DiditManager:
         try:
             resp = requests.post(
                 url,
-                json={"vendor_data": [vendor]},
+                json={"vendor_data_list": [vendor]},
                 headers={
                     "Content-Type": "application/json",
                     "accept": "application/json",
