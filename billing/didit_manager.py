@@ -243,6 +243,31 @@ class DiditManager:
         status = str(decision.get("status") or "").strip().lower()
         return {"success": True, "status": status, "decision": decision}
 
+    @staticmethod
+    def _delete_response_success(resp: requests.Response) -> bool:
+        """True when Didit accepted a session delete (or it is already gone)."""
+        if resp.status_code in (200, 202, 204):
+            return True
+        if resp.status_code != 404:
+            return False
+        # HTML 404 means we hit the wrong route, not "session already deleted".
+        content_type = (resp.headers.get("content-type") or "").lower()
+        body = (resp.text or "").strip()
+        if "text/html" in content_type or body.startswith("<!"):
+            return False
+        return True
+
+    def _delete_session_paths(self, session_id: str) -> list[str]:
+        import os
+
+        override = (os.environ.get("DIDIT_DELETE_PATH_TEMPLATE") or "").strip()
+        if override:
+            return [override]
+        return (
+            "/v3/session/{session_id}/delete/",
+            "/v3/session/{session_id}/",
+        )
+
     def delete_session(self, session_id: str) -> Dict[str, Any]:
         """Delete (purge) a verification session from didit.
 
@@ -254,52 +279,127 @@ class DiditManager:
         decision endpoints); the row is hard-deleted once didit's configured
         retention window expires.
 
-        Idempotent: both ``204 No Content`` (deleted) and ``404 Not Found``
-        (already deleted / unknown ``session_id``) are treated as success.
+        Idempotent: ``204 No Content`` (deleted) and genuine API ``404`` (already
+        gone) are treated as success. HTML ``404`` responses are *not* success —
+        they indicate the wrong delete route was used.
+
         Never raises; the caller treats any failure as non-fatal so issuance is
         never coupled to upstream purge availability.
 
-        Docs: https://docs.didit.me/console/data-retention (process-and-purge);
-        the documented purge call is ``DELETE /v3/session/{session_id}/``. If
-        your didit tenant uses the ``/v3/session/{session_id}/delete/`` route
-        instead, set ``DIDIT_DELETE_PATH_TEMPLATE`` accordingly.
+        Docs: https://docs.didit.me/sessions-api/delete-session
+        (``DELETE /v3/session/{session_id}/delete/``).
         """
         if not self.enabled:
             return {"success": False, "error": "didit_not_configured"}
         if not session_id:
             return {"success": False, "error": "session_id required"}
 
-        import os
-        path_template = (
-            os.environ.get("DIDIT_DELETE_PATH_TEMPLATE")
-            or "/v3/session/{session_id}/"
-        )
-        url = f"{self.api_base}{path_template.format(session_id=session_id)}"
+        headers = {
+            "accept": "application/json",
+            "x-api-key": self.api_key,
+        }
+        last_failure: Dict[str, Any] = {"success": False, "error": "didit_delete_failed"}
+
+        for path_template in self._delete_session_paths(session_id):
+            url = f"{self.api_base}{path_template.format(session_id=session_id)}"
+            try:
+                resp = requests.delete(url, headers=headers, timeout=_SESSION_TIMEOUT_SECONDS)
+            except requests.RequestException as exc:
+                logger.error("Didit session delete failed: %s", exc)
+                return {"success": False, "error": "didit_request_failed", "message": str(exc)}
+
+            if self._delete_response_success(resp):
+                logger.info(
+                    "Didit session delete ok: session=%s path=%s status=%s",
+                    session_id, path_template, resp.status_code,
+                )
+                return {"success": True, "status_code": resp.status_code, "path": path_template}
+
+            last_failure = {
+                "success": False,
+                "error": "didit_delete_failed",
+                "status_code": resp.status_code,
+                "path": path_template,
+            }
+            logger.warning(
+                "Didit session delete attempt failed: session=%s path=%s status=%s body=%s",
+                session_id, path_template, resp.status_code, resp.text[:200],
+            )
+
+        return last_failure
+
+    def delete_user(self, vendor_data: str) -> Dict[str, Any]:
+        """Delete a Didit user entity keyed by ``vendor_data`` (our wallet id).
+
+        Session delete removes the verification session; user delete clears the
+        consolidated user record (including portrait/document history shown in
+        the Didit console). Best-effort and idempotent.
+        """
+        if not self.enabled:
+            return {"success": False, "error": "didit_not_configured"}
+        vendor = (vendor_data or "").strip()
+        if not vendor:
+            return {"success": False, "error": "vendor_data required"}
+
+        url = f"{self.api_base}/v3/users/delete/"
         try:
-            resp = requests.delete(
+            resp = requests.post(
                 url,
+                json={"vendor_data": [vendor]},
                 headers={
+                    "Content-Type": "application/json",
                     "accept": "application/json",
                     "x-api-key": self.api_key,
                 },
                 timeout=_SESSION_TIMEOUT_SECONDS,
             )
         except requests.RequestException as exc:
-            logger.error("Didit session delete failed: %s", exc)
+            logger.error("Didit user delete failed: %s", exc)
             return {"success": False, "error": "didit_request_failed", "message": str(exc)}
 
-        # 200/202/204 => deleted; 404 => already gone / unknown (idempotent).
-        if resp.status_code in (200, 202, 204, 404):
+        if resp.status_code in (200, 202, 204):
+            logger.info("Didit user delete ok: vendor_data=%s status=%s", vendor, resp.status_code)
             return {"success": True, "status_code": resp.status_code}
 
+        if resp.status_code == 404:
+            body = (resp.text or "").strip()
+            if not body.startswith("<!"):
+                return {"success": True, "status_code": resp.status_code}
+
         logger.warning(
-            "Didit session delete non-success: %s %s",
-            resp.status_code, resp.text[:300],
+            "Didit user delete non-success: vendor=%s status=%s body=%s",
+            vendor, resp.status_code, resp.text[:300],
         )
         return {
             "success": False,
-            "error": "didit_delete_failed",
+            "error": "didit_user_delete_failed",
             "status_code": resp.status_code,
+        }
+
+    def purge_verification_data(
+        self,
+        session_id: str,
+        *,
+        vendor_data: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Delete session artifacts and the consolidated Didit user record."""
+        session_result = self.delete_session(session_id)
+        if not session_result.get("success"):
+            return session_result
+        if not vendor_data:
+            return session_result
+        user_result = self.delete_user(vendor_data)
+        if not user_result.get("success"):
+            return {
+                "success": False,
+                "error": user_result.get("error", "didit_user_delete_failed"),
+                "session": session_result,
+                "user": user_result,
+            }
+        return {
+            "success": True,
+            "session": session_result,
+            "user": user_result,
         }
 
     def verify_webhook(

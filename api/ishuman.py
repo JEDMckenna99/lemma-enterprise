@@ -499,7 +499,11 @@ def _purge_didit_session_after_issuance(db, record) -> None:
 
     try:
         from billing.didit_manager import DiditManager
-        result = DiditManager().delete_session(session_id)
+        vendor_data = getattr(record, "wallet_id", "") or ""
+        result = DiditManager().purge_verification_data(
+            session_id,
+            vendor_data=vendor_data,
+        )
     except Exception:
         logger.exception(
             "Didit session purge raised (non-fatal) for session %s", session_id

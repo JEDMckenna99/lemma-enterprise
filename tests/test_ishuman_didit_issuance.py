@@ -155,11 +155,12 @@ def test_didit_webhook_verified_issues_master(
 
     purged = {}
 
-    def _fake_delete(self, session_id):
+    def _fake_purge(self, session_id, *, vendor_data=None):
         purged["session_id"] = session_id
+        purged["vendor_data"] = vendor_data
         return {"success": True, "status_code": 204}
 
-    monkeypatch.setattr("billing.didit_manager.DiditManager.delete_session", _fake_delete)
+    monkeypatch.setattr("billing.didit_manager.DiditManager.purge_verification_data", _fake_purge)
 
     resp = ishuman_client.post(
         "/api/webhooks/didit-identity",
@@ -213,11 +214,12 @@ def test_didit_webhook_terminal_failure_purges_session(
 
     purged = {}
 
-    def _fake_delete(self, session_id):
+    def _fake_purge(self, session_id, *, vendor_data=None):
         purged["session_id"] = session_id
+        purged["vendor_data"] = vendor_data
         return {"success": True, "status_code": 204}
 
-    monkeypatch.setattr("billing.didit_manager.DiditManager.delete_session", _fake_delete)
+    monkeypatch.setattr("billing.didit_manager.DiditManager.purge_verification_data", _fake_purge)
 
     resp = ishuman_client.post(
         "/api/webhooks/didit-identity",

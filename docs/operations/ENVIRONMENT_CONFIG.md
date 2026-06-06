@@ -73,7 +73,7 @@ both the API key and workflow id are present.
 | `DIDIT_WEBHOOK_SECRET`            | HMAC secret for verifying `X-Signature-V2` on `/api/webhooks/didit-identity`.      | Webhook verification fails closed (401).      |
 | `DIDIT_API_BASE`                  | Base URL for the didit API. Default `https://verification.didit.me`.               | Defaults to production didit.                 |
 | `LEMMA_ISHUMAN_DIDIT_PURGE`       | Delete the upstream didit session after the credential is durably issued (process-and-purge data minimization). Default `"true"`; set `0` to retain sessions (e.g. staging debugging). | Defaults on; best-effort and non-fatal to issuance. |
-| `DIDIT_DELETE_PATH_TEMPLATE`      | Override the didit delete route. Default `/v3/session/{session_id}/` per didit's data-retention docs. Set to `/v3/session/{session_id}/delete/` if your tenant uses that route. | Uses the documented default path. |
+| `DIDIT_DELETE_PATH_TEMPLATE`      | Override the didit delete route. Default tries `/v3/session/{session_id}/delete/` then legacy `/v3/session/{session_id}/`. | Uses the Management API delete route first. |
 | `LEMMA_IDENTITY_ROOT_PEPPER_DIDIT_V1` | Optional per-issuer pepper isolation (Phase 3.2 Option A).                     | Falls back to the shared `LEMMA_IDENTITY_ROOT_PEPPER_V1`. |
 
 > Provider namespacing: `provider` is part of the signed `document_root` claim
