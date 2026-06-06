@@ -102,7 +102,12 @@
             <tr><td><code>stamp(payload, opts?)</code></td><td><code>Promise&lt;Object&gt;</code></td><td>Returns a copy of <code>payload</code> with the stamp merged in. Your payload is never mutated.</td></tr>
         </tbody>
     </table>
-    <p style="color: var(--gray-600); font-size: 14px;">Options: <code>{ key?: string (default <code>'lemma'</code>), includeProof?: boolean, autoProvision?: boolean }</code>. Pass <code>autoProvision: true</code> to verify-then-stamp at an entry point; otherwise these never open a popup.</p>
+    <p style="color: var(--gray-600); font-size: 14px;">Options: <code>{ key?: string (default <code>'lemma'</code>), includeCredential?: boolean, includeProof?: boolean, autoProvision?: boolean }</code>. Pass <code>autoProvision: true</code> to verify-then-stamp at an entry point; otherwise these never open a popup.</p>
+
+    <div class="callout callout--info">
+        <div class="callout-title">Which evidence should I store?</div>
+        <p><strong>For audit logs, use <code>{ includeCredential: true }</code></strong> &mdash; it stores the bare verifiable credential. It's compact, offline-verifiable, and <strong>durable</strong>: re-verifiable at any time until the credential expires. Use <code>{ includeProof: true }</code> only when you also need the signed <em>session assertion</em> (proof-of-possession / replay resistance, e.g. when forwarding proofs between parties) &mdash; it adds a freshness window and ages out, so it's not ideal for long-lived logs. Both verify entirely on your backend with no call to lemma.id.</p>
+    </div>
 
     <h3>Stamp shape</h3>
     <table class="docs-table">
@@ -117,7 +122,8 @@
             <tr><td><code>verifiedAt</code></td><td>number</td><td>Unix ms when the stamp was produced.</td></tr>
             <tr><td><code>expiresAt</code></td><td>number \| null</td><td>Credential expiry (unix seconds).</td></tr>
             <tr><td><code>credentialId</code></td><td>string \| null</td><td>The underlying credential id.</td></tr>
-            <tr><td><code>proof</code></td><td>object \| null</td><td>Signed presentation &mdash; only when <code>{ includeProof: true }</code>. Independently re-verifiable with the backend verifier; no call back to lemma.id.</td></tr>
+            <tr><td><code>credential</code></td><td>object \| null</td><td>The bare verifiable credential &mdash; only when <code>{ includeCredential: true }</code>. Durable, offline-verifiable evidence; re-verifiable any time until expiry. <strong>Recommended for logs.</strong></td></tr>
+            <tr><td><code>proof</code></td><td>object \| null</td><td>VC + signed session assertion &mdash; only when <code>{ includeProof: true }</code>. Adds replay resistance but ages out. Independently re-verifiable; no call back to lemma.id.</td></tr>
         </tbody>
     </table>
 
@@ -149,17 +155,19 @@ await logAction('checkout', { amountCents: 4200 });
 // Or just grab the id to store against your own user record:
 const ppid = await ih.getPPID();           // 'did:lemma:ppid_...' | null
 
-// Want durable, independently-verifiable evidence? Include the signed proof:
-const stampWithProof = await ih.getVerification({ includeProof: true });</code>
+// Recommended for audit logs: store the bare credential (durable, re-verifiable):
+const event = await ih.stamp({ action: 'post_comment' }, { includeCredential: true });
+// event.lemma now carries { ppid, verified, ..., credential } you can re-verify later.</code>
     </div>
 
     <div class="callout callout--info">
         <div class="callout-title">You own the data</div>
-        <p>Treat the PPID as an opaque per-site key: store it on your user/account record and attach it to whatever events you already log. Because the PPID is stable per (person, site), it behaves like a durable user id for that user on your domain &mdash; ideal for activity history and, when needed, blocking via <a href="#revocation">Revocation</a>. The optional <code>proof</code> lets you keep cryptographic evidence that a given action came from a verified human, re-verifiable later with the <code>lemma-ishuman-verify</code> backend SDK &mdash; all without lemma.id ever seeing your logs.</p>
+        <p>Treat the PPID as an opaque per-site key: store it on your user/account record and attach it to whatever events you already log. Because the PPID is stable per (person, site), it behaves like a durable user id for that user on your domain &mdash; ideal for activity history and, when needed, blocking via <a href="#revocation">Revocation</a>. The optional <code>credential</code> (recommended) lets you keep durable cryptographic evidence that a given action came from a verified human, re-verifiable later with the <code>lemma-ishuman-verify</code> backend SDK &mdash; all without lemma.id ever seeing your logs.</p>
     </div>
 
     <h3>Re-verify a stored stamp on your backend</h3>
-    <p>If you captured the stamp with <code>{ includeProof: true }</code>, you can later confirm &mdash; entirely on your own infrastructure &mdash; that a logged action genuinely came from a verified human. <code>verifyStamp()</code> re-checks the signed proof <strong>and</strong> that the stamp's logged <code>ppid</code>/<code>credentialId</code> match it, so a tampered log row is rejected. lemma.id is contacted only to refresh the signed revocation snapshot (cached, ~15&nbsp;min), never per check.</p>
+    <p>If you captured the stamp with <code>{ includeCredential: true }</code> (or <code>{ includeProof: true }</code>), you can later confirm &mdash; entirely on your own infrastructure &mdash; that a logged action genuinely came from a verified human. <code>verifyStamp()</code> re-checks the credential + revocation <strong>and</strong> that the stamp's logged <code>ppid</code>/<code>credentialId</code> match it, so a tampered log row is rejected. It accepts a bare credential, a presentation, a stamp, or a full stamped event interchangeably. lemma.id is contacted only to refresh the signed revocation snapshot (cached, ~15&nbsp;min), never per check.</p>
+    <p style="color: var(--gray-600); font-size: 14px;">Re-verifying <strong>old</strong> log rows? Pass <code>{ durable: true }</code> so an aged session assertion is treated as informational &mdash; the credential and revocation status are still fully enforced.</p>
     <div class="code-block">
         <div class="code-header">
             <span>Node.js / Deno / Workers</span>
@@ -169,12 +177,15 @@ const stampWithProof = await ih.getVerification({ includeProof: true });</code>
 
 const verifier = createVerifier({ siteId: "your-site-id" });
 
-// `row.lemma` is the stamp you stored from ih.stamp(..., { includeProof: true })
+// `row.lemma` is the stamp you stored from ih.stamp(..., { includeCredential: true })
 const check = await verifier.verifyStamp(row.lemma);
 if (!check.ok) {
   // reasons: invalid_signature | revoked | expired | stamp_ppid_mismatch | ...
   flagSuspiciousLogRow(row, check.reason);
-}</code>
+}
+
+// Re-verifying an old row whose session assertion has aged out? Use durable mode:
+const audit = await verifier.verifyStamp(oldRow.lemma, { durable: true });</code>
     </div>
     <div class="code-block">
         <div class="code-header">
@@ -188,7 +199,10 @@ ctx = VerificationContext(site_id="your-site-id")
 
 check = ctx.verify_stamp(row["lemma"])
 if not check.ok:
-    flag_suspicious_log_row(row, check.reason)</code>
+    flag_suspicious_log_row(row, check.reason)
+
+# Re-verifying an old row whose session assertion has aged out? Use durable mode:
+audit = ctx.verify_stamp(old_row["lemma"], durable=True)</code>
     </div>
 </div>
 

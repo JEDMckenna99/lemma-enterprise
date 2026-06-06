@@ -23,12 +23,19 @@
  *   const ppid = result.ppid;
  *
  *   // Or verify a stamp you stored earlier (from the browser SDK's
- *   // stamp(payload, { includeProof: true })) — re-checks the signed proof
- *   // AND that the stamp's logged ppid/credentialId match it:
+ *   // stamp(payload, { includeCredential: true })) — re-checks the credential
+ *   // + revocation AND that the stamp's logged ppid/credentialId match it.
+ *   // verifyStamp accepts a bare VC, a presentation, a stamp, or a stamped
+ *   // event interchangeably:
  *   const check = await verifier.verifyStamp(storedLogRow.lemma);
  *   if (!check.ok) flagSuspiciousLogRow();
  *
- * @version 1.1.0
+ *   // Re-verifying OLD log rows? Use durable mode so an aged session
+ *   // assertion is treated as informational (credential + revocation still
+ *   // enforced):
+ *   const audit = await verifier.verifyStamp(oldRow.lemma, { durable: true });
+ *
+ * @version 1.2.0
  */
 
 const SESSION_PRESENTATION_PREFIX = "lemma:site-session-presentation:v1";
@@ -364,11 +371,16 @@ export function createVerifier({
     };
   }
 
-  async function verifyStamp(stamp, { key = "lemma" } = {}) {
+  async function verifyStamp(stamp, { key = "lemma", durable = false } = {}) {
     const unwrapped = unwrapStamp(stamp, key);
     if (!unwrapped) return { ok: false, reason: "stamp_missing_proof" };
     const { stamp: inner, presentation } = unwrapped;
-    const result = await verify(presentation);
+    // Durable mode: re-verify the credential + revocation only and treat any
+    // aged session assertion as informational, so historical log rows still
+    // verify long after the session-freshness window has passed. Drop the
+    // session assertion before handing it to verify().
+    const toVerify = durable ? { credential: presentation.credential } : presentation;
+    const result = await verify(toVerify);
     if (!result.ok) return result;
     // Bind the loggable fields to the cryptographically verified values so a
     // tampered log row can't claim a different identity than the proof supports.
@@ -399,31 +411,75 @@ export function createVerifier({
   return { verify, verifyStamp, refresh };
 }
 
+/** A bare verifiable credential has subject + claims + a proof object. */
+function looksLikeVc(obj) {
+  return (
+    !!obj && typeof obj === "object"
+    && typeof obj.subject !== "undefined"
+    && typeof obj.claims !== "undefined"
+    && !!obj.proof && typeof obj.proof === "object"
+  );
+}
+
+/** Does this object carry the flat summary fields a stamp adds? */
+function hasStampFields(obj) {
+  return (
+    typeof obj.ppid !== "undefined"
+    || typeof obj.verified !== "undefined"
+    || typeof obj.verifiedAt !== "undefined"
+    || typeof obj.credentialId !== "undefined"
+  );
+}
+
 /**
  * Normalize the many shapes a relying site might pass to verifyStamp into
  * `{ stamp, presentation }`. Accepts:
- *   - a raw presentation (has `.credential`)
- *   - a stamp object from `getVerification({ includeProof: true })` (has `.proof`)
+ *   - a bare verifiable credential (has `.subject` + `.claims`)
+ *   - a raw presentation (has `.credential` + optional session assertion)
+ *   - a stamp from `getVerification({ includeCredential: true })` (flat fields + `.credential`)
+ *   - a stamp from `getVerification({ includeProof: true })` (flat fields + `.proof`)
  *   - a stamped event from `stamp(payload)` (has `[key]` with one of the above)
+ * `stamp` is the flat-field object (used for tamper-binding) when present, else null.
  * @returns {{stamp: object|null, presentation: object}|null}
  */
 function unwrapStamp(input, key = "lemma") {
   if (!input || typeof input !== "object") return null;
-  if (input.credential && typeof input.credential === "object") {
-    return { stamp: null, presentation: input };
+
+  // Stamped event: unwrap the [key] envelope first, but only if the top level
+  // isn't itself a credential/presentation/stamp.
+  if (
+    !looksLikeVc(input)
+    && !(input.proof && typeof input.proof === "object")
+    && !(input.credential && typeof input.credential === "object")
+    && input[key] && typeof input[key] === "object"
+  ) {
+    input = input[key];
   }
-  if (input.proof && typeof input.proof === "object") {
+
+  // Bare VC -> wrap as a presentation; nothing to cross-check.
+  if (looksLikeVc(input)) {
+    return { stamp: null, presentation: { credential: input } };
+  }
+
+  // Stamp carrying a full session presentation under `proof`.
+  if (input.proof && typeof input.proof === "object" && input.proof.credential) {
     return { stamp: input, presentation: input.proof };
   }
-  const inner = input[key];
-  if (inner && typeof inner === "object") {
-    if (inner.proof && typeof inner.proof === "object") {
-      return { stamp: inner, presentation: inner.proof };
-    }
-    if (inner.credential && typeof inner.credential === "object") {
-      return { stamp: inner, presentation: inner };
-    }
+
+  // Object carrying a VC under `credential`: either a raw presentation
+  // (no flat fields) or a VC-only stamp (flat fields present).
+  if (input.credential && typeof input.credential === "object") {
+    const isStamp = hasStampFields(input);
+    const presentation = {
+      credential: input.credential,
+      session_assertion: input.session_assertion,
+      session_signature: input.session_signature,
+      session_nonce: input.session_nonce,
+      bloom_sequence: input.bloom_sequence,
+    };
+    return { stamp: isStamp ? input : null, presentation };
   }
+
   return null;
 }
 
@@ -436,8 +492,10 @@ export async function verifyPresentation(presentation, options) {
 }
 
 /**
- * One-shot verify of a stamp produced by the browser SDK's
- * `stamp(payload, { includeProof: true })` or `getVerification({ includeProof: true })`.
+ * One-shot verify of a stamp/credential produced by the browser SDK's
+ * `stamp(payload, { includeCredential: true })` / `getVerification(...)`.
+ * Accepts a bare VC, presentation, stamp, or stamped event. Pass
+ * `{ durable: true }` to re-verify old log rows without session-freshness.
  * Prefer `createVerifier().verifyStamp()` for long-running servers so the
  * signed snapshot is cached across requests.
  */

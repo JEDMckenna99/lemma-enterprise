@@ -28,11 +28,12 @@
  * Attach the verified identity to your own logs:
  *   const ih = new IsHumanVerifier({ siteId: 'your-site-id' });
  *   await ih.verify({ autoProvision: true });        // once, at an entry point
- *   const event = await ih.stamp({ action: 'post_comment' });
- *   // -> { action: 'post_comment', lemma: { ppid, verified, ... } }
+ *   // Recommended for audit logs: store the bare VC (durable, offline-verifiable).
+ *   const event = await ih.stamp({ action: 'post_comment' }, { includeCredential: true });
+ *   // -> { action: 'post_comment', lemma: { ppid, verified, ..., credential } }
  *   // POST `event` to YOUR backend. Lemma stores none of it.
  *
- * @version 1.6.0
+ * @version 1.7.0
  */
 
 (function () {
@@ -679,14 +680,23 @@ class IsHumanVerifier {
      *     verifiedAt:   number,        // unix ms when this stamp was produced
      *     expiresAt:    number|null,   // credential expiry (unix seconds)
      *     credentialId: string|null,
-     *     proof:        object|null,   // signed presentation — only when
-     *                                  // { includeProof: true }
+     *     credential:   object|null,   // the bare VC — only when
+     *                                  // { includeCredential: true }
+     *     proof:        object|null,   // VC + signed session assertion — only
+     *                                  // when { includeProof: true }
      *   }
      *
-     * `proof` (when requested) is the signed session presentation. You can
-     * store it as durable evidence and independently re-verify it later with
-     * the backend verifier (lemma-ishuman-verify.mjs / lemma_ishuman_verify.py)
-     * — no call back to lemma.id required.
+     * Choosing what evidence to store:
+     *   - { includeCredential: true } (RECOMMENDED for audit logs): stores the
+     *     bare verifiable credential. It is offline-verifiable and DURABLE —
+     *     re-verifiable at any time until the credential expires — and smaller.
+     *   - { includeProof: true }: also stores the signed session assertion,
+     *     which adds replay resistance / proof-of-possession but ages out (the
+     *     session assertion has an expiry + max age). Use it when you forward
+     *     proofs between parties or need evidence the holder was live.
+     *
+     * Both are re-verifiable entirely on your backend (lemma-ishuman-verify.mjs
+     * / lemma_ishuman_verify.py) with no call back to lemma.id.
      *
      * By default this does NOT open a popup. Pass { autoProvision: true } to
      * verify-then-stamp at an entry point in your flow.
@@ -714,6 +724,8 @@ class IsHumanVerifier {
         };
         if (options.includeProof) {
             stamp.proof = result.presentation || null;
+        } else if (options.includeCredential) {
+            stamp.credential = result.credential || null;
         }
         return stamp;
     }
@@ -735,7 +747,7 @@ class IsHumanVerifier {
      * Your original payload is never mutated. Nothing is sent to lemma.id.
      *
      * @param {Object} payload  your event/action object
-     * @param {Object} [options] { key?: string, includeProof?: bool, autoProvision?: bool }
+     * @param {Object} [options] { key?: string, includeCredential?: bool, includeProof?: bool, autoProvision?: bool }
      * @returns {Promise<Object>}
      */
     async stamp(payload = {}, options = {}) {

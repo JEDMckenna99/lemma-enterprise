@@ -38,10 +38,51 @@ def _load_py_sdk():
 # _unwrap_stamp: all accepted shapes
 # ---------------------------------------------------------------------------
 
+def _vc(cid="c1", subject="did:lemma:ppid_a"):
+    """A minimal object that satisfies _looks_like_vc (subject+claims+proof)."""
+    return {
+        "id": cid,
+        "subject": subject,
+        "claims": {"isHuman": True},
+        "proof": {"signatureValueWeb": "sig"},
+    }
+
+
 def test_unwrap_raw_presentation():
     mod = _load_py_sdk()
     presentation = {"credential": {"id": "c1"}}
-    assert mod._unwrap_stamp(presentation) == (None, presentation)
+    stamp, pres = mod._unwrap_stamp(presentation)
+    assert stamp is None
+    assert pres["credential"] == {"id": "c1"}
+
+
+def test_unwrap_bare_vc():
+    mod = _load_py_sdk()
+    vc = _vc()
+    stamp, pres = mod._unwrap_stamp(vc)
+    assert stamp is None
+    assert pres == {"credential": vc}
+
+
+def test_unwrap_vc_only_stamp_preserves_tamper_binding():
+    mod = _load_py_sdk()
+    vc = _vc()
+    stamp_obj = {"ppid": "did:lemma:ppid_a", "verified": True, "credential": vc}
+    stamp, pres = mod._unwrap_stamp(stamp_obj)
+    # Flat fields present -> returned as the stamp for cross-checking.
+    assert stamp is stamp_obj
+    assert pres["credential"] == vc
+    assert pres["session_assertion"] is None
+
+
+def test_unwrap_stamped_event_with_bare_vc():
+    mod = _load_py_sdk()
+    vc = _vc()
+    inner = {"ppid": "did:lemma:ppid_a", "credential": vc}
+    event = {"action": "checkout", "lemma": inner}
+    stamp, pres = mod._unwrap_stamp(event)
+    assert stamp is inner
+    assert pres["credential"] == vc
 
 
 def test_unwrap_stamp_object_with_proof():
@@ -145,26 +186,67 @@ def test_verify_stamp_ok_when_consistent(monkeypatch):
     assert res.ppid == "did:lemma:ppid_a"
 
 
+def test_verify_stamp_accepts_bare_vc(monkeypatch):
+    mod = _load_py_sdk()
+    ctx = _ctx(mod)
+    seen = {}
+
+    def fake_verify(presentation):
+        seen["presentation"] = presentation
+        return mod.VerificationContext.Result(True, "valid", ppid="did:lemma:ppid_a", credential_id="c1")
+
+    monkeypatch.setattr(ctx, "verify", fake_verify)
+    res = ctx.verify_stamp(_vc())
+    assert res.ok is True
+    assert seen["presentation"]["credential"]["id"] == "c1"
+
+
+def test_verify_stamp_durable_drops_session_assertion(monkeypatch):
+    mod = _load_py_sdk()
+    ctx = _ctx(mod)
+    seen = {}
+
+    def fake_verify(presentation):
+        seen["presentation"] = presentation
+        return mod.VerificationContext.Result(True, "valid", ppid="did:lemma:ppid_a", credential_id="c1")
+
+    monkeypatch.setattr(ctx, "verify", fake_verify)
+    stamp = {"lemma": {"ppid": "did:lemma:ppid_a",
+                       "credential": {"id": "c1"},
+                       "session_assertion": {"expires_at_unix": 1}}}
+    res = ctx.verify_stamp(stamp, durable=True)
+    assert res.ok is True
+    # Durable mode strips the session assertion before verifying.
+    assert "session_assertion" not in seen["presentation"]
+    assert seen["presentation"] == {"credential": {"id": "c1"}}
+
+
 # ---------------------------------------------------------------------------
 # Node SDK + version + docs lockstep (source-pattern)
 # ---------------------------------------------------------------------------
 
 def test_node_sdk_exposes_verify_stamp():
     src = MJS_PATH.read_text(encoding="utf-8")
-    assert "async function verifyStamp(stamp, { key = \"lemma\" } = {})" in src
+    assert "async function verifyStamp(stamp, { key = \"lemma\", durable = false } = {})" in src
     assert "function unwrapStamp(input, key = \"lemma\")" in src
+    assert "function looksLikeVc(obj)" in src
     assert "export async function verifyStamp(stamp, options)" in src
     assert "stamp_ppid_mismatch" in src
     assert "stamp_credential_mismatch" in src
     # Exported from the factory and CommonJS interop.
     assert "return { verify, verifyStamp, refresh };" in src
     assert "verifyStamp," in src
-    assert "@version 1.1.0" in src
+    assert "@version 1.2.0" in src
+
+
+def test_node_sdk_durable_drops_session_assertion():
+    src = MJS_PATH.read_text(encoding="utf-8")
+    assert "durable ? { credential: presentation.credential } : presentation" in src
 
 
 def test_backend_sdk_versions_bumped():
     app = APP_PATH.read_text(encoding="utf-8")
-    assert app.count("response.headers['X-SDK-Version'] = '1.1.0'") >= 2
+    assert app.count("response.headers['X-SDK-Version'] = '1.2.0'") >= 2
 
 
 def test_docs_document_backend_verify_stamp():
@@ -172,3 +254,5 @@ def test_docs_document_backend_verify_stamp():
     assert "Re-verify a stored stamp on your backend" in docs
     assert "verifyStamp(" in docs
     assert "verify_stamp(" in docs
+    assert "durable" in docs
+    assert "includeCredential" in docs

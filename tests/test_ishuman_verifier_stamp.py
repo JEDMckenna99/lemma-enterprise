@@ -49,6 +49,9 @@ def test_sdk_exposes_get_verification_stamp(verifier_source):
     # Optional cryptographic proof only when explicitly requested.
     assert "if (options.includeProof) {" in verifier_source
     assert "stamp.proof = result.presentation || null;" in verifier_source
+    # VC-first: bare credential is the recommended durable evidence.
+    assert "} else if (options.includeCredential) {" in verifier_source
+    assert "stamp.credential = result.credential || null;" in verifier_source
 
 
 @pytest.mark.browser
@@ -64,9 +67,9 @@ def test_sdk_version_bumped_in_lockstep():
     verifier = VERIFIER_PATH.read_text(encoding="utf-8")
     app = APP_PATH.read_text(encoding="utf-8")
     demo = DEMO_PATH.read_text(encoding="utf-8")
-    assert "@version 1.6.0" in verifier
-    assert "response.headers['X-SDK-Version'] = '1.6.0'" in app
-    assert "/sdk/ishuman-verifier.js?v=1.6.0" in demo
+    assert "@version 1.7.0" in verifier
+    assert "response.headers['X-SDK-Version'] = '1.7.0'" in app
+    assert "/sdk/ishuman-verifier.js?v=1.7.0" in demo
 
 
 def test_docs_document_stamp_pattern():
@@ -76,3 +79,5 @@ def test_docs_document_stamp_pattern():
     assert "ih.stamp(" in docs
     # Reinforces the data-stays-with-you positioning.
     assert "lemma.id stores none of it" in docs
+    # VC-first guidance present.
+    assert "includeCredential" in docs

@@ -35,11 +35,16 @@ Example:
     user_ppid = result.ppid
 
     # Or re-verify a stamp you stored earlier (from the browser SDK's
-    # stamp(payload, includeProof=True)) — checks the signed proof AND that the
-    # logged ppid/credentialId match it:
+    # stamp(payload, includeCredential=True)) — checks the credential +
+    # revocation AND that the logged ppid/credentialId match it. Accepts a bare
+    # VC, a presentation, a stamp, or a stamped event interchangeably:
     check = ctx.verify_stamp(stored_log_row["lemma"])
     if not check.ok:
         flag_suspicious_log_row()
+
+    # Re-verifying OLD log rows? Use durable mode so an aged session assertion
+    # is treated as informational (credential + revocation still enforced):
+    audit = ctx.verify_stamp(old_row["lemma"], durable=True)
 """
 
 from __future__ import annotations
@@ -112,26 +117,70 @@ def _build_session_message(assertion: dict) -> bytes:
     return "\n".join(lines).encode("utf-8")
 
 
+def _looks_like_vc(obj) -> bool:
+    """A bare verifiable credential has subject + claims + a proof object."""
+    return (
+        isinstance(obj, dict)
+        and "subject" in obj
+        and "claims" in obj
+        and isinstance(obj.get("proof"), dict)
+    )
+
+
+def _has_stamp_fields(obj: dict) -> bool:
+    """Does this object carry the flat summary fields a stamp adds?"""
+    return any(k in obj for k in ("ppid", "verified", "verifiedAt", "credentialId"))
+
+
 def _unwrap_stamp(value, key: str = "lemma"):
     """Normalize the shapes a relying site may pass to ``verify_stamp`` into
     ``(stamp_or_None, presentation)``.
 
-    Accepts a raw presentation (has ``credential``), a stamp object from
-    ``getVerification(includeProof=True)`` (has ``proof``), or a stamped event
-    from ``stamp(payload)`` (has ``[key]`` holding one of the above).
+    Accepts:
+      - a bare verifiable credential (has ``subject`` + ``claims``)
+      - a raw presentation (has ``credential`` + optional session assertion)
+      - a stamp from ``getVerification(includeCredential=True)`` (flat fields + ``credential``)
+      - a stamp from ``getVerification(includeProof=True)`` (flat fields + ``proof``)
+      - a stamped event from ``stamp(payload)`` (has ``[key]`` holding one of the above)
+
+    The first element is the flat-field stamp (used for tamper-binding) when
+    present, else ``None``.
     """
     if not isinstance(value, dict):
         return None
+
+    # Stamped event: unwrap the [key] envelope first, but only if the top level
+    # isn't itself a credential/presentation/stamp.
+    if (
+        not _looks_like_vc(value)
+        and not isinstance(value.get("proof"), dict)
+        and not isinstance(value.get("credential"), dict)
+        and isinstance(value.get(key), dict)
+    ):
+        value = value[key]
+
+    # Bare VC -> wrap as a presentation; nothing to cross-check.
+    if _looks_like_vc(value):
+        return (None, {"credential": value})
+
+    # Stamp carrying a full session presentation under ``proof``.
+    proof = value.get("proof")
+    if isinstance(proof, dict) and isinstance(proof.get("credential"), dict):
+        return (value, proof)
+
+    # Object carrying a VC under ``credential``: either a raw presentation
+    # (no flat fields) or a VC-only stamp (flat fields present).
     if isinstance(value.get("credential"), dict):
-        return (None, value)
-    if isinstance(value.get("proof"), dict):
-        return (value, value["proof"])
-    inner = value.get(key)
-    if isinstance(inner, dict):
-        if isinstance(inner.get("proof"), dict):
-            return (inner, inner["proof"])
-        if isinstance(inner.get("credential"), dict):
-            return (inner, inner)
+        is_stamp = _has_stamp_fields(value)
+        presentation = {
+            "credential": value["credential"],
+            "session_assertion": value.get("session_assertion"),
+            "session_signature": value.get("session_signature"),
+            "session_nonce": value.get("session_nonce"),
+            "bloom_sequence": value.get("bloom_sequence"),
+        }
+        return (value if is_stamp else None, presentation)
+
     return None
 
 
@@ -381,21 +430,29 @@ class VerificationContext:
             bound_site_id=bound_site,
         )
 
-    def verify_stamp(self, stamp: dict, *, key: str = "lemma") -> "VerificationContext.Result":
-        """Verify a stamp produced by the browser SDK's ``stamp(payload,
-        {includeProof: true})`` / ``getVerification({includeProof: true})``.
+    def verify_stamp(
+        self, stamp: dict, *, key: str = "lemma", durable: bool = False
+    ) -> "VerificationContext.Result":
+        """Verify a stamp/credential produced by the browser SDK's
+        ``stamp(payload, {includeCredential: true})`` / ``getVerification(...)``.
 
-        Re-checks the signed proof AND that the stamp's logged ``ppid`` /
-        ``credentialId`` match the cryptographically verified values, so a
-        tampered log row can't claim a different identity than its proof
-        supports. Accepts the full stamped event, the stamp object, or a raw
-        presentation.
+        Re-checks the credential + revocation AND that the stamp's logged
+        ``ppid`` / ``credentialId`` match the cryptographically verified values,
+        so a tampered log row can't claim a different identity than its proof
+        supports. Accepts a bare VC, a raw presentation, a stamp object, or a
+        full stamped event interchangeably.
+
+        Pass ``durable=True`` to re-verify OLD log rows: any aged session
+        assertion is treated as informational (the session assertion is dropped
+        before verification) while the credential + revocation are still
+        enforced.
         """
         unwrapped = _unwrap_stamp(stamp, key)
         if unwrapped is None:
             return self.Result(False, "stamp_missing_proof")
         inner, presentation = unwrapped
-        result = self.verify(presentation)
+        to_verify = {"credential": presentation.get("credential")} if durable else presentation
+        result = self.verify(to_verify)
         if not result.ok:
             return result
         if inner:
