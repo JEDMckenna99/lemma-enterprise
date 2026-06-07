@@ -1,8 +1,8 @@
 {% extends "modern/layout.html" %}
 {% set is_public_page = true %}
 
-{% block title %}Pricing - lemma.id | Early Access{% endblock %}
-{% block description %}lemma.id is free to integrate during early access. Stripe Identity verification is pass-through at $2/person. Local proof checks require no paid server call.{% endblock %}
+{% block title %}Pricing - lemma.id{% endblock %}
+{% block description %}lemma.id pricing: $0.35 per first site credential issuance, then $0.01 per monthly active user. Unlimited local verification. IDV pass-through at $2/person when required.{% endblock %}
 
 {% block head %}
 {{ super() }}
@@ -12,58 +12,69 @@
         padding: 120px 20px 80px;
         background: linear-gradient(135deg, var(--gray-900) 0%, #0f172a 100%);
         color: var(--white);
-        min-height: 70vh;
+        min-height: 60vh;
         display: flex;
         flex-direction: column;
         justify-content: center;
         align-items: center;
     }
-    
-    .early-access-badge {
-        display: inline-block;
-        background: rgba(16, 185, 129, 0.15);
-        border: 1px solid rgba(16, 185, 129, 0.3);
-        color: #10b981;
-        padding: 8px 20px;
-        border-radius: 50px;
-        font-size: 14px;
-        font-weight: 600;
-        letter-spacing: 0.5px;
-        margin-bottom: 32px;
-        text-transform: uppercase;
-    }
-    
+
     .pricing-hero h1 {
-        font-size: 72px;
+        font-size: 56px;
         margin: 0 0 24px 0;
         font-weight: 700;
         color: #10b981;
     }
-    
+
     .pricing-hero .subtitle {
-        font-size: 24px;
+        font-size: 22px;
         margin: 0 0 16px 0;
         opacity: 0.95;
-        max-width: 600px;
+        max-width: 640px;
         line-height: 1.5;
         color: var(--white);
     }
-    
+
     .pricing-hero .description {
-        font-size: 18px;
-        margin: 0 0 48px 0;
-        opacity: 0.7;
-        max-width: 500px;
+        font-size: 17px;
+        margin: 0 0 40px 0;
+        opacity: 0.75;
+        max-width: 560px;
         line-height: 1.6;
     }
-    
+
+    .pricing-hero-highlight {
+        display: flex;
+        gap: 32px;
+        flex-wrap: wrap;
+        justify-content: center;
+        margin-bottom: 40px;
+    }
+
+    .pricing-hero-stat {
+        text-align: center;
+    }
+
+    .pricing-hero-stat .amount {
+        font-size: 36px;
+        font-weight: 700;
+        color: #10b981;
+        display: block;
+    }
+
+    .pricing-hero-stat .label {
+        font-size: 14px;
+        opacity: 0.8;
+        margin-top: 4px;
+    }
+
     .pricing-cta {
         display: flex;
         gap: 16px;
         flex-wrap: wrap;
         justify-content: center;
     }
-    
+
     .pricing-cta .btn-primary {
         background: #10b981;
         padding: 18px 48px;
@@ -71,12 +82,12 @@
         font-weight: 600;
         border-radius: 10px;
     }
-    
+
     .pricing-cta .btn-primary:hover {
         background: #059669;
         transform: translateY(-2px);
     }
-    
+
     .pricing-cta .btn-secondary {
         background: transparent;
         border: 2px solid rgba(255,255,255,0.3);
@@ -88,32 +99,141 @@
         text-decoration: none;
         transition: all 0.2s;
     }
-    
+
     .pricing-cta .btn-secondary:hover {
         border-color: rgba(255,255,255,0.6);
         background: rgba(255,255,255,0.05);
     }
-    
+
+    .lemma-pricing {
+        max-width: 980px;
+        margin: 0 auto;
+        padding: 64px 20px 40px;
+    }
+
+    .lemma-pricing h2 {
+        font-size: 30px;
+        margin: 0 0 12px 0;
+        color: var(--gray-900);
+        text-align: center;
+    }
+
+    .lemma-pricing .intro {
+        text-align: center;
+        color: var(--gray-600);
+        margin: 0 auto 32px;
+        max-width: 720px;
+        line-height: 1.7;
+    }
+
+    .lemma-pricing-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+        gap: 18px;
+        margin-bottom: 40px;
+    }
+
+    .lemma-price-card {
+        border: 1px solid var(--gray-200);
+        border-radius: 12px;
+        padding: 22px;
+        background: var(--white);
+    }
+
+    .lemma-price-card.featured {
+        border-color: #10b981;
+        box-shadow: 0 4px 20px rgba(16, 185, 129, 0.12);
+    }
+
+    .lemma-price-card h3 {
+        margin: 0 0 10px 0;
+        font-size: var(--font-size-lg);
+        color: var(--gray-900);
+    }
+
+    .lemma-price-card .price {
+        margin: 0 0 10px 0;
+        font-size: 28px;
+        font-weight: 700;
+        color: #059669;
+    }
+
+    .lemma-price-card p {
+        margin: 0;
+        color: var(--gray-600);
+        line-height: 1.5;
+        font-size: 15px;
+    }
+
+    .pricing-rules {
+        max-width: 720px;
+        margin: 0 auto 48px;
+        padding: 24px 28px;
+        background: var(--gray-50);
+        border-radius: 12px;
+        border: 1px solid var(--gray-200);
+    }
+
+    .pricing-rules h3 {
+        margin: 0 0 16px 0;
+        font-size: 18px;
+        color: var(--gray-900);
+    }
+
+    .pricing-rules ol {
+        margin: 0;
+        padding-left: 22px;
+        color: var(--gray-700);
+        line-height: 1.8;
+        font-size: 15px;
+    }
+
+    .pricing-example {
+        max-width: 720px;
+        margin: 0 auto 48px;
+        padding: 24px 28px;
+        background: #f0fdf4;
+        border-radius: 12px;
+        border: 1px solid #bbf7d0;
+    }
+
+    .pricing-example h3 {
+        margin: 0 0 12px 0;
+        font-size: 18px;
+        color: var(--gray-900);
+    }
+
+    .pricing-example p {
+        margin: 0 0 12px 0;
+        color: var(--gray-700);
+        line-height: 1.7;
+        font-size: 15px;
+    }
+
+    .pricing-example p:last-child {
+        margin-bottom: 0;
+    }
+
     .features-included {
         max-width: 800px;
         margin: 0 auto;
-        padding: 80px 20px;
+        padding: 40px 20px 80px;
         text-align: center;
     }
-    
+
     .features-included h2 {
         font-size: 32px;
         color: var(--gray-900);
         margin-bottom: 48px;
     }
-    
+
     .features-grid {
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
         gap: 24px;
         text-align: left;
     }
-    
+
     .feature-item {
         display: flex;
         align-items: flex-start;
@@ -122,7 +242,7 @@
         background: var(--gray-50);
         border-radius: 12px;
     }
-    
+
     .feature-check {
         width: 24px;
         height: 24px;
@@ -136,100 +256,49 @@
         font-weight: 700;
         font-size: 14px;
     }
-    
+
     .feature-text {
         color: var(--gray-700);
         font-size: 15px;
         line-height: 1.5;
     }
-    
-    .future-note {
+
+    .idv-note {
         background: var(--gray-50);
         padding: 60px 20px;
         text-align: center;
     }
-    
-    .future-note-inner {
-        max-width: 600px;
+
+    .idv-note-inner {
+        max-width: 640px;
         margin: 0 auto;
     }
-    
-    .future-note h3 {
+
+    .idv-note h3 {
         font-size: 20px;
         color: var(--gray-800);
         margin-bottom: 12px;
     }
-    
-    .future-note p {
+
+    .idv-note p {
         color: var(--gray-600);
         line-height: 1.7;
         font-size: 16px;
     }
 
-    .ishuman-pricing {
-        max-width: 980px;
-        margin: 0 auto;
-        padding: 24px 20px 40px;
-    }
-
-    .ishuman-pricing h2 {
-        font-size: 30px;
-        margin: 0 0 12px 0;
-        color: var(--gray-900);
-        text-align: center;
-    }
-
-    .ishuman-pricing .intro {
-        text-align: center;
-        color: var(--gray-600);
-        margin: 0 auto 28px;
-        max-width: 700px;
-        line-height: 1.6;
-    }
-
-    .ishuman-pricing-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-        gap: 18px;
-    }
-
-    .ishuman-price-card {
-        border: 1px solid var(--gray-200);
-        border-radius: 12px;
-        padding: 22px;
-        background: var(--white);
-    }
-
-    .ishuman-price-card h3 {
-        margin: 0 0 10px 0;
-        font-size: var(--font-size-lg);
-        color: var(--gray-900);
-    }
-
-    .ishuman-price-card .price {
-        margin: 0 0 10px 0;
-        font-size: 28px;
-        font-weight: 700;
-        color: #059669;
-    }
-
-    .ishuman-price-card p {
-        margin: 0;
-        color: var(--gray-600);
-        line-height: 1.5;
-        font-size: 15px;
-    }
-    
     @media (max-width: 768px) {
         .pricing-hero {
             padding: 80px 20px 60px;
             min-height: auto;
         }
         .pricing-hero h1 {
-            font-size: 48px;
+            font-size: 40px;
         }
         .pricing-hero .subtitle {
-            font-size: 20px;
+            font-size: 18px;
+        }
+        .pricing-hero-highlight {
+            gap: 20px;
         }
         .pricing-cta {
             flex-direction: column;
@@ -247,46 +316,77 @@
 
 {% block content %}
 <div class="pricing-hero">
-    <div class="early-access-badge">Early Access</div>
-    <h1>Free to integrate</h1>
-    <p class="subtitle">Add lemma.id during early access with no platform fee.</p>
-    <p class="description">Relying sites get the SDK, dashboard, API keys, local checks, and abuse controls free during early access. IDV is pass-through only when a user needs first-time verification — and your servers never store the ID document or PII behind it.</p>
+    <h1>Simple pricing</h1>
+    <p class="subtitle">Pay when a user gets their first site credential. Pay a small MAU fee only when they come back.</p>
+    <p class="description">Unlimited local verification on your servers — no per-check fee. lemma.id is only in the loop when a passkey is required to issue or renew a site credential.</p>
+    <div class="pricing-hero-highlight">
+        <div class="pricing-hero-stat">
+            <span class="amount">$0.35</span>
+            <span class="label">first site credential per user</span>
+        </div>
+        <div class="pricing-hero-stat">
+            <span class="amount">$0.01</span>
+            <span class="label">per MAU, starting month two</span>
+        </div>
+        <div class="pricing-hero-stat">
+            <span class="amount">$0</span>
+            <span class="label">local proof checks</span>
+        </div>
+    </div>
     <div class="pricing-cta">
         <a href="/docs" class="btn btn-primary">Add to your site</a>
         <a href="/demo" class="btn-secondary">See Demo</a>
     </div>
 </div>
 
-<div class="ishuman-pricing">
-    <h2>Early access pricing</h2>
-    <p class="intro">Three separate concepts — don't mix them up:</p>
-    <ul style="max-width: 720px; margin: 0 auto 32px; padding-left: 24px; color: var(--gray-700); line-height: 1.8; font-size: var(--font-size-base);">
-        <li><strong>IDV verification</strong> (paid, pass-through): first-time identity check via Stripe Identity — currently $2/person. The relying site or user pays at checkout; lemma.id adds no platform fee.</li>
-        <li><strong>Local proof check</strong> (free): routine <code>verify()</code> calls that validate an existing credential in-browser — no paid server call per check.</li>
-        <li><strong>Site integration</strong> (free in early access): API keys, dashboard, site-block controls, and hosted platform features.</li>
-    </ul>
-    <p class="intro" style="margin-bottom: 24px;"><strong>Recommended use:</strong> trigger IDV only on suspicious or high-risk actions, not every signup. Users who already hold a credential reuse it for free local checks.</p>
-    <div class="ishuman-pricing-grid">
-        <div class="ishuman-price-card">
-            <h3>IDV verification</h3>
-            <p class="price">$2.00 / person</p>
-            <p>Stripe Identity pass-through for <strong>first-time</strong> verification only. No lemma.id platform fee on each IDV event.</p>
+<div class="lemma-pricing">
+    <h2>How billing works</h2>
+    <p class="intro">Each user gets a site-specific credential (a lemma with their PPID as subject). You are billed on issuance and on monthly activity — not on every login or verification.</p>
+
+    <div class="lemma-pricing-grid">
+        <div class="lemma-price-card featured">
+            <h3>Initial site issuance</h3>
+            <p class="price">$0.35 / user / site</p>
+            <p>Charged once when a user receives their <strong>first site credential</strong> for your site — the passkey-gated issuance that binds their PPID to your domain.</p>
         </div>
-        <div class="ishuman-price-card">
-            <h3>Local proof check</h3>
+        <div class="lemma-price-card featured">
+            <h3>Monthly active user (MAU)</h3>
+            <p class="price">$0.01 / user / month</p>
+            <p>Charged for each month a user is <strong>active on your site</strong>, starting the <strong>calendar month after</strong> their first site credential was issued. Inactive months are not billed.</p>
+        </div>
+        <div class="lemma-price-card">
+            <h3>Local verification</h3>
             <p class="price">Free</p>
-            <p>Embed <code>IsHumanVerifier</code> and validate existing credentials in the browser. No per-check server call or metered fee.</p>
+            <p>Your site validates credentials locally with the SDK — signature, expiry, and revocation checks. No server call to lemma.id and no per-check fee, no matter how many times the user presents the credential.</p>
         </div>
-        <div class="ishuman-price-card">
+        <div class="lemma-price-card">
             <h3>Site integration</h3>
-            <p class="price">Free in early access</p>
-            <p>API keys, site-block controls, developer dashboard, and check endpoints at no extra cost during early access.</p>
+            <p class="price">Included</p>
+            <p>API keys, developer dashboard, site-block controls, SDK, and hosted platform features at no additional platform fee.</p>
         </div>
+    </div>
+
+    <div class="pricing-rules">
+        <h3>Billing rules</h3>
+        <ol>
+            <li><strong>First issuance ($0.35):</strong> billed when lemma.id issues the user's first site-bound credential for your site (passkey required).</li>
+            <li><strong>MAU ($0.01):</strong> billed for each calendar month the user is active <em>after</em> the month of their first issuance. The issuance month itself has no MAU charge.</li>
+            <li><strong>Active user:</strong> a user who passkey-renews their site credential during that month (monthly continuity check).</li>
+            <li><strong>Local checks:</strong> unlimited presentations and verifications on your infrastructure — never metered.</li>
+            <li><strong>Per site:</strong> each relying site is billed independently for its own users (pairwise PPIDs).</li>
+        </ol>
+    </div>
+
+    <div class="pricing-example">
+        <h3>Example: 1,000 new users in January, 600 return in February</h3>
+        <p><strong>January:</strong> 1,000 × $0.35 = <strong>$350</strong> (initial issuance). No MAU charges — first month after issuance is excluded.</p>
+        <p><strong>February:</strong> 600 returning active users × $0.01 = <strong>$6.00</strong> MAU. Plus any new users who join in February at $0.35 each.</p>
+        <p><strong>All year:</strong> A user who logs in daily but renews once per month still counts as <strong>one MAU</strong> that month — not 30 verification events like SMS OTP.</p>
     </div>
 </div>
 
 <div class="features-included">
-    <h2>Everything included for early access integrations</h2>
+    <h2>Everything included</h2>
     <div class="features-grid">
         <div class="feature-item">
             <div class="feature-check">✓</div>
@@ -294,7 +394,7 @@
         </div>
         <div class="feature-item">
             <div class="feature-check">✓</div>
-            <div class="feature-text">Unlimited local proof checks (not IDV events)</div>
+            <div class="feature-text">Unlimited local proof checks</div>
         </div>
         <div class="feature-item">
             <div class="feature-check">✓</div>
@@ -310,7 +410,7 @@
         </div>
         <div class="feature-item">
             <div class="feature-check">✓</div>
-            <div class="feature-text">No KYC stack to build or run</div>
+            <div class="feature-text">Monthly continuity via passkey renewal</div>
         </div>
         <div class="feature-item">
             <div class="feature-check">✓</div>
@@ -331,10 +431,10 @@
     </div>
 </div>
 
-<div class="future-note">
-    <div class="future-note-inner">
-        <h3>What happens when early access ends?</h3>
-        <p>We'll introduce simple, affordable pricing for hosted platform features, with generous free tiers and clear pass-through IDV costs. Local verification remains the core cost advantage: routine checks do not require a paid server call.</p>
+<div class="idv-note">
+    <div class="idv-note-inner">
+        <h3>Identity verification (IDV) — separate pass-through</h3>
+        <p>First-time proof of personhood via Stripe Identity is <strong>$2.00 per person</strong> (pass-through; no lemma.id markup). IDV is only required when a user has no existing lemma.id master credential — not on every site issuance or monthly renewal. Trigger IDV on high-risk actions, not every signup, to keep costs down.</p>
     </div>
 </div>
 {% endblock %}
