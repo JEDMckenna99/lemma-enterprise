@@ -2,7 +2,7 @@
 {% set is_public_page = true %}
 
 {% block title %}{{ page_title or 'Documentation' }} - lemma.id{% endblock %}
-{% block description %}{{ page_description or 'lemma.id proof of humanity — integrate verified-human credentials with the browser SDK, site-private PPIDs, and optional API keys for abuse controls.' }}{% endblock %}
+{% block description %}{{ page_description or 'lemma.id documentation — proof of humanity for websites and Agent Ops for AI runtime authorization.' }}{% endblock %}
 
 {% block preload_scripts %}
 <!-- Docs pages skip wallet preload for faster LCP -->
@@ -18,7 +18,7 @@
 
 {% block head %}
 {{ super() }}
-<link rel="stylesheet" href="{{ url_for('static', filename='css/docs.css') }}?v=4">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/docs.css') }}?v=5">
 {% endblock %}
 
 {% block content %}
@@ -59,9 +59,31 @@
         <aside class="docs-sidebar" id="docs-sidebar">
             <nav class="docs-nav">
                 <div class="nav-product-label">
-                    <a href="{{ url_for('docs_overview') }}" class="nav-product-link">lemma.id</a>
+                    <a href="/" class="nav-product-link">lemma.id</a>
                 </div>
 
+                <div class="docs-product-switcher">
+                    <a href="{{ url_for('docs_overview') }}" class="docs-product-tab {% if active_product|default('ishuman') == 'ishuman' %}active{% endif %}">Proof of humanity</a>
+                    <a href="{{ url_for('docs_agents') }}" class="docs-product-tab {% if active_product|default('ishuman') == 'agents' %}active{% endif %}">Agent Ops</a>
+                </div>
+
+                {% if active_product|default('ishuman') == 'agents' %}
+                <div class="nav-section">
+                    <div class="nav-title">On this page</div>
+                    <a href="{{ url_for('docs_agents') }}#quickstart" class="nav-link">Quickstart</a>
+                    <a href="{{ url_for('docs_agents') }}#overview" class="nav-link">Overview</a>
+                    <a href="{{ url_for('docs_agents') }}#runtime-contract" class="nav-link">Request contract</a>
+                    <a href="{{ url_for('docs_agents') }}#cli" class="nav-link">CLI reference</a>
+                    <a href="{{ url_for('docs_agents') }}#api-reference" class="nav-link">API reference</a>
+                    <a href="{{ url_for('docs_agents') }}#agent-ops" class="nav-link">Agent Ops console</a>
+                </div>
+                <div class="nav-section">
+                    <div class="nav-title">Resources</div>
+                    <a href="/admin/agent-ops" class="nav-link">Agent Ops console</a>
+                    <a href="{{ url_for('docs_overview') }}" class="nav-link">Proof of humanity docs</a>
+                    <a href="/docs/openclaw/PERSONAL_QUICKSTART.md" class="nav-link">OpenClaw quickstart (md)</a>
+                </div>
+                {% else %}
                 <div class="nav-section">
                     <div class="nav-title">On this page</div>
                     <a href="{{ url_for('docs_overview') }}#quickstart" class="nav-link">Quickstart</a>
@@ -74,8 +96,9 @@
                     <div class="nav-title">Resources</div>
                     <a href="/developer/ishuman" class="nav-link">Developer hub</a>
                     <a href="/developer/external-api-keys" class="nav-link">API key manager</a>
-                    <a href="/sdk/ishuman-verifier.js" class="nav-link">SDK script</a>
+                    <a href="{{ url_for('docs_agents') }}" class="nav-link">Agent Ops docs</a>
                 </div>
+                {% endif %}
             </nav>
         </aside>
         
@@ -160,7 +183,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const searchInput = document.getElementById('docs-search-input');
     const searchResults = document.getElementById('docs-search-results');
     
-    // Search index - public docs surface (lemma.id proof of humanity)
+    // Search index - public docs (proof of humanity + Agent Ops)
     const docsIndex = [
         {
             title: 'lemma.id proof of humanity',
@@ -168,6 +191,13 @@ document.addEventListener('DOMContentLoaded', () => {
             category: 'integration',
             keywords: 'ishuman lemma.id proof of humanity didit identity verification ppid site block network revoke local verification ed25519 sdk api autoProvision siteId api key no webhook',
             excerpt: 'Integrate lemma.id proof of humanity with the browser SDK, site-private PPIDs, local verification, and optional API-key abuse controls. No customer webhooks required.'
+        },
+        {
+            title: 'Agent Ops',
+            url: '{{ url_for("docs_agents") }}',
+            category: 'getting-started',
+            keywords: 'agent ops firewall lemma-cli runtime X-Lemma-Credential kill switch openclaw setup-openclaw demo authorize decisions control plane',
+            excerpt: 'Proof-first authorization for AI agent runtimes — install lemma-cli, send X-Lemma-Credential, connect runtimes, and operate the Lemma Firewall.'
         }
     ];
     
@@ -222,7 +252,8 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         
         const categoryLabels = {
-            'integration': 'Product'
+            'integration': 'Proof of humanity',
+            'getting-started': 'Agent Ops'
         };
         
         let html = results.map((doc, i) => `

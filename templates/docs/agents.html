@@ -1,0 +1,274 @@
+{% extends "docs/layout.html" %}
+{% set active_product = 'agents' %}
+{% set active_page = 'agents' %}
+{% set hero_title = 'Agent Ops' %}
+{% set hero_subtitle = 'Proof-first authorization for AI agent runtimes — local firewall enforcement, runtime kill switches, and decision observability.' %}
+{% set page_description = 'Agent Ops documentation — install lemma-cli, send X-Lemma-Credential, connect runtimes, and operate the Lemma Firewall control plane.' %}
+
+{% block docs_content %}
+<div class="docs-section" id="quickstart">
+    <h2>5-minute quickstart</h2>
+    <ol style="line-height: 1.8; color: var(--gray-700); padding-left: 24px;">
+        <li><strong>Install the CLI:</strong> <code>pipx install lemma-cli</code></li>
+        <li><strong>Run the demo:</strong> <code>lemma demo --api-base https://lemma.id</code> — issues a credential, starts the local firewall, and runs 6 containment tests.</li>
+        <li><strong>Configure identifiers:</strong> choose stable <code>runtime_id</code>, <code>agent_id</code>, and <code>workspace_id</code> values for your environment.</li>
+        <li><strong>Send proofs on protected routes:</strong> attach <code>X-Lemma-Credential</code> (base64url-encoded signed lemma) on every privileged API call.</li>
+        <li><strong>Validate controls:</strong> confirm allow/deny decisions appear in Agent Ops and that kill switch denies new privileged actions immediately.</li>
+    </ol>
+    <div class="callout callout--info">
+        <div class="callout-title">Fastest personal path</div>
+        <p>For OpenClaw-style local onboarding, run <code>lemma setup-openclaw --api-base https://lemma.id</code>. It handles browser approval, firewall startup, one allowed request, and a kill-to-deny check.</p>
+    </div>
+</div>
+
+<div class="docs-section" id="overview">
+    <h2>What is Agent Ops?</h2>
+    <p>Agent Ops is lemma.id&apos;s proof-first control plane for AI agent runtimes. The <strong>Lemma Firewall</strong> sits between your agent and upstream APIs, verifying Ed25519-signed credentials on the enforcement hot path — without a server round-trip per action when running locally.</p>
+    <p>New integrations should send <code>X-Lemma-Credential</code> directly. Exchange proofs for bearer tokens only on legacy routes that cannot yet accept the lemma header.</p>
+
+    <h3>Runtime onboarding (one-time)</h3>
+    <ol>
+        <li>Install <code>lemma-cli</code> and start a wallet session (or use an existing proof file).</li>
+        <li>lemma.id issues or validates a runtime credential for your connected environment.</li>
+        <li>The runtime registers with a policy profile, risk defaults, and kill switch enabled.</li>
+        <li>Your gateway sends <code>X-Lemma-Credential</code> on protected API calls.</li>
+        <li>Agent Ops shows runtime state, decisions, and control-plane defaults.</li>
+    </ol>
+
+    <h3>Per-request enforcement</h3>
+    <ol>
+        <li>Gateway validates proof scope, audience, and signature.</li>
+        <li>Runtime authorization gate checks active state and kill switch.</li>
+        <li>Request is allowed or denied with a machine-readable reason code.</li>
+        <li>Decision is logged for query and explain workflows.</li>
+    </ol>
+</div>
+
+<div class="docs-section" id="proof-hierarchy">
+    <h2>Proof hierarchy</h2>
+    <table class="docs-table">
+        <thead>
+            <tr><th>Layer</th><th>Purpose</th><th>Boundaries</th></tr>
+        </thead>
+        <tbody>
+            <tr><td>Root identity proof</td><td>Links operator identity to PPID</td><td>Never grants broad runtime access directly</td></tr>
+            <tr><td>Delegation proof</td><td>Delegates authority to automation intent</td><td>Scope, audience, and expiry constrained</td></tr>
+            <tr><td>Runtime binding proof</td><td>Binds grant to runtime / agent / workspace</td><td>Kill switch and runtime state enforced</td></tr>
+            <tr><td>Run proof (ephemeral)</td><td>Constrains a specific job window</td><td>Short TTL, budgeted operations</td></tr>
+            <tr><td>PoP request signature</td><td>Protects each API call from replay</td><td>Nonce, method, path, body hash (advanced tier)</td></tr>
+        </tbody>
+    </table>
+    <p style="color: var(--gray-600); font-size: 14px;">Beginner integrations use the full signed credential in <code>X-Lemma-Credential</code>. Advanced integrations may send <code>X-Lemma-Proof</code> plus <code>X-Lemma-PoP</code> for proof-chain and per-request replay resistance.</p>
+</div>
+
+<div class="docs-section" id="security">
+    <h2>Security boundaries</h2>
+    <table class="docs-table">
+        <thead>
+            <tr><th>Property</th><th>How it is enforced</th></tr>
+        </thead>
+        <tbody>
+            <tr><td>Proof-first route protection</td><td>Protected routes require signed proofs and policy checks</td></tr>
+            <tr><td>Deny-by-default execution</td><td>Missing or ambiguous context produces explicit deny</td></tr>
+            <tr><td>Runtime containment</td><td>Kill switch checked before privileged execution</td></tr>
+            <tr><td>Revocation freshness</td><td>Revocation list and freshness channels gate stale credentials</td></tr>
+            <tr><td>Identity boundary</td><td>PPID is the relying-party identity key; wallet_id is internal plumbing</td></tr>
+            <tr><td>Taint epoch</td><td>Prompt-injection containment — stale epoch denies until re-approval</td></tr>
+        </tbody>
+    </table>
+</div>
+
+<div class="docs-section" id="installation">
+    <h2>Installation</h2>
+    <p>Install the packaged CLI with <code>pipx</code> for isolated, repeatable local usage.</p>
+    <div class="code-block">
+        <div class="code-header">
+            <span>Shell</span>
+            <button class="copy-btn">Copy</button>
+        </div>
+        <code>pipx install lemma-cli</code>
+    </div>
+    <p><strong>Prerequisites:</strong> Python 3.10+, a browser for wallet approval (or an existing proof file), and stable <code>runtime_id</code> / <code>agent_id</code> / <code>workspace_id</code> identifiers.</p>
+</div>
+
+<div class="docs-section" id="runtime-contract">
+    <h2>Runtime request contract</h2>
+    <p>Load the signed proof from disk or memory and attach it to protected requests. This is the default contract for new agent integrations.</p>
+    <div class="code-block">
+        <div class="code-header">
+            <span>Environment</span>
+            <button class="copy-btn">Copy</button>
+        </div>
+        <code>LEMMA_BASE_URL=https://lemma.id
+LEMMA_PROOF_FILE=/path/to/.lemma-proof.json
+LEMMA_RUNTIME_ID=my-runtime
+LEMMA_AGENT_ID=my-agent
+LEMMA_WORKSPACE_ID=prod</code>
+    </div>
+    <div class="code-block">
+        <div class="code-header">
+            <span>HTTP</span>
+            <button class="copy-btn">Copy</button>
+        </div>
+        <code>POST /api/protected/action
+Headers:
+  X-Lemma-Credential: &lt;base64url(full signed lemma)&gt;
+  Content-Type: application/json</code>
+    </div>
+    <div class="callout callout--info">
+        <div class="callout-title">Compatibility only</div>
+        <p>Legacy bearer integrations may call <code>POST /api/auth/exchange-proof</code> for a short-lived <code>lm_at_...</code> token. Do not use token exchange as the default on new routes.</p>
+    </div>
+</div>
+
+<div class="docs-section" id="cli">
+    <h2>CLI reference</h2>
+    <table class="docs-table">
+        <thead>
+            <tr><th>Command</th><th>Purpose</th></tr>
+        </thead>
+        <tbody>
+            <tr><td><code>lemma demo</code></td><td>Issue credential, start firewall, run 6 containment tests</td></tr>
+            <tr><td><code>lemma setup-openclaw</code></td><td>One-command OpenClaw starter: approve, firewall, allow, kill-to-deny</td></tr>
+            <tr><td><code>lemma firewall-connect</code></td><td>Connect runtime to control plane (aliases: <code>runtime-onboard</code>, <code>openclaw-connect</code>)</td></tr>
+            <tr><td><code>lemma session start|status</code></td><td>Browser-backed wallet session for CLI</td></tr>
+            <tr><td><code>lemma start|stop|replay</code></td><td>Local scoped session + firewall on <code>:8787</code></td></tr>
+            <tr><td><code>lemma doctor --fix</code></td><td>Remediation by error code (<code>wallet_unlock_required</code>, etc.)</td></tr>
+            <tr><td><code>lemma safety-status</code></td><td>Check local firewall posture</td></tr>
+            <tr><td><code>lemma login</code></td><td>Headless auth with platform API key (CI only)</td></tr>
+        </tbody>
+    </table>
+    <div class="code-block">
+        <div class="code-header">
+            <span>Shell — common flows</span>
+            <button class="copy-btn">Copy</button>
+        </div>
+        <code>lemma demo --api-base https://lemma.id
+
+lemma session start --api-base https://lemma.id
+lemma firewall-connect --api-base https://lemma.id \
+  --runtime-id my-runtime --agent-id my-agent --workspace-id prod
+
+lemma doctor --fix --error wallet_unlock_required --api-base https://lemma.id</code>
+    </div>
+    <p style="color: var(--gray-600); font-size: 14px;">Machine-oriented commands support <code>--json</code> with fields <code>schema_version</code>, <code>command</code>, <code>ok</code>, and <code>error_code</code>.</p>
+</div>
+
+<div class="docs-section" id="examples">
+    <h2>Code examples</h2>
+    <h3>Runtime client (Node.js)</h3>
+    <div class="code-block">
+        <div class="code-header">
+            <span>Node.js</span>
+            <button class="copy-btn">Copy</button>
+        </div>
+        <code>import fs from 'node:fs/promises';
+
+const proof = JSON.parse(await fs.readFile(process.env.LEMMA_PROOF_FILE, 'utf8'));
+const encodedProof = Buffer.from(JSON.stringify(proof)).toString('base64url');
+
+const response = await fetch('https://api.example.com/api/agent/run', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+    'X-Lemma-Credential': encodedProof,
+  },
+  body: JSON.stringify({ action: 'site.read' }),
+});</code>
+    </div>
+    <h3>Protected backend route (Express)</h3>
+    <div class="code-block">
+        <div class="code-header">
+            <span>Express</span>
+            <button class="copy-btn">Copy</button>
+        </div>
+        <code>app.post('/api/agent/run', async (req, res) => {
+  const encoded = (req.header('X-Lemma-Credential') || '').trim();
+  if (!encoded) {
+    return res.status(401).json({ success: false, error: 'auth_required' });
+  }
+  const credential = JSON.parse(Buffer.from(encoded, 'base64url').toString('utf8'));
+  const verification = await verifyCredentialWithTrust(credential);
+  if (!verification.valid) {
+    return res.status(401).json({ success: false, error: 'invalid_lemma' });
+  }
+  return res.json({ success: true, actor: credential.subject });
+});</code>
+    </div>
+</div>
+
+<div class="docs-section" id="api-reference">
+    <h2>API reference</h2>
+    <p>Runtime control-plane endpoints require wallet session or operator auth. Compatibility auth endpoints are listed separately.</p>
+
+    <h3>Runtime control plane</h3>
+    <table class="docs-table">
+        <thead>
+            <tr><th>Method</th><th>Path</th><th>Purpose</th></tr>
+        </thead>
+        <tbody>
+            <tr><td><code>POST</code></td><td><code>/api/wallet/runtimes/bootstrap</code></td><td>Register or connect a runtime</td></tr>
+            <tr><td><code>POST</code></td><td><code>/api/wallet/runtimes/issue-proof</code></td><td>Issue runtime proof</td></tr>
+            <tr><td><code>GET</code></td><td><code>/api/wallet/runtimes</code></td><td>List runtimes (org/env scoped)</td></tr>
+            <tr><td><code>POST</code></td><td><code>/api/wallet/runtimes/&lt;id&gt;/kill</code></td><td>Kill switch — deny new privileged actions</td></tr>
+            <tr><td><code>POST</code></td><td><code>/api/wallet/runtimes/&lt;id&gt;/authorize</code></td><td>Per-action authorization gate</td></tr>
+            <tr><td><code>GET</code></td><td><code>/api/wallet/runtimes/decisions</code></td><td>Decision feed</td></tr>
+            <tr><td><code>GET</code></td><td><code>/api/wallet/runtimes/decisions/&lt;id&gt;/explain</code></td><td>Explain allow/deny with policy snapshot</td></tr>
+            <tr><td><code>GET</code></td><td><code>/api/wallet/runtimes/decisions/export</code></td><td>Export decisions for audit</td></tr>
+            <tr><td><code>GET</code></td><td><code>/api/wallet/runtimes/alerts/summary</code></td><td>Deny spikes and revocation lag SLA</td></tr>
+        </tbody>
+    </table>
+
+    <h3>Compatibility auth</h3>
+    <table class="docs-table">
+        <thead>
+            <tr><th>Method</th><th>Path</th><th>Purpose</th></tr>
+        </thead>
+        <tbody>
+            <tr><td><code>POST</code></td><td><code>/api/auth/exchange-proof</code></td><td>Exchange verified proof for short-lived bearer token (legacy)</td></tr>
+            <tr><td><code>POST</code></td><td><code>/api/auth/introspect</code></td><td>Introspect bearer token (API key)</td></tr>
+            <tr><td><code>POST</code></td><td><code>/api/auth/revoke</code></td><td>Revoke bearer token (API key)</td></tr>
+        </tbody>
+    </table>
+
+    <h3>Monitoring (delegated tokens)</h3>
+    <table class="docs-table">
+        <thead>
+            <tr><th>Method</th><th>Path</th><th>Purpose</th></tr>
+        </thead>
+        <tbody>
+            <tr><td><code>GET</code></td><td><code>/api/agent/monitor/summary</code></td><td>Activity summary (<code>X-API-Key</code>)</td></tr>
+            <tr><td><code>GET</code></td><td><code>/api/agent/monitor/events</code></td><td>Event stream (<code>X-API-Key</code>)</td></tr>
+        </tbody>
+    </table>
+</div>
+
+<div class="docs-section" id="agent-ops">
+    <h2>Agent Ops console</h2>
+    <p>After connecting a runtime, operators use the Agent Ops console to monitor decisions, publish policies, and trigger kill switches.</p>
+    <ul>
+        <li>Connect your runtime with <code>lemma firewall-connect</code> or <code>lemma setup-openclaw</code></li>
+        <li>Monitor live activity and the decision stream</li>
+        <li>Kill or contain a runtime or delegated agent</li>
+        <li>Explain allow/deny decisions from logs and policy snapshots</li>
+        <li>Track deny spikes and revocation lag SLA</li>
+    </ul>
+    <p>Sign in with your lemma.id wallet, then open <a href="/admin/agent-ops">/admin/agent-ops</a>. The console requires an authenticated wallet session with operator access to your organization.</p>
+</div>
+
+<div class="docs-section" id="validation">
+    <h2>Validation checklist</h2>
+    <table class="docs-table">
+        <thead>
+            <tr><th>Check</th><th>Expected result</th></tr>
+        </thead>
+        <tbody>
+            <tr><td>Protected request with valid proof</td><td><code>ALLOW</code> with normal response</td></tr>
+            <tr><td>Missing scope or wrong audience</td><td><code>DENY</code> with machine-readable reason code</td></tr>
+            <tr><td>Decision query / explain</td><td>Runtime decisions visible in Agent Ops</td></tr>
+            <tr><td>Kill switch</td><td>New privileged actions denied immediately</td></tr>
+            <tr><td><code>lemma demo</code> containment suite</td><td>6/6 tests pass</td></tr>
+        </tbody>
+    </table>
+</div>
+{% endblock %}
