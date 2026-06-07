@@ -1,6 +1,6 @@
 {% extends "modern/layout.html" %}
 
-{% block title %}Developer Platform - lemma.id{% endblock %}
+{% block title %}lemma.id proof of humanity — Developer hub{% endblock %}
 
 {% block head %}
 {{ super() }}
@@ -27,56 +27,57 @@
 {% block content %}
 <div class="devhub-wrap">
   <section class="devhub-hero">
-    <span class="devhub-chip">Public Developer Hub</span>
+    <span class="devhub-chip">Developer hub</span>
     <span class="devhub-chip">lemma.id</span>
-    <h1>Build with lemma.id credentials</h1>
+    <h1>lemma.id proof of humanity</h1>
     <p>
-      Integrate Stripe-verified proof-of-humanity into your app with site-private PPIDs, local verification,
-      and revocation-aware controls. Start with docs and SDK references, then wire API keys for your runtime.
+      Integrate verified-human credentials into your app with site-private PPIDs and local browser verification.
+      No webhooks to configure on your side — embed the SDK, set <code>siteId</code> to your hostname, and register
+      a site API key only when you need server-side blocks or network revocation requests.
     </p>
     <div class="devhub-actions">
-      <a class="devhub-btn primary" href="/docs">Read the guide</a>
-      <a class="devhub-btn" href="/docs#quickstart">Open SDK quickstart</a>
+      <a class="devhub-btn primary" href="/docs/ishuman">Read the guide</a>
+      <a class="devhub-btn" href="/docs/ishuman#quickstart">5-minute quickstart</a>
       <a class="devhub-btn" href="/sdk/ishuman-verifier.js">SDK script URL</a>
     </div>
   </section>
 
   <div class="devhub-grid">
     <section class="devhub-card">
-      <h2>1) Onboard</h2>
-      <p>Implement wallet bridge + verifier to request and validate site-bound credentials in browser.</p>
+      <h2>1) Integrate</h2>
+      <p>Embed the verifier SDK and gate actions with <code>verify({ autoProvision: true })</code>. No dashboard step required for the basic human check.</p>
       <ul class="devhub-list">
-        <li>Set `siteId` to your canonical hostname or registered site identity.</li>
-        <li>Use `verify()` before sensitive actions.</li>
-        <li>Fail closed on missing, expired, or revoked proofs.</li>
+        <li>Set <code>siteId</code> to your canonical hostname (for example <code>app.example.com</code>).</li>
+        <li>Add <code>ishuman-verifier.js</code> and fail closed when <code>human</code> is false.</li>
+        <li>Store the returned <code>ppid</code> on your user record — no KYC fields.</li>
       </ul>
       <div class="devhub-actions" style="margin-top:10px">
-        <a class="devhub-btn" href="/docs#sdk-integration">SDK integration</a>
-        <a class="devhub-btn" href="/docs/wallet-flow">Wallet flow</a>
+        <a class="devhub-btn" href="/docs/ishuman#quickstart">5-minute quickstart</a>
+        <a class="devhub-btn" href="/docs/ishuman#sdk-integration">SDK integration</a>
       </div>
     </section>
 
     <section class="devhub-card">
       <h2>2) Operate</h2>
-      <p>Use the lemma.id API surfaces for verification lifecycle, site blocks, and network revocation requests.</p>
+      <p>The SDK handles IDV and site-proof derivation in a Lemma-hosted popup. Your server does not receive webhooks for verification completion.</p>
       <ul class="devhub-list">
-        <li>Start verification with `/api/ishuman/start-verification`.</li>
-        <li>Check status with `/api/ishuman/verification-status/&lt;session_id&gt;`.</li>
-        <li>Apply site-local abuse blocks with API keys.</li>
+        <li>First visit may open a popup (wallet unlock + Didit IDV).</li>
+        <li>Later checks validate locally — no per-page network call.</li>
+        <li>Optional: stamp actions and re-verify on your backend with <code>verifyStamp()</code>.</li>
       </ul>
       <div class="devhub-actions" style="margin-top:10px">
-        <a class="devhub-btn" href="/docs#api-reference">API reference</a>
-        <a class="devhub-btn" href="/docs/api/auth">Auth API docs</a>
+        <a class="devhub-btn" href="/docs/ishuman#integration-flow">Integration flow</a>
+        <a class="devhub-btn" href="/docs/ishuman#api-reference">API reference</a>
       </div>
     </section>
 
     <section class="devhub-card">
-      <h2>3) Manage Access</h2>
-      <p>Use authenticated key management for your runtime and site operations dashboards.</p>
+      <h2>3) Enforce bans</h2>
+      <p>Use your site API key for server-side abuse response. The API key is not required for human verification itself.</p>
       <ul class="devhub-list">
-        <li>Runtime/customer keys are managed in the key manager.</li>
-        <li>Admin and wallet session are required for privileged actions.</li>
-        <li>Keep key scopes minimal and rotate regularly.</li>
+        <li><code>POST /api/ishuman/site-block</code> — immediate site-scoped PPID ban.</li>
+        <li><code>POST /api/ishuman/network-revoke</code> — request network-wide action.</li>
+        <li>Issue keys in the <a href="/developer/external-api-keys">API key manager</a>.</li>
       </ul>
       <div class="devhub-actions" style="margin-top:10px">
         <a class="devhub-btn primary" href="/developer/external-api-keys">Open API key manager</a>
@@ -85,7 +86,7 @@
   </div>
 
   <p class="devhub-note">
-    Legacy internal consoles are restricted to admin-only routes and are not served on public developer paths.
+    Full documentation: <a href="/docs/ishuman">/docs/ishuman</a>. Legacy IAM-only consoles remain on restricted admin routes.
   </p>
 </div>
 {% endblock %}

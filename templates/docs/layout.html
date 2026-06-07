@@ -2,7 +2,7 @@
 {% set is_public_page = true %}
 
 {% block title %}{{ page_title or 'Documentation' }} - lemma.id{% endblock %}
-{% block description %}{{ page_description or 'lemma.id developer documentation - SDK, API, verification flow, and revocation controls.' }}{% endblock %}
+{% block description %}{{ page_description or 'lemma.id proof of humanity — integrate verified-human credentials with the browser SDK, site-private PPIDs, and optional API keys for abuse controls.' }}{% endblock %}
 
 {% block preload_scripts %}
 <!-- Docs pages skip wallet preload for faster LCP -->
@@ -18,14 +18,15 @@
 
 {% block head %}
 {{ super() }}
-<link rel="stylesheet" href="{{ url_for('static', filename='css/docs.css') }}?v=3">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/docs.css') }}?v=4">
 {% endblock %}
 
 {% block content %}
-<div class="docs-hero">
-    <div class="container">
+<div class="hero docs-hero">
+    <div class="container" style="position: relative; z-index: 1;">
+        <p class="docs-hero-eyebrow">Developer documentation</p>
         <h1>{{ hero_title or 'lemma.id Documentation' }}</h1>
-        <p>{{ hero_subtitle or 'Everything you need to integrate lemma.id into your platform.' }}</p>
+        <p class="docs-hero-subtitle">{{ hero_subtitle or 'Everything you need to integrate lemma.id into your platform.' }}</p>
         
         <!-- Docs Search -->
         <div class="docs-search-container">
@@ -62,8 +63,18 @@
                 </div>
 
                 <div class="nav-section">
-                    <div class="nav-title">Product Docs</div>
-                    <a href="{{ url_for('docs_ishuman') }}" class="nav-link {% if active_page == 'ishuman' %}active{% endif %}">Documentation</a>
+                    <div class="nav-title">On this page</div>
+                    <a href="{{ url_for('docs_ishuman') }}#quickstart" class="nav-link">Quickstart</a>
+                    <a href="{{ url_for('docs_ishuman') }}#site-registration" class="nav-link">Site registration</a>
+                    <a href="{{ url_for('docs_ishuman') }}#sdk-integration" class="nav-link">SDK integration</a>
+                    <a href="{{ url_for('docs_ishuman') }}#api-reference" class="nav-link">API reference</a>
+                    <a href="{{ url_for('docs_ishuman') }}#revocation" class="nav-link">Revocation</a>
+                </div>
+                <div class="nav-section">
+                    <div class="nav-title">Resources</div>
+                    <a href="/developer/ishuman" class="nav-link">Developer hub</a>
+                    <a href="/developer/external-api-keys" class="nav-link">API key manager</a>
+                    <a href="/sdk/ishuman-verifier.js" class="nav-link">SDK script</a>
                 </div>
             </nav>
         </aside>
@@ -100,16 +111,21 @@ document.addEventListener('DOMContentLoaded', () => {
     
     if (navToggle) {
         navToggle.addEventListener('click', () => {
-            sidebar.classList.toggle('mobile-open');
-            navToggle.classList.toggle('active');
+            if (sidebar.classList.contains('mobile-open')) {
+                closeSidebar();
+            } else {
+                openSidebar();
+            }
         });
-        
-        // Close sidebar when clicking a link (on mobile)
+
+        if (overlay) {
+            overlay.addEventListener('click', closeSidebar);
+        }
+
         sidebar.querySelectorAll('.nav-link').forEach(link => {
             link.addEventListener('click', () => {
                 if (window.innerWidth <= 900) {
-                    sidebar.classList.remove('mobile-open');
-                    navToggle.classList.remove('active');
+                    closeSidebar();
                 }
             });
         });
@@ -144,14 +160,14 @@ document.addEventListener('DOMContentLoaded', () => {
     const searchInput = document.getElementById('docs-search-input');
     const searchResults = document.getElementById('docs-search-results');
     
-    // Search index - public docs surface (isHuman only)
+    // Search index - public docs surface (lemma.id proof of humanity)
     const docsIndex = [
         {
-            title: 'lemma.id Documentation',
+            title: 'lemma.id proof of humanity',
             url: '{{ url_for("docs_ishuman") }}',
             category: 'integration',
-            keywords: 'ishuman proof of humanity stripe identity ppid site block network revoke local verification ed25519 sdk api',
-            excerpt: 'Integrate lemma.id verification, site-private credential derivation, and two-tier revocation controls.'
+            keywords: 'ishuman lemma.id proof of humanity didit identity verification ppid site block network revoke local verification ed25519 sdk api autoProvision siteId api key no webhook',
+            excerpt: 'Integrate lemma.id proof of humanity with the browser SDK, site-private PPIDs, local verification, and optional API-key abuse controls. No customer webhooks required.'
         }
     ];
     
