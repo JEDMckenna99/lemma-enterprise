@@ -59,16 +59,16 @@
         <aside class="docs-sidebar" id="docs-sidebar">
             <nav class="docs-nav">
                 <div class="nav-product-label">
-                    <a href="{{ url_for('docs_ishuman') }}" class="nav-product-link">lemma.id</a>
+                    <a href="{{ url_for('docs_overview') }}" class="nav-product-link">lemma.id</a>
                 </div>
 
                 <div class="nav-section">
                     <div class="nav-title">On this page</div>
-                    <a href="{{ url_for('docs_ishuman') }}#quickstart" class="nav-link">Quickstart</a>
-                    <a href="{{ url_for('docs_ishuman') }}#site-registration" class="nav-link">Site registration</a>
-                    <a href="{{ url_for('docs_ishuman') }}#sdk-integration" class="nav-link">SDK integration</a>
-                    <a href="{{ url_for('docs_ishuman') }}#api-reference" class="nav-link">API reference</a>
-                    <a href="{{ url_for('docs_ishuman') }}#revocation" class="nav-link">Revocation</a>
+                    <a href="{{ url_for('docs_overview') }}#quickstart" class="nav-link">Quickstart</a>
+                    <a href="{{ url_for('docs_overview') }}#site-registration" class="nav-link">Site registration</a>
+                    <a href="{{ url_for('docs_overview') }}#sdk-integration" class="nav-link">SDK integration</a>
+                    <a href="{{ url_for('docs_overview') }}#api-reference" class="nav-link">API reference</a>
+                    <a href="{{ url_for('docs_overview') }}#revocation" class="nav-link">Revocation</a>
                 </div>
                 <div class="nav-section">
                     <div class="nav-title">Resources</div>
@@ -164,7 +164,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const docsIndex = [
         {
             title: 'lemma.id proof of humanity',
-            url: '{{ url_for("docs_ishuman") }}',
+            url: '{{ url_for("docs_overview") }}',
             category: 'integration',
             keywords: 'ishuman lemma.id proof of humanity didit identity verification ppid site block network revoke local verification ed25519 sdk api autoProvision siteId api key no webhook',
             excerpt: 'Integrate lemma.id proof of humanity with the browser SDK, site-private PPIDs, local verification, and optional API-key abuse controls. No customer webhooks required.'

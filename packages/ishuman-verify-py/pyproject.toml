@@ -33,8 +33,8 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://lemma.id/docs/ishuman"
-Documentation = "https://lemma.id/docs/ishuman"
+Homepage = "https://lemma.id/docs"
+Documentation = "https://lemma.id/docs"
 Repository = "https://github.com/JEDMckenna99/lemma-enterprise"
 
 [tool.setuptools]

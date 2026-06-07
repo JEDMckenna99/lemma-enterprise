@@ -893,98 +893,98 @@ def create_app():
     # ==================== DOCUMENTATION ====================
     @app.route('/docs')
     def docs_overview():
-        """Public docs entrypoint."""
-        return redirect(url_for('docs_ishuman'), code=302)
+        """Public docs entrypoint — lemma.id proof of humanity."""
+        return render_template('docs/ishuman.html')
 
     @app.route('/docs/overview')
     def docs_overview_alias():
         """Legacy docs overview alias."""
-        return redirect(url_for('docs_ishuman'), code=301)
+        return redirect(url_for('docs_overview'), code=301)
     
     @app.route('/docs/quickstart')
     def docs_quickstart():
         """Legacy Agent Ops quickstart alias."""
-        return redirect(url_for('docs_ishuman'), code=301)
+        return redirect(url_for('docs_overview'), code=301)
     
     @app.route('/docs/installation')
     def docs_installation():
         """Legacy Agent Ops installation alias."""
-        return redirect(url_for('docs_ishuman'), code=301)
+        return redirect(url_for('docs_overview'), code=301)
 
     @app.route('/docs/cli')
     def docs_cli():
         """Legacy Agent Ops CLI alias."""
-        return redirect(url_for('docs_ishuman'), code=301)
+        return redirect(url_for('docs_overview'), code=301)
     
     @app.route('/docs/wallet-flow')
     def docs_wallet_flow():
         """Legacy wallet-flow alias."""
-        return redirect(url_for('docs_ishuman'), code=301)
+        return redirect(url_for('docs_overview'), code=301)
     
     @app.route('/docs/verification')
     def docs_verification():
         """Legacy verification guide alias."""
-        return redirect(url_for('docs_ishuman'), code=301)
+        return redirect(url_for('docs_overview'), code=301)
     
     @app.route('/docs/permissions')
     def docs_permissions():
         """Legacy permissions guide alias."""
-        return redirect(url_for('docs_ishuman'), code=301)
+        return redirect(url_for('docs_overview'), code=301)
 
     @app.route('/docs/ishuman')
     def docs_ishuman():
-        """isHuman network guide"""
-        return render_template('docs/ishuman.html')
+        """Legacy alias — canonical docs live at /docs."""
+        return redirect(url_for('docs_overview'), code=301)
     
     @app.route('/docs/sdk')
     def docs_sdk_js():
         """Legacy SDK docs alias."""
-        return redirect(url_for('docs_ishuman'), code=301)
+        return redirect(url_for('docs_overview'), code=301)
     
     @app.route('/docs/sdk/methods')
     def docs_sdk_methods():
         """Legacy SDK methods alias."""
-        return redirect(url_for('docs_ishuman'), code=301)
+        return redirect(url_for('docs_overview'), code=301)
     
     @app.route('/docs/sdk/events')
     def docs_sdk_events():
         """Legacy SDK events alias."""
-        return redirect(url_for('docs_ishuman'), code=301)
+        return redirect(url_for('docs_overview'), code=301)
     
     @app.route('/docs/api/auth')
     def docs_api_auth():
         """Legacy auth API alias."""
-        return redirect(url_for('docs_ishuman'), code=301)
+        return redirect(url_for('docs_overview'), code=301)
     
     @app.route('/docs/api/verification')
     def docs_api_verification():
         """Legacy verification API alias."""
-        return redirect(url_for('docs_ishuman'), code=301)
+        return redirect(url_for('docs_overview'), code=301)
     
     @app.route('/docs/api/revocation')
     def docs_api_revocation():
         """Legacy revocation API alias."""
-        return redirect(url_for('docs_ishuman'), code=301)
+        return redirect(url_for('docs_overview'), code=301)
     
     @app.route('/docs/errors')
     def docs_error_codes():
         """Legacy error docs alias."""
-        return redirect(url_for('docs_ishuman'), code=301)
+        return redirect(url_for('docs_overview'), code=301)
     
     @app.route('/docs/examples')
     def docs_examples():
         """Legacy examples alias."""
-        return redirect(url_for('docs_ishuman'), code=301)
+        return redirect(url_for('docs_overview'), code=301)
     
     @app.route('/docs/changelog')
     def docs_changelog():
         """Legacy changelog alias."""
-        return redirect(url_for('docs_ishuman'), code=301)
+        return redirect(url_for('docs_overview'), code=301)
     
     @app.route('/docs/setup')
     def docs_setup():
         """Legacy setup generator alias."""
-        return redirect(url_for('docs_ishuman'), code=301)
+        return redirect(url_for('docs_overview'), code=301)
     
     @app.route('/docs/iam')
     def docs_iam_legacy():

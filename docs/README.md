@@ -53,7 +53,7 @@ If you need policy lifecycle, exports, or org-level controls:
 | [Quick Start: Simple Login](integration/QUICK_START_SIMPLE_LOGIN.md) | User-login quickstart, distinct from agent runtime auth |
 | [IAM-Only Integration](integration/IAM_ONLY_INTEGRATION_GUIDE.md) | IAM without Proof-of-Human |
 | [Permission Lemmas Guide](integration/PERMISSION_LEMMAS_IAM_DEVELOPER_GUIDE.md) | Complete IAM developer reference |
-| [lemma.id proof of humanity](https://lemma.id/docs/ishuman) | SDK and API reference for proof-of-humanity integration |
+| [lemma.id proof of humanity](https://lemma.id/docs) | SDK and API reference for proof-of-humanity integration |
 | [KMS Setup Guide](operations/KMS_SETUP_GUIDE.md) | AWS KMS configuration for key management |
 | [CLI Release Checklist](operations/CLI_RELEASE_CHECKLIST.md) | Packaging and release workflow |
 | [Launch Status](status/GA_GATE_STATUS.md) | Current readiness snapshot |
