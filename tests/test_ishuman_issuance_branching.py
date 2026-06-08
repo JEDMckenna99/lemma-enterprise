@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-import os
 from datetime import datetime, timedelta
 
 import pytest
 
+from tests.test_didit_root_material import PROOF_OF_HUMANITY_WORKFLOW_ID, _approved_poh_decision
 from tests.wallet_test_helpers import (
     DERIVE_ASSERTION_FIELDS,
     SITE_SIGNING_PUBKEY_B64,
@@ -146,45 +146,54 @@ def test_no_master_then_master_issued_then_site_derived(
 ):
     from api.database import IsHumanVerification, DerivedCredential
 
-    os.environ["STRIPE_IDENTITY_WEBHOOK_SECRET"] = "whsec_test_123"
     db = fake_ishuman_db_session_factory
     monkeypatch.setattr("api.database.SessionLocal", db.session_local)
+    monkeypatch.setattr("api.config.is_ishuman_didit_enabled", lambda: True)
     monkeypatch.setattr(
-        "billing.stripe_manager.StripeManager.create_identity_verification_session",
-        lambda self, user_id, return_url: {
+        "billing.didit_manager.DiditManager.create_identity_verification_session",
+        lambda self, user_id, return_url, callback_url=None: {
             "success": True,
-            "session_id": "vs_branch_123",
-            "client_secret": "cs_branch_123",
-            "url": "https://verify.stripe.test/session",
+            "session_id": "didit_branch_123",
+            "url": "https://verify.didit.test/session",
         },
     )
     monkeypatch.setattr(
-        "stripe.Webhook.construct_event",
-        lambda payload, sig_header, secret: {
-            "type": "identity.verification_session.verified",
-            "data": {"object": {"id": "vs_branch_123", "metadata": {"user_id": "wallet_test_001"}}},
+        "billing.didit_manager.DiditManager.verify_webhook",
+        lambda self, raw, **kw: {
+            "webhook_type": "status.updated",
+            "status": "Approved",
+            "session_id": "didit_branch_123",
+            "workflow_id": PROOF_OF_HUMANITY_WORKFLOW_ID,
+            "decision": _approved_poh_decision(),
         },
     )
-
-    def _fake_complete(db, record, *, wallet_id, stripe_session_id):
-        from api.identity_person import material_from_test_fixture, resolve_or_create_person_from_material
-        from api.ppid import derive_ppid_from_person_root_hash
-        from api.ishuman import _issue_ishuman_credential
-
-        material = material_from_test_fixture(stripe_session_id=stripe_session_id)
-        resolved = resolve_or_create_person_from_material(db, material=material, wallet_id=wallet_id)
-        ppid = derive_ppid_from_person_root_hash(resolved.person_root_hash, "lemma.id")
-        record.lemma_person_id = resolved.person_id
-        record.document_root_hash = resolved.document_root_hash
-        record.ppid = ppid
-        return _issue_ishuman_credential(ppid, wallet_id, ppid_derivation="person_root_v1")
-
-    monkeypatch.setattr("api.ishuman._complete_verified_ishuman_from_stripe", _fake_complete)
 
     def _issue(_ppid, _wallet_id=None, site_id=None, **kwargs):
         if site_id:
             return {"id": "ishuman_site_created_123", "claims": {"isHuman": True, "siteId": site_id}}
         return {"id": "ishuman_master_created_123", "claims": {"isHuman": True, "siteId": "lemma.id"}}
+
+    def _fake_complete(db, record, *, wallet_id, decision, workflow_id=None):
+        from api.identity_person import material_from_test_fixture, resolve_or_create_person_from_material
+        from api.ppid import derive_ppid_from_person_root_hash
+
+        material = material_from_test_fixture(stripe_session_id="didit_branch_123")
+        resolved = resolve_or_create_person_from_material(db, material=material, wallet_id=wallet_id)
+        ppid = derive_ppid_from_person_root_hash(resolved.person_root_hash, "lemma.id")
+        record.lemma_person_id = resolved.person_id
+        record.document_root_hash = resolved.document_root_hash
+        record.ppid = ppid
+        return _issue(ppid, wallet_id, ppid_derivation="person_root_v1")
+
+    monkeypatch.setattr("api.ishuman._complete_verified_ishuman_from_didit", _fake_complete)
+    monkeypatch.setattr(
+        "api.site_ppid_revocation.clear_amnesty_eligible_wallet_revocations",
+        lambda *args, **kwargs: {"cleared_revocation_entries": 0, "cleared_site_blocks": 0, "reactivated_derived_credentials": 0},
+    )
+    monkeypatch.setattr(
+        "billing.didit_manager.DiditManager.purge_verification_data",
+        lambda self, session_id, **kw: {"success": True, "status_code": 204},
+    )
 
     monkeypatch.setattr("api.ishuman._issue_ishuman_credential", _issue)
 
@@ -195,11 +204,6 @@ def test_no_master_then_master_issued_then_site_derived(
                 "wallet_id": "wallet_test_001",
                 "wallet_secret": "ab" * 32,
                 "return_url": "https://lemma.id/app",
-                # Didit is the default rail and fails closed when unconfigured.
-                # This test simulates the legacy Stripe Identity rail end-to-end
-                # (StripeManager + stripe webhook + _complete_verified_ishuman_from_stripe),
-                # so explicitly opt into the retained stripe_identity escape hatch.
-                "provider": "stripe_identity",
             },
             START_ASSERTION_FIELDS,
         ),
@@ -208,9 +212,9 @@ def test_no_master_then_master_issued_then_site_derived(
     session_id = start.get_json()["session_id"]
 
     webhook = ishuman_client.post(
-        "/api/webhooks/stripe-identity",
+        "/api/webhooks/didit-identity",
         data=b"{}",
-        headers={"Stripe-Signature": "t=1,v1=abc"},
+        headers={"X-Signature-V2": "sig", "X-Timestamp": "1"},
     )
     assert webhook.status_code == 200
 

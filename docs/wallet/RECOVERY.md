@@ -19,7 +19,7 @@ everywhere.
 Flow:
 
 1. User opens the wallet and chooses **"Lost your device?"**.
-2. Wallet runs the standard Stripe Identity verification.
+2. Wallet runs the standard Didit identity verification (default IDV rail).
 3. On completion the server re-derives `person_root`, and the wallet calls
    [`POST /api/ishuman/reissue-master`](../../api/ishuman.py) (Phase 1.3) to
    re-fetch a freshly signed master credential. The old master id is revoked

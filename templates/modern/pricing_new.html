@@ -2,7 +2,7 @@
 {% set is_public_page = true %}
 
 {% block title %}Pricing - lemma.id{% endblock %}
-{% block description %}lemma.id pricing: $0.35 per first site credential issuance, then $0.01 per monthly active user. Unlimited local verification. IDV pass-through at $2/person when required.{% endblock %}
+{% block description %}lemma.id pricing: $0.35 per first site credential issuance, then $0.01 per monthly active user. Unlimited local verification.{% endblock %}
 
 {% block head %}
 {{ super() }}
@@ -263,29 +263,6 @@
         line-height: 1.5;
     }
 
-    .idv-note {
-        background: var(--gray-50);
-        padding: 60px 20px;
-        text-align: center;
-    }
-
-    .idv-note-inner {
-        max-width: 640px;
-        margin: 0 auto;
-    }
-
-    .idv-note h3 {
-        font-size: 20px;
-        color: var(--gray-800);
-        margin-bottom: 12px;
-    }
-
-    .idv-note p {
-        color: var(--gray-600);
-        line-height: 1.7;
-        font-size: 16px;
-    }
-
     @media (max-width: 768px) {
         .pricing-hero {
             padding: 80px 20px 60px;
@@ -428,13 +405,6 @@
             <div class="feature-check">✓</div>
             <div class="feature-text">Developer dashboard</div>
         </div>
-    </div>
-</div>
-
-<div class="idv-note">
-    <div class="idv-note-inner">
-        <h3>Identity verification (IDV) — separate pass-through</h3>
-        <p>First-time proof of personhood via Stripe Identity is <strong>$2.00 per person</strong> (pass-through; no lemma.id markup). IDV is only required when a user has no existing lemma.id master credential — not on every site issuance or monthly renewal. Trigger IDV on high-risk actions, not every signup, to keep costs down.</p>
     </div>
 </div>
 {% endblock %}

@@ -32,14 +32,14 @@
         // Direct verification function for immediate widget display
         window.startDirectVerification = async function(heroShield, verifyBtn) {
             try {
-                console.log('Starting direct Stripe verification...');
+                console.log('Starting direct IDV verification...');
                 
                 // Update button state
                 const originalText = verifyBtn.textContent;
                 verifyBtn.textContent = 'Starting verification...';
                 verifyBtn.disabled = true;
                 
-                // Start identity verification (creates Stripe session)
+                // Start identity verification (Didit default)
                 const response = await fetch(`${window.location.origin}/api/sdk/start-identity-verification`, {
                     method: 'POST',
                     headers: {
@@ -47,7 +47,7 @@
                         'Authorization': 'Bearer demo-integration-key-12345'
                     },
                     body: JSON.stringify({
-                        provider: 'stripe_identity',
+                        provider: 'didit',
                         inline_mode: false,
                         return_url: window.location.origin + window.location.pathname + '?verification_return=true'
                     })
@@ -56,8 +56,8 @@
                 const result = await response.json();
                 
                 if (result.success && result.url) {
-                    console.log('Stripe session created, redirecting...');
-                    // Redirect to Stripe Identity
+                    console.log('IDV session created, redirecting...');
+                    // Redirect to hosted IDV (Didit)
                     window.location.href = result.url;
                 } else {
                     throw new Error(result.message || 'Failed to start verification');

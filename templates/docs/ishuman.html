@@ -106,7 +106,7 @@ await fetch('/api/audit-log', {
             <tr><td>Set <code>siteId</code> to your hostname</td><td>Derives a per-site PPID bound to that hostname</td></tr>
             <tr><td>Store <code>ppid</code> on your user record</td><td>Does not receive your app&apos;s business data or audit logs</td></tr>
             <tr><td>API key — only for <code>site-block</code>, <code>network-revoke</code>, etc.</td><td>Operates upstream IDV (Didit by default) and platform webhooks internally</td></tr>
-            <tr><td><strong>No</strong> webhook URL, Didit account, or Stripe Identity setup</td><td>IDV issuer webhooks terminate at lemma.id, not at your servers</td></tr>
+            <tr><td><strong>No</strong> webhook URL, Didit account, or upstream IDV setup</td><td>IDV issuer webhooks terminate at lemma.id, not at your servers</td></tr>
         </tbody>
     </table>
 </div>
@@ -137,7 +137,7 @@ await fetch('/api/audit-log', {
         </thead>
         <tbody>
             <tr><td>1</td><td>Your page</td><td>You call <code>verify({ autoProvision: true })</code> before a protected action (signup, post, checkout, etc.).</td></tr>
-            <tr><td>2</td><td>Lemma popup</td><td>If the user has no proof yet, a popup at <code>/wallet/ishuman-idv</code> unlocks the wallet (passkey) and runs live IDV at Didit (default). Legacy opt-in: <code>provider=stripe_identity</code> on <code>start-verification</code>.</td></tr>
+            <tr><td>2</td><td>Lemma popup</td><td>If the user has no proof yet, a popup at <code>/wallet/ishuman-idv</code> unlocks the wallet (passkey) and runs live IDV at Didit.</td></tr>
             <tr><td>3</td><td>lemma.id</td><td>After approved IDV, lemma.id issues a master verified-human credential and derives a site-bound credential for your <code>siteId</code>.</td></tr>
             <tr><td>4</td><td>Your page</td><td>The SDK validates signature, expiry, and revocation locally, then returns <code>{ human: true, ppid: &quot;did:lemma:ppid_...&quot; }</code>.</td></tr>
             <tr><td>5</td><td>Your backend</td><td>Accept the <code>ppid</code> (or a stamped event with <code>includeCredential: true</code>) from your client. Optionally re-verify cryptographically on your server — no lemma.id webhook required.</td></tr>
@@ -303,7 +303,7 @@ if not check.ok:
             <tr><th>Method</th><th>Path</th><th>Purpose</th><th>Auth</th></tr>
         </thead>
         <tbody>
-            <tr><td><code>POST</code></td><td><code>/api/ishuman/start-verification</code></td><td>Create an IDV session (Didit default; <code>provider=stripe_identity</code> legacy).</td><td>Wallet assertion</td></tr>
+            <tr><td><code>POST</code></td><td><code>/api/ishuman/start-verification</code></td><td>Create a Didit IDV session.</td><td>Wallet assertion</td></tr>
             <tr><td><code>GET</code></td><td><code>/api/ishuman/verification-status/&lt;session_id&gt;</code></td><td>Poll status after IDV (used by the Lemma popup; not required if you use the SDK only).</td><td>None (unguessable session id)</td></tr>
             <tr><td><code>POST</code></td><td><code>/api/ishuman/derive-site-proof</code></td><td>Derive site-bound credential from master proof.</td><td>Wallet assertion + <code>wallet_secret</code> (popup path)</td></tr>
             <tr><td><code>POST</code></td><td><code>/api/ishuman/verify-presentation</code></td><td>Optional server-side re-verify (prefer local <code>verifyStamp()</code>).</td><td>None</td></tr>

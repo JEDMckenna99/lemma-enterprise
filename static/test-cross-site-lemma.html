@@ -148,7 +148,7 @@
         <div class="instructions">
             <h3>🧪 How to Test Cross-Site Lemma Recognition:</h3>
             <ol>
-                <li><strong>Step 1:</strong> Complete Stripe Identity verification on <strong>lemma.id</strong></li>
+                <li><strong>Step 1:</strong> Complete identity verification on <strong>lemma.id</strong> (Didit)</li>
                 <li><strong>Step 2:</strong> Visit <strong>lemma-identity-network</strong> (this page)</li>
                 <li><strong>Step 3:</strong> Click "Check Network Identity Lemma" below</li>
                 <li><strong>Step 4:</strong> Should find your identity lemma from the network without re-verification</li>
@@ -160,7 +160,7 @@
                 <div class="site-url">lemma.id</div>
                 <div>Primary Site</div>
                 <div style="font-size: 12px; color: #888; margin-top: 5px;">
-                    Where you complete Stripe verification
+                    Where you complete identity verification
                 </div>
             </div>
             <div class="site-card current">
@@ -327,13 +327,13 @@
                         `;
                     } else {
                         log('❌ No identity lemma found for user');
-                        log(`💡 User may need to complete Stripe verification first`);
+                        log(`💡 User may need to complete identity verification on lemma.id first`);
                         
                         const results = document.getElementById('testResults');
                         results.innerHTML = `
                             <div class="status error">❌ No Identity Lemma Found</div>
                             <div style="margin-top: 10px;">
-                                User needs to complete Stripe Identity verification on lemma.id first.
+                                User needs to complete identity verification on lemma.id first.
                             </div>
                         `;
                     }

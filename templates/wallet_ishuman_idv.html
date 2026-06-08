@@ -108,9 +108,6 @@
         const issueMode = params.get('issue_mode') || '';
         const refreshReason = params.get('refresh_reason') || '';
         const requestNonce = params.get('request_nonce') || '';
-        // IDV provider rail: absent (default) uses didit, the standard hosted
-        // flow; 'stripe_identity' opts into the legacy/retired Stripe rail.
-        const idvProvider = (params.get('idv_provider') || '').trim().toLowerCase();
         const clientSessionNonce = params.get('session_nonce') || '';
         const bloomSequence = Number(params.get('bloom_sequence') || 0);
         const sessionTtlSec = Number(params.get('session_ttl_sec') || (24 * 60 * 60));
@@ -434,9 +431,6 @@
                 enc_pubkey: await encPubkeyForStart(),
                 wallet_assertion: walletAssertion,
             };
-            // Only send a provider hint when explicitly selected; the server
-            // defaults to didit (the standard IDV rail) otherwise.
-            if (idvProvider) startBody.provider = idvProvider;
             const payload = await requestJson('/api/ishuman/start-verification', {
                 method: 'POST',
                 body: JSON.stringify(startBody),
@@ -458,7 +452,7 @@
             }
 
             if (payload.url) {
-                // Hosted redirect flow (didit; also used by legacy Stripe Identity).
+                // Hosted redirect flow (Didit).
                 window.location.href = payload.url;
                 return null;
             }
@@ -517,7 +511,7 @@
             setStatus('Starting fresh identity check…', 'loading');
             await ensureWalletUnlocked();
 
-            // 1. If we returned from a previous Stripe Identity attempt, try
+            // 1. If we returned from a previous IDV attempt, try
             //    to use that session first — but if it failed/expired, fall
             //    through to a fresh verification path instead of throwing.
             let masterIssued = false;
@@ -543,7 +537,7 @@
                     await verifyOnceTestMode();
                     masterIssued = true;
                 } else {
-                    setStatus(idvProvider === 'stripe_identity' ? 'Opening Stripe Identity…' : 'Opening identity check…', 'loading');
+                    setStatus('Opening identity check…', 'loading');
                     await startHostedVerification();
                     return false;
                 }
@@ -630,7 +624,7 @@
                 return;
             }
 
-            setStatus(idvProvider === 'stripe_identity' ? 'Opening Stripe Identity…' : 'Opening identity check…', 'loading');
+            setStatus('Opening identity check…', 'loading');
             await startHostedVerification();
         }
 

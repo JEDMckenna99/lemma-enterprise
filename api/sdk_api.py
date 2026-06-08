@@ -551,7 +551,7 @@ def check_credentials():
 @rate_limit(max_requests=20, window=60)
 def start_identity_verification():
     """
-    Start Stripe Identity KYC verification for creating comprehensive identity credentials
+    Start Didit KYC verification for creating comprehensive identity credentials
     
     This creates the full identity claims including isHuman from KYC data.
     """
@@ -561,71 +561,68 @@ def start_identity_verification():
     
     try:
         data = request.get_json() or {}
-        provider = data.get('provider', 'stripe_identity')
+        provider = (data.get('provider') or 'didit').strip().lower()
         inline_mode = data.get('inline_mode', True)
         return_url = data.get('return_url', request.referrer or request.host_url)
         
-        if provider != 'stripe_identity':
+        if provider != 'didit':
             return jsonify({
                 'success': False,
                 'error': 'unsupported_provider',
-                'message': f'Provider {provider} not supported'
+                'message': f'Provider {provider} not supported; Didit is the only IDV rail'
             }), 400
         
         user_id = f"sdk_user_{secrets.token_hex(8)}"
         
         logger.info(f"🆔 Starting SDK identity verification for user: {user_id}")
         
-        # Import and use Stripe manager
         try:
-            from billing.stripe_manager import StripeManager
-            stripe_manager = StripeManager()
-            
-            # If Stripe is not properly configured, use demo mode only when explicitly enabled.
-            if not stripe_manager.initialized:
+            from api.config import is_ishuman_didit_enabled
+            from billing.didit_manager import DiditManager
+
+            if not is_ishuman_didit_enabled():
                 if _allow_sdk_demo_features() and _is_non_prod_mode():
-                    logger.info("🎭 Stripe not configured - using demo identity verification")
+                    logger.info("🎭 Didit not configured - using demo identity verification")
                     session_result = create_demo_identity_session(user_id, return_url, inline_mode)
                 else:
                     return jsonify({
                         'success': False,
-                        'error': 'stripe_unavailable',
-                        'message': 'Stripe identity provider not configured'
+                        'error': 'didit_unavailable',
+                        'message': 'Didit identity provider not configured'
                     }), 503
             else:
-                session_result = stripe_manager.create_identity_verification_session(
+                session_result = DiditManager().create_identity_verification_session(
                     user_id=user_id,
                     return_url=return_url,
-                    inline_mode=inline_mode
                 )
                 
         except ImportError as e:
-            logger.error(f"❌ Stripe manager import failed: {e}")
+            logger.error(f"❌ Didit manager import failed: {e}")
             if _allow_sdk_demo_features() and _is_non_prod_mode():
-                logger.info("🎭 Stripe manager not available - using demo identity verification")
+                logger.info("🎭 Didit manager not available - using demo identity verification")
                 session_result = create_demo_identity_session(user_id, return_url, inline_mode)
             else:
                 return jsonify({
                     'success': False,
-                    'error': 'stripe_unavailable',
-                    'message': 'Stripe identity provider is unavailable'
+                    'error': 'didit_unavailable',
+                    'message': 'Didit identity provider is unavailable'
                 }), 503
         except Exception as e:
-            logger.error(f"❌ Stripe manager initialization failed: {e}")
+            logger.error(f"❌ Didit manager initialization failed: {e}")
             if _allow_sdk_demo_features() and _is_non_prod_mode():
-                logger.info("🎭 Stripe manager error - using demo identity verification")
+                logger.info("🎭 Didit manager error - using demo identity verification")
                 session_result = create_demo_identity_session(user_id, return_url, inline_mode)
             else:
                 return jsonify({
                     'success': False,
-                    'error': 'stripe_unavailable',
-                    'message': 'Stripe identity provider is unavailable'
+                    'error': 'didit_unavailable',
+                    'message': 'Didit identity provider is unavailable'
                 }), 503
         
         if not session_result.get('success'):
             return jsonify({
                 'success': False,
-                'error': 'stripe_session_failed',
+                'error': 'didit_session_failed',
                 'message': session_result.get('message', 'Failed to create verification session')
             }), 500
         
@@ -637,14 +634,9 @@ def start_identity_verification():
             'started_at': time.time()
         }
         
-        # Debug: Check client_secret format before sending
-        client_secret = session_result['client_secret']
-        logger.info(f"🔍 Sending client_secret to frontend: {client_secret[:20]}... (length: {len(client_secret)})")
-        
         return jsonify({
             'success': True,
             'session_id': session_result['session_id'],
-            'client_secret': client_secret,
             'url': session_result['url'],
             'user_id': user_id,
             'provider': provider,
@@ -667,7 +659,7 @@ def complete_identity_verification():
     """
     Complete identity verification and create comprehensive identity credentials
     
-    This extracts full identity from Stripe KYC and creates isHuman + other claims.
+    This extracts full identity from Didit KYC and creates isHuman + other claims.
     """
     # Handle CORS preflight requests
     if request.method == 'OPTIONS':
@@ -682,7 +674,7 @@ def complete_identity_verification():
         
         logger.info(f"📥 Completion request: session_id={session_id}, verification_return={verification_return}")
         
-        # Handle return from Stripe Identity without explicit session ID
+        # Handle return from hosted IDV without explicit session ID
         if verification_return and not session_id:
             # Use the most recent verification session from Flask session
             verification_session = session.get('sdk_verification_session')
@@ -699,7 +691,7 @@ def complete_identity_verification():
             return jsonify({
                 'success': False,
                 'error': 'missing_session_id',
-                'message': 'Stripe verification session ID or verification_return flag required'
+                'message': 'Didit verification session ID or verification_return flag required'
             }), 400
         
         # Get session info - now using client-provided session_id instead of Flask session
@@ -711,9 +703,7 @@ def complete_identity_verification():
                 'message': 'Session ID is required for verification completion'
             }), 400
         
-        # For now, we'll validate the session_id format and trust the client
-        # In production, you might want to store session data in Redis/database
-        if not session_id.startswith('vs_') or len(session_id) < 10:
+        if not session_id or len(session_id) < 8:
             return jsonify({
                 'success': False,
                 'error': 'invalid_session_format',
@@ -725,79 +715,88 @@ def complete_identity_verification():
         
         logger.info(f"✅ Completing SDK identity verification for user: {user_id}")
         
-        # Check Stripe verification status
+        # Check Didit verification status
         try:
-            from billing.stripe_manager import StripeManager
-            stripe_manager = StripeManager()
-            
+            from api.config import is_ishuman_didit_enabled
+            from billing.didit_manager import DiditManager
+
             # Handle demo mode
-            if session_id.startswith('vs_demo_'):
+            if session_id.startswith('didit_demo_'):
                 if _allow_sdk_demo_features() and _is_non_prod_mode():
                     logger.info("🎭 Using demo identity verification completion")
-                    stripe_result = create_demo_stripe_result(session_id)
+                    idv_result = create_demo_idv_result(session_id)
                 else:
                     return jsonify({
                         'success': False,
                         'error': 'demo_mode_disabled',
                         'message': 'Demo verification completion is disabled'
                     }), 403
-            elif not stripe_manager.initialized:
+            elif not is_ishuman_didit_enabled():
                 if _allow_sdk_demo_features() and _is_non_prod_mode():
-                    logger.info("🎭 Stripe not configured - using demo completion")
-                    stripe_result = create_demo_stripe_result(session_id)
+                    logger.info("🎭 Didit not configured - using demo completion")
+                    idv_result = create_demo_idv_result(session_id)
                 else:
                     return jsonify({
                         'success': False,
-                        'error': 'stripe_unavailable',
-                        'message': 'Stripe identity provider not configured'
+                        'error': 'didit_unavailable',
+                        'message': 'Didit identity provider not configured'
                     }), 503
             else:
-                logger.info(f"🔍 Retrieving Stripe session: {session_id}")
-                stripe_result = stripe_manager.get_identity_verification_session(session_id)
+                logger.info(f"🔍 Retrieving Didit session decision: {session_id}")
+                decision_payload = DiditManager().retrieve_session_decision(session_id)
                 
-                if not stripe_result.get('success'):
-                    error_msg = stripe_result.get('message', 'Unknown Stripe error')
-                    logger.error(f"❌ Stripe verification check failed: {error_msg}")
+                if not decision_payload.get('success'):
+                    error_msg = decision_payload.get('error', 'Unknown Didit error')
+                    logger.error(f"❌ Didit verification check failed: {error_msg}")
                     return jsonify({
                         'success': False,
-                        'error': 'stripe_check_failed',
-                        'message': f'Failed to check Stripe verification status: {error_msg}',
+                        'error': 'didit_check_failed',
+                        'message': f'Failed to check Didit verification status: {error_msg}',
                         'session_id': session_id
                     }), 500
                 
-                if stripe_result.get('status') != 'verified':
+                if decision_payload.get('status') != 'approved':
                     return jsonify({
                         'success': False,
                         'verified': False,
-                        'status': stripe_result.get('status', 'unknown'),
+                        'status': decision_payload.get('status', 'unknown'),
                         'message': 'Identity verification not yet complete'
                     })
+                idv_result = {
+                    'success': True,
+                    'status': 'verified',
+                    'identity_details': {
+                        'verification_method': 'didit',
+                        'liveness_check': True,
+                        'document_check': True,
+                    },
+                }
             
         except ImportError as e:
-            logger.error(f"❌ Stripe manager import failed in completion: {e}")
+            logger.error(f"❌ Didit manager import failed in completion: {e}")
             if _allow_sdk_demo_features() and _is_non_prod_mode():
-                logger.info("🎭 Stripe manager not available - using demo completion")
-                stripe_result = create_demo_stripe_result(session_id)
+                logger.info("🎭 Didit manager not available - using demo completion")
+                idv_result = create_demo_idv_result(session_id)
             else:
                 return jsonify({
                     'success': False,
-                    'error': 'stripe_unavailable',
-                    'message': 'Stripe identity provider is unavailable'
+                    'error': 'didit_unavailable',
+                    'message': 'Didit identity provider is unavailable'
                 }), 503
         except Exception as e:
-            logger.error(f"❌ Stripe manager error in completion: {e}")
+            logger.error(f"❌ Didit manager error in completion: {e}")
             if _allow_sdk_demo_features() and _is_non_prod_mode():
-                logger.info("🎭 Stripe manager error - using demo completion")
-                stripe_result = create_demo_stripe_result(session_id)
+                logger.info("🎭 Didit manager error - using demo completion")
+                idv_result = create_demo_idv_result(session_id)
             else:
                 return jsonify({
                     'success': False,
-                    'error': 'stripe_unavailable',
-                    'message': 'Stripe identity provider is unavailable'
+                    'error': 'didit_unavailable',
+                    'message': 'Didit identity provider is unavailable'
                 }), 503
         
         # Create comprehensive identity credential with full KYC claims
-        credential = create_enhanced_identity_credential(user_id, session_id, stripe_result)
+        credential = create_enhanced_identity_credential(user_id, session_id, idv_result)
         
         # Verify using Rust engine if available
         verification_time_us = 0
@@ -834,7 +833,7 @@ def complete_identity_verification():
             'verification_time_us': verification_time_us,
             'total_time_ms': (end_time - start_time) * 1000,
             'rust_engine_used': RUST_ENGINE_AVAILABLE and enable_rust_engine,
-            'method': 'stripe_identity_kyc',
+            'method': 'didit_kyc',
             'user_id': user_id
         })
         
@@ -913,12 +912,10 @@ def store_credential():
 def create_demo_identity_session(user_id: str, return_url: str, inline_mode: bool) -> dict:
     """
     Create a demo identity verification session for development/testing
-    Only used when Stripe is not configured - should not be the primary flow
+    Only used when Didit is not configured - should not be the primary flow
     """
-    session_id = f"vs_demo_{secrets.token_hex(12)}"
-    client_secret = f"demo_secret_{secrets.token_hex(24)}"
+    session_id = f"didit_demo_{secrets.token_hex(12)}"
 
-    # Keep response shape consistent with real Stripe flow for smoother SDK DX.
     safe_return = return_url or "/"
     url = f"{safe_return}{'&' if '?' in safe_return else '?'}lemma_demo_verification=1&session_id={session_id}"
 
@@ -927,18 +924,17 @@ def create_demo_identity_session(user_id: str, return_url: str, inline_mode: boo
     return {
         'success': True,
         'demo_mode': True,
-        'provider': 'stripe_identity_demo',
+        'provider': 'didit_demo',
         'message': 'Demo identity verification session created (non-production).',
         'session_id': session_id,
-        'client_secret': client_secret,
         'url': url,
         'user_id': user_id,
         'inline_mode': inline_mode,
     }
 
-def create_demo_stripe_result(session_id: str) -> dict:
+def create_demo_idv_result(session_id: str) -> dict:
     """
-    Create a demo Stripe verification result for testing
+    Create a demo IDV verification result for testing
     """
     return {
         'success': True,
@@ -952,17 +948,20 @@ def create_demo_stripe_result(session_id: str) -> dict:
         'demo_mode': True
     }
 
-def create_enhanced_identity_credential(user_id: str, session_id: str, stripe_result: dict) -> dict:
+def create_demo_stripe_result(session_id: str) -> dict:
+    """Backward-compatible alias for demo IDV completion."""
+    return create_demo_idv_result(session_id)
+
+def create_enhanced_identity_credential(user_id: str, session_id: str, idv_result: dict) -> dict:
     """
-    Create enhanced identity credential using Rust engine with essential claims from Stripe KYC
+    Create enhanced identity credential using Rust engine with essential claims from IDV
     
     IMPORTANT: This now uses the Rust engine since cryptography is core technology.
     We focus on the 3 essential claims that provide maximum value.
     """
     current_time = int(time.time())
     
-    # Extract identity details from Stripe result (in production, more comprehensive)
-    identity_details = stripe_result.get('identity_details', {})
+    identity_details = idv_result.get('identity_details', {})
     
     # Use REAL crypto engine to create properly signed credential
     try:
@@ -993,10 +992,10 @@ def create_enhanced_identity_credential(user_id: str, session_id: str, stripe_re
         identity_claims = {
             "packageType": "identity",
             "isHuman": "true", 
-            "verificationMethod": "stripe_identity",
+            "verificationMethod": "didit",
             "verificationLevel": "high",
-            "stripe_session_id": session_id,
-            "stripe_verification_data": json.dumps(stripe_result),
+            "idv_session_id": session_id,
+            "idv_verification_data": json.dumps(idv_result),
             "verified_at": str(int(time.time())),
             "network_type": "federated_identity"
         }
@@ -1010,7 +1009,7 @@ def create_enhanced_identity_credential(user_id: str, session_id: str, stripe_re
         # The Rust engine has already created the credential with:
         # 1. packageType: 'identity' - Routes to identity package
         # 2. isHuman: True - The critical bot shield claim  
-        # 3. verificationMethod: 'stripe_identity' - Proves Stripe KYC completion
+        # 3. verificationMethod: 'didit' - Proves Didit KYC completion
         # Plus cryptographic signatures and proofs
         
         logger.info(f"✅ Rust engine created enhanced identity credential {credential['id']} with 3 essential claims")

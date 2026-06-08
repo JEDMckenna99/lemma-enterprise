@@ -115,10 +115,10 @@ paths:
   /api/sdk/start-identity-verification:
     post:
       tags: ["SDK - Verification"]
-      summary: Start Stripe Identity verification
+      summary: Start identity verification
       description: |
-        Initiate KYC verification process using Stripe Identity.
-        Returns a session URL for user to complete document verification.
+        Initiate KYC verification using the hosted Didit IDV rail.
+        Returns a session URL for the user to complete document and liveness checks.
       operationId: startIdentityVerification
       requestBody:
         required: true
@@ -160,7 +160,7 @@ paths:
               example:
                 success: true
                 sessionId: "vs_1234567890"
-                sessionUrl: "https://verify.stripe.com/start/..."
+                sessionUrl: "https://verify.didit.me/..."
                 expiresAt: "2025-01-21T12:00:00Z"
         '401':
           $ref: '#/components/responses/Unauthorized'
@@ -173,7 +173,7 @@ paths:
       summary: Complete identity verification
       description: |
         Complete verification process and receive cryptographically-signed identity credential.
-        Call this endpoint after user completes Stripe Identity verification.
+        Call this endpoint after the user completes hosted IDV (Didit default).
       operationId: completeIdentityVerification
       requestBody:
         required: true
@@ -184,7 +184,7 @@ paths:
               properties:
                 sessionId:
                   type: string
-                  description: Stripe Identity session ID
+                  description: IDV session ID from start-identity-verification
                 verificationData:
                   type: object
                   description: Additional verification data
@@ -212,7 +212,7 @@ paths:
                 credential:
                   packageType: "identity"
                   isHuman: true
-                  verificationMethod: "stripe_identity"
+                  verificationMethod: "didit"
                   signature: "base64_signature..."
                 networkRegistered: true
                 processingTime: 45.2
@@ -471,8 +471,8 @@ components:
           description: Human verification status
         verificationMethod:
           type: string
-          enum: ["stripe_identity"]
-          description: Verification method used
+          enum: ["didit"]
+          description: Verification method used (Didit IDV rail)
         signature:
           type: string
           description: Cryptographic signature

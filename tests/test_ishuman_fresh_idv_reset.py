@@ -66,7 +66,7 @@ def test_clear_wallet_revocations_helper_signature(site_ppid_revocation_source):
     cache, so the next bloom-filter fetch reflects the cleared state.
 
     The helper now lives in api/site_ppid_revocation.py and is shared by the
-    production Stripe Identity webhook and the demo test-mode IDV endpoint.
+    production Didit webhook and the demo test-mode IDV endpoint.
     """
     tree = ast.parse(site_ppid_revocation_source)
     func = next(
@@ -95,10 +95,10 @@ def test_demo_helper_returns_counts(site_ppid_revocation_source):
     assert "\"reactivated_derived_credentials\"" in site_ppid_revocation_source
 
 
-def test_production_stripe_webhook_calls_amnesty_helper():
-    """The production Stripe Identity webhook must invoke the shared helper
+def test_production_didit_webhook_calls_amnesty_helper():
+    """The production Didit webhook must invoke the shared helper
     so successful real IDV restores amnesty-eligible access without a
     separate manual / governance step."""
     source = (ROOT / "api" / "ishuman.py").read_text(encoding="utf-8")
     assert "clear_amnesty_eligible_wallet_revocations" in source
-    assert "stripe_identity_verified" in source
+    assert "didit_verified" in source

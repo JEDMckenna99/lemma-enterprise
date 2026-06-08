@@ -72,6 +72,33 @@ def test_start_verification_routes_to_didit(
 
 
 @pytest.mark.integration
+def test_start_verification_rejects_stripe_identity_provider(
+    ishuman_client,
+    fake_ishuman_db_session_factory,
+    monkeypatch,
+    attach_wallet_assertion,
+):
+    db = fake_ishuman_db_session_factory
+    monkeypatch.setattr("api.database.SessionLocal", db.session_local)
+    monkeypatch.setattr("api.config.is_ishuman_didit_enabled", lambda: True)
+
+    resp = ishuman_client.post(
+        "/api/ishuman/start-verification",
+        json=attach_wallet_assertion(
+            {
+                "wallet_id": "wallet_test_001",
+                "wallet_secret": "ab" * 32,
+                "return_url": "https://customer.example/return",
+                "provider": "stripe_identity",
+            },
+            START_ASSERTION_FIELDS,
+        ),
+    )
+    assert resp.status_code == 400
+    assert resp.get_json()["error"] == "unsupported_provider"
+
+
+@pytest.mark.integration
 def test_start_verification_didit_disabled_fails_closed(
     ishuman_client,
     fake_ishuman_db_session_factory,

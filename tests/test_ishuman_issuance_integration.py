@@ -78,77 +78,8 @@ def test_webhook_verified_updates_master_record(
     make_ishuman_verification,
     monkeypatch,
 ):
-    from api.database import IsHumanVerification
-
-    os.environ["STRIPE_IDENTITY_WEBHOOK_SECRET"] = "whsec_test_456"
-
-    db = fake_ishuman_db_session_factory
-    db.store.data["IsHumanVerification"].append(
-        make_ishuman_verification(
-            session_id="ishuman_sess_integration_2",
-            stripe_session_id="vs_integration_002",
-            wallet_id="wallet_test_001",
-            ppid=None,
-            credential_id=None,
-            status="pending",
-            verified_at=None,
-            issued_at=None,
-            expires_at=None,
-        )
-    )
-    monkeypatch.setattr("api.database.SessionLocal", db.session_local)
-    monkeypatch.setattr(
-        "stripe.Webhook.construct_event",
-        lambda payload, sig_header, secret: {
-            "type": "identity.verification_session.verified",
-            "data": {"object": {"id": "vs_integration_002", "metadata": {"user_id": "wallet_test_001"}}},
-        },
-    )
-    def _fake_complete(db, record, *, wallet_id, stripe_session_id):
-        from api.identity_person import material_from_test_fixture, resolve_or_create_person_from_material
-        from api.ppid import derive_ppid_from_person_root_hash
-        from api.ishuman import _issue_ishuman_credential
-
-        material = material_from_test_fixture(stripe_session_id=stripe_session_id)
-        resolved = resolve_or_create_person_from_material(db, material=material, wallet_id=wallet_id)
-        ppid = derive_ppid_from_person_root_hash(resolved.person_root_hash, "lemma.id")
-        record.lemma_person_id = resolved.person_id
-        record.document_root_hash = resolved.document_root_hash
-        record.ppid = ppid
-        return _issue_ishuman_credential(ppid, wallet_id, ppid_derivation="person_root_v1")
-
-    monkeypatch.setattr("api.ishuman._complete_verified_ishuman_from_stripe", _fake_complete)
-    monkeypatch.setattr(
-        "api.ishuman._issue_ishuman_credential",
-        lambda ppid, wallet_id=None, site_id=None, **kwargs: {
-            "id": "ishuman_master_integration_001",
-            "issuerInfo": {"did": "did:lemma:issuer:test"},
-            "claims": {
-                "isHuman": True,
-                "siteId": site_id or "lemma.id",
-                "ppidDerivation": kwargs.get("ppid_derivation"),
-            },
-            "subject": ppid,
-        },
-    )
-
-    resp = ishuman_client.post(
-        "/api/webhooks/stripe-identity",
-        data=b"{}",
-        headers={"Stripe-Signature": "t=1,v1=test"},
-    )
-    assert resp.status_code == 200
-
-    row = db.store.data[IsHumanVerification.__name__][0]
-    assert row.status == "verified"
-    assert row.ppid and row.ppid.startswith("did:lemma:ppid_")
-    assert row.lemma_person_id
-    assert row.document_root_hash
-    assert row.credential_id == "ishuman_master_integration_001"
-    assert row.verified_at is not None
-    assert row.issued_at is not None
-    assert row.expires_at is not None
-    assert row.metadata_json["credential_issuer_did"] == "did:lemma:issuer:test"
+    """Didit webhook issuance is covered by test_ishuman_didit_issuance.py."""
+    pytest.skip("Stripe Identity webhook removed; see test_didit_webhook_verified_issues_master")
 
 
 @pytest.mark.integration

@@ -738,10 +738,10 @@ class LemmaBotShield {
         
         try {
             if (this.config.debug) {
-                console.log('🚀 Starting Stripe Identity verification...');
+                console.log('🚀 Starting identity verification (Didit)...');
             }
             
-            // Start identity verification (this creates Stripe session)
+            // Start identity verification (Didit default)
             const response = await fetch(`${this.config.apiBase}/api/sdk/start-identity-verification`, {
                 method: 'POST',
                 headers: {
@@ -749,7 +749,7 @@ class LemmaBotShield {
                     'Authorization': `Bearer ${this.config.apiKey}`
                 },
                 body: JSON.stringify({
-                    provider: 'stripe_identity',
+                    provider: 'didit',
                     inline_mode: false, // Use redirect mode (which works!)
                     return_url: window.location.origin + window.location.pathname + '?verification_return=true'
                 })
@@ -759,7 +759,7 @@ class LemmaBotShield {
             
             if (result.success && result.url) {
                 if (this.config.debug) {
-                    console.log('✅ Stripe session created, redirecting...', {
+                    console.log('✅ IDV session created, redirecting...', {
                         session_id: result.session_id,
                         user_id: result.user_id
                     });
@@ -779,7 +779,7 @@ class LemmaBotShield {
                     console.log('💾 Verification after storage:', localStorage.getItem('lemma_verification_session'));
                 }
                 
-                // Redirect to Stripe Identity (the working flow!)
+                // Redirect to hosted IDV (Didit default)
                 window.location.href = result.url;
             } else {
                 throw new Error(result.message || 'Failed to start verification');

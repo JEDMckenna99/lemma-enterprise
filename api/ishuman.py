@@ -6,10 +6,10 @@ Core product endpoints for the Lemma isHuman proof-of-humanity network.
 
 Flows
 -----
-1. **Start verification** — create a Stripe Identity session, return client
-   secret so the browser can embed the Stripe Identity modal.
-2. **Stripe webhook** — receive ``identity.verification_session.verified``
-   (or failed/canceled), issue an Ed25519-signed isHuman credential on success.
+1. **Start verification** — create a Didit hosted IDV session and return the
+   redirect URL.
+2. **Didit webhook** — receive verification outcomes, issue an Ed25519-signed
+   isHuman credential on approval.
 3. **Site-block** — a site immediately blocks a PPID on its own domain
    (first tier of two-tier revocation).
 4. **Network revocation** — a site submits evidence for network-wide
@@ -30,7 +30,6 @@ from datetime import datetime, timedelta
 from typing import Optional
 from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 
-import stripe
 from flask import Blueprint, request, jsonify
 from flask_cors import cross_origin
 from sqlalchemy.exc import IntegrityError
@@ -128,8 +127,7 @@ def _issue_ishuman_credential(
     to ``lemma.id``.
 
     *verification_method* records which IDV rail established the underlying
-    proof of personhood (``didit`` is the standard rail; ``stripe_identity``
-    is retained only for legacy records). It is derived from the verification
+    proof of personhood (``didit``). It is derived from the verification
     record's ``issuer_id`` so derived/reissued credentials stay consistent
     with how the human was originally verified.
     """
@@ -281,67 +279,6 @@ def _derive_master_ppid_for_person(db, lemma_person_id: str) -> str:
     return _derive_ppid_for_site(rp_id="lemma.id", lemma_person_id=lemma_person_id, db=db)
 
 
-def _complete_verified_ishuman_from_stripe(
-    db,
-    record,
-    *,
-    wallet_id: str,
-    stripe_session_id: str,
-) -> Optional[dict]:
-    """
-    Resolve document/person roots from Stripe and issue master isHuman credential.
-
-    Returns credential dict on success, None on root material failure.
-    """
-    from api.identity_roots import IdentityRootMaterialError
-    from api.identity_person import process_verified_stripe_identity
-    from api.ppid import derive_ppid_from_person_root_hash
-
-    try:
-        resolved, _session = process_verified_stripe_identity(
-            db,
-            stripe_session_id=stripe_session_id,
-            wallet_id=wallet_id,
-        )
-    except IdentityRootMaterialError as exc:
-        logger.error(
-            "Identity root material unavailable for stripe session %s: %s",
-            stripe_session_id,
-            exc,
-        )
-        record.status = "failed"
-        record.metadata_json = {
-            **(record.metadata_json or {}),
-            "root_error": str(exc),
-        }
-        return None
-
-    from api.identity_roots import active_root_version
-
-    ppid = derive_ppid_from_person_root_hash(resolved.person_root_hash, "lemma.id")
-    record.lemma_person_id = resolved.person_id
-    record.document_root_hash = encrypt_column(resolved.document_root_hash)
-    record.root_version = active_root_version()
-    record.confidence_level = resolved.confidence_level
-
-    # v2 (Phase 1.1): seal person-root seed envelopes for the wallet, if it
-    # posted an encryption pubkey at IDV start. Best-effort and feature-flagged;
-    # a failure here must never block credential issuance.
-    try:
-        _maybe_store_seed_envelopes(record, wallet_id, resolved.person_root_hash)
-    except Exception:
-        logger.exception("Seed-envelope generation failed (non-fatal) for wallet %s", wallet_id)
-
-    credential = _issue_ishuman_credential(
-        ppid,
-        wallet_id,
-        ppid_derivation="person_root_v1",
-        verification_method="stripe_identity",
-    )
-    record.ppid = ppid
-    return credential
-
-
 def _complete_verified_ishuman_from_didit(
     db,
     record,
@@ -352,9 +289,8 @@ def _complete_verified_ishuman_from_didit(
 ) -> Optional[dict]:
     """Resolve document/person roots from a didit decision and issue the master VC.
 
-    Parallel to _complete_verified_ishuman_from_stripe, but the decision is the
-    (already HMAC-authenticated) didit webhook payload rather than a re-fetched
-    Stripe session. Lemma still signs the credential with its own issuer key.
+    The decision is the (already HMAC-authenticated) didit webhook payload.
+    Lemma still signs the credential with its own issuer key.
     Returns the credential dict on success, None on root material failure.
     """
     from api.identity_roots import IdentityRootMaterialError, active_root_version, validate_didit_workflow_id
@@ -859,35 +795,21 @@ def start_verification_for_body(body: dict) -> tuple[dict, int]:
     session_id = f"ishuman_sess_{secrets.token_urlsafe(16)}"
     provider_return_url = _append_url_query(return_url, "ishuman_session", session_id)
 
-    # Provider routing. isHuman verification runs on Didit, which replaced
-    # Stripe Identity as the IDV rail. Didit is the default and fails closed if
-    # unconfigured (never silently substitutes another provider). Stripe Identity
-    # is retained only as an explicit, opt-in legacy escape hatch
-    # (provider="stripe_identity") and is no longer the default path.
+    # isHuman IDV runs exclusively on Didit and fails closed if unconfigured.
     provider = (body.get("provider") or "didit").strip().lower()
-    if provider == "stripe_identity":
-        from billing.stripe_manager import StripeManager
-        mgr = StripeManager()
-        result = mgr.create_identity_verification_session(
-            user_id=wallet_id,
-            return_url=provider_return_url,
-        )
-        if not result.get("success"):
-            logger.error("Stripe Identity session creation failed: %s", result)
-            return {"success": False, "error": result.get("error", "stripe_error")}, 502
-    else:
-        provider = "didit"
-        from api.config import is_ishuman_didit_enabled
-        if not is_ishuman_didit_enabled():
-            return {"success": False, "error": "didit_not_enabled"}, 400
-        from billing.didit_manager import DiditManager
-        result = DiditManager().create_identity_verification_session(
-            user_id=wallet_id,
-            return_url=provider_return_url,
-        )
-        if not result.get("success"):
-            logger.error("Didit session creation failed: %s", result)
-            return {"success": False, "error": result.get("error", "didit_error")}, 502
+    if provider != "didit":
+        return {"success": False, "error": "unsupported_provider"}, 400
+    from api.config import is_ishuman_didit_enabled
+    if not is_ishuman_didit_enabled():
+        return {"success": False, "error": "didit_not_enabled"}, 400
+    from billing.didit_manager import DiditManager
+    result = DiditManager().create_identity_verification_session(
+        user_id=wallet_id,
+        return_url=provider_return_url,
+    )
+    if not result.get("success"):
+        logger.error("Didit session creation failed: %s", result)
+        return {"success": False, "error": result.get("error", "didit_error")}, 502
 
     provider_session_id = result["session_id"]
 
@@ -942,9 +864,7 @@ def start_verification_for_body(body: dict) -> tuple[dict, int]:
         else:
             verification = IsHumanVerification(
                 session_id=session_id,
-                # Stripe keeps its dedicated column for back-compat; all providers
-                # also populate the generic provider_session_id used for lookups.
-                stripe_session_id=provider_session_id if provider == "stripe_identity" else None,
+                stripe_session_id=None,
                 provider_session_id=provider_session_id,
                 issuer_id=provider,
                 wallet_id=wallet_id,
@@ -992,25 +912,19 @@ def start_verification_for_body(body: dict) -> tuple[dict, int]:
         provider_session_id,
     )
 
-    response: dict = {
+    return {
         "success": True,
         "session_id": session_id,
         "provider": provider,
         "provider_session_id": provider_session_id,
         "url": result.get("url"),
-    }
-    # Preserve the Stripe response shape (client_secret + stripe_session_id) so
-    # existing Stripe Identity frontends keep working unchanged.
-    if provider == "stripe_identity":
-        response["stripe_session_id"] = provider_session_id
-        response["client_secret"] = result.get("client_secret")
-    return response, 200
+    }, 200
 
 
 @ishuman_bp.route("/api/ishuman/start-verification", methods=["POST"])
 @cross_origin()
 def start_verification():
-    """Create a Stripe Identity session for a new isHuman verification.
+    """Create a Didit hosted IDV session for a new isHuman verification.
 
     Request body::
 
@@ -1019,8 +933,7 @@ def start_verification():
             "return_url": "..."       // optional, defaults to lemma.id/app
         }
 
-    Returns ``client_secret`` that the frontend uses to mount the Stripe
-    Identity modal.
+    Returns the hosted verification URL for redirect.
     """
     body = request.get_json(silent=True) or {}
     payload, status = start_verification_for_body(body)
@@ -1028,118 +941,7 @@ def start_verification():
 
 
 # ---------------------------------------------------------------------------
-# 2. Stripe Identity Webhook
-# ---------------------------------------------------------------------------
-
-@ishuman_bp.route("/api/webhooks/stripe-identity", methods=["POST"])
-def stripe_identity_webhook():
-    """Receive Stripe Identity webhook events.
-
-    On ``identity.verification_session.verified`` we issue an isHuman
-    credential and store it against the verification record so the client
-    can poll for it.
-    """
-    payload = request.data
-    sig_header = request.headers.get("Stripe-Signature")
-    webhook_secret = os.getenv("STRIPE_IDENTITY_WEBHOOK_SECRET") or os.getenv("STRIPE_WEBHOOK_SECRET")
-
-    if not webhook_secret:
-        logger.error("No Stripe webhook secret configured")
-        return jsonify({"error": "webhook_not_configured"}), 500
-
-    try:
-        event = stripe.Webhook.construct_event(payload, sig_header, webhook_secret)
-    except (ValueError, stripe.error.SignatureVerificationError) as exc:
-        logger.warning("Stripe webhook signature verification failed: %s", exc)
-        return jsonify({"error": "invalid_signature"}), 400
-
-    event_type = event["type"]
-    session_obj = event["data"]["object"]
-    stripe_session_id = session_obj["id"]
-
-    logger.info("Stripe Identity webhook: type=%s session=%s", event_type, stripe_session_id)
-
-    from api.database import SessionLocal, IsHumanVerification
-    db = SessionLocal()
-    try:
-        record = db.query(IsHumanVerification).filter_by(
-            stripe_session_id=stripe_session_id
-        ).first()
-
-        if not record:
-            logger.warning("No verification record for stripe session %s", stripe_session_id)
-            return jsonify({"received": True}), 200
-
-        if event_type == "identity.verification_session.verified":
-            wallet_id = record.wallet_id or session_obj.get("metadata", {}).get("user_id", "")
-
-            credential = _complete_verified_ishuman_from_stripe(
-                db,
-                record,
-                wallet_id=wallet_id,
-                stripe_session_id=stripe_session_id,
-            )
-            if not credential:
-                db.commit()
-                return jsonify({"received": True}), 200
-
-            record.status = "verified"
-            record.verified_at = datetime.utcnow()
-            record.credential_id = credential.get("id")
-            record.issued_at = datetime.utcnow()
-            record.expires_at = datetime.utcnow() + timedelta(days=ISHUMAN_CREDENTIAL_TTL_DAYS)
-            record.metadata_json = {
-                **(record.metadata_json or {}),
-                "credential_issuer_did": credential.get("issuerInfo", {}).get("did"),
-                "ppid_derivation": "person_root_v1",
-            }
-            db.commit()
-
-            logger.info(
-                "isHuman credential issued: ppid=%s credential_id=%s person=%s",
-                (record.ppid or "")[:40],
-                credential.get("id"),
-                record.lemma_person_id,
-            )
-
-            # Successful real IDV is the network's amnesty signal: lift any
-            # prior amnesty-eligible revocations for this wallet so the user
-            # can rejoin sites that previously blocked them. The IDV cost
-            # (Stripe Identity + real document) is the deterrent; refusing
-            # to ever let a human back in is not.
-            try:
-                from api.site_ppid_revocation import clear_amnesty_eligible_wallet_revocations
-                clear_amnesty_eligible_wallet_revocations(
-                    db,
-                    wallet_id=wallet_id,
-                    new_master_credential_id=credential.get("id") or "",
-                    reason="stripe_identity_verified",
-                )
-            except Exception:  # noqa: BLE001
-                logger.exception(
-                    "Failed to clear amnesty-eligible revocations after Stripe Identity verified for wallet %s",
-                    wallet_id,
-                )
-
-        elif event_type in (
-            "identity.verification_session.requires_input",
-            "identity.verification_session.canceled",
-        ):
-            record.status = "failed" if "requires_input" in event_type else "canceled"
-            db.commit()
-
-        return jsonify({"received": True}), 200
-
-    except Exception:
-        db.rollback()
-        logger.exception("Error processing Stripe Identity webhook")
-        return jsonify({"error": "processing_failed"}), 500
-    finally:
-        db.close()
-
-
-# ---------------------------------------------------------------------------
-# 2a. Didit Identity Webhook (Phase 3.2 second IDV rail)
+# 2. Didit Identity Webhook
 # ---------------------------------------------------------------------------
 
 @ishuman_bp.route("/api/webhooks/didit-identity", methods=["POST"])
