@@ -333,20 +333,17 @@
 // Initialize wallet SDK
 const wallet = new LemmaWallet();
 let returnUrl = null;
-let encKey = null;
 let redirectParams = null;
 
 // Parse URL params
 function parseParams() {
     const params = new URLSearchParams(window.location.search);
     returnUrl = params.get('return_url');
-    encKey = params.get('enc_key');
     const state = params.get('state');
     
     if (returnUrl) {
         redirectParams = {
             returnUrl,
-            encKey,
             state: state ? JSON.parse(atob(state)) : null
         };
         
@@ -556,44 +553,6 @@ async function getStoredSecretDirectly() {
             }
         };
     });
-}
-
-// Encrypt wallet data using AES-GCM (client-side)
-async function encryptWalletData(data, keyBase64) {
-    // Decode the key (handle URL-safe base64)
-    const standardBase64 = keyBase64.replace(/-/g, '+').replace(/_/g, '/');
-    const padding = standardBase64.length % 4;
-    const paddedBase64 = padding ? standardBase64 + '='.repeat(4 - padding) : standardBase64;
-    const keyBytes = Uint8Array.from(atob(paddedBase64), c => c.charCodeAt(0));
-    
-    // Import key
-    const key = await crypto.subtle.importKey(
-        'raw', keyBytes,
-        { name: 'AES-GCM' },
-        false, ['encrypt']
-    );
-    
-    // Generate nonce
-    const nonce = crypto.getRandomValues(new Uint8Array(12));
-    
-    // Encrypt
-    const dataBytes = new TextEncoder().encode(JSON.stringify(data));
-    const ciphertext = await crypto.subtle.encrypt(
-        { name: 'AES-GCM', iv: nonce },
-        key, dataBytes
-    );
-    
-    // Combine nonce + ciphertext
-    const combined = new Uint8Array(nonce.length + ciphertext.byteLength);
-    combined.set(nonce, 0);
-    combined.set(new Uint8Array(ciphertext), nonce.length);
-    
-    // Return URL-safe base64
-    let binary = '';
-    for (let i = 0; i < combined.length; i++) {
-        binary += String.fromCharCode(combined[i]);
-    }
-    return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
 
 // Create new wallet

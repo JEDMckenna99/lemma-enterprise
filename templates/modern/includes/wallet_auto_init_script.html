@@ -1,0 +1,229 @@
+<script nonce="{{ csp_nonce }}">
+    // Wallet auto-init: only included on routes that need globalLemmaWallet at page load.
+    async function initSessionFreeNav() {
+        if (typeof LemmaWallet === 'undefined') {
+            setTimeout(initSessionFreeNav, 50);
+            return;
+        }
+
+        try {
+            if (!window.globalLemmaWallet) {
+                window.globalLemmaWallet = new LemmaWallet({
+                    debug: false,
+                    enableDeviceSync: true,
+                    enableAdvancedFeatures: true
+                });
+                await window.globalLemmaWallet.init();
+            }
+            const wallet = window.globalLemmaWallet;
+            wallet._autoStartHeartbeat?.();
+
+            const isPublicPage = document.body.dataset.publicPage === 'true';
+            const SESSION_MS = (typeof getSessionDurationMs === 'function')
+                ? getSessionDurationMs()
+                : (10 * 60 * 60 * 1000);
+
+            function setLoggedOutUI() {
+                const userDropdown = document.getElementById('user-dropdown');
+                const authButtons = document.getElementById('auth-buttons');
+                const publicDashboard = document.getElementById('public-dashboard-link');
+                if (userDropdown) userDropdown.style.display = 'none';
+                if (authButtons) authButtons.style.display = 'flex';
+                if (publicDashboard) publicDashboard.style.display = 'none';
+
+                const navAdmin = document.getElementById('nav-admin');
+                const adminDropdown = document.getElementById('admin-dropdown-link');
+                if (navAdmin) navAdmin.style.display = 'none';
+                if (adminDropdown) adminDropdown.style.display = 'none';
+
+                const devDashboardLink = document.getElementById('dev-dashboard-link');
+                const apiKeysLink = document.getElementById('api-keys-link');
+                if (devDashboardLink) devDashboardLink.style.display = 'none';
+                if (apiKeysLink) apiKeysLink.style.display = 'none';
+
+                const pricingLink = document.getElementById('nav-pricing');
+                if (pricingLink) pricingLink.style.display = 'block';
+
+                delete window.lemmaCredential;
+                delete window.lemmaAuth;
+            }
+
+            function isDeveloperAccount(normalized, claims) {
+                const accountType = (normalized?.accountType || claims.accountType || '').toLowerCase();
+                const permissionId = (normalized?.permissionId || claims.permissionId || '').toLowerCase();
+                if (['customer', 'developer', 'admin'].includes(accountType)) return true;
+                if (['admin_access', 'super_admin', 'admin', 'superadmin', 'site_admin'].includes(permissionId)) return true;
+                return normalized?.isAdmin === true;
+            }
+
+            function handleLockedState() {
+                setLoggedOutUI();
+                const protectedPath = /^\/(developer|admin|wallet)(\/|$)/.test(window.location.pathname);
+                if (protectedPath) {
+                    window.location.href = '/login?reason=wallet_locked';
+                }
+            }
+
+            async function ensureServerWalletSession(walletInstance, options) {
+                const opts = options || {};
+                try {
+                    let walletId = null;
+                    if (typeof walletInstance.getWalletInfo === 'function') {
+                        const info = await walletInstance.getWalletInfo();
+                        walletId = info?.walletId || null;
+                    }
+                    if (!walletId && typeof walletInstance._resolveCurrentWalletId === 'function') {
+                        walletId = await walletInstance._resolveCurrentWalletId();
+                    }
+                    if (!walletId && walletInstance.session?.walletId) {
+                        walletId = walletInstance.session.walletId;
+                    }
+                    if (!walletId) return false;
+
+                    const nowMs = Date.now();
+                    const expiresAt = Math.floor((nowMs + SESSION_MS) / 1000);
+                    const response = await window.__lemmaRawFetch('/api/wallet/signal-unlock', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        credentials: 'include',
+                        body: JSON.stringify({
+                            wallet_id: walletId,
+                            unlocked_at: nowMs,
+                            expires_at: expiresAt
+                        })
+                    });
+
+                    if (!response.ok) {
+                        if (opts.debug) {
+                            console.warn('Wallet session sync failed', response.status);
+                        }
+                        return false;
+                    }
+                    return true;
+                } catch (e) {
+                    if (opts.debug) {
+                        console.warn('Wallet session sync error', e);
+                    }
+                    return false;
+                }
+            }
+
+            if (!window.__lemmaLockHandlersBound) {
+                window.addEventListener('lemma:session-expired', handleLockedState);
+                window.addEventListener('lemma-wallet-locked', handleLockedState);
+                window.__lemmaLockHandlersBound = true;
+            }
+
+            const permissions = await wallet.getCredentials('permission');
+            const utils = window.LemmaCredentialUtils;
+
+            const lemmaPermissions = permissions.filter(p => {
+                if (utils) {
+                    const normalized = utils.normalizeCredentialClaims(p);
+                    return normalized.isLemmaSite;
+                }
+                const claims = p.claims || p.credentialSubject || {};
+                const siteId = (claims.siteId || claims.site || claims.site_id || claims.siteDomain || '').toLowerCase();
+                return siteId === 'lemma.id' || siteId === 'lemma_platform' || siteId.includes('lemma');
+            });
+
+            let cred = null;
+            if (utils) {
+                const validCreds = utils.selectBestCredentials(lemmaPermissions);
+                cred = validCreds.length > 0 ? validCreds[0] : null;
+            } else if (lemmaPermissions.length > 0) {
+                cred = lemmaPermissions[0];
+            }
+
+            const walletUnlocked = wallet.isUnlocked();
+            if (cred && walletUnlocked) {
+                const normalized = utils ? utils.normalizeCredentialClaims(cred) : null;
+                const claims = cred.claims || cred.credentialSubject || {};
+
+                if (localStorage.getItem('lemma_debug_auth') === 'true') {
+                    console.log('🔐 Auth: Found credential', { id: cred.id, normalized });
+                }
+
+                const userDropdown = document.getElementById('user-dropdown');
+                const authButtons = document.getElementById('auth-buttons');
+                const publicDashboard = document.getElementById('public-dashboard-link');
+                if (isPublicPage) {
+                    if (authButtons) authButtons.style.display = 'none';
+                    if (publicDashboard) publicDashboard.style.display = 'inline-flex';
+                } else {
+                    if (userDropdown) userDropdown.style.display = 'block';
+                    if (authButtons) authButtons.style.display = 'none';
+                }
+
+                const email = normalized?.email || claims.email || 'Customer';
+                const accountType = normalized?.accountType || claims.accountType || 'customer';
+                const emailElem = document.getElementById('dropdown-email');
+                const roleElem = document.getElementById('dropdown-role');
+                const avatarInitials = document.getElementById('avatar-initials');
+                const userDisplayName = document.getElementById('user-display-name');
+
+                if (emailElem) emailElem.textContent = email;
+                if (roleElem) roleElem.textContent = accountType.charAt(0).toUpperCase() + accountType.slice(1);
+
+                if (avatarInitials && email && email !== 'Customer') {
+                    const initials = email.split('@')[0].substring(0, 2).toUpperCase();
+                    avatarInitials.textContent = initials;
+                }
+
+                if (userDisplayName) {
+                    const displayName = email && email !== 'Customer'
+                        ? email.split('@')[0]
+                        : accountType.charAt(0).toUpperCase() + accountType.slice(1);
+                    userDisplayName.textContent = displayName;
+                }
+
+                const isAdmin = normalized ? normalized.isAdmin : (
+                    ['admin_access', 'super_admin', 'admin', 'superadmin', 'site_admin'].includes(claims.permissionId) ||
+                    claims.accountType === 'admin'
+                );
+
+                const showDeveloperNav = isDeveloperAccount(normalized, claims);
+                const devDashboardLink = document.getElementById('dev-dashboard-link');
+                const apiKeysLink = document.getElementById('api-keys-link');
+                if (devDashboardLink) devDashboardLink.style.display = showDeveloperNav ? 'flex' : 'none';
+                if (apiKeysLink) apiKeysLink.style.display = showDeveloperNav ? 'flex' : 'none';
+
+                if (isAdmin) {
+                    const navAdmin = document.getElementById('nav-admin');
+                    const adminDropdown = document.getElementById('admin-dropdown-link');
+                    if (navAdmin) navAdmin.style.display = 'block';
+                    if (adminDropdown) adminDropdown.style.display = 'block';
+
+                    await ensureServerWalletSession(wallet, {
+                        debug: localStorage.getItem('lemma_debug_auth') === 'true'
+                    });
+                }
+
+                const pricingLink = document.getElementById('nav-pricing');
+                if (pricingLink && !isPublicPage) pricingLink.style.display = 'none';
+
+                window.lemmaCredential = cred;
+                window.lemmaCredentialForHeader = window.buildLemmaCredentialForHeader(cred);
+                window.dispatchEvent(new CustomEvent('lemma:credential-ready', {
+                    detail: { id: cred.id || null }
+                }));
+
+                const auth = new SessionFreeAuth(wallet, {debug: false});
+                window.lemmaAuth = auth;
+            } else {
+                setLoggedOutUI();
+            }
+        } catch (error) {
+            console.warn('🔐 Auth init warning:', error.message);
+            if (localStorage.getItem('lemma_debug_auth') === 'true') {
+                console.error('🔐 Auth init error details:', error);
+            }
+        }
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initSessionFreeNav);
+    } else {
+        initSessionFreeNav();
+    }
+</script>

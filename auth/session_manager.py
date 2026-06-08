@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 # SESSION CONFIGURATION
 # ============================================
 
-SESSION_DURATION = 24 * 60 * 60  # 24 hours in seconds
+SESSION_DURATION = 10 * 60 * 60  # 10 hours in seconds (aligned with client daily-unlock bundle)
 UNLOCK_TOKEN_TTL = 5 * 60  # 5 minutes
 
 _session_secret = os.environ.get('SESSION_SECRET')

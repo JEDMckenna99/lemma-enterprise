@@ -549,7 +549,7 @@ class TestSessionManager:
             get_time_remaining,
         )
 
-        assert SESSION_DURATION == 24 * 60 * 60
+        assert SESSION_DURATION == 10 * 60 * 60
         assert callable(generate_session_token)
         assert callable(validate_session_token)
 

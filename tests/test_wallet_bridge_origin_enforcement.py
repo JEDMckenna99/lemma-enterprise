@@ -30,6 +30,22 @@ def test_lemma_wallet_uses_exact_origin_helper(wallet_js_source):
 
 
 @pytest.mark.unit
+def test_lemma_wallet_uses_exact_hostname_helper(wallet_js_source):
+    assert "function isLemmaHostname(hostname)" in wallet_js_source
+    assert "return isLemmaHostname(window.location.hostname)" in wallet_js_source
+    assert "hostname.includes('lemma.id')" not in wallet_js_source
+
+
+@pytest.mark.unit
+def test_unlock_with_redirect_omits_enc_key_from_url(wallet_js_source):
+    start = wallet_js_source.index("unlockWithRedirect(options = {})")
+    end = wallet_js_source.index("    /**", start + 1)
+    block = wallet_js_source[start:end]
+    assert "enc_key" not in block
+    assert "encKey" not in block
+
+
+@pytest.mark.unit
 def test_bridge_iframe_fully_removed(wallet_js_source):
     # The hidden cross-origin bridge iframe must never be created again.
     assert "/wallet/bridge" not in wallet_js_source

@@ -73,6 +73,20 @@ window.addEventListener('message', (event) => {
 
 ---
 
+## XSS on lemma.id (primary wallet threat)
+
+| Check | Status | Notes |
+|-------|--------|-------|
+| CSP blocks inline scripts without nonce | IN_PROGRESS | `script-src` uses nonces; CI guard in `tests/test_csp_security.py` |
+| Daily unlock bundle TTL | IN_PROGRESS | 10h default (`DEFAULT_SESSION_HOURS = 10`) |
+| Bundle fail-closed on wrap failure | PASS | No plaintext fallback in `_persistIsHumanLockBundle` |
+| Wallet auto-init scoped to app routes | IN_PROGRESS | `wallet_auto_init` block empty by default; developer/admin/wallet routes opt in |
+| CSP violation reporting | IN_PROGRESS | `report-uri /api/security/csp-report` |
+| Debug panel gated in production | PASS | Requires `LEMMA_WALLET_DEBUG=true` server flag |
+| Compromise response documented | PASS | See `docs/security/WALLET_COMPROMISE_RESPONSE.md` |
+
+---
+
 ## ✅ Credential Storage
 
 | Check | Status | Notes |

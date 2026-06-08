@@ -25,10 +25,11 @@ class LemmaUnifiedCrypto {
     }
     
     detectCDNUrl() {
-        // Detect nearest CDN edge for optimal performance
         const hostname = window.location.hostname;
-        
-        if (hostname.includes('lemma.id')) {
+        const host = String(hostname || '').trim().toLowerCase().replace(/\.$/, '');
+        const isLemmaHost = host === 'lemma.id' || host.endsWith('.lemma.id');
+
+        if (isLemmaHost) {
             return 'https://cdn.lemma.id';
         } else if (hostname.includes('herokuapp.com')) {
             return 'https://lemma.id/cdn';

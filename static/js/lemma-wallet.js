@@ -35,6 +35,15 @@ function isLemmaTrustedOrigin(origin) {
     return origin === 'https://lemma.id' || origin === 'https://www.lemma.id';
 }
 
+/** Boundary-safe hostname check (mirrors server _lemma_origin_allowed). */
+function isLemmaHostname(hostname) {
+    const host = String(hostname || '').trim().toLowerCase().replace(/\.$/, '');
+    if (!host) return false;
+    if (host === 'lemma.id' || host.endsWith('.lemma.id')) return true;
+    if (host === 'localhost' || host === '127.0.0.1') return true;
+    return false;
+}
+
 // IIFE to avoid global scope pollution (fixes Cloudflare Rocket Loader issues)
 (function() {
 'use strict';
@@ -50,7 +59,8 @@ if (typeof window !== 'undefined' && window.LemmaWallet) {
 
 const WALLET_DB_NAME = 'LemmaWallet';
 const WALLET_DB_VERSION = 6;  // v6: ishuman_cache plaintext store for lock-period bridge reads
-const DEFAULT_SESSION_HOURS = 24;
+const DEFAULT_SESSION_HOURS = 10;
+const MAX_SESSION_HOURS = 10;
 const DEFAULT_PROFILE_ID = 'default';
 const ISHUMAN_LOCK_STORAGE_KEY = 'lemma_ishuman_lock:v1';
 const ISHUMAN_LOCK_LEGACY_SESSION_KEY = 'lemma_ishuman_lock:v1'; // sessionStorage migration
@@ -60,7 +70,7 @@ function getSessionDurationMs() {
     try {
         const hours = parseInt(localStorage.getItem('lemma_session_hours')) || DEFAULT_SESSION_HOURS;
         // Clamp between 1 and 24 hours for safety
-        const clampedHours = Math.max(1, Math.min(24, hours));
+        const clampedHours = Math.max(1, Math.min(MAX_SESSION_HOURS, hours));
         return clampedHours * 60 * 60 * 1000;
     } catch (e) {
         return DEFAULT_SESSION_HOURS * 60 * 60 * 1000;
@@ -974,8 +984,7 @@ class LemmaWallet {
      * @private
      */
     _isLemmaDomain() {
-        const hostname = window.location.hostname;
-        return hostname.includes('lemma.id') || hostname.includes('localhost');
+        return isLemmaHostname(window.location.hostname);
     }
 
     /**
@@ -1035,10 +1044,10 @@ class LemmaWallet {
      * More reliable than popups on iOS Safari which blocks popups aggressively.
      * 
      * Flow:
-     * 1. Saves current URL and state (including encryption key)
+     * 1. Saves current URL and state in localStorage
      * 2. Redirects to lemma.id/unlock (clean, focused page)
      * 3. User unlocks with passkey
-     * 4. Wallet data encrypted client-side, returned in URL
+     * 4. lemma.id issues site-bound lemma_credential and redirects back
      * 5. SDK detects return and completes auth
      * 
      * @param {Object} options Configuration
@@ -1049,45 +1058,33 @@ class LemmaWallet {
     unlockWithRedirect(options = {}) {
         const returnUrl = options.returnUrl || window.location.href;
         const state = options.state || {};
-        
-        // Generate a random encryption key for secure client-side token exchange
-        // This key never touches lemma.id servers - all encryption happens client-side
-        const encKeyBytes = crypto.getRandomValues(new Uint8Array(32));
-        const encKeyBase64 = this._arrayBufferToBase64(encKeyBytes);
-        
-        // Store state for when we return (including encryption key)
+
+        // Store redirect context for return processing (lemma_credential flow).
         const redirectState = {
             returnUrl,
             state,
             timestamp: Date.now(),
             origin: window.location.origin,
-            encKey: encKeyBase64  // Store key to decrypt the response
         };
-        
+
         try {
             localStorage.setItem('lemma_redirect_state', JSON.stringify(redirectState));
         } catch (e) {
-            // Fallback to URL-encoded state in the redirect
             console.warn('[Lemma] Could not save redirect state to localStorage');
         }
-        
+
         console.log('[Lemma] Redirecting to lemma.id for wallet unlock...');
-        console.log('[Lemma]  Using client-side encryption (wallet secret never touches server)');
-        
-        // Build the redirect URL with encryption key
-        // PRIVACY: The enc_key is only used by client-side JavaScript on lemma.id
-        // The server never sees or stores the wallet secret
+        console.log('[Lemma]  Lemma credential flow (wallet_secret stays on lemma.id)');
+
         const params = new URLSearchParams({
             return_url: returnUrl,
             redirect_flow: '1',
-            enc_key: encKeyBase64  // Pass key for client-side encryption
         });
-        
-        // Add custom state if provided
+
         if (Object.keys(state).length > 0) {
             params.set('state', btoa(JSON.stringify(state)));
         }
-        
+
         this._showRedirectOverlay('Connecting to Lemma...');
         window.location.href = `https://lemma.id/unlock?${params.toString()}`;
     }
@@ -1205,6 +1202,8 @@ class LemmaWallet {
         // PRIVACY-FIRST: Client-side encrypted data (no server involvement)
         // The wallet secret was encrypted by lemma.id's client-side JavaScript
         // using a key we generated and stored locally. Server never sees the secret.
+        // DEPRECATED: legacy encrypted wallet_secret transfer (lemma_data + encKey).
+        // New redirects use lemma_credential; kept for in-flight old tabs only.
         if (encryptedData && savedState?.encKey) {
             try {
                 const decrypted = await this._decryptRedirectData(encryptedData, savedState.encKey);
@@ -1462,7 +1461,8 @@ class LemmaWallet {
      */
     startSessionHeartbeat(intervalMs = 300000) {
         // Skip only on localhost dev hosts where SSE endpoint may not exist.
-        if (window.location.hostname.includes('localhost')) {
+        const devHost = window.location.hostname.toLowerCase();
+        if (devHost === 'localhost' || devHost === '127.0.0.1') {
             return;
         }
 
@@ -2015,7 +2015,7 @@ class LemmaWallet {
                                 this.session = {
                                     isUnlocked: true,
                                     unlockedAt: Date.now(),
-                                    expiresAt: Date.now() + (24 * 60 * 60 * 1000),
+                                    expiresAt: Date.now() + getSessionDurationMs(),
                                     walletId: credData.lemma.walletId || ppid,
                                     source: 'redirect_lemma'
                                 };
@@ -2053,7 +2053,7 @@ class LemmaWallet {
                             this.session = {
                                 isUnlocked: true,
                                 unlockedAt: Date.now(),
-                                expiresAt: Date.now() + (24 * 60 * 60 * 1000),
+                                expiresAt: Date.now() + getSessionDurationMs(),
                                 walletId: walletId,
                                 walletSecret: walletSecret,
                                 source: 'redirect'
@@ -2165,8 +2165,7 @@ class LemmaWallet {
         // ============================================================
         // THIRD-PARTY SITES: Use local lemma verification (v2.45.0)
         // ============================================================
-        if (!window.location.hostname.includes('lemma.id') && 
-            !window.location.hostname.includes('localhost')) {
+        if (!this._isLemmaDomain()) {
             console.log('[Lemma] Third-party site: checking local authorization...');
             
             // Try local lemma verification first (no network calls)
@@ -2819,17 +2818,13 @@ class LemmaWallet {
                 bundle.sec = wrapped;
                 bundle.secured = true;
             } else {
-                // Degraded fallback (no WebCrypto/IndexedDB): keep the legacy
-                // plaintext fields so the 24h unlock still functions, but warn.
-                bundle.walletSecret = sensitive.walletSecret;
-                bundle.atRestKeyB64 = sensitive.atRestKeyB64;
-                bundle.secured = false;
-                console.warn('[Lemma] Unlock bundle stored unencrypted (device wrap key unavailable)');
+                console.warn('[Lemma] Unlock bundle not persisted (device wrap key unavailable); passkey required on next visit');
+                return;
             }
             if (typeof localStorage !== 'undefined') {
                 localStorage.setItem(ISHUMAN_LOCK_STORAGE_KEY, JSON.stringify(bundle));
             }
-            console.log('[Lemma] Daily unlock bundle persisted (24h)' + (bundle.secured ? ' [encrypted]' : ''));
+            console.log('[Lemma] Daily unlock bundle persisted (10h)' + (bundle.secured ? ' [encrypted]' : ''));
         } catch (e) {
             console.warn('[Lemma] Failed to persist daily unlock bundle:', e.message);
         }
@@ -3193,8 +3188,8 @@ class LemmaWallet {
     }) {
         const SESSION_PRESENTATION_PREFIX = 'lemma:site-session-presentation:v1';
         const MIN_SESSION_TTL_SECONDS = 60;
-        const MAX_SESSION_TTL_SECONDS = 24 * 60 * 60;
-        const DEFAULT_SESSION_TTL_SECONDS = 24 * 60 * 60;
+        const MAX_SESSION_TTL_SECONDS = MAX_SESSION_HOURS * 60 * 60;
+        const DEFAULT_SESSION_TTL_SECONDS = MAX_SESSION_HOURS * 60 * 60;
 
         const keys = this._getLemmaKeys();
         const canonicalSite = keys.canonicalizeSiteDomain(siteId || '');
@@ -3350,8 +3345,7 @@ class LemmaWallet {
 
         // SMART CHECK: On third-party sites, check bridge session first
         // If user already unlocked on lemma.id today, don't prompt for passkey
-        if (!window.location.hostname.includes('lemma.id') && 
-            !window.location.hostname.includes('localhost')) {
+        if (!this._isLemmaDomain()) {
             console.log('[Lemma] Third-party site: checking local authorization...');
                 
             // Try local lemma verification first (no network calls)
@@ -3553,8 +3547,7 @@ class LemmaWallet {
         }
 
         // Start heartbeat on third-party sites
-        if (!window.location.hostname.includes('lemma.id') &&
-            !window.location.hostname.includes('localhost')) {
+        if (!this._isLemmaDomain()) {
             this.startSessionHeartbeat(300000); // 5 minute backup (primary is tab focus)
         }
 
@@ -3723,7 +3716,7 @@ class LemmaWallet {
         // when the session had hours of remaining TTL.
         const sessionMs = (typeof getSessionDurationMs === 'function')
             ? getSessionDurationMs()
-            : 24 * 60 * 60 * 1000;
+            : DEFAULT_SESSION_HOURS * 60 * 60 * 1000;
         const unlockedAt = this.session.unlockedAt || 0;
         const isWithinRollingWindow = unlockedAt > 0 && (Date.now() - unlockedAt) < sessionMs;
 
@@ -3840,7 +3833,7 @@ class LemmaWallet {
         const maxAgeMs = options.maxAgeMs || 30000;  // Default 30 seconds
         
         // If on lemma.id, do it locally
-        if (window.location.hostname.includes('lemma.id')) {
+        if (this._isLemmaDomain()) {
             return this._localFreshAuth(maxAgeMs);
         }
         
@@ -3863,7 +3856,7 @@ class LemmaWallet {
      */
     async getAuthFreshness() {
         // If on lemma.id, check locally
-        if (window.location.hostname.includes('lemma.id')) {
+        if (this._isLemmaDomain()) {
             const session = await this._get('session', 'current');
             if (!session || !session.unlockedAt) {
                 return { authenticated: false, fresh: false, reason: 'no_session' };
@@ -3976,7 +3969,7 @@ class LemmaWallet {
         const localState = this._getBasicAuthState();
         
         // If we're on lemma.id, use local state
-        if (window.location.hostname.includes('lemma.id')) {
+        if (this._isLemmaDomain()) {
             return {
                 source: 'local',
                 ...localState,
@@ -4084,7 +4077,7 @@ class LemmaWallet {
         await this.init();
         
         // Check if we're on lemma.id (first-party)
-        if (window.location.hostname.includes('lemma.id')) {
+        if (this._isLemmaDomain()) {
             const localAuth = this._getBasicAuthState();
             if (localAuth.authenticated) {
                 return {
@@ -7817,7 +7810,7 @@ if (typeof window !== 'undefined') {
         
         try {
             // Only register SW on lemma.id or sites that explicitly opt-in
-            const isLemmaOrigin = window.location.hostname.includes('lemma.id');
+            const isLemmaOrigin = isLemmaHostname(window.location.hostname);
             const hasOptIn = document.querySelector('meta[name="lemma-sw"]');
             
             if (!isLemmaOrigin && !hasOptIn) {
@@ -7859,7 +7852,7 @@ if (typeof window !== 'undefined') {
     window.registerLemmaServiceWorker = registerLemmaServiceWorker;
     
     // Auto-register on lemma.id
-    if (window.location.hostname.includes('lemma.id')) {
+    if (isLemmaHostname(window.location.hostname)) {
         registerLemmaServiceWorker();
     }
     
@@ -7970,6 +7963,11 @@ if (typeof window !== 'undefined') {
     const debugLogs = [];
     const MAX_DEBUG_LOGS = 100;
     
+    function isLemmaWalletDebugEnabled() {
+        return typeof window !== 'undefined'
+            && (window.LEMMA_WALLET_DEBUG === true || window.LEMMA_WALLET_DEBUG === 'true');
+    }
+
     function createDebugPanel() {
         if (debugPanel) return debugPanel;
         
@@ -8180,6 +8178,10 @@ if (typeof window !== 'undefined') {
      * Shows all Lemma SDK logs in a mobile-friendly panel
      */
     function enableDebug() {
+        if (!isLemmaWalletDebugEnabled()) {
+            originalConsole.warn.apply(console, ['[Lemma] Debug panel disabled in production (set LEMMA_WALLET_DEBUG=true to enable)']);
+            return;
+        }
         if (debugEnabled) return;
         debugEnabled = true;
         interceptConsole();
@@ -8199,8 +8201,8 @@ if (typeof window !== 'undefined') {
     window.enableLemmaDebug = enableDebug;
     LemmaWallet.enableDebug = enableDebug;
     
-    // Auto-enable if URL param is set
-    if (typeof window !== 'undefined') {
+    // Auto-enable only when server explicitly enables wallet debug mode
+    if (typeof window !== 'undefined' && isLemmaWalletDebugEnabled()) {
         const urlParams = new URLSearchParams(window.location.search);
         if (urlParams.get('lemma_debug') === '1' || urlParams.get('lemma_debug') === 'true') {
             if (document.readyState === 'loading') {

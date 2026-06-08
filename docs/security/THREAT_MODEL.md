@@ -46,10 +46,25 @@
 - Mitigation: `/api/ishuman/reissue-master` (Phase 1.3) revokes the prior master
   id on reissue, so leaked local master copies cannot be replayed.
 
-### 3.4 Compromised browser (malware in the browser process)
-- Can read decrypted wallet contents during a passkey-unlocked session.
-- Cannot persist beyond the session (each unlock is per-session; Phase 2.2 removes
-  the daily-unlock bundle, narrowing this window).
+### 3.4 Compromised browser / XSS on lemma.id (primary wallet threat)
+
+Same-origin JavaScript during an unlocked session can read `session.walletSecret`,
+call `unwrapBundle()` on the daily-unlock envelope, and invoke wallet SDK APIs.
+Passkeys and PRF-at-rest encryption do not protect against this class of attack.
+
+**Mitigations (current posture):**
+
+| Control | Effect |
+|---------|--------|
+| CSP with per-request nonces (no `script-src` `unsafe-inline`) | Blocks most injected script execution |
+| 10h encrypted daily-unlock bundle (device wrap key) | Shrinks window vs 24h; not XSS-proof |
+| Fail-closed bundle persist when wrap unavailable | No plaintext `walletSecret` in localStorage |
+| Wallet auto-init scoped to wallet/developer/admin routes | Marketing XSS cannot restore bundle via `globalLemmaWallet.init()` |
+| CSP `report-uri` + Sentry | Detection of policy violations |
+| `/api/ishuman/reissue-master` | User response after suspected compromise |
+
+**Residual risk:** XSS on a wallet route during the 10h unlock window still equals
+wallet compromise until lock + reissue.
 
 ### 3.5 Compromised IDV provider (fooled by a fake document)
 - Network mints a credential for a fraudulent identity.

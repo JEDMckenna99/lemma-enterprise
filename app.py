@@ -84,6 +84,7 @@ def create_app():
         return {
             'cross_site_lock_enabled': flag in ('1', 'true', 'yes', 'on'),
             'ishuman_use_person_root_seeds': seeds_enabled,
+            'wallet_debug_enabled': (os.getenv('LEMMA_WALLET_DEBUG') or '').strip().lower() in ('1', 'true', 'yes', 'on'),
         }
 
     # ================================================================================
@@ -131,11 +132,11 @@ def create_app():
                 "default-src 'self'; "
                 # Scripts: self + nonce for inline scripts + trusted CDNs
                 f"script-src 'self' 'nonce-{nonce}' "
-                    "https://cdn.jsdelivr.net/npm/ "  # jsdelivr for specific npm packages
-                    "https://unpkg.com/ "  # unpkg for html5-qrcode scanner
-                    "https://static.cloudflareinsights.com "  # Cloudflare analytics
-                    "https://challenges.cloudflare.com "  # Cloudflare Turnstile
-                    "https://js.stripe.com; "  # Stripe payments
+                    "https://cdn.jsdelivr.net/npm/ "  # CSP-ALLOW: jsdelivr npm packages
+                    "https://unpkg.com/ "  # CSP-ALLOW: html5-qrcode scanner
+                    "https://static.cloudflareinsights.com "  # CSP-ALLOW: Cloudflare analytics
+                    "https://challenges.cloudflare.com "  # CSP-ALLOW: Cloudflare Turnstile
+                    "https://js.stripe.com; "  # CSP-ALLOW: Stripe payments
                 # Styles: self + unsafe-inline (needed for style attributes) + Google Fonts
                 # Note: unsafe-inline for styles is lower risk than for scripts
                 "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
@@ -160,7 +161,8 @@ def create_app():
                 # Limit form submissions
                 "form-action 'self' https://*.stripe.com; "
                 # Upgrade HTTP to HTTPS
-                "upgrade-insecure-requests"
+                "upgrade-insecure-requests; "
+                "report-uri /api/security/csp-report"
             )
             response.headers['Content-Security-Policy'] = csp
         
@@ -698,12 +700,12 @@ def create_app():
         """
         Sign-in page for redirect-based authentication.
 
-        FLOW (v2.32.0 - Redirect-only architecture):
-        1. Third-party SDK generates encryption key, redirects here with return_url + enc_key
+        FLOW (lemma-credential redirect):
+        1. Third-party SDK redirects here with return_url (+ optional state)
         2. User signs in via passkey (or uses existing session)
-        3. Wallet data encrypted client-side with enc_key (never touches server)
-        4. User redirected back to return_url with encrypted data in URL
-        5. SDK decrypts client-side, establishes session
+        3. lemma.id issues a site-bound signed credential (wallet_secret stays local)
+        4. User redirected back to return_url with lemma_credential in the URL
+        5. SDK stores the credential locally and establishes session
 
         This provides consistent UX across all platforms while preserving privacy.
         """
@@ -1422,6 +1424,48 @@ def create_app():
     @app.route('/admin/iam')
     def admin_iam_redirect():
         return redirect('/admin')
+
+    # CSP violation reports (XSS detection)
+    @app.route('/api/security/csp-report', methods=['POST'])
+    def csp_report():
+        """Accept browser CSP violation reports. No PII; log + optional Sentry."""
+        payload = request.get_json(silent=True)
+        if payload is None:
+            raw = request.get_data(as_text=True) or ''
+            try:
+                import json as _json
+                payload = _json.loads(raw) if raw else {}
+            except Exception:
+                payload = {}
+
+        report = payload.get('csp-report') if isinstance(payload, dict) else None
+        if not isinstance(report, dict):
+            report = payload if isinstance(payload, dict) else {}
+
+        violated = str(report.get('violated-directive') or report.get('effective-directive') or 'unknown')
+        blocked = str(report.get('blocked-uri') or '')
+        document_uri = str(report.get('document-uri') or report.get('source-file') or '')
+
+        logger.warning(
+            "CSP violation: directive=%s blocked=%s document=%s",
+            violated,
+            blocked[:200],
+            document_uri[:200],
+        )
+
+        try:
+            import sentry_sdk
+            if sentry_sdk.Hub.current.client:
+                sentry_sdk.capture_message(
+                    f"CSP violation: {violated}",
+                    level='warning',
+                    tags={'security': 'csp', 'violated_directive': violated[:100]},
+                    extras={'blocked_uri': blocked[:500], 'document_uri': document_uri[:500]},
+                )
+        except Exception:
+            pass
+
+        return ('', 204)
 
     # Health check
     @app.route('/api/health')

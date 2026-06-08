@@ -82,16 +82,18 @@ def test_lock_restore_reimports_at_rest_key_and_tags_source(wallet_source):
 
 @pytest.mark.browser
 def test_lock_bundle_sensitive_material_is_encrypted(wallet_source):
-    """Sensitive material must be wrapped under the device key (bundle.sec); the
-    plaintext path is only a warned, degraded fallback when WebCrypto/IndexedDB
-    is unavailable."""
+    """Sensitive material must be wrapped under the device key (bundle.sec).
+    If wrap fails, persist must fail closed (no plaintext walletSecret write)."""
     assert "wrapped = await mod.wrapBundle(sensitive);" in wallet_source
     assert "bundle.sec = wrapped;" in wallet_source
     assert "bundle.secured = true;" in wallet_source
     assert (
-        "console.warn('[Lemma] Unlock bundle stored unencrypted (device wrap key unavailable)');"
+        "console.warn('[Lemma] Unlock bundle not persisted (device wrap key unavailable); passkey required on next visit');"
         in wallet_source
     )
+    persist_block_start = wallet_source.index("async _persistIsHumanLockBundle()")
+    persist_block = wallet_source[persist_block_start:persist_block_start + 2500]
+    assert "bundle.walletSecret = sensitive.walletSecret" not in persist_block
 
 
 @pytest.mark.browser
