@@ -1020,6 +1020,12 @@ def start_verification_for_body(body: dict) -> tuple[dict, int]:
                     encrypted_blob=encrypted_blob,
                 )
                 handoff_stored = True
+                logger.info(
+                    "IDV mobile handoff stored handoff=%s session=%s wallet=%s",
+                    handoff_id[:24],
+                    session_id[:24],
+                    str(wallet_id)[:24],
+                )
             except Exception:
                 logger.exception("Failed to store IDV mobile handoff during start-verification")
                 return {"success": False, "error": "handoff_store_failed"}, 500
@@ -2248,10 +2254,29 @@ def idv_mobile_handoff_claim():
 
     entry = _lookup_idv_mobile_handoff(handoff_id=handoff_id, session_id=session_id)
     if not entry:
+        logger.info(
+            "IDV mobile handoff claim miss handoff=%s session=%s ua=%s",
+            (handoff_id or "")[:24],
+            (session_id or "")[:24],
+            (request.headers.get("User-Agent") or "")[:80],
+        )
         return jsonify({"success": False, "error": "handoff_not_found"}), 404
 
     if not _delete_idv_mobile_handoff_entry(entry):
+        logger.info(
+            "IDV mobile handoff already claimed handoff=%s session=%s",
+            (entry.get("handoff_id") or "")[:24],
+            (entry.get("session_id") or "")[:24],
+        )
         return jsonify({"success": False, "error": "handoff_already_claimed"}), 409
+
+    logger.info(
+        "IDV mobile handoff claimed handoff=%s session=%s wallet=%s ua=%s",
+        (entry.get("handoff_id") or "")[:24],
+        (entry.get("session_id") or "")[:24],
+        str(entry.get("wallet_id") or "")[:24],
+        (request.headers.get("User-Agent") or "")[:80],
+    )
 
     return jsonify({
         "success": True,

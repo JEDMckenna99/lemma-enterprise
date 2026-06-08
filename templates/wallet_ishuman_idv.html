@@ -379,6 +379,10 @@
          * freshly registered passkey wallet that does not match the wallet_id on
          * the server's verification row. Claim the PC-deposited handoff whenever
          * we have handoff params and no local master proof yet.
+         *
+         * Desktop popups that already unlocked the originating wallet must NOT
+         * claim the one-time relay — Didit also redirects the PC popup, and
+         * consuming the handoff there leaves the phone with handoff_not_found.
          */
         async function needsMobileHandoffClaim() {
             const hasHandoffParams = !!(handoffMk && (handoffId || sessionId || ishumanSessionParam));
@@ -389,6 +393,11 @@
                 if (await hasMasterProof()) return false;
             } catch (err) {
                 console.warn('[isHuman IDV] master check before handoff failed:', err?.message || err);
+            }
+
+            const isCoarseMobile = /iPhone|iPad|iPod|Android|Mobi/i.test(navigator.userAgent || '');
+            if (!isCoarseMobile && await hasExistingWalletSecret()) {
+                return false;
             }
             return true;
         }
