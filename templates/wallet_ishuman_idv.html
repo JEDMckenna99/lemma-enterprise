@@ -99,7 +99,7 @@
     <script src="/static/js/lemma-keys.js?v=4" nonce="{{ csp_nonce }}"></script>
     <script src="/static/js/wallet-at-rest-crypto.js?v=2" nonce="{{ csp_nonce }}"></script>
     <script nonce="{{ csp_nonce }}">window.LEMMA_ISHUMAN_USE_PERSON_ROOT_SEEDS = {{ 'true' if ishuman_use_person_root_seeds else 'false' }};</script>
-    <script src="/static/js/lemma-wallet.js?v=2544" nonce="{{ csp_nonce }}"></script>
+    <script src="/static/js/lemma-wallet.js?v=2545" nonce="{{ csp_nonce }}"></script>
     <script nonce="{{ csp_nonce }}">
         const SESSION_KEY = 'ishuman_idv_popup_session_id';
         const params = new URLSearchParams(window.location.search);
@@ -381,7 +381,8 @@
          * we have handoff params and no local master proof yet.
          */
         async function needsMobileHandoffClaim() {
-            if (!isVerificationReturn || !handoffId || !handoffMk) return false;
+            const hasHandoffParams = !!(handoffMk && (handoffId || sessionId || ishumanSessionParam));
+            if (!isVerificationReturn || !hasHandoffParams) return false;
             wallet = wallet || new LemmaWallet();
             await wallet.init();
             try {
@@ -393,10 +394,11 @@
         }
 
         async function claimMobileHandoffIfPresent() {
-            if (!handoffId || !handoffMk) return false;
+            if (!handoffMk || (!handoffId && !sessionId && !ishumanSessionParam)) return false;
             const claimed = await wallet.claimIdvMobileHandoff({
                 handoffId,
                 mk: handoffMk,
+                sessionId: sessionId || ishumanSessionParam || '',
             });
             walletId = claimed.walletId || '';
             walletSecret = claimed.walletSecret || '';
@@ -451,7 +453,22 @@
             }
 
             const returnUrl = `${window.location.origin}/wallet/ishuman-idv?${returnParams.toString()}`;
-            const walletAssertion = await wallet.buildWalletAssertion(['return_url'], { return_url: returnUrl });
+            let encryptedHandoffBlob = null;
+            if (pendingHandoff) {
+                encryptedHandoffBlob = await wallet.buildIdvMobileHandoffEncryptedBlob({
+                    handoffId: pendingHandoff.handoffId,
+                    walletSecret,
+                    walletId,
+                });
+            }
+
+            const assertionFields = pendingHandoff
+                ? ['return_url', 'handoff_id']
+                : ['return_url'];
+            const assertionValues = pendingHandoff
+                ? { return_url: returnUrl, handoff_id: pendingHandoff.handoffId }
+                : { return_url: returnUrl };
+            const walletAssertion = await wallet.buildWalletAssertion(assertionFields, assertionValues);
             const startBody = {
                 wallet_id: walletId,
                 wallet_secret: walletSecret,
@@ -459,23 +476,20 @@
                 enc_pubkey: await encPubkeyForStart(),
                 wallet_assertion: walletAssertion,
             };
+            if (pendingHandoff && encryptedHandoffBlob) {
+                startBody.handoff_id = pendingHandoff.handoffId;
+                startBody.encrypted_blob = encryptedHandoffBlob;
+            }
             const payload = await requestJson('/api/ishuman/start-verification', {
                 method: 'POST',
                 body: JSON.stringify(startBody),
             });
             sessionId = payload.session_id;
             localStorage.setItem(SESSION_KEY, sessionId);
-
-            if (pendingHandoff && typeof wallet.finalizeAndDepositIdvMobileHandoff === 'function') {
-                try {
-                    await wallet.finalizeAndDepositIdvMobileHandoff({
-                        handoffId: pendingHandoff.handoffId,
-                        walletSecret,
-                        walletId,
-                        sessionId,
-                    });
-                } catch (err) {
-                    console.warn('[isHuman IDV] handoff deposit failed:', err?.message || err);
+            if (pendingHandoff) {
+                wallet._pendingIdvHandoffKey = null;
+                if (payload.handoff_stored !== true) {
+                    throw new Error('Mobile wallet handoff could not be saved — retry verification.');
                 }
             }
 

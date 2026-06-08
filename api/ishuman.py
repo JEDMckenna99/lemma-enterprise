@@ -26,7 +26,7 @@ import logging
 import os
 import secrets
 import time
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 
@@ -773,6 +773,97 @@ def _normalize_site_signing_pubkey(pubkey: str) -> str:
 # 1. Start Verification
 # ---------------------------------------------------------------------------
 
+_IDV_MOBILE_HANDOFF_TTL_SECONDS = 900
+
+
+def _idv_mobile_handoff_key(handoff_id: str) -> str:
+    return f"ishuman:idv-handoff:{handoff_id}"
+
+
+def _idv_mobile_handoff_session_key(session_id: str) -> str:
+    return f"ishuman:idv-handoff-session:{session_id}"
+
+
+def _store_idv_mobile_handoff(
+    *,
+    handoff_id: str,
+    session_id: str,
+    wallet_id: str,
+    encrypted_blob: str,
+) -> None:
+    """Persist a one-time mobile handoff under handoff_id and session_id keys."""
+    from auth.redis_store import store as redis_store
+
+    entry = {
+        "handoff_id": handoff_id,
+        "wallet_id": wallet_id,
+        "session_id": session_id,
+        "encrypted_blob": encrypted_blob,
+    }
+    redis_store(
+        _idv_mobile_handoff_key(handoff_id),
+        entry,
+        ttl_seconds=_IDV_MOBILE_HANDOFF_TTL_SECONDS,
+    )
+    redis_store(
+        _idv_mobile_handoff_session_key(session_id),
+        entry,
+        ttl_seconds=_IDV_MOBILE_HANDOFF_TTL_SECONDS,
+    )
+
+
+def _delete_idv_mobile_handoff_entry(entry: dict) -> bool:
+    """Delete both Redis keys for a handoff entry (one-time claim)."""
+    from auth.redis_store import delete as redis_delete
+
+    deleted = False
+    handoff_id = str(entry.get("handoff_id") or "").strip()
+    session_id = str(entry.get("session_id") or "").strip()
+    if handoff_id:
+        deleted = redis_delete(_idv_mobile_handoff_key(handoff_id)) or deleted
+    if session_id:
+        deleted = redis_delete(_idv_mobile_handoff_session_key(session_id)) or deleted
+    return deleted
+
+
+def _lookup_idv_mobile_handoff(*, handoff_id: str = "", session_id: str = "") -> Optional[dict]:
+    from auth.redis_store import get as redis_get
+
+    handoff_id = (handoff_id or "").strip()
+    session_id = (session_id or "").strip()
+    if handoff_id:
+        entry = redis_get(_idv_mobile_handoff_key(handoff_id))
+        if entry:
+            return entry
+    if session_id:
+        return redis_get(_idv_mobile_handoff_session_key(session_id))
+    return None
+
+
+def _resolve_start_verification_session_id(db, wallet_id: str, return_url: str) -> str:
+    """Reuse a recent in-flight session when the same return URL is retried."""
+    from datetime import timedelta
+
+    from api.database import IsHumanVerification
+
+    cutoff = datetime.now(timezone.utc) - timedelta(minutes=30)
+    pending_rows = (
+        db.query(IsHumanVerification)
+        .filter(
+            IsHumanVerification.wallet_id == wallet_id,
+            IsHumanVerification.status == "pending",
+            IsHumanVerification.created_at >= cutoff,
+        )
+        .order_by(IsHumanVerification.created_at.desc())
+        .all()
+    )
+    for row in pending_rows:
+        meta_return = str((row.metadata_json or {}).get("return_url") or "")
+        if meta_return == return_url:
+            return row.session_id
+    return f"ishuman_sess_{secrets.token_urlsafe(16)}"
+
+
 def start_verification_for_body(body: dict) -> tuple[dict, int]:
     """Run start-verification logic for a JSON body (shared with demo routes)."""
     body = body or {}
@@ -781,18 +872,39 @@ def start_verification_for_body(body: dict) -> tuple[dict, int]:
     if not wallet_id:
         return {"success": False, "error": "wallet_id required"}, 400
 
-    err, _wid = _require_wallet_assertion(body, field_names=["return_url"])
-    if err:
-        return err[0].get_json(), err[1]
-
     return_url = body.get(
         "return_url",
         os.getenv("ISHUMAN_RETURN_URL", "https://lemma.id/app"),
     )
+    handoff_id = str(body.get("handoff_id") or "").strip()
+    encrypted_blob = str(body.get("encrypted_blob") or "").strip()
+    handoff_requested = bool(handoff_id or encrypted_blob)
+    if handoff_requested and (not handoff_id or not encrypted_blob):
+        return {"success": False, "error": "missing_handoff_fields"}, 400
+    if handoff_id and len(handoff_id) < 16:
+        return {"success": False, "error": "weak_handoff_id"}, 400
 
-    # Pre-generate the Lemma session id so it can be embedded in the Didit
-    # callback URL (mobile browsers lack the popup's localStorage session key).
-    session_id = f"ishuman_sess_{secrets.token_urlsafe(16)}"
+    assertion_fields = ["return_url"]
+    if handoff_id:
+        assertion_fields.append("handoff_id")
+    err, _wid = _require_wallet_assertion(body, field_names=assertion_fields)
+    if err:
+        return err[0].get_json(), err[1]
+
+    if handoff_requested:
+        from api.config import is_ishuman_idv_mobile_handoff_enabled
+        if not is_ishuman_idv_mobile_handoff_enabled():
+            return {"success": False, "error": "mobile_handoff_disabled"}, 404
+
+    from api.database import SessionLocal, IsHumanVerification
+    db = SessionLocal()
+    try:
+        # Pre-generate (or reuse) the Lemma session id so it can be embedded in
+        # the Didit callback URL (mobile browsers lack the popup localStorage key).
+        session_id = _resolve_start_verification_session_id(db, wallet_id, return_url)
+    finally:
+        db.close()
+
     provider_return_url = _append_url_query(return_url, "ishuman_session", session_id)
 
     # isHuman IDV runs exclusively on Didit and fails closed if unconfigured.
@@ -813,8 +925,8 @@ def start_verification_for_body(body: dict) -> tuple[dict, int]:
 
     provider_session_id = result["session_id"]
 
-    from api.database import SessionLocal, IsHumanVerification
     db = SessionLocal()
+    handoff_stored = False
     try:
         derived_ppid = None
         if wallet_secret:
@@ -898,6 +1010,19 @@ def start_verification_for_body(body: dict) -> tuple[dict, int]:
                     winner.ppid = derived_ppid
                 db.commit()
                 session_id = winner.session_id
+
+        if handoff_requested:
+            try:
+                _store_idv_mobile_handoff(
+                    handoff_id=handoff_id,
+                    session_id=session_id,
+                    wallet_id=str(wallet_id),
+                    encrypted_blob=encrypted_blob,
+                )
+                handoff_stored = True
+            except Exception:
+                logger.exception("Failed to store IDV mobile handoff during start-verification")
+                return {"success": False, "error": "handoff_store_failed"}, 500
     except Exception:
         db.rollback()
         logger.exception("Failed to persist isHuman verification session")
@@ -906,19 +1031,23 @@ def start_verification_for_body(body: dict) -> tuple[dict, int]:
         db.close()
 
     logger.info(
-        "isHuman verification started: %s (provider=%s session=%s)",
+        "isHuman verification started: %s (provider=%s session=%s handoff=%s)",
         session_id,
         provider,
         provider_session_id,
+        handoff_id or "-",
     )
 
-    return {
+    payload = {
         "success": True,
         "session_id": session_id,
         "provider": provider,
         "provider_session_id": provider_session_id,
         "url": result.get("url"),
-    }, 200
+    }
+    if handoff_requested:
+        payload["handoff_stored"] = handoff_stored
+    return payload, 200
 
 
 @ishuman_bp.route("/api/ishuman/start-verification", methods=["POST"])
@@ -2058,24 +2187,17 @@ def wallet_sync_device():
 # 8a-ii. Silent mobile wallet handoff during Didit IDV return
 # ---------------------------------------------------------------------------
 
-_IDV_MOBILE_HANDOFF_TTL_SECONDS = 900
-
-
-def _idv_mobile_handoff_key(handoff_id: str) -> str:
-    return f"ishuman:idv-handoff:{handoff_id}"
-
 
 @ishuman_bp.route("/api/ishuman/idv-mobile-handoff/deposit", methods=["POST"])
 @cross_origin()
 def idv_mobile_handoff_deposit():
     """Store an opaque encrypted wallet handoff blob for mobile Didit return.
 
-    The server never sees plaintext ``wallet_secret``. The originating popup
-    deposits a client-encrypted blob keyed by ``handoff_id`` after
-    ``start-verification`` returns the Lemma ``session_id``.
+    Prefer passing ``handoff_id`` + ``encrypted_blob`` to ``start-verification``
+    so the handoff is stored atomically with session creation. This endpoint
+    remains for backwards-compatible clients.
     """
     from api.config import is_ishuman_idv_mobile_handoff_enabled
-    from auth.redis_store import store as redis_store
 
     if not is_ishuman_idv_mobile_handoff_enabled():
         return jsonify({"success": False, "error": "mobile_handoff_disabled"}), 404
@@ -2097,14 +2219,11 @@ def idv_mobile_handoff_deposit():
     if err:
         return err
 
-    redis_store(
-        _idv_mobile_handoff_key(handoff_id),
-        {
-            "wallet_id": wallet_id,
-            "session_id": session_id,
-            "encrypted_blob": encrypted_blob,
-        },
-        ttl_seconds=_IDV_MOBILE_HANDOFF_TTL_SECONDS,
+    _store_idv_mobile_handoff(
+        handoff_id=handoff_id,
+        session_id=session_id,
+        wallet_id=wallet_id,
+        encrypted_blob=encrypted_blob,
     )
     return jsonify({
         "success": True,
@@ -2117,22 +2236,21 @@ def idv_mobile_handoff_deposit():
 def idv_mobile_handoff_claim():
     """One-time claim of a mobile IDV handoff blob (target device has no wallet)."""
     from api.config import is_ishuman_idv_mobile_handoff_enabled
-    from auth.redis_store import delete as redis_delete
-    from auth.redis_store import get as redis_get
 
     if not is_ishuman_idv_mobile_handoff_enabled():
         return jsonify({"success": False, "error": "mobile_handoff_disabled"}), 404
 
     body = request.get_json(silent=True) or {}
     handoff_id = (body.get("handoff_id") or "").strip()
-    if not handoff_id:
-        return jsonify({"success": False, "error": "handoff_id required"}), 400
+    session_id = (body.get("session_id") or "").strip()
+    if not handoff_id and not session_id:
+        return jsonify({"success": False, "error": "handoff_id or session_id required"}), 400
 
-    entry = redis_get(_idv_mobile_handoff_key(handoff_id))
+    entry = _lookup_idv_mobile_handoff(handoff_id=handoff_id, session_id=session_id)
     if not entry:
         return jsonify({"success": False, "error": "handoff_not_found"}), 404
 
-    if not redis_delete(_idv_mobile_handoff_key(handoff_id)):
+    if not _delete_idv_mobile_handoff_entry(entry):
         return jsonify({"success": False, "error": "handoff_already_claimed"}), 409
 
     return jsonify({

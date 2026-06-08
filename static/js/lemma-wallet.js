@@ -6710,6 +6710,26 @@ class LemmaWallet {
     }
 
     /**
+     * Encrypt wallet material for a pending IDV mobile handoff (no session_id yet).
+     */
+    async buildIdvMobileHandoffEncryptedBlob({ handoffId, walletSecret, walletId } = {}) {
+        const encryptionKey = this._pendingIdvHandoffKey;
+        if (!encryptionKey || !handoffId || !walletSecret || !walletId) {
+            throw new Error('pending handoff key and wallet fields required');
+        }
+
+        const HANDOFF_TTL_MS = 900000;
+        const payload = JSON.stringify({
+            walletSecret,
+            walletId,
+            profileId: DEFAULT_PROFILE_ID,
+            profileName: 'Personal',
+            expiresAt: Date.now() + HANDOFF_TTL_MS,
+        });
+        return this._encryptForLink(payload, encryptionKey);
+    }
+
+    /**
      * Encrypt and deposit the handoff blob once session_id is available.
      */
     async finalizeAndDepositIdvMobileHandoff({
@@ -6719,21 +6739,16 @@ class LemmaWallet {
         sessionId,
     } = {}) {
         const encryptionKey = this._pendingIdvHandoffKey;
-        this._pendingIdvHandoffKey = null;
         if (!encryptionKey || !handoffId || !walletSecret || !walletId || !sessionId) {
             throw new Error('pending handoff key and wallet/session fields required');
         }
 
-        const HANDOFF_TTL_MS = 900000;
-        const payload = JSON.stringify({
+        const encryptedBlob = await this.buildIdvMobileHandoffEncryptedBlob({
+            handoffId,
             walletSecret,
             walletId,
-            sessionId,
-            profileId: DEFAULT_PROFILE_ID,
-            profileName: 'Personal',
-            expiresAt: Date.now() + HANDOFF_TTL_MS,
         });
-        const encryptedBlob = await this._encryptForLink(payload, encryptionKey);
+        this._pendingIdvHandoffKey = null;
         await this.depositIdvMobileHandoff({
             handoffId,
             sessionId,
@@ -6817,18 +6832,36 @@ class LemmaWallet {
     /**
      * Claim a mobile IDV handoff, decrypt, and persist wallet locally (no passkey).
      */
-    async claimIdvMobileHandoff({ handoffId, mk } = {}) {
+    async claimIdvMobileHandoff({ handoffId, mk, sessionId } = {}) {
         await this.init();
-        if (!handoffId || !mk) {
-            throw new Error('handoffId and mk required');
+        if (!mk) {
+            throw new Error('mk required');
+        }
+        if (!handoffId && !sessionId) {
+            throw new Error('handoffId or sessionId required');
         }
 
-        const res = await fetch('/api/ishuman/idv-mobile-handoff/claim', {
+        const claimBody = {};
+        if (handoffId) claimBody.handoff_id = handoffId;
+        if (sessionId) claimBody.session_id = sessionId;
+
+        let res = await fetch('/api/ishuman/idv-mobile-handoff/claim', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             credentials: 'include',
-            body: JSON.stringify({ handoff_id: handoffId }),
+            body: JSON.stringify(claimBody),
         });
+        if (!res.ok && handoffId && sessionId) {
+            const firstErr = await res.json().catch(() => ({}));
+            if (firstErr.error === 'handoff_not_found') {
+                res = await fetch('/api/ishuman/idv-mobile-handoff/claim', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify({ session_id: sessionId }),
+                });
+            }
+        }
         if (!res.ok) {
             const err = await res.json().catch(() => ({}));
             throw new Error(`mobile handoff claim failed: ${err.error || res.status}`);
