@@ -1,0 +1,302 @@
+{% extends "modern/layout.html" %}
+{% set is_public_page = true %}
+
+{% block title %}Trust &amp; Data Minimization - lemma.id{% endblock %}
+{% block description %}How lemma.id minimizes identity data as a responsible data controller — what each party stores, what sites receive, and why bounded transparency builds trust between users, integrators, and the public.{% endblock %}
+
+{% block head %}
+    {{ super() }}
+    <style>
+        .trust-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: var(--font-size-sm);
+        }
+        .trust-table th,
+        .trust-table td {
+            padding: 14px 16px;
+            border-bottom: 1px solid var(--gray-200);
+            text-align: left;
+            vertical-align: top;
+        }
+        .trust-table thead th {
+            background: var(--gray-50);
+            font-weight: 600;
+            color: var(--gray-900);
+        }
+        .trust-table tbody tr:last-child td {
+            border-bottom: none;
+        }
+        .trust-col-lemma {
+            background: rgba(102, 126, 234, 0.04);
+        }
+        .trust-badge {
+            display: inline-block;
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            padding: 3px 8px;
+            border-radius: 4px;
+            margin-bottom: 6px;
+        }
+        .trust-badge--good { background: #dcfce7; color: #166534; }
+        .trust-badge--warn { background: #fef3c7; color: #92400e; }
+        .trust-badge--neutral { background: var(--gray-100); color: var(--gray-700); }
+        .trust-footprint {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 20px;
+        }
+        .trust-footprint-item {
+            background: var(--white);
+            border: 1px solid var(--gray-200);
+            border-radius: 12px;
+            padding: 24px;
+        }
+        .trust-footprint-item h3 {
+            font-size: var(--font-size-base);
+            margin-bottom: 8px;
+        }
+        .trust-footprint-size {
+            font-size: var(--font-size-2xl);
+            font-weight: 700;
+            color: var(--primary);
+            margin-bottom: 8px;
+        }
+        @media (max-width: 768px) {
+            .trust-table-wrap { overflow-x: auto; }
+            .trust-table { min-width: 720px; }
+        }
+    </style>
+{% endblock %}
+
+{% block content %}
+
+<!-- Hero -->
+<section class="hero">
+    <div class="container" style="position: relative; z-index: 1;">
+        <div style="max-width: 860px; margin: 0 auto; text-align: center;">
+            <p style="font-size: var(--font-size-sm); font-weight: 600; text-transform: uppercase; letter-spacing: 2px; color: var(--primary); margin-bottom: 16px;">Trust &amp; transparency</p>
+            <h1 style="font-size: clamp(2.5rem, 5vw, 3.5rem); line-height: 1.1; margin-bottom: 24px;">Identity-grade enforcement<br>without identity-grade liability.</h1>
+            <p style="font-size: var(--font-size-xl); font-weight: 500; margin-bottom: var(--space-4); color: var(--gray-700);">lemma.id is a <strong>data-minimized controller</strong> — not a neutral pipe and not a surveillance network. We hold the minimum derived identifiers needed to make bans stick; your site holds an opaque per-site ID; users carry signed credentials in their browser wallet. Everyone knows what each party stores, processes, and never sees.</p>
+            <div style="display: flex; gap: 16px; justify-content: center; flex-wrap: wrap; margin-top: 28px;">
+                <a href="/docs/ishuman" class="btn btn-primary">Integration docs</a>
+                <a href="/privacy" class="btn btn-secondary">Privacy policy</a>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Data footprint at a glance -->
+<section class="section" id="footprint">
+    <div class="container">
+        <div style="text-align: center; margin-bottom: 48px;">
+            <p style="font-size: var(--font-size-sm); font-weight: 700; text-transform: uppercase; letter-spacing: 2px; color: var(--primary); margin-bottom: 12px;">Data footprint</p>
+            <h2>What each party actually holds</h2>
+            <p class="text-gray" style="max-width: 720px; margin: 16px auto 0;">The privacy win is practical and bounded: relying sites avoid becoming KYC operators, users avoid a reusable global ID, and lemma.id stores derived anchors — not raw government documents.</p>
+        </div>
+        <div class="trust-footprint" style="max-width: 960px; margin: 0 auto;">
+            <div class="trust-footprint-item">
+                <span class="trust-badge trust-badge--good">Your site</span>
+                <div class="trust-footprint-size">~80 chars</div>
+                <h3>Verdict + site-private PPID</h3>
+                <p style="color: var(--gray-600); font-size: var(--font-size-sm); margin: 0;">A boolean human signal and an opaque per-site identifier like <code>did:lemma:ppid_…</code>. No ID document, selfie, legal name, or date of birth.</p>
+            </div>
+            <div class="trust-footprint-item" style="border-color: var(--primary);">
+                <span class="trust-badge trust-badge--neutral">lemma.id</span>
+                <div class="trust-footprint-size">~200 bytes</div>
+                <h3>Derived identity anchors</h3>
+                <p style="color: var(--gray-600); font-size: var(--font-size-sm); margin: 0;">Encrypted hashes derived from IDV outcomes, plus wallet↔person linkage for revocation. No raw documents, face images, or legal name at rest.</p>
+            </div>
+            <div class="trust-footprint-item">
+                <span class="trust-badge trust-badge--warn">Typical IdP</span>
+                <div class="trust-footprint-size">Full profile</div>
+                <h3>Email, name, login graph</h3>
+                <p style="color: var(--gray-600); font-size: var(--font-size-sm); margin: 0;">Auth0, Google, and Okta typically store email, profile attributes, session history, and a <strong>shared <code>sub</code></strong> across every app on that provider.</p>
+            </div>
+            <div class="trust-footprint-item">
+                <span class="trust-badge trust-badge--warn">Direct KYC</span>
+                <div class="trust-footprint-size">Full IDV record</div>
+                <h3>Documents + biometrics</h3>
+                <p style="color: var(--gray-600); font-size: var(--font-size-sm); margin: 0;">Running Stripe Identity or Onfido yourself means your servers (or your vendor contract) hold document images, selfies, legal name, DOB, and verification reports.</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Comparative table -->
+<section class="section" id="comparison" style="background: var(--gray-50);">
+    <div class="container">
+        <div style="text-align: center; margin-bottom: 40px;">
+            <p style="font-size: var(--font-size-sm); font-weight: 700; text-transform: uppercase; letter-spacing: 2px; color: var(--primary); margin-bottom: 12px;">Side-by-side</p>
+            <h2>How lemma.id compares</h2>
+        </div>
+        <div class="trust-table-wrap" style="max-width: 1000px; margin: 0 auto; background: var(--white); border: 1px solid var(--gray-200); border-radius: 14px; overflow: hidden;">
+            <table class="trust-table">
+                <thead>
+                    <tr>
+                        <th style="width: 22%;">Dimension</th>
+                        <th style="width: 26%;">Your site + lemma.id</th>
+                        <th style="width: 26%;">Auth0 / Google / Okta</th>
+                        <th style="width: 26%;">Direct KYC on your stack</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>What your backend stores</strong></td>
+                        <td class="trust-col-lemma"><code>human: true</code> + site-private PPID</td>
+                        <td>Email, name, global <code>sub</code>, tokens</td>
+                        <td>ID images, selfies, name, DOB, reports</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Cross-site user linkability</strong></td>
+                        <td class="trust-col-lemma">Sites see different PPIDs — not linkable to each other</td>
+                        <td>Same <code>sub</code> across all apps on that IdP</td>
+                        <td>You become the identity store; correlation is your problem</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Return-visit verification</strong></td>
+                        <td class="trust-col-lemma">Local Ed25519 check in browser — no lemma.id call</td>
+                        <td>Server token validation every session</td>
+                        <td>Re-verify or re-query vendor per check</td>
+                    </tr>
+                    <tr>
+                        <td><strong>IDV document retention</strong></td>
+                        <td class="trust-col-lemma">lemma.id: derived hashes only; Didit sessions purged after issuance</td>
+                        <td>No government-ID verification (weaker human signal)</td>
+                        <td>Full artifacts retained per vendor policy</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Breach blast radius (your servers)</strong></td>
+                        <td class="trust-col-lemma">Opaque IDs — not usable as identity documents</td>
+                        <td>Email + profile data exposed</td>
+                        <td>Government ID data exposed</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Enforcement durability</strong></td>
+                        <td class="trust-col-lemma">Person-root binding — bans survive email/SIM rotation</td>
+                        <td>Attacker rotates email or creates new OAuth account</td>
+                        <td>Strong if you keep artifacts; expensive to operate</td>
+                    </tr>
+                    <tr>
+                        <td><strong>User erasure</strong></td>
+                        <td class="trust-col-lemma">Wallet export + <code>POST /api/ishuman/erase</code></td>
+                        <td>Provider-dependent; often incomplete across apps</td>
+                        <td>Vendor + your DB; multi-system coordination</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        <p style="text-align: center; margin-top: 24px; max-width: 720px; margin-left: auto; margin-right: auto; color: var(--gray-600); font-size: var(--font-size-sm);">Figures are directional engineering comparisons, not legal guarantees. Map to your DPIA, DPAs, and threat model before production reliance.</p>
+    </div>
+</section>
+
+<!-- What being a data controller means -->
+<section class="section" id="controller">
+    <div class="container">
+        <div style="max-width: 820px; margin: 0 auto;">
+            <div style="text-align: center; margin-bottom: 40px;">
+                <p style="font-size: var(--font-size-sm); font-weight: 700; text-transform: uppercase; letter-spacing: 2px; color: var(--primary); margin-bottom: 12px;">Honest scope</p>
+                <h2>What &ldquo;data controller&rdquo; means here</h2>
+            </div>
+            <div style="background: var(--white); border: 1px solid var(--gray-200); border-radius: 14px; padding: 32px;">
+                <p style="font-size: var(--font-size-lg); color: var(--gray-700); line-height: 1.7; margin-bottom: 20px;">Under GDPR, <strong>pseudonymous data is still personal data</strong> if a party holding keying material can re-identify it. lemma.id does not claim to be outside privacy law. We are a <strong>data-minimized controller</strong> for the identity-anchoring layer — and we say that plainly because transparency is part of the trust model.</p>
+
+                <p style="font-size: var(--font-size-lg); color: var(--gray-700); line-height: 1.7; margin-bottom: 20px;"><strong>What lemma.id processes once (transiently, not persisted raw):</strong> document number and date of birth from the IDV provider, used only to derive cryptographic anchors. Legal name and selfie images are not used in root derivation and are not stored.</p>
+
+                <p style="font-size: var(--font-size-lg); color: var(--gray-700); line-height: 1.7; margin-bottom: 20px;"><strong>What lemma.id persists:</strong> HMAC-derived document and person-root hashes (encrypted at rest), wallet↔person bindings, per-site PPID mappings for revocation, and verification metadata. This is roughly <strong>200 bytes of derived identifiers per person</strong> — not a document vault.</p>
+
+                <p style="font-size: var(--font-size-lg); color: var(--gray-700); line-height: 1.7; margin-bottom: 20px;"><strong>What lemma.id does not expose to sites:</strong> cross-site linkage. Sites receive only their own PPID. Lemma can correlate identities internally on the <em>enforcement plane</em> (revocation) — by design, so network-wide bans work — but that linkage is never returned to relying sites.</p>
+
+                <p style="font-size: var(--font-size-lg); color: var(--gray-700); line-height: 1.7; margin: 0;">lemma.id is not pretending the control plane disappears. Issuance, revocation, and recovery need infrastructure. The trust claim is narrower: <strong>routine access decisions do not require a live callback to an IDV provider</strong>, and <strong>credentials do not carry one stable cross-site identifier</strong>.</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Trust between parties -->
+<section class="section" id="parties" style="background: var(--gray-50);">
+    <div class="container">
+        <div style="text-align: center; margin-bottom: 48px;">
+            <p style="font-size: var(--font-size-sm); font-weight: 700; text-transform: uppercase; letter-spacing: 2px; color: var(--primary); margin-bottom: 12px;">Three-party trust</p>
+            <h2>How bounded data handling improves trust</h2>
+        </div>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 24px; max-width: 960px; margin: 0 auto;">
+            <div class="card">
+                <h3 class="card-title">For users</h3>
+                <p>You verify once and carry a signed credential in your browser wallet — like a physical ID you control. Sites see a site-private pseudonym, not your name or document. Return visits verify locally; lemma.id does not observe every check. You can export your wallet and request erasure.</p>
+            </div>
+            <div class="card">
+                <h3 class="card-title">For integrators</h3>
+                <p>You get an enforcement-grade human signal without building a KYC stack or holding document images. Your breach surface is an opaque PPID, not a passport scan. Compliance reviewers can see exactly what your servers store — and what they do not.</p>
+            </div>
+            <div class="card">
+                <h3 class="card-title">For the public web</h3>
+                <p>The default choice has been &ldquo;no real accountability&rdquo; or &ldquo;centralized identity surveillance.&rdquo; lemma.id offers a third path: verified-person enforcement with site-private identifiers and local verification — accountability without asking every website to become a regulated identity operator.</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Who sees what -->
+<section class="section" id="who-sees-what">
+    <div class="container">
+        <div style="text-align: center; margin-bottom: 40px;">
+            <h2>Who sees what at runtime</h2>
+        </div>
+        <div class="trust-table-wrap" style="max-width: 900px; margin: 0 auto; background: var(--white); border: 1px solid var(--gray-200); border-radius: 14px; overflow: hidden;">
+            <table class="trust-table">
+                <thead>
+                    <tr>
+                        <th>Party</th>
+                        <th>Sees at verification</th>
+                        <th>Stores long-term</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>IDV issuer (Didit)</strong></td>
+                        <td>Document, selfie, liveness — during the check</td>
+                        <td>Purged after lemma.id issues credential (Didit path)</td>
+                    </tr>
+                    <tr>
+                        <td><strong>lemma.id</strong></td>
+                        <td>IDV outcome fields for anchor derivation</td>
+                        <td>Derived hashes, PPIDs, revocation linkage</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Your site</strong></td>
+                        <td><code>{ human, ppid, reason, timeMs }</code></td>
+                        <td>PPID on user record (your choice)</td>
+                    </tr>
+                    <tr>
+                        <td><strong>User wallet</strong></td>
+                        <td>Full signed credential</td>
+                        <td>Credentials, passkey, wallet secret (encrypted locally)</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Other Lemma sites</strong></td>
+                        <td>Different PPID for their domain only</td>
+                        <td>Their own site-private ID — cannot link to yours</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</section>
+
+<!-- CTA -->
+<section class="section" style="background: var(--gray-900); color: var(--white); padding: 80px 0;">
+    <div class="container" style="text-align: center;">
+        <h2 style="color: var(--white); font-size: var(--font-size-3xl); margin-bottom: 20px;">Enforcement you can explain to legal</h2>
+        <p style="color: var(--gray-400); font-size: var(--font-size-lg); margin-bottom: 40px; max-width: 640px; margin-left: auto; margin-right: auto;">Add identity-rooted bot defense without turning your backend into an identity honeypot. Read the integration docs or review the full privacy policy.</p>
+        <div style="display: flex; gap: 16px; justify-content: center; flex-wrap: wrap;">
+            <a href="/docs/ishuman" class="btn btn-primary">View integration docs</a>
+            <a href="/demo" class="btn btn-secondary" style="background: transparent; border-color: var(--gray-600); color: var(--white);">See demo</a>
+            <a href="/privacy" class="btn btn-secondary" style="background: transparent; border-color: var(--gray-600); color: var(--white);">Privacy policy</a>
+        </div>
+    </div>
+</section>
+
+{% endblock %}

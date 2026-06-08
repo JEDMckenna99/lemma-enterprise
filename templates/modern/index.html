@@ -219,6 +219,31 @@
         padding: 4px 0;
     }
 }
+
+/* Homepage data comparison */
+.home-compare-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: var(--font-size-sm);
+}
+.home-compare-table th,
+.home-compare-table td {
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--gray-200);
+    text-align: left;
+    vertical-align: top;
+}
+.home-compare-table thead th {
+    background: var(--gray-50);
+    font-weight: 600;
+}
+.home-compare-table .col-lemma {
+    background: rgba(102, 126, 234, 0.05);
+}
+@media (max-width: 768px) {
+    .home-compare-wrap { overflow-x: auto; }
+    .home-compare-table { min-width: 640px; }
+}
 </style>
 
 <!-- Hero Section -->
@@ -471,6 +496,58 @@
 })();
 </script>
 
+<!-- Data comparison — visible early -->
+<section class="section" id="data-comparison" style="background: var(--gray-50); padding-top: 64px; padding-bottom: 64px;">
+    <div class="container">
+        <div style="text-align: center; margin-bottom: 40px;">
+            <p style="font-size: var(--font-size-sm); font-weight: 700; text-transform: uppercase; letter-spacing: 2px; color: var(--primary); margin-bottom: 12px;">Why teams choose lemma.id</p>
+            <h2>Enforcement without the data liability</h2>
+            <p class="text-gray" style="max-width: 720px; margin: 16px auto 0;">Your site stores a human verdict and a site-private ID — not a KYC record. lemma.id is a data-minimized controller that holds derived anchors so bans stick; Auth0 and direct KYC hold far more.</p>
+        </div>
+        <div class="home-compare-wrap" style="max-width: 960px; margin: 0 auto 28px; background: var(--white); border: 1px solid var(--gray-200); border-radius: 14px; overflow: hidden;">
+            <table class="home-compare-table">
+                <thead>
+                    <tr>
+                        <th></th>
+                        <th class="col-lemma">lemma.id + your site</th>
+                        <th>Auth0 / Google SSO</th>
+                        <th>Direct KYC on your stack</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>Your servers store</strong></td>
+                        <td class="col-lemma"><code>human</code> + ~80-char PPID</td>
+                        <td>Email, name, shared <code>sub</code></td>
+                        <td>ID images, name, DOB, reports</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Cross-site linkability</strong></td>
+                        <td class="col-lemma">Different PPID per site</td>
+                        <td>Same user ID across apps</td>
+                        <td>You own the identity store</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Return-visit checks</strong></td>
+                        <td class="col-lemma">Local — no lemma.id call</td>
+                        <td>Server token validation</td>
+                        <td>Vendor re-query or re-verify</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Ban survives rotation</strong></td>
+                        <td class="col-lemma">Person-root binding</td>
+                        <td>New email = new account</td>
+                        <td>Strong, but you run KYC</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        <p style="text-align: center; margin: 0;">
+            <a href="/trust" class="btn btn-secondary">Full trust &amp; data comparison →</a>
+        </p>
+    </div>
+</section>
+
 <!-- How It Works Section -->
 <section class="section" id="how-it-works">
     <div class="container">
@@ -575,7 +652,7 @@
                 <p>Each site receives a human yes/no and a PPID scoped to its own domain — not a reusable global identity, and nothing it has to treat as sensitive identity data.</p>
             </div>
         </div>
-        <p style="text-align: center; margin-top: 32px; max-width: 720px; margin-left: auto; margin-right: auto; color: var(--gray-600); font-size: var(--font-size-sm);">lemma.id carries the verified-person root needed for re-verification and revocation, so your site stays out of the identity-data business entirely.</p>
+        <p style="text-align: center; margin-top: 32px; max-width: 720px; margin-left: auto; margin-right: auto; color: var(--gray-600); font-size: var(--font-size-sm);">lemma.id carries the verified-person root needed for re-verification and revocation, so your site stays out of the identity-data business entirely. <a href="/trust" style="color: var(--primary);">See what each party stores →</a></p>
     </div>
 </section>
 

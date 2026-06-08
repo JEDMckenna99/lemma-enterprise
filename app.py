@@ -639,6 +639,12 @@ def create_app():
         logger.info("📄 Serving about page")
         return render_template('modern/about.html')
 
+    @app.route('/trust')
+    def trust():
+        """Trust & data minimization - comparative transparency for users, integrators, and compliance."""
+        logger.info("📄 Serving trust page")
+        return render_template('modern/trust.html')
+
     @app.route('/partners')
     def partners():
         """Partners / For IDV Issuers - Marketing page targeting IDV provider partnerships"""

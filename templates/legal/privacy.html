@@ -31,7 +31,7 @@
 
         <h3 style="font-size: var(--font-size-lg); margin-top: 24px; color: var(--gray-800);">2.3 Cryptographic Data</h3>
         <ul style="margin-left: 20px; margin-bottom: 20px;">
-            <li><strong>Credentials:</strong> Stored in user's browser wallet (we do not have access to credential contents)</li>
+            <li><strong>Credentials:</strong> Primary copy stored in the user's browser wallet; lemma.id issues credentials and retains issuance linkage metadata (PPID, credential ID, wallet bindings) but not raw IDV documents</li>
             <li><strong>Public Keys:</strong> Ed25519 public keys for verification (site-specific, stored on your servers)</li>
             <li><strong>Revocation Data:</strong> Bloom filter hashes of credential IDs (designed to avoid disclosing original credential IDs directly)</li>
             <li><strong>PPIDs:</strong> Pairwise Pseudonymous Identifiers unique per user per site (unlinkable across sites)</li>
@@ -50,7 +50,7 @@
         </ul>
 
         <h2>4. Privacy-Preserving Features</h2>
-        <p>Lemma.id is designed with privacy as a core principle:</p>
+        <p>Lemma.id is designed with privacy as a core principle. For a comparative overview of what each party stores and what being a data controller means in practice, see our <a href="/trust">Trust &amp; Data Minimization</a> page.</p>
         <ul style="margin-left: 20px; margin-bottom: 20px;">
             <li><strong>Local Verification:</strong> Credentials can be verified locally using Ed25519 signatures, reducing server dependency for many return-visit checks</li>
             <li><strong>Bloom Filter Revocation:</strong> Revocation lists use probabilistic Bloom filters designed to reduce direct disclosure of specific revoked credential IDs</li>
