@@ -1064,24 +1064,29 @@ def check_global_session():
 
 
 # ============================================================
-# REDIRECT AUTH TOKEN EXCHANGE
+# REDIRECT AUTH TOKEN EXCHANGE (REMOVED)
 # ============================================================
-# For mobile browsers that block third-party cookies/storage,
-# we use a short-lived token passed in the redirect URL.
-#
-# Flow:
-# 1. User unlocks on lemma.id wallet page
-# 2. lemma.id calls /api/wallet/create-redirect-token
-# 3. Token returned, included in redirect URL
-# 4. Third-party site receives token, calls /api/wallet/exchange-redirect-token
-# 5. Token validated, wallet_secret returned, token deleted (single-use)
-#
-# Security:
-# - Tokens expire in 60 seconds
-# - Tokens are single-use (deleted after exchange)
-# - Tokens are cryptographically random
-# - wallet_secret encrypted in transit (HTTPS)
-# ============================================================
+# Legacy redirect tokens transferred wallet_secret to third-party sites.
+# Removed in favor of the lemma_credential redirect flow (wallet_secret stays
+# on lemma.id). Endpoints return HTTP 410 Gone.
+
+LEGACY_REDIRECT_TOKEN_REMOVED = {
+    'success': False,
+    'error': 'redirect_token_removed',
+    'message': (
+        'Server-side redirect tokens are no longer supported. '
+        'Upgrade to the lemma_credential redirect flow.'
+    ),
+}
+
+
+def _legacy_redirect_token_response(origin=None, status=410):
+    response = jsonify(LEGACY_REDIRECT_TOKEN_REMOVED)
+    if origin:
+        response.headers['Access-Control-Allow-Origin'] = origin
+        response.headers['Access-Control-Allow-Credentials'] = 'true'
+    return response, status
+
 
 def _get_redirect_token_db():
     """Get database session and RedirectToken model."""
@@ -1115,26 +1120,7 @@ def _cleanup_expired_tokens_db():
 
 @wallet_session_sync_bp.route('/api/wallet/create-redirect-token', methods=['POST', 'OPTIONS'])
 def create_redirect_token():
-    """
-    DEPRECATED: Legacy endpoint for server-side redirect tokens.
-    
-    New SDK versions (2.30.0+) use client-side encryption instead.
-    This endpoint is kept for backward compatibility with older SDKs.
-    
-    PRIVACY NOTE: We intentionally do NOT store return_url to avoid tracking
-    which sites users authenticate to.
-    
-    Request body:
-        - wallet_id: The wallet identifier
-        - wallet_secret: The wallet secret to pass to third-party site
-        - return_url: IGNORED (not stored for privacy)
-    
-    Returns:
-        - token: Short-lived token to include in redirect URL
-    
-    SECURITY: Only called from lemma.id domain (same-origin)
-    TOKEN STORAGE: Database-backed for multi-dyno Heroku deployment
-    """
+    """Removed: legacy server-side redirect token creation."""
     if request.method == 'OPTIONS':
         response = make_response()
         response.headers['Access-Control-Allow-Origin'] = 'https://lemma.id'
@@ -1142,154 +1128,28 @@ def create_redirect_token():
         response.headers['Access-Control-Allow-Headers'] = 'Content-Type'
         response.headers['Access-Control-Allow-Credentials'] = 'true'
         return response
-    
-    # Only allow from lemma origins.
+
     origin = request.headers.get('Origin', '')
     if not _lemma_origin_allowed(origin):
         return jsonify({'success': False, 'error': 'origin_not_allowed'}), 403
-    
-    data = request.get_json() or {}
-    wallet_id = data.get('wallet_id')
-    wallet_secret = data.get('wallet_secret')
-    # NOTE: return_url is intentionally ignored for privacy - we don't track site visits
-    
-    if not wallet_id or not wallet_secret:
-        return jsonify({'success': False, 'error': 'wallet_id and wallet_secret required'}), 400
-    
-    # Get database session
-    db_session, RedirectToken = _get_redirect_token_db()
-    if not db_session or not RedirectToken:
-        return jsonify({'success': False, 'error': 'database_unavailable'}), 500
-    
-    try:
-        # Cleanup old tokens periodically
-        _cleanup_expired_tokens_db()
-        
-        # Generate random token
-        token = secrets.token_urlsafe(32)
-        
-        # Store with 60 second expiration in DATABASE (works across Heroku dynos)
-        # PRIVACY: return_url is NOT stored - we don't track which sites users visit
-        token_record = RedirectToken(
-            token=token,
-            wallet_id=wallet_id,
-            wallet_secret=wallet_secret,
-            return_url=None,  # Intentionally not stored for privacy
-            expires_at=datetime.utcnow() + timedelta(seconds=60)
-        )
-        db_session.add(token_record)
-        db_session.commit()
-        
-        logger.info(f"Created legacy redirect token for wallet (expires in 60s)")
-        
-        response = jsonify({
-            'success': True,
-            'token': token,
-            'expires_in': 60
-        })
-        response.headers['Access-Control-Allow-Origin'] = origin
-        response.headers['Access-Control-Allow-Credentials'] = 'true'
-        return response
-        
-    except Exception as e:
-        logger.error(f"Failed to create redirect token: {e}")
-        db_session.rollback()
-        return jsonify({'success': False, 'error': 'database_error'}), 500
-    finally:
-        db_session.close()
+
+    return _legacy_redirect_token_response(origin)
 
 
 @wallet_session_sync_bp.route('/api/wallet/exchange-redirect-token', methods=['POST', 'OPTIONS'])
 def exchange_redirect_token():
-    """
-    Exchange a redirect token for wallet authentication data.
-    
-    Called by third-party site SDK after redirect from lemma.id.
-    Token is single-use - deleted after successful exchange.
-    
-    Request body:
-        - token: The token from the redirect URL
-    
-    Returns:
-        - wallet_id: The wallet identifier
-        - wallet_secret: The wallet secret for PPID derivation
-    
-    SECURITY: Tokens are single-use and expire in 60 seconds
-    """
+    """Removed: legacy server-side redirect token exchange."""
     if request.method == 'OPTIONS':
         response = make_response()
         origin = request.headers.get('Origin')
         response.headers.update(_cors_headers(origin))
         return response
-    
+
     origin = request.headers.get('Origin')
     if not _origin_allowed(origin):
         return jsonify({'success': False, 'error': 'origin_not_allowed'}), 403
-    
-    data = request.get_json() or {}
-    token = data.get('token')
-    
-    if not token:
-        response = jsonify({'success': False, 'error': 'token required'})
-        response.headers.update(_cors_headers(origin))
-        return response, 400
-    
-    # Get database session
-    db_session, RedirectToken = _get_redirect_token_db()
-    if not db_session or not RedirectToken:
-        response = jsonify({'success': False, 'error': 'database_unavailable'})
-        response.headers.update(_cors_headers(origin))
-        return response, 500
-    
-    try:
-        # Look up token in database
-        token_record = db_session.query(RedirectToken).filter_by(token=token).first()
-        
-        if not token_record:
-            response = jsonify({
-                'success': False,
-                'error': 'invalid_or_expired_token',
-                'message': 'Token not found, expired, or already used'
-            })
-            response.headers.update(_cors_headers(origin))
-            return response, 400
-        
-        # Check expiration
-        if token_record.expires_at < datetime.utcnow():
-            db_session.delete(token_record)
-            db_session.commit()
-            response = jsonify({
-                'success': False,
-                'error': 'token_expired',
-                'message': 'Token has expired'
-            })
-            response.headers.update(_cors_headers(origin))
-            return response, 400
-        
-        # Token valid - extract data and DELETE (single-use)
-        wallet_id = token_record.wallet_id
-        wallet_secret = token_record.wallet_secret
-        db_session.delete(token_record)
-        db_session.commit()
-        
-        logger.info(f"Exchanged redirect token successfully (from DB)")
-        
-        response = jsonify({
-            'success': True,
-            'wallet_id': wallet_id,
-            'wallet_secret': wallet_secret
-        })
-        response.headers.update(_cors_headers(origin))
-        return response
-        
-    except Exception as e:
-        logger.error(f"Failed to exchange redirect token: {e}")
-        db_session.rollback()
-        response = jsonify({'success': False, 'error': 'database_error'})
-        response.headers.update(_cors_headers(origin))
-        return response, 500
-    finally:
-        db_session.close()
+
+    return _legacy_redirect_token_response(origin)
 
 
 # ---------------------------------------------------------------------------

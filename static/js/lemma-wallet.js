@@ -1155,150 +1155,25 @@ class LemmaWallet {
      */
     async checkRedirectReturn() {
         await this.init();
-        
-        // Check URL params for redirect flow completion
+
         const urlParams = new URLSearchParams(window.location.search);
-        const isRedirectReturn = urlParams.get('lemma_unlocked') === '1';
-        const encryptedData = urlParams.get('lemma_data');  // Client-side encrypted wallet data
-        const legacyToken = urlParams.get('lemma_token');   // Legacy server-side token (deprecated)
-            
-        // Retrieve saved redirect state (contains decryption key)
-        let savedState = null;
-        try {
-            const stateJson = localStorage.getItem('lemma_redirect_state');
-            if (stateJson) {
-                savedState = JSON.parse(stateJson);
-                // Only valid if recent (within 10 minutes)
-                if (Date.now() - savedState.timestamp > 10 * 60 * 1000) {
-                    localStorage.removeItem('lemma_redirect_state');
-                    savedState = null;
-                }
-            }
-        } catch (e) {
-            savedState = null;
-        }
-        
-        if (!isRedirectReturn && !savedState) {
-            return null;
-        }
-                    
-        // Clear the redirect state AFTER we've read it
-        try {
-            localStorage.removeItem('lemma_redirect_state');
-        } catch (e) {}
-        
-        // Clean up URL (remove lemma params)
-        if (isRedirectReturn) {
-            urlParams.delete('lemma_unlocked');
-            urlParams.delete('lemma_wallet_id');
-            urlParams.delete('lemma_data');
-            urlParams.delete('lemma_token');
-            const cleanUrl = urlParams.toString() 
+        const legacyParams = ['lemma_unlocked', 'lemma_wallet_id', 'lemma_data', 'lemma_token'];
+        const hadLegacyParams = legacyParams.some((name) => urlParams.has(name));
+
+        if (hadLegacyParams) {
+            legacyParams.forEach((name) => urlParams.delete(name));
+            const cleanUrl = urlParams.toString()
                 ? `${window.location.pathname}?${urlParams.toString()}`
                 : window.location.pathname;
             window.history.replaceState({}, '', cleanUrl);
+            console.warn('[Lemma] Legacy redirect unlock params ignored; use lemma_credential flow');
         }
-        
-        // PRIVACY-FIRST: Client-side encrypted data (no server involvement)
-        // The wallet secret was encrypted by lemma.id's client-side JavaScript
-        // using a key we generated and stored locally. Server never sees the secret.
-        // DEPRECATED: legacy encrypted wallet_secret transfer (lemma_data + encKey).
-        // New redirects use lemma_credential; kept for in-flight old tabs only.
-        if (encryptedData && savedState?.encKey) {
-            try {
-                const decrypted = await this._decryptRedirectData(encryptedData, savedState.encKey);
-                
-                if (decrypted && decrypted.wallet_secret) {
-                    // Store the wallet secret locally
-                    if (this._canPersistWalletSecret()) {
-                        await this._put('secrets', { id: 'master', secret: decrypted.wallet_secret, source: 'redirect_encrypted' });
-                    }
-                    
-                    // Store wallet_id for heartbeat cross-device checks
-                    if (decrypted.wallet_id) {
-                        await this._put('passkey', { id: 'walletId', value: decrypted.wallet_id });
-                    }
-                    
-                    // Set up local session
-                        this.session = {
-                            isUnlocked: true,
-                        unlockedAt: Date.now(),
-                        expiresAt: Date.now() + getSessionDurationMs(),
-                        walletId: decrypted.wallet_id,
-                        walletSecret: decrypted.wallet_secret,
-                        source: 'redirect'
-                        };
-                        await this._put('session', { id: 'current', ...this.session });
 
-                    this._autoStartHeartbeat();
+        try {
+            localStorage.removeItem('lemma_redirect_state');
+        } catch (e) {}
 
-                    return {
-                        success: true,
-                        authenticated: true,
-                        walletId: decrypted.wallet_id,
-                        walletSecret: decrypted.wallet_secret,
-                        message: 'Authenticated via encrypted redirect (privacy-preserving)'
-                    };
-                } else {
-                    console.warn('[Lemma] Decryption succeeded but no wallet secret');
-                }
-            } catch (e) {
-                console.warn('[Lemma] Client-side decryption failed:', e.message);
-                        }
-                    }
-                    
-        // LEGACY FALLBACK: Server-side token exchange (deprecated, for old SDK compatibility)
-        if (legacyToken) {
-            console.log('[Lemma] Using legacy server-side token exchange (deprecated)...');
-            try {
-                const response = await fetch('https://lemma.id/api/wallet/exchange-redirect-token', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ token: legacyToken })
-                });
-                
-                const data = await response.json();
-                
-                if (data.success && data.wallet_secret) {
-                    console.log('[Lemma]  Legacy token exchange successful');
-
-                    if (this._canPersistWalletSecret()) {
-                        await this._put('secrets', { id: 'master', secret: data.wallet_secret, source: 'redirect_token' });
-                    }
-
-                    this.session = {
-                        isUnlocked: true,
-                        unlockedAt: Date.now(),
-                        expiresAt: Date.now() + getSessionDurationMs(),
-                        walletId: data.wallet_id,
-                        walletSecret: data.wallet_secret,
-                        source: 'redirect'
-                    };
-                    await this._put('session', { id: 'current', ...this.session });
-
-                    this._autoStartHeartbeat();
-
-                    return {
-                        success: true,
-                        authenticated: true,
-                        walletId: data.wallet_id,
-                        walletSecret: data.wallet_secret,
-                        message: 'Authenticated via legacy redirect token'
-                    };
-                }
-            } catch (e) {
-                console.warn('[Lemma] Legacy token exchange error:', e.message);
-            }
-        }
-                    
-        // Phase 2.1: the bridge was removed; there is no cross-origin session to
-        // fall back to here. Establishing a session is popup-only / first-party now.
-        console.log('[Lemma] Redirect return but could not establish session');
-        return {
-                            success: false,
-            authenticated: false,
-            message: 'Session not established after redirect'
-        };
+        return null;
     }
     
     /**
@@ -2039,34 +1914,6 @@ class LemmaWallet {
                         } catch (parseErr) {
                             console.warn('[Lemma] Could not parse lemma_credential:', parseErr.message);
                         }
-                    }
-                    
-                    // Legacy fallback: try old checkRedirectReturn (encrypted wallet_secret)
-                    const redirectResult = await this.checkRedirectReturn();
-                    if (redirectResult?.authenticated) {
-                        console.log('[Lemma]  Redirect returned authenticated (legacy flow)');
-                        
-                        const walletSecret = redirectResult.walletSecret || this.session.walletSecret;
-                        const walletId = redirectResult.walletId || this.session.walletId;
-                        
-                        if (walletSecret) {
-                            this.session = {
-                                isUnlocked: true,
-                                unlockedAt: Date.now(),
-                                expiresAt: Date.now() + getSessionDurationMs(),
-                                walletId: walletId,
-                                walletSecret: walletSecret,
-                                source: 'redirect'
-                            };
-                            await this._put('session', { id: 'current', ...this.session });
-                            if (this._canPersistWalletSecret()) {
-                                await this._put('secrets', { id: 'master', secret: walletSecret, source: 'redirect' });
-                            }
-                            console.log('[Lemma]  Session created from legacy redirect');
-                            return;
-                        }
-                    } else {
-                        console.warn('[Lemma] Redirect processing did not authenticate');
                     }
                 } catch (e) {
                     console.error('[Lemma] Failed to process redirect:', e);
@@ -5920,23 +5767,7 @@ class LemmaWallet {
                 }
             }
             
-            // 2. Legacy: check redirect with wallet_secret (backwards compatibility)
-            const redirectResult = await this.checkRedirectReturn();
-            if (redirectResult?.authenticated && redirectResult.walletSecret) {
-                console.log('[Lemma] Authenticated via legacy redirect (wallet_secret)');
-                
-                const ppidHash = await this._hmacSha256(redirectResult.walletSecret, hostname);
-                const ppid = `did:lemma:ppid_${ppidHash}`;
-                
-                return {
-                    authenticated: true,
-                    ppid: ppid,
-                    needsPasskey: false,
-                    message: 'Authenticated via redirect'
-                };
-            }
-            
-            // 3. Check if authenticated via autoAuthenticate
+            // 2. Check if authenticated via autoAuthenticate
             const authResult = await this.autoAuthenticate();
             
             const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
@@ -7064,12 +6895,13 @@ class LemmaWallet {
         try {
             console.log('[Lemma] Restoring lemma.id role credential for linked device...');
             
+            const ppid = await this.derivePPID('lemma.id');
             const issueResponse = await fetch('https://lemma.id/api/wallet-auth/restore-site-access', {
                 method: 'POST',
                 credentials: 'include',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    wallet_secret: payload.walletSecret,
+                    ppid: ppid,
                     site_id: 'lemma.id'
                 })
             });

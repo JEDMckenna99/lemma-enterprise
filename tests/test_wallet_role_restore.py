@@ -47,6 +47,17 @@ def test_restore_site_access_requires_identity_material():
         assert "required" in body["error"]
 
 
+def test_restore_site_access_rejects_wallet_secret():
+    app = _app_with_wallet_service()
+    with app.test_client() as client:
+        response = client.post(
+            "/api/wallet-auth/restore-site-access",
+            json={"wallet_secret": "secret_123", "site_id": "lemma.id"},
+        )
+        assert response.status_code == 410
+        assert response.get_json()["error"] == "wallet_secret_not_accepted"
+
+
 def test_restore_site_access_issues_role_backed_lemma(monkeypatch):
     app = _app_with_wallet_service()
     issued_calls = []
@@ -77,7 +88,7 @@ def test_restore_site_access_issues_role_backed_lemma(monkeypatch):
     with app.test_client() as client:
         response = client.post(
             "/api/wallet-auth/restore-site-access",
-            json={"wallet_secret": "secret_123", "site_id": "lemma.id"},
+            json={"ppid": "did:lemma:ppid_" + ("a" * 64), "site_id": "lemma.id"},
         )
         assert response.status_code == 200
         body = response.get_json()

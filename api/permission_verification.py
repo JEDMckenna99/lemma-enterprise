@@ -141,6 +141,60 @@ def sync_revocations_to_bloom():
         logger.error(f"❌ Revocation sync failed: {e}")
 
 
+def sync_revocation_keys(credential_id: str) -> bool:
+    """
+    Sync all revocation identifiers for a credential into the in-process Bloom verifier.
+
+    Looks up the revocation_list row when present so lemma_id, credential_id, ppid,
+    and wallet_id keys stay aligned with sync_revocations_to_bloom().
+    """
+    global _global_verifier
+
+    if _global_verifier is None:
+        logger.warning("⚠️ Verifier not initialized - cannot sync revocation")
+        return False
+
+    keys = [credential_id]
+    try:
+        from api.database import get_db, RevocationList
+        from api.site_ppid_revocation import keys_for_revocation_row
+
+        session = get_db()
+        try:
+            row = (
+                session.query(RevocationList)
+                .filter(
+                    (RevocationList.lemma_id == credential_id)
+                    | (RevocationList.credential_id == credential_id)
+                )
+                .first()
+            )
+            if row:
+                keys = keys_for_revocation_row(row)
+        finally:
+            session.close()
+    except Exception as exc:
+        logger.debug("Revocation row lookup failed for %s: %s", credential_id, exc)
+
+    synced = False
+    for key in keys:
+        try:
+            _global_verifier.revoke_credential(key)
+            synced = True
+            logger.info("✅ Added %s to bloom filter (immediate sync)", key)
+        except Exception as exc:
+            logger.error("❌ Failed to add %s to bloom filter: %s", key, exc)
+
+    try:
+        from api.bloom_snapshot import invalidate_bloom_filter_cache
+
+        invalidate_bloom_filter_cache()
+    except Exception:
+        pass
+
+    return synced
+
+
 def sync_single_revocation(credential_id: str) -> bool:
     """
     Add a SINGLE revoked credential to Bloom filter immediately
@@ -156,19 +210,7 @@ def sync_single_revocation(credential_id: str) -> bool:
     Returns:
         True if successfully added to bloom filter
     """
-    global _global_verifier
-    
-    if _global_verifier is None:
-        logger.warning("⚠️ Verifier not initialized - cannot sync revocation")
-        return False
-    
-    try:
-        _global_verifier.revoke_credential(credential_id)
-        logger.info(f"✅ Added {credential_id} to bloom filter (immediate sync)")
-        return True
-    except Exception as e:
-        logger.error(f"❌ Failed to add {credential_id} to bloom filter: {e}")
-        return False
+    return sync_revocation_keys(credential_id)
 
 def is_nonce_fresh(nonce: str) -> bool:
     """

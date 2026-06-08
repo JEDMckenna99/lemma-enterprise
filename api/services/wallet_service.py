@@ -267,6 +267,37 @@ def _wallet_transfer_plaintext_allowed() -> bool:
     return raw not in {'0', 'false', 'no', 'off'}
 
 
+LEGACY_WALLET_SECRET_REMOVED = {
+    'success': False,
+    'error': 'wallet_secret_not_accepted',
+    'message': (
+        'wallet_secret is no longer accepted by this endpoint; '
+        'derive PPID client-side or use passkey_credential_id'
+    ),
+}
+
+
+def _reject_wallet_secret_payload(data) -> tuple | None:
+    """Return a 410 response tuple when legacy wallet_secret is supplied."""
+    if isinstance(data, dict) and data.get('wallet_secret'):
+        logger.warning("Rejected legacy wallet_secret payload on %s", request.path)
+        return jsonify(LEGACY_WALLET_SECRET_REMOVED), 410
+    return None
+
+
+def _is_network_wide_credential(credential_type: str, credential_scope: str) -> bool:
+    cred_type = str(credential_type or '').lower()
+    scope = str(credential_scope or '').lower()
+    return scope == 'cross_site' or cred_type == 'poh'
+
+
+def _is_site_scoped_credential(credential_type: str, credential_scope: str) -> bool:
+    if _is_network_wide_credential(credential_type, credential_scope):
+        return False
+    cred_type = str(credential_type or '').lower()
+    return cred_type not in {'unknown', ''}
+
+
 def _payload_contains_sensitive_wallet_keys(value) -> bool:
     sensitive = {'wallet_secret', 'secret', 'master_secret', 'private_key', 'seed'}
     if isinstance(value, dict):
@@ -1603,8 +1634,8 @@ def await_site_revocation(credential_id: str, reason: str, site_domain: str = No
             # Immediately sync this revocation into bloom path.
             bloom_synced = False
             try:
-                from api.permission_verification import sync_single_revocation
-                bloom_synced = bool(sync_single_revocation(credential_id))
+                from api.permission_verification import sync_revocation_keys
+                bloom_synced = bool(sync_revocation_keys(credential_id))
             except Exception as sync_err:
                 logger.warning(f"Local bloom sync failed for {credential_id}: {sync_err}")
 
@@ -1613,6 +1644,13 @@ def await_site_revocation(credential_id: str, reason: str, site_domain: str = No
                 db_session.commit()
             else:
                 logger.warning(f"Revocation stored but bloom_filter_updated remains false for {credential_id}")
+
+            try:
+                from api.bloom_snapshot import invalidate_bloom_filter_cache
+
+                invalidate_bloom_filter_cache()
+            except Exception:
+                pass
 
             return True
             
@@ -1731,16 +1769,18 @@ except ImportError:
 def issue_to_wallet():
     """Issue a permission lemma directly to the user's wallet.
     
-    Accepts three authentication methods (in order of preference):
+    Accepts two authentication methods (in order of preference):
     1. ppid — client-derived PPID (PREFERRED: wallet_secret stays in browser)
     2. passkey_credential_id — server-side PPID derivation from passkey
-    3. wallet_secret — DEPRECATED, kept for backwards compatibility
     
     Security: Rate limited (20/min per IP), requires registered site,
     cross-origin requests must match site domain.
     """
     try:
         data = request.get_json() or {}
+        rejected = _reject_wallet_secret_payload(data)
+        if rejected:
+            return rejected
         
         from api.validation import validate_site_id, ValidationError
         try:
@@ -1759,7 +1799,6 @@ def issue_to_wallet():
         
         # Accept client-derived PPID directly (preferred — wallet_secret never leaves browser)
         client_ppid = data.get('ppid')
-        wallet_secret = data.get('wallet_secret')
         passkey_credential_id = data.get('passkey_credential_id')
         
         if client_ppid:
@@ -1770,12 +1809,12 @@ def issue_to_wallet():
             ppid = client_ppid
         elif passkey_credential_id:
             ppid = derive_user_ppid(site_id, passkey_credential_id=passkey_credential_id)
-        elif wallet_secret:
-            # DEPRECATED: wallet_secret should not be sent to server
-            logger.warning(f"Issue: wallet_secret used (deprecated) for site {site_id}")
-            ppid = derive_user_ppid(site_id, wallet_secret=wallet_secret)
         else:
-            return jsonify({'success': False, 'error': 'ppid, passkey_credential_id, or wallet_secret required'}), 400
+            return jsonify({
+                'success': False,
+                'error': 'ppid_or_passkey_required',
+                'message': 'ppid or passkey_credential_id required',
+            }), 400
         
         permission_lemma = issue_permission_lemma(
             subject_ppid=ppid,
@@ -1811,6 +1850,10 @@ def register_and_issue():
     """
     try:
         data = request.get_json() or {}
+        rejected = _reject_wallet_secret_payload(data)
+        if rejected:
+            return rejected
+
         site_id = data.get('site_id', 'lemma.id')
         
         # Validate issuance is authorized for this site/origin
@@ -1822,13 +1865,16 @@ def register_and_issue():
                 'message': error_msg
             }), 403
         
-        wallet_secret = data.get('wallet_secret')
         passkey_credential_id = data.get('passkey_credential_id')
         
-        if not wallet_secret and not passkey_credential_id:
-            return jsonify({'success': False, 'error': 'Either wallet_secret or passkey_credential_id required'}), 400
+        if not passkey_credential_id:
+            return jsonify({
+                'success': False,
+                'error': 'passkey_required',
+                'message': 'passkey_credential_id required',
+            }), 400
         
-        ppid = derive_user_ppid(site_id, wallet_secret, passkey_credential_id)
+        ppid = derive_user_ppid(site_id, passkey_credential_id=passkey_credential_id)
         
         permission_lemma = issue_permission_lemma(
             subject_ppid=ppid,
@@ -1859,15 +1905,22 @@ def verify_wallet_session():
     """Verify wallet unlock and check permissions."""
     try:
         data = request.get_json() or {}
+        rejected = _reject_wallet_secret_payload(data)
+        if rejected:
+            return rejected
+
         site_id = data.get('site_id', 'lemma.id')
-        wallet_secret = data.get('wallet_secret')
         passkey_credential_id = data.get('passkey_credential_id')
         permissions = data.get('permissions', [])
         
-        if not wallet_secret and not passkey_credential_id:
-            return jsonify({'success': False, 'error': 'Either wallet_secret or passkey_credential_id required'}), 400
+        if not passkey_credential_id:
+            return jsonify({
+                'success': False,
+                'error': 'passkey_required',
+                'message': 'passkey_credential_id required',
+            }), 400
         
-        ppid = derive_user_ppid(site_id, wallet_secret, passkey_credential_id)
+        ppid = derive_user_ppid(site_id, passkey_credential_id=passkey_credential_id)
         
         from api.ppid import canonicalize_rp_id
         site_canonical = canonicalize_rp_id(site_id)
@@ -1901,15 +1954,27 @@ def platform_login():
     """
     try:
         data = request.get_json() or {}
-        wallet_secret = data.get('wallet_secret')
+        rejected = _reject_wallet_secret_payload(data)
+        if rejected:
+            return rejected
+
         passkey_credential_id = data.get('passkey_credential_id')
+        client_ppid = data.get('ppid')
         client_wallet_id = data.get('wallet_id')  # SDK's local wallet_id
         
-        if not wallet_secret and not passkey_credential_id:
-            return jsonify({'success': False, 'error': 'Either wallet_secret or passkey_credential_id required'}), 400
+        if client_ppid:
+            ppid = client_ppid
+        elif passkey_credential_id:
+            site_id = 'lemma.id'
+            ppid = derive_user_ppid(site_id, passkey_credential_id=passkey_credential_id)
+        else:
+            return jsonify({
+                'success': False,
+                'error': 'ppid_or_passkey_required',
+                'message': 'ppid or passkey_credential_id required',
+            }), 400
         
         site_id = 'lemma.id'
-        ppid = derive_user_ppid(site_id, wallet_secret, passkey_credential_id)
         
         # Find or create Customer record for this developer
         from api.database import get_db, Customer
@@ -2026,14 +2091,24 @@ def restore_site_access():
     """
     try:
         data = request.get_json(silent=True) or {}
-        wallet_secret = data.get('wallet_secret')
+        rejected = _reject_wallet_secret_payload(data)
+        if rejected:
+            return rejected
+
         passkey_credential_id = data.get('passkey_credential_id')
+        client_ppid = data.get('ppid')
         site_id = (data.get('site_id') or 'lemma.id').strip().lower()
 
-        if not wallet_secret and not passkey_credential_id:
-            return jsonify({'success': False, 'error': 'Either wallet_secret or passkey_credential_id required'}), 400
-
-        ppid = derive_user_ppid(site_id, wallet_secret, passkey_credential_id)
+        if client_ppid:
+            ppid = client_ppid
+        elif passkey_credential_id:
+            ppid = derive_user_ppid(site_id, passkey_credential_id=passkey_credential_id)
+        else:
+            return jsonify({
+                'success': False,
+                'error': 'ppid_or_passkey_required',
+                'message': 'ppid or passkey_credential_id required',
+            }), 400
         role_profile = _resolve_platform_role_for_ppid(ppid, site_id=site_id)
         _upsert_platform_membership(
             ppid=ppid,
@@ -3397,7 +3472,7 @@ def revoke_credential():
                 'network_propagated': network_success
             })
         
-        elif credential_type == 'permission':
+        elif _is_site_scoped_credential(credential_type, credential_scope):
             site_success = await_site_revocation(credential_id, reason, site_domain)
 
             if not site_success:
@@ -3412,7 +3487,7 @@ def revoke_credential():
             
             try:
                 from api.revocation_sync import trigger_revocation_sync
-                trigger_revocation_sync(credential_id, 'permission', site_id=site_domain)
+                trigger_revocation_sync(credential_id, credential_type or 'permission', site_id=site_domain)
             except Exception:
                 pass
             
@@ -3420,7 +3495,10 @@ def revoke_credential():
                 'success': True,
                 'credential_id': credential_id,
                 'revocation_type': 'site_specific',
-                'site_updated': site_success
+                'site_updated': site_success,
+                'site_domain': site_domain,
+                'registry_updated': site_success,
+                'bloom_filter_synced': True,
             })
         
         return jsonify({
