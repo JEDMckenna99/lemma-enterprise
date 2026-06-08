@@ -28,6 +28,7 @@ import secrets
 import time
 from datetime import datetime, timedelta
 from typing import Optional
+from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 
 import stripe
 from flask import Blueprint, request, jsonify
@@ -750,6 +751,22 @@ def _b64url_decode_32(value: str) -> bytes:
     return decoded
 
 
+def _append_url_query(url: str, key: str, value: str) -> str:
+    """Append or replace a single query parameter on *url*."""
+    parsed = urlparse(url)
+    query = dict(parse_qsl(parsed.query, keep_blank_values=True))
+    query[key] = value
+    new_query = urlencode(query)
+    return urlunparse((
+        parsed.scheme,
+        parsed.netloc,
+        parsed.path,
+        parsed.params,
+        new_query,
+        parsed.fragment,
+    ))
+
+
 def _require_wallet_assertion(body: dict, *, field_names: list[str]) -> tuple:
     """Verify wallet_assertion on protected endpoints; return (error_response, None) or (None, ok)."""
     from api.wallet_authn import assertion_error_response, verify_assertion_from_body
@@ -837,6 +854,11 @@ def start_verification_for_body(body: dict) -> tuple[dict, int]:
         os.getenv("ISHUMAN_RETURN_URL", "https://lemma.id/app"),
     )
 
+    # Pre-generate the Lemma session id so it can be embedded in the Didit
+    # callback URL (mobile browsers lack the popup's localStorage session key).
+    session_id = f"ishuman_sess_{secrets.token_urlsafe(16)}"
+    provider_return_url = _append_url_query(return_url, "ishuman_session", session_id)
+
     # Provider routing. isHuman verification runs on Didit, which replaced
     # Stripe Identity as the IDV rail. Didit is the default and fails closed if
     # unconfigured (never silently substitutes another provider). Stripe Identity
@@ -848,7 +870,7 @@ def start_verification_for_body(body: dict) -> tuple[dict, int]:
         mgr = StripeManager()
         result = mgr.create_identity_verification_session(
             user_id=wallet_id,
-            return_url=return_url,
+            return_url=provider_return_url,
         )
         if not result.get("success"):
             logger.error("Stripe Identity session creation failed: %s", result)
@@ -861,14 +883,13 @@ def start_verification_for_body(body: dict) -> tuple[dict, int]:
         from billing.didit_manager import DiditManager
         result = DiditManager().create_identity_verification_session(
             user_id=wallet_id,
-            return_url=return_url,
+            return_url=provider_return_url,
         )
         if not result.get("success"):
             logger.error("Didit session creation failed: %s", result)
             return {"success": False, "error": result.get("error", "didit_error")}, 502
 
     provider_session_id = result["session_id"]
-    session_id = f"ishuman_sess_{secrets.token_urlsafe(16)}"
 
     from api.database import SessionLocal, IsHumanVerification
     db = SessionLocal()
@@ -2229,6 +2250,95 @@ def wallet_sync_device():
         })
 
     return jsonify({"success": False, "error": "unknown_action"}), 400
+
+
+# ---------------------------------------------------------------------------
+# 8a-ii. Silent mobile wallet handoff during Didit IDV return
+# ---------------------------------------------------------------------------
+
+_IDV_MOBILE_HANDOFF_TTL_SECONDS = 900
+
+
+def _idv_mobile_handoff_key(handoff_id: str) -> str:
+    return f"ishuman:idv-handoff:{handoff_id}"
+
+
+@ishuman_bp.route("/api/ishuman/idv-mobile-handoff/deposit", methods=["POST"])
+@cross_origin()
+def idv_mobile_handoff_deposit():
+    """Store an opaque encrypted wallet handoff blob for mobile Didit return.
+
+    The server never sees plaintext ``wallet_secret``. The originating popup
+    deposits a client-encrypted blob keyed by ``handoff_id`` after
+    ``start-verification`` returns the Lemma ``session_id``.
+    """
+    from api.config import is_ishuman_idv_mobile_handoff_enabled
+    from auth.redis_store import store as redis_store
+
+    if not is_ishuman_idv_mobile_handoff_enabled():
+        return jsonify({"success": False, "error": "mobile_handoff_disabled"}), 404
+
+    body = request.get_json(silent=True) or {}
+    wallet_id = (body.get("wallet_id") or "").strip()
+    handoff_id = (body.get("handoff_id") or "").strip()
+    session_id = (body.get("session_id") or "").strip()
+    encrypted_blob = (body.get("encrypted_blob") or "").strip()
+
+    if not wallet_id or not handoff_id or not session_id or not encrypted_blob:
+        return jsonify({"success": False, "error": "missing_handoff_fields"}), 400
+    if len(handoff_id) < 16:
+        return jsonify({"success": False, "error": "weak_handoff_id"}), 400
+
+    err, _wid = _require_wallet_assertion(
+        body, field_names=["handoff_id", "session_id"]
+    )
+    if err:
+        return err
+
+    redis_store(
+        _idv_mobile_handoff_key(handoff_id),
+        {
+            "wallet_id": wallet_id,
+            "session_id": session_id,
+            "encrypted_blob": encrypted_blob,
+        },
+        ttl_seconds=_IDV_MOBILE_HANDOFF_TTL_SECONDS,
+    )
+    return jsonify({
+        "success": True,
+        "expires_in": _IDV_MOBILE_HANDOFF_TTL_SECONDS,
+    })
+
+
+@ishuman_bp.route("/api/ishuman/idv-mobile-handoff/claim", methods=["POST"])
+@cross_origin()
+def idv_mobile_handoff_claim():
+    """One-time claim of a mobile IDV handoff blob (target device has no wallet)."""
+    from api.config import is_ishuman_idv_mobile_handoff_enabled
+    from auth.redis_store import delete as redis_delete
+    from auth.redis_store import get as redis_get
+
+    if not is_ishuman_idv_mobile_handoff_enabled():
+        return jsonify({"success": False, "error": "mobile_handoff_disabled"}), 404
+
+    body = request.get_json(silent=True) or {}
+    handoff_id = (body.get("handoff_id") or "").strip()
+    if not handoff_id:
+        return jsonify({"success": False, "error": "handoff_id required"}), 400
+
+    entry = redis_get(_idv_mobile_handoff_key(handoff_id))
+    if not entry:
+        return jsonify({"success": False, "error": "handoff_not_found"}), 404
+
+    if not redis_delete(_idv_mobile_handoff_key(handoff_id)):
+        return jsonify({"success": False, "error": "handoff_already_claimed"}), 409
+
+    return jsonify({
+        "success": True,
+        "wallet_id": entry.get("wallet_id"),
+        "session_id": entry.get("session_id"),
+        "encrypted_blob": entry.get("encrypted_blob"),
+    })
 
 
 # ---------------------------------------------------------------------------

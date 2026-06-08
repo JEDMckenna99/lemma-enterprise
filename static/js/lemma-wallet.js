@@ -6618,6 +6618,274 @@ class LemmaWallet {
     }
     
     /**
+     * Persist a linked wallet secret to IndexedDB without creating a passkey.
+     * Used by QR device linking and silent IDV mobile handoff.
+     *
+     * @param {Object} options
+     * @param {string} options.walletSecret
+     * @param {string} [options.walletId]
+     * @param {string} [options.profileId]
+     * @param {string} [options.profileName]
+     * @param {string} [options.source] - session source tag (e.g. 'link', 'idv_handoff')
+     * @param {string} [options.linkedFrom] - originating wallet id for audit metadata
+     * @returns {Promise<Object>} { walletId, profileId, profileName, walletSecret }
+     */
+    async persistLinkedWallet({
+        walletSecret,
+        walletId = null,
+        profileId = DEFAULT_PROFILE_ID,
+        profileName = 'Personal',
+        source = 'link',
+        linkedFrom = null,
+    } = {}) {
+        await this.init();
+
+        if (!walletSecret) {
+            throw new Error('walletSecret required');
+        }
+
+        const linkedProfile = {
+            id: profileId,
+            name: profileName,
+            secret: walletSecret,
+            createdAt: Date.now(),
+            linkedFrom: linkedFrom || walletId || 'unknown',
+            linkedAt: Date.now(),
+            isDefault: profileId === DEFAULT_PROFILE_ID,
+        };
+
+        await this._put('profiles', linkedProfile);
+        await this._put('secrets', {
+            id: 'master',
+            secret: walletSecret,
+            createdAt: Date.now(),
+            linkedFrom: linkedProfile.linkedFrom,
+            linkedAt: Date.now(),
+            activeProfileId: profileId,
+        });
+        await this._put('passkey', { id: 'activeProfile', value: profileId });
+
+        if (walletId) {
+            await this._put('passkey', {
+                id: 'walletId',
+                value: walletId,
+            });
+        }
+
+        const now = Date.now();
+        this.session = {
+            isUnlocked: true,
+            unlockedAt: now,
+            expiresAt: now + getSessionDurationMs(),
+            walletId: walletId,
+            walletSecret: walletSecret,
+            source: source,
+        };
+        await this._put('session', { id: 'current', ...this.session });
+
+        return {
+            walletId,
+            profileId,
+            profileName,
+            walletSecret,
+        };
+    }
+
+    /**
+     * Prepare handoff credentials before start-verification (return URL params).
+     * Call finalizeAndDepositIdvMobileHandoff() after session_id is known.
+     */
+    prepareIdvMobileHandoff() {
+        const handoffId = 'handoff_' + this._generateId();
+        const encryptionKey = crypto.getRandomValues(new Uint8Array(16));
+        const mk = Array.from(encryptionKey)
+            .map((b) => b.toString(16).padStart(2, '0'))
+            .join('');
+        this._pendingIdvHandoffKey = encryptionKey;
+        return {
+            handoffId,
+            mk,
+            expiresIn: 900,
+        };
+    }
+
+    /**
+     * Encrypt and deposit the handoff blob once session_id is available.
+     */
+    async finalizeAndDepositIdvMobileHandoff({
+        handoffId,
+        walletSecret,
+        walletId,
+        sessionId,
+    } = {}) {
+        const encryptionKey = this._pendingIdvHandoffKey;
+        this._pendingIdvHandoffKey = null;
+        if (!encryptionKey || !handoffId || !walletSecret || !walletId || !sessionId) {
+            throw new Error('pending handoff key and wallet/session fields required');
+        }
+
+        const HANDOFF_TTL_MS = 900000;
+        const payload = JSON.stringify({
+            walletSecret,
+            walletId,
+            sessionId,
+            profileId: DEFAULT_PROFILE_ID,
+            profileName: 'Personal',
+            expiresAt: Date.now() + HANDOFF_TTL_MS,
+        });
+        const encryptedBlob = await this._encryptForLink(payload, encryptionKey);
+        await this.depositIdvMobileHandoff({
+            handoffId,
+            sessionId,
+            encryptedBlob,
+            walletId,
+        });
+        return { handoffId, sessionId, encryptedBlob };
+    }
+
+    /**
+     * Build a one-time encrypted mobile handoff for Didit IDV return.
+     */
+    async createIdvMobileHandoff({ walletSecret, walletId, sessionId } = {}) {
+        await this.init();
+        if (!walletSecret || !walletId || !sessionId) {
+            throw new Error('walletSecret, walletId, and sessionId required');
+        }
+
+        const handoffId = 'handoff_' + this._generateId();
+        const encryptionKey = crypto.getRandomValues(new Uint8Array(16));
+        const encryptionKeyHex = Array.from(encryptionKey)
+            .map((b) => b.toString(16).padStart(2, '0'))
+            .join('');
+        const HANDOFF_TTL_MS = 900000;
+
+        const payload = JSON.stringify({
+            walletSecret,
+            walletId,
+            sessionId,
+            profileId: DEFAULT_PROFILE_ID,
+            profileName: 'Personal',
+            expiresAt: Date.now() + HANDOFF_TTL_MS,
+        });
+        const encryptedBlob = await this._encryptForLink(payload, encryptionKey);
+
+        return {
+            handoffId,
+            mk: encryptionKeyHex,
+            encryptedBlob,
+            expiresIn: HANDOFF_TTL_MS / 1000,
+        };
+    }
+
+    /**
+     * Deposit an encrypted IDV mobile handoff blob (source popup, before Didit redirect).
+     */
+    async depositIdvMobileHandoff({ handoffId, sessionId, encryptedBlob, walletId } = {}) {
+        if (!handoffId || !sessionId || !encryptedBlob) {
+            throw new Error('handoffId, sessionId, and encryptedBlob required');
+        }
+
+        const resolvedWalletId = walletId || this.session?.walletId;
+        if (!resolvedWalletId) {
+            throw new Error('walletId required for handoff deposit');
+        }
+
+        const walletAssertion = await this.buildWalletAssertion(
+            ['handoff_id', 'session_id'],
+            { handoff_id: handoffId, session_id: sessionId },
+        );
+
+        const res = await fetch('/api/ishuman/idv-mobile-handoff/deposit', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({
+                wallet_id: resolvedWalletId,
+                handoff_id: handoffId,
+                session_id: sessionId,
+                encrypted_blob: encryptedBlob,
+                wallet_assertion: walletAssertion,
+            }),
+        });
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            throw new Error(`mobile handoff deposit failed: ${err.error || res.status}`);
+        }
+        return res.json();
+    }
+
+    /**
+     * Claim a mobile IDV handoff, decrypt, and persist wallet locally (no passkey).
+     */
+    async claimIdvMobileHandoff({ handoffId, mk } = {}) {
+        await this.init();
+        if (!handoffId || !mk) {
+            throw new Error('handoffId and mk required');
+        }
+
+        const res = await fetch('/api/ishuman/idv-mobile-handoff/claim', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ handoff_id: handoffId }),
+        });
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            throw new Error(`mobile handoff claim failed: ${err.error || res.status}`);
+        }
+        const data = await res.json();
+        const payload = await this._decryptHandoffBlob(data.encrypted_blob, mk);
+        if (payload.expiresAt && payload.expiresAt < Date.now()) {
+            throw new Error('Handoff expired');
+        }
+
+        await this.persistLinkedWallet({
+            walletSecret: payload.walletSecret,
+            walletId: payload.walletId || data.wallet_id,
+            profileId: payload.profileId,
+            profileName: payload.profileName,
+            source: 'idv_handoff',
+            linkedFrom: payload.walletId || data.wallet_id,
+        });
+
+        return {
+            walletId: payload.walletId || data.wallet_id,
+            sessionId: payload.sessionId || data.session_id,
+            walletSecret: payload.walletSecret,
+        };
+    }
+
+    /**
+     * Decrypt a handoff blob using the URL-supplied AES key (hex).
+     * @private
+     */
+    async _decryptHandoffBlob(encryptedBlob, keyHex) {
+        if (!encryptedBlob || !keyHex) {
+            throw new Error('encrypted blob and key required');
+        }
+        const keyBytes = new Uint8Array(
+            String(keyHex).match(/.{2}/g).map((byte) => parseInt(byte, 16)),
+        );
+        const combined = Uint8Array.from(atob(encryptedBlob), (c) => c.charCodeAt(0));
+        const iv = combined.slice(0, 12);
+        const ciphertext = combined.slice(12);
+        const key = await crypto.subtle.importKey(
+            'raw',
+            keyBytes,
+            { name: 'AES-GCM' },
+            false,
+            ['decrypt'],
+        );
+        const decrypted = await crypto.subtle.decrypt(
+            { name: 'AES-GCM', iv: iv },
+            key,
+            ciphertext,
+        );
+        const decoder = new TextDecoder();
+        return JSON.parse(decoder.decode(decrypted));
+    }
+
+    /**
      * Link this device to an existing wallet using a link code.
      * This transfers the wallet_secret from another device.
      * 
@@ -6685,51 +6953,15 @@ class LemmaWallet {
         // Create or update profile with the linked wallet secret
         const profileId = payload.profileId || DEFAULT_PROFILE_ID;
         const profileName = payload.profileName || 'Personal';
-        
-        const linkedProfile = {
-            id: profileId,
-            name: profileName,
-            secret: payload.walletSecret,
-            createdAt: Date.now(),
-            linkedFrom: payload.walletId || 'unknown',
-            linkedAt: Date.now(),
-            isDefault: profileId === DEFAULT_PROFILE_ID
-        };
-        
-        await this._put('profiles', linkedProfile);
-        
-        // Also store in secrets/master for backward compatibility
-        await this._put('secrets', {
-            id: 'master',
-            secret: payload.walletSecret,
-            createdAt: Date.now(),
-            linkedFrom: payload.walletId || 'unknown',
-            linkedAt: Date.now(),
-            activeProfileId: profileId
-        });
-        
-        // Set as active profile
-        await this._put('passkey', { id: 'activeProfile', value: profileId });
-        
-        // Store wallet ID if provided
-        if (payload.walletId) {
-            await this._put('passkey', {
-                id: 'walletId',
-                value: payload.walletId
-            });
-        }
-        
-        // Set up local session after device linking
-        const now = Date.now();
-        this.session = {
-            isUnlocked: true,
-            unlockedAt: now,
-            expiresAt: now + getSessionDurationMs(),
-            walletId: payload.walletId,
+
+        await this.persistLinkedWallet({
             walletSecret: payload.walletSecret,
-            source: 'link'
-        };
-        await this._put('session', { id: 'current', ...this.session });
+            walletId: payload.walletId,
+            profileId,
+            profileName,
+            source: 'link',
+            linkedFrom: payload.walletId || 'unknown',
+        });
         console.log('[Lemma]  Local session set after linking');
         
         // Signal to server that this device is now unlocked (if on lemma.id)
@@ -6743,7 +6975,7 @@ class LemmaWallet {
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         wallet_id: payload.walletId,
-                        unlocked_at: now,
+                        unlocked_at: this.session.unlockedAt,
                         expires_at: Math.floor(this.session.expiresAt / 1000),
                         profile_id: profileId,
                         profile_name: profileName

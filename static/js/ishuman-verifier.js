@@ -631,6 +631,13 @@ class IsHumanVerifier {
                 if (!result.human) {
                     result = await this._verifyOnce(t0);
                 }
+            } else if (issued.reason === 'popup_closed' && !options._retriedAfterPopupClose) {
+                result = await this._verifyOnce(t0);
+                if (result.human) {
+                    this._markProvisionedMaster();
+                } else {
+                    result = this._result(false, null, 'popup_closed', t0);
+                }
             } else {
                 result = this._result(false, null, issued.reason || 'idv_cancelled', t0);
             }
@@ -1301,17 +1308,20 @@ class IsHumanVerifier {
             }
 
             let settled = false;
+            let gotMessage = false;
             const finish = (value) => {
                 if (settled) return;
                 settled = true;
                 window.removeEventListener('message', onMessage);
                 clearTimeout(timeoutId);
+                clearInterval(closedTimer);
                 resolve(value);
             };
 
             const onMessage = (event) => {
                 if (event.origin !== this.lemmaOrigin) return;
                 if (event.data?.type === 'ISHUMAN_SITE_PROOF_ISSUED') {
+                    gotMessage = true;
                     const detail = event.data.detail || {};
                     if (detail.request_nonce && detail.request_nonce !== requestNonce) {
                         if (this.debug) console.warn('[isHuman] popup request nonce mismatch');
@@ -1319,6 +1329,7 @@ class IsHumanVerifier {
                     }
                     finish({ ok: true, detail });
                 } else if (event.data?.type === 'ISHUMAN_IDV_CANCELLED') {
+                    gotMessage = true;
                     finish({ ok: false, reason: 'idv_cancelled', detail: event.data.detail || null });
                 }
             };
@@ -1327,6 +1338,14 @@ class IsHumanVerifier {
                 () => finish({ ok: false, reason: 'idv_timeout', detail: null }),
                 IDV_POPUP_TIMEOUT_MS,
             );
+            const closedTimer = setInterval(() => {
+                if (settled || !popup.closed) return;
+                if (gotMessage) {
+                    finish({ ok: false, reason: 'idv_timeout', detail: null });
+                    return;
+                }
+                finish({ ok: false, reason: 'popup_closed', detail: null });
+            }, 500);
             window.addEventListener('message', onMessage);
         });
     }
@@ -1399,24 +1418,36 @@ class IsHumanVerifier {
             }
 
             let settled = false;
+            let gotMessage = false;
             const finish = (value) => {
                 if (settled) return;
                 settled = true;
                 window.removeEventListener('message', onMessage);
                 clearTimeout(timeoutId);
+                clearInterval(closedTimer);
                 resolve(value);
             };
 
             const onMessage = (event) => {
                 if (event.origin !== this.lemmaOrigin) return;
                 if (event.data?.type === 'ISHUMAN_IDV_COMPLETE') {
+                    gotMessage = true;
                     finish({ ok: true, detail: event.data.detail || {} });
                 } else if (event.data?.type === 'ISHUMAN_IDV_CANCELLED') {
+                    gotMessage = true;
                     finish({ ok: false, detail: event.data.detail || null });
                 }
             };
 
             const timeoutId = setTimeout(() => finish({ ok: false, detail: null }), IDV_POPUP_TIMEOUT_MS);
+            const closedTimer = setInterval(() => {
+                if (settled || !popup.closed) return;
+                if (gotMessage) {
+                    finish({ ok: false, detail: null });
+                    return;
+                }
+                finish({ ok: false, detail: null, reason: 'popup_closed' });
+            }, 500);
             window.addEventListener('message', onMessage);
         });
     }

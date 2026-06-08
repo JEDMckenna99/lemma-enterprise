@@ -258,6 +258,15 @@ def _env_truthy(name: str, default: bool) -> bool:
     return raw.strip().lower() in ("1", "true", "yes", "on")
 
 
+def is_ishuman_idv_mobile_handoff_enabled() -> bool:
+    """Silent mobile wallet provision during Didit IDV return (default on).
+
+    Set LEMMA_IDV_MOBILE_HANDOFF_ENABLED=0 to disable the one-time handoff
+    relay without affecting the core IDV popup flow.
+    """
+    return _env_truthy("LEMMA_IDV_MOBILE_HANDOFF_ENABLED", True)
+
+
 def is_ishuman_pull_fallback_enabled() -> bool:
     """Whether status-poll may actively pull a didit decision to issue.
 

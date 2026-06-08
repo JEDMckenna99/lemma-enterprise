@@ -99,7 +99,7 @@
     <script src="/static/js/lemma-keys.js?v=4" nonce="{{ csp_nonce }}"></script>
     <script src="/static/js/wallet-at-rest-crypto.js?v=2" nonce="{{ csp_nonce }}"></script>
     <script nonce="{{ csp_nonce }}">window.LEMMA_ISHUMAN_USE_PERSON_ROOT_SEEDS = {{ 'true' if ishuman_use_person_root_seeds else 'false' }};</script>
-    <script src="/static/js/lemma-wallet.js?v=2543" nonce="{{ csp_nonce }}"></script>
+    <script src="/static/js/lemma-wallet.js?v=2544" nonce="{{ csp_nonce }}"></script>
     <script nonce="{{ csp_nonce }}">
         const SESSION_KEY = 'ishuman_idv_popup_session_id';
         const params = new URLSearchParams(window.location.search);
@@ -117,6 +117,9 @@
         const isSiteProofIssue = issueMode === 'site_proof' && !!clientSessionNonce;
         const isFreshIdv = issueMode === 'fresh_idv' && !!clientSessionNonce;
         const isVerificationReturn = params.has('verification_return');
+        const handoffId = (params.get('handoff_id') || '').trim();
+        const handoffMk = (params.get('mk') || '').trim();
+        const ishumanSessionParam = (params.get('ishuman_session') || '').trim();
         const root = document.getElementById('ishuman-idv-root');
         const testVerifyEnabled = root.dataset.testVerifyEnabled === 'true';
         const serverTestToken = root.dataset.serverTestToken || '';
@@ -124,7 +127,10 @@
         let wallet = null;
         let walletId = '';
         let walletSecret = '';
-        let sessionId = localStorage.getItem(SESSION_KEY) || '';
+        let sessionId = localStorage.getItem(SESSION_KEY) || ishumanSessionParam || '';
+        if (ishumanSessionParam && !localStorage.getItem(SESSION_KEY)) {
+            localStorage.setItem(SESSION_KEY, ishumanSessionParam);
+        }
 
         document.getElementById('site-chip').textContent = requestingSite;
 
@@ -364,8 +370,62 @@
             return '';
         }
 
+        async function hasExistingWalletSecret() {
+            wallet = wallet || new LemmaWallet();
+            await wallet.init();
+            const info = await wallet.getWalletInfo();
+            return !!info.hasWalletSecret;
+        }
+
+        async function runSilentMobileHandoffCompletion() {
+            setStatus('Finalizing…', 'loading');
+            wallet = wallet || new LemmaWallet();
+            await wallet.init();
+
+            if (!(await hasExistingWalletSecret()) && handoffId && handoffMk) {
+                const claimed = await wallet.claimIdvMobileHandoff({
+                    handoffId,
+                    mk: handoffMk,
+                });
+                walletId = claimed.walletId || '';
+                walletSecret = claimed.walletSecret || '';
+                if (claimed.sessionId) {
+                    sessionId = claimed.sessionId;
+                    localStorage.setItem(SESSION_KEY, sessionId);
+                }
+            }
+
+            if (!sessionId) {
+                throw new Error('Missing verification session');
+            }
+
+            await pollAndStoreMaster();
+
+            try {
+                await wallet.fetchAndStoreSeedEnvelopes?.();
+            } catch (err) {
+                console.warn('[isHuman IDV] seed envelope fetch failed:', err?.message || err);
+            }
+
+            window.close();
+        }
+
         async function startHostedVerification() {
-            const returnUrl = `${window.location.origin}/wallet/ishuman-idv?${params.toString()}&verification_return=true`;
+            const returnParams = new URLSearchParams(params.toString());
+            returnParams.set('verification_return', 'true');
+
+            let pendingHandoff = null;
+            if (typeof wallet.prepareIdvMobileHandoff === 'function') {
+                try {
+                    pendingHandoff = wallet.prepareIdvMobileHandoff();
+                    returnParams.set('handoff_id', pendingHandoff.handoffId);
+                    returnParams.set('mk', pendingHandoff.mk);
+                } catch (err) {
+                    console.warn('[isHuman IDV] handoff prepare failed:', err?.message || err);
+                }
+            }
+
+            const returnUrl = `${window.location.origin}/wallet/ishuman-idv?${returnParams.toString()}`;
             const walletAssertion = await wallet.buildWalletAssertion(['return_url'], { return_url: returnUrl });
             const startBody = {
                 wallet_id: walletId,
@@ -383,6 +443,20 @@
             });
             sessionId = payload.session_id;
             localStorage.setItem(SESSION_KEY, sessionId);
+
+            if (pendingHandoff && typeof wallet.finalizeAndDepositIdvMobileHandoff === 'function') {
+                try {
+                    await wallet.finalizeAndDepositIdvMobileHandoff({
+                        handoffId: pendingHandoff.handoffId,
+                        walletSecret,
+                        walletId,
+                        sessionId,
+                    });
+                } catch (err) {
+                    console.warn('[isHuman IDV] handoff deposit failed:', err?.message || err);
+                }
+            }
+
             if (payload.url) {
                 // Hosted redirect flow (didit; also used by legacy Stripe Identity).
                 window.location.href = payload.url;
@@ -584,7 +658,26 @@
             // site proof) and self-close — the opener is only needed for the live
             // postMessage hand-off, which notifyOpener() already no-ops without.
             // So only block a truly context-free direct open: no opener AND no flow.
-            const hasFlowContext = isFreshIdv || isSiteProofIssue || (isVerificationReturn && sessionId);
+            const hasFlowContext = isFreshIdv
+                || isSiteProofIssue
+                || (isVerificationReturn && (sessionId || handoffId || ishumanSessionParam));
+
+            // Silent mobile provision: phone browser returns from Didit without a
+            // local wallet; claim handoff, store master, close with no extra UX.
+            if (isVerificationReturn && handoffId && handoffMk) {
+                try {
+                    if (!(await hasExistingWalletSecret())) {
+                        document.getElementById('primary-btn').classList.add('hidden');
+                        document.getElementById('cancel-btn').classList.add('hidden');
+                        await runSilentMobileHandoffCompletion();
+                        return;
+                    }
+                } catch (err) {
+                    console.warn('[isHuman IDV] silent mobile handoff failed:', err?.message || err);
+                    // Fall through to the normal return path (PC popup with wallet).
+                }
+            }
+
             if (!window.opener && !hasFlowContext) {
                 setStatus('Open this page from a customer site action, not directly.', 'error');
                 document.getElementById('cancel-btn').textContent = 'Close';
