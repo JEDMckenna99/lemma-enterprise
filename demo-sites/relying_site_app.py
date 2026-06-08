@@ -235,8 +235,15 @@ def index():
       </aside>
     </div>
   </main>
-  <script src="{LEMMA_ORIGIN}/sdk/ishuman-verifier.js?v=1.5.6"></script>
+  <script src="{LEMMA_ORIGIN}/sdk/ishuman-verifier.js?v=1.7.0" crossorigin="anonymous"
+    onerror="window.__lemmaSdkLoadError='ishuman-verifier failed to load from {LEMMA_ORIGIN}'"></script>
   <script>
+    if (typeof IsHumanVerifier === 'undefined') {{
+      const msg = window.__lemmaSdkLoadError
+        || 'Lemma SDK (IsHumanVerifier) did not load — check network connection and that {LEMMA_ORIGIN} is reachable.';
+      document.getElementById('decision-copy').textContent = msg;
+      document.getElementById('verify-btn').disabled = true;
+    }}
     const pill = document.getElementById('status-pill');
     const result = document.getElementById('result');
     const decisionCard = document.getElementById('decision-card');
@@ -302,6 +309,13 @@ def index():
     runBackgroundCheck();
 
     document.getElementById('verify-btn').addEventListener('click', async () => {{
+      if (typeof IsHumanVerifier === 'undefined') {{
+        pill.textContent = 'ERROR';
+        pill.className = 'pill deny';
+        decisionCopy.textContent = window.__lemmaSdkLoadError
+          || 'Lemma SDK failed to load. Open this page in Safari/Chrome (not an in-app browser) and retry.';
+        return;
+      }}
       const button = document.getElementById('verify-btn');
       button.disabled = true;
       pill.textContent = 'CHECKING';

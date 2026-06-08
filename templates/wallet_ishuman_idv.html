@@ -374,23 +374,45 @@
             return !!info.hasWalletSecret;
         }
 
-        async function runSilentMobileHandoffCompletion() {
+        /**
+         * Mobile Didit return may land on a device with no master yet, or with a
+         * freshly registered passkey wallet that does not match the wallet_id on
+         * the server's verification row. Claim the PC-deposited handoff whenever
+         * we have handoff params and no local master proof yet.
+         */
+        async function needsMobileHandoffClaim() {
+            if (!isVerificationReturn || !handoffId || !handoffMk) return false;
+            wallet = wallet || new LemmaWallet();
+            await wallet.init();
+            try {
+                if (await hasMasterProof()) return false;
+            } catch (err) {
+                console.warn('[isHuman IDV] master check before handoff failed:', err?.message || err);
+            }
+            return true;
+        }
+
+        async function claimMobileHandoffIfPresent() {
+            if (!handoffId || !handoffMk) return false;
+            const claimed = await wallet.claimIdvMobileHandoff({
+                handoffId,
+                mk: handoffMk,
+            });
+            walletId = claimed.walletId || '';
+            walletSecret = claimed.walletSecret || '';
+            if (claimed.sessionId) {
+                sessionId = claimed.sessionId;
+                localStorage.setItem(SESSION_KEY, sessionId);
+            }
+            return true;
+        }
+
+        async function finishMobileHandoffStoreMaster({ autoClose = true } = {}) {
             setStatus('Finalizing…', 'loading');
             wallet = wallet || new LemmaWallet();
             await wallet.init();
 
-            if (!(await hasExistingWalletSecret()) && handoffId && handoffMk) {
-                const claimed = await wallet.claimIdvMobileHandoff({
-                    handoffId,
-                    mk: handoffMk,
-                });
-                walletId = claimed.walletId || '';
-                walletSecret = claimed.walletSecret || '';
-                if (claimed.sessionId) {
-                    sessionId = claimed.sessionId;
-                    localStorage.setItem(SESSION_KEY, sessionId);
-                }
-            }
+            await claimMobileHandoffIfPresent();
 
             if (!sessionId) {
                 throw new Error('Missing verification session');
@@ -404,7 +426,13 @@
                 console.warn('[isHuman IDV] seed envelope fetch failed:', err?.message || err);
             }
 
-            window.close();
+            if (autoClose) {
+                window.close();
+            }
+        }
+
+        async function runSilentMobileHandoffCompletion() {
+            await finishMobileHandoffStoreMaster({ autoClose: true });
         }
 
         async function startHostedVerification() {
@@ -461,6 +489,9 @@
 
         async function issueSiteProofAndClose() {
             setStatus('Issuing site proof…', 'loading');
+            if (await needsMobileHandoffClaim()) {
+                await claimMobileHandoffIfPresent();
+            }
             await ensureWalletUnlocked();
 
             if (!(await hasMasterProof())) {
@@ -600,6 +631,13 @@
                 return issueSiteProofAndClose();
             }
 
+            if (await needsMobileHandoffClaim()) {
+                await finishMobileHandoffStoreMaster({ autoClose: false });
+                setStatus('Human proof stored in wallet.', 'success');
+                setTimeout(() => closeWith('ISHUMAN_IDV_COMPLETE', { reason: 'verified' }), 600);
+                return;
+            }
+
             setStatus('Checking wallet…', 'loading');
             await ensureWalletUnlocked();
 
@@ -656,19 +694,18 @@
                 || isSiteProofIssue
                 || (isVerificationReturn && (sessionId || handoffId || ishumanSessionParam));
 
-            // Silent mobile provision: phone browser returns from Didit without a
-            // local wallet; claim handoff, store master, close with no extra UX.
-            if (isVerificationReturn && handoffId && handoffMk) {
+            // Silent mobile provision: phone browser returns from Didit; claim the
+            // PC-deposited handoff when we do not have a local master yet (even if
+            // a passkey wallet was created on this device during the redirect).
+            if (await needsMobileHandoffClaim()) {
                 try {
-                    if (!(await hasExistingWalletSecret())) {
-                        document.getElementById('primary-btn').classList.add('hidden');
-                        document.getElementById('cancel-btn').classList.add('hidden');
-                        await runSilentMobileHandoffCompletion();
-                        return;
-                    }
+                    document.getElementById('primary-btn').classList.add('hidden');
+                    document.getElementById('cancel-btn').classList.add('hidden');
+                    await runSilentMobileHandoffCompletion();
+                    return;
                 } catch (err) {
                     console.warn('[isHuman IDV] silent mobile handoff failed:', err?.message || err);
-                    // Fall through to the normal return path (PC popup with wallet).
+                    // Fall through to the normal return path.
                 }
             }
 
