@@ -14,7 +14,7 @@ jobs:
     timeout-minutes: 20
     env:
       LEMMA_BASE_URL: https://lemma.id
-      LEMMA_PLATFORM_API_KEY: ${{ secrets.LEMMA_PLATFORM_API_KEY }}
+      LEMMA_PLATFORM_API_KEY: ${{ secrets.LEMMA_PLATFORM_API_KEY || secrets.LEMMA_API_KEY }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -22,7 +22,7 @@ jobs:
       - name: Verify required secret
         run: |
           if [ -z "${LEMMA_PLATFORM_API_KEY}" ]; then
-            echo "LEMMA_PLATFORM_API_KEY secret is required for strict auth launch gate."
+            echo "LEMMA_PLATFORM_API_KEY or LEMMA_API_KEY secret is required for strict auth launch gate."
             exit 1
           fi
 
