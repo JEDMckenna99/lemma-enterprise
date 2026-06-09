@@ -2298,6 +2298,76 @@ def idv_mobile_handoff_claim():
     })
 
 
+_SITE_PROOF_REDIRECT_TTL_SECONDS = 900
+
+
+def _site_proof_redirect_key(request_nonce: str) -> str:
+    return f"ishuman:site-proof-redirect:{request_nonce}"
+
+
+@ishuman_bp.route("/api/ishuman/site-proof-redirect/deposit", methods=["POST"])
+@cross_origin()
+def site_proof_redirect_deposit():
+    """Store a site-proof bundle for same-tab mobile redirect return."""
+    from auth.redis_store import store as redis_store
+
+    body = request.get_json(silent=True) or {}
+    request_nonce = (body.get("request_nonce") or "").strip()
+    site_id = (body.get("site_id") or "").strip()
+    credential = body.get("credential")
+    session_assertion = body.get("session_assertion")
+    session_signature = (body.get("session_signature") or "").strip()
+    session_nonce = (body.get("session_nonce") or "").strip()
+
+    if not request_nonce or len(request_nonce) < 8:
+        return jsonify({"success": False, "error": "request_nonce required"}), 400
+    if not site_id or not isinstance(credential, dict) or not isinstance(session_assertion, dict):
+        return jsonify({"success": False, "error": "missing_site_proof_fields"}), 400
+    if not session_signature:
+        return jsonify({"success": False, "error": "session_signature required"}), 400
+
+    redis_store(
+        _site_proof_redirect_key(request_nonce),
+        {
+            "site_id": site_id,
+            "credential": credential,
+            "session_assertion": session_assertion,
+            "session_signature": session_signature,
+            "session_nonce": session_nonce,
+        },
+        ttl_seconds=_SITE_PROOF_REDIRECT_TTL_SECONDS,
+    )
+    return jsonify({"success": True, "expires_in": _SITE_PROOF_REDIRECT_TTL_SECONDS})
+
+
+@ishuman_bp.route("/api/ishuman/site-proof-redirect/claim", methods=["POST"])
+@cross_origin()
+def site_proof_redirect_claim():
+    """One-time claim of a redirect-deposited site proof bundle."""
+    from auth.redis_store import delete as redis_delete
+    from auth.redis_store import get as redis_get
+
+    body = request.get_json(silent=True) or {}
+    request_nonce = (body.get("request_nonce") or "").strip()
+    if not request_nonce:
+        return jsonify({"success": False, "error": "request_nonce required"}), 400
+
+    entry = redis_get(_site_proof_redirect_key(request_nonce))
+    if not entry:
+        return jsonify({"success": False, "error": "redirect_proof_not_found"}), 404
+    if not redis_delete(_site_proof_redirect_key(request_nonce)):
+        return jsonify({"success": False, "error": "redirect_proof_already_claimed"}), 409
+
+    return jsonify({
+        "success": True,
+        "site_id": entry.get("site_id"),
+        "credential": entry.get("credential"),
+        "session_assertion": entry.get("session_assertion"),
+        "session_signature": entry.get("session_signature"),
+        "session_nonce": entry.get("session_nonce"),
+    })
+
+
 # ---------------------------------------------------------------------------
 # 8b. Re-verify a presentation bundle (relying-site backend helper)
 # ---------------------------------------------------------------------------

@@ -99,7 +99,7 @@
     <script src="/static/js/lemma-keys.js?v=4" nonce="{{ csp_nonce }}"></script>
     <script src="/static/js/wallet-at-rest-crypto.js?v=2" nonce="{{ csp_nonce }}"></script>
     <script nonce="{{ csp_nonce }}">window.LEMMA_ISHUMAN_USE_PERSON_ROOT_SEEDS = {{ 'true' if ishuman_use_person_root_seeds else 'false' }};</script>
-    <script src="/static/js/lemma-wallet.js?v=2545" nonce="{{ csp_nonce }}"></script>
+    <script src="/sdk/lemma-wallet.js?v=2546" nonce="{{ csp_nonce }}"></script>
     <script nonce="{{ csp_nonce }}">
         const SESSION_KEY = 'ishuman_idv_popup_session_id';
         const params = new URLSearchParams(window.location.search);
@@ -117,6 +117,8 @@
         const handoffId = (params.get('handoff_id') || '').trim();
         const handoffMk = (params.get('mk') || '').trim();
         const ishumanSessionParam = (params.get('ishuman_session') || '').trim();
+        const flowMode = (params.get('flow_mode') || '').trim();
+        const redirectReturn = (params.get('redirect_return') || '').trim();
         const root = document.getElementById('ishuman-idv-root');
         const testVerifyEnabled = root.dataset.testVerifyEnabled === 'true';
         const serverTestToken = root.dataset.serverTestToken || '';
@@ -212,6 +214,37 @@
                     console.warn('[isHuman IDV] close sync failed:', err.message);
                 }
             }
+
+            if (
+                flowMode === 'redirect'
+                && redirectReturn
+                && type === 'ISHUMAN_SITE_PROOF_ISSUED'
+                && detail?.request_nonce
+            ) {
+                try {
+                    await requestJson('/api/ishuman/site-proof-redirect/deposit', {
+                        method: 'POST',
+                        body: JSON.stringify({
+                            request_nonce: detail.request_nonce,
+                            site_id: requestingSite,
+                            credential: detail.credential || null,
+                            session_assertion: detail.session_assertion || null,
+                            session_signature: detail.session_signature || null,
+                            session_nonce: detail.session_nonce || clientSessionNonce || '',
+                        }),
+                    });
+                    const returnUrl = new URL(redirectReturn);
+                    returnUrl.searchParams.set('lemma_ishuman_return', '1');
+                    returnUrl.searchParams.set('request_nonce', detail.request_nonce);
+                    window.location.replace(returnUrl.toString());
+                    return;
+                } catch (err) {
+                    console.error('[isHuman IDV] redirect return deposit failed:', err);
+                    setStatus(err.message || 'Could not return to site', 'error');
+                    return;
+                }
+            }
+
             notifyOpener(type, detail);
             window.close();
         }

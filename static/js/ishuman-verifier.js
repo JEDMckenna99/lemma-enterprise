@@ -33,7 +33,7 @@
  *   // -> { action: 'post_comment', lemma: { ppid, verified, ..., credential } }
  *   // POST `event` to YOUR backend. Lemma stores none of it.
  *
- * @version 1.7.0
+ * @version 1.7.1
  */
 
 (function () {
@@ -66,6 +66,10 @@ const UNLOCK_POPUP_PATH = '/wallet/popup';
 const IDV_POPUP_TIMEOUT_MS = 10 * 60 * 1000;
 const UNLOCK_POPUP_TIMEOUT_MS = 5 * 60 * 1000;
 const PROVISIONED_STORAGE_KEY = 'ishuman_master_provisioned_v1';
+
+function isMobileLikeUserAgent(ua) {
+    return /iPhone|iPad|iPod|Android|Mobi/i.test(String(ua || ''));
+}
 
 function sessionCacheKey(siteId) {
     return `${SESSION_STORAGE_KEY}:${siteId || ''}`;
@@ -523,6 +527,7 @@ class IsHumanVerifier {
         this._trustListTrusted = false;
         this._trustedIssuers = new Map();
         this._session = null;
+        this._redirectReturnResult = null;
 
         // Cross-tab site-block invalidation: when any tab on the same origin
         // posts a SITE_BLOCK_UPDATE for this site, the cached session is
@@ -592,6 +597,14 @@ class IsHumanVerifier {
     async verify(options = {}) {
         const t0 = performance.now();
         await this._initPromise;
+        if (this._redirectReturnResult) {
+            const redirected = this._redirectReturnResult;
+            this._redirectReturnResult = null;
+            if (redirected.human) {
+                this._markProvisionedMaster();
+            }
+            return redirected;
+        }
 
         const autoProvision = options.autoProvision ?? this.autoProvision;
         let result = await this._verifyOnce(t0);
@@ -816,10 +829,55 @@ class IsHumanVerifier {
         await detectWebCryptoEd25519();
         if (cacheOk) {
             this._bloomNetworkRefresh = this._syncBloom().catch(() => {});
-            return;
+        } else {
+            // No usable cached snapshot — must wait for the network fetch.
+            await this._syncBloom();
         }
-        // No usable cached snapshot — must wait for the network fetch.
-        await this._syncBloom();
+        this._redirectReturnResult = await this._consumeRedirectReturnIfPresent(performance.now());
+    }
+
+    async _consumeRedirectReturnIfPresent(t0) {
+        if (typeof window === 'undefined') return null;
+        const params = new URLSearchParams(window.location.search);
+        if (params.get('lemma_ishuman_return') !== '1') return null;
+        const requestNonce = (params.get('request_nonce') || '').trim();
+        if (!requestNonce) {
+            return this._result(false, null, 'redirect_return_missing_nonce', t0);
+        }
+
+        try {
+            const res = await fetch(`${this.lemmaOrigin}/api/ishuman/site-proof-redirect/claim`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'omit',
+                body: JSON.stringify({ request_nonce: requestNonce }),
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok || !data.success) {
+                return this._result(false, null, data.error || 'redirect_proof_not_found', t0);
+            }
+
+            params.delete('lemma_ishuman_return');
+            params.delete('request_nonce');
+            const cleanQuery = params.toString();
+            const cleanUrl = `${window.location.pathname}${cleanQuery ? `?${cleanQuery}` : ''}${window.location.hash || ''}`;
+            window.history.replaceState({}, '', cleanUrl);
+
+            return this._applyIssuedSiteProof({
+                credential: data.credential,
+                session_assertion: data.session_assertion,
+                session_signature: data.session_signature,
+                session_nonce: data.session_nonce,
+                request_nonce: requestNonce,
+            }, t0);
+        } catch (err) {
+            return this._result(false, null, 'redirect_return_failed', t0, err);
+        }
+    }
+
+    _isMobileLike() {
+        if (typeof navigator === 'undefined') return false;
+        return isMobileLikeUserAgent(navigator.userAgent);
     }
 
     async _hydrateBloomFromCache() {
@@ -1291,6 +1349,14 @@ class IsHumanVerifier {
             popupUrl.searchParams.set('bloom_sequence', String(bloomSequence));
             popupUrl.searchParams.set('session_ttl_sec', String(this.sessionTtlSec));
 
+            const useRedirect = this._isMobileLike();
+            if (useRedirect) {
+                popupUrl.searchParams.set('flow_mode', 'redirect');
+                popupUrl.searchParams.set('redirect_return', window.location.href);
+                window.location.assign(popupUrl.toString());
+                return;
+            }
+
             const width = 480;
             const height = 640;
             const left = Math.max(0, Math.round(window.screenX + (window.outerWidth - width) / 2));
@@ -1302,8 +1368,10 @@ class IsHumanVerifier {
             );
 
             if (!popup) {
-                if (this.debug) console.warn('[isHuman] site proof popup blocked by browser');
-                resolve({ ok: false, reason: 'popup_blocked', detail: null });
+                if (this.debug) console.warn('[isHuman] site proof popup blocked — falling back to redirect');
+                popupUrl.searchParams.set('flow_mode', 'redirect');
+                popupUrl.searchParams.set('redirect_return', window.location.href);
+                window.location.assign(popupUrl.toString());
                 return;
             }
 

@@ -875,7 +875,7 @@ def create_app():
         response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
         response.headers['Pragma'] = 'no-cache'
         response.headers['Expires'] = '0'
-        response.headers['X-SDK-Version'] = '1.7.0'
+        response.headers['X-SDK-Version'] = '1.7.1'
         response.headers['Access-Control-Allow-Origin'] = '*'
         return response
 
