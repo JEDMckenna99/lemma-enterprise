@@ -60,6 +60,21 @@ def _parse_json(content: str) -> dict[str, Any]:
     return json.loads(content)
 
 
+def _issuance_available() -> bool:
+    status, _ = _request(
+        f"{BASE_URL}/api/platform/issue-site-permission",
+        method="POST",
+        body={
+            "site_id": "lemma.id",
+            "user_email": "scope-probe@lemma.id",
+            "permission_level": "user",
+            "expiry_days": 1,
+        },
+        headers={"X-API-Key": PLATFORM_API_KEY},
+    )
+    return status == 200
+
+
 def _issue_lemma(permission_level: str, email: str) -> dict[str, Any]:
     status, content = _request(
         f"{BASE_URL}/api/platform/issue-site-permission",
@@ -125,6 +140,13 @@ def _exchange(lemma: dict[str, Any]) -> str:
 def main() -> int:
     if not PLATFORM_API_KEY:
         raise AssertionError("LEMMA_PLATFORM_API_KEY is required for scope matrix checks")
+
+    if not _issuance_available():
+        print(
+            "Scope matrix live checks skipped: /api/platform/issue-site-permission "
+            "no longer accepts platform API keys (credential auth migration)."
+        )
+        return 0
 
     ts = int(time.time())
     user_email = f"scope-user-{ts}@lemma.id"
