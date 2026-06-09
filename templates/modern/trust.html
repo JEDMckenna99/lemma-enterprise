@@ -1,8 +1,8 @@
 {% extends "modern/layout.html" %}
 {% set is_public_page = true %}
 
-{% block title %}Trust &amp; Data Minimization - lemma.id{% endblock %}
-{% block description %}How lemma.id minimizes identity data as a responsible data controller — what each party stores, what sites receive, and why bounded transparency builds trust between users, integrators, and the public.{% endblock %}
+{% block title %}Trust &amp; Personal Data Minimization - lemma.id{% endblock %}
+{% block description %}How lemma.id acts as a personal data minimizer — what each party stores, what sites receive, and why bounded transparency builds trust between users, integrators, and the public.{% endblock %}
 
 {% block head %}
     {{ super() }}
@@ -79,7 +79,7 @@
         <div style="max-width: 860px; margin: 0 auto; text-align: center;">
             <p style="font-size: var(--font-size-sm); font-weight: 600; text-transform: uppercase; letter-spacing: 2px; color: var(--primary); margin-bottom: 16px;">Trust &amp; transparency</p>
             <h1 style="font-size: clamp(2.5rem, 5vw, 3.5rem); line-height: 1.1; margin-bottom: 24px;">Identity-grade enforcement<br>without identity-grade liability.</h1>
-            <p style="font-size: var(--font-size-xl); font-weight: 500; margin-bottom: var(--space-4); color: var(--gray-700);">lemma.id is a <strong>data-minimized controller</strong> — not a neutral pipe and not a surveillance network. We hold the minimum derived identifiers needed to make bans stick; your site holds an opaque per-site ID; users carry signed credentials in their browser wallet. Everyone knows what each party stores, processes, and never sees.</p>
+            <p style="font-size: var(--font-size-xl); font-weight: 500; margin-bottom: var(--space-4); color: var(--gray-700);">lemma.id is a <strong>personal data minimizer</strong> — not a neutral pipe and not a surveillance network. We hold the minimum derived identifiers needed to make bans stick; your site holds an opaque per-site ID; users carry signed credentials in their browser wallet. Everyone knows what each party stores, processes, and never sees.</p>
             <div style="display: flex; gap: 16px; justify-content: center; flex-wrap: wrap; margin-top: 28px;">
                 <a href="/docs/ishuman" class="btn btn-primary">Integration docs</a>
                 <a href="/privacy" class="btn btn-secondary">Privacy policy</a>
@@ -192,16 +192,16 @@
     </div>
 </section>
 
-<!-- What being a data controller means -->
-<section class="section" id="controller">
+<!-- What personal data minimizer means -->
+<section class="section" id="personal-data-minimizer">
     <div class="container">
         <div style="max-width: 820px; margin: 0 auto;">
             <div style="text-align: center; margin-bottom: 40px;">
                 <p style="font-size: var(--font-size-sm); font-weight: 700; text-transform: uppercase; letter-spacing: 2px; color: var(--primary); margin-bottom: 12px;">Honest scope</p>
-                <h2>What &ldquo;data controller&rdquo; means here</h2>
+                <h2>What &ldquo;personal data minimizer&rdquo; means here</h2>
             </div>
             <div style="background: var(--white); border: 1px solid var(--gray-200); border-radius: 14px; padding: 32px;">
-                <p style="font-size: var(--font-size-lg); color: var(--gray-700); line-height: 1.7; margin-bottom: 20px;">Under GDPR, <strong>pseudonymous data is still personal data</strong> if a party holding keying material can re-identify it. lemma.id does not claim to be outside privacy law. We are a <strong>data-minimized controller</strong> for the identity-anchoring layer — and we say that plainly because transparency is part of the trust model.</p>
+                <p style="font-size: var(--font-size-lg); color: var(--gray-700); line-height: 1.7; margin-bottom: 20px;">Under GDPR, <strong>pseudonymous data is still personal data</strong> if a party holding keying material can re-identify it. lemma.id does not claim to be outside privacy law. We are a <strong>personal data minimizer</strong> for the identity-anchoring layer — deliberately holding the minimum derived identifiers needed for enforcement while meeting data-controller obligations transparently.</p>
 
                 <p style="font-size: var(--font-size-lg); color: var(--gray-700); line-height: 1.7; margin-bottom: 20px;"><strong>What lemma.id processes once (transiently, not persisted raw):</strong> document number and date of birth from the IDV provider, used only to derive cryptographic anchors. Legal name and selfie images are not used in root derivation and are not stored.</p>
 
