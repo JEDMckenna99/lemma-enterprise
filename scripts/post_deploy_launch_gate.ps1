@@ -28,7 +28,18 @@ function Get-PowerShellExecutable {
     return "powershell"
 }
 
+function Get-CurlExecutable {
+    if (Get-Command curl.exe -ErrorAction SilentlyContinue) {
+        return "curl.exe"
+    }
+    if (Get-Command curl -ErrorAction SilentlyContinue) {
+        return "curl"
+    }
+    throw "curl is required for transport/TLS checks but was not found on PATH."
+}
+
 $PowerShellExecutable = Get-PowerShellExecutable
+$CurlExecutable = Get-CurlExecutable
 
 New-Item -ItemType Directory -Force -Path $OutputDir | Out-Null
 
@@ -122,7 +133,7 @@ function Run-CurlCapture {
     $previousErrorActionPreference = $ErrorActionPreference
     $ErrorActionPreference = "Continue"
     try {
-        & curl.exe @CurlArgs 2>&1 | Out-File -FilePath $OutputPath -Append -Encoding utf8
+        & $CurlExecutable @CurlArgs 2>&1 | Out-File -FilePath $OutputPath -Append -Encoding utf8
         Append-Line -Path $OutputPath -Text "exit_code=$LASTEXITCODE"
     } finally {
         $ErrorActionPreference = $previousErrorActionPreference
