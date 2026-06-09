@@ -1,7 +1,34 @@
 # Lemma Security Checklist
 
-> Control inventory for Lemma.id production security. For GA gate decisions use
+> Control inventory for **lemma.id production** (one Heroku app, multiple product
+> surfaces). For GA gate decisions use
 > [`docs/status/GA_GATE_STATUS.md`](../status/GA_GATE_STATUS.md).
+
+## Product scope (read this first)
+
+Lemma.id is **not one product**. This checklist mixes controls for three surfaces
+that share `lemma-wallet.js` and passkey infrastructure:
+
+| Surface | What it is | Typical routes / flows | Dedicated docs |
+|---------|------------|------------------------|----------------|
+| **Platform login & IAM** | Developer/admin login, passkey unlock, permissions, API keys, agent control plane | `/unlock`, `/platform`, `/register`, `developer_access` proofs | [`IAM_ONLY_INTEGRATION_GUIDE.md`](../integration/IAM_ONLY_INTEGRATION_GUIDE.md) |
+| **isHuman (proof of humanity)** | IDV + site proofs for relying sites; verifier SDK on customer origins | `/wallet/ishuman-idv`, `/api/ishuman/*`, `ishuman-verifier.js` | [`THREAT_MODEL.md`](THREAT_MODEL.md), [`ISHUMAN_LOCAL_FIRST_IMPLEMENTATION_OUTLINE.md`](ISHUMAN_LOCAL_FIRST_IMPLEMENTATION_OUTLINE.md) |
+| **Shared wallet crypto** | IndexedDB, PRF at-rest encryption, revocation bloom, device link | `lemma-wallet.js`, `/link`, `/api/v1/revocation/*` | [`ARCHITECTURE_WALLET_FIRST.md`](../architecture/ARCHITECTURE_WALLET_FIRST.md) |
+
+**What the 2026-06 hardening program mostly targeted**
+
+- **Platform / login:** route-scoped CSP on `/unlock`, admin/developer template XSS, legacy redirect 410s, GA smoke gates.
+- **isHuman-specific:** `ishuman_cache` encryption, isHuman API `wallet_secret` rejection, lock-period bundle hardening.
+- **Shared:** wallet at-rest crypto, revocation list/bloom, CSP reporting.
+
+**Common confusion:** `scripts/revoke_to_deny_smoke.py` exercises the **platform
+control plane** (issue `developer_access` proof → revoke → deny), not a relying-site
+isHuman site-proof flow. The `ppid_not_linked` error means the session-link wallet
+has not completed **lemma.id platform login/unlock** to bind a network PPID — that is
+not the same as a user completing isHuman IDV on a customer site.
+
+For isHuman-only assurance, also run relying-site E2E (verifier SDK + IDV popup +
+derive-site-proof) and track separately from platform login sign-off.
 
 ## Status Legend
 
@@ -83,7 +110,7 @@ window.addEventListener('message', (event) => {
 | CSP violation reporting | PASS | `report-uri` + `POST /api/security/csp-report` → 204; drill `2026-06-08-incident-drill-csp-alert.md` |
 | Daily unlock bundle TTL capped at 10h | PASS | `DEFAULT_SESSION_HOURS = MAX_SESSION_HOURS = 10`; `tests/test_xss_wallet_hardening.py` |
 | Bundle fail-closed on wrap failure | PASS | `_persistIsHumanLockBundle` — no plaintext `walletSecret` fallback |
-| `ishuman_cache` encrypted at rest | PASS | `SENSITIVE_STORES` + `WALLET_DB_VERSION = 7`; `tests/test_ishuman_cache_encryption.py`; bundle v2545 prod |
+| `ishuman_cache` encrypted at rest (**isHuman**) | PASS | `SENSITIVE_STORES` + `WALLET_DB_VERSION = 7`; `tests/test_ishuman_cache_encryption.py`; bundle v2545 prod |
 | Wallet auto-init scoped to app routes | PASS | Public index empty block; developer/admin/wallet routes opt in; `tests/test_xss_wallet_hardening.py` |
 | Debug panel gated in production | PASS | `LEMMA_WALLET_DEBUG` server flag required |
 | Compromise response documented | PASS | `docs/security/WALLET_COMPROMISE_RESPONSE.md` (thresholds + escalation) |
@@ -168,7 +195,7 @@ Implemented in `app.py` → `build_content_security_policy()`. See
 | Profile | Routes | Extra `script-src` |
 |---------|--------|-------------------|
 | `strict` | Default (e.g. `/`, `/dashboard`) | none |
-| `unlock_idv` | `/unlock`, `/wallet/unlock`, `/wallet/popup`, `/wallet/ishuman-idv` | Stripe, Cloudflare Turnstile |
+| `unlock_idv` | `/unlock`, `/wallet/unlock` (**platform login**); `/wallet/popup`, `/wallet/ishuman-idv` (**isHuman**) | Stripe, Cloudflare Turnstile |
 | `link_qr` | `/link`, `/wallet/link` | above + `unpkg.com` (html5-qrcode) |
 
 Removed from global policy: `static.cloudflareinsights.com`, `cdn.jsdelivr.net` (unused in layouts).
@@ -251,9 +278,9 @@ These items block **P0-1 Security Controls Sign-off** and **GA GO**. Code/deploy
 
 | # | Action | Closes | Artifact to attach |
 |---|--------|--------|-------------------|
-| 1 | Log in on lemma.id, then run `python scripts/revoke_to_deny_smoke.py` | P0-4, revocation rows | `ops/evidence/launch/*-revoke-to-deny-evidence.md` with list+bloom PASS |
-| 2 | Fill Chrome / Firefox / Safari passkey matrix | P0-5, passkey rows | `ops/evidence/launch/2026-06-08-passkey-browser-matrix.md` + screenshots |
-| 3 | Run manual E2E flows (unlock, IDV, lock, relying-site auth) | P0-2 | Signed `docs/status/SOLO_GA_TEST_EXECUTION_SHEET.md` |
+| 1 | **Platform:** log in on lemma.id, then run `python scripts/revoke_to_deny_smoke.py` | P0-4 (control plane) | `ops/evidence/launch/*-revoke-to-deny-evidence.md` with list+bloom PASS |
+| 2 | **Platform login:** passkey matrix on `/unlock` + `/platform` | P0-5 | `ops/evidence/launch/2026-06-08-passkey-browser-matrix.md` + screenshots |
+| 3 | **Platform + isHuman:** manual E2E — lemma.id unlock *and* relying-site isHuman verify/IDV | P0-2 | Signed `docs/status/SOLO_GA_TEST_EXECUTION_SHEET.md` |
 | 4 | Commission scoped external pentest | P0-6 | Report + remediation tracker per `2026-06-08-external-pentest-scope.md` |
 | 5 | Confirm Sentry `security=csp` event from drill POST | P0-7 | Event id in `2026-06-08-incident-drill-csp-alert.md` |
 | 6 | Security Lead reviews this checklist and marks remaining IN_PROGRESS/UNKNOWN rows PASS or accepted risk | P0-1 | Updated rows + approver name/date in `GA_GATE_STATUS.md` |
