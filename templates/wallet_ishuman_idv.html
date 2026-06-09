@@ -480,11 +480,15 @@
             const walletAssertion = await wallet.buildWalletAssertion(assertionFields, assertionValues);
             const startBody = {
                 wallet_id: walletId,
-                wallet_secret: walletSecret,
                 return_url: returnUrl,
                 enc_pubkey: await encPubkeyForStart(),
                 wallet_assertion: walletAssertion,
             };
+            try {
+                startBody.ppid = await wallet.derivePPID('lemma.id');
+            } catch (ppidErr) {
+                console.warn('[isHuman IDV] provisional PPID not sent:', ppidErr?.message || ppidErr);
+            }
             if (pendingHandoff && encryptedHandoffBlob) {
                 startBody.handoff_id = pendingHandoff.handoffId;
                 startBody.encrypted_blob = encryptedHandoffBlob;

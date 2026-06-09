@@ -34,17 +34,13 @@ def test_start_verification_persists_pending_session(
             "url": "https://verify.didit.test/session",
         },
     )
-    monkeypatch.setattr(
-        "api.ishuman._derive_ppid_for_site",
-        lambda **_kwargs: "did:lemma:ppid_start_001",
-    )
 
     resp = ishuman_client.post(
         "/api/ishuman/start-verification",
         json=attach_wallet_assertion(
             {
                 "wallet_id": "wallet_test_001",
-                "wallet_secret": "ab" * 32,
+                "ppid": "did:lemma:ppid_" + ("a" * 64),
                 "return_url": "https://customer.example/return",
             },
             START_ASSERTION_FIELDS,
@@ -66,7 +62,7 @@ def test_start_verification_persists_pending_session(
     assert rows[0].issuer_id == "didit"
     assert rows[0].provider_session_id == "didit_integration_001"
     assert rows[0].stripe_session_id is None
-    assert rows[0].ppid == "did:lemma:ppid_start_001"
+    assert rows[0].ppid == "did:lemma:ppid_" + ("a" * 64)
     assert rows[0].status == "pending"
     assert rows[0].metadata_json["return_url"] == "https://customer.example/return"
 

@@ -573,7 +573,11 @@ def ishuman_demo_verify_once_test_mode():
 
     start_body = dict(body)
     start_body.setdefault("wallet_id", wallet_id)
-    start_body.setdefault("wallet_secret", wallet_secret)
+    if wallet_secret and not start_body.get("ppid"):
+        from api.ppid import derive_ppid_from_wallet_secret
+
+        start_body["ppid"] = derive_ppid_from_wallet_secret(wallet_secret, "lemma.id")
+    start_body.pop("wallet_secret", None)
     if return_url:
         start_body["return_url"] = return_url
     start_payload, start_status = start_verification_for_body(start_body)

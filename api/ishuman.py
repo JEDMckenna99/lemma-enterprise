@@ -40,6 +40,29 @@ logger = logging.getLogger(__name__)
 
 ishuman_bp = Blueprint("ishuman", __name__)
 
+_WALLET_SECRET_REMOVED = {
+    "success": False,
+    "error": "wallet_secret_not_accepted",
+    "message": (
+        "wallet_secret is no longer accepted by isHuman endpoints; "
+        "use wallet_assertion and person-root derivation"
+    ),
+}
+
+
+def _reject_wallet_secret_payload(body) -> tuple | None:
+    if isinstance(body, dict) and body.get("wallet_secret"):
+        logger.warning("Rejected legacy wallet_secret payload on isHuman path")
+        return jsonify(_WALLET_SECRET_REMOVED), 410
+    return None
+
+
+def _validate_client_ppid(ppid: str) -> bool:
+    import re
+
+    value = str(ppid or "").strip()
+    return bool(re.match(r"^did:lemma:ppid_[0-9a-f]{64}$", value))
+
 # ---------------------------------------------------------------------------
 # Constants
 # ---------------------------------------------------------------------------
@@ -723,7 +746,6 @@ def _deny_if_derivation_revoked(
     *,
     master_credential_id: str,
     wallet_id: str,
-    wallet_secret: Optional[str],
     target_site: str,
     lemma_person_id: Optional[str] = None,
 ) -> Optional[str]:
@@ -737,7 +759,6 @@ def _deny_if_derivation_revoked(
     try:
         site_ppid = _derive_ppid_for_site(
             rp_id=target_site,
-            wallet_secret=wallet_secret,
             wallet_id=wallet_id,
             lemma_person_id=lemma_person_id,
             db=db,
@@ -867,8 +888,11 @@ def _resolve_start_verification_session_id(db, wallet_id: str, return_url: str) 
 def start_verification_for_body(body: dict) -> tuple[dict, int]:
     """Run start-verification logic for a JSON body (shared with demo routes)."""
     body = body or {}
+    rejected = _reject_wallet_secret_payload(body)
+    if rejected:
+        return rejected[0].get_json(), rejected[1]
+
     wallet_id = body.get("wallet_id")
-    wallet_secret = body.get("wallet_secret")
     if not wallet_id:
         return {"success": False, "error": "wallet_id required"}, 400
 
@@ -929,20 +953,11 @@ def start_verification_for_body(body: dict) -> tuple[dict, int]:
     handoff_stored = False
     try:
         derived_ppid = None
-        if wallet_secret:
-            try:
-                # Pre-IDV: no person root exists yet, so this is an explicitly
-                # provisional placeholder PPID. It is overwritten with the
-                # canonical person-root PPID at issuance and is never used as an
-                # authoritative identity.
-                derived_ppid = _derive_ppid_for_site(
-                    rp_id="lemma.id",
-                    wallet_secret=wallet_secret,
-                    wallet_id=wallet_id,
-                    provisional=True,
-                )
-            except Exception:
-                logger.exception("Failed pre-deriving PPID during isHuman start-verification")
+        client_ppid = (body.get("ppid") or "").strip()
+        if client_ppid:
+            if not _validate_client_ppid(client_ppid):
+                return {"success": False, "error": "invalid_ppid"}, 400
+            derived_ppid = client_ppid
 
         # v2 (Phase 1.1): the wallet may post a one-time X25519 encryption
         # pubkey so the server can seal person-root seed envelopes at IDV
@@ -1772,12 +1787,15 @@ def derive_site_proof():
     5. Returns the per-site credential for the bridge to store
     """
     body = request.get_json(silent=True) or {}
+    rejected = _reject_wallet_secret_payload(body)
+    if rejected:
+        return rejected
+
     # v2 (Phase 1.2): master_credential_id is now an OPTIONAL hint. When absent
     # we fall back to the wallet's latest verified record, so a wallet that lost
     # its local master copy can still derive site proofs.
     master_credential_id = (body.get("master_credential_id") or "").strip()
     wallet_id = body.get("wallet_id")
-    wallet_secret = body.get("wallet_secret")
     target_site = body.get("target_site")
     site_signing_pubkey_raw = (body.get("site_signing_pubkey") or "").strip()
 
@@ -1786,9 +1804,6 @@ def derive_site_proof():
             "success": False,
             "error": "wallet_id and target_site required",
         }), 400
-
-    if not wallet_secret:
-        return jsonify({"success": False, "error": "wallet_secret required"}), 400
     try:
         site_signing_pubkey = _normalize_site_signing_pubkey(site_signing_pubkey_raw)
     except ValueError as exc:
@@ -1863,7 +1878,6 @@ def derive_site_proof():
             db,
             master_credential_id=master_credential_id,
             wallet_id=wallet_id,
-            wallet_secret=wallet_secret,
             target_site=target_site,
             lemma_person_id=person_id,
         )
@@ -1886,7 +1900,6 @@ def derive_site_proof():
             # Re-issue the credential (same ID) so the caller can store it
             ppid = _derive_ppid_for_site(
                 rp_id=target_site,
-                wallet_secret=wallet_secret,
                 wallet_id=wallet_id,
                 lemma_person_id=person_id,
                 db=db,
@@ -1905,7 +1918,6 @@ def derive_site_proof():
         # 3. Derive site-specific PPID
         site_ppid = _derive_ppid_for_site(
             rp_id=target_site,
-            wallet_secret=wallet_secret,
             wallet_id=wallet_id,
             lemma_person_id=person_id,
             db=db,

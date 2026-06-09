@@ -445,14 +445,19 @@
     if (!state.wallet) await initWallet();
     const returnUrl = `${window.location.origin}${window.location.pathname}?verification_return=true`;
     const walletAssertion = await state.wallet.buildWalletAssertion(['return_url'], { return_url: returnUrl });
+    const startBody = {
+      wallet_id: walletId,
+      return_url: returnUrl,
+      wallet_assertion: walletAssertion,
+    };
+    try {
+      startBody.ppid = await state.wallet.derivePPID('lemma.id');
+    } catch (err) {
+      console.warn('[isHuman demo] provisional PPID not sent:', err?.message || err);
+    }
     const payload = await requestJson('/api/ishuman/start-verification', {
       method: 'POST',
-      body: JSON.stringify({
-        wallet_id: walletId,
-        wallet_secret: walletSecret,
-        return_url: returnUrl,
-        wallet_assertion: walletAssertion,
-      }),
+      body: JSON.stringify(startBody),
     });
 
     state.sessionId = payload.session_id;

@@ -34,7 +34,20 @@ def test_start_verification_fails_closed_when_persistence_fails(monkeypatch, att
         },
     )
 
+    class _EmptyQuery:
+        def filter(self, *args, **kwargs):
+            return self
+
+        def order_by(self, *args, **kwargs):
+            return self
+
+        def all(self):
+            return []
+
     class _FailingDbSession:
+        def query(self, *_args, **_kwargs):
+            return _EmptyQuery()
+
         def add(self, _obj):
             return None
 

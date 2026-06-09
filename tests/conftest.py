@@ -84,8 +84,7 @@ def attach_wallet_assertion(wallet_seed):
         )
         out = dict(body)
         out.setdefault("wallet_id", wid)
-        if secret:
-            out.setdefault("wallet_secret", secret)
+        out.pop("wallet_secret", None)
         out["wallet_assertion"] = {
             "nonce": assertion.nonce,
             "signature": assertion.signature,

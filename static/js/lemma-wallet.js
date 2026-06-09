@@ -2930,12 +2930,7 @@ class LemmaWallet {
         const siteKeys = await this.deriveSiteSigningKeypair(canonicalSite);
         const siteSigningPubkey = siteKeys.publicKeyB64;
         const walletId = this.session?.walletId || '';
-        let walletSecret = this.session?.walletSecret || '';
-        if (!walletSecret) {
-            const secretRecord = await this._get('secrets', 'master');
-            walletSecret = secretRecord?.secret || '';
-        }
-        if (!walletId || !walletSecret) {
+        if (!walletId) {
             throw new Error('wallet_locked');
         }
 
@@ -2959,7 +2954,6 @@ class LemmaWallet {
 
         const deriveBody = {
             wallet_id: walletId,
-            wallet_secret: walletSecret,
             target_site: canonicalSite,
             site_signing_pubkey: siteSigningPubkey,
             wallet_assertion: walletAssertion,
