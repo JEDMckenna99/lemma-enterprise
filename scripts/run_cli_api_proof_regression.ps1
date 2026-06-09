@@ -24,7 +24,8 @@ if (-not (Test-Path $smokePath)) {
 
 if ([string]::IsNullOrWhiteSpace($ProofFile)) {
     $defaultProof = Join-Path $repoRoot ".lemma-proof.json"
-    if (Test-Path $defaultProof) {
+    $inCi = $env:GITHUB_ACTIONS -eq "true" -or $env:CI -eq "true"
+    if (-not $inCi -and (Test-Path $defaultProof)) {
         $ProofFile = $defaultProof
     }
 }
