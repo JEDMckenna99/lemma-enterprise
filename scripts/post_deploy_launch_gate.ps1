@@ -50,6 +50,59 @@ function Append-Line {
     $Text | Out-File -FilePath $Path -Encoding utf8 -Append
 }
 
+function Invoke-PythonChecked {
+    param(
+        [string[]]$CommandArgs,
+        [string]$StepName,
+        [string]$OutputPath = "",
+        [switch]$Append
+    )
+
+    Write-Output "[$StepName] python $($CommandArgs -join ' ')"
+    $previousErrorActionPreference = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    try {
+        if ($OutputPath) {
+            if ($Append) {
+                & python @CommandArgs 2>&1 | Tee-Object -FilePath $OutputPath -Append
+            } else {
+                & python @CommandArgs 2>&1 | Tee-Object -FilePath $OutputPath
+            }
+        } else {
+            & python @CommandArgs 2>&1
+        }
+        if ($LASTEXITCODE -ne 0) {
+            throw "$StepName failed with exit code $LASTEXITCODE"
+        }
+    } finally {
+        $ErrorActionPreference = $previousErrorActionPreference
+    }
+}
+
+function Invoke-PowerShellChecked {
+    param(
+        [string[]]$CommandArgs,
+        [string]$StepName,
+        [string]$OutputPath = ""
+    )
+
+    Write-Output "[$StepName] powershell $($CommandArgs -join ' ')"
+    $previousErrorActionPreference = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    try {
+        if ($OutputPath) {
+            & powershell @CommandArgs 2>&1 | Tee-Object -FilePath $OutputPath
+        } else {
+            & powershell @CommandArgs 2>&1
+        }
+        if ($LASTEXITCODE -ne 0) {
+            throw "$StepName failed with exit code $LASTEXITCODE"
+        }
+    } finally {
+        $ErrorActionPreference = $previousErrorActionPreference
+    }
+}
+
 function Run-CurlCapture {
     param(
         [string[]]$CurlArgs,
@@ -79,13 +132,13 @@ $cliApiArgs = @(
 if ($ProofFixturePath) {
     $cliApiArgs += @("-ProofFile", $ProofFixturePath, "-StrictProof")
 }
-powershell @cliApiArgs | Tee-Object -FilePath $cliApiRegressionOut
+Invoke-PowerShellChecked -StepName "cli-api-proof-regression" -CommandArgs $cliApiArgs -OutputPath $cliApiRegressionOut
 
 # 1) Core smoke checks
-python scripts/launch_gate_smoke_ci.py | Tee-Object -FilePath $smokeOut
+Invoke-PythonChecked -StepName "launch-gate-smoke" -CommandArgs @("scripts/launch_gate_smoke_ci.py") -OutputPath $smokeOut
 
 # 1a) Auth scope policy baseline generation + review
-python scripts/generate_auth_scope_matrix.py | Tee-Object -FilePath $scopePolicyOut
+Invoke-PythonChecked -StepName "generate-auth-scope-matrix" -CommandArgs @("scripts/generate_auth_scope_matrix.py") -OutputPath $scopePolicyOut
 $enforceStrictScopePolicy = $true
 if ($RelaxedScopePolicy) {
     $enforceStrictScopePolicy = $false
@@ -94,9 +147,9 @@ if ($RelaxedScopePolicy) {
 }
 
 if ($enforceStrictScopePolicy) {
-    python scripts/review_auth_scope_matrix.py --strict-state-changing | Tee-Object -FilePath $scopePolicyOut -Append
+    Invoke-PythonChecked -StepName "review-auth-scope-matrix-strict" -CommandArgs @("scripts/review_auth_scope_matrix.py", "--strict-state-changing") -OutputPath $scopePolicyOut -Append
 } else {
-    python scripts/review_auth_scope_matrix.py | Tee-Object -FilePath $scopePolicyOut -Append
+    Invoke-PythonChecked -StepName "review-auth-scope-matrix" -CommandArgs @("scripts/review_auth_scope_matrix.py") -OutputPath $scopePolicyOut -Append
 }
 
 # 1b) Auth contract checks (baseline always, strict when fixture provided)
@@ -113,11 +166,11 @@ if ($ProofFixturePath) {
 if ($PlatformApiKey) {
     $env:LEMMA_PLATFORM_API_KEY = $PlatformApiKey
 }
-python scripts/proof_exchange_contract_check.py | Tee-Object -FilePath $contractOut
+Invoke-PythonChecked -StepName "proof-exchange-contract" -CommandArgs @("scripts/proof_exchange_contract_check.py") -OutputPath $contractOut
 
 # 1c) Scope matrix checks (requires platform API key)
 if ($env:LEMMA_PLATFORM_API_KEY) {
-    python scripts/auth_scope_matrix_check.py | Tee-Object -FilePath $scopeMatrixOut
+    Invoke-PythonChecked -StepName "auth-scope-matrix-check" -CommandArgs @("scripts/auth_scope_matrix_check.py") -OutputPath $scopeMatrixOut
 } else {
     if ($RequirePlatformApiKey) {
         throw "Scope matrix check requires platform API key. Set -PlatformApiKey or LEMMA_PLATFORM_API_KEY."
@@ -127,7 +180,7 @@ if ($env:LEMMA_PLATFORM_API_KEY) {
 }
 
 # 1d) Redis degradation resilience checks (must be non-500 structured health)
-python scripts/redis_degrade_gate_check.py | Tee-Object -FilePath $redisDegradeOut
+Invoke-PythonChecked -StepName "redis-degrade-gate" -CommandArgs @("scripts/redis_degrade_gate_check.py") -OutputPath $redisDegradeOut
 
 # 2) Transport/TLS checks
 "Transport/TLS checks: $(Get-Date -Format o)" | Out-File -FilePath $transportOut -Encoding utf8
@@ -202,7 +255,7 @@ if ($effectiveAgentToken -or $effectiveProof -or $effectiveProofFile) {
     if ($effectiveProofFile) { $latencyArgs += @("--proof-file", $effectiveProofFile) }
     if ($effectivePoP) { $latencyArgs += @("--pop", $effectivePoP) }
     if ($effectivePoPFile) { $latencyArgs += @("--pop-file", $effectivePoPFile) }
-    python @latencyArgs
+    Invoke-PythonChecked -StepName "latency-budget-gate" -CommandArgs $latencyArgs
 } else {
     if ($RequireAgentToken) {
         throw "Latency gate requires auth input. Set -AgentToken or -Proof/-ProofFile."
@@ -214,7 +267,7 @@ if ($effectiveAgentToken -or $effectiveProof -or $effectiveProofFile) {
 # 3c) Compatibility bearer sunset gate
 $effectiveCompatSunset = if ($CompatBearerSunsetUtc) { $CompatBearerSunsetUtc } elseif ($env:LEMMA_COMPAT_BEARER_SUNSET_UTC) { $env:LEMMA_COMPAT_BEARER_SUNSET_UTC } else { "" }
 if ($effectiveCompatSunset) {
-    python scripts/check_compat_bearer_sunset.py --sunset-utc $effectiveCompatSunset | Tee-Object -FilePath $compatSunsetOut
+    Invoke-PythonChecked -StepName "compat-bearer-sunset" -CommandArgs @("scripts/check_compat_bearer_sunset.py", "--sunset-utc", $effectiveCompatSunset) -OutputPath $compatSunsetOut
 } else {
     if ($RequireCompatBearerSunset) {
         throw "Compat bearer sunset gate requires -CompatBearerSunsetUtc or LEMMA_COMPAT_BEARER_SUNSET_UTC."
@@ -225,10 +278,13 @@ if ($effectiveCompatSunset) {
 
 # 3d) Pilot release gates (optional, combines local + live checks)
 if ($IncludePilotReleaseGates) {
-    powershell -ExecutionPolicy Bypass -File "scripts/run_pilot_release_gates.ps1" `
-        -BaseUrl $BaseUrl `
-        -OutputDir $OutputDir `
-        -RuntimeId "lemma-firewall-default" | Tee-Object -FilePath $pilotGatesOut
+    Invoke-PowerShellChecked -StepName "pilot-release-gates" -CommandArgs @(
+        "-ExecutionPolicy", "Bypass",
+        "-File", "scripts/run_pilot_release_gates.ps1",
+        "-BaseUrl", $BaseUrl,
+        "-OutputDir", $OutputDir,
+        "-RuntimeId", "lemma-firewall-default"
+    ) -OutputPath $pilotGatesOut
 } else {
     "Pilot release gates skipped. Use -IncludePilotReleaseGates to run combined local+live pilot checks." | Out-File -FilePath $pilotGatesOut -Encoding utf8
 }

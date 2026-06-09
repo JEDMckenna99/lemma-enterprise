@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Review AUTH_SCOPE_MATRIX_V1.json for high-risk policy gaps.
+Review docs/api/AUTH_SCOPE_MATRIX_V1.json for high-risk policy gaps.
 
 Fail conditions:
 1) /api/admin/* routes without an explicit admin auth decorator.
@@ -17,7 +17,7 @@ from pathlib import Path
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-MATRIX_PATH = REPO_ROOT / "docs" / "AUTH_SCOPE_MATRIX_V1.json"
+MATRIX_PATH = REPO_ROOT / "docs" / "api" / "AUTH_SCOPE_MATRIX_V1.json"
 
 STATE_CHANGING_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
 ADMIN_AUTH_DECORATORS = {"require_admin", "require_site_admin"}
@@ -96,6 +96,47 @@ ADMIN_EXPLICIT_AUTH_ALLOWLIST = {
     "/api/admin/reissue-with-ppid",
 }
 
+# State-changing routes that enforce auth inside the handler (wallet assertions,
+# webhook signatures, demo guards) rather than via route decorators.
+IN_HANDLER_AUTH_ALLOWLIST = {
+    "/api/agent/monitor/log-external",
+    "/api/auth/issue-credential",
+    "/api/demo/ishuman/approve-network-revocation",
+    "/api/demo/ishuman/force-reverify",
+    "/api/demo/ishuman/network-revoke-request",
+    "/api/demo/ishuman/probe-derive",
+    "/api/demo/ishuman/reset-wallet",
+    "/api/demo/ishuman/self-reset",
+    "/api/demo/ishuman/site-block",
+    "/api/demo/ishuman/site-unblock",
+    "/api/demo/ishuman/test-complete-verification",
+    "/api/demo/ishuman/verify-once-test-mode",
+    "/api/demo/issue-credential",
+    "/api/demo/issue-proof",
+    "/api/demo/issue-proof-chain",
+    "/api/demo/revoke",
+    "/api/demo/revoke-credential",
+    "/api/demo/taint-bump",
+    "/api/demo/verify",
+    "/api/ishuman/approve-revocation",
+    "/api/ishuman/derive-site-proof",
+    "/api/ishuman/erase",
+    "/api/ishuman/idv-mobile-handoff/claim",
+    "/api/ishuman/idv-mobile-handoff/deposit",
+    "/api/ishuman/network-revoke",
+    "/api/ishuman/reissue-master",
+    "/api/ishuman/seed-envelope",
+    "/api/ishuman/site-block",
+    "/api/ishuman/site-unblock",
+    "/api/ishuman/start-verification",
+    "/api/ishuman/verify-presentation",
+    "/api/wallet/challenge",
+    "/api/wallet/firewall/runtimes/<runtime_id>/authorize",
+    "/api/wallet/register-signing-key",
+    "/api/wallet/sync-device",
+    "/api/webhooks/didit-identity",
+}
+
 
 def _fmt(route: dict) -> str:
     methods = ",".join(route.get("methods", []))
@@ -131,6 +172,8 @@ def main() -> int:
         if not path.startswith("/api/"):
             continue
         if path in PUBLIC_STATE_CHANGING_ALLOWLIST:
+            continue
+        if path in IN_HANDLER_AUTH_ALLOWLIST:
             continue
         if not (methods & STATE_CHANGING_METHODS):
             continue

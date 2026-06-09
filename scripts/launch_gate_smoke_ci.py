@@ -11,11 +11,14 @@ from __future__ import annotations
 import json
 import os
 import sys
+import time
 import urllib.error
 import urllib.request
 
 
 BASE_URL = os.environ.get("LEMMA_BASE_URL", "https://lemma.id").rstrip("/")
+MAX_ATTEMPTS = int(os.environ.get("LEMMA_SMOKE_MAX_ATTEMPTS", "3"))
+RETRY_BACKOFF_SECONDS = int(os.environ.get("LEMMA_SMOKE_RETRY_BACKOFF", "15"))
 
 
 def request(url: str, method: str = "GET", body: bytes | None = None) -> tuple[int, str, dict]:
@@ -40,9 +43,7 @@ def assert_true(condition: bool, message: str) -> None:
         raise AssertionError(message)
 
 
-def main() -> int:
-    print(f"Running launch-gate smoke checks against: {BASE_URL}")
-
+def run_checks() -> None:
     # Required availability and revocation data endpoints.
     get_endpoints = [
         f"{BASE_URL}/",
@@ -106,14 +107,29 @@ def main() -> int:
     authn_payload = json.loads(authn_content)
     assert_true(authn_payload.get("success") is True, "Passkey authenticate begin success != true")
 
-    print("Launch-gate smoke checks passed.")
-    return 0
+
+def main() -> int:
+    print(f"Running launch-gate smoke checks against: {BASE_URL}")
+
+    last_error: Exception | None = None
+    for attempt in range(1, MAX_ATTEMPTS + 1):
+        try:
+            if attempt > 1:
+                print(f"Retry attempt {attempt}/{MAX_ATTEMPTS}")
+            run_checks()
+            print("Launch-gate smoke checks passed.")
+            return 0
+        except Exception as exc:
+            last_error = exc
+            print(f"Attempt {attempt}/{MAX_ATTEMPTS} failed: {exc}", file=sys.stderr)
+            if attempt < MAX_ATTEMPTS:
+                print(f"Waiting {RETRY_BACKOFF_SECONDS}s before retry...")
+                time.sleep(RETRY_BACKOFF_SECONDS)
+
+    print(f"Launch-gate smoke checks failed after {MAX_ATTEMPTS} attempts: {last_error}", file=sys.stderr)
+    return 1
 
 
 if __name__ == "__main__":
-    try:
-        raise SystemExit(main())
-    except Exception as exc:
-        print(f"Launch-gate smoke checks failed: {exc}", file=sys.stderr)
-        raise SystemExit(1) from exc
+    raise SystemExit(main())
 

@@ -34,33 +34,19 @@ jobs:
       - name: Install Python dependencies
         run: |
           python -m pip install --upgrade pip
-          python -m pip install requests
+          python -m pip install pytest flask requests sqlalchemy stripe flask-cors psycopg2-binary redis
 
-      - name: Run default CLI+API proof regression bundle (MCP-free)
-        shell: pwsh
-        run: >
-          ./scripts/run_cli_api_proof_regression.ps1
-          -LemmaUrl "$env:LEMMA_BASE_URL"
-
-      - name: Run CSP security unit tests
-        run: python -m pytest tests/test_csp_security.py -q
-
-      - name: Run launch gate smoke
-        run: python scripts/launch_gate_smoke_ci.py
-
-      - name: Run Redis degrade gate checks
-        run: python scripts/redis_degrade_gate_check.py
-
-      - name: Generate and review auth scope matrix (strict)
+      - name: Run local security gates
+        env:
+          SESSION_SECRET: test-session-secret
+          DATABASE_URL: sqlite:///:memory:
         run: |
+          python -m pytest tests/test_csp_security.py -q
           python scripts/generate_auth_scope_matrix.py
           python scripts/review_auth_scope_matrix.py --strict-state-changing
 
-      - name: Run proof exchange contract checks
-        run: python scripts/proof_exchange_contract_check.py
-
-      - name: Run auth scope matrix checks
-        run: python scripts/auth_scope_matrix_check.py
+      - name: Wait for production deploy readiness
+        run: python scripts/wait_for_deploy_health.py
 
       - name: Run strict post-deploy launch gate bundle
         shell: pwsh
