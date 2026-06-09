@@ -30,7 +30,7 @@ def test_wallet_ishuman_lock_bundle_constants(wallet_source):
     assert "isHumanIssuance" in wallet_source
     assert "ensureIsHumanIssuanceReady" in wallet_source
     assert "ishuman_cache" in wallet_source
-    assert "WALLET_DB_VERSION = 6" in wallet_source
+    assert "WALLET_DB_VERSION = 7" in wallet_source
 
 
 @pytest.mark.browser
@@ -160,7 +160,7 @@ def test_wallet_pages_use_current_wallet_bundle():
     for path in wallet_pages:
         source = path.read_text(encoding="utf-8")
         assert "lemma-wallet.js?v=2542" not in source
-        assert "lemma-wallet.js') }}?v=2543" in source or "lemma-wallet.js?v=2543" in source
+        assert "lemma-wallet.js') }}?v=2545" in source or "lemma-wallet.js?v=2545" in source
         assert "lemma-keys.js?v=2" not in source
         assert "lemma-keys.js?v=3" not in source
         assert "lemma-keys.js') }}?v=4" in source or "lemma-keys.js?v=4" in source

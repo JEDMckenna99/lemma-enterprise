@@ -739,13 +739,23 @@
             }
         }
         
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = String(text ?? '');
+            return div.innerHTML;
+        }
+
         function showToast(type, message) {
             const toast = document.createElement('div');
             toast.className = `toast toast-${type}`;
-            toast.innerHTML = `
-                <span class="toast-icon">${type === 'error' ? '❌' : '✅'}</span>
-                <span class="toast-message">${message}</span>
-            `;
+            const icon = document.createElement('span');
+            icon.className = 'toast-icon';
+            icon.textContent = type === 'error' ? '❌' : '✅';
+            const msg = document.createElement('span');
+            msg.className = 'toast-message';
+            msg.textContent = message;
+            toast.appendChild(icon);
+            toast.appendChild(msg);
             
             // Add toast styles
             toast.style.cssText = `
@@ -806,7 +816,7 @@
                 <div style="text-align: center; padding: 40px;">
                     <h2 style="color: var(--gray-900); margin-bottom: 16px;">Check Your Email</h2>
                     <p style="color: var(--gray-600); margin-bottom: 24px;">
-                        We've sent a confirmation email to <strong>${email}</strong>
+                        We've sent a confirmation email to <strong>${escapeHtml(email)}</strong>
                     </p>
                     <div style="background: var(--primary-light); border: 1px solid var(--primary); border-radius: 8px; padding: 20px; margin: 20px 0;">
                         <h3 style="color: var(--gray-900); margin-bottom: 12px;">Next Steps:</h3>

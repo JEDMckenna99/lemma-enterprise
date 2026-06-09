@@ -15,6 +15,74 @@ _LOG_LEVEL = getattr(logging, _LOG_LEVEL_NAME, logging.INFO)
 logging.basicConfig(level=_LOG_LEVEL)
 logger = logging.getLogger(__name__)
 
+# Route prefixes that need expanded script-src (see docs/security/THIRD_PARTY_SCRIPTS.md)
+_CSP_UNLOCK_IDV_PREFIXES = (
+    '/unlock',
+    '/wallet/unlock',
+    '/wallet/popup',
+    '/wallet/ishuman-idv',
+)
+_CSP_LINK_QR_PREFIXES = (
+    '/link',
+    '/wallet/link',
+)
+
+
+def _path_matches_prefix(path: str, prefixes: tuple[str, ...]) -> bool:
+    normalized = path or '/'
+    for prefix in prefixes:
+        if normalized == prefix or normalized.startswith(prefix + '/'):
+            return True
+    return False
+
+
+def resolve_csp_profile(path: str) -> str:
+    """Return CSP profile name for a request path."""
+    if _path_matches_prefix(path, _CSP_LINK_QR_PREFIXES):
+        return 'link_qr'
+    if _path_matches_prefix(path, _CSP_UNLOCK_IDV_PREFIXES):
+        return 'unlock_idv'
+    return 'strict'
+
+
+def build_content_security_policy(nonce: str, profile: str = 'strict') -> str:
+    """Build CSP header value for the given route profile."""
+    script_src = [f"'self'", f"'nonce-{nonce}'"]
+    connect_src = ["'self'", "https://lemma.id"]
+    frame_src = ["'self'"]
+    form_action = ["'self'"]
+
+    if profile in ('unlock_idv', 'link_qr'):
+        script_src.extend([
+            "https://challenges.cloudflare.com",  # CSP-ALLOW: Cloudflare Turnstile
+            "https://js.stripe.com",  # CSP-ALLOW: Stripe payments
+        ])
+        connect_src.extend(["https://*.stripe.com", "https://api.stripe.com"])
+        frame_src.extend(["https://*.stripe.com", "https://challenges.cloudflare.com"])
+        form_action.append("https://*.stripe.com")
+
+    if profile == 'link_qr':
+        script_src.append("https://unpkg.com/")  # CSP-ALLOW: html5-qrcode scanner
+
+    return (
+        "default-src 'self'; "
+        f"script-src {' '.join(script_src)}; "
+        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
+        "font-src 'self' https://fonts.gstatic.com; "
+        "img-src 'self' data: https:; "
+        "media-src 'self' blob:; "
+        f"connect-src {' '.join(connect_src)}; "
+        f"frame-src {' '.join(frame_src)} "
+            "https://lemma-demo-tickets-1d3d7411af33.herokuapp.com "
+            "https://lemma-demo-trials-7090f46cae0d.herokuapp.com; "
+        "object-src 'none'; "
+        "base-uri 'self'; "
+        f"form-action {' '.join(form_action)}; "
+        "upgrade-insecure-requests; "
+        "report-uri /api/security/csp-report"
+    )
+
+
 def create_app():
     app = Flask(__name__)
 
@@ -44,6 +112,7 @@ def create_app():
     def generate_csp_nonce():
         """Generate a unique nonce for each request to allow inline scripts securely."""
         g.csp_nonce = secrets.token_urlsafe(16)
+        g.csp_profile = resolve_csp_profile(request.path or '/')
 
     @app.before_request
     def capture_request_telemetry():
@@ -125,46 +194,9 @@ def create_app():
         # Content Security Policy - Restrict resource loading
         # Skip if route already set its own CSP (e.g., wallet bridge)
         if 'Content-Security-Policy' not in response.headers:
-            # Get the nonce generated for this request
             nonce = getattr(g, 'csp_nonce', '')
-            
-            csp = (
-                "default-src 'self'; "
-                # Scripts: self + nonce for inline scripts + trusted CDNs
-                f"script-src 'self' 'nonce-{nonce}' "
-                    "https://cdn.jsdelivr.net/npm/ "  # CSP-ALLOW: jsdelivr npm packages
-                    "https://unpkg.com/ "  # CSP-ALLOW: html5-qrcode scanner
-                    "https://static.cloudflareinsights.com "  # CSP-ALLOW: Cloudflare analytics
-                    "https://challenges.cloudflare.com "  # CSP-ALLOW: Cloudflare Turnstile
-                    "https://js.stripe.com; "  # CSP-ALLOW: Stripe payments
-                # Styles: self + unsafe-inline (needed for style attributes) + Google Fonts
-                # Note: unsafe-inline for styles is lower risk than for scripts
-                "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
-                # Fonts: self + Google Fonts
-                "font-src 'self' https://fonts.gstatic.com; "
-                # Images: self + data URIs (for QR codes) + any HTTPS (logos, etc)
-                "img-src 'self' data: https:; "
-                # Media: blob for camera video streams (QR scanner)
-                "media-src 'self' blob:; "
-                # API connections
-                "connect-src 'self' https://lemma.id https://*.stripe.com https://api.stripe.com; "
-                # Iframes: Stripe, Cloudflare, and the first-party isHuman demo
-                # relying sites (the /demo/ishuman "Clear my lemma.id" flow mounts
-                # their /lemma-clear page in a hidden iframe to wipe per-site cache).
-                "frame-src 'self' https://*.stripe.com https://challenges.cloudflare.com "
-                    "https://lemma-demo-tickets-1d3d7411af33.herokuapp.com "
-                    "https://lemma-demo-trials-7090f46cae0d.herokuapp.com; "
-                # Block plugins (Flash, etc)
-                "object-src 'none'; "
-                # Prevent base tag hijacking
-                "base-uri 'self'; "
-                # Limit form submissions
-                "form-action 'self' https://*.stripe.com; "
-                # Upgrade HTTP to HTTPS
-                "upgrade-insecure-requests; "
-                "report-uri /api/security/csp-report"
-            )
-            response.headers['Content-Security-Policy'] = csp
+            profile = getattr(g, 'csp_profile', 'strict')
+            response.headers['Content-Security-Policy'] = build_content_security_policy(nonce, profile)
         
         return response
 

@@ -36,7 +36,7 @@ def test_wallet_at_rest_crypto_module_exports_contract(crypto_js):
 
 @pytest.mark.unit
 def test_lemma_wallet_wires_encrypted_storage(wallet_js):
-    assert "WALLET_DB_VERSION = 6" in wallet_js
+    assert "WALLET_DB_VERSION = 7" in wallet_js
     assert "_bindAtRestKeyFromCredential" in wallet_js
     assert "_migratePlaintextStores" in wallet_js
     assert "_encryptStoredValue" in wallet_js

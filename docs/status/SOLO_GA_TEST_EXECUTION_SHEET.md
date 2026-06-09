@@ -5,8 +5,23 @@ Use this as the single-operator checklist before declaring GA.
 Gate normalization source of truth: `docs/status/GA_GATE_STATUS.md`
 
 Operator: __________  
-Date: 2026-02-11  
-Target deploy: Heroku release v1682 / commit 34c68e4a
+Date: 2026-06-08 (security hardening program)  
+Target deploy: lemma-enterprise / https://lemma.id
+
+---
+
+## Security hardening program (2026-06-08)
+
+Automated evidence from Phases A–D (see `lemma-security-hardening-plan.canvas.tsx`):
+
+| Phase | Result | Evidence |
+|-------|--------|----------|
+| A — ishuman_cache encryption | Code complete | `ops/evidence/launch/*-phase-a-summary.md`, `tests/test_ishuman_cache_encryption.py` |
+| B — revoke→deny smoke | Script ready; prod blocked `ppid_not_linked` | `ops/evidence/launch/2026-06-08-revoke-to-deny-evidence.md`, `scripts/revoke_to_deny_smoke.py` |
+| C — route CSP + innerHTML | Code complete | `ops/evidence/launch/*-phase-c-summary.md`, `tests/test_csp_security.py` |
+| D — CSP alert drill | PASS | `ops/evidence/launch/2026-06-08-incident-drill-csp-alert.md` |
+
+Deploy pending: `git push production HEAD:main` after operator commit.
 
 ---
 
@@ -76,7 +91,7 @@ Target deploy: Heroku release v1682 / commit 34c68e4a
   - issue credential -> verify accepted -> revoke -> sync -> verify denied
   - do in at least 2 client contexts (two browsers or two devices)
   - Result: `PASS` / `FAIL`
-  - Evidence: `ops/evidence/launch/2026-02-11-revocation-path-post-dbfix.md` + manual UX capture __________
+  - Evidence: `scripts/revoke_to_deny_smoke.py` + `ops/evidence/launch/2026-06-08-revoke-to-deny-evidence.md` (re-run when PPID linked)
 
 ---
 
@@ -114,6 +129,10 @@ Target deploy: Heroku release v1682 / commit 34c68e4a
   - post-rollback verification
   - Result: `PASS`
   - Evidence: `ops/evidence/launch/2026-03-04-114534-incident-drill-auth-control-plane.md`
+
+- [x] CSP violation alert drill completed.
+  - Result: `PASS`
+  - Evidence: `ops/evidence/launch/2026-06-08-incident-drill-csp-alert.md`
 
 - [ ] Confirm alerting/dashboard signals for auth/revocation health.
   - Result: `PASS` / `FAIL`

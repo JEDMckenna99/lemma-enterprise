@@ -23,6 +23,28 @@ See [`THREAT_MODEL.md`](THREAT_MODEL.md) §3.3–3.4 for design rationale.
 - Alert on spikes in Sentry errors under `/wallet/*`, `/unlock`, `/app`.
 - Review [`THIRD_PARTY_SCRIPTS.md`](THIRD_PARTY_SCRIPTS.md) after any CSP violation involving third-party origins.
 
+### CSP alert thresholds (Sentry)
+
+Configure a Sentry alert rule (lemma-enterprise project):
+
+| Signal | Threshold | Action |
+|--------|-----------|--------|
+| `security=csp` tagged events | > 10 in 5 minutes | Page on-call; open incident channel |
+| Same `blocked_uri` on `/unlock` or `/wallet/*` | > 3 in 15 minutes | Treat as possible XSS attempt; run §1 user guidance if user-reported |
+| `violated_directive=script-src` spike sitewide | > 25 in 5 minutes | Check recent deploy; consider rollback |
+
+**Escalation path:** Sentry alert → on-call acknowledges within 15m → triage using this runbook §1–4 → if wallet paths affected, notify Security Lead and capture evidence under `ops/evidence/launch/*incident-drill*`.
+
+**Dry-run verification:** POST a sample report (returns `204`):
+
+```bash
+curl -s -o /dev/null -w "%{http_code}" -X POST https://lemma.id/api/security/csp-report \
+  -H "Content-Type: application/csp-report" \
+  -d '{"csp-report":{"violated-directive":"script-src","blocked-uri":"https://drill.example.invalid","document-uri":"https://lemma.id/unlock"}}'
+```
+
+Confirm the event appears in Sentry with tag `security=csp`.
+
 ## 4. Post-incident hardening
 
 - Identify the injection vector (template bug, third-party script, stored content).

@@ -81,7 +81,7 @@ window.addEventListener('message', (event) => {
 | Daily unlock bundle TTL | IN_PROGRESS | 10h default (`DEFAULT_SESSION_HOURS = 10`) |
 | Bundle fail-closed on wrap failure | PASS | No plaintext fallback in `_persistIsHumanLockBundle` |
 | Wallet auto-init scoped to app routes | IN_PROGRESS | `wallet_auto_init` block empty by default; developer/admin/wallet routes opt in |
-| CSP violation reporting | IN_PROGRESS | `report-uri /api/security/csp-report` |
+| CSP violation reporting | PASS | `report-uri` + `POST /api/security/csp-report` → 204; Sentry `security=csp` tag; drill `ops/evidence/launch/2026-06-08-incident-drill-csp-alert.md` |
 | Debug panel gated in production | PASS | Requires `LEMMA_WALLET_DEBUG=true` server flag |
 | Compromise response documented | PASS | See `docs/security/WALLET_COMPROMISE_RESPONSE.md` |
 
@@ -159,8 +159,8 @@ if (!result.valid) {
 
 | Check | Status | Notes |
 |-------|--------|-------|
-| Revocation list synced periodically | IN_PROGRESS | Revocation endpoints healthy and cache metadata present |
-| Credentials checked against revocation | FAIL | Post-deploy test found site-specific revoke did not appear in list/bloom (`site_updated=false`) |
+| Revocation list synced periodically | IN_PROGRESS | Revocation endpoints healthy; `scripts/revoke_to_deny_smoke.py` adds list+bloom polling (prod PASS pending PPID-linked wallet) |
+| Credentials checked against revocation | IN_PROGRESS | Smoke script ready (`scripts/revoke_to_deny_evidence.py`); prod blocked `ppid_not_linked` — see `ops/evidence/launch/2026-06-08-revoke-to-deny-evidence.md` |
 | Stale revocation data flagged | UNKNOWN | Needs explicit stale-cache scenario test output |
 | Network failure doesn't block auth | UNKNOWN | Offline/failure-mode validation not yet recorded |
 

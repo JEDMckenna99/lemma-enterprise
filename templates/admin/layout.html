@@ -217,6 +217,12 @@
 
 <!-- Toast JavaScript -->
 <script nonce="{{ csp_nonce }}">
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = String(text ?? '');
+    return div.innerHTML;
+}
+
 window.showToast = function(type, title, message, duration = 5000) {
     const container = document.getElementById('toast-container');
     const toast = document.createElement('div');
@@ -232,8 +238,8 @@ window.showToast = function(type, title, message, duration = 5000) {
     toast.innerHTML = `
         <span class="toast-icon">${icons[type] || icons.info}</span>
         <div class="toast-content">
-            <div class="toast-title">${title}</div>
-            ${message ? `<div class="toast-message">${message}</div>` : ''}
+            <div class="toast-title">${escapeHtml(title)}</div>
+            ${message ? `<div class="toast-message">${escapeHtml(message)}</div>` : ''}
         </div>
         <button class="toast-close" onclick="this.parentElement.remove()">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">

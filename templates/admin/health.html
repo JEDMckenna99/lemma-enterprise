@@ -106,6 +106,12 @@
 </div>
 
 <script nonce="{{ csp_nonce }}">
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = String(text ?? '');
+    return div.innerHTML;
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     loadHealthStatus();
     document.getElementById('refresh-health-btn').addEventListener('click', loadHealthStatus);
@@ -154,7 +160,7 @@ async function loadHealthStatus() {
                 <td>
                     <div class="health-indicator">
                         <span class="health-dot ${getHealthDotClass(s.status || 'unknown')}"></span>
-                        <span>${s.name || 'Unknown service'}</span>
+                        <span>${escapeHtml(s.name || 'Unknown service')}</span>
                     </div>
                 </td>
                 <td>${getCriticalityText(s.criticality)}</td>
@@ -169,7 +175,7 @@ async function loadHealthStatus() {
         
         depsTable.innerHTML = deps.length ? deps.map(d => `
             <tr>
-                <td>${d.name || 'Unknown dependency'}</td>
+                <td>${escapeHtml(d.name || 'Unknown dependency')}</td>
                 <td><span class="badge ${getHealthBadgeClass(d.status || 'unknown')}">${getStatusText(d.status || 'unknown')}</span></td>
             </tr>
         `).join('') : '<tr><td colspan="2" style="text-align: center;">No dependency telemetry available.</td></tr>';
@@ -185,7 +191,7 @@ async function loadHealthStatus() {
             ['Python', runtime.python_version || 'unavailable'],
             ['Process Started', runtime.process_started_at ? new Date(runtime.process_started_at).toLocaleString() : 'unavailable'],
             ['Last Health Check', data.timestamp ? new Date(data.timestamp).toLocaleString() : 'unavailable'],
-        ].map(([k, v]) => `<tr><td><strong>${k}</strong></td><td>${v}</td></tr>`).join('');
+        ].map(([k, v]) => `<tr><td><strong>${escapeHtml(k)}</strong></td><td>${escapeHtml(v)}</td></tr>`).join('');
 
         // Operational signals
         const op = data.operational || {};

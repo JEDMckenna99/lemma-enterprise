@@ -58,7 +58,7 @@ if (typeof window !== 'undefined' && window.LemmaWallet) {
 // ============================================
 
 const WALLET_DB_NAME = 'LemmaWallet';
-const WALLET_DB_VERSION = 6;  // v6: ishuman_cache plaintext store for lock-period bridge reads
+const WALLET_DB_VERSION = 7;  // v7: ishuman_cache encrypted at rest; v6 added ishuman_cache store
 const DEFAULT_SESSION_HOURS = 10;
 const MAX_SESSION_HOURS = 10;
 const DEFAULT_PROFILE_ID = 'default';
@@ -1719,7 +1719,7 @@ class LemmaWallet {
                     db.createObjectStore('wallet_meta', { keyPath: 'id' });
                 }
 
-                // v6: Plaintext isHuman presentation cache (lock-period bridge reads)
+                // v6/v7: isHuman presentation cache (encrypted at rest via envelope; lock-period bridge reads)
                 if (!db.objectStoreNames.contains('ishuman_cache')) {
                     db.createObjectStore('ishuman_cache', { keyPath: 'id' });
                 }
@@ -2794,7 +2794,15 @@ class LemmaWallet {
             id: credential.id,
             cachedAt: Date.now(),
         };
-        await this._putRaw('ishuman_cache', record);
+        try {
+            await this._put('ishuman_cache', record);
+        } catch (e) {
+            if (this._isEncryptedStorageLockedError(e)) {
+                console.warn('[Lemma] ishuman_cache persist skipped — storage key unavailable');
+                return;
+            }
+            throw e;
+        }
     }
 
     async syncIsHumanCacheFromWallet() {
@@ -2818,7 +2826,7 @@ class LemmaWallet {
 
     async getIsHumanCredentialsFromCache() {
         try {
-            const rows = await this._getAllRaw('ishuman_cache');
+            const rows = await this._getAll('ishuman_cache');
             return (rows || []).filter((row) => row && this._isIsHumanCredentialRecord(row));
         } catch {
             return [];
@@ -5322,6 +5330,9 @@ class LemmaWallet {
         if (!this._isSensitiveStore(storeName)) return value;
         const mod = this._walletAtRest();
         if (!this._atRestKey || !mod) {
+            if (storeName === 'ishuman_cache') {
+                throw new Error('storage_key_unavailable');
+            }
             const meta = await this._getWalletMeta();
             if (meta.migrationComplete) {
                 throw new Error('storage_key_unavailable');
@@ -5355,7 +5366,7 @@ class LemmaWallet {
         const mod = this._walletAtRest();
         if (!mod?.isEncryptedEnvelope) return false;
         if (this._atRestKey) return false;
-        const stores = ['lemmas', 'secrets', 'session', 'profiles'];
+        const stores = ['lemmas', 'secrets', 'session', 'profiles', 'ishuman_cache'];
         for (const storeName of stores) {
             const rows = await this._getAllRaw(storeName);
             if (rows.some((row) => mod.isEncryptedEnvelope(row))) {
@@ -5395,6 +5406,12 @@ class LemmaWallet {
         for (const lemma of await this._getAllRaw('lemmas')) {
             if (lemma && !mod.isEncryptedEnvelope(lemma)) {
                 await this._put('lemmas', lemma);
+            }
+        }
+
+        for (const cached of await this._getAllRaw('ishuman_cache')) {
+            if (cached && !mod.isEncryptedEnvelope(cached)) {
+                await this._put('ishuman_cache', cached);
             }
         }
 

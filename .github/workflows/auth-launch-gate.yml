@@ -42,6 +42,9 @@ jobs:
           ./scripts/run_cli_api_proof_regression.ps1
           -LemmaUrl "$env:LEMMA_BASE_URL"
 
+      - name: Run CSP security unit tests
+        run: python -m pytest tests/test_csp_security.py -q
+
       - name: Run launch gate smoke
         run: python scripts/launch_gate_smoke_ci.py
 

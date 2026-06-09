@@ -1088,36 +1088,6 @@ def _legacy_redirect_token_response(origin=None, status=410):
     return response, status
 
 
-def _get_redirect_token_db():
-    """Get database session and RedirectToken model."""
-    try:
-        from api.database import get_session, RedirectToken
-        return get_session(), RedirectToken
-    except Exception as e:
-        logger.warning(f"Database not available for redirect tokens: {e}")
-        return None, None
-
-
-def _cleanup_expired_tokens_db():
-    """Remove expired tokens from database."""
-    db_session, RedirectToken = _get_redirect_token_db()
-    if not db_session or not RedirectToken:
-        return
-    
-    try:
-        expired_count = db_session.query(RedirectToken).filter(
-            RedirectToken.expires_at < datetime.utcnow()
-        ).delete()
-        db_session.commit()
-        if expired_count > 0:
-            logger.info(f"Cleaned up {expired_count} expired redirect tokens")
-    except Exception as e:
-        logger.error(f"Failed to cleanup expired tokens: {e}")
-        db_session.rollback()
-    finally:
-        db_session.close()
-
-
 @wallet_session_sync_bp.route('/api/wallet/create-redirect-token', methods=['POST', 'OPTIONS'])
 def create_redirect_token():
     """Removed: legacy server-side redirect token creation."""

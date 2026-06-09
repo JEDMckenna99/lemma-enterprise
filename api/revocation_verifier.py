@@ -24,6 +24,11 @@ def is_credential_revoked(credential_id: Optional[str]) -> bool:
     Returns False (not revoked) if the Bloom verifier is not yet
     initialized — this is a documented fail-open choice so that
     startup ordering does not block all requests.
+
+    Ops note: monitor ``GET /api/health/detailed`` revocation lag signals;
+    if bloom sync is stale, revoked credentials may be accepted until the
+    verifier initializes. See ``docs/security/SECURITY_CHECKLIST.md``
+    revocation rows and Phase F backlog for a future fail-closed startup gate.
     """
     if not credential_id:
         return False

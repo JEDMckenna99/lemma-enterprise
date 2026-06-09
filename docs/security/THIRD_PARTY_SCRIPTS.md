@@ -1,24 +1,41 @@
 # Third-party script origins (CSP `script-src`)
 
-Lemma.id CSP allows only `'self'`, per-request nonces, and the origins below.
-Each origin is marked with `# CSP-ALLOW:` in [`app.py`](../../app.py) for CI review.
+Lemma.id CSP uses **route profiles** built by `build_content_security_policy()` in [`app.py`](../../app.py).
+Global pages use the `strict` profile (`'self'` + per-request nonce only).
 
-| Origin | Purpose | Used on | Remove candidate? |
-|--------|---------|---------|-------------------|
-| `https://cdn.jsdelivr.net/npm/` | npm packages via jsDelivr | Various admin/developer tooling | Audit per-page need |
-| `https://unpkg.com/` | html5-qrcode scanner | Admin QR flows | Scope to admin-only route CSP override |
-| `https://js.stripe.com` | Stripe.js | IDV / billing (`/unlock`, wallet IDV) | Required |
-| `https://challenges.cloudflare.com` | Cloudflare Turnstile | Bot protection surfaces | Audit usage |
-| `https://static.cloudflareinsights.com` | Cloudflare Web Analytics | Global layout | Optional — remove if unused |
+## Route profiles
+
+| Profile | Routes | Extra `script-src` origins |
+|---------|--------|----------------------------|
+| `strict` | All routes by default | *(none)* |
+| `unlock_idv` | `/unlock`, `/wallet/unlock`, `/wallet/popup`, `/wallet/ishuman-idv` | `js.stripe.com`, `challenges.cloudflare.com` |
+| `link_qr` | `/link`, `/wallet/link` | `unlock_idv` origins + `unpkg.com` (html5-qrcode) |
+
+`connect-src`, `frame-src`, and `form-action` expand on `unlock_idv` / `link_qr` for Stripe and Turnstile.
+
+## Removed from global policy
+
+| Origin | Reason |
+|--------|--------|
+| `https://static.cloudflareinsights.com` | Not loaded in layout templates |
+| `https://cdn.jsdelivr.net/npm/` | No current template dependency; add via route profile if needed |
+
+## Template map
+
+| Origin | Template / route | Profile |
+|--------|------------------|---------|
+| `https://unpkg.com/` | [`templates/wallet_link.html`](../../templates/wallet_link.html) | `link_qr` |
+| `https://js.stripe.com` | Wallet unlock / IDV flows (dynamic load) | `unlock_idv`, `link_qr` |
+| `https://challenges.cloudflare.com` | Turnstile surfaces on wallet flows | `unlock_idv`, `link_qr` |
 
 ## Review checklist
 
 Before adding a new `script-src` origin:
 
-1. Add `# CSP-ALLOW: <reason>` comment in `app.py` next to the origin.
+1. Add `# CSP-ALLOW: <reason>` comment in `build_content_security_policy()` next to the origin.
 2. Document the route/template that requires it in this file.
-3. Update [`tests/test_csp_security.py`](../../tests/test_csp_security.py) `EXPECTED_SCRIPT_ORIGINS`.
-4. Prefer route-specific CSP overrides instead of expanding the global policy.
+3. Extend [`tests/test_csp_security.py`](../../tests/test_csp_security.py) profile expectations.
+4. Prefer route-specific CSP profiles instead of expanding the global `strict` policy.
 
 ## XSS note
 

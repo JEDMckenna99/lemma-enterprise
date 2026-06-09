@@ -2,18 +2,20 @@
 """
 Create hard evidence for proof-first revoke-to-deny propagation.
 
-Flow:
+Flow (canvas revoke-to-deny smoke):
 1) Acquire a wallet unlock token from CLI session-link.
 2) Issue a temporary wallet-authenticated proof credential.
 3) Confirm /api/auth/exchange-proof succeeds before revoke (ALLOW).
-4) Revoke that credential via /api/wallet/revoke.
-5) Poll /api/auth/exchange-proof until denied (DENY) and /api/authz/revocation/delta
-   until the credential appears.
-6) Write markdown + json artifacts under ops/evidence/launch.
+4) Revoke via POST /api/wallet/revoke (credential_type permission or identity).
+5) Assert credential id in GET /api/v1/revocation/list within 60s.
+6) Assert bloom filter membership (SHA-256 hash of credential id in snapshot).
+7) Assert verification endpoint rejects credential (DENY / 403).
+8) Write markdown + json artifacts under ops/evidence/launch.
 """
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import subprocess
@@ -151,6 +153,52 @@ def main() -> int:
     steps.append({"step": "revoke_credential", "status": status, "payload": payload, "at": _utc_now()})
     _assert(status == 200 and payload.get("success") is True, f"Revoke failed: status={status}, payload={payload}")
 
+    credential_hash = hashlib.sha256(credential_id.encode("utf-8")).hexdigest()
+
+    list_seen = False
+    list_attempts: list[dict[str, Any]] = []
+    list_deadline = time.time() + 60.0
+    while time.time() < list_deadline:
+        status, payload = _request(f"{BASE_URL}/api/v1/revocation/list")
+        revocations = payload.get("revocations") if isinstance(payload.get("revocations"), list) else []
+        found = credential_id in revocations
+        list_attempts.append(
+            {
+                "status": status,
+                "count": payload.get("count"),
+                "found": found,
+                "at": _utc_now(),
+            }
+        )
+        if status == 200 and found:
+            list_seen = True
+            break
+        time.sleep(2.0)
+    steps.append({"step": "revocation_list_contains_credential", "attempts": list_attempts})
+    _assert(list_seen, f"Credential not in revocation list within 60s: attempts={list_attempts}")
+
+    bloom_seen = False
+    bloom_attempts: list[dict[str, Any]] = []
+    bloom_deadline = time.time() + 60.0
+    while time.time() < bloom_deadline:
+        status, payload = _request(f"{BASE_URL}/api/revocation/bloom-filter")
+        hashed_ids = payload.get("hashed_revoked_ids") if isinstance(payload.get("hashed_revoked_ids"), list) else []
+        found_hash = credential_hash in hashed_ids
+        bloom_attempts.append(
+            {
+                "status": status,
+                "count": payload.get("count"),
+                "hash_found": found_hash,
+                "at": _utc_now(),
+            }
+        )
+        if status == 200 and found_hash:
+            bloom_seen = True
+            break
+        time.sleep(2.0)
+    steps.append({"step": "bloom_contains_credential_hash", "attempts": bloom_attempts})
+    _assert(bloom_seen, f"Bloom hash not present within 60s: hash={credential_hash}, attempts={bloom_attempts}")
+
     denied = False
     deny_attempts: list[dict[str, Any]] = []
     for _ in range(8):
@@ -260,6 +308,8 @@ def main() -> int:
         "## Result",
         "",
         "- PASS: proof exchange ALLOW before revoke and DENY after revoke; revocation status confirms credential revoked.",
+        f"- Revocation list contains credential id within 60s: `{list_seen}`.",
+        f"- Bloom snapshot contains SHA-256 hash: `{bloom_seen}` (`{credential_hash}`).",
         f"- Revocation delta observed credential id: `{delta_seen}` (best effort endpoint).",
         f"- Revocation delta shape metadata present: `{delta_shape_ok}`.",
         "",

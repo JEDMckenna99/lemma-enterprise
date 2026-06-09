@@ -7,7 +7,7 @@
 
     const ENVELOPE_VERSION = 'enc_v1';
     const PRF_SALT_PREFIX = 'lemma:wallet:prf:v1:';
-    const SENSITIVE_STORES = ['secrets', 'profiles', 'session', 'lemmas'];
+    const SENSITIVE_STORES = ['secrets', 'profiles', 'session', 'lemmas', 'ishuman_cache'];
 
     function isPrfSupported() {
         return typeof window !== 'undefined'
