@@ -91,7 +91,7 @@ const AUTH_STATE = {
 class LemmaWallet {
     // SDK version - check with LemmaWallet.VERSION
     // v2.32.0: Redirect-only architecture - removed popup flow for simpler, consistent UX
-    static VERSION = '2.62.0';  // v2.62: Phase 2.1 cleanup — excised the inert bridge IAM plumbing and dead central-wallet/validator helpers (popup-only)
+    static VERSION = '2.64.0';  // v2.64: require passkey for isHuman site proof; bind passkey to handoff wallet_id (no orphan mint)
     
     constructor(options = {}) {
         this.db = null;
@@ -1975,11 +1975,20 @@ class LemmaWallet {
     async registerPasskey(options = {}) {
         await this.init();
 
+        if (options.isHumanIssuance) {
+            await this.reconcileSessionWalletIdForIssuance();
+        }
+
+        const existingPasskeyRecord = await this._get('passkey', 'primary');
+        const mustCreatePasskeyForIssuance = options.isHumanIssuance
+            && !existingPasskeyRecord?.credentialId;
+
         // SMART CHECK (any host): if init() already restored a valid 24h
         // session, don't prompt for passkey again — the user is already
         // authenticated for the rest of the day. Pass { force: true } to
         // require an explicit re-authentication.
-        if (!options.force && this.isUnlocked && this.isUnlocked()) {
+        // Site proof issuance always needs passkey when none exists yet (decrypt + bind).
+        if (!options.force && !mustCreatePasskeyForIssuance && this.isUnlocked && this.isUnlocked()) {
             const needsAtRestKey = await this._encryptedStorageNeedsAtRestKey();
             if (!needsAtRestKey || this._atRestKey) {
                 console.log('[Lemma] registerPasskey(): reusing valid restored session');
@@ -2066,9 +2075,15 @@ class LemmaWallet {
             return await this.unlock(options);
         }
         
-        // Get wallet ID (or create one)
+        // Get wallet ID — reuse linked/handoff identity; never mint a fresh id when
+        // wallet_secret already exists (would desync from server verification row).
         let walletId = await this._get('passkey', 'walletId');
-        if (!walletId) {
+        const storedIdentity = await this._resolveStoredWalletIdentity();
+        if (!walletId?.value && storedIdentity?.walletId) {
+            walletId = { id: 'walletId', value: storedIdentity.walletId };
+            await this._put('passkey', walletId);
+        }
+        if (!walletId?.value) {
             walletId = { id: 'walletId', value: this._generateId() };
             await this._put('passkey', walletId);
         }
@@ -2923,6 +2938,7 @@ class LemmaWallet {
 
     async deriveAndStoreSiteProof(targetSite) {
         await this.ensureIsHumanIssuanceReady({ isHumanIssuance: true });
+        await this.reconcileSessionWalletIdForIssuance();
         const keys = this._getLemmaKeys();
         const canonicalSite = keys.canonicalizeSiteDomain(targetSite || '');
 
@@ -3099,6 +3115,10 @@ class LemmaWallet {
     async ensureIsHumanIssuanceReady(options = {}) {
         await this.init();
         let forcePasskeyForEncryptedCache = false;
+        const existingPasskeyEarly = await this._get('passkey', 'primary');
+        const requirePasskeyForIssuance = !!(options.isHumanIssuance
+            && !existingPasskeyEarly?.credentialId);
+
         if (this.isIsHumanLockValid()) {
             await this._restoreIsHumanLockBundleIfValid();
             if (this.isUnlocked && this.isUnlocked()) {
@@ -3106,7 +3126,7 @@ class LemmaWallet {
                     return { ready: true, method: 'ishuman_lock_bundle_cache' };
                 }
                 const needsAtRestKey = await this._encryptedStorageNeedsAtRestKey();
-                if (!needsAtRestKey || this._atRestKey) {
+                if (!requirePasskeyForIssuance && (!needsAtRestKey || this._atRestKey)) {
                     await this.syncIsHumanCacheFromWallet().catch(() => ({ synced: 0 }));
                     return { ready: true, method: 'ishuman_lock_bundle' };
                 }
@@ -3115,25 +3135,33 @@ class LemmaWallet {
         }
         if (this.isUnlocked && this.isUnlocked()) {
             const needsAtRestKey = await this._encryptedStorageNeedsAtRestKey();
-            if (!needsAtRestKey || this._atRestKey) {
-                await this.syncIsHumanCacheFromWallet().catch(() => ({ synced: 0 }));
-                return { ready: true, method: 'restored_session' };
-            }
-            if (await this.hasIsHumanMasterInCache()) {
-                return { ready: true, method: 'restored_session_cache' };
+            if (!requirePasskeyForIssuance) {
+                if (!needsAtRestKey || this._atRestKey) {
+                    await this.syncIsHumanCacheFromWallet().catch(() => ({ synced: 0 }));
+                    return { ready: true, method: 'restored_session' };
+                }
+                if (await this.hasIsHumanMasterInCache()) {
+                    return { ready: true, method: 'restored_session_cache' };
+                }
             }
             forcePasskeyForEncryptedCache = true;
         }
+
+        await this.reconcileSessionWalletIdForIssuance();
+
         const existingPasskey = await this._get('passkey', 'primary');
         const issuanceOpts = {
             ...options,
             isHumanIssuance: true,
-            force: options.force || forcePasskeyForEncryptedCache,
+            force: options.force || forcePasskeyForEncryptedCache || requirePasskeyForIssuance,
         };
+
         if (existingPasskey && existingPasskey.credentialId) {
             await this.unlock(issuanceOpts);
+            await this.reconcileSessionWalletIdForIssuance();
         } else {
             await this.registerPasskey(issuanceOpts);
+            await this.reconcileSessionWalletIdForIssuance();
         }
         return { ready: this.isUnlocked && this.isUnlocked(), method: 'passkey' };
     }
@@ -3285,12 +3313,19 @@ class LemmaWallet {
         
         console.log(' Browser verified user via biometrics');
 
-        // Get wallet ID (create and store if missing)
+        // Reuse linked/handoff wallet id when present; only mint when truly new.
         if (!walletIdRecord?.value) {
-            const newWalletId = 'wallet_' + this._generateId();
-            walletIdRecord = { id: 'walletId', value: newWalletId };
-            await this._put('passkey', walletIdRecord);
-            console.log('[Lemma] Created wallet ID:', newWalletId);
+            const storedIdentity = await this._resolveStoredWalletIdentity();
+            if (storedIdentity?.walletId) {
+                walletIdRecord = { id: 'walletId', value: storedIdentity.walletId };
+                await this._put('passkey', walletIdRecord);
+                console.log('[Lemma] Restored wallet ID from stored identity:', storedIdentity.walletId);
+            } else {
+                const newWalletId = this._generateId();
+                walletIdRecord = { id: 'walletId', value: newWalletId };
+                await this._put('passkey', walletIdRecord);
+                console.log('[Lemma] Created wallet ID:', newWalletId);
+            }
         }
         const walletId = walletIdRecord.value;
 
@@ -6452,6 +6487,109 @@ class LemmaWallet {
         }
     }
     
+    /**
+     * Resolve wallet_id + secret already persisted via handoff, QR link, or session.
+     * @private
+     */
+    async _resolveStoredWalletIdentity() {
+        await this.init();
+        let walletId = '';
+        let walletSecret = '';
+        let source = '';
+
+        try {
+            const walletIdRec = await this._get('passkey', 'walletId');
+            walletId = walletIdRec?.value || '';
+        } catch (err) {
+            if (!this._isEncryptedStorageLockedError(err)) throw err;
+        }
+
+        const sess = this.session?.isUnlocked
+            ? this.session
+            : await this._get('session', 'current').catch((err) => {
+                if (this._isEncryptedStorageLockedError(err)) return null;
+                throw err;
+            });
+        if (sess?.walletId) {
+            walletId = walletId || sess.walletId;
+            walletSecret = walletSecret || sess.walletSecret || '';
+            source = source || sess.source || '';
+        }
+
+        try {
+            const secretRec = await this._get('secrets', 'master');
+            if (secretRec?.secret) {
+                walletSecret = walletSecret || secretRec.secret;
+                source = source || secretRec.source || '';
+                const linkedFrom = secretRec.linkedFrom || '';
+                if (!walletId && String(linkedFrom).startsWith('wallet_')) {
+                    walletId = linkedFrom;
+                }
+            }
+        } catch (err) {
+            if (!this._isEncryptedStorageLockedError(err)) throw err;
+        }
+
+        if (!walletSecret) {
+            try {
+                const activeProfileId = await this._get('passkey', 'activeProfile');
+                const profileId = activeProfileId?.value || DEFAULT_PROFILE_ID;
+                const profile = await this._get('profiles', profileId);
+                if (profile?.secret) {
+                    walletSecret = profile.secret;
+                    const linkedFrom = profile.linkedFrom || '';
+                    if (!walletId && String(linkedFrom).startsWith('wallet_')) {
+                        walletId = linkedFrom;
+                    }
+                }
+            } catch (err) {
+                if (!this._isEncryptedStorageLockedError(err)) throw err;
+            }
+        }
+
+        if (!walletId || !walletSecret) return null;
+        return { walletId, walletSecret, source };
+    }
+
+    /**
+     * Unlock session from persisted wallet material (no passkey prompt).
+     * @private
+     */
+    async _unlockSessionFromStoredIdentity(identity, sourceTag = 'stored_identity') {
+        if (!identity?.walletId || !identity?.walletSecret) return false;
+        const now = Date.now();
+        this.session = {
+            isUnlocked: true,
+            unlockedAt: now,
+            expiresAt: now + getSessionDurationMs(),
+            walletId: identity.walletId,
+            walletSecret: identity.walletSecret,
+            source: sourceTag || identity.source || 'stored_identity',
+        };
+        await this._put('session', { id: 'current', ...this.session });
+        const walletIdRec = await this._get('passkey', 'walletId').catch(() => null);
+        if (!walletIdRec?.value || walletIdRec.value !== identity.walletId) {
+            await this._put('passkey', { id: 'walletId', value: identity.walletId });
+        }
+        return true;
+    }
+
+    /**
+     * Align live session wallet_id with IndexedDB linked/handoff identity before
+     * isHuman server calls (derive-site-proof binds to verified wallet row).
+     */
+    async reconcileSessionWalletIdForIssuance() {
+        const storedIdentity = await this._resolveStoredWalletIdentity();
+        if (!storedIdentity?.walletId || !storedIdentity?.walletSecret) return false;
+        if (this.session?.walletId === storedIdentity.walletId
+            && this.session?.walletSecret === storedIdentity.walletSecret) {
+            return false;
+        }
+        console.warn('[Lemma] Reconciling session wallet for isHuman issuance:', storedIdentity.walletId);
+        await this._unlockSessionFromStoredIdentity(storedIdentity, 'reconciled_for_issuance');
+        return true;
+    }
+
     /**
      * Persist a linked wallet secret to IndexedDB without creating a passkey.
      * Used by QR device linking and silent IDV mobile handoff.

@@ -99,7 +99,7 @@
     <script src="/static/js/lemma-keys.js?v=4" nonce="{{ csp_nonce }}"></script>
     <script src="/static/js/wallet-at-rest-crypto.js?v=2" nonce="{{ csp_nonce }}"></script>
     <script nonce="{{ csp_nonce }}">window.LEMMA_ISHUMAN_USE_PERSON_ROOT_SEEDS = {{ 'true' if ishuman_use_person_root_seeds else 'false' }};</script>
-    <script src="/sdk/lemma-wallet.js?v=2546" nonce="{{ csp_nonce }}"></script>
+    <script src="/sdk/lemma-wallet.js?v=2548" nonce="{{ csp_nonce }}"></script>
     <script nonce="{{ csp_nonce }}">
         const SESSION_KEY = 'ishuman_idv_popup_session_id';
         const params = new URLSearchParams(window.location.search);
@@ -261,6 +261,13 @@
                 walletIdRecord = await wallet._get('passkey', 'walletId');
             } catch (err) {
                 console.warn('[isHuman IDV] walletId read failed:', err.message);
+            }
+            if (typeof wallet.reconcileSessionWalletIdForIssuance === 'function') {
+                try {
+                    await wallet.reconcileSessionWalletIdForIssuance();
+                } catch (reconcileErr) {
+                    console.warn('[isHuman IDV] wallet reconcile failed:', reconcileErr?.message || reconcileErr);
+                }
             }
             walletId = wallet.session?.walletId || walletIdRecord?.value || '';
             walletSecret = wallet.session?.walletSecret || '';
@@ -555,7 +562,7 @@
             await ensureWalletUnlocked();
 
             if (!(await hasMasterProof())) {
-                if (isVerificationReturn && sessionId) {
+                if (sessionId) {
                     await pollAndStoreMaster();
                 } else if (testVerifyEnabled && serverTestToken) {
                     setStatus('Completing demo verification…', 'loading');

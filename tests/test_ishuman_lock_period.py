@@ -96,6 +96,24 @@ def test_verifier_broadcasts_site_block_updates_cross_tab(verifier_source):
 
 
 @pytest.mark.browser
+def test_wallet_handoff_wallet_id_reconciled_for_site_proof(wallet_source):
+    """Handoff-linked wallets must bind passkey to the verified wallet_id, not mint a new one."""
+    assert "_resolveStoredWalletIdentity" in wallet_source
+    assert "reconcileSessionWalletIdForIssuance" in wallet_source
+    assert "requirePasskeyForIssuance" in wallet_source
+    assert "mustCreatePasskeyForIssuance" in wallet_source
+    assert "ishuman_deferred_passkey" not in wallet_source
+
+
+@pytest.mark.browser
+def test_idv_site_proof_polls_master_when_session_pending():
+    idv_html = IDV_HTML.read_text(encoding="utf-8")
+    assert "if (sessionId) {" in idv_html
+    assert "await pollAndStoreMaster();" in idv_html
+    assert "reconcileSessionWalletIdForIssuance" in idv_html
+
+
+@pytest.mark.browser
 def test_idv_popup_issues_site_proof_via_wallet():
     idv_html = IDV_HTML.read_text(encoding="utf-8")
     assert "ensureIsHumanIssuanceReady" in idv_html
@@ -160,7 +178,10 @@ def test_wallet_pages_use_current_wallet_bundle():
     for path in wallet_pages:
         source = path.read_text(encoding="utf-8")
         assert "lemma-wallet.js?v=2542" not in source
-        assert "lemma-wallet.js') }}?v=2545" in source or "lemma-wallet.js?v=2545" in source
+        if path == IDV_HTML:
+            assert "lemma-wallet.js?v=2548" in source
+        else:
+            assert "lemma-wallet.js') }}?v=2545" in source or "lemma-wallet.js?v=2545" in source
         assert "lemma-keys.js?v=2" not in source
         assert "lemma-keys.js?v=3" not in source
         assert "lemma-keys.js') }}?v=4" in source or "lemma-keys.js?v=4" in source
