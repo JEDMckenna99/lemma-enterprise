@@ -276,7 +276,7 @@ Single checklist for hardening the isHuman wallet + verifier stack into a local-
 
 - [static/js/lemma-wallet.js](static/js/lemma-wallet.js) (v2.52.0):
   - Tab-scoped `sessionStorage` lock bundle `lemma_ishuman_lock:v1` after isHuman passkey unlock (24h rolling TTL)
-  - Plaintext `ishuman_cache` IndexedDB store for bridge reads without re-passkey while lock valid
+  - Encrypted `ishuman_cache` IndexedDB store (v7) for lock-period bridge reads without re-passkey while lock valid
   - `ensureIsHumanIssuanceReady({ isHumanIssuance: true })` for IDV popup / bridge issuance
 - [templates/wallet_bridge.html](templates/wallet_bridge.html):
   - `probeIsHumanIssuanceReady()` + `getIsHumanCredentialsForBridge()` cache-first credential resolution

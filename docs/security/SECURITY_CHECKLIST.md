@@ -1,70 +1,71 @@
 # Lemma Security Checklist
 
-> Security audit checklist for Lemma integration
-
-## Overview
-
-This checklist helps developers verify their Lemma integration follows security best practices.
+> Control inventory for Lemma.id production security. For GA gate decisions use
+> [`docs/status/GA_GATE_STATUS.md`](../status/GA_GATE_STATUS.md).
 
 ## Status Legend
 
-- `PASS`: verified with current production evidence.
-- `IN_PROGRESS`: partially verified (code and/or smoke checks), full validation pending.
-- `UNKNOWN`: not yet validated with sufficient evidence.
-- `FAIL`: validated and not meeting control requirement.
+- `PASS`: verified with current production and/or automated test evidence.
+- `IN_PROGRESS`: partially verified; operator or E2E evidence still required.
+- `UNKNOWN`: not validated with sufficient evidence.
+- `FAIL`: validated and not meeting the control requirement.
+- `N/A`: control removed or not applicable to current architecture.
 
-## Current Verification Snapshot (2026-02-11)
+## Current Verification Snapshot (2026-06-08)
 
-- Environment: production `https://lemma.id` (Heroku)
-- Evidence:
-  - `ops/evidence/launch/2026-02-11-heroku-smoke.md`
-  - `ops/evidence/launch/2026-02-11-heroku-extended-smoke.md`
-  - `ops/evidence/launch/2026-02-11-transport-tls-checks.md`
-  - `ops/evidence/launch/2026-02-11-origin-and-dom-safety-checks.md`
-  - `ops/evidence/launch/2026-02-11-code-remediation.md`
-  - `ops/evidence/launch/2026-02-11-post-remediation-scan.md`
-  - `ops/evidence/launch/2026-02-11-130201-post-deploy-summary.md`
-  - `ops/evidence/launch/2026-02-11-132844-post-deploy-summary.md`
-  - `ops/evidence/launch/2026-02-11-ci-gate-setup.md`
-- Note: this snapshot does not replace full manual/browser E2E validation.
+- **Environment:** production `https://lemma.id` (Heroku app `lemma-enterprise`)
+- **Release:** v2186 · commit `78d52f68` (security hardening deploy)
+- **Architecture:** popup-first wallet (Phase 2.1 — `/wallet/bridge` iframe **removed**)
+- **Primary evidence (local, gitignored):**
+  - `ops/evidence/launch/2026-06-08-security-hardening-deploy-summary.md`
+  - `ops/evidence/launch/2026-06-08-213645-post-deploy-summary.md`
+  - `ops/evidence/launch/2026-06-08-incident-drill-csp-alert.md`
+  - `ops/evidence/launch/2026-03-18-212437-revoke-to-deny-evidence.md` (historical deny-path PASS)
+- **Automated guards:** `tests/test_csp_security.py`, `tests/test_ishuman_cache_encryption.py`,
+  `tests/test_xss_wallet_hardening.py`, `tests/test_wallet_bridge_origin_enforcement.py`,
+  `.github/workflows/auth-launch-gate.yml`
+- **Note:** This snapshot does not replace manual browser E2E, external pentest, or formal sign-off.
 
----
+### Summary counts (this snapshot)
 
-## ✅ Transport Security
-
-| Check | Status | Notes |
-|-------|--------|-------|
-| HTTPS enforced for all production traffic | PASS | `http://lemma.id` returns `301` redirect to HTTPS in production test |
-| TLS 1.2+ only | PASS | TLS 1.1 handshake failed while TLS 1.2 request succeeded in production test |
-| HSTS header enabled | PASS | `Strict-Transport-Security` observed on production root |
-| Certificate pinning (mobile) | UNKNOWN | Optional control; mobile app policy evidence not recorded |
-
-### Verification:
-```bash
-# Check HTTPS headers
-curl -I https://yoursite.com
-
-# Verify TLS version
-openssl s_client -connect yoursite.com:443 -tls1_2
-```
+| Status | Count | Meaning |
+|--------|------:|---------|
+| PASS | 24 | Code + smoke and/or prod probe verified |
+| IN_PROGRESS | 25 | Implemented; needs E2E, matrix, or operator run |
+| UNKNOWN | 9 | Not yet tested; evidence not recorded |
+| FAIL | 0 | No open validated failures |
+| N/A | 2 | Retired or not applicable (bridge era, React N/A) |
 
 ---
 
-## ✅ Cross-Origin Security
+## Transport Security
 
 | Check | Status | Notes |
 |-------|--------|-------|
-| Bridge iframe only from `lemma.id` | IN_PROGRESS | Bridge endpoint validated; third-party embed policy still needs E2E confirmation |
-| postMessage origin validation | IN_PROGRESS | Implemented in code patterns; runtime cross-site abuse tests still pending |
-| CSP `frame-ancestors` set | PASS | Present on `/wallet/bridge` in production headers |
-| No sensitive data in URL params | UNKNOWN | Needs targeted flow inspection and capture |
+| HTTPS enforced for all production traffic | PASS | `http://lemma.id` → 301 HTTPS (2026-02-11 + v2186 smoke) |
+| TLS 1.2+ only | PASS | TLS 1.1 fails, TLS 1.2 succeeds (`post_deploy_launch_gate` transport checks) |
+| HSTS header enabled | PASS | `Strict-Transport-Security` on production root |
+| Certificate pinning (mobile) | UNKNOWN | Optional; no mobile app policy artifact |
 
-### Verification:
+---
+
+## Cross-Origin Security (popup-first, no bridge)
+
+| Check | Status | Notes |
+|-------|--------|-------|
+| Legacy `/wallet/bridge` iframe removed | N/A | Route, template, and audit endpoint removed Phase 2.1; `tests/test_wallet_bridge_origin_enforcement.py` |
+| Wallet verification uses popup flow | IN_PROGRESS | Code path popup-only; full cross-browser E2E capture pending |
+| postMessage uses exact origin match | PASS | `isLemmaTrustedOrigin()` — no `.includes('lemma.id')` substring bypass |
+| `enc_key` omitted from redirect unlock URL | PASS | `unlockWithRedirect` has no enc_key param; regression test pinned |
+| Legacy redirect tokens return 410 | PASS | `POST /api/wallet/create-redirect-token` and `exchange-redirect-token` → 410 on prod |
+| No sensitive data in URL params | IN_PROGRESS | enc_key removed; device-link QR and other flows need targeted audit capture |
+
+### Verification (current pattern)
+
 ```javascript
-// Correct origin checking
+// Exact origin — do NOT use origin.includes('lemma.id')
 window.addEventListener('message', (event) => {
-    if (!event.origin.includes('lemma.id')) {
-        console.warn('Rejected message from:', event.origin);
+    if (!isLemmaTrustedOrigin(event.origin)) {
         return;
     }
     // Process message...
@@ -77,195 +78,142 @@ window.addEventListener('message', (event) => {
 
 | Check | Status | Notes |
 |-------|--------|-------|
-| CSP blocks inline scripts without nonce | IN_PROGRESS | `script-src` uses nonces; CI guard in `tests/test_csp_security.py` |
-| Daily unlock bundle TTL | IN_PROGRESS | 10h default (`DEFAULT_SESSION_HOURS = 10`) |
-| Bundle fail-closed on wrap failure | PASS | No plaintext fallback in `_persistIsHumanLockBundle` |
-| Wallet auto-init scoped to app routes | IN_PROGRESS | `wallet_auto_init` block empty by default; developer/admin/wallet routes opt in |
-| CSP violation reporting | PASS | `report-uri` + `POST /api/security/csp-report` → 204; Sentry `security=csp` tag; drill `ops/evidence/launch/2026-06-08-incident-drill-csp-alert.md` |
-| Debug panel gated in production | PASS | Requires `LEMMA_WALLET_DEBUG=true` server flag |
-| Compromise response documented | PASS | See `docs/security/WALLET_COMPROMISE_RESPONSE.md` |
+| Route-scoped CSP (strict default) | PASS | `/` = self+nonce only; `/unlock` + Stripe/Turnstile; `/link` + unpkg; prod curl v2186 |
+| CSP blocks inline scripts without nonce | PASS | No `unsafe-inline`/`unsafe-eval` in `script-src`; `tests/test_csp_security.py` |
+| CSP violation reporting | PASS | `report-uri` + `POST /api/security/csp-report` → 204; drill `2026-06-08-incident-drill-csp-alert.md` |
+| Daily unlock bundle TTL capped at 10h | PASS | `DEFAULT_SESSION_HOURS = MAX_SESSION_HOURS = 10`; `tests/test_xss_wallet_hardening.py` |
+| Bundle fail-closed on wrap failure | PASS | `_persistIsHumanLockBundle` — no plaintext `walletSecret` fallback |
+| `ishuman_cache` encrypted at rest | PASS | `SENSITIVE_STORES` + `WALLET_DB_VERSION = 7`; `tests/test_ishuman_cache_encryption.py`; bundle v2545 prod |
+| Wallet auto-init scoped to app routes | PASS | Public index empty block; developer/admin/wallet routes opt in; `tests/test_xss_wallet_hardening.py` |
+| Debug panel gated in production | PASS | `LEMMA_WALLET_DEBUG` server flag required |
+| Compromise response documented | PASS | `docs/security/WALLET_COMPROMISE_RESPONSE.md` (thresholds + escalation) |
+| Residual XSS during unlock window | IN_PROGRESS | Same-origin JS during 10h unlock can read `session.walletSecret`; documented accepted risk |
 
 ---
 
-## ✅ Credential Storage
+## Credential Storage
 
 | Check | Status | Notes |
 |-------|--------|-------|
-| Credentials stored in IndexedDB | IN_PROGRESS | Architecture and SDK indicate IndexedDB; production browser artifact capture pending |
-| Wallet secret never exposed to server | UNKNOWN | Requires request-level tracing proof across all auth flows |
-| Session expiry enforced | IN_PROGRESS | Session guardrails validated on API; full client lifecycle validation pending |
-| Passkey required for unlock | IN_PROGRESS | Passkey auth endpoints and challenge flows validated; full UI/E2E still pending |
-
-### Verification:
-```javascript
-// Check storage location
-const dbRequest = indexedDB.open('LemmaWallet');
-dbRequest.onsuccess = () => {
-    console.log('✅ Using IndexedDB for storage');
-};
-
-// Verify session check
-const state = await lemmaWallet.getSessionState();
-if (state.expiresAt < Date.now()) {
-    console.log('✅ Session expiry enforced');
-}
-```
+| Credentials stored in IndexedDB | PASS | `LemmaWallet` DB; envelope encryption for sensitive stores |
+| PRF-derived at-rest key for sensitive stores | PASS | `wallet-at-rest-crypto.js`; migration via `_migratePlaintextStores` |
+| Wallet secret never exposed to server (design) | IN_PROGRESS | Server paths reject `wallet_secret` on isHuman APIs (410); full network trace audit pending |
+| Session expiry enforced | IN_PROGRESS | API guardrails present; full client lifecycle E2E pending |
+| Passkey required for unlock | IN_PROGRESS | Endpoints live; browser matrix evidence pending |
 
 ---
 
-## ✅ Passkey Security
+## Passkey Security
 
 | Check | Status | Notes |
 |-------|--------|-------|
-| `userVerification: 'required'` for unlock | IN_PROGRESS | Enforced in registration/auth verification code; cross-browser runtime matrix pending |
-| `userVerification: 'discouraged'` for extend | IN_PROGRESS | Documented in implemented session model; direct runtime proof capture pending |
-| Credential bound to RP ID | IN_PROGRESS | `rpId: lemma.id` observed in passkey challenge response |
-| No passkey export capability | UNKNOWN | Depends on authenticator/platform behavior; policy evidence not captured |
-
-### Verification:
-```javascript
-// Check unlock requires full verification
-const credential = await navigator.credentials.get({
-    publicKey: {
-        // ...
-        userVerification: 'required'  // Must be 'required' for unlock
-    }
-});
-```
+| `userVerification: 'required'` for unlock | IN_PROGRESS | Enforced in server challenge options; Chrome/Firefox/Safari matrix pending |
+| `userVerification: 'discouraged'` for extend | IN_PROGRESS | Documented session model; runtime capture pending |
+| Credential bound to RP ID `lemma.id` | PASS | `rpId` in passkey challenge responses (smoke + code) |
+| No passkey export capability | UNKNOWN | Authenticator/platform dependent; policy evidence not captured |
 
 ---
 
-## ✅ Signature Verification
+## Signature Verification
 
 | Check | Status | Notes |
 |-------|--------|-------|
-| Ed25519 verification enabled | IN_PROGRESS | Verification components present in code and docs; full black-box proof still pending |
-| Issuer public key validated | UNKNOWN | Needs explicit test artifacts for issuer key trust-chain validation |
-| Signature checked before trust | IN_PROGRESS | Verification-first flow implemented; end-to-end negative tests pending |
-| Expired credentials rejected | UNKNOWN | Requires dedicated expiry test evidence |
-
-### Verification:
-```javascript
-// Always verify before trusting
-const result = await lemmaWallet.verifyLemma(credential);
-if (!result.valid) {
-    throw new Error(`Invalid credential: ${result.reason}`);
-}
-```
+| Ed25519 verification enabled | IN_PROGRESS | WASM + `lemma-keys.js` async signing; black-box negative tests pending |
+| Issuer public key validated | IN_PROGRESS | Trust list + verifier paths exist; dedicated artifact pending |
+| Signature checked before trust | IN_PROGRESS | Verification-first in SDK; E2E negative test capture pending |
+| Expired credentials rejected | UNKNOWN | Dedicated expiry test evidence not recorded |
 
 ---
 
-## ✅ Revocation Checking
+## Revocation Checking
 
 | Check | Status | Notes |
 |-------|--------|-------|
-| Revocation list synced periodically | IN_PROGRESS | Revocation endpoints healthy; `scripts/revoke_to_deny_smoke.py` adds list+bloom polling (prod PASS pending PPID-linked wallet) |
-| Credentials checked against revocation | IN_PROGRESS | v2186 deployed; historical PASS `ops/evidence/launch/2026-03-18-212437-revoke-to-deny-evidence.md`; list/bloom smoke blocked `ppid_not_linked` on 2026-06-08 |
-| Stale revocation data flagged | UNKNOWN | Needs explicit stale-cache scenario test output |
-| Network failure doesn't block auth | UNKNOWN | Offline/failure-mode validation not yet recorded |
-
-### Verification:
-```javascript
-const revInfo = await lemmaWallet.getRevocationInfo();
-console.log('Revocation list:', {
-    synced: revInfo.synced,
-    count: revInfo.count,
-    age: revInfo.age / 1000 + ' seconds old'
-});
-```
+| Revocation list endpoint healthy | PASS | `GET /api/v1/revocation/list` 200 on v2186 smoke |
+| Bloom filter endpoint healthy | PASS | `GET /api/revocation/bloom-filter` 200 on v2186 smoke |
+| Revoke → deny propagation | IN_PROGRESS | Historical PASS `2026-03-18-212437-revoke-to-deny-evidence.md`; v2186 list/bloom smoke blocked `ppid_not_linked` |
+| Bloom sync on site revoke | PASS | Unit coverage `tests/test_wallet_site_revocation.py` |
+| Stale revocation data flagged | UNKNOWN | Stale-cache scenario test not recorded |
+| Bloom verifier fail-open at startup | IN_PROGRESS | Documented in `api/revocation_verifier.py`; no startup gate yet |
 
 ---
 
-## ✅ Session Management
+## Session Management
 
 | Check | Status | Notes |
 |-------|--------|-------|
-| Session stored in IndexedDB | IN_PROGRESS | SDK design indicates IndexedDB; production browser artifact still needed |
-| Session bound to wallet | IN_PROGRESS | Session APIs require authenticated context; full proof path pending |
-| Max extension limit (7) | IN_PROGRESS | Documented in implementation progress; runtime validation pending |
-| Extension requires user presence | IN_PROGRESS | Design enforces user presence; capture with passkey prompt evidence pending |
-
-### Verification:
-```javascript
-const state = await lemmaWallet.getSessionState();
-console.log('Session security:', {
-    extensionCount: state.extensionCount,
-    maxReached: state.extensionCount >= 7,
-    canExtend: state.canExtend
-});
-```
+| Session stored in IndexedDB (encrypted) | PASS | `session` in `SENSITIVE_STORES` |
+| Session bound to wallet | IN_PROGRESS | APIs require authenticated context; full proof path pending |
+| Max extension limit (7) | IN_PROGRESS | Documented; runtime validation pending |
+| Extension requires user presence | IN_PROGRESS | Design enforces presence; passkey prompt evidence pending |
 
 ---
 
-## ✅ Privacy Protection
+## Privacy Protection
 
 | Check | Status | Notes |
 |-------|--------|-------|
-| PPID used for user identification | IN_PROGRESS | Architecture/docs define PPID model; live proof capture pending |
-| No cross-site tracking possible | UNKNOWN | Requires adversarial correlation test evidence |
-| Wallet secret never sent to server | UNKNOWN | Needs network trace evidence across all flows |
-| Credentials filtered by site | IN_PROGRESS | Site-scoped controls documented; cross-site denial tests pending |
-
-### Verification:
-```javascript
-// PPID is different for each site
-const ppid1 = await derivePPID(walletSecret, 'site1.com');
-const ppid2 = await derivePPID(walletSecret, 'site2.com');
-console.log('PPIDs are different:', ppid1 !== ppid2);
-```
+| PPID used for user identification | PASS | Architecture + server enforcement; see `PRIVACY_ARCHITECTURE.md` |
+| No cross-site tracking possible | UNKNOWN | Adversarial correlation test not recorded |
+| Wallet secret not sent to server (runtime proof) | IN_PROGRESS | Legacy paths removed/410; HAR/trace across all flows pending |
+| Credentials filtered by site | IN_PROGRESS | Site-scoped controls in code; cross-site denial E2E pending |
 
 ---
 
-## ✅ Content Security Policy
+## Content Security Policy (lemma.id route profiles)
 
-Recommended CSP headers:
+Implemented in `app.py` → `build_content_security_policy()`. See
+[`THIRD_PARTY_SCRIPTS.md`](THIRD_PARTY_SCRIPTS.md).
 
-```
-Content-Security-Policy:
-    default-src 'self';
-    script-src 'self' https://lemma.id;
-    frame-src https://lemma.id;
-    connect-src 'self' https://lemma.id;
-```
+| Profile | Routes | Extra `script-src` |
+|---------|--------|-------------------|
+| `strict` | Default (e.g. `/`, `/dashboard`) | none |
+| `unlock_idv` | `/unlock`, `/wallet/unlock`, `/wallet/popup`, `/wallet/ishuman-idv` | Stripe, Cloudflare Turnstile |
+| `link_qr` | `/link`, `/wallet/link` | above + `unpkg.com` (html5-qrcode) |
 
-### For bridge page (`/wallet/bridge`):
-```
-Content-Security-Policy:
-    frame-ancestors https: http://localhost:* http://127.0.0.1:*;
-```
+Removed from global policy: `static.cloudflareinsights.com`, `cdn.jsdelivr.net` (unused in layouts).
 
 ---
 
-## ✅ Service Worker Security
+## Service Worker Security
 
 | Check | Status | Notes |
 |-------|--------|-------|
-| SW only registered on lemma.id | IN_PROGRESS | Documented behavior; explicit production registration artifact pending |
-| Cache-first for static assets | IN_PROGRESS | Bridge cache headers validated; full SW mode test still pending |
-| Network-first for sensitive data | UNKNOWN | Needs explicit request policy verification |
-| SW scope properly restricted | UNKNOWN | Requires header/scope validation artifact |
+| SW only registered on lemma.id | IN_PROGRESS | `static/sw.js` exists; production registration artifact pending |
+| Cache-first for static assets | IN_PROGRESS | SW present; full mode test pending |
+| Network-first for sensitive data | UNKNOWN | Explicit request policy verification pending |
+| SW scope properly restricted | UNKNOWN | Header/scope validation artifact pending |
 
 ---
 
-## ✅ Error Handling
+## Error Handling
 
 | Check | Status | Notes |
 |-------|--------|-------|
-| No sensitive data in error messages | IN_PROGRESS | Basic unauthenticated responses reviewed; full error corpus audit pending |
-| Auth failures don't reveal user existence | IN_PROGRESS | Unauthenticated register/session paths return generic denial statuses |
-| Console logs disabled in production | UNKNOWN | Needs built artifact and runtime console audit |
-| Error boundaries in React | UNKNOWN | Requires frontend app audit evidence |
+| No sensitive data in error messages | IN_PROGRESS | Basic API responses reviewed; full corpus audit pending |
+| Auth failures don't reveal user existence | IN_PROGRESS | Generic denial on unauthenticated paths |
+| Console logs disabled in production | UNKNOWN | Built artifact + runtime console audit pending |
+| Error boundaries in React | N/A | Lemma.id is server-rendered templates, not a React SPA |
 
 ---
 
-## ✅ Input Validation
+## Input Validation & Template XSS
 
 | Check | Status | Notes |
 |-------|--------|-------|
-| Credential data validated before use | IN_PROGRESS | Request validation present in key API paths; comprehensive coverage pending |
-| Origin always validated | IN_PROGRESS | Runtime checks show disallowed origin POST has no ACAO; preflight strictness still needs review |
-| No eval() or innerHTML with data | IN_PROGRESS | Production templates refactored to safer DOM/text patterns; remaining dynamic interpolation exists in non-production test/build files |
-| Claims sanitized before display | UNKNOWN | Requires UI rendering audit evidence |
+| Credential data validated before use | IN_PROGRESS | Key API paths validated; comprehensive coverage pending |
+| Origin validated on credentialed CORS | IN_PROGRESS | Disallowed origin POST has no ACAO; preflight review pending |
+| High-risk innerHTML surfaces escaped | PASS | `register.html`, `admin/health.html`, admin/dev layout toasts (v2186) |
+| Remaining innerHTML in admin/developer | IN_PROGRESS | `developer/platform.html` and others not fully audited |
+| Claims sanitized before display | UNKNOWN | UI rendering audit pending |
+
+---
+
+## Device Linking (residual exposure)
+
+| Check | Status | Notes |
+|-------|--------|-------|
+| QR device link minimizes secret exposure | IN_PROGRESS | Encrypted payload in QR (not plaintext); server-relay migration backlog — see `DEVICE_LINKING_REVIEW.md` |
 
 ---
 
@@ -281,15 +229,34 @@ We follow responsible disclosure and will work with you to resolve issues.
 
 | Date | Auditor | Scope | Result |
 |------|---------|-------|--------|
-| TBD | TBD | Full SDK audit | TBD |
-| 2026-02-11 | Internal (launch gate) | Production smoke + header + guardrail checks | Partial verification complete; full audit pending |
-| 2026-02-11 | Internal (post-deploy) | Heroku `v1676` automated launch gate run | Smoke/transport/origin checks passed; full E2E audit still pending |
+| 2026-02-11 | Internal | Launch gate v1676 smoke/transport | Partial — baseline |
+| 2026-03-04 | Internal | GA decision record | NO-GO — P0 gaps documented |
+| 2026-03-18 | Internal | Revoke→deny evidence script | PASS deny-path (pre list/bloom steps) |
+| 2026-06-08 | Internal | Security hardening v2186 deploy | Code PASS; assurance gaps remain — see sign-off section below |
 
 ---
 
 ## Compliance Notes
 
-- **GDPR**: Lemma is a data-minimized **controller** (likely joint controller with the IDV provider for the verification step). Relying sites receive only a site-private PPID and a boolean claim. Lemma does **not** store raw documents, face/selfie images, or legal name, but **does** store derived, re-identifiable pseudonymous data (document/person root hashes, PPIDs, wallet↔person bindings, revocation state) and logs IP/UA on some paths. Pseudonymous data is still personal data (GDPR Recital 26). Erasure is implemented via `POST /api/ishuman/erase`. See `docs/architecture/PRIVACY_ARCHITECTURE.md` for the authoritative, code-accurate data inventory. Do **not** claim "no personal data on Lemma servers."
-- **CCPA**: No sale of personal information. Same controller posture and data inventory as the GDPR note above.
+- **GDPR**: Lemma is a data-minimized **controller** (likely joint controller with the IDV provider for the verification step). Relying sites receive only a site-private PPID and a boolean claim. Lemma does **not** store raw documents, face/selfie images, or legal name, but **does** store derived, re-identifiable pseudonymous data (document/person root hashes, PPIDs, wallet↔person bindings, revocation state) and logs IP/UA on some paths. Pseudonymous data is still personal data (GDPR Recital 26). Erasure is implemented via `POST /api/ishuman/erase`. See [`docs/architecture/PRIVACY_ARCHITECTURE.md`](../architecture/PRIVACY_ARCHITECTURE.md). Do **not** claim "no personal data on Lemma servers."
+- **CCPA**: No sale of personal information.
 - **SOC 2**: In progress (server infrastructure only).
-- **PCI DSS**: Not applicable - no payment data handling.
+- **PCI DSS**: Not applicable — Stripe.js loads on wallet routes only; card data handled by Stripe.
+
+---
+
+## Sign-Off Blockers (operator actions)
+
+These items block **P0-1 Security Controls Sign-off** and **GA GO**. Code/deploy work from the 2026-06 hardening program is complete.
+
+| # | Action | Closes | Artifact to attach |
+|---|--------|--------|-------------------|
+| 1 | Log in on lemma.id, then run `python scripts/revoke_to_deny_smoke.py` | P0-4, revocation rows | `ops/evidence/launch/*-revoke-to-deny-evidence.md` with list+bloom PASS |
+| 2 | Fill Chrome / Firefox / Safari passkey matrix | P0-5, passkey rows | `ops/evidence/launch/2026-06-08-passkey-browser-matrix.md` + screenshots |
+| 3 | Run manual E2E flows (unlock, IDV, lock, relying-site auth) | P0-2 | Signed `docs/status/SOLO_GA_TEST_EXECUTION_SHEET.md` |
+| 4 | Commission scoped external pentest | P0-6 | Report + remediation tracker per `2026-06-08-external-pentest-scope.md` |
+| 5 | Confirm Sentry `security=csp` event from drill POST | P0-7 | Event id in `2026-06-08-incident-drill-csp-alert.md` |
+| 6 | Security Lead reviews this checklist and marks remaining IN_PROGRESS/UNKNOWN rows PASS or accepted risk | P0-1 | Updated rows + approver name/date in `GA_GATE_STATUS.md` |
+| 7 | Revoke/rotate any test admin/agent tokens used during QA | Token hygiene | Note in SOLO sheet |
+
+**GA rule:** All P0 gates in `GA_GATE_STATUS.md` must be `PASS` before public GA claim.

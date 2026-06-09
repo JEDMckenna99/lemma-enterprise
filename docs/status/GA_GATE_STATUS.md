@@ -13,7 +13,7 @@ Last updated: 2026-06-08 (deploy v2186 / commit 78d52f68)
 
 | Gate | Status | Owner | Evidence | Blocking Gap |
 |---|---|---|---|---|
-| P0-1 Security Controls Sign-off | IN_PROGRESS | Security Lead | `docs/security/SECURITY_CHECKLIST.md` | Formal security sign-off and closure plan for non-PASS controls |
+| P0-1 Security Controls Sign-off | IN_PROGRESS | Security Lead | `docs/security/SECURITY_CHECKLIST.md` (refreshed 2026-06-08: 24 PASS / 22 IN_PROGRESS / 14 UNKNOWN) | Security Lead sign-off + close remaining IN_PROGRESS/UNKNOWN per checklist §Sign-Off Blockers |
 | P0-2 End-to-End Test Execution Evidence | IN_PROGRESS | QA Lead | `docs/status/SOLO_GA_TEST_EXECUTION_SHEET.md`, `docs/testing/FULL_TEST_SUITE.md` | Manual critical flows still missing evidence |
 | P0-3 CI Release Gate for Auth/Security Paths | PASS | Platform/DevOps | `.github/workflows/auth-launch-gate.yml`, `.github/workflows/launch-gate-smoke.yml` | Strict workflow added with required secret check and non-skippable scope matrix gate |
 | P0-4 Revocation Data Path Completeness | IN_PROGRESS | Backend Lead | `ops/evidence/launch/2026-03-18-212437-revoke-to-deny-evidence.md` (historical PASS), `ops/evidence/launch/2026-06-08-security-hardening-deploy-summary.md` | v2186 deployed; new list/bloom smoke blocked `ppid_not_linked`; historical deny-path PASS on 2026-03-18 |
