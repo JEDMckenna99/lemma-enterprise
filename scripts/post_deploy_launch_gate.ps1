@@ -21,6 +21,15 @@ param(
 
 $ErrorActionPreference = "Stop"
 
+function Get-PowerShellExecutable {
+    if (Get-Command pwsh -ErrorAction SilentlyContinue) {
+        return "pwsh"
+    }
+    return "powershell"
+}
+
+$PowerShellExecutable = Get-PowerShellExecutable
+
 New-Item -ItemType Directory -Force -Path $OutputDir | Out-Null
 
 $stamp = Get-Date -Format "yyyy-MM-dd-HHmmss"
@@ -86,14 +95,14 @@ function Invoke-PowerShellChecked {
         [string]$OutputPath = ""
     )
 
-    Write-Output "[$StepName] powershell $($CommandArgs -join ' ')"
+    Write-Output "[$StepName] $PowerShellExecutable $($CommandArgs -join ' ')"
     $previousErrorActionPreference = $ErrorActionPreference
     $ErrorActionPreference = "Continue"
     try {
         if ($OutputPath) {
-            & powershell @CommandArgs 2>&1 | Tee-Object -FilePath $OutputPath
+            & $PowerShellExecutable @CommandArgs 2>&1 | Tee-Object -FilePath $OutputPath
         } else {
-            & powershell @CommandArgs 2>&1
+            & $PowerShellExecutable @CommandArgs 2>&1
         }
         if ($LASTEXITCODE -ne 0) {
             throw "$StepName failed with exit code $LASTEXITCODE"
