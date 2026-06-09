@@ -91,7 +91,7 @@ const AUTH_STATE = {
 class LemmaWallet {
     // SDK version - check with LemmaWallet.VERSION
     // v2.32.0: Redirect-only architecture - removed popup flow for simpler, consistent UX
-    static VERSION = '2.64.0';  // v2.64: require passkey for isHuman site proof; bind passkey to handoff wallet_id (no orphan mint)
+    static VERSION = '2.65.0';  // v2.65: isHuman passkey required without force-flag loop; bind handoff wallet_id
     
     constructor(options = {}) {
         this.db = null;
@@ -3153,7 +3153,7 @@ class LemmaWallet {
         const issuanceOpts = {
             ...options,
             isHumanIssuance: true,
-            force: options.force || forcePasskeyForEncryptedCache || requirePasskeyForIssuance,
+            force: options.force || forcePasskeyForEncryptedCache,
         };
 
         if (existingPasskey && existingPasskey.credentialId) {

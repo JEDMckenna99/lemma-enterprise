@@ -1185,17 +1185,10 @@
     bind('ih-force-reverify-btn', forceFreshIdv);
 
     try {
-      const isVerificationReturn =
-        state.sessionId && new URLSearchParams(window.location.search).has('verification_return');
-      if (isVerificationReturn) {
-        await initWallet();
-        await pollAndStoreMaster();
-      } else {
-        await refreshWalletStatus();
-        if (state.masterCredentialId || state.sessionId) {
-          await refreshStatus();
-          setPill('ih-lemma-status', 'READY', 'ok');
-        }
+      await refreshWalletStatus();
+      if (state.masterCredentialId || state.sessionId) {
+        await refreshStatus();
+        setPill('ih-lemma-status', 'READY', 'ok');
       }
     } catch (err) {
       log('Startup check skipped', err.message);

@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="referrer" content="no-referrer">
+    <meta name="cloudflare-no-rocket-loader" content="true">
     <title>Verify once with Lemma</title>
     <style nonce="{{ csp_nonce }}">
         * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -96,10 +97,10 @@
         </div>
     </div>
 
-    <script src="/static/js/lemma-keys.js?v=4" nonce="{{ csp_nonce }}"></script>
-    <script src="/static/js/wallet-at-rest-crypto.js?v=2" nonce="{{ csp_nonce }}"></script>
+    <script src="/static/js/lemma-keys.js?v=4" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
+    <script src="/static/js/wallet-at-rest-crypto.js?v=2" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
     <script nonce="{{ csp_nonce }}">window.LEMMA_ISHUMAN_USE_PERSON_ROOT_SEEDS = {{ 'true' if ishuman_use_person_root_seeds else 'false' }};</script>
-    <script src="/sdk/lemma-wallet.js?v=2548" nonce="{{ csp_nonce }}"></script>
+    <script src="/sdk/lemma-wallet.js?v=2549" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
     <script nonce="{{ csp_nonce }}">
         const SESSION_KEY = 'ishuman_idv_popup_session_id';
         const params = new URLSearchParams(window.location.search);
@@ -289,13 +290,44 @@
         }
 
         async function ensureWalletUnlocked() {
+            if (typeof LemmaWallet === 'undefined') {
+                throw new Error('Wallet SDK failed to load — allow scripts for lemma.id and refresh.');
+            }
             wallet = wallet || new LemmaWallet();
+            setStatus('Unlock wallet with passkey…', 'loading');
             const result = await wallet.ensureIsHumanIssuanceReady({ isHumanIssuance: true });
             if (!result.ready) {
-                throw new Error('Wallet unlock failed');
+                throw new Error('Wallet unlock failed — complete the passkey prompt or try again.');
             }
             await adoptWalletState();
             if (!walletId) throw new Error('Wallet unlock failed');
+        }
+
+        async function canAutoFinishVerificationReturn() {
+            if (!isVerificationReturn || !sessionId) return false;
+            wallet = wallet || new LemmaWallet();
+            await wallet.init();
+            try {
+                if (await hasMasterProof()) return true;
+            } catch (err) {
+                const msg = String(err?.message || err || '');
+                if (msg.indexOf('passkey') === -1 && msg.indexOf('encrypted') === -1) {
+                    return false;
+                }
+            }
+            let passkey = null;
+            try {
+                passkey = await wallet._get('passkey', 'primary');
+            } catch (err) {
+                return false;
+            }
+            if (!passkey?.credentialId) return false;
+            if (!(wallet.isUnlocked && wallet.isUnlocked())) return false;
+            if (typeof wallet._encryptedStorageNeedsAtRestKey === 'function') {
+                const needsAtRestKey = await wallet._encryptedStorageNeedsAtRestKey();
+                if (needsAtRestKey && !wallet._atRestKey) return false;
+            }
+            return true;
         }
 
         async function hasMasterProof() {
@@ -824,12 +856,16 @@
             if (isVerificationReturn && sessionId) {
                 document.getElementById('primary-btn').classList.add('hidden');
                 try {
-                    await runVerification();
+                    if (await canAutoFinishVerificationReturn()) {
+                        await runVerification();
+                        return;
+                    }
                 } catch (err) {
-                    setStatus(err.message || 'Could not finish verification', 'error');
-                    document.getElementById('primary-btn').classList.remove('hidden');
-                    document.getElementById('primary-btn').textContent = 'Try again';
+                    console.warn('[isHuman IDV] auto-finish skipped:', err?.message || err);
                 }
+                setStatus('Unlock wallet to finish verification…', 'info');
+                document.getElementById('primary-btn').classList.remove('hidden');
+                document.getElementById('primary-btn').textContent = 'Unlock & finish';
                 return;
             }
 

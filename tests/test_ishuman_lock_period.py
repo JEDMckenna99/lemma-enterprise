@@ -102,6 +102,7 @@ def test_wallet_handoff_wallet_id_reconciled_for_site_proof(wallet_source):
     assert "reconcileSessionWalletIdForIssuance" in wallet_source
     assert "requirePasskeyForIssuance" in wallet_source
     assert "mustCreatePasskeyForIssuance" in wallet_source
+    assert "canAutoFinishVerificationReturn" in IDV_HTML.read_text(encoding="utf-8")
     assert "ishuman_deferred_passkey" not in wallet_source
 
 
@@ -179,9 +180,9 @@ def test_wallet_pages_use_current_wallet_bundle():
         source = path.read_text(encoding="utf-8")
         assert "lemma-wallet.js?v=2542" not in source
         if path == IDV_HTML:
-            assert "lemma-wallet.js?v=2548" in source
+            assert "lemma-wallet.js?v=2549" in source
         else:
-            assert "lemma-wallet.js') }}?v=2545" in source or "lemma-wallet.js?v=2545" in source
+            assert "lemma-wallet.js') }}?v=2549" in source or "lemma-wallet.js?v=2549" in source
         assert "lemma-keys.js?v=2" not in source
         assert "lemma-keys.js?v=3" not in source
         assert "lemma-keys.js') }}?v=4" in source or "lemma-keys.js?v=4" in source
