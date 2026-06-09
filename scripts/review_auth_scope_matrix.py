@@ -128,6 +128,8 @@ IN_HANDLER_AUTH_ALLOWLIST = {
     "/api/ishuman/seed-envelope",
     "/api/ishuman/site-block",
     "/api/ishuman/site-unblock",
+    "/api/ishuman/site-proof-redirect/claim",
+    "/api/ishuman/site-proof-redirect/deposit",
     "/api/ishuman/start-verification",
     "/api/ishuman/verify-presentation",
     "/api/wallet/challenge",
