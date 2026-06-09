@@ -21,7 +21,9 @@ Automated evidence from Phases A–D (see `lemma-security-hardening-plan.canvas.
 | C — route CSP + innerHTML | Code complete | `ops/evidence/launch/*-phase-c-summary.md`, `tests/test_csp_security.py` |
 | D — CSP alert drill | PASS | `ops/evidence/launch/2026-06-08-incident-drill-csp-alert.md` |
 
-Deploy pending: `git push production HEAD:main` after operator commit.
+- [x] Deploy security hardening to prod (v2186 / `78d52f68`).
+  - Result: `PASS`
+  - Evidence: `ops/evidence/launch/2026-06-08-security-hardening-deploy-summary.md`, `ops/evidence/launch/2026-06-08-213645-post-deploy-summary.md`
 
 ---
 

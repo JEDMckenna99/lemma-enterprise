@@ -160,7 +160,7 @@ if (!result.valid) {
 | Check | Status | Notes |
 |-------|--------|-------|
 | Revocation list synced periodically | IN_PROGRESS | Revocation endpoints healthy; `scripts/revoke_to_deny_smoke.py` adds list+bloom polling (prod PASS pending PPID-linked wallet) |
-| Credentials checked against revocation | IN_PROGRESS | Smoke script ready (`scripts/revoke_to_deny_evidence.py`); prod blocked `ppid_not_linked` — see `ops/evidence/launch/2026-06-08-revoke-to-deny-evidence.md` |
+| Credentials checked against revocation | IN_PROGRESS | v2186 deployed; historical PASS `ops/evidence/launch/2026-03-18-212437-revoke-to-deny-evidence.md`; list/bloom smoke blocked `ppid_not_linked` on 2026-06-08 |
 | Stale revocation data flagged | UNKNOWN | Needs explicit stale-cache scenario test output |
 | Network failure doesn't block auth | UNKNOWN | Offline/failure-mode validation not yet recorded |
 
