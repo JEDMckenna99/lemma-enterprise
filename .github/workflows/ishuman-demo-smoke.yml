@@ -8,6 +8,10 @@ on:
 jobs:
   demo-smoke:
     runs-on: ubuntu-latest
+    env:
+      ISHUMAN_LIVE_BASE_URL: ${{ secrets.ISHUMAN_LIVE_BASE_URL }}
+      LEMMA_ISHUMAN_PROD_TEST_MASTER_CREDENTIAL_ID: ${{ secrets.LEMMA_ISHUMAN_PROD_TEST_MASTER_CREDENTIAL_ID }}
+      LEMMA_ISHUMAN_PROD_TEST_SITE_API_KEY: ${{ secrets.LEMMA_ISHUMAN_PROD_TEST_SITE_API_KEY }}
     steps:
       - uses: actions/checkout@v4
 
@@ -19,11 +23,7 @@ jobs:
         run: python scripts/smoke_ishuman_customer_sites.py
 
       - name: Prod revocation smoke (optional secrets)
-        if: ${{ secrets.ISHUMAN_LIVE_BASE_URL != '' }}
-        env:
-          ISHUMAN_LIVE_BASE_URL: ${{ secrets.ISHUMAN_LIVE_BASE_URL }}
-          LEMMA_ISHUMAN_PROD_TEST_MASTER_CREDENTIAL_ID: ${{ secrets.LEMMA_ISHUMAN_PROD_TEST_MASTER_CREDENTIAL_ID }}
-          LEMMA_ISHUMAN_PROD_TEST_SITE_API_KEY: ${{ secrets.LEMMA_ISHUMAN_PROD_TEST_SITE_API_KEY }}
+        if: env.ISHUMAN_LIVE_BASE_URL != ''
         run: |
           python scripts/run_ishuman_prod_revocation_smoke.py \
             --base-url "${ISHUMAN_LIVE_BASE_URL:-https://lemma.id}"

@@ -81,7 +81,7 @@ jobs:
 
       - name: Run ISHUMAN issuance test suite (non-live)
         env:
-          DATABASE_URL: sqlite:///:memory:
+          DATABASE_URL: "sqlite:///:memory:"
           LEMMA_PPID_ROOT_KEY: xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
           LEMMA_IDENTITY_ROOT_PEPPER_V1: yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy
           LEMMA_PERSON_ROOT_SALT_V1: zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz
