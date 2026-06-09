@@ -39,7 +39,7 @@ jobs:
       - name: Run local security gates
         env:
           SESSION_SECRET: test-session-secret
-          DATABASE_URL: sqlite:///:memory:
+          DATABASE_URL: "sqlite:///:memory:"
         run: |
           python -m pytest tests/test_csp_security.py -q
           python scripts/generate_auth_scope_matrix.py
