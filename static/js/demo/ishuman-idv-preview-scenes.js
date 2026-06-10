@@ -12,7 +12,7 @@
     eyebrow: 'Secured by Lemma.id',
     headline: "Prove you're human once",
     privacy:
-      'Your ID documents are used only to create your human proof. After the proof is created, your documents and photos are removed from the verification provider. Lemma.id keeps your proof, not your ID.',
+      'Your ID documents are used only to create your human proof. After your proof is created, your documents and photos are removed from the verification provider. Lemma.id only stores your human proof, not your ID.',
     cancel: 'Not now',
     steps: [
       'Secure this device with Face ID, Touch ID, or your passkey',
@@ -31,7 +31,7 @@
     intro: {
       verifyOnce(site) {
         const s = formatSiteLabel(site);
-        return `Create your lemma.id to prove you\u2019re a real person without sharing your ID with ${s}. Your lemma.id stores your human proof, so you can skip repeat checks on other sites that use Lemma.id.`;
+        return `Create your lemma.id to prove you\u2019re a real person without sharing your ID with ${s}. Your lemma.id is stored in your browser, so you can skip repeat checks on other sites that use Lemma.id.`;
       },
       unlockReturning(site) {
         const s = formatSiteLabel(site);
