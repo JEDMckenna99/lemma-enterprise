@@ -50,14 +50,15 @@ The public `/demo/ishuman` route demonstrates reusable proof-of-humanity using t
 - The browser wallet stores the master credential locally.
 - `IsHumanVerifier` requests site-specific credentials through `/wallet/bridge`.
 - `/api/ishuman/derive-site-proof` derives different PPIDs for `tickets-demo.lemma.id` and `trials-demo.lemma.id`.
-- Demo wrappers under `/api/demo/ishuman/*` apply site-local blocks and token-gated network revocation drills without exposing demo site API keys.
+- Demo wrappers under `/api/demo/ishuman/*` apply site-local blocks. Network revocation drill endpoints require `LEMMA_ISHUMAN_NETWORK_REVOCATION_ENABLED=1`.
 
 ## Required environment variables
 
 - `STRIPE_SECRET_KEY`: Stripe account key with Identity enabled.
 - `STRIPE_IDENTITY_WEBHOOK_SECRET`: webhook secret for `/api/webhooks/stripe-identity`.
 - `ISHUMAN_RETURN_URL`: optional default return URL. The demo passes `/demo/ishuman?verification_return=true` explicitly.
-- `LEMMA_ISHUMAN_DEMO_ADMIN_TOKEN`: optional. Required only for the live **Approve network revocation** button.
+- `LEMMA_ISHUMAN_NETWORK_REVOCATION_ENABLED=1`: optional. Enables tier-2 network revocation endpoints and the demo network drill.
+- `LEMMA_ISHUMAN_DEMO_ADMIN_TOKEN`: optional. Required only for the live **Approve network revocation** button when tier 2 is enabled.
 - `LEMMA_ISHUMAN_DEMO_ALLOW_TEST_VERIFY=true`: optional. Enables the guarded Stripe test-mode completion helper.
 - `LEMMA_ISHUMAN_DEMO_TEST_TOKEN`: optional but required when test-mode completion is enabled. Pass this in the demo UI or as `X-Demo-Test-Token`.
 
@@ -69,8 +70,7 @@ The public `/demo/ishuman` route demonstrates reusable proof-of-humanity using t
 4. Return to the demo and click **Poll and store master proof** if it does not run automatically.
 5. Click **Verify both demo sites** and show the two different PPIDs.
 6. Click **Block ticketing PPID** and show ticketing denied while free trial remains valid.
-7. Click **Request network review** to show the reviewed escalation path.
-8. Optional: enter `LEMMA_ISHUMAN_DEMO_ADMIN_TOKEN`, click **Approve network revocation**, and show both sites denied after revocation sync.
+7. Optional (tier 2 only): set `LEMMA_ISHUMAN_NETWORK_REVOCATION_ENABLED=1`, click **Request network review**, then approve network revocation to show both sites denied.
 
 ## Demo language guardrail
 

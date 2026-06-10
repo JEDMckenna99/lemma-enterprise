@@ -105,7 +105,7 @@ await fetch('/api/audit-log', {
             <tr><td>Embed <code>ishuman-verifier.js</code> and call <code>verify()</code></td><td>Hosts the wallet + IDV popup and issues signed credentials</td></tr>
             <tr><td>Set <code>siteId</code> to your hostname</td><td>Derives a per-site PPID bound to that hostname</td></tr>
             <tr><td>Store <code>ppid</code> on your user record</td><td>Does not receive your app&apos;s business data or audit logs</td></tr>
-            <tr><td>API key — only for <code>site-block</code>, <code>network-revoke</code>, etc.</td><td>Operates upstream IDV (Didit by default) and platform webhooks internally</td></tr>
+            <tr><td>API key — only for <code>site-block</code> and related moderation APIs</td><td>Operates upstream IDV (Didit by default) and platform webhooks internally</td></tr>
             <tr><td><strong>No</strong> webhook URL, Didit account, or upstream IDV setup</td><td>IDV issuer webhooks terminate at lemma.id, not at your servers</td></tr>
         </tbody>
     </table>
@@ -309,7 +309,6 @@ if not check.ok:
             <tr><td><code>POST</code></td><td><code>/api/ishuman/verify-presentation</code></td><td>Optional server-side re-verify (prefer local <code>verifyStamp()</code>).</td><td>None</td></tr>
             <tr><td><code>POST</code></td><td><code>/api/ishuman/site-block</code></td><td>Immediate site-level PPID block.</td><td><code>X-API-Key</code></td></tr>
             <tr><td><code>POST</code></td><td><code>/api/ishuman/site-unblock</code></td><td>Remove site-scoped block.</td><td><code>X-API-Key</code></td></tr>
-            <tr><td><code>POST</code></td><td><code>/api/ishuman/network-revoke</code></td><td>Submit network-wide revocation request (reviewed).</td><td><code>X-API-Key</code></td></tr>
             <tr><td><code>GET</code></td><td><code>/api/ishuman/check</code></td><td>Check block / revocation status for a PPID.</td><td>None</td></tr>
             <tr><td><code>GET</code></td><td><code>/api/ishuman/site-blocks</code></td><td>List active blocks for your site.</td><td><code>X-API-Key</code></td></tr>
             <tr><td><code>GET</code></td><td><code>/api/ishuman/stats</code></td><td>Public network statistics.</td><td>None</td></tr>
@@ -337,8 +336,9 @@ if not check.ok:
   -H "X-API-Key: YOUR_SITE_API_KEY" \
   -d '{"ppid": "did:lemma:ppid_...", "reason": "Terms violation — automated activity"}'</code>
     </div>
-    <h3>Tier 2: Network revocation (reviewed)</h3>
-    <p>Request network action via <code>POST /api/ishuman/network-revoke</code> with your site API key. A tier 1 site block applies immediately while the request is reviewed. lemma.id operators approve network-wide wallet revocation internally — <code>POST /api/ishuman/approve-revocation</code> is not a customer-facing endpoint.</p>
+    <h3>Tier 2: Network revocation (optional, disabled by default)</h3>
+    <p>Network-wide revocation is not enabled on the default deployment. Site-scoped <code>site-block</code> (tier 1) is the supported GA enforcement path.</p>
+    <p>When Lemma operators enable tier 2 (<code>LEMMA_ISHUMAN_NETWORK_REVOCATION_ENABLED=1</code>), a site may request network action via <code>POST /api/ishuman/network-revoke</code>. A tier 1 site block applies immediately while the request is reviewed. Lemma.id operators approve network-wide wallet revocation internally — <code>POST /api/ishuman/approve-revocation</code> is not a customer-facing endpoint.</p>
 </div>
 
 <div class="docs-section">
@@ -353,7 +353,7 @@ if not check.ok:
     </ul>
     <div class="callout callout--info">
         <div class="callout-title">What lemma.id can and can&apos;t see</div>
-        <p>lemma.id holds the verified-person root that links credentials for re-verification and network revocation. After approved issuance (and on declined, expired, or abandoned sessions), lemma.id requests upstream deletion of raw IDV session data at Didit — document images, liveness captures, and selfies. Your site never receives that material. Routine verification on your site runs locally in the browser; lemma.id does not observe which pages users visit or when they pass <code>verify()</code> on your domain.</p>
+        <p>lemma.id holds the verified-person root that links credentials for re-verification and optional network revocation. After approved issuance (and on declined, expired, or abandoned sessions), lemma.id requests upstream deletion of raw IDV session data at Didit — document images, liveness captures, and selfies. Your site never receives that material. Routine verification on your site runs locally in the browser; lemma.id does not observe which pages users visit or when they pass <code>verify()</code> on your domain.</p>
     </div>
 </div>
 {% endblock %}

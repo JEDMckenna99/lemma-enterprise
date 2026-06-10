@@ -6,7 +6,16 @@
     tickets: 'tickets-demo.lemma.id',
     trials: 'trials-demo.lemma.id',
   };
-  const WIZARD_TOTAL = 7;
+  const WIZARD_TOTAL_DEFAULT = 7;
+  const WIZARD_TOTAL_SITE_ONLY = 5;
+
+  function networkRevocationEnabled() {
+    return !!(state.config && state.config.network_revocation_enabled);
+  }
+
+  function wizardTotal() {
+    return networkRevocationEnabled() ? WIZARD_TOTAL_DEFAULT : WIZARD_TOTAL_SITE_ONLY;
+  }
 
   const state = {
     config: null,
@@ -85,11 +94,16 @@
     if (shell) shell.hidden = false;
     if (statusEl && statusText) statusEl.textContent = statusText;
     if (labelEl) {
-      labelEl.textContent = step > 0 ? `Step ${step} of ${WIZARD_TOTAL}` : 'Demo complete';
+      labelEl.textContent = step > 0 ? `Step ${step} of ${wizardTotal()}` : 'Demo complete';
     }
     document.querySelectorAll('.wizard-dot').forEach((dot) => {
       const dotStep = Number(dot.dataset.step || 0);
       dot.classList.remove('active', 'done');
+      if (!networkRevocationEnabled() && dotStep > WIZARD_TOTAL_SITE_ONLY) {
+        dot.hidden = true;
+        return;
+      }
+      dot.hidden = false;
       if (step > 0 && dotStep < step) dot.classList.add('done');
       else if (dotStep === step) dot.classList.add('active');
     });
@@ -942,6 +956,9 @@
   }
 
   async function requestNetworkReview() {
+    if (!networkRevocationEnabled()) {
+      throw new Error('Network revocation is disabled on this deployment');
+    }
     const result = state.results.tickets || await verifySite('tickets');
     if (!result.ppid) throw new Error('Ticketing PPID unavailable');
     const payload = await requestJson('/api/demo/ishuman/network-revoke-request', {
@@ -963,6 +980,9 @@
   }
 
   async function approveNetworkRevocation() {
+    if (!networkRevocationEnabled()) {
+      throw new Error('Network revocation is disabled on this deployment');
+    }
     if (!state.walletId && !state.masterCredentialId) {
       throw new Error('Create wallet and complete verification first');
     }
@@ -1100,13 +1120,17 @@
         trialsOutcome.className = trials.human ? 'abuse-outcome' : 'abuse-outcome deny';
       }
 
-      setWizardStep(6, 'Requesting network review…');
-      await requestNetworkReview();
+      if (networkRevocationEnabled()) {
+        setWizardStep(6, 'Requesting network review…');
+        await requestNetworkReview();
 
-      setWizardStep(7, 'Approving network revocation…');
-      await approveNetworkRevocation();
+        setWizardStep(7, 'Approving network revocation…');
+        await approveNetworkRevocation();
 
-      setWizardStep(0, 'Demo complete — both sites denied at network layer.');
+        setWizardStep(0, 'Demo complete — both sites denied at network layer.');
+      } else {
+        setWizardStep(0, 'Demo complete — site block scoped to ticketing only.');
+      }
       setDemoReadyBanner(true);
       log('Guided demo complete');
     } catch (err) {

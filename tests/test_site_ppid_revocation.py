@@ -234,6 +234,19 @@ def test_derive_site_proof_denies_site_ppid_bloom_revocation(
 
 
 @pytest.mark.unit
+def test_network_revoke_disabled_by_default(ishuman_client):
+    resp = ishuman_client.post(
+        "/api/ishuman/network-revoke",
+        json={"ppid": "did:lemma:ppid_demo"},
+        headers={"X-API-Key": "test-site-key"},
+    )
+    payload = resp.get_json()
+
+    assert resp.status_code == 503
+    assert payload["error"] == "network_revocation_disabled"
+
+
+@pytest.mark.unit
 def test_approve_network_revocation_publishes_ishuman_events_without_reason_kwarg(
     ishuman_client,
     fake_ishuman_db_session_factory,
@@ -244,6 +257,7 @@ def test_approve_network_revocation_publishes_ishuman_events_without_reason_kwar
     from api.database import DerivedCredential, IsHumanVerification, RevocationList
     from api.authz_engine import AuthzPrincipal
 
+    monkeypatch.setenv("LEMMA_ISHUMAN_NETWORK_REVOCATION_ENABLED", "1")
     db = fake_ishuman_db_session_factory
     db.store.data[IsHumanVerification.__name__].append(
         make_ishuman_verification(

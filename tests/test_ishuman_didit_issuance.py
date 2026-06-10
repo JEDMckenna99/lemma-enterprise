@@ -313,6 +313,7 @@ def test_didit_risk_event_blocked_triggers_revocation(
     )
     monkeypatch.setattr("api.database.SessionLocal", db.session_local)
     monkeypatch.setattr("api.config.is_ishuman_didit_enabled", lambda: True)
+    monkeypatch.setenv("LEMMA_ISHUMAN_NETWORK_REVOCATION_ENABLED", "1")
     monkeypatch.setattr(
         "billing.didit_manager.DiditManager.verify_webhook",
         lambda self, raw, **kw: {
@@ -342,3 +343,49 @@ def test_didit_risk_event_blocked_triggers_revocation(
     assert captured["wallet_id"] == "wallet_blocked_001"
     assert captured["revoked_by"] == "didit_risk_feed"
     assert "didit_risk" in captured["reason"]
+
+
+@pytest.mark.integration
+def test_didit_risk_event_ignored_when_network_revocation_disabled(
+    ishuman_client,
+    fake_ishuman_db_session_factory,
+    make_ishuman_verification,
+    monkeypatch,
+):
+    db = fake_ishuman_db_session_factory
+    db.store.data["IsHumanVerification"].append(
+        make_ishuman_verification(
+            session_id="ishuman_sess_didit_risk_disabled",
+            provider_session_id="didit_sess_risk_disabled",
+            issuer_id="didit",
+            wallet_id="wallet_blocked_002",
+            status="verified",
+        )
+    )
+    monkeypatch.setattr("api.database.SessionLocal", db.session_local)
+    monkeypatch.setattr("api.config.is_ishuman_didit_enabled", lambda: True)
+    monkeypatch.setattr(
+        "billing.didit_manager.DiditManager.verify_webhook",
+        lambda self, raw, **kw: {
+            "webhook_type": "user.status.updated",
+            "status": "BLOCKED",
+            "session_id": "didit_sess_risk_disabled",
+            "vendor_data": "wallet_blocked_002",
+        },
+    )
+
+    captured = {}
+
+    def _fake_revoke(db, *, wallet_id=None, master_credential_id=None, reason="", revoked_by="admin"):
+        captured["wallet_id"] = wallet_id
+        return {"wallet_id": wallet_id, "revoked_credential_ids": ["c1"], "master_count": 1, "derived_count": 0}
+
+    monkeypatch.setattr("api.ishuman.revoke_wallet_network_wide", _fake_revoke)
+
+    resp = ishuman_client.post(
+        "/api/webhooks/didit-identity",
+        data=b"{}",
+        headers={"X-Signature-V2": "sig", "X-Timestamp": "1"},
+    )
+    assert resp.status_code == 200
+    assert "wallet_id" not in captured

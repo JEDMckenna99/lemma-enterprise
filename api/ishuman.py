@@ -12,8 +12,8 @@ Flows
    isHuman credential on approval.
 3. **Site-block** — a site immediately blocks a PPID on its own domain
    (first tier of two-tier revocation).
-4. **Network revocation** — a site submits evidence for network-wide
-   credential revocation (second tier, queued for review).
+4. **Network revocation** — optional second tier (disabled by default; see
+   ``LEMMA_ISHUMAN_NETWORK_REVOCATION_ENABLED``).
 5. **Check** — quick lookup: is a PPID blocked for a given site?
 """
 
@@ -55,6 +55,17 @@ def _reject_wallet_secret_payload(body) -> tuple | None:
         logger.warning("Rejected legacy wallet_secret payload on isHuman path")
         return jsonify(_WALLET_SECRET_REMOVED), 410
     return None
+
+
+def _network_revocation_disabled_response():
+    return jsonify({
+        "success": False,
+        "error": "network_revocation_disabled",
+        "message": (
+            "Network-wide revocation is not enabled on this deployment. "
+            "Use POST /api/ishuman/site-block for immediate site-scoped enforcement."
+        ),
+    }), 503
 
 
 def _validate_client_ppid(ppid: str) -> bool:
@@ -629,6 +640,14 @@ def _handle_didit_risk_event(webhook_type: str, status: str, body: dict) -> None
         "transaction.status.updated", "transaction.created",
     )
     if not (is_risk_family and negative):
+        return
+
+    from api.config import is_ishuman_network_revocation_enabled
+    if not is_ishuman_network_revocation_enabled():
+        logger.info(
+            "Didit risk event (%s/%s) ignored — network revocation disabled",
+            webhook_type, status,
+        )
         return
 
     vendor_data = body.get("vendor_data") or ""
@@ -1686,6 +1705,10 @@ def network_revoke():
             "evidence_url": "https://..."
         }
     """
+    from api.config import is_ishuman_network_revocation_enabled
+    if not is_ishuman_network_revocation_enabled():
+        return _network_revocation_disabled_response()
+
     site = _require_site_api_key()
     if not site:
         return jsonify({"success": False, "error": "valid API key required"}), 401
@@ -2823,7 +2846,10 @@ def approve_network_revocation():
             "reason": "Confirmed non-human activity"
         }
     """
-    from auth.decorators import require_credential
+    from api.config import is_ishuman_network_revocation_enabled
+    if not is_ishuman_network_revocation_enabled():
+        return _network_revocation_disabled_response()
+
     from api.authz_engine import extract_user_lemma_principal
 
     # Require admin credential for this action

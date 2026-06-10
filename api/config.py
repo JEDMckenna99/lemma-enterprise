@@ -331,6 +331,17 @@ def is_ishuman_didit_purge_enabled() -> bool:
     return _env_truthy("LEMMA_ISHUMAN_DIDIT_PURGE", True)
 
 
+def is_ishuman_network_revocation_enabled() -> bool:
+    """Tier-2 isHuman network-wide revocation (review queue + admin approval).
+
+    Default OFF for GA: site-scoped ``site-block`` (tier 1) is the supported
+    enforcement path. Set ``LEMMA_ISHUMAN_NETWORK_REVOCATION_ENABLED=1`` to
+    re-enable ``/api/ishuman/network-revoke``, admin approval, and automatic
+    Didit risk-feed kills. Existing Bloom entries remain enforceable either way.
+    """
+    return _env_truthy("LEMMA_ISHUMAN_NETWORK_REVOCATION_ENABLED", False)
+
+
 def ppid_require_person_root() -> bool:
     """Fail closed instead of deriving a divergent legacy wallet-secret PPID.
 

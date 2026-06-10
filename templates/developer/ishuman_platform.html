@@ -33,7 +33,7 @@
     <p>
       Integrate verified-human credentials into your app with site-private PPIDs and local browser verification.
       No webhooks to configure on your side — embed the SDK, set <code>siteId</code> to your hostname, and register
-      a site API key only when you need server-side blocks or network revocation requests.
+      a site API key only when you need server-side blocks.
     </p>
     <div class="devhub-actions">
       <a class="devhub-btn primary" href="/docs">Read the guide</a>
@@ -76,7 +76,6 @@
       <p>Use your site API key for server-side abuse response. The API key is not required for human verification itself.</p>
       <ul class="devhub-list">
         <li><code>POST /api/ishuman/site-block</code> — immediate site-scoped PPID ban.</li>
-        <li><code>POST /api/ishuman/network-revoke</code> — request network-wide action.</li>
         <li>Issue keys in the <a href="/developer/external-api-keys">API key manager</a>.</li>
       </ul>
       <div class="devhub-actions" style="margin-top:10px">
