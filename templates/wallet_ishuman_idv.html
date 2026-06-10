@@ -250,6 +250,44 @@
             window.close();
         }
 
+        async function hasHandoffLinkedWallet() {
+            wallet = wallet || new LemmaWallet();
+            await wallet.init();
+            const sess = wallet.session || {};
+            if (sess.source === 'idv_handoff' && sess.walletId && sess.walletSecret) {
+                return true;
+            }
+            try {
+                const walletIdRecord = await wallet._get('passkey', 'walletId');
+                if (walletIdRecord?.value && sess.walletSecret) return true;
+            } catch (err) {
+                console.warn('[isHuman IDV] handoff wallet check failed:', err?.message || err);
+            }
+            return false;
+        }
+
+        async function showMobileHandoffCompleteUi(reason) {
+            await adoptWalletState().catch(() => {});
+            document.getElementById('intro-copy').textContent =
+                'Identity verified. Your lemma.id is saved on this device. Passkey setup happens automatically the first time you verify on a site.';
+            setStatus('Your lemma.id is ready on this phone.', 'success');
+            document.getElementById('primary-btn').classList.add('hidden');
+            const cancelBtn = document.getElementById('cancel-btn');
+            cancelBtn.classList.remove('hidden');
+            cancelBtn.textContent = 'Close tab';
+            let finished = false;
+            const finish = () => {
+                if (finished) return;
+                finished = true;
+                closeWith('ISHUMAN_IDV_COMPLETE', { reason: reason || 'mobile_handoff_complete' });
+            };
+            cancelBtn.onclick = (event) => {
+                event.preventDefault();
+                finish();
+            };
+            setTimeout(finish, 700);
+        }
+
         async function adoptWalletState() {
             // Prefer the live session walletId: it's the one the wallet
             // assertion + /api/wallet/challenge nonce are bound to. The
@@ -501,7 +539,14 @@
                 throw new Error('Missing verification session');
             }
 
-            await pollAndStoreMaster();
+            try {
+                await pollAndStoreMaster();
+            } catch (pollErr) {
+                if (!(await hasHandoffLinkedWallet())) {
+                    throw pollErr;
+                }
+                console.warn('[isHuman IDV] master poll pending after handoff:', pollErr?.message || pollErr);
+            }
 
             try {
                 await wallet.fetchAndStoreSeedEnvelopes?.();
@@ -510,7 +555,7 @@
             }
 
             if (autoClose) {
-                window.close();
+                await showMobileHandoffCompleteUi('mobile_handoff_verified');
             }
         }
 
@@ -804,6 +849,10 @@
                     return;
                 } catch (err) {
                     console.warn('[isHuman IDV] silent mobile handoff failed:', err?.message || err);
+                    if (await hasHandoffLinkedWallet()) {
+                        await showMobileHandoffCompleteUi('mobile_handoff_linked');
+                        return;
+                    }
                     // Fall through to the normal return path.
                 }
             }
@@ -854,6 +903,17 @@
             }
 
             if (isVerificationReturn && sessionId) {
+                if (await hasHandoffLinkedWallet()) {
+                    try {
+                        if (!(await hasMasterProof())) {
+                            await pollAndStoreMaster();
+                        }
+                    } catch (pollErr) {
+                        console.warn('[isHuman IDV] handoff return poll skipped:', pollErr?.message || pollErr);
+                    }
+                    await showMobileHandoffCompleteUi('mobile_handoff_return');
+                    return;
+                }
                 document.getElementById('primary-btn').classList.add('hidden');
                 try {
                     if (await canAutoFinishVerificationReturn()) {

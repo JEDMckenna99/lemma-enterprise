@@ -115,6 +115,14 @@ def test_idv_site_proof_polls_master_when_session_pending():
 
 
 @pytest.mark.browser
+def test_mobile_handoff_shows_success_ui():
+    idv_html = IDV_HTML.read_text(encoding="utf-8")
+    assert "showMobileHandoffCompleteUi" in idv_html
+    assert "hasHandoffLinkedWallet" in idv_html
+    assert "Your lemma.id is ready on this phone." in idv_html
+
+
+@pytest.mark.browser
 def test_idv_popup_issues_site_proof_via_wallet():
     idv_html = IDV_HTML.read_text(encoding="utf-8")
     assert "ensureIsHumanIssuanceReady" in idv_html
