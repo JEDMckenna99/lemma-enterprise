@@ -8,11 +8,11 @@
   }
 
   const CONSUMER = {
-    documentTitle: "Confirm you're human — lemma.id",
-    eyebrow: 'Secured by lemma.id',
+    documentTitle: "Confirm you're human — Lemma.id",
+    eyebrow: 'Secured by Lemma.id',
     headline: "Prove you're human once",
     privacy:
-      'Your ID documents are used only to create your human proof. After the proof is created, your documents and photos are removed from the verification provider. lemma.id keeps your proof, not your ID.',
+      'Your ID documents are used only to create your human proof. After the proof is created, your documents and photos are removed from the verification provider. Lemma.id keeps your proof, not your ID.',
     cancel: 'Not now',
     steps: [
       'Secure this device with Face ID, Touch ID, or your passkey',
@@ -31,7 +31,7 @@
     intro: {
       verifyOnce(site) {
         const s = formatSiteLabel(site);
-        return `Create your lemma.id to prove you\u2019re a real person without sharing your ID with ${s}. Your lemma.id stores your human proof, so you can skip repeat checks on other sites that use lemma.id.`;
+        return `Create your lemma.id to prove you\u2019re a real person without sharing your ID with ${s}. Your lemma.id stores your human proof, so you can skip repeat checks on other sites that use Lemma.id.`;
       },
       unlockReturning(site) {
         const s = formatSiteLabel(site);
@@ -39,7 +39,7 @@
       },
       siteProof(site) {
         const s = formatSiteLabel(site);
-        return `${s} needs to know you\u2019re a real person. Unlock lemma.id and we\u2019ll share a private proof \u2014 not your documents.`;
+        return `${s} needs to know you\u2019re a real person. Unlock your lemma.id and we\u2019ll share a private proof \u2014 not your documents.`;
       },
       claim:
         'You\u2019re verified. Save your lemma.id on this device with a passkey so you can use it again.',

@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="referrer" content="no-referrer">
     <meta name="cloudflare-no-rocket-loader" content="true">
-    <title>Confirm you're human — lemma.id</title>
+    <title>Confirm you're human — Lemma.id</title>
     <style nonce="{{ csp_nonce }}">
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body {
@@ -110,16 +110,16 @@
             UI preview — static screen only; no wallet unlock or IDV.
             <span class="ui-preview-flow" id="ui-preview-flow-label"></span>
         </div>
-        <p class="eyebrow" id="eyebrow-copy">Secured by lemma.id</p>
+        <p class="eyebrow" id="eyebrow-copy">Secured by Lemma.id</p>
         <h1 id="headline-copy">Prove you're human once</h1>
-        <p id="intro-copy">Create your lemma.id to prove you're a real person without sharing your ID with this site. Your lemma.id stores your human proof, so you can skip repeat checks on other sites that use lemma.id.</p>
+        <p id="intro-copy">Create your lemma.id to prove you're a real person without sharing your ID with this site. Your lemma.id stores your human proof, so you can skip repeat checks on other sites that use Lemma.id.</p>
         <div class="site-chip" id="site-chip">Requesting site</div>
         <ol class="steps" id="steps-list">
             <li>Secure this device with Face ID, Touch ID, or your passkey</li>
             <li>Complete a one-time identity check, usually under a minute</li>
             <li>Return to the site. They see a private proof, not your documents</li>
         </ol>
-        <p class="privacy-line" id="privacy-copy">Your ID documents are used only to create your human proof. After the proof is created, your documents and photos are removed from the verification provider. lemma.id keeps your proof, not your ID.</p>
+        <p class="privacy-line" id="privacy-copy">Your ID documents are used only to create your human proof. After the proof is created, your documents and photos are removed from the verification provider. Lemma.id keeps your proof, not your ID.</p>
         <div id="status" class="status info">Preparing…</div>
         <div id="actions">
             <button id="primary-btn" class="btn btn-primary hidden" type="button">Continue</button>
@@ -127,7 +127,7 @@
         </div>
     </div>
 
-    <script src="/static/js/demo/ishuman-idv-preview-scenes.js?v=3" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
+    <script src="/static/js/demo/ishuman-idv-preview-scenes.js?v=4" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
     <script src="/static/js/lemma-keys.js?v=4" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
     <script src="/static/js/wallet-at-rest-crypto.js?v=2" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
     <script nonce="{{ csp_nonce }}">window.LEMMA_ISHUMAN_USE_PERSON_ROOT_SEEDS = {{ 'true' if ishuman_use_person_root_seeds else 'false' }};</script>
@@ -637,7 +637,7 @@
         async function resolvePrimaryButtonLabel() {
             const demoSuffix = testVerifyEnabled ? ' (demo)' : '';
             if (typeof LemmaWallet === 'undefined') {
-                return `Unlock lemma.id${demoSuffix}`;
+                return `Unlock my lemma.id${demoSuffix}`;
             }
             wallet = wallet || new LemmaWallet();
             await wallet.init();
