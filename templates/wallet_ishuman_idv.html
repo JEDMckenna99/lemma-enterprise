@@ -112,7 +112,7 @@
         </div>
         <p class="eyebrow" id="eyebrow-copy">Secured by Lemma.id</p>
         <h1 id="headline-copy">Prove you're human once</h1>
-        <p id="intro-copy">Create your lemma.id to prove you're a real person without sharing your ID with this site. Your lemma.id is stored in your browser, so you can skip repeat checks on other sites that use Lemma.id.</p>
+        <p id="intro-copy">Create your lemma.id to prove you're a real person without sharing your ID with this site. Your lemma.id is stored privately in your browser, so you can skip repeat checks on other sites that use Lemma.id.</p>
         <div class="site-chip" id="site-chip">Requesting site</div>
         <ol class="steps" id="steps-list">
             <li>Secure this device with Face ID, Touch ID, or your passkey</li>
@@ -127,7 +127,7 @@
         </div>
     </div>
 
-    <script src="/static/js/demo/ishuman-idv-preview-scenes.js?v=5" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
+    <script src="/static/js/demo/ishuman-idv-preview-scenes.js?v=6" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
     <script src="/static/js/lemma-keys.js?v=4" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
     <script src="/static/js/wallet-at-rest-crypto.js?v=2" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
     <script nonce="{{ csp_nonce }}">window.LEMMA_ISHUMAN_USE_PERSON_ROOT_SEEDS = {{ 'true' if ishuman_use_person_root_seeds else 'false' }};</script>

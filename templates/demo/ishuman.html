@@ -275,7 +275,7 @@ const result = await new IsHumanVerifier({
 
 {% block scripts %}
 {{ super() }}
-<script src="/static/js/demo/ishuman-idv-preview-scenes.js?v=5" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
+<script src="/static/js/demo/ishuman-idv-preview-scenes.js?v=6" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
 <script src="/static/js/demo/ishuman-idv-viewer.js?v=2" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
 <script src="/static/js/lemma-keys.js?v=4" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
 <script nonce="{{ csp_nonce }}">window.LEMMA_ISHUMAN_USE_PERSON_ROOT_SEEDS = {{ 'true' if ishuman_use_person_root_seeds else 'false' }};</script>

@@ -31,7 +31,7 @@
     intro: {
       verifyOnce(site) {
         const s = formatSiteLabel(site);
-        return `Create your lemma.id to prove you\u2019re a real person without sharing your ID with ${s}. Your lemma.id is stored in your browser, so you can skip repeat checks on other sites that use Lemma.id.`;
+        return `Create your lemma.id to prove you\u2019re a real person without sharing your ID with ${s}. Your lemma.id is stored privately in your browser, so you can skip repeat checks on other sites that use Lemma.id.`;
       },
       unlockReturning(site) {
         const s = formatSiteLabel(site);
