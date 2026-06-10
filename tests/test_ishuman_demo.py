@@ -365,3 +365,64 @@ def test_ishuman_demo_force_reverify_requires_ppid(ishuman_demo_client):
     payload = resp.get_json()
     assert resp.status_code == 403
     assert payload["code"] == "wallet_assertion_required"
+
+
+def test_skeleton_idv_flow_issues_short_lived_credential(
+    ishuman_demo_client,
+    fake_ishuman_db_session_factory,
+    monkeypatch,
+):
+    monkeypatch.setattr("api.database.SessionLocal", fake_ishuman_db_session_factory.session_local)
+    monkeypatch.setenv("ENVIRONMENT", "staging")
+    monkeypatch.setenv("LEMMA_ISHUMAN_DEMO_ALLOW_TEST_VERIFY", "true")
+    monkeypatch.setenv("LEMMA_ISHUMAN_DEMO_TEST_TOKEN", "test-token")
+    monkeypatch.setenv("LEMMA_ISHUMAN_SKELETON_IDV_ENABLED", "true")
+    monkeypatch.setattr(
+        "api.ishuman._derive_ppid_for_site",
+        lambda **_kwargs: "did:lemma:ppid_skeleton",
+    )
+    monkeypatch.setattr(
+        "api.ishuman._issue_ishuman_credential",
+        lambda ppid, wallet_id=None, site_id=None, ttl_seconds=None, **kwargs: {
+            "id": "ishuman_master_skeleton_test",
+            "issuerInfo": {"did": "did:lemma:issuer:test"},
+            "claims": {
+                "isHuman": True,
+                "siteId": site_id or "lemma.id",
+                "expiresAt": str(int(__import__("time").time()) + (ttl_seconds or 900)),
+            },
+            "subject": ppid,
+        },
+    )
+
+    resp = ishuman_demo_client.post(
+        "/api/demo/ishuman/skeleton-idv-flow",
+        headers={"X-Demo-Test-Token": "test-token"},
+        json={
+            "wallet_id": "wallet_skeleton_demo_001",
+            "wallet_secret": "ab" * 32,
+            "credential_ttl_seconds": 900,
+            "complete_immediately": True,
+        },
+    )
+    payload = resp.get_json()
+    assert resp.status_code == 200, payload
+    assert payload["session_id"].startswith("ishuman_skeleton_")
+    assert payload["credential_id"]
+    assert payload["credential"]["claims"]["expiresAt"]
+    assert payload["credential_ttl_seconds"] == 900
+
+
+def test_skeleton_idv_blocked_on_production(ishuman_demo_client, monkeypatch):
+    monkeypatch.setenv("ENVIRONMENT", "production")
+    monkeypatch.setenv("LEMMA_ISHUMAN_DEMO_ALLOW_TEST_VERIFY", "true")
+    monkeypatch.setenv("LEMMA_ISHUMAN_DEMO_TEST_TOKEN", "test-token")
+
+    resp = ishuman_demo_client.post(
+        "/api/demo/ishuman/skeleton-idv-flow",
+        headers={"X-Demo-Test-Token": "test-token"},
+        json={"wallet_id": "wallet_skeleton_demo_002"},
+    )
+    assert resp.status_code == 403
+    assert resp.get_json()["error"] == "skeleton_idv_disabled"
+

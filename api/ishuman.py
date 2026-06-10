@@ -142,6 +142,7 @@ def _issue_ishuman_credential(
     site_signing_pubkey: Optional[str] = None,
     ppid_derivation: Optional[str] = None,
     verification_method: str = "didit",
+    ttl_seconds: Optional[int] = None,
 ) -> dict:
     """Sign and return a new isHuman credential for *ppid*.
 
@@ -158,6 +159,11 @@ def _issue_ishuman_credential(
     now = int(time.time())
     prefix = "ishuman_site" if site_id else "ishuman_master"
     credential_id = f"{prefix}_{secrets.token_urlsafe(24)}"
+    lifetime_seconds = (
+        int(ttl_seconds)
+        if ttl_seconds is not None
+        else ISHUMAN_CREDENTIAL_TTL_DAYS * 86400
+    )
 
     claims: dict = {
         "isHuman": True,
@@ -165,7 +171,7 @@ def _issue_ishuman_credential(
         "packageType": "identity",
         "siteId": site_id or "lemma.id",
         "issuedAt": str(now),
-        "expiresAt": str(now + ISHUMAN_CREDENTIAL_TTL_DAYS * 86400),
+        "expiresAt": str(now + lifetime_seconds),
     }
     if site_signing_pubkey:
         claims["site_signing_pubkey"] = site_signing_pubkey
@@ -794,7 +800,108 @@ def _normalize_site_signing_pubkey(pubkey: str) -> str:
 # 1. Start Verification
 # ---------------------------------------------------------------------------
 
-_IDV_MOBILE_HANDOFF_TTL_SECONDS = 900
+_IDV_HANDOFF_MK_FAIL_MAX = 5
+_IDV_HANDOFF_CLAIM_IP_LIMIT = 30
+_IDV_HANDOFF_CLAIM_IP_WINDOW_SECONDS = 900
+_IDV_HANDOFF_CLAIM_HANDOFF_LIMIT = 10
+
+
+def _idv_handoff_ttl_seconds() -> int:
+    from api.config import ishuman_idv_handoff_ttl_seconds
+
+    return ishuman_idv_handoff_ttl_seconds()
+
+
+def _handoff_mk_fingerprint(mk: str) -> str:
+    return hashlib.sha256(str(mk or "").encode("utf-8")).hexdigest()
+
+
+def _handoff_mk_fail_key(handoff_id: str) -> str:
+    return f"ishuman:idv-handoff-mk-fail:{handoff_id}"
+
+
+def _handoff_mk_fail_count(handoff_id: str) -> int:
+    from auth.redis_store import get as redis_get
+
+    entry = redis_get(_handoff_mk_fail_key(handoff_id))
+    if not entry:
+        return 0
+    try:
+        return int(entry.get("count") or 0)
+    except (TypeError, ValueError):
+        return 0
+
+
+def _increment_handoff_mk_fail(handoff_id: str) -> int:
+    from auth.redis_store import store as redis_store
+
+    count = _handoff_mk_fail_count(handoff_id) + 1
+    redis_store(
+        _handoff_mk_fail_key(handoff_id),
+        {"count": count},
+        ttl_seconds=_idv_handoff_ttl_seconds(),
+    )
+    return count
+
+
+def _client_ip_hash() -> str:
+    ip = (request.remote_addr or "").strip()
+    return hashlib.sha256(ip.encode("utf-8")).hexdigest()[:16]
+
+
+def _log_handoff_security_event(event: str, **fields) -> None:
+    parts = " ".join(f"{key}={value}" for key, value in fields.items())
+    logger.info("handoff_security event=%s %s", event, parts)
+
+
+def _validate_handoff_mk(mk: str, entry: dict) -> bool:
+    stored = str(entry.get("mk_fingerprint") or "").strip()
+    if not stored or not mk:
+        return False
+    return _handoff_mk_fingerprint(mk) == stored
+
+
+def _validate_handoff_verification_session(session_id: str, entry: dict) -> bool:
+    from api.database import SessionLocal, IsHumanVerification
+
+    wallet_id = str(entry.get("wallet_id") or "").strip()
+    session_id = (session_id or "").strip()
+    if not wallet_id or not session_id:
+        return False
+
+    db = SessionLocal()
+    try:
+        row = (
+            db.query(IsHumanVerification)
+            .filter(IsHumanVerification.session_id == session_id)
+            .first()
+        )
+        if not row:
+            return False
+        if str(row.wallet_id or "").strip() != wallet_id:
+            return False
+        if row.status not in ("pending", "verified"):
+            return False
+
+        ttl = _idv_handoff_ttl_seconds()
+        now = datetime.now(timezone.utc)
+        created_at = row.created_at
+        if created_at:
+            if created_at.tzinfo is None:
+                created_at = created_at.replace(tzinfo=timezone.utc)
+            if (now - created_at).total_seconds() > ttl:
+                return False
+
+        if row.status == "verified" and row.verified_at:
+            verified_at = row.verified_at
+            if verified_at.tzinfo is None:
+                verified_at = verified_at.replace(tzinfo=timezone.utc)
+            if (now - verified_at).total_seconds() > ttl:
+                return False
+
+        return True
+    finally:
+        db.close()
 
 
 def _idv_mobile_handoff_key(handoff_id: str) -> str:
@@ -811,25 +918,29 @@ def _store_idv_mobile_handoff(
     session_id: str,
     wallet_id: str,
     encrypted_blob: str,
+    mk_fingerprint: str = "",
 ) -> None:
     """Persist a one-time mobile handoff under handoff_id and session_id keys."""
     from auth.redis_store import store as redis_store
 
+    ttl_seconds = _idv_handoff_ttl_seconds()
     entry = {
         "handoff_id": handoff_id,
         "wallet_id": wallet_id,
         "session_id": session_id,
         "encrypted_blob": encrypted_blob,
     }
+    if mk_fingerprint:
+        entry["mk_fingerprint"] = mk_fingerprint
     redis_store(
         _idv_mobile_handoff_key(handoff_id),
         entry,
-        ttl_seconds=_IDV_MOBILE_HANDOFF_TTL_SECONDS,
+        ttl_seconds=ttl_seconds,
     )
     redis_store(
         _idv_mobile_handoff_session_key(session_id),
         entry,
-        ttl_seconds=_IDV_MOBILE_HANDOFF_TTL_SECONDS,
+        ttl_seconds=ttl_seconds,
     )
 
 
@@ -902,23 +1013,31 @@ def start_verification_for_body(body: dict) -> tuple[dict, int]:
     )
     handoff_id = str(body.get("handoff_id") or "").strip()
     encrypted_blob = str(body.get("encrypted_blob") or "").strip()
-    handoff_requested = bool(handoff_id or encrypted_blob)
-    if handoff_requested and (not handoff_id or not encrypted_blob):
+    handoff_mk_fingerprint = str(body.get("handoff_mk_fingerprint") or "").strip()
+    handoff_requested = bool(handoff_id)
+    if handoff_requested and not handoff_id:
         return {"success": False, "error": "missing_handoff_fields"}, 400
     if handoff_id and len(handoff_id) < 16:
         return {"success": False, "error": "weak_handoff_id"}, 400
 
+    if handoff_requested:
+        from api.config import (
+            is_ishuman_idv_handoff_strict_claim_enabled,
+            is_ishuman_idv_mobile_handoff_enabled,
+        )
+        if not is_ishuman_idv_mobile_handoff_enabled():
+            return {"success": False, "error": "mobile_handoff_disabled"}, 404
+        if is_ishuman_idv_handoff_strict_claim_enabled() and not handoff_mk_fingerprint:
+            return {"success": False, "error": "missing_handoff_mk_fingerprint"}, 400
+
     assertion_fields = ["return_url"]
     if handoff_id:
         assertion_fields.append("handoff_id")
+    if handoff_mk_fingerprint:
+        assertion_fields.append("handoff_mk_fingerprint")
     err, _wid = _require_wallet_assertion(body, field_names=assertion_fields)
     if err:
         return err[0].get_json(), err[1]
-
-    if handoff_requested:
-        from api.config import is_ishuman_idv_mobile_handoff_enabled
-        if not is_ishuman_idv_mobile_handoff_enabled():
-            return {"success": False, "error": "mobile_handoff_disabled"}, 404
 
     from api.database import SessionLocal, IsHumanVerification
     db = SessionLocal()
@@ -1026,13 +1145,14 @@ def start_verification_for_body(body: dict) -> tuple[dict, int]:
                 db.commit()
                 session_id = winner.session_id
 
-        if handoff_requested:
+        if handoff_requested and encrypted_blob:
             try:
                 _store_idv_mobile_handoff(
                     handoff_id=handoff_id,
                     session_id=session_id,
                     wallet_id=str(wallet_id),
                     encrypted_blob=encrypted_blob,
+                    mk_fingerprint=handoff_mk_fingerprint,
                 )
                 handoff_stored = True
                 logger.info(
@@ -1068,6 +1188,7 @@ def start_verification_for_body(body: dict) -> tuple[dict, int]:
     }
     if handoff_requested:
         payload["handoff_stored"] = handoff_stored
+        payload["handoff_expires_in"] = _idv_handoff_ttl_seconds()
     return payload, 200
 
 
@@ -2225,14 +2346,23 @@ def idv_mobile_handoff_deposit():
     handoff_id = (body.get("handoff_id") or "").strip()
     session_id = (body.get("session_id") or "").strip()
     encrypted_blob = (body.get("encrypted_blob") or "").strip()
+    handoff_mk_fingerprint = (body.get("handoff_mk_fingerprint") or "").strip()
 
     if not wallet_id or not handoff_id or not session_id or not encrypted_blob:
         return jsonify({"success": False, "error": "missing_handoff_fields"}), 400
     if len(handoff_id) < 16:
         return jsonify({"success": False, "error": "weak_handoff_id"}), 400
 
+    from api.config import is_ishuman_idv_handoff_strict_claim_enabled
+
+    if is_ishuman_idv_handoff_strict_claim_enabled() and not handoff_mk_fingerprint:
+        return jsonify({"success": False, "error": "missing_handoff_mk_fingerprint"}), 400
+
+    assertion_fields = ["handoff_id", "session_id"]
+    if handoff_mk_fingerprint:
+        assertion_fields.append("handoff_mk_fingerprint")
     err, _wid = _require_wallet_assertion(
-        body, field_names=["handoff_id", "session_id"]
+        body, field_names=assertion_fields
     )
     if err:
         return err
@@ -2242,10 +2372,11 @@ def idv_mobile_handoff_deposit():
         session_id=session_id,
         wallet_id=wallet_id,
         encrypted_blob=encrypted_blob,
+        mk_fingerprint=handoff_mk_fingerprint,
     )
     return jsonify({
         "success": True,
-        "expires_in": _IDV_MOBILE_HANDOFF_TTL_SECONDS,
+        "expires_in": _idv_handoff_ttl_seconds(),
     })
 
 
@@ -2253,7 +2384,11 @@ def idv_mobile_handoff_deposit():
 @cross_origin()
 def idv_mobile_handoff_claim():
     """One-time claim of a mobile IDV handoff blob (target device has no wallet)."""
-    from api.config import is_ishuman_idv_mobile_handoff_enabled
+    from api.config import (
+        is_ishuman_idv_handoff_strict_claim_enabled,
+        is_ishuman_idv_mobile_handoff_enabled,
+    )
+    from api.rate_limiter import check_rate_limit
 
     if not is_ishuman_idv_mobile_handoff_enabled():
         return jsonify({"success": False, "error": "mobile_handoff_disabled"}), 404
@@ -2261,33 +2396,111 @@ def idv_mobile_handoff_claim():
     body = request.get_json(silent=True) or {}
     handoff_id = (body.get("handoff_id") or "").strip()
     session_id = (body.get("session_id") or "").strip()
-    if not handoff_id and not session_id:
-        return jsonify({"success": False, "error": "handoff_id or session_id required"}), 400
+    mk = str(body.get("mk") or "").strip()
+    strict_claim = is_ishuman_idv_handoff_strict_claim_enabled()
+    ip_hash = _client_ip_hash()
 
-    entry = _lookup_idv_mobile_handoff(handoff_id=handoff_id, session_id=session_id)
-    if not entry:
-        logger.info(
-            "IDV mobile handoff claim miss handoff=%s session=%s ua=%s",
+    if strict_claim:
+        if not handoff_id or not session_id or not mk:
+            return jsonify({"success": False, "error": "handoff_id_session_id_mk_required"}), 400
+
+        if not check_rate_limit(
+            f"ishuman_handoff_claim_ip:{ip_hash}",
+            _IDV_HANDOFF_CLAIM_IP_LIMIT,
+            _IDV_HANDOFF_CLAIM_IP_WINDOW_SECONDS,
+        ):
+            _log_handoff_security_event(
+                "handoff_claim_rate_limited",
+                ip=ip_hash,
+                handoff=handoff_id[:24],
+            )
+            return jsonify({"success": False, "error": "handoff_claim_rate_limited"}), 429
+
+        if _handoff_mk_fail_count(handoff_id) >= _IDV_HANDOFF_MK_FAIL_MAX:
+            _log_handoff_security_event(
+                "handoff_claim_mk_locked",
+                ip=ip_hash,
+                handoff=handoff_id[:24],
+            )
+            return jsonify({"success": False, "error": "handoff_claim_rate_limited"}), 429
+
+        if not check_rate_limit(
+            f"ishuman_handoff_claim_id:{handoff_id}",
+            _IDV_HANDOFF_CLAIM_HANDOFF_LIMIT,
+            _idv_handoff_ttl_seconds(),
+        ):
+            _log_handoff_security_event(
+                "handoff_claim_rate_limited",
+                ip=ip_hash,
+                handoff=handoff_id[:24],
+            )
+            return jsonify({"success": False, "error": "handoff_claim_rate_limited"}), 429
+
+        entry = _lookup_idv_mobile_handoff(handoff_id=handoff_id)
+    else:
+        logger.warning(
+            "IDV mobile handoff legacy claim path used handoff=%s session=%s",
             (handoff_id or "")[:24],
             (session_id or "")[:24],
-            (request.headers.get("User-Agent") or "")[:80],
+        )
+        if not handoff_id and not session_id:
+            return jsonify({"success": False, "error": "handoff_id or session_id required"}), 400
+        entry = _lookup_idv_mobile_handoff(handoff_id=handoff_id, session_id=session_id)
+
+    if not entry:
+        _log_handoff_security_event(
+            "handoff_claim_miss",
+            ip=ip_hash,
+            handoff=(handoff_id or "")[:24],
+            session=(session_id or "")[:24],
         )
         return jsonify({"success": False, "error": "handoff_not_found"}), 404
 
+    if strict_claim:
+        entry_session_id = str(entry.get("session_id") or "").strip()
+        if session_id != entry_session_id:
+            _log_handoff_security_event(
+                "handoff_claim_session_invalid",
+                ip=ip_hash,
+                handoff=(handoff_id or "")[:24],
+                session=(session_id or "")[:24],
+            )
+            return jsonify({"success": False, "error": "handoff_session_invalid"}), 403
+
+        if not _validate_handoff_mk(mk, entry):
+            fail_count = _increment_handoff_mk_fail(handoff_id)
+            _log_handoff_security_event(
+                "handoff_claim_mk_fail",
+                ip=ip_hash,
+                handoff=handoff_id[:24],
+                fails=fail_count,
+            )
+            return jsonify({"success": False, "error": "handoff_mk_mismatch"}), 403
+
+        if not _validate_handoff_verification_session(session_id, entry):
+            _log_handoff_security_event(
+                "handoff_claim_session_invalid",
+                ip=ip_hash,
+                handoff=handoff_id[:24],
+                session=session_id[:24],
+            )
+            return jsonify({"success": False, "error": "handoff_session_invalid"}), 403
+
     if not _delete_idv_mobile_handoff_entry(entry):
-        logger.info(
-            "IDV mobile handoff already claimed handoff=%s session=%s",
-            (entry.get("handoff_id") or "")[:24],
-            (entry.get("session_id") or "")[:24],
+        _log_handoff_security_event(
+            "handoff_claim_race",
+            ip=ip_hash,
+            handoff=(entry.get("handoff_id") or "")[:24],
+            session=(entry.get("session_id") or "")[:24],
         )
         return jsonify({"success": False, "error": "handoff_already_claimed"}), 409
 
-    logger.info(
-        "IDV mobile handoff claimed handoff=%s session=%s wallet=%s ua=%s",
-        (entry.get("handoff_id") or "")[:24],
-        (entry.get("session_id") or "")[:24],
-        str(entry.get("wallet_id") or "")[:24],
-        (request.headers.get("User-Agent") or "")[:80],
+    _log_handoff_security_event(
+        "handoff_claim_ok",
+        ip=ip_hash,
+        handoff=(entry.get("handoff_id") or "")[:24],
+        session=(entry.get("session_id") or "")[:24],
+        wallet=str(entry.get("wallet_id") or "")[:24],
     )
 
     return jsonify({

@@ -78,6 +78,37 @@ wallet compromise until lock + reissue.
   - Trust-list rotation cuts off the old issuer key; clients refetch.
   - Mitigation: multi-issuer trust list (Phase 3.2).
 
+### 3.7 Silent mobile IDV wallet handoff (URL-bearer + mk proof)
+
+During Didit IDV, the source device (PC popup) encrypts the wallet secret and
+deposits a one-time relay blob keyed by `handoff_id`. The Didit return URL on
+the phone carries `handoff_id` and `mk` (AES key hex). The phone claims the
+blob via `POST /api/ishuman/idv-mobile-handoff/claim` with
+`handoff_id`, `session_id`, and `mk`.
+
+**Controls (current posture):**
+
+| Control | Effect |
+|---------|--------|
+| `SHA-256(mk)` fingerprint stored at deposit; `mk` required on claim | `session_id` or `handoff_id` alone cannot fetch the blob |
+| Claim bound to in-flight `IsHumanVerification` row (wallet + status + TTL) | Stolen relay from unrelated/expired IDV cannot be claimed |
+| One-time Redis delete on successful claim | Replay of the same handoff fails closed |
+| AES-GCM AAD `idv_handoff_v1\|handoff_id\|session_id\|wallet_id` | Ciphertext not swappable across handoffs even if `mk` leaks elsewhere |
+| Per-IP and per-`handoff_id` rate limits + mk-guess lockout | Slows online guessing within the TTL window |
+| Default TTL 300s (`LEMMA_IDV_HANDOFF_TTL_SECONDS`) | Shrinks exposure vs prior 15-minute window |
+
+**Residual risk:** An attacker who captures the **full return URL** (`handoff_id`
++ `mk` + `ishuman_session`) within the TTL can claim **one** wallet onto their
+phone/browser. This is intentional for silent UX (no QR / second channel).
+
+**Explicit non-goals:** Does not protect against a compromised phone/browser,
+malware with URL visibility, or TLS termination that logs query strings.
+Operational mitigation: strip query strings from access logs where possible;
+never log `mk` or full return URLs in application logs.
+
+**Emergency rollback:** `LEMMA_IDV_HANDOFF_STRICT_CLAIM=0` restores the legacy
+session-only claim path (deprecated, logged).
+
 ## 4. Failure modes
 
 | Behavior                                   | Fails ...  | Rationale                                                        |
@@ -88,6 +119,8 @@ wallet compromise until lock + reissue.
 | Stale `master_credential_id` hint          | open (graceful) | Falls back to the wallet's latest verified record (Phase 1.2). |
 | Redis rate-limiter unavailable             | open (memory fallback) | In-process fixed-window limiting; `fail_open` only if configured. |
 | Reissue beyond per-day cap                 | closed     | `reissue_rate_limited` 429 (Phase 1.3).                          |
+| Mobile IDV handoff claim without `mk` proof | closed     | `handoff_id_session_id_mk_required` 400 / `handoff_mk_mismatch` 403. |
+| Mobile IDV handoff claim with wrong session | closed     | `handoff_session_invalid` 403 — blob not consumed.               |
 
 ## 5. Things this design does NOT protect against
 

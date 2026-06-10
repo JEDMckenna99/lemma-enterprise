@@ -80,6 +80,7 @@
 <body>
     <div class="card" id="ishuman-idv-root"
          data-test-verify-enabled="{{ 'true' if demo_test_verify_enabled else 'false' }}"
+         data-skeleton-idv-enabled="{{ 'true' if skeleton_idv_enabled|default(false) else 'false' }}"
          data-server-test-token="{{ demo_test_token }}">
         <p class="eyebrow">lemma.id</p>
         <h1>Verify once, reuse everywhere</h1>
@@ -100,7 +101,7 @@
     <script src="/static/js/lemma-keys.js?v=4" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
     <script src="/static/js/wallet-at-rest-crypto.js?v=2" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
     <script nonce="{{ csp_nonce }}">window.LEMMA_ISHUMAN_USE_PERSON_ROOT_SEEDS = {{ 'true' if ishuman_use_person_root_seeds else 'false' }};</script>
-    <script src="/sdk/lemma-wallet.js?v=2549" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
+    <script src="/sdk/lemma-wallet.js?v=2550" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
     <script nonce="{{ csp_nonce }}">
         const SESSION_KEY = 'ishuman_idv_popup_session_id';
         const params = new URLSearchParams(window.location.search);
@@ -122,6 +123,7 @@
         const redirectReturn = (params.get('redirect_return') || '').trim();
         const root = document.getElementById('ishuman-idv-root');
         const testVerifyEnabled = root.dataset.testVerifyEnabled === 'true';
+        const skeletonIdvEnabled = root.dataset.skeletonIdvEnabled === 'true';
         const serverTestToken = root.dataset.serverTestToken || '';
 
         let wallet = null;
@@ -443,16 +445,27 @@
         async function verifyOnceTestMode() {
             const returnUrl = `${window.location.origin}/wallet/ishuman-idv?${params.toString()}&verification_return=true`;
             const walletAssertion = await wallet.buildWalletAssertion(['return_url'], { return_url: returnUrl });
-            const payload = await requestJson('/api/demo/ishuman/verify-once-test-mode', {
-                method: 'POST',
-                headers: demoHeaders(),
-                body: JSON.stringify({
+            const endpoint = skeletonIdvEnabled
+                ? '/api/demo/ishuman/skeleton-idv-flow'
+                : '/api/demo/ishuman/verify-once-test-mode';
+            const requestBody = skeletonIdvEnabled
+                ? {
+                    wallet_id: walletId,
+                    wallet_secret: walletSecret,
+                    return_url: returnUrl,
+                    complete_immediately: true,
+                }
+                : {
                     wallet_id: walletId,
                     wallet_secret: walletSecret,
                     return_url: returnUrl,
                     enc_pubkey: await encPubkeyForStart(),
                     wallet_assertion: walletAssertion,
-                }),
+                };
+            const payload = await requestJson(endpoint, {
+                method: 'POST',
+                headers: demoHeaders(),
+                body: JSON.stringify(requestBody),
             });
             sessionId = payload.session_id;
             localStorage.setItem(SESSION_KEY, sessionId);
@@ -579,20 +592,20 @@
             }
 
             const returnUrl = `${window.location.origin}/wallet/ishuman-idv?${returnParams.toString()}`;
-            let encryptedHandoffBlob = null;
+            let handoffMkFingerprint = null;
             if (pendingHandoff) {
-                encryptedHandoffBlob = await wallet.buildIdvMobileHandoffEncryptedBlob({
-                    handoffId: pendingHandoff.handoffId,
-                    walletSecret,
-                    walletId,
-                });
+                handoffMkFingerprint = await wallet.handoffMkFingerprint(pendingHandoff.mk);
             }
 
             const assertionFields = pendingHandoff
-                ? ['return_url', 'handoff_id']
+                ? ['return_url', 'handoff_id', 'handoff_mk_fingerprint']
                 : ['return_url'];
             const assertionValues = pendingHandoff
-                ? { return_url: returnUrl, handoff_id: pendingHandoff.handoffId }
+                ? {
+                    return_url: returnUrl,
+                    handoff_id: pendingHandoff.handoffId,
+                    handoff_mk_fingerprint: handoffMkFingerprint,
+                }
                 : { return_url: returnUrl };
             const walletAssertion = await wallet.buildWalletAssertion(assertionFields, assertionValues);
             const startBody = {
@@ -606,9 +619,9 @@
             } catch (ppidErr) {
                 console.warn('[isHuman IDV] provisional PPID not sent:', ppidErr?.message || ppidErr);
             }
-            if (pendingHandoff && encryptedHandoffBlob) {
+            if (pendingHandoff) {
                 startBody.handoff_id = pendingHandoff.handoffId;
-                startBody.encrypted_blob = encryptedHandoffBlob;
+                startBody.handoff_mk_fingerprint = handoffMkFingerprint;
             }
             const payload = await requestJson('/api/ishuman/start-verification', {
                 method: 'POST',
@@ -617,10 +630,12 @@
             sessionId = payload.session_id;
             localStorage.setItem(SESSION_KEY, sessionId);
             if (pendingHandoff) {
-                wallet._pendingIdvHandoffKey = null;
-                if (payload.handoff_stored !== true) {
-                    throw new Error('Mobile wallet handoff could not be saved — retry verification.');
-                }
+                await wallet.finalizeAndDepositIdvMobileHandoff({
+                    handoffId: pendingHandoff.handoffId,
+                    walletSecret,
+                    walletId,
+                    sessionId,
+                });
             }
 
             if (payload.url) {

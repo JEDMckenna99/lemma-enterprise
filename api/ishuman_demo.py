@@ -11,9 +11,12 @@ from __future__ import annotations
 import os
 import secrets
 import time
+import logging
 from datetime import datetime
 
 from flask import Blueprint, jsonify, render_template, request
+
+logger = logging.getLogger(__name__)
 
 
 ishuman_demo_bp = Blueprint("ishuman_demo", __name__)
@@ -138,6 +141,8 @@ def _public_record(record) -> dict:
 
 def _demo_page_context() -> dict:
     """Server-only demo tokens for /demo/ishuman (never exposed on other routes)."""
+    from api.config import is_ishuman_skeleton_idv_enabled
+
     demo_enabled = _demo_enabled()
     return {
         "demo_sites": list(DEMO_SITES.values()),
@@ -147,6 +152,7 @@ def _demo_page_context() -> dict:
         "demo_admin_token_configured": bool(os.getenv("LEMMA_ISHUMAN_DEMO_ADMIN_TOKEN")),
         "demo_test_token": os.getenv("LEMMA_ISHUMAN_DEMO_TEST_TOKEN", "") if demo_enabled else "",
         "demo_admin_token": os.getenv("LEMMA_ISHUMAN_DEMO_ADMIN_TOKEN", "") if demo_enabled else "",
+        "skeleton_idv_enabled": demo_enabled and is_ishuman_skeleton_idv_enabled(),
     }
 
 
@@ -164,6 +170,7 @@ def ishuman_idv_popup():
         "wallet_ishuman_idv.html",
         demo_test_verify_enabled=ctx["demo_test_verify_enabled"],
         demo_test_token=ctx["demo_test_token"],
+        skeleton_idv_enabled=ctx["skeleton_idv_enabled"],
     ), 200, {
         "Cache-Control": "no-cache, no-store, must-revalidate",
         "Pragma": "no-cache",
@@ -173,6 +180,8 @@ def ishuman_idv_popup():
 
 @ishuman_demo_bp.route("/api/demo/ishuman/config", methods=["GET"])
 def ishuman_demo_config():
+    from api.config import is_ishuman_skeleton_idv_enabled
+
     sites = ensure_demo_sites()
     return jsonify({
         "success": True,
@@ -182,6 +191,7 @@ def ishuman_demo_config():
         "test_verify_enabled": os.getenv("LEMMA_ISHUMAN_DEMO_ALLOW_TEST_VERIFY", "").lower() == "true",
         "server_test_token_configured": bool(os.getenv("LEMMA_ISHUMAN_DEMO_TEST_TOKEN")),
         "server_admin_token_configured": bool(os.getenv("LEMMA_ISHUMAN_DEMO_ADMIN_TOKEN")),
+        "skeleton_idv_enabled": _demo_enabled() and is_ishuman_skeleton_idv_enabled(),
         "customer_site_urls": {
             "tickets": "https://lemma-demo-tickets-1d3d7411af33.herokuapp.com",
             "trials": "https://lemma-demo-trials-7090f46cae0d.herokuapp.com",
@@ -395,11 +405,69 @@ def _require_demo_test_verify(*, require_token_header: bool = True) -> tuple[dic
     return {}, None
 
 
+def _require_demo_skeleton_idv(*, require_token_header: bool = True) -> tuple[dict | None, tuple | None]:
+    """Guards for Didit-free skeleton IDV (non-production only)."""
+    from api.config import is_ishuman_skeleton_idv_enabled
+
+    if not is_ishuman_skeleton_idv_enabled():
+        return None, (jsonify({"success": False, "error": "skeleton_idv_disabled"}), 403)
+    if os.getenv("LEMMA_ISHUMAN_DEMO_ALLOW_TEST_VERIFY", "").lower() != "true":
+        return None, (jsonify({"success": False, "error": "test_verify_disabled"}), 403)
+    if require_token_header:
+        expected = os.getenv("LEMMA_ISHUMAN_DEMO_TEST_TOKEN")
+        provided = request.headers.get("X-Demo-Test-Token") or ""
+        if not expected or provided != expected:
+            return None, (jsonify({"success": False, "error": "demo_test_token_required"}), 403)
+    return {}, None
+
+
+def _skeleton_credential_ttl_seconds(body: dict | None = None) -> int:
+    from api.config import ishuman_skeleton_credential_ttl_seconds
+
+    body = body or {}
+    raw = body.get("credential_ttl_seconds")
+    if raw is not None:
+        try:
+            return max(300, min(int(raw), 86400))
+        except (TypeError, ValueError):
+            pass
+    return ishuman_skeleton_credential_ttl_seconds()
+
+
+def _create_skeleton_verification_row(
+    db,
+    *,
+    wallet_id: str,
+    return_url: str = "",
+    ppid: str = "",
+) -> "IsHumanVerification":
+    from api.database import IsHumanVerification
+
+    session_id = f"ishuman_skeleton_{secrets.token_urlsafe(16)}"
+    provider_session_id = f"skeleton_{secrets.token_urlsafe(12)}"
+    row = IsHumanVerification(
+        session_id=session_id,
+        provider_session_id=provider_session_id,
+        wallet_id=wallet_id,
+        ppid=ppid or None,
+        status="pending",
+        issuer_id="skeleton",
+        metadata_json={
+            "return_url": return_url,
+            "skeleton_idv": True,
+        },
+    )
+    db.add(row)
+    return row
+
+
 def _complete_demo_test_session(
     *,
     session_id: str = "",
     stripe_session_id: str = "",
     wallet_secret: str = "",
+    credential_ttl_seconds: int | None = None,
+    verification_method: str = "didit",
 ) -> tuple[dict, int]:
     """Shared test-complete logic for demo endpoints."""
     from api.database import IsHumanVerification, SessionLocal
@@ -435,7 +503,7 @@ def _complete_demo_test_session(
             )
         else:
             material = material_from_test_fixture(
-                stripe_session_id=record.stripe_session_id,
+                stripe_session_id=record.stripe_session_id or record.session_id,
                 document_number=f"demo_{wallet_id[-8:]}",
             )
             resolved = resolve_or_create_person_from_material(db, material=material, wallet_id=wallet_id)
@@ -460,6 +528,8 @@ def _complete_demo_test_session(
             ppid,
             wallet_id,
             ppid_derivation=ppid_derivation,
+            verification_method=verification_method,
+            ttl_seconds=credential_ttl_seconds,
         )
 
         record.status = "verified"
@@ -474,6 +544,7 @@ def _complete_demo_test_session(
             **(record.metadata_json or {}),
             "credential_issuer_did": credential.get("issuerInfo", {}).get("did"),
             "demo_test_completed": True,
+            "skeleton_idv": bool((record.metadata_json or {}).get("skeleton_idv")),
             "ppid_derivation": ppid_derivation or (record.metadata_json or {}).get("ppid_derivation"),
         }
         db.commit()
@@ -618,6 +689,209 @@ def ishuman_demo_verify_once_test_mode():
         "mode": "verify_once_test_mode",
         "revocation_reset": reset_summary,
     })
+
+
+@ishuman_demo_bp.route("/api/demo/ishuman/skeleton-idv-flow", methods=["POST"])
+def ishuman_demo_skeleton_idv_flow():
+    """Didit-free IDV for autonomous testing on non-production deploys.
+
+    Creates a pending ``ishuman_skeleton_*`` verification row, optionally stores
+    a mobile handoff relay, and can issue a short-lived master credential
+    immediately (popup test path) or leave the session pending for handoff E2E.
+    """
+    _guards, err = _require_demo_skeleton_idv(require_token_header=True)
+    if err:
+        return err
+
+    body = request.get_json(silent=True) or {}
+    wallet_id = (body.get("wallet_id") or "").strip()
+    wallet_secret = (body.get("wallet_secret") or "").strip()
+    return_url = (body.get("return_url") or "").strip()
+    include_handoff = bool(body.get("include_handoff", False))
+    complete_immediately = bool(body.get("complete_immediately", not include_handoff))
+    handoff_id = (body.get("handoff_id") or "").strip()
+    encrypted_blob = (body.get("encrypted_blob") or "").strip()
+    handoff_mk_fingerprint = (body.get("handoff_mk_fingerprint") or "").strip()
+    mk = (body.get("mk") or "").strip()
+    ttl = _skeleton_credential_ttl_seconds(body)
+
+    if not wallet_id:
+        return jsonify({"success": False, "error": "wallet_id required"}), 400
+
+    from api.database import SessionLocal
+
+    db = SessionLocal()
+    try:
+        ppid = ""
+        if wallet_secret:
+            from api.ppid import derive_ppid_from_wallet_secret
+
+            ppid = derive_ppid_from_wallet_secret(wallet_secret, "lemma.id")
+        row = _create_skeleton_verification_row(
+            db,
+            wallet_id=wallet_id,
+            return_url=return_url,
+            ppid=ppid,
+        )
+        db.commit()
+        session_id = row.session_id
+    except Exception:
+        db.rollback()
+        logger.exception("Skeleton IDV session create failed")
+        return jsonify({"success": False, "error": "skeleton_session_failed"}), 500
+    finally:
+        db.close()
+
+    handoff_payload = None
+    if include_handoff:
+        from api.ishuman import _handoff_mk_fingerprint, _idv_handoff_ttl_seconds, _store_idv_mobile_handoff
+
+        if not handoff_id or len(handoff_id) < 16:
+            handoff_id = f"handoff_{secrets.token_urlsafe(18)}"
+        if not mk:
+            mk = secrets.token_hex(16)
+        if not handoff_mk_fingerprint:
+            handoff_mk_fingerprint = _handoff_mk_fingerprint(mk)
+        if not encrypted_blob:
+            encrypted_blob = "skeleton_placeholder_blob"
+        try:
+            _store_idv_mobile_handoff(
+                handoff_id=handoff_id,
+                session_id=session_id,
+                wallet_id=wallet_id,
+                encrypted_blob=encrypted_blob,
+                mk_fingerprint=handoff_mk_fingerprint,
+            )
+        except Exception:
+            logger.exception("Skeleton handoff store failed")
+            return jsonify({"success": False, "error": "skeleton_handoff_failed"}), 500
+
+        base = return_url or (request.host_url.rstrip("/") + "/wallet/ishuman-idv")
+        joiner = "&" if "?" in base else "?"
+        mobile_return_url = (
+            f"{base}{joiner}verification_return=true"
+            f"&handoff_id={handoff_id}&mk={mk}&ishuman_session={session_id}"
+        )
+        handoff_payload = {
+            "handoff_id": handoff_id,
+            "mk": mk,
+            "session_id": session_id,
+            "mobile_return_url": mobile_return_url,
+            "expires_in": _idv_handoff_ttl_seconds(),
+        }
+
+    payload = {
+        "success": True,
+        "session_id": session_id,
+        "mode": "skeleton_idv_flow",
+        "credential_ttl_seconds": ttl,
+        "complete_immediately": complete_immediately,
+    }
+    if handoff_payload:
+        payload["handoff"] = handoff_payload
+
+    if complete_immediately:
+        complete_payload, complete_status = _complete_demo_test_session(
+            session_id=session_id,
+            wallet_secret=wallet_secret,
+            credential_ttl_seconds=ttl,
+            verification_method="skeleton",
+        )
+        if complete_status != 200:
+            return jsonify(complete_payload), complete_status
+        payload.update({
+            "credential_id": complete_payload["credential_id"],
+            "credential": complete_payload["credential"],
+            "ppid": complete_payload["ppid"],
+            "expires_at": int((complete_payload["credential"].get("claims") or {}).get("expiresAt", 0)),
+        })
+
+    return jsonify(payload)
+
+
+@ishuman_demo_bp.route("/api/demo/ishuman/skeleton-idv-complete", methods=["POST"])
+def ishuman_demo_skeleton_idv_complete():
+    """Issue a short-lived master credential for a pending skeleton session."""
+    _guards, err = _require_demo_skeleton_idv(require_token_header=True)
+    if err:
+        return err
+
+    body = request.get_json(silent=True) or {}
+    session_id = (body.get("session_id") or "").strip()
+    wallet_secret = (body.get("wallet_secret") or "").strip()
+    if not session_id:
+        return jsonify({"success": False, "error": "session_id required"}), 400
+    if not session_id.startswith("ishuman_skeleton_"):
+        return jsonify({"success": False, "error": "not_a_skeleton_session"}), 400
+
+    ttl = _skeleton_credential_ttl_seconds(body)
+    complete_payload, complete_status = _complete_demo_test_session(
+        session_id=session_id,
+        wallet_secret=wallet_secret,
+        credential_ttl_seconds=ttl,
+        verification_method="skeleton",
+    )
+    if complete_status != 200:
+        return jsonify(complete_payload), complete_status
+
+    return jsonify({
+        "success": True,
+        "session_id": complete_payload["session_id"],
+        "credential_id": complete_payload["credential_id"],
+        "credential": complete_payload["credential"],
+        "ppid": complete_payload["ppid"],
+        "mode": "skeleton_idv_complete",
+        "credential_ttl_seconds": ttl,
+        "expires_at": int((complete_payload["credential"].get("claims") or {}).get("expiresAt", 0)),
+    })
+
+
+@ishuman_demo_bp.route("/api/demo/ishuman/skeleton-idv-expire", methods=["POST"])
+def ishuman_demo_skeleton_idv_expire():
+    """Mark skeleton verification rows expired after a test run."""
+    _guards, err = _require_demo_skeleton_idv(require_token_header=True)
+    if err:
+        return err
+
+    body = request.get_json(silent=True) or {}
+    session_id = (body.get("session_id") or "").strip()
+    wallet_id = (body.get("wallet_id") or "").strip()
+    if not session_id and not wallet_id:
+        return jsonify({"success": False, "error": "session_id or wallet_id required"}), 400
+
+    from api.database import IsHumanVerification, SessionLocal
+
+    db = SessionLocal()
+    try:
+        query = db.query(IsHumanVerification).filter(
+            IsHumanVerification.session_id.like("ishuman_skeleton_%")
+        )
+        if session_id:
+            query = query.filter(IsHumanVerification.session_id == session_id)
+        if wallet_id:
+            query = query.filter(IsHumanVerification.wallet_id == wallet_id)
+        rows = query.all()
+        if not rows:
+            return jsonify({"success": False, "error": "skeleton_session_not_found"}), 404
+        now = datetime.utcnow()
+        for row in rows:
+            row.status = "expired"
+            row.expires_at = now
+            row.metadata_json = {
+                **(row.metadata_json or {}),
+                "skeleton_expired_at": now.isoformat() + "Z",
+            }
+        db.commit()
+        return jsonify({
+            "success": True,
+            "expired_count": len(rows),
+            "session_ids": [row.session_id for row in rows],
+        })
+    except Exception:
+        db.rollback()
+        raise
+    finally:
+        db.close()
 
 
 @ishuman_demo_bp.route("/api/demo/ishuman/probe-derive", methods=["POST"])

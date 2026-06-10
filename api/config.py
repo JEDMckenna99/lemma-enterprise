@@ -267,6 +267,42 @@ def is_ishuman_idv_mobile_handoff_enabled() -> bool:
     return _env_truthy("LEMMA_IDV_MOBILE_HANDOFF_ENABLED", True)
 
 
+def ishuman_idv_handoff_ttl_seconds() -> int:
+    """One-time mobile handoff relay TTL (default 300s)."""
+    raw = os.environ.get("LEMMA_IDV_HANDOFF_TTL_SECONDS", "300")
+    try:
+        value = int(raw)
+    except (TypeError, ValueError):
+        return 300
+    return max(60, min(value, 900))
+
+
+def is_ishuman_idv_handoff_strict_claim_enabled() -> bool:
+    """Require handoff_id + session_id + mk proof on mobile handoff claim.
+
+    Set LEMMA_IDV_HANDOFF_STRICT_CLAIM=0 for emergency rollback to the legacy
+    session-only claim path (logged as deprecated).
+    """
+    return _env_truthy("LEMMA_IDV_HANDOFF_STRICT_CLAIM", True)
+
+
+def ishuman_skeleton_credential_ttl_seconds() -> int:
+    """Short-lived master credentials for demo/skeleton IDV flows (default 1h)."""
+    raw = os.environ.get("LEMMA_ISHUMAN_SKELETON_CREDENTIAL_TTL_SECONDS", "3600")
+    try:
+        value = int(raw)
+    except (TypeError, ValueError):
+        return 3600
+    return max(300, min(value, 86400))
+
+
+def is_ishuman_skeleton_idv_enabled() -> bool:
+    """Bypass Didit for autonomous demo/testing on non-production deploys."""
+    if os.getenv("ENVIRONMENT", "").strip().lower() == "production":
+        return False
+    return _env_truthy("LEMMA_ISHUMAN_SKELETON_IDV_ENABLED", True)
+
+
 def is_ishuman_pull_fallback_enabled() -> bool:
     """Whether status-poll may actively pull a didit decision to issue.
 

@@ -6678,28 +6678,46 @@ class LemmaWallet {
         return {
             handoffId,
             mk,
-            expiresIn: 900,
+            expiresIn: 300,
         };
+    }
+
+    /**
+     * SHA-256 fingerprint of the handoff AES key (server stores this, never mk).
+     */
+    async handoffMkFingerprint(mk) {
+        const data = new TextEncoder().encode(String(mk || ''));
+        const hash = await crypto.subtle.digest('SHA-256', data);
+        return Array.from(new Uint8Array(hash))
+            .map((b) => b.toString(16).padStart(2, '0'))
+            .join('');
+    }
+
+    _idvHandoffAad(handoffId, sessionId, walletId) {
+        return `idv_handoff_v1|${handoffId}|${sessionId}|${walletId}`;
     }
 
     /**
      * Encrypt wallet material for a pending IDV mobile handoff (no session_id yet).
      */
-    async buildIdvMobileHandoffEncryptedBlob({ handoffId, walletSecret, walletId } = {}) {
+    async buildIdvMobileHandoffEncryptedBlob({ handoffId, walletSecret, walletId, sessionId } = {}) {
         const encryptionKey = this._pendingIdvHandoffKey;
-        if (!encryptionKey || !handoffId || !walletSecret || !walletId) {
-            throw new Error('pending handoff key and wallet fields required');
+        if (!encryptionKey || !handoffId || !walletSecret || !walletId || !sessionId) {
+            throw new Error('pending handoff key, wallet fields, and sessionId required');
         }
 
-        const HANDOFF_TTL_MS = 900000;
+        const HANDOFF_TTL_MS = 300000;
         const payload = JSON.stringify({
+            handoffVersion: 'v1',
             walletSecret,
             walletId,
+            sessionId,
             profileId: DEFAULT_PROFILE_ID,
             profileName: 'Personal',
             expiresAt: Date.now() + HANDOFF_TTL_MS,
         });
-        return this._encryptForLink(payload, encryptionKey);
+        const aad = this._idvHandoffAad(handoffId, sessionId, walletId);
+        return this._encryptForLink(payload, encryptionKey, aad);
     }
 
     /**
@@ -6716,17 +6734,23 @@ class LemmaWallet {
             throw new Error('pending handoff key and wallet/session fields required');
         }
 
+        const mkHex = Array.from(encryptionKey)
+            .map((b) => b.toString(16).padStart(2, '0'))
+            .join('');
         const encryptedBlob = await this.buildIdvMobileHandoffEncryptedBlob({
             handoffId,
             walletSecret,
             walletId,
+            sessionId,
         });
         this._pendingIdvHandoffKey = null;
+        const handoffMkFingerprint = await this.handoffMkFingerprint(mkHex);
         await this.depositIdvMobileHandoff({
             handoffId,
             sessionId,
             encryptedBlob,
             walletId,
+            handoffMkFingerprint,
         });
         return { handoffId, sessionId, encryptedBlob };
     }
@@ -6745,9 +6769,10 @@ class LemmaWallet {
         const encryptionKeyHex = Array.from(encryptionKey)
             .map((b) => b.toString(16).padStart(2, '0'))
             .join('');
-        const HANDOFF_TTL_MS = 900000;
+        const HANDOFF_TTL_MS = 300000;
 
         const payload = JSON.stringify({
+            handoffVersion: 'v1',
             walletSecret,
             walletId,
             sessionId,
@@ -6755,7 +6780,8 @@ class LemmaWallet {
             profileName: 'Personal',
             expiresAt: Date.now() + HANDOFF_TTL_MS,
         });
-        const encryptedBlob = await this._encryptForLink(payload, encryptionKey);
+        const aad = this._idvHandoffAad(handoffId, sessionId, walletId);
+        const encryptedBlob = await this._encryptForLink(payload, encryptionKey, aad);
 
         return {
             handoffId,
@@ -6768,9 +6794,9 @@ class LemmaWallet {
     /**
      * Deposit an encrypted IDV mobile handoff blob (source popup, before Didit redirect).
      */
-    async depositIdvMobileHandoff({ handoffId, sessionId, encryptedBlob, walletId } = {}) {
-        if (!handoffId || !sessionId || !encryptedBlob) {
-            throw new Error('handoffId, sessionId, and encryptedBlob required');
+    async depositIdvMobileHandoff({ handoffId, sessionId, encryptedBlob, walletId, handoffMkFingerprint } = {}) {
+        if (!handoffId || !sessionId || !encryptedBlob || !handoffMkFingerprint) {
+            throw new Error('handoffId, sessionId, encryptedBlob, and handoffMkFingerprint required');
         }
 
         const resolvedWalletId = walletId || this.session?.walletId;
@@ -6779,8 +6805,12 @@ class LemmaWallet {
         }
 
         const walletAssertion = await this.buildWalletAssertion(
-            ['handoff_id', 'session_id'],
-            { handoff_id: handoffId, session_id: sessionId },
+            ['handoff_id', 'session_id', 'handoff_mk_fingerprint'],
+            {
+                handoff_id: handoffId,
+                session_id: sessionId,
+                handoff_mk_fingerprint: handoffMkFingerprint,
+            },
         );
 
         const res = await fetch('/api/ishuman/idv-mobile-handoff/deposit', {
@@ -6792,6 +6822,7 @@ class LemmaWallet {
                 handoff_id: handoffId,
                 session_id: sessionId,
                 encrypted_blob: encryptedBlob,
+                handoff_mk_fingerprint: handoffMkFingerprint,
                 wallet_assertion: walletAssertion,
             }),
         });
@@ -6810,37 +6841,30 @@ class LemmaWallet {
         if (!mk) {
             throw new Error('mk required');
         }
-        if (!handoffId && !sessionId) {
-            throw new Error('handoffId or sessionId required');
+        if (!handoffId || !sessionId) {
+            throw new Error('handoffId and sessionId required');
         }
 
-        const claimBody = {};
-        if (handoffId) claimBody.handoff_id = handoffId;
-        if (sessionId) claimBody.session_id = sessionId;
-
-        let res = await fetch('/api/ishuman/idv-mobile-handoff/claim', {
+        const res = await fetch('/api/ishuman/idv-mobile-handoff/claim', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             credentials: 'include',
-            body: JSON.stringify(claimBody),
+            body: JSON.stringify({
+                handoff_id: handoffId,
+                session_id: sessionId,
+                mk,
+            }),
         });
-        if (!res.ok && handoffId && sessionId) {
-            const firstErr = await res.json().catch(() => ({}));
-            if (firstErr.error === 'handoff_not_found') {
-                res = await fetch('/api/ishuman/idv-mobile-handoff/claim', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    credentials: 'include',
-                    body: JSON.stringify({ session_id: sessionId }),
-                });
-            }
-        }
         if (!res.ok) {
             const err = await res.json().catch(() => ({}));
             throw new Error(`mobile handoff claim failed: ${err.error || res.status}`);
         }
         const data = await res.json();
-        const payload = await this._decryptHandoffBlob(data.encrypted_blob, mk);
+        const aad = this._idvHandoffAad(handoffId, sessionId, data.wallet_id);
+        const payload = await this._decryptHandoffBlob(data.encrypted_blob, mk, aad);
+        if (payload.sessionId && payload.sessionId !== sessionId) {
+            throw new Error('Handoff session mismatch');
+        }
         if (payload.expiresAt && payload.expiresAt < Date.now()) {
             throw new Error('Handoff expired');
         }
@@ -6865,7 +6889,7 @@ class LemmaWallet {
      * Decrypt a handoff blob using the URL-supplied AES key (hex).
      * @private
      */
-    async _decryptHandoffBlob(encryptedBlob, keyHex) {
+    async _decryptHandoffBlob(encryptedBlob, keyHex, additionalData = null) {
         if (!encryptedBlob || !keyHex) {
             throw new Error('encrypted blob and key required');
         }
@@ -6882,8 +6906,12 @@ class LemmaWallet {
             false,
             ['decrypt'],
         );
+        const decryptParams = { name: 'AES-GCM', iv: iv };
+        if (additionalData) {
+            decryptParams.additionalData = new TextEncoder().encode(additionalData);
+        }
         const decrypted = await crypto.subtle.decrypt(
-            { name: 'AES-GCM', iv: iv },
+            decryptParams,
             key,
             ciphertext,
         );
@@ -7254,7 +7282,7 @@ class LemmaWallet {
     /**
      * Encrypt payload for device linking using AES-GCM
      */
-    async _encryptForLink(payload, keyBytes) {
+    async _encryptForLink(payload, keyBytes, additionalData = null) {
         // Import key
         const key = await crypto.subtle.importKey(
             'raw',
@@ -7269,8 +7297,12 @@ class LemmaWallet {
         
         // Encrypt
         const encoder = new TextEncoder();
+        const encryptParams = { name: 'AES-GCM', iv: iv };
+        if (additionalData) {
+            encryptParams.additionalData = encoder.encode(additionalData);
+        }
         const encrypted = await crypto.subtle.encrypt(
-            { name: 'AES-GCM', iv: iv },
+            encryptParams,
             key,
             encoder.encode(payload)
         );
