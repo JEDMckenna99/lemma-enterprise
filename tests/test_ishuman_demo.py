@@ -49,6 +49,67 @@ def test_ishuman_demo_page_loads_expected_assets(ishuman_demo_client):
     assert "/static/css/demo/ishuman-demo.css" in body
 
 
+def test_ishuman_idv_ui_preview_loads(ishuman_demo_client):
+    resp = ishuman_demo_client.get(
+        "/wallet/ishuman-idv"
+        "?ui_preview=site_proof_success"
+        "&origin=http%3A%2F%2Flocalhost%3A5000"
+        "&site_id=tickets-demo.lemma.id"
+    )
+    body = resp.get_data(as_text=True)
+
+    assert resp.status_code == 200
+    assert 'data-ui-preview-enabled="true"' in body
+    assert "UI preview — static screen only" in body
+    assert "Site proof ready." in body
+    assert "renderUiPreview" in body
+
+
+def test_ishuman_demo_page_includes_idv_preview_panel(ishuman_demo_client):
+    resp = ishuman_demo_client.get("/demo/ishuman")
+    body = resp.get_data(as_text=True)
+
+    assert resp.status_code == 200
+    assert "Popup &amp; redirect UI preview" in body
+    assert "ih-idv-preview-grid" in body
+    assert 'data-ui-preview-enabled="true"' in body
+
+
+def test_ishuman_demo_config_includes_ui_preview_flag(ishuman_demo_client):
+    resp = ishuman_demo_client.get("/api/demo/ishuman/config")
+    payload = resp.get_json()
+
+    assert resp.status_code == 200
+    assert payload.get("ui_preview_enabled") is True
+
+
+def test_ishuman_idv_viewer_page_loads(ishuman_demo_client):
+    resp = ishuman_demo_client.get("/demo/ishuman/idv-viewer")
+    body = resp.get_data(as_text=True)
+
+    assert resp.status_code == 200
+    assert "Popup &amp; redirect UI viewer" in body
+    assert "ih-idv-preview-grid" in body
+    assert "/static/js/demo/ishuman-idv-viewer.js" in body
+
+
+def test_ui_preview_enabled_on_production(ishuman_demo_client, monkeypatch):
+    monkeypatch.setenv("ENVIRONMENT", "production")
+
+    config = ishuman_demo_client.get("/api/demo/ishuman/config").get_json()
+    assert config["ui_preview_enabled"] is True
+
+    resp = ishuman_demo_client.get(
+        "/wallet/ishuman-idv"
+        "?ui_preview=verify_once"
+        "&origin=https%3A%2F%2Flemma.id"
+        "&site_id=lemma.id"
+    )
+    body = resp.get_data(as_text=True)
+    assert resp.status_code == 200
+    assert 'data-ui-preview-enabled="true"' in body
+
+
 def test_ishuman_idv_popup_page_loads(ishuman_demo_client):
     resp = ishuman_demo_client.get("/wallet/ishuman-idv?origin=https%3A%2F%2Fexample.com&site_id=tickets-demo.lemma.id")
     body = resp.get_data(as_text=True)

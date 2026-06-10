@@ -607,6 +607,63 @@
   border-bottom: 0;
 }
 
+.demo-idv-preview {
+  margin-top: 28px;
+}
+
+.demo-idv-viewer-page {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 32px 20px 48px;
+}
+
+.demo-idv-viewer-page .demo-idv-preview {
+  margin-top: 0;
+}
+
+.idv-preview-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.demo-input-inline {
+  width: auto;
+  min-width: 220px;
+  margin: 0;
+}
+
+.idv-preview-grid {
+  display: grid;
+  gap: 8px;
+}
+
+.idv-preview-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 8px;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--demo-line);
+}
+
+.idv-preview-row:last-child {
+  border-bottom: 0;
+}
+
+.idv-preview-label {
+  font-size: 0.88rem;
+  color: var(--demo-ink);
+}
+
+.idv-preview-row .demo-btn {
+  padding: 8px 12px;
+  font-size: 0.82rem;
+  white-space: nowrap;
+}
+
 /* Hide duplicate hero CTA — keep one in workflow head */
 #ih-run-guided-demo-hero {
   display: none !important;

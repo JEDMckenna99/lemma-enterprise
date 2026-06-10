@@ -1,0 +1,40 @@
+{% extends "modern/layout.html" %}
+{% set is_public_page = true %}
+
+{% block title %}isHuman IDV UI viewer — lemma.id{% endblock %}
+{% block description %}Preview lemma.id popup and mobile redirect identity-check screens without running wallet unlock or IDV.{% endblock %}
+
+{% block head %}
+{{ super() }}
+<link rel="stylesheet" href="/static/css/demo/ishuman-demo.css?v=4">
+{% endblock %}
+
+{% block content %}
+<div class="demo-page demo-idv-viewer-page" id="ishuman-idv-viewer-root"
+     data-ui-preview-enabled="{{ 'true' if ui_preview_enabled else 'false' }}">
+
+  <header class="demo-intro">
+    <p class="demo-eyebrow">lemma.id · internal design tool</p>
+    <h1 class="demo-title">Popup &amp; redirect UI viewer</h1>
+    <p class="demo-lead">Open static screens from <code>/wallet/ishuman-idv</code> to review copy and layout. No passkey, no Stripe/Didit, no credential issuance.</p>
+    <p class="demo-muted">Production-safe: preview mode never calls wallet or IDV APIs.</p>
+  </header>
+
+  <section class="demo-details-body demo-idv-preview">
+    <div class="idv-preview-toolbar">
+      <label class="demo-muted" for="ih-idv-preview-site">Requesting site</label>
+      <select id="ih-idv-preview-site" class="demo-input demo-input-inline">
+        <option value="lemma.id">lemma.id (verify once)</option>
+        <option value="tickets-demo.lemma.id" selected>tickets-demo.lemma.id</option>
+        <option value="trials-demo.lemma.id">trials-demo.lemma.id</option>
+      </select>
+    </div>
+    <div class="idv-preview-grid" id="ih-idv-preview-grid" aria-live="polite"></div>
+  </section>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script src="/static/js/demo/ishuman-idv-viewer.js?v=1" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
+{% endblock %}

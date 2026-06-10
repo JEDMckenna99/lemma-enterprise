@@ -75,13 +75,35 @@
         .btn:disabled { opacity: 0.65; cursor: not-allowed; }
         .steps { margin: 14px 0 18px; padding-left: 18px; color: #475569; font-size: 0.85rem; line-height: 1.55; }
         .hidden { display: none !important; }
+        .ui-preview-banner {
+            background: #fef9c3;
+            border: 1px solid #fde047;
+            color: #854d0e;
+            border-radius: 10px;
+            padding: 10px 12px;
+            font-size: 0.78rem;
+            line-height: 1.45;
+            margin-bottom: 14px;
+            font-weight: 600;
+        }
+        .ui-preview-flow {
+            display: block;
+            margin-top: 4px;
+            font-weight: 500;
+            color: #a16207;
+        }
     </style>
 </head>
 <body>
     <div class="card" id="ishuman-idv-root"
          data-test-verify-enabled="{{ 'true' if demo_test_verify_enabled else 'false' }}"
          data-skeleton-idv-enabled="{{ 'true' if skeleton_idv_enabled|default(false) else 'false' }}"
+         data-ui-preview-enabled="{{ 'true' if ui_preview_enabled|default(false) else 'false' }}"
          data-server-test-token="{{ demo_test_token }}">
+        <div id="ui-preview-banner" class="ui-preview-banner hidden">
+            UI preview — static screen only; no wallet unlock or IDV.
+            <span class="ui-preview-flow" id="ui-preview-flow-label"></span>
+        </div>
         <p class="eyebrow">lemma.id</p>
         <h1>Verify once, reuse everywhere</h1>
         <p id="intro-copy">Create or unlock your browser wallet, complete a one-time identity check, and reuse the proof on any Lemma-enabled site.</p>
@@ -124,7 +146,151 @@
         const root = document.getElementById('ishuman-idv-root');
         const testVerifyEnabled = root.dataset.testVerifyEnabled === 'true';
         const skeletonIdvEnabled = root.dataset.skeletonIdvEnabled === 'true';
+        const uiPreviewEnabled = root.dataset.uiPreviewEnabled === 'true';
+        const uiPreviewState = (params.get('ui_preview') || '').trim();
         const serverTestToken = root.dataset.serverTestToken || '';
+
+        const UI_PREVIEW_SCENES = {
+            verify_once: {
+                intro: 'Create or unlock your browser wallet, complete a one-time identity check, and reuse the proof on any Lemma-enabled site.',
+                status: { message: 'Ready when you are.', tone: 'info' },
+                primary: { text: 'Unlock wallet & verify', visible: true },
+                cancel: 'Cancel',
+            },
+            loading_unlock: {
+                intro: 'Create or unlock your browser wallet, complete a one-time identity check, and reuse the proof on any Lemma-enabled site.',
+                status: { message: 'Unlock wallet with passkey…', tone: 'loading' },
+                primary: { visible: false },
+                cancel: 'Cancel',
+            },
+            loading_idv: {
+                intro: 'Create or unlock your browser wallet, complete a one-time identity check, and reuse the proof on any Lemma-enabled site.',
+                status: { message: 'Opening identity check…', tone: 'loading' },
+                primary: { visible: false },
+                cancel: 'Cancel',
+            },
+            loading_finalize: {
+                intro: 'Create or unlock your browser wallet, complete a one-time identity check, and reuse the proof on any Lemma-enabled site.',
+                status: { message: 'Finalizing your verification…', tone: 'loading' },
+                primary: { visible: false },
+                cancel: 'Cancel',
+            },
+            site_proof: {
+                intro: 'Lemma issues a site-scoped human proof from your wallet. Passkey unlock is once per day; IDV runs only if you have no master proof yet.',
+                status: { message: 'Ready when you are.', tone: 'info' },
+                primary: { visible: false },
+                cancel: 'Cancel',
+            },
+            site_proof_issuing: {
+                intro: 'Lemma issues a site-scoped human proof from your wallet. Passkey unlock is once per day; IDV runs only if you have no master proof yet.',
+                status: { message: 'Issuing site proof…', tone: 'loading' },
+                primary: { visible: false },
+                cancel: 'Cancel',
+            },
+            site_proof_success: {
+                intro: 'Lemma issues a site-scoped human proof from your wallet. Passkey unlock is once per day; IDV runs only if you have no master proof yet.',
+                status: { message: 'Site proof ready.', tone: 'success' },
+                primary: { visible: false },
+                cancel: 'Cancel',
+            },
+            fresh_idv_blocked: {
+                intro: 'This site asked you to re-verify before continuing. Complete a fresh identity check to regain access. The site never sees your documents.',
+                status: { message: 'Ready when you are.', tone: 'info' },
+                primary: { visible: false },
+                cancel: 'Cancel',
+            },
+            fresh_idv_revoked: {
+                intro: 'Your previous verification was revoked. Complete a fresh identity check to regain access. The site never sees your documents.',
+                status: { message: 'Ready when you are.', tone: 'info' },
+                primary: { visible: false },
+                cancel: 'Cancel',
+            },
+            fresh_idv_success: {
+                intro: 'Your previous verification was revoked. Complete a fresh identity check to regain access. The site never sees your documents.',
+                status: { message: 'Fresh verification complete. Re-entry granted.', tone: 'success' },
+                primary: { visible: false },
+                cancel: 'Cancel',
+            },
+            mobile_handoff: {
+                intro: 'Identity verified. Your lemma.id is saved on this device. Passkey setup happens automatically the first time you verify on a site.',
+                status: { message: 'Your lemma.id is ready on this phone.', tone: 'success' },
+                primary: { visible: false },
+                cancel: 'Close tab',
+            },
+            return_unlock: {
+                intro: 'Create or unlock your browser wallet, complete a one-time identity check, and reuse the proof on any Lemma-enabled site.',
+                status: { message: 'Unlock wallet to finish verification…', tone: 'info' },
+                primary: { text: 'Unlock & finish', visible: true },
+                cancel: 'Cancel',
+            },
+            already_provisioned: {
+                intro: 'Create or unlock your browser wallet, complete a one-time identity check, and reuse the proof on any Lemma-enabled site.',
+                status: { message: 'Human proof already in wallet.', tone: 'success' },
+                primary: { visible: false },
+                cancel: 'Cancel',
+            },
+            master_stored: {
+                intro: 'Create or unlock your browser wallet, complete a one-time identity check, and reuse the proof on any Lemma-enabled site.',
+                status: { message: 'Human proof stored in wallet.', tone: 'success' },
+                primary: { visible: false },
+                cancel: 'Cancel',
+            },
+            error: {
+                intro: 'Create or unlock your browser wallet, complete a one-time identity check, and reuse the proof on any Lemma-enabled site.',
+                status: { message: 'Verification failed — try again or contact support.', tone: 'error' },
+                primary: { text: 'Try again', visible: true },
+                cancel: 'Cancel',
+            },
+        };
+
+        function renderUiPreview(stateKey) {
+            const scene = UI_PREVIEW_SCENES[stateKey];
+            if (!scene) {
+                setStatus('Unknown preview state: ' + stateKey, 'error');
+                document.getElementById('ui-preview-banner').classList.remove('hidden');
+                return;
+            }
+
+            document.getElementById('ui-preview-banner').classList.remove('hidden');
+            const flowLabel = document.getElementById('ui-preview-flow-label');
+            if (flowMode === 'redirect') {
+                const returnHint = redirectReturn ? redirectReturn : 'customer site';
+                flowLabel.textContent = 'Redirect flow — would return to ' + returnHint + ' after success.';
+            } else {
+                flowLabel.textContent = 'Popup flow — opened from a customer site or the demo page.';
+            }
+
+            document.getElementById('intro-copy').textContent = scene.intro;
+            document.getElementById('site-chip').textContent = requestingSite;
+            setStatus(scene.status.message, scene.status.tone);
+
+            const primaryBtn = document.getElementById('primary-btn');
+            if (scene.primary && scene.primary.visible) {
+                primaryBtn.textContent = scene.primary.text || 'Continue';
+                primaryBtn.classList.remove('hidden');
+                primaryBtn.disabled = true;
+            } else {
+                primaryBtn.classList.add('hidden');
+            }
+
+            const cancelBtn = document.getElementById('cancel-btn');
+            cancelBtn.textContent = scene.cancel || 'Cancel';
+            cancelBtn.onclick = (event) => {
+                event.preventDefault();
+                if (flowMode === 'redirect') {
+                    if (redirectReturn) {
+                        window.location.href = redirectReturn;
+                    } else if (window.history.length > 1) {
+                        window.history.back();
+                    }
+                    return;
+                }
+                window.close();
+                setTimeout(() => {
+                    if (window.history.length > 1) window.history.back();
+                }, 120);
+            };
+        }
 
         let wallet = null;
         let walletId = '';
@@ -843,6 +1009,11 @@
         });
 
         (async function boot() {
+            if (uiPreviewEnabled && uiPreviewState) {
+                renderUiPreview(uiPreviewState);
+                return;
+            }
+
             // A cross-origin IDV round-trip (e.g. Didit) can sever window.opener
             // when the provider redirects the popup back here. In that case we must
             // still finish the in-flight flow (store the master, derive/issue the

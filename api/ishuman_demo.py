@@ -14,7 +14,7 @@ import time
 import logging
 from datetime import datetime
 
-from flask import Blueprint, jsonify, render_template, request
+from flask import Blueprint, abort, jsonify, render_template, request
 
 logger = logging.getLogger(__name__)
 
@@ -56,6 +56,11 @@ def _demo_enabled() -> bool:
     See docs/operations/ENVIRONMENT_CONFIG.md for the full env-var contract.
     """
     return os.getenv("ENVIRONMENT", "").strip().lower() != "production"
+
+
+def _ui_preview_enabled() -> bool:
+    """Static popup/redirect UI preview — safe on production (no wallet/IDV)."""
+    return os.getenv("LEMMA_ISHUMAN_UI_PREVIEW_ENABLED", "true").lower() == "true"
 
 
 def ensure_demo_sites() -> list[dict]:
@@ -153,6 +158,7 @@ def _demo_page_context() -> dict:
         "demo_test_token": os.getenv("LEMMA_ISHUMAN_DEMO_TEST_TOKEN", "") if demo_enabled else "",
         "demo_admin_token": os.getenv("LEMMA_ISHUMAN_DEMO_ADMIN_TOKEN", "") if demo_enabled else "",
         "skeleton_idv_enabled": demo_enabled and is_ishuman_skeleton_idv_enabled(),
+        "ui_preview_enabled": _ui_preview_enabled(),
     }
 
 
@@ -160,6 +166,17 @@ def _demo_page_context() -> dict:
 def ishuman_demo_page():
     """Guided public demo for reusable proof-of-humanity."""
     return render_template("demo/ishuman.html", **_demo_page_context())
+
+
+@ishuman_demo_bp.route("/demo/ishuman/idv-viewer")
+def ishuman_idv_viewer_page():
+    """Production-safe static viewer for popup + redirect IDV screens."""
+    if not _ui_preview_enabled():
+        abort(404)
+    return render_template(
+        "demo/ishuman_idv_viewer.html",
+        ui_preview_enabled=True,
+    )
 
 
 @ishuman_demo_bp.route("/wallet/ishuman-idv")
@@ -171,6 +188,7 @@ def ishuman_idv_popup():
         demo_test_verify_enabled=ctx["demo_test_verify_enabled"],
         demo_test_token=ctx["demo_test_token"],
         skeleton_idv_enabled=ctx["skeleton_idv_enabled"],
+        ui_preview_enabled=ctx["ui_preview_enabled"],
     ), 200, {
         "Cache-Control": "no-cache, no-store, must-revalidate",
         "Pragma": "no-cache",
@@ -192,6 +210,7 @@ def ishuman_demo_config():
         "server_test_token_configured": bool(os.getenv("LEMMA_ISHUMAN_DEMO_TEST_TOKEN")),
         "server_admin_token_configured": bool(os.getenv("LEMMA_ISHUMAN_DEMO_ADMIN_TOKEN")),
         "skeleton_idv_enabled": _demo_enabled() and is_ishuman_skeleton_idv_enabled(),
+        "ui_preview_enabled": _ui_preview_enabled(),
         "customer_site_urls": {
             "tickets": "https://lemma-demo-tickets-1d3d7411af33.herokuapp.com",
             "trials": "https://lemma-demo-trials-7090f46cae0d.herokuapp.com",
