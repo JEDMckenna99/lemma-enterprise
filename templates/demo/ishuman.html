@@ -19,7 +19,7 @@
     <p class="demo-eyebrow">lemma.id enforcement demo</p>
     <h1 class="demo-title">Bot defense should punish abusive humans, not whole networks.</h1>
     <p class="demo-lead">Follow the steps below — verify once, prove human on two demo sites, then block or revoke at the human-proof layer.</p>
-    <p class="demo-lead demo-intro-summary">This demo shows the core lemma.id enforcement loop: one human proof produces different private IDs for different sites. A site can block its own PPID without affecting other sites. Severe abuse can be escalated to network-wide revocation.</p>
+    <p class="demo-lead demo-intro-summary">This demo shows the core lemma.id enforcement loop: one human proof produces different private IDs for different sites. A site can block its own PPID without affecting other sites{% if network_revocation_enabled %}. Severe abuse can be escalated to network-wide revocation{% endif %}.</p>
     <div class="demo-intro-actions">
       <button class="demo-btn demo-btn-ghost-danger" id="ih-clear-lemma-id-btn" type="button">Clear my lemma.id</button>
       <span class="demo-muted">Wipes the master human proof + all site-derived IDs from this browser and signals customer sites to drop cached sessions.</span>
@@ -161,7 +161,7 @@
         <div class="workflow-head">
           <div>
             <h2>Respond to abuse</h2>
-            <p class="demo-muted">Block one site, confirm the other stays human, then revoke network-wide if needed.</p>
+            <p class="demo-muted">Block one site, confirm the other stays human{% if network_revocation_enabled %}, then revoke network-wide if needed{% endif %}.</p>
           </div>
         </div>
 
@@ -181,8 +181,9 @@
             <p class="abuse-outcome" id="ih-abuse-scoped-outcome">Trials should remain human</p>
             <button class="demo-btn demo-btn-secondary demo-btn-quiet" id="ih-unblock-tickets-btn" type="button">Unblock ticketing</button>
           </div>
+          {% if network_revocation_enabled %}
           <div class="abuse-arrow" aria-hidden="true">→</div>
-          <div class="abuse-step">
+          <div class="abuse-step" id="ih-network-revoke-step">
             <h3>Network revoke</h3>
             <p class="demo-muted">Status: <span class="demo-pill" id="ih-network-pill">WAITING</span></p>
             <button class="demo-btn demo-btn-danger" id="ih-abuse-network-btn" type="button">Revoke everywhere</button>
@@ -198,6 +199,7 @@
               automatically on their next attempt.
             </p>
           </div>
+          {% endif %}
         </div>
       </div>
     </section>
@@ -239,7 +241,7 @@
           <ul>
             <li>Block site-private human proofs.</li>
             <li>Require fresh verification.</li>
-            <li>Revoke network-wide when confirmed.</li>
+            {% if network_revocation_enabled %}<li>Revoke network-wide when confirmed.</li>{% endif %}
           </ul>
         </div>
       </div>
@@ -273,10 +275,10 @@ const result = await new IsHumanVerifier({
 
 {% block scripts %}
 {{ super() }}
-<script src="/static/js/demo/ishuman-idv-preview-scenes.js?v=1" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
+<script src="/static/js/demo/ishuman-idv-preview-scenes.js?v=2" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
 <script src="/static/js/demo/ishuman-idv-viewer.js?v=2" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
 <script src="/static/js/lemma-keys.js?v=4" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
 <script nonce="{{ csp_nonce }}">window.LEMMA_ISHUMAN_USE_PERSON_ROOT_SEEDS = {{ 'true' if ishuman_use_person_root_seeds else 'false' }};</script>
 <script src="/sdk/ishuman-verifier.js?v=1.7.1" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
-<script src="/static/js/demo/ishuman-demo.js?v=13" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
+<script src="/static/js/demo/ishuman-demo.js?v=14" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
 {% endblock %}

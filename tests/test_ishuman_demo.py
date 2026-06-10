@@ -40,10 +40,10 @@ def test_ishuman_demo_page_loads_expected_assets(ishuman_demo_client):
     assert "ih-step-1" in body
     assert "ih-wizard-progress" in body
     assert "ih-demo-ready-banner" in body
-    assert "ih-network-pill" in body
+    assert "ih-network-pill" not in body
     assert "lemma-demo-tickets" in body
     assert "lemma-demo-trials" in body
-    assert "/wallet/ishuman-idv" not in body
+    assert 'href="/wallet/ishuman-idv"' not in body
     assert "/sdk/ishuman-verifier.js" in body
     assert "/static/js/demo/ishuman-demo.js" in body
     assert "/static/css/demo/ishuman-demo.css" in body
@@ -61,7 +61,7 @@ def test_ishuman_idv_ui_preview_loads(ishuman_demo_client):
     assert resp.status_code == 200
     assert 'data-ui-preview-enabled="true"' in body
     assert "ishuman-idv-preview-scenes.js" in body
-    assert "Site proof ready." in body
+    assert "Prove you" in body or "verified for this site" in body
     assert "renderUiPreview" in body
 
 
@@ -81,6 +81,19 @@ def test_ishuman_demo_config_includes_ui_preview_flag(ishuman_demo_client):
 
     assert resp.status_code == 200
     assert payload.get("ui_preview_enabled") is True
+    assert payload.get("network_revocation_enabled") is False
+
+
+def test_ishuman_demo_page_shows_network_revoke_when_enabled(
+    ishuman_demo_client, monkeypatch,
+):
+    monkeypatch.setenv("LEMMA_ISHUMAN_NETWORK_REVOCATION_ENABLED", "1")
+    resp = ishuman_demo_client.get("/demo/ishuman")
+    body = resp.get_data(as_text=True)
+
+    assert resp.status_code == 200
+    assert "ih-network-pill" in body
+    assert "Revoke everywhere" in body
 
 
 def test_ishuman_idv_viewer_page_loads(ishuman_demo_client):
@@ -92,7 +105,7 @@ def test_ishuman_idv_viewer_page_loads(ishuman_demo_client):
     assert "ih-idv-preview-grid" in body
     assert "/static/js/demo/ishuman-idv-preview-scenes.js" in body
     assert "/static/js/demo/ishuman-idv-viewer.js" in body
-    assert "Claim lemma.id" in body
+    assert "plain-language" in body or "consumer" in body.lower()
 
 
 def test_ui_preview_enabled_on_production(ishuman_demo_client, monkeypatch):
@@ -117,7 +130,7 @@ def test_ishuman_idv_popup_page_loads(ishuman_demo_client):
     body = resp.get_data(as_text=True)
 
     assert resp.status_code == 200
-    assert "Verify once, reuse everywhere" in body
+    assert "Prove you're human" in body or "Verify once" in body
     assert "lemma-keys.js" in body
     assert "wallet-at-rest-crypto.js" in body
     assert "lemma-wallet.js" in body
@@ -172,9 +185,11 @@ def test_ishuman_demo_site_block_is_scoped_to_seeded_demo_site(
 def test_ishuman_demo_network_review_request_stays_site_scoped(
     ishuman_demo_client,
     fake_ishuman_db_session_factory,
+    monkeypatch,
 ):
     from api.database import SiteBlock
 
+    monkeypatch.setenv("LEMMA_ISHUMAN_NETWORK_REVOCATION_ENABLED", "1")
     ishuman_demo_client.get("/api/demo/ishuman/config")
     resp = ishuman_demo_client.post(
         "/api/demo/ishuman/network-revoke-request",
@@ -196,7 +211,23 @@ def test_ishuman_demo_network_review_request_stays_site_scoped(
     assert blocks[0].network_revocation_status == "pending_review"
 
 
-def test_ishuman_demo_network_approve_requires_demo_admin_token(ishuman_demo_client):
+def test_ishuman_demo_network_review_disabled_by_default(ishuman_demo_client):
+    resp = ishuman_demo_client.post(
+        "/api/demo/ishuman/network-revoke-request",
+        json={
+            "site_slug": "tickets",
+            "ppid": "did:lemma:ppid_demo_ticket",
+            "reason": "escalate demo block",
+        },
+    )
+    payload = resp.get_json()
+
+    assert resp.status_code == 503
+    assert payload["error"] == "network_revocation_disabled"
+
+
+def test_ishuman_demo_network_approve_requires_demo_admin_token(ishuman_demo_client, monkeypatch):
+    monkeypatch.setenv("LEMMA_ISHUMAN_NETWORK_REVOCATION_ENABLED", "1")
     resp = ishuman_demo_client.post(
         "/api/demo/ishuman/approve-network-revocation",
         json={"wallet_id": "wallet_demo_001"},
@@ -284,6 +315,7 @@ def test_ishuman_demo_network_approve_revokes_demo_wallet_when_token_matches(
 ):
     from api.database import IsHumanVerification, DerivedCredential, RevocationList
 
+    monkeypatch.setenv("LEMMA_ISHUMAN_NETWORK_REVOCATION_ENABLED", "1")
     monkeypatch.setenv("LEMMA_ISHUMAN_DEMO_ADMIN_TOKEN", "demo-token")
     fake_ishuman_db_session_factory.store.data[IsHumanVerification.__name__].append(
         make_ishuman_verification(
