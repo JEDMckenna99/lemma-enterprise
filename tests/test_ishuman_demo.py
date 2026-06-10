@@ -60,7 +60,7 @@ def test_ishuman_idv_ui_preview_loads(ishuman_demo_client):
 
     assert resp.status_code == 200
     assert 'data-ui-preview-enabled="true"' in body
-    assert "UI preview — static screen only" in body
+    assert "ishuman-idv-preview-scenes.js" in body
     assert "Site proof ready." in body
     assert "renderUiPreview" in body
 
@@ -90,7 +90,9 @@ def test_ishuman_idv_viewer_page_loads(ishuman_demo_client):
     assert resp.status_code == 200
     assert "Popup &amp; redirect UI viewer" in body
     assert "ih-idv-preview-grid" in body
+    assert "/static/js/demo/ishuman-idv-preview-scenes.js" in body
     assert "/static/js/demo/ishuman-idv-viewer.js" in body
+    assert "Claim lemma.id" in body
 
 
 def test_ui_preview_enabled_on_production(ishuman_demo_client, monkeypatch):

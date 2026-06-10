@@ -1,26 +1,6 @@
 (function () {
   'use strict';
 
-  const IDV_PREVIEW_SCENES = [
-    { id: 'verify_once', label: 'Verify once — Create lemma.id' },
-    { id: 'unlock_lemma', label: 'Wallet locked — Unlock lemma.id' },
-    { id: 'claim_lemma', label: 'Master proof, no passkey — Claim lemma.id' },
-    { id: 'loading_unlock', label: 'Unlocking wallet…' },
-    { id: 'loading_idv', label: 'Opening identity check…' },
-    { id: 'loading_finalize', label: 'Finalizing verification…' },
-    { id: 'site_proof', label: 'Site proof — ready' },
-    { id: 'site_proof_issuing', label: 'Site proof — issuing' },
-    { id: 'site_proof_success', label: 'Site proof — success' },
-    { id: 'fresh_idv_blocked', label: 'Fresh IDV — site blocked' },
-    { id: 'fresh_idv_revoked', label: 'Fresh IDV — revoked' },
-    { id: 'fresh_idv_success', label: 'Fresh IDV — success' },
-    { id: 'mobile_handoff', label: 'Mobile handoff — complete' },
-    { id: 'return_unlock', label: 'Return from IDV — unlock & finish' },
-    { id: 'already_provisioned', label: 'Master already in wallet' },
-    { id: 'master_stored', label: 'Master stored' },
-    { id: 'error', label: 'Error state' },
-  ];
-
   function $(id) {
     return document.getElementById(id);
   }
@@ -68,54 +48,94 @@
     if (typeof onOpen === 'function') onOpen('popup', sceneId);
   }
 
+  function appendSceneRow(grid, scene, options) {
+    const row = document.createElement('div');
+    row.className = 'idv-preview-row';
+
+    const label = document.createElement('span');
+    label.className = 'idv-preview-label';
+    label.textContent = scene.label;
+
+    const popupBtn = document.createElement('button');
+    popupBtn.type = 'button';
+    popupBtn.className = 'demo-btn demo-btn-secondary';
+    popupBtn.textContent = 'Popup';
+    popupBtn.addEventListener('click', () => {
+      openIdvPreview(scene.id, { redirect: false, onOpen: options.onOpen });
+    });
+
+    const redirectBtn = document.createElement('button');
+    redirectBtn.type = 'button';
+    redirectBtn.className = 'demo-btn demo-btn-secondary';
+    redirectBtn.textContent = 'Redirect';
+    redirectBtn.addEventListener('click', () => {
+      openIdvPreview(scene.id, { redirect: true, onOpen: options.onOpen });
+    });
+
+    row.appendChild(label);
+    row.appendChild(popupBtn);
+    row.appendChild(redirectBtn);
+    grid.appendChild(row);
+  }
+
   function initIdvPreviewPanel(options = {}) {
     const root = $(options.rootId || 'ishuman-idv-viewer-root');
     const grid = $('ih-idv-preview-grid');
     if (!grid) return;
     if (root && root.dataset.uiPreviewEnabled !== 'true') return;
 
+    const sections = window.LemmaIdvPreviewSections || [];
     grid.innerHTML = '';
-    for (const scene of IDV_PREVIEW_SCENES) {
-      const row = document.createElement('div');
-      row.className = 'idv-preview-row';
 
-      const label = document.createElement('span');
-      label.className = 'idv-preview-label';
-      label.textContent = scene.label;
+    for (const section of sections) {
+      const block = document.createElement('div');
+      block.className = 'idv-preview-section';
 
-      const popupBtn = document.createElement('button');
-      popupBtn.type = 'button';
-      popupBtn.className = 'demo-btn demo-btn-secondary';
-      popupBtn.textContent = 'Popup';
-      popupBtn.addEventListener('click', () => {
-        openIdvPreview(scene.id, { redirect: false, onOpen: options.onOpen });
-      });
+      const heading = document.createElement('h3');
+      heading.className = 'idv-preview-section-title';
+      heading.textContent = section.title;
+      block.appendChild(heading);
 
-      const redirectBtn = document.createElement('button');
-      redirectBtn.type = 'button';
-      redirectBtn.className = 'demo-btn demo-btn-secondary';
-      redirectBtn.textContent = 'Redirect';
-      redirectBtn.addEventListener('click', () => {
-        openIdvPreview(scene.id, { redirect: true, onOpen: options.onOpen });
-      });
+      if (section.description) {
+        const desc = document.createElement('p');
+        desc.className = 'demo-muted idv-preview-section-desc';
+        desc.textContent = section.description;
+        block.appendChild(desc);
+      }
 
-      row.appendChild(label);
-      row.appendChild(popupBtn);
-      row.appendChild(redirectBtn);
-      grid.appendChild(row);
+      const sectionGrid = document.createElement('div');
+      sectionGrid.className = 'idv-preview-grid';
+      for (const scene of section.scenes) {
+        appendSceneRow(sectionGrid, scene, options);
+      }
+      block.appendChild(sectionGrid);
+      grid.appendChild(block);
     }
   }
 
+  function bootViewerPanel() {
+    const grid = $('ih-idv-preview-grid');
+    if (!grid) return;
+    const root = $('ishuman-idv-viewer-root') || $('ishuman-demo');
+    if (root && root.dataset.uiPreviewEnabled !== 'true') return;
+    initIdvPreviewPanel({ rootId: root ? root.id : 'ishuman-idv-viewer-root' });
+  }
+
   window.LemmaIdvViewer = {
-    IDV_PREVIEW_SCENES,
+    get scenes() {
+      return window.LemmaIdvPreviewScenes || {};
+    },
+    get sections() {
+      return window.LemmaIdvPreviewSections || [];
+    },
     buildIdvPreviewUrl,
     openIdvPreview,
     initIdvPreviewPanel,
   };
 
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => initIdvPreviewPanel());
+    document.addEventListener('DOMContentLoaded', bootViewerPanel);
   } else {
-    initIdvPreviewPanel();
+    bootViewerPanel();
   }
 })();

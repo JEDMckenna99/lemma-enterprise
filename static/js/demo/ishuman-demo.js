@@ -491,20 +491,6 @@
     return false;
   }
 
-  function initIdvPreviewPanel() {
-    if (!window.LemmaIdvViewer) return;
-    window.LemmaIdvViewer.initIdvPreviewPanel({
-      rootId: 'ishuman-demo',
-      onOpen: (mode, sceneId) => {
-        if (mode === 'blocked') {
-          log('Preview popup blocked', 'Allow popups or use Redirect');
-          return;
-        }
-        log('Opened IDV UI preview', sceneId);
-      },
-    });
-  }
-
   function createLemmaIdViaPopup() {
     const popupUrl = new URL(`${window.location.origin}/wallet/ishuman-idv`);
     // The demo page is the opener; lemma.id is the requesting site. No
@@ -1174,7 +1160,6 @@
   async function boot() {
     setWorkflowHighlight(1);
     await loadConfig();
-    initIdvPreviewPanel();
     bind('ih-run-guided-demo', runGuidedDemo);
     bind('ih-run-guided-demo-hero', runGuidedDemo);
     bind('ih-wallet-btn', initWallet);

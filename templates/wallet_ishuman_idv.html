@@ -120,6 +120,7 @@
         </div>
     </div>
 
+    <script src="/static/js/demo/ishuman-idv-preview-scenes.js?v=1" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
     <script src="/static/js/lemma-keys.js?v=4" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
     <script src="/static/js/wallet-at-rest-crypto.js?v=2" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
     <script nonce="{{ csp_nonce }}">window.LEMMA_ISHUMAN_USE_PERSON_ROOT_SEEDS = {{ 'true' if ishuman_use_person_root_seeds else 'false' }};</script>
@@ -150,113 +151,9 @@
         const uiPreviewState = (params.get('ui_preview') || '').trim();
         const serverTestToken = root.dataset.serverTestToken || '';
 
-        const UI_PREVIEW_SCENES = {
-            verify_once: {
-                intro: 'Create or unlock your browser wallet, complete a one-time identity check, and reuse the proof on any Lemma-enabled site.',
-                status: { message: 'Ready when you are.', tone: 'info' },
-                primary: { text: 'Create lemma.id', visible: true },
-                cancel: 'Cancel',
-            },
-            unlock_lemma: {
-                intro: 'Create or unlock your browser wallet, complete a one-time identity check, and reuse the proof on any Lemma-enabled site.',
-                status: { message: 'Ready when you are.', tone: 'info' },
-                primary: { text: 'Unlock lemma.id', visible: true },
-                cancel: 'Cancel',
-            },
-            claim_lemma: {
-                intro: 'Identity verified. Your lemma.id is saved on this device. Passkey setup happens automatically the first time you verify on a site.',
-                status: { message: 'Ready when you are.', tone: 'info' },
-                primary: { text: 'Claim lemma.id', visible: true },
-                cancel: 'Cancel',
-            },
-            loading_unlock: {
-                intro: 'Create or unlock your browser wallet, complete a one-time identity check, and reuse the proof on any Lemma-enabled site.',
-                status: { message: 'Unlock wallet with passkey…', tone: 'loading' },
-                primary: { visible: false },
-                cancel: 'Cancel',
-            },
-            loading_idv: {
-                intro: 'Create or unlock your browser wallet, complete a one-time identity check, and reuse the proof on any Lemma-enabled site.',
-                status: { message: 'Opening identity check…', tone: 'loading' },
-                primary: { visible: false },
-                cancel: 'Cancel',
-            },
-            loading_finalize: {
-                intro: 'Create or unlock your browser wallet, complete a one-time identity check, and reuse the proof on any Lemma-enabled site.',
-                status: { message: 'Finalizing your verification…', tone: 'loading' },
-                primary: { visible: false },
-                cancel: 'Cancel',
-            },
-            site_proof: {
-                intro: 'Lemma issues a site-scoped human proof from your wallet. Passkey unlock is once per day; IDV runs only if you have no master proof yet.',
-                status: { message: 'Ready when you are.', tone: 'info' },
-                primary: { visible: false },
-                cancel: 'Cancel',
-            },
-            site_proof_issuing: {
-                intro: 'Lemma issues a site-scoped human proof from your wallet. Passkey unlock is once per day; IDV runs only if you have no master proof yet.',
-                status: { message: 'Issuing site proof…', tone: 'loading' },
-                primary: { visible: false },
-                cancel: 'Cancel',
-            },
-            site_proof_success: {
-                intro: 'Lemma issues a site-scoped human proof from your wallet. Passkey unlock is once per day; IDV runs only if you have no master proof yet.',
-                status: { message: 'Site proof ready.', tone: 'success' },
-                primary: { visible: false },
-                cancel: 'Cancel',
-            },
-            fresh_idv_blocked: {
-                intro: 'This site asked you to re-verify before continuing. Complete a fresh identity check to regain access. The site never sees your documents.',
-                status: { message: 'Ready when you are.', tone: 'info' },
-                primary: { visible: false },
-                cancel: 'Cancel',
-            },
-            fresh_idv_revoked: {
-                intro: 'Your previous verification was revoked. Complete a fresh identity check to regain access. The site never sees your documents.',
-                status: { message: 'Ready when you are.', tone: 'info' },
-                primary: { visible: false },
-                cancel: 'Cancel',
-            },
-            fresh_idv_success: {
-                intro: 'Your previous verification was revoked. Complete a fresh identity check to regain access. The site never sees your documents.',
-                status: { message: 'Fresh verification complete. Re-entry granted.', tone: 'success' },
-                primary: { visible: false },
-                cancel: 'Cancel',
-            },
-            mobile_handoff: {
-                intro: 'Identity verified. Your lemma.id is saved on this device. Passkey setup happens automatically the first time you verify on a site.',
-                status: { message: 'Your lemma.id is ready on this phone.', tone: 'success' },
-                primary: { visible: false },
-                cancel: 'Close tab',
-            },
-            return_unlock: {
-                intro: 'Create or unlock your browser wallet, complete a one-time identity check, and reuse the proof on any Lemma-enabled site.',
-                status: { message: 'Unlock wallet to finish verification…', tone: 'info' },
-                primary: { text: 'Unlock & finish', visible: true },
-                cancel: 'Cancel',
-            },
-            already_provisioned: {
-                intro: 'Create or unlock your browser wallet, complete a one-time identity check, and reuse the proof on any Lemma-enabled site.',
-                status: { message: 'Human proof already in wallet.', tone: 'success' },
-                primary: { visible: false },
-                cancel: 'Cancel',
-            },
-            master_stored: {
-                intro: 'Create or unlock your browser wallet, complete a one-time identity check, and reuse the proof on any Lemma-enabled site.',
-                status: { message: 'Human proof stored in wallet.', tone: 'success' },
-                primary: { visible: false },
-                cancel: 'Cancel',
-            },
-            error: {
-                intro: 'Create or unlock your browser wallet, complete a one-time identity check, and reuse the proof on any Lemma-enabled site.',
-                status: { message: 'Verification failed — try again or contact support.', tone: 'error' },
-                primary: { text: 'Try again', visible: true },
-                cancel: 'Cancel',
-            },
-        };
-
         function renderUiPreview(stateKey) {
-            const scene = UI_PREVIEW_SCENES[stateKey];
+            const scenes = window.LemmaIdvPreviewScenes || {};
+            const scene = scenes[stateKey];
             if (!scene) {
                 setStatus('Unknown preview state: ' + stateKey, 'error');
                 document.getElementById('ui-preview-banner').classList.remove('hidden');
@@ -512,7 +409,7 @@
                 throw new Error('Wallet SDK failed to load — allow scripts for lemma.id and refresh.');
             }
             wallet = wallet || new LemmaWallet();
-            setStatus('Unlock wallet with passkey…', 'loading');
+            setStatus('Unlocking lemma.id…', 'loading');
             const result = await wallet.ensureIsHumanIssuanceReady({ isHumanIssuance: true });
             if (!result.ready) {
                 throw new Error('Wallet unlock failed — complete the passkey prompt or try again.');

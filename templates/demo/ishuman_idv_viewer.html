@@ -16,7 +16,7 @@
   <header class="demo-intro">
     <p class="demo-eyebrow">lemma.id · internal design tool</p>
     <h1 class="demo-title">Popup &amp; redirect UI viewer</h1>
-    <p class="demo-lead">Open static screens from <code>/wallet/ishuman-idv</code> to review copy and layout. No passkey, no Stripe/Didit, no credential issuance.</p>
+    <p class="demo-lead">Browse every popup and redirect screen — grouped by flow. Primary buttons match live wallet state: <strong>Create</strong>, <strong>Unlock</strong>, or <strong>Claim lemma.id</strong>.</p>
     <p class="demo-muted">Production-safe: preview mode never calls wallet or IDV APIs.</p>
   </header>
 
@@ -36,5 +36,6 @@
 
 {% block scripts %}
 {{ super() }}
-<script src="/static/js/demo/ishuman-idv-viewer.js?v=1" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
+<script src="/static/js/demo/ishuman-idv-preview-scenes.js?v=1" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
+<script src="/static/js/demo/ishuman-idv-viewer.js?v=2" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
 {% endblock %}

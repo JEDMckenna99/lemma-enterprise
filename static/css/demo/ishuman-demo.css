@@ -640,6 +640,30 @@
   gap: 8px;
 }
 
+.idv-preview-section {
+  margin-bottom: 28px;
+}
+
+.idv-preview-section:last-child {
+  margin-bottom: 0;
+}
+
+.idv-preview-section-title {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--demo-ink);
+  margin: 0 0 6px;
+}
+
+.idv-preview-section-desc {
+  margin: 0 0 12px;
+  font-size: 0.88rem;
+}
+
+.demo-idv-viewer-page > .demo-idv-preview > .idv-preview-grid {
+  display: block;
+}
+
 .idv-preview-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto auto;
