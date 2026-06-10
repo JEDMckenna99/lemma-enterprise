@@ -3,41 +3,54 @@
 
   function formatSiteLabel(site) {
     const raw = String(site || '').trim();
-    if (!raw || raw === 'customer site') return 'This site';
+    if (!raw || raw === 'customer site') return 'this site';
     return raw.replace(/^www\./i, '');
   }
 
   const CONSUMER = {
     documentTitle: "Confirm you're human — lemma.id",
     eyebrow: 'Secured by lemma.id',
-    headline: "Prove you're human — once",
-    privacy: 'Your ID stays with Lemma. Sites never receive your documents.',
+    headline: "Prove you're human once",
+    privacy:
+      'Your ID documents are used only to create your human proof. After the proof is created, your documents and photos are removed from the verification provider. lemma.id keeps your proof, not your ID.',
     cancel: 'Not now',
     steps: [
       'Secure this device with Face ID, Touch ID, or your passkey',
-      'Complete a one-time identity check — usually under a minute',
-      'Return to the site. They see you\u2019re verified, not your documents',
+      'Complete a one-time identity check, usually under a minute',
+      'Return to the site. They see a private proof, not your documents',
     ],
+    primary: {
+      create: 'Create my lemma.id',
+      unlock: 'Unlock my lemma.id',
+      claim: 'Claim my lemma.id',
+      verifyIdentity: 'Verify identity',
+      tryAgain: 'Try again',
+      unlockFinish: 'Unlock & finish',
+      closeTab: 'Close',
+    },
     intro: {
       verifyOnce(site) {
         const s = formatSiteLabel(site);
-        return `${s} uses Lemma to keep bots out \u2014 without storing your ID. Set up lemma.id once, then skip repeat checks on other sites that use Lemma.`;
+        return `Create your lemma.id to prove you\u2019re a real person without sharing your ID with ${s}. Your lemma.id stores your human proof, so you can skip repeat checks on other sites that use lemma.id.`;
       },
       unlockReturning(site) {
         const s = formatSiteLabel(site);
-        return `Welcome back. Unlock lemma.id with your passkey to continue on ${s}.`;
+        return `Welcome back. Unlock your lemma.id with your passkey to continue on ${s}.`;
       },
       siteProof(site) {
         const s = formatSiteLabel(site);
-        return `${s} needs to know you\u2019re a real person. Unlock lemma.id and we\u2019ll send a private confirmation \u2014 never your documents.`;
+        return `${s} needs to know you\u2019re a real person. Unlock lemma.id and we\u2019ll share a private proof \u2014 not your documents.`;
       },
-      claim: 'You\u2019re verified. Save lemma.id on this device with a passkey so you can use it again.',
+      claim:
+        'You\u2019re verified. Save your lemma.id on this device with a passkey so you can use it again.',
       freshBlocked(site) {
         const s = formatSiteLabel(site);
-        return `${s} asked for a fresh check before you continue. Verify once more \u2014 your documents still stay with Lemma, not the site.`;
+        return `${s} asked for a fresh check before you continue. Verify once more \u2014 your ID still stays out of their hands.`;
       },
-      freshRevoked: 'Your previous verification was reset. Verify once more to continue. Sites still never see your ID documents.',
-      mobileHandoff: 'You\u2019re verified. Save lemma.id on this phone \u2014 a passkey keeps it secure on this device only.',
+      freshRevoked:
+        'Your previous verification was reset. Verify once more to continue. Sites still never see your ID documents.',
+      mobileHandoff:
+        'You\u2019re verified. Save your lemma.id on this phone \u2014 a passkey keeps it secure on this device only.',
     },
     status: {
       ready: 'Takes about a minute. You can stop anytime.',
@@ -54,26 +67,20 @@
       freshSuccess: 'You\u2019re verified again.',
       stored: 'You\u2019re all set.',
       alreadyVerified: 'You\u2019re already verified.',
-      claimReady: 'Almost done \u2014 secure lemma.id on this device.',
+      claimReady: 'Almost done \u2014 secure your lemma.id on this device.',
       mobileReady: 'Your lemma.id is ready on this device.',
       returnUnlock: 'Unlock to finish where you left off.',
       error: 'Something went wrong. Please try again.',
       returnFailed: 'Couldn\u2019t return to the site. Try again.',
       directOpen: 'Open this from the site you\u2019re signing in to.',
     },
-    primary: {
-      verifyIdentity: 'Verify identity',
-      tryAgain: 'Try again',
-      unlockFinish: 'Unlock & finish',
-      closeTab: 'Close',
-    },
   };
 
-  const INTRO_VERIFY_ONCE = CONSUMER.intro.verifyOnce('This site');
-  const INTRO_SITE_PROOF = CONSUMER.intro.siteProof('This site');
+  const INTRO_VERIFY_ONCE = CONSUMER.intro.verifyOnce('this site');
+  const INTRO_SITE_PROOF = CONSUMER.intro.siteProof('this site');
   const INTRO_CLAIM = CONSUMER.intro.claim;
   const INTRO_FRESH_REVOKED = CONSUMER.intro.freshRevoked;
-  const INTRO_FRESH_BLOCKED = CONSUMER.intro.freshBlocked('This site');
+  const INTRO_FRESH_BLOCKED = CONSUMER.intro.freshBlocked('this site');
   const INTRO_MOBILE = CONSUMER.intro.mobileHandoff;
 
   /** @type {Record<string, object>} */
@@ -81,19 +88,19 @@
     verify_once: {
       intro: INTRO_VERIFY_ONCE,
       status: { message: CONSUMER.status.ready, tone: 'info' },
-      primary: { text: 'Create lemma.id', visible: true },
+      primary: { text: CONSUMER.primary.create, visible: true },
       cancel: CONSUMER.cancel,
     },
     unlock_lemma: {
-      intro: CONSUMER.intro.unlockReturning('This site'),
+      intro: CONSUMER.intro.unlockReturning('this site'),
       status: { message: CONSUMER.status.ready, tone: 'info' },
-      primary: { text: 'Unlock lemma.id', visible: true },
+      primary: { text: CONSUMER.primary.unlock, visible: true },
       cancel: CONSUMER.cancel,
     },
     claim_lemma: {
       intro: INTRO_CLAIM,
       status: { message: CONSUMER.status.claimReady, tone: 'info' },
-      primary: { text: 'Claim lemma.id', visible: true },
+      primary: { text: CONSUMER.primary.claim, visible: true },
       cancel: CONSUMER.cancel,
     },
     verify_ready: {
@@ -135,19 +142,19 @@
     site_proof_needs_idv: {
       intro: INTRO_SITE_PROOF,
       status: { message: CONSUMER.status.siteProofPending, tone: 'info' },
-      primary: { text: 'Create lemma.id', visible: true },
+      primary: { text: CONSUMER.primary.create, visible: true },
       cancel: CONSUMER.cancel,
     },
     site_proof_unlock: {
       intro: INTRO_SITE_PROOF,
       status: { message: CONSUMER.status.siteProofPending, tone: 'info' },
-      primary: { text: 'Unlock lemma.id', visible: true },
+      primary: { text: CONSUMER.primary.unlock, visible: true },
       cancel: CONSUMER.cancel,
     },
     site_proof_claim: {
       intro: INTRO_SITE_PROOF,
       status: { message: CONSUMER.status.siteProofPending, tone: 'info' },
-      primary: { text: 'Claim lemma.id', visible: true },
+      primary: { text: CONSUMER.primary.claim, visible: true },
       cancel: CONSUMER.cancel,
     },
     site_proof_verify: {
@@ -223,9 +230,9 @@
       title: 'Getting started',
       description: 'First screen most people see.',
       scenes: [
-        { id: 'verify_once', label: 'New — Create lemma.id' },
-        { id: 'unlock_lemma', label: 'Returning — Unlock lemma.id' },
-        { id: 'claim_lemma', label: 'Verified elsewhere — Claim lemma.id' },
+        { id: 'verify_once', label: 'New — Create my lemma.id' },
+        { id: 'unlock_lemma', label: 'Returning — Unlock my lemma.id' },
+        { id: 'claim_lemma', label: 'Verified elsewhere — Claim my lemma.id' },
         { id: 'verify_ready', label: 'Continue — Verify identity' },
       ],
     },
@@ -242,9 +249,9 @@
       title: 'Confirming on a site',
       scenes: [
         { id: 'site_proof', label: 'Ready — auto confirm' },
-        { id: 'site_proof_needs_idv', label: 'Needs check — Create lemma.id' },
-        { id: 'site_proof_unlock', label: 'Needs check — Unlock lemma.id' },
-        { id: 'site_proof_claim', label: 'Needs check — Claim lemma.id' },
+        { id: 'site_proof_needs_idv', label: 'Needs check — Create my lemma.id' },
+        { id: 'site_proof_unlock', label: 'Needs check — Unlock my lemma.id' },
+        { id: 'site_proof_claim', label: 'Needs check — Claim my lemma.id' },
         { id: 'site_proof_verify', label: 'Needs check — Verify identity' },
         { id: 'site_proof_issuing', label: 'Confirming…' },
         { id: 'site_proof_success', label: 'Verified for this site' },
