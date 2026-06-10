@@ -2,7 +2,9 @@
   'use strict';
 
   const IDV_PREVIEW_SCENES = [
-    { id: 'verify_once', label: 'Verify once — ready' },
+    { id: 'verify_once', label: 'Verify once — Create lemma.id' },
+    { id: 'unlock_lemma', label: 'Wallet locked — Unlock lemma.id' },
+    { id: 'claim_lemma', label: 'Master proof, no passkey — Claim lemma.id' },
     { id: 'loading_unlock', label: 'Unlocking wallet…' },
     { id: 'loading_idv', label: 'Opening identity check…' },
     { id: 'loading_finalize', label: 'Finalizing verification…' },

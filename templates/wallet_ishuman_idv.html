@@ -154,7 +154,19 @@
             verify_once: {
                 intro: 'Create or unlock your browser wallet, complete a one-time identity check, and reuse the proof on any Lemma-enabled site.',
                 status: { message: 'Ready when you are.', tone: 'info' },
-                primary: { text: 'Unlock wallet & verify', visible: true },
+                primary: { text: 'Create lemma.id', visible: true },
+                cancel: 'Cancel',
+            },
+            unlock_lemma: {
+                intro: 'Create or unlock your browser wallet, complete a one-time identity check, and reuse the proof on any Lemma-enabled site.',
+                status: { message: 'Ready when you are.', tone: 'info' },
+                primary: { text: 'Unlock lemma.id', visible: true },
+                cancel: 'Cancel',
+            },
+            claim_lemma: {
+                intro: 'Identity verified. Your lemma.id is saved on this device. Passkey setup happens automatically the first time you verify on a site.',
+                status: { message: 'Ready when you are.', tone: 'info' },
+                primary: { text: 'Claim lemma.id', visible: true },
                 cancel: 'Cancel',
             },
             loading_unlock: {
@@ -536,13 +548,19 @@
             return true;
         }
 
-        async function hasMasterProof() {
+        async function hasMasterProofCached() {
+            wallet = wallet || new LemmaWallet();
+            await wallet.init();
             const cached = await wallet.getIsHumanCredentialsFromCache?.().catch(() => []) || [];
-            if (cached.some((c) => {
+            return cached.some((c) => {
                 const cl = c.claims || c.credentialSubject || {};
                 const site = cl.siteId || cl.site_id || cl.siteDomain || cl.site_domain || '';
                 return cl.isHuman && (site === 'lemma.id' || !site);
-            })) {
+            });
+        }
+
+        async function hasMasterProof() {
+            if (await hasMasterProofCached()) {
                 return true;
             }
             let creds = [];
@@ -661,6 +679,41 @@
             await wallet.init();
             const info = await wallet.getWalletInfo();
             return !!info.hasWalletSecret;
+        }
+
+        async function resolvePrimaryButtonLabel() {
+            const demoSuffix = testVerifyEnabled ? ' (demo)' : '';
+            if (typeof LemmaWallet === 'undefined') {
+                return `Unlock lemma.id${demoSuffix}`;
+            }
+            wallet = wallet || new LemmaWallet();
+            await wallet.init();
+            const info = await wallet.getWalletInfo();
+
+            let hasMaster = await hasMasterProofCached();
+            if (!hasMaster) {
+                try {
+                    hasMaster = await hasMasterProof();
+                } catch (err) {
+                    hasMaster = false;
+                }
+            }
+
+            if (!info.hasWallet && !hasMaster) {
+                return `Create lemma.id${demoSuffix}`;
+            }
+            if (hasMaster && !info.hasPasskey) {
+                return `Claim lemma.id${demoSuffix}`;
+            }
+            const walletLocked = info.hasWallet && (!info.isUnlocked || info.encryptedStorageLocked);
+            if (walletLocked) {
+                return `Unlock lemma.id${demoSuffix}`;
+            }
+            return `Unlock wallet & verify${demoSuffix}`;
+        }
+
+        async function applyPrimaryButtonLabel() {
+            document.getElementById('primary-btn').textContent = await resolvePrimaryButtonLabel();
         }
 
         /**
@@ -828,9 +881,7 @@
                 } else {
                     setStatus('Complete identity verification once, then we issue your site proof.', 'info');
                     document.getElementById('primary-btn').classList.remove('hidden');
-                    document.getElementById('primary-btn').textContent = testVerifyEnabled
-                        ? 'Unlock wallet & verify (demo)'
-                        : 'Unlock wallet & verify';
+                    await applyPrimaryButtonLabel();
                     return false;
                 }
             }
@@ -1117,9 +1168,7 @@
 
             setStatus('Ready when you are.', 'info');
             document.getElementById('primary-btn').classList.remove('hidden');
-            document.getElementById('primary-btn').textContent = testVerifyEnabled
-                ? 'Unlock wallet & verify (demo)'
-                : 'Unlock wallet & verify';
+            await applyPrimaryButtonLabel();
         })();
     </script>
 </body>
