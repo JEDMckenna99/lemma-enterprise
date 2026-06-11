@@ -1961,7 +1961,7 @@ def platform_login():
     4. Global session setup
     """
     try:
-        from api.platform_owner import resolve_platform_login_ppid
+        from api.platform_owner import enforce_platform_login_wallet, platform_owner_enforcement_enabled
 
         data = request.get_json() or {}
         rejected = _reject_wallet_secret_payload(data)
@@ -1972,18 +1972,13 @@ def platform_login():
         client_ppid = data.get('ppid')
         client_wallet_id = data.get('wallet_id')  # SDK's local wallet_id
 
-        try:
-            ppid = resolve_platform_login_ppid(
-                client_ppid=client_ppid,
-                wallet_id=client_wallet_id,
-                passkey_credential_id=passkey_credential_id,
-            )
-        except ValueError:
-            return jsonify({
-                'success': False,
-                'error': 'ppid_or_passkey_required',
-                'message': 'ppid or passkey_credential_id required',
-            }), 400
+        ppid, denied = enforce_platform_login_wallet(
+            client_ppid=client_ppid,
+            wallet_id=client_wallet_id,
+            passkey_credential_id=passkey_credential_id,
+        )
+        if denied:
+            return jsonify(denied[0]), denied[1]
         
         site_id = 'lemma.id'
         
@@ -2017,20 +2012,25 @@ def platform_login():
                     db.commit()
                     logger.info(f"Platform login: stored client wallet_id {canonical_wallet_id[:12]}...")
             else:
-                # New developer - create Customer record
                 is_new_user = True
                 canonical_wallet_id = client_wallet_id or f"wallet_{secrets.token_hex(16)}"
-                
-                customer = Customer(
-                    customer_id=f"dev_{secrets.token_hex(8)}",
-                    customer_did=ppid,
-                    wallet_id=canonical_wallet_id,
-                    role='developer',
-                    created_at=datetime.utcnow()
-                )
-                db.add(customer)
-                db.commit()
-                logger.info(f"Platform login: created new developer {customer.customer_id}")
+                if not platform_owner_enforcement_enabled():
+                    # Legacy open signup: provision developer customer records.
+                    customer = Customer(
+                        customer_id=f"dev_{secrets.token_hex(8)}",
+                        customer_did=ppid,
+                        wallet_id=canonical_wallet_id,
+                        role='developer',
+                        created_at=datetime.utcnow()
+                    )
+                    db.add(customer)
+                    db.commit()
+                    logger.info(f"Platform login: created new developer {customer.customer_id}")
+                else:
+                    logger.info(
+                        "Platform login: no customer record for %s; owner gate active — default user role",
+                        ppid[:24],
+                    )
                 
         finally:
             db.close()
@@ -2106,21 +2106,16 @@ def restore_site_access():
         client_wallet_id = data.get('wallet_id')
         site_id = (data.get('site_id') or 'lemma.id').strip().lower()
 
-        from api.platform_owner import is_platform_site, resolve_platform_login_ppid
+        from api.platform_owner import enforce_platform_login_wallet, is_platform_site
 
         if is_platform_site(site_id):
-            try:
-                ppid = resolve_platform_login_ppid(
-                    client_ppid=client_ppid,
-                    wallet_id=client_wallet_id,
-                    passkey_credential_id=passkey_credential_id,
-                )
-            except ValueError:
-                return jsonify({
-                    'success': False,
-                    'error': 'ppid_or_passkey_required',
-                    'message': 'ppid or passkey_credential_id required',
-                }), 400
+            ppid, denied = enforce_platform_login_wallet(
+                client_ppid=client_ppid,
+                wallet_id=client_wallet_id,
+                passkey_credential_id=passkey_credential_id,
+            )
+            if denied:
+                return jsonify(denied[0]), denied[1]
         elif client_ppid:
             ppid = client_ppid
         elif passkey_credential_id:

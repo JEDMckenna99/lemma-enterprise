@@ -89,6 +89,10 @@ def test_restore_site_access_caps_non_owner_admin(monkeypatch):
     monkeypatch.setattr(wallet_service, "_resolve_platform_role_for_ppid", _resolve_with_cap)
     monkeypatch.setattr(wallet_service, "_upsert_platform_membership", lambda *args, **kwargs: None)
     monkeypatch.setattr(
+        "api.platform_owner.enforce_platform_login_wallet",
+        lambda **kwargs: (kwargs.get("client_ppid") or OTHER_PPID, None),
+    )
+    monkeypatch.setattr(
         wallet_service,
         "issue_permission_lemma",
         lambda **kwargs: {"id": "cred", "subject": kwargs["subject_ppid"]},
@@ -103,6 +107,64 @@ def test_restore_site_access_caps_non_owner_admin(monkeypatch):
         body = response.get_json()
         assert body["success"] is True
         assert body["restored_role"] == "user"
+
+
+def test_platform_login_denies_unbound_wallet_when_enforcement_on(monkeypatch):
+    monkeypatch.setenv("LEMMA_PLATFORM_OWNER_PPID", OWNER_PPID)
+    monkeypatch.setattr(
+        "api.platform_owner.enforce_platform_login_wallet",
+        lambda **kwargs: (
+            None,
+            (
+                {
+                    "success": False,
+                    "error": "person_root_required",
+                    "message": "Complete isHuman IDV on this wallet before platform login.",
+                },
+                403,
+            ),
+        ),
+    )
+
+    app = Flask(__name__)
+    app.config["TESTING"] = True
+    app.register_blueprint(wallet_service_bp)
+
+    with app.test_client() as client:
+        response = client.post(
+            "/api/wallet-auth/platform-login",
+            json={
+                "ppid": OTHER_PPID,
+                "wallet_id": "wallet_probe_nonexistent",
+            },
+        )
+        assert response.status_code == 403
+        body = response.get_json()
+        assert body["error"] == "person_root_required"
+
+
+def test_enforce_platform_login_wallet_requires_person_root(monkeypatch):
+    from api.platform_owner import enforce_platform_login_wallet
+
+    monkeypatch.setenv("LEMMA_PLATFORM_OWNER_PPID", OWNER_PPID)
+    monkeypatch.setattr(
+        "api.platform_owner.resolve_platform_login_ppid",
+        lambda **kwargs: OTHER_PPID,
+    )
+    monkeypatch.setattr(
+        "api.ishuman._resolve_person_id_for_wallet",
+        lambda db, wallet_id: None,
+    )
+
+    ppid, denied = enforce_platform_login_wallet(
+        client_ppid=OTHER_PPID,
+        wallet_id="wallet_unverified",
+        db=object(),
+    )
+    assert ppid is None
+    assert denied is not None
+    assert denied[1] == 403
+    assert denied[0]["error"] == "person_root_required"
 
 
 def test_resolve_platform_login_ppid_prefers_binding(monkeypatch):

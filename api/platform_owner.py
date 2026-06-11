@@ -149,6 +149,70 @@ def resolve_platform_login_ppid(
     raise ValueError("ppid or passkey_credential_id required for platform login")
 
 
+def enforce_platform_login_wallet(
+    *,
+    client_ppid: Optional[str],
+    wallet_id: Optional[str],
+    passkey_credential_id: Optional[str] = None,
+    db=None,
+) -> Tuple[Optional[str], Optional[Tuple[Dict[str, str], int]]]:
+    """
+    Resolve platform-login PPID or deny when owner enforcement requires IDV.
+
+    When LEMMA_PLATFORM_OWNER_PPID is set, platform login/restore must come from
+    a wallet with a completed isHuman person-root binding. Bare client PPIDs are
+    not accepted.
+    """
+    try:
+        ppid = resolve_platform_login_ppid(
+            client_ppid=client_ppid,
+            wallet_id=wallet_id,
+            passkey_credential_id=passkey_credential_id,
+            db=db,
+        )
+    except ValueError:
+        return None, (
+            {
+                "success": False,
+                "error": "ppid_or_passkey_required",
+                "message": "ppid or passkey_credential_id required",
+            },
+            400,
+        )
+
+    if not platform_owner_enforcement_enabled():
+        return ppid, None
+
+    close_db = False
+    if db is None:
+        from api.database import get_db
+
+        db = get_db()
+        close_db = True
+
+    person_root_verified = False
+    try:
+        if wallet_id:
+            from api.ishuman import _resolve_person_id_for_wallet
+
+            person_root_verified = bool(_resolve_person_id_for_wallet(db, wallet_id))
+    finally:
+        if close_db and db is not None:
+            db.close()
+
+    if not person_root_verified:
+        return None, (
+            {
+                "success": False,
+                "error": "person_root_required",
+                "message": "Complete isHuman IDV on this wallet before platform login.",
+            },
+            403,
+        )
+
+    return ppid, None
+
+
 def platform_owner_admin_email() -> str:
     return str(
         os.getenv("LEMMA_ADMIN_EMAIL", os.getenv("PLATFORM_ADMIN_EMAIL", "")) or "admin@lemma.id"
