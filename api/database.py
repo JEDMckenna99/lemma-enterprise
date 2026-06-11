@@ -151,7 +151,6 @@ class Customer(Base):
     workspace_id = Column(String, index=True)
     billing_email = Column(String)
     password_hash = Column(String)
-    role = Column(String, default='customer')
     permissions = Column(JSON, default=list)
     last_login = Column(DateTime)
     login_count = Column(Integer, default=0)

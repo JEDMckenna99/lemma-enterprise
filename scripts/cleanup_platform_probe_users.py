@@ -64,7 +64,7 @@ def cleanup(*, keep_ppids: set[str], apply: bool) -> int:
             if not ppid or ppid in keep:
                 continue
             if is_probe_ppid(ppid) or ppid not in collect_registered_platform_ppids(db=db):
-                print(f"  remove customers: {ppid[:32]}... email={row.email} role={row.role}")
+                print(f"  remove customers: {ppid[:32]}... email={row.email}")
                 stats["customers_removed"] += 1
                 if apply:
                     db.delete(row)

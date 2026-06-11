@@ -683,7 +683,11 @@ def passkey_authenticate_complete():
                 Customer.customer_id == passkey.user_id
             ).first()
             user_email = customer.email if customer else None
-            user_role = customer.role if customer else 'user'
+            if customer and customer.customer_did:
+                from api.platform_account import resolve_account_type
+                user_role = resolve_account_type(customer.customer_did, db=db)
+            else:
+                user_role = 'user'
             wallet_id = customer.wallet_id if customer else None
             
             # Generate wallet_id if not set (for cross-device sync)

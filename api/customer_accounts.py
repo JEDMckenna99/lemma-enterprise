@@ -403,7 +403,6 @@ class Customer:
     sites: List[Dict[str, Any]]
     billing_email: Optional[str]
     password_hash: Optional[str] = None  # Hashed password for authentication
-    role: str = 'customer'  # 'customer' or 'admin'
     permissions: List[str] = field(default_factory=list)
     last_login: Optional[datetime] = None
     login_count: int = 0
@@ -486,7 +485,6 @@ class CustomerAccountManager:
             monthly_usage=db_customer.monthly_usage or {},
             billing_email=db_customer.billing_email,
             password_hash=db_customer.password_hash,
-            role=db_customer.role,
             permissions=db_customer.permissions or [],
             last_login=db_customer.last_login,
             login_count=db_customer.login_count,
@@ -727,7 +725,7 @@ class CustomerAccountManager:
                        billing_email: Optional[str] = None, password: Optional[str] = None,
                        skip_default_api_key: bool = False,
                        customer_did: str = None, wallet_id: str = None,
-                       display_name: str = None, role: str = 'customer') -> Dict[str, Any]:
+                       display_name: str = None) -> Dict[str, Any]:
         """Create a new customer account
         
         Args:
@@ -823,7 +821,6 @@ class CustomerAccountManager:
                 monthly_usage={},
                 billing_email=billing_email or email,
                 password_hash=password_hash,
-                role=role,
             )
             
             # Store customer in database
@@ -847,7 +844,6 @@ class CustomerAccountManager:
                     monthly_usage={},
                     billing_email=billing_email or email,
                     password_hash=password_hash,
-                    role=role,
                     permissions=[],
                     login_count=0
                 )
@@ -1270,11 +1266,11 @@ class CustomerAccountManager:
     def create_admin_user(self, email: str, name: str, company: str = "Lemma Admin") -> Dict[str, Any]:
         """Create an admin user account"""
         try:
+            from api.platform_account import upsert_platform_account
+
             # Check if user already exists
             existing_customer = self.get_customer_by_email(email)
             if existing_customer:
-                # Upgrade existing user to admin
-                existing_customer.role = 'admin'
                 existing_customer.permissions = ['admin_access', 'user_management', 'system_config']
                 # Set password if not already set
                 if not existing_customer.password_hash:
@@ -1285,7 +1281,6 @@ class CustomerAccountManager:
                     db = get_db()
                     db_customer = db.query(DBCustomer).filter(DBCustomer.email == email).first()
                     if db_customer:
-                        db_customer.role = 'admin'
                         db_customer.permissions = ['admin_access', 'user_management', 'system_config']
                         if not db_customer.password_hash:
                             db_customer.password_hash = self.hash_password("admin123")
@@ -1295,6 +1290,16 @@ class CustomerAccountManager:
                     logger.error(f"Failed to update admin in database: {e}")
                     db.rollback()
                     db.close()
+
+                if existing_customer.customer_did:
+                    upsert_platform_account(
+                        existing_customer.customer_did,
+                        account_type="admin",
+                        email=email,
+                        display_name=name,
+                        name=name,
+                        company=company,
+                    )
                 
                 logger.info(f"Upgraded existing user to admin: {email}")
                 return {
@@ -1306,10 +1311,8 @@ class CustomerAccountManager:
             # Create new admin user with default password
             result = self.create_customer(email, name, company, password="admin123")
             if result['success']:
-                # Upgrade to admin role
                 customer = self.get_customer(result['customer_id'])
                 if customer:
-                    customer.role = 'admin'
                     customer.permissions = ['admin_access', 'user_management', 'system_config', 'analytics_access']
                     
                     # Update in database
@@ -1317,7 +1320,6 @@ class CustomerAccountManager:
                         db = get_db()
                         db_customer = db.query(DBCustomer).filter(DBCustomer.customer_id == result['customer_id']).first()
                         if db_customer:
-                            db_customer.role = 'admin'
                             db_customer.permissions = ['admin_access', 'user_management', 'system_config', 'analytics_access']
                             db.commit()
                         db.close()
@@ -1325,6 +1327,17 @@ class CustomerAccountManager:
                         logger.error(f"Failed to update new admin in database: {e}")
                         db.rollback()
                         db.close()
+
+                    if customer.customer_did:
+                        upsert_platform_account(
+                            customer.customer_did,
+                            account_type="admin",
+                            email=email,
+                            display_name=name,
+                            name=name,
+                            company=company,
+                            billing_customer_id=customer.customer_id,
+                        )
                     logger.info(f"Created new admin user: {email}")
                     
                 return {
@@ -1550,7 +1563,6 @@ def register_wallet_developer():
                 customer_did=ppid,
                 wallet_id=wallet_id or None,
                 display_name=name,
-                role='developer',
             )
             if not result.get('success'):
                 return jsonify(result), 400
@@ -1742,21 +1754,26 @@ def login():
         permission_lemma_data = None
         user_did = None
         issuer_did = None
+        account_type = 'customer'
         
         try:
+            from api.platform_account import is_admin_account_type, resolve_account_type_for_customer
             from .real_iam_manager import get_or_create_site_manager
             from .ppid import derive_ppid_did
+
+            account_type = resolve_account_type_for_customer(customer)
             
             # Get platform IAM manager with Ed25519 keypair
             manager = get_or_create_site_manager('lemma_platform', 'lemma.id')
             
             if manager:
-                # Determine permission level based on role
-                permission_id = 'admin_access' if customer.role == 'admin' else 'customer_access'
-                scope = ['platform_admin', 'customer_management', 'site_management', 'billing_access'] if customer.role == 'admin' else ['customer_dashboard', 'api_management']
+                is_admin = is_admin_account_type(account_type)
+                # Determine permission level based on platform account type
+                permission_id = 'admin_access' if is_admin else 'customer_access'
+                scope = ['platform_admin', 'customer_management', 'site_management', 'billing_access'] if is_admin else ['customer_dashboard', 'api_management']
 
                 from api.platform_owner import platform_owner_enforcement_enabled
-                if customer.role == 'admin' and platform_owner_enforcement_enabled():
+                if is_admin and platform_owner_enforcement_enabled():
                     permission_id = 'customer_access'
                     scope = ['customer_dashboard', 'api_management']
                 
@@ -1764,10 +1781,10 @@ def login():
                 if permission_id not in manager.permissions:
                     manager.add_permission({
                         'permission_id': permission_id,
-                        'display_name': 'Platform Admin' if customer.role == 'admin' else 'Customer Access',
+                        'display_name': 'Platform Admin' if is_admin else 'Customer Access',
                         'scope': scope,
                         'conditions': [],
-                        'priority': 100 if customer.role == 'admin' else 50
+                        'priority': 100 if is_admin else 50
                     })
                 
                 # Derive user DID from email
@@ -1780,7 +1797,7 @@ def login():
                     expiry_days=90,
                     custom_claims={
                         'siteId': 'lemma.id',
-                        'accountType': customer.role,
+                        'accountType': account_type,
                         'permissionId': permission_id,
                         'email': email,
                         'scope': scope
@@ -1811,7 +1828,8 @@ def login():
             'issuer_did': issuer_did,
             'permission_lemma_active': permission_lemma_data is not None,
             'permission_lemma': permission_lemma_data,
-            'role': customer.role,
+            'role': account_type,
+            'account_type': account_type,
             'redirect_url': '/dashboard'
         })
         

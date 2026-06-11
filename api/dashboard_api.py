@@ -224,6 +224,10 @@ def get_customer_profile():
                 'error': 'Customer not found'
             }), 404
 
+        from api.platform_account import resolve_account_type_for_customer
+
+        account_type = resolve_account_type_for_customer(customer)
+
         return jsonify({
             'success': True,
             'customer': {
@@ -231,7 +235,8 @@ def get_customer_profile():
                 'email': customer.email,
                 'name': customer.name,
                 'company': customer.company,
-                'role': customer.role,
+                'role': account_type,
+                'account_type': account_type,
                 'created_at': customer.created_at.isoformat() if customer.created_at else None,
                 'last_login': customer.last_login.isoformat() if customer.last_login else None,
                 'login_count': customer.login_count,
@@ -675,9 +680,12 @@ def issue_admin_credential():
         is_platform_admin = platform_key and api_key == platform_key
         
         if not is_platform_admin:
-            # Check if customer API key with admin role
+            # Check if customer API key belongs to a platform admin account
+            from api.platform_account import is_admin_account_type, resolve_account_type_for_customer
+
             customer = customer_manager.get_customer_by_api_key(api_key)
-            if not customer or customer.role != 'admin':
+            account_type = resolve_account_type_for_customer(customer) if customer else 'customer'
+            if not customer or not is_admin_account_type(account_type):
                 return jsonify({
                     'success': False,
                     'error': 'Not authorized for admin credential issuance',
@@ -995,17 +1003,21 @@ def get_admin_user_stats():
     try:
         stats = None
         try:
-            from .customer_accounts import customer_manager
-            customers = customer_manager.get_all_customers(limit=5000, offset=0)
-            total_users = len(customers)
-            developers = sum(1 for c in customers if (c.role or '').lower() != 'admin')
-            admins = sum(1 for c in customers if (c.role or '').lower() == 'admin')
+            from api.platform_membership import list_registered_platform_user_rows
+
+            rows = list_registered_platform_user_rows(site_id='lemma.id')
+            total_users = len(rows)
+            admins = sum(
+                1 for row in rows
+                if (row.get('role') or '').lower() in {'admin', 'owner', 'super_admin', 'superadmin'}
+            )
+            developers = total_users - admins
 
             now = datetime.utcnow()
             active_today = 0
-            for c in customers:
-                ts = c.last_login or c.created_at
-                if ts and ts.date() == now.date():
+            for row in rows:
+                ts_raw = row.get('last_active') or row.get('created_at')
+                if isinstance(ts_raw, datetime) and ts_raw.date() == now.date():
                     active_today += 1
 
             stats = {
@@ -1015,7 +1027,7 @@ def get_admin_user_stats():
                 'admins': admins,
             }
         except Exception as customer_err:
-            logger.warning(f"Get user stats: customer manager unavailable, falling back to sites-derived counts: {customer_err}")
+            logger.warning(f"Get user stats: platform account registry unavailable, falling back to sites-derived counts: {customer_err}")
 
         if stats is None:
             sites = _load_admin_sites()

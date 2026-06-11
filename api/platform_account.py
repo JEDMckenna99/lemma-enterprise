@@ -31,6 +31,32 @@ def normalize_account_type(value: Optional[str]) -> str:
     return (value or "customer").strip().lower()
 
 
+def resolve_account_type(ppid: Optional[str], db=None) -> str:
+    """Return platform account_type for a PPID, defaulting to customer."""
+    account = get_platform_account(ppid, db=db)
+    if account and getattr(account, "account_type", None):
+        return normalize_account_type(account.account_type)
+    return "customer"
+
+
+def resolve_account_type_for_customer(customer, db=None) -> str:
+    """Resolve platform account_type from a billing customer record."""
+    ppid = getattr(customer, "customer_did", None)
+    if ppid:
+        return resolve_account_type(ppid, db=db)
+    return "customer"
+
+
+def is_admin_account_type(account_type: Optional[str]) -> bool:
+    return normalize_account_type(account_type) in {
+        "admin",
+        "owner",
+        "super_admin",
+        "superadmin",
+        "platform_admin",
+    }
+
+
 def is_platform_member_account_type(account_type: Optional[str]) -> bool:
     return normalize_account_type(account_type) in _PLATFORM_MEMBER_ACCOUNT_TYPES
 

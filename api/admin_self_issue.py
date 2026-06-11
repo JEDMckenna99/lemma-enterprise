@@ -381,10 +381,13 @@ def validate_api_key(api_key: str, site_id: str) -> bool:
             logger.info(f"Valid customer API key for site {site_id}")
             return True
         
-        # For platform-level sites, allow if customer is admin
-        if site_id in ('lemma.id', 'lemma_platform') and customer.role == 'admin':
-            logger.info(f"Valid admin API key for platform site {site_id}")
-            return True
+        # For platform-level sites, allow if customer is a platform admin account
+        if site_id in ('lemma.id', 'lemma_platform'):
+            from api.platform_account import is_admin_account_type, resolve_account_type_for_customer
+
+            if is_admin_account_type(resolve_account_type_for_customer(customer)):
+                logger.info(f"Valid admin API key for platform site {site_id}")
+                return True
     
     # Check if this matches standard Lemma API key format (lemma_ prefix + 32 chars)
     if api_key.startswith('lemma_') and len(api_key) >= 38:
