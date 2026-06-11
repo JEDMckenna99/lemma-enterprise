@@ -14,25 +14,33 @@
             <h1 style="text-align: center; margin-bottom: 32px;">Admin Bootstrap</h1>
             
             <p style="text-align: center; color: var(--gray-600); margin-bottom: 32px;">
-                Issue your first admin credential using your Lemma API key
+                Platform owner bootstrap for lemma.id — detects your person-root PPID and issues admin access automatically when configured as owner.
             </p>
 
+            <div id="owner-status" class="wallet-status" style="margin-bottom: 24px;">
+                <span>🔍</span> Checking wallet and platform owner status...
+            </div>
+
+            <div id="manual-bootstrap-section" style="display: none;">
+            <p style="color: var(--gray-600); font-size: 14px; margin-bottom: 16px;">
+                Manual bootstrap (customer sites or when platform owner auto-issue is unavailable)
+            </p>
             <form id="bootstrap-form" style="display: flex; flex-direction: column; gap: 20px;">
                 <div>
                     <label style="display: block; font-weight: 600; margin-bottom: 8px;">Site ID</label>
-                    <input type="text" id="site_id" value=""
-                           placeholder="Required: your site id"
+                    <input type="text" id="site_id" value="lemma.id"
+                           placeholder="lemma.id"
                            required
                            style="width: 100%; padding: 12px; border: 1px solid var(--gray-300); border-radius: 6px; font-family: monospace;">
                 </div>
                 
                 <div>
                     <label style="display: block; font-weight: 600; margin-bottom: 8px;">Site Domain</label>
-                    <input type="text" id="site_domain" value=""
-                           placeholder="example.com (recommended for site-scoped PPID derivation)"
+                    <input type="text" id="site_domain" value="lemma.id"
+                           placeholder="lemma.id"
                            style="width: 100%; padding: 12px; border: 1px solid var(--gray-300); border-radius: 6px;">
                 </div>
-                
+
                 <div>
                     <label style="display: block; font-weight: 600; margin-bottom: 8px;">Your Email</label>
                     <input type="email" id="user_email" value="" 
@@ -61,10 +69,11 @@
                     </small>
                 </div>
                 
-                <button type="submit" class="btn btn-primary" style="width: 100%; padding: 16px; font-size: 16px; margin-top: 16px;">
+                <button type="submit" id="manual-issue-btn" class="btn btn-primary" style="width: 100%; padding: 16px; font-size: 16px; margin-top: 16px;">
                     Issue Admin Credential
                 </button>
             </form>
+            </div>
             
             <div id="status" style="margin-top: 24px; padding: 16px; border-radius: 8px; display: none;"></div>
             
@@ -87,10 +96,10 @@
         <div style="margin-top: 24px; padding: 20px; background: var(--gray-50); border-radius: 8px; font-size: 14px; color: var(--gray-700);">
             <strong>What happens:</strong>
             <ul style="margin: 12px 0; padding-left: 20px;">
-                <li>Your API key validates your ownership of the site</li>
-                <li>Admin credential is issued after server verification (no email roundtrip required)</li>
-                <li>Credential is stored in your encrypted browser wallet</li>
-                <li>Access is granted immediately</li>
+                <li>Your wallet derives your person-root PPID for lemma.id after unlock</li>
+                <li>Server verifies it matches <code>LEMMA_PLATFORM_OWNER_PPID</code> and a completed isHuman IDV binding</li>
+                <li>Admin credential is issued automatically and stored in your wallet</li>
+                <li>Manual API-key bootstrap remains available for customer sites</li>
             </ul>
         </div>
     </div>
@@ -158,6 +167,201 @@ function normalizeScopeClaim(rawScope) {
     }
     return value.split(',').map(s => s.trim()).filter(Boolean);
 }
+
+let bootstrapState = {
+    ppid: null,
+    walletId: null,
+    ownerStatus: null,
+};
+
+function truncatePpid(ppid) {
+    if (!ppid || ppid.length < 24) return ppid || '';
+    return `${ppid.slice(0, 20)}...${ppid.slice(-8)}`;
+}
+
+function setOwnerStatus(message, tone = 'info') {
+    const el = document.getElementById('owner-status');
+    if (!el) return;
+    el.textContent = message;
+    el.className = 'wallet-status';
+    if (tone === 'ready') el.classList.add('ready');
+    if (tone === 'locked') el.classList.add('locked');
+}
+
+async function waitForWallet(maxAttempts = 30) {
+    let attempts = 0;
+    while (!window.globalLemmaWallet && attempts < maxAttempts) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+        attempts++;
+    }
+    return window.globalLemmaWallet || null;
+}
+
+async function ensureWalletUnlocked(wallet) {
+    if (wallet.isUnlocked && wallet.isUnlocked()) return true;
+    if (typeof wallet.unlock === 'function') {
+        return await wallet.unlock();
+    }
+    return false;
+}
+
+async function readWalletIdentity(wallet) {
+    const ppid = await wallet.derivePPID('lemma.id');
+    let walletId = null;
+    try {
+        const debugState = await wallet.getDebugState?.() || {};
+        walletId = debugState.walletId || null;
+    } catch (_) {}
+    bootstrapState.ppid = ppid;
+    bootstrapState.walletId = walletId;
+    return { ppid, walletId };
+}
+
+async function fetchOwnerBootstrapStatus() {
+    const response = await fetch('/api/v1/iam/admin/platform-bootstrap/status', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            ppid: bootstrapState.ppid,
+            wallet_id: bootstrapState.walletId,
+        }),
+    });
+    const result = await response.json();
+    if (!response.ok || !result.success) {
+        throw new Error(result.message || result.error || 'Owner status check failed');
+    }
+    bootstrapState.ownerStatus = result;
+    return result;
+}
+
+async function storeIssuedCredential(wallet, result, permission_level) {
+    const issuedClaims = result.credential?.claims || result.credential?.credentialSubject || {};
+    const derivedDomain = 'lemma.id';
+    const issuedSite = normalizeSiteIdentifier(
+        issuedClaims.siteId ||
+        issuedClaims.site_domain ||
+        issuedClaims.siteDomain ||
+        result.site_domain ||
+        result.site_id ||
+        derivedDomain
+    );
+    if (!issuedSite) {
+        throw new Error('Issued credential did not include a valid site binding.');
+    }
+
+    const credentialToStore = {
+        ...result.credential,
+        packageType: result.credential?.packageType || 'permission',
+        type: result.credential?.type || ['VerifiableCredential', 'PermissionLemma']
+    };
+
+    await wallet.storeCredential(credentialToStore);
+    window.lemmaCredential = credentialToStore;
+    if (!window.lemmaAuth && typeof SessionFreeAuth !== 'undefined') {
+        window.lemmaAuth = new SessionFreeAuth(wallet, { debug: true });
+    }
+
+    const manualSection = document.getElementById('manual-bootstrap-section');
+    if (manualSection) manualSection.style.display = 'none';
+    document.getElementById('status').style.display = 'none';
+    document.getElementById('success-actions').style.display = 'block';
+    document.getElementById('credential-debug').style.display = 'block';
+    document.getElementById('credential-json').textContent = JSON.stringify({
+        credential: credentialToStore,
+        ppid: bootstrapState.ppid,
+        issue_time_us: result.issue_time_us,
+    }, null, 2);
+    setOwnerStatus('Platform admin credential issued and stored in your wallet.', 'ready');
+}
+
+async function autoIssuePlatformOwnerAdmin(wallet) {
+    showStatus('Verified platform owner — issuing admin credential...', 'loading');
+    const response = await fetch('/api/v1/iam/admin/platform-bootstrap/auto-issue', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            ppid: bootstrapState.ppid,
+            wallet_id: bootstrapState.walletId,
+        }),
+    });
+    const result = await response.json();
+    if (!response.ok || !result.success) {
+        throw new Error(result.message || result.error || 'Auto-issue failed');
+    }
+    await storeIssuedCredential(wallet, result, 'super_admin');
+}
+
+async function runPlatformOwnerBootstrap() {
+    try {
+        setOwnerStatus('Initializing wallet...');
+        const wallet = await waitForWallet();
+        if (!wallet) {
+            setOwnerStatus('Wallet failed to initialize. Refresh and unlock your wallet.', 'locked');
+            document.getElementById('manual-bootstrap-section').style.display = 'block';
+            return;
+        }
+
+        setOwnerStatus('Unlock your wallet with passkey to continue...', 'locked');
+        const unlocked = await ensureWalletUnlocked(wallet);
+        if (!unlocked) {
+            setOwnerStatus('Wallet locked — unlock with passkey to detect your platform owner PPID.', 'locked');
+            document.getElementById('manual-bootstrap-section').style.display = 'block';
+            return;
+        }
+
+        setOwnerStatus('Deriving person-root PPID for lemma.id...');
+        const { ppid } = await readWalletIdentity(wallet);
+        if (!ppid || !String(ppid).startsWith('did:lemma:ppid_')) {
+            setOwnerStatus('Could not derive lemma.id PPID. Complete isHuman IDV first.', 'locked');
+            document.getElementById('manual-bootstrap-section').style.display = 'block';
+            return;
+        }
+
+        const status = await fetchOwnerBootstrapStatus();
+        if (!status.owner_configured) {
+            setOwnerStatus(`Owner gate not configured yet. Set LEMMA_PLATFORM_OWNER_PPID to ${truncatePpid(ppid)}`, 'locked');
+            document.getElementById('manual-bootstrap-section').style.display = 'block';
+            return;
+        }
+        if (!status.person_root_verified) {
+            setOwnerStatus('Complete isHuman IDV on this wallet before platform admin bootstrap.', 'locked');
+            document.getElementById('manual-bootstrap-section').style.display = 'block';
+            return;
+        }
+        if (!status.is_platform_owner) {
+            setOwnerStatus('This wallet is not the configured lemma.id platform owner.', 'locked');
+            document.getElementById('manual-bootstrap-section').style.display = 'block';
+            return;
+        }
+
+        setOwnerStatus(`Verified platform owner ${truncatePpid(ppid)}`, 'ready');
+
+        const perms = await wallet.getVerifiedPermissions?.('lemma.id');
+        if (perms?.hasAccess && ['admin', 'owner', 'super_admin'].includes(String(perms.role || '').toLowerCase())) {
+            document.getElementById('success-actions').style.display = 'block';
+            setOwnerStatus('Admin access already active in your wallet.', 'ready');
+            return;
+        }
+
+        if (status.should_auto_issue) {
+            await autoIssuePlatformOwnerAdmin(wallet);
+            return;
+        }
+
+        if (status.has_site_admin) {
+            setOwnerStatus('Owner verified. Use login to restore admin access, or issue manually below.', 'ready');
+        }
+        document.getElementById('manual-bootstrap-section').style.display = 'block';
+    } catch (error) {
+        console.error('Platform owner bootstrap failed:', error);
+        setOwnerStatus(`Bootstrap error: ${error.message}`, 'locked');
+        document.getElementById('manual-bootstrap-section').style.display = 'block';
+    }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    runPlatformOwnerBootstrap();
+});
 
 document.getElementById('bootstrap-form').addEventListener('submit', async (e) => {
     e.preventDefault();

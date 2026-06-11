@@ -121,3 +121,149 @@ def test_resolve_platform_login_ppid_prefers_binding(monkeypatch):
         db=object(),
     )
     assert ppid == OWNER_PPID
+
+
+def test_evaluate_platform_owner_bootstrap_owner_match(monkeypatch):
+    from api.platform_owner import evaluate_platform_owner_bootstrap
+
+    monkeypatch.setenv("LEMMA_PLATFORM_OWNER_PPID", OWNER_PPID)
+    monkeypatch.setattr(
+        "api.ishuman._resolve_person_id_for_wallet",
+        lambda db, wallet_id: "person_1",
+    )
+    monkeypatch.setattr(
+        "api.platform_owner.resolve_platform_login_ppid",
+        lambda **kwargs: OWNER_PPID,
+    )
+
+    status = evaluate_platform_owner_bootstrap(
+        client_ppid=OWNER_PPID,
+        wallet_id="wallet_verified",
+        db=object(),
+    )
+    assert status["owner_configured"] is True
+    assert status["person_root_verified"] is True
+    assert status["is_platform_owner"] is True
+    assert status["can_auto_issue"] is True
+    assert status["ppid"] == OWNER_PPID
+
+
+def test_platform_bootstrap_status_endpoint(monkeypatch):
+    from api.admin_self_issue import admin_self_issue_bp
+
+    monkeypatch.setenv("LEMMA_PLATFORM_OWNER_PPID", OWNER_PPID)
+    monkeypatch.setattr(
+        "api.platform_owner.evaluate_platform_owner_bootstrap",
+        lambda **kwargs: {
+            "owner_configured": True,
+            "person_root_verified": True,
+            "is_platform_owner": True,
+            "ppid_consistent": True,
+            "can_auto_issue": True,
+            "ppid": OWNER_PPID,
+            "site_id": "lemma.id",
+            "site_domain": "lemma.id",
+            "admin_email": "admin@lemma.id",
+        },
+    )
+
+    class _FakeQuery:
+        def filter(self, *args, **kwargs):
+            return self
+
+        def first(self):
+            return None
+
+    class _FakeSession:
+        def query(self, model):
+            return _FakeQuery()
+
+        def close(self):
+            pass
+
+    monkeypatch.setattr("api.database.SessionLocal", lambda: _FakeSession())
+
+    app = Flask(__name__)
+    app.config["TESTING"] = True
+    app.register_blueprint(admin_self_issue_bp)
+
+    with app.test_client() as client:
+        response = client.post(
+            "/api/v1/iam/admin/platform-bootstrap/status",
+            json={"ppid": OWNER_PPID, "wallet_id": "wallet_verified"},
+        )
+        assert response.status_code == 200
+        body = response.get_json()
+        assert body["success"] is True
+        assert body["should_auto_issue"] is True
+        assert body["has_site_admin"] is False
+
+
+def test_platform_bootstrap_auto_issue_endpoint(monkeypatch):
+    from api.admin_self_issue import admin_self_issue_bp
+
+    monkeypatch.setattr(
+        "api.platform_owner.verify_platform_owner_wallet",
+        lambda **kwargs: (OWNER_PPID, None),
+    )
+    monkeypatch.setattr(
+        "api.platform_owner.platform_owner_admin_email",
+        lambda: "admin@lemma.id",
+    )
+    monkeypatch.setattr(
+        "api.admin_self_issue._issue_admin_credential_core",
+        lambda **kwargs: {
+            "success": True,
+            "credential": {"id": "cred-1", "claims": {"siteId": "lemma.id"}},
+            "site_id": "lemma.id",
+            "site_domain": "lemma.id",
+            "permission_level": "super_admin",
+            "issue_time_us": 12.5,
+        },
+    )
+
+    app = Flask(__name__)
+    app.config["TESTING"] = True
+    app.register_blueprint(admin_self_issue_bp)
+
+    with app.test_client() as client:
+        response = client.post(
+            "/api/v1/iam/admin/platform-bootstrap/auto-issue",
+            json={"ppid": OWNER_PPID, "wallet_id": "wallet_verified"},
+        )
+        assert response.status_code == 200
+        body = response.get_json()
+        assert body["success"] is True
+        assert body["credential"]["id"] == "cred-1"
+
+
+def test_platform_bootstrap_auto_issue_denies_non_owner(monkeypatch):
+    from api.admin_self_issue import admin_self_issue_bp
+
+    monkeypatch.setattr(
+        "api.platform_owner.verify_platform_owner_wallet",
+        lambda **kwargs: (
+            None,
+            (
+                {
+                    "success": False,
+                    "error": "platform_owner_required",
+                    "message": "This wallet is not the configured lemma.id platform owner.",
+                },
+                403,
+            ),
+        ),
+    )
+
+    app = Flask(__name__)
+    app.config["TESTING"] = True
+    app.register_blueprint(admin_self_issue_bp)
+
+    with app.test_client() as client:
+        response = client.post(
+            "/api/v1/iam/admin/platform-bootstrap/auto-issue",
+            json={"ppid": OTHER_PPID, "wallet_id": "wallet_other"},
+        )
+        assert response.status_code == 403
+        body = response.get_json()
+        assert body["error"] == "platform_owner_required"

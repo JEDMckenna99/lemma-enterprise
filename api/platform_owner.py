@@ -147,3 +147,126 @@ def resolve_platform_login_ppid(
         return derive_user_ppid("lemma.id", passkey_credential_id=passkey_credential_id)
 
     raise ValueError("ppid or passkey_credential_id required for platform login")
+
+
+def platform_owner_admin_email() -> str:
+    return str(
+        os.getenv("LEMMA_ADMIN_EMAIL", os.getenv("PLATFORM_ADMIN_EMAIL", "")) or "admin@lemma.id"
+    ).strip().lower()
+
+
+def evaluate_platform_owner_bootstrap(
+    *,
+    client_ppid: Optional[str],
+    wallet_id: Optional[str],
+    db=None,
+) -> Dict[str, Any]:
+    """Evaluate whether the wallet qualifies for platform-owner auto-bootstrap."""
+    close_db = False
+    if db is None:
+        from api.database import get_db
+
+        db = get_db()
+        close_db = True
+
+    owner = platform_owner_ppid()
+    server_ppid: Optional[str] = None
+    person_root_verified = False
+
+    try:
+        if wallet_id:
+            from api.ishuman import _resolve_person_id_for_wallet
+
+            person_root_verified = bool(_resolve_person_id_for_wallet(db, wallet_id))
+            if person_root_verified:
+                server_ppid = resolve_platform_login_ppid(
+                    client_ppid=client_ppid,
+                    wallet_id=wallet_id,
+                    db=db,
+                )
+    except ValueError:
+        server_ppid = None
+    finally:
+        if close_db and db is not None:
+            db.close()
+
+    effective_ppid = normalize_ppid(server_ppid) or normalize_ppid(client_ppid)
+    client_norm = normalize_ppid(client_ppid)
+    ppid_consistent = (
+        not client_norm
+        or not server_ppid
+        or hmac.compare_digest(client_norm, server_ppid)
+    )
+
+    is_owner = is_platform_owner_ppid(effective_ppid)
+    return {
+        "owner_configured": owner is not None,
+        "person_root_verified": person_root_verified,
+        "is_platform_owner": is_owner,
+        "ppid_consistent": ppid_consistent,
+        "can_auto_issue": bool(
+            owner
+            and person_root_verified
+            and is_owner
+            and ppid_consistent
+            and effective_ppid
+        ),
+        "ppid": effective_ppid,
+        "site_id": "lemma.id",
+        "site_domain": "lemma.id",
+        "admin_email": platform_owner_admin_email(),
+    }
+
+
+def verify_platform_owner_wallet(
+    *,
+    client_ppid: Optional[str],
+    wallet_id: Optional[str],
+    db=None,
+) -> Tuple[Optional[str], Optional[Tuple[Dict[str, str], int]]]:
+    """Return canonical owner PPID or an error payload for bootstrap issuance."""
+    status = evaluate_platform_owner_bootstrap(
+        client_ppid=client_ppid,
+        wallet_id=wallet_id,
+        db=db,
+    )
+    if not status.get("owner_configured"):
+        return None, (
+            {
+                "success": False,
+                "error": "platform_owner_not_configured",
+                "message": (
+                    "Set LEMMA_PLATFORM_OWNER_PPID on the server to your person-root "
+                    "lemma.id PPID before using owner auto-bootstrap."
+                ),
+            },
+            503,
+        )
+    if not status.get("person_root_verified"):
+        return None, (
+            {
+                "success": False,
+                "error": "person_root_required",
+                "message": "Complete isHuman IDV on this wallet before platform admin bootstrap.",
+            },
+            403,
+        )
+    if not status.get("ppid_consistent"):
+        return None, (
+            {
+                "success": False,
+                "error": "ppid_mismatch",
+                "message": "Wallet PPID does not match the server person-root derivation.",
+            },
+            403,
+        )
+    if not status.get("is_platform_owner"):
+        return None, (
+            {
+                "success": False,
+                "error": "platform_owner_required",
+                "message": "This wallet is not the configured lemma.id platform owner.",
+            },
+            403,
+        )
+    return status.get("ppid"), None

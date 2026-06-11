@@ -652,6 +652,184 @@ def get_default_scope(permission_level: str) -> list:
     return scopes.get(permission_level, ['posts:read'])
 
 
+def _upsert_site_admin_record(site_id: str, user_did: str, user_email: str, *, added_by: str) -> None:
+    from api.database import SessionLocal, SiteAdmin
+
+    db = SessionLocal()
+    try:
+        admin_record = db.query(SiteAdmin).filter(
+            SiteAdmin.site_id == site_id,
+            SiteAdmin.admin_did == user_did,
+        ).first()
+        if admin_record:
+            admin_record.admin_email = user_email
+            admin_record.admin_role = 'owner'
+            admin_record.is_active = True
+            admin_record.last_activity = datetime.utcnow()
+        else:
+            db.add(
+                SiteAdmin(
+                    site_id=site_id,
+                    admin_did=user_did,
+                    admin_email=user_email,
+                    admin_role='owner',
+                    permissions=['users', 'permissions', 'billing'],
+                    added_by=added_by,
+                    is_active=True,
+                    last_activity=datetime.utcnow(),
+                )
+            )
+        db.commit()
+    finally:
+        db.close()
+
+
+def _issue_admin_credential_core(
+    *,
+    site_id: str,
+    site_domain: str,
+    user_did: str,
+    user_email: str,
+    permission_level: str,
+    issued_via: str,
+    added_by: str,
+) -> dict:
+    import time
+
+    site_id_norm = str(site_id or '').strip().lower()
+    site_domain = (site_domain or site_id_norm or 'lemma.id').strip().lower()
+
+    manager = get_site_manager(site_id_norm, site_domain)
+    if not manager:
+        manager = get_or_create_site_manager(site_id_norm, site_domain)
+    if not manager:
+        raise RuntimeError('Failed to create site manager')
+
+    if permission_level not in manager.permissions:
+        manager.add_permission(
+            {
+                'permission_id': permission_level,
+                'display_name': permission_level.replace('_', ' ').title(),
+                'scope': get_default_scope(permission_level),
+                'conditions': [],
+                'priority': 100 if 'admin' in permission_level else 50,
+            }
+        )
+
+    _upsert_site_admin_record(site_id_norm, user_did, user_email, added_by=added_by)
+
+    start_time = time.perf_counter()
+    permission_lemma = manager.issue_permission_lemma(
+        user_did,
+        permission_level,
+        expiry_days=90,
+        custom_claims={
+            'email': user_email,
+            'site_domain': site_domain,
+            'issued_via': issued_via,
+            'accountType': 'admin',
+            'permissionId': 'admin_access',
+            'permission_level': permission_level,
+            'permissionAliases': ['admin_access', permission_level],
+            'isAdmin': True,
+            'networkShared': False,
+        },
+    )
+    permission_lemma['type'] = ['VerifiableCredential', 'PermissionLemma']
+    permission_lemma['packageType'] = 'permission'
+
+    issue_time_us = (time.perf_counter() - start_time) * 1_000_000
+    return {
+        'success': True,
+        'credential': permission_lemma,
+        'user_did': user_did,
+        'issuer_did': manager.issuer_did,
+        'site_id': site_id_norm,
+        'site_domain': site_domain,
+        'permission_level': permission_level,
+        'issue_time_us': issue_time_us,
+        'notification_email': user_email,
+        'message': 'Admin credential issued successfully. Store this credential in your browser wallet.',
+    }
+
+
+@admin_self_issue_bp.route('/api/v1/iam/admin/platform-bootstrap/status', methods=['POST'])
+@cross_origin()
+def platform_bootstrap_status():
+    """Evaluate whether the unlocked wallet qualifies for lemma.id owner auto-bootstrap."""
+    data = request.get_json(silent=True) or {}
+    client_ppid = (data.get('ppid') or '').strip()
+    wallet_id = (data.get('wallet_id') or '').strip()
+
+    from api.platform_owner import evaluate_platform_owner_bootstrap, normalize_ppid
+    from api.database import SessionLocal, SiteAdmin
+
+    status = evaluate_platform_owner_bootstrap(
+        client_ppid=client_ppid or None,
+        wallet_id=wallet_id or None,
+    )
+
+    has_site_admin = False
+    effective_ppid = normalize_ppid(status.get('ppid'))
+    if effective_ppid:
+        db = SessionLocal()
+        try:
+            has_site_admin = (
+                db.query(SiteAdmin)
+                .filter(
+                    SiteAdmin.site_id.in_(['lemma.id', 'lemma_platform']),
+                    SiteAdmin.admin_did == effective_ppid,
+                    SiteAdmin.is_active == True,  # noqa: E712
+                )
+                .first()
+                is not None
+            )
+        finally:
+            db.close()
+
+    status['has_site_admin'] = has_site_admin
+    status['should_auto_issue'] = bool(status.get('can_auto_issue') and not has_site_admin)
+    return jsonify({'success': True, **status})
+
+
+@admin_self_issue_bp.route('/api/v1/iam/admin/platform-bootstrap/auto-issue', methods=['POST'])
+@cross_origin()
+def platform_bootstrap_auto_issue():
+    """Issue lemma.id admin proof to the configured platform owner wallet."""
+    data = request.get_json(silent=True) or {}
+    client_ppid = (data.get('ppid') or '').strip()
+    wallet_id = (data.get('wallet_id') or '').strip()
+
+    from api.platform_owner import platform_owner_admin_email, verify_platform_owner_wallet
+
+    user_did, denied = verify_platform_owner_wallet(
+        client_ppid=client_ppid or None,
+        wallet_id=wallet_id or None,
+    )
+    if denied:
+        return jsonify(denied[0]), denied[1]
+
+    user_email = platform_owner_admin_email()
+    try:
+        payload = _issue_admin_credential_core(
+            site_id='lemma.id',
+            site_domain='lemma.id',
+            user_did=user_did,
+            user_email=user_email,
+            permission_level='super_admin',
+            issued_via='platform_owner_auto_bootstrap',
+            added_by='platform_owner_auto_bootstrap',
+        )
+        logger.info(
+            "Platform owner auto-bootstrap issued admin credential for %s",
+            user_did[:24],
+        )
+        return jsonify(payload)
+    except Exception as exc:
+        logger.error("Platform owner auto-bootstrap failed: %s", exc)
+        return jsonify({'success': False, 'error': 'issue_failed', 'message': str(exc)}), 500
+
+
 def _canonicalize_admin_permission_lemma(permission_lemma: dict, permission_level: str, site_domain: str, user_email: str) -> dict:
     """
     Normalize admin lemmas to a strict, compatibility-safe claim shape.
