@@ -139,6 +139,39 @@ def test_ishuman_idv_popup_page_loads(ishuman_demo_client):
     assert "ISHUMAN_IDV_COMPLETE" in body
 
 
+def test_ishuman_idv_popup_does_not_enable_test_verify_on_production(
+    ishuman_demo_client,
+    monkeypatch,
+):
+    """Production must use live Didit IDV, not the demo verify-once shortcut."""
+    monkeypatch.setenv("ENVIRONMENT", "production")
+    monkeypatch.setenv("LEMMA_ISHUMAN_DEMO_ALLOW_TEST_VERIFY", "true")
+    monkeypatch.setenv("LEMMA_ISHUMAN_DEMO_TEST_TOKEN", "prod-leak-token")
+    monkeypatch.setenv("LEMMA_ISHUMAN_DEMO_QR_IDV_ENABLED", "true")
+
+    resp = ishuman_demo_client.get(
+        "/wallet/ishuman-idv?origin=https%3A%2F%2Fexample.com&site_id=trials-demo.lemma.id"
+    )
+    body = resp.get_data(as_text=True)
+
+    assert resp.status_code == 200
+    assert 'data-test-verify-enabled="false"' in body
+
+
+def test_ishuman_demo_config_disables_test_verify_on_production(
+    ishuman_demo_client,
+    monkeypatch,
+):
+    monkeypatch.setenv("ENVIRONMENT", "production")
+    monkeypatch.setenv("LEMMA_ISHUMAN_DEMO_ALLOW_TEST_VERIFY", "true")
+
+    resp = ishuman_demo_client.get("/api/demo/ishuman/config")
+    payload = resp.get_json()
+
+    assert resp.status_code == 200
+    assert payload["test_verify_enabled"] is False
+
+
 def test_ishuman_demo_config_seeds_sites_without_exposing_api_keys(
     ishuman_demo_client,
     fake_ishuman_db_session_factory,

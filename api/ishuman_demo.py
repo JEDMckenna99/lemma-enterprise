@@ -159,7 +159,10 @@ def _demo_page_context() -> dict:
     return {
         "demo_sites": list(DEMO_SITES.values()),
         "network_revoke_configured": bool(os.getenv("LEMMA_ISHUMAN_DEMO_ADMIN_TOKEN")),
-        "demo_test_verify_enabled": os.getenv("LEMMA_ISHUMAN_DEMO_ALLOW_TEST_VERIFY", "").lower() == "true",
+        "demo_test_verify_enabled": (
+            demo_enabled
+            and os.getenv("LEMMA_ISHUMAN_DEMO_ALLOW_TEST_VERIFY", "").lower() == "true"
+        ),
         "demo_test_token_configured": bool(os.getenv("LEMMA_ISHUMAN_DEMO_TEST_TOKEN")),
         "demo_admin_token_configured": bool(os.getenv("LEMMA_ISHUMAN_DEMO_ADMIN_TOKEN")),
         "demo_test_token": os.getenv("LEMMA_ISHUMAN_DEMO_TEST_TOKEN", "") if expose_token else "",
@@ -219,7 +222,10 @@ def ishuman_demo_config():
         "sites": sites,
         "stripe_demo_rail": True,
         "network_revoke_configured": bool(os.getenv("LEMMA_ISHUMAN_DEMO_ADMIN_TOKEN")),
-        "test_verify_enabled": os.getenv("LEMMA_ISHUMAN_DEMO_ALLOW_TEST_VERIFY", "").lower() == "true",
+        "test_verify_enabled": (
+            _demo_enabled()
+            and os.getenv("LEMMA_ISHUMAN_DEMO_ALLOW_TEST_VERIFY", "").lower() == "true"
+        ),
         "server_test_token_configured": bool(os.getenv("LEMMA_ISHUMAN_DEMO_TEST_TOKEN")),
         "server_admin_token_configured": bool(os.getenv("LEMMA_ISHUMAN_DEMO_ADMIN_TOKEN")),
         "skeleton_idv_enabled": _demo_enabled() and is_ishuman_skeleton_idv_enabled(),

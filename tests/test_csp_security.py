@@ -17,13 +17,31 @@ PROFILE_SCRIPT_ORIGINS = {
     "unlock_idv": [
         "https://challenges.cloudflare.com",
         "https://js.stripe.com",
+        "https://cdn.jsdelivr.net/npm/",
     ],
     "link_qr": [
         "https://challenges.cloudflare.com",
         "https://js.stripe.com",
+        "https://cdn.jsdelivr.net/npm/",
         "https://unpkg.com/",
     ],
 }
+
+
+@pytest.mark.unit
+def test_unlock_idv_profile_allows_jsdelivr_for_noble_esm():
+    csp = build_content_security_policy("nonce123", "unlock_idv")
+    script_src = csp.split("script-src ", 1)[1].split("; ", 1)[0]
+    connect_src = csp.split("connect-src ", 1)[1].split("; ", 1)[0]
+    assert "https://cdn.jsdelivr.net/npm/" in script_src
+    assert "https://cdn.jsdelivr.net" in connect_src
+
+
+@pytest.mark.unit
+def test_strict_profile_excludes_jsdelivr():
+    csp = build_content_security_policy("testnonce", "strict")
+    script_src = csp.split("script-src ", 1)[1].split("; ", 1)[0]
+    assert "https://cdn.jsdelivr.net" not in script_src
 
 
 @pytest.mark.unit

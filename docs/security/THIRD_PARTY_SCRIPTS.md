@@ -8,7 +8,7 @@ Global pages use the `strict` profile (`'self'` + per-request nonce only).
 | Profile | Routes | Extra `script-src` origins |
 |---------|--------|----------------------------|
 | `strict` | All routes by default | *(none)* |
-| `unlock_idv` | `/unlock`, `/wallet/unlock`, `/wallet/popup`, `/wallet/ishuman-idv` | `js.stripe.com`, `challenges.cloudflare.com` |
+| `unlock_idv` | `/unlock`, `/wallet/unlock`, `/wallet/popup`, `/wallet/ishuman-idv` | `js.stripe.com`, `challenges.cloudflare.com`, `cdn.jsdelivr.net/npm/` (@noble ESM) |
 | `link_qr` | `/link`, `/wallet/link` | `unlock_idv` origins + `unpkg.com` (html5-qrcode) |
 
 `connect-src`, `frame-src`, and `form-action` expand on `unlock_idv` / `link_qr` for Stripe and Turnstile.
@@ -18,7 +18,7 @@ Global pages use the `strict` profile (`'self'` + per-request nonce only).
 | Origin | Reason |
 |--------|--------|
 | `https://static.cloudflareinsights.com` | Not loaded in layout templates |
-| `https://cdn.jsdelivr.net/npm/` | No current template dependency; add via route profile if needed |
+| *(none removed)* | — |
 
 ## Template map
 
@@ -27,6 +27,7 @@ Global pages use the `strict` profile (`'self'` + per-request nonce only).
 | `https://unpkg.com/` | [`templates/wallet_link.html`](../../templates/wallet_link.html) | `link_qr` |
 | `https://js.stripe.com` | Wallet unlock / IDV flows (dynamic load) | `unlock_idv`, `link_qr` |
 | `https://challenges.cloudflare.com` | Turnstile surfaces on wallet flows | `unlock_idv`, `link_qr` |
+| `https://cdn.jsdelivr.net/npm/` | `@noble/ed25519` / `@noble/curves` dynamic import in `lemma-keys.js` | `unlock_idv`, `link_qr` |
 
 ## Review checklist
 

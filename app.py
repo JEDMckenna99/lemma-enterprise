@@ -56,8 +56,13 @@ def build_content_security_policy(nonce: str, profile: str = 'strict') -> str:
         script_src.extend([
             "https://challenges.cloudflare.com",  # CSP-ALLOW: Cloudflare Turnstile
             "https://js.stripe.com",  # CSP-ALLOW: Stripe payments
+            "https://cdn.jsdelivr.net/npm/",  # CSP-ALLOW: @noble/* ESM (lemma-keys.js)
         ])
-        connect_src.extend(["https://*.stripe.com", "https://api.stripe.com"])
+        connect_src.extend([
+            "https://*.stripe.com",
+            "https://api.stripe.com",
+            "https://cdn.jsdelivr.net",  # CSP-ALLOW: @noble/* ESM sub-imports
+        ])
         frame_src.extend(["https://*.stripe.com", "https://challenges.cloudflare.com"])
         form_action.append("https://*.stripe.com")
 
