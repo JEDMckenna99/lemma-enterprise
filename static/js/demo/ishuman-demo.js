@@ -288,6 +288,7 @@
     }
   }
 
+  function updateIntegrationLatency() {
     const el = $('ih-integration-latency');
     if (!el) return;
     const parts = [];

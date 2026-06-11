@@ -76,7 +76,7 @@
           <button class="demo-btn demo-btn-secondary" id="ih-wallet-btn" type="button">Unlock wallet</button>
         </div>
         <div class="demo-create-options" id="ih-create-options">
-          <article class="demo-create-option" id="ih-qr-demo-option" hidden>
+          <article class="demo-create-option" id="ih-qr-demo-option"{% if not qr_demo_idv_enabled %} hidden{% endif %}>
             <div class="demo-create-option-head">
               <span class="demo-create-option-badge">Quick demo</span>
               <h3>Try with your phone</h3>
@@ -307,5 +307,5 @@ const result = await new IsHumanVerifier({
 <script src="/static/js/lemma-keys.js?v=4" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
 <script nonce="{{ csp_nonce }}">window.LEMMA_ISHUMAN_USE_PERSON_ROOT_SEEDS = {{ 'true' if ishuman_use_person_root_seeds else 'false' }};</script>
 <script src="/sdk/ishuman-verifier.js?v=1.7.1" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
-<script src="/static/js/demo/ishuman-demo.js?v=16" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
+<script src="/static/js/demo/ishuman-demo.js?v=17" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
 {% endblock %}
