@@ -1290,6 +1290,13 @@ def _role_to_permission_profile(role: str) -> Dict[str, object]:
             'permissions': ['developer', 'write', 'read', 'access'],
             'scope': ['developer', 'write', 'read'],
         }
+    if role_norm in {'customer'}:
+        return {
+            'role': 'customer',
+            'permission_id': 'customer_access',
+            'permissions': ['read', 'access'],
+            'scope': ['read'],
+        }
     return {
         'role': 'user',
         'permission_id': 'customer_access',
@@ -1361,6 +1368,19 @@ def _resolve_platform_role_for_ppid(ppid: str, site_id: str = 'lemma.id') -> Dic
         db.close()
 
     return _finalize({**profile, 'source': source})
+
+
+def _finalize_platform_login_authorization(request, ppid: str, role_profile: Dict[str, object]):
+    from api.platform_owner import deny_if_no_platform_entitlement, enforce_developer_login_proof
+
+    denied = deny_if_no_platform_entitlement(role_profile)
+    if denied:
+        return denied
+    return enforce_developer_login_proof(
+        request.headers,
+        ppid=ppid,
+        role_profile=role_profile,
+    )
 
 
 def _upsert_platform_membership(
@@ -1961,7 +1981,7 @@ def platform_login():
     4. Global session setup
     """
     try:
-        from api.platform_owner import enforce_platform_login_wallet, platform_owner_enforcement_enabled
+        from api.platform_owner import enforce_platform_login_wallet
 
         data = request.get_json() or {}
         rejected = _reject_wallet_secret_payload(data)
@@ -2014,28 +2034,18 @@ def platform_login():
             else:
                 is_new_user = True
                 canonical_wallet_id = client_wallet_id or f"wallet_{secrets.token_hex(16)}"
-                if not platform_owner_enforcement_enabled():
-                    # Legacy open signup: provision developer customer records.
-                    customer = Customer(
-                        customer_id=f"dev_{secrets.token_hex(8)}",
-                        customer_did=ppid,
-                        wallet_id=canonical_wallet_id,
-                        role='developer',
-                        created_at=datetime.utcnow()
-                    )
-                    db.add(customer)
-                    db.commit()
-                    logger.info(f"Platform login: created new developer {customer.customer_id}")
-                else:
-                    logger.info(
-                        "Platform login: no customer record for %s; owner gate active — default user role",
-                        ppid[:24],
-                    )
+                logger.info(
+                    "Platform login: no linked customer record for %s",
+                    ppid[:24],
+                )
                 
         finally:
             db.close()
         
         role_profile = _resolve_platform_role_for_ppid(ppid, site_id=site_id)
+        denied = _finalize_platform_login_authorization(request, ppid, role_profile)
+        if denied:
+            return jsonify(denied[0]), denied[1]
         _upsert_platform_membership(
             ppid=ppid,
             site_id=site_id,
@@ -2127,6 +2137,9 @@ def restore_site_access():
                 'message': 'ppid or passkey_credential_id required',
             }), 400
         role_profile = _resolve_platform_role_for_ppid(ppid, site_id=site_id)
+        denied = _finalize_platform_login_authorization(request, ppid, role_profile)
+        if denied:
+            return jsonify(denied[0]), denied[1]
         _upsert_platform_membership(
             ppid=ppid,
             site_id=site_id,

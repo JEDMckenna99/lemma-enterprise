@@ -374,9 +374,16 @@
                     console.warn('Could not get wallet_id:', e.message);
                 }
 
+                const loginHeaders = { 'Content-Type': 'application/json' };
+                if (typeof window.getLemmaAuthHeadersAsync === 'function') {
+                    Object.assign(loginHeaders, await window.getLemmaAuthHeadersAsync());
+                } else if (typeof window.getLemmaAuthHeaders === 'function') {
+                    Object.assign(loginHeaders, window.getLemmaAuthHeaders());
+                }
+
                 const response = await fetch('/api/wallet-auth/platform-login', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: loginHeaders,
                     body: JSON.stringify({
                         ppid,
                         passkey_credential_id: passkeyCredentialId,

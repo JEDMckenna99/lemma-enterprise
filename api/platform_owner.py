@@ -157,31 +157,20 @@ def enforce_platform_login_wallet(
     db=None,
 ) -> Tuple[Optional[str], Optional[Tuple[Dict[str, str], int]]]:
     """
-    Resolve platform-login PPID or deny when owner enforcement requires IDV.
+    Resolve platform-login PPID or deny for lemma.id platform auth.
 
-    When LEMMA_PLATFORM_OWNER_PPID is set, platform login/restore must come from
-    a wallet with a completed isHuman person-root binding. Bare client PPIDs are
-    not accepted.
+    Platform login never trusts a bare client PPID. The wallet must have a
+    completed isHuman person-root binding; the server derives the canonical PPID.
     """
-    try:
-        ppid = resolve_platform_login_ppid(
-            client_ppid=client_ppid,
-            wallet_id=wallet_id,
-            passkey_credential_id=passkey_credential_id,
-            db=db,
-        )
-    except ValueError:
+    if not wallet_id:
         return None, (
             {
                 "success": False,
-                "error": "ppid_or_passkey_required",
-                "message": "ppid or passkey_credential_id required",
+                "error": "wallet_id_required",
+                "message": "Unlock your wallet and retry platform login.",
             },
             400,
         )
-
-    if not platform_owner_enforcement_enabled():
-        return ppid, None
 
     close_db = False
     if db is None:
@@ -192,10 +181,9 @@ def enforce_platform_login_wallet(
 
     person_root_verified = False
     try:
-        if wallet_id:
-            from api.ishuman import _resolve_person_id_for_wallet
+        from api.ishuman import _resolve_person_id_for_wallet
 
-            person_root_verified = bool(_resolve_person_id_for_wallet(db, wallet_id))
+        person_root_verified = bool(_resolve_person_id_for_wallet(db, wallet_id))
     finally:
         if close_db and db is not None:
             db.close()
@@ -210,7 +198,120 @@ def enforce_platform_login_wallet(
             403,
         )
 
+    try:
+        ppid = resolve_platform_login_ppid(
+            client_ppid=client_ppid,
+            wallet_id=wallet_id,
+            passkey_credential_id=passkey_credential_id,
+            db=db if not close_db else None,
+        )
+    except ValueError:
+        return None, (
+            {
+                "success": False,
+                "error": "ppid_or_passkey_required",
+                "message": "ppid or passkey_credential_id required",
+            },
+            400,
+        )
+
+    normalized_client = normalize_ppid(client_ppid)
+    if normalized_client and normalized_client != ppid:
+        return None, (
+            {
+                "success": False,
+                "error": "ppid_mismatch",
+                "message": "Wallet PPID does not match the server person-root derivation.",
+            },
+            403,
+        )
+
     return ppid, None
+
+
+def deny_if_no_platform_entitlement(
+    role_profile: Dict[str, Any],
+) -> Optional[Tuple[Dict[str, str], int]]:
+    """Fail closed when the wallet has no lemma.id account or membership record."""
+    source = str(role_profile.get("source") or "default").strip().lower()
+    if source != "default":
+        return None
+    return (
+        {
+            "success": False,
+            "error": "platform_access_not_granted",
+            "message": (
+                "No lemma.id developer account is linked to this wallet. "
+                "Register at /register, then sign in with your IDV-bound wallet."
+            ),
+        },
+        403,
+    )
+
+
+def enforce_developer_login_proof(
+    headers,
+    *,
+    ppid: str,
+    role_profile: Dict[str, Any],
+) -> Optional[Tuple[Dict[str, str], int]]:
+    """
+    Developer-scope re-issue requires a verified developer/admin credential proof
+    unless the entitlement is being restored from explicit DB membership.
+    """
+    permission_id = str(role_profile.get("permission_id") or "").strip().lower()
+    role = str(role_profile.get("role") or "").strip().lower()
+    source = str(role_profile.get("source") or "").strip().lower()
+    developer_scope = permission_id in {"developer_access", "developer"} or role == "developer"
+    if not developer_scope:
+        return None
+
+    db_backed_developer = source in {"site_admins", "platform_user_sites", "customers"} and (
+        role == "developer" or permission_id in {"developer_access", "developer"}
+    )
+    if db_backed_developer:
+        return None
+
+    from api.authz_engine import extract_user_lemma_principal
+    from auth.permissions import is_admin_permission
+
+    principal, _error = extract_user_lemma_principal(headers)
+    if not principal:
+        return (
+            {
+                "success": False,
+                "error": "developer_proof_required",
+                "message": (
+                    "Developer login requires a valid signed developer permission "
+                    "credential in X-Lemma-Credential."
+                ),
+            },
+            403,
+        )
+    if principal.ppid != ppid:
+        return (
+            {
+                "success": False,
+                "error": "developer_proof_mismatch",
+                "message": "Developer credential subject does not match this wallet.",
+            },
+            403,
+        )
+    if not (
+        is_admin_permission(principal.permission_id)
+        or principal.permission_id in {"developer_access", "developer"}
+        or "developer" in principal.scope
+        or "admin" in principal.scope
+    ):
+        return (
+            {
+                "success": False,
+                "error": "developer_proof_required",
+                "message": "Credential does not grant developer access.",
+            },
+            403,
+        )
+    return None
 
 
 def platform_owner_admin_email() -> str:

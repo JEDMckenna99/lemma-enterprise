@@ -167,6 +167,66 @@ def test_enforce_platform_login_wallet_requires_person_root(monkeypatch):
     assert denied[0]["error"] == "person_root_required"
 
 
+def test_deny_if_no_platform_entitlement_blocks_default():
+    from api.platform_owner import deny_if_no_platform_entitlement
+
+    denied = deny_if_no_platform_entitlement({"source": "default", "role": "user"})
+    assert denied is not None
+    assert denied[1] == 403
+    assert denied[0]["error"] == "platform_access_not_granted"
+
+    assert deny_if_no_platform_entitlement({"source": "customers", "role": "customer"}) is None
+
+
+def test_platform_login_denies_unregistered_wallet(monkeypatch):
+    monkeypatch.setenv("LEMMA_PLATFORM_OWNER_PPID", OWNER_PPID)
+    monkeypatch.setattr(
+        "api.platform_owner.enforce_platform_login_wallet",
+        lambda **kwargs: (OWNER_PPID, None),
+    )
+    monkeypatch.setattr(
+        wallet_service,
+        "_resolve_platform_role_for_ppid",
+        lambda ppid, site_id="lemma.id": {
+            "role": "user",
+            "permission_id": "customer_access",
+            "permissions": ["read"],
+            "scope": ["read"],
+            "source": "default",
+        },
+    )
+    monkeypatch.setattr(wallet_service, "_upsert_platform_membership", lambda *args, **kwargs: None)
+    monkeypatch.setattr(wallet_service, "issue_permission_lemma", lambda **kwargs: {"id": "cred"})
+
+    class _FakeQuery:
+        def filter(self, *args, **kwargs):
+            return self
+
+        def first(self):
+            return None
+
+    class _FakeDB:
+        def query(self, model):
+            return _FakeQuery()
+
+        def close(self):
+            return None
+
+    monkeypatch.setattr("api.database.get_db", lambda: _FakeDB())
+
+    app = Flask(__name__)
+    app.config["TESTING"] = True
+    app.register_blueprint(wallet_service_bp)
+
+    with app.test_client() as client:
+        response = client.post(
+            "/api/wallet-auth/platform-login",
+            json={"ppid": OWNER_PPID, "wallet_id": "wallet_verified"},
+        )
+        assert response.status_code == 403
+        assert response.get_json()["error"] == "platform_access_not_granted"
+
+
 def test_resolve_platform_login_ppid_prefers_binding(monkeypatch):
     monkeypatch.setattr(
         "api.ishuman._resolve_person_id_for_wallet",

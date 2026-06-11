@@ -84,11 +84,20 @@ def test_restore_site_access_issues_role_backed_lemma(monkeypatch):
         return {"id": "cred_restore_1", "claims": {"permissionId": kwargs.get("permission_id")}}
 
     monkeypatch.setattr(wallet_service, "issue_permission_lemma", _fake_issue_permission_lemma)
+    monkeypatch.setattr(
+        "api.platform_owner.enforce_platform_login_wallet",
+        lambda **kwargs: ("did:lemma:ppid_" + ("a" * 64), None),
+    )
+    monkeypatch.setattr(wallet_service, "_upsert_platform_membership", lambda *args, **kwargs: None)
 
     with app.test_client() as client:
         response = client.post(
             "/api/wallet-auth/restore-site-access",
-            json={"ppid": "did:lemma:ppid_" + ("a" * 64), "site_id": "lemma.id"},
+            json={
+                "ppid": "did:lemma:ppid_" + ("a" * 64),
+                "wallet_id": "wallet_verified",
+                "site_id": "lemma.id",
+            },
         )
         assert response.status_code == 200
         body = response.get_json()
