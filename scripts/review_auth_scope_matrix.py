@@ -136,6 +136,8 @@ IN_HANDLER_AUTH_ALLOWLIST = {
     "/api/ishuman/site-proof-redirect/deposit",
     "/api/ishuman/start-verification",
     "/api/ishuman/verify-presentation",
+    "/api/v1/iam/admin/platform-bootstrap/auto-issue",
+    "/api/v1/iam/admin/platform-bootstrap/status",
     "/api/wallet/challenge",
     "/api/wallet/firewall/runtimes/<runtime_id>/authorize",
     "/api/wallet/register-signing-key",
