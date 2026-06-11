@@ -1749,6 +1749,26 @@ def issue_agent_credential():
         )
         intended_platform = _normalize_site_identifier(intended_platform) or 'lemma.id'
 
+        from api.platform_owner import (
+            is_platform_owner_ppid,
+            is_platform_site,
+            platform_owner_enforcement_enabled,
+        )
+
+        scope_values = scope if isinstance(scope, list) else [scope]
+        scope_norm = {str(item).strip().lower() for item in scope_values if item}
+        if (
+            platform_owner_enforcement_enabled()
+            and is_platform_site(intended_platform)
+            and 'admin' in scope_norm
+            and not is_platform_owner_ppid(authorized_by)
+        ):
+            return jsonify({
+                'success': False,
+                'error': 'platform_owner_required',
+                'message': 'Platform admin agent credentials may only be issued by the platform owner.',
+            }), 403
+
         allowed_sites = data.get('allowed_sites')
         if allowed_sites is None:
             # Security default: site-bind credentials to the site where they are issued.

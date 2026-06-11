@@ -92,6 +92,8 @@ both the API key and workflow id are present.
 | `LEMMA_ISHUMAN_DEMO_ADMIN_TOKEN`    | Shared secret required in `X-Demo-Admin-Token` (network revoke).  |
 | `LEMMA_ISHUMAN_SKELETON_IDV_ENABLED`| Default on non-production; Didit-free `/api/demo/ishuman/skeleton-idv-*`. |
 | `LEMMA_ISHUMAN_SKELETON_CREDENTIAL_TTL_SECONDS` | Short-lived skeleton master TTL (default `3600`).          |
+| `LEMMA_ISHUMAN_DEMO_QR_CREDENTIAL_TTL_SECONDS` | QR demo on `/demo/ishuman` master TTL (default `900` / 15 min). |
+| `LEMMA_ISHUMAN_DEMO_QR_IDV_ENABLED` | `"true"` enables the public QR shell demo (safe on production; short-lived, no Didit). |
 | `LEMMA_IDV_HANDOFF_TTL_SECONDS`     | Mobile handoff relay TTL (default `300`).                         |
 | `LEMMA_IDV_HANDOFF_STRICT_CLAIM`    | Default `1`; set `0` for legacy session-only handoff claim.         |
 | `LEMMA_ISHUMAN_DEMO_API_KEY_<SITE>` | Stable API key for a seeded demo relying site.                    |
@@ -105,6 +107,15 @@ both the API key and workflow id are present.
 | `LEMMA_DISABLE_BRIDGE_IFRAME`         | unset   | When `"true"`, verifier SDK uses popup-only flow, skips bridge iframe (Phase 2). |
 | `LEMMA_ISHUMAN_USE_PERSON_ROOT_SEEDS` | unset   | When `"true"`, post-IDV wallets use `wallet_local_seed`/`person_root_proxy` derivation (Phase 1.1). |
 | `LEMMA_API_RATE_LIMIT_DEGRADED_MODE`  | `memory`| Behavior when Redis limiter is unavailable: `memory` or `fail_open`.          |
+
+### Platform owner (lemma.id admin sole-control)
+
+| Variable                    | What it does |
+| --------------------------- | ------------ |
+| `LEMMA_PLATFORM_OWNER_PPID` | Person-root PPID allowed platform admin on `lemma.id`. When set, other PPIDs cannot receive platform admin credentials. |
+| `LEMMA_ADMIN_EMAIL`         | Email for platform admin self-issue bootstrap. |
+
+Bootstrap: `python scripts/bootstrap_platform_owner.py --owner-ppid did:lemma:ppid_...`
 
 ## 3. Provisioning runbook (operator-run)
 

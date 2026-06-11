@@ -1309,6 +1309,10 @@ def _resolve_platform_role_for_ppid(ppid: str, site_id: str = 'lemma.id') -> Dic
       5) default user
     """
     from api.database import get_db, SiteAdmin, SiteUser, PlatformUserSite, Customer
+    from api.platform_owner import cap_platform_role_profile
+
+    def _finalize(profile_dict: Dict[str, object]) -> Dict[str, object]:
+        return cap_platform_role_profile(ppid, site_id, profile_dict)
 
     profile = _role_to_permission_profile('user')
     source = 'default'
@@ -1320,39 +1324,43 @@ def _resolve_platform_role_for_ppid(ppid: str, site_id: str = 'lemma.id') -> Dic
             SiteAdmin.is_active == True  # noqa: E712
         ).order_by(SiteAdmin.id.desc()).first()
         if site_admin:
-            profile = _role_to_permission_profile(site_admin.admin_role or 'admin')
-            source = 'site_admins'
-            return {**profile, 'source': source}
+            return _finalize({
+                **_role_to_permission_profile(site_admin.admin_role or 'admin'),
+                'source': 'site_admins',
+            })
 
         pus = db.query(PlatformUserSite).filter(
             PlatformUserSite.site_id == site_id,
             PlatformUserSite.user_did == ppid
         ).order_by(PlatformUserSite.id.desc()).first()
         if pus and (pus.status or 'active').lower() in {'active', 'enabled'}:
-            profile = _role_to_permission_profile(pus.role or 'user')
-            source = 'platform_user_sites'
-            return {**profile, 'source': source}
+            return _finalize({
+                **_role_to_permission_profile(pus.role or 'user'),
+                'source': 'platform_user_sites',
+            })
 
         site_user = db.query(SiteUser).filter(
             SiteUser.site_id == site_id,
             SiteUser.user_did == ppid
         ).order_by(SiteUser.id.desc()).first()
         if site_user and (site_user.user_status or 'active').lower() not in {'suspended', 'banned'}:
-            profile = _role_to_permission_profile(site_user.user_role or 'user')
-            source = 'site_users'
-            return {**profile, 'source': source}
+            return _finalize({
+                **_role_to_permission_profile(site_user.user_role or 'user'),
+                'source': 'site_users',
+            })
 
         customer = db.query(Customer).filter(Customer.customer_did == ppid).first()
         if customer and getattr(customer, 'role', None):
-            profile = _role_to_permission_profile(str(customer.role))
-            source = 'customers'
-            return {**profile, 'source': source}
+            return _finalize({
+                **_role_to_permission_profile(str(customer.role)),
+                'source': 'customers',
+            })
     except Exception as role_err:
         logger.warning(f"Role restore lookup failed for {site_id} {ppid[:16]}...: {role_err}")
     finally:
         db.close()
 
-    return {**profile, 'source': source}
+    return _finalize({**profile, 'source': source})
 
 
 def _upsert_platform_membership(
@@ -1953,6 +1961,8 @@ def platform_login():
     4. Global session setup
     """
     try:
+        from api.platform_owner import resolve_platform_login_ppid
+
         data = request.get_json() or {}
         rejected = _reject_wallet_secret_payload(data)
         if rejected:
@@ -1961,13 +1971,14 @@ def platform_login():
         passkey_credential_id = data.get('passkey_credential_id')
         client_ppid = data.get('ppid')
         client_wallet_id = data.get('wallet_id')  # SDK's local wallet_id
-        
-        if client_ppid:
-            ppid = client_ppid
-        elif passkey_credential_id:
-            site_id = 'lemma.id'
-            ppid = derive_user_ppid(site_id, passkey_credential_id=passkey_credential_id)
-        else:
+
+        try:
+            ppid = resolve_platform_login_ppid(
+                client_ppid=client_ppid,
+                wallet_id=client_wallet_id,
+                passkey_credential_id=passkey_credential_id,
+            )
+        except ValueError:
             return jsonify({
                 'success': False,
                 'error': 'ppid_or_passkey_required',
@@ -1986,12 +1997,7 @@ def platform_login():
         
         try:
             # Try to find customer by PPID or wallet_id
-            customer = None
-            if passkey_credential_id:
-                # customers table does not have passkey_credential_id; PPID is the durable link.
-                customer = db.query(Customer).filter(
-                    Customer.customer_did == ppid
-                ).first()
+            customer = db.query(Customer).filter(Customer.customer_did == ppid).first()
             
             if not customer:
                 # Look by wallet_id if client provided one
@@ -2097,9 +2103,25 @@ def restore_site_access():
 
         passkey_credential_id = data.get('passkey_credential_id')
         client_ppid = data.get('ppid')
+        client_wallet_id = data.get('wallet_id')
         site_id = (data.get('site_id') or 'lemma.id').strip().lower()
 
-        if client_ppid:
+        from api.platform_owner import is_platform_site, resolve_platform_login_ppid
+
+        if is_platform_site(site_id):
+            try:
+                ppid = resolve_platform_login_ppid(
+                    client_ppid=client_ppid,
+                    wallet_id=client_wallet_id,
+                    passkey_credential_id=passkey_credential_id,
+                )
+            except ValueError:
+                return jsonify({
+                    'success': False,
+                    'error': 'ppid_or_passkey_required',
+                    'message': 'ppid or passkey_credential_id required',
+                }), 400
+        elif client_ppid:
             ppid = client_ppid
         elif passkey_credential_id:
             ppid = derive_user_ppid(site_id, passkey_credential_id=passkey_credential_id)

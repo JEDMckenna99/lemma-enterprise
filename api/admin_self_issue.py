@@ -519,6 +519,14 @@ def admin_self_issue():
                 'message': 'Valid wallet PPID is required (did:lemma:ppid_...). Email-derived DID is disabled.'
             }), 400
 
+        from api.platform_owner import enforce_platform_admin_ppid, is_platform_site
+
+        site_id_norm = str(site_id or '').strip().lower()
+        if is_platform_site(site_id_norm) and 'admin' in str(permission_level or '').lower():
+            denied = enforce_platform_admin_ppid(user_did, site_id_norm)
+            if denied:
+                return jsonify(denied[0]), denied[1]
+
         # Ensure SiteAdmin ownership record exists/updated for this admin DID.
         try:
             from api.database import SessionLocal, SiteAdmin

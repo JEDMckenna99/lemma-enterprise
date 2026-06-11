@@ -546,6 +546,12 @@ def issue_admin_lemma_endpoint():
             admin_did = derive_ppid_did(username, site_domain)
         else:
             logger.info(f"Using wallet-derived PPID: {admin_did[:50]}...")
+
+        from api.platform_owner import enforce_platform_admin_ppid
+
+        denied = enforce_platform_admin_ppid(admin_did, site_domain)
+        if denied:
+            return jsonify(denied[0]), denied[1]
         
         # Issue permission lemma with REAL Ed25519 signature
         permission_lemma = manager.issue_permission_lemma(
@@ -640,6 +646,12 @@ def issue_admin_credential():
                 'error': 'X-Lemma-Credential header required',
                 'message': 'Provide full wallet lemma in X-Lemma-Credential so server can verify subject PPID.'
             }), 400
+
+        from api.platform_owner import enforce_platform_admin_ppid
+
+        denied = enforce_platform_admin_ppid(ppid, 'lemma.id')
+        if denied:
+            return jsonify(denied[0]), denied[1]
         
         # 2. REQUIRE API key authorization (proves they have platform access)
         api_key = request.headers.get('X-API-Key')

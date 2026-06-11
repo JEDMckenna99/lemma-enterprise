@@ -350,27 +350,22 @@
             try {
                 updateButton('Issuing permission...', false, true);
                 updateStatus('info', '📝 Creating your access credential...');
-                
-                // Get wallet secret for PPID derivation
-                // PPID = HMAC(wallet_secret, site_id) - site-specific identifier
-                let walletSecret = null;
+
                 let passkeyCredentialId = null;
                 let clientWalletId = null;
-                
+
+                const ppid = await wallet.derivePPID('lemma.id');
+                if (!ppid || !String(ppid).startsWith('did:lemma:ppid_')) {
+                    throw new Error('Could not derive a valid lemma.id PPID. Complete isHuman IDV first.');
+                }
+                console.log('🔐 Person-root PPID for lemma.id:', ppid.substring(0, 32) + '...');
+
                 try {
-                    walletSecret = await wallet.getWalletSecret();
-                    console.log('🔐 Got wallet secret for PPID derivation');
-                } catch (e) {
-                    console.warn('Could not get wallet secret, using passkey fallback:', e.message);
-                }
-                
-                // Fallback: use passkey credential ID for server-side PPID derivation
-                if (!walletSecret) {
                     passkeyCredentialId = await wallet.getPasskeyCredentialId();
-                    console.log('🔐 Using passkey credential ID for PPID derivation');
+                } catch (e) {
+                    console.warn('Passkey credential id unavailable:', e.message);
                 }
-                
-                // Get client's wallet_id for cross-device sync
+
                 try {
                     const debugState = await wallet.getDebugState?.() || {};
                     clientWalletId = debugState.walletId || walletInfo?.walletId;
@@ -378,18 +373,12 @@
                 } catch (e) {
                     console.warn('Could not get wallet_id:', e.message);
                 }
-                
-                if (!walletSecret && !passkeyCredentialId) {
-                    throw new Error('No wallet secret or passkey available for authentication');
-                }
-                
-                // Request permission from server using platform-login endpoint
-                // This handles wallet_id sync for cross-device support
+
                 const response = await fetch('/api/wallet-auth/platform-login', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        wallet_secret: walletSecret,
+                        ppid,
                         passkey_credential_id: passkeyCredentialId,
                         wallet_id: clientWalletId
                     })

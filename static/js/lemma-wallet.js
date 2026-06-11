@@ -5641,7 +5641,8 @@ class LemmaWallet {
             for (const lemma of candidates) {
                 const claims = lemma.claims || lemma.credentialSubject || {};
                 const personRoot = claims.ppidDerivation === 'person_root_v1'
-                    || claims.verificationMethod === 'stripe_identity';
+                    || claims.verificationMethod === 'stripe_identity'
+                    || claims.verificationMethod === 'didit';
                 if (!personRoot) continue;
                 const ppid = lemma.subject || claims.ppid || claims.id || claims.subject;
                 if (ppid && String(ppid).startsWith('did:lemma:ppid_')) {

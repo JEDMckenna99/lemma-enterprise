@@ -1621,6 +1621,11 @@ def login():
                 # Determine permission level based on role
                 permission_id = 'admin_access' if customer.role == 'admin' else 'customer_access'
                 scope = ['platform_admin', 'customer_management', 'site_management', 'billing_access'] if customer.role == 'admin' else ['customer_dashboard', 'api_management']
+
+                from api.platform_owner import platform_owner_enforcement_enabled
+                if customer.role == 'admin' and platform_owner_enforcement_enabled():
+                    permission_id = 'customer_access'
+                    scope = ['customer_dashboard', 'api_management']
                 
                 # Ensure permission type exists
                 if permission_id not in manager.permissions:
