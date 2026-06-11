@@ -41,10 +41,10 @@ def test_restore_site_access_requires_identity_material():
     app = _app_with_wallet_service()
     with app.test_client() as client:
         response = client.post("/api/wallet-auth/restore-site-access", json={"site_id": "lemma.id"})
-        assert response.status_code == 400
+        assert response.status_code == 403
         body = response.get_json()
         assert body["success"] is False
-        assert "required" in body["error"]
+        assert body["error"] == "wallet_id_required"
 
 
 def test_restore_site_access_rejects_wallet_secret():

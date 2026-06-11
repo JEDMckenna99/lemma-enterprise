@@ -1290,13 +1290,6 @@ def _role_to_permission_profile(role: str) -> Dict[str, object]:
             'permissions': ['developer', 'write', 'read', 'access'],
             'scope': ['developer', 'write', 'read'],
         }
-    if role_norm in {'customer'}:
-        return {
-            'role': 'customer',
-            'permission_id': 'customer_access',
-            'permissions': ['read', 'access'],
-            'scope': ['read'],
-        }
     return {
         'role': 'user',
         'permission_id': 'customer_access',
@@ -1370,17 +1363,26 @@ def _resolve_platform_role_for_ppid(ppid: str, site_id: str = 'lemma.id') -> Dic
     return _finalize({**profile, 'source': source})
 
 
-def _finalize_platform_login_authorization(request, ppid: str, role_profile: Dict[str, object]):
-    from api.platform_owner import deny_if_no_platform_entitlement, enforce_developer_login_proof
+def _has_platform_membership(ppid: str, site_id: str = 'lemma.id') -> bool:
+    """True when the PPID has a persisted lemma.id platform entitlement."""
+    profile = _resolve_platform_role_for_ppid(ppid, site_id=site_id)
+    return str(profile.get('source') or 'default') != 'default'
 
-    denied = deny_if_no_platform_entitlement(role_profile)
-    if denied:
-        return denied
-    return enforce_developer_login_proof(
-        request.headers,
-        ppid=ppid,
-        role_profile=role_profile,
-    )
+
+def _deny_unregistered_platform_login(ppid: str, site_id: str = 'lemma.id'):
+    """Fail closed when wallet PPID has no platform signup / entitlement record."""
+    if _has_platform_membership(ppid, site_id=site_id):
+        return None
+    return jsonify(
+        {
+            'success': False,
+            'error': 'platform_membership_required',
+            'message': (
+                'Register for lemma.id platform access before signing in with this wallet. '
+                'Developer credentials are issued only after signup.'
+            ),
+        }
+    ), 403
 
 
 def _upsert_platform_membership(
@@ -1999,6 +2001,10 @@ def platform_login():
         )
         if denied:
             return jsonify(denied[0]), denied[1]
+
+        denied_membership = _deny_unregistered_platform_login(ppid, site_id='lemma.id')
+        if denied_membership:
+            return denied_membership
         
         site_id = 'lemma.id'
         
@@ -2035,7 +2041,7 @@ def platform_login():
                 is_new_user = True
                 canonical_wallet_id = client_wallet_id or f"wallet_{secrets.token_hex(16)}"
                 logger.info(
-                    "Platform login: no linked customer record for %s",
+                    "Platform login: no customer record for %s; membership gate required",
                     ppid[:24],
                 )
                 
@@ -2043,9 +2049,6 @@ def platform_login():
             db.close()
         
         role_profile = _resolve_platform_role_for_ppid(ppid, site_id=site_id)
-        denied = _finalize_platform_login_authorization(request, ppid, role_profile)
-        if denied:
-            return jsonify(denied[0]), denied[1]
         _upsert_platform_membership(
             ppid=ppid,
             site_id=site_id,
@@ -2126,6 +2129,9 @@ def restore_site_access():
             )
             if denied:
                 return jsonify(denied[0]), denied[1]
+            denied_membership = _deny_unregistered_platform_login(ppid, site_id=site_id)
+            if denied_membership:
+                return denied_membership
         elif client_ppid:
             ppid = client_ppid
         elif passkey_credential_id:
@@ -2137,9 +2143,6 @@ def restore_site_access():
                 'message': 'ppid or passkey_credential_id required',
             }), 400
         role_profile = _resolve_platform_role_for_ppid(ppid, site_id=site_id)
-        denied = _finalize_platform_login_authorization(request, ppid, role_profile)
-        if denied:
-            return jsonify(denied[0]), denied[1]
         _upsert_platform_membership(
             ppid=ppid,
             site_id=site_id,

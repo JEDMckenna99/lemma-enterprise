@@ -117,22 +117,22 @@ def main() -> int:
         c.fail(f"Expected 403 for fake PPID, got {status} {payload!r}")
     checks.append(c)
 
-    # 5) Platform login fails closed for unbound wallet when owner gate active
+    # 5) Platform login fails closed for unbound/fake wallet
     c = Check("Platform login denies unbound/fake wallet")
     status, payload = request(
         f"{BASE_URL}/api/wallet-auth/platform-login",
         method="POST",
         body={"ppid": FAKE_PPID, "wallet_id": "wallet_probe_nonexistent"},
     )
-    if not owner_configured:
-        if status in (200, 403):
-            c.pass_(f"Owner gate inactive: HTTP {status}")
-        else:
-            c.fail(f"Unexpected status without owner gate: {status}")
-    elif status == 403 and isinstance(payload, dict) and payload.get("error") == "person_root_required":
-        c.pass_("403 person_root_required")
+    if status == 403 and isinstance(payload, dict) and payload.get("error") in {
+        "person_root_required",
+        "wallet_id_required",
+        "platform_membership_required",
+        "ppid_mismatch",
+    }:
+        c.pass_(f"403 {payload.get('error')}")
     else:
-        c.fail(f"Expected 403 person_root_required, got {status} {payload!r}")
+        c.fail(f"Expected fail-closed 403, got {status} {payload!r}")
     checks.append(c)
 
     # 6) Revocation data available for local VC verify
