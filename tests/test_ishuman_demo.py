@@ -47,6 +47,8 @@ def test_ishuman_demo_page_loads_expected_assets(ishuman_demo_client):
     assert "/sdk/ishuman-verifier.js" in body
     assert "/static/js/demo/ishuman-demo.js" in body
     assert "/static/css/demo/ishuman-demo.css" in body
+    assert "ih-try-qr-demo-btn" in body
+    assert "ih-create-lemma-id-btn" in body
 
 
 def test_ishuman_idv_ui_preview_loads(ishuman_demo_client):
@@ -363,6 +365,9 @@ def test_ishuman_demo_js_uses_real_verifier_with_two_site_bindings():
     assert "/api/demo/ishuman/verify-once-test-mode" in js
     assert "/api/demo/ishuman/probe-derive" in js
     assert "/api/demo/ishuman/force-reverify" in js
+    assert "/api/demo/ishuman/qr-demo-idv-flow" in js
+    assert "createLemmaIdViaPopup" in js
+    assert "startQrDemoIdvFlow" in js
     assert "/api/ishuman/start-verification" in js
     assert "/api/ishuman/verification-status/" in js
 
@@ -520,4 +525,59 @@ def test_skeleton_idv_blocked_on_production(ishuman_demo_client, monkeypatch):
     )
     assert resp.status_code == 403
     assert resp.get_json()["error"] == "skeleton_idv_disabled"
+
+
+def test_qr_demo_idv_flow_prepares_skeleton_session(
+    ishuman_demo_client,
+    fake_ishuman_db_session_factory,
+    monkeypatch,
+):
+    monkeypatch.setattr("api.database.SessionLocal", fake_ishuman_db_session_factory.session_local)
+    monkeypatch.setenv("ENVIRONMENT", "staging")
+    monkeypatch.setenv("LEMMA_ISHUMAN_DEMO_ALLOW_TEST_VERIFY", "true")
+    monkeypatch.setenv("LEMMA_ISHUMAN_DEMO_TEST_TOKEN", "test-token")
+    monkeypatch.setenv("LEMMA_ISHUMAN_SKELETON_IDV_ENABLED", "true")
+    monkeypatch.setenv("LEMMA_ISHUMAN_DEMO_QR_CREDENTIAL_TTL_SECONDS", "900")
+
+    resp = ishuman_demo_client.post(
+        "/api/demo/ishuman/qr-demo-idv-flow",
+        headers={"X-Demo-Test-Token": "test-token"},
+        json={
+            "wallet_id": "wallet_qr_demo_001",
+            "wallet_secret": "ab" * 32,
+            "return_url": "https://lemma.id/wallet/ishuman-idv?verification_return=true",
+        },
+    )
+    payload = resp.get_json()
+    assert resp.status_code == 200, payload
+    assert payload["session_id"].startswith("ishuman_skeleton_")
+    assert payload["mode"] == "qr_demo_idv_flow"
+    assert payload["credential_ttl_seconds"] == 900
+
+
+def test_qr_demo_idv_enabled_on_production_with_explicit_flag(
+    ishuman_demo_client,
+    fake_ishuman_db_session_factory,
+    monkeypatch,
+):
+    monkeypatch.setattr("api.database.SessionLocal", fake_ishuman_db_session_factory.session_local)
+    monkeypatch.setenv("ENVIRONMENT", "production")
+    monkeypatch.setenv("LEMMA_ISHUMAN_DEMO_QR_IDV_ENABLED", "true")
+    monkeypatch.setenv("LEMMA_ISHUMAN_DEMO_TEST_TOKEN", "test-token")
+
+    config = ishuman_demo_client.get("/api/demo/ishuman/config").get_json()
+    assert config["qr_demo_idv_enabled"] is True
+    assert config["skeleton_idv_enabled"] is False
+
+    resp = ishuman_demo_client.post(
+        "/api/demo/ishuman/qr-demo-idv-flow",
+        headers={"X-Demo-Test-Token": "test-token"},
+        json={
+            "wallet_id": "wallet_qr_prod_001",
+            "return_url": "https://lemma.id/wallet/ishuman-idv?verification_return=true",
+        },
+    )
+    payload = resp.get_json()
+    assert resp.status_code == 200, payload
+    assert payload["mode"] == "qr_demo_idv_flow"
 

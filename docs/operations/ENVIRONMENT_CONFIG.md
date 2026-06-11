@@ -92,6 +92,8 @@ both the API key and workflow id are present.
 | `LEMMA_ISHUMAN_DEMO_ADMIN_TOKEN`    | Shared secret required in `X-Demo-Admin-Token` (network revoke).  |
 | `LEMMA_ISHUMAN_SKELETON_IDV_ENABLED`| Default on non-production; Didit-free `/api/demo/ishuman/skeleton-idv-*`. |
 | `LEMMA_ISHUMAN_SKELETON_CREDENTIAL_TTL_SECONDS` | Short-lived skeleton master TTL (default `3600`).          |
+| `LEMMA_ISHUMAN_DEMO_QR_CREDENTIAL_TTL_SECONDS` | QR demo on `/demo/ishuman` master TTL (default `900` / 15 min). |
+| `LEMMA_ISHUMAN_DEMO_QR_IDV_ENABLED` | `"true"` enables the public QR shell demo (safe on production; short-lived, no Didit). |
 | `LEMMA_IDV_HANDOFF_TTL_SECONDS`     | Mobile handoff relay TTL (default `300`).                         |
 | `LEMMA_IDV_HANDOFF_STRICT_CLAIM`    | Default `1`; set `0` for legacy session-only handoff claim.         |
 | `LEMMA_ISHUMAN_DEMO_API_KEY_<SITE>` | Stable API key for a seeded demo relying site.                    |

@@ -109,6 +109,7 @@ IN_HANDLER_AUTH_ALLOWLIST = {
     "/api/demo/ishuman/self-reset",
     "/api/demo/ishuman/site-block",
     "/api/demo/ishuman/site-unblock",
+    "/api/demo/ishuman/qr-demo-idv-flow",
     "/api/demo/ishuman/skeleton-idv-complete",
     "/api/demo/ishuman/skeleton-idv-expire",
     "/api/demo/ishuman/skeleton-idv-flow",

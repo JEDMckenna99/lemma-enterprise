@@ -6,7 +6,7 @@
 
 {% block head %}
 {{ super() }}
-<link rel="stylesheet" href="/static/css/demo/ishuman-demo.css?v=3">
+<link rel="stylesheet" href="/static/css/demo/ishuman-demo.css?v=4">
 {% endblock %}
 
 {% block content %}
@@ -38,9 +38,8 @@
         <div class="workflow-head">
           <div>
             <h2>Verify once</h2>
-            <p class="demo-muted">Unlock the browser wallet and store a reusable human proof.</p>
+            <p class="demo-muted">Unlock the browser wallet, then try the quick QR demo or create a real lemma.id.</p>
           </div>
-          <button class="demo-btn demo-btn-primary" id="ih-create-lemma-id-btn" type="button">Create my lemma.id</button>
         </div>
 
         <p class="demo-notice" id="ih-test-verify-disabled" hidden>Test-mode automation is off. Complete verification on a customer site first.</p>
@@ -76,7 +75,34 @@
         <div class="action-row">
           <button class="demo-btn demo-btn-secondary" id="ih-wallet-btn" type="button">Unlock wallet</button>
         </div>
-        <p class="demo-muted" id="ih-create-lemma-id-hint">Runs the one-time identity check in a Lemma popup and stores your lemma.id — the master human proof every site-private ID is derived from.</p>
+        <div class="demo-create-options" id="ih-create-options">
+          <article class="demo-create-option" id="ih-qr-demo-option" hidden>
+            <div class="demo-create-option-head">
+              <span class="demo-create-option-badge">Quick demo</span>
+              <h3>Try with your phone</h3>
+            </div>
+            <p class="demo-muted">Scan a QR code for a short-lived demo credential — no Didit, expires in about 15 minutes. Good for walking through the flow on stage.</p>
+            <button class="demo-btn demo-btn-secondary" id="ih-try-qr-demo-btn" type="button">Scan QR to try demo</button>
+          </article>
+          <article class="demo-create-option demo-create-option-primary">
+            <div class="demo-create-option-head">
+              <span class="demo-create-option-badge demo-create-option-badge-primary">Join Lemma</span>
+              <h3>Create my lemma.id</h3>
+            </div>
+            <p class="demo-muted">Run the full identity check and store a reusable human proof — the master credential every site-private ID is derived from.</p>
+            <button class="demo-btn demo-btn-primary" id="ih-create-lemma-id-btn" type="button">Create my lemma.id</button>
+          </article>
+        </div>
+        <div class="demo-qr-panel" id="ih-qr-demo-panel" hidden>
+          <h3 class="demo-qr-title">Scan with your phone</h3>
+          <p class="demo-muted">Demo identity check — no Didit. Expires in <strong id="ih-qr-timer">15:00</strong>.</p>
+          <div class="demo-qr-code-wrap">
+            <div id="ih-qr-code" class="demo-qr-code" aria-label="QR code for mobile verification"></div>
+          </div>
+          <p class="demo-muted" id="ih-qr-status">Waiting for scan…</p>
+          <button class="demo-btn demo-btn-secondary" id="ih-qr-cancel-btn" type="button">Cancel QR</button>
+        </div>
+        <p class="demo-muted" id="ih-create-lemma-id-hint">Unlock your wallet first. Try the QR demo to explore the flow, or create a real lemma.id when you are ready to join.</p>
       </div>
     </section>
 
@@ -275,10 +301,11 @@ const result = await new IsHumanVerifier({
 
 {% block scripts %}
 {{ super() }}
+<script src="/static/js/qrcode.min.js" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
 <script src="/static/js/demo/ishuman-idv-preview-scenes.js?v=7" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
 <script src="/static/js/demo/ishuman-idv-viewer.js?v=2" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
 <script src="/static/js/lemma-keys.js?v=4" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
 <script nonce="{{ csp_nonce }}">window.LEMMA_ISHUMAN_USE_PERSON_ROOT_SEEDS = {{ 'true' if ishuman_use_person_root_seeds else 'false' }};</script>
 <script src="/sdk/ishuman-verifier.js?v=1.7.1" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
-<script src="/static/js/demo/ishuman-demo.js?v=14" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
+<script src="/static/js/demo/ishuman-demo.js?v=16" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
 {% endblock %}

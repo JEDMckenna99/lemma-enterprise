@@ -303,6 +303,27 @@ def is_ishuman_skeleton_idv_enabled() -> bool:
     return _env_truthy("LEMMA_ISHUMAN_SKELETON_IDV_ENABLED", True)
 
 
+def is_ishuman_demo_qr_idv_enabled() -> bool:
+    """Public QR shell demo on /demo/ishuman (short-lived, no Didit).
+
+    Enabled explicitly on production via LEMMA_ISHUMAN_DEMO_QR_IDV_ENABLED.
+    On non-production, follows skeleton IDV unless disabled.
+    """
+    if _env_truthy("LEMMA_ISHUMAN_DEMO_QR_IDV_ENABLED", False):
+        return True
+    return is_ishuman_skeleton_idv_enabled()
+
+
+def ishuman_demo_qr_credential_ttl_seconds() -> int:
+    """Demo QR IDV master credential lifetime (default 15 minutes)."""
+    raw = os.environ.get("LEMMA_ISHUMAN_DEMO_QR_CREDENTIAL_TTL_SECONDS", "900")
+    try:
+        value = int(raw)
+    except (TypeError, ValueError):
+        return 900
+    return max(300, min(value, 86400))
+
+
 def is_ishuman_pull_fallback_enabled() -> bool:
     """Whether status-poll may actively pull a didit decision to issue.
 

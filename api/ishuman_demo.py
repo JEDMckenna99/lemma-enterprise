@@ -144,20 +144,28 @@ def _public_record(record) -> dict:
     }
 
 
+def _demo_exposes_test_token() -> bool:
+    from api.config import is_ishuman_demo_qr_idv_enabled
+
+    return _demo_enabled() or is_ishuman_demo_qr_idv_enabled()
+
+
 def _demo_page_context() -> dict:
     """Server-only demo tokens for /demo/ishuman (never exposed on other routes)."""
-    from api.config import is_ishuman_skeleton_idv_enabled
+    from api.config import is_ishuman_demo_qr_idv_enabled, is_ishuman_skeleton_idv_enabled
 
     demo_enabled = _demo_enabled()
+    expose_token = _demo_exposes_test_token()
     return {
         "demo_sites": list(DEMO_SITES.values()),
         "network_revoke_configured": bool(os.getenv("LEMMA_ISHUMAN_DEMO_ADMIN_TOKEN")),
         "demo_test_verify_enabled": os.getenv("LEMMA_ISHUMAN_DEMO_ALLOW_TEST_VERIFY", "").lower() == "true",
         "demo_test_token_configured": bool(os.getenv("LEMMA_ISHUMAN_DEMO_TEST_TOKEN")),
         "demo_admin_token_configured": bool(os.getenv("LEMMA_ISHUMAN_DEMO_ADMIN_TOKEN")),
-        "demo_test_token": os.getenv("LEMMA_ISHUMAN_DEMO_TEST_TOKEN", "") if demo_enabled else "",
+        "demo_test_token": os.getenv("LEMMA_ISHUMAN_DEMO_TEST_TOKEN", "") if expose_token else "",
         "demo_admin_token": os.getenv("LEMMA_ISHUMAN_DEMO_ADMIN_TOKEN", "") if demo_enabled else "",
         "skeleton_idv_enabled": demo_enabled and is_ishuman_skeleton_idv_enabled(),
+        "qr_demo_idv_enabled": is_ishuman_demo_qr_idv_enabled(),
         "ui_preview_enabled": _ui_preview_enabled(),
     }
 
@@ -198,7 +206,11 @@ def ishuman_idv_popup():
 
 @ishuman_demo_bp.route("/api/demo/ishuman/config", methods=["GET"])
 def ishuman_demo_config():
-    from api.config import is_ishuman_skeleton_idv_enabled
+    from api.config import (
+        is_ishuman_demo_qr_idv_enabled,
+        is_ishuman_skeleton_idv_enabled,
+        ishuman_demo_qr_credential_ttl_seconds,
+    )
 
     sites = ensure_demo_sites()
     return jsonify({
@@ -210,6 +222,8 @@ def ishuman_demo_config():
         "server_test_token_configured": bool(os.getenv("LEMMA_ISHUMAN_DEMO_TEST_TOKEN")),
         "server_admin_token_configured": bool(os.getenv("LEMMA_ISHUMAN_DEMO_ADMIN_TOKEN")),
         "skeleton_idv_enabled": _demo_enabled() and is_ishuman_skeleton_idv_enabled(),
+        "qr_demo_idv_enabled": is_ishuman_demo_qr_idv_enabled(),
+        "demo_qr_credential_ttl_seconds": ishuman_demo_qr_credential_ttl_seconds(),
         "ui_preview_enabled": _ui_preview_enabled(),
         "customer_site_urls": {
             "tickets": "https://lemma-demo-tickets-1d3d7411af33.herokuapp.com",
@@ -424,6 +438,20 @@ def _require_demo_test_verify(*, require_token_header: bool = True) -> tuple[dic
     return {}, None
 
 
+def _require_demo_qr_idv(*, require_token_header: bool = True) -> tuple[dict | None, tuple | None]:
+    """Guards for the public QR shell demo on /demo/ishuman."""
+    from api.config import is_ishuman_demo_qr_idv_enabled
+
+    if not is_ishuman_demo_qr_idv_enabled():
+        return None, (jsonify({"success": False, "error": "qr_demo_idv_disabled"}), 403)
+    if require_token_header:
+        expected = os.getenv("LEMMA_ISHUMAN_DEMO_TEST_TOKEN")
+        provided = request.headers.get("X-Demo-Test-Token") or ""
+        if not expected or provided != expected:
+            return None, (jsonify({"success": False, "error": "demo_test_token_required"}), 403)
+    return {}, None
+
+
 def _require_demo_skeleton_idv(*, require_token_header: bool = True) -> tuple[dict | None, tuple | None]:
     """Guards for Didit-free skeleton IDV (non-production only)."""
     from api.config import is_ishuman_skeleton_idv_enabled
@@ -459,11 +487,21 @@ def _create_skeleton_verification_row(
     wallet_id: str,
     return_url: str = "",
     ppid: str = "",
+    credential_ttl_seconds: int | None = None,
+    qr_demo: bool = False,
 ) -> "IsHumanVerification":
     from api.database import IsHumanVerification
 
     session_id = f"ishuman_skeleton_{secrets.token_urlsafe(16)}"
     provider_session_id = f"skeleton_{secrets.token_urlsafe(12)}"
+    metadata = {
+        "return_url": return_url,
+        "skeleton_idv": True,
+    }
+    if credential_ttl_seconds is not None:
+        metadata["credential_ttl_seconds"] = int(credential_ttl_seconds)
+    if qr_demo:
+        metadata["qr_demo_idv"] = True
     row = IsHumanVerification(
         session_id=session_id,
         provider_session_id=provider_session_id,
@@ -471,10 +509,7 @@ def _create_skeleton_verification_row(
         ppid=ppid or None,
         status="pending",
         issuer_id="skeleton",
-        metadata_json={
-            "return_url": return_url,
-            "skeleton_idv": True,
-        },
+        metadata_json=metadata,
     )
     db.add(row)
     return row
@@ -911,6 +946,106 @@ def ishuman_demo_skeleton_idv_expire():
         raise
     finally:
         db.close()
+
+
+def complete_skeleton_handoff_after_claim(session_id: str) -> tuple[dict, int] | None:
+    """Issue a short-lived master credential after a skeleton handoff claim (demo only)."""
+    from api.config import (
+        is_ishuman_demo_qr_idv_enabled,
+        is_ishuman_skeleton_idv_enabled,
+        ishuman_demo_qr_credential_ttl_seconds,
+    )
+    from api.database import SessionLocal, IsHumanVerification
+
+    if not (is_ishuman_skeleton_idv_enabled() or is_ishuman_demo_qr_idv_enabled()):
+        return None
+
+    db = SessionLocal()
+    try:
+        row = (
+            db.query(IsHumanVerification)
+            .filter(IsHumanVerification.session_id == session_id)
+            .first()
+        )
+        if not row or row.status != "pending":
+            return None
+        meta = row.metadata_json or {}
+        if not meta.get("skeleton_idv"):
+            return None
+        if is_ishuman_demo_qr_idv_enabled() and not is_ishuman_skeleton_idv_enabled():
+            if not meta.get("qr_demo_idv"):
+                return None
+        ttl = int(meta.get("credential_ttl_seconds") or ishuman_demo_qr_credential_ttl_seconds())
+    finally:
+        db.close()
+
+    return _complete_demo_test_session(
+        session_id=session_id,
+        credential_ttl_seconds=ttl,
+        verification_method="skeleton",
+    )
+
+
+@ishuman_demo_bp.route("/api/demo/ishuman/qr-demo-idv-flow", methods=["POST"])
+def ishuman_demo_qr_demo_idv_flow():
+    """Prepare a QR demo IDV session for /demo/ishuman (no Didit).
+
+    The browser unlocks the wallet, calls this endpoint, deposits an encrypted
+    handoff blob, renders a QR code, and polls until the phone scan completes.
+    """
+    _guards, err = _require_demo_qr_idv(require_token_header=True)
+    if err:
+        return err
+
+    from api.config import ishuman_demo_qr_credential_ttl_seconds, ishuman_idv_handoff_ttl_seconds
+
+    body = request.get_json(silent=True) or {}
+    wallet_id = (body.get("wallet_id") or "").strip()
+    return_url = (body.get("return_url") or "").strip()
+    if not wallet_id:
+        return jsonify({"success": False, "error": "wallet_id required"}), 400
+
+    ttl = _skeleton_credential_ttl_seconds(body)
+    if body.get("credential_ttl_seconds") is None:
+        ttl = ishuman_demo_qr_credential_ttl_seconds()
+    handoff_ttl = ishuman_idv_handoff_ttl_seconds()
+
+    from api.database import SessionLocal
+
+    db = SessionLocal()
+    try:
+        ppid = ""
+        wallet_secret = (body.get("wallet_secret") or "").strip()
+        if wallet_secret:
+            from api.ppid import derive_ppid_from_wallet_secret
+
+            ppid = derive_ppid_from_wallet_secret(wallet_secret, "lemma.id")
+        row = _create_skeleton_verification_row(
+            db,
+            wallet_id=wallet_id,
+            return_url=return_url,
+            ppid=ppid,
+            credential_ttl_seconds=ttl,
+            qr_demo=True,
+        )
+        db.commit()
+        session_id = row.session_id
+    except Exception:
+        db.rollback()
+        logger.exception("QR demo IDV session create failed")
+        return jsonify({"success": False, "error": "qr_demo_session_failed"}), 500
+    finally:
+        db.close()
+
+    expires_at = int(time.time()) + ttl
+    return jsonify({
+        "success": True,
+        "session_id": session_id,
+        "mode": "qr_demo_idv_flow",
+        "credential_ttl_seconds": ttl,
+        "handoff_expires_in": handoff_ttl,
+        "expires_at": expires_at,
+    })
 
 
 @ishuman_demo_bp.route("/api/demo/ishuman/probe-derive", methods=["POST"])

@@ -2486,6 +2486,13 @@ def idv_mobile_handoff_claim():
             )
             return jsonify({"success": False, "error": "handoff_session_invalid"}), 403
 
+        try:
+            from api.ishuman_demo import complete_skeleton_handoff_after_claim
+
+            complete_skeleton_handoff_after_claim(session_id)
+        except Exception:
+            logger.exception("Skeleton handoff auto-complete failed session=%s", session_id[:24])
+
     if not _delete_idv_mobile_handoff_entry(entry):
         _log_handoff_security_event(
             "handoff_claim_race",
