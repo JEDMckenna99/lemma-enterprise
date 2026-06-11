@@ -192,7 +192,10 @@ def _load_admin_sites() -> List[Dict[str, Any]]:
 
     sites = list(merged.values())
     sites.sort(key=lambda s: s.get('created_at') or '', reverse=True)
-    return sites
+
+    from api.platform_sites import filter_managed_sites
+
+    return filter_managed_sites(sites)
 
 # ================================================================================
 # CUSTOMER DASHBOARD ENDPOINTS
@@ -1070,12 +1073,13 @@ def get_admin_site_stats():
     try:
         sites = _load_admin_sites()
         total = len(sites)
-        active = sum(1 for s in sites if str(s.get('status') or '').lower() not in {'revoked', 'suspended', 'inactive'})
-        development = sum(
-            1 for s in sites if str(s.get('site_domain') or '').startswith(('localhost', '127.0.0.1'))
-            or 'dev' in str(s.get('site_domain') or '').lower()
-            or 'staging' in str(s.get('site_domain') or '').lower()
+        active = sum(
+            1 for s in sites
+            if str(s.get('status') or '').lower() not in {'revoked', 'suspended', 'inactive'}
         )
+        from api.platform_sites import is_demo_site
+
+        development = sum(1 for s in sites if is_demo_site(s.get('site_id')))
         production = max(total - development, 0)
 
         return jsonify({
