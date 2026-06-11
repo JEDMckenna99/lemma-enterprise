@@ -1971,30 +1971,36 @@ POST /api/auth/exchange-proof</pre>
                     }
                 }
                 
-                // Get wallet secret (now that wallet should be unlocked)
-                let walletSecret = null;
+                // Get person-root PPID (prefers isHuman master credential subject).
+                let ppid = null;
                 try {
-                    walletSecret = await wallet.getWalletSecret();
-                    console.log('Got wallet secret:', walletSecret ? 'yes' : 'no');
+                    ppid = await wallet.derivePPID('lemma.id');
+                    console.log('Person-root PPID:', ppid ? ppid.substring(0, 32) + '...' : 'none');
                 } catch (e) {
-                    console.warn('No wallet secret:', e.message);
+                    console.warn('Could not derive PPID:', e.message);
                 }
-                
-                if (!walletSecret && !passkeyCredentialId) {
+
+                if (!ppid) {
+                    try {
+                        passkeyCredentialId = passkeyCredentialId || await wallet.getPasskeyCredentialId();
+                    } catch (e) {
+                        console.warn('No passkey credential id:', e.message);
+                    }
+                }
+
+                if (!ppid && !passkeyCredentialId) {
                     console.log('No wallet credentials - need setup');
                     showSetupWallet();
                     return;
                 }
-                
-                // Request permission using standard Lemma API
+
                 const response = await fetch('/api/wallet-auth/issue', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        site_id: 'lemma_platform',
-                        permission_level: 'developer',
-                        wallet_secret: walletSecret,
-                        passkey_credential_id: passkeyCredentialId
+                        site_id: 'lemma.id',
+                        ppid: ppid || undefined,
+                        passkey_credential_id: ppid ? undefined : passkeyCredentialId
                     })
                 });
                 

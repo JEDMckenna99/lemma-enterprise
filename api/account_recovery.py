@@ -474,6 +474,15 @@ def complete_recovery():
         
         site_id = token_data['site_id']
         admin_email = token_data['admin_email']
+
+        if ppid and ppid.startswith('did:lemma:ppid_'):
+            from api.platform_owner import enforce_platform_admin_ppid, is_platform_site
+
+            site_id_norm = str(site_id or '').strip().lower()
+            if is_platform_site(site_id_norm):
+                denied = enforce_platform_admin_ppid(ppid, site_id_norm)
+                if denied:
+                    return jsonify(denied[0]), denied[1]
         
         # Look up site details
         from api.database import SessionLocal, Site

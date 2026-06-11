@@ -111,6 +111,26 @@ def require_credential(
                     provided_scope=principal.scope,
                 )
 
+            if required_scope == "admin":
+                from api.platform_owner import (
+                    is_platform_owner_ppid,
+                    is_platform_site,
+                    platform_owner_enforcement_enabled,
+                )
+
+                site_binding = (principal.site_binding or "").strip().lower()
+                if (
+                    platform_owner_enforcement_enabled()
+                    and is_platform_site(site_binding)
+                    and not is_platform_owner_ppid(principal.ppid)
+                ):
+                    return _auth_error(
+                        "platform_owner_required",
+                        "Platform admin access is restricted to the configured platform owner.",
+                        status=403,
+                        auth_method="credential",
+                    )
+
             if required_permission:
                 if not g.is_admin and principal.permission_id != required_permission:
                     return _auth_error(

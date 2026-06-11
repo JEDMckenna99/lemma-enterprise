@@ -108,6 +108,15 @@ both the API key and workflow id are present.
 | `LEMMA_ISHUMAN_USE_PERSON_ROOT_SEEDS` | unset   | When `"true"`, post-IDV wallets use `wallet_local_seed`/`person_root_proxy` derivation (Phase 1.1). |
 | `LEMMA_API_RATE_LIMIT_DEGRADED_MODE`  | `memory`| Behavior when Redis limiter is unavailable: `memory` or `fail_open`.          |
 
+### Platform owner (lemma.id admin sole-control)
+
+| Variable                    | What it does |
+| --------------------------- | ------------ |
+| `LEMMA_PLATFORM_OWNER_PPID` | Person-root PPID allowed platform admin on `lemma.id`. When set, other PPIDs cannot receive platform admin credentials. |
+| `LEMMA_ADMIN_EMAIL`         | Email for platform admin self-issue bootstrap. |
+
+Bootstrap: `python scripts/bootstrap_platform_owner.py --owner-ppid did:lemma:ppid_...`
+
 ## 3. Provisioning runbook (operator-run)
 
 > These steps require Heroku CLI access and DNS control. Run them manually;
