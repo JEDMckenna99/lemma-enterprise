@@ -9,7 +9,7 @@
 
   const CONSUMER = {
     documentTitle: "Confirm you're human — Lemma.id",
-    eyebrow: 'Secured by Lemma.id',
+    eyebrow: 'Lemma.id',
     headline: "Prove you're human once",
     privacy:
       'Your ID documents are used only to create your human proof. After your proof is created, your documents and photos are removed from the verification provider. Lemma.id only stores your human proof, not your ID.',

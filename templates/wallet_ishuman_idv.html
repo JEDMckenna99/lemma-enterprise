@@ -30,11 +30,11 @@
         .brand-mark {
             display: flex;
             justify-content: center;
-            margin-bottom: 16px;
+            margin-bottom: 12px;
         }
         .brand-mark img {
-            width: 80px;
-            height: 80px;
+            width: 100px;
+            height: 100px;
             display: block;
         }
         .eyebrow {
@@ -42,8 +42,9 @@
             font-weight: 800;
             letter-spacing: 1.4px;
             text-transform: uppercase;
+            text-align: center;
             color: #4f46e5;
-            margin-bottom: 8px;
+            margin-bottom: 10px;
         }
         h1 { font-size: 1.35rem; margin-bottom: 8px; line-height: 1.25; }
         p { color: #64748b; font-size: 0.92rem; line-height: 1.55; margin-bottom: 18px; }
@@ -100,9 +101,9 @@
          data-ui-preview-enabled="{{ 'true' if ui_preview_enabled|default(false) else 'false' }}"
          data-server-test-token="{{ demo_test_token }}">
         <div class="brand-mark">
-            <img src="/static/img/lemma_logo.svg" alt="Lemma.id" width="80" height="80">
+            <img src="/static/img/lemma_logo.svg" alt="Lemma.id" width="100" height="100">
         </div>
-        <p class="eyebrow" id="eyebrow-copy">Secured by Lemma.id</p>
+        <p class="eyebrow" id="eyebrow-copy">Lemma.id</p>
         <h1 id="headline-copy">Prove you're human once</h1>
         <p id="intro-copy">Create your lemma.id to prove you're a real person without sharing your ID with this site. Your lemma.id is stored privately in your browser, so you can skip repeat checks on other sites that use Lemma.id.</p>
         <div class="site-chip" id="site-chip">Requesting site</div>
@@ -119,7 +120,7 @@
         </div>
     </div>
 
-    <script src="/static/js/demo/ishuman-idv-preview-scenes.js?v=6" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
+    <script src="/static/js/demo/ishuman-idv-preview-scenes.js?v=7" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
     <script src="/static/js/lemma-keys.js?v=4" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
     <script src="/static/js/wallet-at-rest-crypto.js?v=2" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
     <script nonce="{{ csp_nonce }}">window.LEMMA_ISHUMAN_USE_PERSON_ROOT_SEEDS = {{ 'true' if ishuman_use_person_root_seeds else 'false' }};</script>
