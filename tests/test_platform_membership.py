@@ -79,11 +79,25 @@ def test_collect_registered_platform_ppids_uses_accounts_and_site_admins():
                 _Row(user_did=PROBE_PPID, account_type="developer"),
                 _Row(user_did=OWNER_PPID, account_type="customer"),
             ],
+            "PlatformUserSite": [
+                _Row(user_did=DEV_PPID, site_id="lemma.id", role="developer", status="active"),
+            ],
         }
     )
 
     registered = collect_registered_platform_ppids(site_id="lemma.id", db=db)
     assert registered == {OWNER_PPID, DEV_PPID}
+
+
+def test_collect_registered_excludes_orphan_platform_accounts():
+    db = _FakeDb(
+        {
+            "SiteAdmin": [],
+            "PlatformUser": [_Row(user_did=DEV_PPID, account_type="developer")],
+            "PlatformUserSite": [],
+        }
+    )
+    assert collect_registered_platform_ppids(site_id="lemma.id", db=db) == set()
 
 
 def test_has_registered_platform_membership_rejects_probe_and_orphans():
@@ -157,7 +171,7 @@ def test_list_registered_platform_user_rows_excludes_orphan_memberships():
                 )
             ],
             "PlatformUserSite": [
-                _Row(id=1, user_did=PROBE_PPID, site_id="lemma.id", role="user", joined_at=datetime.utcnow())
+                _Row(id=1, user_did=PROBE_PPID, site_id="lemma.id", role="user", status="active", joined_at=datetime.utcnow())
             ],
         }
     )

@@ -53,7 +53,7 @@ def collect_registered_platform_ppids(
 
     registered: Set[str] = set()
     try:
-        from api.database import PlatformUser, SiteAdmin
+        from api.database import PlatformUser, PlatformUserSite, SiteAdmin
 
         for key in site_keys:
             for row in (
@@ -68,12 +68,24 @@ def collect_registered_platform_ppids(
                 if ppid and not is_probe_ppid(ppid):
                     registered.add(ppid)
 
-        for row in db.query(PlatformUser).filter(PlatformUser.user_did.isnot(None)).all():
-            ppid = normalize_ppid(row.user_did)
-            if not ppid or is_probe_ppid(ppid):
-                continue
-            if is_platform_member_account_type(row.account_type):
-                registered.add(ppid)
+        for key in site_keys:
+            for row in (
+                db.query(PlatformUserSite)
+                .filter(PlatformUserSite.site_id == key)
+                .all()
+            ):
+                if (getattr(row, "status", "active") or "active").lower() not in {"active", "enabled"}:
+                    continue
+                ppid = normalize_ppid(row.user_did)
+                if not ppid or is_probe_ppid(ppid):
+                    continue
+                account = db.query(PlatformUser).filter(PlatformUser.user_did == ppid).first()
+                site_role = normalize_account_type(getattr(row, "role", None))
+                account_type = normalize_account_type(
+                    getattr(account, "account_type", None) if account else site_role
+                )
+                if is_platform_member_account_type(site_role) or is_platform_member_account_type(account_type):
+                    registered.add(ppid)
     finally:
         if close_db and db is not None:
             db.close()
