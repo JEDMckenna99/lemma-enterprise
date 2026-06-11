@@ -1036,9 +1036,8 @@
                     setStatus('Completing demo verification…', 'loading');
                     await verifyOnceTestMode();
                 } else {
-                    setStatus(consumerCopy().status?.siteProofPending || 'One quick identity check, then we\u2019ll confirm you\u2019re human here.', 'info');
-                    document.getElementById('primary-btn').classList.remove('hidden');
-                    await applyPrimaryButtonLabel();
+                    setStatus(consumerCopy().status?.openingIdv || 'Opening secure identity check…', 'loading');
+                    await startHostedVerification();
                     return false;
                 }
             }
@@ -1228,9 +1227,15 @@
             // site proof) and self-close — the opener is only needed for the live
             // postMessage hand-off, which notifyOpener() already no-ops without.
             // So only block a truly context-free direct open: no opener AND no flow.
+            const isSameOriginMasterFlow = requestingSite === 'lemma.id'
+                && !issueMode
+                && openerOrigin !== '*'
+                && openerOrigin === window.location.origin;
+            const isMasterCreationFlow = requestingSite === 'lemma.id' && !issueMode;
             const hasFlowContext = isFreshIdv
                 || isSiteProofIssue
                 || isDemoQrFlow
+                || isSameOriginMasterFlow
                 || (isVerificationReturn && (sessionId || handoffId || ishumanSessionParam));
 
             if (isDemoQrFlow) {
@@ -1303,6 +1308,7 @@
                 try {
                     const done = await runVerification();
                     if (!done) {
+                        const copy = consumerCopy();
                         setStatus(copy.status?.ready || 'Takes about a minute. You can stop anytime.', 'info');
                     }
                 } catch (err) {
@@ -1337,6 +1343,20 @@
                 setStatus(consumerCopy().status?.returnUnlock || 'Unlock to finish where you left off.', 'info');
                 document.getElementById('primary-btn').classList.remove('hidden');
                 document.getElementById('primary-btn').textContent = consumerCopy().primary?.unlockFinish || 'Unlock & finish';
+                return;
+            }
+
+            if (isMasterCreationFlow && (window.opener || isSameOriginMasterFlow)) {
+                document.getElementById('primary-btn').classList.add('hidden');
+                try {
+                    await runVerification();
+                } catch (err) {
+                    console.error('[isHuman IDV] master creation failed:', err);
+                    const detail = err?.message || err?.toString() || 'Verification failed';
+                    setStatus(detail, 'error');
+                    document.getElementById('primary-btn').classList.remove('hidden');
+                    await applyPrimaryButtonLabel();
+                }
                 return;
             }
 

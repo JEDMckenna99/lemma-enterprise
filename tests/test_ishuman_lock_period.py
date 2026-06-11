@@ -134,6 +134,30 @@ def test_idv_popup_issues_site_proof_via_wallet():
 
 
 @pytest.mark.browser
+def test_idv_site_proof_starts_hosted_verification_without_master():
+    idv_html = IDV_HTML.read_text(encoding="utf-8")
+    site_proof_block = idv_html.split("async function issueSiteProofAndClose()", 1)[1]
+    site_proof_block = site_proof_block.split("async function runFreshIdvAndClose()", 1)[0]
+    assert "startHostedVerification();" in site_proof_block
+    assert "siteProofPending" not in site_proof_block
+
+
+@pytest.mark.browser
+def test_idv_popup_allows_same_origin_demo_hub_master_flow():
+    idv_html = IDV_HTML.read_text(encoding="utf-8")
+    assert "isSameOriginMasterFlow" in idv_html
+    assert "isMasterCreationFlow" in idv_html
+
+
+@pytest.mark.browser
+def test_idv_site_proof_boot_does_not_reference_undefined_copy():
+    idv_html = IDV_HTML.read_text(encoding="utf-8")
+    site_proof_boot = idv_html.split("if (isSiteProofIssue) {", 1)[1]
+    site_proof_boot = site_proof_boot.split("if (isVerificationReturn && sessionId) {", 1)[0]
+    assert "setStatus(copy.status" not in site_proof_boot
+
+
+@pytest.mark.browser
 def test_wallet_prefers_newest_credential_after_fresh_idv(wallet_source):
     """After fresh IDV the wallet cache holds both the old and new master.
     Lookups must prefer the most-recently-issued credential or the
