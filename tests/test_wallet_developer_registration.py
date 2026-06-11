@@ -60,7 +60,7 @@ def test_register_wallet_developer_requires_person_root(monkeypatch):
 
 def test_register_wallet_developer_provisions_developer_access(monkeypatch):
     issued = []
-    upserts = []
+    registrations = []
 
     monkeypatch.setattr(
         "api.platform_owner.enforce_platform_login_wallet",
@@ -71,8 +71,9 @@ def test_register_wallet_developer_provisions_developer_access(monkeypatch):
         lambda ppid, site_id="lemma.id": False,
     )
     monkeypatch.setattr(
-        "api.services.wallet_service._upsert_platform_membership",
-        lambda *args, **kwargs: upserts.append((args, kwargs)),
+        "api.platform_account.register_developer_account",
+        lambda *args, **kwargs: registrations.append((args, kwargs))
+        or {"ppid": OWNER_PPID, "account_type": "developer", "billing_customer_id": "cus_test123"},
     )
     monkeypatch.setattr(
         "api.services.wallet_service.issue_permission_lemma",
@@ -116,7 +117,8 @@ def test_register_wallet_developer_provisions_developer_access(monkeypatch):
     assert len(issued) == 1
     assert issued[0]["subject_ppid"] == OWNER_PPID
     assert issued[0]["permission_id"] == "developer_access"
-    assert len(upserts) == 2
+    assert len(registrations) == 1
+    assert registrations[0][1]["billing_customer_id"] == "cus_test123"
 
 
 def test_register_wallet_developer_rejects_existing_membership(monkeypatch):

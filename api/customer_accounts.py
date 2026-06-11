@@ -1516,7 +1516,6 @@ def register_wallet_developer():
 
         from api.services.wallet_service import (
             _has_platform_membership,
-            _upsert_platform_membership,
             issue_permission_lemma,
         )
 
@@ -1558,30 +1557,17 @@ def register_wallet_developer():
             customer_id = result['customer_id']
             api_key = result.get('api_key')
 
-        for site_key in ('lemma.id', 'lemma_platform'):
-            _upsert_platform_membership(
-                ppid,
-                site_key,
-                'developer',
-                wallet_id=wallet_id or None,
-                passkey_credential_id=passkey_credential_id,
-            )
+        from api.platform_account import register_developer_account
 
-        try:
-            from api.database import get_db, PlatformUser
-
-            db = get_db()
-            try:
-                platform_user = db.query(PlatformUser).filter(PlatformUser.user_did == ppid).first()
-                if platform_user:
-                    platform_user.email = email
-                    platform_user.display_name = name
-                    platform_user.verification_level = 'human_verified'
-                    db.commit()
-            finally:
-                db.close()
-        except Exception as profile_err:
-            logger.warning("Platform user profile update failed (non-fatal): %s", profile_err)
+        register_developer_account(
+            ppid,
+            email=email,
+            name=name,
+            company=company,
+            wallet_id=wallet_id or None,
+            passkey_credential_id=passkey_credential_id,
+            billing_customer_id=customer_id,
+        )
 
         permission_lemma = issue_permission_lemma(
             subject_ppid=ppid,

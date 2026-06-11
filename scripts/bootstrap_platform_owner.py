@@ -20,6 +20,7 @@ def bootstrap(owner_ppid: str, admin_email: str | None = None) -> int:
         return 1
 
     from api.database import PlatformUserSite, SessionLocal, SiteAdmin
+    from api.platform_account import ensure_owner_account
 
     db = SessionLocal()
     deactivated = 0
@@ -79,6 +80,8 @@ def bootstrap(owner_ppid: str, admin_email: str | None = None) -> int:
                         joined_at=datetime.utcnow(),
                     )
                 )
+
+        ensure_owner_account(owner, email=admin_email or os.getenv("LEMMA_ADMIN_EMAIL", "admin@lemma.id"), db=db)
 
         db.commit()
     except Exception as exc:

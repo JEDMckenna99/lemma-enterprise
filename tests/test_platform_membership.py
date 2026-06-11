@@ -7,6 +7,11 @@ import pytest
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 os.environ.setdefault("DATABASE_URL", "sqlite:///:memory:")
 
+from api.platform_account import (
+    is_platform_member_account_type,
+    normalize_account_type,
+    upsert_platform_account,
+)
 from api.platform_membership import (
     build_platform_user_row,
     collect_registered_platform_ppids,
@@ -27,6 +32,12 @@ def test_is_probe_ppid_detects_uniform_test_hex():
     assert is_probe_ppid("not-a-ppid") is True
 
 
+def test_normalize_account_type_and_membership():
+    assert normalize_account_type("Developer") == "developer"
+    assert is_platform_member_account_type("developer") is True
+    assert is_platform_member_account_type("customer") is False
+
+
 class _Row:
     def __init__(self, **kwargs):
         for key, value in kwargs.items():
@@ -36,12 +47,8 @@ class _Row:
 class _Query:
     def __init__(self, rows):
         self._rows = list(rows)
-        self._filters = []
 
     def filter(self, *args, **_kwargs):
-        return self
-
-    def filter_by(self, **_kwargs):
         return self
 
     def all(self):
@@ -60,20 +67,17 @@ class _FakeDb:
         self._tables = tables
 
     def query(self, model):
-        name = model.__name__
-        return _Query(self._tables.get(name, []))
+        return _Query(self._tables.get(model.__name__, []))
 
 
-def test_collect_registered_platform_ppids_uses_site_admins_and_developers():
+def test_collect_registered_platform_ppids_uses_accounts_and_site_admins():
     db = _FakeDb(
         {
-            "SiteAdmin": [
-                _Row(site_id="lemma.id", admin_did=OWNER_PPID, is_active=True),
-            ],
-            "Customer": [
-                _Row(customer_did=DEV_PPID, role="developer"),
-                _Row(customer_did=PROBE_PPID, role="developer"),
-                _Row(customer_did=OWNER_PPID, role="user"),
+            "SiteAdmin": [_Row(site_id="lemma.id", admin_did=OWNER_PPID, is_active=True)],
+            "PlatformUser": [
+                _Row(user_did=DEV_PPID, account_type="developer"),
+                _Row(user_did=PROBE_PPID, account_type="developer"),
+                _Row(user_did=OWNER_PPID, account_type="customer"),
             ],
         }
     )
@@ -86,7 +90,7 @@ def test_has_registered_platform_membership_rejects_probe_and_orphans():
     db = _FakeDb(
         {
             "SiteAdmin": [_Row(site_id="lemma.id", admin_did=OWNER_PPID, is_active=True)],
-            "Customer": [],
+            "PlatformUser": [],
         }
     )
 
@@ -105,13 +109,14 @@ def test_build_platform_user_row_prefers_site_admin_role():
                     user_did=OWNER_PPID,
                     email="owner@lemma.id",
                     display_name="Owner",
+                    account_type="customer",
                     status="active",
+                    created_at=now,
                 )
             ],
             "PlatformUserSite": [
                 _Row(id=9, user_did=OWNER_PPID, site_id="lemma.id", role="user", joined_at=now, status="active")
             ],
-            "Customer": [],
             "SiteAdmin": [
                 _Row(
                     id=3,
@@ -131,7 +136,7 @@ def test_build_platform_user_row_prefers_site_admin_role():
     assert row["source"] == "site_admins"
 
 
-def test_list_registered_platform_user_rows_excludes_orphan_memberships(monkeypatch):
+def test_list_registered_platform_user_rows_excludes_orphan_memberships():
     db = _FakeDb(
         {
             "SiteAdmin": [
@@ -143,20 +148,74 @@ def test_list_registered_platform_user_rows_excludes_orphan_memberships(monkeypa
                     admin_email="owner@lemma.id",
                 )
             ],
-            "Customer": [],
-            "PlatformUser": [],
+            "PlatformUser": [
+                _Row(
+                    user_did=OWNER_PPID,
+                    account_type="owner",
+                    email="owner@lemma.id",
+                    status="active",
+                )
+            ],
             "PlatformUserSite": [
                 _Row(id=1, user_did=PROBE_PPID, site_id="lemma.id", role="user", joined_at=datetime.utcnow())
             ],
         }
     )
 
-    monkeypatch.setattr("api.platform_membership.get_db", lambda: db, raising=False)
-
     rows = list_registered_platform_user_rows(site_id="lemma.id", db=db)
     ppids = {row["ppid"] for row in rows}
     assert OWNER_PPID in ppids
     assert PROBE_PPID not in ppids
+
+
+def test_upsert_platform_account_upgrades_account_type(monkeypatch):
+    stored = []
+
+    class _Account:
+        user_did = OWNER_PPID
+        account_type = "customer"
+        status = "active"
+        email = None
+        display_name = None
+        name = None
+        company = None
+        wallet_id = None
+        passkey_credential_id = None
+        verification_level = "base"
+        billing_customer_id = None
+        last_seen = None
+
+    class _QueryOne:
+        def filter(self, *_args, **_kwargs):
+            return self
+
+        def order_by(self, *_args, **_kwargs):
+            return self
+
+        def first(self):
+            return stored[0] if stored else None
+
+    class _Db:
+        def query(self, model):
+            return _QueryOne()
+
+        def add(self, obj):
+            stored.append(obj)
+
+        def commit(self):
+            return None
+
+        def rollback(self):
+            return None
+
+        def close(self):
+            return None
+
+    monkeypatch.setattr("api.database.get_db", lambda: _Db())
+
+    upsert_platform_account(OWNER_PPID, account_type="developer", email="dev@lemma.id")
+    assert stored[0].account_type == "developer"
+    assert stored[0].email == "dev@lemma.id"
 
 
 def test_get_admin_users_uses_registered_platform_rows(monkeypatch):

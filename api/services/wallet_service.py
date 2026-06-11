@@ -1303,12 +1303,12 @@ def _resolve_platform_role_for_ppid(ppid: str, site_id: str = 'lemma.id') -> Dic
     Resolve the canonical platform role for a PPID from DB state.
     Priority:
       1) site_admins (active)
-      2) platform_user_sites (active) for site-scoped role
-      3) site_users (active)
-      4) customers.role
+      2) platform_users.account_type
+      3) platform_user_sites (active) for site-scoped role
+      4) site_users (active)
       5) default user
     """
-    from api.database import get_db, SiteAdmin, SiteUser, PlatformUserSite, Customer
+    from api.database import get_db, SiteAdmin, SiteUser, PlatformUserSite, PlatformUser
     from api.platform_owner import cap_platform_role_profile
 
     def _finalize(profile_dict: Dict[str, object]) -> Dict[str, object]:
@@ -1329,6 +1329,13 @@ def _resolve_platform_role_for_ppid(ppid: str, site_id: str = 'lemma.id') -> Dic
                 'source': 'site_admins',
             })
 
+        account = db.query(PlatformUser).filter(PlatformUser.user_did == ppid).first()
+        if account and getattr(account, 'account_type', None):
+            return _finalize({
+                **_role_to_permission_profile(str(account.account_type)),
+                'source': 'platform_accounts',
+            })
+
         pus = db.query(PlatformUserSite).filter(
             PlatformUserSite.site_id == site_id,
             PlatformUserSite.user_did == ppid
@@ -1347,13 +1354,6 @@ def _resolve_platform_role_for_ppid(ppid: str, site_id: str = 'lemma.id') -> Dic
             return _finalize({
                 **_role_to_permission_profile(site_user.user_role or 'user'),
                 'source': 'site_users',
-            })
-
-        customer = db.query(Customer).filter(Customer.customer_did == ppid).first()
-        if customer and getattr(customer, 'role', None):
-            return _finalize({
-                **_role_to_permission_profile(str(customer.role)),
-                'source': 'customers',
             })
     except Exception as role_err:
         logger.warning(f"Role restore lookup failed for {site_id} {ppid[:16]}...: {role_err}")
@@ -1393,61 +1393,19 @@ def _upsert_platform_membership(
     wallet_id: Optional[str] = None,
     passkey_credential_id: Optional[str] = None,
 ) -> None:
-    """
-    Ensure platform_users + platform_user_sites reflect latest site membership.
-    """
-    db = None
+    """Ensure canonical platform account + site membership reflect latest state."""
     try:
-        from api.database import get_db, PlatformUser, PlatformUserSite
-        db = get_db()
-        platform_user = db.query(PlatformUser).filter(PlatformUser.user_did == ppid).first()
-        if not platform_user:
-            platform_user = PlatformUser(
-                user_did=ppid,
-                wallet_id=wallet_id,
-                passkey_credential_id=passkey_credential_id,
-                status='active',
-                auth_method='passkey' if passkey_credential_id else 'wallet_secret',
-                created_at=datetime.utcnow(),
-                last_seen=datetime.utcnow(),
-            )
-            db.add(platform_user)
-        else:
-            platform_user.last_seen = datetime.utcnow()
-            if wallet_id and not platform_user.wallet_id:
-                platform_user.wallet_id = wallet_id
-            if passkey_credential_id and not platform_user.passkey_credential_id:
-                platform_user.passkey_credential_id = passkey_credential_id
-            if (platform_user.status or '').lower() in {'suspended', 'deleted'}:
-                # Keep account recoverable without reviving deleted records.
-                if (platform_user.status or '').lower() == 'suspended':
-                    platform_user.status = 'active'
+        from api.platform_account import upsert_platform_account
 
-        membership = db.query(PlatformUserSite).filter(
-            PlatformUserSite.user_did == ppid,
-            PlatformUserSite.site_id == site_id
-        ).order_by(PlatformUserSite.id.desc()).first()
-        if not membership:
-            membership = PlatformUserSite(
-                user_did=ppid,
-                site_id=site_id,
-                role=role,
-                status='active',
-                joined_at=datetime.utcnow(),
-            )
-            db.add(membership)
-        else:
-            membership.role = role
-            membership.status = 'active'
-
-        db.commit()
+        upsert_platform_account(
+            ppid,
+            site_id=site_id,
+            site_role=role,
+            wallet_id=wallet_id,
+            passkey_credential_id=passkey_credential_id,
+        )
     except Exception as sync_err:
-        if db:
-            db.rollback()
         logger.warning(f"Platform membership upsert failed for {site_id} {ppid[:16]}...: {sync_err}")
-    finally:
-        if db:
-            db.close()
 
 
 def _track_permission_grant(site_id: str, user_did: str, permission_id: str,

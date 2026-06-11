@@ -160,21 +160,29 @@ class Customer(Base):
 
 class PlatformUser(Base):
     """
-    Users for the permission system (identified by DID, email optional)
-    Separate from Customer which is for billing/business accounts
+    Canonical lemma.id platform account — one row per person-root PPID.
+
+    Billing/API keys live on the optional linked customers row (billing_customer_id).
+    Site-scoped admin grants remain in site_admins.
     """
     __tablename__ = 'platform_users'
     
     id = Column(Integer, primary_key=True, autoincrement=True)
-    user_did = Column(String, unique=True, nullable=False)  # Primary identifier
+    user_did = Column(String, unique=True, nullable=False)  # person-root PPID
     
-    # Optional identity info
-    email = Column(String)  # Optional, for notifications only
-    display_name = Column(String)  # Optional, for UI
+    # Profile
+    email = Column(String)
+    display_name = Column(String)
+    name = Column(String)
+    company = Column(String)
+    account_type = Column(String, default='customer')  # owner, admin, developer, customer
     
     # Wallet linkage  
-    wallet_id = Column(String)  # Browser wallet ID
-    passkey_credential_id = Column(String)  # Primary passkey credential
+    wallet_id = Column(String)
+    passkey_credential_id = Column(String)
+    
+    # Optional billing extension (customers.customer_id)
+    billing_customer_id = Column(String, index=True)
     
     # Account state
     created_at = Column(DateTime, default=datetime.utcnow)
@@ -182,8 +190,8 @@ class PlatformUser(Base):
     status = Column(String, default='active')  # active, suspended, deleted
     
     # Metadata
-    auth_method = Column(String, default='passkey')  # passkey, email_link, oauth
-    verification_level = Column(String, default='base')  # base, email_verified, human_verified
+    auth_method = Column(String, default='passkey')
+    verification_level = Column(String, default='base')
 
 
 class PlatformUserSite(Base):
