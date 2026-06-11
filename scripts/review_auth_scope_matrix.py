@@ -50,6 +50,7 @@ PUBLIC_STATE_CHANGING_ALLOWLIST = {
     "/api/recovery/complete-wallet",
     "/api/recovery/issue-admin-proof",
     "/api/customer/register-secure",
+    "/api/customer/register-wallet-developer",
     "/api/developer/credential-transfer/redeem",
     "/api/passkey/register/begin",
     "/api/passkey/register/complete",

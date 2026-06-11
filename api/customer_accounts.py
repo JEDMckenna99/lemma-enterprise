@@ -727,7 +727,7 @@ class CustomerAccountManager:
                        billing_email: Optional[str] = None, password: Optional[str] = None,
                        skip_default_api_key: bool = False,
                        customer_did: str = None, wallet_id: str = None,
-                       display_name: str = None) -> Dict[str, Any]:
+                       display_name: str = None, role: str = 'customer') -> Dict[str, Any]:
         """Create a new customer account
         
         Args:
@@ -822,7 +822,8 @@ class CustomerAccountManager:
                 subscription_status='none',
                 monthly_usage={},
                 billing_email=billing_email or email,
-                password_hash=password_hash
+                password_hash=password_hash,
+                role=role,
             )
             
             # Store customer in database
@@ -846,7 +847,7 @@ class CustomerAccountManager:
                     monthly_usage={},
                     billing_email=billing_email or email,
                     password_hash=password_hash,
-                    role='customer',
+                    role=role,
                     permissions=[],
                     login_count=0
                 )
@@ -1474,6 +1475,152 @@ def register():
             'success': False,
             'error': 'Registration failed'
         }), 500
+
+
+@customer_accounts_bp.route('/api/customer/register-wallet-developer', methods=['POST'])
+@cross_origin(origins=_public_cors_origins(), supports_credentials=True, allow_headers=['Content-Type', 'Authorization'])
+def register_wallet_developer():
+    """
+    Wallet-first developer registration for lemma.id.
+
+    Requires a person-root IDV wallet binding. Creates customer + platform
+    membership and issues a signed developer_access credential for the wallet.
+    """
+    try:
+        from api.platform_owner import enforce_platform_login_wallet
+
+        data = request.get_json(silent=True) or {}
+        email = (data.get('email') or '').strip().lower()
+        name = (data.get('name') or '').strip()
+        company = (data.get('company') or '').strip()
+        billing_email = (data.get('billing_email') or '').strip().lower()
+        invite_code = (data.get('invite_code') or '').strip()
+        client_ppid = (data.get('ppid') or '').strip()
+        wallet_id = (data.get('wallet_id') or '').strip()
+        passkey_credential_id = (data.get('passkey_credential_id') or '').strip() or None
+
+        if not all([email, name, company]):
+            return jsonify({'success': False, 'error': 'Email, name, and company are required'}), 400
+        if '@' not in email:
+            return jsonify({'success': False, 'error': 'Invalid email address'}), 400
+        if _is_invite_only_mode_enabled() and not _is_valid_invite_code(invite_code):
+            return jsonify({'success': False, 'error': 'Invite code required or invalid'}), 403
+
+        ppid, denied = enforce_platform_login_wallet(
+            client_ppid=client_ppid or None,
+            wallet_id=wallet_id or None,
+            passkey_credential_id=passkey_credential_id,
+        )
+        if denied:
+            return jsonify(denied[0]), denied[1]
+
+        from api.services.wallet_service import (
+            _has_platform_membership,
+            _upsert_platform_membership,
+            issue_permission_lemma,
+        )
+
+        if _has_platform_membership(ppid, site_id='lemma.id'):
+            return jsonify(
+                {
+                    'success': False,
+                    'error': 'platform_membership_exists',
+                    'message': 'This wallet is already registered. Sign in instead.',
+                }
+            ), 409
+
+        existing_email = customer_manager.get_customer_by_email(email)
+        if existing_email and (existing_email.customer_did or '') not in ('', ppid):
+            return jsonify(
+                {
+                    'success': False,
+                    'error': 'email_in_use',
+                    'message': 'An account with this email already exists.',
+                }
+            ), 400
+
+        if existing_email and existing_email.customer_did == ppid:
+            customer_id = existing_email.customer_id
+            api_key = None
+        else:
+            result = customer_manager.create_customer(
+                email=email,
+                name=name,
+                company=company,
+                billing_email=billing_email or email,
+                customer_did=ppid,
+                wallet_id=wallet_id or None,
+                display_name=name,
+                role='developer',
+            )
+            if not result.get('success'):
+                return jsonify(result), 400
+            customer_id = result['customer_id']
+            api_key = result.get('api_key')
+
+        for site_key in ('lemma.id', 'lemma_platform'):
+            _upsert_platform_membership(
+                ppid,
+                site_key,
+                'developer',
+                wallet_id=wallet_id or None,
+                passkey_credential_id=passkey_credential_id,
+            )
+
+        try:
+            from api.database import get_db, PlatformUser
+
+            db = get_db()
+            try:
+                platform_user = db.query(PlatformUser).filter(PlatformUser.user_did == ppid).first()
+                if platform_user:
+                    platform_user.email = email
+                    platform_user.display_name = name
+                    platform_user.verification_level = 'human_verified'
+                    db.commit()
+            finally:
+                db.close()
+        except Exception as profile_err:
+            logger.warning("Platform user profile update failed (non-fatal): %s", profile_err)
+
+        permission_lemma = issue_permission_lemma(
+            subject_ppid=ppid,
+            site_id='lemma.id',
+            permissions=['developer', 'write', 'read', 'access'],
+            scope=['developer', 'write', 'read'],
+            permission_id='developer_access',
+            account_type='developer',
+            granted_by='wallet_developer_registration',
+            custom_claims={
+                'email': email,
+                'company': company,
+                'accountType': 'developer',
+                'permissionId': 'developer_access',
+                'permission_level': 'developer',
+                'permissionAliases': ['developer_access', 'developer'],
+                'issued_via': 'wallet_developer_registration',
+                'site_domain': 'lemma.id',
+            },
+        )
+        permission_lemma['type'] = ['VerifiableCredential', 'PermissionLemma']
+        permission_lemma['packageType'] = 'permission'
+
+        logger.info("Wallet developer registered %s for %s", ppid[:24], email)
+        return jsonify(
+            {
+                'success': True,
+                'customer_id': customer_id,
+                'ppid': ppid,
+                'api_key': api_key,
+                'permission_lemma': permission_lemma,
+                'permission_level': 'developer',
+                'message': 'Developer account created. Store your API key and wallet credential securely.',
+            }
+        ), 201
+    except Exception as exc:
+        logger.error("Wallet developer registration failed: %s", exc)
+        return jsonify({'success': False, 'error': 'registration_failed', 'message': str(exc)}), 500
+
 
 @customer_accounts_bp.route('/api/customer/register-secure', methods=['POST'])
 @cross_origin(origins=_public_cors_origins(), supports_credentials=True, allow_headers=['Content-Type', 'Authorization'])

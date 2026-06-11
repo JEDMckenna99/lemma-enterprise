@@ -427,7 +427,7 @@
                 <div class="register-icon">🛡️</div>
                 <h1 class="register-title">Create your lemma.id developer account</h1>
                 <p class="register-subtitle">
-                    Add reusable proof-of-humanity to your site with site-private PPIDs and local verification. Get started in under 2 minutes.
+                    Verify your humanity once, bind your wallet, and get developer access with a signed permission credential.
                 </p>
                 
                 <div class="features-preview">
@@ -450,6 +450,13 @@
                 <div class="progress-step active"></div>
                 <div class="progress-step"></div>
                 <div class="progress-step"></div>
+            </div>
+
+            <div id="wallet-status" class="wallet-status" style="margin-bottom: 24px; padding: 16px; border-radius: 8px; background: var(--gray-50); border: 1px solid var(--gray-200);">
+                <span>🔐</span> Unlock your wallet and complete isHuman IDV before registering.
+                <div style="margin-top: 8px; font-size: 14px;">
+                    <a href="/wallet/ishuman-idv">Complete identity verification</a>
+                </div>
             </div>
 
             <div class="success-message" id="successMessage">
@@ -567,6 +574,73 @@
     </div>
 
     <script nonce="{{ csp_nonce }}">
+        let registerWallet = null;
+
+        function setWalletStatus(message, tone = 'info') {
+            const el = document.getElementById('wallet-status');
+            if (!el) return;
+            el.innerHTML = `<span>${tone === 'ready' ? '✅' : tone === 'locked' ? '🔒' : '🔐'}</span> ${message}`;
+            if (tone === 'locked' || tone === 'info') {
+                el.innerHTML += `<div style="margin-top: 8px; font-size: 14px;"><a href="/wallet/ishuman-idv">Complete identity verification</a></div>`;
+            }
+        }
+
+        async function waitForRegisterWallet(maxAttempts = 30) {
+            let attempts = 0;
+            while (!window.globalLemmaWallet && attempts < maxAttempts) {
+                await new Promise(resolve => setTimeout(resolve, 100));
+                attempts++;
+            }
+            return window.globalLemmaWallet || null;
+        }
+
+        async function prepareWalletForRegistration() {
+            const wallet = await waitForRegisterWallet();
+            if (!wallet) {
+                throw new Error('Wallet failed to initialize. Refresh and try again.');
+            }
+            registerWallet = wallet;
+            if (!wallet.getWalletInfo) {
+                throw new Error('Wallet SDK unavailable.');
+            }
+            const info = await wallet.getWalletInfo();
+            if (!info.hasPasskey) {
+                setWalletStatus('Create a passkey to secure your developer wallet...', 'locked');
+                await wallet.registerPasskey();
+            }
+            if (!wallet.isUnlocked || !wallet.isUnlocked()) {
+                setWalletStatus('Unlock your wallet with passkey to continue...', 'locked');
+                const unlocked = await wallet.unlock();
+                if (!unlocked) {
+                    throw new Error('Wallet unlock cancelled.');
+                }
+            }
+            const ppid = await wallet.derivePPID('lemma.id');
+            if (!ppid || !String(ppid).startsWith('did:lemma:ppid_')) {
+                throw new Error('Complete isHuman IDV on this wallet before registering.');
+            }
+            let walletId = null;
+            let passkeyCredentialId = null;
+            try {
+                const debugState = await wallet.getDebugState?.() || {};
+                walletId = debugState.walletId || null;
+            } catch (_) {}
+            try {
+                passkeyCredentialId = await wallet.getPasskeyCredentialId();
+            } catch (_) {}
+            setWalletStatus('Wallet verified — ready to register as developer.', 'ready');
+            return { ppid, walletId, passkeyCredentialId };
+        }
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            try {
+                await waitForRegisterWallet();
+                setWalletStatus('Unlock your wallet with passkey to continue...', 'locked');
+            } catch (_) {
+                setWalletStatus('Wallet failed to initialize. Refresh and try again.', 'locked');
+            }
+        });
+
         // Auto-focus first input
         document.getElementById('email').focus();
         
@@ -600,8 +674,15 @@
             try {
                 const formData = new FormData(this);
                 const data = Object.fromEntries(formData.entries());
-                
-                const response = await fetch('/api/customer/register-secure', {
+
+                const identity = await prepareWalletForRegistration();
+                data.ppid = identity.ppid;
+                data.wallet_id = identity.walletId;
+                if (identity.passkeyCredentialId) {
+                    data.passkey_credential_id = identity.passkeyCredentialId;
+                }
+
+                const response = await fetch('/api/customer/register-wallet-developer', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
@@ -612,32 +693,32 @@
                 const result = await response.json();
                 
                 if (result.success) {
-                    // Complete progress
                     updateProgress(3);
-                    
-                    // Show email confirmation message instead of immediate success
-                    showEmailConfirmationMessage(data.email, data.company);
-                    
-                    // OLD CODE: Store permission lemma (now moved to confirmation step)
-                    // Wallet integration will happen after email confirmation
-                    
-                    // Email confirmation message is already shown by showEmailConfirmationMessage()
-                    // No additional processing needed since API keys come after confirmation
-                    
-                } else {
-                    // Reset progress
-                    updateProgress(1);
-                    
-                    // Show error
-                    if (result.errors && typeof result.errors === 'object') {
-                        // Show field-specific errors
-                        Object.keys(result.errors).forEach(field => {
-                            showError(field, result.errors[field]);
-                        });
-                    } else {
-                        showError('general', result.error || 'Registration failed');
+
+                    if (result.permission_lemma && registerWallet) {
+                        await registerWallet.storeCredential(result.permission_lemma);
+                        window.lemmaCredential = result.permission_lemma;
                     }
-                    
+
+                    document.getElementById('registerForm').style.display = 'none';
+                    document.getElementById('wallet-status').style.display = 'none';
+                    document.getElementById('successMessage').style.display = 'block';
+
+                    if (result.api_key) {
+                        document.getElementById('apiKeyValue').textContent = result.api_key;
+                        document.getElementById('apiKeyDisplay').style.display = 'block';
+                    } else {
+                        showToast('success', result.message || 'Developer account created.');
+                        setTimeout(() => { window.location.href = '/dashboard'; }, 1500);
+                    }
+                } else {
+                    updateProgress(1);
+                    if (result.error === 'platform_membership_exists') {
+                        showError('general', 'This wallet is already registered. Redirecting to sign in...');
+                        setTimeout(() => { window.location.href = '/login'; }, 1500);
+                    } else {
+                        showError('general', result.message || result.error || 'Registration failed');
+                    }
                     button.disabled = false;
                     button.innerHTML = originalContent;
                 }
@@ -645,7 +726,7 @@
             } catch (error) {
                 console.error('Registration error:', error);
                 updateProgress(1);
-                showError('general', 'Network error. Please try again.');
+                showError('general', error.message || 'Network error. Please try again.');
                 button.disabled = false;
                 button.innerHTML = originalContent;
             }
@@ -855,4 +936,8 @@
         `;
         document.head.appendChild(style);
     </script>
+{% endblock %}
+
+{% block wallet_auto_init %}
+{% include "modern/includes/wallet_auto_init_script.html" %}
 {% endblock %}
