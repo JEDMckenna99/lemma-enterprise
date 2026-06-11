@@ -799,97 +799,48 @@ def reissue_admin_with_ppid():
 @cross_origin()
 @require_site_admin
 def get_admin_users():
-    """Get site-scoped platform users for admin management."""
+    """List registered lemma.id platform members (developers/admins), not all PPIDs."""
     try:
-        from api.database import get_db, PlatformUser, PlatformUserSite, SiteAdmin
+        from api.platform_membership import list_registered_platform_user_rows
 
         site_id = (request.args.get('site_id') or 'lemma.id').strip() or 'lemma.id'
         role_filter = (request.args.get('role') or '').strip().lower()
         status_filter = (request.args.get('status') or '').strip().lower()
         search = (request.args.get('search') or '').strip().lower()
 
-        db = get_db()
-        try:
-            membership_query = db.query(PlatformUserSite).filter(PlatformUserSite.site_id == site_id)
-            membership_rows = membership_query.order_by(PlatformUserSite.joined_at.desc()).limit(3000).all()
+        user_list = list_registered_platform_user_rows(site_id=site_id)
 
-            # Build user lookup once to avoid N+1 DB queries.
-            user_dids = [m.user_did for m in membership_rows if m.user_did]
-            platform_users = {}
-            if user_dids:
-                pu_rows = db.query(PlatformUser).filter(PlatformUser.user_did.in_(user_dids)).all()
-                platform_users = {pu.user_did: pu for pu in pu_rows if pu.user_did}
+        if role_filter:
+            user_list = [u for u in user_list if (u.get('role') or '').lower() == role_filter]
+        if status_filter:
+            user_list = [u for u in user_list if (u.get('status') or '').lower() == status_filter]
+        if search:
+            filtered = []
+            for row in user_list:
+                haystack = " ".join([
+                    str(row.get('ppid') or ''),
+                    str(row.get('email') or ''),
+                    str(row.get('display_name') or ''),
+                    str(row.get('internal_identifier') or ''),
+                ]).lower()
+                if search in haystack:
+                    filtered.append(row)
+            user_list = filtered
 
-            admin_dids = set()
-            if user_dids:
-                site_admin_rows = db.query(SiteAdmin).filter(
-                    SiteAdmin.site_id == site_id,
-                    SiteAdmin.is_active == True,  # noqa: E712
-                    SiteAdmin.admin_did.in_(user_dids),
-                ).all()
-                admin_dids = {a.admin_did for a in site_admin_rows if a.admin_did}
-
-            user_list: List[Dict[str, Any]] = []
-            for membership in membership_rows:
-                ppid = membership.user_did
-                if not ppid:
-                    continue
-                pu = platform_users.get(ppid)
-                effective_role = (membership.role or 'user').strip().lower()
-                if ppid in admin_dids and effective_role not in {'admin', 'owner'}:
-                    effective_role = 'admin'
-                account_status = (pu.status if pu and pu.status else membership.status) or 'active'
-                account_status = account_status.lower()
-
-                if role_filter and effective_role != role_filter:
-                    continue
-                if status_filter and account_status != status_filter:
-                    continue
-
-                row = {
-                    'id': pu.id if pu else membership.id,
-                    'internal_identifier': ppid,
-                    'email': pu.email if pu else None,
-                    'display_name': (
-                        (pu.display_name if pu else None)
-                        or ((pu.email.split('@')[0]) if (pu and pu.email) else ppid[:18])
-                    ),
-                    'ppid': ppid,
-                    'type': 'admin' if effective_role in {'admin', 'owner'} else 'user',
-                    'role': effective_role,
-                    'site_id': site_id,
-                    'site_count': 1,
-                    'created_at': _to_iso(pu.created_at if pu else membership.joined_at),
-                    'last_active': _to_iso(pu.last_seen if pu else membership.joined_at),
-                    'status': account_status,
-                    'membership_status': (membership.status or 'active').lower(),
-                    'joined_at': _to_iso(membership.joined_at),
-                    'source': 'platform_user_sites',
-                }
-
-                if search:
-                    haystack = " ".join([
-                        str(row.get('ppid') or ''),
-                        str(row.get('email') or ''),
-                        str(row.get('display_name') or ''),
-                        str(row.get('internal_identifier') or ''),
-                    ]).lower()
-                    if search not in haystack:
-                        continue
-
-                user_list.append(row)
-        finally:
-            db.close()
+        for row in user_list:
+            row['created_at'] = _to_iso(row.get('created_at'))
+            row['last_active'] = _to_iso(row.get('last_active'))
+            row['joined_at'] = _to_iso(row.get('joined_at'))
 
         user_list.sort(key=lambda u: u.get('joined_at') or u.get('created_at') or '', reverse=True)
-        
+
         return jsonify({
             'success': True,
             'site_id': site_id,
             'users': user_list,
-            'total': len(user_list)
+            'total': len(user_list),
         })
-        
+
     except Exception as e:
         logger.error(f"Get admin users hard failure: {e}")
         return jsonify({

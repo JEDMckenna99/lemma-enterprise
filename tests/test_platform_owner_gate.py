@@ -88,6 +88,7 @@ def test_restore_site_access_caps_non_owner_admin(monkeypatch):
 
     monkeypatch.setattr(wallet_service, "_resolve_platform_role_for_ppid", _resolve_with_cap)
     monkeypatch.setattr(wallet_service, "_upsert_platform_membership", lambda *args, **kwargs: None)
+    monkeypatch.setattr(wallet_service, "_has_platform_membership", lambda ppid, site_id="lemma.id": True)
     monkeypatch.setattr(
         "api.platform_owner.enforce_platform_login_wallet",
         lambda **kwargs: (kwargs.get("client_ppid") or OTHER_PPID, None),

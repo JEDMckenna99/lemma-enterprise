@@ -1364,9 +1364,10 @@ def _resolve_platform_role_for_ppid(ppid: str, site_id: str = 'lemma.id') -> Dic
 
 
 def _has_platform_membership(ppid: str, site_id: str = 'lemma.id') -> bool:
-    """True when the PPID has a persisted lemma.id platform entitlement."""
-    profile = _resolve_platform_role_for_ppid(ppid, site_id=site_id)
-    return str(profile.get('source') or 'default') != 'default'
+    """True when the PPID has intentional lemma.id platform entitlement."""
+    from api.platform_membership import has_registered_platform_membership
+
+    return has_registered_platform_membership(ppid, site_id=site_id)
 
 
 def _deny_unregistered_platform_login(ppid: str, site_id: str = 'lemma.id'):
