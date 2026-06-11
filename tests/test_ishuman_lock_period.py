@@ -79,6 +79,7 @@ def test_verifier_routes_revocation_to_fresh_idv_flow(verifier_source):
     permanently blocked."""
     assert "'revoked'," in verifier_source
     assert "'site_blocked'," in verifier_source
+    assert "'expired'," in verifier_source
     assert "freshIdv: needsFreshIdv" in verifier_source
     assert "options.freshIdv ? 'fresh_idv' : 'site_proof'" in verifier_source
     assert "refresh_reason" in verifier_source

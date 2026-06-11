@@ -68,7 +68,17 @@ def _validate_client_ppid(ppid: str) -> bool:
 # ---------------------------------------------------------------------------
 
 ISHUMAN_CREDENTIAL_TTL_DAYS = int(os.getenv("ISHUMAN_CREDENTIAL_TTL_DAYS", "365"))
+ISHUMAN_SITE_CREDENTIAL_TTL_DAYS = int(
+    os.getenv("ISHUMAN_SITE_CREDENTIAL_TTL_DAYS", "30")
+)
 STRIPE_IDENTITY_COST_CENTS = 200  # $2.00 per verification
+
+
+def _default_credential_lifetime_seconds(site_id: Optional[str]) -> int:
+    """Master proofs use ISHUMAN_CREDENTIAL_TTL_DAYS; site-bound proofs renew monthly."""
+    if site_id and site_id not in ("lemma.id",):
+        return ISHUMAN_SITE_CREDENTIAL_TTL_DAYS * 86400
+    return ISHUMAN_CREDENTIAL_TTL_DAYS * 86400
 
 
 # ---------------------------------------------------------------------------
@@ -162,7 +172,7 @@ def _issue_ishuman_credential(
     lifetime_seconds = (
         int(ttl_seconds)
         if ttl_seconds is not None
-        else ISHUMAN_CREDENTIAL_TTL_DAYS * 86400
+        else _default_credential_lifetime_seconds(site_id)
     )
 
     claims: dict = {
@@ -1884,6 +1894,22 @@ def ishuman_stats():
 # 8. Derive per-site proof (called by the wallet bridge on first visit)
 # ---------------------------------------------------------------------------
 
+
+def _track_site_proof_mau(db, target_site: str, ppid: str) -> None:
+    """Record a site-bound credential issuance for monthly active-user billing."""
+    if not ppid:
+        return
+    try:
+        from api.site_ppid_revocation import resolve_site_by_domain
+        from api.usage_tracking import track_site_proof_mau
+
+        site = resolve_site_by_domain(db, target_site)
+        site_key = site.site_id if site else target_site
+        track_site_proof_mau(site_key, ppid)
+    except Exception as exc:
+        logger.warning("Failed to track site proof MAU for %s: %s", target_site, exc)
+
+
 @ishuman_bp.route("/api/ishuman/derive-site-proof", methods=["POST"])
 @cross_origin()
 def derive_site_proof():
@@ -2034,6 +2060,7 @@ def derive_site_proof():
                 verification_method=(getattr(master, "issuer_id", None) or "didit"),
             )
             credential["id"] = existing.derived_credential_id
+            _track_site_proof_mau(db, target_site, ppid)
             return jsonify({"success": True, "credential": credential, "cached": True})
 
         # 3. Derive site-specific PPID
@@ -2070,6 +2097,7 @@ def derive_site_proof():
             master_credential_id[:30], target_site, credential["id"][:30],
         )
 
+        _track_site_proof_mau(db, target_site, site_ppid)
         return jsonify({"success": True, "credential": credential, "cached": False})
 
     except Exception:

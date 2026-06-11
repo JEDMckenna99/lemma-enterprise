@@ -622,6 +622,9 @@ class IsHumanVerifier {
             'no_ishuman_credential',
             'site_proof_required',
             'legacy_credential_format',
+            // Monthly site VC expiry: renew via daily-unlock popup (passkey only
+            // when the lock bundle is missing or stale).
+            'expired',
             // A revoked credential is not a permanent block — it triggers a
             // fresh IDV (or fresh test verification in the demo) so the user
             // can regain access. The popup runs in 'fresh_idv' mode below.

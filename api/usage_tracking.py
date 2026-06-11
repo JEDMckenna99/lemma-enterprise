@@ -6,9 +6,10 @@ Tracks MAU (Monthly Active Users) and determines billing tier
 import os
 import redis
 import logging
+import hashlib
+import hmac
 from datetime import datetime, timedelta
 from typing import Dict, Optional, Set
-import hashlib
 
 logger = logging.getLogger(__name__)
 
@@ -32,6 +33,50 @@ except Exception as e:
     REDIS_AVAILABLE = False
     logger.warning(f"⚠️ Redis connection failed for usage tracking: {e}")
     logger.warning("   Usage tracking will use fallback (no MAU counting)")
+
+
+def _hash_ppid_for_mau(ppid: str) -> str:
+    """HMAC-hash a site-scoped PPID before storing it for MAU counting."""
+    key = (
+        os.getenv("LEMMA_MAU_HASH_KEY")
+        or os.getenv("LEMMA_PPID_ROOT_KEY")
+        or "lemma_mau_dev_key_change_in_production"
+    )
+    return hmac.new(key.encode("utf-8"), ppid.encode("utf-8"), hashlib.sha256).hexdigest()
+
+
+def track_site_proof_mau(site_key: str, ppid: str, month: Optional[str] = None) -> bool:
+    """
+    Track a site-bound credential issuance for MAU billing.
+
+    Called when lemma.id issues or re-issues a per-site isHuman credential
+    (monthly continuity renewal via daily unlock). The PPID is HMAC-hashed
+    before storage; only deduplicated counts per calendar month are kept.
+
+    Args:
+        site_key: Internal site id (site_...) or normalized hostname fallback
+        ppid: Site-scoped pairwise subject (did:lemma:ppid_...)
+        month: Optional YYYY-MM override (default: current month)
+
+    Returns:
+        True when the user was newly counted for the month, else False
+    """
+    if not REDIS_AVAILABLE or not site_key or not ppid:
+        return False
+
+    try:
+        user_hash = _hash_ppid_for_mau(ppid)
+        month_key = month or datetime.now().strftime("%Y-%m")
+        mau_key = f"mau:{site_key}:{month_key}"
+
+        added = redis_client.sadd(mau_key, user_hash)
+        redis_client.expire(mau_key, 90 * 24 * 60 * 60)
+        if added:
+            logger.debug("Tracked site proof MAU for site %s", site_key)
+        return bool(added)
+    except Exception as e:
+        logger.error(f"Failed to track site proof MAU: {e}")
+        return False
 
 
 def track_active_user(site_id: str, user_email: str):

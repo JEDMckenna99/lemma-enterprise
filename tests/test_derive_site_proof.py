@@ -80,6 +80,49 @@ def test_derive_without_master_id_succeeds_for_verified_wallet(
 
 
 @pytest.mark.unit
+def test_derive_site_proof_tracks_mau(
+    ishuman_client,
+    fake_ishuman_db_session_factory,
+    make_ishuman_verification,
+    monkeypatch,
+    attach_wallet_assertion,
+):
+    tracked: list[tuple[str, str]] = []
+
+    def _capture(site_key, ppid):
+        tracked.append((site_key, ppid))
+        return True
+
+    db = fake_ishuman_db_session_factory
+    db.store.data["IsHumanVerification"].append(
+        make_ishuman_verification(
+            credential_id="ishuman_master_verified_001",
+            wallet_id="wallet_test_001",
+            status="verified",
+        )
+    )
+    monkeypatch.setattr("api.database.SessionLocal", db.session_local)
+    monkeypatch.setattr("api.usage_tracking.track_site_proof_mau", _capture)
+    _patch_issuance(monkeypatch)
+
+    resp = ishuman_client.post(
+        "/api/ishuman/derive-site-proof",
+        json=attach_wallet_assertion(
+            {
+                "wallet_id": "wallet_test_001",
+                "wallet_secret": "ab" * 32,
+                "target_site": "example.com",
+                "site_signing_pubkey": SITE_SIGNING_PUBKEY_B64,
+            },
+            NO_MASTER_ASSERTION_FIELDS,
+        ),
+    )
+
+    assert resp.status_code == 200, resp.get_json()
+    assert tracked == [("example.com", "did:lemma:ppid_site_phase12")]
+
+
+@pytest.mark.unit
 def test_derive_with_valid_master_hint_still_works(
     ishuman_client,
     fake_ishuman_db_session_factory,
