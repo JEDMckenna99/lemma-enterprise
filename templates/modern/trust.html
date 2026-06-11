@@ -209,14 +209,35 @@
 
                 <p style="font-size: var(--font-size-lg); color: var(--gray-700); line-height: 1.7; margin-bottom: 20px;"><strong>What lemma.id does not expose to sites:</strong> cross-site linkage. Sites receive only their own PPID. Lemma can correlate identities internally on the <em>enforcement plane</em> (revocation) — by design, so network-wide bans work — but that linkage is never returned to relying sites.</p>
 
+                <p style="font-size: var(--font-size-lg); color: var(--gray-700); line-height: 1.7; margin-bottom: 20px;"><strong>No advertising to end users:</strong> lemma.id does not use verification outcomes, credentials, wallet data, or PPIDs to advertise to people who verify through Lemma-powered sites. We do not monetize end-user identity data through ad targeting — on lemma.id or elsewhere. Product analytics and fraud prevention are separate from marketing; developer accounts may still receive service communications under our <a href="/privacy">privacy policy</a>.</p>
+
                 <p style="font-size: var(--font-size-lg); color: var(--gray-700); line-height: 1.7; margin: 0;">lemma.id is not pretending the control plane disappears. Issuance, revocation, and recovery need infrastructure. The trust claim is narrower: <strong>routine access decisions do not require a live callback to an IDV provider</strong>, and <strong>credentials do not carry one stable cross-site identifier</strong>.</p>
             </div>
         </div>
     </div>
 </section>
 
+<!-- Why lemma.id -->
+<section class="section" id="why-lemma-id" style="background: var(--gray-50);">
+    <div class="container">
+        <div style="max-width: 820px; margin: 0 auto;">
+            <div style="text-align: center; margin-bottom: 40px;">
+                <p style="font-size: var(--font-size-sm); font-weight: 700; text-transform: uppercase; letter-spacing: 2px; color: var(--primary); margin-bottom: 12px;">The name is the model</p>
+                <h2>Why &ldquo;lemma.id&rdquo;</h2>
+            </div>
+            <div style="background: var(--white); border: 1px solid var(--gray-200); border-radius: 14px; padding: 32px;">
+                <p style="font-size: var(--font-size-lg); color: var(--gray-700); line-height: 1.7; margin-bottom: 20px;">In mathematics, a <strong>lemma</strong> is a proven intermediate result — something already established that you reuse to prove a larger claim. <strong>lemma.id</strong> is short for <em>lemma identifier</em>: one place where you keep verified proofs of whatever claims a relying site needs — that you are human, that you meet an age threshold, that you are one account per person, and more over time.</p>
+
+                <p style="font-size: var(--font-size-lg); color: var(--gray-700); line-height: 1.7; margin-bottom: 20px;">Each proof is a signed credential stored in your browser wallet under your lemma.id. Sites do not receive your identity profile; they receive a <strong>proof of the specific claim they asked for</strong>, bound to a site-private identifier. Return visits can verify that proof locally — without a live callback and without exposing one reusable ID across the web.</p>
+
+                <p style="font-size: var(--font-size-lg); color: var(--gray-700); line-height: 1.7; margin: 0;"><strong>Multiple different proofs under one lemma.id is itself the trust model.</strong> Verification composes: each new claim builds on anchors already proven, without turning every website into a KYC operator or building a cross-site surveillance graph. The name is not wordplay — it describes how bounded, reusable proofs build trust on the open web.</p>
+            </div>
+        </div>
+    </div>
+</section>
+
 <!-- Trust between parties -->
-<section class="section" id="parties" style="background: var(--gray-50);">
+<section class="section" id="parties">
     <div class="container">
         <div style="text-align: center; margin-bottom: 48px;">
             <p style="font-size: var(--font-size-sm); font-weight: 700; text-transform: uppercase; letter-spacing: 2px; color: var(--primary); margin-bottom: 12px;">Three-party trust</p>
@@ -225,7 +246,7 @@
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 24px; max-width: 960px; margin: 0 auto;">
             <div class="card">
                 <h3 class="card-title">For users</h3>
-                <p>You verify once and carry a signed credential in your browser wallet — like a physical ID you control. Sites see a site-private pseudonym, not your name or document. Return visits verify locally; lemma.id does not observe every check. You can export your wallet and request erasure.</p>
+                <p>You verify once and carry a signed credential in your browser wallet — like a physical ID you control. Sites see a site-private pseudonym, not your name or document. Return visits verify locally; lemma.id does not observe every check. Lemma does not use your verification data to advertise to you. You can export your wallet and request erasure.</p>
             </div>
             <div class="card">
                 <h3 class="card-title">For integrators</h3>

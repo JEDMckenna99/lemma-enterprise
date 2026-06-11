@@ -12,7 +12,7 @@
     eyebrow: 'Lemma.id',
     headline: "Prove you're human once",
     privacy:
-      'Your ID documents are used only to create your human proof. After your proof is created, your documents and photos are removed from the verification provider. Lemma.id only stores your human proof, not your ID.',
+      'Your ID documents are used only to create your human proof. After your proof is created, your documents and photos are removed from the verification provider. Lemma.id only stores your human proof, not your ID. Lemma does not use your verification data for advertising.',
     cancel: 'Not now',
     steps: [
       'Secure this device with Face ID, Touch ID, or your passkey',

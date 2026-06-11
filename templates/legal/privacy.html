@@ -7,7 +7,7 @@
 <div class="container" style="max-width: 900px; padding: 60px 20px;">
     <div style="background: var(--white); padding: 48px; border-radius: 12px; box-shadow: var(--shadow-lg);">
         <h1 style="color: var(--gray-900); margin-bottom: 8px;">Privacy Policy</h1>
-        <p style="color: var(--gray-500); font-size: 14px; margin-bottom: 40px;">Last Updated: January 31, 2026</p>
+        <p style="color: var(--gray-500); font-size: 14px; margin-bottom: 40px;">Last Updated: June 11, 2026</p>
 
         <h2 style="margin-top: 40px;">1. Introduction</h2>
         <p>Lemma.id ("we," "our," or "us") is committed to protecting your privacy. This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use our cryptographic credential verification service.</p>
@@ -46,8 +46,12 @@
             <li>Monitor usage for billing purposes (MAU tracking)</li>
             <li>Detect and prevent fraud, abuse, and security incidents</li>
             <li>Comply with legal obligations</li>
-            <li>Improve the Service through analytics</li>
+            <li>Improve the Service through product analytics and security monitoring (not used for advertising to end users)</li>
         </ul>
+
+        <h3 style="font-size: var(--font-size-lg); margin-top: 24px; color: var(--gray-800);">3.1 No Advertising to End Users</h3>
+        <p>We do not use identity verification outcomes, credentials, wallet data, PPIDs, or verification metadata to deliver advertising, retargeting, or behavioral marketing to people who use Lemma-powered services on third-party sites. This commitment applies to end users of integrated sites, not to developer or business accounts that sign up for Lemma.id directly — those accounts may receive product and service communications, which you can opt out of as described in Section 8.</p>
+        <p>Integrator sites remain responsible for their own privacy practices on their properties. This section describes only how Lemma.id uses data within its control.</p>
 
         <h2>4. Privacy-Preserving Features</h2>
         <p>Lemma.id is designed with privacy as a core principle. For a comparative overview of what each party stores and what being a personal data minimizer means in practice, see our <a href="/trust">Trust &amp; Personal Data Minimization</a> page.</p>
@@ -57,7 +61,7 @@
             <li><strong>Pairwise Identifiers (PPIDs):</strong> Each user gets a unique identifier per site, which helps limit cross-site linkability</li>
             <li><strong>Client-Side Storage:</strong> Credentials are stored in the browser wallet for normal sign-in flows; server systems may retain minimal issuance/audit metadata.</li>
             <li><strong>Local Return-Visit Verification:</strong> For routine sign-in checks, your server verifies credentials locally using Ed25519 signatures without contacting Lemma.id, so we do not observe those individual verification events. Initial identity verification (IDV) does involve our servers: we receive the verification outcome from the IDV provider and derive minimal, encrypted identifiers from it (we do not retain raw identity documents, face images, or your legal name).</li>
-            <li><strong>No Third-Party Tracking:</strong> We do not sell or share your data with advertisers</li>
+            <li><strong>No Advertising Monetization:</strong> We do not sell, share, or use end-user identity data for advertising or behavioral targeting — on Lemma.id or elsewhere</li>
         </ul>
 
         <h2>5. Data Sharing and Disclosure</h2>
