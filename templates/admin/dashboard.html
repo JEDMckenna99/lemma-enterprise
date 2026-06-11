@@ -5,18 +5,18 @@
 
 {% block admin_content %}
 <div class="admin-header">
-    <h1 class="admin-title">Platform Dashboard</h1>
-    <p class="admin-subtitle">Overview of Lemma platform health and activity</p>
+    <h1 class="admin-title">isHuman Overview</h1>
+    <p class="admin-subtitle">Operator pulse for the lemma.id proof-of-humanity network</p>
 </div>
 
 <!-- Stats Grid -->
 <div class="admin-stats">
     <div class="stat-card stat-card--info">
-        <div class="stat-label">Total Users</div>
-        <div class="stat-value stat-loading" id="stat-users">
+        <div class="stat-label">Verified Humans</div>
+        <div class="stat-value stat-loading" id="stat-verifications">
             <span class="stat-skeleton"></span>
         </div>
-        <div class="stat-change stat-change--up">↑ Active wallets</div>
+        <div class="stat-change">Total IDV verifications</div>
     </div>
     <div class="stat-card stat-card--success">
         <div class="stat-label">Registered Sites</div>
@@ -25,19 +25,35 @@
         </div>
         <div class="stat-change" id="stat-growth">Loading...</div>
     </div>
-    <div class="stat-card stat-card--warning">
-        <div class="stat-label">Active Credentials</div>
-        <div class="stat-value stat-loading" id="stat-credentials">
+    <div class="stat-card stat-card--warning" id="pending-review-card">
+        <div class="stat-label">Pending Review</div>
+        <div class="stat-value stat-loading" id="stat-pending">
             <span class="stat-skeleton"></span>
         </div>
-        <div class="stat-change">Agent tokens</div>
+        <div class="stat-change"><a href="{{ url_for('admin_trust_safety') }}" id="pending-review-link">Trust &amp; Safety queue</a></div>
     </div>
     <div class="stat-card stat-card--danger">
-        <div class="stat-label">Revocations</div>
+        <div class="stat-label">Network Revocations</div>
         <div class="stat-value stat-loading" id="stat-revocations">
             <span class="stat-skeleton"></span>
         </div>
-        <div class="stat-change">This month</div>
+        <div class="stat-change">isHuman credential kills</div>
+    </div>
+</div>
+<div class="admin-stats" style="margin-top:-8px;">
+    <div class="stat-card stat-card--info">
+        <div class="stat-label">Active Site Blocks</div>
+        <div class="stat-value stat-loading" id="stat-blocks">
+            <span class="stat-skeleton"></span>
+        </div>
+        <div class="stat-change">Tier-1 site-scoped bans</div>
+    </div>
+    <div class="stat-card stat-card--success">
+        <div class="stat-label">Platform MAU</div>
+        <div class="stat-value stat-loading" id="stat-mau">
+            <span class="stat-skeleton"></span>
+        </div>
+        <div class="stat-change">Site-proof MAU this month</div>
     </div>
 </div>
 <div class="stats-timestamp" id="stats-timestamp" style="text-align: right; font-size: 12px; color: var(--admin-text-muted); margin-top: -10px; margin-bottom: 20px;">
@@ -149,20 +165,17 @@
         <h2 class="admin-card-title">Quick Actions</h2>
     </div>
     <div class="admin-card-body" style="display: flex; gap: 12px; flex-wrap: wrap;">
-        <a href="{{ url_for('admin_monitoring_page') }}" class="admin-btn admin-btn--secondary">
-            🔧 View Monitoring
+        <a href="{{ url_for('admin_trust_safety') }}" class="admin-btn admin-btn--secondary">
+            Trust &amp; Safety
         </a>
         <a href="{{ url_for('admin_users') }}" class="admin-btn admin-btn--secondary">
-            👥 Manage Users
+            Developers
         </a>
         <a href="{{ url_for('admin_sites') }}" class="admin-btn admin-btn--secondary">
-            🌐 View Sites
+            Sites
         </a>
-        <a href="{{ url_for('admin_revocations') }}" class="admin-btn admin-btn--secondary">
-            🚫 Revocations
-        </a>
-        <a href="{{ url_for('admin_bootstrap') }}" class="admin-btn admin-btn--primary">
-            🔐 Admin Bootstrap
+        <a href="{{ url_for('admin_monitoring_page') }}" class="admin-btn admin-btn--secondary">
+            Monitoring
         </a>
     </div>
 </div>
@@ -273,53 +286,52 @@ function getAuthHeaders() {
 
 async function loadDashboardStats() {
     try {
-        const response = await fetch('/api/admin/platform-stats', { headers: getAuthHeaders() });
+        const headers = await getAuthHeadersAsync();
+        const response = await fetch('/api/admin/ishuman-overview', { headers });
         if (!response.ok) throw new Error('Failed to load stats');
         const data = await response.json();
-        
-        // Use flat response (with fallback to nested for backwards compatibility)
-        const users = data.total_users ?? data.stats?.total_customers ?? 0;
-        const sites = data.total_sites ?? data.stats?.active_sites ?? 0;
-        const credentials = data.total_credentials ?? data.stats?.iam_system?.total_permission_lemmas ?? 0;
-        const revocations = data.total_revocations ?? 0;
-        const growthRate = data.growth_rate ?? 0;
-        const newThisWeek = data.new_this_week ?? 0;
-        
-        // Update stats with animation
-        updateStatValue('stat-users', users);
-        updateStatValue('stat-sites', sites);
-        updateStatValue('stat-credentials', credentials);
-        updateStatValue('stat-revocations', revocations);
-        
-        // Update growth indicator
+
+        updateStatValue('stat-verifications', data.total_verifications ?? 0);
+        updateStatValue('stat-sites', data.total_sites ?? 0);
+        updateStatValue('stat-pending', data.pending_review_count ?? 0);
+        updateStatValue('stat-revocations', data.network_revocations ?? 0);
+        updateStatValue('stat-blocks', data.active_site_blocks ?? 0);
+        updateStatValue('stat-mau', data.platform_mau ?? 0);
+
+        const pendingCard = document.getElementById('pending-review-card');
+        if (pendingCard) {
+            pendingCard.classList.toggle('stat-card--danger', (data.pending_review_count || 0) > 0);
+            pendingCard.classList.toggle('stat-card--warning', !(data.pending_review_count || 0));
+        }
+
         const growthEl = document.getElementById('stat-growth');
+        const newThisWeek = data.new_sites_week ?? 0;
         if (growthEl) {
             if (newThisWeek > 0) {
-                growthEl.innerHTML = '';
-                const growthCount = document.createElement('span');
-                growthCount.style.color = 'var(--admin-success)';
-                growthCount.textContent = `+${newThisWeek}`;
-                growthEl.appendChild(growthCount);
-                growthEl.appendChild(document.createTextNode(' this week'));
+                growthEl.textContent = `+${newThisWeek} new sites this week`;
             } else {
                 growthEl.textContent = 'No new sites this week';
             }
         }
-        
-        // Update timestamp
+
         if (data.last_updated) {
             const timestamp = new Date(data.last_updated);
-            document.getElementById('stats-timestamp').textContent = 
+            document.getElementById('stats-timestamp').textContent =
                 `Last updated: ${timestamp.toLocaleTimeString()}`;
         }
-        
     } catch (e) {
         console.warn('Could not load stats:', e);
-        updateStatValue('stat-users', '-');
-        updateStatValue('stat-sites', '-');
-        updateStatValue('stat-credentials', '-');
-        updateStatValue('stat-revocations', '-');
+        ['stat-verifications', 'stat-sites', 'stat-pending', 'stat-revocations', 'stat-blocks', 'stat-mau'].forEach(id => {
+            updateStatValue(id, '-');
+        });
     }
+}
+
+async function getAuthHeadersAsync() {
+    if (typeof window.getLemmaAuthHeadersAsync === 'function') {
+        return await window.getLemmaAuthHeadersAsync({});
+    }
+    return getAuthHeaders();
 }
 
 function updateStatValue(elementId, value) {
@@ -332,7 +344,7 @@ function updateStatValue(elementId, value) {
 
 async function loadHealthStatus() {
     try {
-        const response = await fetch('/api/health/detailed', { headers: getAuthHeaders() });
+        const response = await fetch('/api/health/detailed', { headers: await getAuthHeadersAsync() });
         const data = await response.json();
         
         // Handle both nested and flat response formats
@@ -383,7 +395,7 @@ async function loadRecentActivity() {
     const list = document.getElementById('activity-list');
     
     try {
-        const response = await fetch('/api/admin/recent-activity', { headers: getAuthHeaders() });
+        const response = await fetch('/api/admin/recent-activity', { headers: await getAuthHeadersAsync() });
         if (!response.ok) throw new Error('Failed to load activity');
         const data = await response.json();
         

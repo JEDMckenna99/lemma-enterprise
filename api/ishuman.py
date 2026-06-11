@@ -507,6 +507,43 @@ def _purge_didit_session_after_issuance(db, record) -> None:
     logger.info("Purged upstream didit session %s after issuance", session_id)
 
 
+def resolve_wallet_id_for_ppid(db, ppid: str) -> Optional[str]:
+    """Resolve wallet_id from a site-scoped PPID for admin revocation actions."""
+    if not ppid:
+        return None
+
+    from api.database import DerivedCredential, IsHumanVerification
+
+    derived = (
+        db.query(DerivedCredential)
+        .filter_by(derived_ppid=ppid)
+        .order_by(DerivedCredential.created_at.desc())
+        .first()
+    )
+    if derived and derived.wallet_id:
+        return derived.wallet_id
+
+    master = (
+        db.query(IsHumanVerification)
+        .filter_by(ppid=ppid, status="verified")
+        .order_by(IsHumanVerification.verified_at.desc())
+        .first()
+    )
+    if master and master.wallet_id:
+        return master.wallet_id
+
+    master_any = (
+        db.query(IsHumanVerification)
+        .filter_by(ppid=ppid)
+        .order_by(IsHumanVerification.created_at.desc())
+        .first()
+    )
+    if master_any and master_any.wallet_id:
+        return master_any.wallet_id
+
+    return None
+
+
 def revoke_wallet_network_wide(
     db,
     *,
@@ -2872,14 +2909,29 @@ def approve_network_revocation():
     body = request.get_json(silent=True) or {}
     wallet_id = body.get("wallet_id")
     master_credential_id = body.get("master_credential_id")
+    block_id = body.get("block_id")
+    ppid = body.get("ppid")
     reason = body.get("reason", "Network revocation approved after evidence review")
 
-    if not wallet_id and not master_credential_id:
-        return jsonify({"success": False, "error": "wallet_id or master_credential_id required"}), 400
-
-    from api.database import SessionLocal
+    from api.database import SessionLocal, SiteBlock
     db = SessionLocal()
     try:
+        if block_id and not wallet_id and not master_credential_id:
+            block = db.query(SiteBlock).filter_by(id=int(block_id)).first()
+            if not block:
+                return jsonify({"success": False, "error": "block_not_found"}), 404
+            ppid = ppid or block.ppid
+            wallet_id = resolve_wallet_id_for_ppid(db, block.ppid)
+
+        if ppid and not wallet_id and not master_credential_id:
+            wallet_id = resolve_wallet_id_for_ppid(db, ppid)
+
+        if not wallet_id and not master_credential_id:
+            return jsonify({
+                "success": False,
+                "error": "wallet_id, master_credential_id, block_id, or ppid required",
+            }), 400
+
         try:
             result = revoke_wallet_network_wide(
                 db,
@@ -2890,6 +2942,25 @@ def approve_network_revocation():
             )
         except ValueError as exc:
             return jsonify({"success": False, "error": str(exc)}), 400
+
+        from api.audit_logger import AuditEvent, log_event
+
+        operator_ppid = getattr(principal, "ppid", None) or getattr(principal, "subject", None)
+        log_event(
+            AuditEvent.ADMIN_ACTION,
+            result="success",
+            site_id="lemma.id",
+            resource="/api/ishuman/approve-revocation",
+            action="approve_network_revocation",
+            user_did=operator_ppid,
+            metadata={
+                "block_id": block_id,
+                "target_ppid": (ppid or "")[:24] + "..." if ppid and len(ppid) > 24 else ppid,
+                "wallet_id_prefix": (result["wallet_id"] or "")[:20],
+                "total_revoked": len(result["revoked_credential_ids"]),
+                "reason": reason[:500] if reason else "",
+            },
+        )
 
         logger.info(
             "Network revocation approved: wallet=%s master_count=%d derived_count=%d total_revoked=%d",

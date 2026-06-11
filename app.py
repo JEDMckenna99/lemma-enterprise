@@ -269,6 +269,9 @@ def create_app():
     try:
         from api.dashboard_api import dashboard_bp
         app.register_blueprint(dashboard_bp)
+
+        from api.admin_trust import admin_trust_bp
+        app.register_blueprint(admin_trust_bp)
         logger.info("✅ Dashboard API registered")
     except Exception as e:
         logger.error(f"❌ Failed to register Dashboard API: {e}")
@@ -1425,11 +1428,16 @@ def create_app():
         logger.info("Serving admin credentials")
         return _require_wallet_session('admin/credentials.html')
     
+    @app.route('/admin/trust-safety')
+    def admin_trust_safety():
+        """Admin Trust & Safety - isHuman network revoke queue and blocks"""
+        logger.info("Serving admin trust & safety")
+        return _require_wallet_session('admin/trust_safety.html')
+
     @app.route('/admin/revocations')
     def admin_revocations():
-        """Admin Revocations - Revocation management"""
-        logger.info("Serving admin revocations")
-        return _require_wallet_session('admin/revocations.html')
+        """Legacy revocations URL redirects to Trust & Safety."""
+        return redirect('/admin/trust-safety', code=302)
     
     @app.route('/admin/audit')
     def admin_audit():

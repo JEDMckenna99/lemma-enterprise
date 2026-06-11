@@ -1,12 +1,12 @@
 {% extends "admin/layout.html" %}
 {% set active_page = 'users' %}
 
-{% block title %}Users - lemma.id Admin{% endblock %}
+{% block title %}Developers - lemma.id Admin{% endblock %}
 
 {% block admin_content %}
 <div class="admin-header">
-    <h1 class="admin-title">User Management</h1>
-    <p class="admin-subtitle">View and manage platform users</p>
+    <h1 class="admin-title">Developers</h1>
+    <p class="admin-subtitle">Registered isHuman integrators on lemma.id (platform members, not all verified humans)</p>
 </div>
 
 <!-- Stats -->
@@ -48,7 +48,7 @@
 <!-- Users Table -->
 <div class="admin-card">
     <div class="admin-card-header">
-        <h2 class="admin-card-title">All Users</h2>
+        <h2 class="admin-card-title">Platform Members</h2>
         <div style="display: flex; gap: 12px;">
             <input type="text" id="user-search" placeholder="Search users..." 
                    style="padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 0.9rem;">

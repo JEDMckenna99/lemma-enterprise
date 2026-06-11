@@ -1,0 +1,315 @@
+{% extends "admin/layout.html" %}
+{% set active_page = 'trust-safety' %}
+
+{% block title %}Trust &amp; Safety - lemma.id Admin{% endblock %}
+
+{% block admin_content %}
+<div class="admin-header">
+    <h1 class="admin-title">Trust &amp; Safety</h1>
+    <p class="admin-subtitle">isHuman network blocks, revocation review queue, and network kills</p>
+</div>
+
+<div class="admin-stats">
+    <div class="stat-card stat-card--warning">
+        <div class="stat-label">Pending Review</div>
+        <div class="stat-value" id="stat-pending">-</div>
+    </div>
+    <div class="stat-card stat-card--danger">
+        <div class="stat-label">Active Site Blocks</div>
+        <div class="stat-value" id="stat-blocks">-</div>
+    </div>
+    <div class="stat-card stat-card--info">
+        <div class="stat-label">Network Revocations</div>
+        <div class="stat-value" id="stat-revocations">-</div>
+    </div>
+</div>
+
+<div class="admin-card">
+    <div class="admin-card-header">
+        <div style="display:flex; gap:8px; flex-wrap:wrap;">
+            <button type="button" class="admin-btn admin-btn--primary admin-btn--sm trust-tab active" data-tab="queue">Review Queue</button>
+            <button type="button" class="admin-btn admin-btn--secondary admin-btn--sm trust-tab" data-tab="blocks">Active Blocks</button>
+            <button type="button" class="admin-btn admin-btn--secondary admin-btn--sm trust-tab" data-tab="revocations">Network Revocations</button>
+        </div>
+        <button type="button" class="admin-btn admin-btn--secondary admin-btn--sm" id="refresh-trust-btn">Refresh</button>
+    </div>
+    <div class="admin-card-body" style="padding:0; overflow-x:auto;">
+        <div id="panel-queue" class="trust-panel">
+            <table class="admin-table">
+                <thead>
+                    <tr>
+                        <th>Site</th>
+                        <th>PPID</th>
+                        <th>Reason</th>
+                        <th>Evidence</th>
+                        <th>Blocked</th>
+                        <th>Wallet</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="queue-table-body">
+                    <tr><td colspan="7" style="text-align:center;padding:32px;">Loading queue...</td></tr>
+                </tbody>
+            </table>
+        </div>
+        <div id="panel-blocks" class="trust-panel" style="display:none;">
+            <table class="admin-table">
+                <thead>
+                    <tr>
+                        <th>Site</th>
+                        <th>PPID</th>
+                        <th>Reason</th>
+                        <th>Status</th>
+                        <th>Blocked</th>
+                        <th>By</th>
+                    </tr>
+                </thead>
+                <tbody id="blocks-table-body">
+                    <tr><td colspan="6" style="text-align:center;padding:32px;">Loading blocks...</td></tr>
+                </tbody>
+            </table>
+        </div>
+        <div id="panel-revocations" class="trust-panel" style="display:none;">
+            <table class="admin-table">
+                <thead>
+                    <tr>
+                        <th>Type</th>
+                        <th>PPID / Wallet</th>
+                        <th>Site</th>
+                        <th>Reason</th>
+                        <th>Revoked</th>
+                        <th>By</th>
+                    </tr>
+                </thead>
+                <tbody id="revocations-table-body">
+                    <tr><td colspan="6" style="text-align:center;padding:32px;">Loading revocations...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<div id="trust-action-modal" style="display:none; position:fixed; inset:0; background:rgba(15,23,42,0.45); z-index:1000; align-items:center; justify-content:center;">
+    <div style="background:#fff; border-radius:12px; padding:24px; max-width:480px; width:90%;">
+        <h3 style="margin:0 0 12px;" id="modal-title">Confirm action</h3>
+        <p style="color:#64748b; font-size:14px; margin:0 0 16px;" id="modal-subtitle"></p>
+        <label style="display:block; font-weight:600; margin-bottom:8px;">Reason (optional)</label>
+        <textarea id="modal-reason" rows="3" style="width:100%; padding:10px; border:1px solid #e2e8f0; border-radius:6px; font-size:14px;"></textarea>
+        <div style="display:flex; gap:10px; justify-content:flex-end; margin-top:16px;">
+            <button type="button" class="admin-btn admin-btn--secondary" id="modal-cancel">Cancel</button>
+            <button type="button" class="admin-btn admin-btn--primary" id="modal-confirm">Confirm</button>
+        </div>
+    </div>
+</div>
+
+<script nonce="{{ csp_nonce }}">
+let currentTab = 'queue';
+let pendingAction = null;
+
+document.addEventListener('DOMContentLoaded', () => {
+    document.querySelectorAll('.trust-tab').forEach(btn => {
+        btn.addEventListener('click', () => showTrustTab(btn.getAttribute('data-tab')));
+    });
+    document.getElementById('refresh-trust-btn').addEventListener('click', loadTrustData);
+    document.getElementById('modal-cancel').addEventListener('click', closeModal);
+    document.getElementById('modal-confirm').addEventListener('click', confirmModalAction);
+    loadTrustData();
+});
+
+function showTrustTab(tab) {
+    currentTab = tab;
+    document.querySelectorAll('.trust-tab').forEach(btn => {
+        const active = btn.getAttribute('data-tab') === tab;
+        btn.classList.toggle('active', active);
+        btn.classList.toggle('admin-btn--primary', active);
+        btn.classList.toggle('admin-btn--secondary', !active);
+    });
+    document.querySelectorAll('.trust-panel').forEach(panel => {
+        panel.style.display = 'none';
+    });
+    const panel = document.getElementById('panel-' + tab);
+    if (panel) panel.style.display = 'block';
+}
+
+async function getAuthHeaders() {
+    if (typeof window.getLemmaAuthHeadersAsync === 'function') {
+        return await window.getLemmaAuthHeadersAsync({});
+    }
+    return {};
+}
+
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = String(text ?? '');
+    return div.innerHTML;
+}
+
+function formatDate(iso) {
+    if (!iso) return '-';
+    try {
+        return new Date(iso).toLocaleString();
+    } catch (e) {
+        return iso;
+    }
+}
+
+async function loadTrustData() {
+    const headers = await getAuthHeaders();
+    await Promise.all([
+        loadQueue(headers),
+        loadBlocks(headers),
+        loadRevocations(headers),
+    ]);
+}
+
+async function loadQueue(headers) {
+    const tbody = document.getElementById('queue-table-body');
+    try {
+        const resp = await fetch('/api/admin/trust/queue', { headers });
+        const data = await resp.json();
+        if (!resp.ok) throw new Error(data.error || 'Failed');
+        document.getElementById('stat-pending').textContent = String(data.total || 0);
+        if (!data.queue || data.queue.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:32px;color:#64748b;">No items pending review</td></tr>';
+            return;
+        }
+        tbody.innerHTML = data.queue.map(row => `
+            <tr>
+                <td><code>${escapeHtml(row.site_domain || row.site_id)}</code></td>
+                <td><code title="${escapeHtml(row.ppid)}">${escapeHtml(row.ppid_display)}</code></td>
+                <td>${escapeHtml(row.reason || '-')}</td>
+                <td>${row.evidence_url ? `<a href="${escapeHtml(row.evidence_url)}" target="_blank" rel="noopener">View</a>` : '-'}</td>
+                <td>${escapeHtml(formatDate(row.blocked_at))}</td>
+                <td><code>${escapeHtml(row.wallet_id_prefix || 'unknown')}</code></td>
+                <td style="white-space:nowrap;">
+                    <button type="button" class="admin-btn admin-btn--primary admin-btn--sm" data-action="approve" data-block-id="${row.block_id}">Approve</button>
+                    <button type="button" class="admin-btn admin-btn--secondary admin-btn--sm" data-action="reject" data-block-id="${row.block_id}">Reject</button>
+                </td>
+            </tr>
+        `).join('');
+        tbody.querySelectorAll('button[data-action]').forEach(btn => {
+            btn.addEventListener('click', () => openActionModal(btn));
+        });
+    } catch (e) {
+        tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:32px;color:#b91c1c;">${escapeHtml(e.message)}</td></tr>`;
+    }
+}
+
+async function loadBlocks(headers) {
+    const tbody = document.getElementById('blocks-table-body');
+    try {
+        const resp = await fetch('/api/admin/trust/blocks?limit=100', { headers });
+        const data = await resp.json();
+        if (!resp.ok) throw new Error(data.error || 'Failed');
+        document.getElementById('stat-blocks').textContent = String(data.total || 0);
+        if (!data.blocks || data.blocks.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:32px;color:#64748b;">No active site blocks</td></tr>';
+            return;
+        }
+        tbody.innerHTML = data.blocks.map(row => `
+            <tr>
+                <td><code>${escapeHtml(row.site_domain || row.site_id)}</code></td>
+                <td><code title="${escapeHtml(row.ppid)}">${escapeHtml(row.ppid_display)}</code></td>
+                <td>${escapeHtml(row.reason || '-')}</td>
+                <td><span class="badge badge--warning">${escapeHtml(row.network_revocation_status || 'site_block')}</span></td>
+                <td>${escapeHtml(formatDate(row.blocked_at))}</td>
+                <td>${escapeHtml(row.blocked_by || '-')}</td>
+            </tr>
+        `).join('');
+    } catch (e) {
+        tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:32px;color:#b91c1c;">${escapeHtml(e.message)}</td></tr>`;
+    }
+}
+
+async function loadRevocations(headers) {
+    const tbody = document.getElementById('revocations-table-body');
+    try {
+        const resp = await fetch('/api/admin/trust/revocations?limit=100', { headers });
+        const data = await resp.json();
+        if (!resp.ok) throw new Error(data.error || 'Failed');
+        document.getElementById('stat-revocations').textContent = String(data.total || 0);
+        if (!data.revocations || data.revocations.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:32px;color:#64748b;">No network revocations recorded</td></tr>';
+            return;
+        }
+        tbody.innerHTML = data.revocations.map(row => `
+            <tr>
+                <td>${escapeHtml(row.revocation_type || '-')}</td>
+                <td><code>${escapeHtml(row.ppid_display || row.wallet_id_prefix || '-')}</code></td>
+                <td>${escapeHtml(row.site_id || '-')}</td>
+                <td>${escapeHtml(row.reason || '-')}</td>
+                <td>${escapeHtml(formatDate(row.revoked_at))}</td>
+                <td>${escapeHtml(row.revoked_by || '-')}</td>
+            </tr>
+        `).join('');
+    } catch (e) {
+        tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:32px;color:#b91c1c;">${escapeHtml(e.message)}</td></tr>`;
+    }
+}
+
+function openActionModal(btn) {
+    const action = btn.getAttribute('data-action');
+    const blockId = btn.getAttribute('data-block-id');
+    pendingAction = { action, blockId };
+    const modal = document.getElementById('trust-action-modal');
+    document.getElementById('modal-title').textContent = action === 'approve'
+        ? 'Approve network revocation'
+        : 'Reject network revocation request';
+    document.getElementById('modal-subtitle').textContent = action === 'approve'
+        ? 'This will revoke the wallet network-wide across all isHuman relying sites.'
+        : 'The site block will remain active; only the network revoke request is rejected.';
+    document.getElementById('modal-reason').value = '';
+    modal.style.display = 'flex';
+}
+
+function closeModal() {
+    pendingAction = null;
+    document.getElementById('trust-action-modal').style.display = 'none';
+}
+
+async function confirmModalAction() {
+    if (!pendingAction) return;
+    const reason = document.getElementById('modal-reason').value.trim();
+    const headers = await getAuthHeaders();
+    headers['Content-Type'] = 'application/json';
+    const confirmBtn = document.getElementById('modal-confirm');
+    confirmBtn.disabled = true;
+    try {
+        let resp;
+        if (pendingAction.action === 'approve') {
+            resp = await fetch('/api/ishuman/approve-revocation', {
+                method: 'POST',
+                headers,
+                body: JSON.stringify({
+                    block_id: Number(pendingAction.blockId),
+                    reason: reason || 'Network revocation approved after evidence review',
+                }),
+            });
+        } else {
+            resp = await fetch(`/api/admin/trust/queue/${pendingAction.blockId}/reject`, {
+                method: 'POST',
+                headers,
+                body: JSON.stringify({ reason: reason || 'Network revocation request rejected after review' }),
+            });
+        }
+        const data = await resp.json();
+        if (!resp.ok) throw new Error(data.error || data.message || 'Action failed');
+        if (typeof window.showToast === 'function') {
+            window.showToast('success', 'Success', pendingAction.action === 'approve'
+                ? `Network revocation approved (${data.total_revoked || 0} credentials)`
+                : 'Request rejected');
+        }
+        closeModal();
+        await loadTrustData();
+    } catch (e) {
+        if (typeof window.showToast === 'function') {
+            window.showToast('error', 'Failed', e.message);
+        } else {
+            alert(e.message);
+        }
+    } finally {
+        confirmBtn.disabled = false;
+    }
+}
+</script>
+{% endblock %}

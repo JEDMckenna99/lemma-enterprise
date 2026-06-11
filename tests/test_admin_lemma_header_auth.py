@@ -85,6 +85,38 @@ def test_require_site_admin_rejects_invalid_credential(monkeypatch):
         assert body["error"] == "auth_required"
 
 
+def test_admin_trust_routes_require_admin(monkeypatch, fake_ishuman_db_session_factory):
+    """Cover new admin trust + overview routes with require_site_admin."""
+    from api.admin_trust import admin_trust_bp
+    from api.dashboard_api import dashboard_bp
+
+    monkeypatch.setattr("api.database.SessionLocal", fake_ishuman_db_session_factory.session_local)
+    monkeypatch.setattr(
+        "api.trusted_issuers.verify_credential_with_trust",
+        lambda credential: {"valid": True, "reason": "ok"},
+    )
+    monkeypatch.setattr("api.dashboard_api._load_admin_sites", lambda: [])
+    monkeypatch.setattr("api.dashboard_api._get_slo_snapshot", lambda: {})
+
+    app = Flask(__name__)
+    app.config["TESTING"] = True
+    app.register_blueprint(admin_trust_bp)
+    app.register_blueprint(dashboard_bp)
+
+    with app.test_client() as client:
+        for path in (
+            "/api/admin/trust/queue",
+            "/api/admin/trust/blocks",
+            "/api/admin/trust/revocations",
+            "/api/admin/ishuman-overview",
+        ):
+            denied = client.get(path)
+            assert denied.status_code == 401
+
+            ok = client.get(path, headers={"X-Lemma-Credential": _encode_lemma_header(_stub_lemma("admin_access"))})
+            assert ok.status_code == 200, path
+
+
 def test_require_site_admin_rejects_missing_credential():
     """No credential header at all -> 401."""
     app = _app_with_site_admin_route()

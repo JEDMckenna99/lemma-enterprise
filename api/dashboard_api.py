@@ -413,6 +413,82 @@ def get_platform_stats():
             'error': 'Failed to get platform stats'
         }), 500
 
+
+@dashboard_bp.route('/api/admin/ishuman-overview', methods=['GET'])
+@cross_origin()
+@require_site_admin
+def get_ishuman_overview():
+    """isHuman-centric operator overview metrics."""
+    overview = {
+        'total_verifications': 0,
+        'active_site_blocks': 0,
+        'network_revocations': 0,
+        'pending_review_count': 0,
+        'total_sites': 0,
+        'new_sites_week': 0,
+        'platform_mau': 0,
+        'bloom_revocations_total': 0,
+        'last_updated': datetime.utcnow().isoformat() + 'Z',
+        'slo': _get_slo_snapshot(),
+    }
+
+    sites = _load_admin_sites()
+    overview['total_sites'] = len(sites)
+
+    database_url = os.environ.get('DATABASE_URL')
+    if database_url and database_url.startswith('postgres'):
+        import psycopg2
+        conn = psycopg2.connect(database_url)
+        cur = conn.cursor()
+        try:
+            cur.execute(
+                "SELECT COUNT(*) FROM sites WHERE created_at >= NOW() - INTERVAL '7 days'"
+            )
+            overview['new_sites_week'] = cur.fetchone()[0] or 0
+        except Exception:
+            pass
+        cur.close()
+        conn.close()
+
+    try:
+        from api.database import SessionLocal, IsHumanVerification, RevocationList, SiteBlock
+
+        db = SessionLocal()
+        try:
+            overview['total_verifications'] = (
+                db.query(IsHumanVerification).filter_by(status='verified').count()
+            )
+            overview['active_site_blocks'] = (
+                db.query(SiteBlock).filter_by(is_active=True).count()
+            )
+            overview['network_revocations'] = (
+                db.query(RevocationList).filter_by(lemma_type='ishuman').count()
+            )
+            overview['pending_review_count'] = (
+                db.query(SiteBlock)
+                .filter_by(network_revocation_status='pending_review')
+                .count()
+            )
+            overview['bloom_revocations_total'] = overview['network_revocations']
+        finally:
+            db.close()
+    except Exception as exc:
+        logger.warning('ishuman overview DB metrics failed: %s', exc)
+
+    mau_total = 0
+    for site in sites:
+        site_key = site.get('site_id') or site.get('site_domain')
+        if not site_key:
+            continue
+        try:
+            mau_total += int(get_monthly_active_users(site_key) or 0)
+        except Exception:
+            pass
+    overview['platform_mau'] = mau_total
+
+    return jsonify({'success': True, **overview})
+
+
 @dashboard_bp.route('/api/admin/customers', methods=['GET'])
 @cross_origin()
 @require_site_admin
