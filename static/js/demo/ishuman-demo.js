@@ -284,7 +284,7 @@
     if (qrOption) qrOption.hidden = !qrEnabled;
     if (hint && qrEnabled) {
       const ttlMin = Math.round((state.config.demo_qr_credential_ttl_seconds || 900) / 60);
-      hint.textContent = `Unlock your wallet first. Try the QR demo for a ~${ttlMin}-minute walkthrough, or create a real lemma.id when you are ready to join.`;
+      hint.textContent = `Try "Create demo lemma.id" for the popup + QR walkthrough (~${ttlMin} min), or "Create my lemma.id" for the real join flow.`;
     }
   }
 
@@ -503,32 +503,31 @@
     return false;
   }
 
-  function createLemmaIdViaPopup() {
+  function openIdvPopup({ demoQr = false } = {}) {
     const popupUrl = new URL(`${window.location.origin}/wallet/ishuman-idv`);
-    // The demo page is the opener; lemma.id is the requesting site. No
-    // issue_mode → the popup runs its generic verify flow: unlock with passkey,
-    // run the identity check if no master proof exists yet, store the master,
-    // then signal completion.
     popupUrl.searchParams.set('origin', window.location.origin);
     popupUrl.searchParams.set('site_id', 'lemma.id');
+    if (demoQr) {
+      popupUrl.searchParams.set('flow_mode', 'demo_qr');
+    }
 
     const width = 480;
-    const height = 660;
+    const height = demoQr ? 760 : 660;
     const left = Math.max(0, Math.round(window.screenX + (window.outerWidth - width) / 2));
     const top = Math.max(0, Math.round(window.screenY + (window.outerHeight - height) / 2));
     const popup = window.open(
       popupUrl.toString(),
-      'lemma_ishuman_idv',
+      demoQr ? 'lemma_ishuman_demo_qr' : 'lemma_ishuman_idv',
       `popup=yes,width=${width},height=${height},left=${left},top=${top}`,
     );
     if (!popup) {
       setPill('ih-lemma-status', 'POPUP BLOCKED', 'warn');
       log('Identity popup blocked', 'Allow popups for lemma.id and retry');
-      return;
+      return null;
     }
 
-    setPill('ih-lemma-status', 'VERIFYING', 'warn');
-    log('Opened identity check popup for lemma.id');
+    setPill('ih-lemma-status', demoQr ? 'DEMO POPUP' : 'VERIFYING', 'warn');
+    log(demoQr ? 'Opened demo QR popup' : 'Opened identity check popup for lemma.id');
 
     let settled = false;
     const finish = async (outcome) => {
@@ -536,12 +535,13 @@
       settled = true;
       window.removeEventListener('message', onMessage);
       clearInterval(closedTimer);
-      log('Identity check popup closed', outcome);
-      // The master is created server-side at IDV completion, so server status
-      // is the source of truth even if the cross-origin postMessage was
-      // dropped after the hosted redirect. Refresh local + server state.
+      log(demoQr ? 'Demo QR popup closed' : 'Identity check popup closed', outcome);
       await refreshWalletStatus().catch(() => {});
       await syncMasterFromServer().catch(() => {});
+      if (outcome === 'completed') {
+        setWorkflowHighlight(2);
+        setDemoReadyBanner(true);
+      }
     };
     const onMessage = (event) => {
       if (event.origin !== window.location.origin) return;
@@ -556,135 +556,15 @@
       if (popup.closed) finish('closed');
     }, 800);
     window.addEventListener('message', onMessage);
+    return popup;
   }
 
-  let qrExpireTimer = null;
-
-  function hideQrDemoPanel() {
-    const panel = $('ih-qr-demo-panel');
-    if (panel) panel.hidden = true;
-    if (qrExpireTimer) {
-      clearInterval(qrExpireTimer);
-      qrExpireTimer = null;
-    }
-    const container = $('ih-qr-code');
-    if (container) container.innerHTML = '';
-    const statusEl = $('ih-qr-status');
-    if (statusEl) statusEl.textContent = 'Waiting for scan…';
+  function createLemmaIdViaPopup() {
+    return openIdvPopup({ demoQr: false });
   }
 
-  function renderQrCode(url) {
-    const container = $('ih-qr-code');
-    if (!container) return;
-    container.innerHTML = '';
-    if (typeof QRCode === 'undefined') {
-      container.textContent = url;
-      return;
-    }
-    new QRCode(container, {
-      text: url,
-      width: 220,
-      height: 220,
-      colorDark: '#000000',
-      colorLight: '#ffffff',
-      correctLevel: QRCode.CorrectLevel ? QRCode.CorrectLevel.M : 0,
-    });
-  }
-
-  function startQrCountdown(seconds) {
-    const el = $('ih-qr-timer');
-    let remaining = Number(seconds) || 900;
-    const tick = () => {
-      if (!el) return;
-      const mins = Math.floor(remaining / 60);
-      const secs = remaining % 60;
-      el.textContent = `${mins}:${String(secs).padStart(2, '0')}`;
-      if (remaining <= 0) hideQrDemoPanel();
-      remaining -= 1;
-    };
-    tick();
-    if (qrExpireTimer) clearInterval(qrExpireTimer);
-    qrExpireTimer = setInterval(tick, 1000);
-  }
-
-  async function pollQrDemoSession(sessionId) {
-    const statusEl = $('ih-qr-status');
-    const maxAttempts = 120;
-    for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
-      const payload = await requestJson(
-        `/api/ishuman/verification-status/${encodeURIComponent(sessionId)}`,
-      );
-      if (payload.status === 'verified' && payload.credential) {
-        if (state.wallet?.storeCredential) {
-          await state.wallet.storeCredential(payload.credential);
-        }
-        state.sessionId = sessionId;
-        state.masterCredentialId = payload.credential_id || payload.credential?.id;
-        if (state.masterCredentialId) {
-          localStorage.setItem('ishuman_demo_master_id', state.masterCredentialId);
-        }
-        localStorage.setItem('ishuman_demo_session_id', sessionId);
-        renderMaster(payload.credential);
-        setPill('ih-lemma-status', 'READY', 'ok');
-        setDemoReadyBanner(true);
-        if (statusEl) statusEl.textContent = 'Phone verification complete — lemma.id ready on this device.';
-        log('QR demo IDV complete', short(state.masterCredentialId));
-        hideQrDemoPanel();
-        setWorkflowHighlight(2);
-        return payload;
-      }
-      if (statusEl) {
-        statusEl.textContent = attempt === 0
-          ? 'Waiting for phone scan…'
-          : `Waiting for phone scan… (${attempt + 1}/${maxAttempts})`;
-      }
-      await sleep(2000);
-    }
-    throw new Error('Timed out waiting for phone scan — cancel and try again.');
-  }
-
-  async function startQrDemoIdvFlow() {
-    hideQrDemoPanel();
-    await initWallet();
-    const { walletId, walletSecret } = await getWalletContext();
-    if (typeof state.wallet.prepareIdvMobileHandoff !== 'function') {
-      throw new Error('Wallet SDK too old — hard-refresh the page (need lemma-wallet v2550+).');
-    }
-
-    const pending = state.wallet.prepareIdvMobileHandoff();
-    const returnUrl = `${window.location.origin}/wallet/ishuman-idv?verification_return=true`;
-    const prepare = await requestJson('/api/demo/ishuman/qr-demo-idv-flow', {
-      method: 'POST',
-      headers: demoHeaders(),
-      body: JSON.stringify({
-        wallet_id: walletId,
-        wallet_secret: walletSecret,
-        return_url: returnUrl,
-      }),
-    });
-
-    state.sessionId = prepare.session_id;
-    localStorage.setItem('ishuman_demo_session_id', state.sessionId);
-
-    await state.wallet.finalizeAndDepositIdvMobileHandoff({
-      handoffId: pending.handoffId,
-      walletSecret,
-      walletId,
-      sessionId: prepare.session_id,
-    });
-
-    const qrUrl = `${returnUrl}&handoff_id=${encodeURIComponent(pending.handoffId)}`
-      + `&mk=${encodeURIComponent(pending.mk)}`
-      + `&ishuman_session=${encodeURIComponent(prepare.session_id)}`;
-
-    const panel = $('ih-qr-demo-panel');
-    if (panel) panel.hidden = false;
-    renderQrCode(qrUrl);
-    startQrCountdown(prepare.credential_ttl_seconds || state.config?.demo_qr_credential_ttl_seconds || 900);
-    setPill('ih-lemma-status', 'SCAN QR', 'warn');
-    log('QR demo IDV ready', short(prepare.session_id));
-
-    return pollQrDemoSession(prepare.session_id);
+  function startQrDemoIdvFlow() {
+    return openIdvPopup({ demoQr: true });
   }
 
   // Cross-origin storage wipe for the customer demo sites. lemma.id JS cannot
@@ -1306,7 +1186,6 @@
     bind('ih-wallet-btn', initWallet);
     bind('ih-try-qr-demo-btn', startQrDemoIdvFlow);
     bind('ih-create-lemma-id-btn', createLemmaIdViaPopup);
-    bind('ih-qr-cancel-btn', hideQrDemoPanel);
     bind('ih-clear-lemma-id-btn', clearLemmaId);
     bind('ih-start-idv-btn', startIdentityVerification);
     bind('ih-test-complete-btn', completeTestModeVerification);

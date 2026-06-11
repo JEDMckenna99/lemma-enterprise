@@ -92,16 +92,60 @@
             margin-bottom: 16px;
         }
         .hidden { display: none !important; }
+        .demo-tag {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 999px;
+            background: #fef3c7;
+            border: 1px solid #fde68a;
+            color: #92400e;
+            font-size: 11px;
+            font-weight: 800;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+        }
+        .demo-tag-wrap {
+            text-align: center;
+            margin-bottom: 4px;
+        }
+        .qr-demo-panel {
+            margin-top: 4px;
+            padding-top: 4px;
+            text-align: center;
+        }
+        .qr-demo-panel p {
+            margin-bottom: 12px;
+        }
+        .qr-code-wrap {
+            display: flex;
+            justify-content: center;
+            margin: 12px 0 10px;
+        }
+        .qr-code-box {
+            display: inline-block;
+            padding: 12px;
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            background: #fff;
+        }
+        .qr-timer {
+            font-weight: 800;
+            color: #0f172a;
+        }
     </style>
 </head>
 <body>
     <div class="card" id="ishuman-idv-root"
          data-test-verify-enabled="{{ 'true' if demo_test_verify_enabled else 'false' }}"
          data-skeleton-idv-enabled="{{ 'true' if skeleton_idv_enabled|default(false) else 'false' }}"
+         data-qr-demo-enabled="{{ 'true' if qr_demo_idv_enabled|default(false) else 'false' }}"
          data-ui-preview-enabled="{{ 'true' if ui_preview_enabled|default(false) else 'false' }}"
          data-server-test-token="{{ demo_test_token }}">
         <div class="brand-mark">
             <img src="/static/img/lemma_logo.svg" alt="Lemma.id" width="100" height="100">
+        </div>
+        <div class="demo-tag-wrap hidden" id="demo-tag-wrap">
+            <span class="demo-tag" id="demo-tag">Demo</span>
         </div>
         <p class="eyebrow" id="eyebrow-copy">Lemma.id</p>
         <h1 id="headline-copy">Prove you're human once</h1>
@@ -114,6 +158,13 @@
         </ol>
         <p class="privacy-line" id="privacy-copy">Your ID documents are used only to create your human proof. After your proof is created, your documents and photos are removed from the verification provider. Lemma.id only stores your human proof, not your ID.</p>
         <div id="status" class="status info">Takes about a minute. You can stop anytime.</div>
+        <div id="qr-demo-panel" class="qr-demo-panel hidden">
+            <p id="qr-demo-copy">Scan with your phone to finish the demo identity check. No Didit — expires in <span class="qr-timer" id="qr-demo-timer">15:00</span>.</p>
+            <div class="qr-code-wrap">
+                <div id="qr-demo-code" class="qr-code-box" aria-label="QR code for mobile demo verification"></div>
+            </div>
+            <p id="qr-demo-status" style="margin-bottom:0;">Waiting for phone scan…</p>
+        </div>
         <div id="actions">
             <button id="primary-btn" class="btn btn-primary hidden" type="button">Continue</button>
             <button id="cancel-btn" class="btn btn-secondary" type="button">Not now</button>
@@ -125,6 +176,7 @@
     <script src="/static/js/wallet-at-rest-crypto.js?v=2" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
     <script nonce="{{ csp_nonce }}">window.LEMMA_ISHUMAN_USE_PERSON_ROOT_SEEDS = {{ 'true' if ishuman_use_person_root_seeds else 'false' }};</script>
     <script src="/sdk/lemma-wallet.js?v=2550" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
+    <script src="/static/js/qrcode.min.js" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
     <script nonce="{{ csp_nonce }}">
         const SESSION_KEY = 'ishuman_idv_popup_session_id';
         const params = new URLSearchParams(window.location.search);
@@ -147,6 +199,8 @@
         const root = document.getElementById('ishuman-idv-root');
         const testVerifyEnabled = root.dataset.testVerifyEnabled === 'true';
         const skeletonIdvEnabled = root.dataset.skeletonIdvEnabled === 'true';
+        const qrDemoEnabled = root.dataset.qrDemoEnabled === 'true';
+        const isDemoQrFlow = flowMode === 'demo_qr';
         const uiPreviewEnabled = root.dataset.uiPreviewEnabled === 'true';
         const uiPreviewState = (params.get('ui_preview') || '').trim();
         const serverTestToken = root.dataset.serverTestToken || '';
@@ -560,6 +614,169 @@
                 }
             }
             throw new Error('Verification is still finalizing — close this window and click “Create my lemma.id” again in a moment.');
+        }
+
+        let qrDemoExpireTimer = null;
+
+        function applyDemoQrShell() {
+            const demoTagWrap = document.getElementById('demo-tag-wrap');
+            if (demoTagWrap) demoTagWrap.classList.remove('hidden');
+            const eyebrow = document.getElementById('eyebrow-copy');
+            const headline = document.getElementById('headline-copy');
+            const intro = document.getElementById('intro-copy');
+            const privacy = document.getElementById('privacy-copy');
+            const stepsList = document.getElementById('steps-list');
+            const siteChip = document.getElementById('site-chip');
+            if (eyebrow) eyebrow.textContent = 'Lemma.id demo';
+            if (headline) headline.textContent = 'Create your demo lemma.id';
+            if (intro) {
+                intro.textContent = 'Unlock this browser, scan the QR with your phone, and finish a short demo identity check. Your demo credential expires in about 15 minutes.';
+            }
+            if (privacy) privacy.textContent = 'This is a sandbox flow — no Didit, no real ID documents. It mirrors the production popup so you can try Lemma.id before joining for real.';
+            if (siteChip) siteChip.textContent = 'lemma.id demo';
+            if (stepsList) {
+                stepsList.innerHTML = [
+                    '<li>Unlock this device with Face ID, Touch ID, or your passkey</li>',
+                    '<li>Scan the QR code with your phone to finish the demo check</li>',
+                    '<li>Return here — your demo lemma.id is ready on this device and your phone</li>',
+                ].join('');
+            }
+        }
+
+        function renderDemoQrCode(url) {
+            const container = document.getElementById('qr-demo-code');
+            if (!container) return;
+            container.innerHTML = '';
+            if (typeof QRCode === 'undefined') {
+                container.textContent = url;
+                return;
+            }
+            new QRCode(container, {
+                text: url,
+                width: 200,
+                height: 200,
+                colorDark: '#000000',
+                colorLight: '#ffffff',
+                correctLevel: QRCode.CorrectLevel ? QRCode.CorrectLevel.M : 0,
+            });
+        }
+
+        function startDemoQrCountdown(seconds) {
+            const el = document.getElementById('qr-demo-timer');
+            let remaining = Number(seconds) || 900;
+            const tick = () => {
+                if (!el) return;
+                const mins = Math.floor(remaining / 60);
+                const secs = remaining % 60;
+                el.textContent = `${mins}:${String(secs).padStart(2, '0')}`;
+                remaining -= 1;
+            };
+            tick();
+            if (qrDemoExpireTimer) clearInterval(qrDemoExpireTimer);
+            qrDemoExpireTimer = setInterval(tick, 1000);
+        }
+
+        function showDemoQrPanel(qrUrl, ttlSeconds) {
+            document.getElementById('steps-list')?.classList.add('hidden');
+            document.getElementById('privacy-copy')?.classList.add('hidden');
+            document.getElementById('actions')?.classList.add('hidden');
+            const panel = document.getElementById('qr-demo-panel');
+            if (panel) panel.classList.remove('hidden');
+            renderDemoQrCode(qrUrl);
+            startDemoQrCountdown(ttlSeconds || 900);
+        }
+
+        async function runDemoQrVerification() {
+            if (!qrDemoEnabled) {
+                throw new Error('Demo QR flow is not enabled on this environment.');
+            }
+            setStatus('Unlocking your wallet…', 'loading');
+            await ensureWalletUnlocked();
+            if (typeof wallet.prepareIdvMobileHandoff !== 'function') {
+                throw new Error('Wallet SDK too old — refresh lemma.id and retry.');
+            }
+
+            const pending = wallet.prepareIdvMobileHandoff();
+            const returnParams = new URLSearchParams({
+                verification_return: 'true',
+                origin: openerOrigin !== '*' ? openerOrigin : window.location.origin,
+                site_id: requestingSite,
+            });
+            const returnUrl = `${window.location.origin}/wallet/ishuman-idv?${returnParams.toString()}`;
+
+            setStatus('Preparing demo verification…', 'loading');
+            const prepare = await requestJson('/api/demo/ishuman/qr-demo-idv-flow', {
+                method: 'POST',
+                headers: demoHeaders(),
+                body: JSON.stringify({
+                    wallet_id: walletId,
+                    wallet_secret: walletSecret,
+                    return_url: returnUrl,
+                }),
+            });
+
+            sessionId = prepare.session_id;
+            localStorage.setItem(SESSION_KEY, sessionId);
+
+            await wallet.finalizeAndDepositIdvMobileHandoff({
+                handoffId: pending.handoffId,
+                walletSecret,
+                walletId,
+                sessionId: prepare.session_id,
+            });
+
+            const qrUrl = `${returnUrl}&handoff_id=${encodeURIComponent(pending.handoffId)}`
+                + `&mk=${encodeURIComponent(pending.mk)}`
+                + `&ishuman_session=${encodeURIComponent(prepare.session_id)}`;
+
+            showDemoQrPanel(qrUrl, prepare.credential_ttl_seconds || 900);
+            setStatus('Scan the QR code with your phone to finish the demo.', 'info');
+
+            const statusEl = document.getElementById('qr-demo-status');
+            const maxAttempts = 120;
+            for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+                const payload = await requestJson(
+                    `/api/ishuman/verification-status/${encodeURIComponent(sessionId)}`,
+                );
+                if (payload.status === 'verified' && payload.credential) {
+                    await storeMasterFromStatus(payload);
+                    if (statusEl) statusEl.textContent = 'Phone verification complete.';
+                    setStatus('Demo lemma.id ready on this device.', 'success');
+                    setTimeout(() => closeWith('ISHUMAN_IDV_COMPLETE', { reason: 'demo_qr_complete' }), 500);
+                    return payload;
+                }
+                if (statusEl) {
+                    statusEl.textContent = attempt === 0
+                        ? 'Waiting for phone scan…'
+                        : `Waiting for phone scan… (${attempt + 1}/${maxAttempts})`;
+                }
+                await new Promise((resolve) => setTimeout(resolve, 2000));
+            }
+            throw new Error('Timed out waiting for phone scan — close and try again.');
+        }
+
+        async function bootDemoQrPopup() {
+            applyDemoQrShell();
+            document.getElementById('cancel-btn').onclick = (event) => {
+                event.preventDefault();
+                closeWith('ISHUMAN_IDV_CANCELLED', { reason: 'demo_qr_cancelled' });
+            };
+            document.getElementById('primary-btn').textContent = 'Continue';
+            document.getElementById('primary-btn').classList.remove('hidden');
+            document.getElementById('primary-btn').onclick = async (event) => {
+                event.preventDefault();
+                const btn = document.getElementById('primary-btn');
+                btn.disabled = true;
+                try {
+                    await runDemoQrVerification();
+                } catch (err) {
+                    console.error('[isHuman IDV] demo QR failed:', err);
+                    setStatus(err?.message || 'Demo verification failed', 'error');
+                    btn.disabled = false;
+                    btn.textContent = 'Try again';
+                }
+            };
+            setStatus('Unlock your wallet, then scan the QR code with your phone.', 'info');
         }
 
         async function verifyOnceTestMode() {
@@ -1013,7 +1230,25 @@
             // So only block a truly context-free direct open: no opener AND no flow.
             const hasFlowContext = isFreshIdv
                 || isSiteProofIssue
+                || isDemoQrFlow
                 || (isVerificationReturn && (sessionId || handoffId || ishumanSessionParam));
+
+            if (isDemoQrFlow) {
+                if (!qrDemoEnabled) {
+                    setStatus('Demo QR flow is not enabled on this environment.', 'error');
+                    document.getElementById('cancel-btn').onclick = (event) => {
+                        event.preventDefault();
+                        window.close();
+                    };
+                    return;
+                }
+                if (!window.opener) {
+                    setStatus('Open this demo from the lemma.id demo page.', 'error');
+                    return;
+                }
+                await bootDemoQrPopup();
+                return;
+            }
 
             // Silent mobile provision: phone browser returns from Didit; claim the
             // PC-deposited handoff when we do not have a local master yet (even if

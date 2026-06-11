@@ -81,8 +81,8 @@
               <span class="demo-create-option-badge">Quick demo</span>
               <h3>Try with your phone</h3>
             </div>
-            <p class="demo-muted">Scan a QR code for a short-lived demo credential — no Didit, expires in about 15 minutes. Good for walking through the flow on stage.</p>
-            <button class="demo-btn demo-btn-secondary" id="ih-try-qr-demo-btn" type="button">Scan QR to try demo</button>
+            <p class="demo-muted">Opens the same popup shell as production, with a Demo tag and a QR code inside. Scan with your phone — no Didit, expires in about 15 minutes.</p>
+            <button class="demo-btn demo-btn-secondary" id="ih-try-qr-demo-btn" type="button">Create demo lemma.id</button>
           </article>
           <article class="demo-create-option demo-create-option-primary">
             <div class="demo-create-option-head">
@@ -93,16 +93,7 @@
             <button class="demo-btn demo-btn-primary" id="ih-create-lemma-id-btn" type="button">Create my lemma.id</button>
           </article>
         </div>
-        <div class="demo-qr-panel" id="ih-qr-demo-panel" hidden>
-          <h3 class="demo-qr-title">Scan with your phone</h3>
-          <p class="demo-muted">Demo identity check — no Didit. Expires in <strong id="ih-qr-timer">15:00</strong>.</p>
-          <div class="demo-qr-code-wrap">
-            <div id="ih-qr-code" class="demo-qr-code" aria-label="QR code for mobile verification"></div>
-          </div>
-          <p class="demo-muted" id="ih-qr-status">Waiting for scan…</p>
-          <button class="demo-btn demo-btn-secondary" id="ih-qr-cancel-btn" type="button">Cancel QR</button>
-        </div>
-        <p class="demo-muted" id="ih-create-lemma-id-hint">Unlock your wallet first. Try the QR demo to explore the flow, or create a real lemma.id when you are ready to join.</p>
+        <p class="demo-muted" id="ih-create-lemma-id-hint">Try the demo popup to explore the flow, or create a real lemma.id when you are ready to join.</p>
       </div>
     </section>
 
@@ -301,11 +292,10 @@ const result = await new IsHumanVerifier({
 
 {% block scripts %}
 {{ super() }}
-<script src="/static/js/qrcode.min.js" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
 <script src="/static/js/demo/ishuman-idv-preview-scenes.js?v=7" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
 <script src="/static/js/demo/ishuman-idv-viewer.js?v=2" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
 <script src="/static/js/lemma-keys.js?v=4" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
 <script nonce="{{ csp_nonce }}">window.LEMMA_ISHUMAN_USE_PERSON_ROOT_SEEDS = {{ 'true' if ishuman_use_person_root_seeds else 'false' }};</script>
 <script src="/sdk/ishuman-verifier.js?v=1.7.1" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
-<script src="/static/js/demo/ishuman-demo.js?v=17" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
+<script src="/static/js/demo/ishuman-demo.js?v=18" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
 {% endblock %}

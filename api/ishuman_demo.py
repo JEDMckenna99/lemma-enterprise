@@ -196,6 +196,7 @@ def ishuman_idv_popup():
         demo_test_verify_enabled=ctx["demo_test_verify_enabled"],
         demo_test_token=ctx["demo_test_token"],
         skeleton_idv_enabled=ctx["skeleton_idv_enabled"],
+        qr_demo_idv_enabled=ctx["qr_demo_idv_enabled"],
         ui_preview_enabled=ctx["ui_preview_enabled"],
     ), 200, {
         "Cache-Control": "no-cache, no-store, must-revalidate",

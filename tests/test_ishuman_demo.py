@@ -365,7 +365,8 @@ def test_ishuman_demo_js_uses_real_verifier_with_two_site_bindings():
     assert "/api/demo/ishuman/verify-once-test-mode" in js
     assert "/api/demo/ishuman/probe-derive" in js
     assert "/api/demo/ishuman/force-reverify" in js
-    assert "/api/demo/ishuman/qr-demo-idv-flow" in js
+    assert "openIdvPopup" in js
+    assert "demo_qr" in js
     assert "createLemmaIdViaPopup" in js
     assert "startQrDemoIdvFlow" in js
     assert "/api/ishuman/start-verification" in js
