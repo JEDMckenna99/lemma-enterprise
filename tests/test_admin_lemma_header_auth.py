@@ -87,6 +87,7 @@ def test_require_site_admin_rejects_invalid_credential(monkeypatch):
 
 def test_admin_trust_routes_require_admin(monkeypatch, fake_ishuman_db_session_factory):
     """Cover new admin trust + overview routes with require_site_admin."""
+    from api.admin_billing import admin_billing_bp
     from api.admin_trust import admin_trust_bp
     from api.dashboard_api import dashboard_bp
 
@@ -95,13 +96,21 @@ def test_admin_trust_routes_require_admin(monkeypatch, fake_ishuman_db_session_f
         "api.trusted_issuers.verify_credential_with_trust",
         lambda credential: {"valid": True, "reason": "ok"},
     )
-    monkeypatch.setattr("api.dashboard_api._load_admin_sites", lambda: [])
+    monkeypatch.setattr(
+        "api.dashboard_api._load_admin_sites",
+        lambda: [{"site_id": "site_test", "site_domain": "test.example.com", "plan": "starter", "status": "active"}],
+    )
     monkeypatch.setattr("api.dashboard_api._get_slo_snapshot", lambda: {})
+    monkeypatch.setattr("api.dashboard_api._site_block_counts", lambda site_id: {"active_blocks_count": 0, "pending_review_count": 0})
+    monkeypatch.setattr("api.dashboard_api._site_activity_count", lambda site_id, domain: 0)
+    monkeypatch.setattr("api.dashboard_api.get_monthly_active_users", lambda site_id: 0)
+    monkeypatch.setattr("api.dashboard_api._lookup_stripe_customer_for_site", lambda site: "")
 
     app = Flask(__name__)
     app.config["TESTING"] = True
     app.register_blueprint(admin_trust_bp)
     app.register_blueprint(dashboard_bp)
+    app.register_blueprint(admin_billing_bp)
 
     with app.test_client() as client:
         for path in (
@@ -109,6 +118,8 @@ def test_admin_trust_routes_require_admin(monkeypatch, fake_ishuman_db_session_f
             "/api/admin/trust/blocks",
             "/api/admin/trust/revocations",
             "/api/admin/ishuman-overview",
+            "/api/admin/sites/site_test",
+            "/api/admin/billing/summary",
         ):
             denied = client.get(path)
             assert denied.status_code == 401

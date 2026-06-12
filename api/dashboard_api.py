@@ -14,7 +14,7 @@ import time
 from datetime import datetime, timedelta
 from flask import Blueprint, request, jsonify, render_template, g
 from flask_cors import cross_origin
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 from api.admin_issuance_notifications import notify_admin_lemma_issued
 
 logger = logging.getLogger(__name__)
@@ -196,6 +196,126 @@ def _load_admin_sites() -> List[Dict[str, Any]]:
     from api.platform_sites import filter_managed_sites
 
     return filter_managed_sites(sites)
+
+
+PLAN_MAU_LIMITS = {
+    'free': 1000,
+    'starter': 5000,
+    'growth': 100000,
+    'enterprise': None,
+}
+
+
+def _truncate_ppid(ppid: str) -> str:
+    if not ppid:
+        return ''
+    ppid = str(ppid)
+    if len(ppid) <= 24:
+        return ppid
+    return ppid[:18] + '…' + ppid[-6:]
+
+
+def _plan_mau_limit(plan: str):
+    key = (plan or 'starter').strip().lower()
+    if key in PLAN_MAU_LIMITS:
+        return PLAN_MAU_LIMITS[key]
+    return PLAN_MAU_LIMITS.get('starter')
+
+
+def _site_block_counts(site_id: str) -> Dict[str, int]:
+    counts = {'active_blocks_count': 0, 'pending_review_count': 0}
+    try:
+        from api.database import SiteBlock, get_db
+
+        db = get_db()
+        try:
+            blocks = db.query(SiteBlock).filter(SiteBlock.site_id == site_id).all()
+            for block in blocks:
+                if getattr(block, 'is_active', False):
+                    counts['active_blocks_count'] += 1
+                if getattr(block, 'network_revocation_status', None) == 'pending_review':
+                    counts['pending_review_count'] += 1
+        finally:
+            db.close()
+    except Exception as exc:
+        logger.warning('Site block counts unavailable for %s: %s', site_id, exc)
+    return counts
+
+
+def _site_activity_count(site_id: str, site_domain: str) -> int:
+    try:
+        from api.database import DerivedCredential, get_db
+
+        db = get_db()
+        try:
+            domain = (site_domain or site_id).strip().lower()
+            return (
+                db.query(DerivedCredential)
+                .filter(
+                    DerivedCredential.target_site.in_([domain, site_id]),
+                    DerivedCredential.is_active == True,  # noqa: E712
+                )
+                .count()
+            )
+        finally:
+            db.close()
+    except Exception as exc:
+        logger.warning('Site activity count unavailable for %s: %s', site_id, exc)
+        return 0
+
+
+def _lookup_stripe_customer_for_site(site: Dict[str, Any]) -> str:
+    email = (site.get('admin_email') or '').strip().lower()
+    database_url = os.environ.get('DATABASE_URL')
+    if not database_url or not email:
+        return ''
+    try:
+        import psycopg2
+
+        conn = psycopg2.connect(database_url)
+        cur = conn.cursor()
+        cur.execute(
+            'SELECT stripe_customer_id FROM customers WHERE LOWER(email) = %s LIMIT 1',
+            (email,),
+        )
+        row = cur.fetchone()
+        cur.close()
+        conn.close()
+        return (row[0] or '') if row else ''
+    except Exception as exc:
+        logger.warning('Stripe customer lookup failed for site %s: %s', site.get('site_id'), exc)
+        return ''
+
+
+def _enrich_admin_site(site: Dict[str, Any]) -> Dict[str, Any]:
+    enriched = dict(site)
+    site_id = enriched.get('site_id') or ''
+    site_domain = enriched.get('site_domain') or site_id
+    mau_current = int(get_monthly_active_users(site_id) or 0)
+    plan = (enriched.get('plan') or 'starter').strip().lower()
+    mau_limit = _plan_mau_limit(plan)
+    block_counts = _site_block_counts(site_id)
+
+    enriched.update({
+        'mau_current': mau_current,
+        'mau_limit': mau_limit,
+        'mau_overage': max(mau_current - mau_limit, 0) if mau_limit else 0,
+        'active_blocks_count': block_counts['active_blocks_count'],
+        'pending_review_count': block_counts['pending_review_count'],
+        'activity_count': _site_activity_count(site_id, site_domain),
+        'stripe_customer_id': enriched.get('stripe_customer_id') or _lookup_stripe_customer_for_site(enriched),
+    })
+    return enriched
+
+
+def _find_admin_site(site_id: str) -> Optional[Dict[str, Any]]:
+    target = (site_id or '').strip()
+    if not target:
+        return None
+    for site in _load_admin_sites():
+        if site.get('site_id') == target:
+            return _enrich_admin_site(site)
+    return None
 
 # ================================================================================
 # CUSTOMER DASHBOARD ENDPOINTS
@@ -525,7 +645,7 @@ def get_all_sites():
     """
     try:
         # Admin auth verified by decorator
-        sites = _load_admin_sites()
+        sites = [_enrich_admin_site(site) for site in _load_admin_sites()]
         if not sites:
             logger.info("No registered sites found in normalized table or customer JSON")
 
@@ -541,6 +661,101 @@ def get_all_sites():
             'success': False,
             'error': 'Failed to get sites'
         }), 500
+
+
+@dashboard_bp.route('/api/admin/sites/<site_id>', methods=['GET'])
+@cross_origin()
+@require_site_admin
+def get_admin_site_detail(site_id):
+    """Get a single site with operator metrics (admin only)."""
+    try:
+        site = _find_admin_site(site_id)
+        if not site:
+            return jsonify({'success': False, 'error': 'site_not_found'}), 404
+        return jsonify({'success': True, 'site': site})
+    except Exception as e:
+        logger.error(f"Get admin site detail error: {e}")
+        return jsonify({'success': False, 'error': 'Failed to get site detail'}), 500
+
+
+@dashboard_bp.route('/api/admin/sites/<site_id>/revoke', methods=['POST'])
+@cross_origin()
+@require_site_admin
+def revoke_admin_site(site_id):
+    """Suspend a relying site (tier-1 operator action; not network-wide revoke)."""
+    from api.audit_logger import AuditEvent, log_event
+    from api.authz_engine import extract_user_lemma_principal
+
+    try:
+        site = _find_admin_site(site_id)
+        if not site:
+            return jsonify({'success': False, 'error': 'site_not_found'}), 404
+
+        data = request.get_json(silent=True) or {}
+        reason = (data.get('reason') or 'manual_admin_site_revoke').strip()
+
+        principal, _ = extract_user_lemma_principal(request.headers)
+        operator_ppid = getattr(principal, 'ppid', None) if principal else None
+
+        database_url = os.environ.get('DATABASE_URL')
+        if not database_url:
+            return jsonify({'success': False, 'error': 'Database not configured'}), 500
+
+        import psycopg2
+
+        conn = psycopg2.connect(database_url)
+        cur = conn.cursor()
+        updated = 0
+        try:
+            cur.execute(
+                "UPDATE sites SET status = 'suspended' WHERE site_id = %s",
+                (site_id,),
+            )
+            updated += cur.rowcount or 0
+        except Exception as exc:
+            logger.warning('Site status update skipped for %s: %s', site_id, exc)
+
+        admin_email = (site.get('admin_email') or '').strip().lower()
+        if admin_email:
+            try:
+                cur.execute(
+                    "UPDATE customers SET status = 'suspended' WHERE LOWER(email) = %s",
+                    (admin_email,),
+                )
+                updated += cur.rowcount or 0
+            except Exception as exc:
+                logger.warning('Customer suspend skipped for site %s: %s', site_id, exc)
+
+        conn.commit()
+        cur.close()
+        conn.close()
+
+        log_event(
+            AuditEvent.ADMIN_ACTION,
+            result='success',
+            site_id='lemma.id',
+            resource='/api/admin/sites',
+            action='revoke_site',
+            user_did=operator_ppid,
+            metadata={
+                'target_site_id': site_id,
+                'target_domain': site.get('site_domain'),
+                'reason': reason[:500],
+                'records_updated': updated,
+            },
+        )
+
+        return jsonify({
+            'success': True,
+            'site_id': site_id,
+            'status': 'suspended',
+            'records_updated': updated,
+            'message': 'Site suspended (tier-1). Network-wide revoke remains in Trust & Safety.',
+        })
+    except Exception as e:
+        logger.error(f"Revoke admin site error: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
 
 @dashboard_bp.route('/api/admin/issue-admin-lemma', methods=['POST'])
 @cross_origin()
@@ -670,6 +885,22 @@ def issue_admin_lemma_endpoint():
             issued_via='dashboard_issue_admin_lemma',
             credential_id=permission_lemma.get('id'),
             fallback_email=username,
+        )
+
+        from api.audit_logger import AuditEvent, log_event
+
+        log_event(
+            AuditEvent.ADMIN_ACTION,
+            result='success',
+            site_id='lemma.id',
+            resource='/api/admin/issue-admin-lemma',
+            action='bootstrap_admin_lemma',
+            user_did=admin_did,
+            metadata={
+                'target_ppid': _truncate_ppid(admin_did),
+                'issued_via': 'bootstrap_basic_auth',
+                'credential_id': permission_lemma.get('id'),
+            },
         )
 
         return jsonify({
@@ -1048,6 +1279,26 @@ def revoke_admin_user_access():
         cur.close()
         conn.close()
 
+        from api.audit_logger import AuditEvent, log_event
+        from api.authz_engine import extract_user_lemma_principal
+
+        principal, _ = extract_user_lemma_principal(request.headers)
+        operator_ppid = getattr(principal, 'ppid', None) if principal else None
+        log_event(
+            AuditEvent.ADMIN_ACTION,
+            result='success',
+            site_id='lemma.id',
+            resource='/api/admin/users/revoke-access',
+            action='revoke_developer_access',
+            user_did=operator_ppid,
+            metadata={
+                'target_ppid': _truncate_ppid(resolved_ppid or ppid or ''),
+                'target_email': email or None,
+                'reason': reason[:500],
+                'revocation_written': bool(revocation_written),
+            },
+        )
+
         logger.info(
             "Manual admin revoke: site=%s user_id=%s ppid=%s email=%s",
             site_id,
@@ -1356,6 +1607,31 @@ def get_admin_monitoring_summary():
 
             # Event bus quick probe (derived signal from Redis URL presence).
             summary['pipeline']['event_bus'] = 'configured' if os.environ.get('REDIS_URL') else 'not_configured'
+            summary['pipeline']['idv_webhook_configured'] = bool(
+                os.environ.get('STRIPE_IDENTITY_WEBHOOK_SECRET')
+                or os.environ.get('STRIPE_WEBHOOK_SECRET')
+            )
+            summary['pipeline']['rate_limiter_mode'] = os.environ.get('RATE_LIMITER_MODE', 'default')
+            if not summary['pipeline']['idv_webhook_configured']:
+                summary['warnings'] = summary.get('warnings', []) + [
+                    'Stripe Identity webhook secret is not configured'
+                ]
+
+            try:
+                from api.database import IsHumanVerification, RevocationList, SiteBlock, SessionLocal
+
+                idb = SessionLocal()
+                try:
+                    summary['ishuman'] = {
+                        'total_verifications': idb.query(IsHumanVerification).filter_by(status='verified').count(),
+                        'active_site_blocks': idb.query(SiteBlock).filter_by(is_active=True).count(),
+                        'network_revocations': idb.query(RevocationList).filter_by(lemma_type='ishuman').count(),
+                    }
+                finally:
+                    idb.close()
+            except Exception as exc:
+                logger.warning('ishuman stats unavailable for monitoring summary: %s', exc)
+                summary['ishuman'] = {}
         finally:
             cur.close()
             conn.close()

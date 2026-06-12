@@ -1,0 +1,109 @@
+{% extends "admin/layout.html" %}
+{% set active_page = 'platform_ops' %}
+
+{% block title %}Platform Ops - lemma.id Admin{% endblock %}
+
+{% block admin_content %}
+<div class="admin-header">
+    <h1 class="admin-title">Platform Ops</h1>
+    <p class="admin-subtitle">Infrastructure health, revocation pipeline, and isHuman IDV signals</p>
+</div>
+
+<div id="ops-warnings"></div>
+
+<div class="admin-stats">
+    <div class="stat-card stat-card--info" id="card-slo">
+        <div class="stat-label">SLO Error Rate (5m)</div>
+        <div class="stat-value" id="stat-slo-error">-</div>
+    </div>
+    <div class="stat-card stat-card--warning" id="card-revocations">
+        <div class="stat-label">Revocations (24h)</div>
+        <div class="stat-value" id="stat-rev-24h">-</div>
+    </div>
+    <div class="stat-card stat-card--success" id="card-ishuman">
+        <div class="stat-label">Verified Humans</div>
+        <div class="stat-value" id="stat-verifications">-</div>
+    </div>
+    <div class="stat-card stat-card--danger" id="card-health">
+        <div class="stat-label">System Health</div>
+        <div class="stat-value" id="stat-health">-</div>
+    </div>
+</div>
+
+<div class="admin-card" style="margin-bottom:16px;">
+    <div class="admin-card-header">
+        <h2 class="admin-card-title">Revocation Pipeline</h2>
+        <button class="admin-btn admin-btn--secondary admin-btn--sm" id="refresh-ops-btn">Refresh</button>
+    </div>
+    <div class="admin-card-body">
+        <pre id="monitoring-json" style="background:#1e1e1e;color:#d4d4d4;padding:12px;border-radius:8px;overflow:auto;font-size:12px;">Loading…</pre>
+    </div>
+</div>
+
+<div class="admin-card">
+    <div class="admin-card-header"><h2 class="admin-card-title">Services &amp; Dependencies</h2></div>
+    <div class="admin-card-body" style="padding:0; overflow-x:auto;">
+        <table class="admin-table">
+            <thead><tr><th>Service</th><th>Status</th><th>Latency</th></tr></thead>
+            <tbody id="services-table"><tr><td colspan="3">Loading…</td></tr></tbody>
+        </table>
+    </div>
+</div>
+
+<script nonce="{{ csp_nonce }}">
+async function getAuthHeaders() {
+    if (typeof window.getLemmaAuthHeadersAsync === 'function') {
+        return await window.getLemmaAuthHeadersAsync({});
+    }
+    return {};
+}
+
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = String(text ?? '');
+    return div.innerHTML;
+}
+
+async function loadPlatformOps() {
+    const headers = await getAuthHeaders();
+    const [monResp, healthResp] = await Promise.all([
+        fetch('/api/admin/monitoring-summary', { headers }),
+        fetch('/api/health/detailed', { headers }),
+    ]);
+    const mon = await monResp.json();
+    const health = await healthResp.json();
+
+    const summary = mon.summary || {};
+    document.getElementById('monitoring-json').textContent = JSON.stringify(summary, null, 2);
+    document.getElementById('stat-rev-24h').textContent = summary.revocations?.last_24h ?? '-';
+    document.getElementById('stat-verifications').textContent = summary.ishuman?.total_verifications ?? '-';
+    const slo = summary.slo || {};
+    document.getElementById('stat-slo-error').textContent = slo.error_rate_5m_percent != null ? `${slo.error_rate_5m_percent}%` : '-';
+
+    const healthy = health.status === 'healthy' || health.healthy;
+    document.getElementById('stat-health').textContent = healthy ? 'Healthy' : (health.status || 'Degraded');
+
+    const warnings = summary.warnings || [];
+    const warnEl = document.getElementById('ops-warnings');
+    warnEl.innerHTML = warnings.length
+        ? warnings.map(w => `<div class="admin-card" style="border-left:4px solid #f59e0b;padding:12px;margin-bottom:12px;">⚠ ${escapeHtml(w)}</div>`).join('')
+        : '';
+
+    const services = Array.isArray(health.services) ? health.services : [];
+    const deps = Array.isArray(health.dependencies) ? health.dependencies : [];
+    const rows = [
+        ...services.map(s => ({ name: s.name, status: s.status, latency: s.latency_ms })),
+        ...deps.map(d => ({ name: d.name + ' (dep)', status: d.status, latency: null })),
+    ];
+    document.getElementById('services-table').innerHTML = rows.length
+        ? rows.map(r => `<tr><td>${escapeHtml(r.name)}</td><td>${escapeHtml(r.status || '-')}</td><td>${r.latency != null ? r.latency + 'ms' : '-'}</td></tr>`).join('')
+        : '<tr><td colspan="3">No telemetry</td></tr>';
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    loadPlatformOps();
+    document.getElementById('refresh-ops-btn').addEventListener('click', loadPlatformOps);
+    setInterval(loadPlatformOps, 60000);
+});
+</script>
+{% endblock %}

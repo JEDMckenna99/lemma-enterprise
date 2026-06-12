@@ -12,7 +12,7 @@
 <!-- Stats -->
 <div class="admin-stats">
     <div class="stat-card stat-card--info">
-        <div class="stat-label">Total Users</div>
+        <div class="stat-label">Platform Members</div>
         <div class="stat-value stat-loading" id="stat-total"><span class="stat-skeleton"></span></div>
     </div>
     <div class="stat-card stat-card--success">
@@ -63,10 +63,10 @@
                 <thead>
                     <tr>
                         <th>User</th>
-                        <th>Identifiers</th>
+                        <th>Company</th>
                         <th>Type</th>
+                        <th>Plan</th>
                         <th>Sites</th>
-                        <th>Created</th>
                         <th>Last Active</th>
                         <th>Actions</th>
                     </tr>
@@ -80,6 +80,30 @@
                 </tbody>
             </table>
         </div>
+    </div>
+</div>
+
+<div class="slide-panel" id="user-detail-panel">
+    <div class="panel-header">
+        <h3 class="panel-title">Developer Details</h3>
+        <button class="panel-close" type="button" id="close-user-panel">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+        </button>
+    </div>
+    <div class="panel-body">
+        <div class="panel-field"><div class="panel-field-label">Display Name</div><div class="panel-field-value" id="panel-user-name">-</div></div>
+        <div class="panel-field"><div class="panel-field-label">Email</div><div class="panel-field-value" id="panel-user-email">-</div></div>
+        <div class="panel-field"><div class="panel-field-label">PPID</div><div class="panel-field-value mono" id="panel-user-ppid" style="font-size:12px;word-break:break-all;">-</div></div>
+        <div class="panel-field"><div class="panel-field-label">Role</div><div class="panel-field-value" id="panel-user-role">-</div></div>
+        <div class="panel-field"><div class="panel-field-label">Status</div><div class="panel-field-value" id="panel-user-status">-</div></div>
+        <div class="panel-field"><div class="panel-field-label">Sites</div><div class="panel-field-value" id="panel-user-sites">-</div></div>
+        <div class="panel-field"><div class="panel-field-label">Joined</div><div class="panel-field-value" id="panel-user-joined">-</div></div>
+    </div>
+    <div class="panel-footer">
+        <button class="admin-btn admin-btn--danger ripple" type="button" id="panel-revoke-user-btn">Revoke Platform Access</button>
     </div>
 </div>
 
@@ -219,26 +243,23 @@ function renderUsers(users) {
                         👤
                     </div>
                     <div>
-                        <div style="font-weight: 500;">${escapeHtml(user.display_name || user.ppid?.substring(0, 12) + '...' || 'Unknown')}</div>
-                        <div style="font-size: 0.75rem; color: #6b7280;">${escapeHtml(user.email || user.ppid?.substring(0, 20) + '...' || '')}</div>
+                        <div style="font-weight: 500;">${escapeHtml(user.display_name || user.email || 'Unknown')}</div>
+                        <div style="font-size: 0.75rem; color: #6b7280;">${escapeHtml(user.ppid ? String(user.ppid).substring(0, 24) + '…' : user.internal_identifier || '')}</div>
                     </div>
                 </div>
             </td>
-            <td style="font-size: 0.75rem; color: #6b7280; line-height: 1.35;">
-                <div><strong>ID:</strong> ${escapeHtml(user.internal_identifier || user.id || '-')}</div>
-                <div><strong>PPID:</strong> ${escapeHtml(user.ppid ? `${String(user.ppid).substring(0, 20)}...` : '-')}</div>
-            </td>
+            <td>${escapeHtml(user.display_name || user.company || '-')}</td>
             <td>
-                <span class="badge ${getUserTypeBadge(user.type)}">${escapeHtml(user.type || 'User')}</span>
+                <span class="badge ${getUserTypeBadge(user.type || user.role)}">${escapeHtml(user.type || user.role || 'developer')}</span>
             </td>
+            <td>${escapeHtml(user.plan || user.account_type || 'starter')}</td>
             <td>${user.site_count || 0}</td>
-            <td>${formatDate(user.created_at)}</td>
-            <td>${formatDate(user.last_active)}</td>
+            <td>${formatDate(user.last_active || user.joined_at)}</td>
             <td>
-                <button class="admin-btn admin-btn--secondary admin-btn--sm" data-action="view-user" data-user-id="${escapeHtml(user.id || user.ppid)}">
+                <button class="admin-btn admin-btn--secondary admin-btn--sm" data-action="view-user" data-user='${JSON.stringify(user).replace(/'/g, "&#39;")}'>
                     View
                 </button>
-                <button class="admin-btn admin-btn--danger admin-btn--sm" style="margin-left: 6px; ${user.ppid ? '' : 'opacity:0.5; cursor:not-allowed;'}" ${user.ppid ? '' : 'disabled'} data-action="revoke-user" data-user='${JSON.stringify(user).replace(/'/g, "&#39;")}'>
+                <button class="admin-btn admin-btn--danger admin-btn--sm" style="margin-left: 6px; ${user.ppid || user.email ? '' : 'opacity:0.5; cursor:not-allowed;'}" ${user.ppid || user.email ? '' : 'disabled'} data-action="revoke-user" data-user='${JSON.stringify(user).replace(/'/g, "&#39;")}'>
                     Revoke Access
                 </button>
             </td>
@@ -266,31 +287,47 @@ function getUserTypeBadge(type) {
     return badges[type] || 'badge--neutral';
 }
 
-function viewUser(id) {
-    alert('User details view coming soon. ID: ' + id);
+function viewUser(user) {
+    window.currentPanelUser = user;
+    document.getElementById('panel-user-name').textContent = user.display_name || user.email || '-';
+    document.getElementById('panel-user-email').textContent = user.email || '-';
+    document.getElementById('panel-user-ppid').textContent = user.ppid || '-';
+    document.getElementById('panel-user-role').textContent = user.role || user.type || '-';
+    document.getElementById('panel-user-status').textContent = user.status || 'active';
+    document.getElementById('panel-user-sites').textContent = String(user.site_count || 0);
+    document.getElementById('panel-user-joined').textContent = formatDate(user.joined_at || user.created_at);
+    document.getElementById('user-detail-panel').classList.add('open');
 }
 
 async function revokeUserAccess(user) {
     const identifier = user.email || user.ppid || user.internal_identifier || user.id || 'this user';
-    if (!user.ppid) {
+    if (!user.ppid && !user.email) {
         if (window.showToast) {
-            showToast('warning', 'PPID Required', 'This user has no PPID on record, so user-level revocation API cannot be applied.');
+            showToast('warning', 'Identifier Required', 'Need PPID or email to revoke platform access.');
         }
         return;
     }
-    if (!confirm(`Revoke lemma.id access for ${identifier}? This will call the user-level revocation API and invalidate access for this PPID on lemma.id.`)) {
+    const reason = prompt(`Reason for revoking platform access for ${identifier}:`, 'manual_admin_revoke');
+    if (reason === null) return;
+    if (!confirm(`Revoke lemma.id platform access for ${identifier}?`)) {
         return;
     }
 
     try {
-        const response = await fetch('/api/wallet/revoke-user', {
+        const authHeaders = await getAuthHeaders();
+        const response = await fetch('/api/admin/users/revoke-access', {
             method: 'POST',
             credentials: 'include',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+                'Content-Type': 'application/json',
+                ...authHeaders,
+            },
             body: JSON.stringify({
                 ppid: user.ppid,
+                email: user.email,
+                user_id: user.id || user.internal_identifier,
                 site_id: 'lemma.id',
-                reason: 'manual_admin_revoke'
+                reason: reason,
             })
         });
 
@@ -300,8 +337,9 @@ async function revokeUserAccess(user) {
         }
 
         if (window.showToast) {
-            showToast('success', 'Access Revoked', `Revocation API applied for ${identifier}`);
+            showToast('success', 'Access Revoked', `Platform access revoked for ${identifier}`);
         }
+        document.getElementById('user-detail-panel').classList.remove('open');
         await loadUsers();
         await loadUserStats();
     } catch (err) {
@@ -343,7 +381,11 @@ document.addEventListener('click', function(e) {
     if (!target) return;
     
     if (target.dataset.action === 'view-user') {
-        viewUser(target.dataset.userId);
+        try {
+            viewUser(JSON.parse(target.dataset.user));
+        } catch (e) {
+            console.error('Failed to parse user payload', e);
+        }
         return;
     }
     if (target.dataset.action === 'revoke-user') {
@@ -354,6 +396,12 @@ document.addEventListener('click', function(e) {
             console.error('Failed to parse user payload', e);
         }
     }
+});
+document.getElementById('close-user-panel').addEventListener('click', () => {
+    document.getElementById('user-detail-panel').classList.remove('open');
+});
+document.getElementById('panel-revoke-user-btn').addEventListener('click', () => {
+    if (window.currentPanelUser) revokeUserAccess(window.currentPanelUser);
 });
 </script>
 {% endblock %}

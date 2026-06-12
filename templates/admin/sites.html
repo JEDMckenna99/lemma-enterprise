@@ -483,7 +483,7 @@ function getPlanClass(plan) {
 }
 
 function viewSite(siteId) {
-    window.location.href = '/admin/site-manager/' + siteId;
+    window.location.href = '/admin/sites/' + encodeURIComponent(siteId);
 }
 
 function openSitePanel(site) {
@@ -610,8 +610,9 @@ document.addEventListener('click', function(e) {
             break;
             
         case 'edit-site':
-            if (window.currentPanelSite) {
-                window.location.href = '/developer/sites/' + window.currentPanelSite.site_id + '/edit';
+            if (window.currentPanelSite || window.currentSite) {
+                const sid = (window.currentPanelSite || window.currentSite).site_id;
+                window.location.href = '/admin/sites/' + encodeURIComponent(sid);
             }
             break;
             
@@ -630,14 +631,17 @@ document.addEventListener('click', function(e) {
 });
 
 async function revokeSite(siteId) {
+    const reason = prompt('Reason for suspending this site (tier-1 only):', 'manual_admin_site_revoke');
+    if (reason === null) return;
     try {
         const authHeaders = await getAuthHeaders();
-        const response = await fetch(`/api/admin/sites/${siteId}/revoke`, {
+        const response = await fetch(`/api/admin/sites/${encodeURIComponent(siteId)}/revoke`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
                 ...authHeaders
-            }
+            },
+            body: JSON.stringify({ reason })
         });
         
         if (response.ok) {

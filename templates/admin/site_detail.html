@@ -1,0 +1,127 @@
+{% extends "admin/layout.html" %}
+{% set active_page = 'sites' %}
+
+{% block title %}Site Detail - lemma.id Admin{% endblock %}
+
+{% block admin_content %}
+<div class="admin-header">
+    <h1 class="admin-title" id="site-title">Site Detail</h1>
+    <p class="admin-subtitle" id="site-subtitle">Loading…</p>
+</div>
+
+<div class="admin-stats" id="site-stats">
+    <div class="stat-card stat-card--info">
+        <div class="stat-label">MAU (this month)</div>
+        <div class="stat-value" id="stat-mau">-</div>
+    </div>
+    <div class="stat-card stat-card--warning">
+        <div class="stat-label">Active Blocks</div>
+        <div class="stat-value" id="stat-blocks">-</div>
+    </div>
+    <div class="stat-card stat-card--danger">
+        <div class="stat-label">Pending Network Review</div>
+        <div class="stat-value" id="stat-pending">-</div>
+    </div>
+    <div class="stat-card stat-card--success">
+        <div class="stat-label">Active Credentials</div>
+        <div class="stat-value" id="stat-activity">-</div>
+    </div>
+</div>
+
+<div class="admin-card" style="margin-bottom: 16px;">
+    <div class="admin-card-header">
+        <h2 class="admin-card-title">Overview</h2>
+        <div style="display:flex; gap:8px;">
+            <a class="admin-btn admin-btn--secondary admin-btn--sm" id="manage-site-link" href="#">Legacy Site Manager</a>
+            <a class="admin-btn admin-btn--secondary admin-btn--sm" id="trust-link" href="/admin/trust-safety">Trust &amp; Safety</a>
+            <button class="admin-btn admin-btn--danger admin-btn--sm" id="revoke-site-btn">Suspend Site</button>
+        </div>
+    </div>
+    <div class="admin-card-body">
+        <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px;">
+            <div><div class="stat-label">Site ID</div><div class="mono" id="field-site-id">-</div></div>
+            <div><div class="stat-label">Domain</div><div id="field-domain">-</div></div>
+            <div><div class="stat-label">Company</div><div id="field-company">-</div></div>
+            <div><div class="stat-label">Admin Email</div><div id="field-admin">-</div></div>
+            <div><div class="stat-label">Plan</div><div id="field-plan">-</div></div>
+            <div><div class="stat-label">Status</div><div id="field-status">-</div></div>
+            <div><div class="stat-label">MAU Limit</div><div id="field-mau-limit">-</div></div>
+            <div><div class="stat-label">Stripe Customer</div><div id="field-stripe">-</div></div>
+            <div><div class="stat-label">Created</div><div id="field-created">-</div></div>
+        </div>
+        <p style="margin-top:16px; font-size:0.85rem; color:#64748b;">
+            Suspend site is tier-1 (site suspension only). Network-wide kills remain in Trust &amp; Safety.
+        </p>
+    </div>
+</div>
+
+<script nonce="{{ csp_nonce }}">
+const SITE_ID = {{ site_id|tojson }};
+
+async function getAuthHeaders() {
+    if (typeof window.getLemmaAuthHeadersAsync === 'function') {
+        return await window.getLemmaAuthHeadersAsync({});
+    }
+    return {};
+}
+
+function formatDate(value) {
+    if (!value) return '-';
+    try { return new Date(value).toLocaleString(); } catch { return value; }
+}
+
+async function loadSiteDetail() {
+    const headers = await getAuthHeaders();
+    const resp = await fetch(`/api/admin/sites/${encodeURIComponent(SITE_ID)}`, { headers });
+    const data = await resp.json();
+    if (!resp.ok || !data.success) {
+        document.getElementById('site-subtitle').textContent = data.error || 'Site not found';
+        return;
+    }
+    const site = data.site;
+    document.getElementById('site-title').textContent = site.company_name || site.site_domain || site.site_id;
+    document.getElementById('site-subtitle').textContent = site.site_domain || site.site_id;
+    document.getElementById('stat-mau').textContent = (site.mau_current ?? 0).toLocaleString();
+    document.getElementById('stat-blocks').textContent = site.active_blocks_count ?? 0;
+    document.getElementById('stat-pending').textContent = site.pending_review_count ?? 0;
+    document.getElementById('stat-activity').textContent = site.activity_count ?? 0;
+    document.getElementById('field-site-id').textContent = site.site_id;
+    document.getElementById('field-domain').textContent = site.site_domain || '-';
+    document.getElementById('field-company').textContent = site.company_name || '-';
+    document.getElementById('field-admin').textContent = site.admin_email || '-';
+    document.getElementById('field-plan').textContent = site.plan || 'starter';
+    document.getElementById('field-status').textContent = site.status || 'active';
+    document.getElementById('field-mau-limit').textContent = site.mau_limit != null ? site.mau_limit.toLocaleString() : 'Unlimited';
+    document.getElementById('field-created').textContent = formatDate(site.created_at);
+    const stripeEl = document.getElementById('field-stripe');
+    if (site.stripe_customer_id) {
+        stripeEl.innerHTML = `<a href="https://dashboard.stripe.com/customers/${site.stripe_customer_id}" target="_blank" rel="noopener">${site.stripe_customer_id}</a>`;
+    } else {
+        stripeEl.textContent = '-';
+    }
+    document.getElementById('manage-site-link').href = `/admin/site-manager/${encodeURIComponent(site.site_id)}`;
+}
+
+document.getElementById('revoke-site-btn').addEventListener('click', async () => {
+    const reason = prompt('Reason for suspending this site (tier-1 only):', 'manual_admin_site_revoke');
+    if (reason === null) return;
+    if (!confirm('Suspend this site? This does not network-revoke users.')) return;
+    try {
+        const headers = await getAuthHeaders();
+        const resp = await fetch(`/api/admin/sites/${encodeURIComponent(SITE_ID)}/revoke`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', ...headers },
+            body: JSON.stringify({ reason }),
+        });
+        const data = await resp.json();
+        if (!resp.ok || !data.success) throw new Error(data.error || `HTTP ${resp.status}`);
+        if (window.showToast) showToast('success', 'Site Suspended', data.message || 'Site suspended');
+        await loadSiteDetail();
+    } catch (err) {
+        if (window.showToast) showToast('error', 'Failed', err.message || 'Could not suspend site');
+    }
+});
+
+document.addEventListener('DOMContentLoaded', loadSiteDetail);
+</script>
+{% endblock %}

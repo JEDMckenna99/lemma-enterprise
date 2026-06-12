@@ -272,6 +272,8 @@ def create_app():
 
         from api.admin_trust import admin_trust_bp
         app.register_blueprint(admin_trust_bp)
+        from api.admin_billing import admin_billing_bp
+        app.register_blueprint(admin_billing_bp)
         logger.info("✅ Dashboard API registered")
     except Exception as e:
         logger.error(f"❌ Failed to register Dashboard API: {e}")
@@ -1278,6 +1280,8 @@ def create_app():
         logger.info("Serving admin archived Agent Ops dashboard")
         return _require_wallet_session(
             'developer/agent_ops_mvp.html',
+            layout_template='admin/layout.html',
+            active_page='agent_ops',
             screen='dashboard',
             user_email=request.headers.get('X-User-Email'),
             user_name=None,
@@ -1328,15 +1332,19 @@ def create_app():
     
     @app.route('/admin/monitoring')
     def admin_monitoring_page():
-        """Admin Monitoring - Bloom filter, system health"""
-        logger.info("Serving admin monitoring")
-        return _require_wallet_session('admin/platform_monitoring.html')
-    
+        """Legacy monitoring URL redirects to Platform Ops."""
+        return redirect('/admin/platform-ops', code=302)
+
     @app.route('/admin/health')
     def admin_health_page():
-        """Admin Health - System health details"""
-        logger.info("Serving admin health")
-        return _require_wallet_session('admin/health.html')
+        """Legacy health URL redirects to Platform Ops."""
+        return redirect('/admin/platform-ops', code=302)
+
+    @app.route('/admin/platform-ops')
+    def admin_platform_ops_page():
+        """Unified platform operations view."""
+        logger.info("Serving admin platform ops")
+        return _require_wallet_session('admin/platform_ops.html', active_page='platform_ops')
     
     @app.route('/admin/users')
     def admin_users():
@@ -1349,6 +1357,18 @@ def create_app():
         """Admin Sites - All registered sites"""
         logger.info("Serving admin sites")
         return _require_wallet_session('admin/sites.html')
+
+    @app.route('/admin/sites/<site_id>')
+    def admin_site_detail(site_id):
+        """Admin site detail with operator metrics."""
+        logger.info("Serving admin site detail: %s", site_id)
+        return _require_wallet_session('admin/site_detail.html', active_page='sites', site_id=site_id)
+
+    @app.route('/admin/billing')
+    def admin_billing():
+        """Admin billing summary across tenants."""
+        logger.info("Serving admin billing")
+        return _require_wallet_session('admin/billing.html', active_page='billing')
 
     @app.route('/admin/site-manager')
     def admin_site_manager_legacy():
@@ -1424,9 +1444,8 @@ def create_app():
     
     @app.route('/admin/credentials')
     def admin_credentials():
-        """Admin Credentials - Credential management"""
-        logger.info("Serving admin credentials")
-        return _require_wallet_session('admin/credentials.html')
+        """Legacy credentials stub redirects to overview."""
+        return redirect('/admin', code=302)
     
     @app.route('/admin/trust-safety')
     def admin_trust_safety():

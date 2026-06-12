@@ -146,3 +146,24 @@ Store evidence under `ops/evidence/launch/ishuman/`:
 ## Exit Criteria
 
 Only mark isHuman "service live" when all sections above are green or have explicit, accepted risk waivers with owner/date.
+
+## 12) Operator Console (lemma.id /admin)
+
+Use the Lemma Operator Console for cross-tenant isHuman operations (platform members only — not every verified human PPID).
+
+- [ ] **Overview loads isHuman KPIs**
+  - `/admin` — pending network-review count links to Trust & Safety
+- [ ] **Trust & Safety queue**
+  - `/admin/trust-safety` — pending `network_revocation_status=pending_review` rows; approve via `POST /api/ishuman/approve-revocation`; reject via `POST /api/admin/trust/queue/<block_id>/reject`
+  - Prod smoke: `python scripts/run_ishuman_prod_revocation_smoke.py --base-url https://lemma.id`
+- [ ] **Site suspend vs network revoke**
+  - Tier-1 site suspend: `POST /api/admin/sites/<site_id>/revoke` (site suspension only)
+  - Tier-2 network kill: operator approve in Trust & Safety (never from site revoke)
+- [ ] **Developer platform access**
+  - `/admin/users` — revoke via `POST /api/admin/users/revoke-access` (not wallet revoke API)
+- [ ] **Billing MAU check**
+  - `/admin/billing` — sites over MAU limit without opening Stripe for every tenant
+- [ ] **Platform Ops**
+  - `/admin/platform-ops` — Bloom/revocation pipeline, IDV webhook configured, system health
+- [ ] **Audit trail**
+  - `/admin/audit` — `GET /api/v1/audit/logs?site_id=lemma.id&event_type=admin_action` after approve/reject/revoke actions
