@@ -213,6 +213,9 @@ function formatIssueError(data, status) {
     if (code === 'platform_owner_required') {
         return detail || 'Only the platform owner can issue lemma.id admin agent tokens.';
     }
+    if (String(code).startsWith('invalid_lemma')) {
+        return detail || 'Admin credential could not be verified. Re-bootstrap at /admin/bootstrap and refresh.';
+    }
     return detail || code || `HTTP ${status}`;
 }
 
@@ -323,11 +326,7 @@ async function generateToken() {
         audience: OPERATOR_SITE,
         operator_plane: true,
         task: 'Inspect lemma.id operator admin plane (/api/admin/**)',
-        admin_credential: window.lemmaCredentialForHeader
-            || (typeof window.buildLemmaCredentialForHeader === 'function'
-                ? window.buildLemmaCredentialForHeader(window.lemmaCredential)
-                : window.lemmaCredential)
-            || null,
+        admin_credential: adminCredential || window.lemmaCredential || null,
     };
 
     const headers = await getOperatorAuthHeaders({ 'Content-Type': 'application/json' });

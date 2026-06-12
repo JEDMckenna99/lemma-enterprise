@@ -1498,6 +1498,40 @@ def _resolve_agent_owner_ppid():
     return None, 'Authentication required'
 
 
+def _admin_lemma_ctx_allows_delegation(admin_ctx: dict | None) -> bool:
+    admin_ctx = admin_ctx or {}
+    allowed_permissions = _get_allowed_values(
+        'AGENT_DELEGATION_ALLOWED_PERMISSIONS',
+        DEFAULT_DELEGATION_ALLOWED_PERMISSIONS,
+    )
+    allowed_roles = _get_allowed_values(
+        'AGENT_DELEGATION_ALLOWED_ROLES',
+        DEFAULT_DELEGATION_ALLOWED_ROLES,
+    )
+    lemma_permission_id = (admin_ctx.get('permission_id') or '').strip().lower()
+    lemma_role = (admin_ctx.get('role') or '').strip().lower()
+    return (
+        (lemma_permission_id and lemma_permission_id in allowed_permissions)
+        or (lemma_role and lemma_role in allowed_roles)
+    )
+
+
+def _try_wallet_delegation_principal() -> str | None:
+    """
+    Browser operator issuance: unlocked wallet session + admin lemma in JSON body.
+    Used when auto-attached X-Lemma-Credential fails strict verification.
+    """
+    if not _has_valid_wallet_unlock_session():
+        return None
+    admin_ctx = _parse_admin_lemma_context()
+    if not _admin_lemma_ctx_allows_delegation(admin_ctx):
+        return None
+    ppid = admin_ctx.get('ppid')
+    if ppid and str(ppid).startswith('did:lemma:ppid_'):
+        return str(ppid)
+    return None
+
+
 def _resolve_monitor_identity():
     """
     Resolve owner identity for monitoring endpoints.
@@ -1748,6 +1782,14 @@ def require_agent_or_user_session(required_scope=None):
                 g.authenticated = True
                 g.auth_method = lemma_principal.auth_method
                 return f(*args, **kwargs)
+
+            wallet_delegation_ppid = _try_wallet_delegation_principal()
+            if wallet_delegation_ppid:
+                g.ppid = wallet_delegation_ppid
+                g.authenticated = True
+                g.auth_method = 'wallet_delegation'
+                return f(*args, **kwargs)
+
             elif lemma_error and lemma_error not in {'missing_lemma_header', 'invalid_lemma_header'}:
                 return jsonify({
                     'success': False,

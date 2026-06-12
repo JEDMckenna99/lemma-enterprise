@@ -84,3 +84,62 @@ def test_list_agent_credentials_still_requires_auth_without_session(monkeypatch)
     client = _make_client()
     resp = client.get("/api/agent/credentials")
     assert resp.status_code == 401
+
+
+def test_issue_accepts_wallet_delegation_when_header_invalid(monkeypatch):
+    from api import agent_credentials as mod
+    from flask import jsonify
+
+    ppid = "did:lemma:ppid_" + ("b" * 64)
+    monkeypatch.setattr(mod, "_has_valid_wallet_unlock_session", lambda: True)
+    monkeypatch.setattr(
+        "api.authz_engine.extract_user_lemma_principal",
+        lambda _headers: (None, "invalid_lemma:invalid_signature"),
+    )
+    monkeypatch.setattr(
+        mod,
+        "_require_delegation_admin_session",
+        lambda: (False, (jsonify({"success": False, "error": "passed_decorator_gate"}), 403)),
+    )
+
+    client = _make_client()
+    resp = client.post(
+        "/api/agent/credentials/issue",
+        json={
+            "agent_name": "Cursor Admin Inspector",
+            "scope": ["read", "admin"],
+            "operator_plane": True,
+            "allowed_sites": ["lemma.id"],
+            "admin_credential": {
+                "subject": ppid,
+                "claims": {
+                    "permissionId": "admin_access",
+                    "siteId": "lemma.id",
+                },
+            },
+        },
+        headers={"X-Lemma-Credential": "invalid"},
+    )
+    assert resp.status_code == 403
+    assert resp.get_json()["error"] == "passed_decorator_gate"
+
+
+def test_try_wallet_delegation_principal_reads_body_admin_credential(monkeypatch):
+    from api import agent_credentials as mod
+
+    ppid = "did:lemma:ppid_" + ("c" * 64)
+    monkeypatch.setattr(mod, "_has_valid_wallet_unlock_session", lambda: True)
+
+    app = Flask(__name__)
+    app.config["TESTING"] = True
+    with app.test_request_context(
+        "/api/agent/credentials/issue",
+        method="POST",
+        json={
+            "admin_credential": {
+                "subject": ppid,
+                "claims": {"permissionId": "admin_access", "siteId": "lemma.id"},
+            }
+        },
+    ):
+        assert mod._try_wallet_delegation_principal() == ppid
