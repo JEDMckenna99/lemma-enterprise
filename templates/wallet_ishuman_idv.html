@@ -179,6 +179,9 @@
     <script src="/static/js/qrcode.min.js" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
     <script nonce="{{ csp_nonce }}">
         const SESSION_KEY = 'ishuman_idv_popup_session_id';
+        const PENDING_REGISTER_KEY = 'lemma_register_pending_v1';
+        const REGISTER_RESULT_KEY = 'lemma_register_result_v1';
+        const REGISTER_ERROR_KEY = 'lemma_register_error_v1';
         const params = new URLSearchParams(window.location.search);
         const PLATFORM_SITE_IDS = new Set(['lemma.id', 'lemma_platform']);
         const platformHost = /^lemma\.id$/i.test(window.location.hostname.replace(/^www\./i, ''));
@@ -359,6 +362,77 @@
             });
         }
 
+        async function tryCompletePendingPlatformRegistration() {
+            let pending = null;
+            try {
+                const raw = sessionStorage.getItem(PENDING_REGISTER_KEY);
+                pending = raw ? JSON.parse(raw) : null;
+            } catch (_) {}
+            if (!pending) return null;
+
+            wallet = wallet || new LemmaWallet();
+            if (!wallet.isUnlocked || !wallet.isUnlocked()) {
+                await ensureWalletUnlocked();
+            } else {
+                await adoptWalletState();
+            }
+
+            const ppid = await wallet.derivePPID('lemma.id');
+            if (!ppid || !String(ppid).startsWith('did:lemma:ppid_')) {
+                throw new Error('Identity verification was not completed.');
+            }
+
+            const resolvedWalletId = walletId || wallet.session?.walletId;
+            if (!resolvedWalletId) {
+                throw new Error('Wallet unlock failed.');
+            }
+
+            let passkeyCredentialId = null;
+            try {
+                passkeyCredentialId = await wallet.getPasskeyCredentialId();
+            } catch (_) {}
+
+            const payload = {
+                email: pending.email,
+                name: pending.name,
+                company: pending.company,
+                billing_email: pending.billing_email,
+                invite_code: pending.invite_code,
+                ppid,
+                wallet_id: resolvedWalletId,
+            };
+            if (passkeyCredentialId) {
+                payload.passkey_credential_id = passkeyCredentialId;
+            }
+
+            sessionStorage.removeItem(REGISTER_ERROR_KEY);
+
+            const response = await fetch('/api/customer/register-wallet-developer', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload),
+            });
+            const result = await response.json();
+            if (!result.success) {
+                sessionStorage.setItem(REGISTER_ERROR_KEY, JSON.stringify({
+                    error: result.error,
+                    message: result.message || result.error || 'Registration failed',
+                }));
+                if (result.error === 'platform_membership_exists') {
+                    sessionStorage.removeItem(PENDING_REGISTER_KEY);
+                }
+                return null;
+            }
+
+            if (result.permission_lemma && typeof wallet.storeCredential === 'function') {
+                await wallet.storeCredential(result.permission_lemma);
+            }
+
+            sessionStorage.removeItem(PENDING_REGISTER_KEY);
+            sessionStorage.setItem(REGISTER_RESULT_KEY, JSON.stringify(result));
+            return result;
+        }
+
         async function closeWith(type, detail) {
             const syncTypes = new Set(['ISHUMAN_IDV_COMPLETE', 'ISHUMAN_SITE_PROOF_ISSUED']);
             if (syncTypes.has(type) && wallet) {
@@ -417,12 +491,32 @@
                     }
                 }
                 if (type === 'ISHUMAN_IDV_COMPLETE') {
+                    try {
+                        await tryCompletePendingPlatformRegistration();
+                    } catch (err) {
+                        console.error('[isHuman IDV] platform registration failed:', err);
+                        try {
+                            sessionStorage.setItem(REGISTER_ERROR_KEY, JSON.stringify({
+                                message: err?.message || 'Registration could not be completed.',
+                            }));
+                        } catch (_) {}
+                    }
                     window.location.replace(redirectReturn);
                     return;
                 }
             }
 
             if (!window.opener && redirectReturn && type === 'ISHUMAN_IDV_COMPLETE') {
+                try {
+                    await tryCompletePendingPlatformRegistration();
+                } catch (err) {
+                    console.error('[isHuman IDV] platform registration failed:', err);
+                    try {
+                        sessionStorage.setItem(REGISTER_ERROR_KEY, JSON.stringify({
+                            message: err?.message || 'Registration could not be completed.',
+                        }));
+                    } catch (_) {}
+                }
                 window.location.replace(redirectReturn);
                 return;
             }
