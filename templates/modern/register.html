@@ -1,13 +1,13 @@
 {% extends "modern/layout.html" %}
 
-{% block title %}Create Account - lemma.id{% endblock %}
-{% block description %}Create your lemma.id developer account and add reusable proof-of-humanity to your site with site-private PPIDs and local verification.{% endblock %}
+{% block title %}Get Started - lemma.id{% endblock %}
+{% block description %}Register for lemma.id platform access with isHuman verification and a passkey-secured wallet. Developer credentials are issued after signup.{% endblock %}
 
 {% block head %}
     {{ super() }}
     <style>
         .register-container {
-            max-width: 580px;
+            max-width: 520px;
             margin: var(--space-12) auto;
             padding: 0 var(--space-6);
         }
@@ -17,12 +17,10 @@
             border: 1px solid var(--gray-200);
             border-radius: 24px;
             padding: var(--space-12);
-            box-shadow: 
+            box-shadow:
                 0 4px 6px -1px rgba(0, 0, 0, 0.1),
-                0 2px 4px -1px rgba(0, 0, 0, 0.06),
-                0 0 0 1px rgba(255, 255, 255, 0.05);
+                0 2px 4px -1px rgba(0, 0, 0, 0.06);
             position: relative;
-            overflow: hidden;
         }
 
         .register-card::before {
@@ -32,26 +30,18 @@
             left: 0;
             right: 0;
             height: 4px;
-            background: linear-gradient(90deg, #6366f1, #8b5cf6, #ec4899);
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            border-radius: 24px 24px 0 0;
         }
 
         .register-header {
             text-align: center;
-            margin-bottom: var(--space-10);
-            position: relative;
+            margin-bottom: var(--space-8);
         }
 
-        .register-icon {
-            width: 64px;
-            height: 64px;
-            background: linear-gradient(135deg, #6366f1, #8b5cf6);
-            border-radius: 20px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            margin: 0 auto var(--space-4);
-            font-size: 28px;
-            box-shadow: 0 8px 24px rgba(99, 102, 241, 0.3);
+        .register-logo {
+            margin: 0 auto var(--space-6);
+            display: block;
         }
 
         .register-title {
@@ -59,45 +49,73 @@
             font-weight: 800;
             color: var(--gray-900);
             margin-bottom: var(--space-3);
-            background: linear-gradient(135deg, #1f2937, #4b5563);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
         }
 
         .register-subtitle {
             color: var(--gray-600);
             font-size: var(--font-size-lg);
             line-height: 1.6;
-            max-width: 400px;
-            margin: 0 auto;
         }
 
-        .features-preview {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: var(--space-4);
+        .register-requirements {
             margin-top: var(--space-6);
             padding: var(--space-4);
             background: var(--gray-50);
-            border-radius: 16px;
-            border: 1px solid var(--gray-100);
+            border-radius: 12px;
+            border: 1px solid var(--gray-200);
+            text-align: left;
         }
 
-        .feature-item {
-            text-align: center;
-            padding: var(--space-2);
+        .register-requirements-title {
+            font-size: var(--font-size-sm);
+            font-weight: 700;
+            color: var(--gray-700);
+            margin-bottom: var(--space-3);
         }
 
-        .feature-icon {
-            font-size: 24px;
-            margin-bottom: var(--space-1);
+        .register-requirements-list {
+            margin: 0;
+            padding-left: var(--space-5);
+            color: var(--gray-600);
+            font-size: var(--font-size-sm);
+            line-height: 1.6;
         }
 
-        .feature-text {
+        .register-requirements-list li + li {
+            margin-top: var(--space-2);
+        }
+
+        .wallet-status {
+            padding: var(--space-4);
+            background: var(--gray-50);
+            border: 1px solid var(--gray-200);
+            border-radius: 12px;
+            margin-bottom: var(--space-6);
             font-size: var(--font-size-sm);
             color: var(--gray-600);
+            line-height: 1.6;
+        }
+
+        .wallet-status.ready {
+            background: #ecfdf5;
+            border-color: #10b981;
+            color: #065f46;
+        }
+
+        .wallet-status.locked {
+            background: #fef3c7;
+            border-color: #f59e0b;
+            color: #92400e;
+        }
+
+        .wallet-status a {
+            color: #667eea;
             font-weight: 600;
+            text-decoration: none;
+        }
+
+        .wallet-status a:hover {
+            text-decoration: underline;
         }
 
         .form-section {
@@ -113,13 +131,6 @@
             font-weight: 700;
             color: var(--gray-800);
             margin-bottom: var(--space-4);
-            display: flex;
-            align-items: center;
-            gap: var(--space-2);
-        }
-
-        .section-icon {
-            font-size: 20px;
         }
 
         .form-group {
@@ -145,24 +156,12 @@
 
         .form-input {
             width: 100%;
-            padding: var(--space-4) var(--space-4) var(--space-4) var(--space-12);
+            padding: var(--space-4);
             border: 2px solid var(--gray-200);
             border-radius: 12px;
             font-size: var(--font-size-base);
             transition: all 0.3s ease;
             background: var(--white);
-            position: relative;
-        }
-
-        .input-icon {
-            position: absolute;
-            left: var(--space-4);
-            top: 50%;
-            transform: translateY(-50%);
-            color: var(--gray-400);
-            font-size: 18px;
-            z-index: 1;
-            pointer-events: none;
         }
 
         .form-input:focus {
@@ -170,10 +169,6 @@
             border-color: var(--primary-500);
             box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.1);
             background: var(--white);
-        }
-
-        .form-input:focus + .input-icon {
-            color: var(--primary-500);
         }
 
         .form-input.error {
@@ -190,15 +185,6 @@
             font-size: var(--font-size-sm);
             color: var(--gray-500);
             margin-top: var(--space-2);
-            padding-left: var(--space-1);
-            display: flex;
-            align-items: center;
-            gap: var(--space-1);
-        }
-
-        .help-icon {
-            font-size: 14px;
-            color: var(--gray-400);
         }
 
         .error-message {
@@ -215,7 +201,7 @@
 
         .register-button {
             width: 100%;
-            background: linear-gradient(135deg, #6366f1, #8b5cf6);
+            background: linear-gradient(135deg, #667eea, #764ba2);
             color: var(--white);
             border: none;
             padding: var(--space-5);
@@ -225,42 +211,19 @@
             cursor: pointer;
             transition: all 0.3s ease;
             margin-top: var(--space-6);
-            position: relative;
-            overflow: hidden;
-            box-shadow: 0 8px 24px rgba(99, 102, 241, 0.3);
-        }
-
-        .register-button::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: -100%;
-            width: 100%;
-            height: 100%;
-            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
-            transition: left 0.5s ease;
-        }
-
-        .register-button:hover::before {
-            left: 100%;
+            box-shadow: 0 8px 24px rgba(102, 126, 234, 0.3);
         }
 
         .register-button:hover:not(:disabled) {
             transform: translateY(-2px);
-            box-shadow: 0 16px 40px rgba(99, 102, 241, 0.4);
-            background: linear-gradient(135deg, #5b5bf6, #7c3aed);
-        }
-
-        .register-button:active:not(:disabled) {
-            transform: translateY(0);
-            box-shadow: 0 8px 24px rgba(99, 102, 241, 0.3);
+            box-shadow: 0 16px 40px rgba(102, 126, 234, 0.4);
+            background: linear-gradient(135deg, #5a67d8, #6b46c1);
         }
 
         .register-button:disabled {
             opacity: 0.7;
             cursor: not-allowed;
             transform: none;
-            box-shadow: 0 4px 12px rgba(99, 102, 241, 0.2);
         }
 
         .button-content {
@@ -268,10 +231,6 @@
             align-items: center;
             justify-content: center;
             gap: var(--space-2);
-        }
-
-        .button-icon {
-            font-size: 20px;
         }
 
         .login-link {
@@ -283,10 +242,9 @@
         }
 
         .login-link a {
-            color: var(--primary-600);
+            color: #667eea;
             text-decoration: none;
             font-weight: 600;
-            transition: all 0.2s ease;
         }
 
         .login-link a:hover {
@@ -295,68 +253,26 @@
         }
 
         .success-message {
-            background: linear-gradient(135deg, #ecfdf5, #f0fdf4);
+            background: #ecfdf5;
             border: 2px solid #10b981;
             color: #065f46;
             padding: var(--space-6);
-            border-radius: 16px;
+            border-radius: 12px;
             margin-bottom: var(--space-6);
             display: none;
             text-align: center;
             font-weight: 600;
-            box-shadow: 0 4px 12px rgba(16, 185, 129, 0.2);
         }
 
-        .success-message::before {
-            content: '🎉';
-            display: block;
-            font-size: 32px;
-            margin-bottom: var(--space-2);
-        }
-
-        .progress-indicator {
-            display: flex;
-            justify-content: center;
-            gap: var(--space-2);
-            margin-bottom: var(--space-8);
-        }
-
-        .progress-step {
-            width: 40px;
-            height: 4px;
-            background: var(--gray-200);
-            border-radius: 2px;
-            transition: all 0.3s ease;
-        }
-
-        .progress-step.active {
-            background: linear-gradient(90deg, #6366f1, #8b5cf6);
-        }
-
-        .trust-indicators {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            gap: var(--space-6);
-            margin-top: var(--space-6);
-            padding: var(--space-4);
-            background: var(--gray-50);
-            border-radius: 12px;
-            border: 1px solid var(--gray-100);
-        }
-
-        .trust-item {
-            display: flex;
-            align-items: center;
-            gap: var(--space-1);
+        .general-error {
+            display: none;
+            color: var(--error);
             font-size: var(--font-size-sm);
-            color: var(--gray-600);
-            font-weight: 500;
-        }
-
-        .trust-icon {
-            font-size: 16px;
-            color: #10b981;
+            margin-bottom: var(--space-4);
+            padding: var(--space-3) var(--space-4);
+            background: rgba(239, 68, 68, 0.08);
+            border: 1px solid rgba(239, 68, 68, 0.25);
+            border-radius: 12px;
         }
 
         .loading-spinner {
@@ -424,71 +340,52 @@
     <div class="register-container">
         <div class="register-card">
             <div class="register-header">
-                <div class="register-icon">🛡️</div>
-                <h1 class="register-title">Create your lemma.id developer account</h1>
+                <img src="{{ url_for('static', filename='img/lemma_logo.svg') }}" alt="Lemma.id" class="register-logo" width="80" height="80">
+                <h1 class="register-title">Get Started</h1>
                 <p class="register-subtitle">
-                    Verify your humanity once, bind your passkey wallet, and receive a signed developer credential for the platform.
+                    Register for lemma.id platform access. Developer credentials are issued after signup, not at sign-in.
                 </p>
-                
-                <div class="features-preview">
-                    <div class="feature-item">
-                        <div class="feature-icon">⚡</div>
-                        <div class="feature-text">Instant Setup</div>
-                    </div>
-                    <div class="feature-item">
-                        <div class="feature-icon">🔐</div>
-                        <div class="feature-text">Enterprise Security</div>
-                    </div>
-                    <div class="feature-item">
-                        <div class="feature-icon">📊</div>
-                        <div class="feature-text">Real-time Analytics</div>
-                    </div>
+
+                <div class="register-requirements">
+                    <div class="register-requirements-title">Before you register</div>
+                    <ol class="register-requirements-list">
+                        <li>Complete isHuman verification on your wallet</li>
+                        <li>Unlock your passkey-secured wallet</li>
+                        <li>Submit your developer account details below</li>
+                    </ol>
                 </div>
             </div>
 
-            <div class="progress-indicator">
-                <div class="progress-step active"></div>
-                <div class="progress-step"></div>
-                <div class="progress-step"></div>
-            </div>
-
-            <div id="wallet-status" class="wallet-status" style="margin-bottom: 24px; padding: 16px; border-radius: 8px; background: var(--gray-50); border: 1px solid var(--gray-200);">
-                <span>🔐</span> Unlock your wallet and complete isHuman IDV before registering.
-                <div style="margin-top: 8px; font-size: 14px;">
-                    <a href="/wallet/ishuman-idv">Complete identity verification</a>
-                </div>
+            <div id="wallet-status" class="wallet-status locked">
+                Checking wallet status...
             </div>
 
             <div class="success-message" id="successMessage">
-                <strong>Welcome to lemma.id!</strong> Your API key is ready to use.
+                <strong>Developer account created.</strong> Save your API key before continuing.
             </div>
+
+            <div class="error-message general-error" id="generalError"></div>
 
             <form id="registerForm">
                 <div class="form-section">
-                    <div class="section-title">
-                        <span class="section-icon">👤</span>
-                        Your Information
-                    </div>
+                    <div class="section-title">Your information</div>
                     
                     <div class="form-group">
                         <label class="form-label" for="email">
-                            Email Address <span class="required-indicator">*</span>
+                            Email address <span class="required-indicator">*</span>
                         </label>
-                        <div class="input-icon">📧</div>
                         <input type="email" id="email" name="email" class="form-input" required 
                                placeholder="you@company.com">
                         <div class="form-help">
-                            <span class="help-icon">💡</span>
-                            We'll use this for account notifications and API key management
+                            Used for account notifications and API key management
                         </div>
                         <div class="error-message" id="emailError"></div>
                     </div>
 
                     <div class="form-group">
                         <label class="form-label" for="name">
-                            Full Name <span class="required-indicator">*</span>
+                            Full name <span class="required-indicator">*</span>
                         </label>
-                        <div class="input-icon">👤</div>
                         <input type="text" id="name" name="name" class="form-input" required 
                                placeholder="John Smith">
                         <div class="error-message" id="nameError"></div>
@@ -496,34 +393,27 @@
                 </div>
 
                 <div class="form-section">
-                    <div class="section-title">
-                        <span class="section-icon">🏢</span>
-                        Company Details
-                    </div>
+                    <div class="section-title">Company details</div>
                     
                     <div class="form-group">
                         <label class="form-label" for="company">
-                            Company Name <span class="required-indicator">*</span>
+                            Company name <span class="required-indicator">*</span>
                         </label>
-                        <div class="input-icon">🏢</div>
                         <input type="text" id="company" name="company" class="form-input" required 
                                placeholder="Acme Corporation">
                         <div class="form-help">
-                            <span class="help-icon">💡</span>
-                            This will appear on your invoices and API documentation
+                            Appears on invoices and API documentation
                         </div>
                         <div class="error-message" id="companyError"></div>
                     </div>
 
                     <div class="form-group">
                         <label class="form-label" for="billingEmail">
-                            Billing Email (Optional)
+                            Billing email (optional)
                         </label>
-                        <div class="input-icon">💳</div>
                         <input type="email" id="billingEmail" name="billing_email" class="form-input" 
                                placeholder="billing@company.com">
                         <div class="form-help">
-                            <span class="help-icon">💡</span>
                             Leave empty to use your main email for billing notifications
                         </div>
                         <div class="error-message" id="billingEmailError"></div>
@@ -532,25 +422,9 @@
 
                 <button type="submit" class="register-button" id="registerButton">
                     <div class="button-content">
-                        <span class="button-icon">🚀</span>
-                        Create Account & Get API Keys
+                        Create developer account
                     </div>
                 </button>
-
-                <div class="trust-indicators">
-                    <div class="trust-item">
-                        <span class="trust-icon">🔒</span>
-                        SOC 2 Compliant
-                    </div>
-                    <div class="trust-item">
-                        <span class="trust-icon">⚡</span>
-                        Free to Start
-                    </div>
-                    <div class="trust-item">
-                        <span class="trust-icon">🛡️</span>
-                        Enterprise Ready
-                    </div>
-                </div>
             </form>
 
             <div class="api-key-display" id="apiKeyDisplay">
@@ -568,7 +442,7 @@
             </div>
 
             <div class="login-link">
-                Already have an account? <a href="/login">Sign in here</a>
+                Already have an account? <a href="/login">Sign in</a>
             </div>
         </div>
     </div>
@@ -579,9 +453,10 @@
         function setWalletStatus(message, tone = 'info') {
             const el = document.getElementById('wallet-status');
             if (!el) return;
-            el.innerHTML = `<span>${tone === 'ready' ? '✅' : tone === 'locked' ? '🔒' : '🔐'}</span> ${message}`;
+            el.className = 'wallet-status' + (tone === 'ready' ? ' ready' : tone === 'locked' ? ' locked' : '');
+            el.textContent = message;
             if (tone === 'locked' || tone === 'info') {
-                el.innerHTML += `<div style="margin-top: 8px; font-size: 14px;"><a href="/wallet/ishuman-idv">Complete identity verification</a></div>`;
+                el.innerHTML = `${message}<div style="margin-top: 8px;"><a href="/wallet/ishuman-idv">Complete isHuman verification</a></div>`;
             }
         }
 
@@ -605,11 +480,11 @@
             }
             const info = await wallet.getWalletInfo();
             if (!info.hasPasskey) {
-                setWalletStatus('Create a passkey to secure your developer wallet...', 'locked');
+                setWalletStatus('Create a passkey to secure your wallet before registering.', 'locked');
                 await wallet.registerPasskey();
             }
             if (!wallet.isUnlocked || !wallet.isUnlocked()) {
-                setWalletStatus('Unlock your wallet with passkey to continue...', 'locked');
+                setWalletStatus('Unlock your wallet with passkey to continue.', 'locked');
                 const unlocked = await wallet.unlock();
                 if (!unlocked) {
                     throw new Error('Wallet unlock cancelled.');
@@ -631,14 +506,14 @@
             if (!walletId) {
                 throw new Error('Wallet unlock failed. Refresh and try again.');
             }
-            setWalletStatus('Wallet verified — ready to register as developer.', 'ready');
+            setWalletStatus('Wallet verified. Complete the form to register.', 'ready');
             return { ppid, walletId, passkeyCredentialId };
         }
 
         document.addEventListener('DOMContentLoaded', async () => {
             try {
                 await waitForRegisterWallet();
-                setWalletStatus('Unlock your wallet and complete isHuman IDV before registering.', 'locked');
+                setWalletStatus('Unlock your wallet and complete isHuman verification before registering.', 'locked');
             } catch (_) {
                 setWalletStatus('Wallet failed to initialize. Refresh and try again.', 'locked');
             }
@@ -661,9 +536,6 @@
             
             // Clear previous errors
             clearErrors();
-            
-            // Update progress
-            updateProgress(2);
             
             // Show loading state
             button.disabled = true;
@@ -696,8 +568,6 @@
                 const result = await response.json();
                 
                 if (result.success) {
-                    updateProgress(3);
-
                     if (result.permission_lemma && registerWallet) {
                         await registerWallet.storeCredential(result.permission_lemma);
                         window.lemmaCredential = result.permission_lemma;
@@ -715,7 +585,6 @@
                         setTimeout(() => { window.location.href = '/dashboard'; }, 1500);
                     }
                 } else {
-                    updateProgress(1);
                     if (result.error === 'platform_membership_exists') {
                         showError('general', 'This wallet is already registered. Redirecting to sign in...');
                         setTimeout(() => { window.location.href = '/login'; }, 1500);
@@ -728,24 +597,11 @@
                 
             } catch (error) {
                 console.error('Registration error:', error);
-                updateProgress(1);
                 showError('general', error.message || 'Network error. Please try again.');
                 button.disabled = false;
                 button.innerHTML = originalContent;
             }
         });
-        
-        // Progress indicator functions
-        function updateProgress(step) {
-            const steps = document.querySelectorAll('.progress-step');
-            steps.forEach((stepEl, index) => {
-                if (index < step) {
-                    stepEl.classList.add('active');
-                } else {
-                    stepEl.classList.remove('active');
-                }
-            });
-        }
         
         // Validation functions
         function validateEmail() {
@@ -818,7 +674,6 @@
                     input.focus();
                 }
             } else {
-                // General error - create a toast notification
                 showToast('error', message);
             }
         }
@@ -832,14 +687,7 @@
         function showToast(type, message) {
             const toast = document.createElement('div');
             toast.className = `toast toast-${type}`;
-            const icon = document.createElement('span');
-            icon.className = 'toast-icon';
-            icon.textContent = type === 'error' ? '❌' : '✅';
-            const msg = document.createElement('span');
-            msg.className = 'toast-message';
-            msg.textContent = message;
-            toast.appendChild(icon);
-            toast.appendChild(msg);
+            toast.textContent = message;
             
             // Add toast styles
             toast.style.cssText = `
