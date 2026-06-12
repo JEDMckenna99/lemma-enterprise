@@ -77,6 +77,24 @@ async function getAuthHeaders() {
     return {};
 }
 
+async function getOperatorAuthHeaders(extra = {}) {
+    if (!adminCredential) {
+        await loadAdminCredential();
+    }
+    const headers = { ...extra };
+    if (adminCredential && typeof window.buildLemmaCredentialForHeader === 'function') {
+        const headerCred = window.buildLemmaCredentialForHeader(adminCredential);
+        const encoded = window.encodeLemmaCredentialHeader(headerCred);
+        if (encoded) headers['X-Lemma-Credential'] = encoded;
+        if (headerCred?.id) headers['X-Credential-ID'] = headerCred.id;
+        const claims = headerCred?.claims || headerCred?.credentialSubject || {};
+        const permissionId = claims.permissionId || claims.permission_id || claims.permission_level;
+        if (permissionId) headers['X-Permission-ID'] = String(permissionId);
+        return headers;
+    }
+    return { ...headers, ...(await getAuthHeaders()) };
+}
+
 async function loadAdminCredential() {
     adminCredential = null;
 
@@ -98,11 +116,17 @@ async function loadAdminCredential() {
         if (!authResult?.authenticated) return null;
 
         const credentials = await wallet.getCredentials('permission');
-        adminCredential = credentials.find((c) => {
+        const utils = window.LemmaCredentialUtils;
+        const lemmaPermissions = credentials.filter((c) => {
             const site = getCredentialSite(c);
-            const siteOk = !site || OPERATOR_SITES.has(site) || site.includes('lemma.id');
-            return siteOk && isLemmaOperatorAdminCredential(c);
-        }) || null;
+            return !site || OPERATOR_SITES.has(site) || site.includes('lemma.id');
+        });
+        if (utils && typeof utils.selectBestCredentials === 'function') {
+            const adminMatches = utils.selectBestCredentials(lemmaPermissions, { requireAdmin: true });
+            adminCredential = adminMatches[0] || lemmaPermissions.find((c) => isLemmaOperatorAdminCredential(c)) || null;
+        } else {
+            adminCredential = lemmaPermissions.find((c) => isLemmaOperatorAdminCredential(c)) || null;
+        }
 
         if (adminCredential) {
             window.lemmaCredential = adminCredential;
@@ -127,11 +151,28 @@ async function resolveOperatorAccess() {
         return { ok: true };
     }
 
+    // Wallet unlocked with lemma.id admin in wallet but header auto-select missed it.
     if (typeof LemmaWallet !== 'undefined') {
         try {
             const wallet = window.globalLemmaWallet || new LemmaWallet();
             if (!window.globalLemmaWallet) await wallet.init();
             const authResult = await wallet.autoAuthenticate();
+            if (authResult?.authenticated) {
+                const creds = await wallet.getCredentials('permission');
+                const adminMatch = creds.find((c) => {
+                    const site = getCredentialSite(c);
+                    const siteOk = !site || OPERATOR_SITES.has(site) || site.includes('lemma.id');
+                    return siteOk && isLemmaOperatorAdminCredential(c);
+                });
+                if (adminMatch) {
+                    adminCredential = adminMatch;
+                    window.lemmaCredential = adminMatch;
+                    if (typeof window.buildLemmaCredentialForHeader === 'function') {
+                        window.lemmaCredentialForHeader = window.buildLemmaCredentialForHeader(adminMatch);
+                    }
+                    return { ok: true };
+                }
+            }
             if (!authResult?.authenticated) {
                 return {
                     ok: false,
@@ -196,8 +237,8 @@ async function loadPanel() {
     }
 
     try {
-        const headers = await getAuthHeaders();
-        const response = await fetch('/api/agent/credentials', { headers });
+        const headers = await getOperatorAuthHeaders();
+        const response = await fetch('/api/agent/credentials', { credentials: 'include', headers });
         const data = await response.json();
         if (!response.ok || !data.success) throw new Error(data.error || 'Failed to load tokens');
 
@@ -289,11 +330,11 @@ async function generateToken() {
             || null,
     };
 
-    const headers = await getAuthHeaders();
+    const headers = await getOperatorAuthHeaders({ 'Content-Type': 'application/json' });
     const response = await fetch('/api/agent/credentials/issue', {
         method: 'POST',
         credentials: 'include',
-        headers: { 'Content-Type': 'application/json', ...headers },
+        headers,
         body: JSON.stringify(payload),
     });
     const data = await response.json();
@@ -322,10 +363,11 @@ async function generateToken() {
 
 async function revokeOne(tokenId) {
     if (!confirm('Revoke this token?')) return;
-    const headers = await getAuthHeaders();
+    const headers = await getOperatorAuthHeaders({ 'Content-Type': 'application/json' });
     const response = await fetch(`/api/agent/credentials/${encodeURIComponent(tokenId)}/revoke`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...headers },
+        credentials: 'include',
+        headers,
         body: JSON.stringify({ reason: 'Revoked from admin agent delegation' }),
     });
     const data = await response.json();

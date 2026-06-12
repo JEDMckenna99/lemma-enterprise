@@ -376,11 +376,18 @@ h1{color:#1e293b;font-weight:600;line-height:1.25;margin-bottom:16px;font-size:4
                             const siteId = String(claims.siteId || claims.site || claims.site_id || claims.siteDomain || '').toLowerCase();
                             return siteId === 'lemma.id' || siteId === 'lemma_platform' || siteId.includes('lemma');
                         });
+                        const preferAdmin = typeof window.location?.pathname === 'string'
+                            && window.location.pathname.startsWith('/admin');
                         let selected = null;
                         if (utils && typeof utils.selectBestCredentials === 'function') {
-                            const valid = utils.selectBestCredentials(lemmaPermissions);
-                            selected = valid.length ? valid[0] : null;
-                            } else {
+                            const adminCreds = utils.selectBestCredentials(lemmaPermissions, { requireAdmin: preferAdmin });
+                            if (adminCreds.length) {
+                                selected = adminCreds[0];
+                            } else if (!preferAdmin) {
+                                const valid = utils.selectBestCredentials(lemmaPermissions);
+                                selected = valid.length ? valid[0] : null;
+                            }
+                        } else {
                             selected = lemmaPermissions.length ? lemmaPermissions[0] : null;
                         }
 

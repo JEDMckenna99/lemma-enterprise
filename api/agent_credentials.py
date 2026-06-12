@@ -1385,19 +1385,30 @@ def _extract_api_key_from_request():
     return None
 
 
-def _extract_ppid_from_lemma_header():
-    """
-    Extract verified PPID from full credential header.
-    Header format: X-Lemma-Credential = base64url(JSON credential) or raw JSON.
-    """
+def _parse_ppid_from_credential_dict(credential: dict | None) -> str | None:
+    if not isinstance(credential, dict):
+        return None
+    claims = credential.get('claims') or credential.get('credentialSubject') or {}
+    ppid = (
+        credential.get('subject')
+        or credential.get('sub')
+        or claims.get('sub')
+        or claims.get('ppid')
+        or claims.get('id')
+        or claims.get('subject')
+    )
+    if ppid and str(ppid).startswith('did:lemma:ppid_'):
+        return str(ppid)
+    return None
+
+
+def _decode_lemma_header_credential() -> dict | None:
     raw = request.headers.get('X-Lemma-Credential')
     if not raw:
         return None
-
     text = str(raw).strip()
     if not text:
         return None
-
     try:
         if text.startswith('{'):
             credential = json.loads(text)
@@ -1407,29 +1418,84 @@ def _extract_ppid_from_lemma_header():
             credential = json.loads(decoded)
     except Exception:
         return None
+    return credential if isinstance(credential, dict) else None
 
-    if not isinstance(credential, dict):
+
+def _extract_ppid_from_lemma_header(*, require_verification: bool = True):
+    """
+    Extract verified PPID from full credential header.
+    Header format: X-Lemma-Credential = base64url(JSON credential) or raw JSON.
+    """
+    credential = _decode_lemma_header_credential()
+    if not credential:
         return None
+
+    if require_verification:
+        try:
+            from api.trusted_issuers import verify_credential_with_trust
+            verification = verify_credential_with_trust(credential)
+            if not verification.get('valid'):
+                return None
+        except Exception:
+            return None
+
+    return _parse_ppid_from_credential_dict(credential)
+
+
+def _has_valid_wallet_unlock_session() -> bool:
+    wallet_session_cookie = request.cookies.get('lemma_wallet_session')
+    if not wallet_session_cookie:
+        return False
+    try:
+        from auth.session_manager import validate_session_token
+        return bool(validate_session_token(wallet_session_cookie))
+    except Exception:
+        return False
+
+
+def _resolve_agent_owner_ppid():
+    """
+    Resolve the principal for agent credential list/manage browser flows.
+
+    Prefers verified lemma credentials, then agent tokens and session anchors.
+    When the wallet unlock cookie is valid, accepts a parseable lemma header PPID
+    so admin pages can list tokens even if the auto-selected credential fails
+    strict server verification (for example identity/isHuman package types).
+    """
+    agent_token = request.headers.get('X-Agent-Token')
+    if agent_token:
+        credential_info = validate_agent_token(agent_token)
+        if credential_info:
+            principal = credential_info.get('authorized_by_ppid') or credential_info.get('authorized_by_email')
+            if principal:
+                return principal, None
 
     try:
-        from api.trusted_issuers import verify_credential_with_trust
-        verification = verify_credential_with_trust(credential)
-        if not verification.get('valid'):
-            return None
+        from api.authz_engine import extract_user_lemma_principal
+        principal, _error = extract_user_lemma_principal(request.headers)
+        if principal and principal.ppid:
+            return principal.ppid, None
     except Exception:
-        return None
+        pass
 
-    claims = credential.get('claims') or credential.get('credentialSubject') or {}
-    ppid = (
-        credential.get('subject')
-        or credential.get('sub')
-        or claims.get('ppid')
-        or claims.get('id')
-        or claims.get('subject')
-    )
-    if ppid and str(ppid).startswith('did:lemma:ppid_'):
-        return str(ppid)
-    return None
+    ppid = _extract_ppid_from_lemma_header()
+    if ppid:
+        return ppid, None
+
+    ppid = session.get('ppid')
+    if ppid:
+        return str(ppid), None
+
+    customer_id = session.get('customer_id')
+    if customer_id:
+        return f"customer:{customer_id}", None
+
+    if _has_valid_wallet_unlock_session():
+        ppid = _parse_ppid_from_credential_dict(_decode_lemma_header_credential())
+        if ppid:
+            return ppid, None
+
+    return None, 'Authentication required'
 
 
 def _resolve_monitor_identity():
@@ -2710,27 +2776,12 @@ def require_agent_or_user_auth(required_scope=None, enforce_task_bounds=True):
 @restricted_cross_origin()
 def list_agent_credentials():
     """List all agent credentials for the authenticated user, including task-bound info."""
-    # Allow direct token-based auth for automation and API clients.
-    agent_token = request.headers.get('X-Agent-Token')
-    credential_info = validate_agent_token(agent_token) if agent_token else None
-
-    ppid = _extract_ppid_from_lemma_header() or session.get('ppid')
-    customer_id = session.get('customer_id')
-
-    if credential_info:
-        authorized_by = credential_info.get('authorized_by_ppid') or credential_info.get('authorized_by_email')
-        if not authorized_by:
-            return jsonify({
-                'success': False,
-                'error': 'Agent token missing authorized principal'
-            }), 401
-    elif not ppid and not customer_id:
+    authorized_by, auth_error = _resolve_agent_owner_ppid()
+    if not authorized_by:
         return jsonify({
             'success': False,
-            'error': 'Authentication required'
+            'error': auth_error or 'Authentication required'
         }), 401
-    else:
-        authorized_by = ppid or f"customer:{customer_id}"
 
     try:
         from api.database import get_db_connection
