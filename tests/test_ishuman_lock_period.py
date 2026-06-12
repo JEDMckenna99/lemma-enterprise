@@ -147,6 +147,8 @@ def test_idv_popup_allows_same_origin_demo_hub_master_flow():
     idv_html = IDV_HTML.read_text(encoding="utf-8")
     assert "isSameOriginMasterFlow" in idv_html
     assert "isMasterCreationFlow" in idv_html
+    assert "PLATFORM_SITE_IDS" in idv_html
+    assert "platformHost" in idv_html
 
 
 @pytest.mark.browser

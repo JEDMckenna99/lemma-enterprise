@@ -118,6 +118,17 @@
             text-decoration: underline;
         }
 
+        .idv-action {
+            background: none;
+            border: none;
+            padding: 0;
+            color: #667eea;
+            font-weight: 600;
+            font-size: inherit;
+            cursor: pointer;
+            text-decoration: underline;
+        }
+
         .form-section {
             background: var(--gray-50);
             border-radius: 16px;
@@ -449,15 +460,102 @@
 
     <script nonce="{{ csp_nonce }}">
         let registerWallet = null;
+        let idvPopupMonitor = null;
+
+        function buildPlatformIdvUrl({ redirect = false } = {}) {
+            const url = new URL('/wallet/ishuman-idv', window.location.origin);
+            url.searchParams.set('origin', window.location.origin);
+            url.searchParams.set('site_id', 'lemma.id');
+            if (redirect) {
+                url.searchParams.set('flow_mode', 'redirect');
+                url.searchParams.set('redirect_return', window.location.href);
+            }
+            return url;
+        }
+
+        function walletStatusActionHtml() {
+            return '<div style="margin-top: 8px;"><button type="button" class="idv-action" id="open-idv-btn">Complete isHuman verification</button></div>';
+        }
 
         function setWalletStatus(message, tone = 'info') {
             const el = document.getElementById('wallet-status');
             if (!el) return;
             el.className = 'wallet-status' + (tone === 'ready' ? ' ready' : tone === 'locked' ? ' locked' : '');
-            el.textContent = message;
             if (tone === 'locked' || tone === 'info') {
-                el.innerHTML = `${message}<div style="margin-top: 8px;"><a href="/wallet/ishuman-idv">Complete isHuman verification</a></div>`;
+                el.innerHTML = message + walletStatusActionHtml();
+            } else {
+                el.textContent = message;
             }
+        }
+
+        async function refreshWalletReadiness() {
+            const wallet = await waitForRegisterWallet();
+            if (!wallet) {
+                setWalletStatus('Wallet failed to initialize. Refresh and try again.', 'locked');
+                return;
+            }
+            registerWallet = wallet;
+            try {
+                await wallet.init?.();
+                const ppid = await wallet.derivePPID('lemma.id');
+                if (ppid && String(ppid).startsWith('did:lemma:ppid_')) {
+                    setWalletStatus('Wallet verified. Complete the form to register.', 'ready');
+                    return;
+                }
+            } catch (_) {}
+            setWalletStatus('Unlock your wallet and complete isHuman verification before registering.', 'locked');
+        }
+
+        function openPlatformIdvVerification() {
+            const popupUrl = buildPlatformIdvUrl();
+            const width = 480;
+            const height = 640;
+            const left = Math.max(0, Math.round(window.screenX + (window.outerWidth - width) / 2));
+            const top = Math.max(0, Math.round(window.screenY + (window.outerHeight - height) / 2));
+            const popup = window.open(
+                popupUrl.toString(),
+                'lemma_ishuman_idv',
+                `popup=yes,width=${width},height=${height},left=${left},top=${top}`
+            );
+
+            if (!popup) {
+                window.location.assign(buildPlatformIdvUrl({ redirect: true }).toString());
+                return;
+            }
+
+            if (idvPopupMonitor) {
+                clearInterval(idvPopupMonitor);
+            }
+
+            let settled = false;
+            const finish = () => {
+                if (settled) return;
+                settled = true;
+                window.removeEventListener('message', onMessage);
+                if (idvPopupMonitor) {
+                    clearInterval(idvPopupMonitor);
+                    idvPopupMonitor = null;
+                }
+            };
+
+            const onMessage = (event) => {
+                if (event.origin !== window.location.origin) return;
+                const type = event.data?.type;
+                if (type === 'ISHUMAN_IDV_COMPLETE') {
+                    finish();
+                    refreshWalletReadiness();
+                } else if (type === 'ISHUMAN_IDV_CANCELLED') {
+                    finish();
+                }
+            };
+
+            window.addEventListener('message', onMessage);
+            idvPopupMonitor = setInterval(() => {
+                if (popup.closed) {
+                    finish();
+                    refreshWalletReadiness();
+                }
+            }, 500);
         }
 
         async function waitForRegisterWallet(maxAttempts = 30) {
@@ -511,9 +609,14 @@
         }
 
         document.addEventListener('DOMContentLoaded', async () => {
+            document.getElementById('wallet-status')?.addEventListener('click', (event) => {
+                if (event.target.closest('#open-idv-btn')) {
+                    event.preventDefault();
+                    openPlatformIdvVerification();
+                }
+            });
             try {
-                await waitForRegisterWallet();
-                setWalletStatus('Unlock your wallet and complete isHuman verification before registering.', 'locked');
+                await refreshWalletReadiness();
             } catch (_) {
                 setWalletStatus('Wallet failed to initialize. Refresh and try again.', 'locked');
             }

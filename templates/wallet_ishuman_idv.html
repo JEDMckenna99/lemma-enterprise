@@ -180,8 +180,16 @@
     <script nonce="{{ csp_nonce }}">
         const SESSION_KEY = 'ishuman_idv_popup_session_id';
         const params = new URLSearchParams(window.location.search);
-        const openerOrigin = params.get('origin') || '*';
-        const requestingSite = params.get('site_id') || 'customer site';
+        const PLATFORM_SITE_IDS = new Set(['lemma.id', 'lemma_platform']);
+        const platformHost = /^lemma\.id$/i.test(window.location.hostname.replace(/^www\./i, ''));
+        const openerOriginParam = (params.get('origin') || '').trim();
+        const requestingSite = (() => {
+            const raw = (params.get('site_id') || '').trim();
+            if (raw) return raw;
+            return platformHost ? 'lemma.id' : 'customer site';
+        })();
+        const openerOrigin = openerOriginParam
+            || (platformHost && PLATFORM_SITE_IDS.has(requestingSite) ? window.location.origin : '*');
         const issueMode = params.get('issue_mode') || '';
         const refreshReason = params.get('refresh_reason') || '';
         const requestNonce = params.get('request_nonce') || '';
@@ -383,34 +391,40 @@
                 }
             }
 
-            if (
-                flowMode === 'redirect'
-                && redirectReturn
-                && type === 'ISHUMAN_SITE_PROOF_ISSUED'
-                && detail?.request_nonce
-            ) {
-                try {
-                    await requestJson('/api/ishuman/site-proof-redirect/deposit', {
-                        method: 'POST',
-                        body: JSON.stringify({
-                            request_nonce: detail.request_nonce,
-                            site_id: requestingSite,
-                            credential: detail.credential || null,
-                            session_assertion: detail.session_assertion || null,
-                            session_signature: detail.session_signature || null,
-                            session_nonce: detail.session_nonce || clientSessionNonce || '',
-                        }),
-                    });
-                    const returnUrl = new URL(redirectReturn);
-                    returnUrl.searchParams.set('lemma_ishuman_return', '1');
-                    returnUrl.searchParams.set('request_nonce', detail.request_nonce);
-                    window.location.replace(returnUrl.toString());
-                    return;
-                } catch (err) {
-                    console.error('[isHuman IDV] redirect return deposit failed:', err);
-                    setStatus(err.message || consumerCopy().status?.returnFailed || 'Couldn\u2019t return to the site. Try again.', 'error');
+            if (flowMode === 'redirect' && redirectReturn) {
+                if (type === 'ISHUMAN_SITE_PROOF_ISSUED' && detail?.request_nonce) {
+                    try {
+                        await requestJson('/api/ishuman/site-proof-redirect/deposit', {
+                            method: 'POST',
+                            body: JSON.stringify({
+                                request_nonce: detail.request_nonce,
+                                site_id: requestingSite,
+                                credential: detail.credential || null,
+                                session_assertion: detail.session_assertion || null,
+                                session_signature: detail.session_signature || null,
+                                session_nonce: detail.session_nonce || clientSessionNonce || '',
+                            }),
+                        });
+                        const returnUrl = new URL(redirectReturn);
+                        returnUrl.searchParams.set('lemma_ishuman_return', '1');
+                        returnUrl.searchParams.set('request_nonce', detail.request_nonce);
+                        window.location.replace(returnUrl.toString());
+                        return;
+                    } catch (err) {
+                        console.error('[isHuman IDV] redirect return deposit failed:', err);
+                        setStatus(err.message || consumerCopy().status?.returnFailed || 'Couldn\u2019t return to the site. Try again.', 'error');
+                        return;
+                    }
+                }
+                if (type === 'ISHUMAN_IDV_COMPLETE') {
+                    window.location.replace(redirectReturn);
                     return;
                 }
+            }
+
+            if (!window.opener && redirectReturn && type === 'ISHUMAN_IDV_COMPLETE') {
+                window.location.replace(redirectReturn);
+                return;
             }
 
             notifyOpener(type, detail);
@@ -1227,11 +1241,11 @@
             // site proof) and self-close — the opener is only needed for the live
             // postMessage hand-off, which notifyOpener() already no-ops without.
             // So only block a truly context-free direct open: no opener AND no flow.
-            const isSameOriginMasterFlow = requestingSite === 'lemma.id'
+            const isSameOriginMasterFlow = PLATFORM_SITE_IDS.has(requestingSite)
                 && !issueMode
                 && openerOrigin !== '*'
                 && openerOrigin === window.location.origin;
-            const isMasterCreationFlow = requestingSite === 'lemma.id' && !issueMode;
+            const isMasterCreationFlow = PLATFORM_SITE_IDS.has(requestingSite) && !issueMode;
             const hasFlowContext = isFreshIdv
                 || isSiteProofIssue
                 || isDemoQrFlow
