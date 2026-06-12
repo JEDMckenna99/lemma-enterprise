@@ -1496,11 +1496,12 @@ def register_wallet_developer():
     """
     Wallet-first developer registration for lemma.id.
 
-    Requires a person-root IDV wallet binding. Creates customer + platform
-    membership and issues a signed developer_access credential for the wallet.
+    Requires an unlocked passkey wallet with completed isHuman IDV. Creates
+    customer + platform membership and issues a signed developer_access
+    credential for the wallet.
     """
     try:
-        from api.platform_owner import enforce_platform_login_wallet
+        from api.platform_owner import enforce_platform_registration_wallet
 
         data = request.get_json(silent=True) or {}
         email = (data.get('email') or '').strip().lower()
@@ -1519,7 +1520,7 @@ def register_wallet_developer():
         if _is_invite_only_mode_enabled() and not _is_valid_invite_code(invite_code):
             return jsonify({'success': False, 'error': 'Invite code required or invalid'}), 403
 
-        ppid, denied = enforce_platform_login_wallet(
+        ppid, denied = enforce_platform_registration_wallet(
             client_ppid=client_ppid or None,
             wallet_id=wallet_id or None,
             passkey_credential_id=passkey_credential_id,

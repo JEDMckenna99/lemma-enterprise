@@ -427,7 +427,7 @@
                 <div class="register-icon">🛡️</div>
                 <h1 class="register-title">Create your lemma.id developer account</h1>
                 <p class="register-subtitle">
-                    Verify your humanity once, bind your wallet, and get developer access with a signed permission credential.
+                    Verify your humanity once, bind your passkey wallet, and receive a signed developer credential for the platform.
                 </p>
                 
                 <div class="features-preview">
@@ -628,6 +628,9 @@
             try {
                 passkeyCredentialId = await wallet.getPasskeyCredentialId();
             } catch (_) {}
+            if (!walletId) {
+                throw new Error('Wallet unlock failed. Refresh and try again.');
+            }
             setWalletStatus('Wallet verified — ready to register as developer.', 'ready');
             return { ppid, walletId, passkeyCredentialId };
         }
@@ -635,7 +638,7 @@
         document.addEventListener('DOMContentLoaded', async () => {
             try {
                 await waitForRegisterWallet();
-                setWalletStatus('Unlock your wallet with passkey to continue...', 'locked');
+                setWalletStatus('Unlock your wallet and complete isHuman IDV before registering.', 'locked');
             } catch (_) {
                 setWalletStatus('Wallet failed to initialize. Refresh and try again.', 'locked');
             }

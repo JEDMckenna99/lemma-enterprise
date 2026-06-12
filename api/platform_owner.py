@@ -157,19 +157,82 @@ def enforce_platform_login_wallet(
     db=None,
 ) -> Tuple[Optional[str], Optional[Tuple[Dict[str, str], int]]]:
     """
-    Resolve platform-login PPID from a person-root IDV wallet binding only.
+    Resolve platform-login PPID from an unlocked wallet.
 
-    Bare client PPIDs, passkey-only derivation, and wallet_secret paths are
-    rejected for lemma.id platform login/restore.
+    Prefers person-root IDV binding when present; otherwise accepts
+    client-derived PPID or passkey-based derivation. wallet_secret paths
+    remain rejected at the HTTP layer.
     """
-    del passkey_credential_id  # not accepted without person-root wallet binding
-
     if not wallet_id:
         return None, (
             {
                 "success": False,
                 "error": "wallet_id_required",
                 "message": "Unlock your wallet and retry platform login.",
+            },
+            403,
+        )
+
+    close_db = False
+    if db is None:
+        from api.database import get_db
+
+        db = get_db()
+        close_db = True
+
+    try:
+        ppid = resolve_platform_login_ppid(
+            client_ppid=client_ppid,
+            wallet_id=wallet_id,
+            passkey_credential_id=passkey_credential_id,
+            db=db,
+        )
+        normalized_client = normalize_ppid(client_ppid)
+        if normalized_client and not hmac.compare_digest(normalized_client, ppid):
+            return None, (
+                {
+                    "success": False,
+                    "error": "ppid_mismatch",
+                    "message": "Wallet PPID does not match the server derivation.",
+                },
+                403,
+            )
+        return ppid, None
+    except ValueError:
+        return None, (
+            {
+                "success": False,
+                "error": "ppid_or_passkey_required",
+                "message": "Unlock your wallet and retry platform login.",
+            },
+            403,
+        )
+    finally:
+        if close_db and db is not None:
+            db.close()
+
+
+def enforce_platform_registration_wallet(
+    *,
+    client_ppid: Optional[str],
+    wallet_id: Optional[str],
+    passkey_credential_id: Optional[str] = None,
+    db=None,
+) -> Tuple[Optional[str], Optional[Tuple[Dict[str, str], int]]]:
+    """
+    Resolve platform-registration PPID from a person-root IDV wallet binding.
+
+    Developer account creation requires completed isHuman verification on the
+    wallet. Passkey-only derivation without IDV is rejected.
+    """
+    del passkey_credential_id
+
+    if not wallet_id:
+        return None, (
+            {
+                "success": False,
+                "error": "wallet_id_required",
+                "message": "Unlock your wallet and retry developer registration.",
             },
             403,
         )
@@ -189,7 +252,7 @@ def enforce_platform_login_wallet(
                 {
                     "success": False,
                     "error": "person_root_required",
-                    "message": "Complete isHuman IDV on this wallet before platform login.",
+                    "message": "Complete isHuman IDV on this wallet before creating a developer account.",
                 },
                 403,
             )

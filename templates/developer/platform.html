@@ -1990,29 +1990,47 @@ POST /api/auth/exchange-proof</pre>
 
                 if (!ppid && !passkeyCredentialId) {
                     console.log('No wallet credentials - need setup');
-                    showSetupWallet();
+                    showRegisterForAccess();
                     return;
                 }
 
-                const response = await fetch('/api/wallet-auth/issue', {
+                let clientWalletId = null;
+                try {
+                    const debugState = await wallet.getDebugState?.() || {};
+                    clientWalletId = debugState.walletId || null;
+                } catch (e) {
+                    console.warn('Could not read wallet_id:', e.message);
+                }
+
+                if (!clientWalletId) {
+                    showRegisterForAccess();
+                    return;
+                }
+
+                const response = await fetch('/api/wallet-auth/platform-login', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
                     body: JSON.stringify({
-                        site_id: 'lemma.id',
                         ppid: ppid || undefined,
-                        passkey_credential_id: ppid ? undefined : passkeyCredentialId
+                        passkey_credential_id: passkeyCredentialId,
+                        wallet_id: clientWalletId
                     })
                 });
                 
                 const result = await response.json();
                 
                 if (!result.success) {
-                    console.error('Auto-issue failed:', result.error);
+                    console.error('Platform login failed:', result.error);
+                    if (result.error === 'platform_membership_required') {
+                        showRegisterForAccess();
+                        return;
+                    }
                     showSetupWallet();
                     return;
                 }
                 
-                console.log('Developer permission auto-issued');
+                console.log('Developer permission restored from platform login');
                 
                 // Store in wallet using standard SDK method
                 await wallet.storeCredential(result.permission_lemma);
@@ -2058,6 +2076,22 @@ POST /api/auth/exchange-proof</pre>
             showSection(currentSection || 'overview', { updateUrl: false });
         }
         
+        // Show register prompt when wallet lacks platform membership
+        function showRegisterForAccess() {
+            document.getElementById('loading-state').innerHTML = `
+                <div style="text-align: center; padding: 60px 20px;">
+                    <div style="font-size: 64px; margin-bottom: 24px;">🚀</div>
+                    <h2>Developer account required</h2>
+                    <p style="color: #6b7280; margin-bottom: 24px;">
+                        Register for lemma.id platform access before using the developer dashboard.<br>
+                        <span style="font-size: 14px;">Developer credentials are issued only after signup.</span>
+                    </p>
+                    <a href="/register" class="btn btn-primary" style="margin-right: 12px;">Get Started</a>
+                    <a href="/login" class="btn btn-secondary">Sign In</a>
+                </div>
+            `;
+        }
+        
         // Show "setup wallet" message
         function showSetupWallet() {
             document.getElementById('loading-state').innerHTML = `
@@ -2065,10 +2099,11 @@ POST /api/auth/exchange-proof</pre>
                     <div style="font-size: 64px; margin-bottom: 24px;">Wallet</div>
                     <h2>Set Up Your Wallet</h2>
                     <p style="color: #6b7280; margin-bottom: 24px;">
-                        Create a passkey to access the developer platform.<br>
-                        <span style="font-size: 14px;">One-time setup, then fast access across participating Lemma-enabled sites.</span>
+                        Unlock your passkey wallet, then sign in with your developer account.<br>
+                        <span style="font-size: 14px;">New developers should register first at Get Started.</span>
                     </p>
-                    <a href="/wallet" class="btn btn-primary">Set Up Wallet</a>
+                    <a href="/register" class="btn btn-primary" style="margin-right: 12px;">Get Started</a>
+                    <a href="/login" class="btn btn-secondary">Sign In</a>
                 </div>
             `;
         }

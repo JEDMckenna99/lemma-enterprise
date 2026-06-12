@@ -38,6 +38,11 @@ def test_restore_site_access_accepts_ppid_only(monkeypatch):
 
     monkeypatch.setattr(
         wallet_service,
+        "_has_platform_membership",
+        lambda _ppid, site_id="lemma.id": True,
+    )
+    monkeypatch.setattr(
+        wallet_service,
         "_resolve_platform_role_for_ppid",
         lambda _ppid, site_id="lemma.id": {
             "role": "user",
@@ -61,7 +66,7 @@ def test_restore_site_access_accepts_ppid_only(monkeypatch):
     with app.test_client() as client:
         response = client.post(
             "/api/wallet-auth/restore-site-access",
-            json={"ppid": ppid, "site_id": "lemma.id"},
+            json={"ppid": ppid, "site_id": "customer.example.com"},
         )
         assert response.status_code == 200
         assert response.get_json()["success"] is True

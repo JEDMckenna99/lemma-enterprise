@@ -28,14 +28,14 @@ def _app():
 
 def test_register_wallet_developer_requires_person_root(monkeypatch):
     monkeypatch.setattr(
-        "api.platform_owner.enforce_platform_login_wallet",
+        "api.platform_owner.enforce_platform_registration_wallet",
         lambda **kwargs: (
             None,
             (
                 {
                     "success": False,
                     "error": "person_root_required",
-                    "message": "Complete isHuman IDV on this wallet before platform login.",
+                    "message": "Complete isHuman IDV on this wallet before creating a developer account.",
                 },
                 403,
             ),
@@ -63,7 +63,7 @@ def test_register_wallet_developer_provisions_developer_access(monkeypatch):
     registrations = []
 
     monkeypatch.setattr(
-        "api.platform_owner.enforce_platform_login_wallet",
+        "api.platform_owner.enforce_platform_registration_wallet",
         lambda **kwargs: (OWNER_PPID, None),
     )
     monkeypatch.setattr(
@@ -123,7 +123,7 @@ def test_register_wallet_developer_provisions_developer_access(monkeypatch):
 
 def test_register_wallet_developer_rejects_existing_membership(monkeypatch):
     monkeypatch.setattr(
-        "api.platform_owner.enforce_platform_login_wallet",
+        "api.platform_owner.enforce_platform_registration_wallet",
         lambda **kwargs: (OWNER_PPID, None),
     )
     monkeypatch.setattr(

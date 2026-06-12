@@ -162,6 +162,23 @@
             background: #fef3c7;
             color: #92400e;
         }
+
+        .register-link {
+            text-align: center;
+            margin-top: var(--space-6);
+            color: var(--gray-600);
+            font-size: var(--font-size-sm);
+        }
+
+        .register-link a {
+            color: #667eea;
+            font-weight: 600;
+            text-decoration: none;
+        }
+
+        .register-link a:hover {
+            text-decoration: underline;
+        }
     </style>
 {% endblock %}
 
@@ -172,7 +189,7 @@
                 <img src="{{ url_for('static', filename='img/lemma_logo.svg') }}" alt="Lemma.id" class="login-logo" width="80" height="80">
                 <h1 class="login-title">Sign In</h1>
                 <p class="login-subtitle">
-                    Authenticate with your device's biometrics
+                    Sign in with your passkey wallet if you already registered as a developer.
                 </p>
             </div>
 
@@ -186,12 +203,16 @@
             </button>
 
             <div class="status-message" id="statusMessage"></div>
+
+            <div class="register-link">
+                New to lemma.id? <a href="/register">Get started with a developer account</a>
+            </div>
         </div>
     </div>
 
     <script nonce="{{ csp_nonce }}">
         // ============================================
-        // WALLET-FIRST AUTHENTICATION FLOW
+        // PLATFORM SIGN-IN (registered developers only)
         // ============================================
         
         let wallet = null;
@@ -229,7 +250,7 @@
             
             if (!hasWallet) {
                 el.className = 'wallet-status';
-                el.innerHTML = '<span>📦</span> New user - wallet will be created';
+                el.innerHTML = '<span>🚀</span> No wallet yet — <a href="/register">create a developer account</a> to get started';
             } else if (!hasPasskey) {
                 el.className = 'wallet-status locked';
                 el.innerHTML = '<span>🔓</span> Wallet found - passkey setup needed';
@@ -296,69 +317,20 @@
             }
         }
 
-        async function setupPasskeyAndIssue() {
+        async function signInExisting() {
             try {
-                updateButton('Setting up passkey...', false, true);
-                updateStatus('info', '👆 Please authenticate with your device');
-                
-                // Register passkey for wallet
-                await wallet.registerPasskey();
-                console.log('✅ Passkey registered');
-                
-                // Now issue permission
-                return await issuePermission();
-                
-            } catch (e) {
-                console.error('Passkey setup failed:', e);
-                updateStatus('error', '❌ Passkey setup cancelled or failed. Please try again.');
-                updateButton('Try Again', true);
-                return false;
-            }
-        }
-
-        async function unlockAndIssue() {
-            try {
-                updateButton('Unlocking wallet...', false, true);
-                updateStatus('info', '👆 Please authenticate with your device');
-                
-                // Unlock with local passkey first (no server requirement)
-                // Server session will be established via platform-login
-                const unlocked = await wallet.unlock();
-                
-                if (!unlocked) {
-                    throw new Error('Unlock failed');
-                }
-                
-                console.log('✅ Wallet unlocked locally');
-                
-                // Check for existing permission first
-                const hasExisting = await checkExistingCredentials();
-                if (hasExisting) return true;
-                
-                // Issue permission (this establishes server session)
-                return await issuePermission();
-                
-            } catch (e) {
-                console.error('Unlock failed:', e);
-                updateStatus('error', '❌ Passkey authentication cancelled or failed. Please try again.');
-                updateButton('Try Again', true);
-                return false;
-            }
-        }
-
-        async function issuePermission() {
-            try {
-                updateButton('Issuing permission...', false, true);
-                updateStatus('info', '📝 Creating your access credential...');
+                updateButton('Signing in...', false, true);
+                updateStatus('info', '🔐 Verifying your platform access...');
 
                 let passkeyCredentialId = null;
                 let clientWalletId = null;
 
-                const ppid = await wallet.derivePPID('lemma.id');
-                if (!ppid || !String(ppid).startsWith('did:lemma:ppid_')) {
-                    throw new Error('Could not derive a valid lemma.id PPID. Complete isHuman IDV first.');
+                let ppid = null;
+                try {
+                    ppid = await wallet.derivePPID('lemma.id');
+                } catch (e) {
+                    console.warn('Could not derive PPID from wallet:', e.message);
                 }
-                console.log('🔐 Person-root PPID for lemma.id:', ppid.substring(0, 32) + '...');
 
                 try {
                     passkeyCredentialId = await wallet.getPasskeyCredentialId();
@@ -369,9 +341,12 @@
                 try {
                     const debugState = await wallet.getDebugState?.() || {};
                     clientWalletId = debugState.walletId || walletInfo?.walletId;
-                    console.log('🔐 Client wallet_id:', clientWalletId?.substring(0, 12) + '...');
                 } catch (e) {
                     console.warn('Could not get wallet_id:', e.message);
+                }
+
+                if (!clientWalletId) {
+                    throw new Error('Unlock your wallet with passkey before signing in.');
                 }
 
                 const loginHeaders = { 'Content-Type': 'application/json' };
@@ -385,7 +360,7 @@
                     method: 'POST',
                     headers: loginHeaders,
                     body: JSON.stringify({
-                        ppid,
+                        ppid: ppid || undefined,
                         passkey_credential_id: passkeyCredentialId,
                         wallet_id: clientWalletId
                     })
@@ -394,23 +369,30 @@
                 const result = await response.json();
                 
                 if (!result.success) {
-                    throw new Error(result.error || 'Failed to issue permission');
+                    if (result.error === 'platform_membership_required') {
+                        updateStatus(
+                            'info',
+                            'You need a developer account first. Redirecting to registration...'
+                        );
+                        setTimeout(() => {
+                            window.location.href = '/register' + (redirectUrl !== '/dashboard'
+                                ? '?redirect=' + encodeURIComponent(redirectUrl)
+                                : '');
+                        }, 1500);
+                        return false;
+                    }
+                    throw new Error(result.message || result.error || 'Sign in failed');
                 }
                 
-                console.log('📝 Permission issued with PPID:', result.ppid);
-                console.log('📝 Permission lemma:', result.permission_lemma);
+                console.log('📝 Permission restored with PPID:', result.ppid);
                 
-                // CRITICAL: Sync wallet_id if server returned a different one (cross-device sync)
                 if (result.wallet_id && result.wallet_id !== clientWalletId) {
                     console.log('🔄 Syncing wallet_id from server:', result.wallet_id?.substring(0, 12) + '...');
                     try {
-                        // Update SDK's local wallet_id storage
                         if (wallet._put) {
                             await wallet._put('passkey', { id: 'walletId', value: result.wallet_id });
-                            console.log('✅ Wallet_id synced to local storage');
                         }
                         
-                        // Re-set session with correct wallet_id for cross-site auth
                         await fetch('/api/wallet/set-session', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
@@ -422,44 +404,83 @@
                                 profile_name: 'Developer'
                             })
                         });
-                        console.log('✅ Session cookie set with synced wallet_id');
                     } catch (e) {
                         console.warn('Wallet_id sync warning:', e.message);
                     }
                 }
                 
-                // Store in wallet
                 await wallet.storeCredential(result.permission_lemma);
                 console.log('✅ Permission stored in wallet');
                 
-                updateStatus('success', `✅ Welcome${result.is_new_user ? ' to Lemma' : ' back'}! Redirecting...`);
-                
+                updateStatus('success', '✅ Welcome back! Redirecting...');
                 setTimeout(() => window.location.href = redirectUrl, 1500);
                 return true;
                 
             } catch (e) {
-                console.error('Issue failed:', e);
-                updateStatus('error', '❌ Failed to create permission: ' + e.message);
+                console.error('Sign in failed:', e);
+                updateStatus('error', '❌ ' + e.message);
+                updateButton('Try Again', true);
+                return false;
+            }
+        }
+
+        async function unlockAndSignIn() {
+            try {
+                updateButton('Unlocking wallet...', false, true);
+                updateStatus('info', '👆 Please authenticate with your device');
+                
+                const unlocked = await wallet.unlock();
+                if (!unlocked) {
+                    throw new Error('Unlock failed');
+                }
+                
+                walletInfo = await wallet.getWalletInfo();
+                updateWalletStatus(
+                    walletInfo.lemmaCount > 0 || walletInfo.hasPasskey,
+                    walletInfo.isUnlocked,
+                    walletInfo.hasPasskey
+                );
+
+                const hasExisting = await checkExistingCredentials();
+                if (hasExisting) return true;
+
+                return await signInExisting();
+                
+            } catch (e) {
+                console.error('Unlock failed:', e);
+                updateStatus('error', '❌ Passkey authentication cancelled or failed. Please try again.');
                 updateButton('Try Again', true);
                 return false;
             }
         }
 
         async function handleSignIn() {
-            // Refresh wallet info
             walletInfo = await wallet.getWalletInfo();
             
             if (!walletInfo.hasPasskey) {
-                // New user or no passkey - setup passkey first
-                return await setupPasskeyAndIssue();
-            } else if (!walletInfo.isUnlocked) {
-                // Has passkey but locked - unlock
-                return await unlockAndIssue();
-            } else {
-                // Already unlocked - just issue
-                return await issuePermission();
+                updateStatus(
+                    'info',
+                    'Create a developer account first — registration sets up your passkey wallet and issues access.'
+                );
+                setTimeout(() => {
+                    window.location.href = '/register' + (redirectUrl !== '/dashboard'
+                        ? '?redirect=' + encodeURIComponent(redirectUrl)
+                        : '');
+                }, 1200);
+                return false;
             }
+
+            if (!walletInfo.isUnlocked) {
+                return await unlockAndSignIn();
+            }
+
+            const hasExisting = await checkExistingCredentials();
+            if (hasExisting) return true;
+
+            return await signInExisting();
         }
+
+        // Legacy alias removed — sign-in never auto-registers or auto-issues for new wallets.
 
         // ============================================
         // INITIALIZATION
@@ -491,11 +512,11 @@
             
             // Set button text based on state
             if (!walletInfo.hasPasskey) {
-                updateButton('Create Wallet & Sign In', true);
+                updateButton('Get Started', true);
             } else if (!walletInfo.isUnlocked) {
                 updateButton('Unlock & Sign In', true);
             } else {
-                updateButton('Get Access', true);
+                updateButton('Sign In with Passkey', true);
             }
             
             // Attach click handler

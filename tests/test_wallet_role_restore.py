@@ -88,6 +88,11 @@ def test_restore_site_access_issues_role_backed_lemma(monkeypatch):
         "api.platform_owner.enforce_platform_login_wallet",
         lambda **kwargs: ("did:lemma:ppid_" + ("a" * 64), None),
     )
+    monkeypatch.setattr(
+        wallet_service,
+        "_has_platform_membership",
+        lambda ppid, site_id="lemma.id": True,
+    )
     monkeypatch.setattr(wallet_service, "_upsert_platform_membership", lambda *args, **kwargs: None)
 
     with app.test_client() as client:

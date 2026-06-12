@@ -119,8 +119,8 @@ def test_platform_login_denies_unbound_wallet_when_enforcement_on(monkeypatch):
             (
                 {
                     "success": False,
-                    "error": "person_root_required",
-                    "message": "Complete isHuman IDV on this wallet before platform login.",
+                    "error": "wallet_id_required",
+                    "message": "Unlock your wallet and retry platform login.",
                 },
                 403,
             ),
@@ -136,31 +136,33 @@ def test_platform_login_denies_unbound_wallet_when_enforcement_on(monkeypatch):
             "/api/wallet-auth/platform-login",
             json={
                 "ppid": OTHER_PPID,
-                "wallet_id": "wallet_probe_nonexistent",
             },
         )
         assert response.status_code == 403
         body = response.get_json()
-        assert body["error"] == "person_root_required"
+        assert body["error"] == "wallet_id_required"
 
 
-def test_enforce_platform_login_wallet_requires_person_root(monkeypatch):
+def test_enforce_platform_login_wallet_allows_passkey_without_person_root(monkeypatch):
     from api.platform_owner import enforce_platform_login_wallet
 
     monkeypatch.setattr(
         "api.ishuman._resolve_person_id_for_wallet",
         lambda db, wallet_id: None,
     )
+    monkeypatch.setattr(
+        "api.services.wallet_service.derive_user_ppid",
+        lambda site_id, passkey_credential_id=None: OTHER_PPID,
+    )
 
     ppid, denied = enforce_platform_login_wallet(
-        client_ppid=OTHER_PPID,
+        client_ppid=None,
         wallet_id="wallet_unverified",
+        passkey_credential_id="pk_test",
         db=object(),
     )
-    assert ppid is None
-    assert denied is not None
-    assert denied[1] == 403
-    assert denied[0]["error"] == "person_root_required"
+    assert denied is None
+    assert ppid == OTHER_PPID
 
 
 def test_enforce_platform_login_wallet_requires_wallet_id():

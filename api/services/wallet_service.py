@@ -1790,6 +1790,8 @@ def issue_to_wallet():
         client_ppid = data.get('ppid')
         passkey_credential_id = data.get('passkey_credential_id')
         
+        from api.platform_owner import is_platform_site
+
         if client_ppid:
             # Validate PPID format: did:lemma:ppid_<64-hex-chars>
             import re
@@ -1804,13 +1806,28 @@ def issue_to_wallet():
                 'error': 'ppid_or_passkey_required',
                 'message': 'ppid or passkey_credential_id required',
             }), 400
-        
-        permission_lemma = issue_permission_lemma(
-            subject_ppid=ppid,
-            site_id=site_id,
-            permissions=['read', 'write', 'access'],
-            granted_by='wallet_auth'
-        )
+
+        if is_platform_site(site_id):
+            denied_membership = _deny_unregistered_platform_login(ppid, site_id=site_id)
+            if denied_membership:
+                return denied_membership
+            role_profile = _resolve_platform_role_for_ppid(ppid, site_id=site_id)
+            permission_lemma = issue_permission_lemma(
+                subject_ppid=ppid,
+                site_id=site_id,
+                permissions=role_profile['permissions'],
+                scope=role_profile['scope'],
+                permission_id=role_profile['permission_id'],
+                account_type=role_profile['role'],
+                granted_by='wallet_auth',
+            )
+        else:
+            permission_lemma = issue_permission_lemma(
+                subject_ppid=ppid,
+                site_id=site_id,
+                permissions=['read', 'write', 'access'],
+                granted_by='wallet_auth'
+            )
         
         # Return PPID and permission_lemma - client stores in wallet
         # No server-side session needed (session-free architecture)
