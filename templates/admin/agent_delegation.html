@@ -42,8 +42,33 @@
 
 <script nonce="{{ csp_nonce }}">
 const OPERATOR_SITE = 'lemma.id';
+const OPERATOR_SITES = new Set(['lemma.id', 'lemma_platform']);
 let adminCredential = null;
 let activeTokens = [];
+
+function getCredentialClaims(cred) {
+    if (!cred) return {};
+    if (cred.normalized && typeof cred.normalized === 'object') return cred.normalized;
+    return cred.claims || cred.credentialSubject || {};
+}
+
+function isLemmaOperatorAdminCredential(cred) {
+    const claims = getCredentialClaims(cred);
+    const perm = String(claims.permissionId || claims.permission_id || claims.permission_level || '').toLowerCase();
+    const account = String(claims.accountType || claims.account_type || '').toLowerCase();
+    const type = String(claims.type || '').toLowerCase();
+    return perm === 'admin_access'
+        || perm.includes('admin')
+        || account === 'admin'
+        || type.includes('admin');
+}
+
+function getCredentialSite(cred) {
+    const claims = getCredentialClaims(cred);
+    return String(
+        claims.siteId || claims.site_id || claims.siteDomain || claims.site_domain || claims.site || ''
+    ).toLowerCase();
+}
 
 async function getAuthHeaders() {
     if (typeof window.getLemmaAuthHeadersAsync === 'function') {
@@ -53,24 +78,75 @@ async function getAuthHeaders() {
 }
 
 async function loadAdminCredential() {
+    adminCredential = null;
+
+    if (typeof window.ensureLemmaCredential === 'function') {
+        const cred = await window.ensureLemmaCredential(true);
+        if (cred && isLemmaOperatorAdminCredential(cred)) {
+            adminCredential = cred;
+            return cred;
+        }
+    }
+
     if (typeof LemmaWallet === 'undefined') return null;
     try {
-        const wallet = new LemmaWallet();
+        const wallet = window.globalLemmaWallet || new LemmaWallet();
+        if (!window.globalLemmaWallet) {
+            await wallet.init();
+        }
         const authResult = await wallet.autoAuthenticate();
-        if (!authResult.authenticated) return null;
-        const credentials = await wallet.getCredentials({ siteId: OPERATOR_SITE });
+        if (!authResult?.authenticated) return null;
+
+        const credentials = await wallet.getCredentials('permission');
         adminCredential = credentials.find((c) => {
-            const n = c.normalized || {};
-            return n.permissionId === 'admin_access' || n.accountType === 'admin';
+            const site = getCredentialSite(c);
+            const siteOk = !site || OPERATOR_SITES.has(site) || site.includes('lemma.id');
+            return siteOk && isLemmaOperatorAdminCredential(c);
         }) || null;
+
         if (adminCredential) {
-            window.lemmaCredential = adminCredential.raw || adminCredential;
+            window.lemmaCredential = adminCredential;
+            if (typeof window.buildLemmaCredentialForHeader === 'function') {
+                window.lemmaCredentialForHeader = window.buildLemmaCredentialForHeader(adminCredential);
+            }
         }
         return adminCredential;
     } catch (e) {
         console.warn('Admin credential load failed', e);
         return null;
     }
+}
+
+async function resolveOperatorAccess() {
+    await loadAdminCredential();
+    if (adminCredential) return { ok: true };
+
+    const headers = await getAuthHeaders();
+    const permissionId = String(headers['X-Permission-ID'] || '').toLowerCase();
+    if (permissionId.includes('admin') && headers['X-Lemma-Credential']) {
+        return { ok: true };
+    }
+
+    if (typeof LemmaWallet !== 'undefined') {
+        try {
+            const wallet = window.globalLemmaWallet || new LemmaWallet();
+            if (!window.globalLemmaWallet) await wallet.init();
+            const authResult = await wallet.autoAuthenticate();
+            if (!authResult?.authenticated) {
+                return {
+                    ok: false,
+                    message: 'Unlock your wallet at <a href="/unlock">/unlock</a>, then refresh this page.',
+                };
+            }
+        } catch (_) {
+            /* fall through */
+        }
+    }
+
+    return {
+        ok: false,
+        message: 'No <strong>admin_access</strong> credential for <strong>lemma.id</strong> found in your wallet. Use <a href="/admin/bootstrap">Bootstrap</a> to issue one, then refresh.',
+    };
 }
 
 function formatDate(value) {
@@ -102,17 +178,17 @@ function formatIssueError(data, status) {
 async function loadPanel() {
     const container = document.getElementById('agent-token-content');
     const badge = document.getElementById('agent-status');
-    await loadAdminCredential();
+    const access = await resolveOperatorAccess();
 
-    if (!adminCredential) {
+    if (!access.ok) {
         badge.textContent = 'Admin credential required';
         badge.className = 'badge badge--warning';
-        container.innerHTML = '<p class="agent-error">Unlock your wallet and ensure an <strong>admin_access</strong> credential for <strong>lemma.id</strong> is stored. Use <a href="/admin/bootstrap">Bootstrap</a> if needed.</p>';
+        container.innerHTML = `<p class="agent-error">${access.message}</p>`;
         return;
     }
 
-    const siteId = (adminCredential.normalized && (adminCredential.normalized.siteId || adminCredential.normalized.site_id)) || '';
-    if (siteId && siteId !== OPERATOR_SITE && siteId !== 'lemma_platform') {
+    const siteId = getCredentialSite(adminCredential);
+    if (siteId && !OPERATOR_SITES.has(siteId) && !siteId.includes('lemma.id')) {
         badge.textContent = 'Wrong site binding';
         badge.className = 'badge badge--danger';
         container.innerHTML = `<p class="agent-error">Your admin credential is bound to <strong>${escapeHtml(siteId)}</strong>. Operator tokens require <strong>lemma.id</strong> only.</p>`;
@@ -206,7 +282,11 @@ async function generateToken() {
         audience: OPERATOR_SITE,
         operator_plane: true,
         task: 'Inspect lemma.id operator admin plane (/api/admin/**)',
-        admin_credential: window.lemmaCredential || null,
+        admin_credential: window.lemmaCredentialForHeader
+            || (typeof window.buildLemmaCredentialForHeader === 'function'
+                ? window.buildLemmaCredentialForHeader(window.lemmaCredential)
+                : window.lemmaCredential)
+            || null,
     };
 
     const headers = await getAuthHeaders();
