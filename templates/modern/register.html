@@ -358,17 +358,17 @@
                 </p>
 
                 <div class="register-requirements">
-                    <div class="register-requirements-title">Before you register</div>
+                    <div class="register-requirements-title">How registration works</div>
                     <ol class="register-requirements-list">
-                        <li>Complete isHuman verification on your wallet</li>
-                        <li>Unlock your passkey-secured wallet</li>
-                        <li>Submit your developer account details below</li>
+                        <li>Enter your developer account details below</li>
+                        <li>Submit the form to unlock your wallet and run isHuman verification</li>
+                        <li>Your account and developer credential are created only after verification succeeds</li>
                     </ol>
                 </div>
             </div>
 
-            <div id="wallet-status" class="wallet-status locked">
-                Checking wallet status...
+            <div id="wallet-status" class="wallet-status">
+                Complete the form below. isHuman verification opens automatically when you submit.
             </div>
 
             <div class="success-message" id="successMessage">
@@ -433,7 +433,7 @@
 
                 <button type="submit" class="register-button" id="registerButton">
                     <div class="button-content">
-                        Create developer account
+                        Continue to identity verification
                     </div>
                 </button>
             </form>
@@ -461,6 +461,7 @@
     <script nonce="{{ csp_nonce }}">
         let registerWallet = null;
         let idvPopupMonitor = null;
+        const PENDING_REGISTER_KEY = 'lemma_register_pending_v1';
 
         function buildPlatformIdvUrl({ redirect = false } = {}) {
             const url = new URL('/wallet/ishuman-idv', window.location.origin);
@@ -468,97 +469,28 @@
             url.searchParams.set('site_id', 'lemma.id');
             if (redirect) {
                 url.searchParams.set('flow_mode', 'redirect');
-                url.searchParams.set('redirect_return', window.location.href);
+                url.searchParams.set('redirect_return', window.location.pathname + window.location.search);
             }
             return url;
         }
 
         function walletStatusActionHtml() {
-            return '<div style="margin-top: 8px;"><button type="button" class="idv-action" id="open-idv-btn">Complete isHuman verification</button></div>';
+            return '<div style="margin-top: 8px;"><button type="button" class="idv-action" id="open-idv-btn">Retry identity verification</button></div>';
         }
 
-        function setWalletStatus(message, tone = 'info') {
+        function setWalletStatus(message, tone = 'info', options = {}) {
             const el = document.getElementById('wallet-status');
             if (!el) return;
-            el.className = 'wallet-status' + (tone === 'ready' ? ' ready' : tone === 'locked' ? ' locked' : '');
-            if (tone === 'locked' || tone === 'info') {
+            el.className = 'wallet-status'
+                + (tone === 'ready' ? ' ready' : tone === 'locked' ? ' locked' : '');
+            if (options.showIdvAction && (tone === 'locked' || tone === 'info')) {
                 el.innerHTML = message + walletStatusActionHtml();
             } else {
                 el.textContent = message;
             }
         }
 
-        async function refreshWalletReadiness() {
-            const wallet = await waitForRegisterWallet();
-            if (!wallet) {
-                setWalletStatus('Wallet failed to initialize. Refresh and try again.', 'locked');
-                return;
-            }
-            registerWallet = wallet;
-            try {
-                await wallet.init?.();
-                const ppid = await wallet.derivePPID('lemma.id');
-                if (ppid && String(ppid).startsWith('did:lemma:ppid_')) {
-                    setWalletStatus('Wallet verified. Complete the form to register.', 'ready');
-                    return;
-                }
-            } catch (_) {}
-            setWalletStatus('Unlock your wallet and complete isHuman verification before registering.', 'locked');
-        }
-
-        function openPlatformIdvVerification() {
-            const popupUrl = buildPlatformIdvUrl();
-            const width = 480;
-            const height = 640;
-            const left = Math.max(0, Math.round(window.screenX + (window.outerWidth - width) / 2));
-            const top = Math.max(0, Math.round(window.screenY + (window.outerHeight - height) / 2));
-            const popup = window.open(
-                popupUrl.toString(),
-                'lemma_ishuman_idv',
-                `popup=yes,width=${width},height=${height},left=${left},top=${top}`
-            );
-
-            if (!popup) {
-                window.location.assign(buildPlatformIdvUrl({ redirect: true }).toString());
-                return;
-            }
-
-            if (idvPopupMonitor) {
-                clearInterval(idvPopupMonitor);
-            }
-
-            let settled = false;
-            const finish = () => {
-                if (settled) return;
-                settled = true;
-                window.removeEventListener('message', onMessage);
-                if (idvPopupMonitor) {
-                    clearInterval(idvPopupMonitor);
-                    idvPopupMonitor = null;
-                }
-            };
-
-            const onMessage = (event) => {
-                if (event.origin !== window.location.origin) return;
-                const type = event.data?.type;
-                if (type === 'ISHUMAN_IDV_COMPLETE') {
-                    finish();
-                    refreshWalletReadiness();
-                } else if (type === 'ISHUMAN_IDV_CANCELLED') {
-                    finish();
-                }
-            };
-
-            window.addEventListener('message', onMessage);
-            idvPopupMonitor = setInterval(() => {
-                if (popup.closed) {
-                    finish();
-                    refreshWalletReadiness();
-                }
-            }, 500);
-        }
-
-        async function waitForRegisterWallet(maxAttempts = 30) {
+        async function waitForRegisterWallet(maxAttempts = 60) {
             let attempts = 0;
             while (!window.globalLemmaWallet && attempts < maxAttempts) {
                 await new Promise(resolve => setTimeout(resolve, 100));
@@ -567,31 +499,28 @@
             return window.globalLemmaWallet || null;
         }
 
-        async function prepareWalletForRegistration() {
+        async function getRegisterWallet() {
             const wallet = await waitForRegisterWallet();
             if (!wallet) {
                 throw new Error('Wallet failed to initialize. Refresh and try again.');
             }
             registerWallet = wallet;
-            if (!wallet.getWalletInfo) {
-                throw new Error('Wallet SDK unavailable.');
+            if (typeof wallet.init === 'function') {
+                await wallet.init();
             }
-            const info = await wallet.getWalletInfo();
-            if (!info.hasPasskey) {
-                setWalletStatus('Create a passkey to secure your wallet before registering.', 'locked');
-                await wallet.registerPasskey();
+            return wallet;
+        }
+
+        async function hasVerifiedPersonRoot(wallet) {
+            try {
+                const ppid = await wallet.derivePPID('lemma.id');
+                return !!(ppid && String(ppid).startsWith('did:lemma:ppid_'));
+            } catch (_) {
+                return false;
             }
-            if (!wallet.isUnlocked || !wallet.isUnlocked()) {
-                setWalletStatus('Unlock your wallet with passkey to continue.', 'locked');
-                const unlocked = await wallet.unlock();
-                if (!unlocked) {
-                    throw new Error('Wallet unlock cancelled.');
-                }
-            }
-            const ppid = await wallet.derivePPID('lemma.id');
-            if (!ppid || !String(ppid).startsWith('did:lemma:ppid_')) {
-                throw new Error('Complete isHuman IDV on this wallet before registering.');
-            }
+        }
+
+        async function collectWalletIdentity(wallet) {
             let walletId = null;
             let passkeyCredentialId = null;
             try {
@@ -601,24 +530,228 @@
             try {
                 passkeyCredentialId = await wallet.getPasskeyCredentialId();
             } catch (_) {}
+            const ppid = await wallet.derivePPID('lemma.id');
+            if (!ppid || !String(ppid).startsWith('did:lemma:ppid_')) {
+                throw new Error('Identity verification was not completed.');
+            }
             if (!walletId) {
                 throw new Error('Wallet unlock failed. Refresh and try again.');
             }
-            setWalletStatus('Wallet verified. Complete the form to register.', 'ready');
             return { ppid, walletId, passkeyCredentialId };
+        }
+
+        async function ensureWalletUnlocked(wallet) {
+            if (!wallet.getWalletInfo) {
+                throw new Error('Wallet SDK unavailable.');
+            }
+            const info = await wallet.getWalletInfo();
+            if (!info.hasPasskey) {
+                setWalletStatus('Create a passkey to secure your wallet…', 'locked');
+                await wallet.registerPasskey();
+            }
+            if (!wallet.isUnlocked || !wallet.isUnlocked()) {
+                setWalletStatus('Unlock your wallet with passkey…', 'locked');
+                const unlocked = await wallet.unlock();
+                if (!unlocked) {
+                    throw new Error('Wallet unlock cancelled.');
+                }
+            }
+        }
+
+        function openPlatformIdvVerification() {
+            return new Promise((resolve, reject) => {
+                const popupUrl = buildPlatformIdvUrl();
+                const width = 480;
+                const height = 640;
+                const left = Math.max(0, Math.round(window.screenX + (window.outerWidth - width) / 2));
+                const top = Math.max(0, Math.round(window.screenY + (window.outerHeight - height) / 2));
+                const popup = window.open(
+                    popupUrl.toString(),
+                    'lemma_ishuman_idv',
+                    `popup=yes,width=${width},height=${height},left=${left},top=${top}`
+                );
+
+                if (!popup) {
+                    window.location.assign(buildPlatformIdvUrl({ redirect: true }).toString());
+                    return;
+                }
+
+                if (idvPopupMonitor) {
+                    clearInterval(idvPopupMonitor);
+                }
+
+                let settled = false;
+                const finish = () => {
+                    if (settled) return;
+                    settled = true;
+                    window.removeEventListener('message', onMessage);
+                    if (idvPopupMonitor) {
+                        clearInterval(idvPopupMonitor);
+                        idvPopupMonitor = null;
+                    }
+                };
+
+                const onMessage = async (event) => {
+                    if (event.origin !== window.location.origin) return;
+                    const type = event.data?.type;
+                    if (type === 'ISHUMAN_IDV_COMPLETE') {
+                        finish();
+                        resolve(event.data?.detail || {});
+                    } else if (type === 'ISHUMAN_IDV_CANCELLED') {
+                        finish();
+                        reject(new Error('Identity verification was cancelled.'));
+                    }
+                };
+
+                window.addEventListener('message', onMessage);
+                idvPopupMonitor = setInterval(async () => {
+                    if (!popup.closed) return;
+                    finish();
+                    try {
+                        const wallet = await getRegisterWallet();
+                        if (await hasVerifiedPersonRoot(wallet)) {
+                            resolve({});
+                        } else {
+                            reject(new Error('Identity verification was not completed.'));
+                        }
+                    } catch (err) {
+                        reject(err);
+                    }
+                }, 500);
+            });
+        }
+
+        async function ensurePlatformIdentityVerified() {
+            const wallet = await getRegisterWallet();
+            await ensureWalletUnlocked(wallet);
+            if (await hasVerifiedPersonRoot(wallet)) {
+                setWalletStatus('Identity verified. Creating your developer account…', 'ready');
+                return collectWalletIdentity(wallet);
+            }
+
+            setWalletStatus('Opening isHuman verification…', 'locked');
+            await openPlatformIdvVerification();
+            await ensureWalletUnlocked(wallet);
+            if (!(await hasVerifiedPersonRoot(wallet))) {
+                throw new Error('Identity verification was not completed.');
+            }
+            setWalletStatus('Identity verified. Creating your developer account…', 'ready');
+            return collectWalletIdentity(wallet);
+        }
+
+        function readPendingRegistration() {
+            try {
+                const raw = sessionStorage.getItem(PENDING_REGISTER_KEY);
+                return raw ? JSON.parse(raw) : null;
+            } catch (_) {
+                return null;
+            }
+        }
+
+        function savePendingRegistration(data) {
+            sessionStorage.setItem(PENDING_REGISTER_KEY, JSON.stringify(data));
+        }
+
+        function clearPendingRegistration() {
+            sessionStorage.removeItem(PENDING_REGISTER_KEY);
+        }
+
+        async function completeRegistration(data) {
+            const identity = await ensurePlatformIdentityVerified();
+            data.ppid = identity.ppid;
+            data.wallet_id = identity.walletId;
+            if (identity.passkeyCredentialId) {
+                data.passkey_credential_id = identity.passkeyCredentialId;
+            }
+
+            const response = await fetch('/api/customer/register-wallet-developer', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data),
+            });
+            const result = await response.json();
+
+            if (!result.success) {
+                if (result.error === 'platform_membership_exists') {
+                    clearPendingRegistration();
+                    throw new Error('REGISTERED_REDIRECT');
+                }
+                throw new Error(result.message || result.error || 'Registration failed');
+            }
+
+            clearPendingRegistration();
+
+            if (result.permission_lemma && registerWallet) {
+                await registerWallet.storeCredential(result.permission_lemma);
+                window.lemmaCredential = result.permission_lemma;
+            }
+
+            document.getElementById('registerForm').style.display = 'none';
+            document.getElementById('wallet-status').style.display = 'none';
+            document.getElementById('successMessage').style.display = 'block';
+
+            if (result.api_key) {
+                document.getElementById('apiKeyValue').textContent = result.api_key;
+                document.getElementById('apiKeyDisplay').style.display = 'block';
+            } else {
+                showToast('success', result.message || 'Developer account created.');
+                setTimeout(() => { window.location.href = '/dashboard'; }, 1500);
+            }
+            return result;
+        }
+
+        async function resumePendingRegistrationIfReady() {
+            const pending = readPendingRegistration();
+            if (!pending) return false;
+            try {
+                const wallet = await getRegisterWallet();
+                if (!(await hasVerifiedPersonRoot(wallet))) {
+                    return false;
+                }
+                setWalletStatus('Finishing registration…', 'locked');
+                const button = document.getElementById('registerButton');
+                button.disabled = true;
+                await completeRegistration(pending);
+                return true;
+            } catch (err) {
+                if (err.message === 'REGISTERED_REDIRECT') {
+                    showError('general', 'This wallet is already registered. Redirecting to sign in…');
+                    setTimeout(() => { window.location.href = '/login'; }, 1500);
+                    return true;
+                }
+                setWalletStatus(
+                    err.message || 'Could not finish registration after verification.',
+                    'locked',
+                    { showIdvAction: true }
+                );
+                return false;
+            }
         }
 
         document.addEventListener('DOMContentLoaded', async () => {
             document.getElementById('wallet-status')?.addEventListener('click', (event) => {
                 if (event.target.closest('#open-idv-btn')) {
                     event.preventDefault();
-                    openPlatformIdvVerification();
+                    const pending = readPendingRegistration();
+                    if (!pending) {
+                        showError('general', 'Submit the form first, then retry verification.');
+                        return;
+                    }
+                    openPlatformIdvVerification()
+                        .then(() => completeRegistration(pending))
+                        .catch((err) => {
+                            setWalletStatus(
+                                err.message || 'Identity verification was not completed.',
+                                'locked',
+                                { showIdvAction: true }
+                            );
+                        });
                 }
             });
-            try {
-                await refreshWalletReadiness();
-            } catch (_) {
-                setWalletStatus('Wallet failed to initialize. Refresh and try again.', 'locked');
+
+            const resumed = await resumePendingRegistrationIfReady();
+            if (!resumed) {
+                setWalletStatus('Complete the form below. isHuman verification opens automatically when you submit.');
             }
         });
 
@@ -637,70 +770,38 @@
             const button = document.getElementById('registerButton');
             const originalContent = button.innerHTML;
             
-            // Clear previous errors
             clearErrors();
+
+            if (!validateEmail() || !validateName() || !validateCompany()) {
+                return;
+            }
             
-            // Show loading state
             button.disabled = true;
             button.innerHTML = `
                 <div class="button-content">
                     <span class="loading-spinner"></span>
-                    Creating your account...
+                    Verifying identity…
                 </div>
             `;
             
             try {
                 const formData = new FormData(this);
                 const data = Object.fromEntries(formData.entries());
+                savePendingRegistration(data);
 
-                const identity = await prepareWalletForRegistration();
-                data.ppid = identity.ppid;
-                data.wallet_id = identity.walletId;
-                if (identity.passkeyCredentialId) {
-                    data.passkey_credential_id = identity.passkeyCredentialId;
-                }
-
-                const response = await fetch('/api/customer/register-wallet-developer', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify(data)
-                });
-                
-                const result = await response.json();
-                
-                if (result.success) {
-                    if (result.permission_lemma && registerWallet) {
-                        await registerWallet.storeCredential(result.permission_lemma);
-                        window.lemmaCredential = result.permission_lemma;
-                    }
-
-                    document.getElementById('registerForm').style.display = 'none';
-                    document.getElementById('wallet-status').style.display = 'none';
-                    document.getElementById('successMessage').style.display = 'block';
-
-                    if (result.api_key) {
-                        document.getElementById('apiKeyValue').textContent = result.api_key;
-                        document.getElementById('apiKeyDisplay').style.display = 'block';
-                    } else {
-                        showToast('success', result.message || 'Developer account created.');
-                        setTimeout(() => { window.location.href = '/dashboard'; }, 1500);
-                    }
-                } else {
-                    if (result.error === 'platform_membership_exists') {
-                        showError('general', 'This wallet is already registered. Redirecting to sign in...');
-                        setTimeout(() => { window.location.href = '/login'; }, 1500);
-                    } else {
-                        showError('general', result.message || result.error || 'Registration failed');
-                    }
-                    button.disabled = false;
-                    button.innerHTML = originalContent;
-                }
-                
+                await completeRegistration(data);
             } catch (error) {
                 console.error('Registration error:', error);
-                showError('general', error.message || 'Network error. Please try again.');
+                if (error.message === 'REGISTERED_REDIRECT') {
+                    showError('general', 'This wallet is already registered. Redirecting to sign in…');
+                    setTimeout(() => { window.location.href = '/login'; }, 1500);
+                } else if ((error.message || '').toLowerCase().includes('verification')) {
+                    setWalletStatus(error.message, 'locked', { showIdvAction: true });
+                    showError('general', 'No account was created. Complete isHuman verification to continue.');
+                } else {
+                    showError('general', error.message || 'Registration failed. Please try again.');
+                    setWalletStatus('Registration did not complete. Fix the issue and submit again.', 'locked');
+                }
                 button.disabled = false;
                 button.innerHTML = originalContent;
             }
