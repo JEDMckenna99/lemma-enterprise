@@ -80,6 +80,20 @@ def require_credential(
             principal, error = extract_user_lemma_principal(request.headers)
 
             if not principal:
+                from auth.agent_principal import extract_agent_admin_principal
+
+                agent_info = None
+                principal, agent_error, agent_info = extract_agent_admin_principal(
+                    request.headers,
+                    request_path=request.path,
+                )
+                if principal:
+                    error = None
+                    g.agent_credential = agent_info
+                elif error is None:
+                    error = agent_error
+
+            if not principal:
                 if allow_unauthenticated:
                     g.authenticated = False
                     return f(*args, **kwargs)
@@ -90,7 +104,7 @@ def require_credential(
                 )
 
             g.authenticated = True
-            g.auth_method = "credential"
+            g.auth_method = getattr(principal, "auth_method", None) or "credential"
             g.ppid = principal.ppid
             g.credential_id = principal.credential_id
             g.permission_id = principal.permission_id

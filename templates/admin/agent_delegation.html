@@ -1,0 +1,269 @@
+{% extends "admin/layout.html" %}
+{% set active_page = 'agent_delegation' %}
+
+{% block title %}Agent Delegation - lemma.id Admin{% endblock %}
+
+{% block admin_content %}
+<div class="admin-header">
+    <h1 class="admin-title">Agent Delegation</h1>
+    <p class="admin-subtitle">Issue a lemma.id-only admin token for automated operator-plane inspection (Cursor, MCP, scripts)</p>
+</div>
+
+<div class="admin-card">
+    <div class="admin-card-header">
+        <h2 class="admin-card-title">Operator Token</h2>
+        <span class="badge badge--info" id="agent-status">Checking…</span>
+    </div>
+    <div class="admin-card-body">
+        <div id="agent-token-content">
+            <div style="text-align:center;padding:24px;color:#64748b;">Checking wallet and admin credential…</div>
+        </div>
+    </div>
+</div>
+
+<div class="admin-card">
+    <div class="admin-card-header">
+        <h2 class="admin-card-title">How agents use this token</h2>
+    </div>
+    <div class="admin-card-body" style="font-size:0.9rem;color:#475569;line-height:1.6;">
+        <p>Send the token on every request:</p>
+        <pre style="background:#1e1e1e;color:#d4d4d4;padding:12px;border-radius:8px;overflow:auto;">X-Agent-Token: lm_agent_…</pre>
+        <p>Tokens are bound to <strong>lemma.id only</strong> with <strong>admin</strong> scope and default access to <code>/api/admin/**</code>. They do not network-revoke users or mutate production without explicit API calls.</p>
+    </div>
+</div>
+
+<style>
+.agent-form { display:grid; gap:12px; max-width:520px; }
+.agent-form-row { display:grid; grid-template-columns:120px 1fr; gap:10px; align-items:center; }
+.agent-token-value { font-family:monospace; font-size:12px; word-break:break-all; background:#f1f5f9; padding:10px; border-radius:6px; margin:10px 0; }
+.agent-token-item { display:flex; justify-content:space-between; align-items:center; gap:12px; padding:10px; border:1px solid #e2e8f0; border-radius:6px; margin-bottom:8px; }
+.agent-error { color:#b91c1c; }
+</style>
+
+<script nonce="{{ csp_nonce }}">
+const OPERATOR_SITE = 'lemma.id';
+let adminCredential = null;
+let activeTokens = [];
+
+async function getAuthHeaders() {
+    if (typeof window.getLemmaAuthHeadersAsync === 'function') {
+        return await window.getLemmaAuthHeadersAsync({});
+    }
+    return {};
+}
+
+async function loadAdminCredential() {
+    if (typeof LemmaWallet === 'undefined') return null;
+    try {
+        const wallet = new LemmaWallet();
+        const authResult = await wallet.autoAuthenticate();
+        if (!authResult.authenticated) return null;
+        const credentials = await wallet.getCredentials({ siteId: OPERATOR_SITE });
+        adminCredential = credentials.find((c) => {
+            const n = c.normalized || {};
+            return n.permissionId === 'admin_access' || n.accountType === 'admin';
+        }) || null;
+        if (adminCredential) {
+            window.lemmaCredential = adminCredential.raw || adminCredential;
+        }
+        return adminCredential;
+    } catch (e) {
+        console.warn('Admin credential load failed', e);
+        return null;
+    }
+}
+
+function formatDate(value) {
+    if (!value) return '-';
+    try { return new Date(value).toLocaleString(); } catch { return value; }
+}
+
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = String(text ?? '');
+    return div.innerHTML;
+}
+
+function formatIssueError(data, status) {
+    const code = String((data && data.error) || '').trim();
+    const detail = String((data && data.message) || '').trim();
+    if (code === 'admin_lemma_site_mismatch') {
+        return detail || 'Admin credential must be bound to lemma.id only.';
+    }
+    if (code === 'site_ownership_mismatch') {
+        return 'You must be a lemma.id platform operator to issue this token.';
+    }
+    if (code === 'platform_owner_required') {
+        return detail || 'Only the platform owner can issue lemma.id admin agent tokens.';
+    }
+    return detail || code || `HTTP ${status}`;
+}
+
+async function loadPanel() {
+    const container = document.getElementById('agent-token-content');
+    const badge = document.getElementById('agent-status');
+    await loadAdminCredential();
+
+    if (!adminCredential) {
+        badge.textContent = 'Admin credential required';
+        badge.className = 'badge badge--warning';
+        container.innerHTML = '<p class="agent-error">Unlock your wallet and ensure an <strong>admin_access</strong> credential for <strong>lemma.id</strong> is stored. Use <a href="/admin/bootstrap">Bootstrap</a> if needed.</p>';
+        return;
+    }
+
+    const siteId = (adminCredential.normalized && (adminCredential.normalized.siteId || adminCredential.normalized.site_id)) || '';
+    if (siteId && siteId !== OPERATOR_SITE && siteId !== 'lemma_platform') {
+        badge.textContent = 'Wrong site binding';
+        badge.className = 'badge badge--danger';
+        container.innerHTML = `<p class="agent-error">Your admin credential is bound to <strong>${escapeHtml(siteId)}</strong>. Operator tokens require <strong>lemma.id</strong> only.</p>`;
+        return;
+    }
+
+    try {
+        const headers = await getAuthHeaders();
+        const response = await fetch('/api/agent/credentials', { headers });
+        const data = await response.json();
+        if (!response.ok || !data.success) throw new Error(data.error || 'Failed to load tokens');
+
+        activeTokens = (data.credentials || []).filter((c) => c.status === 'active');
+        badge.textContent = activeTokens.length ? `${activeTokens.length} active` : 'No active tokens';
+        badge.className = activeTokens.length ? 'badge badge--success' : 'badge badge--neutral';
+
+        container.innerHTML = `
+            <div class="agent-form">
+                <div class="agent-form-row">
+                    <label for="agent-name">Agent name</label>
+                    <input id="agent-name" class="admin-input" type="text" value="Cursor Admin Inspector">
+                </div>
+                <div class="agent-form-row">
+                    <label for="agent-ttl">Duration</label>
+                    <select id="agent-ttl" class="admin-input">
+                        <option value="1">1 hour</option>
+                        <option value="4" selected>4 hours</option>
+                        <option value="8">8 hours</option>
+                        <option value="24">24 hours</option>
+                    </select>
+                </div>
+                <div class="agent-form-row">
+                    <label>Site binding</label>
+                    <div><strong>lemma.id</strong> only (locked)</div>
+                </div>
+                <div class="agent-form-row">
+                    <label>Scope</label>
+                    <div><label><input type="checkbox" checked disabled> read</label> <label><input type="checkbox" id="scope-write" checked> write</label> <label><input type="checkbox" id="scope-admin" checked> admin</label></div>
+                </div>
+                <div>
+                    <button class="admin-btn admin-btn--primary" id="generate-token-btn">Generate operator token</button>
+                    <button class="admin-btn admin-btn--danger admin-btn--sm" id="revoke-all-btn" style="margin-left:8px;">Revoke all</button>
+                </div>
+            </div>
+            <div style="margin-top:20px;">
+                <h3 style="font-size:1rem;margin-bottom:8px;">Active tokens</h3>
+                ${activeTokens.length ? activeTokens.map((c) => `
+                    <div class="agent-token-item">
+                        <div>
+                            <div style="font-weight:600;">${escapeHtml(c.agent_name || 'Agent')}</div>
+                            <div style="font-size:12px;font-family:monospace;color:#64748b;">${escapeHtml(c.token_id)}</div>
+                            <div style="font-size:12px;color:#64748b;">Expires ${formatDate(c.expires_at)} · sites: ${escapeHtml((c.allowed_sites || []).join(', ') || 'lemma.id')}</div>
+                        </div>
+                        <button class="admin-btn admin-btn--danger admin-btn--sm" data-revoke-id="${escapeHtml(c.token_id)}">Revoke</button>
+                    </div>
+                `).join('') : '<p style="color:#64748b;">No active tokens.</p>'}
+            </div>
+        `;
+
+        document.getElementById('generate-token-btn').addEventListener('click', () => {
+            generateToken().catch((err) => {
+                if (window.showToast) showToast('error', 'Token issue failed', err.message);
+                else alert(err.message);
+            });
+        });
+        document.getElementById('revoke-all-btn').addEventListener('click', revokeAll);
+        container.querySelectorAll('[data-revoke-id]').forEach((btn) => {
+            btn.addEventListener('click', () => revokeOne(btn.dataset.revokeId));
+        });
+    } catch (err) {
+        badge.textContent = 'Error';
+        container.innerHTML = `<p class="agent-error">${escapeHtml(err.message)}</p>`;
+    }
+}
+
+async function generateToken() {
+    const scope = ['read'];
+    if (document.getElementById('scope-write')?.checked) scope.push('write');
+    if (document.getElementById('scope-admin')?.checked) scope.push('admin');
+    if (!scope.includes('admin')) {
+        alert('Admin scope is required for operator-plane inspection.');
+        return;
+    }
+
+    const payload = {
+        agent_name: document.getElementById('agent-name')?.value || 'Cursor Admin Inspector',
+        ttl_hours: parseInt(document.getElementById('agent-ttl')?.value || '4', 10),
+        scope,
+        intended_platform: OPERATOR_SITE,
+        allowed_sites: [OPERATOR_SITE],
+        audience: OPERATOR_SITE,
+        operator_plane: true,
+        task: 'Inspect lemma.id operator admin plane (/api/admin/**)',
+        admin_credential: window.lemmaCredential || null,
+    };
+
+    const headers = await getAuthHeaders();
+    const response = await fetch('/api/agent/credentials/issue', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json', ...headers },
+        body: JSON.stringify(payload),
+    });
+    const data = await response.json();
+    if (!response.ok || !data.success) {
+        throw new Error(formatIssueError(data, response.status));
+    }
+
+    const token = data?.credential?.token || data?.token || '';
+    await loadPanel();
+    const container = document.getElementById('agent-token-content');
+    if (token) {
+        container.insertAdjacentHTML('afterbegin', `
+            <div class="admin-card" style="border-left:4px solid #22c55e;margin-bottom:16px;padding:14px;">
+                <strong>New token (copy now)</strong>
+                <div class="agent-token-value">${escapeHtml(token)}</div>
+                <button class="admin-btn admin-btn--secondary admin-btn--sm" type="button" id="copy-token-btn">Copy token</button>
+                <p style="font-size:12px;color:#b45309;margin-top:8px;">Use header: X-Agent-Token</p>
+            </div>
+        `);
+        document.getElementById('copy-token-btn')?.addEventListener('click', () => {
+            navigator.clipboard.writeText(token);
+            if (window.showToast) showToast('success', 'Copied', 'Agent token copied');
+        });
+    }
+}
+
+async function revokeOne(tokenId) {
+    if (!confirm('Revoke this token?')) return;
+    const headers = await getAuthHeaders();
+    const response = await fetch(`/api/agent/credentials/${encodeURIComponent(tokenId)}/revoke`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...headers },
+        body: JSON.stringify({ reason: 'Revoked from admin agent delegation' }),
+    });
+    const data = await response.json();
+    if (!response.ok || !data.success) throw new Error(data.error || 'Revoke failed');
+    await loadPanel();
+}
+
+async function revokeAll() {
+    if (!activeTokens.length || !confirm(`Revoke all ${activeTokens.length} tokens?`)) return;
+    for (const t of [...activeTokens]) {
+        await revokeOne(t.token_id);
+    }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    loadPanel().catch((err) => {
+        document.getElementById('agent-token-content').innerHTML = `<p class="agent-error">${escapeHtml(err.message)}</p>`;
+    });
+});
+</script>
+{% endblock %}

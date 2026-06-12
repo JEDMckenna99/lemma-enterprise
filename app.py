@@ -1472,9 +1472,12 @@ def create_app():
 
     @app.route('/admin/agent-delegation')
     def admin_agent_delegation():
-        """Admin legacy agent delegator (direct legacy template)."""
-        logger.info("Serving admin legacy agent delegator")
-        return _require_wallet_session('developer/agent_delegation.html')
+        """Issue lemma.id-only operator agent tokens from the admin plane."""
+        logger.info("Serving admin agent delegation")
+        return _require_wallet_session(
+            'admin/agent_delegation.html',
+            active_page='agent_delegation',
+        )
 
     @app.route('/admin/agent-delegation/legacy-ui')
     def admin_agent_delegation_legacy_ui():

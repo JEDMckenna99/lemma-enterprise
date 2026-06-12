@@ -642,8 +642,54 @@ def _validate_allowed_sites_against_ownership(
     allowed_norm = [
         s for s in (_normalize_site_identifier(site) for site in (allowed_sites or [])) if s
     ]
+    if (
+        allowed_norm
+        and set(allowed_norm).issubset(internal_aliases)
+        and _is_lemma_platform_operator(authorized_by_ppid, authorized_by_email)
+    ):
+        return True, [], owned_sites_norm | internal_aliases
     invalid = [site for site in sorted(set(allowed_norm)) if site not in owned_sites_norm]
     return len(invalid) == 0, invalid, owned_sites_norm
+
+
+def _is_lemma_platform_operator(ppid: str | None, email: str | None) -> bool:
+    """True when principal may delegate lemma.id-only operator plane tokens."""
+    ppid = str(ppid or '').strip()
+    email = str(email or '').strip().lower()
+    if not ppid and not email:
+        return False
+    try:
+        from api.database import SiteAdmin, get_db
+
+        db = get_db()
+        try:
+            query = db.query(SiteAdmin).filter(
+                SiteAdmin.site_id.in_(['lemma.id', 'lemma_platform']),
+                SiteAdmin.is_active == True,  # noqa: E712
+            )
+            if ppid:
+                row = query.filter(SiteAdmin.admin_did == ppid).first()
+                if row:
+                    return True
+            if email:
+                row = query.filter(SiteAdmin.admin_email == email).first()
+                if row:
+                    return True
+        finally:
+            db.close()
+    except Exception as exc:
+        logger.warning('lemma platform operator lookup failed: %s', exc)
+
+    admin_ctx = _parse_admin_lemma_context()
+    ctx_site = _normalize_site_identifier(admin_ctx.get('site_id') or '')
+    platform_sites = {'lemma.id', 'lemma_platform'}
+    if ctx_site in platform_sites:
+        ctx_ppid = admin_ctx.get('ppid')
+        if ppid and ctx_ppid and str(ctx_ppid) == ppid:
+            perm = (admin_ctx.get('permission_id') or admin_ctx.get('role') or '').lower()
+            if perm in {'admin_access', 'super_admin_access', 'admin', 'super_admin', 'owner'}:
+                return True
+    return False
 
 
 def _normalize_ppid_claim(value) -> str | None:
@@ -865,6 +911,22 @@ def _parse_admin_lemma_context():
     """
     payload = request.get_json(silent=True) or {}
     credential = payload.get('admin_credential') or payload.get('credential')
+
+    if not credential:
+        raw_header = request.headers.get('X-Lemma-Credential')
+        if raw_header:
+            try:
+                import base64
+                import json as _json
+
+                text = str(raw_header).strip()
+                if text.startswith('{'):
+                    credential = _json.loads(text)
+                else:
+                    padded = text + ('=' * (-len(text) % 4))
+                    credential = _json.loads(base64.urlsafe_b64decode(padded.encode('utf-8')).decode('utf-8'))
+            except Exception:
+                credential = None
 
     if not credential:
         auth_header = request.headers.get('Authorization', '')
@@ -1840,6 +1902,27 @@ def issue_agent_credential():
                 }), 400
             normalized_allowed_sites.append(site_norm)
         allowed_sites = sorted(list(set(normalized_allowed_sites)))
+
+        if data.get('operator_plane'):
+            op_sites = {'lemma.id'}
+            if set(allowed_sites) - op_sites:
+                return jsonify({
+                    'success': False,
+                    'error': 'operator_plane_site_lock',
+                    'message': 'Operator-plane tokens must use allowed_sites=["lemma.id"] only.',
+                }), 400
+            if _normalize_site_identifier(intended_platform) not in {'lemma.id', 'lemma_platform'}:
+                return jsonify({
+                    'success': False,
+                    'error': 'operator_plane_site_lock',
+                    'message': 'Operator-plane tokens must target lemma.id only.',
+                }), 400
+            if 'admin' not in scope_norm:
+                return jsonify({
+                    'success': False,
+                    'error': 'admin_scope_required',
+                    'message': 'Operator-plane tokens require admin scope.',
+                }), 400
 
         # SECURITY: Delegated agent tokens may only target sites owned/administered
         # by the delegating principal.
