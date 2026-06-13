@@ -82,6 +82,18 @@ def _resolve_site_for_checkout(db, site_id: str, customer) -> Optional[Dict[str,
             "site_domain": first.get("site_domain") or "",
             "admin_email": getattr(customer, "email", None) or getattr(customer, "billing_email", None),
         }
+
+    email = (
+        getattr(customer, "billing_email", None) or getattr(customer, "email", None) or ""
+    ).strip().lower()
+    if email:
+        site = db.query(Site).filter(Site.admin_email.ilike(email)).first()
+        if site:
+            return {
+                "site_id": site.site_id,
+                "site_domain": site.site_domain,
+                "admin_email": site.admin_email,
+            }
     return None
 
 
@@ -227,9 +239,27 @@ def billing_account_status():
 
     db = SessionLocal()
     try:
-        if customer and customer.sites:
-            first_site = customer.sites[0] or {}
+        if customer:
+            email = (
+                getattr(customer, "billing_email", None) or getattr(customer, "email", None) or ""
+            ).strip().lower()
+            if email:
+                from api.database import Site
+
+                linked_site = db.query(Site).filter(Site.admin_email.ilike(email)).first()
+                if linked_site:
+                    onboarding["has_site"] = True
+                    if (customer.subscription_status or "none").lower() != "active":
+                        onboarding["next_step"] = "complete_checkout"
+                    else:
+                        onboarding["next_step"] = "ready"
+
+        if customer and onboarding.get("has_site"):
+            first_site = (customer.sites or [{}])[0] if customer.sites else {}
             domain = first_site.get("site_domain") or ""
+            if not domain and email:
+                linked = db.query(Site).filter(Site.admin_email.ilike(email)).first()
+                domain = linked.site_domain if linked else ""
             if domain:
                 ctx = get_registered_site_billing_context(db, domain)
                 onboarding["site_billing"] = {

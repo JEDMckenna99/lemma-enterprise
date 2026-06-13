@@ -79,6 +79,20 @@ def ensure_billing_customer(
 
     if existing:
         customer_id = existing.customer_id
+        if normalized_email and not (existing.email or "").strip():
+            if customer_manager.db_available:
+                from api.database import Customer as DBCustomer
+
+                row = (
+                    db.query(DBCustomer)
+                    .filter(DBCustomer.customer_id == customer_id)
+                    .first()
+                )
+                if row:
+                    row.email = normalized_email
+                    row.billing_email = normalized_email
+                    db.commit()
+            existing = customer_manager.get_customer(customer_id)
     else:
         result = customer_manager.create_customer(
             email=normalized_email,
@@ -106,6 +120,36 @@ def ensure_billing_customer(
         )
         db.commit()
 
+    if existing and normalized_email and not (existing.stripe_customer_id or "").strip():
+        try:
+            import os
+
+            import stripe
+
+            stripe.api_key = os.getenv("STRIPE_SECRET_KEY", "")
+            if stripe.api_key:
+                stripe_customer = stripe.Customer.create(
+                    email=normalized_email,
+                    name=name or existing.name or normalized_email.split("@", 1)[0],
+                    metadata={
+                        "lemma_customer_id": customer_id,
+                        "lemma_did": ppid,
+                    },
+                )
+                from api.database import Customer as DBCustomer
+
+                row = (
+                    db.query(DBCustomer)
+                    .filter(DBCustomer.customer_id == customer_id)
+                    .first()
+                )
+                if row:
+                    row.stripe_customer_id = stripe_customer.id
+                    db.commit()
+                existing = customer_manager.get_customer(customer_id)
+        except Exception as exc:
+            logger.warning("Stripe customer backfill skipped: %s", exc)
+
     return existing
 
 
@@ -118,18 +162,28 @@ def link_customer_to_site(
     admin_email: str,
     company_name: str = "Lemma Developer",
 ) -> None:
-    """Ensure sites table row exists and points at the billing customer."""
-    try:
-        from api.storage_helpers import upsert_site_to_postgres
+    """Ensure sites table row exists for billing resolution by admin_email."""
+    import secrets
 
-        upsert_site_to_postgres(
-            site_id=site_id,
-            site_domain=site_domain,
-            customer_id=customer_id,
-            company_name=company_name,
-            admin_email=admin_email,
-            environment="production",
-            site_label=site_domain,
+    from api.database import Site
+
+    normalized_email = (admin_email or "").strip().lower()
+    existing = db.query(Site).filter_by(site_id=site_id).first()
+    if existing:
+        existing.site_domain = site_domain
+        existing.company_name = company_name or existing.company_name
+        if normalized_email:
+            existing.admin_email = normalized_email
+    else:
+        db.add(
+            Site(
+                site_id=site_id,
+                site_domain=site_domain,
+                company_name=company_name,
+                admin_email=normalized_email or "billing@lemma.id",
+                api_key=f"lm_{secrets.token_urlsafe(32)}",
+                oauth_client_id=f"oc_{secrets.token_urlsafe(16)}",
+                oauth_client_secret=secrets.token_urlsafe(32),
+            )
         )
-    except Exception as exc:
-        logger.warning("Could not upsert site %s for billing: %s", site_id, exc)
+    db.commit()
