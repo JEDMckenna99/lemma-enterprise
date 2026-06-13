@@ -1932,19 +1932,31 @@ def ishuman_stats():
 # ---------------------------------------------------------------------------
 
 
-def _track_site_proof_mau(db, target_site: str, ppid: str) -> None:
-    """Record a site-bound credential issuance for monthly active-user billing."""
-    if not ppid:
+def _bill_site_credential_event(
+    db,
+    *,
+    target_site: str,
+    ppid: str,
+    credential_id: str,
+    issue_mode: Optional[str] = None,
+    is_cached_reissue: bool = False,
+) -> None:
+    """Classify and record a billable site-credential event (issuance / MAU / doubt)."""
+    if not ppid or not credential_id:
         return
     try:
-        from api.site_ppid_revocation import resolve_site_by_domain
-        from api.usage_tracking import track_site_proof_mau
+        from billing.credential_billing import record_credential_billing_event
 
-        site = resolve_site_by_domain(db, target_site)
-        site_key = site.site_id if site else target_site
-        track_site_proof_mau(site_key, ppid)
+        record_credential_billing_event(
+            db,
+            target_site=target_site,
+            ppid=ppid,
+            credential_id=credential_id,
+            issue_mode=issue_mode,
+            is_cached_reissue=is_cached_reissue,
+        )
     except Exception as exc:
-        logger.warning("Failed to track site proof MAU for %s: %s", target_site, exc)
+        logger.warning("Failed to record credential billing for %s: %s", target_site, exc)
 
 
 @ishuman_bp.route("/api/ishuman/derive-site-proof", methods=["POST"])
@@ -1982,6 +1994,7 @@ def derive_site_proof():
     wallet_id = body.get("wallet_id")
     target_site = body.get("target_site")
     site_signing_pubkey_raw = (body.get("site_signing_pubkey") or "").strip()
+    issue_mode = (body.get("issue_mode") or "site_proof").strip().lower()
 
     if not wallet_id or not target_site:
         return jsonify({
@@ -2068,6 +2081,16 @@ def derive_site_proof():
         if deny_reason:
             return jsonify({"success": False, "error": deny_reason}), 403
 
+        from billing.billing_access import check_site_billing_allows_issuance
+
+        billing_deny = check_site_billing_allows_issuance(db, target_site)
+        if billing_deny:
+            return jsonify({
+                "success": False,
+                "error": billing_deny,
+                "message": "Site billing is inactive. Update payment method in developer billing.",
+            }), 402
+
         ppid_derivation = "person_root_v1" if person_id else None
 
         # 2. Check if derivation already exists
@@ -2097,7 +2120,14 @@ def derive_site_proof():
                 verification_method=(getattr(master, "issuer_id", None) or "didit"),
             )
             credential["id"] = existing.derived_credential_id
-            _track_site_proof_mau(db, target_site, ppid)
+            _bill_site_credential_event(
+                db,
+                target_site=target_site,
+                ppid=ppid,
+                credential_id=credential["id"],
+                issue_mode=issue_mode,
+                is_cached_reissue=True,
+            )
             return jsonify({"success": True, "credential": credential, "cached": True})
 
         # 3. Derive site-specific PPID
@@ -2134,7 +2164,14 @@ def derive_site_proof():
             master_credential_id[:30], target_site, credential["id"][:30],
         )
 
-        _track_site_proof_mau(db, target_site, site_ppid)
+        _bill_site_credential_event(
+            db,
+            target_site=target_site,
+            ppid=site_ppid,
+            credential_id=credential["id"],
+            issue_mode=issue_mode,
+            is_cached_reissue=False,
+        )
         return jsonify({"success": True, "credential": credential, "cached": False})
 
     except Exception:

@@ -295,7 +295,7 @@
 <div class="pricing-hero">
     <h1>Simple pricing</h1>
     <p class="subtitle">Pay when a user gets their first site credential. Pay a small MAU fee only when they come back.</p>
-    <p class="description">Unlimited local verification on your servers — no per-check fee. lemma.id is only in the loop when a passkey is required to issue or renew a site credential.</p>
+    <p class="description">Unlimited local verification on your servers — no per-check fee. lemma.id is only in the loop when a user needs a new or renewed site credential (about once per month).</p>
     <div class="pricing-hero-highlight">
         <div class="pricing-hero-stat">
             <span class="amount">$0.35</span>
@@ -324,17 +324,17 @@
         <div class="lemma-price-card featured">
             <h3>Initial site issuance</h3>
             <p class="price">$0.35 / user / site</p>
-            <p>Charged once when a user receives their <strong>first site credential</strong> for your site — the passkey-gated issuance that binds their PPID to your domain.</p>
+            <p>Charged once when a user receives their <strong>first site credential</strong> for your site — the lemma.id popup flow that binds their site-private PPID to your domain after one-time identity verification.</p>
         </div>
         <div class="lemma-price-card featured">
             <h3>Monthly active user (MAU)</h3>
             <p class="price">$0.01 / user / month</p>
-            <p>Charged for each month a user is <strong>active on your site</strong>, starting the <strong>calendar month after</strong> their first site credential was issued. Inactive months are not billed.</p>
+            <p>Charged for each calendar month a user <strong>renews</strong> their site credential on your site, starting the <strong>calendar month after</strong> their first issuance. Inactive months are not billed.</p>
         </div>
         <div class="lemma-price-card">
             <h3>Local verification</h3>
             <p class="price">Free</p>
-            <p>Your site validates credentials locally with the SDK — signature, expiry, and revocation checks. No server call to lemma.id and no per-check fee, no matter how many times the user presents the credential.</p>
+            <p>Your site validates credentials locally with the SDK — signature, expiry, and revocation checks. Site credentials expire after <strong>30 days</strong>; renewal opens a lemma.id popup. Routine checks between renewals need no server call and are never metered.</p>
         </div>
         <div class="lemma-price-card">
             <h3>Site integration</h3>
@@ -346,10 +346,11 @@
     <div class="pricing-rules">
         <h3>Billing rules</h3>
         <ol>
-            <li><strong>First issuance ($0.35):</strong> billed when lemma.id issues the user's first site-bound credential for your site (passkey required).</li>
-            <li><strong>MAU ($0.01):</strong> billed for each calendar month the user is active <em>after</em> the month of their first issuance. The issuance month itself has no MAU charge.</li>
-            <li><strong>Active user:</strong> a user who passkey-renews their site credential during that month (monthly continuity check).</li>
-            <li><strong>Local checks:</strong> unlimited presentations and verifications on your infrastructure — never metered.</li>
+            <li><strong>First issuance ($0.35):</strong> billed when lemma.id issues the user's first site-bound credential for your site (one-time IDV + wallet setup; passkey secures the wallet on first use).</li>
+            <li><strong>MAU ($0.01):</strong> billed for each calendar month the user renews <em>after</em> the month of their first issuance. The issuance month itself has no MAU charge.</li>
+            <li><strong>Active user:</strong> a user whose site credential is <strong>re-issued</strong> by lemma.id that month — typically when their prior credential expires (~30 days) and they complete the continuity popup (daily unlock when already signed in on lemma.id; passkey if the wallet lock has expired).</li>
+            <li><strong>Same person, same PPID:</strong> renewals re-check the verified person root and issue a fresh credential with the same site-private PPID — no repeat IDV for routine continuity.</li>
+            <li><strong>Local checks:</strong> unlimited presentations and verifications on your infrastructure between renewals — never metered.</li>
             <li><strong>Per site:</strong> each relying site is billed independently for its own users (pairwise PPIDs).</li>
         </ol>
     </div>
@@ -358,7 +359,7 @@
         <h3>Example: 1,000 new users in January, 600 return in February</h3>
         <p><strong>January:</strong> 1,000 × $0.35 = <strong>$350</strong> (initial issuance). No MAU charges — first month after issuance is excluded.</p>
         <p><strong>February:</strong> 600 returning active users × $0.01 = <strong>$6.00</strong> MAU. Plus any new users who join in February at $0.35 each.</p>
-        <p><strong>All year:</strong> A user who logs in daily but renews once per month still counts as <strong>one MAU</strong> that month — not 30 verification events like SMS OTP.</p>
+        <p><strong>All year:</strong> A user who visits daily but renews once when their credential expires still counts as <strong>one MAU</strong> that month — not one charge per login or local verification.</p>
     </div>
 </div>
 
@@ -379,7 +380,7 @@
         </div>
         <div class="feature-item">
             <div class="feature-check">✓</div>
-            <div class="feature-text">Passkey authentication</div>
+            <div class="feature-text">Passkey-secured wallet (first setup)</div>
         </div>
         <div class="feature-item">
             <div class="feature-check">✓</div>
@@ -387,7 +388,7 @@
         </div>
         <div class="feature-item">
             <div class="feature-check">✓</div>
-            <div class="feature-text">Monthly continuity via passkey renewal</div>
+            <div class="feature-text">30-day site credentials with monthly continuity renewal</div>
         </div>
         <div class="feature-item">
             <div class="feature-check">✓</div>

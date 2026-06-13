@@ -1,0 +1,151 @@
+{% extends "developer/layout.html" %}
+{% set active_page = 'billing' %}
+
+{% block dev_content %}
+<div class="dev-header">
+    <div class="dev-header-row">
+        <div>
+            <h1 class="dev-title">Billing</h1>
+            <p class="dev-subtitle">Pay-as-you-go site credentials — $0.35 issuance, $0.01 MAU, $0.35 doubt re-entry</p>
+        </div>
+    </div>
+</div>
+
+<div class="dev-card" id="billing-status-card">
+    <div class="dev-card-header">
+        <h2 class="dev-card-title">Account status</h2>
+        <button class="dev-btn dev-btn-secondary dev-btn-sm" id="refresh-billing-btn" type="button">Refresh</button>
+    </div>
+    <div class="dev-card-body">
+        <div class="dev-stats" style="margin-bottom: 1rem;">
+            <div class="dev-stat-card">
+                <div class="dev-stat-label">Subscription</div>
+                <div class="dev-stat-value" id="billing-status">—</div>
+            </div>
+            <div class="dev-stat-card">
+                <div class="dev-stat-label">Stripe customer</div>
+                <div class="dev-stat-value" id="billing-stripe-customer" style="font-size: 0.9rem;">—</div>
+            </div>
+        </div>
+        <p id="billing-message" style="color: var(--gray-600); margin: 0 0 1rem;"></p>
+        <button class="dev-btn dev-btn-primary" id="setup-billing-btn" type="button">Set up billing</button>
+    </div>
+</div>
+
+<div class="dev-card">
+    <div class="dev-card-header">
+        <h2 class="dev-card-title">How you're billed</h2>
+    </div>
+    <div class="dev-card-body">
+        <ul style="margin: 0; padding-left: 1.25rem; line-height: 1.8; color: var(--gray-700);">
+            <li><strong>$0.35</strong> — first site credential per user</li>
+            <li><strong>$0.01</strong> — monthly active user (renewal after first month)</li>
+            <li><strong>$0.35</strong> — doubt re-entry after amnesty-eligible block (fresh IDV)</li>
+            <li><strong>$0</strong> — site blocks, hard bans, local verification</li>
+        </ul>
+        <p style="margin-top: 1rem; color: var(--gray-600); font-size: 0.9rem;">
+            Invoices are generated monthly from metered usage. Failed payments pause new credential issuance until resolved.
+        </p>
+    </div>
+</div>
+
+<script nonce="{{ csp_nonce }}">
+async function billingAuthHeaders() {
+    if (typeof window.getLemmaAuthHeadersAsync === 'function') {
+        return await window.getLemmaAuthHeadersAsync({ 'Content-Type': 'application/json' });
+    }
+    if (typeof window.getLemmaAuthHeaders === 'function') {
+        return window.getLemmaAuthHeaders({ 'Content-Type': 'application/json' });
+    }
+    return { 'Content-Type': 'application/json' };
+}
+
+function formatStatus(status) {
+    const map = {
+        active: 'Active',
+        past_due: 'Past due',
+        canceled: 'Canceled',
+        none: 'Not set up',
+    };
+    return map[status] || status || 'Unknown';
+}
+
+async function loadBillingStatus() {
+    const statusEl = document.getElementById('billing-status');
+    const stripeEl = document.getElementById('billing-stripe-customer');
+    const messageEl = document.getElementById('billing-message');
+    const setupBtn = document.getElementById('setup-billing-btn');
+
+    try {
+        const headers = await billingAuthHeaders();
+        const resp = await fetch('/api/billing/account-status', { headers });
+        const data = await resp.json();
+        if (!resp.ok || !data.success) {
+            statusEl.textContent = 'Unavailable';
+            messageEl.textContent = data.message || data.error || 'Could not load billing status.';
+            return;
+        }
+
+        const billing = data.billing;
+        if (!billing) {
+            statusEl.textContent = 'Guest';
+            messageEl.textContent = 'Sign in with your developer account to manage billing.';
+            setupBtn.disabled = true;
+            return;
+        }
+
+        statusEl.textContent = formatStatus(billing.subscription_status);
+        stripeEl.textContent = billing.stripe_customer_id || '—';
+
+        if (billing.subscription_status === 'active') {
+            messageEl.textContent = 'Billing is active. New site credentials will be metered on your monthly invoice.';
+            setupBtn.textContent = 'Update payment method';
+        } else if (billing.subscription_status === 'past_due') {
+            messageEl.textContent = 'Payment failed — new credential issuance is paused until you update your payment method.';
+            setupBtn.textContent = 'Fix payment method';
+        } else {
+            messageEl.textContent = 'Add a payment method to enable metered billing for site credentials.';
+            setupBtn.textContent = 'Set up billing';
+        }
+    } catch (err) {
+        statusEl.textContent = 'Error';
+        messageEl.textContent = err?.message || 'Failed to load billing status.';
+    }
+}
+
+async function startBillingCheckout() {
+    const setupBtn = document.getElementById('setup-billing-btn');
+    setupBtn.disabled = true;
+    try {
+        const headers = await billingAuthHeaders();
+        const resp = await fetch('/api/billing/usage-checkout', {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({
+                success_url: window.location.origin + '/developer/billing?billing=success',
+                cancel_url: window.location.origin + '/developer/billing',
+            }),
+        });
+        const data = await resp.json();
+        if (!resp.ok || !data.success || !data.url) {
+            window.showToast?.('error', 'Checkout failed', data.message || data.error || 'Unable to start checkout');
+            return;
+        }
+        window.location.href = data.url;
+    } catch (err) {
+        window.showToast?.('error', 'Checkout failed', err?.message || 'Network error');
+    } finally {
+        setupBtn.disabled = false;
+    }
+}
+
+document.getElementById('refresh-billing-btn').addEventListener('click', loadBillingStatus);
+document.getElementById('setup-billing-btn').addEventListener('click', startBillingCheckout);
+
+if (new URLSearchParams(window.location.search).get('billing') === 'success') {
+    window.showToast?.('success', 'Billing updated', 'Stripe checkout completed. Status may take a moment to sync.');
+}
+
+loadBillingStatus();
+</script>
+{% endblock %}

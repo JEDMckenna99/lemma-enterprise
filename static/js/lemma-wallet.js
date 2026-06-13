@@ -2936,14 +2936,18 @@ class LemmaWallet {
         return this._sortCredentialsNewestFirst(masters)[0];
     }
 
-    async deriveAndStoreSiteProof(targetSite) {
+    async deriveAndStoreSiteProof(targetSite, options = {}) {
         await this.ensureIsHumanIssuanceReady({ isHumanIssuance: true });
         await this.reconcileSessionWalletIdForIssuance();
         const keys = this._getLemmaKeys();
         const canonicalSite = keys.canonicalizeSiteDomain(targetSite || '');
+        const issueMode = (options.issueMode || 'site_proof').trim().toLowerCase();
+        const forceServerDerive = issueMode === 'fresh_idv' || !!options.forceServerDerive;
 
-        const existing = await this.findIsHumanSiteCredential(canonicalSite);
-        if (existing) return existing;
+        if (!forceServerDerive) {
+            const existing = await this.findIsHumanSiteCredential(canonicalSite);
+            if (existing) return existing;
+        }
 
         // v2 (Phase 1.2): the master credential is an optional hint. If the
         // local copy is missing, the server falls back to our latest verified
@@ -2981,6 +2985,7 @@ class LemmaWallet {
             target_site: canonicalSite,
             site_signing_pubkey: siteSigningPubkey,
             wallet_assertion: walletAssertion,
+            issue_mode: issueMode === 'fresh_idv' ? 'fresh_idv' : 'site_proof',
         };
         if (masterId) {
             deriveBody.master_credential_id = masterId;
@@ -3101,8 +3106,11 @@ class LemmaWallet {
         sessionNonce,
         bloomSequence,
         sessionTtlSec,
+        issueMode,
     }) {
-        const credential = await this.deriveAndStoreSiteProof(siteId);
+        const credential = await this.deriveAndStoreSiteProof(siteId, {
+            issueMode: issueMode || 'site_proof',
+        });
         return this.signSiteSessionPresentation({
             credential,
             siteId,

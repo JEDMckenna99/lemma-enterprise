@@ -1,0 +1,22 @@
+{
+  "product_id": "prod_UhJ0jtndWiR1nX",
+  "meters": {
+    "initial_issuance": {
+      "event_name": "lemma.initial_issuance",
+      "meter_id": "mtr_61UrIMEFP3lzmyJ0x41DvNB3AmVHjQHQ"
+    },
+    "mau_renewal": {
+      "event_name": "lemma.mau_renewal",
+      "meter_id": "mtr_61UrIMF0CqVc2BXQi41DvNB3AmVHjJ16"
+    },
+    "doubt_reentry": {
+      "event_name": "lemma.doubt_reentry",
+      "meter_id": "mtr_61UrIMFIMBjcCg1Gn41DvNB3AmVHj2XA"
+    }
+  },
+  "prices": {
+    "initial_issuance": "price_1ThuOsDvNB3AmVHj1Q8Xsp6v",
+    "mau_renewal": "price_1ThuOtDvNB3AmVHjMCVeBo4N",
+    "doubt_reentry": "price_1ThuOuDvNB3AmVHjYqfleutU"
+  }
+}

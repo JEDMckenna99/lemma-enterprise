@@ -1248,6 +1248,7 @@
                 sessionNonce: clientSessionNonce,
                 bloomSequence: effectiveBloomSeq,
                 sessionTtlSec,
+                issueMode: 'fresh_idv',
             });
 
             setStatus(consumerCopy().status?.freshSuccess || 'You\u2019re verified again.', 'success');

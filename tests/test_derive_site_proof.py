@@ -80,18 +80,17 @@ def test_derive_without_master_id_succeeds_for_verified_wallet(
 
 
 @pytest.mark.unit
-def test_derive_site_proof_tracks_mau(
+def test_derive_site_proof_records_billing_event(
     ishuman_client,
     fake_ishuman_db_session_factory,
     make_ishuman_verification,
     monkeypatch,
     attach_wallet_assertion,
 ):
-    tracked: list[tuple[str, str]] = []
+    billed: list[dict] = []
 
-    def _capture(site_key, ppid):
-        tracked.append((site_key, ppid))
-        return True
+    def _capture(db, **kwargs):
+        billed.append(kwargs)
 
     db = fake_ishuman_db_session_factory
     db.store.data["IsHumanVerification"].append(
@@ -102,7 +101,7 @@ def test_derive_site_proof_tracks_mau(
         )
     )
     monkeypatch.setattr("api.database.SessionLocal", db.session_local)
-    monkeypatch.setattr("api.usage_tracking.track_site_proof_mau", _capture)
+    monkeypatch.setattr("api.ishuman._bill_site_credential_event", _capture)
     _patch_issuance(monkeypatch)
 
     resp = ishuman_client.post(
@@ -119,7 +118,8 @@ def test_derive_site_proof_tracks_mau(
     )
 
     assert resp.status_code == 200, resp.get_json()
-    assert tracked == [("example.com", "did:lemma:ppid_site_phase12")]
+    assert len(billed) == 1
+    assert billed[0]["ppid"] == "did:lemma:ppid_site_phase12"
 
 
 @pytest.mark.unit

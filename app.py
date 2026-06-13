@@ -294,6 +294,13 @@ def create_app():
         logger.error(f"❌ Failed to register Stripe Checkout: {e}")
 
     try:
+        from api.stripe_usage_billing import stripe_usage_billing_bp
+        app.register_blueprint(stripe_usage_billing_bp)
+        logger.info("✅ Stripe Usage Billing registered")
+    except Exception as e:
+        logger.error(f"❌ Failed to register Stripe Usage Billing: {e}")
+
+    try:
         from api.mau_api import mau_api_bp
         app.register_blueprint(mau_api_bp)
         logger.info("✅ MAU API registered")
@@ -1226,8 +1233,15 @@ def create_app():
     
     @app.route('/developer/billing')
     def developer_billing():
-        """Developer Platform - Billing"""
-        return redirect('/pricing')
+        """Developer billing — usage-based Stripe metered subscription."""
+        logger.info("Serving developer billing")
+        return _require_wallet_session(
+            'developer/billing.html',
+            active_page='billing',
+            user_email=request.headers.get('X-User-Email'),
+            user_name=None,
+            is_admin=request.headers.get('X-Permission-ID', '').lower() in ['super_admin', 'admin_access'],
+        )
     
     @app.route('/docs/<path:filename>')
     def serve_docs(filename):
