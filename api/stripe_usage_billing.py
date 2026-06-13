@@ -92,31 +92,54 @@ def create_usage_checkout():
     if not _stripe_configured():
         return jsonify({"success": False, "error": "stripe_not_configured"}), 500
 
-    from billing.stripe_catalog import catalog_prices_configured, load_catalog_price_ids
-
-    if not catalog_prices_configured():
-        return jsonify({
-            "success": False,
-            "error": "billing_catalog_not_configured",
-            "message": "Run scripts/bootstrap_stripe_billing_catalog.py or set LEMMA_STRIPE_PRICE_* env vars.",
-        }), 503
-
     data = request.get_json(silent=True) or {}
+    ppid = getattr(g, "ppid", None)
     customer = _customer_for_request()
     email = (
         (data.get("email") or "").strip().lower()
         or (getattr(customer, "billing_email", None) or getattr(customer, "email", None) or "")
     ).strip().lower()
-    if not email:
-        return jsonify({"success": False, "error": "email_required"}), 400
 
-    from api.database import SessionLocal
+    from api.database import PlatformUser, SessionLocal
+    from billing.billing_customer import ensure_billing_customer
 
     db = SessionLocal()
     try:
+        if not email and ppid:
+            account = db.query(PlatformUser).filter_by(user_did=ppid).first()
+            email = (getattr(account, "email", None) or "").strip().lower()
+
+        if not email:
+            return jsonify({
+                "success": False,
+                "error": "email_required",
+                "message": "Provide billing email to start Checkout.",
+            }), 400
+
+        if not customer and ppid:
+            customer = ensure_billing_customer(
+                db,
+                ppid=ppid,
+                email=email,
+                wallet_id=getattr(db.query(PlatformUser).filter_by(user_did=ppid).first(), "wallet_id", None),
+            )
+
         site_info = _resolve_site_for_checkout(db, data.get("site_id") or "", customer)
         if not site_info or not site_info.get("site_id"):
-            return jsonify({"success": False, "error": "site_required"}), 400
+            return jsonify({
+                "success": False,
+                "error": "site_required",
+                "message": "Register a site first, then return to billing setup.",
+            }), 400
+
+        from billing.stripe_catalog import catalog_prices_configured, load_catalog_price_ids
+
+        if not catalog_prices_configured():
+            return jsonify({
+                "success": False,
+                "error": "billing_catalog_not_configured",
+                "message": "Run scripts/bootstrap_stripe_billing_catalog.py or set LEMMA_STRIPE_PRICE_* env vars.",
+            }), 503
 
         price_ids = load_catalog_price_ids()
         success_url = (
@@ -138,6 +161,7 @@ def create_usage_checkout():
                 "lemma_site_id": site_info["site_id"],
                 "lemma_site_domain": site_info.get("site_domain") or "",
                 "lemma_customer_id": getattr(customer, "customer_id", "") if customer else "",
+                "lemma_owner_ppid": ppid or "",
                 "billing_model": "usage_metered",
             },
             "subscription_data": {
@@ -177,9 +201,52 @@ def create_usage_checkout():
 @require_customer_or_admin
 def billing_account_status():
     """Return billing status for the authenticated developer account."""
+    from api.database import SessionLocal
+    from billing.billing_customer import get_registered_site_billing_context
+
     customer = _customer_for_request()
+    ppid = getattr(g, "ppid", None)
+
+    onboarding = {
+        "has_customer": customer is not None,
+        "has_site": False,
+        "subscription_active": False,
+        "next_step": "register_site",
+    }
+
+    if customer:
+        sites = list(getattr(customer, "sites", None) or [])
+        onboarding["has_site"] = bool(sites)
+        onboarding["subscription_active"] = (customer.subscription_status or "").lower() == "active"
+        if not sites:
+            onboarding["next_step"] = "register_site"
+        elif (customer.subscription_status or "none").lower() != "active":
+            onboarding["next_step"] = "complete_checkout"
+        else:
+            onboarding["next_step"] = "ready"
+
+    db = SessionLocal()
+    try:
+        if customer and customer.sites:
+            first_site = customer.sites[0] or {}
+            domain = first_site.get("site_domain") or ""
+            if domain:
+                ctx = get_registered_site_billing_context(db, domain)
+                onboarding["site_billing"] = {
+                    "site_id": ctx.get("site_id"),
+                    "site_domain": ctx.get("site_domain"),
+                    "subscription_status": ctx.get("subscription_status"),
+                }
+    finally:
+        db.close()
+
     if not customer:
-        return jsonify({"success": True, "billing": None})
+        return jsonify({
+            "success": True,
+            "billing": None,
+            "onboarding": {**onboarding, "next_step": "provide_email"},
+            "ppid": ppid,
+        })
 
     usage = dict(getattr(customer, "monthly_usage", None) or {})
     return jsonify({
@@ -193,6 +260,8 @@ def billing_account_status():
             "enforcement_enabled": os.getenv("LEMMA_BILLING_ENFORCEMENT", "0").strip().lower()
             in ("1", "true", "yes", "on"),
         },
+        "onboarding": onboarding,
+        "ppid": ppid,
     })
 
 

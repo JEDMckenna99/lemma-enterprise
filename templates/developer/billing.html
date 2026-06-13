@@ -28,6 +28,10 @@
             </div>
         </div>
         <p id="billing-message" style="color: var(--gray-600); margin: 0 0 1rem;"></p>
+        <div id="billing-email-row" style="display:none; margin-bottom: 1rem;">
+            <label for="billing-email" style="display:block; font-size:0.875rem; margin-bottom:0.35rem;">Billing email</label>
+            <input id="billing-email" type="email" class="dev-input" placeholder="you@company.com" style="max-width: 360px; width: 100%; padding: 0.5rem 0.75rem; border: 1px solid #cbd5e1; border-radius: 8px;">
+        </div>
         <button class="dev-btn dev-btn-primary" id="setup-billing-btn" type="button">Set up billing</button>
     </div>
 </div>
@@ -87,16 +91,28 @@ async function loadBillingStatus() {
         }
 
         const billing = data.billing;
+        const onboarding = data.onboarding || {};
         if (!billing) {
-            statusEl.textContent = 'Guest';
-            messageEl.textContent = 'Sign in with your developer account to manage billing.';
-            setupBtn.disabled = true;
+            statusEl.textContent = 'Not set up';
+            stripeEl.textContent = '—';
+            messageEl.textContent = 'Add a billing email and complete Stripe Checkout to enable metered isHuman billing.';
+            document.getElementById('billing-email-row').style.display = 'block';
+            setupBtn.textContent = 'Create billing account';
             return;
         }
 
+        document.getElementById('billing-email-row').style.display = 'none';
         statusEl.textContent = formatStatus(billing.subscription_status);
         stripeEl.textContent = billing.stripe_customer_id || '—';
 
+        if (onboarding.next_step === 'register_site') {
+            messageEl.textContent = 'Register your first site, then return here to attach metered billing.';
+            setupBtn.textContent = 'Register a site';
+            setupBtn.onclick = () => { window.location.href = '/developer'; };
+            return;
+        }
+
+        setupBtn.onclick = startBillingCheckout;
         if (billing.subscription_status === 'active') {
             messageEl.textContent = 'Billing is active. New site credentials will be metered on your monthly invoice.';
             setupBtn.textContent = 'Update payment method';
@@ -118,13 +134,18 @@ async function startBillingCheckout() {
     setupBtn.disabled = true;
     try {
         const headers = await billingAuthHeaders();
+        const emailInput = document.getElementById('billing-email');
+        const payload = {
+            success_url: window.location.origin + '/developer/billing?billing=success',
+            cancel_url: window.location.origin + '/developer/billing',
+        };
+        if (emailInput && emailInput.value.trim()) {
+            payload.email = emailInput.value.trim().toLowerCase();
+        }
         const resp = await fetch('/api/billing/usage-checkout', {
             method: 'POST',
             headers,
-            body: JSON.stringify({
-                success_url: window.location.origin + '/developer/billing?billing=success',
-                cancel_url: window.location.origin + '/developer/billing',
-            }),
+            body: JSON.stringify(payload),
         });
         const data = await resp.json();
         if (!resp.ok || !data.success || !data.url) {

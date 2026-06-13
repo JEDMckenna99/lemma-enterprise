@@ -107,7 +107,10 @@ def test_dispatch_checkout_session_completed(fake_ishuman_db_session_factory):
                 "customer": "cus_stripe_003",
                 "customer_email": "owner@example.com",
                 "subscription": "sub_new",
-                "metadata": {"lemma_site_id": "site_abc"},
+                "metadata": {
+                    "lemma_site_id": "site_abc",
+                    "lemma_customer_id": "cus_lemma_003",
+                },
             }
         },
     }
@@ -150,6 +153,36 @@ def test_billing_gate_blocks_past_due(monkeypatch, fake_ishuman_db_session_facto
     db = fake_ishuman_db_session_factory.session_local()
 
     assert check_site_billing_allows_issuance(db, "blocked.example") == "billing_past_due"
+
+
+@pytest.mark.unit
+def test_billing_gate_blocks_unprovisioned_customer(monkeypatch, fake_ishuman_db_session_factory):
+    from api.database import Site
+
+    monkeypatch.setenv("LEMMA_BILLING_ENFORCEMENT", "1")
+
+    store = fake_ishuman_db_session_factory.store
+    store.data[Site.__name__].append(
+        Site(
+            site_id="site_new",
+            site_domain="new.example",
+            company_name="New Co",
+            admin_email="newdev@example.com",
+            api_key="key_test",
+            oauth_client_id="oauth_test",
+            oauth_client_secret="secret_test",
+        )
+    )
+    db = fake_ishuman_db_session_factory.session_local()
+
+    assert check_site_billing_allows_issuance(db, "new.example") == "billing_setup_required"
+
+
+@pytest.mark.unit
+def test_billing_gate_allows_unregistered_host(monkeypatch, fake_ishuman_db_session_factory):
+    monkeypatch.setenv("LEMMA_BILLING_ENFORCEMENT", "1")
+    db = fake_ishuman_db_session_factory.session_local()
+    assert check_site_billing_allows_issuance(db, "unregistered.example") is None
 
 
 @pytest.mark.unit

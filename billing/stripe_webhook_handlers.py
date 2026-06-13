@@ -74,13 +74,27 @@ def handle_checkout_session_completed(db, session_obj: Dict[str, Any]) -> bool:
     email = session_obj.get("customer_email") or session_obj.get("customer_details", {}).get("email")
     metadata = session_obj.get("metadata") or {}
     subscription_id = session_obj.get("subscription")
+    lemma_customer_id = (metadata.get("lemma_customer_id") or "").strip()
 
-    customer = _find_customer(db, stripe_customer_id=stripe_customer_id, email=email)
+    customer = None
+    if lemma_customer_id:
+        from api.database import Customer
+
+        customer = db.query(Customer).filter_by(customer_id=lemma_customer_id).first()
+    if not customer:
+        customer = _find_customer(db, stripe_customer_id=stripe_customer_id, email=email)
     if not customer and email:
-        logger.warning("Checkout completed but no lemma customer for email=%s", email)
-        return False
+        from billing.billing_customer import ensure_billing_customer
+
+        ppid = (metadata.get("lemma_owner_ppid") or "").strip()
+        customer_dataclass = ensure_billing_customer(db, ppid=ppid, email=email)
+        if customer_dataclass:
+            from api.database import Customer
+
+            customer = db.query(Customer).filter_by(customer_id=customer_dataclass.customer_id).first()
 
     if not customer:
+        logger.warning("Checkout completed but no lemma customer for email=%s", email)
         return False
 
     _apply_customer_billing_update(

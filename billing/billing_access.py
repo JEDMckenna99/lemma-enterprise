@@ -7,7 +7,7 @@ from __future__ import annotations
 import os
 from typing import Optional
 
-from billing.credential_billing import resolve_stripe_customer_id_for_site
+from billing.billing_customer import get_registered_site_billing_context
 
 
 def billing_enforcement_enabled() -> bool:
@@ -19,42 +19,29 @@ def billing_enforcement_enabled() -> bool:
     )
 
 
-def _lookup_subscription_status(db, stripe_customer_id: str) -> Optional[str]:
-    from api.database import Customer
-
-    customer = (
-        db.query(Customer)
-        .filter_by(stripe_customer_id=stripe_customer_id)
-        .first()
-    )
-    if not customer:
-        return None
-    return (getattr(customer, "subscription_status", None) or "none").strip().lower()
-
-
 def check_site_billing_allows_issuance(db, target_site: str) -> Optional[str]:
     """
     Return an error code when new credential issuance must be blocked, else None.
 
-    Existing credentials continue to verify locally when billing lapses; only
-    lemma.id issuance paths are gated.
+    Unregistered hostnames (no sites row) are allowed — demo and first integration.
+    Registered relying sites require an active metered subscription when enforcement
+    is enabled.
     """
     if not billing_enforcement_enabled():
         return None
 
-    stripe_customer_id = resolve_stripe_customer_id_for_site(db, target_site)
-    if not stripe_customer_id:
+    ctx = get_registered_site_billing_context(db, target_site)
+    if not ctx.get("is_registered_site"):
         return None
 
-    status = _lookup_subscription_status(db, stripe_customer_id)
-    if status is None:
+    if not ctx.get("customer"):
         return "billing_setup_required"
+
+    status = (ctx.get("subscription_status") or "none").strip().lower()
     if status == "active":
         return None
     if status in ("past_due", "unpaid"):
         return "billing_past_due"
     if status == "canceled":
         return "billing_canceled"
-    if status == "none":
-        return "billing_setup_required"
-    return "billing_inactive"
+    return "billing_setup_required"
