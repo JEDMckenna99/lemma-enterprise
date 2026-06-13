@@ -73,11 +73,45 @@ def ensure_billing_customer(
     if not ppid or not normalized_email:
         return None
 
-    existing = customer_manager.get_customer_by_did(ppid)
-    if not existing:
-        existing = customer_manager.get_customer_by_email(normalized_email)
+    existing_by_did = customer_manager.get_customer_by_did(ppid)
+    existing_by_email = customer_manager.get_customer_by_email(normalized_email)
 
-    if existing:
+    if (
+        existing_by_did
+        and existing_by_email
+        and existing_by_did.customer_id != existing_by_email.customer_id
+    ):
+        existing = existing_by_email
+        customer_id = existing.customer_id
+        if customer_manager.db_available:
+            from api.database import Customer as DBCustomer
+
+            row = (
+                db.query(DBCustomer)
+                .filter(DBCustomer.customer_id == customer_id)
+                .first()
+            )
+            if row and not (row.customer_did or "").strip():
+                row.customer_did = ppid
+                db.commit()
+            existing = customer_manager.get_customer(customer_id)
+    elif existing_by_email:
+        existing = existing_by_email
+        customer_id = existing.customer_id
+        if customer_manager.db_available:
+            from api.database import Customer as DBCustomer
+
+            row = (
+                db.query(DBCustomer)
+                .filter(DBCustomer.customer_id == customer_id)
+                .first()
+            )
+            if row and not (row.customer_did or "").strip():
+                row.customer_did = ppid
+                db.commit()
+            existing = customer_manager.get_customer(customer_id)
+    elif existing_by_did:
+        existing = existing_by_did
         customer_id = existing.customer_id
         if normalized_email and not (existing.email or "").strip():
             if customer_manager.db_available:
