@@ -21,7 +21,8 @@ import secrets
 from datetime import datetime
 from flask import Blueprint, request, jsonify
 from flask_cors import cross_origin
-from auth.decorators import require_api_key, extract_authenticated_ppid_from_request
+from auth.bootstrap import require_site_bootstrap_api_key
+from auth.decorators import extract_authenticated_ppid_from_request
 
 from api.real_iam_manager import get_site_manager, get_or_create_site_manager
 from api.email_service import send_email
@@ -403,7 +404,7 @@ def validate_api_key(api_key: str, site_id: str) -> bool:
 
 @admin_self_issue_bp.route('/api/v1/iam/admin/self-issue', methods=['POST'])
 @cross_origin()
-@require_api_key
+@require_site_bootstrap_api_key
 def admin_self_issue():
     """
     Admin self-issue endpoint for site owners to bootstrap their first admin credential
@@ -431,15 +432,14 @@ def admin_self_issue():
         }
     """
     try:
-        # Validate API key
-        auth_header = request.headers.get('Authorization', '')
-        if not auth_header.startswith('Bearer '):
+        from flask import g
+
+        api_key = getattr(g, 'api_key', None)
+        if not api_key:
             return jsonify({
                 'error': 'unauthorized',
-                'message': 'Missing or invalid Authorization header'
+                'message': 'Site API key required in X-API-Key or Authorization: Bearer',
             }), 401
-        
-        api_key = auth_header.replace('Bearer ', '').strip()
         
         data = request.get_json(silent=True) or {}
         

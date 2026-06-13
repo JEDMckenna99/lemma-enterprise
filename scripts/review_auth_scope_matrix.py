@@ -30,6 +30,7 @@ ANY_AUTH_DECORATORS = {
     "require_permission",
     "require_authenticated",
     "require_api_key",
+    "require_site_bootstrap_api_key",
     "validate_api_key",
     "require_agent_or_user_auth",
     "require_agent_or_user_session",

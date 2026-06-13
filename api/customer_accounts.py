@@ -359,22 +359,6 @@ def _extract_customer_id_from_request() -> Optional[str]:
             logger.info(f"✅ Authenticated via lemma header PPID: {customer.customer_id}")
             return customer.customer_id
     
-    # Check for credential headers (edge computing pattern)
-    credential_id = request.headers.get('X-Credential-ID')
-    user_email = request.headers.get('X-User-Email')
-    if credential_id:
-        # Trust client-side verification, but always enforce canonical revocation checks
-        from api.revocation_verifier import is_credential_revoked
-        if not is_credential_revoked(credential_id):
-            # Look up customer by email from credential (if provided)
-            if user_email:
-                customer = customer_manager.get_customer_by_email(user_email)
-                if customer:
-                    logger.info(f"✅ Authenticated via credential header (email): {customer.customer_id}")
-                    return customer.customer_id
-            logger.info(f"✅ Credential {credential_id[:20]}... verified (no customer lookup)")
-            return None  # Credential valid but no customer linkage
-    
     # No valid authentication found
     logger.debug("No valid authentication found in request")
     return None
@@ -1844,6 +1828,7 @@ def login():
 # Dashboard route moved to app.py - using new permission lemma-based access control
 
 @customer_accounts_bp.route('/api/customer/info')
+@require_customer_or_admin
 def get_customer_info():
     """Get customer information (session-free: requires credential in request)"""
     customer_id = _extract_customer_id_from_request()
@@ -2177,6 +2162,7 @@ def register_customer_site():
 
 
 @customer_accounts_bp.route('/api/customer/sites', methods=['GET'])
+@require_customer_or_admin
 def get_customer_sites():
     """Get all sites registered by customer
     

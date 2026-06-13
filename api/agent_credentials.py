@@ -1490,11 +1490,6 @@ def _resolve_agent_owner_ppid():
     if customer_id:
         return f"customer:{customer_id}", None
 
-    if _has_valid_wallet_unlock_session():
-        ppid = _parse_ppid_from_credential_dict(_decode_lemma_header_credential())
-        if ppid:
-            return ppid, None
-
     return None, 'Authentication required'
 
 
@@ -1518,16 +1513,32 @@ def _admin_lemma_ctx_allows_delegation(admin_ctx: dict | None) -> bool:
 
 def _try_wallet_delegation_principal() -> str | None:
     """
-    Browser operator issuance: unlocked wallet session + admin lemma in JSON body.
-    Used when auto-attached X-Lemma-Credential fails strict verification.
+    Browser operator issuance: unlocked wallet session + verified admin lemma.
+    Disabled by default; set LEMMA_ALLOW_WALLET_DELEGATION=1 to enable.
     """
+    if os.environ.get("LEMMA_ALLOW_WALLET_DELEGATION", "0").strip().lower() not in {
+        "1", "true", "yes", "on",
+    }:
+        return None
     if not _has_valid_wallet_unlock_session():
         return None
     admin_ctx = _parse_admin_lemma_context()
     if not _admin_lemma_ctx_allows_delegation(admin_ctx):
         return None
-    ppid = admin_ctx.get('ppid')
-    if ppid and str(ppid).startswith('did:lemma:ppid_'):
+    raw = request.get_json(silent=True) or {}
+    credential = raw.get("admin_credential") or raw.get("credential")
+    if not credential:
+        credential = _decode_lemma_header_credential()
+    if credential:
+        try:
+            from api.trusted_issuers import verify_credential_with_trust
+            verification = verify_credential_with_trust(credential)
+            if not verification.get("valid"):
+                return None
+        except Exception:
+            return None
+    ppid = admin_ctx.get("ppid")
+    if ppid and str(ppid).startswith("did:lemma:ppid_"):
         return str(ppid)
     return None
 
@@ -1621,6 +1632,33 @@ def _validate_request_api_key(api_key: str):
         logger.warning(f"API key validation failed in agent auth decorator: {e}")
 
     return False, {}
+
+
+def _scopes_for_api_key(key_info: dict, policy=None) -> list[str]:
+    """Derive API-key scopes. Service routes get full scope; automation keys are read-only."""
+    allowed = tuple(getattr(policy, "allowed_principals", ()) or ())
+    if allowed and set(allowed) == {"api_key"}:
+        return ["read", "write", "admin"]
+    return ["read"]
+
+
+def _apply_api_key_auth(*, policy, effective_required_scope, key_info, api_key):
+    """Shared API-key auth path for compat decorators."""
+    policy_error = _enforce_route_policy_for_principal(
+        policy=policy,
+        principal_type="api_key",
+        required_scope=effective_required_scope,
+        provided_scope=_scopes_for_api_key(key_info, policy),
+        site_binding=None,
+        allow_unscoped=False,
+    )
+    if policy_error:
+        return policy_error
+    g.api_key = api_key
+    g.api_key_info = key_info
+    g.authenticated = True
+    g.auth_method = "api_key"
+    return None
 
 
 def _build_owner_filter(identity, alias='ac'):
@@ -1829,26 +1867,20 @@ def require_agent_or_user_session(required_scope=None):
             api_key = _extract_api_key_from_request()
             is_valid_key, key_info = _validate_request_api_key(api_key)
             if is_valid_key:
-                policy_error = _enforce_route_policy_for_principal(
+                denied = _apply_api_key_auth(
                     policy=policy,
-                    principal_type='api_key',
-                    required_scope=effective_required_scope,
-                    provided_scope=[],
-                    site_binding=None,
-                    allow_unscoped=True,
+                    effective_required_scope=effective_required_scope,
+                    key_info=key_info,
+                    api_key=api_key,
                 )
-                if policy_error:
-                    return policy_error
-                g.api_key = api_key
-                g.api_key_info = key_info
-                g.authenticated = True
-                g.auth_method = 'api_key'
+                if denied:
+                    return denied
                 return f(*args, **kwargs)
 
             return jsonify({
                 'success': False,
                 'error': 'auth_required',
-                'message': 'Provide X-Agent-Token, X-Lemma-Credential, X-API-Key, or Authorization: Bearer <api_key> header',
+                'message': 'Provide X-Agent-Token, X-Lemma-Credential, or X-API-Key (read-only routes). Mutations require wallet credential or agent token.',
             }), 401
 
         return wrapped
@@ -2782,27 +2814,21 @@ def require_agent_or_user_auth(required_scope=None, enforce_task_bounds=True):
 
             is_valid_key, key_info = _validate_request_api_key(api_key)
             if is_valid_key:
-                policy_error = _enforce_route_policy_for_principal(
+                denied = _apply_api_key_auth(
                     policy=policy,
-                    principal_type='api_key',
-                    required_scope=effective_required_scope,
-                    provided_scope=[],
-                    site_binding=None,
-                    allow_unscoped=True,
+                    effective_required_scope=effective_required_scope,
+                    key_info=key_info,
+                    api_key=api_key,
                 )
-                if policy_error:
-                    return _finalize_auth_response(policy_error)
-                g.api_key = api_key
-                g.api_key_info = key_info
-                g.authenticated = True
-                g.auth_method = 'api_key'
+                if denied:
+                    return _finalize_auth_response(denied)
                 auth_elapsed_ms = (time.perf_counter() - auth_started_at) * 1000.0
                 return _finalize_auth_response(f(*args, **kwargs), auth_elapsed_ms=auth_elapsed_ms)
 
             return _finalize_auth_response((jsonify({
                 'success': False,
                 'error': 'auth_required',
-                'message': 'Provide X-Agent-Token, X-Lemma-Credential, X-API-Key, or Authorization: Bearer <api_key> header',
+                'message': 'Provide X-Agent-Token or X-Lemma-Credential. Mutations require wallet credential or agent token.',
                 'lemma_error': lemma_error
             }), 401))
 

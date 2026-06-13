@@ -41,123 +41,12 @@ def _enforce_developer_tenant_context():
         return jsonify({"success": False, "error": "site_scope_forbidden"}), 403
 
 
-# =============================================================================
-# SECURITY: Site Ownership Validation
-# =============================================================================
-
-def _get_authenticated_ppid() -> str:
-    """
-    Extract the authenticated user's PPID from request context.
-    Works with agent tokens, agent sessions, and full lemma credential headers.
-    """
-    # Check g context first (set by auth decorators)
-    if hasattr(g, 'ppid') and g.ppid:
-        return g.ppid
-    
-    # Check agent credential context
-    if hasattr(g, 'agent_credential') and g.agent_credential:
-        return g.agent_credential.get('authorized_by_ppid')
-    
-    # Fallback to full credential header for direct calls.
-    raw_lemma = request.headers.get('X-Lemma-Credential')
-    if raw_lemma:
-        try:
-            text = str(raw_lemma).strip()
-            if text.startswith('{'):
-                credential = json.loads(text)
-            else:
-                padded = text + ('=' * (-len(text) % 4))
-                credential = json.loads(base64.urlsafe_b64decode(padded.encode('utf-8')).decode('utf-8'))
-            claims = credential.get('claims') or credential.get('credentialSubject') or {}
-            ppid = credential.get('subject') or credential.get('sub') or claims.get('ppid') or claims.get('id')
-            if ppid and str(ppid).startswith('did:lemma:ppid_'):
-                return str(ppid)
-        except Exception:
-            return None
-    return None
-
-
-def _verify_site_ownership(site_id: str, ppid: str) -> bool:
-    """
-    SECURITY: Verify the authenticated user has admin access to the site.
-    
-    This prevents unauthorized access to site resources like API keys.
-    
-    Args:
-        site_id: The site to check access for
-        ppid: The authenticated user's PPID
-        
-    Returns:
-        True if user has admin access, False otherwise
-    """
-    if not ppid or not site_id:
-        return False
-    
-    try:
-        from api.database import SessionLocal, SiteAdmin
-        
-        db = SessionLocal()
-        try:
-            # Check if user is an active admin for this site
-            admin_record = db.query(SiteAdmin).filter(
-                SiteAdmin.site_id == site_id,
-                SiteAdmin.admin_did == ppid,
-                SiteAdmin.is_active == True
-            ).first()
-            
-            if admin_record:
-                logger.debug(f"Site ownership verified: {ppid[:30]}... owns {site_id}")
-                return True
-            
-            logger.warning(f"SECURITY: Unauthorized site access attempt - user {ppid[:30]}... tried to access {site_id}")
-            return False
-            
-        finally:
-            db.close()
-            
-    except Exception as e:
-        logger.error(f"Site ownership check failed: {e}")
-        return False
-
-
-def _require_site_ownership(site_id: str):
-    """
-    SECURITY: Check site ownership and return error response if unauthorized.
-    
-    Returns:
-        None if authorized, or (response, status_code) tuple if unauthorized
-    """
-    ppid = _get_authenticated_ppid()
-    
-    # Allow API key auth to bypass (API key is already site-specific)
-    if hasattr(g, 'api_key') and g.api_key:
-        # Verify API key belongs to this site
-        try:
-            from api.database import SessionLocal, Site
-            db = SessionLocal()
-            site = db.query(Site).filter(Site.site_id == site_id).first()
-            db.close()
-            
-            if site and site.api_key == g.api_key:
-                return None  # Authorized via matching API key
-        except:
-            pass
-    
-    if not ppid:
-        return jsonify({
-            'success': False,
-            'error': 'Authentication required',
-            'code': 'AUTH_REQUIRED'
-        }), 401
-    
-    if not _verify_site_ownership(site_id, ppid):
-        return jsonify({
-            'success': False,
-            'error': 'You do not have access to this site',
-            'code': 'UNAUTHORIZED_SITE_ACCESS'
-        }), 403
-    
-    return None  # Authorized
+from api.site_access import (
+    get_authenticated_ppid as _get_authenticated_ppid,
+    require_site_ownership as _require_site_ownership,
+    verify_site_ownership as _verify_site_ownership,
+)
+from api.forensic_audit import capture_action_proof
 
 
 def _get_site_bootstrap_status(db, site_id: str, caller_ppid: str):
@@ -748,6 +637,9 @@ def create_developer_site():
 @require_agent_or_user_auth(required_scope='read')
 def get_site_detail(site_id):
     """Get details for a specific site"""
+    auth_error = _require_site_ownership(site_id)
+    if auth_error:
+        return auth_error
     try:
         from api.database import SessionLocal, Site
         
@@ -830,7 +722,7 @@ def bootstrap_site_admin(site_id):
     auth_error = _require_site_ownership(site_id)
     if auth_error:
         return auth_error
-
+    
     caller_ppid = _get_authenticated_ppid()
     if not caller_ppid:
         return jsonify({
@@ -987,6 +879,11 @@ def bootstrap_site_admin(site_id):
                 except Exception as transfer_err:
                     logger.warning(f"Failed to create transfer token in bootstrap-admin for {site.site_id}: {transfer_err}")
 
+            capture_action_proof(
+                action="site.bootstrap_admin",
+                site_id=site.site_id,
+                resource=permission_lemma.get('id'),
+            )
             return jsonify({
                 'success': True,
                 'site_id': site.site_id,
@@ -1085,6 +982,7 @@ def create_admin_transfer_token(site_id):
                 json.dumps(payload)
             )
 
+            capture_action_proof(action="site.admin_transfer_token", site_id=site_id)
             return jsonify({
                 'success': True,
                 'token': token,
@@ -1478,8 +1376,8 @@ def get_site_keys(site_id):
     
     SECURITY: Requires site ownership verification before exposing key information.
     """
-    # SECURITY: Verify site ownership before accessing keys
-    auth_error = _require_site_ownership(site_id)
+    # SECURITY: Verify site ownership (site API key allowed for read-only automation)
+    auth_error = _require_site_ownership(site_id, allow_site_api_key=True)
     if auth_error:
         return auth_error
     
@@ -1578,6 +1476,7 @@ def create_site_key(site_id):
                 'error': 'Failed to store API key'
             }), 500
         
+        capture_action_proof(action="site_key.create", site_id=site_id)
         return jsonify({
             'success': True,
             'key_id': 'primary',
@@ -1627,7 +1526,7 @@ def rotate_site_key(site_id, key_id):
         db.close()
         
         logger.info(f"SECURITY: API key rotated for site {site_id} by {_get_authenticated_ppid()[:30] if _get_authenticated_ppid() else 'unknown'}...")
-        
+        capture_action_proof(action="site_key.rotate", site_id=site_id, resource=str(key_id))
         return jsonify({
             'success': True,
             'key_id': key_id,
@@ -1677,7 +1576,7 @@ def revoke_site_key(site_id, key_id):
             db.close()
             
             logger.info(f"SECURITY: API key revoked for site {site_id} by {_get_authenticated_ppid()[:30] if _get_authenticated_ppid() else 'api_key'}...")
-            
+            capture_action_proof(action="site_key.revoke", site_id=site_id, resource=str(key_id))
         except Exception as e:
             logger.error(f"Could not revoke API key: {e}")
             return jsonify({

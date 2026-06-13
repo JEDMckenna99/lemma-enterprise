@@ -207,6 +207,7 @@ h1{color:#1e293b;font-weight:600;line-height:1.25;margin-bottom:16px;font-size:4
     <script src="{{ url_for('static', filename='js/encrypted-wallet-transparent.js') }}?v=1121" defer data-cfasync="false"></script>
     <script src="{{ url_for('static', filename='js/lemma-session-free-auth.js') }}?v=1121" defer data-cfasync="false"></script>
     <script src="{{ url_for('static', filename='js/lemma-credential-utils.js') }}?v=1" defer data-cfasync="false"></script>
+    <script src="{{ url_for('static', filename='js/lemma-auth-headers.js') }}?v=1" defer data-cfasync="false"></script>
     {% endblock %}
     
     {% block auth_scripts %}
@@ -466,7 +467,20 @@ h1{color:#1e293b;font-weight:600;line-height:1.25;margin-bottom:16px;font-size:4
                         if (isSameOriginApi) {
                             const h = new Headers(reqInit.headers || (input && input.headers) || {});
                             if (!h.has('X-Lemma-Credential') && !h.has('X-Agent-Token') && !h.has('X-API-Key') && !h.has('Authorization')) {
-                                const authHeaders = await window.getLemmaAuthHeadersAsync();
+                                const method = reqInit.method || (input && input.method) || 'GET';
+                                const path = typeof urlString === 'string'
+                                    ? urlString.replace(window.location.origin, '')
+                                    : '/';
+                                let bodyText = '';
+                                if (reqInit.body != null) {
+                                    bodyText = typeof reqInit.body === 'string' ? reqInit.body : '';
+                                }
+                                const requestContext = { method, path, body: bodyText };
+                                const authHeaders = typeof window.getLemmaAuthHeadersAsync === 'function'
+                                    ? await window.getLemmaAuthHeadersAsync({}, requestContext)
+                                    : (typeof window.getLemmaAuthHeaders === 'function'
+                                        ? window.getLemmaAuthHeaders({}, requestContext)
+                                        : {});
                                 Object.entries(authHeaders).forEach(([k, v]) => {
                                     if (v != null && v !== '') h.set(k, v);
                                 });

@@ -13,6 +13,13 @@ from api.authz_engine import AuthzPrincipal  # noqa: E402
 import api.agent_credentials as agent_credentials  # noqa: E402
 
 
+PROOF_HEADER = {"X-Lemma-Proof": "{}"}
+
+
+def _proof_env(monkeypatch):
+    monkeypatch.setenv("LEMMA_AUTHZ_PROOF_SHADOW", "0")
+
+
 def _make_test_app():
     app = Flask(__name__)
     app.config["TESTING"] = True
@@ -46,6 +53,7 @@ def _make_test_app():
 
 def test_user_lemma_missing_scope_rejected_by_policy(monkeypatch):
     app = _make_test_app()
+    _proof_env(monkeypatch)
 
     monkeypatch.setattr(
         agent_credentials,
@@ -66,7 +74,7 @@ def test_user_lemma_missing_scope_rejected_by_policy(monkeypatch):
     monkeypatch.setattr(agent_credentials, "_validate_request_api_key", lambda api_key: (False, {}))
 
     with app.test_client() as client:
-        resp = client.post("/api/developer/sites/lemma.id/keys")
+        resp = client.post("/api/developer/sites/lemma.id/keys", headers=PROOF_HEADER)
         assert resp.status_code == 403
         payload = resp.get_json()
         assert payload["error"] == "missing_scope"
@@ -113,6 +121,28 @@ def test_api_key_allowed_for_api_key_only_route(monkeypatch):
         assert resp.get_json()["success"] is True
 
 
+def test_api_key_rejected_on_developer_key_create(monkeypatch):
+    app = _make_test_app()
+    _proof_env(monkeypatch)
+
+    monkeypatch.setattr(agent_credentials, "extract_user_lemma_principal", lambda headers: (None, "missing_lemma_header"))
+    monkeypatch.setattr(
+        agent_credentials,
+        "_validate_request_api_key",
+        lambda api_key: (True, {"type": "customer", "site_id": "site_abc"}),
+    )
+
+    with app.test_client() as client:
+        resp = client.post(
+            "/api/developer/sites/site_abc/keys",
+            headers={"X-API-Key": "lm_site_key", **PROOF_HEADER},
+        )
+        assert resp.status_code == 403
+        payload = resp.get_json()
+        assert payload["error"] == "principal_not_allowed"
+        assert "api_key" not in payload.get("allowed_principals", [])
+
+
 def test_user_lemma_write_scope_allowed_for_issue_session_decorator(monkeypatch):
     app = _make_test_app()
 
@@ -142,6 +172,7 @@ def test_user_lemma_write_scope_allowed_for_issue_session_decorator(monkeypatch)
 
 def test_agent_token_allow_sets_decision_headers(monkeypatch):
     app = _make_test_app()
+    _proof_env(monkeypatch)
 
     monkeypatch.setattr(
         agent_credentials,
@@ -171,7 +202,10 @@ def test_agent_token_allow_sets_decision_headers(monkeypatch):
     monkeypatch.setattr(agent_credentials, "_validate_request_api_key", lambda api_key: (False, {}))
 
     with app.test_client() as client:
-        resp = client.post("/api/developer/sites/lemma.id/keys", headers={"X-Agent-Token": "lm_agent_test"})
+        resp = client.post(
+            "/api/developer/sites/lemma.id/keys",
+            headers={"X-Agent-Token": "lm_agent_test", **PROOF_HEADER},
+        )
         assert resp.status_code == 200
         assert resp.headers.get("X-Lemma-Decision-Id")
         assert resp.headers.get("X-Lemma-Decision-Signature")
@@ -179,12 +213,16 @@ def test_agent_token_allow_sets_decision_headers(monkeypatch):
 
 def test_agent_token_invalid_includes_decision_receipt(monkeypatch):
     app = _make_test_app()
+    _proof_env(monkeypatch)
 
     monkeypatch.setattr(agent_credentials, "validate_agent_token_with_reason", lambda token: (None, "invalid_token"))
     monkeypatch.setattr(agent_credentials, "_validate_request_api_key", lambda api_key: (False, {}))
 
     with app.test_client() as client:
-        resp = client.post("/api/developer/sites/lemma.id/keys", headers={"X-Agent-Token": "lm_agent_bad"})
+        resp = client.post(
+            "/api/developer/sites/lemma.id/keys",
+            headers={"X-Agent-Token": "lm_agent_bad", **PROOF_HEADER},
+        )
         assert resp.status_code == 401
         payload = resp.get_json()
         assert payload["error"] == "invalid_token"

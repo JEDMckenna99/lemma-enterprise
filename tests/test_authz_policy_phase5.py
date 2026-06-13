@@ -1,4 +1,8 @@
-from api.authz_policy import get_error_defaults, get_policy_for_request
+from api.authz_policy import (
+    MUTATE_PRINCIPALS,
+    get_error_defaults,
+    get_policy_for_request,
+)
 
 
 def test_get_policy_for_request_known_route():
@@ -55,4 +59,37 @@ def test_core_protected_route_coverage():
     for method, path in expected_routes:
         policy = get_policy_for_request(method, path)
         assert policy is not None, f"Missing policy for {method} {path}"
+
+
+def test_mutate_routes_exclude_api_key_principal():
+    mutate_paths = [
+        ("POST", "/api/developer/sites/site_1/keys"),
+        ("POST", "/api/developer/sites/site_1/users/did:lemma:ppid_abc/revoke"),
+        ("POST", "/api/developer/sites/site_1/permissions"),
+    ]
+    for method, path in mutate_paths:
+        policy = get_policy_for_request(method, path)
+        assert policy is not None
+        assert "api_key" not in policy.allowed_principals
+        assert policy.allowed_principals == MUTATE_PRINCIPALS
+
+
+def test_site_api_keys_handlers_not_duplicated_in_site_management():
+    import ast
+    from pathlib import Path
+
+    repo_root = Path(__file__).resolve().parents[1]
+    site_mgmt = (repo_root / "api" / "site_management_api.py").read_text(encoding="utf-8")
+    tree = ast.parse(site_mgmt)
+    route_names = []
+    for node in tree.body:
+        if not isinstance(node, ast.FunctionDef):
+            continue
+        for dec in node.decorator_list:
+            if isinstance(dec, ast.Call) and getattr(dec.func, "attr", None) == "route":
+                if dec.args and isinstance(dec.args[0], ast.Constant):
+                    route = dec.args[0].value
+                    if "/keys" in route:
+                        route_names.append(node.name)
+    assert route_names == []
 

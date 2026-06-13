@@ -11,6 +11,8 @@ from datetime import datetime, timezone
 from flask import Blueprint, request, jsonify, g
 from flask_cors import cross_origin
 from api.agent_credentials import require_agent_or_user_auth
+from api.site_access import get_authenticated_ppid, require_site_ownership
+from api.forensic_audit import capture_action_proof
 
 logger = logging.getLogger(__name__)
 
@@ -34,12 +36,22 @@ def _enforce_site_tenant_context():
         return jsonify({"success": False, "error": "site_scope_forbidden"}), 403
 
 
+@site_management_bp.before_request
+def _enforce_site_ownership_context():
+    if request.method == "OPTIONS":
+        return None
+    site_id = (request.view_args or {}).get("site_id")
+    if not site_id:
+        return None
+    return require_site_ownership(site_id)
+
+
 def _actor_ppid_for_audit() -> str:
     """Resolve authenticated actor PPID for audit fields."""
-    ppid = getattr(g, 'ppid', None)
-    if ppid and str(ppid).startswith('did:lemma:ppid_'):
-        return str(ppid)
-    return 'api'
+    ppid = get_authenticated_ppid()
+    if ppid:
+        return ppid
+    return "api"
 
 
 # ============================================
@@ -439,6 +451,8 @@ def revoke_site_user(site_id, ppid):
             )
         
         logger.info(f"Revoked user {ppid[:20]}... from site {site_id} (permissions: {revoked_permissions})")
+
+        capture_action_proof(action="site_user.revoke", site_id=site_id, resource=ppid)
         
         return jsonify({
             'success': True,
@@ -510,6 +524,7 @@ def unblock_site_user(site_id, ppid):
         conn.close()
 
         logger.info(f"Unblocked user {ppid[:20]}... on site {site_id}")
+        capture_action_proof(action="site_user.unblock", site_id=site_id, resource=ppid)
         return jsonify({
             'success': True,
             'message': 'User unblocked successfully',
@@ -686,6 +701,8 @@ def create_permission_type(site_id):
         db.close()
         
         logger.info(f"Created permission type {permission_id} for site {site_id}")
+
+        capture_action_proof(action="permission.create", site_id=site_id, resource=permission_id)
         
         return jsonify({
             'success': True,
@@ -732,7 +749,7 @@ def update_permission_type(site_id, permission_id):
         db.close()
         
         logger.info(f"Updated permission type {permission_id} for site {site_id}")
-        
+        capture_action_proof(action="permission.update", site_id=site_id, resource=permission_id)
         return jsonify({
             'success': True,
             'message': 'Permission updated'
@@ -785,7 +802,7 @@ def delete_permission_type(site_id, permission_id):
         db.close()
         
         logger.info(f"Deleted permission type {permission_id} from site {site_id}")
-        
+        capture_action_proof(action="permission.delete", site_id=site_id, resource=permission_id)
         return jsonify({
             'success': True,
             'message': 'Permission deleted'
@@ -852,7 +869,7 @@ def grant_user_permission(site_id, ppid):
         conn.close()
         
         logger.info(f"Granted {permission_id} to user {ppid[:20]}... on site {site_id}")
-        
+        capture_action_proof(action="permission.grant", site_id=site_id, resource=f"{ppid}:{permission_id}")
         return jsonify({
             'success': True,
             'grant_id': grant_id,
@@ -892,7 +909,7 @@ def revoke_user_permission(site_id, ppid, permission_id):
         conn.close()
         
         logger.info(f"Revoked {permission_id} from user {ppid[:20]}... on site {site_id}")
-        
+        capture_action_proof(action="permission.revoke", site_id=site_id, resource=f"{ppid}:{permission_id}")
         return jsonify({
             'success': True,
             'message': f'Permission {permission_id} revoked'
@@ -900,287 +917,6 @@ def revoke_user_permission(site_id, ppid, permission_id):
         
     except Exception as e:
         logger.error(f"Failed to revoke permission: {e}")
-        return jsonify({'success': False, 'error': str(e)}), 500
-
-
-# ============================================
-# API KEYS MANAGEMENT
-# ============================================
-
-@site_management_bp.route('/api/developer/sites/<site_id>/keys', methods=['GET'])
-@cross_origin()
-@require_agent_or_user_auth(required_scope='read')
-def get_api_keys(site_id):
-    """Get all API keys for a site"""
-    try:
-        from api.database import get_db_connection
-        
-        conn = get_db_connection(site_id)
-        cursor = conn.cursor()
-        
-        cursor.execute("""
-            SELECT id, key_name, key_prefix, key_type, is_active, created_at, last_used, expires_at, permissions
-            FROM site_api_keys
-            WHERE site_id = %s
-            ORDER BY created_at DESC
-        """, (site_id,))
-        
-        keys = []
-        for row in cursor.fetchall():
-            keys.append({
-                'id': row[0],
-                'name': row[1],
-                'key_prefix': row[2],  # Only show prefix, not full key
-                'type': row[3],  # 'test' or 'live'
-                'is_active': row[4],
-                'created_at': row[5].isoformat() if row[5] else None,
-                'last_used': row[6].isoformat() if row[6] else None,
-                'expires_at': row[7].isoformat() if row[7] else None,
-                'permissions': row[8] or ['read', 'write']
-            })
-        
-        cursor.close()
-        conn.close()
-        
-        # If no keys exist, return the site's default key from sites table
-        if not keys:
-            from api.database import SessionLocal, Site
-            db = SessionLocal()
-            site = db.query(Site).filter(Site.site_id == site_id).first()
-            if site and site.api_key:
-                keys.append({
-                    'id': 0,
-                    'name': 'Default API Key',
-                    'key_prefix': site.api_key[:12] + '...',
-                    'type': 'live',
-                    'is_active': True,
-                    'created_at': site.created_at.isoformat() if site.created_at else None,
-                    'last_used': None,
-                    'expires_at': None,
-                    'permissions': ['read', 'write']
-                })
-            db.close()
-        
-        return jsonify({
-            'success': True,
-            'keys': keys
-        })
-        
-    except Exception as e:
-        logger.error(f"Failed to get API keys: {e}")
-        return jsonify({'success': False, 'error': str(e)}), 500
-
-
-@site_management_bp.route('/api/developer/sites/<site_id>/keys', methods=['POST'])
-@cross_origin()
-@require_agent_or_user_auth(required_scope='admin')
-def create_api_key(site_id):
-    """Create a new API key"""
-    try:
-        data = request.get_json() or {}
-        
-        key_name = data.get('name', 'API Key').strip()
-        key_type = data.get('type', 'live')  # 'test' or 'live'
-        permissions = data.get('permissions', ['read', 'write'])
-        
-        # Generate key
-        prefix = 'sk_test_' if key_type == 'test' else 'sk_live_'
-        random_part = secrets.token_urlsafe(32)
-        full_key = prefix + random_part
-        key_hash = hashlib.sha256(full_key.encode()).hexdigest()
-        
-        from api.database import get_db_connection
-        
-        conn = get_db_connection(site_id)
-        cursor = conn.cursor()
-        
-        # Ensure table exists (create if needed)
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS site_api_keys (
-                id SERIAL PRIMARY KEY,
-                site_id VARCHAR(50) NOT NULL REFERENCES sites(site_id) ON DELETE CASCADE,
-                key_name VARCHAR(255) NOT NULL,
-                key_hash VARCHAR(64) NOT NULL UNIQUE,
-                key_prefix VARCHAR(20) NOT NULL,
-                key_type VARCHAR(10) DEFAULT 'live',
-                is_active BOOLEAN DEFAULT true,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                created_by VARCHAR(255),
-                last_used TIMESTAMP,
-                expires_at TIMESTAMP,
-                permissions JSONB DEFAULT '["read", "write"]'::jsonb
-            )
-        """)
-        
-        # Insert key
-        cursor.execute("""
-            INSERT INTO site_api_keys (site_id, key_name, key_hash, key_prefix, key_type, is_active, created_by, permissions)
-            VALUES (%s, %s, %s, %s, %s, true, %s, %s)
-            RETURNING id
-        """, (
-            site_id,
-            key_name,
-            key_hash,
-            full_key[:12] + '...',
-            key_type,
-            _actor_ppid_for_audit(),
-            str(permissions).replace("'", '"')
-        ))
-        
-        key_id = cursor.fetchone()[0]
-        
-        conn.commit()
-        cursor.close()
-        conn.close()
-        
-        logger.info(f"Created API key {key_name} for site {site_id}")
-        
-        return jsonify({
-            'success': True,
-            'key_id': key_id,
-            'key': full_key,  # Only returned once on creation
-            'message': 'Save this key securely - it will not be shown again'
-        })
-        
-    except Exception as e:
-        logger.error(f"Failed to create API key: {e}")
-        return jsonify({'success': False, 'error': str(e)}), 500
-
-
-@site_management_bp.route('/api/developer/sites/<site_id>/keys/<int:key_id>/rotate', methods=['POST'])
-@cross_origin()
-@require_agent_or_user_auth(required_scope='admin')
-def rotate_api_key(site_id, key_id):
-    """Rotate an API key (deactivate old, create new)"""
-    try:
-        # Handle key_id=0 as the primary site key (stored in sites table)
-        if key_id == 0:
-            from api.database import SessionLocal, Site
-            
-            db = SessionLocal()
-            site = db.query(Site).filter(Site.site_id == site_id).first()
-            
-            if not site:
-                db.close()
-                return jsonify({'success': False, 'error': 'Site not found'}), 404
-            
-            # Generate new primary API key
-            new_key = f"lm_{secrets.token_urlsafe(32)}"
-            site.api_key = new_key
-            db.commit()
-            db.close()
-            
-            logger.info(f"SECURITY: Primary API key rotated for site {site_id}")
-            
-            return jsonify({
-                'success': True,
-                'key_id': 0,
-                'key': new_key,
-                'warning': 'This key is shown only once. Store it securely.'
-            })
-        
-        from api.database import get_db_connection
-        
-        conn = get_db_connection(site_id)
-        cursor = conn.cursor()
-        
-        # Get old key details
-        cursor.execute("""
-            SELECT key_name, key_type, permissions FROM site_api_keys
-            WHERE id = %s AND site_id = %s
-        """, (key_id, site_id))
-        
-        row = cursor.fetchone()
-        if not row:
-            cursor.close()
-            conn.close()
-            return jsonify({'success': False, 'error': 'Key not found'}), 404
-        
-        key_name, key_type, permissions = row
-        
-        # Deactivate old key
-        cursor.execute("""
-            UPDATE site_api_keys
-            SET is_active = false, key_name = key_name || ' (rotated)'
-            WHERE id = %s
-        """, (key_id,))
-        
-        # Create new key
-        prefix = 'sk_test_' if key_type == 'test' else 'sk_live_'
-        random_part = secrets.token_urlsafe(32)
-        full_key = prefix + random_part
-        key_hash = hashlib.sha256(full_key.encode()).hexdigest()
-        
-        cursor.execute("""
-            INSERT INTO site_api_keys (site_id, key_name, key_hash, key_prefix, key_type, is_active, created_by, permissions)
-            VALUES (%s, %s, %s, %s, %s, true, %s, %s)
-            RETURNING id
-        """, (
-            site_id,
-            key_name,
-            key_hash,
-            full_key[:12] + '...',
-            key_type,
-            _actor_ppid_for_audit(),
-            str(permissions or ['read', 'write']).replace("'", '"')
-        ))
-        
-        new_key_id = cursor.fetchone()[0]
-        
-        conn.commit()
-        cursor.close()
-        conn.close()
-        
-        logger.info(f"Rotated API key {key_id} -> {new_key_id} for site {site_id}")
-        
-        return jsonify({
-            'success': True,
-            'new_key_id': new_key_id,
-            'key': full_key,
-            'message': 'Key rotated successfully. Old key is now inactive.'
-        })
-        
-    except Exception as e:
-        logger.error(f"Failed to rotate API key: {e}")
-        return jsonify({'success': False, 'error': str(e)}), 500
-
-
-@site_management_bp.route('/api/developer/sites/<site_id>/keys/<int:key_id>', methods=['DELETE'])
-@cross_origin()
-@require_agent_or_user_auth(required_scope='admin')
-def revoke_api_key(site_id, key_id):
-    """Revoke (deactivate) an API key"""
-    try:
-        from api.database import get_db_connection
-        
-        conn = get_db_connection(site_id)
-        cursor = conn.cursor()
-        
-        cursor.execute("""
-            UPDATE site_api_keys
-            SET is_active = false
-            WHERE id = %s AND site_id = %s
-            RETURNING id
-        """, (key_id, site_id))
-        
-        if cursor.rowcount == 0:
-            cursor.close()
-            conn.close()
-            return jsonify({'success': False, 'error': 'Key not found'}), 404
-        
-        conn.commit()
-        cursor.close()
-        conn.close()
-        
-        logger.info(f"Revoked API key {key_id} for site {site_id}")
-        
-        return jsonify({
-            'success': True,
-            'message': 'API key revoked'
-        })
-        
-    except Exception as e:
-        logger.error(f"Failed to revoke API key: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
 

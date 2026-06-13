@@ -18,160 +18,177 @@ class RouteAuthPolicy:
     compat_bearer_sunset_utc: Optional[str] = None
 
 
+# Principal sets — mutations require verified credential or agent token (PPID-bound).
+READ_PRINCIPALS = ("user_lemma", "agent_token", "access_token", "api_key")
+MUTATE_PRINCIPALS = ("user_lemma", "agent_token", "access_token")
+API_KEY_ONLY_PRINCIPALS = ("api_key",)
+
+
 # Expanded matrix for protected API routes.
 ROUTE_AUTHZ_POLICY: dict[tuple[str, str], RouteAuthPolicy] = {
     # Developer platform
     ("GET", "/api/developer/stats"): RouteAuthPolicy(
         required_scope="read",
-        allowed_principals=("user_lemma", "agent_token", "access_token", "api_key"),
+        allowed_principals=READ_PRINCIPALS,
     ),
     ("GET", "/api/developer/sites"): RouteAuthPolicy(
         required_scope="read",
-        allowed_principals=("user_lemma", "agent_token", "access_token", "api_key"),
+        allowed_principals=READ_PRINCIPALS,
     ),
     ("POST", "/api/developer/sites"): RouteAuthPolicy(
         required_scope="write",
-        allowed_principals=("user_lemma", "agent_token", "access_token", "api_key"),
+        allowed_principals=MUTATE_PRINCIPALS,
+        auth_mode="credential_required",
     ),
     ("GET", "/api/developer/sites/<site_id>"): RouteAuthPolicy(
         required_scope="read",
-        allowed_principals=("user_lemma", "agent_token", "access_token", "api_key"),
+        allowed_principals=READ_PRINCIPALS,
         site_binding_required=True,
     ),
     ("GET", "/api/developer/sites/<site_id>/bootstrap-status"): RouteAuthPolicy(
         required_scope="read",
-        allowed_principals=("user_lemma", "agent_token", "access_token", "api_key"),
+        allowed_principals=READ_PRINCIPALS,
         site_binding_required=True,
     ),
     ("POST", "/api/developer/sites/<site_id>/bootstrap-admin"): RouteAuthPolicy(
         required_scope="admin",
-        allowed_principals=("user_lemma", "agent_token", "access_token", "api_key"),
+        allowed_principals=MUTATE_PRINCIPALS,
         site_binding_required=True,
         risk_tier="critical",
         auth_mode="proof_required",
     ),
     ("POST", "/api/developer/sites/<site_id>/admin-transfer-token"): RouteAuthPolicy(
         required_scope="admin",
-        allowed_principals=("user_lemma", "agent_token", "access_token", "api_key"),
+        allowed_principals=MUTATE_PRINCIPALS,
         site_binding_required=True,
         risk_tier="high",
         auth_mode="proof_required",
     ),
     ("POST", "/api/developer/credential-transfer/redeem"): RouteAuthPolicy(
         required_scope="write",
-        allowed_principals=("user_lemma", "agent_token", "access_token", "api_key"),
+        allowed_principals=MUTATE_PRINCIPALS,
     ),
     ("GET", "/api/developer/sites/<site_id>/stats-summary"): RouteAuthPolicy(
         required_scope="read",
-        allowed_principals=("user_lemma", "agent_token", "access_token", "api_key"),
+        allowed_principals=READ_PRINCIPALS,
         site_binding_required=True,
     ),
     ("GET", "/api/developer/sites/<site_id>/keys"): RouteAuthPolicy(
         required_scope="read",
-        allowed_principals=("user_lemma", "agent_token", "access_token", "api_key"),
+        allowed_principals=READ_PRINCIPALS,
         site_binding_required=True,
     ),
     ("POST", "/api/developer/sites/<site_id>/keys"): RouteAuthPolicy(
         required_scope="admin",
-        allowed_principals=("user_lemma", "agent_token", "access_token", "api_key"),
+        allowed_principals=MUTATE_PRINCIPALS,
         site_binding_required=True,
+        risk_tier="high",
+        auth_mode="proof_required",
     ),
     ("POST", "/api/developer/sites/<site_id>/keys/<key_id>/rotate"): RouteAuthPolicy(
         required_scope="admin",
-        allowed_principals=("user_lemma", "agent_token", "access_token", "api_key"),
+        allowed_principals=MUTATE_PRINCIPALS,
         site_binding_required=True,
+        risk_tier="high",
+        auth_mode="proof_required",
     ),
     ("DELETE", "/api/developer/sites/<site_id>/keys/<key_id>"): RouteAuthPolicy(
         required_scope="admin",
-        allowed_principals=("user_lemma", "agent_token", "access_token", "api_key"),
+        allowed_principals=MUTATE_PRINCIPALS,
         site_binding_required=True,
         risk_tier="high",
         auth_mode="proof_required",
     ),
     ("GET", "/api/developer/sites/<site_id>/users-summary"): RouteAuthPolicy(
         required_scope="read",
-        allowed_principals=("user_lemma", "agent_token", "access_token", "api_key"),
+        allowed_principals=READ_PRINCIPALS,
         site_binding_required=True,
     ),
     # Site management API
     ("GET", "/api/developer/sites/<site_id>/users"): RouteAuthPolicy(
         required_scope="read",
-        allowed_principals=("user_lemma", "agent_token", "access_token", "api_key"),
+        allowed_principals=READ_PRINCIPALS,
         site_binding_required=True,
     ),
     ("POST", "/api/developer/sites/<site_id>/users"): RouteAuthPolicy(
         required_scope="write",
-        allowed_principals=("user_lemma", "agent_token", "access_token", "api_key"),
+        allowed_principals=MUTATE_PRINCIPALS,
         site_binding_required=True,
+        auth_mode="credential_required",
     ),
     ("GET", "/api/developer/sites/<site_id>/users/<ppid>"): RouteAuthPolicy(
         required_scope="read",
-        allowed_principals=("user_lemma", "agent_token", "access_token", "api_key"),
+        allowed_principals=READ_PRINCIPALS,
         site_binding_required=True,
     ),
     ("PUT", "/api/developer/sites/<site_id>/users/<ppid>"): RouteAuthPolicy(
         required_scope="write",
-        allowed_principals=("user_lemma", "agent_token", "access_token", "api_key"),
+        allowed_principals=MUTATE_PRINCIPALS,
         site_binding_required=True,
+        auth_mode="credential_required",
     ),
     ("POST", "/api/developer/sites/<site_id>/users/<ppid>/revoke"): RouteAuthPolicy(
         required_scope="admin",
-        allowed_principals=("user_lemma", "agent_token", "access_token", "api_key"),
+        allowed_principals=MUTATE_PRINCIPALS,
         site_binding_required=True,
+        risk_tier="high",
+        auth_mode="proof_required",
     ),
     ("POST", "/api/developer/sites/<site_id>/users/<ppid>/unblock"): RouteAuthPolicy(
         required_scope="admin",
-        allowed_principals=("user_lemma", "agent_token", "access_token", "api_key"),
+        allowed_principals=MUTATE_PRINCIPALS,
         site_binding_required=True,
+        risk_tier="high",
+        auth_mode="proof_required",
     ),
     ("GET", "/api/developer/sites/<site_id>/users/export"): RouteAuthPolicy(
         required_scope="read",
-        allowed_principals=("user_lemma", "agent_token", "access_token", "api_key"),
+        allowed_principals=READ_PRINCIPALS,
         site_binding_required=True,
     ),
     ("GET", "/api/developer/sites/<site_id>/permissions"): RouteAuthPolicy(
         required_scope="read",
-        allowed_principals=("user_lemma", "agent_token", "access_token", "api_key"),
+        allowed_principals=READ_PRINCIPALS,
         site_binding_required=True,
     ),
     ("POST", "/api/developer/sites/<site_id>/permissions"): RouteAuthPolicy(
         required_scope="write",
-        allowed_principals=("user_lemma", "agent_token", "access_token", "api_key"),
+        allowed_principals=MUTATE_PRINCIPALS,
         site_binding_required=True,
+        risk_tier="high",
+        auth_mode="proof_required",
     ),
     ("PUT", "/api/developer/sites/<site_id>/permissions/<permission_id>"): RouteAuthPolicy(
         required_scope="admin",
-        allowed_principals=("user_lemma", "agent_token", "access_token", "api_key"),
+        allowed_principals=MUTATE_PRINCIPALS,
         site_binding_required=True,
+        risk_tier="high",
+        auth_mode="proof_required",
     ),
     ("DELETE", "/api/developer/sites/<site_id>/permissions/<permission_id>"): RouteAuthPolicy(
         required_scope="admin",
-        allowed_principals=("user_lemma", "agent_token", "access_token", "api_key"),
+        allowed_principals=MUTATE_PRINCIPALS,
         site_binding_required=True,
+        risk_tier="high",
+        auth_mode="proof_required",
     ),
     ("POST", "/api/developer/sites/<site_id>/users/<ppid>/permissions"): RouteAuthPolicy(
         required_scope="admin",
-        allowed_principals=("user_lemma", "agent_token", "access_token", "api_key"),
+        allowed_principals=MUTATE_PRINCIPALS,
         site_binding_required=True,
+        risk_tier="high",
+        auth_mode="proof_required",
     ),
     ("DELETE", "/api/developer/sites/<site_id>/users/<ppid>/permissions/<permission_id>"): RouteAuthPolicy(
         required_scope="admin",
-        allowed_principals=("user_lemma", "agent_token", "access_token", "api_key"),
+        allowed_principals=MUTATE_PRINCIPALS,
         site_binding_required=True,
-    ),
-    ("POST", "/api/developer/sites/<site_id>/keys/<int:key_id>/rotate"): RouteAuthPolicy(
-        required_scope="admin",
-        allowed_principals=("user_lemma", "agent_token", "access_token", "api_key"),
-        site_binding_required=True,
-    ),
-    ("DELETE", "/api/developer/sites/<site_id>/keys/<int:key_id>"): RouteAuthPolicy(
-        required_scope="admin",
-        allowed_principals=("user_lemma", "agent_token", "access_token", "api_key"),
-        site_binding_required=True,
+        risk_tier="high",
+        auth_mode="proof_required",
     ),
     ("GET", "/api/developer/sites/<site_id>/stats"): RouteAuthPolicy(
         required_scope="read",
-        allowed_principals=("user_lemma", "agent_token", "access_token", "api_key"),
+        allowed_principals=READ_PRINCIPALS,
         site_binding_required=True,
     ),
     # Customer and dashboard
@@ -206,11 +223,12 @@ ROUTE_AUTHZ_POLICY: dict[tuple[str, str], RouteAuthPolicy] = {
     # Issuance/admin endpoints
     ("POST", "/api/developer/issue-self-permission"): RouteAuthPolicy(
         required_scope="write",
-        allowed_principals=("user_lemma", "agent_token", "access_token", "api_key"),
+        allowed_principals=MUTATE_PRINCIPALS,
+        auth_mode="credential_required",
     ),
     ("POST", "/api/v1/iam/admin/self-issue"): RouteAuthPolicy(
         required_scope="admin",
-        allowed_principals=("api_key",),
+        allowed_principals=API_KEY_ONLY_PRINCIPALS,
     ),
     # Agent APIs
     ("GET", "/api/agent/credentials"): RouteAuthPolicy(
@@ -238,11 +256,11 @@ ROUTE_AUTHZ_POLICY: dict[tuple[str, str], RouteAuthPolicy] = {
     # SDK auth admin endpoints
     ("POST", "/api/auth/introspect"): RouteAuthPolicy(
         required_scope="read",
-        allowed_principals=("api_key",),
+        allowed_principals=API_KEY_ONLY_PRINCIPALS,
     ),
     ("POST", "/api/auth/revoke"): RouteAuthPolicy(
         required_scope="write",
-        allowed_principals=("api_key",),
+        allowed_principals=API_KEY_ONLY_PRINCIPALS,
     ),
     # Stripe checkout endpoints
     ("POST", "/api/create-checkout-session"): RouteAuthPolicy(
@@ -276,6 +294,7 @@ AUTH_ERROR_CATALOG: dict[str, tuple[int, str]] = {
     "AUTH_REPLAY_DETECTED": (401, "Replay detected for proof-of-possession envelope"),
     "AUTH_PROOF_OF_POSSESSION_FAILED": (401, "Proof-of-possession validation failed"),
     "AUTH_RISK_STEP_UP_REQUIRED": (403, "Step-up or freshness refresh required for this route"),
+    "AUTH_CREDENTIAL_REQUIRED": (403, "Verified X-Lemma-Credential or X-Agent-Token required for this route"),
 }
 
 
