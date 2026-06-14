@@ -253,6 +253,7 @@ export function createVerifier({
   lemmaOrigin = DEFAULT_LEMMA_ORIGIN,
   refreshMs = DEFAULT_REFRESH_MS,
   maxSessionAgeSeconds = DEFAULT_MAX_SESSION_AGE_S,
+  requireSessionAssertion = true,
   fetch: fetchImpl,
 } = {}) {
   if (!siteId) throw new Error("siteId required");
@@ -333,8 +334,8 @@ export function createVerifier({
 
     const assertion = presentation.session_assertion;
     const sigB64 = presentation.session_signature;
+    const sitePubkeyB64 = claims.site_signing_pubkey || claims.siteSigningPubkey || "";
     if (assertion && sigB64) {
-      const sitePubkeyB64 = claims.site_signing_pubkey || claims.siteSigningPubkey || "";
       if (!sitePubkeyB64) {
         return { ok: false, reason: "credential_missing_site_signing_pubkey" };
       }
@@ -359,6 +360,8 @@ export function createVerifier({
       if (String(assertion.site_id || "") !== siteId) {
         return { ok: false, reason: "session_site_id_mismatch" };
       }
+    } else if (requireSessionAssertion && sitePubkeyB64) {
+      return { ok: false, reason: "session_assertion_required" };
     }
 
     return {

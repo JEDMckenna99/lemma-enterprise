@@ -25,6 +25,10 @@ logger = logging.getLogger(__name__)
 CONFIDENCE_DOCUMENT_ROOT_V1 = "document_root_v1"
 
 
+class WalletPersonBindingConflictError(ValueError):
+    """Raised when a wallet is already bound to a different LemmaPerson."""
+
+
 @dataclass
 class ResolvedLemmaPerson:
     person_id: str
@@ -107,11 +111,9 @@ def resolve_or_create_person_from_material(
                 )
             )
         elif binding.lemma_person_id != person_id:
-            logger.warning(
-                "wallet %s already bound to %s; verified document maps to %s",
-                wallet_id,
-                binding.lemma_person_id,
-                person_id,
+            raise WalletPersonBindingConflictError(
+                f"wallet {wallet_id} already bound to {binding.lemma_person_id}; "
+                f"verified document maps to {person_id}"
             )
 
     return ResolvedLemmaPerson(

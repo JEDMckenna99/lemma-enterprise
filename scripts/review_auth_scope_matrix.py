@@ -137,6 +137,7 @@ IN_HANDLER_AUTH_ALLOWLIST = {
     "/api/ishuman/site-proof-redirect/claim",
     "/api/ishuman/site-proof-redirect/deposit",
     "/api/ishuman/start-verification",
+    "/api/ishuman/verification-status/<session_id>/claim",
     "/api/ishuman/verify-presentation",
     "/api/v1/iam/admin/platform-bootstrap/auto-issue",
     "/api/v1/iam/admin/platform-bootstrap/status",

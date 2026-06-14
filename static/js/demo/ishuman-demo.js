@@ -721,11 +721,33 @@
     log('lemma.id cleared', 'run "Create my lemma.id" to start fresh');
   }
 
+  async function claimVerifiedMaster(activeSessionId) {
+    const { walletId } = await getWalletContext();
+    const walletAssertion = await state.wallet.buildWalletAssertion(
+      ['session_id'],
+      { session_id: activeSessionId },
+    );
+    return requestJson(
+      `/api/ishuman/verification-status/${encodeURIComponent(activeSessionId)}/claim`,
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          wallet_id: walletId,
+          session_id: activeSessionId,
+          wallet_assertion: walletAssertion,
+        }),
+      },
+    );
+  }
+
   async function pollAndStoreMaster() {
     if (!state.sessionId) throw new Error('No demo verification session. Start the identity check first.');
     if (!state.wallet) await initWallet();
 
-    const payload = await requestJson(`/api/ishuman/verification-status/${encodeURIComponent(state.sessionId)}`);
+    let payload = await requestJson(`/api/ishuman/verification-status/${encodeURIComponent(state.sessionId)}`);
+    if (payload.status === 'verified' && payload.credential_ready) {
+      payload = await claimVerifiedMaster(state.sessionId);
+    }
     const netJson = $('ih-master-json');
     if (netJson) netJson.textContent = pretty(payload);
     log('Verification status checked', payload.status);

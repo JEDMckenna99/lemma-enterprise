@@ -33,7 +33,7 @@
  *   // -> { action: 'post_comment', lemma: { ppid, verified, ..., credential } }
  *   // POST `event` to YOUR backend. Lemma stores none of it.
  *
- * @version 1.7.1
+ * @version 1.8.0
  */
 
 (function () {
@@ -179,7 +179,7 @@ function buildSessionPresentationPayload({
     ].join('\n'));
 }
 
-async function verifySessionAssertion(assertion, signatureB64, sitePubkeyB64, expectedBloomSequence) {
+async function verifySessionAssertion(assertion, signatureB64, sitePubkeyB64, expectedBloomSequence, expectedSiteId) {
     if (!assertion || typeof assertion !== 'object') {
         return { ok: false, reason: 'session_assertion_missing' };
     }
@@ -196,6 +196,16 @@ async function verifySessionAssertion(assertion, signatureB64, sitePubkeyB64, ex
     for (const key of required) {
         if (assertion[key] === undefined || assertion[key] === null || assertion[key] === '') {
             return { ok: false, reason: `session_${key}_missing` };
+        }
+    }
+
+    if (expectedSiteId) {
+        const boundSite = String(assertion.site_id || '').trim().toLowerCase()
+            .replace(/^www\./, '').split('/')[0].split(':')[0];
+        const expected = String(expectedSiteId || '').trim().toLowerCase()
+            .replace(/^www\./, '').split('/')[0].split(':')[0];
+        if (boundSite && expected && boundSite !== expected) {
+            return { ok: false, reason: 'session_site_id_mismatch' };
         }
     }
 
@@ -519,6 +529,7 @@ class IsHumanVerifier {
                 Number(config.sessionTtlSec) || DEFAULT_SESSION_TTL_SECONDS,
             ),
         );
+        this.strictSession = config.strictSession !== false;
 
         this._warnSiteIdHostnameMismatch();
 
@@ -701,6 +712,24 @@ class IsHumanVerifier {
      */
     async checkStatus(options = {}) {
         return this.verify({ ...options, autoProvision: false });
+    }
+
+    /**
+     * Verify and return a backend-safe presentation bundle (recommended for signup).
+     *
+     * @returns {Promise<{ok: boolean, presentation: object|null, ppid: string|null, reason: string, timeMs: number}>}
+     */
+    async verifyForBackend(options = {}) {
+        const result = await this.verify(options);
+        const presentation = result.presentation || null;
+        const ok = !!(result.human && presentation && presentation.credential);
+        return {
+            ok,
+            presentation: ok ? presentation : null,
+            ppid: ok ? result.ppid : null,
+            reason: ok ? result.reason : (result.reason || 'presentation_missing'),
+            timeMs: result.timeMs,
+        };
     }
 
     /**
@@ -987,10 +1016,18 @@ class IsHumanVerifier {
                 session.session_signature,
                 siteSigningPubkey,
                 bloomSequence,
+                this.siteId,
             );
             if (sessionCheck.ok) {
                 return this._result(true, credential.subject, 'session_valid', t0, null, session);
             }
+            if (this.strictSession) {
+                this._clearSessionCache();
+                return this._result(false, credential.subject, sessionCheck.reason, t0);
+            }
+        } else if (this.strictSession && siteSigningPubkey) {
+            this._clearSessionCache();
+            return this._result(false, credential.subject, 'session_assertion_required', t0);
         }
 
         return this._result(true, credential.subject, 'vc_valid', t0, null, session);
@@ -1020,6 +1057,7 @@ class IsHumanVerifier {
                 signature,
                 siteSigningPubkey,
                 bloomSequence,
+                this.siteId,
             );
             if (!sessionCheck.ok) {
                 return { ok: false, reason: sessionCheck.reason };
@@ -1040,6 +1078,14 @@ class IsHumanVerifier {
         const claims = credential.claims || credential.credentialSubject || {};
         if (!claims.isHuman) {
             return { ok: false, ppid: null, reason: 'not_ishuman' };
+        }
+
+        const boundSite = this._canonicalizeSiteDomain(
+            claims.siteId || claims.site_id || claims.siteDomain || '',
+        );
+        const expectedSite = this._canonicalizeSiteDomain(this.siteId);
+        if (boundSite && expectedSite && boundSite !== expectedSite) {
+            return { ok: false, ppid: credential.subject, reason: 'site_id_mismatch' };
         }
 
         const expiresAt = parseInt(credential.expiresAt || claims.expiresAt || '0', 10);

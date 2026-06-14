@@ -63,6 +63,8 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 
 
 SESSION_PRESENTATION_PREFIX = "lemma:site-session-presentation:v1"
+TRUST_LIST_PREFIX = "lemma:issuer-trust-list:v1"
+TIME_SKEW_SECONDS = 300
 
 
 # ---------------------------------------------------------------------------
@@ -100,6 +102,138 @@ def browser_canonical_message(credential: dict) -> bytes:
 def _b64url_decode(text: str) -> bytes:
     pad = "=" * ((4 - len(text) % 4) % 4)
     return base64.urlsafe_b64decode(text + pad)
+
+
+@dataclass
+class TrustedIssuer:
+    did: str
+    pubkeys_hex: set[str]
+
+
+def _compute_trust_list_content_hash(entries: list[dict]) -> str:
+    canonical_entries = [
+        {
+            "did": str(item["did"]),
+            "pubkey": str(item["pubkey"]).lower(),
+            "key_id": str(item["key_id"]),
+            "status": str(item["status"]),
+            "valid_from_unix": int(item["valid_from_unix"]),
+            "valid_until_unix": int(item["valid_until_unix"]),
+            "priority": int(item.get("priority") or 0),
+        }
+        for item in entries
+    ]
+    canonical = json.dumps(canonical_entries, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
+def _build_trust_list_signature_message(
+    *, version: int, content_hash: str, generated_at_unix: int, valid_until_unix: int
+) -> bytes:
+    return "\n".join(
+        [
+            TRUST_LIST_PREFIX,
+            str(int(version)),
+            str(content_hash or "").strip(),
+            str(int(generated_at_unix)),
+            str(int(valid_until_unix)),
+        ]
+    ).encode("utf-8")
+
+
+def _normalize_trust_list_entry(raw: dict) -> dict | None:
+    did = str(raw.get("did") or raw.get("issuer_did") or "").strip()
+    pubkey = str(raw.get("pubkey") or raw.get("public_key") or raw.get("publicKey") or "").strip().lower()
+    if not did or len(pubkey) != 64 or not all(c in "0123456789abcdef" for c in pubkey):
+        return None
+    status = str(raw.get("status") or "active").strip().lower()
+    if status == "revoked":
+        return None
+    return {
+        "did": did,
+        "pubkey": pubkey,
+        "key_id": str(raw.get("key_id") or f"{did}#{pubkey[:12]}").strip(),
+        "status": status,
+        "valid_from_unix": int(raw.get("valid_from_unix") or 0),
+        "valid_until_unix": int(raw.get("valid_until_unix") or 0),
+        "priority": int(raw.get("priority") or 0),
+    }
+
+
+def _verify_signed_trust_list_payload(payload: dict, *, now_unix: int | None = None) -> dict[str, TrustedIssuer]:
+    if not isinstance(payload, dict):
+        raise RuntimeError("trust_list_missing")
+
+    required = (
+        "version",
+        "generated_at_unix",
+        "valid_until_unix",
+        "content_hash",
+        "signer_pubkey",
+        "signature",
+        "issuers",
+    )
+    for key in required:
+        if payload.get(key) in (None, ""):
+            raise RuntimeError(f"trust_list_{key}_missing")
+
+    now = int(now_unix if now_unix is not None else time.time())
+    if now + TIME_SKEW_SECONDS < int(payload["generated_at_unix"]):
+        raise RuntimeError("trust_list_not_yet_valid")
+    if now - TIME_SKEW_SECONDS > int(payload["valid_until_unix"]):
+        raise RuntimeError("trust_list_expired")
+
+    raw_issuers = payload.get("issuers")
+    if not isinstance(raw_issuers, list) or not raw_issuers:
+        raise RuntimeError("trust_list_issuers_missing")
+
+    normalized: list[dict] = []
+    for row in raw_issuers:
+        if not isinstance(row, dict):
+            raise RuntimeError("trust_list_issuer_malformed")
+        entry = _normalize_trust_list_entry(row)
+        if not entry:
+            raise RuntimeError("trust_list_issuer_invalid")
+        normalized.append(entry)
+
+    expected_hash = _compute_trust_list_content_hash(normalized)
+    if expected_hash != str(payload["content_hash"]):
+        raise RuntimeError("trust_list_content_hash_mismatch")
+
+    try:
+        signer_key = Ed25519PublicKey.from_public_bytes(bytes.fromhex(str(payload["signer_pubkey"])))
+        signature = _b64url_decode(str(payload["signature"]))
+    except Exception as exc:
+        raise RuntimeError("trust_list_malformed") from exc
+
+    message = _build_trust_list_signature_message(
+        version=int(payload["version"]),
+        content_hash=str(payload["content_hash"]),
+        generated_at_unix=int(payload["generated_at_unix"]),
+        valid_until_unix=int(payload["valid_until_unix"]),
+    )
+    try:
+        signer_key.verify(signature, message)
+    except InvalidSignature as exc:
+        raise RuntimeError("trust_list_invalid_signature") from exc
+
+    issuers: dict[str, TrustedIssuer] = {}
+    for entry in normalized:
+        valid_from = int(entry.get("valid_from_unix") or 0)
+        valid_until = int(entry.get("valid_until_unix") or 0)
+        if valid_from and (now + TIME_SKEW_SECONDS) < valid_from:
+            continue
+        if valid_until and (now - TIME_SKEW_SECONDS) > valid_until:
+            continue
+        existing = issuers.get(entry["did"])
+        if existing:
+            existing.pubkeys_hex.add(entry["pubkey"])
+        else:
+            issuers[entry["did"]] = TrustedIssuer(did=entry["did"], pubkeys_hex={entry["pubkey"]})
+
+    if not issuers:
+        raise RuntimeError("trust_list_no_active_issuers")
+    return issuers
 
 
 def _build_session_message(assertion: dict) -> bytes:
@@ -190,12 +324,6 @@ def _unwrap_stamp(value, key: str = "lemma"):
 
 
 @dataclass
-class TrustedIssuer:
-    did: str
-    pubkeys_hex: set[str]
-
-
-@dataclass
 class _Snapshot:
     sequence_number: int
     revoked_hash_set: set[str]
@@ -215,11 +343,13 @@ class VerificationContext:
         lemma_origin: str = "https://lemma.id",
         max_session_age_seconds: int = 24 * 60 * 60,
         refresh_seconds: int = 15 * 60,
+        require_session_assertion: bool = True,
     ) -> None:
         self.site_id = site_id
         self.lemma_origin = lemma_origin.rstrip("/")
         self.max_session_age_seconds = max_session_age_seconds
         self.refresh_seconds = refresh_seconds
+        self.require_session_assertion = require_session_assertion
         self._lock = threading.Lock()
         self._snapshot: Optional[_Snapshot] = None
 
@@ -248,25 +378,7 @@ class VerificationContext:
         )
 
     def _verify_trust_list(self, trust_list: dict) -> dict[str, TrustedIssuer]:
-        # Minimal subset — see api/issuer_trust_list.py for the full spec.
-        # For brevity we trust the embedded list and only extract issuer pubkeys.
-        # Production implementations SHOULD verify the trust list's own
-        # signature against a hard-coded root pubkey published by lemma.id.
-        issuers: dict[str, TrustedIssuer] = {}
-        for entry in (trust_list.get("issuers") or []):
-            did = (entry.get("did") or "").strip()
-            pubkey_hex = (entry.get("public_key") or entry.get("publicKey") or "").strip().lower()
-            status = (entry.get("status") or "active").lower()
-            if not did or not pubkey_hex or status != "active":
-                continue
-            existing = issuers.get(did)
-            if existing:
-                existing.pubkeys_hex.add(pubkey_hex)
-            else:
-                issuers[did] = TrustedIssuer(did=did, pubkeys_hex={pubkey_hex})
-        if not issuers:
-            raise RuntimeError("trust list contained no active issuers")
-        return issuers
+        return _verify_signed_trust_list_payload(trust_list)
 
     def _verify_bloom_snapshot(
         self,
@@ -395,10 +507,10 @@ class VerificationContext:
         # 4. Verify the site-bound session assertion (proof of possession)
         assertion = (presentation or {}).get("session_assertion")
         signature_b64 = (presentation or {}).get("session_signature") or ""
+        site_pubkey_b64 = (
+            claims.get("site_signing_pubkey") or claims.get("siteSigningPubkey") or ""
+        )
         if assertion and signature_b64:
-            site_pubkey_b64 = (
-                claims.get("site_signing_pubkey") or claims.get("siteSigningPubkey") or ""
-            )
             if not site_pubkey_b64:
                 return self.Result(False, "credential_missing_site_signing_pubkey")
             try:
@@ -420,6 +532,8 @@ class VerificationContext:
                 return self.Result(False, "session_timestamps_invalid")
             if str(assertion.get("site_id") or "") != self.site_id:
                 return self.Result(False, "session_site_id_mismatch")
+        elif self.require_session_assertion and site_pubkey_b64:
+            return self.Result(False, "session_assertion_required")
 
         return self.Result(
             ok=True,

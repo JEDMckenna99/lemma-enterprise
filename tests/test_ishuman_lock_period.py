@@ -59,7 +59,10 @@ def test_verifier_site_vc_cache(verifier_source):
     assert "SITE_VC_STORAGE_KEY = 'ishuman_site_vc:v1'" in verifier_source
     assert "_verifyFromSiteVcCache" in verifier_source
     assert "'vc_valid'" in verifier_source
-    assert "TIME_SKEW_SECONDS" in verifier_source
+    assert "site_id_mismatch" in verifier_source
+    assert "session_assertion_required" in verifier_source
+    assert "verifyForBackend" in verifier_source
+    assert "strictSession" in verifier_source
     assert "signatureValueWeb" in verifier_source
     assert "legacy_credential_format" in verifier_source
     assert "_hydrateBloomFromCache" in verifier_source

@@ -421,6 +421,18 @@ def _complete_verified_ishuman_from_didit(
             "root_error": str(exc),
         }
         return None
+    except Exception as exc:
+        from api.identity_person import WalletPersonBindingConflictError
+
+        if isinstance(exc, WalletPersonBindingConflictError):
+            logger.warning("Wallet/person binding conflict during didit issuance: %s", exc)
+            record.status = "failed"
+            record.metadata_json = {
+                **(record.metadata_json or {}),
+                "binding_error": str(exc),
+            }
+            return None
+        raise
 
     ppid = derive_ppid_from_person_root_hash(resolved.person_root_hash, "lemma.id")
     record.lemma_person_id = resolved.person_id
@@ -1457,98 +1469,174 @@ def didit_identity_webhook():
 
 
 # ---------------------------------------------------------------------------
-# 2b. Poll for credential (client polls after Stripe modal closes)
+# 2b. Poll for credential (client polls after IDV completes)
 # ---------------------------------------------------------------------------
+
+
+def _resolve_verification_status_record(db, session_id: str):
+    """Resolve the verification row for status polling (with sibling + pull fallback)."""
+    from api.database import IsHumanVerification
+
+    record = db.query(IsHumanVerification).filter_by(session_id=session_id).first()
+    if not record:
+        return None
+
+    if record.status != "verified" or not record.credential_id:
+        sibling = None
+        if record.provider_session_id:
+            sibling = (
+                db.query(IsHumanVerification)
+                .filter(
+                    IsHumanVerification.provider_session_id == record.provider_session_id,
+                    IsHumanVerification.status == "verified",
+                    IsHumanVerification.credential_id.isnot(None),
+                )
+                .order_by(IsHumanVerification.verified_at.desc())
+                .first()
+            )
+        if not sibling and record.wallet_id:
+            sibling = (
+                db.query(IsHumanVerification)
+                .filter(
+                    IsHumanVerification.wallet_id == record.wallet_id,
+                    IsHumanVerification.status == "verified",
+                    IsHumanVerification.credential_id.isnot(None),
+                )
+                .order_by(IsHumanVerification.verified_at.desc())
+                .first()
+            )
+        if sibling:
+            record = sibling
+
+    if record.status != "verified" or not record.credential_id:
+        try:
+            _maybe_pull_issue_didit(db, record)
+        except Exception:
+            logger.exception("Pull-fallback attempt errored (non-fatal)")
+
+    return record
+
+
+def _reissue_verification_credential(record) -> Optional[dict]:
+    """Re-issue the master credential for wallet storage (stable credential id)."""
+    if record.status != "verified" or not record.credential_id or not record.ppid:
+        return None
+    meta = record.metadata_json or {}
+    ppid_deriv = meta.get("ppid_derivation") or (
+        "person_root_v1" if record.lemma_person_id else None
+    )
+    credential = _issue_ishuman_credential(
+        record.ppid,
+        record.wallet_id,
+        ppid_derivation=ppid_deriv,
+        verification_method=(record.issuer_id or "didit"),
+    )
+    credential["id"] = record.credential_id
+    return credential
+
 
 @ishuman_bp.route("/api/ishuman/verification-status/<session_id>", methods=["GET"])
 @cross_origin()
 def verification_status(session_id: str):
-    """Poll the status of an isHuman verification.
+    """Poll verification status (no credential — use POST .../claim with wallet_assertion).
 
-    After the Stripe Identity modal closes, the client polls this endpoint
-    until status becomes ``verified`` (and the credential is ready) or a
-    terminal failure state.
+    Returns ``credential_ready: true`` when verified so the wallet can claim the
+    master VC without exposing it to unauthenticated callers.
     """
-    from api.database import SessionLocal, IsHumanVerification
+    from api.database import SessionLocal
+    from api.rate_limiter import check_rate_limit
+
+    session_id = (session_id or "").strip()
+    if not session_id:
+        return jsonify({"success": False, "error": "session_id required"}), 400
+
+    if not check_rate_limit(f"ishuman_status_poll:{session_id}", 120, 3600):
+        return jsonify({"success": False, "error": "status_poll_rate_limited"}), 429
+
     db = SessionLocal()
     try:
-        record = db.query(IsHumanVerification).filter_by(session_id=session_id).first()
+        record = _resolve_verification_status_record(db, session_id)
         if not record:
             return jsonify({"success": False, "error": "session_not_found"}), 404
-
-        # Duplicate-session resolution. The same provider (Didit) hosted session
-        # can map to more than one local verification row — e.g. when
-        # start-verification is called twice for one hosted flow, both rows share
-        # the same provider_session_id. The webhook only flips the FIRST matching
-        # row to verified, so a client polling a sibling row would see 'pending'
-        # forever even though the master credential was already issued. If the
-        # polled row isn't verified yet, fall back to any verified sibling for the
-        # same provider session (then the same wallet) and serve its credential.
-        if record.status != "verified" or not record.credential_id:
-            sibling = None
-            if record.provider_session_id:
-                sibling = (
-                    db.query(IsHumanVerification)
-                    .filter(
-                        IsHumanVerification.provider_session_id == record.provider_session_id,
-                        IsHumanVerification.status == "verified",
-                        IsHumanVerification.credential_id.isnot(None),
-                    )
-                    .order_by(IsHumanVerification.verified_at.desc())
-                    .first()
-                )
-            if not sibling and record.wallet_id:
-                sibling = (
-                    db.query(IsHumanVerification)
-                    .filter(
-                        IsHumanVerification.wallet_id == record.wallet_id,
-                        IsHumanVerification.status == "verified",
-                        IsHumanVerification.credential_id.isnot(None),
-                    )
-                    .order_by(IsHumanVerification.verified_at.desc())
-                    .first()
-                )
-            if sibling:
-                record = sibling
-
-        # Pull-based issuance fallback: if the polled (and any sibling) row is
-        # still unverified, the webhook may simply not have landed. Actively pull
-        # the didit decision and issue so the user is never stranded post-IDV.
-        if record.status != "verified" or not record.credential_id:
-            try:
-                _maybe_pull_issue_didit(db, record)
-            except Exception:
-                logger.exception("Pull-fallback attempt errored (non-fatal)")
 
         resp: dict = {
             "success": True,
             "status": record.status,
             "session_id": record.session_id,
+            "credential_ready": bool(
+                record.status == "verified" and record.credential_id and record.ppid
+            ),
+        }
+        return jsonify(resp)
+    finally:
+        db.close()
+
+
+@ishuman_bp.route("/api/ishuman/verification-status/<session_id>/claim", methods=["POST"])
+@cross_origin()
+def verification_status_claim(session_id: str):
+    """Claim the master credential after IDV (wallet_assertion required).
+
+    Body::
+
+        {
+            "wallet_id": "...",
+            "wallet_assertion": { "nonce": "...", "signature": "..." }
         }
 
-        if record.status == "verified" and record.credential_id:
-            resp["credential_id"] = record.credential_id
-            resp["ppid"] = record.ppid
+    The assertion must sign ``session_id`` (and ``wallet_id`` must match the row).
+    """
+    from api.database import SessionLocal
+    from api.rate_limiter import check_rate_limit
 
-            # Re-issue the credential so the client can store it
-            try:
-                meta = record.metadata_json or {}
-                ppid_deriv = meta.get("ppid_derivation") or (
-                    "person_root_v1" if record.lemma_person_id else None
-                )
-                credential = _issue_ishuman_credential(
-                    record.ppid,
-                    record.wallet_id,
-                    ppid_derivation=ppid_deriv,
-                    verification_method=(record.issuer_id or "didit"),
-                )
-                credential["id"] = record.credential_id
-                resp["credential"] = credential
-                if record.lemma_person_id:
-                    resp["lemma_person_id"] = record.lemma_person_id
-            except Exception:
-                logger.exception("Failed to re-issue credential for polling")
+    session_id = (session_id or "").strip()
+    body = request.get_json(silent=True) or {}
+    wallet_id = (body.get("wallet_id") or "").strip()
+    if not session_id or not wallet_id:
+        return jsonify({"success": False, "error": "session_id and wallet_id required"}), 400
 
+    body["session_id"] = session_id
+    err, _wid = _require_wallet_assertion(body, field_names=["session_id"])
+    if err:
+        return err
+
+    if not check_rate_limit(f"ishuman_status_claim:{wallet_id}", 30, 3600):
+        return jsonify({"success": False, "error": "status_claim_rate_limited"}), 429
+
+    db = SessionLocal()
+    try:
+        record = _resolve_verification_status_record(db, session_id)
+        if not record:
+            return jsonify({"success": False, "error": "session_not_found"}), 404
+        if str(record.wallet_id or "").strip() != wallet_id:
+            return jsonify({"success": False, "error": "wallet_session_mismatch"}), 403
+        if record.status != "verified" or not record.credential_id:
+            return jsonify({
+                "success": True,
+                "status": record.status,
+                "session_id": record.session_id,
+                "credential_ready": False,
+            })
+
+        try:
+            credential = _reissue_verification_credential(record)
+        except Exception:
+            logger.exception("Failed to re-issue credential for claim")
+            return jsonify({"success": False, "error": "credential_reissue_failed"}), 500
+
+        if not credential:
+            return jsonify({"success": False, "error": "credential_not_ready"}), 404
+
+        resp = {
+            "success": True,
+            "status": record.status,
+            "session_id": record.session_id,
+            "credential_id": record.credential_id,
+            "ppid": record.ppid,
+            "credential": credential,
+        }
+        if record.lemma_person_id:
+            resp["lemma_person_id"] = record.lemma_person_id
         return jsonify(resp)
     finally:
         db.close()
@@ -1861,19 +1949,29 @@ def network_revoke():
 @ishuman_bp.route("/api/ishuman/check", methods=["GET"])
 @cross_origin()
 def check_ppid():
-    """Check if a PPID is blocked on a specific site.
+    """Check if a PPID is blocked on a specific site (site API key required).
 
     Query params::
 
         ?ppid=did:lemma:ppid_...&site_id=site_...
 
-    Also checks network-wide revocation via the Bloom filter.
+    Also checks network-wide revocation via the Bloom filter when no site_id is given.
     """
+    from api.rate_limiter import check_rate_limit
+
+    site = _require_site_api_key()
+    if not site:
+        return jsonify({"success": False, "error": "valid API key required"}), 401
+
     ppid = request.args.get("ppid")
-    site_id = request.args.get("site_id")
+    site_id = request.args.get("site_id") or site.site_id
 
     if not ppid:
         return jsonify({"success": False, "error": "ppid required"}), 400
+
+    ip_hash = _client_ip_hash()
+    if not check_rate_limit(f"ishuman_check:{site.site_id}:{ip_hash}", 120, 3600):
+        return jsonify({"success": False, "error": "check_rate_limited"}), 429
 
     result = {"success": True, "ppid": ppid, "blocked": False, "reason": None}
 
@@ -2706,6 +2804,7 @@ def site_proof_redirect_deposit():
     body = request.get_json(silent=True) or {}
     request_nonce = (body.get("request_nonce") or "").strip()
     site_id = (body.get("site_id") or "").strip()
+    wallet_id = (body.get("wallet_id") or "").strip()
     credential = body.get("credential")
     session_assertion = body.get("session_assertion")
     session_signature = (body.get("session_signature") or "").strip()
@@ -2713,15 +2812,25 @@ def site_proof_redirect_deposit():
 
     if not request_nonce or len(request_nonce) < 8:
         return jsonify({"success": False, "error": "request_nonce required"}), 400
-    if not site_id or not isinstance(credential, dict) or not isinstance(session_assertion, dict):
+    if not site_id or not wallet_id or not isinstance(credential, dict) or not isinstance(session_assertion, dict):
         return jsonify({"success": False, "error": "missing_site_proof_fields"}), 400
     if not session_signature:
         return jsonify({"success": False, "error": "session_signature required"}), 400
+
+    body["request_nonce"] = request_nonce
+    body["site_id"] = site_id
+    err, _wid = _require_wallet_assertion(
+        body,
+        field_names=["request_nonce", "site_id"],
+    )
+    if err:
+        return err
 
     redis_store(
         _site_proof_redirect_key(request_nonce),
         {
             "site_id": site_id,
+            "wallet_id": wallet_id,
             "credential": credential,
             "session_assertion": session_assertion,
             "session_signature": session_signature,
@@ -2895,8 +3004,9 @@ def verify_presentation():
         from api.trusted_issuers import is_trusted_issuer
         if not is_trusted_issuer(issuer_did):
             return jsonify({"success": False, "error": "untrusted_issuer"}), 403
-    except Exception:
-        logger.warning("Trust list check unavailable; proceeding with embedded pubkey")
+    except Exception as exc:
+        logger.warning("Trust list check unavailable: %s", exc)
+        return jsonify({"success": False, "error": "trust_list_unavailable"}), 503
 
     if not issuer_pubkey_hex and issuer_did.startswith("did:lemma:"):
         issuer_pubkey_hex = issuer_did.split(":", 2)[2]

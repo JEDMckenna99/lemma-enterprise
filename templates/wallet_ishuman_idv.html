@@ -468,9 +468,18 @@
             if (flowMode === 'redirect' && redirectReturn) {
                 if (type === 'ISHUMAN_SITE_PROOF_ISSUED' && detail?.request_nonce) {
                     try {
+                        const walletAssertion = await wallet.buildWalletAssertion(
+                            ['request_nonce', 'site_id'],
+                            {
+                                request_nonce: detail.request_nonce,
+                                site_id: requestingSite,
+                            },
+                        );
                         await requestJson('/api/ishuman/site-proof-redirect/deposit', {
                             method: 'POST',
                             body: JSON.stringify({
+                                wallet_id: walletId,
+                                wallet_assertion: walletAssertion,
                                 request_nonce: detail.request_nonce,
                                 site_id: requestingSite,
                                 credential: detail.credential || null,
@@ -694,6 +703,24 @@
             localStorage.removeItem(SESSION_KEY);
         }
 
+        async function claimVerifiedMaster(activeSessionId) {
+            const walletAssertion = await wallet.buildWalletAssertion(
+                ['session_id'],
+                { session_id: activeSessionId },
+            );
+            return requestJson(
+                `/api/ishuman/verification-status/${encodeURIComponent(activeSessionId)}/claim`,
+                {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        wallet_id: walletId,
+                        session_id: activeSessionId,
+                        wallet_assertion: walletAssertion,
+                    }),
+                },
+            );
+        }
+
         async function pollAndStoreMaster() {
             if (!sessionId) throw new Error('Missing verification session');
             setStatus(consumerCopy().status?.waitingVerification || 'Finishing your verification…', 'loading');
@@ -707,6 +734,9 @@
             let payload = null;
             for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
                 payload = await requestJson(`/api/ishuman/verification-status/${encodeURIComponent(sessionId)}`);
+                if (payload && payload.status === 'verified' && payload.credential_ready) {
+                    payload = await claimVerifiedMaster(sessionId);
+                }
                 if (payload && payload.status === 'verified' && payload.credential) {
                     await storeMasterFromStatus(payload);
                     return payload;
@@ -843,9 +873,12 @@
             const statusEl = document.getElementById('qr-demo-status');
             const maxAttempts = 120;
             for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
-                const payload = await requestJson(
+                let payload = await requestJson(
                     `/api/ishuman/verification-status/${encodeURIComponent(sessionId)}`,
                 );
+                if (payload.status === 'verified' && payload.credential_ready) {
+                    payload = await claimVerifiedMaster(sessionId);
+                }
                 if (payload.status === 'verified' && payload.credential) {
                     await storeMasterFromStatus(payload);
                     if (statusEl) statusEl.textContent = 'Phone verification complete.';

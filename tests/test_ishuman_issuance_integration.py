@@ -9,6 +9,7 @@ from tests.wallet_test_helpers import (
     DERIVE_ASSERTION_FIELDS,
     SITE_SIGNING_PUBKEY_B64,
     START_ASSERTION_FIELDS,
+    STATUS_CLAIM_ASSERTION_FIELDS,
 )
 
 
@@ -79,11 +80,12 @@ def test_webhook_verified_updates_master_record(
 
 
 @pytest.mark.integration
-def test_verification_status_returns_stable_credential_id(
+def test_verification_status_poll_hides_credential_until_claim(
     ishuman_client,
     fake_ishuman_db_session_factory,
     make_ishuman_verification,
     monkeypatch,
+    attach_wallet_assertion,
 ):
     db = fake_ishuman_db_session_factory
     db.store.data["IsHumanVerification"].append(
@@ -92,6 +94,7 @@ def test_verification_status_returns_stable_credential_id(
             credential_id="ishuman_master_stable_001",
             status="verified",
             ppid="did:lemma:ppid_status_001",
+            wallet_id="wallet_test_001",
         )
     )
     monkeypatch.setattr("api.database.SessionLocal", db.session_local)
@@ -104,15 +107,69 @@ def test_verification_status_returns_stable_credential_id(
         },
     )
 
-    resp = ishuman_client.get("/api/ishuman/verification-status/ishuman_sess_status_001")
-    payload = resp.get_json()
+    poll = ishuman_client.get("/api/ishuman/verification-status/ishuman_sess_status_001")
+    poll_payload = poll.get_json()
 
-    assert resp.status_code == 200
-    assert payload["success"] is True
-    assert payload["status"] == "verified"
-    assert payload["credential_id"] == "ishuman_master_stable_001"
-    assert payload["credential"]["id"] == "ishuman_master_stable_001"
-    assert payload["credential"]["subject"] == "did:lemma:ppid_status_001"
+    assert poll.status_code == 200
+    assert poll_payload["success"] is True
+    assert poll_payload["status"] == "verified"
+    assert poll_payload["credential_ready"] is True
+    assert "credential" not in poll_payload
+    assert "ppid" not in poll_payload
+
+    claim = ishuman_client.post(
+        "/api/ishuman/verification-status/ishuman_sess_status_001/claim",
+        json=attach_wallet_assertion(
+            {
+                "wallet_id": "wallet_test_001",
+                "session_id": "ishuman_sess_status_001",
+            },
+            STATUS_CLAIM_ASSERTION_FIELDS,
+        ),
+    )
+    claim_payload = claim.get_json()
+
+    assert claim.status_code == 200
+    assert claim_payload["success"] is True
+    assert claim_payload["status"] == "verified"
+    assert claim_payload["credential_id"] == "ishuman_master_stable_001"
+    assert claim_payload["credential"]["id"] == "ishuman_master_stable_001"
+    assert claim_payload["credential"]["subject"] == "did:lemma:ppid_status_001"
+
+
+@pytest.mark.integration
+def test_verification_status_claim_rejects_wallet_mismatch(
+    ishuman_client,
+    fake_ishuman_db_session_factory,
+    make_ishuman_verification,
+    monkeypatch,
+    attach_wallet_assertion,
+):
+    db = fake_ishuman_db_session_factory
+    db.store.data["IsHumanVerification"].append(
+        make_ishuman_verification(
+            session_id="ishuman_sess_status_002",
+            credential_id="ishuman_master_stable_002",
+            status="verified",
+            ppid="did:lemma:ppid_status_002",
+            wallet_id="wallet_owner",
+        )
+    )
+    monkeypatch.setattr("api.database.SessionLocal", db.session_local)
+
+    resp = ishuman_client.post(
+        "/api/ishuman/verification-status/ishuman_sess_status_002/claim",
+        json=attach_wallet_assertion(
+            {
+                "wallet_id": "wallet_other",
+                "session_id": "ishuman_sess_status_002",
+            },
+            STATUS_CLAIM_ASSERTION_FIELDS,
+            wallet_id="wallet_other",
+        ),
+    )
+    assert resp.status_code == 403
+    assert resp.get_json()["error"] == "wallet_session_mismatch"
 
 
 @pytest.mark.integration

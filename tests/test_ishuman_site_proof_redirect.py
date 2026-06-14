@@ -4,8 +4,11 @@ from __future__ import annotations
 
 import pytest
 
+from tests.wallet_test_helpers import REDIRECT_DEPOSIT_ASSERTION_FIELDS
+
 REQUEST_NONCE = "nonce_test_redirect_001"
 SITE_ID = "tickets-demo.lemma.id"
+WALLET_ID = "wallet_test_001"
 CREDENTIAL = {
     "id": "ishuman_site_test_001",
     "subject": "did:lemma:ppid_" + ("a" * 64),
@@ -25,17 +28,27 @@ SESSION_SIGNATURE = "sig_test_redirect_001"
 
 
 @pytest.mark.integration
-def test_site_proof_redirect_deposit_then_claim(ishuman_client):
+def test_site_proof_redirect_deposit_then_claim(
+    ishuman_client,
+    fake_ishuman_db_session_factory,
+    monkeypatch,
+    attach_wallet_assertion,
+):
+    monkeypatch.setattr("api.database.SessionLocal", fake_ishuman_db_session_factory.session_local)
     deposit = ishuman_client.post(
         "/api/ishuman/site-proof-redirect/deposit",
-        json={
-            "request_nonce": REQUEST_NONCE,
-            "site_id": SITE_ID,
-            "credential": CREDENTIAL,
-            "session_assertion": SESSION_ASSERTION,
-            "session_signature": SESSION_SIGNATURE,
-            "session_nonce": "nonce_session_001",
-        },
+        json=attach_wallet_assertion(
+            {
+                "wallet_id": WALLET_ID,
+                "request_nonce": REQUEST_NONCE,
+                "site_id": SITE_ID,
+                "credential": CREDENTIAL,
+                "session_assertion": SESSION_ASSERTION,
+                "session_signature": SESSION_SIGNATURE,
+                "session_nonce": "nonce_session_001",
+            },
+            REDIRECT_DEPOSIT_ASSERTION_FIELDS,
+        ),
     )
     assert deposit.status_code == 200, deposit.get_json()
     assert deposit.get_json()["expires_in"] == 900

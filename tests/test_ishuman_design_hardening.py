@@ -83,6 +83,41 @@ def test_derive_ppid_missing_inputs_raises():
         _derive_ppid_for_site(rp_id="example.com")
 
 
+@pytest.mark.unit
+def test_wallet_person_binding_conflict_fails_closed():
+    from types import SimpleNamespace
+
+    from api.identity_person import (
+        WalletPersonBindingConflictError,
+        material_from_test_fixture,
+        resolve_or_create_person_from_material,
+    )
+
+    binding = SimpleNamespace(wallet_id="wallet_a", lemma_person_id="person_old")
+    db = SimpleNamespace(
+        query=lambda model: SimpleNamespace(
+            filter_by=lambda **kwargs: SimpleNamespace(
+                first=lambda: (
+                    binding
+                    if kwargs.get("wallet_id") == "wallet_a"
+                    else None
+                )
+            ),
+            filter=lambda *args, **kwargs: SimpleNamespace(first=lambda: None),
+        ),
+        add=lambda obj: None,
+    )
+
+    material = material_from_test_fixture(document_number="UNIQUE_DOC_999")
+    with pytest.raises(WalletPersonBindingConflictError):
+        resolve_or_create_person_from_material(
+            db,
+            material=material,
+            wallet_id="wallet_a",
+            provider="didit",
+        )
+
+
 # ---------------------------------------------------------------------------
 # Config flags
 # ---------------------------------------------------------------------------
