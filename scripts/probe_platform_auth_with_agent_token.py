@@ -40,7 +40,7 @@ DEFAULT_ROUTES = [
     ProbeRoute("admin_trust_blocks", "GET", "/api/admin/trust/blocks", expect_status=lambda s: s == 200),
     ProbeRoute("customer_api_keys", "GET", "/api/customer/api-keys", expect_status=lambda s: s == 200),
     ProbeRoute("customer_sites", "GET", "/api/customer/sites", expect_status=lambda s: s == 200),
-    ProbeRoute("audit_logs", "GET", "/api/v1/audit/logs?limit=1", expect_status=lambda s: s in {200, 404}),
+    ProbeRoute("audit_logs", "GET", "/api/v1/audit/logs?site_id=lemma.id&limit=1", expect_status=lambda s: s in {200, 404}),
     ProbeRoute("site_binding_check", "GET", "/api/ishuman/site-binding-check?hostname=lemma.id", expect_status=lambda s: s == 200),
     ProbeRoute("agent_credentials_list", "GET", "/api/agent/credentials", expect_status=lambda s: s in {200, 403}),
 ]

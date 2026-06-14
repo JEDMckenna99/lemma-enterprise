@@ -131,10 +131,19 @@ def evaluate_mode_policy(
             bearer_present=bearer_present,
         )
 
-    # Hard sunset for bearer compatibility.
+    # Hard sunset for legacy bearer-only compatibility (not agent delegation).
     if expected_mode == MODE_COMPAT_BEARER:
         sunset = _parse_iso_utc(compat_sunset_utc or os.getenv("LEMMA_COMPAT_BEARER_SUNSET_UTC"))
         if sunset and datetime.now(timezone.utc) >= sunset:
+            if _credential_or_agent_present(headers):
+                return ModeDecision(
+                    allowed=True,
+                    reason_code=None,
+                    expected_mode=expected_mode,
+                    effective_mode=MODE_CREDENTIAL_REQUIRED,
+                    proof_present=proof_present,
+                    bearer_present=bearer_present,
+                )
             return ModeDecision(
                 allowed=False,
                 reason_code="AUTH_COMPAT_MODE_EXPIRED",
