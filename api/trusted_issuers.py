@@ -73,6 +73,21 @@ def _load_trusted_issuers() -> Set[str]:
     except Exception:
         pass
 
+    try:
+        from api.database import SessionLocal, Site
+
+        db = SessionLocal()
+        try:
+            rows = db.query(Site.issuer_did).filter(Site.issuer_did.isnot(None)).all()
+            for (site_issuer_did,) in rows:
+                did = str(site_issuer_did or '').strip()
+                if did:
+                    trusted.add(did)
+        finally:
+            db.close()
+    except Exception as exc:
+        logger.warning('Could not load site issuer DIDs for trust registry: %s', exc)
+
     logger.info(f"Loaded {len(trusted)} trusted issuer DIDs")
     return trusted
 

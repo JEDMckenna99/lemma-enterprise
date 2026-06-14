@@ -153,3 +153,27 @@ def test_try_wallet_delegation_principal_reads_body_admin_credential(monkeypatch
         },
     ):
         assert mod._try_wallet_delegation_principal() == ppid
+
+
+def test_try_wallet_delegation_accepts_site_admin_operator(monkeypatch):
+    from api import agent_credentials as mod
+
+    ppid = "did:lemma:ppid_" + ("d" * 64)
+    monkeypatch.setattr(mod, "_has_valid_wallet_unlock_session", lambda: True)
+    monkeypatch.setattr(mod, "_admin_lemma_ctx_allows_delegation", lambda _ctx: False)
+    monkeypatch.setattr(mod, "_is_lemma_platform_operator", lambda p, e: p == ppid)
+
+    app = Flask(__name__)
+    app.config["TESTING"] = True
+    with app.test_request_context(
+        "/api/agent/credentials/issue",
+        method="POST",
+        json={
+            "admin_credential": {
+                "subject": ppid,
+                "issuer": "did:lemma:cb4c40010453d393f0f03f848259a8c767ca5501347fecb5cab227395cd99514",
+                "claims": {"permissionId": "admin_access", "siteId": "lemma.id"},
+            }
+        },
+    ):
+        assert mod._try_wallet_delegation_principal() == ppid

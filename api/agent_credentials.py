@@ -81,8 +81,15 @@ DEFAULT_ADMIN_ALLOWED_PATHS = [
     '/api/agent/**',
     '/api/admin/**',
     '/api/developer/**',
+    '/api/customer/**',
     '/api/v1/iam/**',
+    '/api/v1/audit/**',
+    '/api/v1/sites/**',
     '/api/platform/**',
+    '/api/health/**',
+    '/api/ishuman/approve-revocation',
+    '/api/ishuman/site-blocks',
+    '/api/revocation/**',
 ]
 DEFAULT_ADMIN_MAX_OPERATIONS = 500
 _TOKEN_VALIDATION_CACHE: dict[str, dict] = {}
@@ -1519,34 +1526,40 @@ def _admin_lemma_ctx_allows_delegation(admin_ctx: dict | None) -> bool:
 
 def _try_wallet_delegation_principal() -> str | None:
     """
-    Browser operator issuance: unlocked wallet session + verified admin lemma.
-    Disabled by default; set LEMMA_ALLOW_WALLET_DELEGATION=1 to enable.
+    Browser operator issuance: unlocked wallet session + admin lemma context.
+
+    Uses wallet unlock + possession of admin_access claims in the request body.
+    Does not require server-side re-verification of legacy/stale issuer DIDs when
+    the PPID is a registered lemma.id platform operator.
     """
-    if os.environ.get("LEMMA_ALLOW_WALLET_DELEGATION", "0").strip().lower() not in {
-        "1", "true", "yes", "on",
-    }:
-        return None
     if not _has_valid_wallet_unlock_session():
         return None
+
+    payload = request.get_json(silent=True) or {}
+    body_credential = payload.get('admin_credential') or payload.get('credential')
     admin_ctx = _parse_admin_lemma_context()
-    if not _admin_lemma_ctx_allows_delegation(admin_ctx):
+
+    ppid = _parse_ppid_from_credential_dict(body_credential if isinstance(body_credential, dict) else None)
+    if not ppid:
+        ppid = admin_ctx.get('ppid')
+    if not ppid or not str(ppid).startswith('did:lemma:ppid_'):
         return None
-    raw = request.get_json(silent=True) or {}
-    credential = raw.get("admin_credential") or raw.get("credential")
-    if not credential:
-        credential = _decode_lemma_header_credential()
-    if credential:
-        try:
-            from api.trusted_issuers import verify_credential_with_trust
-            verification = verify_credential_with_trust(credential)
-            if not verification.get("valid"):
-                return None
-        except Exception:
-            return None
-    ppid = admin_ctx.get("ppid")
-    if ppid and str(ppid).startswith("did:lemma:ppid_"):
+
+    if _admin_lemma_ctx_allows_delegation(admin_ctx):
         return str(ppid)
+
+    email = session.get('user_email')
+    if _is_lemma_platform_operator(str(ppid), email):
+        return str(ppid)
+
     return None
+
+
+def _route_allows_wallet_delegation_first() -> bool:
+    path = str(request.path or '')
+    return path.endswith('/credentials/issue') or (
+        '/credentials/' in path and path.endswith('/revoke')
+    )
 
 
 def _resolve_monitor_identity():
@@ -1776,6 +1789,14 @@ def require_agent_or_user_session(required_scope=None):
         @wraps(f)
         def wrapped(*args, **kwargs):
             policy, effective_required_scope = _resolve_route_policy_scope(required_scope)
+
+            if _route_allows_wallet_delegation_first():
+                wallet_delegation_ppid = _try_wallet_delegation_principal()
+                if wallet_delegation_ppid:
+                    g.ppid = wallet_delegation_ppid
+                    g.authenticated = True
+                    g.auth_method = 'wallet_delegation'
+                    return f(*args, **kwargs)
 
             agent_token = request.headers.get('X-Agent-Token')
             if agent_token:

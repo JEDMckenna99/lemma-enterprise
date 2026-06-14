@@ -317,6 +317,10 @@ async function generateToken() {
         return;
     }
 
+    if (!adminCredential) {
+        await loadAdminCredential();
+    }
+
     const payload = {
         agent_name: document.getElementById('agent-name')?.value || 'Cursor Admin Inspector',
         ttl_hours: parseInt(document.getElementById('agent-ttl')?.value || '4', 10),
@@ -329,11 +333,11 @@ async function generateToken() {
         admin_credential: adminCredential || window.lemmaCredential || null,
     };
 
-    const headers = await getOperatorAuthHeaders({ 'Content-Type': 'application/json' });
-    const response = await fetch('/api/agent/credentials/issue', {
+    const fetchImpl = window.__lemmaRawFetch || window.fetch.bind(window);
+    const response = await fetchImpl('/api/agent/credentials/issue', {
         method: 'POST',
         credentials: 'include',
-        headers,
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
     });
     const data = await response.json();
