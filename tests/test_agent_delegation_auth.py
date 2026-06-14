@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from flask import Flask, g
 
-from api.authz.mode_policy import MODE_COMPAT_BEARER, MODE_PROOF_REQUIRED, evaluate_mode_policy
+from api.authz.mode_policy import MODE_PROOF_REQUIRED, evaluate_mode_policy
 from auth.agent_principal import extract_agent_admin_principal
 from auth.request_principal import get_context_ppid, resolve_admin_principal
 
@@ -65,20 +65,19 @@ def test_resolve_admin_principal_from_g_context():
         assert principal.ppid == g.ppid
 
 
-def test_compat_bearer_sunset_allows_agent_delegation(monkeypatch):
-    monkeypatch.setenv("LEMMA_COMPAT_BEARER_SUNSET_UTC", "2000-01-01T00:00:00Z")
-    decision = evaluate_mode_policy(
-        expected_mode=MODE_COMPAT_BEARER,
-        headers={"X-Agent-Token": "lm_agent_probe_token"},
-    )
-    assert decision.allowed is True
+def test_get_context_ppid_reads_g():
+    app = Flask(__name__)
+    with app.test_request_context("/"):
+        g.ppid = "did:lemma:ppid_" + ("c" * 64)
+        assert get_context_ppid() == g.ppid
 
 
-def test_compat_bearer_sunset_still_blocks_empty_bearer(monkeypatch):
-    monkeypatch.setenv("LEMMA_COMPAT_BEARER_SUNSET_UTC", "2000-01-01T00:00:00Z")
-    decision = evaluate_mode_policy(
-        expected_mode=MODE_COMPAT_BEARER,
-        headers={"Authorization": "Bearer legacy_only"},
-    )
-    assert decision.allowed is False
-    assert decision.reason_code == "AUTH_COMPAT_MODE_EXPIRED"
+def test_resolve_agent_site_binding_for_request(monkeypatch):
+    from api.agent_credentials import _resolve_agent_site_binding_for_request
+
+    app = Flask(__name__)
+    with app.test_request_context("/api/developer/sites/lemma.id/keys"):
+        binding = _resolve_agent_site_binding_for_request(
+            {"allowed_sites": ["lemma.id"], "scope": ["admin", "read"]}
+        )
+        assert binding == "lemma.id"

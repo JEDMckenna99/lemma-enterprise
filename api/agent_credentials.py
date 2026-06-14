@@ -1311,6 +1311,46 @@ def infer_requested_site_ids():
     return sorted(site_ids)
 
 
+def _resolve_agent_site_binding_for_request(credential_info) -> str | None:
+    """
+    Derive site binding for agent tokens on site-scoped routes.
+
+    Agent delegation has no lemma siteId claim; use allowed_sites ∩ requested path sites.
+    """
+    requested_sites = infer_requested_site_ids()
+    if not requested_sites:
+        return None
+
+    path_sites = set()
+    try:
+        path = (request.path or "").strip("/").split("/")
+        for i, seg in enumerate(path):
+            if seg in ("sites", "site") and i + 1 < len(path):
+                candidate = _normalize_site_identifier(path[i + 1])
+                if candidate:
+                    path_sites.add(candidate)
+    except Exception:
+        path_sites = set()
+
+    targets = path_sites or requested_sites
+
+    allowed_sites = credential_info.get("allowed_sites")
+    if allowed_sites is None:
+        return next(iter(targets)) if len(targets) == 1 else None
+
+    allowed_norm = {
+        s for s in (_normalize_site_identifier(item) for item in allowed_sites) if s
+    }
+    platform_aliases = {"lemma.id", "lemma_platform"}
+    if allowed_norm.intersection(platform_aliases):
+        allowed_norm.update(platform_aliases)
+
+    for site in targets:
+        if site in allowed_norm:
+            return site
+    return None
+
+
 def check_site_allowed(credential_info):
     """
     Enforce allowed_sites restriction for the current request.
@@ -1810,7 +1850,7 @@ def require_agent_or_user_session(required_scope=None):
                     principal_type='agent_token',
                     required_scope=effective_required_scope,
                     provided_scope=scope,
-                    site_binding=None,
+                    site_binding=_resolve_agent_site_binding_for_request(credential_info),
                 )
                 if policy_error:
                     return policy_error
@@ -1864,12 +1904,13 @@ def require_agent_or_user_session(required_scope=None):
 
             if session.get('agent_authenticated'):
                 session_scope = session.get('agent_scope', [])
+                session_site_ctx = {'allowed_sites': session.get('agent_allowed_sites')}
                 policy_error = _enforce_route_policy_for_principal(
                     policy=policy,
                     principal_type='agent_token',
                     required_scope=effective_required_scope,
                     provided_scope=session_scope,
-                    site_binding=None,
+                    site_binding=_resolve_agent_site_binding_for_request(session_site_ctx),
                 )
                 if policy_error:
                     return policy_error
@@ -2647,7 +2688,7 @@ def require_agent_or_user_auth(required_scope=None, enforce_task_bounds=True):
                     principal_type='agent_token',
                     required_scope=effective_required_scope,
                     provided_scope=credential_info.get('scope', []),
-                    site_binding=None,
+                    site_binding=_resolve_agent_site_binding_for_request(credential_info),
                 )
                 if policy_error:
                     deny_receipt = _build_decision_receipt(
@@ -2785,12 +2826,13 @@ def require_agent_or_user_auth(required_scope=None, enforce_task_bounds=True):
             # Support browser agent sessions created via /api/agent/session.
             if session.get('agent_authenticated'):
                 session_scope = session.get('agent_scope', [])
+                session_site_ctx = {'allowed_sites': session.get('agent_allowed_sites')}
                 policy_error = _enforce_route_policy_for_principal(
                     policy=policy,
                     principal_type='agent_token',
                     required_scope=effective_required_scope,
                     provided_scope=session_scope,
-                    site_binding=None,
+                    site_binding=_resolve_agent_site_binding_for_request(session_site_ctx),
                 )
                 if policy_error:
                     return _finalize_auth_response(policy_error)
