@@ -3002,16 +3002,11 @@ def approve_network_revocation():
             "reason": "Confirmed non-human activity"
         }
     """
-    from auth.decorators import require_credential
-    from api.authz_engine import extract_user_lemma_principal
+    from auth.request_principal import resolve_admin_principal
 
-    # Require admin credential for this action
-    principal, error = extract_user_lemma_principal(request.headers)
-    if not principal or not (
-        principal.permission_id in ("admin_access", "super_admin")
-        or "admin" in (principal.scope or [])
-    ):
-        return jsonify({"success": False, "error": "admin_required"}), 403
+    principal, error = resolve_admin_principal()
+    if not principal:
+        return jsonify({"success": False, "error": error or "admin_required"}), 403
 
     body = request.get_json(silent=True) or {}
     wallet_id = body.get("wallet_id")

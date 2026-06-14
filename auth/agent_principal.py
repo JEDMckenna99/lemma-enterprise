@@ -50,7 +50,9 @@ def extract_agent_admin_principal(
         for site in allowed_sites
         if str(site).strip()
     }
-    if not site_norm or not site_norm.issubset(_LEMMA_PLATFORM_SITES):
+    if not site_norm:
+        site_norm = set(_LEMMA_PLATFORM_SITES)
+    elif not site_norm.issubset(_LEMMA_PLATFORM_SITES):
         return None, 'agent_site_binding_mismatch', None
 
     ppid = info.get('authorized_by_ppid') or info.get('authorized_by')

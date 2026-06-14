@@ -259,6 +259,15 @@ def _extract_customer_id_from_request() -> Optional[str]:
     - did:lemma:user:{user_id} - IAM user, lookup by email in claims
     - Credential with email in claims - lookup customer by email
     """
+    from auth.request_principal import get_context_ppid
+
+    ctx_ppid = get_context_ppid()
+    if ctx_ppid:
+        customer = customer_manager.get_customer_by_did(ctx_ppid)
+        if customer:
+            logger.info("Authenticated via agent/credential context PPID: %s", customer.customer_id)
+            return customer.customer_id
+
     auth_header = request.headers.get('Authorization')
     if auth_header and auth_header.startswith('Bearer '):
         try:

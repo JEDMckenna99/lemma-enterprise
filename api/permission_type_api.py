@@ -36,6 +36,12 @@ def _verify_site_access(site_id: str) -> bool:
 
     Uses verified credentials (X-Lemma-Credential) or validated API keys only.
     """
+    from auth.request_principal import resolve_admin_principal
+
+    principal, _admin_error = resolve_admin_principal()
+    if principal:
+        return True
+
     from api.site_access import verify_site_ownership, get_authenticated_ppid
     from auth.decorators import extract_authenticated_ppid_from_request
     from api.authz_engine import extract_user_lemma_principal

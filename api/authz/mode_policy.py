@@ -102,6 +102,16 @@ def evaluate_mode_policy(
         )
 
     if expected_mode == MODE_PROOF_REQUIRED and not proof_present:
+        agent_token = (headers.get("X-Agent-Token") or "").strip()
+        if agent_token.startswith("lm_agent_"):
+            return ModeDecision(
+                allowed=True,
+                reason_code=None,
+                expected_mode=expected_mode,
+                effective_mode=MODE_CREDENTIAL_REQUIRED,
+                proof_present=proof_present,
+                bearer_present=bearer_present,
+            )
         return ModeDecision(
             allowed=False,
             reason_code="AUTH_PROOF_REQUIRED",

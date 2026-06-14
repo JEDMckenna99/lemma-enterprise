@@ -10,7 +10,6 @@ from flask import Blueprint, jsonify, request
 from flask_cors import cross_origin
 
 from auth.decorators import require_site_admin
-from api.authz_engine import extract_user_lemma_principal
 
 logger = logging.getLogger(__name__)
 
@@ -93,14 +92,11 @@ def _serialize_block_row(db, block, site_domains: Dict[str, str]) -> Dict[str, A
 
 
 def _require_admin_principal():
-    principal, error = extract_user_lemma_principal(request.headers)
+    from auth.request_principal import resolve_admin_principal
+
+    principal, error = resolve_admin_principal()
     if not principal:
         return None, (jsonify({"success": False, "error": error or "admin_required"}), 403)
-    if not (
-        principal.permission_id in ("admin_access", "super_admin")
-        or "admin" in (principal.scope or [])
-    ):
-        return None, (jsonify({"success": False, "error": "admin_required"}), 403)
     return principal, None
 
 

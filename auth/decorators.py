@@ -259,7 +259,8 @@ def cors_headers(f):
         response.headers["Access-Control-Allow-Origin"] = origin
         response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
         response.headers["Access-Control-Allow-Headers"] = (
-            "Content-Type, Authorization, X-Lemma-Credential, X-Lemma-CSRF, X-CSRF-Token"
+            "Content-Type, Authorization, X-Lemma-Credential, X-Lemma-Proof, "
+            "X-Lemma-PoP, X-Agent-Token, X-API-Key, X-Lemma-CSRF, X-CSRF-Token"
         )
         response.headers["Access-Control-Allow-Credentials"] = "true"
         return response
@@ -277,7 +278,13 @@ def rate_limit(max_requests=100, window=60):
 
 
 def extract_authenticated_ppid_from_request() -> Optional[str]:
-    """Return PPID from a verified credential header, if present and valid."""
+    """Return PPID from request context or verified credential header."""
+    from auth.request_principal import get_context_ppid
+
+    ppid = get_context_ppid()
+    if ppid:
+        return ppid
+
     principal, _ = extract_user_lemma_principal(request.headers)
     if principal:
         return principal.ppid
