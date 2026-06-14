@@ -459,7 +459,7 @@ async function loadNobleEd25519() {
         return _nobleEd25519;
     }
     try {
-        _nobleEd25519 = await import('https://cdn.jsdelivr.net/npm/@noble/ed25519@2.0.0/+esm');
+        _nobleEd25519 = await import(new URL('/static/js/vendor/noble-ed25519.mjs', window.location.origin).href);
         return _nobleEd25519;
     } catch {
         return null;

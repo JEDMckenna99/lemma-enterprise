@@ -103,6 +103,7 @@ def create_app():
     import mimetypes
     mimetypes.add_type('image/svg+xml', '.svg')
     mimetypes.add_type('application/javascript', '.js')
+    mimetypes.add_type('application/javascript', '.mjs')
     mimetypes.add_type('text/css', '.css')
 
     # Enhanced configuration for platform

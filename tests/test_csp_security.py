@@ -38,6 +38,16 @@ def test_unlock_idv_profile_allows_jsdelivr_for_noble_esm():
 
 
 @pytest.mark.unit
+def test_lemma_keys_uses_self_hosted_noble_modules():
+    keys_js = (ROOT / "static" / "js" / "lemma-keys.js").read_text(encoding="utf-8")
+    assert "/static/js/vendor/noble-ed25519.mjs" in keys_js
+    assert "/static/js/vendor/noble-curves-ed25519.mjs" in keys_js
+    assert "cdn.jsdelivr.net/npm/@noble/ed25519" not in keys_js
+    assert (ROOT / "static" / "js" / "vendor" / "noble-ed25519.mjs").is_file()
+    assert (ROOT / "static" / "js" / "vendor" / "noble-curves-ed25519.mjs").is_file()
+
+
+@pytest.mark.unit
 def test_strict_profile_excludes_jsdelivr():
     csp = build_content_security_policy("testnonce", "strict")
     script_src = csp.split("script-src ", 1)[1].split("; ", 1)[0]

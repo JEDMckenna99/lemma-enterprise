@@ -230,7 +230,7 @@ class LemmaVerifier {
                 return true;
             }
             
-            const module = await import('https://cdn.jsdelivr.net/npm/@noble/ed25519@2.0.0/+esm');
+            const module = await import(new URL('/static/js/vendor/noble-ed25519.mjs', window.location.origin).href);
             this.ed25519 = module;
             window.ed25519 = module;
             

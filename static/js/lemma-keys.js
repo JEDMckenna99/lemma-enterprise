@@ -14,6 +14,8 @@
     const ASSERTION_PREFIX = 'lemma:wallet-assertion:v1';
     const REGISTER_PREFIX = 'lemma:register-signing-key:v1';
     const SITE_SIGNING_KEY_INFO_PREFIX = 'site-signing-key-v1:';
+    const NOBLE_ED25519_MODULE = '/static/js/vendor/noble-ed25519.mjs';
+    const NOBLE_CURVES_ED25519_MODULE = '/static/js/vendor/noble-curves-ed25519.mjs';
 
     let _webCryptoEd25519 = null;
     let _nobleEd25519 = null;
@@ -76,13 +78,17 @@
                 testKey,
                 { name: 'Ed25519', namedCurve: 'Ed25519' },
                 false,
-                ['sign'],
+                ['sign', 'verify'],
             );
             _webCryptoEd25519 = true;
         } catch {
             _webCryptoEd25519 = false;
         }
         return _webCryptoEd25519;
+    }
+
+    function nobleModuleUrl(path) {
+        return new URL(path, window.location.origin).href;
     }
 
     async function loadNobleEd25519() {
@@ -92,7 +98,7 @@
             return _nobleEd25519;
         }
         try {
-            _nobleEd25519 = await import('https://cdn.jsdelivr.net/npm/@noble/ed25519@2.0.0/+esm');
+            _nobleEd25519 = await import(nobleModuleUrl(NOBLE_ED25519_MODULE));
             return _nobleEd25519;
         } catch {
             return null;
@@ -104,7 +110,42 @@
         return new Uint8Array(digest);
     }
 
+    async function ed25519FromSeedWebCrypto(seedBytes) {
+        const privateKey = await crypto.subtle.importKey(
+            'raw',
+            seedBytes,
+            { name: 'Ed25519', namedCurve: 'Ed25519' },
+            true,
+            ['sign'],
+        );
+        const jwk = await crypto.subtle.exportKey('jwk', privateKey);
+        if (!jwk?.x) {
+            throw new Error('Ed25519 public key export failed');
+        }
+        const publicKey = base64urlDecode(jwk.x);
+        return {
+            publicKey,
+            async sign(messageBytes) {
+                const digest = await sha256Bytes(messageBytes);
+                const signature = await crypto.subtle.sign(
+                    { name: 'Ed25519' },
+                    privateKey,
+                    digest,
+                );
+                return new Uint8Array(signature);
+            },
+        };
+    }
+
     async function ed25519FromSeed(seedBytes) {
+        if (await detectWebCryptoEd25519()) {
+            try {
+                return await ed25519FromSeedWebCrypto(seedBytes);
+            } catch (err) {
+                console.warn('[LemmaKeys] Web Crypto Ed25519 unavailable, falling back to noble:', err?.message || err);
+            }
+        }
+
         const noble = await loadNobleEd25519();
         if (noble) {
             if (noble.etc && typeof noble.etc.sha512Sync !== 'function') {
@@ -229,7 +270,7 @@
             _nobleX25519 = window.x25519;
             return _nobleX25519;
         }
-        const mod = await import('https://cdn.jsdelivr.net/npm/@noble/curves@1.6.0/ed25519/+esm');
+        const mod = await import(nobleModuleUrl(NOBLE_CURVES_ED25519_MODULE));
         _nobleX25519 = mod.x25519;
         return _nobleX25519;
     }
