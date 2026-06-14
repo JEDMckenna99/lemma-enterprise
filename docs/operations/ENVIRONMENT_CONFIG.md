@@ -107,6 +107,7 @@ both the API key and workflow id are present.
 | `LEMMA_DISABLE_BRIDGE_IFRAME`         | unset   | When `"true"`, verifier SDK uses popup-only flow, skips bridge iframe (Phase 2). |
 | `LEMMA_ISHUMAN_USE_PERSON_ROOT_SEEDS` | unset   | When `"true"`, post-IDV wallets use `wallet_local_seed`/`person_root_proxy` derivation (Phase 1.1). |
 | `LEMMA_API_RATE_LIMIT_DEGRADED_MODE`  | `memory`| Behavior when Redis limiter is unavailable: `memory` or `fail_open`.          |
+| `LEMMA_BILLING_ENFORCEMENT`           | unset   | When `"1"`, blocks isHuman issuance (`derive-site-proof`) for customers without active billing. **Do not enable in production without an explicit go-live decision.** |
 
 ### Platform owner (lemma.id admin sole-control)
 

@@ -5,9 +5,11 @@ Production revocation smoke drill for isHuman.
 Uses:
   - site API key from Heroku DB (site_demo_tickets) OR LEMMA_ISHUMAN_PROD_TEST_SITE_API_KEY
   - prod test wallet fixture (LEMMA_ISHUMAN_PROD_TEST_WALLET_*)
+  - optional LEMMA_PLATFORM_ADMIN_CREDENTIAL (JSON or base64url X-Lemma-Credential) for approve-revocation step
 
 Usage:
   export LEMMA_ISHUMAN_PROD_TEST_WALLET_SECRET=...
+  export LEMMA_PLATFORM_ADMIN_CREDENTIAL='{"id":"cred_...","subject":"did:lemma:ppid_...",...}'
   python scripts/run_ishuman_prod_revocation_smoke.py
   python scripts/run_ishuman_prod_revocation_smoke.py --base-url https://lemma.id
 """
@@ -15,6 +17,8 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import base64
+import json
 import os
 import platform
 import subprocess
@@ -161,6 +165,23 @@ def _step(name: str, ok: bool, detail: str) -> dict:
     return {"step": name, "ok": ok, "detail": detail}
 
 
+def _admin_credential_headers() -> dict:
+    """Build X-Lemma-Credential header from LEMMA_PLATFORM_ADMIN_CREDENTIAL."""
+    raw = os.getenv("LEMMA_PLATFORM_ADMIN_CREDENTIAL", "").strip()
+    if not raw:
+        return {}
+    if raw.startswith("{"):
+        try:
+            cred = json.loads(raw)
+            encoded = base64.urlsafe_b64encode(
+                json.dumps(cred, separators=(",", ":"), sort_keys=True).encode("utf-8")
+            ).decode("utf-8").rstrip("=")
+            return {"X-Lemma-Credential": encoded}
+        except json.JSONDecodeError:
+            return {}
+    return {"X-Lemma-Credential": raw}
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--base-url", default=os.getenv("ISHUMAN_LIVE_BASE_URL", "https://lemma.id"))
@@ -192,6 +213,19 @@ def main() -> int:
     # Health
     r = requests.get(f"{base}/api/health", timeout=30)
     results.append(_step("health", r.status_code == 200, f"HTTP {r.status_code}"))
+
+    r = requests.get(
+        f"{base}/api/ishuman/site-binding-check",
+        params={"hostname": target_site},
+        timeout=30,
+    )
+    bind_data = r.json() if r.ok else {}
+    bind_ok = (
+        r.status_code == 200
+        and bind_data.get("success")
+        and bind_data.get("canonical_hostname") == target_site
+    )
+    results.append(_step("site-binding-check", bind_ok, str(bind_data)[:200]))
 
     # Demo prod-guard (Phase 4): test-verify must fail closed on production
     for path, label in (
@@ -398,6 +432,54 @@ def main() -> int:
         timeout=30,
     )
     results.append(_step("site-unblock fixture site_ppid", r.ok and r.json().get("success"), str(r.json())))
+
+    admin_headers = _admin_credential_headers()
+    if admin_headers:
+        net_ppid = f"did:lemma:ppid_smoke_admin_{int(time.time())}"
+        r = requests.post(
+            f"{base}/api/ishuman/network-revoke",
+            headers=headers,
+            json={
+                "ppid": net_ppid,
+                "reason": "prod smoke admin approve drill",
+                "evidence_url": "https://lemma.id/docs/ishuman",
+            },
+            timeout=30,
+        )
+        net_data = r.json() if r.ok else {}
+        results.append(
+            _step(
+                "network-revoke (customer API key)",
+                r.ok and net_data.get("success"),
+                str(net_data)[:200],
+            )
+        )
+        approve_headers = {**admin_headers, "Content-Type": "application/json"}
+        r = requests.post(
+            f"{base}/api/ishuman/approve-revocation",
+            headers=approve_headers,
+            json={
+                "ppid": net_ppid,
+                "reason": "prod smoke admin approve drill",
+            },
+            timeout=30,
+        )
+        approve_data = r.json() if r.headers.get("content-type", "").startswith("application/json") else {}
+        results.append(
+            _step(
+                "admin approve-revocation",
+                r.status_code == 200 and approve_data.get("success"),
+                f"HTTP {r.status_code} {str(approve_data)[:200]}",
+            )
+        )
+    else:
+        results.append(
+            _step(
+                "admin approve-revocation",
+                True,
+                "skipped — set LEMMA_PLATFORM_ADMIN_CREDENTIAL to enable",
+            )
+        )
 
     passed = sum(1 for row in results if row["ok"])
     print(f"\nSummary: {passed}/{len(results)} passed")

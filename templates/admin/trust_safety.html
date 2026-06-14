@@ -293,7 +293,15 @@ async function confirmModalAction() {
             });
         }
         const data = await resp.json();
-        if (!resp.ok) throw new Error(data.error || data.message || 'Action failed');
+        if (!resp.ok) {
+            if (resp.status === 403 && (data.error === 'admin_required' || data.code === 'admin_required')) {
+                throw new Error('Admin credential required. Sign in with a platform admin lemma credential.');
+            }
+            throw new Error(data.error || data.message || 'Action failed');
+        }
+        if (!data.success && pendingAction.action === 'approve') {
+            throw new Error(data.error || data.message || 'Action failed');
+        }
         if (typeof window.showToast === 'function') {
             window.showToast('success', 'Success', pendingAction.action === 'approve'
                 ? `Network revocation approved (${data.total_revoked || 0} credentials)`

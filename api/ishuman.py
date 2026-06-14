@@ -223,17 +223,87 @@ def _issue_ishuman_credential(
     return credential
 
 
-def _require_site_api_key():
-    """Validate the API key in the request and return the site row, or None."""
+def _resolve_site_from_request_api_key():
+    """Resolve Site from X-API-Key: legacy sites.api_key or customer-issued keys."""
     api_key = request.headers.get("X-API-Key") or request.args.get("api_key")
     if not api_key:
         return None
 
     from api.database import SessionLocal, Site
+    from api.site_hostname import try_canonicalize_site_hostname
+
     db = SessionLocal()
     try:
         site = db.query(Site).filter_by(api_key=api_key).first()
+        if site:
+            _, domain_err = try_canonicalize_site_hostname(getattr(site, "site_domain", ""))
+            if domain_err:
+                return None
+            return site
+
+        from api.customer_accounts import customer_manager
+
+        validation = customer_manager.validate_api_key(api_key)
+        if not validation.get("valid"):
+            return None
+
+        site_id = validation.get("site_id")
+        if not site_id:
+            return None
+
+        site = db.query(Site).filter_by(site_id=site_id).first()
+        if not site:
+            return None
+
+        _, domain_err = try_canonicalize_site_hostname(getattr(site, "site_domain", ""))
+        if domain_err:
+            return None
+
+        if site.api_key != api_key:
+            try:
+                site.api_key = api_key
+                db.commit()
+            except Exception:
+                db.rollback()
+
         return site
+    finally:
+        db.close()
+
+
+def _require_site_api_key():
+    """Backward-compatible alias for site API key resolution."""
+    return _resolve_site_from_request_api_key()
+
+
+@ishuman_bp.route("/api/ishuman/site-binding-check", methods=["GET"])
+@cross_origin()
+def site_binding_check():
+    """Read-only hostname binding check for SDK siteId alignment."""
+    from api.database import SessionLocal
+    from api.site_hostname import try_canonicalize_site_hostname
+    from api.site_ppid_revocation import resolve_site_by_domain
+
+    hostname = (
+        request.args.get("hostname")
+        or request.args.get("site_domain")
+        or ""
+    ).strip()
+    canonical, err = try_canonicalize_site_hostname(hostname)
+    if err:
+        return jsonify({"success": False, "error": err}), 400
+
+    db = SessionLocal()
+    try:
+        site = resolve_site_by_domain(db, canonical)
+        return jsonify({
+            "success": True,
+            "canonical_hostname": canonical,
+            "registered": site is not None,
+            "site_id": getattr(site, "site_id", None) if site else None,
+            "sdk_siteId_hint": canonical,
+            "ppid_derivation_site": canonical,
+        })
     finally:
         db.close()
 
@@ -2997,6 +3067,14 @@ def approve_network_revocation():
                 "total_revoked": len(result["revoked_credential_ids"]),
                 "reason": reason[:500] if reason else "",
             },
+        )
+
+        from api.forensic_audit import capture_action_proof
+
+        capture_action_proof(
+            action="ishuman.approve_network_revocation",
+            site_id="lemma.id",
+            resource=str(block_id) if block_id else result.get("wallet_id"),
         )
 
         logger.info(

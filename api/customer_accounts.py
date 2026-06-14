@@ -15,7 +15,7 @@ from typing import Dict, Any, Optional, List
 from dataclasses import dataclass, asdict, field
 from collections import defaultdict
 from threading import Lock
-from flask import Blueprint, request, jsonify, session, redirect, url_for, render_template, make_response
+from flask import Blueprint, request, jsonify, session, redirect, url_for, render_template, make_response, g
 from flask_cors import cross_origin
 import stripe
 from sqlalchemy.orm import Session
@@ -1982,6 +1982,76 @@ def validate_api_key():
     return jsonify(result)
 
 
+def _upsert_site_admin_for_registration(db, site_id: str, admin_did: str, admin_email: str = ""):
+    """Ensure SiteAdmin row exists for wallet-first site registration."""
+    from api.database import SiteAdmin
+
+    if not site_id or not admin_did:
+        return
+
+    admin_record = db.query(SiteAdmin).filter(
+        SiteAdmin.site_id == site_id,
+        SiteAdmin.admin_did == admin_did,
+    ).first()
+
+    if admin_record:
+        if admin_email:
+            admin_record.admin_email = admin_email
+        admin_record.is_active = True
+        admin_record.last_activity = datetime.utcnow()
+        if not admin_record.permissions:
+            admin_record.permissions = ["users", "permissions", "billing"]
+        return
+
+    db.add(SiteAdmin(
+        site_id=site_id,
+        admin_did=admin_did,
+        admin_email=admin_email or "",
+        admin_role="owner",
+        permissions=["users", "permissions", "billing"],
+        added_by="register_site",
+        is_active=True,
+        last_activity=datetime.utcnow(),
+    ))
+
+
+def _ensure_site_row_for_registration(
+    db,
+    *,
+    site_id: str,
+    site_domain: str,
+    admin_email: str,
+    company_name: str,
+    api_key: Optional[str] = None,
+):
+    """Ensure SQLAlchemy Site row exists with canonical domain and primary API key."""
+    from api.database import Site
+
+    site = db.query(Site).filter_by(site_id=site_id).first()
+    if site:
+        site.site_domain = site_domain
+        if api_key:
+            site.api_key = api_key
+        if admin_email:
+            site.admin_email = admin_email
+        if company_name:
+            site.company_name = company_name
+        return site
+
+    site = Site(
+        site_id=site_id,
+        site_domain=site_domain,
+        company_name=company_name or site_domain,
+        admin_email=admin_email or "",
+        api_key=api_key or f"lm_{secrets.token_urlsafe(32)}",
+        oauth_client_id=f"oc_{secrets.token_urlsafe(16)}",
+        oauth_client_secret=secrets.token_urlsafe(32),
+        created_at=datetime.utcnow(),
+    )
+    db.add(site)
+    return site
+
+
 @customer_accounts_bp.route('/api/customer/register-site', methods=['POST'])
 @require_customer_or_admin
 def register_customer_site():
@@ -1992,6 +2062,13 @@ def register_customer_site():
     customer_id = _extract_customer_id_from_request()
     if not customer_id:
         return jsonify({'error': 'Authentication required'}), 401
+
+    wallet_ppid = getattr(g, 'ppid', None) or extract_authenticated_ppid_from_request()
+    if not wallet_ppid or not str(wallet_ppid).startswith('did:lemma:ppid_'):
+        return jsonify({
+            'error': 'wallet_ppid_required',
+            'message': 'Site registration requires a wallet PPID credential',
+        }), 400
     
     try:
         customer = customer_manager.get_customer(customer_id)
@@ -1999,15 +2076,15 @@ def register_customer_site():
             return jsonify({'error': 'Customer not found'}), 404
         
         data = request.get_json() or {}
-        site_domain = (data.get('site_domain') or '').strip().lower()
-        if not site_domain:
+        raw_domain = (data.get('site_domain') or '').strip()
+        if not raw_domain:
             return jsonify({'error': 'site_domain required'}), 400
-        
-        # Clean site domain (remove protocol, path, trailing slash)
-        site_domain = site_domain.replace('https://', '').replace('http://', '')
-        site_domain = site_domain.split('/', 1)[0].rstrip('/')
-        if not site_domain:
-            return jsonify({'error': 'Invalid site_domain'}), 400
+
+        from api.site_hostname import canonicalize_site_hostname, SiteHostnameError
+        try:
+            site_domain = canonicalize_site_hostname(raw_domain)
+        except SiteHostnameError as exc:
+            return jsonify({'error': str(exc)}), 400
         
         site_label = (data.get('site_label') or site_domain).strip()
         environment = (data.get('environment') or 'production').lower()
@@ -2017,7 +2094,7 @@ def register_customer_site():
         contact_email = (data.get('contact_email') or customer.email or '').strip()
         key_name = (data.get('key_name') or f"{site_label or site_domain} Key").strip() or 'API Key'
         
-        # Generate site_id (deterministic from domain)
+        # Generate site_id (deterministic from canonical domain)
         site_id = f"site_{hashlib.sha256(site_domain.encode()).hexdigest()[:12]}"
         
         # Create site with IAM system (generates Ed25519 keypair)
@@ -2041,23 +2118,23 @@ def register_customer_site():
                 'priority': 100
             })
         
-        user_did = f"did:lemma:customer:{customer_id}"
+        user_did = str(wallet_ppid)
         user_email = customer.email or ''
         
-        # Issue admin credential
+        # Issue admin credential to wallet PPID with canonical hostname binding
         admin_credential = manager.issue_permission_lemma(
             user_did,
             'admin',
             expiry_days=90,
             custom_claims={
-                'email': user_email or None,  # Exclude if empty
+                'email': user_email or None,
                 'site_domain': site_domain,
                 'site_label': site_label,
                 'environment': environment,
-                'siteId': site_id,
+                'siteId': site_domain,
                 'accountType': 'admin',
                 'permissionId': 'admin',
-                'issued_via': 'developer_platform'
+                'issued_via': 'developer_platform',
             }
         )
         admin_credential['type'] = ['VerifiableCredential', 'PermissionLemma']
@@ -2094,6 +2171,10 @@ def register_customer_site():
             sites.append(site_entry)
         
         customer.sites = sites
+
+        # Link wallet DID when customer record lacks one
+        if not getattr(customer, 'customer_did', None):
+            customer.customer_did = user_did
         
         # Update database record - DUAL WRITE to both JSON column and normalized table
         if customer_manager.db_available:
@@ -2104,6 +2185,8 @@ def register_customer_site():
                 if db_customer:
                     # Write to JSON column (legacy)
                     db_customer.sites = sites
+                    if not getattr(db_customer, 'customer_did', None):
+                        db_customer.customer_did = user_did
                     db.commit()
                 
                 # Also write to normalized sites table (new)
@@ -2138,6 +2221,33 @@ def register_customer_site():
         key_result = customer_manager.generate_additional_api_key(customer_id, key_name, site_id=site_id)
         if not key_result.get('success'):
             return jsonify(key_result), 400
+
+        raw_api_key = key_result.get('api_key')
+
+        # Persist Site row + primary key for isHuman abuse APIs
+        try:
+            from api.database import SessionLocal
+            site_db = SessionLocal()
+            try:
+                _ensure_site_row_for_registration(
+                    site_db,
+                    site_id=site_id,
+                    site_domain=site_domain,
+                    admin_email=contact_email or user_email,
+                    company_name=company_name,
+                    api_key=raw_api_key,
+                )
+                _upsert_site_admin_for_registration(
+                    site_db,
+                    site_id,
+                    user_did,
+                    contact_email or user_email,
+                )
+                site_db.commit()
+            finally:
+                site_db.close()
+        except Exception as site_row_err:
+            logger.warning(f"Could not persist Site row for {site_id}: {site_row_err}")
         
         site_entry['last_api_key_label'] = key_name
         site_entry['last_api_key_created_at'] = datetime.utcnow().isoformat()

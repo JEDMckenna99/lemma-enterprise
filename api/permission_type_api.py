@@ -33,64 +33,46 @@ permission_type_api = Blueprint('permission_type_api', __name__)
 def _verify_site_access(site_id: str) -> bool:
     """
     Verify the request has admin access to this site.
-    
-    Supports:
-    1. API Key authentication (Bearer lemma_xxx)
-    2. Credential authentication (Bearer {json credential})
+
+    Uses verified credentials (X-Lemma-Credential) or validated API keys only.
     """
-    from .database import get_db
-    from sqlalchemy import text
-    
-    auth_header = request.headers.get('Authorization', '')
-    if not auth_header.startswith('Bearer '):
+    from api.site_access import verify_site_ownership, get_authenticated_ppid
+    from auth.decorators import extract_authenticated_ppid_from_request
+    from api.authz_engine import extract_user_lemma_principal
+
+    principal, _error = extract_user_lemma_principal(request.headers)
+    if principal and principal.ppid:
+        if verify_site_ownership(site_id, principal.ppid):
+            return True
+        if principal.permission_id in ("admin_access", "super_admin"):
+            return True
+
+    ppid = get_authenticated_ppid() or extract_authenticated_ppid_from_request()
+    if ppid and verify_site_ownership(site_id, ppid):
+        return True
+
+    auth_header = request.headers.get("Authorization", "")
+    if not auth_header.startswith("Bearer "):
         return False
-    
-    token = auth_header.replace('Bearer ', '')
-    
-    db = get_db()
+
+    token = auth_header.replace("Bearer ", "").strip()
+    if not (token.startswith("lemma_") or token.startswith("lm_")):
+        return False
+
+    from api.customer_accounts import customer_manager
+
+    validation = customer_manager.validate_api_key(token)
+    if validation.get("valid") and validation.get("site_id") == site_id:
+        return True
+
+    from api.database import SessionLocal, Site
+
+    db = SessionLocal()
     try:
-        # Method 1: API Key authentication
-        if token.startswith('lemma_'):
-            result = db.execute(text("""
-                SELECT site_id FROM sites 
-                WHERE api_key = :api_key AND site_id = :site_id
-            """), {'api_key': token, 'site_id': site_id}).fetchone()
-            return result is not None
-        
-        # Method 2: Credential authentication (JSON)
-        try:
-            credential = json.loads(token)
-            claims = credential.get('claims') or credential.get('credentialSubject') or {}
-            email = claims.get('email')
-            
-            if not email:
-                return False
-            
-            # Check if this email owns this site
-            result = db.execute(text("""
-                SELECT site_id FROM sites 
-                WHERE site_id = :site_id AND admin_email = :email
-            """), {'site_id': site_id, 'email': email}).fetchone()
-            
-            if result:
-                return True
-            
-            # Also check if they have a customer record with this site
-            from .customer_accounts import customer_manager
-            customer = customer_manager.get_customer_by_email(email)
-            if customer:
-                sites = getattr(customer, 'sites', []) or []
-                for site in sites:
-                    if site.get('site_id') == site_id:
-                        return True
-            
-            return False
-            
-        except json.JSONDecodeError:
-            return False
-        
-    except Exception as e:
-        logger.warning(f"Site access check failed: {e}")
+        row = db.query(Site).filter(Site.site_id == site_id, Site.api_key == token).first()
+        return row is not None
+    except Exception as exc:
+        logger.warning("Site access check failed: %s", exc)
         return False
     finally:
         db.close()

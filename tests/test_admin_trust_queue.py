@@ -178,6 +178,12 @@ def test_approve_revocation_with_block_id(admin_trust_client, monkeypatch):
     )
     monkeypatch.setattr("api.audit_logger.log_event", lambda *args, **kwargs: None)
 
+    forensic_calls = []
+    monkeypatch.setattr(
+        "api.forensic_audit.capture_action_proof",
+        lambda **kwargs: forensic_calls.append(kwargs),
+    )
+
     resp = client.post(
         "/api/ishuman/approve-revocation",
         headers={**_admin_headers(), "Content-Type": "application/json"},
@@ -192,6 +198,8 @@ def test_approve_revocation_with_block_id(admin_trust_client, monkeypatch):
     from api.database import SiteBlock
 
     assert factory.store.data[SiteBlock.__name__][0].network_revocation_status == "approved"
+    assert forensic_calls
+    assert forensic_calls[0]["action"] == "ishuman.approve_network_revocation"
 
 
 def test_ishuman_overview_route_auth(monkeypatch, fake_ishuman_db_session_factory):

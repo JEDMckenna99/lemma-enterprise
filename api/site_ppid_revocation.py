@@ -240,10 +240,10 @@ def keys_for_revocation_row(row: Any) -> list[str]:
 def resolve_site_by_domain(db, target_site: str) -> Any | None:
     """Resolve a registered Site row from a normalized hostname / rp_id."""
     from api.database import Site
-    from api.ppid import canonicalize_rp_id
+    from api.site_hostname import try_canonicalize_site_hostname
 
-    domain = canonicalize_rp_id(target_site)
-    if not domain or domain == "unknown":
+    domain, err = try_canonicalize_site_hostname(target_site)
+    if err or not domain:
         return None
 
     site = db.query(Site).filter_by(site_domain=domain).first()
@@ -251,7 +251,10 @@ def resolve_site_by_domain(db, target_site: str) -> Any | None:
         return site
 
     for candidate in db.query(Site).all():
-        if canonicalize_rp_id(getattr(candidate, "site_domain", "")) == domain:
+        candidate_domain, candidate_err = try_canonicalize_site_hostname(
+            getattr(candidate, "site_domain", "")
+        )
+        if not candidate_err and candidate_domain == domain:
             return candidate
     return None
 

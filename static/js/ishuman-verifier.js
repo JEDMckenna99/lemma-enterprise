@@ -520,6 +520,8 @@ class IsHumanVerifier {
             ),
         );
 
+        this._warnSiteIdHostnameMismatch();
+
         this._bloomFilter = new Set();
         this._bloomSyncedAt = 0;
         this._bloomTrusted = false;
@@ -535,6 +537,35 @@ class IsHumanVerifier {
         this._setupBlockBroadcastChannel();
 
         this._initPromise = this._init();
+    }
+
+    _canonicalizeSiteDomain(siteDomain) {
+        const input = String(siteDomain || '').trim().toLowerCase();
+        if (!input) return '';
+        let host = input;
+        try {
+            if (host.includes('://')) {
+                host = new URL(host).hostname.toLowerCase();
+            }
+        } catch {
+            host = input;
+        }
+        return host.split('/')[0].split(':')[0].replace(/^www\./, '').trim();
+    }
+
+    _warnSiteIdHostnameMismatch() {
+        try {
+            if (typeof window === 'undefined' || !window.location?.hostname) return;
+            const configured = this._canonicalizeSiteDomain(this.siteId);
+            const runtime = this._canonicalizeSiteDomain(window.location.hostname);
+            if (configured && runtime && configured !== runtime) {
+                console.warn(
+                    `[isHuman] siteId "${this.siteId}" canonicalizes to "${configured}" ` +
+                    `but window.location.hostname is "${window.location.hostname}" (${runtime}). ` +
+                    'PPID derivation and site-block APIs require matching hostnames.',
+                );
+            }
+        } catch { /* non-fatal */ }
     }
 
     _setupBlockBroadcastChannel() {
