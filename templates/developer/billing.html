@@ -54,14 +54,26 @@
 </div>
 
 <script nonce="{{ csp_nonce }}">
-async function billingAuthHeaders() {
+async function billingAuthHeaders(method, path, bodyText) {
+    const extra = { 'Content-Type': 'application/json' };
+    const requestContext = {
+        method: method || 'GET',
+        path: path || '/api/billing/account-status',
+        body: bodyText || '',
+    };
     if (typeof window.getLemmaAuthHeadersAsync === 'function') {
-        return await window.getLemmaAuthHeadersAsync({ 'Content-Type': 'application/json' });
+        if (typeof window.ensureLemmaCredential === 'function') {
+            await window.ensureLemmaCredential(false);
+            if (!window.lemmaCredential) {
+                await window.ensureLemmaCredential(true);
+            }
+        }
+        return await window.getLemmaAuthHeadersAsync(extra, requestContext);
     }
     if (typeof window.getLemmaAuthHeaders === 'function') {
-        return window.getLemmaAuthHeaders({ 'Content-Type': 'application/json' });
+        return window.getLemmaAuthHeaders(extra, requestContext);
     }
-    return { 'Content-Type': 'application/json' };
+    return extra;
 }
 
 function formatStatus(status) {
@@ -74,6 +86,12 @@ function formatStatus(status) {
     return map[status] || status || 'Unknown';
 }
 
+function showBillingAuthRequired(messageEl, setupBtn) {
+    messageEl.textContent = 'Unlock your wallet to view billing status and start Stripe Checkout.';
+    setupBtn.textContent = 'Unlock wallet';
+    setupBtn.onclick = () => { window.location.href = '/login?return=' + encodeURIComponent('/developer/billing'); };
+}
+
 async function loadBillingStatus() {
     const statusEl = document.getElementById('billing-status');
     const stripeEl = document.getElementById('billing-stripe-customer');
@@ -81,9 +99,20 @@ async function loadBillingStatus() {
     const setupBtn = document.getElementById('setup-billing-btn');
 
     try {
-        const headers = await billingAuthHeaders();
+        const headers = await billingAuthHeaders('GET', '/api/billing/account-status');
+        if (!headers['X-Lemma-Credential'] && !headers['X-Agent-Token']) {
+            statusEl.textContent = 'Sign in required';
+            showBillingAuthRequired(messageEl, setupBtn);
+            return;
+        }
+
         const resp = await fetch('/api/billing/account-status', { headers });
         const data = await resp.json();
+        if (resp.status === 401) {
+            statusEl.textContent = 'Sign in required';
+            showBillingAuthRequired(messageEl, setupBtn);
+            return;
+        }
         if (!resp.ok || !data.success) {
             statusEl.textContent = 'Unavailable';
             messageEl.textContent = data.message || data.error || 'Could not load billing status.';
@@ -92,6 +121,8 @@ async function loadBillingStatus() {
 
         const billing = data.billing;
         const onboarding = data.onboarding || {};
+        setupBtn.onclick = startBillingCheckout;
+
         if (!billing) {
             statusEl.textContent = 'Not set up';
             stripeEl.textContent = '—';
@@ -112,7 +143,6 @@ async function loadBillingStatus() {
             return;
         }
 
-        setupBtn.onclick = startBillingCheckout;
         if (billing.subscription_status === 'active') {
             messageEl.textContent = 'Billing is active. New site credentials will be metered on your monthly invoice.';
             setupBtn.textContent = 'Update payment method';
@@ -133,7 +163,6 @@ async function startBillingCheckout() {
     const setupBtn = document.getElementById('setup-billing-btn');
     setupBtn.disabled = true;
     try {
-        const headers = await billingAuthHeaders();
         const emailInput = document.getElementById('billing-email');
         const payload = {
             success_url: window.location.origin + '/developer/billing?billing=success',
@@ -142,10 +171,17 @@ async function startBillingCheckout() {
         if (emailInput && emailInput.value.trim()) {
             payload.email = emailInput.value.trim().toLowerCase();
         }
+        const bodyText = JSON.stringify(payload);
+        const headers = await billingAuthHeaders('POST', '/api/billing/usage-checkout', bodyText);
+        if (!headers['X-Lemma-Credential'] && !headers['X-Agent-Token']) {
+            window.showToast?.('error', 'Wallet required', 'Unlock your wallet before starting checkout.');
+            window.location.href = '/login?return=' + encodeURIComponent('/developer/billing');
+            return;
+        }
         const resp = await fetch('/api/billing/usage-checkout', {
             method: 'POST',
             headers,
-            body: JSON.stringify(payload),
+            body: bodyText,
         });
         const data = await resp.json();
         if (!resp.ok || !data.success || !data.url) {
@@ -160,13 +196,27 @@ async function startBillingCheckout() {
     }
 }
 
-document.getElementById('refresh-billing-btn').addEventListener('click', loadBillingStatus);
-document.getElementById('setup-billing-btn').addEventListener('click', startBillingCheckout);
+function initBillingPage() {
+    document.getElementById('refresh-billing-btn').addEventListener('click', loadBillingStatus);
+    document.getElementById('setup-billing-btn').addEventListener('click', startBillingCheckout);
 
-if (new URLSearchParams(window.location.search).get('billing') === 'success') {
-    window.showToast?.('success', 'Billing updated', 'Stripe checkout completed. Status may take a moment to sync.');
+    if (new URLSearchParams(window.location.search).get('billing') === 'success') {
+        window.showToast?.('success', 'Billing updated', 'Stripe checkout completed. Status may take a moment to sync.');
+    }
+
+    if (window.lemmaCredential) {
+        loadBillingStatus();
+        return;
+    }
+
+    window.addEventListener('lemma:credential-ready', () => loadBillingStatus(), { once: true });
+    window.setTimeout(() => loadBillingStatus(), 1500);
 }
 
-loadBillingStatus();
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initBillingPage);
+} else {
+    initBillingPage();
+}
 </script>
 {% endblock %}
