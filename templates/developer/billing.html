@@ -110,7 +110,12 @@ async function loadBillingStatus() {
         const data = await resp.json();
         if (resp.status === 401) {
             statusEl.textContent = 'Sign in required';
-            showBillingAuthRequired(messageEl, setupBtn);
+            const detail = data.message || data.error || '';
+            if (detail && !detail.includes('missing_lemma_header')) {
+                messageEl.textContent = detail;
+            } else {
+                showBillingAuthRequired(messageEl, setupBtn);
+            }
             return;
         }
         if (!resp.ok || !data.success) {

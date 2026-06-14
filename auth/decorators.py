@@ -16,7 +16,7 @@ import logging
 import os
 
 from auth.permissions import normalize_scopes, is_admin_permission
-from api.authz_engine import extract_user_lemma_principal
+from api.authz_engine import extract_user_lemma_principal, try_wallet_session_principal
 from api.authz_policy import get_error_defaults
 
 logger = logging.getLogger(__name__)
@@ -94,12 +94,19 @@ def require_credential(
                     error = agent_error
 
             if not principal:
+                wallet_error = None
+                wallet_principal, wallet_error = try_wallet_session_principal(request.headers)
+                if wallet_principal:
+                    principal = wallet_principal
+                    error = None
+
+            if not principal:
                 if allow_unauthenticated:
                     g.authenticated = False
                     return f(*args, **kwargs)
                 return _auth_error(
                     "auth_required",
-                    f"Credential required: {error}",
+                    f"Credential required: {error or wallet_error}",
                     status=401,
                 )
 

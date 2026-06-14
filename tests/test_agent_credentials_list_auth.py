@@ -42,6 +42,16 @@ def test_list_agent_credentials_accepts_wallet_session_with_header_ppid(monkeypa
         lambda _headers: (None, "invalid_lemma:invalid_signature"),
     )
     monkeypatch.setattr(mod, "_extract_ppid_from_lemma_header", lambda: None)
+    monkeypatch.setattr(
+        mod,
+        "_decode_lemma_header_credential",
+        lambda: credential,
+    )
+    monkeypatch.setattr(
+        mod,
+        "_parse_ppid_from_credential_dict",
+        lambda cred: ppid if cred is credential else None,
+    )
 
     class FakeCursor:
         def execute(self, *_args, **_kwargs):

@@ -1482,6 +1482,12 @@ def _resolve_agent_owner_ppid():
     if ppid:
         return ppid, None
 
+    if _has_valid_wallet_unlock_session():
+        credential = _decode_lemma_header_credential()
+        ppid = _parse_ppid_from_credential_dict(credential)
+        if ppid:
+            return ppid, None
+
     ppid = session.get('ppid')
     if ppid:
         return str(ppid), None
