@@ -87,8 +87,9 @@ h1{color:#1e293b;font-weight:600;line-height:1.25;margin-bottom:16px;font-size:4
                 <!-- Public marketing pages: no internal dropdown -->
                 <a href="/developer" class="btn btn-secondary" id="public-dashboard-link" style="display:none;">Dashboard</a>
                 <div id="auth-buttons" style="display:flex; gap:12px; align-items:center;">
-                    <a href="/login" class="btn btn-secondary">Sign In</a>
-                    <a href="/register" class="btn btn-primary">Get Started</a>
+                    <a href="/login" class="btn btn-secondary" id="nav-sign-in-link" style="display:none;">Sign In</a>
+                    <a href="/register" class="btn btn-primary" id="nav-get-started-link">Get Started</a>
+                    <button type="button" class="btn btn-primary" id="nav-unlock-link" style="display:none;">Unlock lemma.id</button>
                 </div>
                 {% else %}
                 <!-- App pages: full user dropdown -->
@@ -119,8 +120,9 @@ h1{color:#1e293b;font-weight:600;line-height:1.25;margin-bottom:16px;font-size:4
                     </div>
                 </div>
                 <div id="auth-buttons" style="display:flex; gap:12px; align-items:center;">
-                    <a href="/login" class="btn btn-secondary">Sign In</a>
-                    <a href="/register" class="btn btn-primary">Get Started</a>
+                    <a href="/login" class="btn btn-secondary" id="nav-sign-in-link" style="display:none;">Sign In</a>
+                    <a href="/register" class="btn btn-primary" id="nav-get-started-link">Get Started</a>
+                    <button type="button" class="btn btn-primary" id="nav-unlock-link" style="display:none;">Unlock lemma.id</button>
                 </div>
                 {% endif %}
             </div>
@@ -749,6 +751,10 @@ h1{color:#1e293b;font-weight:600;line-height:1.25;margin-bottom:16px;font-size:4
     {% endblock %}
 
     {% block wallet_auto_init %}
+    {% include "modern/includes/platform_auth_cta_script.html" %}
+    {% if is_public_page %}
+    {% include "modern/includes/wallet_auto_init_script.html" %}
+    {% endif %}
     {% endblock %}
 </body>
 </html>

@@ -1,0 +1,284 @@
+<script nonce="{{ csp_nonce }}">
+    (function() {
+        if (window.LemmaPlatformAuth) return;
+
+        function isDeveloperPermission(perms, claims) {
+            const normalizedClaims = claims || perms?.claims || {};
+            const accountType = String(normalizedClaims.accountType || normalizedClaims.account_type || '').toLowerCase();
+            const permissionId = String(
+                perms?.permissionId
+                || normalizedClaims.permissionId
+                || normalizedClaims.permission_level
+                || normalizedClaims.permission_id
+                || ''
+            ).toLowerCase();
+            const aliases = (perms?.permissionAliases || normalizedClaims.permissionAliases || [])
+                .map((value) => String(value).toLowerCase());
+            const scope = (perms?.scope || normalizedClaims.scope || [])
+                .map((value) => String(value).toLowerCase());
+
+            if (accountType === 'developer') return true;
+            if (permissionId === 'developer_access' || permissionId.includes('developer')) return true;
+            if (aliases.some((alias) => alias.includes('developer'))) return true;
+            if (scope.some((entry) => entry.includes('developer'))) return true;
+            if (['admin', 'super_admin', 'superadmin', 'site_admin'].includes(accountType)) return true;
+            if (['admin_access', 'super_admin', 'admin', 'superadmin', 'site_admin'].includes(permissionId)) return true;
+            return normalizedClaims.isAdmin === true;
+        }
+
+        async function checkIsHumanProof(wallet) {
+            try {
+                const ppid = await wallet.derivePPID('lemma.id');
+                return !!(ppid && String(ppid).startsWith('did:lemma:ppid_'));
+            } catch (_) {
+                return false;
+            }
+        }
+
+        async function checkDeveloperPermission(wallet) {
+            try {
+                const perms = await wallet.getVerifiedPermissions('lemma.id');
+                return !!(perms?.hasAccess && isDeveloperPermission(perms, perms.claims));
+            } catch (_) {
+                return false;
+            }
+        }
+
+        async function assessPlatformAuthState(wallet) {
+            if (!wallet) {
+                return { mode: 'none', hasWallet: false, hasIsHuman: false, hasDeveloper: false };
+            }
+
+            await wallet.init();
+            const info = await wallet.getWalletInfo();
+            const hasWallet = !!(info?.hasPasskey || (info?.lemmaCount > 0));
+
+            if (!hasWallet) {
+                return { mode: 'none', hasWallet: false, hasIsHuman: false, hasDeveloper: false };
+            }
+
+            if (!wallet.isUnlocked || !wallet.isUnlocked()) {
+                return { mode: 'locked', hasWallet: true, hasIsHuman: false, hasDeveloper: false };
+            }
+
+            const hasIsHuman = await checkIsHumanProof(wallet);
+            const hasDeveloper = await checkDeveloperPermission(wallet);
+
+            if (hasIsHuman && hasDeveloper) {
+                return { mode: 'ready_signin', hasWallet: true, hasIsHuman, hasDeveloper };
+            }
+
+            return { mode: 'get_started', hasWallet: true, hasIsHuman, hasDeveloper };
+        }
+
+        async function signInPlatformWallet(wallet, options) {
+            if (window.__lemmaPlatformSignInInFlight) {
+                return null;
+            }
+            window.__lemmaPlatformSignInInFlight = true;
+            try {
+            const opts = options || {};
+            const redirectUrl = opts.redirectUrl || '/developer';
+
+            let passkeyCredentialId = null;
+            let clientWalletId = null;
+            let ppid = null;
+
+            try {
+                ppid = await wallet.derivePPID('lemma.id');
+            } catch (_) {}
+
+            try {
+                passkeyCredentialId = await wallet.getPasskeyCredentialId();
+            } catch (_) {}
+
+            try {
+                const debugState = await wallet.getDebugState?.() || {};
+                const info = await wallet.getWalletInfo();
+                clientWalletId = debugState.walletId || info?.walletId || wallet.session?.walletId;
+            } catch (_) {}
+
+            if (!clientWalletId) {
+                throw new Error('Unlock your wallet with passkey before signing in.');
+            }
+
+            const loginHeaders = { 'Content-Type': 'application/json' };
+            if (typeof window.getLemmaAuthHeadersAsync === 'function') {
+                Object.assign(loginHeaders, await window.getLemmaAuthHeadersAsync());
+            } else if (typeof window.getLemmaAuthHeaders === 'function') {
+                Object.assign(loginHeaders, window.getLemmaAuthHeaders());
+            }
+
+            const response = await fetch('/api/wallet-auth/platform-login', {
+                method: 'POST',
+                headers: loginHeaders,
+                credentials: 'include',
+                body: JSON.stringify({
+                    ppid: ppid || undefined,
+                    passkey_credential_id: passkeyCredentialId,
+                    wallet_id: clientWalletId,
+                }),
+            });
+
+            const result = await response.json();
+            if (!result.success) {
+                if (result.error === 'platform_membership_required') {
+                    const err = new Error('platform_membership_required');
+                    err.code = 'platform_membership_required';
+                    throw err;
+                }
+                throw new Error(result.message || result.error || 'Sign in failed');
+            }
+
+            if (result.wallet_id && result.wallet_id !== clientWalletId) {
+                try {
+                    if (wallet._put) {
+                        await wallet._put('passkey', { id: 'walletId', value: result.wallet_id });
+                    }
+                    await fetch('/api/wallet/set-session', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        credentials: 'include',
+                        body: JSON.stringify({
+                            wallet_id: result.wallet_id,
+                            unlocked_at: Date.now(),
+                            profile_id: 'default',
+                            profile_name: 'Developer',
+                        }),
+                    });
+                } catch (_) {}
+            }
+
+            if (result.permission_lemma) {
+                await wallet.storeCredential(result.permission_lemma);
+                window.lemmaCredential = result.permission_lemma;
+                if (typeof window.buildLemmaCredentialForHeader === 'function') {
+                    window.lemmaCredentialForHeader = window.buildLemmaCredentialForHeader(result.permission_lemma);
+                }
+            }
+
+            if (opts.redirect !== false) {
+                window.location.href = redirectUrl;
+            }
+
+            return result;
+            } finally {
+                window.__lemmaPlatformSignInInFlight = false;
+            }
+        }
+
+        function applyNavAuthButtons(state) {
+            const authButtons = document.getElementById('auth-buttons');
+            const signInLink = document.getElementById('nav-sign-in-link');
+            const getStartedLink = document.getElementById('nav-get-started-link');
+            const unlockButton = document.getElementById('nav-unlock-link');
+            if (!authButtons) return;
+
+            if (signInLink) signInLink.style.display = 'none';
+            if (getStartedLink) getStartedLink.style.display = 'none';
+            if (unlockButton) unlockButton.style.display = 'none';
+
+            if (state.mode === 'ready_signin') {
+                authButtons.style.display = 'none';
+                return;
+            }
+
+            authButtons.style.display = 'flex';
+
+            if (state.mode === 'locked') {
+                if (unlockButton) unlockButton.style.display = 'inline-flex';
+                return;
+            }
+
+            if (getStartedLink) getStartedLink.style.display = 'inline-flex';
+        }
+
+        async function unlockPlatformWallet(wallet) {
+            const unlocked = await wallet.unlock();
+            if (!unlocked) {
+                throw new Error('Passkey unlock cancelled.');
+            }
+            return assessPlatformAuthState(wallet);
+        }
+
+        async function initNavPlatformAuthCta() {
+            if (typeof LemmaWallet === 'undefined') {
+                setTimeout(initNavPlatformAuthCta, 50);
+                return;
+            }
+
+            try {
+                if (!window.globalLemmaWallet) {
+                    window.globalLemmaWallet = new LemmaWallet({
+                        debug: false,
+                        enableDeviceSync: true,
+                        enableAdvancedFeatures: true,
+                    });
+                    await window.globalLemmaWallet.init();
+                }
+
+                const wallet = window.globalLemmaWallet;
+                const state = await assessPlatformAuthState(wallet);
+                applyNavAuthButtons(state);
+
+                if (state.mode === 'ready_signin') {
+                    await signInPlatformWallet(wallet, { redirect: false });
+                    const publicDashboard = document.getElementById('public-dashboard-link');
+                    const authButtons = document.getElementById('auth-buttons');
+                    if (authButtons) authButtons.style.display = 'none';
+                    if (publicDashboard) publicDashboard.style.display = 'inline-flex';
+                    window.dispatchEvent(new CustomEvent('lemma:credential-ready', {
+                        detail: { source: 'platform_auth_cta' },
+                    }));
+                    return;
+                }
+
+                const unlockButton = document.getElementById('nav-unlock-link');
+                if (unlockButton && !unlockButton.dataset.bound) {
+                    unlockButton.dataset.bound = '1';
+                    unlockButton.addEventListener('click', async (event) => {
+                        event.preventDefault();
+                        unlockButton.disabled = true;
+                        const original = unlockButton.textContent;
+                        unlockButton.textContent = 'Unlocking…';
+                        try {
+                            const nextState = await unlockPlatformWallet(wallet);
+                            if (nextState.mode === 'ready_signin') {
+                                await signInPlatformWallet(wallet, { redirectUrl: '/developer' });
+                                return;
+                            }
+                            applyNavAuthButtons(nextState);
+                        } catch (err) {
+                            console.warn('[platform-auth-cta] unlock failed:', err?.message || err);
+                            unlockButton.textContent = original;
+                        } finally {
+                            unlockButton.disabled = false;
+                            if (unlockButton.textContent === 'Unlocking…') {
+                                unlockButton.textContent = original;
+                            }
+                        }
+                    });
+                }
+            } catch (err) {
+                console.warn('[platform-auth-cta] nav init failed:', err?.message || err);
+                applyNavAuthButtons({ mode: 'none' });
+            }
+        }
+
+        window.LemmaPlatformAuth = {
+            assess: assessPlatformAuthState,
+            signIn: signInPlatformWallet,
+            unlock: unlockPlatformWallet,
+            applyNavButtons: applyNavAuthButtons,
+            initNav: initNavPlatformAuthCta,
+        };
+
+        if (document.getElementById('auth-buttons')) {
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', initNavPlatformAuthCta);
+            } else {
+                initNavPlatformAuthCta();
+            }
+        }
+    })();
+</script>

@@ -135,6 +135,14 @@
                 cred = lemmaPermissions[0];
             }
 
+            if (cred) {
+                const normalized = utils ? utils.normalizeCredentialClaims(cred) : null;
+                const claims = cred.claims || cred.credentialSubject || {};
+                if (!isDeveloperAccount(normalized, claims)) {
+                    cred = null;
+                }
+            }
+
             const walletUnlocked = wallet.isUnlocked();
             if (cred && walletUnlocked) {
                 const normalized = utils ? utils.normalizeCredentialClaims(cred) : null;

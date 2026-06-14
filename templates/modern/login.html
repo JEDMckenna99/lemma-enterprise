@@ -218,26 +218,8 @@
         let wallet = null;
         let walletInfo = null;
 
-        async function initializeWallet() {
-            try {
-                // Wait for global wallet to be ready
-                let attempts = 0;
-                while (!window.globalLemmaWallet && attempts < 30) {
-                    await new Promise(r => setTimeout(r, 100));
-                    attempts++;
-                }
-                
-                wallet = window.globalLemmaWallet || new LemmaWallet();
-                await wallet.init();
-                walletInfo = await wallet.getWalletInfo();
-                
-                console.log('📦 Wallet info:', walletInfo);
-                return true;
-            } catch (e) {
-                console.error('Failed to init wallet:', e);
-                return false;
-            }
-        }
+        const urlParams = new URLSearchParams(window.location.search);
+        const redirectUrl = urlParams.get('redirect') || '/developer';
 
         function updateStatus(type, message) {
             const el = document.getElementById('statusMessage');
@@ -245,37 +227,11 @@
             el.innerHTML = message;
         }
 
-        function updateWalletStatus(hasWallet, isUnlocked, hasPasskey) {
-            const el = document.getElementById('walletStatus');
-            
-            if (!hasWallet) {
-                el.className = 'wallet-status';
-                el.innerHTML = '<span>🚀</span> No wallet yet — <a href="/register">create a developer account</a> to get started';
-            } else if (!hasPasskey) {
-                el.className = 'wallet-status locked';
-                el.innerHTML = '<span>🔓</span> Wallet found - passkey setup needed';
-            } else if (!isUnlocked) {
-                el.className = 'wallet-status locked';
-                el.innerHTML = '<span>🔒</span> Wallet locked - passkey unlock required';
-            } else {
-                el.className = 'wallet-status ready';
-                el.innerHTML = '<span>✅</span> Wallet unlocked and ready';
-            }
-        }
-
-        // Parse URL parameters for redirect flow
-        const urlParams = new URLSearchParams(window.location.search);
-        const redirectUrl = urlParams.get('redirect') || '/dashboard';
-        const targetSite = urlParams.get('site') || 'lemma_platform';
-        const targetPermission = urlParams.get('permission') || 'developer';
-        
-        console.log('🔗 Login parameters:', { redirectUrl, targetSite, targetPermission });
-        
         function updateButton(text, enabled = true, loading = false) {
             const btn = document.getElementById('signInButton');
             const textEl = document.getElementById('buttonText');
             btn.disabled = !enabled;
-            
+
             if (loading) {
                 textEl.innerHTML = '<span class="loading-spinner"></span> ' + text;
             } else {
@@ -283,244 +239,148 @@
             }
         }
 
-        async function checkExistingCredentials() {
-            try {
-                // Use new getVerifiedPermissions for local Ed25519 verification
-                const perms = await wallet.getVerifiedPermissions('lemma.id');
-                
-                if (perms.hasAccess) {
-                    console.log('✅ Found verified lemma.id permission');
-                    console.log(`   Role: ${perms.role}, Scope: ${perms.scope.join(', ')}`);
-                    console.log(`   Verified ${perms.verified}/${perms.total} in ${perms.verifyTimeUs}µs`);
-                    
-                    updateStatus('success', '✅ Already signed in! Redirecting...');
-                    setTimeout(() => window.location.href = redirectUrl, 1000);
-                    return true;
-                }
-                
-                // Fallback: check for any lemma.id permission (unverified)
-                const permissions = await wallet.getCredentials('permission');
-                const lemmaPerms = permissions.filter(p => {
-                    const claims = p.claims || p.credentialSubject || {};
-                    const siteId = claims.siteId || claims.site || '';
-                    return siteId === 'lemma.id' || siteId === 'lemma_platform';
-                });
-                
-                if (lemmaPerms.length > 0) {
-                    console.log('⚠️ Found unverified lemma.id permission - may need re-issue');
-                }
-                
-                return false;
-            } catch (e) {
-                console.log('No existing credentials:', e.message);
-                return false;
+        async function waitForPlatformAuth() {
+            let attempts = 0;
+            while (!window.LemmaPlatformAuth && attempts < 50) {
+                await new Promise((resolve) => setTimeout(resolve, 100));
+                attempts++;
             }
+            return window.LemmaPlatformAuth || null;
         }
 
-        async function signInExisting() {
+        async function initializeWallet() {
             try {
-                updateButton('Signing in...', false, true);
-                updateStatus('info', '🔐 Verifying your platform access...');
-
-                let passkeyCredentialId = null;
-                let clientWalletId = null;
-
-                let ppid = null;
-                try {
-                    ppid = await wallet.derivePPID('lemma.id');
-                } catch (e) {
-                    console.warn('Could not derive PPID from wallet:', e.message);
+                let attempts = 0;
+                while (!window.globalLemmaWallet && attempts < 30) {
+                    await new Promise(r => setTimeout(r, 100));
+                    attempts++;
                 }
 
-                try {
-                    passkeyCredentialId = await wallet.getPasskeyCredentialId();
-                } catch (e) {
-                    console.warn('Passkey credential id unavailable:', e.message);
-                }
-
-                try {
-                    const debugState = await wallet.getDebugState?.() || {};
-                    clientWalletId = debugState.walletId || walletInfo?.walletId;
-                } catch (e) {
-                    console.warn('Could not get wallet_id:', e.message);
-                }
-
-                if (!clientWalletId) {
-                    throw new Error('Unlock your wallet with passkey before signing in.');
-                }
-
-                const loginHeaders = { 'Content-Type': 'application/json' };
-                if (typeof window.getLemmaAuthHeadersAsync === 'function') {
-                    Object.assign(loginHeaders, await window.getLemmaAuthHeadersAsync());
-                } else if (typeof window.getLemmaAuthHeaders === 'function') {
-                    Object.assign(loginHeaders, window.getLemmaAuthHeaders());
-                }
-
-                const response = await fetch('/api/wallet-auth/platform-login', {
-                    method: 'POST',
-                    headers: loginHeaders,
-                    body: JSON.stringify({
-                        ppid: ppid || undefined,
-                        passkey_credential_id: passkeyCredentialId,
-                        wallet_id: clientWalletId
-                    })
-                });
-                
-                const result = await response.json();
-                
-                if (!result.success) {
-                    if (result.error === 'platform_membership_required') {
-                        updateStatus(
-                            'info',
-                            'You need a developer account first. Redirecting to registration...'
-                        );
-                        setTimeout(() => {
-                            window.location.href = '/register' + (redirectUrl !== '/dashboard'
-                                ? '?redirect=' + encodeURIComponent(redirectUrl)
-                                : '');
-                        }, 1500);
-                        return false;
-                    }
-                    throw new Error(result.message || result.error || 'Sign in failed');
-                }
-                
-                console.log('📝 Permission restored with PPID:', result.ppid);
-                
-                if (result.wallet_id && result.wallet_id !== clientWalletId) {
-                    console.log('🔄 Syncing wallet_id from server:', result.wallet_id?.substring(0, 12) + '...');
-                    try {
-                        if (wallet._put) {
-                            await wallet._put('passkey', { id: 'walletId', value: result.wallet_id });
-                        }
-                        
-                        await fetch('/api/wallet/set-session', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            credentials: 'include',
-                            body: JSON.stringify({
-                                wallet_id: result.wallet_id,
-                                unlocked_at: Date.now(),
-                                profile_id: 'default',
-                                profile_name: 'Developer'
-                            })
-                        });
-                    } catch (e) {
-                        console.warn('Wallet_id sync warning:', e.message);
-                    }
-                }
-                
-                await wallet.storeCredential(result.permission_lemma);
-                console.log('✅ Permission stored in wallet');
-                
-                updateStatus('success', '✅ Welcome back! Redirecting...');
-                setTimeout(() => window.location.href = redirectUrl, 1500);
-                return true;
-                
-            } catch (e) {
-                console.error('Sign in failed:', e);
-                updateStatus('error', '❌ ' + e.message);
-                updateButton('Try Again', true);
-                return false;
-            }
-        }
-
-        async function unlockAndSignIn() {
-            try {
-                updateButton('Unlocking wallet...', false, true);
-                updateStatus('info', '👆 Please authenticate with your device');
-                
-                const unlocked = await wallet.unlock();
-                if (!unlocked) {
-                    throw new Error('Unlock failed');
-                }
-                
+                wallet = window.globalLemmaWallet || new LemmaWallet();
+                await wallet.init();
                 walletInfo = await wallet.getWalletInfo();
-                updateWalletStatus(
-                    walletInfo.lemmaCount > 0 || walletInfo.hasPasskey,
-                    walletInfo.isUnlocked,
-                    walletInfo.hasPasskey
-                );
-
-                const hasExisting = await checkExistingCredentials();
-                if (hasExisting) return true;
-
-                return await signInExisting();
-                
+                return true;
             } catch (e) {
-                console.error('Unlock failed:', e);
-                updateStatus('error', '❌ Passkey authentication cancelled or failed. Please try again.');
-                updateButton('Try Again', true);
+                console.error('Failed to init wallet:', e);
                 return false;
             }
         }
 
-        async function handleSignIn() {
-            walletInfo = await wallet.getWalletInfo();
-            
-            if (!walletInfo.hasPasskey) {
-                updateStatus(
-                    'info',
-                    'Create a developer account first — registration sets up your passkey wallet and issues access.'
-                );
-                setTimeout(() => {
-                    window.location.href = '/register' + (redirectUrl !== '/dashboard'
-                        ? '?redirect=' + encodeURIComponent(redirectUrl)
-                        : '');
-                }, 1200);
-                return false;
+        function updateWalletStatus(state) {
+            const el = document.getElementById('walletStatus');
+            if (!el) return;
+
+            if (state.mode === 'none') {
+                el.className = 'wallet-status';
+                el.innerHTML = 'No wallet yet — use Get Started to create a developer account.';
+            } else if (state.mode === 'locked') {
+                el.className = 'wallet-status locked';
+                el.innerHTML = 'Wallet found — unlock with your passkey to continue.';
+            } else if (state.mode === 'ready_signin') {
+                el.className = 'wallet-status ready';
+                el.innerHTML = 'Verified developer wallet ready — signing you in…';
+            } else if (state.hasIsHuman && !state.hasDeveloper) {
+                el.className = 'wallet-status';
+                el.innerHTML = 'Identity verified — complete developer registration with Get Started.';
+            } else {
+                el.className = 'wallet-status';
+                el.innerHTML = 'Complete developer registration with Get Started.';
             }
-
-            if (!walletInfo.isUnlocked) {
-                return await unlockAndSignIn();
-            }
-
-            const hasExisting = await checkExistingCredentials();
-            if (hasExisting) return true;
-
-            return await signInExisting();
         }
 
-        // Legacy alias removed — sign-in never auto-registers or auto-issues for new wallets.
+        function redirectToRegister() {
+            window.location.href = '/register' + (redirectUrl !== '/developer'
+                ? '?redirect=' + encodeURIComponent(redirectUrl)
+                : '');
+        }
 
-        // ============================================
-        // INITIALIZATION
-        // ============================================
-        
-        document.addEventListener('DOMContentLoaded', async function() {
-            const btn = document.getElementById('signInButton');
-            
-            // Initialize wallet
-            const walletReady = await initializeWallet();
-            
-            if (!walletReady) {
-                updateStatus('error', '❌ Failed to initialize wallet. Please refresh the page.');
+        function configurePrimaryButton(state) {
+            if (state.mode === 'none' || state.mode === 'get_started') {
+                updateButton('Get Started', true);
+                return 'register';
+            }
+            if (state.mode === 'locked') {
+                updateButton('Unlock lemma.id', true);
+                return 'unlock';
+            }
+            updateButton('Signing in…', false, true);
+            return 'signin';
+        }
+
+        async function handlePrimaryAction(action, platformAuth, state) {
+            if (action === 'register') {
+                redirectToRegister();
                 return;
             }
-            
-            // Update UI based on wallet state
-            updateWalletStatus(
-                walletInfo.lemmaCount > 0 || walletInfo.hasPasskey,
-                walletInfo.isUnlocked,
-                walletInfo.hasPasskey
-            );
-            
-            // Check for existing credentials (if wallet is unlocked)
-            if (walletInfo.isUnlocked) {
-                const hasCredential = await checkExistingCredentials();
-                if (hasCredential) return;
+
+            if (action === 'unlock') {
+                try {
+                    updateButton('Unlocking…', false, true);
+                    updateStatus('info', 'Authenticate with your passkey to unlock lemma.id.');
+                    const nextState = await platformAuth.unlock(wallet);
+                    walletInfo = await wallet.getWalletInfo();
+                    updateWalletStatus(nextState);
+                    if (nextState.mode === 'ready_signin') {
+                        await completeSignIn(platformAuth);
+                        return;
+                    }
+                    configurePrimaryButton(nextState);
+                    updateStatus('info', nextState.hasIsHuman
+                        ? 'Identity verified — finish developer registration with Get Started.'
+                        : 'Create a developer account with Get Started.');
+                } catch (e) {
+                    updateStatus('error', e.message || 'Passkey unlock failed.');
+                    updateButton('Unlock lemma.id', true);
+                }
+                return;
             }
-            
-            // Set button text based on state
-            if (!walletInfo.hasPasskey) {
-                updateButton('Get Started', true);
-            } else if (!walletInfo.isUnlocked) {
-                updateButton('Unlock & Sign In', true);
-            } else {
-                updateButton('Sign In with Passkey', true);
+        }
+
+        async function completeSignIn(platformAuth) {
+            try {
+                updateButton('Signing in…', false, true);
+                updateStatus('info', 'Verifying your developer access…');
+                await platformAuth.signIn(wallet, { redirectUrl });
+            } catch (e) {
+                if (e.code === 'platform_membership_required' || e.message === 'platform_membership_required') {
+                    updateStatus('info', 'Developer account required. Redirecting to registration…');
+                    setTimeout(redirectToRegister, 1200);
+                    return;
+                }
+                updateStatus('error', e.message || 'Sign in failed.');
+                const state = await platformAuth.assess(wallet);
+                configurePrimaryButton(state);
             }
-            
-            // Attach click handler
-            btn.addEventListener('click', handleSignIn);
+        }
+
+        document.addEventListener('DOMContentLoaded', async function() {
+            const btn = document.getElementById('signInButton');
+            const platformAuth = await waitForPlatformAuth();
+            const walletReady = await initializeWallet();
+
+            if (!walletReady || !platformAuth) {
+                updateStatus('error', 'Failed to initialize wallet. Please refresh the page.');
+                return;
+            }
+
+            const state = await platformAuth.assess(wallet);
+            updateWalletStatus(state);
+
+            if (state.mode === 'ready_signin') {
+                await completeSignIn(platformAuth);
+                return;
+            }
+
+            configurePrimaryButton(state);
+            btn.addEventListener('click', async () => {
+                const currentState = await platformAuth.assess(wallet);
+                if (currentState.mode === 'ready_signin') {
+                    await completeSignIn(platformAuth);
+                    return;
+                }
+                const action = configurePrimaryButton(currentState);
+                await handlePrimaryAction(action, platformAuth, currentState);
+            });
         });
     </script>
 {% endblock %}
