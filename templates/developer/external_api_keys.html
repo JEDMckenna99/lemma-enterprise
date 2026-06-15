@@ -163,7 +163,23 @@ async function loadExternalKeys() {
         (data.sites || []).forEach((s) => { if (s && s.site_id) siteMap[s.site_id] = s; });
 
         if (!externalKeys.length) {
-            tbody.innerHTML = '<tr><td colspan="6" style="padding:40px; text-align:center; color:#64748b;">No external keys yet.</td></tr>';
+            const siteRows = (data.sites || []);
+            if (siteRows.length) {
+                tbody.innerHTML = siteRows.map((s) => {
+                    const domain = safe(s.site_domain || s.site_id || '—');
+                    const label = safe(s.site_label || s.company_name || domain);
+                    return `<tr>
+                        <td style="padding:12px 16px;">${label}</td>
+                        <td>${domain}</td>
+                        <td>—</td>
+                        <td><span style="color:#64748b;">No key in account</span></td>
+                        <td>${formatDate(s.created_at)}</td>
+                        <td><a class="dev-btn dev-btn-secondary dev-btn-sm" href="/developer/external-api-keys">Issue key</a></td>
+                    </tr>`;
+                }).join('');
+                return;
+            }
+            tbody.innerHTML = '<tr><td colspan="6" style="padding:40px; text-align:center; color:#64748b;">No external keys yet. Register a site to issue your first key.</td></tr>';
             return;
         }
         tbody.innerHTML = externalKeys.map((k) => {

@@ -373,6 +373,88 @@ def _extract_customer_id_from_request() -> Optional[str]:
     return None
 
 
+def _collect_developer_site_catalog(
+    customer: Optional["Customer"],
+    ppid: Optional[str],
+) -> tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
+    """
+    Merge customer JSON site/key records with SiteAdmin + sites table rows.
+
+    Developer console pages historically read customer.sites only; wallet-first
+    registration and bootstrap flows persist ownership in site_admins/sites.
+    """
+    sites_by_id: Dict[str, Dict[str, Any]] = {}
+    keys: List[Dict[str, Any]] = []
+
+    if customer:
+        for site in customer.sites or []:
+            site_id = (site or {}).get("site_id")
+            if site_id:
+                sites_by_id[str(site_id)] = dict(site)
+        for key in customer.api_keys or []:
+            if key and key.get("site_id"):
+                keys.append(dict(key))
+
+    if not ppid:
+        return list(sites_by_id.values()), keys
+
+    try:
+        from api.database import SessionLocal, Site
+        from api.developer_api import _get_owned_site_ids
+
+        db = SessionLocal()
+        try:
+            owned_site_ids = _get_owned_site_ids(db, ppid)
+            if not owned_site_ids:
+                return list(sites_by_id.values()), keys
+
+            db_sites = db.query(Site).filter(Site.site_id.in_(owned_site_ids)).all()
+            existing_hints = {
+                (k.get("site_id"), (k.get("key_hint") or (k.get("key") or "")[-8:]))
+                for k in keys
+                if k.get("site_id")
+            }
+
+            for site in db_sites:
+                site_id = site.site_id
+                if site_id not in sites_by_id:
+                    sites_by_id[site_id] = {
+                        "site_id": site_id,
+                        "site_domain": site.site_domain,
+                        "site_label": site.company_name or site.site_domain,
+                        "company_name": site.company_name,
+                        "contact_email": site.admin_email,
+                        "status": "active" if (site.key_status or "active") == "active" else "inactive",
+                        "created_at": site.created_at.isoformat() if site.created_at else None,
+                        "source": "site_registry",
+                    }
+
+                api_key = (site.api_key or "").strip()
+                if not api_key:
+                    continue
+                hint = api_key[-8:] if len(api_key) >= 8 else api_key
+                hint_key = (site_id, hint)
+                if hint_key in existing_hints:
+                    continue
+                existing_hints.add(hint_key)
+                keys.append({
+                    "name": f"{site.company_name or site.site_domain} Key",
+                    "site_id": site_id,
+                    "key_hint": hint,
+                    "created_at": site.created_at.isoformat() if site.created_at else None,
+                    "last_used": site.key_last_used.isoformat() if site.key_last_used else None,
+                    "usage_count": 0,
+                    "status": site.key_status or "active",
+                    "source": "site_registry",
+                })
+        finally:
+            db.close()
+    except Exception as exc:
+        logger.warning("Could not merge developer site catalog from registry: %s", exc)
+
+    return list(sites_by_id.values()), keys
+
+
 class DateTimeEncoder(json.JSONEncoder):
     """Custom JSON encoder for datetime objects"""
     def default(self, obj):
@@ -1866,29 +1948,29 @@ def manage_api_keys():
         customer = customer_manager.get_customer(customer_id)
         if not customer:
             return jsonify({'error': 'Customer not found'}), 404
-        
-        # Filter out API keys that have no site_id (legacy default keys)
-        # These were created before site registration was required
-        raw_keys = [k for k in (customer.api_keys or []) if k.get('site_id')]
-        
+
+        ppid = getattr(g, 'ppid', None) or extract_authenticated_ppid_from_request()
+        merged_sites, merged_keys = _collect_developer_site_catalog(customer, ppid)
+
         # Sanitize API keys for response - never expose full keys or hashes
         sanitized_keys = []
-        for key in raw_keys:
-            sanitized_key = {
+        for key in merged_keys:
+            if not key.get('site_id'):
+                continue
+            sanitized_keys.append({
                 'name': key.get('name', 'API Key'),
                 'site_id': key.get('site_id'),
                 'key_hint': key.get('key_hint') or (key.get('key', '')[-8:] if key.get('key') else ''),
                 'created_at': key.get('created_at'),
                 'last_used': key.get('last_used'),
                 'usage_count': key.get('usage_count', 0),
-                'status': key.get('status', 'active')
-            }
-            sanitized_keys.append(sanitized_key)
+                'status': key.get('status', 'active'),
+            })
         
         return jsonify({
             'success': True,
             'api_keys': sanitized_keys,
-            'sites': customer.sites or []
+            'sites': merged_sites,
         })
     
     elif request.method == 'POST':
@@ -2296,8 +2378,9 @@ def get_customer_sites():
         customer = customer_manager.get_customer(customer_id)
         if not customer:
             return jsonify({'error': 'Customer not found'}), 404
-        
-        sites = getattr(customer, 'sites', []) or []
+
+        ppid = getattr(g, 'ppid', None) or extract_authenticated_ppid_from_request()
+        sites, _keys = _collect_developer_site_catalog(customer, ppid)
         
         return jsonify({
             'success': True,

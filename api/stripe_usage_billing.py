@@ -219,18 +219,23 @@ def billing_account_status():
     customer = _customer_for_request()
     ppid = getattr(g, "ppid", None)
 
+    merged_sites: list = []
+    if customer:
+        from api.customer_accounts import _collect_developer_site_catalog
+
+        merged_sites, _merged_keys = _collect_developer_site_catalog(customer, ppid)
+
     onboarding = {
         "has_customer": customer is not None,
-        "has_site": False,
+        "has_site": bool(merged_sites),
         "subscription_active": False,
         "next_step": "register_site",
     }
 
     if customer:
-        sites = list(getattr(customer, "sites", None) or [])
-        onboarding["has_site"] = bool(sites)
+        onboarding["has_site"] = bool(merged_sites)
         onboarding["subscription_active"] = (customer.subscription_status or "").lower() == "active"
-        if not sites:
+        if not merged_sites:
             onboarding["next_step"] = "register_site"
         elif (customer.subscription_status or "none").lower() != "active":
             onboarding["next_step"] = "complete_checkout"
@@ -255,8 +260,11 @@ def billing_account_status():
                         onboarding["next_step"] = "ready"
 
         if customer and onboarding.get("has_site"):
-            first_site = (customer.sites or [{}])[0] if customer.sites else {}
+            first_site = merged_sites[0] if merged_sites else {}
             domain = first_site.get("site_domain") or ""
+            email = (
+                getattr(customer, "billing_email", None) or getattr(customer, "email", None) or ""
+            ).strip().lower()
             if not domain and email:
                 linked = db.query(Site).filter(Site.admin_email.ilike(email)).first()
                 domain = linked.site_domain if linked else ""
@@ -291,6 +299,7 @@ def billing_account_status():
             in ("1", "true", "yes", "on"),
         },
         "onboarding": onboarding,
+        "sites": merged_sites,
         "ppid": ppid,
     })
 
