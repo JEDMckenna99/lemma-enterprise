@@ -446,14 +446,26 @@ def main() -> int:
             },
             timeout=30,
         )
-        net_data = r.json() if r.ok else {}
-        results.append(
-            _step(
-                "network-revoke (customer API key)",
-                r.ok and net_data.get("success"),
-                str(net_data)[:200],
+        try:
+            net_data = r.json()
+        except ValueError:
+            net_data = {}
+        if r.status_code == 503 and net_data.get("error") == "network_revocation_disabled":
+            results.append(
+                _step(
+                    "network-revoke (customer API key)",
+                    True,
+                    "disabled (expected — set LEMMA_ISHUMAN_NETWORK_REVOCATION_ENABLED=1 to drill)",
+                )
             )
-        )
+        else:
+            results.append(
+                _step(
+                    "network-revoke (customer API key)",
+                    r.ok and net_data.get("success"),
+                    str(net_data)[:200],
+                )
+            )
         approve_headers = {**admin_headers, "Content-Type": "application/json"}
         r = requests.post(
             f"{base}/api/ishuman/approve-revocation",

@@ -440,3 +440,51 @@ def test_sync_revocations_to_bloom_includes_ppid_and_wallet_keys(
     assert "cred_abc" in revoked_keys
     assert "did:lemma:ppid_wallet_keys" in revoked_keys
     assert "wallet_kill_001" in revoked_keys
+
+
+@pytest.mark.unit
+def test_network_revoke_disabled_by_default(
+    ishuman_client,
+    fake_ishuman_db_session_factory,
+    monkeypatch,
+):
+    db = fake_ishuman_db_session_factory
+    _seed_site(db)
+    monkeypatch.delenv("LEMMA_ISHUMAN_NETWORK_REVOCATION_ENABLED", raising=False)
+
+    resp = ishuman_client.post(
+        "/api/ishuman/network-revoke",
+        json={"ppid": "did:lemma:ppid_network_disabled", "reason": "test"},
+        headers={"X-API-Key": "test_api_key"},
+    )
+    payload = resp.get_json()
+    assert resp.status_code == 503
+    assert payload["error"] == "network_revocation_disabled"
+
+
+@pytest.mark.unit
+def test_network_revoke_enabled_when_flag_set(
+    ishuman_client,
+    fake_ishuman_db_session_factory,
+    monkeypatch,
+):
+    from api.database import SiteBlock
+
+    db = fake_ishuman_db_session_factory
+    _seed_site(db)
+    monkeypatch.setattr("api.database.SessionLocal", db.session_local)
+    monkeypatch.setenv("LEMMA_ISHUMAN_NETWORK_REVOCATION_ENABLED", "1")
+
+    resp = ishuman_client.post(
+        "/api/ishuman/network-revoke",
+        json={"ppid": "did:lemma:ppid_network_enabled", "reason": "test"},
+        headers={"X-API-Key": "test_api_key"},
+    )
+    payload = resp.get_json()
+    assert resp.status_code == 200
+    assert payload["success"] is True
+    assert payload["status"] == "pending_review"
+    blocks = db.store.data[SiteBlock.__name__]
+    assert len(blocks) == 1
+    assert blocks[0].network_revocation_requested is True
+    assert blocks[0].network_revocation_status == "pending_review"

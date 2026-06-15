@@ -89,7 +89,8 @@ both the API key and workflow id are present.
 | ----------------------------------- | ----------------------------------------------------------------- |
 | `LEMMA_ISHUMAN_DEMO_ALLOW_TEST_VERIFY` | `"true"` enables `/api/demo/ishuman/*test*` bypass rails.       |
 | `LEMMA_ISHUMAN_DEMO_TEST_TOKEN`     | Shared secret required in `X-Demo-Test-Token` header.             |
-| `LEMMA_ISHUMAN_DEMO_ADMIN_TOKEN`    | Shared secret required in `X-Demo-Admin-Token` (network revoke).  |
+| `LEMMA_ISHUMAN_DEMO_ADMIN_TOKEN`    | Shared secret required in `X-Demo-Admin-Token` (demo network revoke drill).  |
+| `LEMMA_ISHUMAN_NETWORK_REVOCATION_ENABLED` | Default off. Set `1` to enable customer `POST /api/ishuman/network-revoke` and demo network-revoke UI. Admin approve and erase are unaffected. |
 | `LEMMA_ISHUMAN_SKELETON_IDV_ENABLED`| Default on non-production; Didit-free `/api/demo/ishuman/skeleton-idv-*`. |
 | `LEMMA_ISHUMAN_SKELETON_CREDENTIAL_TTL_SECONDS` | Short-lived skeleton master TTL (default `3600`).          |
 | `LEMMA_ISHUMAN_DEMO_QR_CREDENTIAL_TTL_SECONDS` | QR demo on `/demo/ishuman` master TTL (default `900` / 15 min). |

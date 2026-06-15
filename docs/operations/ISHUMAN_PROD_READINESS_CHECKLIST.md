@@ -82,8 +82,9 @@ Use this checklist to move isHuman from "deployed code" to "operationally live s
 - [ ] **Site block works (tier 1)**
   - `POST /api/ishuman/site-block`
   - `GET /api/ishuman/check` returns `blocked=true`, `reason=site_block`
-- [ ] **Network revoke request works (tier 2 request)**
-  - `POST /api/ishuman/network-revoke` returns pending state
+- [ ] **Network revoke request works (tier 2 request)** — optional until GA
+  - Requires `LEMMA_ISHUMAN_NETWORK_REVOCATION_ENABLED=1`
+  - `POST /api/ishuman/network-revoke` returns pending state (or `503 network_revocation_disabled` when flag off)
 - [ ] **Admin approval path works**
   - `POST /api/ishuman/approve-revocation` with admin credential
 - [ ] **Bloom/revocation propagation confirmed**

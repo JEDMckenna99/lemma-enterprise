@@ -42,7 +42,7 @@
             <p class="dev-subtitle">
                 Integrate verified-human credentials with site-private PPIDs and local browser verification.
                 Embed the SDK, set <code>siteId</code> to your hostname, and register a site API key only when you
-                need server-side blocks or network revocation requests.
+                need server-side PPID blocks.
             </p>
         </div>
         <div style="display:flex; gap:10px; flex-wrap:wrap; flex-shrink:0;">
@@ -151,7 +151,7 @@
             </p>
             <ul class="dev-hub-list">
                 <li><code>POST /api/ishuman/site-block</code> — immediate site-scoped PPID ban.</li>
-                <li><code>POST /api/ishuman/network-revoke</code> — request network-wide action.</li>
+                <li><code>POST /api/ishuman/site-unblock</code> — remove a site block.</li>
                 <li>Issue keys in the <a href="/developer/external-api-keys">API key manager</a>.</li>
             </ul>
             <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:16px;">
@@ -163,5 +163,6 @@
 
 <p class="dev-hub-note">
     Full documentation: <a href="/docs">/docs</a>.
+    AI agent integration guide: <a href="/docs/integration/ISHUMAN_AGENT_INTEGRATION.md">ISHUMAN_AGENT_INTEGRATION.md</a>.
 </p>
 {% endblock %}

@@ -324,6 +324,17 @@ def ishuman_demo_qr_credential_ttl_seconds() -> int:
     return max(300, min(value, 86400))
 
 
+def is_ishuman_network_revocation_enabled() -> bool:
+    """Customer-facing network-revoke request API (Tier 2 abuse).
+
+    Default off until operator review queue and SLA are GA-ready. Admin approve
+    and user erase paths are unaffected. Set
+    LEMMA_ISHUMAN_NETWORK_REVOCATION_ENABLED=1 to enable
+    ``POST /api/ishuman/network-revoke`` and demo network-revoke drills.
+    """
+    return _env_truthy("LEMMA_ISHUMAN_NETWORK_REVOCATION_ENABLED", False)
+
+
 def is_ishuman_pull_fallback_enabled() -> bool:
     """Whether status-poll may actively pull a didit decision to issue.
 

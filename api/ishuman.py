@@ -1891,6 +1891,18 @@ def network_revoke():
             "evidence_url": "https://..."
         }
     """
+    from api.config import is_ishuman_network_revocation_enabled
+
+    if not is_ishuman_network_revocation_enabled():
+        return jsonify({
+            "success": False,
+            "error": "network_revocation_disabled",
+            "message": (
+                "Network revocation requests are not available yet. "
+                "Use POST /api/ishuman/site-block for site-scoped enforcement."
+            ),
+        }), 503
+
     site = _require_site_api_key()
     if not site:
         return jsonify({"success": False, "error": "valid API key required"}), 401

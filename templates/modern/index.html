@@ -618,8 +618,8 @@
             </div>
             
             <div class="card">
-                <h3 class="card-title">Network Revocation Review</h3>
-                <p>Escalate severe abuse to network-wide revocation through an evidence-backed admin approval flow.</p>
+                <h3 class="card-title">Revocation Bloom Sync</h3>
+                <p>Site blocks propagate through signed revocation lists so verifiers reject banned PPIDs locally — no per-check server call.</p>
             </div>
             
             <div class="card">
@@ -792,7 +792,7 @@
         <div style="text-align: center; max-width: 860px; margin: 0 auto 56px;">
             <p style="font-size: var(--font-size-sm); font-weight: 700; text-transform: uppercase; letter-spacing: 2px; color: var(--primary); margin-bottom: 12px;">The network effect</p>
             <h2 style="margin-bottom: 16px;">Enforcement that compounds across sites</h2>
-            <p class="text-gray" style="max-width: 700px; margin: 0 auto;">Every site gets standalone value on day one — no network required. But because the person-root is shared, a verified human carries their proof across Lemma-enabled sites, and confirmed network-wide abuse can be revoked everywhere at once. The same identity can't simply start fresh somewhere else either.</p>
+            <p class="text-gray" style="max-width: 700px; margin: 0 auto;">Every site gets standalone value on day one — no network required. A verified human carries their proof across Lemma-enabled sites, and each integration keeps its own site-private PPID boundary.</p>
             <p class="text-gray" style="max-width: 700px; margin: 16px auto 0; font-style: italic;">Proof-of-humanity is the first claim on this rails. The same wallet, person-root, and local-verification model are designed to carry additional privacy-preserving proofs over time — like age or one-account-per-person — without ever exposing the underlying identity.</p>
         </div>
 
@@ -806,8 +806,8 @@
                 <p>The wallet bridge derives a site-bound credential on first request, so each integration gets its own PPID and privacy boundary.</p>
             </div>
             <div class="card">
-                <h3 class="card-title">Two-Tier Revocation</h3>
-                <p>Sites can block instantly at the domain level, then escalate to evidence-based network revocation for coordinated abuse response.</p>
+                <h3 class="card-title">Site-Scoped Enforcement</h3>
+                <p>Block abuse immediately on your domain with a site API key. Combine with your own app-level deny for fast response.</p>
             </div>
         </div>
 
@@ -840,7 +840,7 @@
             <div class="card"><h3 class="card-title">Not bot detection</h3><p>Your existing tools find suspicious behavior. lemma.id makes the consequence stick.</p></div>
             <div class="card"><h3 class="card-title">Not a global public identity</h3><p>Each site sees only a site-private PPID — not one reusable ID across the web.</p></div>
             <div class="card"><h3 class="card-title">Not an identity store you run</h3><p>Your servers never hold ID documents, names, or dates of birth — only a verdict and a site-private PPID. No KYC stack, no PII honeypot.</p></div>
-            <div class="card"><h3 class="card-title">Not permanent punishment</h3><p>Enforcement is tiered: site block, fresh IDV, then network revocation for severe abuse.</p></div>
+            <div class="card"><h3 class="card-title">Not permanent punishment</h3><p>Enforcement is tiered: immediate app deny, site block, and fresh IDV when users need to re-prove humanity.</p></div>
             <div class="card"><h3 class="card-title">Not a full fraud replacement</h3><p>Works alongside your risk stack — device fingerprinting, velocity rules, and behavior models.</p></div>
         </div>
         <p style="text-align: center; margin-top: 32px; max-width: 640px; margin-left: auto; margin-right: auto; color: var(--gray-600); font-size: var(--font-size-base);"><strong>What it is:</strong> an enforcement layer that makes repeat abuse harder to reset.</p>

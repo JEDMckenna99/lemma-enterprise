@@ -1,72 +1,59 @@
 # Lemma Documentation
 
-Lemma is a proof-first Agent Ops authorization system with a local-first OpenClaw starter path.
+lemma.id **proof of humanity** — verified-human credentials with site-private PPIDs for web platforms.
 
-## Start Here
+## Start here
 
-### Personal OpenClaw
+| Document | Description | Audience |
+|----------|-------------|----------|
+| [Public docs](https://lemma.id/docs) | SDK, API reference, quickstart, revocation | Developers |
+| [AI agent integration guide](integration/ISHUMAN_AGENT_INTEGRATION.md) | Guardrails, trust tiers, code patterns, checklist | AI coding agents |
+| [llms.txt](https://lemma.id/llms.txt) | Pointer file for agents | AI coding agents |
+| [AGENTS.md](../AGENTS.md) | Repo-root agent entrypoint | AI coding agents in this repo |
 
-If you want the practical beginner flow, start here:
+## What isHuman does
 
-| Document | Description | Time |
-|----------|-------------|------|
-| [OpenClaw Personal Quickstart](openclaw/PERSONAL_QUICKSTART.md) | Install one CLI, run one command, approve once, see allow and kill-to-deny | 5-10 min |
-| [What Lemma Adds Beyond OpenClaw](openclaw/WHAT_LEMMA_ADDS_BEYOND_OPENCLAW.md) | Plain-language explanation of the extra controls Lemma provides | 5 min |
-| [CLI README](CLI_PYPI_README.md) | Packaged CLI install and command summary | Reference |
+1. User completes live IDV once in a Lemma-hosted popup (wallet unlock + Didit).
+2. Browser SDK verifies credentials locally (Ed25519 + revocation bloom).
+3. Relying site receives `{ human, ppid }` — no government ID or KYC fields.
+4. Optional site API keys enable server-side PPID blocks.
 
-### Enterprise And Advanced Controls
+## Integration guides
 
-If you need policy lifecycle, exports, or org-level controls:
+| Document | Use case |
+|----------|----------|
+| [Simple Integration](integration/SIMPLE_INTEGRATION_GUIDE.md) | Website and backend login flow walkthrough |
+| [Quick Start: Simple Login](integration/QUICK_START_SIMPLE_LOGIN.md) | User-login quickstart |
+| [IAM-Only Integration](integration/IAM_ONLY_INTEGRATION_GUIDE.md) | IAM without proof-of-human |
+| [Permission Lemmas Guide](integration/PERMISSION_LEMMAS_IAM_DEVELOPER_GUIDE.md) | Complete IAM developer reference |
 
-| Document | Description | Time |
-|----------|-------------|------|
-| [OpenClaw Operator Runbook](operations/OPENCLAW_OPERATOR_RUNBOOK.md) | Runtime onboarding, incident flows, and kill/revoke drills | 10 min |
-| [Developer Auth Contract](api/DEVELOPER_AUTH_CONTRACT_V1.md) | Proof-first contract for advanced agent/runtime integrations | 10 min |
-| [Agent Ops Readiness](AGENT_OPS_READINESS.md) | Build/test tracker for production controls | Reference |
-| [Prompt Injection Ontology](security/AGENT_PROOF_ONTOLOGY_PROMPT_INJECTION.md) | Trust-state and taint-epoch containment model | Reference |
-
-## What Lemma Does
-
-1. Runtime onboarding links agent runtimes to PPID-bound controls.
-2. Proof-native checks enforce scope, resource, and risk at request time.
-3. Agent Ops controls provide kill switches, decision logs, exports, and alerts.
-4. Prompt-injection containment is modeled with trust-state and taint-epoch policy.
-5. lemma.id proof of humanity issues reusable human credentials with site-private PPID derivation and two-tier revocation controls.
-
-## Architecture And Security
+## Architecture and security
 
 | Document | Description |
 |----------|-------------|
 | [Wallet-First Architecture](architecture/ARCHITECTURE_WALLET_FIRST.md) | How wallet-first differs from OAuth |
-| [Whitepaper](architecture/WHITEPAPER_DIGITAL_LEMMAS.md) | Complete technical specification |
-| [Protocol Design](protocol/PROTOCOL_DESIGN.md) | Core verification protocol |
 | [Threat Model](security/THREAT_MODEL.md) | Security analysis and mitigations |
-| [Security Review Package](security/SECURITY_REVIEW_PACKAGE.md) | Comprehensive security documentation |
+| [isHuman local-first outline](security/ISHUMAN_LOCAL_FIRST_IMPLEMENTATION_OUTLINE.md) | Local verification design |
 | [Security Checklist](security/SECURITY_CHECKLIST.md) | Launch and audit verification checklist |
 | [Error Codes](ERROR_CODES.md) | Error handling reference |
 
-## Other Guides
+## Operations (internal)
 
-| Document | Use Case |
-|----------|----------|
-| [Simple Integration](integration/SIMPLE_INTEGRATION_GUIDE.md) | Website and backend login flow walkthrough |
-| [Quick Start: Simple Login](integration/QUICK_START_SIMPLE_LOGIN.md) | User-login quickstart, distinct from agent runtime auth |
-| [IAM-Only Integration](integration/IAM_ONLY_INTEGRATION_GUIDE.md) | IAM without Proof-of-Human |
-| [Permission Lemmas Guide](integration/PERMISSION_LEMMAS_IAM_DEVELOPER_GUIDE.md) | Complete IAM developer reference |
-| [lemma.id proof of humanity](https://lemma.id/docs) | SDK and API reference for proof-of-humanity integration |
-| [Agent Ops](https://lemma.id/docs/agents) | CLI, Lemma Firewall, and runtime control-plane documentation |
-| [KMS Setup Guide](operations/KMS_SETUP_GUIDE.md) | AWS KMS configuration for key management |
-| [CLI Release Checklist](operations/CLI_RELEASE_CHECKLIST.md) | Packaging and release workflow |
-| [Launch Status](status/GA_GATE_STATUS.md) | Current readiness snapshot |
+| Document | Description |
+|----------|-------------|
+| [isHuman prod readiness](operations/ISHUMAN_PROD_READINESS_CHECKLIST.md) | Production go-live checklist |
+| [Environment config](operations/ENVIRONMENT_CONFIG.md) | Environment variables |
 
-## Quick Links
+Agent Ops (lemma-cli, Lemma Firewall, runtime control plane) documentation is operator-only and not part of public relying-site docs.
+
+## Quick links
 
 | Resource | URL |
 |----------|-----|
-| Live Platform | https://lemma.id |
-| Developer Platform | https://lemma.id/platform |
-| Wallet | https://lemma.id/wallet |
-| API Status | https://status.lemma.id |
+| Live platform | https://lemma.id |
+| Developer hub | https://lemma.id/developer/ishuman |
+| Live demo | https://lemma.id/demo/ishuman |
+| Browser SDK | https://lemma.id/sdk/ishuman-verifier.js |
 
 ## Support
 

@@ -152,13 +152,22 @@ def _demo_exposes_test_token() -> bool:
 
 def _demo_page_context() -> dict:
     """Server-only demo tokens for /demo/ishuman (never exposed on other routes)."""
-    from api.config import is_ishuman_demo_qr_idv_enabled, is_ishuman_skeleton_idv_enabled
+    from api.config import (
+        is_ishuman_demo_qr_idv_enabled,
+        is_ishuman_network_revocation_enabled,
+        is_ishuman_skeleton_idv_enabled,
+    )
 
     demo_enabled = _demo_enabled()
     expose_token = _demo_exposes_test_token()
+    network_revocation_enabled = is_ishuman_network_revocation_enabled()
     return {
         "demo_sites": list(DEMO_SITES.values()),
-        "network_revoke_configured": bool(os.getenv("LEMMA_ISHUMAN_DEMO_ADMIN_TOKEN")),
+        "network_revocation_enabled": network_revocation_enabled,
+        "network_revoke_configured": (
+            network_revocation_enabled
+            and bool(os.getenv("LEMMA_ISHUMAN_DEMO_ADMIN_TOKEN"))
+        ),
         "demo_test_verify_enabled": (
             demo_enabled
             and os.getenv("LEMMA_ISHUMAN_DEMO_ALLOW_TEST_VERIFY", "").lower() == "true"
@@ -212,16 +221,22 @@ def ishuman_idv_popup():
 def ishuman_demo_config():
     from api.config import (
         is_ishuman_demo_qr_idv_enabled,
+        is_ishuman_network_revocation_enabled,
         is_ishuman_skeleton_idv_enabled,
         ishuman_demo_qr_credential_ttl_seconds,
     )
 
     sites = ensure_demo_sites()
+    network_revocation_enabled = is_ishuman_network_revocation_enabled()
     return jsonify({
         "success": True,
         "sites": sites,
         "stripe_demo_rail": True,
-        "network_revoke_configured": bool(os.getenv("LEMMA_ISHUMAN_DEMO_ADMIN_TOKEN")),
+        "network_revocation_enabled": network_revocation_enabled,
+        "network_revoke_configured": (
+            network_revocation_enabled
+            and bool(os.getenv("LEMMA_ISHUMAN_DEMO_ADMIN_TOKEN"))
+        ),
         "test_verify_enabled": (
             _demo_enabled()
             and os.getenv("LEMMA_ISHUMAN_DEMO_ALLOW_TEST_VERIFY", "").lower() == "true"
@@ -385,8 +400,12 @@ def ishuman_demo_site_unblock():
 
 @ishuman_demo_bp.route("/api/demo/ishuman/network-revoke-request", methods=["POST"])
 def ishuman_demo_network_revoke_request():
+    from api.config import is_ishuman_network_revocation_enabled
     from api.database import SessionLocal
     from api.site_ppid_revocation import revoke_site_bound_ppid
+
+    if not is_ishuman_network_revocation_enabled():
+        return jsonify({"success": False, "error": "network_revocation_disabled"}), 503
 
     body = request.get_json(silent=True) or {}
     slug = body.get("site_slug", "tickets")
