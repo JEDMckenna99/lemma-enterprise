@@ -13,7 +13,7 @@
         <li><strong>Add the verifier SDK</strong> to your page (see <a href="#sdk-integration">SDK integration</a> below).</li>
         <li><strong>Gate a sensitive action</strong> with <code>await verifier.verify({ autoProvision: true })</code>. The first visit may open a Lemma-hosted popup (wallet unlock + live IDV). Fail closed when <code>human</code> is false.</li>
         <li><strong>Store <code>ppid</code></strong> on your user or account record. It is an opaque, site-private identifier — not a government ID or email.</li>
-        <li><strong>Optional — API key:</strong> create one in the <a href="/developer/external-api-keys">API key manager</a> when you need server-side blocks or revocation requests. An API key is <em>not</em> required for the basic human check.</li>
+        <li><strong>Optional — API key:</strong> create one in the <a href="/developer/external-api-keys">API key manager</a> when you need server-side PPID blocks. An API key is <em>not</em> required for the basic human check.</li>
         <li><strong>On confirmed abuse:</strong> call <code>POST /api/ishuman/site-block</code> with your API key (see <a href="#revocation">Revocation</a>). Do not rely on the abuser&apos;s browser to enforce the ban.</li>
     </ol>
     <div class="callout callout--info">
