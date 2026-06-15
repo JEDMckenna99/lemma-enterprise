@@ -55,7 +55,7 @@ h1{color:#1e293b;font-weight:600;line-height:1.25;margin-bottom:16px;font-size:4
     <header class="nav-header">
         <nav class="nav-container">
             <!-- Brand Link with Logo - explicit dimensions prevent CLS -->
-            <a href="/" class="nav-logo">
+            <a href="/?home=1" class="nav-logo">
                 <img src="{{ url_for('static', filename='img/lemma_logo.svg') }}" alt="lemma.id" class="nav-logo-icon" width="36" height="36">
                 <span>lemma.id</span>
             </a>
@@ -69,7 +69,7 @@ h1{color:#1e293b;font-weight:600;line-height:1.25;margin-bottom:16px;font-size:4
             
             <!-- Navigation Links - toggleable on mobile -->
             <div class="nav-center" id="nav-center">
-                <a href="/" class="nav-link" id="nav-product">Product</a>
+                <a href="/?home=1" class="nav-link" id="nav-product">Product</a>
                 <a href="/demo" class="nav-link">Demo</a>
                 <a href="/docs" class="nav-link">Docs</a>
                 <a href="/pricing" class="nav-link" id="nav-pricing">Pricing</a>

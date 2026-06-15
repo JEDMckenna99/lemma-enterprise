@@ -51,6 +51,18 @@
     line-height: 1.5;
     font-weight: 500;
 }
+.wallet-about-link {
+    margin: 14px 0 0;
+}
+.wallet-about-link a {
+    font-size: 0.88rem;
+    font-weight: 600;
+    color: var(--wallet-brand);
+    text-decoration: none;
+}
+.wallet-about-link a:hover {
+    text-decoration: underline;
+}
 
 /* Cards */
 .wallet-container .card {

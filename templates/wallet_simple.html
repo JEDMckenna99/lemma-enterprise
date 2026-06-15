@@ -6,7 +6,7 @@
 {% block preload_scripts %}{% endblock %}
 
 {% block head %}
-<link rel="stylesheet" href="{{ url_for('static', filename='css/wallet.css') }}?v=4">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/wallet.css') }}?v=5">
 {% endblock %}
 
 {% block content %}
@@ -17,6 +17,7 @@
         </div>
         <h1 class="wallet-brand-name">lemma.id</h1>
         <p class="wallet-tagline">personal data minimizer</p>
+        <p class="wallet-about-link"><a href="/?home=1">About lemma.id</a></p>
     </header>
 
     <!-- STATUS -->
