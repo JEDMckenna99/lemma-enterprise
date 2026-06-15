@@ -123,7 +123,7 @@ def test_mobile_handoff_shows_success_ui():
     idv_html = IDV_HTML.read_text(encoding="utf-8")
     assert "showMobileHandoffCompleteUi" in idv_html
     assert "hasHandoffLinkedWallet" in idv_html
-    assert "Your lemma.id is ready on this phone." in idv_html
+    assert "Your lemma.id is ready on this device." in idv_html
 
 
 @pytest.mark.browser
@@ -179,7 +179,7 @@ def test_idv_popup_supports_fresh_idv_mode():
     idv_html = IDV_HTML.read_text(encoding="utf-8")
     assert "fresh_idv" in idv_html
     assert "runFreshIdvAndClose" in idv_html
-    assert "Complete a fresh identity check" in idv_html
+    assert "Starting a fresh verification" in idv_html
 
 
 @pytest.mark.browser
@@ -219,8 +219,10 @@ def test_wallet_pages_use_current_wallet_bundle():
         assert "lemma-wallet.js?v=2542" not in source
         if path == IDV_HTML:
             assert "lemma-wallet.js?v=2550" in source
-        else:
+        elif path == MODERN_LAYOUT_HTML:
             assert "lemma-wallet.js') }}?v=2550" in source or "lemma-wallet.js?v=2550" in source
+        else:
+            assert "lemma-wallet.js?v=2549" in source
         assert "lemma-keys.js?v=2" not in source
         assert "lemma-keys.js?v=3" not in source
         assert "lemma-keys.js') }}?v=5" in source or "lemma-keys.js?v=5" in source
