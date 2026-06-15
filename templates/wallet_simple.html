@@ -1,35 +1,23 @@
 {% extends "modern/layout.html" %}
 
 {% block title %}Lemma ID{% endblock %}
-{% block description %}Your secure identity across the web. One sign-in, everywhere.{% endblock %}
+{% block description %}Manage your lemma.id wallet — human proof, device linking, and unlock settings.{% endblock %}
 
 {% block preload_scripts %}{% endblock %}
 
 {% block head %}
-<link rel="stylesheet" href="{{ url_for('static', filename='css/wallet.css') }}?v=2">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/wallet.css') }}?v=3">
 {% endblock %}
 
 {% block content %}
 <div class="wallet-container">
     <header class="wallet-header">
         <div class="wallet-logo">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120">
-                <defs>
-                    <linearGradient id="logoGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                        <stop offset="0%" stop-color="#667eea"/>
-                        <stop offset="100%" stop-color="#764ba2"/>
-                    </linearGradient>
-                </defs>
-                <g stroke="url(#logoGrad)" stroke-width="6" fill="none" stroke-linecap="round" stroke-linejoin="round">
-                    <ellipse cx="60" cy="60" rx="38" ry="14" />
-                    <ellipse cx="60" cy="60" rx="38" ry="14" transform="rotate(90 60 60)" />
-                    <ellipse cx="60" cy="60" rx="38" ry="14" transform="rotate(45 60 60)" />
-                    <ellipse cx="60" cy="60" rx="38" ry="14" transform="rotate(-45 60 60)" />
-                </g>
-            </svg>
+            <img src="/static/img/lemma_logo.svg" alt="Lemma.id" width="48" height="48">
         </div>
+        <p class="wallet-eyebrow">Proof of humanity</p>
         <h1>Lemma ID</h1>
-        <p>One sign-in, everywhere</p>
+        <p>Your private wallet for verified-human credentials</p>
     </header>
 
     <!-- STATUS -->
@@ -44,8 +32,8 @@
     <!-- LOCKED VIEW -->
     <div id="locked-view">
         <div class="card" style="text-align: center;">
-            <button id="unlock-btn" class="btn btn-primary btn-full" style="font-size: 1.1rem; padding: 16px;">
-                Sign In
+            <button id="unlock-btn" class="btn btn-primary btn-full btn-lg">
+                Unlock Lemma ID
             </button>
 
             <div id="no-wallet-msg" class="hidden" style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #e5e7eb;">
@@ -59,13 +47,21 @@
     <!-- UNLOCKED VIEW -->
     <div id="unlocked-view" class="hidden">
         
-        <!-- SIGN OUT BUTTON -->
+        <!-- PROOFS SUMMARY -->
+        <div class="card" id="proofs-card">
+            <h2><span class="icon">&#10003;</span> Your proofs</h2>
+            <div id="proofs-summary" class="proofs-summary">
+                <p class="proofs-loading">Loading proof summary...</p>
+            </div>
+        </div>
+
+        <!-- LOCK -->
         <div class="card">
-            <button id="lock-btn" class="btn btn-danger btn-full">
-                Sign Out Everywhere
+            <button id="lock-btn" class="btn btn-secondary btn-full">
+                Lock Lemma ID
             </button>
-            <p style="text-align: center; color: #6b7280; font-size: 0.8rem; margin: 12px 0 0;">
-                Signs you out on all sites and all devices
+            <p class="card-help">
+                Requires your passkey to unlock again. Your proofs stay stored — nothing is deleted.
             </p>
         </div>
 
@@ -80,8 +76,8 @@
 
             <!-- SEND TAB -->
             <div id="send-content">
-                <p style="color: #6b7280; font-size: 0.9rem; margin-bottom: 16px;">
-                    Scan this QR code on your other device to add it.
+                <p style="color: #64748b; font-size: 0.9rem; margin-bottom: 16px;">
+                    Link another phone or computer to this Lemma ID.
                 </p>
                 <button id="show-qr-btn" class="btn btn-primary btn-full">Generate QR Code</button>
                 
@@ -112,17 +108,21 @@
             
             <div class="setting-row">
                 <div>
-                    <div class="setting-label">Session duration</div>
-                    <div class="setting-description">How long until you need to unlock again</div>
+                    <div class="setting-label">Unlock duration</div>
+                    <div class="setting-description">How long your wallet stays unlocked after passkey verification</div>
                 </div>
                 <div class="setting-control">
                     <select id="session-duration-select">
+                        <option value="1">1 hour</option>
+                        <option value="2">2 hours</option>
                         <option value="4">4 hours</option>
+                        <option value="6">6 hours</option>
                         <option value="8">8 hours</option>
                         <option value="10" selected>10 hours</option>
                     </select>
                 </div>
             </div>
+            <p id="session-duration-note" class="setting-note hidden"></p>
         </div>
 
         <!-- DANGER ZONE -->
@@ -342,8 +342,9 @@ async function checkWalletState() {
                 }
             }
             
-            updateStatusDisplay(true, 'Signed In', 'Your Lemma ID is active');
+            updateStatusDisplay(true, 'Unlocked', 'Your human proof wallet is active');
             showUnlockedView();
+            await loadProofSummary();
             return true;
         }
         
@@ -374,17 +375,19 @@ async function checkWalletState() {
                 hadGlobalSession = true;
                 localStorage.setItem('lemma_had_global_session', 'true');
                 
-                updateStatusDisplay(true, 'Signed In', 'Synced from another device');
+                updateStatusDisplay(true, 'Unlocked', 'Synced from another device');
                 showUnlockedView();
+                await loadProofSummary();
                 return true;
             }
         }
         
         // Not signed in - show appropriate state
         if (info.hasPasskey) {
-            updateStatusDisplay(false, 'Signed Out', 'Sign in to continue');
+            updateStatusDisplay(false, 'Locked', 'Unlock with your passkey to use your proofs');
             document.getElementById('no-wallet-msg').classList.add('hidden');
             document.getElementById('unlock-btn').classList.remove('hidden');
+            document.getElementById('unlock-btn').textContent = 'Unlock Lemma ID';
             showLockedView();
         } else if (info.hasWalletSecret) {
             updateStatusDisplay(false, 'Device Added', 'Create a passkey to secure it');
@@ -392,7 +395,7 @@ async function checkWalletState() {
             document.getElementById('no-wallet-msg').classList.add('hidden');
             showLockedView();
         } else {
-            updateStatusDisplay(false, 'Welcome', 'Create your Lemma ID or add this device');
+            updateStatusDisplay(false, 'Welcome', 'Create your Lemma ID to store your human proof');
             document.getElementById('unlock-btn').classList.add('hidden');
             document.getElementById('no-wallet-msg').classList.remove('hidden');
             showLockedView();
@@ -443,8 +446,7 @@ async function unlockWallet() {
 
         const nowUnlocked = await checkWalletState();
         if (nowUnlocked) {
-            await loadControlPlanePreferences();
-            await loadAgentOps();
+            await applySessionDuration({ silent: true });
         }
 
         // Broadcast unlock to other tabs on same device (instant, no polling needed)
@@ -568,8 +570,9 @@ function connectCrossDeviceSSE(walletId) {
                     localStorage.setItem('lemma_had_global_session', 'true');
                     
                     console.log('[SSE] Auto-unlocked local wallet from remote session');
-                    updateStatusDisplay(true, 'Signed In', 'Synced from another device');
+                    updateStatusDisplay(true, 'Unlocked', 'Synced from another device');
                     showUnlockedView();
+                    loadProofSummary();
                 }
             } catch (e) {
                 console.warn('[SSE] Failed to process session_restored:', e);
@@ -837,16 +840,185 @@ async function clearWallet() {
     }
 }
 
-// Session duration setting
-function saveSessionDuration() {
-    const value = document.getElementById('session-duration-select').value;
-    localStorage.setItem('lemma_session_hours', value);
+// Session duration setting — persists preference and updates active unlock window
+function getSessionHoursFromSelect() {
+    const value = parseInt(document.getElementById('session-duration-select').value, 10);
+    return Number.isFinite(value) ? value : 10;
+}
+
+function showSessionDurationNote(message) {
+    const note = document.getElementById('session-duration-note');
+    if (!note) return;
+    note.textContent = message;
+    note.classList.remove('hidden');
+}
+
+async function applySessionDuration(options = {}) {
+    const hours = getSessionHoursFromSelect();
+    localStorage.setItem('lemma_session_hours', String(hours));
+
+    if (!wallet?.session?.isUnlocked) {
+        if (!options.silent) {
+            showSessionDurationNote('Saved. Applies the next time you unlock.');
+        }
+        return;
+    }
+
+    const sessionMs = (typeof getSessionDurationMs === 'function')
+        ? getSessionDurationMs()
+        : hours * 60 * 60 * 1000;
+    const unlockedAt = wallet.session.unlockedAt || Date.now();
+    wallet.session.expiresAt = unlockedAt + sessionMs;
+    await wallet._put('session', { id: 'current', ...wallet.session });
+
+    const info = await wallet.getWalletInfo();
+    const onLemmaId = /^(www\.)?lemma\.id$/i.test(window.location.hostname.replace(/^www\./i, ''));
+    if (info.walletId && onLemmaId) {
+        try {
+            await fetch('/api/wallet/signal-unlock', {
+                method: 'POST',
+                credentials: 'include',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    wallet_id: info.walletId,
+                    unlocked_at: unlockedAt,
+                    expires_at: Math.floor(wallet.session.expiresAt / 1000)
+                })
+            });
+        } catch (e) {
+            console.warn('[Settings] Could not sync unlock duration to server:', e.message);
+        }
+    }
+
+    if (!options.silent) {
+        showSessionDurationNote(`Unlock window set to ${hours} hour${hours === 1 ? '' : 's'}.`);
+    }
 }
 
 function loadSessionDuration() {
     const saved = localStorage.getItem('lemma_session_hours');
     if (saved) {
         document.getElementById('session-duration-select').value = saved;
+    }
+}
+
+function normalizeSiteLabel(raw) {
+    const text = String(raw || '').trim();
+    if (!text) return '';
+    if (text === 'lemma.id' || text === 'lemma_platform') return 'lemma.id';
+    try {
+        if (text.includes('://')) return new URL(text).hostname.replace(/^www\./i, '');
+    } catch (_) {}
+    return text.replace(/^www\./i, '').split('/')[0].split(':')[0].toLowerCase();
+}
+
+function formatProofDate(value) {
+    if (!value) return null;
+    const ms = typeof value === 'number'
+        ? (value < 1e12 ? value * 1000 : value)
+        : Date.parse(value);
+    if (!Number.isFinite(ms)) return null;
+    return new Date(ms).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+}
+
+function renderProofRow(label, value, detail) {
+    return `
+        <div class="proof-row">
+            <div class="proof-row-label">${label}</div>
+            <div class="proof-row-value">${value}</div>
+            ${detail ? `<div class="proof-row-detail">${detail}</div>` : ''}
+        </div>
+    `;
+}
+
+async function loadProofSummary() {
+    const container = document.getElementById('proofs-summary');
+    if (!container) return;
+
+    try {
+        await initWallet();
+        const credentials = await wallet.getCredentials();
+        const claimsFor = (cred) => cred.claims || cred.credentialSubject || {};
+        const isHumanMaster = (cred) => {
+            const cl = claimsFor(cred);
+            if (!cl.isHuman) return false;
+            const site = normalizeSiteLabel(cl.siteDomain || cl.siteId || cl.site_id || cl.site || '');
+            return !site || site === 'lemma.id';
+        };
+        const isHumanSiteProof = (cred) => {
+            const cl = claimsFor(cred);
+            if (!cl.isHuman) return false;
+            const site = normalizeSiteLabel(cl.siteDomain || cl.siteId || cl.site_id || cl.site || '');
+            return !!site && site !== 'lemma.id';
+        };
+        const isPermissionLemma = (cred) => {
+            const pkg = String(cred.packageType || '').toLowerCase();
+            const cl = claimsFor(cred);
+            return (pkg === 'permission' || pkg === 'permissionlemma') && !cl.isHuman;
+        };
+
+        const masterProofs = credentials.filter(isHumanMaster);
+        const siteProofs = credentials.filter(isHumanSiteProof);
+        const permissionLemmas = credentials.filter(isPermissionLemma);
+
+        const siteSet = new Set();
+        siteProofs.forEach((cred) => {
+            const site = normalizeSiteLabel(
+                claimsFor(cred).siteDomain || claimsFor(cred).siteId || claimsFor(cred).site_id || claimsFor(cred).site
+            );
+            if (site) siteSet.add(site);
+        });
+        permissionLemmas.forEach((cred) => {
+            const site = normalizeSiteLabel(
+                claimsFor(cred).siteDomain || claimsFor(cred).siteId || claimsFor(cred).site_id || claimsFor(cred).site
+            );
+            if (site && site !== 'lemma.id') siteSet.add(site);
+        });
+
+        const master = masterProofs[0];
+        const masterClaims = master ? claimsFor(master) : {};
+        const masterIssued = master
+            ? formatProofDate(masterClaims.issuedAt || masterClaims.issued_at || master.issuanceDate || master.storedAt)
+            : null;
+
+        let html = '';
+        html += renderProofRow(
+            'Human proof',
+            master ? 'Verified' : 'Not yet created',
+            master
+                ? (masterIssued ? `Issued ${masterIssued}` : 'Master proof stored in this wallet')
+                : 'Complete identity verification when a site requests it'
+        );
+        html += renderProofRow(
+            'Site proofs',
+            String(siteSet.size),
+            siteSet.size
+                ? 'Each site gets its own private proof derived from your human proof'
+                : 'Created automatically when you verify on a site'
+        );
+
+        if (siteSet.size > 0) {
+            const sites = Array.from(siteSet).sort();
+            html += '<ul class="proof-site-list">';
+            sites.forEach((site) => {
+                html += `<li>${escapeHtml(site)}</li>`;
+            });
+            html += '</ul>';
+        }
+
+        if (permissionLemmas.length > 0) {
+            html += renderProofRow(
+                'Access credentials',
+                String(permissionLemmas.length),
+                'Legacy permission lemmas stored locally (no secrets shown)'
+            );
+        }
+
+        html += '<p class="proofs-privacy-note">Site identifiers stay private per site. PPIDs and wallet secrets are never shown here.</p>';
+        container.innerHTML = html;
+    } catch (e) {
+        console.warn('[Proofs] summary failed:', e.message);
+        container.innerHTML = '<p class="proofs-error">Could not load proof summary.</p>';
     }
 }
 
@@ -983,7 +1155,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     const isUnlocked = await checkWalletState();
     if (isUnlocked) {
-        // No extra wallet manager modules to load.
+        await applySessionDuration({ silent: true });
     }
     
     // Connect SSE for instant cross-device lock/unlock detection
@@ -1032,7 +1204,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('hide-qr-btn').addEventListener('click', hideQR);
     document.getElementById('link-device-btn').addEventListener('click', linkDevice);
     document.getElementById('clear-wallet-btn').addEventListener('click', clearWallet);
-    document.getElementById('session-duration-select').addEventListener('change', saveSessionDuration);
+    document.getElementById('session-duration-select').addEventListener('change', () => applySessionDuration());
 });
 </script>
 {% endblock %}
