@@ -8,8 +8,14 @@
   };
   const WIZARD_TOTAL = 7;
 
+  const PPID_PLACEHOLDER = {
+    tickets: 'ppid_ticketing_••••',
+    trials: 'ppid_trials_••••',
+  };
+
   const state = {
     config: null,
+    demoMode: null,
     wallet: null,
     walletId: null,
     walletSecret: null,
@@ -51,8 +57,29 @@
   function setPill(id, label, tone) {
     const el = $(id);
     if (!el) return;
-    el.textContent = label;
+    const display = id === 'ih-lemma-status' ? formatLemmaStatus(label) : label;
+    el.textContent = display;
     el.className = `demo-pill${tone ? ` ${tone}` : ''}`;
+  }
+
+  function isMasterReady() {
+    return !!(state.masterCredentialId || state.masterCredential);
+  }
+
+  function bothSitesVerified() {
+    return !!(state.results.tickets?.human && state.results.trials?.human);
+  }
+
+  function updateStepLocks() {
+    const ready = isMasterReady();
+    const bothVerified = bothSitesVerified();
+    for (let i = 1; i <= 3; i += 1) {
+      const el = $(`ih-step-${i}`);
+      if (!el) continue;
+      if (i === 1) el.classList.remove('is-locked');
+      else if (i === 2) el.classList.toggle('is-locked', !ready);
+      else if (i === 3) el.classList.toggle('is-locked', !bothVerified);
+    }
   }
 
   function setWorkflowHighlight(workflowStep) {
@@ -69,6 +96,45 @@
         if (el) el.classList.add('is-done');
       }
     }
+    updateStepLocks();
+  }
+
+  function maskPpid(slug, ppid) {
+    if (!ppid) return PPID_PLACEHOLDER[slug] || '—';
+    const text = String(ppid);
+    if (text.length <= 16) return text;
+    return `${text.slice(0, 10)}••••${text.slice(-4)}`;
+  }
+
+  function formatLemmaStatus(label) {
+    const map = {
+      CHECKING: 'Checking…',
+      READY: 'Ready',
+      NONE: 'Not started',
+      LOCKED: 'Locked',
+      UNLOCKED: 'Unlocked',
+      VERIFYING: 'Verifying…',
+      CLEARING: 'Clearing…',
+      CLEARED: 'Cleared',
+      'POPUP BLOCKED': 'Popup blocked',
+    };
+    return map[label] || label;
+  }
+
+  function formatSiteStatus(result) {
+    if (!result) return 'Pending';
+    if (result.human) return 'Human verified';
+    if (result.reason === 'site_blocked' || result.reason === 'revoked') return 'Blocked';
+    return 'Not verified';
+  }
+
+  function setDemoMode(mode) {
+    state.demoMode = mode;
+    const banner = $('ih-simulation-banner');
+    if (banner) banner.hidden = mode !== 'simulated';
+    const createBtn = $('ih-create-lemma-btn');
+    if (createBtn) createBtn.hidden = mode === 'simulated';
+    updateStepLocks();
   }
 
   function workflowStepForWizard(wizardStep) {
@@ -160,12 +226,14 @@
         state.masterCredentialId = master.id;
         localStorage.setItem('ishuman_demo_master_id', state.masterCredentialId);
         renderMaster(master);
+        updateStepLocks();
         return;
       }
 
       if (state.masterCredentialId) {
         setPill('ih-lemma-status', 'READY', 'ok');
         setDemoReadyBanner(true);
+        updateStepLocks();
         return;
       }
 
@@ -187,19 +255,19 @@
   function setWizardBusy(running) {
     state.wizardRunning = running;
     const ids = [
-      'ih-run-guided-demo',
-      'ih-run-guided-demo-hero',
-      'ih-wallet-btn',
+      'ih-start-live-demo',
+      'ih-start-simulated-demo',
+      'ih-unlock-lemma-btn',
+      'ih-create-lemma-btn',
       'ih-verify-sites-btn',
-      'ih-block-tickets-btn',
-      'ih-network-request-btn',
       'ih-verify-tickets-btn',
       'ih-verify-trials-btn',
       'ih-unblock-tickets-btn',
       'ih-abuse-block-btn',
-      'ih-abuse-verify-trials-btn',
+      'ih-abuse-recheck-btn',
       'ih-abuse-network-btn',
       'ih-force-reverify-btn',
+      'ih-run-guided-demo',
     ];
     for (const id of ids) {
       const el = $(id);
@@ -212,6 +280,32 @@
     }
     const shell = $('ih-wizard-shell');
     if (shell && !running && !state.masterCredentialId) shell.hidden = true;
+  }
+
+  async function startLiveDemo() {
+    setDemoMode('live');
+    setWorkflowHighlight(1);
+    scrollToPanel('ih-step-1');
+    log('Live demo started', 'create or unlock your lemma.id');
+  }
+
+  async function startSimulatedDemo() {
+    if (!state.config?.test_verify_enabled) {
+      log('Simulated demo unavailable', 'use Start live demo on this environment');
+      return;
+    }
+    setDemoMode('simulated');
+    setWorkflowHighlight(1);
+    scrollToPanel('ih-step-1');
+    log('Simulated demo started', 'no real lemma.id will be created');
+    try {
+      await initWallet();
+      await verifyOnceTestMode();
+      setWorkflowHighlight(2);
+      scrollToPanel('ih-step-2');
+    } catch (err) {
+      log('Simulated demo failed', err.message);
+    }
   }
 
   function demoHeaders() {
@@ -243,19 +337,18 @@
 
   function applyTestVerifyGate() {
     const enabled = !!(state.config && state.config.test_verify_enabled);
-    const notice = $('ih-test-verify-disabled');
-    const guidedIds = ['ih-run-guided-demo', 'ih-run-guided-demo-hero'];
+    const simBtn = $('ih-start-simulated-demo');
     const operatorConsole = $('ih-operator-console');
     const testIds = [
       'ih-start-idv-btn',
       'ih-test-complete-btn',
       'ih-force-reverify-btn',
       'ih-poll-btn',
+      'ih-run-guided-demo',
     ];
-    if (notice) notice.hidden = enabled;
-    for (const id of guidedIds) {
-      const el = $(id);
-      if (el) el.hidden = !enabled;
+    if (simBtn) {
+      simBtn.disabled = !enabled;
+      simBtn.title = enabled ? '' : 'Simulated demo is available on staging environments only';
     }
     if (operatorConsole) operatorConsole.hidden = !enabled;
     for (const id of testIds) {
@@ -272,20 +365,9 @@
       state.serverAdminToken = root.dataset.serverAdminToken || '';
     }
     applyTestVerifyGate();
-    applyCreateOptions();
     log('Demo config loaded', `${state.config.sites.length} sites`);
     updatePpidCompare();
-  }
-
-  function applyCreateOptions() {
-    const qrOption = $('ih-qr-demo-option');
-    const hint = $('ih-create-lemma-id-hint');
-    const qrEnabled = Boolean(state.config?.qr_demo_idv_enabled);
-    if (qrOption) qrOption.hidden = !qrEnabled;
-    if (hint && qrEnabled) {
-      const ttlMin = Math.round((state.config.demo_qr_credential_ttl_seconds || 900) / 60);
-      hint.textContent = `Try "Create demo lemma.id" for the popup + QR walkthrough (~${ttlMin} min), or "Create my lemma.id" for the real join flow.`;
-    }
+    updateStepLocks();
   }
 
   function updateIntegrationLatency() {
@@ -298,19 +380,44 @@
   }
 
   function updatePpidCompare() {
-    const t = $('ih-tickets-ppid') && $('ih-tickets-ppid').textContent;
-    const r = $('ih-trials-ppid') && $('ih-trials-ppid').textContent;
+    const tResult = state.results.tickets;
+    const rResult = state.results.trials;
+    const t = tResult?.ppid ? maskPpid('tickets', tResult.ppid) : null;
+    const r = rResult?.ppid ? maskPpid('trials', rResult.ppid) : null;
     const tCmp = $('ih-tickets-ppid-compare');
     const rCmp = $('ih-trials-ppid-compare');
-    if (tCmp && t) tCmp.textContent = t;
-    if (rCmp && r) rCmp.textContent = r;
+    if (tCmp) tCmp.textContent = t || '—';
+    if (rCmp) rCmp.textContent = r || '—';
     const diff = $('ih-ppid-diff');
-    if (!diff || !t || !r || t === '-' || r === '-') {
-      if (diff) diff.textContent = 'Verify both sites to compare';
+    if (!diff || !t || !r) {
+      if (diff) diff.textContent = 'Verify both sites';
       return;
     }
-    diff.textContent = t !== r ? 'Different site IDs ✓' : 'Same (unexpected)';
+    diff.textContent = t !== r ? 'Result: different site-private IDs' : 'Result: same ID (unexpected)';
     diff.className = t !== r ? 'ppid-diff' : 'ppid-diff deny';
+  }
+
+  function updateBlockResultsTable() {
+    const table = $('ih-block-results-table');
+    const ticketsCell = $('ih-block-result-tickets');
+    const trialsCell = $('ih-block-result-trials');
+    const unblockBtn = $('ih-unblock-tickets-btn');
+    const tickets = state.results.tickets;
+    const trials = state.results.trials;
+    if (!table || !ticketsCell || !trialsCell) return;
+    if (!tickets && !trials) {
+      table.hidden = true;
+      if (unblockBtn) unblockBtn.hidden = true;
+      return;
+    }
+    table.hidden = false;
+    ticketsCell.textContent = tickets?.human ? 'Still verified' : 'Blocked';
+    ticketsCell.className = tickets?.human ? 'result-ok' : 'result-deny';
+    trialsCell.textContent = trials?.human ? 'Still verified' : 'Blocked';
+    trialsCell.className = trials?.human ? 'result-ok' : 'result-deny';
+    if (unblockBtn) {
+      unblockBtn.hidden = !(tickets && !tickets.human && tickets.reason === 'site_blocked');
+    }
   }
 
   async function copyText(text) {
@@ -541,6 +648,8 @@
       if (outcome === 'completed') {
         setWorkflowHighlight(2);
         setDemoReadyBanner(true);
+        updateStepLocks();
+        scrollToPanel('ih-step-2');
       }
     };
     const onMessage = (event) => {
@@ -560,11 +669,12 @@
   }
 
   function createLemmaIdViaPopup() {
+    if (state.demoMode === 'simulated') {
+      log('Create lemma.id skipped', 'use Unlock in simulation mode');
+      return null;
+    }
+    setDemoMode('live');
     return openIdvPopup({ demoQr: false });
-  }
-
-  function startQrDemoIdvFlow() {
-    return openIdvPopup({ demoQr: true });
   }
 
   // Cross-origin storage wipe for the customer demo sites. lemma.id JS cannot
@@ -718,7 +828,16 @@
     if (wid) wid.textContent = '-';
     setDemoReadyBanner(false);
     setPill('ih-lemma-status', 'CLEARED', 'warn');
-    log('lemma.id cleared', 'run "Create my lemma.id" to start fresh');
+    setDemoMode(null);
+    updateStepLocks();
+    for (const slug of SITE_SLUGS) {
+      setPill(`ih-${slug}-pill`, 'Pending', '');
+      const ppidEl = $(`ih-${slug}-ppid`);
+      if (ppidEl) ppidEl.textContent = PPID_PLACEHOLDER[slug];
+    }
+    updatePpidCompare();
+    updateBlockResultsTable();
+    log('lemma.id cleared', 'start the live or simulated demo again');
   }
 
   async function claimVerifiedMaster(activeSessionId) {
@@ -810,8 +929,6 @@
 
   function renderMaster(credential) {
     const claims = credential?.claims || credential?.credentialSubject || {};
-    const mid = $('ih-master-id');
-    if (mid) mid.textContent = short(credential?.id);
     const json = $('ih-master-json');
     if (json) {
       json.textContent = pretty({
@@ -823,6 +940,7 @@
     }
     setPill('ih-lemma-status', 'READY', 'ok');
     setDemoReadyBanner(true);
+    updateStepLocks();
   }
 
   function verifierFor(slug) {
@@ -858,11 +976,21 @@
   async function verifyBothSites() {
     await verifySite('tickets');
     await verifySite('trials');
+    if (bothSitesVerified()) {
+      setWorkflowHighlight(3);
+      scrollToPanel('ih-abuse-panel');
+    }
+  }
+
+  async function recheckBothSitesAfterBlock() {
+    await verifySite('tickets');
+    await verifySite('trials');
+    updateBlockResultsTable();
   }
 
   function renderSite(slug, result) {
     const tone = result.human ? 'ok' : (result.reason === 'site_blocked' || result.reason === 'revoked' ? 'deny' : 'warn');
-    setPill(`ih-${slug}-pill`, result.human ? 'HUMAN' : 'DENY', tone);
+    setPill(`ih-${slug}-pill`, formatSiteStatus(result), tone);
     const card = $(`ih-${slug}-card`);
     if (card) {
       card.classList.remove('is-human', 'is-deny', 'is-pending');
@@ -871,12 +999,14 @@
       else card.classList.add('is-pending');
     }
     const ppidEl = $(`ih-${slug}-ppid`);
-    if (ppidEl) ppidEl.textContent = result.ppid || '-';
+    if (ppidEl) ppidEl.textContent = maskPpid(slug, result.ppid);
     const reasonEl = $(`ih-${slug}-reason`);
-    if (reasonEl) reasonEl.textContent = result.reason || '-';
+    if (reasonEl) reasonEl.textContent = result.reason || '—';
     const latEl = $(`ih-${slug}-latency`);
-    if (latEl) latEl.textContent = Number.isFinite(result.timeMs) ? `${result.timeMs.toFixed(1)}ms` : '-';
+    if (latEl) latEl.textContent = Number.isFinite(result.timeMs) ? `${result.timeMs.toFixed(1)}ms` : '—';
     updatePpidCompare();
+    updateStepLocks();
+    updateBlockResultsTable();
   }
 
   async function fetchCheck(ppid, siteId) {
@@ -958,15 +1088,13 @@
     if (netJson) netJson.textContent = pretty(payload);
     log('Ticketing site block applied', short(result.ppid));
 
-    const outcome = $('ih-abuse-block-outcome');
-    if (outcome) {
-      outcome.textContent = `tickets DENY · revocation_synced: ${payload.revocation_synced}`;
-      outcome.className = 'abuse-outcome deny';
-    }
-
     await verifySite('tickets');
+    await verifySite('trials');
     await refreshAbuseChecks();
     await probeDerive('tickets');
+    setWorkflowHighlight(3);
+    scrollToPanel('ih-abuse-panel');
+    updateBlockResultsTable();
   }
 
   async function unblockTickets() {
@@ -981,7 +1109,9 @@
     if (netJson) netJson.textContent = pretty(payload);
     log('Ticketing site block removed', short(ppid));
     await verifySite('tickets');
+    await verifySite('trials');
     await refreshAbuseChecks();
+    updateBlockResultsTable();
   }
 
   async function requestNetworkReview() {
@@ -1185,8 +1315,8 @@
   function bind(id, fn) {
     const el = $(id);
     if (!el) return;
-    el.addEventListener('click', async () => {
-      if (state.wizardRunning && id !== 'ih-run-guided-demo' && id !== 'ih-run-guided-demo-hero') return;
+      el.addEventListener('click', async () => {
+      if (state.wizardRunning && id !== 'ih-run-guided-demo') return;
       el.disabled = true;
       try {
         await fn();
@@ -1203,11 +1333,10 @@
   async function boot() {
     setWorkflowHighlight(1);
     await loadConfig();
-    bind('ih-run-guided-demo', runGuidedDemo);
-    bind('ih-run-guided-demo-hero', runGuidedDemo);
-    bind('ih-wallet-btn', initWallet);
-    bind('ih-try-qr-demo-btn', startQrDemoIdvFlow);
-    bind('ih-create-lemma-id-btn', createLemmaIdViaPopup);
+    bind('ih-start-live-demo', startLiveDemo);
+    bind('ih-start-simulated-demo', startSimulatedDemo);
+    bind('ih-unlock-lemma-btn', initWallet);
+    bind('ih-create-lemma-btn', createLemmaIdViaPopup);
     bind('ih-clear-lemma-id-btn', clearLemmaId);
     bind('ih-start-idv-btn', startIdentityVerification);
     bind('ih-test-complete-btn', completeTestModeVerification);
@@ -1216,12 +1345,10 @@
     bind('ih-refresh-status-btn', refreshStatus);
     bind('ih-verify-tickets-btn', () => verifySite('tickets'));
     bind('ih-verify-trials-btn', () => verifySite('trials'));
-    bind('ih-block-tickets-btn', blockTickets);
     bind('ih-unblock-tickets-btn', unblockTickets);
-    bind('ih-network-request-btn', requestNetworkReview);
-    bind('ih-network-approve-btn', approveNetworkRevocation);
     bind('ih-abuse-block-btn', blockTickets);
-    bind('ih-abuse-verify-trials-btn', () => verifySite('trials'));
+    bind('ih-abuse-recheck-btn', recheckBothSitesAfterBlock);
+    bind('ih-run-guided-demo', runGuidedDemo);
     bind('ih-abuse-network-btn', async () => {
       await requestNetworkReview();
       await approveNetworkRevocation();
@@ -1233,6 +1360,7 @@
       if (state.masterCredentialId || state.sessionId) {
         await refreshStatus();
         setPill('ih-lemma-status', 'READY', 'ok');
+        updateStepLocks();
       }
     } catch (err) {
       log('Startup check skipped', err.message);

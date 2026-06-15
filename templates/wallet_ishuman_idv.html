@@ -139,7 +139,6 @@
          data-test-verify-enabled="{{ 'true' if demo_test_verify_enabled else 'false' }}"
          data-skeleton-idv-enabled="{{ 'true' if skeleton_idv_enabled|default(false) else 'false' }}"
          data-qr-demo-enabled="{{ 'true' if qr_demo_idv_enabled|default(false) else 'false' }}"
-         data-ui-preview-enabled="{{ 'true' if ui_preview_enabled|default(false) else 'false' }}"
          data-server-test-token="{{ demo_test_token }}">
         <div class="brand-mark">
             <img src="/static/img/lemma_logo.svg" alt="Lemma.id" width="100" height="100">
@@ -224,8 +223,6 @@
         const skeletonIdvEnabled = root.dataset.skeletonIdvEnabled === 'true';
         const qrDemoEnabled = root.dataset.qrDemoEnabled === 'true';
         const isDemoQrFlow = flowMode === 'demo_qr';
-        const uiPreviewEnabled = root.dataset.uiPreviewEnabled === 'true';
-        const uiPreviewState = (params.get('ui_preview') || '').trim();
         const serverTestToken = root.dataset.serverTestToken || '';
 
         function consumerCopy() {
@@ -270,47 +267,6 @@
             } else if (stepsList) {
                 stepsList.classList.remove('hidden');
             }
-        }
-
-        function renderUiPreview(stateKey) {
-            const scenes = window.LemmaIdvPreviewScenes || {};
-            const scene = scenes[stateKey];
-            if (!scene) {
-                setStatus('Unknown preview state: ' + stateKey, 'error');
-                return;
-            }
-
-            document.getElementById('intro-copy').textContent = scene.intro;
-            document.getElementById('site-chip').textContent = formatSiteLabel(requestingSite);
-            applyConsumerShell({ intro: scene.intro, hideSteps: !!scene.hideSteps });
-            setStatus(scene.status.message, scene.status.tone);
-
-            const primaryBtn = document.getElementById('primary-btn');
-            if (scene.primary && scene.primary.visible) {
-                primaryBtn.textContent = scene.primary.text || 'Continue';
-                primaryBtn.classList.remove('hidden');
-                primaryBtn.disabled = true;
-            } else {
-                primaryBtn.classList.add('hidden');
-            }
-
-            const cancelBtn = document.getElementById('cancel-btn');
-            cancelBtn.textContent = scene.cancel || consumerCopy().cancel || 'Not now';
-            cancelBtn.onclick = (event) => {
-                event.preventDefault();
-                if (flowMode === 'redirect') {
-                    if (redirectReturn) {
-                        window.location.href = redirectReturn;
-                    } else if (window.history.length > 1) {
-                        window.history.back();
-                    }
-                    return;
-                }
-                window.close();
-                setTimeout(() => {
-                    if (window.history.length > 1) window.history.back();
-                }, 120);
-            };
         }
 
         let wallet = null;
@@ -1405,11 +1361,6 @@
         });
 
         (async function boot() {
-            if (uiPreviewEnabled && uiPreviewState) {
-                renderUiPreview(uiPreviewState);
-                return;
-            }
-
             // A cross-origin IDV round-trip (e.g. Didit) can sever window.opener
             // when the provider redirects the popup back here. In that case we must
             // still finish the in-flight flow (store the master, derive/issue the

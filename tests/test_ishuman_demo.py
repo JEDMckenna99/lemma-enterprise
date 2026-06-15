@@ -30,59 +30,35 @@ def test_ishuman_demo_page_loads_expected_assets(ishuman_demo_client):
     body = resp.get_data(as_text=True)
 
     assert resp.status_code == 200
-    assert "Bot defense should punish abusive humans, not whole networks." in body
-    assert "Verify once" in body
-    assert "Prove human on customer sites" in body
-    assert "Respond to abuse" in body
+    assert "See identity-level enforcement in action" in body
+    assert "Start live demo" in body
+    assert "Try simulated demo" in body
+    assert "Step 1 — Create or unlock your lemma.id" in body
+    assert "Step 2 — Use the same lemma.id on two sites" in body
+    assert "Step 3 — Block abuse on one site" in body
     assert "demo-workflow" in body
-    assert "From IP bans to human accountability" in body
+    assert "Advanced / Developer details" in body
     assert "autoProvision: true" in body
     assert "ih-step-1" in body
-    assert "ih-wizard-progress" in body
     assert "ih-demo-ready-banner" in body
     assert "ih-network-pill" not in body
-    assert "lemma-demo-tickets" in body
-    assert "lemma-demo-trials" in body
-    assert 'href="/wallet/ishuman-idv"' not in body
+    assert "ih-verify-tickets-btn" in body
+    assert "ih-verify-trials-btn" in body
+    assert "Verify on ticketing site" in body
+    assert "Test-mode automation" not in body
+    assert "Unlock wallet" not in body
+    assert "ih-try-qr-demo-btn" not in body
+    assert "Popup &amp; redirect UI preview" not in body
     assert "/sdk/ishuman-verifier.js" in body
     assert "/static/js/demo/ishuman-demo.js" in body
     assert "/static/css/demo/ishuman-demo.css" in body
-    assert "ih-try-qr-demo-btn" in body
-    assert "ih-create-lemma-id-btn" in body
 
 
-def test_ishuman_idv_ui_preview_loads(ishuman_demo_client):
-    resp = ishuman_demo_client.get(
-        "/wallet/ishuman-idv"
-        "?ui_preview=site_proof_success"
-        "&origin=http%3A%2F%2Flocalhost%3A5000"
-        "&site_id=tickets-demo.lemma.id"
-    )
-    body = resp.get_data(as_text=True)
-
-    assert resp.status_code == 200
-    assert 'data-ui-preview-enabled="true"' in body
-    assert "ishuman-idv-preview-scenes.js" in body
-    assert "Prove you" in body or "verified for this site" in body
-    assert "renderUiPreview" in body
-
-
-def test_ishuman_demo_page_includes_idv_preview_panel(ishuman_demo_client):
-    resp = ishuman_demo_client.get("/demo/ishuman")
-    body = resp.get_data(as_text=True)
-
-    assert resp.status_code == 200
-    assert "Popup &amp; redirect UI preview" in body
-    assert "ih-idv-preview-grid" in body
-    assert 'data-ui-preview-enabled="true"' in body
-
-
-def test_ishuman_demo_config_includes_ui_preview_flag(ishuman_demo_client):
+def test_ishuman_demo_config_includes_network_revocation_flag(ishuman_demo_client):
     resp = ishuman_demo_client.get("/api/demo/ishuman/config")
     payload = resp.get_json()
 
     assert resp.status_code == 200
-    assert payload.get("ui_preview_enabled") is True
     assert payload.get("network_revocation_enabled") is False
 
 
@@ -96,35 +72,7 @@ def test_ishuman_demo_page_shows_network_revoke_when_enabled(
     assert resp.status_code == 200
     assert "ih-network-pill" in body
     assert "Revoke everywhere" in body
-
-
-def test_ishuman_idv_viewer_page_loads(ishuman_demo_client):
-    resp = ishuman_demo_client.get("/demo/ishuman/idv-viewer")
-    body = resp.get_data(as_text=True)
-
-    assert resp.status_code == 200
-    assert "Popup &amp; redirect UI viewer" in body
-    assert "ih-idv-preview-grid" in body
-    assert "/static/js/demo/ishuman-idv-preview-scenes.js" in body
-    assert "/static/js/demo/ishuman-idv-viewer.js" in body
-    assert "plain-language" in body or "consumer" in body.lower()
-
-
-def test_ui_preview_enabled_on_production(ishuman_demo_client, monkeypatch):
-    monkeypatch.setenv("ENVIRONMENT", "production")
-
-    config = ishuman_demo_client.get("/api/demo/ishuman/config").get_json()
-    assert config["ui_preview_enabled"] is True
-
-    resp = ishuman_demo_client.get(
-        "/wallet/ishuman-idv"
-        "?ui_preview=verify_once"
-        "&origin=https%3A%2F%2Flemma.id"
-        "&site_id=lemma.id"
-    )
-    body = resp.get_data(as_text=True)
-    assert resp.status_code == 200
-    assert 'data-ui-preview-enabled="true"' in body
+    assert "Network revocation drill" in body
 
 
 def test_ishuman_idv_popup_page_loads(ishuman_demo_client):
@@ -133,6 +81,8 @@ def test_ishuman_idv_popup_page_loads(ishuman_demo_client):
 
     assert resp.status_code == 200
     assert "Prove you're human" in body or "Verify once" in body
+    assert "ishuman-idv-preview-scenes.js" in body
+    assert "LemmaIdvConsumerCopy" in body
     assert "lemma-keys.js" in body
     assert "wallet-at-rest-crypto.js" in body
     assert "lemma-wallet.js" in body
@@ -399,9 +349,9 @@ def test_ishuman_demo_js_uses_real_verifier_with_two_site_bindings():
     assert "/api/demo/ishuman/probe-derive" in js
     assert "/api/demo/ishuman/force-reverify" in js
     assert "openIdvPopup" in js
-    assert "demo_qr" in js
     assert "createLemmaIdViaPopup" in js
-    assert "startQrDemoIdvFlow" in js
+    assert "startLiveDemo" in js
+    assert "startSimulatedDemo" in js
     assert "/api/ishuman/start-verification" in js
     assert "/api/ishuman/verification-status/" in js
 
