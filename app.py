@@ -192,7 +192,11 @@ def create_app():
         response.headers['X-XSS-Protection'] = '1; mode=block'
         
         # Referrer Policy - Don't leak URLs to third parties (routes may override, e.g. bridge)
-        if 'Referrer-Policy' not in response.headers:
+        path = request.path or '/'
+        if _path_matches_prefix(path, ('/wallet/ishuman-idv',)):
+            # Mobile IDV return URLs carry handoff secrets in query params; never forward them.
+            response.headers['Referrer-Policy'] = 'no-referrer'
+        elif 'Referrer-Policy' not in response.headers:
             response.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
         
         # Permissions Policy - Disable unnecessary browser features

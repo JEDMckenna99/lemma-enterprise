@@ -161,3 +161,17 @@ def test_csp_response_headers_differ_by_route():
     assert "https://js.stripe.com" in unlock_csp
     assert "https://unpkg.com/" in link_csp
     assert "https://unpkg.com/" not in home_csp
+
+
+@pytest.mark.unit
+def test_ishuman_idv_page_uses_no_referrer_policy():
+    from app import create_app
+
+    app = create_app()
+    client = app.test_client()
+
+    home = client.get("/")
+    idv = client.get("/wallet/ishuman-idv")
+
+    assert home.headers.get("Referrer-Policy") == "strict-origin-when-cross-origin"
+    assert idv.headers.get("Referrer-Policy") == "no-referrer"

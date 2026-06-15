@@ -127,6 +127,17 @@ def test_mobile_handoff_shows_success_ui():
 
 
 @pytest.mark.browser
+def test_mobile_handoff_scrubs_mk_from_url():
+    idv_html = IDV_HTML.read_text(encoding="utf-8")
+    assert "scrubHandoffSecretsFromUrl" in idv_html
+    assert "params.delete('mk')" in idv_html
+    assert "history.replaceState" in idv_html
+    scrub_idx = idv_html.index("scrubHandoffSecretsFromUrl")
+    claim_idx = idv_html.index("claimIdvMobileHandoff")
+    assert scrub_idx < claim_idx
+
+
+@pytest.mark.browser
 def test_idv_popup_issues_site_proof_via_wallet():
     idv_html = IDV_HTML.read_text(encoding="utf-8")
     assert "ensureIsHumanIssuanceReady" in idv_html
@@ -139,10 +150,22 @@ def test_idv_popup_issues_site_proof_via_wallet():
 @pytest.mark.browser
 def test_idv_site_proof_starts_hosted_verification_without_master():
     idv_html = IDV_HTML.read_text(encoding="utf-8")
-    site_proof_block = idv_html.split("async function issueSiteProofAndClose()", 1)[1]
-    site_proof_block = site_proof_block.split("async function runFreshIdvAndClose()", 1)[0]
-    assert "startHostedVerification();" in site_proof_block
-    assert "siteProofPending" not in site_proof_block
+    ensure_block = idv_html.split("async function ensureMasterProofForIssuance()", 1)[1]
+    ensure_block = ensure_block.split("async function issueSiteProofAndClose()", 1)[0]
+    assert "startHostedVerification();" in ensure_block
+    assert "siteProofPending" not in ensure_block
+
+
+@pytest.mark.browser
+def test_idv_site_proof_clears_stale_session_without_verification_return():
+    """A wallet with no master must start fresh IDV, not poll a stale popup session."""
+    idv_html = IDV_HTML.read_text(encoding="utf-8")
+    assert "ensureMasterProofForIssuance" in idv_html
+    ensure_block = idv_html.split("async function ensureMasterProofForIssuance()", 1)[1]
+    ensure_block = ensure_block.split("async function issueSiteProofAndClose()", 1)[0]
+    assert "isVerificationReturn && sessionId" in ensure_block
+    assert "clearIdvSession" in ensure_block
+    assert "starting fresh IDV" in ensure_block
 
 
 @pytest.mark.browser

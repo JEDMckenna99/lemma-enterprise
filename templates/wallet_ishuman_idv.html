@@ -205,6 +205,18 @@
         const handoffId = (params.get('handoff_id') || '').trim();
         const handoffMk = (params.get('mk') || '').trim();
         const ishumanSessionParam = (params.get('ishuman_session') || '').trim();
+
+        /** Drop handoff AES key from the address bar so it does not linger in history. */
+        function scrubHandoffSecretsFromUrl() {
+            if (!params.has('mk')) return;
+            params.delete('mk');
+            const qs = params.toString();
+            const nextUrl = qs
+                ? `${window.location.pathname}?${qs}${window.location.hash || ''}`
+                : `${window.location.pathname}${window.location.hash || ''}`;
+            window.history.replaceState(window.history.state, document.title, nextUrl);
+        }
+        scrubHandoffSecretsFromUrl();
         const flowMode = (params.get('flow_mode') || '').trim();
         const redirectReturn = (params.get('redirect_return') || '').trim();
         const root = document.getElementById('ishuman-idv-root');
@@ -307,6 +319,11 @@
         let sessionId = localStorage.getItem(SESSION_KEY) || ishumanSessionParam || '';
         if (ishumanSessionParam && !localStorage.getItem(SESSION_KEY)) {
             localStorage.setItem(SESSION_KEY, ishumanSessionParam);
+        }
+
+        function clearIdvSession() {
+            sessionId = '';
+            localStorage.removeItem(SESSION_KEY);
         }
 
         document.getElementById('site-chip').textContent = formatSiteLabel(requestingSite);
@@ -1163,6 +1180,46 @@
             throw new Error('Verification URL missing');
         }
 
+        /**
+         * Ensure a master human proof exists before deriving a per-site credential.
+         * Returns true when the master is present (or was just issued). Returns false
+         * when IDV was started and the popup should wait for a redirect return.
+         */
+        async function ensureMasterProofForIssuance() {
+            if (await hasMasterProof()) return true;
+
+            // Only poll an existing session when Didit redirected back here with
+            // verification_return. A stale session id left in localStorage from a
+            // prior popup (wallet exists but IDV never finished) must not block a
+            // fresh identity check.
+            if (isVerificationReturn && sessionId) {
+                try {
+                    await pollAndStoreMaster();
+                    return true;
+                } catch (err) {
+                    console.warn(
+                        '[isHuman IDV] verification return poll failed, starting fresh IDV:',
+                        err?.message || err,
+                    );
+                    clearIdvSession();
+                }
+            } else if (sessionId) {
+                clearIdvSession();
+            }
+
+            if (await hasMasterProof()) return true;
+
+            if (testVerifyEnabled && serverTestToken) {
+                setStatus('Completing demo verification…', 'loading');
+                await verifyOnceTestMode();
+                return true;
+            }
+
+            setStatus(consumerCopy().status?.openingIdv || 'Opening secure identity check…', 'loading');
+            await startHostedVerification();
+            return false;
+        }
+
         async function issueSiteProofAndClose() {
             setStatus(consumerCopy().status?.siteProofIssuing || 'Confirming you\u2019re human…', 'loading');
             if (await needsMobileHandoffClaim()) {
@@ -1170,18 +1227,8 @@
             }
             await ensureWalletUnlocked();
 
-            if (!(await hasMasterProof())) {
-                if (sessionId) {
-                    await pollAndStoreMaster();
-                } else if (testVerifyEnabled && serverTestToken) {
-                    setStatus('Completing demo verification…', 'loading');
-                    await verifyOnceTestMode();
-                } else {
-                    setStatus(consumerCopy().status?.openingIdv || 'Opening secure identity check…', 'loading');
-                    await startHostedVerification();
-                    return false;
-                }
-            }
+            const masterReady = await ensureMasterProofForIssuance();
+            if (!masterReady) return false;
 
             // v2 (Phase 1.1): pull + open person-root seed envelopes so site
             // signing keys derive from wallet_local_seed. No-op when the flag is
