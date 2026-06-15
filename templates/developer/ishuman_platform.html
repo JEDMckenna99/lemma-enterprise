@@ -1,98 +1,167 @@
-{% extends "modern/layout.html" %}
-
-{% block title %}lemma.id proof of humanity - Developer hub{% endblock %}
+{% extends "developer/layout.html" %}
+{% set active_page = 'overview' %}
+{% set page_title = 'Developer Hub' %}
 
 {% block head %}
-{{ super() }}
-<style>
-.devhub-wrap{max-width:1040px;margin:30px auto;padding:0 18px 54px;}
-.devhub-hero{background:#0f172a;color:#e2e8f0;border-radius:16px;padding:22px 20px;margin-bottom:16px}
-.devhub-hero h1{margin:0 0 10px;font-size:30px;color:#fff}
-.devhub-hero p{margin:0 0 12px;color:#cbd5e1;max-width:760px}
-.devhub-chip{display:inline-block;font-size:11px;font-weight:700;background:#1d4ed8;color:#dbeafe;padding:3px 8px;border-radius:999px;margin-right:6px}
-.devhub-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:12px}
-.devhub-card{background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:16px;box-shadow:0 2px 4px rgba(15,23,42,.04)}
-.devhub-card h2{margin:0 0 8px;font-size:18px;color:#0f172a}
-.devhub-card p{margin:0 0 12px;color:#475569;font-size:14px;line-height:1.45}
-.devhub-list{margin:0;padding-left:18px;color:#334155;font-size:13px}
-.devhub-list li{margin:4px 0}
-.devhub-actions{display:flex;gap:8px;flex-wrap:wrap}
-.devhub-btn{display:inline-block;text-decoration:none;padding:8px 11px;border-radius:9px;border:1px solid #cbd5e1;color:#1e293b;background:#fff;font-size:12px;font-weight:700}
-.devhub-btn.primary{background:#4f46e5;border-color:#4338ca;color:#fff}
-.devhub-note{margin-top:14px;font-size:12px;color:#64748b}
-@media (max-width: 760px){.devhub-hero h1{font-size:24px}}
-</style>
+    {{ super() }}
+    <style>
+    .dev-hub-list {
+        margin: 0;
+        padding-left: 1.25rem;
+        color: var(--dev-text);
+        font-size: 14px;
+        line-height: 1.55;
+    }
+    .dev-hub-list li { margin: 6px 0; }
+    .dev-hub-list code {
+        font-size: 12px;
+        background: #f1f5f9;
+        padding: 1px 5px;
+        border-radius: 4px;
+    }
+    .dev-hub-note {
+        margin: 24px 0 0;
+        font-size: 13px;
+        color: var(--dev-text-muted);
+    }
+    .dev-hub-note a { color: var(--dev-primary); }
+    .dev-subtitle code {
+        font-size: 13px;
+        background: #f1f5f9;
+        padding: 1px 5px;
+        border-radius: 4px;
+    }
+    </style>
 {% endblock %}
 
-{% block content %}
-<div class="devhub-wrap">
-  <section class="devhub-hero">
-    <span class="devhub-chip">Developer hub</span>
-    <span class="devhub-chip">lemma.id</span>
-    <h1>lemma.id proof of humanity</h1>
-    <p>
-      Integrate verified-human credentials into your app with site-private PPIDs and local browser verification.
-      No webhooks to configure on your side — embed the SDK, set <code>siteId</code> to your hostname, and register
-      a site API key only when you need server-side blocks or network revocation requests.
-    </p>
-    <div class="devhub-actions">
-      <a class="devhub-btn primary" href="/docs">Read the guide</a>
-      <a class="devhub-btn" href="/docs#quickstart">5-minute quickstart</a>
-      <a class="devhub-btn" href="/sdk/ishuman-verifier.js">SDK script URL</a>
+{% block dev_content %}
+<div class="dev-header">
+    <div class="dev-header-row">
+        <div>
+            <h1 class="dev-title">Proof of humanity</h1>
+            <p class="dev-subtitle">
+                Integrate verified-human credentials with site-private PPIDs and local browser verification.
+                Embed the SDK, set <code>siteId</code> to your hostname, and register a site API key only when you
+                need server-side blocks or network revocation requests.
+            </p>
+        </div>
+        <div style="display:flex; gap:10px; flex-wrap:wrap; flex-shrink:0;">
+            <a href="/docs" class="dev-btn dev-btn-primary">Read the guide</a>
+            <a href="/docs#quickstart" class="dev-btn dev-btn-secondary">Quickstart</a>
+        </div>
     </div>
-  </section>
-
-  <div class="devhub-grid">
-    <section class="devhub-card">
-      <h2>1) Integrate</h2>
-      <p>Embed the verifier SDK and gate actions with <code>verify({ autoProvision: true })</code>. No dashboard step required for the basic human check.</p>
-      <ul class="devhub-list">
-        <li>Set <code>siteId</code> to your canonical hostname (for example <code>app.example.com</code>).</li>
-        <li>Add <code>ishuman-verifier.js</code> and fail closed when <code>human</code> is false.</li>
-        <li>Store the returned <code>ppid</code> on your user record — no KYC fields.</li>
-      </ul>
-      <div class="devhub-actions" style="margin-top:10px">
-        <a class="devhub-btn" href="/docs#quickstart">5-minute quickstart</a>
-        <a class="devhub-btn" href="/docs#sdk-integration">SDK integration</a>
-      </div>
-    </section>
-
-    <section class="devhub-card">
-      <h2>2) Operate</h2>
-      <p>The SDK handles IDV and site-proof derivation in a Lemma-hosted popup. Your server does not receive webhooks for verification completion.</p>
-      <ul class="devhub-list">
-        <li>First visit may open a popup (wallet unlock + Didit IDV).</li>
-        <li>Later checks validate locally — no per-page network call.</li>
-        <li>Optional: stamp actions and re-verify on your backend with <code>verifyStamp()</code>.</li>
-      </ul>
-      <div class="devhub-actions" style="margin-top:10px">
-        <a class="devhub-btn" href="/docs#integration-flow">Integration flow</a>
-        <a class="devhub-btn" href="/docs#api-reference">API reference</a>
-      </div>
-    </section>
-
-    <section class="devhub-card">
-      <h2>3) Enforce bans</h2>
-      <p>Use your site API key for server-side abuse response. The API key is not required for human verification itself.</p>
-      <ul class="devhub-list">
-        <li><code>POST /api/ishuman/site-block</code> — immediate site-scoped PPID ban.</li>
-        <li><code>POST /api/ishuman/network-revoke</code> — request network-wide action.</li>
-        <li>Issue keys in the <a href="/developer/external-api-keys">API key manager</a>.</li>
-      </ul>
-      <div class="devhub-actions" style="margin-top:10px">
-        <a class="devhub-btn primary" href="/developer/external-api-keys">Open API key manager</a>
-        <a class="devhub-btn" href="/login?redirect=%2Fdeveloper%2Fexternal-api-keys">Sign in for keys</a>
-      </div>
-    </section>
-  </div>
-
-  <p class="devhub-note">
-    Full documentation: <a href="/docs">/docs</a>. API key manager and billing require a signed-in developer wallet.
-    Legacy IAM-only consoles remain on restricted admin routes.
-  </p>
 </div>
-{% endblock %}
 
-{% block wallet_auto_init %}
-{% include "modern/includes/wallet_auto_init_script.html" %}
+<div class="dev-card" style="margin-bottom: 24px;">
+    <div class="dev-card-header">
+        <h2 class="dev-card-title">Get started</h2>
+    </div>
+    <div class="dev-card-body">
+        <div class="dev-actions">
+            <a href="/docs#quickstart" class="dev-action">
+                <div class="dev-action-icon">
+                    <svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
+                        <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
+                    </svg>
+                </div>
+                <div class="dev-action-title">5-minute quickstart</div>
+            </a>
+            <a href="/sdk/ishuman-verifier.js" class="dev-action">
+                <div class="dev-action-icon">
+                    <svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M16 18l6-6-6-6"></path>
+                        <path d="M8 6l-6 6 6 6"></path>
+                    </svg>
+                </div>
+                <div class="dev-action-title">SDK script URL</div>
+            </a>
+            <a href="/developer/external-api-keys" class="dev-action">
+                <div class="dev-action-icon">
+                    <svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"></path>
+                    </svg>
+                </div>
+                <div class="dev-action-title">API key manager</div>
+            </a>
+            <a href="/developer/billing" class="dev-action">
+                <div class="dev-action-icon">
+                    <svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="1" y="4" width="22" height="16" rx="2"></rect>
+                        <path d="M1 10h22"></path>
+                    </svg>
+                </div>
+                <div class="dev-action-title">Billing</div>
+            </a>
+        </div>
+    </div>
+</div>
+
+<div class="dev-site-grid">
+    <div class="dev-card" style="margin-bottom: 0;">
+        <div class="dev-card-header">
+            <h2 class="dev-card-title">1) Integrate</h2>
+        </div>
+        <div class="dev-card-body">
+            <p style="margin: 0 0 16px; color: var(--dev-text-muted); font-size: 14px; line-height: 1.55;">
+                Embed the verifier SDK and gate actions with <code>verify({ autoProvision: true })</code>.
+                No dashboard step required for the basic human check.
+            </p>
+            <ul class="dev-hub-list">
+                <li>Set <code>siteId</code> to your canonical hostname (for example <code>app.example.com</code>).</li>
+                <li>Add <code>ishuman-verifier.js</code> and fail closed when <code>human</code> is false.</li>
+                <li>Store the returned <code>ppid</code> on your user record — no KYC fields.</li>
+            </ul>
+            <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:16px;">
+                <a href="/docs#quickstart" class="dev-btn dev-btn-secondary dev-btn-sm">Quickstart</a>
+                <a href="/docs#sdk-integration" class="dev-btn dev-btn-secondary dev-btn-sm">SDK integration</a>
+            </div>
+        </div>
+    </div>
+
+    <div class="dev-card" style="margin-bottom: 0;">
+        <div class="dev-card-header">
+            <h2 class="dev-card-title">2) Operate</h2>
+        </div>
+        <div class="dev-card-body">
+            <p style="margin: 0 0 16px; color: var(--dev-text-muted); font-size: 14px; line-height: 1.55;">
+                The SDK handles IDV and site-proof derivation in a Lemma-hosted popup.
+                Your server does not receive webhooks for verification completion.
+            </p>
+            <ul class="dev-hub-list">
+                <li>First visit may open a popup (wallet unlock + Didit IDV).</li>
+                <li>Later checks validate locally — no per-page network call.</li>
+                <li>Optional: stamp actions and re-verify on your backend with <code>verifyStamp()</code>.</li>
+            </ul>
+            <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:16px;">
+                <a href="/docs#integration-flow" class="dev-btn dev-btn-secondary dev-btn-sm">Integration flow</a>
+                <a href="/docs#api-reference" class="dev-btn dev-btn-secondary dev-btn-sm">API reference</a>
+            </div>
+        </div>
+    </div>
+
+    <div class="dev-card" style="margin-bottom: 0;">
+        <div class="dev-card-header">
+            <h2 class="dev-card-title">3) Enforce bans</h2>
+        </div>
+        <div class="dev-card-body">
+            <p style="margin: 0 0 16px; color: var(--dev-text-muted); font-size: 14px; line-height: 1.55;">
+                Use your site API key for server-side abuse response.
+                The API key is not required for human verification itself.
+            </p>
+            <ul class="dev-hub-list">
+                <li><code>POST /api/ishuman/site-block</code> — immediate site-scoped PPID ban.</li>
+                <li><code>POST /api/ishuman/network-revoke</code> — request network-wide action.</li>
+                <li>Issue keys in the <a href="/developer/external-api-keys">API key manager</a>.</li>
+            </ul>
+            <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:16px;">
+                <a href="/developer/external-api-keys" class="dev-btn dev-btn-primary dev-btn-sm">Open API key manager</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<p class="dev-hub-note">
+    Full documentation: <a href="/docs">/docs</a>.
+</p>
 {% endblock %}

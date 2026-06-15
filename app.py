@@ -1122,19 +1122,16 @@ def create_app():
 
     @app.route('/developer/ishuman')
     def developer_ishuman():
-        """Public isHuman developer platform entrypoint."""
-        logger.info("🚀 Serving isHuman developer platform")
-        return render_template(
+        """Authenticated developer hub — isHuman integration overview."""
+        logger.info("Serving isHuman developer hub")
+        return _require_wallet_session(
             'developer/ishuman_platform.html',
+            active_page='overview',
+            page_title='Developer Hub',
             user_email=request.headers.get('X-User-Email'),
             user_name=None,
-            is_admin=request.headers.get('X-Permission-ID', '').lower() in ['super_admin', 'admin_access']
-        ), 200, {
-            'Cache-Control': 'no-cache, no-store, must-revalidate',
-            'Pragma': 'no-cache',
-            'Expires': '0',
-            'X-Lemma-Developer-Platform': 'ishuman-public-v1'
-        }
+            is_admin=request.headers.get('X-Permission-ID', '').lower() in ['super_admin', 'admin_access'],
+        )
 
     @app.route('/developer/')
     def developer_trailing_slash():

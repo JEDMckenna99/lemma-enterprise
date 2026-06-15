@@ -106,6 +106,7 @@ def test_protected_page_redirects_to_login_with_next_path():
 
     app = create_app()
     client = app.test_client()
-    response = client.get("/developer/external-api-keys")
-    assert response.status_code == 302
-    assert response.location == "/login?redirect=/developer/external-api-keys"
+    for path in ("/developer/external-api-keys", "/developer/ishuman"):
+        response = client.get(path)
+        assert response.status_code == 302
+        assert response.location == f"/login?redirect={path}"
