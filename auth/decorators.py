@@ -80,7 +80,7 @@ def require_credential(
             principal, error = extract_user_lemma_principal(request.headers)
 
             if not principal:
-                from auth.agent_principal import extract_agent_admin_principal
+                from auth.agent_principal import extract_agent_admin_principal, extract_agent_session_principal
 
                 agent_info = None
                 principal, agent_error, agent_info = extract_agent_admin_principal(
@@ -92,6 +92,17 @@ def require_credential(
                     g.agent_credential = agent_info
                 elif error is None:
                     error = agent_error
+
+            if not principal:
+                session_principal, session_error = extract_agent_session_principal(
+                    request_path=request.path,
+                    required_scope=required_scope,
+                )
+                if session_principal:
+                    principal = session_principal
+                    error = None
+                elif error is None and session_error:
+                    error = session_error
 
             if not principal:
                 wallet_error = None

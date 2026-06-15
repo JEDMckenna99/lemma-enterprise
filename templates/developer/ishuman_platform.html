@@ -1,6 +1,6 @@
 {% extends "modern/layout.html" %}
 
-{% block title %}lemma.id proof of humanity — Developer hub{% endblock %}
+{% block title %}lemma.id proof of humanity - Developer hub{% endblock %}
 
 {% block head %}
 {{ super() }}
@@ -81,12 +81,14 @@
       </ul>
       <div class="devhub-actions" style="margin-top:10px">
         <a class="devhub-btn primary" href="/developer/external-api-keys">Open API key manager</a>
+        <a class="devhub-btn" href="/login?redirect=%2Fdeveloper%2Fexternal-api-keys">Sign in for keys</a>
       </div>
     </section>
   </div>
 
   <p class="devhub-note">
-    Full documentation: <a href="/docs">/docs</a>. Legacy IAM-only consoles remain on restricted admin routes.
+    Full documentation: <a href="/docs">/docs</a>. API key manager and billing require a signed-in developer wallet.
+    Legacy IAM-only consoles remain on restricted admin routes.
   </p>
 </div>
 {% endblock %}

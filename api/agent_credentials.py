@@ -4207,6 +4207,56 @@ def cli_login_poll():
     return jsonify({'success': True, 'completed': True, **result}), 200
 
 
+def apply_agent_token_to_flask_session(credential_info: dict) -> None:
+    """Persist validated agent credential metadata in the Flask browser session."""
+    scope_raw = credential_info.get('scope') or []
+    if isinstance(scope_raw, str):
+        scope_parts = [part.strip() for part in scope_raw.split(',') if part.strip()]
+    else:
+        scope_parts = list(scope_raw)
+
+    session['agent_authenticated'] = True
+    session['agent_token_id'] = credential_info['token_id']
+    session['agent_ppid'] = credential_info['authorized_by_ppid']
+    session['agent_scope'] = scope_parts
+    session['agent_allowed_sites'] = credential_info.get('allowed_sites')
+    ppid = credential_info.get('authorized_by_ppid') or ''
+    session['customer_id'] = str(ppid).replace('did:lemma:', '')
+    session['auth_method'] = 'agent_token'
+    session['is_admin'] = 'admin' in {str(s).strip().lower() for s in scope_parts}
+
+
+def try_bootstrap_agent_session_from_request(*, require_admin: bool = False) -> bool:
+    """
+    If the request carries a valid agent token (header or query), establish a
+    browser session and return True. Used by wallet-gated HTML routes.
+    """
+    token = (request.headers.get('X-Agent-Token') or request.args.get('agent_token') or '').strip()
+    if not token or not token.startswith('lm_agent_'):
+        return False
+
+    credential_info = validate_agent_token(token)
+    if not credential_info:
+        return False
+
+    site_ok, _blocked_site, _allowed_sites_norm, _requested_sites = check_site_allowed(credential_info)
+    if not site_ok:
+        return False
+
+    scope_raw = credential_info.get('scope') or []
+    if isinstance(scope_raw, str):
+        scope_parts = [part.strip() for part in scope_raw.split(',') if part.strip()]
+    else:
+        scope_parts = list(scope_raw)
+    scope_norm = {str(s).strip().lower() for s in scope_parts}
+
+    if require_admin and 'admin' not in scope_norm:
+        return False
+
+    apply_agent_token_to_flask_session(credential_info)
+    return True
+
+
 @agent_credentials_bp.route('/api/agent/session', methods=['GET', 'POST'])
 @restricted_cross_origin(supports_credentials=True)
 @require_agent_or_user_session()
@@ -4258,19 +4308,7 @@ def create_agent_session():
             'message': 'This agent credential is restricted to specific sites and cannot create a session here.'
         }), 403
     
-    # Create session from agent token
-    session['agent_authenticated'] = True
-    session['agent_token_id'] = credential_info['token_id']
-    session['agent_ppid'] = credential_info['authorized_by_ppid']
-    session['agent_scope'] = credential_info['scope']
-    session['agent_allowed_sites'] = credential_info.get('allowed_sites')
-    session['customer_id'] = credential_info.get('authorized_by_ppid', '').replace('did:lemma:', '')
-    session['auth_method'] = 'agent_token'
-    
-    # Set admin flag if scope includes admin
-    if 'admin' in credential_info['scope']:
-        session['is_admin'] = True
-    
+    apply_agent_token_to_flask_session(credential_info)
     logger.info(f"Agent session created: {credential_info['token_id']} -> browser session")
     
     # Check for redirect parameter

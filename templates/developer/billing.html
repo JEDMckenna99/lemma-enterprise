@@ -1,5 +1,6 @@
 {% extends "developer/layout.html" %}
 {% set active_page = 'billing' %}
+{% set page_title = 'Billing' %}
 
 {% block dev_content %}
 <div class="dev-header">
@@ -144,7 +145,7 @@ async function loadBillingStatus() {
         if (onboarding.next_step === 'register_site') {
             messageEl.textContent = 'Register your first site, then return here to attach metered billing.';
             setupBtn.textContent = 'Register a site';
-            setupBtn.onclick = () => { window.location.href = '/developer'; };
+            setupBtn.onclick = () => { window.location.href = '/developer/external-api-keys'; };
             return;
         }
 

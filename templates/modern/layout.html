@@ -85,7 +85,7 @@ h1{color:#1e293b;font-weight:600;line-height:1.25;margin-bottom:16px;font-size:4
             <div class="nav-right">
                 {% if is_public_page %}
                 <!-- Public marketing pages: no internal dropdown -->
-                <a href="/developer" class="btn btn-secondary" id="public-dashboard-link" style="display:none;">Dashboard</a>
+                <a href="/developer/ishuman" class="btn btn-secondary" id="public-dashboard-link" style="display:none;">Dashboard</a>
                 <div id="auth-buttons" style="display:flex; gap:12px; align-items:center;">
                     <a href="/login" class="btn btn-secondary" id="nav-sign-in-link" style="display:none;">Sign In</a>
                     <a href="/register" class="btn btn-primary" id="nav-get-started-link">Get Started</a>
@@ -112,7 +112,7 @@ h1{color:#1e293b;font-weight:600;line-height:1.25;margin-bottom:16px;font-size:4
                         </div>
                         <div class="dropdown-divider"></div>
                         <a href="/wallet" class="dropdown-item">My Wallet</a>
-                        <a href="/developer" class="dropdown-item" id="dev-dashboard-link" style="display:none;">Developer Dashboard</a>
+                        <a href="/developer/ishuman" class="dropdown-item" id="dev-dashboard-link" style="display:none;">Developer Dashboard</a>
                         <a href="/developer/external-api-keys" class="dropdown-item" id="api-keys-link" style="display:none;">API Keys</a>
                         <a href="/admin" class="dropdown-item admin-item" id="admin-dropdown-link" style="display:none;">Admin Panel</a>
                         <div class="dropdown-divider"></div>
@@ -273,6 +273,42 @@ h1{color:#1e293b;font-weight:600;line-height:1.25;margin-bottom:16px;font-size:4
             if (!window.__lemmaRawFetch) {
                 window.__lemmaRawFetch = window.fetch.bind(window);
             }
+
+            if (!window.__lemmaAgentSessionBootstrap) {
+                window.__lemmaAgentSessionBootstrap = async function bootstrapAgentSessionFromToken() {
+                    try {
+                        const path = String(window.location.pathname || '');
+                        const isPrivilegedSurface = path.startsWith('/developer') || path.startsWith('/admin');
+                        if (!isPrivilegedSurface) return false;
+
+                        const key = '__lemma_agent_token_override';
+                        const params = new URLSearchParams(window.location.search || '');
+                        const fromUrl = String(params.get('agent_token') || '').trim();
+                        let token = fromUrl.startsWith('lm_agent_')
+                            ? fromUrl
+                            : String(sessionStorage.getItem(key) || '').trim();
+                        if (!token.startsWith('lm_agent_')) return false;
+
+                        if (fromUrl.startsWith('lm_agent_')) {
+                            sessionStorage.setItem(key, fromUrl);
+                            params.delete('agent_token');
+                            const nextQuery = params.toString();
+                            const nextUrl = `${path}${nextQuery ? `?${nextQuery}` : ''}${window.location.hash || ''}`;
+                            window.history.replaceState({}, document.title, nextUrl);
+                        }
+
+                        const resp = await window.__lemmaRawFetch('/api/agent/session', {
+                            method: 'GET',
+                            headers: { 'X-Agent-Token': token },
+                            credentials: 'include',
+                        });
+                        return resp.ok;
+                    } catch (_) {
+                        return false;
+                    }
+                };
+            }
+
             if (!window.encodeLemmaCredentialHeader) {
                 window.encodeLemmaCredentialHeader = function encodeLemmaCredentialHeader(credential) {
                     try {
@@ -450,6 +486,15 @@ h1{color:#1e293b;font-weight:600;line-height:1.25;margin-bottom:16px;font-size:4
 
             if (!window.getLemmaAuthHeadersAsync) {
                 window.getLemmaAuthHeadersAsync = async function getLemmaAuthHeadersAsync(extraHeaders) {
+                    const path = String(window.location.pathname || '');
+                    if (path.startsWith('/developer') || path.startsWith('/admin')) {
+                        const agentToken = typeof window.getAgentTokenOverrideForTesting === 'function'
+                            ? window.getAgentTokenOverrideForTesting()
+                            : '';
+                        if (agentToken && typeof window.__lemmaAgentSessionBootstrap === 'function') {
+                            await window.__lemmaAgentSessionBootstrap();
+                        }
+                    }
                     await window.ensureLemmaCredential(false);
                     if (!window.lemmaCredential) {
                         await window.ensureLemmaCredential(true);
@@ -497,6 +542,17 @@ h1{color:#1e293b;font-weight:600;line-height:1.25;margin-bottom:16px;font-size:4
                 window.__lemmaFetchWrapped = true;
             }
             console.log('🔐 Wallet auth auto-attach enabled');
+
+            (function maybeBootstrapAgentSessionOnLoad() {
+                const path = String(window.location.pathname || '');
+                if (!path.startsWith('/developer') && !path.startsWith('/admin')) return;
+                const params = new URLSearchParams(window.location.search || '');
+                const fromUrl = String(params.get('agent_token') || '').trim();
+                const stored = String(sessionStorage.getItem('__lemma_agent_token_override') || '').trim();
+                if (fromUrl.startsWith('lm_agent_') || stored.startsWith('lm_agent_')) {
+                    window.__lemmaAgentSessionBootstrap?.();
+                }
+            })();
         })();
 
         // Session-free logout

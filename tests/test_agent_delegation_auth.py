@@ -5,7 +5,7 @@ from __future__ import annotations
 from flask import Flask, g
 
 from api.authz.mode_policy import MODE_PROOF_REQUIRED, evaluate_mode_policy
-from auth.agent_principal import extract_agent_admin_principal
+from auth.agent_principal import extract_agent_admin_principal, extract_agent_session_principal
 from auth.request_principal import get_context_ppid, resolve_admin_principal
 
 
@@ -81,3 +81,31 @@ def test_resolve_agent_site_binding_for_request(monkeypatch):
             {"allowed_sites": ["lemma.id"], "scope": ["admin", "read"]}
         )
         assert binding == "lemma.id"
+
+
+def test_extract_agent_session_principal_from_flask_session():
+    app = Flask(__name__)
+    app.secret_key = "test-secret"
+    with app.test_request_context("/api/billing/account-status"):
+        from flask import session
+
+        session["agent_authenticated"] = True
+        session["agent_scope"] = ["admin", "read"]
+        session["agent_ppid"] = "did:lemma:ppid_" + ("d" * 64)
+        session["agent_token_id"] = "tok_browser"
+        session["agent_allowed_sites"] = ["lemma.id"]
+
+        principal, error = extract_agent_session_principal(required_scope=None)
+        assert error is None
+        assert principal.auth_method == "agent_session"
+        assert principal.permission_id == "admin_access"
+
+
+def test_protected_page_redirects_to_login_with_next_path():
+    from app import create_app
+
+    app = create_app()
+    client = app.test_client()
+    response = client.get("/developer/external-api-keys")
+    assert response.status_code == 302
+    assert response.location == "/login?redirect=/developer/external-api-keys"

@@ -8,6 +8,7 @@ import secrets
 import time
 from datetime import datetime, timedelta
 from flask import Flask, request, jsonify, render_template, session, redirect, url_for, g
+from urllib.parse import quote
 
 # Set up logging (override with LOG_LEVEL, e.g. DEBUG/INFO/WARNING/ERROR)
 _LOG_LEVEL_NAME = os.environ.get('LOG_LEVEL', 'INFO').upper()
@@ -1135,6 +1136,11 @@ def create_app():
             'X-Lemma-Developer-Platform': 'ishuman-public-v1'
         }
 
+    @app.route('/developer/')
+    def developer_trailing_slash():
+        """Trailing-slash alias for the developer hub."""
+        return redirect('/developer/ishuman', code=302)
+
     @app.route('/developer/platform')
     def developer_platform():
         """Compatibility redirect for older platform links."""
@@ -1198,7 +1204,9 @@ def create_app():
         """Developer Platform - external/customer API key manager."""
         logger.info("🔑 Serving external API key manager")
         return _require_wallet_session(
-            'developer/external_api_keys_mvp.html',
+            'developer/external_api_keys.html',
+            active_page='external_keys',
+            page_title='External API Keys',
             user_email=request.headers.get('X-User-Email'),
             user_name=None,
             is_admin=request.headers.get('X-Permission-ID', '').lower() in ['super_admin', 'admin_access']
@@ -1239,6 +1247,7 @@ def create_app():
         return _require_wallet_session(
             'developer/billing.html',
             active_page='billing',
+            page_title='Billing',
             user_email=request.headers.get('X-User-Email'),
             user_name=None,
             is_admin=request.headers.get('X-Permission-ID', '').lower() in ['super_admin', 'admin_access'],
@@ -1265,22 +1274,46 @@ def create_app():
     #   Layer 2 (client): JS verifies admin credential via Ed25519 + bloom filter
     #   Layer 3 (API): require_admin decorator on all admin API endpoints
     
-    def _require_wallet_session(template_name, **template_kwargs):
+    def _require_wallet_session(template_name, require_admin=None, **template_kwargs):
         """
-        Server-side guard for admin pages.
-        Requires an active wallet session cookie (or an authenticated admin
-        agent session) before serving admin HTML.
-        Returns the rendered template with noindex headers if session exists,
-        or redirects to home if no session.
+        Server-side guard for developer/admin HTML pages.
+        Requires a wallet session cookie or an agent browser session before
+        serving protected HTML. Unauthenticated visitors are sent to /login with
+        a redirect back to the requested path.
         """
-        has_session = request.cookies.get('lemma_wallet_session')
+        if require_admin is None:
+            require_admin = template_name.startswith('admin/')
+
+        has_wallet_session = request.cookies.get('lemma_wallet_session')
         has_wallet_cookie = request.cookies.get('lemma_wallet_csrf')
-        has_admin_agent_session = bool(session.get('agent_authenticated') and session.get('is_admin'))
-        
-        if not has_session and not has_wallet_cookie and not has_admin_agent_session:
-            logger.warning(f"Admin page access denied - no wallet session: {request.path} from {request.remote_addr}")
-            return redirect('/')
-        
+        has_agent_session = bool(session.get('agent_authenticated'))
+        if has_agent_session and require_admin:
+            scope_raw = session.get('agent_scope') or []
+            scope_norm = {str(s).strip().lower() for s in scope_raw}
+            has_agent_session = 'admin' in scope_norm or bool(session.get('is_admin'))
+
+        if not has_wallet_session and not has_wallet_cookie and not has_agent_session:
+            from api.agent_credentials import try_bootstrap_agent_session_from_request
+
+            if try_bootstrap_agent_session_from_request(require_admin=require_admin):
+                has_agent_session = True
+            else:
+                logger.warning(
+                    "Protected page access denied - no session: %s from %s",
+                    request.path,
+                    request.remote_addr,
+                )
+                next_path = request.path
+                if request.query_string:
+                    # Preserve query string but drop agent_token from login redirect target.
+                    from urllib.parse import urlencode, parse_qs
+
+                    params = parse_qs(request.query_string.decode('utf-8', errors='replace'))
+                    params.pop('agent_token', None)
+                    if params:
+                        next_path = f"{request.path}?{urlencode(params, doseq=True)}"
+                return redirect(f'/login?redirect={quote(next_path, safe="/:?=&")}')
+
         response = render_template(template_name, **template_kwargs)
         return response, 200, {
             'X-Robots-Tag': 'noindex, nofollow',
@@ -1295,6 +1328,7 @@ def create_app():
         logger.info("Serving admin archived Agent Ops dashboard")
         return _require_wallet_session(
             'developer/agent_ops_mvp.html',
+            require_admin=True,
             layout_template='admin/layout.html',
             active_page='agent_ops',
             screen='dashboard',
@@ -1309,6 +1343,7 @@ def create_app():
         logger.info("Serving admin archived Agent Ops issue proof")
         return _require_wallet_session(
             'developer/agent_ops_mvp.html',
+            require_admin=True,
             screen='issue_proof',
             user_email=request.headers.get('X-User-Email'),
             user_name=None,
@@ -1321,6 +1356,7 @@ def create_app():
         logger.info("Serving admin archived Agent Ops proofs")
         return _require_wallet_session(
             'developer/agent_ops_mvp.html',
+            require_admin=True,
             screen='proofs',
             user_email=request.headers.get('X-User-Email'),
             user_name=None,
@@ -1333,6 +1369,7 @@ def create_app():
         logger.info("Serving admin archived Agent Ops settings")
         return _require_wallet_session(
             'developer/agent_ops_mvp.html',
+            require_admin=True,
             screen='settings',
             user_email=request.headers.get('X-User-Email'),
             user_name=None,
@@ -1343,7 +1380,22 @@ def create_app():
     def admin_dashboard():
         """Admin Dashboard - Platform overview"""
         logger.info("Serving admin dashboard")
-        return _require_wallet_session('admin/dashboard.html')
+        return _require_wallet_session('admin/dashboard.html', active_page='dashboard')
+
+    @app.route('/admin/')
+    def admin_trailing_slash():
+        """Trailing-slash alias for admin overview."""
+        return redirect('/admin', code=302)
+
+    @app.route('/admin/dashboard')
+    def admin_dashboard_legacy():
+        """Legacy dashboard URL redirects to admin overview."""
+        return redirect('/admin', code=302)
+
+    @app.route('/admin/trust')
+    def admin_trust_legacy():
+        """Legacy trust URL redirects to Trust & Safety."""
+        return redirect('/admin/trust-safety', code=302)
     
     @app.route('/admin/monitoring')
     def admin_monitoring_page():
@@ -1506,7 +1558,7 @@ def create_app():
     
     # Legacy redirects
     @app.route('/admin/legacy')
-    def admin_dashboard_legacy():
+    def admin_legacy_hub_redirect():
         return redirect('/admin')
     
     @app.route('/admin/iam')

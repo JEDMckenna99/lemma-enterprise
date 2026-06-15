@@ -74,3 +74,53 @@ def extract_agent_admin_principal(
         site_binding='lemma.id',
     )
     return principal, None, info
+
+
+def extract_agent_session_principal(
+    *,
+    request_path: str | None = None,
+    required_scope: str | None = None,
+) -> Tuple[Optional[AuthzPrincipal], Optional[str]]:
+    """
+    Map a Flask browser session created via /api/agent/session to an AuthzPrincipal.
+    """
+    from flask import session
+
+    if not session.get('agent_authenticated'):
+        return None, 'missing_lemma_header'
+
+    scope_raw = session.get('agent_scope') or []
+    scope = normalize_scopes(scope_raw if isinstance(scope_raw, (list, tuple, set)) else [])
+    scope_norm = {str(s).strip().lower() for s in scope}
+
+    if required_scope == 'admin' and 'admin' not in scope_norm:
+        return None, 'missing_scope'
+
+    allowed_sites = session.get('agent_allowed_sites')
+    if allowed_sites is not None:
+        if isinstance(allowed_sites, str):
+            allowed_sites = [allowed_sites]
+        site_norm = {
+            str(site).strip().lower()
+            for site in allowed_sites
+            if str(site).strip()
+        }
+        if site_norm and not site_norm.issubset(_LEMMA_PLATFORM_SITES):
+            return None, 'agent_site_binding_mismatch'
+
+    ppid = session.get('agent_ppid')
+    if not ppid or not str(ppid).startswith('did:lemma:ppid_'):
+        return None, 'invalid_lemma_subject'
+
+    permission_id = 'admin_access' if 'admin' in scope_norm else 'customer_access'
+
+    principal = AuthzPrincipal(
+        principal_type='agent_delegation',
+        auth_method='agent_session',
+        ppid=str(ppid),
+        credential_id=session.get('agent_token_id'),
+        permission_id=permission_id,
+        scope=scope,
+        site_binding='lemma.id',
+    )
+    return principal, None
