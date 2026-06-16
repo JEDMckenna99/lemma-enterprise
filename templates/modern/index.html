@@ -6,345 +6,108 @@
 
 {% block head %}
     {{ super() }}
-    <!-- Disable Cloudflare Rocket Loader and service worker interference -->
     <meta name="cloudflare-no-rocket-loader" content="true">
     <meta name="cf-2fa-verify" content="false">
-    
-    <!-- Note: lemma-wallet.js is already loaded in layout.html - no duplicate needed -->
-    
-    <!-- Local Verification Scripts - defer to improve LCP -->
-    <script src="{{ url_for('static', filename='js/lemma-verifier.js') }}?v=2000" defer></script>
-    
-    <!-- Bot Shield Assets - defer to improve LCP -->
-    <script src="/static/js/lemma-bot-shield-simple.js?v=1121" defer></script>
-    
-    <!-- Disable service worker to prevent resource blocking -->
-    <script nonce="{{ csp_nonce }}" data-cfasync="false">
-        if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.getRegistrations().then(function(registrations) {
-                for (let registration of registrations) {
-                    console.log('Unregistering service worker:', registration.scope);
-                    registration.unregister();
-                }
-            });
-        }
-        
-        // Direct verification function for immediate widget display
-        window.startDirectVerification = async function(heroShield, verifyBtn) {
-            try {
-                console.log('Starting direct IDV verification...');
-                
-                // Update button state
-                const originalText = verifyBtn.textContent;
-                verifyBtn.textContent = 'Starting verification...';
-                verifyBtn.disabled = true;
-                
-                // Start identity verification (Didit default)
-                const response = await fetch(`${window.location.origin}/api/sdk/start-identity-verification`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': 'Bearer demo-integration-key-12345'
-                    },
-                    body: JSON.stringify({
-                        provider: 'didit',
-                        inline_mode: false,
-                        return_url: window.location.origin + window.location.pathname + '?verification_return=true'
-                    })
-                });
-                
-                const result = await response.json();
-                
-                if (result.success && result.url) {
-                    console.log('IDV session created, redirecting...');
-                    // Redirect to hosted IDV (Didit)
-                    window.location.href = result.url;
-                } else {
-                    throw new Error(result.message || 'Failed to start verification');
-                }
-                
-            } catch (error) {
-                console.error('Direct verification failed:', error);
-                
-                // Reset button
-                verifyBtn.textContent = 'Verification failed - Try again';
-                verifyBtn.disabled = false;
-                
-                setTimeout(() => {
-                    verifyBtn.textContent = 'Verify a Lemma';
-                }, 3000);
-            }
-        };
-        
-        // Legacy function for button-triggered verification
-        window.startHeroVerification = async function() {
-            try {
-                console.log('Starting hero verification...');
-                
-                const joinButton = document.getElementById('join-network-btn');
-                if (joinButton) {
-                    joinButton.textContent = 'Starting verification...';
-                    joinButton.disabled = true;
-                }
-                
-                // Create shield instance if not exists
-                if (!window.heroShield) {
-                    window.heroShield = new LemmaBotShield({
-                        debug: true,
-                        apiBase: window.location.origin
-                    });
-                    await window.heroShield.initializeFederatedWallet();
-                }
-                
-                // Use the shield's protect method to show verification widget
-                await window.heroShield.protect('#shield-api-card');
-                
-            } catch (error) {
-                console.error('Hero verification failed:', error);
-                
-                const joinButton = document.getElementById('join-network-btn');
-                if (joinButton) {
-                    joinButton.textContent = 'Verification Failed - Try Again';
-                    joinButton.disabled = false;
-                    
-                    setTimeout(() => {
-                        joinButton.textContent = 'Join Network';
-                    }, 3000);
-                }
-            }
-        };
-    </script>
-    
     <style>
-        /* Status card transition */
-        #status-loading, #status-no-lemma, #status-has-lemma {
-            transition: opacity 0.3s ease-in-out;
+        @media (max-width: 768px) {
+            .hero h1 { font-size: 2rem !important; }
+            .hero h1 br { display: none; }
+            #how-it-works > .container > div:nth-child(2) {
+                grid-template-columns: 1fr !important;
+                gap: 8px !important;
+            }
+            #how-it-works > .container > div:nth-child(2) > div {
+                padding: 20px 16px !important;
+                display: flex;
+                align-items: center;
+                gap: 16px;
+                text-align: left !important;
+            }
+            #how-it-works > .container > div:nth-child(2) > div > div:first-child {
+                margin: 0 !important;
+                flex-shrink: 0;
+                width: 40px !important;
+                height: 40px !important;
+                font-size: 18px !important;
+            }
+            #how-it-works > .container > div:nth-child(2) > div h3 {
+                margin-bottom: 4px !important;
+            }
+        }
+
+        .home-compare-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: var(--font-size-sm);
+        }
+        .home-compare-table th,
+        .home-compare-table td {
+            padding: 14px 16px;
+            border-bottom: 1px solid var(--gray-200);
+            text-align: left;
+            vertical-align: top;
+        }
+        .home-compare-table thead th {
+            background: var(--gray-50);
+            font-weight: 600;
+            color: var(--gray-900);
+        }
+        .home-compare-table tbody tr:last-child td {
+            border-bottom: none;
+        }
+        .home-compare-table .col-lemma {
+            background: rgba(102, 126, 234, 0.04);
+        }
+        @media (max-width: 768px) {
+            .home-compare-wrap { overflow-x: auto; }
+            .home-compare-table { min-width: 640px; }
+        }
+
+        .home-trust-chip {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .home-steps-grid .card {
+            margin-bottom: 0;
         }
     </style>
 {% endblock %}
 
 {% block content %}
-<style>
-/* Mobile responsive adjustments for hero and steps */
-@media (max-width: 768px) {
-    .hero h1 { font-size: 2rem !important; }
-    .hero h1 br { display: none; }
-    #how-it-works > div > div:nth-child(2) {
-        grid-template-columns: 1fr !important;
-        gap: 8px !important;
-    }
-    #how-it-works > div > div:nth-child(2) > div {
-        padding: 20px 16px !important;
-        display: flex;
-        align-items: center;
-        gap: 16px;
-        text-align: left !important;
-    }
-    #how-it-works > div > div:nth-child(2) > div > div:first-child {
-        margin: 0 !important;
-        flex-shrink: 0;
-        width: 40px !important;
-        height: 40px !important;
-        font-size: 18px !important;
-    }
-    #how-it-works > div > div:nth-child(2) > div h3 {
-        margin-bottom: 4px !important;
-    }
-}
 
-/* Data flow diagram */
-.flow-row {
-    display: flex;
-    align-items: stretch;
-    gap: 8px;
-    flex-wrap: nowrap;
-    overflow-x: auto;
-    padding-bottom: 8px;
-}
-.flow-node {
-    flex: 1 1 0;
-    min-width: 168px;
-    background: var(--white);
-    border: 1px solid var(--gray-200);
-    border-radius: 12px;
-    padding: 20px 16px;
-    text-align: center;
-}
-.flow-node-icon {
-    width: 32px;
-    height: 32px;
-    border-radius: 50%;
-    background: var(--primary);
-    color: white;
-    font-weight: 700;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    margin: 0 auto 12px;
-    font-size: 14px;
-}
-.flow-node h4 {
-    font-size: 15px;
-    margin-bottom: 8px;
-    color: var(--gray-900);
-}
-.flow-node p {
-    font-size: 13px;
-    color: var(--gray-600);
-    line-height: 1.5;
-}
-.flow-node code {
-    font-size: 12px;
-    background: var(--gray-100);
-    padding: 1px 6px;
-    border-radius: 4px;
-}
-.flow-arrow {
-    display: flex;
-    align-items: center;
-    color: var(--gray-400);
-    font-size: 22px;
-    flex-shrink: 0;
-    padding: 0 4px;
-}
-
-@media (max-width: 768px) {
-    .flow-row {
-        flex-direction: column;
-        align-items: stretch;
-    }
-    .flow-arrow {
-        justify-content: center;
-        transform: rotate(90deg);
-        padding: 4px 0;
-    }
-}
-
-/* Homepage data comparison */
-.home-compare-table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: var(--font-size-sm);
-}
-.home-compare-table th,
-.home-compare-table td {
-    padding: 12px 14px;
-    border-bottom: 1px solid var(--gray-200);
-    text-align: left;
-    vertical-align: top;
-}
-.home-compare-table thead th {
-    background: var(--gray-50);
-    font-weight: 600;
-}
-.home-compare-table .col-lemma {
-    background: rgba(102, 126, 234, 0.05);
-}
-@media (max-width: 768px) {
-    .home-compare-wrap { overflow-x: auto; }
-    .home-compare-table { min-width: 640px; }
-}
-</style>
-
-<!-- Hero Section -->
+<!-- Hero -->
 <section class="hero">
     <div class="container" style="position: relative; z-index: 1;">
-        <div style="max-width: 800px; margin: 0 auto; text-align: center;">
+        <div style="max-width: 860px; margin: 0 auto; text-align: center;">
             <p style="font-size: var(--font-size-sm); font-weight: 600; text-transform: uppercase; letter-spacing: 2px; color: var(--primary); margin-bottom: 16px;">Enforcement for bot abuse &amp; ban evasion</p>
             <h1 style="font-size: clamp(2.5rem, 5vw, 3.5rem); line-height: 1.1; margin-bottom: 24px;">Make bans cost more<br>than a new email.</h1>
-            <p style="font-size: var(--font-size-xl); font-weight: 500; margin-bottom: var(--space-4); color: var(--gray-700);">lemma.id gives websites an identity-rooted enforcement layer for bot abuse, fraud, and ban evasion. Your existing systems detect suspicious behavior. lemma.id lets you bind risky accounts to a live, document-verified human, block site-private PPIDs, and require fresh IDV when abuse is confirmed — all without your servers ever storing a customer's ID document, legal name, or date of birth.</p>
-            <p style="font-size: var(--font-size-base); color: var(--gray-600); max-width: 600px; margin: 0 auto;">Credentials are only issued after a live identity check with liveness and document-to-selfie matching — so bots, AI agents, and stolen ID images can't earn one. Most users never see verification. Suspicious users do. Local signed proofs keep routine checks fast and private.</p>
-            <!-- Dynamic card: changes based on user's lemma status -->
-            <!-- Fixed min-height prevents CLS when state changes -->
-            <div id="lemma-status-card" style="margin-top: 32px; border-radius: 12px; min-height: 120px;">
-                <!-- Loading state - matches final height to prevent shift -->
-                <div id="status-loading" style="background: var(--gray-100); padding: 28px 40px; border-radius: 12px; max-width: 360px; margin: 0 auto; min-height: 120px; display: flex; align-items: center; justify-content: center;">
-                    <p style="margin: 0; font-size: var(--font-size-lg); color: var(--gray-600); text-align: center;">
-                        Checking credentials...
-                    </p>
-                </div>
-                
-                <!-- No lemma state (shown by default, hidden when lemma found) -->
-                <div id="status-no-lemma" style="display: none; background: var(--gray-900); padding: 28px 40px; border-radius: 12px; box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2); max-width: 360px; margin: 0 auto; text-align: center; min-height: 120px;">
-                    <p style="margin: 0 0 10px 0; font-size: var(--font-size-xl); color: var(--white); font-weight: 700;">
-                        Start verification
-                    </p>
-                    <p style="margin: 0; font-size: var(--font-size-sm); color: var(--gray-400);">
-                        Complete identity verification once with a trusted IDV issuer to receive reusable proof.
-                    </p>
-                    <p style="margin: 10px 0 0 0; font-size: var(--font-size-xs); color: var(--gray-500);">
-                        Site-private credentials + local checks
-                    </p>
-                </div>
-                
-                <!-- Has valid lemma state - Signed In (Green for immediate visual confirmation) -->
-                <div id="status-has-lemma" style="display: none; background: #10b981; padding: 28px 40px; border-radius: 12px; box-shadow: 0 8px 24px rgba(16, 185, 129, 0.3); max-width: 360px; margin: 0 auto; text-align: center; min-height: 120px;">
-                    <!-- Checkmark icon -->
-                    <div id="signin-checkmark" style="margin-bottom: 12px; opacity: 0; transform: scale(0.5); transition: all 0.4s ease-out;">
-                        <svg width="48" height="48" viewBox="0 0 48 48" fill="none" style="display: inline-block;">
-                            <circle cx="24" cy="24" r="22" stroke="rgba(255,255,255,0.3)" stroke-width="2.5" fill="none"/>
-                            <circle id="check-circle" cx="24" cy="24" r="22" stroke="var(--white)" stroke-width="2.5" fill="none" stroke-dasharray="138" stroke-dashoffset="138" style="transition: stroke-dashoffset 0.5s ease-out 0.2s;"/>
-                            <path id="check-path" d="M14 25L21 32L34 18" stroke="var(--white)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none" stroke-dasharray="35" stroke-dashoffset="35" style="transition: stroke-dashoffset 0.3s ease-out 0.5s;"/>
-                        </svg>
-                    </div>
-                    
-                    <!-- Signed in header -->
-                    <div id="signin-header" style="opacity: 0; transform: translateY(10px); transition: all 0.3s ease-out 0.1s;">
-                        <p style="margin: 0 0 16px 0; font-size: var(--font-size-xl); color: var(--white); font-weight: 700;">
-                            Verified human credential ready
-                        </p>
-                    </div>
-                    
-                    <!-- User info -->
-                    <div id="signin-userinfo" style="opacity: 0; transform: translateY(10px); transition: all 0.3s ease-out 0.2s;">
-                        <p id="lemma-user-email" style="margin: 0 0 10px 0; font-size: var(--font-size-base); color: var(--white); font-weight: 600;">
-                        </p>
-                        <p id="lemma-permission-badge" style="margin: 0; font-size: var(--font-size-sm); color: var(--white);">
-                        </p>
-                    </div>
-                    
-                    <!-- Footer message -->
-                    <div id="signin-details" style="opacity: 0; transform: translateY(10px); transition: all 0.3s ease-out 0.3s;">
-                        <p style="margin: 16px 0 0 0; font-size: var(--font-size-xs); color: rgba(255,255,255,0.7);">
-                            Local proof checks are active
-                        </p>
-                    </div>
-                </div>
-            </div>
-            
-            <div id="hero-buttons" style="margin-top: 48px; display: flex; gap: 16px; justify-content: center; flex-wrap: wrap;">
+            <p style="font-size: var(--font-size-xl); font-weight: 500; margin-bottom: var(--space-4); color: var(--gray-700);">lemma.id binds risky accounts to a live, document-verified human and blocks site-private PPIDs — so banned users must pass fresh IDV to return, not just rotate email or proxy. Your servers never store ID documents, legal names, or dates of birth.</p>
+
+            <div style="display: flex; gap: 16px; justify-content: center; flex-wrap: wrap; margin-top: 28px;">
                 <a href="/docs" class="btn btn-primary">Add to Your Site</a>
-                <a href="/demo" class="btn btn-primary">See the Demo</a>
-                <a href="/partners" class="btn btn-primary">For IDV Issuers</a>
-                <a href="/app" class="btn btn-secondary" id="hero-primary-btn">Get Verified</a>
-                <a href="#how-it-works" class="btn btn-secondary">Learn More</a>
+                <a href="/demo" class="btn btn-secondary">See the Demo</a>
             </div>
-            
-            <!-- Trust indicators -->
+
             <div style="margin-top: 48px; display: flex; gap: 32px; justify-content: center; flex-wrap: wrap; color: var(--gray-500); font-size: var(--font-size-sm);">
-                <div style="display: flex; align-items: center; gap: 8px;">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-                    </svg>
-                    <span>Raises the cost of the next account</span>
-                </div>
-                <div style="display: flex; align-items: center; gap: 8px;">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <div class="home-trust-chip">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
                         <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
                         <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
                     </svg>
-                    <span>Liveness-checked humans, not bots or AI</span>
+                    <span>Liveness-checked humans, not bots</span>
                 </div>
-                <div style="display: flex; align-items: center; gap: 8px;">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <div class="home-trust-chip">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
                         <circle cx="12" cy="12" r="10"/>
                         <line x1="2" y1="12" x2="22" y2="12"/>
                         <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
                     </svg>
                     <span>Friction only on suspicion</span>
                 </div>
-                <div style="display: flex; align-items: center; gap: 8px;">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <div class="home-trust-chip">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
                         <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
                         <line x1="9" y1="11" x2="15" y2="11"/>
                     </svg>
@@ -355,154 +118,26 @@
     </div>
 </section>
 
-<!-- Who this is for -->
-<section class="section" style="padding-top: 48px; padding-bottom: 48px; background: var(--white);">
+<!-- Audience + example -->
+<section class="section">
     <div class="container">
-        <p style="text-align: center; font-size: var(--font-size-lg); color: var(--gray-700); max-width: 820px; margin: 0 auto; line-height: 1.65;">
-            <strong style="color: var(--gray-900);">Built for platforms where banned users come back:</strong>
-            marketplaces, ticketing platforms, games, social apps, SaaS products, free trials, rewards programs, and any product where banned users return faster than you can remove them.
+        <p style="text-align: center; font-size: var(--font-size-lg); color: var(--gray-700); max-width: 820px; margin: 0 auto 32px; line-height: 1.65;">
+            <strong style="color: var(--gray-900);">Built for platforms where banned users come back</strong> — marketplaces, ticketing, gaming, social apps, free trials, and rewards programs.
         </p>
-    </div>
-</section>
-
-<!-- Abuse story -->
-<section class="section" style="padding-top: 0; padding-bottom: 48px;">
-    <div class="container">
         <div style="max-width: 760px; margin: 0 auto; padding: 28px 32px; background: var(--gray-50); border: 1px solid var(--gray-200); border-radius: 14px;">
             <p style="margin: 0 0 12px 0; font-size: var(--font-size-sm); font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--primary);">Example</p>
-            <p style="margin: 0; font-size: var(--font-size-base); color: var(--gray-700); line-height: 1.7;">A scalper creates 500 accounts. Your bot system catches 200 and bans them. Tomorrow, the same operator returns with new emails, SIMs, and proxies. With lemma.id, those accounts can be tied back to the same verified-person root, so the operator must pass fresh IDV instead of cheaply rotating infrastructure.</p>
+            <p style="margin: 0; font-size: var(--font-size-base); color: var(--gray-700); line-height: 1.7;">A scalper creates 500 accounts. Your bot system catches 200 and bans them. Tomorrow, the same operator returns with new emails, SIMs, and proxies. With lemma.id, those accounts tie back to the same verified-person root — so the operator must pass fresh IDV instead of cheaply rotating infrastructure.</p>
         </div>
     </div>
 </section>
 
-<script nonce="{{ csp_nonce }}">
-// Hero card state - watches for window.lemmaCredential set by session-free nav in layout.html
-// Uses requestIdleCallback for non-blocking initialization (improves LCP)
-(function() {
-    function initHeroCard() {
-        const loadingEl = document.getElementById('status-loading');
-        const noLemmaEl = document.getElementById('status-no-lemma');
-        const hasLemmaEl = document.getElementById('status-has-lemma');
-        const primaryBtn = document.getElementById('hero-primary-btn');
-        
-        if (!loadingEl) {
-            // Elements not ready yet, retry
-            requestAnimationFrame(initHeroCard);
-            return;
-        }
-        
-        function showSignedIn(cred) {
-            const claims = cred.claims || cred.credentialSubject || {};
-            const email = claims.email || 'Verification complete';
-            const displayName = claims.isHuman ? 'Verified human' : 'Credential active';
-            
-            // Update UI
-            document.getElementById('lemma-user-email').textContent = email;
-            const badgeContainer = document.getElementById('lemma-permission-badge');
-            badgeContainer.innerHTML = '';
-            const badge = document.createElement('span');
-            badge.style.background = 'rgba(255,255,255,0.15)';
-            badge.style.padding = '8px 20px';
-            badge.style.borderRadius = '24px';
-            badge.style.fontWeight = '500';
-            badge.style.fontSize = 'var(--font-size-sm)';
-            badge.textContent = displayName;
-            badgeContainer.appendChild(badge);
-            
-            // Show valid lemma state
-            loadingEl.style.display = 'none';
-            noLemmaEl.style.display = 'none';
-            hasLemmaEl.style.display = 'block';
-            
-            // Trigger sign-in animation
-            setTimeout(() => {
-                // Animate checkmark (scale in)
-                const checkmark = document.getElementById('signin-checkmark');
-                if (checkmark) {
-                    checkmark.style.opacity = '1';
-                    checkmark.style.transform = 'scale(1)';
-                }
-                
-                // Draw circle and check
-                const circle = document.getElementById('check-circle');
-                const path = document.getElementById('check-path');
-                if (circle) circle.style.strokeDashoffset = '0';
-                if (path) path.style.strokeDashoffset = '0';
-                
-                // Animate header
-                const header = document.getElementById('signin-header');
-                if (header) {
-                    header.style.opacity = '1';
-                    header.style.transform = 'translateY(0)';
-                }
-                
-                // Animate user info
-                const userinfo = document.getElementById('signin-userinfo');
-                if (userinfo) {
-                    userinfo.style.opacity = '1';
-                    userinfo.style.transform = 'translateY(0)';
-                }
-                
-                // Animate details
-                const details = document.getElementById('signin-details');
-                if (details) {
-                    details.style.opacity = '1';
-                    details.style.transform = 'translateY(0)';
-                }
-            }, 50);
-            
-            // Update button
-            primaryBtn.textContent = 'View docs';
-            primaryBtn.href = '/docs';
-        }
-        
-        function showJoinBeta() {
-            loadingEl.style.display = 'none';
-            noLemmaEl.style.display = 'block';
-            hasLemmaEl.style.display = 'none';
-        }
-        
-        // Poll for window.lemmaCredential (set by initSessionFreeNav in layout.html)
-        let checks = 0;
-        const maxChecks = 30; // 3 seconds max
-        const checkInterval = setInterval(() => {
-            checks++;
-            if (window.lemmaCredential) {
-                clearInterval(checkInterval);
-                showSignedIn(window.lemmaCredential);
-            } else if (checks >= maxChecks) {
-                clearInterval(checkInterval);
-                showJoinBeta();
-            }
-        }, 100);
-    }
-    
-    // Start after DOM is ready - use requestIdleCallback for non-blocking
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', () => {
-            if ('requestIdleCallback' in window) {
-                requestIdleCallback(initHeroCard);
-            } else {
-                setTimeout(initHeroCard, 0);
-            }
-        });
-    } else {
-        if ('requestIdleCallback' in window) {
-            requestIdleCallback(initHeroCard);
-        } else {
-            setTimeout(initHeroCard, 0);
-        }
-    }
-})();
-</script>
-
-<!-- Data comparison — visible early -->
-<section class="section" id="data-comparison" style="background: var(--gray-50); padding-top: 64px; padding-bottom: 64px;">
+<!-- Comparison -->
+<section class="section" id="data-comparison" style="background: var(--gray-50);">
     <div class="container">
         <div style="text-align: center; margin-bottom: 40px;">
             <p style="font-size: var(--font-size-sm); font-weight: 700; text-transform: uppercase; letter-spacing: 2px; color: var(--primary); margin-bottom: 12px;">Why teams choose lemma.id</p>
             <h2>Enforcement without the data liability</h2>
-            <p class="text-gray" style="max-width: 720px; margin: 16px auto 0;">Your site stores a human verdict and a site-private ID — not a KYC record. lemma.id is a personal data minimizer that holds derived anchors so bans stick; Auth0 and direct KYC hold far more.</p>
+            <p class="text-gray" style="max-width: 720px; margin: 16px auto 0;">Your site stores a human verdict and a site-private PPID — not a KYC record. Verification runs at the IDV issuer; routine checks run locally in the browser.</p>
         </div>
         <div class="home-compare-wrap" style="max-width: 960px; margin: 0 auto 28px; background: var(--white); border: 1px solid var(--gray-200); border-radius: 14px; overflow: hidden;">
             <table class="home-compare-table">
@@ -548,36 +183,34 @@
     </div>
 </section>
 
-<!-- How It Works Section -->
+<!-- How it works -->
 <section class="section" id="how-it-works">
     <div class="container">
-        <div style="text-align: center; margin-bottom: 64px;">
-            <h2>How lemma.id works</h2>
-            <p class="text-gray" style="max-width: 700px; margin: 16px auto 0;">Most platforms can already detect abuse. The hard part is making the penalty stick. lemma.id adds the missing enforcement layer: bind accounts to a verified person, then make a banned user pay to come back.</p>
+        <div style="text-align: center; margin-bottom: 48px;">
+            <p style="font-size: var(--font-size-sm); font-weight: 700; text-transform: uppercase; letter-spacing: 2px; color: var(--primary); margin-bottom: 12px;">How it works</p>
+            <h2>Bind, detect, enforce</h2>
+            <p class="text-gray" style="max-width: 700px; margin: 16px auto 0;">Your existing fraud tooling detects abuse. lemma.id gives your decisions teeth.</p>
         </div>
-        
-        <!-- Step-by-step flow -->
-        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; max-width: 900px; margin: 0 auto 64px; text-align: center;">
+
+        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; max-width: 900px; margin: 0 auto 48px; text-align: center;">
             <div style="padding: 32px 24px;">
                 <div style="width: 56px; height: 56px; border-radius: 50%; background: var(--primary); color: white; font-size: 24px; font-weight: 700; display: flex; align-items: center; justify-content: center; margin: 0 auto 20px;">1</div>
                 <h3 style="font-size: var(--font-size-lg); margin-bottom: 8px;">Bind</h3>
-                <p style="color: var(--gray-600); font-size: var(--font-size-sm);">Accounts link to a verified-person root, exposed to your site only as a site-private PPID. One human, one root — across resets and resource rotations.</p>
+                <p style="color: var(--gray-600); font-size: var(--font-size-sm);">Accounts link to a verified-person root, exposed to your site only as a site-private PPID.</p>
             </div>
             <div style="padding: 32px 24px;">
                 <div style="width: 56px; height: 56px; border-radius: 50%; background: var(--primary); color: white; font-size: 24px; font-weight: 700; display: flex; align-items: center; justify-content: center; margin: 0 auto 20px;">2</div>
                 <h3 style="font-size: var(--font-size-lg); margin-bottom: 8px;">Detect</h3>
-                <p style="color: var(--gray-600); font-size: var(--font-size-sm);">Your existing fraud and abuse tooling flags bad behavior. lemma.id doesn't replace your detection — it gives your decisions teeth.</p>
+                <p style="color: var(--gray-600); font-size: var(--font-size-sm);">Your fraud and abuse tooling flags bad behavior — lemma.id doesn't replace detection.</p>
             </div>
             <div style="padding: 32px 24px;">
                 <div style="width: 56px; height: 56px; border-radius: 50%; background: var(--primary); color: white; font-size: 24px; font-weight: 700; display: flex; align-items: center; justify-content: center; margin: 0 auto 20px;">3</div>
                 <h3 style="font-size: var(--font-size-lg); margin-bottom: 8px;">Enforce</h3>
-                <p style="color: var(--gray-600); font-size: var(--font-size-sm);">Block the person and require fresh IDV to return. Swapping email, SIM, or IP won't mint a clean new account.</p>
+                <p style="color: var(--gray-600); font-size: var(--font-size-sm);">Block the person and require fresh IDV to return. Swapping email, SIM, or IP won't mint a clean account.</p>
             </div>
         </div>
 
-        <!-- Before / After enforcement -->
-        <div style="max-width: 960px; margin: 0 auto 64px;">
-            <h3 style="text-align: center; font-size: var(--font-size-xl); margin-bottom: 32px; color: var(--gray-900);">Before and after lemma.id</h3>
+        <div style="max-width: 960px; margin: 0 auto;">
             <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 24px;">
                 <div style="background: var(--white); border: 1px solid var(--gray-200); border-radius: 12px; padding: 24px;">
                     <p style="font-size: var(--font-size-sm); font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--gray-500); margin-bottom: 16px;">Before</p>
@@ -588,227 +221,20 @@
                     <p style="margin: 0; font-size: var(--font-size-sm); color: var(--gray-700); line-height: 1.8;">Bot detected → account tied to verified-person root → site-private PPID blocked → <strong>must pass fresh IDV to return</strong></p>
                 </div>
             </div>
-        </div>
-        
-        <!-- Feature cards -->
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 32px;">
-            <div class="card">
-                <h3 class="card-title">Live, Verified Humans Only</h3>
-                <p>Proofs are issued only after a live identity check — liveness detection plus document-to-selfie matching at a trusted IDV issuer. Bots, AI agents, and stolen ID images can't obtain one.</p>
-            </div>
-
-            <div class="card">
-                <h3 class="card-title">Master + Derived Credentials</h3>
-                <p>Issue one master proof at lemma.id, then derive per-site credentials that preserve user privacy across domains.</p>
-            </div>
-            
-            <div class="card">
-                <h3 class="card-title">PPID-Bound Privacy</h3>
-                <p>Pairwise identifiers are derived per site, preventing simple cross-site correlation of user identity.</p>
-            </div>
-            
-            <div class="card">
-                <h3 class="card-title">Local Verification Path</h3>
-                <p>The SDK validates Ed25519 signatures, claims, and expiry without requiring a server call on each check.</p>
-            </div>
-            
-            <div class="card">
-                <h3 class="card-title">Site-Scoped Blocking</h3>
-                <p>Operators can block abuse immediately at the site level with deterministic check responses.</p>
-            </div>
-            
-            <div class="card">
-                <h3 class="card-title">Revocation Bloom Sync</h3>
-                <p>Site blocks propagate through signed revocation lists so verifiers reject banned PPIDs locally — no per-check server call.</p>
-            </div>
-            
-            <div class="card">
-                <h3 class="card-title">Simple Integration</h3>
-                <p>Add a script tag and call <code>verify()</code> to get a fast human verdict plus PPID for your local policies.</p>
-            </div>
+            <p style="text-align: center; margin-top: 32px; color: var(--gray-600); font-size: var(--font-size-sm);">
+                <a href="/trust" style="color: var(--primary);">See the full verification flow and data model →</a>
+            </p>
         </div>
     </div>
 </section>
 
-<!-- Benefit: enforcement without the PII burden -->
-<section class="section" id="no-pii-burden" style="background: var(--white);">
+<!-- Integration -->
+<section class="section" id="integrate" style="background: var(--gray-50);">
     <div class="container">
-        <div style="text-align: center; margin-bottom: 48px;">
-            <p style="font-size: var(--font-size-sm); font-weight: 700; text-transform: uppercase; letter-spacing: 2px; color: var(--primary); margin-bottom: 12px;">Identity-grade signal, none of the data liability</p>
-            <h2>Enforcement without becoming an identity store</h2>
-            <p class="text-gray" style="max-width: 740px; margin: 16px auto 0;">A verified-human signal strong enough to enforce bans shouldn't force you to hold the PII that makes identity verification a compliance and breach liability. The live identity check happens at the IDV issuer — your site receives only a human verdict and a site-private PPID.</p>
-        </div>
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 24px; max-width: 960px; margin: 0 auto;">
-            <div class="card">
-                <h3 class="card-title">No ID documents on your servers</h3>
-                <p>Your backend never receives the government ID, selfie, legal name, or date of birth — so there's no new identity honeypot to secure, breach, or be subpoenaed for.</p>
-            </div>
-            <div class="card">
-                <h3 class="card-title">No KYC stack to run</h3>
-                <p>Skip building and maintaining your own identity-verification pipeline and provider integrations. Add a script tag and call <code>verify()</code>.</p>
-            </div>
-            <div class="card">
-                <h3 class="card-title">Only a verdict + a site-private ID</h3>
-                <p>Each site receives a human yes/no and a PPID scoped to its own domain — not a reusable global identity, and nothing it has to treat as sensitive identity data.</p>
-            </div>
-        </div>
-        <p style="text-align: center; margin-top: 32px; max-width: 720px; margin-left: auto; margin-right: auto; color: var(--gray-600); font-size: var(--font-size-sm);">lemma.id carries the verified-person root needed for re-verification and revocation, so your site stays out of the identity-data business entirely. <a href="/trust" style="color: var(--primary);">See what each party stores →</a></p>
-    </div>
-</section>
-
-<!-- Data Flow Diagram Section -->
-<section class="section" id="data-flow">
-    <div class="container">
-        <div style="text-align: center; margin-bottom: 64px;">
-            <p style="font-size: var(--font-size-sm); font-weight: 700; text-transform: uppercase; letter-spacing: 2px; color: var(--primary); margin-bottom: 12px;">Verification flow</p>
-            <h2>Verification Happens In-Context, Not On Lemma</h2>
-            <p class="text-gray" style="max-width: 760px; margin: 16px auto 0;">Users never have to travel to lemma.id. The SDK triggers verification in-flow on whichever site the user is on, the IDV provider runs there, and the signed credential lives in the user's browser wallet — not on a Lemma server.</p>
-        </div>
-
-        <!-- First-time flow -->
-        <div style="margin-bottom: 56px;">
-            <h3 style="margin-bottom: 24px; text-align: center;">First-time user, on any site</h3>
-            <div class="flow-row">
-                <div class="flow-node">
-                    <div class="flow-node-icon">1</div>
-                    <h4>User on any site</h4>
-                    <p>Site loads the lemma.id SDK and calls <code>verify()</code>.</p>
-                </div>
-                <div class="flow-arrow" aria-hidden="true">→</div>
-                <div class="flow-node">
-                    <div class="flow-node-icon">2</div>
-                    <h4>Browser wallet check</h4>
-                    <p>SDK checks the user's browser wallet for an existing verified-human credential.</p>
-                </div>
-                <div class="flow-arrow" aria-hidden="true">→</div>
-                <div class="flow-node">
-                    <div class="flow-node-icon">3</div>
-                    <h4>IDV issuer flow</h4>
-                    <p>None found. SDK launches in-context verification with a trusted IDV issuer — a live check with liveness and document-to-selfie matching.</p>
-                </div>
-                <div class="flow-arrow" aria-hidden="true">→</div>
-                <div class="flow-node">
-                    <div class="flow-node-icon">4</div>
-                    <h4>Wallet stores credential</h4>
-                    <p>Signed master credential is written to the user's browser wallet — not to Lemma servers.</p>
-                </div>
-                <div class="flow-arrow" aria-hidden="true">→</div>
-                <div class="flow-node">
-                    <div class="flow-node-icon">5</div>
-                    <h4>Site decision</h4>
-                    <p>Site receives a local Ed25519 verdict and a site-private PPID.</p>
-                </div>
-            </div>
-        </div>
-
-        <!-- Returning user flow -->
-        <div>
-            <h3 style="margin-bottom: 24px; text-align: center;">Returning user — any Lemma-enabled site</h3>
-            <div class="flow-row">
-                <div class="flow-node">
-                    <div class="flow-node-icon">1</div>
-                    <h4>User on any site</h4>
-                    <p>SDK calls <code>verify()</code>.</p>
-                </div>
-                <div class="flow-arrow" aria-hidden="true">→</div>
-                <div class="flow-node">
-                    <div class="flow-node-icon">2</div>
-                    <h4>Browser wallet</h4>
-                    <p>Existing master credential is found locally.</p>
-                </div>
-                <div class="flow-arrow" aria-hidden="true">→</div>
-                <div class="flow-node">
-                    <div class="flow-node-icon">3</div>
-                    <h4>Derive site PPID</h4>
-                    <p>Wallet derives a site-private credential from the master + this hostname.</p>
-                </div>
-                <div class="flow-arrow" aria-hidden="true">→</div>
-                <div class="flow-node">
-                    <div class="flow-node-icon">4</div>
-                    <h4>Local verify</h4>
-                    <p>Ed25519 signature + revocation freshness checked entirely in-browser. No round-trip to Lemma.</p>
-                </div>
-                <div class="flow-arrow" aria-hidden="true">→</div>
-                <div class="flow-node">
-                    <div class="flow-node-icon">5</div>
-                    <h4>Site decision</h4>
-                    <p>Site receives verdict and PPID for local policy.</p>
-                </div>
-            </div>
-        </div>
-
-        <div style="text-align: center; margin-top: 56px; max-width: 720px; margin-left: auto; margin-right: auto;">
-            <p style="color: var(--gray-700); font-size: var(--font-size-base);"><strong>The wallet works like a physical driver's license:</strong> issuers sign once, sites verify locally, and users carry the credential. Sites can't correlate you with each other — each sees only a site-private PPID, never your name, document, or other PII. The issuer can recognize the same person across re-verification, and that's exactly what makes a ban enforceable.</p>
-            <p style="color: var(--gray-600); font-size: var(--font-size-sm); margin-top: 16px;"><strong>What lemma.id can and can't see.</strong> lemma.id holds the verified-person root that links your credentials for re-verification and revocation — but it does not store your raw ID document and, because checks run locally in the browser, it does not see which sites you visit or when you verify. Relying sites receive only a human verdict and a PPID scoped to their own domain.</p>
-        </div>
-    </div>
-</section>
-
-<!-- Use Cases Section -->
-<section class="section" id="use-cases" style="background: var(--gray-50);">
-    <div class="container">
-        <div style="text-align: center; margin-bottom: 56px;">
-            <p style="font-size: var(--font-size-sm); font-weight: 700; text-transform: uppercase; letter-spacing: 2px; color: var(--primary); margin-bottom: 12px;">Where lemma.id fits</p>
-            <h2>Bans that actually stick</h2>
-            <p class="text-gray" style="max-width: 720px; margin: 16px auto 0;">Wherever a ban is only as good as the cost of the next account. lemma.id binds accounts to a verified person, so blocked users can't rotate cheap resources to return.</p>
-        </div>
-
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 24px;">
-            <div class="card">
-                <h3 class="card-title">Marketplaces</h3>
-                <p>Stop banned sellers and scammers from re-listing under a fresh account the moment you remove them.</p>
-            </div>
-            <div class="card">
-                <h3 class="card-title">Dating &amp; social</h3>
-                <p>Break up repeat catfish, harassment, and ban-evasion rings — while keeping identity site-private.</p>
-            </div>
-            <div class="card">
-                <h3 class="card-title">Gaming</h3>
-                <p>Make cheaters and smurfs pay to rebuild after every ban instead of starting over for free.</p>
-            </div>
-            <div class="card">
-                <h3 class="card-title">Reviews &amp; UGC</h3>
-                <p>Dismantle coordinated fake-review and sock-puppet networks that rebuild faster than you can remove them.</p>
-            </div>
-            <div class="card">
-                <h3 class="card-title">Fintech &amp; rewards</h3>
-                <p>Shut down bonus abuse and multi-accounting by tying each enrollment to one verified person.</p>
-            </div>
-            <div class="card">
-                <h3 class="card-title">Ticketing &amp; releases</h3>
-                <p>Raise the cost for scalpers who treat CAPTCHA as a line item and farm accounts at scale.</p>
-            </div>
-        </div>
-
-        <div style="max-width: 720px; margin: 40px auto 0; padding: 20px 24px; border: 1px solid var(--gray-200); border-radius: 12px; background: var(--white);">
-            <p style="margin: 0; color: var(--gray-600); font-size: var(--font-size-sm); line-height: 1.6;"><strong style="color: var(--gray-900);">What lemma.id does and doesn't do.</strong> It raises the cost of a fresh identity from roughly zero to the cost of passing IDV again. That breaks the economics of high-volume, low-value abuse. It is not designed to stop a funded attacker willing to buy a verified identity for a single high-value target — it's designed to make everyday abuse stop paying.</p>
-        </div>
-    </div>
-</section>
-
-<!-- Network effect -->
-<section class="section" id="lemma-network" style="background: var(--gray-50);">
-    <div class="container">
-        <div style="text-align: center; max-width: 860px; margin: 0 auto 56px;">
-            <p style="font-size: var(--font-size-sm); font-weight: 700; text-transform: uppercase; letter-spacing: 2px; color: var(--primary); margin-bottom: 12px;">The network effect</p>
-            <h2 style="margin-bottom: 16px;">Enforcement that compounds across sites</h2>
-            <p class="text-gray" style="max-width: 700px; margin: 0 auto;">Every site gets standalone value on day one — no network required. A verified human carries their proof across Lemma-enabled sites, and each integration keeps its own site-private PPID boundary.</p>
-            <p class="text-gray" style="max-width: 700px; margin: 16px auto 0; font-style: italic;">Proof-of-humanity is the first claim on this rails. The same wallet, person-root, and local-verification model are designed to carry additional privacy-preserving proofs over time — like age or one-account-per-person — without ever exposing the underlying identity.</p>
-        </div>
-
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 24px; margin-bottom: 40px;">
-            <div class="card">
-                <h3 class="card-title">Verify Once</h3>
-                <p>Users complete one IDV verification in-flow on whichever site they're on — no detour to lemma.id. The signed master credential is stored in the user's browser wallet.</p>
-            </div>
-            <div class="card">
-                <h3 class="card-title">Derive Per Site</h3>
-                <p>The wallet bridge derives a site-bound credential on first request, so each integration gets its own PPID and privacy boundary.</p>
-            </div>
-            <div class="card">
-                <h3 class="card-title">Site-Scoped Enforcement</h3>
-                <p>Block abuse immediately on your domain with a site API key. Combine with your own app-level deny for fast response.</p>
-            </div>
+        <div style="text-align: center; margin-bottom: 32px;">
+            <p style="font-size: var(--font-size-sm); font-weight: 700; text-transform: uppercase; letter-spacing: 2px; color: var(--primary); margin-bottom: 12px;">Developer integration</p>
+            <h2>Integrate in two lines</h2>
+            <p class="text-gray" style="max-width: 640px; margin: 16px auto 0;">Most users never see verification. Suspicious users do. Local signed proofs keep routine checks fast and private.</p>
         </div>
 
         <div style="max-width: 860px; margin: 0 auto; border: 1px solid var(--gray-200); border-radius: 14px; background: var(--white); overflow: hidden;">
@@ -818,46 +244,46 @@
         </div>
 
         <div style="margin-top: 32px; display: flex; gap: 16px; justify-content: center; flex-wrap: wrap;">
-            <a href="/app" class="btn btn-primary">Get Verified</a>
-            <a href="/docs" class="btn btn-secondary">Add to Your Site</a>
-            <a href="/demo" class="btn btn-secondary">See Demo</a>
+            <a href="/docs" class="btn btn-primary">View integration docs</a>
+            <a href="/demo" class="btn btn-secondary">See the demo</a>
         </div>
-
-        <p style="margin-top: 20px; text-align: center; color: var(--gray-600); font-size: var(--font-size-sm);">
-            IDV-issuer verified • Ed25519-signed • Site-private PPIDs
-        </p>
     </div>
 </section>
 
-<!-- What lemma.id is not -->
-<section class="section" id="what-not" style="background: var(--white);">
+<!-- Boundaries -->
+<section class="section" id="what-not">
     <div class="container">
         <div style="text-align: center; margin-bottom: 40px;">
+            <p style="font-size: var(--font-size-sm); font-weight: 700; text-transform: uppercase; letter-spacing: 2px; color: var(--primary); margin-bottom: 12px;">Product boundaries</p>
             <h2>What lemma.id is not</h2>
-            <p class="text-gray" style="max-width: 640px; margin: 16px auto 0;">Clear boundaries build trust. lemma.id is an enforcement layer — not a full fraud stack replacement.</p>
+            <p class="text-gray" style="max-width: 640px; margin: 16px auto 0;">Clear boundaries build trust. It's an enforcement layer — not a full fraud stack replacement.</p>
         </div>
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 20px; max-width: 900px; margin: 0 auto;">
-            <div class="card"><h3 class="card-title">Not bot detection</h3><p>Your existing tools find suspicious behavior. lemma.id makes the consequence stick.</p></div>
-            <div class="card"><h3 class="card-title">Not a global public identity</h3><p>Each site sees only a site-private PPID — not one reusable ID across the web.</p></div>
-            <div class="card"><h3 class="card-title">Not an identity store you run</h3><p>Your servers never hold ID documents, names, or dates of birth — only a verdict and a site-private PPID. No KYC stack, no PII honeypot.</p></div>
-            <div class="card"><h3 class="card-title">Not permanent punishment</h3><p>Enforcement is tiered: immediate app deny, site block, and fresh IDV when users need to re-prove humanity.</p></div>
-            <div class="card"><h3 class="card-title">Not a full fraud replacement</h3><p>Works alongside your risk stack — device fingerprinting, velocity rules, and behavior models.</p></div>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 24px; max-width: 960px; margin: 0 auto;">
+            <div class="card">
+                <h3 class="card-title">Not bot detection</h3>
+                <p>Your tools find suspicious behavior. lemma.id makes the consequence stick.</p>
+            </div>
+            <div class="card">
+                <h3 class="card-title">Not a global public identity</h3>
+                <p>Each site sees only a site-private PPID — not one reusable ID across the web.</p>
+            </div>
+            <div class="card">
+                <h3 class="card-title">Not an identity store you run</h3>
+                <p>Your servers hold a verdict and a PPID — not ID documents, names, or dates of birth.</p>
+            </div>
         </div>
-        <p style="text-align: center; margin-top: 32px; max-width: 640px; margin-left: auto; margin-right: auto; color: var(--gray-600); font-size: var(--font-size-base);"><strong>What it is:</strong> an enforcement layer that makes repeat abuse harder to reset.</p>
+        <p style="text-align: center; margin-top: 32px; max-width: 640px; margin-left: auto; margin-right: auto; color: var(--gray-600); font-size: var(--font-size-base);"><strong>What it is:</strong> an enforcement layer that makes repeat abuse harder to reset. <a href="/about" style="color: var(--primary);">Read more about the approach →</a></p>
     </div>
 </section>
 
-<!-- CTA Section -->
+<!-- CTA -->
 <section class="section" style="background: var(--gray-900); color: var(--white); padding: 80px 0;">
     <div class="container" style="text-align: center;">
         <h2 style="color: var(--white); font-size: var(--font-size-3xl); margin-bottom: 20px;">Give Your Bans Teeth</h2>
-        <p style="color: var(--gray-400); font-size: var(--font-size-lg); margin-bottom: 48px; max-width: 600px; margin-left: auto; margin-right: auto;">Add identity-rooted enforcement, step-up IDV on suspicion, and site-private privacy with a production-ready SDK and API — without running your own KYC stack or storing a single ID document.</p>
+        <p style="color: var(--gray-400); font-size: var(--font-size-lg); margin-bottom: 48px; max-width: 600px; margin-left: auto; margin-right: auto;">Add identity-rooted enforcement with a production-ready SDK — without running your own KYC stack.</p>
         <div style="display: flex; gap: 20px; justify-content: center; flex-wrap: wrap;">
-            <a href="/app" class="btn btn-primary" style="font-size: var(--font-size-lg); padding: 16px 32px;">
-                Get Verified
-            </a>
+            <a href="/docs" class="btn btn-primary" style="font-size: var(--font-size-lg); padding: 16px 32px;">Add to Your Site</a>
             <a href="/demo" class="btn btn-secondary" style="background: transparent; border-color: var(--gray-600); color: var(--white);">Watch Demo</a>
-            <a href="/docs" class="btn btn-secondary" style="background: transparent; border-color: var(--gray-600); color: var(--white);">View docs</a>
         </div>
         <p style="color: var(--gray-500); font-size: var(--font-size-sm); margin-top: 24px;">
             Bind • Detect • Enforce
