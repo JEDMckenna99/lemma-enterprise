@@ -23,9 +23,15 @@
     <p class="field-sub">No package or customer data stored.</p>
     <nav class="field-nav">
       <a href="/metrics/start">Start</a>
-      <a href="/metrics/log" class="active">Log</a>
+      <a href="/metrics/log">Log</a>
       <a href="/metrics/summary">End</a>
       <a href="/metrics/report">Report</a>
+    </nav>
+    <nav class="field-nav field-nav-prototype" aria-label="Prototype demo">
+      <a href="/dispatch">Dispatch + QR</a>
+      <a href="/driver">Verifier</a>
+      <a href="/driver/scan">Scan</a>
+      <a href="/audit">Audit</a>
     </nav>
   </header>
   <main class="field-main">
@@ -36,6 +42,7 @@
   <script src="{{ url_for('static', filename='js/metrics/validate-client.js') }}"></script>
   <script src="{{ url_for('static', filename='js/metrics/aggregate-client.js') }}"></script>
   <script src="{{ url_for('static', filename='js/metrics/pwa.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/metrics/nav.js') }}"></script>
   {% endblock %}
 </body>
 </html>

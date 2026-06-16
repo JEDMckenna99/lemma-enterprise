@@ -2,6 +2,7 @@
 {% block title %}Scan Package{% endblock %}
 {% block content %}
 <h1>Scan Package</h1>
+<p class="muted">Use QR labels from <a href="/dispatch">Dispatch</a>. Download the route bundle on <a href="/driver">Driver home</a> first.</p>
 <div class="controls">
   <label>Mode
     <select id="verify-mode">
@@ -20,11 +21,17 @@
   </label>
 </div>
 <div class="scan-area">
-  <video id="preview" playsinline></video>
-  <button id="manual-scan" class="btn">Simulate Scan (demo)</button>
+  <video id="preview" playsinline muted></video>
+  <button id="start-camera" class="btn primary" type="button">Scan printed QR</button>
+  <button id="stop-camera" class="btn hidden" type="button">Stop camera</button>
+  <p id="camera-status" class="muted"></p>
+  <hr>
+  <label>Or enter package ID manually</label>
   <input id="manual-package" placeholder="Package ID e.g. P-1001">
+  <button id="manual-scan" class="btn" type="button">Verify package ID</button>
 </div>
 <div id="scan-result" class="panel"></div>
+<p class="muted"><a href="/metrics/log">← Back to delay log</a></p>
 {% endblock %}
 {% block scripts %}
 <script src="{{ url_for('static', filename='js/shared/storage.js') }}"></script>

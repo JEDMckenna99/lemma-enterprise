@@ -58,7 +58,16 @@
   </div>
 </form>
 <div id="save-status"></div>
-<p class="install-hint">Tip: Add to Home Screen (Share → Add to Home Screen on iPhone) for one-tap access on route.</p>
+<p class="install-hint">Tip: Add to Home Screen for one-tap access on route.</p>
+<section class="panel prototype-links">
+  <h3>Prototype verifier (fake data only)</h3>
+  <p class="muted">Test signed scan flow separately from delay logging.</p>
+  <div class="btn-stack">
+    <a class="btn" href="/dispatch">Create route &amp; print QR labels</a>
+    <a class="btn" href="/driver">Driver home — download bundle</a>
+    <a class="btn primary" href="/driver/scan">Open scanner</a>
+  </div>
+</section>
 {% endblock %}
 {% block scripts %}
 {{ super() }}

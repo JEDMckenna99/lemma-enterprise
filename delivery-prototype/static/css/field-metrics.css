@@ -54,6 +54,19 @@
   color: white;
 }
 
+.field-nav-prototype {
+  margin-top: 0.5rem;
+}
+
+.field-nav-prototype a {
+  font-size: 0.8rem;
+  background: #1e293b;
+}
+
+.field-nav-prototype a:hover {
+  background: #334155;
+}
+
 .field-main {
   max-width: 640px;
   margin: 0 auto;

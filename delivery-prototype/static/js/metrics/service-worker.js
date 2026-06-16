@@ -15,6 +15,7 @@ const ASSETS = [
   "/static/js/metrics/summary.js",
   "/static/js/metrics/report.js",
   "/static/js/metrics/pwa.js",
+  "/static/js/metrics/nav.js",
   "/static/manifest.webmanifest",
 ];
 
