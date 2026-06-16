@@ -235,7 +235,7 @@ def index():
       </aside>
     </div>
   </main>
-  <script src="{LEMMA_ORIGIN}/sdk/ishuman-verifier.js?v=1.7.1" crossorigin="anonymous"
+  <script src="{LEMMA_ORIGIN}/sdk/ishuman-verifier.js?v=1.7.2" crossorigin="anonymous"
     onerror="window.__lemmaSdkLoadError='ishuman-verifier failed to load from {LEMMA_ORIGIN}'"></script>
   <script>
     if (typeof IsHumanVerifier === 'undefined') {{

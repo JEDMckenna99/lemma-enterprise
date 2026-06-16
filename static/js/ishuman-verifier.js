@@ -664,6 +664,9 @@ class IsHumanVerifier {
             'no_ishuman_credential',
             'site_proof_required',
             'legacy_credential_format',
+            // Stale cached credentials after issuer rotation — re-issue via popup.
+            'untrusted_issuer',
+            'invalid_signature',
             // Monthly site VC expiry: renew via daily-unlock popup (passkey only
             // when the lock bundle is missing or stale).
             'expired',
@@ -839,13 +842,21 @@ class IsHumanVerifier {
         return { ...payload, [key]: verification };
     }
 
-    async _verifyOnce(t0) {
+    async _verifyOnce(t0, options = {}) {
+        if (!this._bloomTrusted || !this._trustListTrusted) {
+            await this._syncBloom({ force: true });
+        }
         if (!this._bloomTrusted || !this._trustListTrusted) {
             return this._result(false, null, 'revocation_data_untrusted', t0);
         }
 
         const cached = await this._verifyFromSiteVcCache(t0);
         if (cached !== null) {
+            const recoverable = new Set(['untrusted_issuer', 'invalid_signature']);
+            if (!cached.human && recoverable.has(cached.reason) && !options.retriedTrust) {
+                await this._syncBloom({ force: true });
+                return this._verifyOnce(t0, { retriedTrust: true });
+            }
             return cached;
         }
 
@@ -886,16 +897,12 @@ class IsHumanVerifier {
     async _init() {
         // Eagerly hydrate the Bloom snapshot + trust list from localStorage so
         // the cache-hit fast path can proceed without waiting for the network.
-        // The fresh network fetch still runs (in the background) below to pick
-        // up new revocations, but it no longer blocks initialisation.
         const cacheOk = await this._hydrateBloomFromCache();
         await detectWebCryptoEd25519();
-        if (cacheOk) {
-            this._bloomNetworkRefresh = this._syncBloom().catch(() => {});
-        } else {
-            // No usable cached snapshot — must wait for the network fetch.
-            await this._syncBloom();
-        }
+        // Always refresh from the network during init. A background-only refresh
+        // left verify() running against a stale issuer trust list after platform
+        // key rotation, which surfaced as untrusted_issuer on cached site proofs.
+        await this._syncBloom({ force: true });
         this._redirectReturnResult = await this._consumeRedirectReturnIfPresent(performance.now());
     }
 

@@ -708,7 +708,7 @@ def create_app():
 
     @app.route('/partners')
     def partners():
-        """Partners / For IDV Issuers - Marketing page targeting IDV provider partnerships"""
+        """For IDV Providers - issuer program pitch page (not a signed-partner list)"""
         logger.info("📄 Serving partners page")
         return render_template('modern/partners.html')
 
@@ -904,7 +904,7 @@ def create_app():
         response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
         response.headers['Pragma'] = 'no-cache'
         response.headers['Expires'] = '0'
-        response.headers['X-SDK-Version'] = '1.7.1'
+        response.headers['X-SDK-Version'] = '1.7.2'
         response.headers['Access-Control-Allow-Origin'] = '*'
         return response
 

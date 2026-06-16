@@ -212,6 +212,21 @@ def test_ishuman_verifier_uses_session_cache_before_popup():
     assert cached_idx < proof_idx
 
 
+def test_ishuman_verifier_retries_trust_refresh_on_untrusted_issuer():
+    sdk_path = os.path.join(
+        os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+        "static",
+        "js",
+        "ishuman-verifier.js",
+    )
+    with open(sdk_path, "r", encoding="utf-8") as handle:
+        content = handle.read()
+
+    assert "'untrusted_issuer'" in content
+    assert "retriedTrust" in content
+    assert "await this._syncBloom({ force: true })" in content
+
+
 def test_ishuman_verifier_is_popup_only_no_bridge():
     """Phase 2.1: the bridge iframe was removed entirely; verify() is popup-only."""
     sdk_path = os.path.join(
