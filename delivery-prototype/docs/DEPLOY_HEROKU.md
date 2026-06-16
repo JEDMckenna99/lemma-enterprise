@@ -16,6 +16,12 @@ Standalone app (same pattern as `demo-sites/`). Uses **SQLite**, not PostgreSQL.
 
 For prototype testing (create route → scan → sync → audit in one session), **SQLite is sufficient**. Set stable signing keys via config vars so credentials stay valid across restarts even if the DB is empty.
 
+## Live app
+
+**URL:** https://lemma-delivery-prototype-c5afc69633cb.herokuapp.com/
+
+**Field logger (install this on your phone):** https://lemma-delivery-prototype-c5afc69633cb.herokuapp.com/metrics/log
+
 ## One-time setup
 
 From repo root (requires [Heroku CLI](https://devcenter.heroku.com/articles/heroku-cli)):
@@ -51,9 +57,13 @@ git subtree push --prefix delivery-prototype heroku main
 After deploy:
 
 ```powershell
-heroku run python scripts/seed_demo_route.py --app lemma-delivery-prototype
+# Seed via HTTP (persists on the web dyno — preferred on Heroku)
+curl -X POST https://lemma-delivery-prototype-c5afc69633cb.herokuapp.com/api/routes -H "Content-Type: application/json" -d "{\"route_id\":\"R-001\",\"package_count\":20}"
+
 heroku open --app lemma-delivery-prototype
 ```
+
+Note: `heroku run python scripts/seed_demo_route.py` uses a one-off dyno with a separate filesystem; use the dispatch UI or `POST /api/routes` instead so the web app sees the data.
 
 ## URLs
 
