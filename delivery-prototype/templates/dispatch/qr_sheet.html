@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>QR Sheet {{ route_id }}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
+  <style>@media print { .no-print { display: none; } }</style>
+</head>
+<body>
+  <h1>QR Sheet — {{ route_id }}</h1>
+  <p class="no-print"><a href="/dispatch">Back to dispatch</a></p>
+  <div class="qr-grid">
+    {% for pkg in packages %}
+    <div class="qr-card">
+      <h3>{{ pkg.package_id }}</h3>
+      <p>Stop: {{ pkg.stop_id }}</p>
+      <img src="/api/routes/{{ route_id }}/qr/{{ pkg.package_id }}" alt="{{ pkg.package_id }}">
+    </div>
+    {% endfor %}
+  </div>
+</body>
+</html>

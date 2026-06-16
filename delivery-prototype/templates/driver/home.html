@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}Driver Home{% endblock %}
+{% block content %}
+<h1>Driver App</h1>
+<div class="btn-stack">
+  <label>Route ID<input id="route-id" value="R-001"></label>
+  <button id="download-bundle" class="btn primary">Download Route Bundle</button>
+  <a href="/driver/scan" class="btn">Start Test Route / Scan</a>
+  <a href="/driver/queue" class="btn">Sync Queue</a>
+  <a href="/driver/benchmark" class="btn">Benchmark</a>
+</div>
+<div id="bundle-status" class="panel muted"></div>
+{% endblock %}
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/shared/storage.js') }}"></script>
+<script src="{{ url_for('static', filename='js/driver/home.js') }}"></script>
+{% endblock %}

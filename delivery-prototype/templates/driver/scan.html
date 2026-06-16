@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block title %}Scan Package{% endblock %}
+{% block content %}
+<h1>Scan Package</h1>
+<div class="controls">
+  <label>Mode
+    <select id="verify-mode">
+      <option value="local-first">Local-First Mode</option>
+      <option value="cloud-check">Cloud-Check Mode</option>
+    </select>
+  </label>
+  <label>Network
+    <select id="network-profile">
+      <option value="good">Good (0.5s)</option>
+      <option value="weak">Weak (3s)</option>
+      <option value="bad">Bad (8s)</option>
+      <option value="timeout">Timeout</option>
+      <option value="offline">Offline</option>
+    </select>
+  </label>
+</div>
+<div class="scan-area">
+  <video id="preview" playsinline></video>
+  <button id="manual-scan" class="btn">Simulate Scan (demo)</button>
+  <input id="manual-package" placeholder="Package ID e.g. P-1001">
+</div>
+<div id="scan-result" class="panel"></div>
+{% endblock %}
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/shared/storage.js') }}"></script>
+<script src="{{ url_for('static', filename='js/shared/network-simulator.js') }}"></script>
+<script src="{{ url_for('static', filename='js/shared/indexeddb-queue.js') }}"></script>
+<script type="module" src="{{ url_for('static', filename='js/driver/scan.js') }}"></script>
+{% endblock %}

@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block title %}Benchmark{% endblock %}
+{% block content %}
+<h1>Cloud vs Local Benchmark</h1>
+<label>Iterations<input id="iterations" type="number" value="10" min="1" max="50"></label>
+<button id="run-benchmark" class="btn primary">Run Benchmark</button>
+<div id="benchmark-results" class="panel"></div>
+{% endblock %}
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/shared/storage.js') }}"></script>
+<script src="{{ url_for('static', filename='js/shared/network-simulator.js') }}"></script>
+<script type="module" src="{{ url_for('static', filename='js/driver/benchmark.js') }}"></script>
+{% endblock %}

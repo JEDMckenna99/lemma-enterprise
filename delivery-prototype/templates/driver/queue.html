@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block title %}Offline Queue{% endblock %}
+{% block content %}
+<h1>Offline Queue</h1>
+<button id="sync-now" class="btn primary">Sync Now</button>
+<div id="queue-list" class="panel"></div>
+{% endblock %}
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/shared/storage.js') }}"></script>
+<script src="{{ url_for('static', filename='js/shared/indexeddb-queue.js') }}"></script>
+<script src="{{ url_for('static', filename='js/driver/queue.js') }}"></script>
+{% endblock %}

@@ -1,0 +1,19 @@
+{% extends "metrics/base.html" %}
+{% block title %}Start Shift{% endblock %}
+{% block content %}
+<h1>Start shift</h1>
+<p class="muted">Optional — defaults work if you skip straight to Log.</p>
+<form id="shift-form" class="form-grid">
+  <label>Date<input name="date" type="date"></label>
+  <label>Weather<select name="weather"><option>clear</option><option>rain</option><option>storm</option><option>other</option></select></label>
+  <label>Route type<select name="route_type"><option>urban</option><option selected>suburban</option><option>rural</option><option>mixed</option></select></label>
+  <label>Difficulty<select name="difficulty"><option>easy</option><option selected>normal</option><option>hard</option></select></label>
+  <label>Battery start %<input name="battery_start" type="number" min="0" max="100" value="100"></label>
+  <button type="submit" class="btn primary">Start shift</button>
+</form>
+<a href="/metrics/log" class="btn primary big" style="display:block;text-align:center;margin-top:1rem;">Go to delay log</a>
+{% endblock %}
+{% block scripts %}
+{{ super() }}
+<script src="{{ url_for('static', filename='js/metrics/start.js') }}"></script>
+{% endblock %}

@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}Dispatch Dashboard{% endblock %}
+{% block content %}
+<h1>Dispatch Dashboard</h1>
+<p class="muted">Create fake test routes only.</p>
+<form id="route-form" class="form-grid">
+  <label>Route ID<input name="route_id" value="R-001"></label>
+  <label>Driver ID<input name="driver_id" value="D-42"></label>
+  <label>Device ID<input name="device_id" value="DEVICE-001"></label>
+  <label>Packages<input name="package_count" type="number" value="20" min="1" max="100"></label>
+  <label>Stops (comma-separated)<input name="stops" value="S-014,S-015,S-016"></label>
+  <label>Expires (hours)<input name="expires_hours" type="number" value="12"></label>
+  <fieldset>
+    <legend>Delivery policy</legend>
+    <label><input type="checkbox" name="photo_required" checked> Photo required</label>
+    <label><input type="checkbox" name="signature_required"> Signature required</label>
+    <label><input type="checkbox" name="otp_required"> OTP required</label>
+  </fieldset>
+  <button type="submit" class="btn primary">Create Route</button>
+</form>
+<div id="result" class="panel hidden"></div>
+<div id="qr-links" class="panel hidden"></div>
+{% endblock %}
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/dispatch/app.js') }}"></script>
+{% endblock %}

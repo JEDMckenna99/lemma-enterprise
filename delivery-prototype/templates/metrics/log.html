@@ -1,0 +1,66 @@
+{% extends "metrics/base.html" %}
+{% block title %}Quick Delay Log{% endblock %}
+{% block content %}
+<div id="shift-banner" class="shift-banner hidden"></div>
+<h1>Log delay</h1>
+<p class="muted">Tap each row, then save. Works offline.</p>
+<p id="today-count" class="muted"></p>
+<form id="delay-form">
+  <fieldset><legend>Stop type</legend>
+    <div class="btn-grid" data-field="stop_type">
+      <button type="button" data-value="house">House</button>
+      <button type="button" data-value="apartment">Apartment</button>
+      <button type="button" data-value="business">Business</button>
+      <button type="button" data-value="locker">Locker</button>
+      <button type="button" data-value="package_room">Pkg room</button>
+      <button type="button" data-value="rural">Rural</button>
+      <button type="button" data-value="other">Other</button>
+    </div>
+  </fieldset>
+  <fieldset><legend>Signal</legend>
+    <div class="btn-grid" data-field="signal_quality">
+      <button type="button" data-value="good">Good</button>
+      <button type="button" data-value="weak">Weak</button>
+      <button type="button" data-value="no_service">No service</button>
+      <button type="button" data-value="unknown">Unknown</button>
+    </div>
+  </fieldset>
+  <fieldset><legend>Delayed action</legend>
+    <div class="btn-grid" data-field="delayed_action">
+      <button type="button" data-value="scan">Scan</button>
+      <button type="button" data-value="photo">Photo</button>
+      <button type="button" data-value="confirm_delivery">Confirm</button>
+      <button type="button" data-value="navigation">Nav</button>
+      <button type="button" data-value="customer_notes">Notes</button>
+      <button type="button" data-value="access_locker_gate">Access</button>
+      <button type="button" data-value="support">Support</button>
+      <button type="button" data-value="other">Other</button>
+    </div>
+  </fieldset>
+  <fieldset><legend>Delay</legend>
+    <div class="btn-grid" data-field="delay_bucket">
+      <button type="button" data-value="0-2_sec">0–2s</button>
+      <button type="button" data-value="3-5_sec">3–5s</button>
+      <button type="button" data-value="6-10_sec">6–10s</button>
+      <button type="button" data-value="10-20_sec">10–20s</button>
+      <button type="button" data-value="20+_sec">20+s</button>
+      <button type="button" data-value="failed_retry">Retry</button>
+    </div>
+  </fieldset>
+  <fieldset><legend>Retry?</legend>
+    <div class="btn-grid" data-field="retry_needed">
+      <button type="button" data-value="false">No</button>
+      <button type="button" data-value="true">Yes</button>
+    </div>
+  </fieldset>
+  <div class="save-bar">
+    <button type="submit" class="btn primary big">Save Event</button>
+  </div>
+</form>
+<div id="save-status"></div>
+<p class="install-hint">Tip: Add to Home Screen (Share → Add to Home Screen on iPhone) for one-tap access on route.</p>
+{% endblock %}
+{% block scripts %}
+{{ super() }}
+<script src="{{ url_for('static', filename='js/metrics/log.js') }}"></script>
+{% endblock %}

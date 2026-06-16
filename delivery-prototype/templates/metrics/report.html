@@ -1,0 +1,12 @@
+{% extends "metrics/base.html" %}
+{% block title %}Daily Report{% endblock %}
+{% block content %}
+<h1>Today's report</h1>
+<button id="refresh-report" class="btn primary">Refresh</button>
+<button id="export-csv" class="btn" style="margin-left:0.5rem;">Export CSV</button>
+<div id="report" class="panel" style="margin-top:1rem;"></div>
+{% endblock %}
+{% block scripts %}
+{{ super() }}
+<script src="{{ url_for('static', filename='js/metrics/report.js') }}"></script>
+{% endblock %}
