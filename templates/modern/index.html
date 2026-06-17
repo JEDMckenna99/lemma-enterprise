@@ -2,7 +2,7 @@
 {% set is_public_page = true %}
 
 {% block title %}lemma.id - Enforcement for Bot Abuse{% endblock %}
-{% block description %}lemma.id gives websites an identity-rooted enforcement layer for bot abuse, fraud, and ban evasion. Bind accounts to a verified person so a banned user can't rotate cheap resources to come back.{% endblock %}
+{% block description %}lemma.id gives your site a stable, site-private ID for each verified human — so you can tell when the same person is back, keep one person per account when needed, and make bans stick when they rotate email or proxy.{% endblock %}
 
 {% block head %}
     {{ super() }}
@@ -83,7 +83,7 @@
         <div style="max-width: 860px; margin: 0 auto; text-align: center;">
             <p style="font-size: var(--font-size-sm); font-weight: 600; text-transform: uppercase; letter-spacing: 2px; color: var(--primary); margin-bottom: 16px;">Enforcement for bot abuse &amp; ban evasion</p>
             <h1 style="font-size: clamp(2.5rem, 5vw, 3.5rem); line-height: 1.1; margin-bottom: 24px;">Make bans cost more<br>than a new email.</h1>
-            <p style="font-size: var(--font-size-xl); font-weight: 500; margin-bottom: var(--space-4); color: var(--gray-700);">lemma.id binds risky accounts to a live, document-verified human and blocks site-private PPIDs — so banned users must pass fresh IDV to return, not just rotate email or proxy. Your servers never store ID documents, legal names, or dates of birth.</p>
+            <p style="font-size: var(--font-size-xl); font-weight: 500; margin-bottom: var(--space-4); color: var(--gray-700);">lemma.id gives your site a stable, site-private ID for each verified human — so you can tell when the same person is on your platform, keep one person per account when your policy requires it, and make bans stick when they rotate email or proxy. Your servers never store ID documents, legal names, or dates of birth.</p>
 
             <div style="display: flex; gap: 16px; justify-content: center; flex-wrap: wrap; margin-top: 28px;">
                 <a href="/docs" class="btn btn-primary">Add to Your Site</a>
@@ -100,11 +100,12 @@
                 </div>
                 <div class="home-trust-chip">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-                        <circle cx="12" cy="12" r="10"/>
-                        <line x1="2" y1="12" x2="22" y2="12"/>
-                        <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+                        <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/>
+                        <circle cx="9" cy="7" r="4"/>
+                        <path d="M22 21v-2a4 4 0 0 0-3-3.87"/>
+                        <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
                     </svg>
-                    <span>Friction only on suspicion</span>
+                    <span>Same human, stable on your site</span>
                 </div>
                 <div class="home-trust-chip">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
@@ -126,7 +127,7 @@
         </p>
         <div style="max-width: 760px; margin: 0 auto; padding: 28px 32px; background: var(--gray-50); border: 1px solid var(--gray-200); border-radius: 14px;">
             <p style="margin: 0 0 12px 0; font-size: var(--font-size-sm); font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--primary);">Example</p>
-            <p style="margin: 0; font-size: var(--font-size-base); color: var(--gray-700); line-height: 1.7;">A scalper creates 500 accounts. Your bot system catches 200 and bans them. Tomorrow, the same operator returns with new emails, SIMs, and proxies. With lemma.id, those accounts tie back to the same verified-person root — so the operator must pass fresh IDV instead of cheaply rotating infrastructure.</p>
+            <p style="margin: 0; font-size: var(--font-size-base); color: var(--gray-700); line-height: 1.7;">A scalper creates 500 accounts. Your bot system catches 200 and bans them. Tomorrow, the same operator returns with new emails, SIMs, and proxies. With lemma.id, your site recognizes the same verified person behind each account — so a banned operator can't slip back with a fresh email, and a legitimate user keeps the same human binding across sessions.</p>
         </div>
     </div>
 </section>
@@ -137,7 +138,7 @@
         <div style="text-align: center; margin-bottom: 40px;">
             <p style="font-size: var(--font-size-sm); font-weight: 700; text-transform: uppercase; letter-spacing: 2px; color: var(--primary); margin-bottom: 12px;">Why teams choose lemma.id</p>
             <h2>Enforcement without the data liability</h2>
-            <p class="text-gray" style="max-width: 720px; margin: 16px auto 0;">Your site stores a human verdict and a site-private PPID — not a KYC record. Verification runs at the IDV issuer; routine checks run locally in the browser.</p>
+            <p class="text-gray" style="max-width: 720px; margin: 16px auto 0;">Your site stores a human verdict and a site-private PPID — a stable per-person ID on your domain, not a KYC record. Verification runs at the IDV issuer; routine checks run locally in the browser.</p>
         </div>
         <div class="home-compare-wrap" style="max-width: 960px; margin: 0 auto 28px; background: var(--white); border: 1px solid var(--gray-200); border-radius: 14px; overflow: hidden;">
             <table class="home-compare-table">
@@ -169,6 +170,12 @@
                         <td>Vendor re-query or re-verify</td>
                     </tr>
                     <tr>
+                        <td><strong>Same person on your site</strong></td>
+                        <td class="col-lemma">Stable site-private PPID per human</td>
+                        <td>Lost when email or login changes</td>
+                        <td>Manual match across records</td>
+                    </tr>
+                    <tr>
                         <td><strong>Ban survives rotation</strong></td>
                         <td class="col-lemma">Person-root binding</td>
                         <td>New email = new account</td>
@@ -189,14 +196,14 @@
         <div style="text-align: center; margin-bottom: 48px;">
             <p style="font-size: var(--font-size-sm); font-weight: 700; text-transform: uppercase; letter-spacing: 2px; color: var(--primary); margin-bottom: 12px;">How it works</p>
             <h2>Bind, detect, enforce</h2>
-            <p class="text-gray" style="max-width: 700px; margin: 16px auto 0;">Your existing fraud tooling detects abuse. lemma.id gives your decisions teeth.</p>
+            <p class="text-gray" style="max-width: 700px; margin: 16px auto 0;">Know when the same verified human is on your platform — then enforce, limit to one account, or keep a trusted binding when your policy requires it.</p>
         </div>
 
         <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; max-width: 900px; margin: 0 auto 48px; text-align: center;">
             <div style="padding: 32px 24px;">
                 <div style="width: 56px; height: 56px; border-radius: 50%; background: var(--primary); color: white; font-size: 24px; font-weight: 700; display: flex; align-items: center; justify-content: center; margin: 0 auto 20px;">1</div>
                 <h3 style="font-size: var(--font-size-lg); margin-bottom: 8px;">Bind</h3>
-                <p style="color: var(--gray-600); font-size: var(--font-size-sm);">Accounts link to a verified-person root, exposed to your site only as a site-private PPID.</p>
+                <p style="color: var(--gray-600); font-size: var(--font-size-sm);">Each account links to one verified person via a site-private PPID. The same human always presents the same ID on your platform — even after email, device, or password changes.</p>
             </div>
             <div style="padding: 32px 24px;">
                 <div style="width: 56px; height: 56px; border-radius: 50%; background: var(--primary); color: white; font-size: 24px; font-weight: 700; display: flex; align-items: center; justify-content: center; margin: 0 auto 20px;">2</div>
@@ -265,14 +272,31 @@
             </div>
             <div class="card">
                 <h3 class="card-title">Not a global public identity</h3>
-                <p>Each site sees only a site-private PPID — not one reusable ID across the web.</p>
+                <p>Each site gets its own stable ID for the same human — not one shared identifier across the whole web.</p>
             </div>
             <div class="card">
                 <h3 class="card-title">Not an identity store you run</h3>
                 <p>Your servers hold a verdict and a PPID — not ID documents, names, or dates of birth.</p>
             </div>
         </div>
-        <p style="text-align: center; margin-top: 32px; max-width: 640px; margin-left: auto; margin-right: auto; color: var(--gray-600); font-size: var(--font-size-base);"><strong>What it is:</strong> an enforcement layer that makes repeat abuse harder to reset. <a href="/about" style="color: var(--primary);">Read more about the approach →</a></p>
+        <p style="text-align: center; margin-top: 32px; max-width: 720px; margin-left: auto; margin-right: auto; color: var(--gray-600); font-size: var(--font-size-base);"><strong>What it is:</strong> a site-scoped human binding layer — recognize the same verified person on your platform, keep one person per account when you need to, and make bans stick when they don't. <a href="/about" style="color: var(--primary);">Read more about the approach →</a></p>
+    </div>
+</section>
+
+<!-- Learn more -->
+<section class="section" style="background: var(--gray-50); padding-top: 48px; padding-bottom: 48px;">
+    <div class="container" style="text-align: center;">
+        <p style="font-size: var(--font-size-sm); font-weight: 700; text-transform: uppercase; letter-spacing: 2px; color: var(--primary); margin-bottom: 16px;">Learn more</p>
+        <p class="text-gray" style="max-width: 640px; margin: 0 auto 20px; font-size: var(--font-size-sm);">Each page goes deeper on one aspect — without repeating the full homepage story.</p>
+        <div style="display: flex; gap: 12px 28px; justify-content: center; flex-wrap: wrap; font-size: var(--font-size-sm);">
+            <a href="/trust" style="color: var(--primary); font-weight: 500;">Trust &amp; data model</a>
+            <a href="/about" style="color: var(--primary); font-weight: 500;">About the approach</a>
+            <a href="/docs" style="color: var(--primary); font-weight: 500;">Integration docs</a>
+            <a href="/demo" style="color: var(--primary); font-weight: 500;">Live demo</a>
+            <a href="/pricing" style="color: var(--primary); font-weight: 500;">Pricing</a>
+            <a href="/partners" style="color: var(--primary); font-weight: 500;">For IDV providers</a>
+            <a href="/privacy" style="color: var(--primary); font-weight: 500;">Privacy policy</a>
+        </div>
     </div>
 </section>
 
@@ -280,7 +304,7 @@
 <section class="section" style="background: var(--gray-900); color: var(--white); padding: 80px 0;">
     <div class="container" style="text-align: center;">
         <h2 style="color: var(--white); font-size: var(--font-size-3xl); margin-bottom: 20px;">Give Your Bans Teeth</h2>
-        <p style="color: var(--gray-400); font-size: var(--font-size-lg); margin-bottom: 48px; max-width: 600px; margin-left: auto; margin-right: auto;">Add identity-rooted enforcement with a production-ready SDK — without running your own KYC stack.</p>
+        <p style="color: var(--gray-400); font-size: var(--font-size-lg); margin-bottom: 48px; max-width: 640px; margin-left: auto; margin-right: auto;">Give your site a stable human ID per person — for enforcement, one-account policies, or keeping the same verified user when you need to.</p>
         <div style="display: flex; gap: 20px; justify-content: center; flex-wrap: wrap;">
             <a href="/docs" class="btn btn-primary" style="font-size: var(--font-size-lg); padding: 16px 32px;">Add to Your Site</a>
             <a href="/demo" class="btn btn-secondary" style="background: transparent; border-color: var(--gray-600); color: var(--white);">Watch Demo</a>
