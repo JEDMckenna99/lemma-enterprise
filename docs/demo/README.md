@@ -111,4 +111,10 @@ Use these after creating/storing a master proof through `https://lemma.id/demo/i
 
 ## Delivery custody prototype (standalone)
 
-Local-first signed delivery scan demo + field metrics logger: [`delivery-prototype/README.md`](../../delivery-prototype/README.md)
+Local-first signed delivery scan demo + field metrics logger.
+
+- **Worktree:** `C:\Users\jedmc\delivery-prototype` (branch `delivery-prototype`)
+- **GitHub:** [delivery-prototype branch](https://github.com/JEDMckenna99/lemma-enterprise/tree/delivery-prototype)
+- **Heroku:** https://lemma-delivery-prototype-c5afc69633cb.herokuapp.com/
+
+Develop in the dedicated worktree only (`C:\Users\jedmc\delivery-prototype`).
