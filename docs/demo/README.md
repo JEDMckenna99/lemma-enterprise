@@ -108,13 +108,3 @@ Both load the hosted verifier from `https://lemma.id/sdk/ishuman-verifier.js` an
 - `trials-demo.lemma.id`
 
 Use these after creating/storing a master proof through `https://lemma.id/demo/ishuman` to show real separate origins requesting site-private credentials from the Lemma wallet bridge.
-
-## Delivery custody prototype (standalone)
-
-Local-first signed delivery scan demo + field metrics logger.
-
-- **Worktree:** `C:\Users\jedmc\delivery-prototype` (branch `delivery-prototype`)
-- **GitHub:** [delivery-prototype branch](https://github.com/JEDMckenna99/lemma-enterprise/tree/delivery-prototype)
-- **Heroku:** https://lemma-delivery-prototype-c5afc69633cb.herokuapp.com/
-
-Develop in the dedicated worktree only (`C:\Users\jedmc\delivery-prototype`).
