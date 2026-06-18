@@ -3002,6 +3002,10 @@ class LemmaWallet {
             throw new Error(deriveData.error || deriveData.message || 'derivation_failed');
         }
 
+        if (deriveData.ppid_migration) {
+            await this._storePpidMigration(canonicalSite, deriveData.ppid_migration);
+        }
+
         const derived = deriveData.credential;
         derived.packageType = derived.packageType || 'identity';
         await this.storeCredential(derived);
@@ -3101,6 +3105,32 @@ class LemmaWallet {
         };
     }
 
+    async _storePpidMigration(canonicalSite, migration) {
+        if (!canonicalSite || !migration) return;
+        try {
+            await this._put('ppid_migrations', {
+                id: canonicalSite,
+                siteId: canonicalSite,
+                migration,
+                cachedAt: Date.now(),
+            });
+        } catch (e) {
+            if (!this._isEncryptedStorageLockedError(e)) throw e;
+        }
+    }
+
+    async getPpidMigrationForSite(targetSite) {
+        const keys = this._getLemmaKeys();
+        const canonicalSite = keys.canonicalizeSiteDomain(targetSite || '');
+        if (!canonicalSite) return null;
+        try {
+            const row = await this._get('ppid_migrations', canonicalSite);
+            return row?.migration || null;
+        } catch {
+            return null;
+        }
+    }
+
     async issueSiteProofPackage({
         siteId,
         sessionNonce,
@@ -3111,13 +3141,18 @@ class LemmaWallet {
         const credential = await this.deriveAndStoreSiteProof(siteId, {
             issueMode: issueMode || 'site_proof',
         });
-        return this.signSiteSessionPresentation({
+        const signed = await this.signSiteSessionPresentation({
             credential,
             siteId,
             sessionNonce,
             bloomSequence,
             sessionTtlSec,
         });
+        const ppidMigration = await this.getPpidMigrationForSite(siteId);
+        if (ppidMigration) {
+            signed.ppid_migration = ppidMigration;
+        }
+        return signed;
     }
 
     async ensureIsHumanIssuanceReady(options = {}) {

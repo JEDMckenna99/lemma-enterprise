@@ -63,6 +63,8 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 
 
 SESSION_PRESENTATION_PREFIX = "lemma:site-session-presentation:v1"
+PPID_MIGRATION_PREFIX = "lemma:ppid-migration:v1"
+PPID_MIGRATION_TYPE = "lemma.ppid_migration.v1"
 TRUST_LIST_PREFIX = "lemma:issuer-trust-list:v1"
 TIME_SKEW_SECONDS = 300
 
@@ -70,6 +72,55 @@ TIME_SKEW_SECONDS = 300
 # ---------------------------------------------------------------------------
 # Canonical message helpers (must byte-exactly match the issuer/verifier)
 # ---------------------------------------------------------------------------
+
+
+def build_ppid_migration_message(payload: dict) -> bytes:
+    lines = [
+        PPID_MIGRATION_PREFIX,
+        str(payload["type"]).strip(),
+        str(payload["mergeId"]).strip(),
+        str(payload["siteId"]).strip(),
+        str(payload["legacyPpid"]).strip(),
+        str(payload["currentPpid"]).strip(),
+        str(payload["walletId"]).strip(),
+        str(payload["nonce"]).strip(),
+        str(payload["issuedAt"]),
+        str(payload["expiresAt"]),
+    ]
+    return "\n".join(lines).encode("utf-8")
+
+
+def verify_ppid_migration(
+    migration: dict,
+    *,
+    site_id: str,
+    current_ppid: str,
+    trusted_pubkey_hex: str,
+    now: Optional[int] = None,
+) -> tuple[bool, str]:
+    """Opt-in helper: verify a site-scoped PPID migration attestation."""
+    if not isinstance(migration, dict):
+        return False, "migration_missing"
+    if migration.get("type") != PPID_MIGRATION_TYPE:
+        return False, "migration_type_mismatch"
+    if str(migration.get("siteId") or "") != site_id:
+        return False, "migration_site_mismatch"
+    if str(migration.get("currentPpid") or "") != current_ppid:
+        return False, "migration_current_ppid_mismatch"
+    try:
+        expires_at = int(migration.get("expiresAt") or 0)
+    except (TypeError, ValueError):
+        return False, "migration_expires_malformed"
+    ts = int(now if now is not None else time.time())
+    if expires_at and expires_at < ts:
+        return False, "migration_expired"
+    try:
+        pubkey = Ed25519PublicKey.from_public_bytes(bytes.fromhex(trusted_pubkey_hex))
+        digest = hashlib.sha256(build_ppid_migration_message(migration)).digest()
+        pubkey.verify(bytes.fromhex(str(migration["signature"])), digest)
+    except (InvalidSignature, ValueError, KeyError, TypeError):
+        return False, "migration_invalid_signature"
+    return True, "ok"
 
 
 def browser_canonical_message(credential: dict) -> bytes:

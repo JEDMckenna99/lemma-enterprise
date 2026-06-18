@@ -885,6 +885,43 @@ class SiteBlock(Base):
     )
 
 
+class PersonMerge(Base):
+    """Wallet-bound identity refresh when a new document number maps to a new person_root."""
+    __tablename__ = 'person_merges'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    merge_id = Column(String(64), unique=True, nullable=False, index=True)
+    wallet_id = Column(String, nullable=False, index=True)
+    old_person_id = Column(String, nullable=False, index=True)
+    new_person_id = Column(String, nullable=False, index=True)
+    old_document_root_hash = Column(String(64))
+    new_document_root_hash = Column(String(64), nullable=False)
+    provider_session_id = Column(String)
+    status = Column(String(32), default='completed', nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class PpidMigrationIssued(Base):
+    """One-time, site-scoped signed migration from legacy_ppid to current_ppid."""
+    __tablename__ = 'ppid_migration_issued'
+    __table_args__ = (
+        UniqueConstraint('merge_id', 'target_site', name='uq_ppid_migration_merge_site'),
+    )
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    migration_id = Column(String(64), unique=True, nullable=False, index=True)
+    merge_id = Column(String(64), nullable=False, index=True)
+    wallet_id = Column(String, nullable=False, index=True)
+    target_site = Column(String(255), nullable=False)
+    legacy_ppid = Column(String, nullable=False)
+    current_ppid = Column(String, nullable=False)
+    nonce = Column(String(64), nullable=False)
+    issued_at = Column(DateTime, nullable=False)
+    expires_at = Column(DateTime, nullable=False)
+    consumed_at = Column(DateTime)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
 def create_tables():
     """Create all database tables"""
     try:

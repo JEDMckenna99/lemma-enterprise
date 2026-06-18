@@ -120,6 +120,12 @@ users across sites" without this qualification. The accurate claim is:
 > Sites cannot correlate users across sites. Lemma can correlate them only on
 > the enforcement plane (revocation), and never exposes that linkage to sites.
 
+**Document refresh (PPID migration):** When a wallet re-proves with a new
+document number, Lemma may issue an **opt-in, site-scoped** signed migration
+(`lemma.ppid_migration.v1`) pairing `legacyPpid` → `currentPpid` for **one**
+site only. Relying sites are not required to honor it; Lemma does not broadcast
+migrations cross-site. See [`docs/integration/PPID_MIGRATION.md`](../integration/PPID_MIGRATION.md).
+
 ---
 
 ## 4. PPID Derivation: Where It Happens

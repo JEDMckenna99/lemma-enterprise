@@ -1408,6 +1408,7 @@ class IsHumanVerifier {
             session_signature: detail.session_signature,
             session_nonce: sessionNonce,
             bloom_sequence: Number(this._bloomSnapshot?.sequence_number ?? 0),
+            ppid_migration: detail.ppid_migration || null,
         };
         this._persistSession(session);
 
@@ -1641,6 +1642,9 @@ class IsHumanVerifier {
                     issuer_did: cred.issuer || cred.issuerInfo?.did || null,
                     issuer_pubkey: cred.issuerInfo?.publicKey || null,
                 };
+                if (presentation.ppid_migration) {
+                    result.presentation.ppid_migration = presentation.ppid_migration;
+                }
             }
         }
         return result;

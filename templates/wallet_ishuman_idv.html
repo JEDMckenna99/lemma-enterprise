@@ -1210,6 +1210,7 @@
                 session_nonce: clientSessionNonce,
                 request_nonce: requestNonce,
                 reason: 'site_proof_issued',
+                ppid_migration: pkg.ppid_migration || null,
             }), 400);
             return true;
         }
@@ -1296,6 +1297,7 @@
                 request_nonce: requestNonce,
                 reason: 'fresh_idv_complete',
                 refresh_reason: refreshReason,
+                ppid_migration: pkg.ppid_migration || null,
             }), 400);
             return true;
         }

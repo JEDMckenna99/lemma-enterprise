@@ -408,10 +408,14 @@ def _complete_verified_ishuman_from_didit(
 
     try:
         validate_didit_workflow_id(workflow_id)
+        verification_metadata = record.metadata_json or {}
+        pending_merge = (verification_metadata.get("pending_merge_from_person_id") or "").strip()
         resolved = process_verified_didit_identity(
             db,
             decision=decision,
             wallet_id=wallet_id,
+            allow_wallet_person_merge=bool(pending_merge),
+            merge_from_person_id=pending_merge or None,
         )
     except IdentityRootMaterialError as exc:
         logger.error("Identity root material unavailable for didit decision: %s", exc)
@@ -433,6 +437,32 @@ def _complete_verified_ishuman_from_didit(
             }
             return None
         raise
+
+    if resolved.merged_from_person_id:
+        from api.database import LemmaDocumentRoot
+        from api.ppid_migration import record_person_merge
+
+        old_doc = (
+            db.query(LemmaDocumentRoot)
+            .filter_by(lemma_person_id=resolved.merged_from_person_id)
+            .order_by(LemmaDocumentRoot.created_at.desc())
+            .first()
+        )
+        merge_id = record_person_merge(
+            db,
+            wallet_id=wallet_id,
+            old_person_id=resolved.merged_from_person_id,
+            new_person_id=resolved.person_id,
+            new_document_root_hash=resolved.document_root_hash,
+            provider_session_id=getattr(record, "provider_session_id", None),
+            old_document_root_hash=old_doc.document_root_hash if old_doc else None,
+        )
+        if merge_id:
+            record.metadata_json = {
+                **(record.metadata_json or {}),
+                "person_merge_id": merge_id,
+                "merged_from_person_id": resolved.merged_from_person_id,
+            }
 
     ppid = derive_ppid_from_person_root_hash(resolved.person_root_hash, "lemma.id")
     record.lemma_person_id = resolved.person_id
@@ -1214,6 +1244,10 @@ def start_verification_for_body(body: dict) -> tuple[dict, int]:
         enc_pubkey = (body.get("enc_pubkey") or "").strip()
         if enc_pubkey:
             verification_metadata["enc_pubkey"] = enc_pubkey
+        from api.ppid_migration import pin_pending_merge_metadata
+        verification_metadata = pin_pending_merge_metadata(
+            db, wallet_id=str(wallet_id), metadata=verification_metadata
+        )
 
         # Dedup: the provider can reuse one hosted session across repeated
         # start-verification calls (e.g. the user re-clicks before redirect).
@@ -1870,6 +1904,54 @@ def site_unblock():
         db.close()
 
 
+@ishuman_bp.route("/api/ishuman/confirm-ppid-migration", methods=["POST"])
+@cross_origin()
+def confirm_ppid_migration():
+    """Confirm Lemma approved a document-refresh PPID update for this site.
+
+    For sites with their own auth: after login + fresh verify (new PPID),
+    call with the account's ``legacy_ppid`` and verified ``current_ppid``.
+    Requires ``X-API-Key``.
+    """
+    site = _require_site_api_key()
+    if not site:
+        return jsonify({"success": False, "error": "valid API key required"}), 401
+
+    body = request.get_json(silent=True) or {}
+    legacy_ppid = (body.get("legacy_ppid") or "").strip()
+    current_ppid = (body.get("current_ppid") or "").strip()
+    if not legacy_ppid or not current_ppid:
+        return jsonify({"success": False, "error": "legacy_ppid and current_ppid required"}), 400
+
+    from api.ppid import canonicalize_rp_id
+    from api.ppid_migration import confirm_ppid_migration_for_site
+    from api.rate_limiter import check_rate_limit
+
+    target_site = canonicalize_rp_id(getattr(site, "site_domain", None) or site.site_id)
+    if not check_rate_limit(f"ppid_mig_confirm:{site.site_id}", 60, 3600):
+        return jsonify({"success": False, "error": "rate_limited"}), 429
+
+    from api.database import SessionLocal
+
+    db = SessionLocal()
+    try:
+        result = confirm_ppid_migration_for_site(
+            db,
+            target_site=target_site,
+            legacy_ppid=legacy_ppid,
+            current_ppid=current_ppid,
+        )
+        if result.get("approved"):
+            logger.info(
+                "PPID migration confirmed site=%s merge=%s",
+                target_site,
+                (result.get("merge_id") or "")[:24],
+            )
+        return jsonify({"success": True, **result})
+    finally:
+        db.close()
+
+
 # ---------------------------------------------------------------------------
 # 4. Network Revocation (second tier — evidence required)
 # ---------------------------------------------------------------------------
@@ -2139,6 +2221,30 @@ def _bill_site_credential_event(
         logger.warning("Failed to record credential billing for %s: %s", target_site, exc)
 
 
+def _jsonify_site_proof_with_migration(
+    db,
+    *,
+    wallet_id: str,
+    target_site: str,
+    site_ppid: str,
+    credential: dict,
+    cached: bool,
+) -> "flask.Response":
+    from api.ppid_migration import issue_ppid_migration_for_site
+
+    payload = {"success": True, "credential": credential, "cached": cached}
+    ppid_migration = issue_ppid_migration_for_site(
+        db,
+        wallet_id=wallet_id,
+        target_site=target_site,
+        current_ppid=site_ppid,
+    )
+    if ppid_migration:
+        db.commit()
+        payload["ppid_migration"] = ppid_migration
+    return jsonify(payload)
+
+
 @ishuman_bp.route("/api/ishuman/derive-site-proof", methods=["POST"])
 @cross_origin()
 def derive_site_proof():
@@ -2308,7 +2414,14 @@ def derive_site_proof():
                 issue_mode=issue_mode,
                 is_cached_reissue=True,
             )
-            return jsonify({"success": True, "credential": credential, "cached": True})
+            return _jsonify_site_proof_with_migration(
+                db,
+                wallet_id=wallet_id,
+                target_site=target_site,
+                site_ppid=ppid,
+                credential=credential,
+                cached=True,
+            )
 
         # 3. Derive site-specific PPID
         site_ppid = _derive_ppid_for_site(
@@ -2352,7 +2465,14 @@ def derive_site_proof():
             issue_mode=issue_mode,
             is_cached_reissue=False,
         )
-        return jsonify({"success": True, "credential": credential, "cached": False})
+        return _jsonify_site_proof_with_migration(
+            db,
+            wallet_id=wallet_id,
+            target_site=target_site,
+            site_ppid=site_ppid,
+            credential=credential,
+            cached=False,
+        )
 
     except Exception:
         db.rollback()

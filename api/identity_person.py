@@ -41,6 +41,7 @@ class ResolvedLemmaPerson:
     stripe_report_id: Optional[str] = None
     document_country: Optional[str] = None
     document_type: Optional[str] = None
+    merged_from_person_id: Optional[str] = None
 
 
 def _new_person_id() -> str:
@@ -53,6 +54,8 @@ def resolve_or_create_person_from_material(
     material: StripeIdentityRootMaterial,
     wallet_id: Optional[str],
     provider: str = "stripe_identity",
+    allow_wallet_person_merge: bool = False,
+    merge_from_person_id: Optional[str] = None,
 ) -> ResolvedLemmaPerson:
     from api.database import LemmaDocumentRoot, LemmaPerson, LemmaWalletBinding
 
@@ -100,6 +103,8 @@ def resolve_or_create_person_from_material(
         db.add(link)
         created_document_link = True
 
+    merged_from_person_id: Optional[str] = None
+
     if wallet_id:
         binding = db.query(LemmaWalletBinding).filter_by(wallet_id=wallet_id).first()
         if not binding:
@@ -111,10 +116,19 @@ def resolve_or_create_person_from_material(
                 )
             )
         elif binding.lemma_person_id != person_id:
-            raise WalletPersonBindingConflictError(
-                f"wallet {wallet_id} already bound to {binding.lemma_person_id}; "
-                f"verified document maps to {person_id}"
-            )
+            if (
+                allow_wallet_person_merge
+                and merge_from_person_id
+                and binding.lemma_person_id == merge_from_person_id
+            ):
+                merged_from_person_id = merge_from_person_id
+                binding.lemma_person_id = person_id
+                binding.updated_at = datetime.utcnow()
+            else:
+                raise WalletPersonBindingConflictError(
+                    f"wallet {wallet_id} already bound to {binding.lemma_person_id}; "
+                    f"verified document maps to {person_id}"
+                )
 
     return ResolvedLemmaPerson(
         person_id=person_id,
@@ -127,6 +141,7 @@ def resolve_or_create_person_from_material(
         stripe_report_id=material.stripe_report_id,
         document_country=claims.get("country"),
         document_type=claims.get("document_type"),
+        merged_from_person_id=merged_from_person_id,
     )
 
 
@@ -178,6 +193,8 @@ def process_verified_didit_identity(
     *,
     decision: dict,
     wallet_id: Optional[str],
+    allow_wallet_person_merge: bool = False,
+    merge_from_person_id: Optional[str] = None,
 ) -> ResolvedLemmaPerson:
     """Resolve a LemmaPerson from a verified didit decision payload.
 
@@ -194,6 +211,8 @@ def process_verified_didit_identity(
         material=material,
         wallet_id=wallet_id,
         provider="didit",
+        allow_wallet_person_merge=allow_wallet_person_merge,
+        merge_from_person_id=merge_from_person_id,
     )
 
 
