@@ -55,6 +55,8 @@
 </div>
 
 <script nonce="{{ csp_nonce }}">
+let billingSites = [];
+
 async function billingAuthHeaders(method, path, bodyText) {
     const extra = { 'Content-Type': 'application/json' };
     const requestContext = {
@@ -127,6 +129,7 @@ async function loadBillingStatus() {
 
         const billing = data.billing;
         const onboarding = data.onboarding || {};
+        billingSites = data.sites || [];
         setupBtn.onclick = startBillingCheckout;
 
         if (!billing) {
@@ -176,6 +179,9 @@ async function startBillingCheckout() {
         };
         if (emailInput && emailInput.value.trim()) {
             payload.email = emailInput.value.trim().toLowerCase();
+        }
+        if (billingSites.length && billingSites[0].site_id) {
+            payload.site_id = billingSites[0].site_id;
         }
         const bodyText = JSON.stringify(payload);
         const headers = await billingAuthHeaders('POST', '/api/billing/usage-checkout', bodyText);

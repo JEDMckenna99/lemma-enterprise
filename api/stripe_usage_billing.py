@@ -58,42 +58,66 @@ def _customer_for_request():
     return None
 
 
-def _resolve_site_for_checkout(db, site_id: str, customer) -> Optional[Dict[str, str]]:
+def _site_info_from_row(site) -> Dict[str, str]:
+    return {
+        "site_id": site.site_id,
+        "site_domain": site.site_domain,
+        "admin_email": site.admin_email,
+    }
+
+
+def _resolve_site_for_checkout(
+    db,
+    site_id: str,
+    customer,
+    ppid: Optional[str] = None,
+) -> Optional[Dict[str, str]]:
+    """
+    Resolve a registered site for Stripe Checkout metadata.
+
+    Mirrors developer site catalog resolution: explicit site_id, customer JSON,
+    admin_email linkage, then wallet PPID ownership (SiteAdmin / grants).
+    """
     from api.database import Site
 
     normalized_site_id = (site_id or "").strip()
     if normalized_site_id:
         site = db.query(Site).filter_by(site_id=normalized_site_id).first()
         if site:
-            return {
-                "site_id": site.site_id,
-                "site_domain": site.site_domain,
-                "admin_email": site.admin_email,
-            }
+            return _site_info_from_row(site)
 
-    if not customer:
-        return None
+    if customer:
+        sites = list(getattr(customer, "sites", None) or [])
+        if sites:
+            first = sites[0] or {}
+            resolved_site_id = (first.get("site_id") or "").strip()
+            if resolved_site_id:
+                site = db.query(Site).filter_by(site_id=resolved_site_id).first()
+                if site:
+                    return _site_info_from_row(site)
+                return {
+                    "site_id": resolved_site_id,
+                    "site_domain": first.get("site_domain") or "",
+                    "admin_email": getattr(customer, "email", None) or getattr(customer, "billing_email", None),
+                }
 
-    sites = list(getattr(customer, "sites", None) or [])
-    if sites:
-        first = sites[0] or {}
-        return {
-            "site_id": first.get("site_id") or "",
-            "site_domain": first.get("site_domain") or "",
-            "admin_email": getattr(customer, "email", None) or getattr(customer, "billing_email", None),
-        }
+        email = (
+            getattr(customer, "billing_email", None) or getattr(customer, "email", None) or ""
+        ).strip().lower()
+        if email:
+            site = db.query(Site).filter(Site.admin_email.ilike(email)).first()
+            if site:
+                return _site_info_from_row(site)
 
-    email = (
-        getattr(customer, "billing_email", None) or getattr(customer, "email", None) or ""
-    ).strip().lower()
-    if email:
-        site = db.query(Site).filter(Site.admin_email.ilike(email)).first()
-        if site:
-            return {
-                "site_id": site.site_id,
-                "site_domain": site.site_domain,
-                "admin_email": site.admin_email,
-            }
+    if ppid:
+        from api.developer_api import _get_owned_site_ids
+
+        owned_site_ids = _get_owned_site_ids(db, ppid)
+        if owned_site_ids:
+            site = db.query(Site).filter(Site.site_id == owned_site_ids[0]).first()
+            if site:
+                return _site_info_from_row(site)
+
     return None
 
 
@@ -136,7 +160,12 @@ def create_usage_checkout():
                 wallet_id=getattr(db.query(PlatformUser).filter_by(user_did=ppid).first(), "wallet_id", None),
             )
 
-        site_info = _resolve_site_for_checkout(db, data.get("site_id") or "", customer)
+        site_info = _resolve_site_for_checkout(
+            db,
+            data.get("site_id") or "",
+            customer,
+            ppid=ppid,
+        )
         if not site_info or not site_info.get("site_id"):
             return jsonify({
                 "success": False,

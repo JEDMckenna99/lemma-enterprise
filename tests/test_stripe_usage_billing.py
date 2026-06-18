@@ -220,6 +220,47 @@ def test_billing_gate_allows_active(monkeypatch, fake_ishuman_db_session_factory
 
 
 @pytest.mark.unit
+def test_resolve_site_for_checkout_uses_ppid_owned_sites(monkeypatch, fake_ishuman_db_session_factory):
+    from datetime import datetime
+
+    from api.database import Site
+    from api.stripe_usage_billing import _resolve_site_for_checkout
+
+    ppid = "did:lemma:ppid_" + ("a" * 64)
+    store = fake_ishuman_db_session_factory.store
+    store.data[Site.__name__].append(
+        Site(
+            site_id="lemma.id",
+            site_domain="lemma.id",
+            company_name="Lemma Platform",
+            admin_email="platform@lemma.id",
+            api_key="key_test",
+            oauth_client_id="oauth_test",
+            oauth_client_secret="secret_test",
+            created_at=datetime.utcnow(),
+        )
+    )
+    db = fake_ishuman_db_session_factory.session_local()
+
+    class FakeCustomer:
+        email = "owner@example.com"
+        billing_email = "owner@example.com"
+        sites = []
+
+    monkeypatch.setattr(
+        "api.developer_api._get_owned_site_ids",
+        lambda _db, owner_ppid: ["lemma.id"] if owner_ppid == ppid else [],
+    )
+
+    resolved = _resolve_site_for_checkout(db, "", FakeCustomer(), ppid=ppid)
+    assert resolved == {
+        "site_id": "lemma.id",
+        "site_domain": "lemma.id",
+        "admin_email": "platform@lemma.id",
+    }
+
+
+@pytest.mark.unit
 def test_derive_site_proof_blocked_when_billing_past_due(
     ishuman_client,
     fake_ishuman_db_session_factory,
