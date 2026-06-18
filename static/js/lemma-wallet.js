@@ -2880,6 +2880,12 @@ class LemmaWallet {
         return !!(cl.site_signing_pubkey || cl.siteSigningPubkey);
     }
 
+    _siteCredentialLocallyVerifiable(credential) {
+        // ishuman-verifier.js verifies proof.signatureValueWeb only; legacy
+        // wallet copies without it must be re-derived server-side.
+        return !!(credential?.proof?.signatureValueWeb);
+    }
+
     _credentialIssuedAtSeconds(credential) {
         if (!credential) return 0;
         const claims = credential.claims || credential.credentialSubject || {};
@@ -2946,7 +2952,9 @@ class LemmaWallet {
 
         if (!forceServerDerive) {
             const existing = await this.findIsHumanSiteCredential(canonicalSite);
-            if (existing) return existing;
+            if (existing && this._siteCredentialLocallyVerifiable(existing)) {
+                return existing;
+            }
         }
 
         // v2 (Phase 1.2): the master credential is an optional hint. If the

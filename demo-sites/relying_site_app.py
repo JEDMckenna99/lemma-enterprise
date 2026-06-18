@@ -22,6 +22,7 @@ def _content():
             "success": "Trial workspace created",
             "form": "Work email",
             "placeholder": "founder@example.com",
+            "action": "start_trial",
         }
     return {
         "eyebrow": "Ticket release",
@@ -31,6 +32,7 @@ def _content():
         "success": "Reservation held",
         "form": "Fan email",
         "placeholder": "fan@example.com",
+        "action": "reserve_tickets",
     }
 
 
@@ -235,7 +237,7 @@ def index():
       </aside>
     </div>
   </main>
-  <script src="{LEMMA_ORIGIN}/sdk/ishuman-verifier.js?v=1.7.2" crossorigin="anonymous"
+  <script src="{LEMMA_ORIGIN}/sdk/ishuman-verifier.js?v=1.8.0" crossorigin="anonymous"
     onerror="window.__lemmaSdkLoadError='ishuman-verifier failed to load from {LEMMA_ORIGIN}'"></script>
   <script>
     if (typeof IsHumanVerifier === 'undefined') {{
@@ -266,13 +268,31 @@ def index():
       return sharedVerifier;
     }}
 
-    function applyVerdict(response, {{ silent = false }} = {{}}) {{
+    function formatMissingProof(reason) {{
+      if (reason === 'site_proof_required') {{
+        return 'No isHuman proof cached for this site yet. Click the protected action to issue one from your lemma.id.';
+      }}
+      if (reason === 'no_credential' || reason === 'no_ishuman_credential') {{
+        return 'No lemma.id human proof yet. Click the protected action to verify once.';
+      }}
+      if (reason === 'wallet_locked') {{
+        return 'Your lemma.id wallet is locked. Click the protected action to unlock and verify.';
+      }}
+      return 'No valid isHuman proof on this device (' + (reason || 'unknown') + '). Click the protected action to verify.';
+    }}
+
+    function applyVerdict(response, {{ silent = false, stampedEvent = null }} = {{}}) {{
       pill.textContent = response.human ? 'HUMAN' : (response.reason === 'session_valid' ? 'HUMAN' : 'DENY');
       pill.className = 'pill ' + (response.human ? 'ok' : (silent ? 'checking' : 'deny'));
+      const lemma = stampedEvent?.lemma || null;
+      const ppid = response.ppid || lemma?.ppid || '';
       if (response.human) {{
-        decisionCopy.textContent = '{copy["success"]}. PPID: ' + (response.ppid || '').slice(0, 28) + '…';
+        decisionCopy.textContent = '{copy["success"]}. PPID: ' + (ppid || '').slice(0, 28) + '…';
         if (!silent) {{
-          decisionCard.innerHTML = '<strong>{copy["success"]}</strong><p class="tiny">human=true · reason=' + response.reason + ' · ' + response.timeMs.toFixed(0) + 'ms · site-private PPID issued.</p>';
+          const stampNote = lemma?.verified
+            ? ' · PPID stamp attached to your action log'
+            : '';
+          decisionCard.innerHTML = '<strong>{copy["success"]}</strong><p class="tiny">human=true · reason=' + response.reason + ' · ' + response.timeMs.toFixed(0) + 'ms · site-private PPID issued' + stampNote + '.</p>';
         }}
       }} else if (!silent) {{
         decisionCopy.textContent = 'Blocked. Reason: ' + response.reason;
@@ -280,9 +300,10 @@ def index():
       }} else if (response.reason === 'session_valid' || response.reason === 'vc_valid') {{
         decisionCopy.textContent = 'Returning visitor — verified from local credential cache.';
       }} else {{
-        decisionCopy.textContent = 'Click the protected action to verify (IDV runs once per browser).';
+        decisionCopy.textContent = formatMissingProof(response.reason);
       }}
-      result.textContent = JSON.stringify(response, null, 2);
+      const payload = stampedEvent || response;
+      result.textContent = JSON.stringify(payload, null, 2);
     }}
 
     async function runBackgroundCheck() {{
@@ -294,9 +315,9 @@ def index():
         if (response.human) {{
           applyVerdict(response, {{ silent: true }});
         }} else {{
-          pill.textContent = 'READY';
-          pill.className = 'pill';
-          decisionCopy.textContent = 'Click the protected action to verify (IDV runs once per browser).';
+          pill.textContent = 'NO PROOF';
+          pill.className = 'pill deny';
+          decisionCopy.textContent = formatMissingProof(response.reason);
           result.textContent = JSON.stringify(response, null, 2);
         }}
       }} catch (err) {{
@@ -324,7 +345,16 @@ def index():
       try {{
         const verifier = makeVerifier(true);
         const response = await verifier.verify();
-        applyVerdict(response);
+        if (response.human) {{
+          const email = document.getElementById('email')?.value || '';
+          const stampedEvent = await verifier.stamp(
+            {{ action: '{copy["action"]}', email, at: Date.now() }},
+            {{ includeCredential: true }},
+          );
+          applyVerdict(response, {{ stampedEvent }});
+        }} else {{
+          applyVerdict(response);
+        }}
       }} catch (err) {{
         pill.textContent = 'ERROR';
         pill.className = 'pill deny';

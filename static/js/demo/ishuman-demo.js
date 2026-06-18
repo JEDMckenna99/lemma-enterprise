@@ -645,6 +645,7 @@
       log(demoQr ? 'Demo QR popup closed' : 'Identity check popup closed', outcome);
       await refreshWalletStatus().catch(() => {});
       await syncMasterFromServer().catch(() => {});
+      await hydrateSiteVerificationFromCache().catch(() => {});
       if (outcome === 'completed') {
         setWorkflowHighlight(2);
         setDemoReadyBanner(true);
@@ -1293,6 +1294,22 @@
     }
   }
 
+  async function hydrateSiteVerificationFromCache() {
+    if (!window.IsHumanVerifier) return;
+    for (const slug of SITE_SLUGS) {
+      try {
+        const verifier = verifierFor(slug);
+        const result = await verifier.checkStatus();
+        state.results[slug] = result;
+        if (Number.isFinite(result.timeMs)) state.lastVerifyMs[slug] = result.timeMs;
+        renderSite(slug, result);
+      } catch (err) {
+        log(`Site cache check skipped (${slug})`, err.message);
+      }
+    }
+    updateIntegrationLatency();
+  }
+
   async function refreshStatus() {
     const params = new URLSearchParams();
     if (state.walletId) params.set('wallet_id', state.walletId);
@@ -1357,6 +1374,7 @@
 
     try {
       await refreshWalletStatus();
+      await hydrateSiteVerificationFromCache();
       if (state.masterCredentialId || state.sessionId) {
         await refreshStatus();
         setPill('ih-lemma-status', 'READY', 'ok');
