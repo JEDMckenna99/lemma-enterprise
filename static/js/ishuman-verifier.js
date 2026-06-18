@@ -33,7 +33,7 @@
  *   // -> { action: 'post_comment', lemma: { ppid, verified, ..., credential } }
  *   // POST `event` to YOUR backend. Lemma stores none of it.
  *
- * @version 1.8.0
+ * @version 1.8.1
  */
 
 (function () {
@@ -71,7 +71,10 @@ function isMobileLikeUserAgent(ua) {
     return /iPhone|iPad|iPod|Android|Mobi/i.test(String(ua || ''));
 }
 
-function sessionCacheKey(siteId) {
+const DEMO_LOGICAL_SITE_IDS = new Set([
+    'tickets-demo.lemma.id',
+    'trials-demo.lemma.id',
+]);
     return `${SESSION_STORAGE_KEY}:${siteId || ''}`;
 }
 
@@ -568,6 +571,7 @@ class IsHumanVerifier {
         try {
             if (typeof window === 'undefined' || !window.location?.hostname) return;
             const configured = this._canonicalizeSiteDomain(this.siteId);
+            if (DEMO_LOGICAL_SITE_IDS.has(configured)) return;
             const runtime = this._canonicalizeSiteDomain(window.location.hostname);
             if (configured && runtime && configured !== runtime) {
                 console.warn(
@@ -1006,6 +1010,13 @@ class IsHumanVerifier {
         const core = await this._verifyCredentialCore(credential, t0);
         if (!core.ok) {
             this._clearSessionCache();
+            // Stale issuer keys / legacy formats should re-issue via popup, not
+            // surface a hard deny on customer demo sites.
+            if (core.reason === 'untrusted_issuer'
+                || core.reason === 'invalid_signature'
+                || core.reason === 'legacy_credential_format') {
+                return null;
+            }
             return this._result(false, core.ppid, core.reason, t0, core.error);
         }
 
@@ -1366,7 +1377,13 @@ class IsHumanVerifier {
             }
         }
 
-        const core = await this._verifyCredentialCore(credential, t0);
+        let core = await this._verifyCredentialCore(credential, t0);
+        if (!core.ok && (core.reason === 'untrusted_issuer' || core.reason === 'invalid_signature')) {
+            try {
+                await this._syncBloom({ force: true });
+            } catch { /* fall through */ }
+            core = await this._verifyCredentialCore(credential, t0);
+        }
         if (!core.ok) {
             return this._result(false, core.ppid, core.reason, t0, core.error);
         }

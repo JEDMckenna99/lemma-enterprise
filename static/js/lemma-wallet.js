@@ -3146,8 +3146,12 @@ class LemmaWallet {
         sessionTtlSec,
         issueMode,
     }) {
+        // Popup handoffs must always re-derive from the server so the credential
+        // is signed by the current federated issuer and includes signatureValueWeb.
+        // Reusing a wallet-local copy caused untrusted_issuer after issuer rotation.
         const credential = await this.deriveAndStoreSiteProof(siteId, {
             issueMode: issueMode || 'site_proof',
+            forceServerDerive: true,
         });
         const signed = await this.signSiteSessionPresentation({
             credential,
