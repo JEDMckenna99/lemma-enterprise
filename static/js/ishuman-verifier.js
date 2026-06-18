@@ -33,7 +33,7 @@
  *   // -> { action: 'post_comment', lemma: { ppid, verified, ..., credential } }
  *   // POST `event` to YOUR backend. Lemma stores none of it.
  *
- * @version 1.8.1
+ * @version 1.8.2
  */
 
 (function () {
@@ -75,6 +75,8 @@ const DEMO_LOGICAL_SITE_IDS = new Set([
     'tickets-demo.lemma.id',
     'trials-demo.lemma.id',
 ]);
+
+function sessionCacheKey(siteId) {
     return `${SESSION_STORAGE_KEY}:${siteId || ''}`;
 }
 
