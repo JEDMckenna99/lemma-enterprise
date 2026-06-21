@@ -25,13 +25,19 @@ def test_pin_pending_merge_metadata_sets_person_id():
 
 
 @pytest.mark.unit
-def test_wallet_merge_allowed_when_pinned(monkeypatch):
+def test_wallet_document_attach_keeps_bound_person(monkeypatch):
     from api.identity_person import material_from_test_fixture, resolve_or_create_person_from_material
 
+    old_person_root = "aa" * 32
     binding = SimpleNamespace(
         wallet_id="wallet_a",
         lemma_person_id="person_old",
         updated_at=None,
+    )
+    person_old = SimpleNamespace(
+        person_id="person_old",
+        person_root_hash=old_person_root,
+        person_root_source="document_derived_v1",
     )
     added = []
 
@@ -56,11 +62,14 @@ def test_wallet_merge_allowed_when_pinned(monkeypatch):
                 return None
             if name == "lemma_wallet_bindings" and self._kwargs.get("wallet_id") == "wallet_a":
                 return binding
+            if name == "lemma_persons" and self._kwargs.get("person_id") == "person_old":
+                return person_old
             return None
 
     db = SimpleNamespace(query=lambda model: FakeQuery(model), add=lambda obj: added.append(obj))
 
     monkeypatch.setattr("api.column_crypto.encrypt_column", lambda value: value)
+    monkeypatch.setattr("api.column_crypto.decrypt_column", lambda value: value)
 
     resolved = resolve_or_create_person_from_material(
         db,
@@ -70,36 +79,68 @@ def test_wallet_merge_allowed_when_pinned(monkeypatch):
         allow_wallet_person_merge=True,
         merge_from_person_id="person_old",
     )
-    assert resolved.merged_from_person_id == "person_old"
-    assert binding.lemma_person_id == resolved.person_id
+    assert resolved.person_id == "person_old"
+    assert resolved.person_root_hash == old_person_root
+    assert resolved.document_attached is True
+    assert resolved.merged_from_person_id is None
+    assert binding.lemma_person_id == "person_old"
+    assert any(getattr(obj, "document_root_hash", None) for obj in added)
 
 
 @pytest.mark.unit
-def test_wallet_merge_still_fails_without_pin(monkeypatch):
+def test_wallet_document_conflict_when_doc_maps_to_other_person(monkeypatch):
     from api.identity_person import (
         WalletPersonBindingConflictError,
         material_from_test_fixture,
         resolve_or_create_person_from_material,
     )
+    from api.identity_roots import document_root_hash_from_material
 
-    binding = SimpleNamespace(wallet_id="wallet_a", lemma_person_id="person_old")
-    db = SimpleNamespace(
-        query=lambda model: SimpleNamespace(
-            filter_by=lambda **kwargs: SimpleNamespace(
-                first=lambda: (
-                    binding if kwargs.get("wallet_id") == "wallet_a" else None
-                )
-            ),
-            filter=lambda *args, **kwargs: SimpleNamespace(first=lambda: None),
-            order_by=lambda *args, **kwargs: SimpleNamespace(first=lambda: None),
-        ),
-        add=lambda obj: None,
+    material = material_from_test_fixture(document_number="NEW_DOC_002")
+    doc_hash = document_root_hash_from_material(material, provider="didit")
+    binding = SimpleNamespace(wallet_id="wallet_a", lemma_person_id="person_wallet")
+    existing_link = SimpleNamespace(
+        document_root_hash=doc_hash,
+        lemma_person_id="person_doc",
     )
+    person_doc = SimpleNamespace(
+        person_id="person_doc",
+        person_root_hash="bb" * 32,
+        person_root_source="document_derived_v1",
+    )
+
+    class FakeQuery:
+        def __init__(self, model):
+            self.model = model
+            self._kwargs = {}
+
+        def filter_by(self, **kwargs):
+            self._kwargs = kwargs
+            return self
+
+        def filter(self, *args, **kwargs):
+            return self
+
+        def order_by(self, *args, **kwargs):
+            return self
+
+        def first(self):
+            name = getattr(self.model, "__tablename__", str(self.model))
+            if name == "lemma_document_roots" and self._kwargs.get("document_root_hash") == doc_hash:
+                return existing_link
+            if name == "lemma_wallet_bindings" and self._kwargs.get("wallet_id") == "wallet_a":
+                return binding
+            if name == "lemma_persons" and self._kwargs.get("person_id") == "person_doc":
+                return person_doc
+            return None
+
+    db = SimpleNamespace(query=lambda model: FakeQuery(model), add=lambda obj: None)
     monkeypatch.setattr("api.column_crypto.encrypt_column", lambda value: value)
+    monkeypatch.setattr("api.column_crypto.decrypt_column", lambda value: value)
     with pytest.raises(WalletPersonBindingConflictError):
         resolve_or_create_person_from_material(
             db,
-            material=material_from_test_fixture(document_number="NEW_DOC_002"),
+            material=material,
             wallet_id="wallet_a",
             provider="didit",
         )

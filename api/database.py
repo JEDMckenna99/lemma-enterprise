@@ -732,6 +732,7 @@ class LemmaPerson(Base):
     # Widened for the AES-GCM envelope; legacy 64-hex rows remain readable.
     person_root_hash = Column(String(255), nullable=False, index=True)
     root_version = Column(String, default='v1', nullable=False)
+    person_root_source = Column(String(32), default='document_derived_v1', nullable=False, index=True)
     primary_wallet_id = Column(String, index=True)
     status = Column(String, default='active')
     created_at = Column(DateTime, default=datetime.utcnow)

@@ -90,7 +90,22 @@ def test_extract_picks_approved_entry_and_normalizes():
     # spaces/hyphens, uppercase) happens later in build_document_root_claims.
     assert material.document_number == "x 12-345 678"
     assert material.date_of_birth == "1985-03-12"
+    assert material.document_expiration_date is None
     assert material.stripe_session_id is None
+
+
+@pytest.mark.unit
+def test_extract_reads_document_expiration_date():
+    decision = _approved_poh_decision(expiration_date="2031-06-02")
+    material = extract_root_material_from_didit_decision(decision)
+    assert material.document_expiration_date == "2031-06-02"
+
+
+@pytest.mark.unit
+def test_extract_ignores_invalid_document_expiration_date():
+    decision = _approved_poh_decision(expiration_date="not-a-date")
+    material = extract_root_material_from_didit_decision(decision)
+    assert material.document_expiration_date is None
 
 
 @pytest.mark.unit

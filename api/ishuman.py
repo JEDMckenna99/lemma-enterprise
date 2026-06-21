@@ -75,10 +75,55 @@ STRIPE_IDENTITY_COST_CENTS = 200  # $2.00 per verification
 
 
 def _default_credential_lifetime_seconds(site_id: Optional[str]) -> int:
-    """Master proofs use ISHUMAN_CREDENTIAL_TTL_DAYS; site-bound proofs renew monthly."""
+    """Site-bound proofs renew monthly; master proofs use policy TTL by default.
+
+    Master issuance passes an explicit ``ttl_seconds`` when document expiration
+    is available from IDV (see ``_master_credential_ttl_seconds``).
+    """
     if site_id and site_id not in ("lemma.id",):
         return ISHUMAN_SITE_CREDENTIAL_TTL_DAYS * 86400
     return ISHUMAN_CREDENTIAL_TTL_DAYS * 86400
+
+
+def _document_expiration_date_from_record(record) -> Optional[str]:
+    meta = getattr(record, "metadata_json", None) or {}
+    raw = meta.get("document_expiration_date")
+    return str(raw).strip() if raw else None
+
+
+def _master_expires_at_datetime(
+    issued_at: datetime,
+    document_expiration_date: Optional[str],
+) -> datetime:
+    """Master verification row expiry: document end-of-day when known, else policy TTL."""
+    from api.identity_roots import document_expiration_end_of_day_utc
+
+    doc_expiry = document_expiration_end_of_day_utc(document_expiration_date)
+    if doc_expiry and doc_expiry > issued_at:
+        return doc_expiry
+    return issued_at + timedelta(days=ISHUMAN_CREDENTIAL_TTL_DAYS)
+
+
+def _master_credential_ttl_seconds(
+    document_expiration_date: Optional[str],
+    *,
+    issued_at: Optional[datetime] = None,
+) -> int:
+    """TTL for a master isHuman credential anchored to document expiration."""
+    issued = issued_at or datetime.utcnow()
+    expires = _master_expires_at_datetime(issued, document_expiration_date)
+    return max(1, int((expires - issued).total_seconds()))
+
+
+def _apply_master_expiry_to_record(record, document_expiration_date: Optional[str]) -> None:
+    """Bind server-side master expiry to the verified document when available."""
+    issued = datetime.utcnow()
+    record.expires_at = _master_expires_at_datetime(issued, document_expiration_date)
+    if document_expiration_date:
+        record.metadata_json = {
+            **(record.metadata_json or {}),
+            "document_expiration_date": document_expiration_date,
+        }
 
 
 # ---------------------------------------------------------------------------
@@ -438,7 +483,13 @@ def _complete_verified_ishuman_from_didit(
             return None
         raise
 
-    if resolved.merged_from_person_id:
+    if resolved.document_attached:
+        record.metadata_json = {
+            **(record.metadata_json or {}),
+            "document_attached": True,
+            "document_root_hash": resolved.document_root_hash,
+        }
+    elif resolved.merged_from_person_id:
         from api.database import LemmaDocumentRoot
         from api.ppid_migration import record_person_merge
 
@@ -480,8 +531,10 @@ def _complete_verified_ishuman_from_didit(
         wallet_id,
         ppid_derivation="person_root_v1",
         verification_method="didit",
+        ttl_seconds=_master_credential_ttl_seconds(resolved.document_expiration_date),
     )
     record.ppid = ppid
+    _apply_master_expiry_to_record(record, resolved.document_expiration_date)
     return credential
 
 
@@ -543,13 +596,14 @@ def _maybe_pull_issue_didit(db, record) -> bool:
     record.verified_at = datetime.utcnow()
     record.credential_id = credential.get("id")
     record.issued_at = datetime.utcnow()
-    record.expires_at = datetime.utcnow() + timedelta(days=ISHUMAN_CREDENTIAL_TTL_DAYS)
     record.metadata_json = {
         **(record.metadata_json or {}),
         "credential_issuer_did": credential.get("issuerInfo", {}).get("did"),
         "ppid_derivation": "person_root_v1",
         "issued_via": "pull_fallback",
     }
+    if not record.expires_at:
+        _apply_master_expiry_to_record(record, _document_expiration_date_from_record(record))
     db.commit()
     logger.info(
         "isHuman credential issued via didit pull-fallback: credential_id=%s session=%s",
@@ -1458,7 +1512,11 @@ def didit_identity_webhook():
             record.verified_at = datetime.utcnow()
             record.credential_id = credential.get("id")
             record.issued_at = datetime.utcnow()
-            record.expires_at = datetime.utcnow() + timedelta(days=ISHUMAN_CREDENTIAL_TTL_DAYS)
+            if not record.expires_at:
+                _apply_master_expiry_to_record(
+                    record,
+                    _document_expiration_date_from_record(record),
+                )
             record.metadata_json = {
                 **(record.metadata_json or {}),
                 "credential_issuer_did": credential.get("issuerInfo", {}).get("did"),
@@ -1564,6 +1622,9 @@ def _reissue_verification_credential(record) -> Optional[dict]:
         record.wallet_id,
         ppid_derivation=ppid_deriv,
         verification_method=(record.issuer_id or "didit"),
+        ttl_seconds=_master_credential_ttl_seconds(
+            _document_expiration_date_from_record(record),
+        ),
     )
     credential["id"] = record.credential_id
     return credential
@@ -2544,6 +2605,9 @@ def reissue_master_credential():
             wallet_id,
             ppid_derivation=ppid_derivation,
             verification_method=(verified.issuer_id or "didit"),
+            ttl_seconds=_master_credential_ttl_seconds(
+                _document_expiration_date_from_record(verified),
+            ),
         )
         verified.credential_id = new_credential["id"]
         verified.metadata_json = {

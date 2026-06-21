@@ -379,3 +379,14 @@ def ppid_require_person_root() -> bool:
     LEMMA_PPID_REQUIRE_PERSON_ROOT=0 to restore the legacy permissive behavior.
     """
     return _env_truthy("LEMMA_PPID_REQUIRE_PERSON_ROOT", True)
+
+
+def use_assigned_person_root() -> bool:
+    """When true, new lemma_person rows get a server-assigned person_root instead
+    of HKDF(document_root). Document roots become renewable attestations; PPIDs
+    stay stable across document number changes when the wallet is rebound.
+
+    Env: ``LEMMA_PERSON_ROOT_SOURCE=assigned_v1`` (default: document-derived v1).
+    """
+    mode = (os.environ.get("LEMMA_PERSON_ROOT_SOURCE") or "document_derived_v1").strip().lower()
+    return mode in ("assigned_v1", "assigned", "assigned_v2")

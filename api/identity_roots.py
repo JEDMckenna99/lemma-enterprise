@@ -13,7 +13,9 @@ import hmac
 import json
 import os
 import re
+import secrets
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from typing import Any, Optional
 
 from cryptography.hazmat.primitives import hashes
@@ -23,6 +25,8 @@ DOCUMENT_ROOT_SCHEMA = "lemma.identity.document-root.v1"
 PERSON_ROOT_VERSION = "v1"
 PERSON_ROOT_HKDF_INFO = b"lemma.id/person-root/v1"
 SITE_PPID_MSG_PREFIX = "lemma.id/site-ppid/v1"
+PERSON_ROOT_SOURCE_DOCUMENT_DERIVED = "document_derived_v1"
+PERSON_ROOT_SOURCE_ASSIGNED = "assigned_v1"
 
 
 class IdentityRootError(Exception):
@@ -41,6 +45,7 @@ class StripeIdentityRootMaterial:
     document_type: str
     document_number: str
     date_of_birth: str  # YYYY-MM-DD
+    document_expiration_date: Optional[str] = None  # YYYY-MM-DD from IDV; not in document_root
     id_number_type: Optional[str] = None
     id_number_last4: Optional[str] = None
     stripe_session_id: Optional[str] = None
@@ -139,6 +144,51 @@ def normalize_document_number(value: str) -> str:
     return re.sub(r"[\s\-]", "", raw)
 
 
+def normalize_document_expiration_date(value: Any) -> Optional[str]:
+    """Parse IDV document expiration to YYYY-MM-DD.
+
+    Returns ``None`` when the field is absent or unparseable. Expiration is
+    optional metadata used for master-credential TTL — it is never part of
+    ``document_root`` claims.
+    """
+    if value is None:
+        return None
+    if isinstance(value, dict):
+        year = int(value.get("year") or 0)
+        month = int(value.get("month") or 0)
+        day = int(value.get("day") or 0)
+        if year < 1900 or not (1 <= month <= 12) or not (1 <= day <= 31):
+            return None
+        return f"{year:04d}-{month:02d}-{day:02d}"
+    raw = str(value).strip()
+    if not raw:
+        return None
+    if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", raw):
+        return None
+    year_s, month_s, day_s = raw.split("-")
+    year, month, day = int(year_s), int(month_s), int(day_s)
+    if year < 1900 or not (1 <= month <= 12) or not (1 <= day <= 31):
+        return None
+    return f"{year:04d}-{month:02d}-{day:02d}"
+
+
+def document_expiration_end_of_day_utc(expiration_date: Optional[str]) -> Optional[datetime]:
+    """End of the expiration calendar day (UTC) for master TTL binding."""
+    normalized = normalize_document_expiration_date(expiration_date)
+    if not normalized:
+        return None
+    year_s, month_s, day_s = normalized.split("-")
+    return datetime(
+        int(year_s),
+        int(month_s),
+        int(day_s),
+        23,
+        59,
+        59,
+        tzinfo=timezone.utc,
+    ).replace(tzinfo=None)
+
+
 def format_dob_from_stripe(dob: Any) -> str:
     if dob is None:
         raise IdentityRootMaterialError("date_of_birth required")
@@ -204,6 +254,15 @@ def derive_person_root_hash(document_root_hash: str, version: str | None = None)
     return derive_person_root_bytes(document_root_hash, version).hex()
 
 
+def generate_assigned_person_root_bytes() -> bytes:
+    """Cryptographically random person_root for assigned_v1 identities."""
+    return secrets.token_bytes(32)
+
+
+def generate_assigned_person_root_hash() -> str:
+    return generate_assigned_person_root_bytes().hex()
+
+
 def _site_ppid_message(rp_id: str) -> bytes:
     from api.ppid import canonicalize_rp_id
 
@@ -264,6 +323,7 @@ def extract_root_material_from_stripe_session(session: Any) -> StripeIdentityRoo
 
     doc_number = _doc_field("number")
     doc_type = _doc_field("type")
+    document_expiration_date = normalize_document_expiration_date(_doc_field("expiration_date"))
 
     id_number = getattr(verified, "id_number", None) if not isinstance(verified, dict) else verified.get("id_number")
     id_number_type = (
@@ -278,6 +338,7 @@ def extract_root_material_from_stripe_session(session: Any) -> StripeIdentityRoo
         document_type=str(doc_type or ""),
         document_number=str(doc_number or ""),
         date_of_birth=dob,
+        document_expiration_date=document_expiration_date,
         id_number_type=str(id_number_type) if id_number_type else None,
         id_number_last4=str(id_number)[-4:] if id_number else None,
         stripe_session_id=str(session_id) if session_id else None,
@@ -391,12 +452,14 @@ def extract_root_material_from_didit_decision(decision: dict[str, Any]) -> Strip
     if not document_number:
         raise IdentityRootMaterialError("didit id_verification missing document_number")
     dob = _normalize_didit_dob(idv.get("date_of_birth"))
+    document_expiration_date = normalize_document_expiration_date(idv.get("expiration_date"))
 
     return StripeIdentityRootMaterial(
         country=country,
         document_type=document_type,
         document_number=document_number,
         date_of_birth=dob,
+        document_expiration_date=document_expiration_date,
         stripe_session_id=None,
         stripe_report_id=None,
     )
