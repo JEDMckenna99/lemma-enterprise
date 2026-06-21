@@ -179,6 +179,29 @@ def test_billing_gate_blocks_unprovisioned_customer(monkeypatch, fake_ishuman_db
 
 
 @pytest.mark.unit
+def test_billing_gate_allows_demo_sites(monkeypatch, fake_ishuman_db_session_factory):
+    from api.database import Site
+
+    monkeypatch.setenv("LEMMA_BILLING_ENFORCEMENT", "1")
+
+    store = fake_ishuman_db_session_factory.store
+    store.data[Site.__name__].append(
+        Site(
+            site_id="site_demo_tickets",
+            site_domain="tickets-demo.lemma.id",
+            company_name="Ticketing Demo",
+            admin_email="demo+tickets@lemma.id",
+            api_key="key_test",
+            oauth_client_id="oauth_test",
+            oauth_client_secret="secret_test",
+        )
+    )
+    db = fake_ishuman_db_session_factory.session_local()
+
+    assert check_site_billing_allows_issuance(db, "tickets-demo.lemma.id") is None
+
+
+@pytest.mark.unit
 def test_billing_gate_allows_unregistered_host(monkeypatch, fake_ishuman_db_session_factory):
     monkeypatch.setenv("LEMMA_BILLING_ENFORCEMENT", "1")
     db = fake_ishuman_db_session_factory.session_local()
