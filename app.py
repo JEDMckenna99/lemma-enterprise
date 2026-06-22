@@ -92,6 +92,10 @@ def build_content_security_policy(nonce: str, profile: str = 'strict') -> str:
 def create_app():
     app = Flask(__name__)
 
+    from api.column_crypto import require_column_encryption_in_production
+
+    require_column_encryption_in_production()
+
     # Configuration
     app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev-secret-key-for-testing')
     app.config['DEBUG'] = os.environ.get('FLASK_ENV') == 'development'

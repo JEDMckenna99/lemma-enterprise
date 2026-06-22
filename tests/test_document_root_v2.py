@@ -95,9 +95,11 @@ def test_extract_didit_subdivision_from_subtype():
 
 @pytest.mark.unit
 def test_document_root_row_persists_policy_fields(fake_ishuman_db_session_factory, monkeypatch):
+    from api.column_crypto import is_encrypted, reset_key_cache
+
     monkeypatch.setenv("LEMMA_DOCUMENT_ROOT_SCHEMA", "v2")
-    monkeypatch.setattr("api.column_crypto.encrypt_column", lambda value: f"enc:{value}")
-    monkeypatch.setattr("api.column_crypto.decrypt_column", lambda value: value.removeprefix("enc:"))
+    monkeypatch.setenv("LEMMA_PERSON_ROOT_SALT_V1", "x" * 40)
+    reset_key_cache()
 
     db = fake_ishuman_db_session_factory.session_local()
     material = material_from_test_fixture(
@@ -111,6 +113,14 @@ def test_document_root_row_persists_policy_fields(fake_ishuman_db_session_factor
     attrs = load_latest_person_idv_attributes(db, resolved.person_id)
     assert attrs is not None
     assert attrs["document_expiration_date"] == "2032-01-15"
+    assert attrs["issuing_subdivision"] is None
+
+    from api.database import LemmaDocumentRoot
+
+    stored = db._store.data[LemmaDocumentRoot.__name__][-1]
+    assert is_encrypted(stored.date_of_birth)
+    assert is_encrypted(stored.document_expiration_date)
+    assert stored.issuing_subdivision is None
     assert attrs["date_of_birth"] == "1990-01-15"
     assert attrs["age_years"] is not None
     assert attrs["document_root_schema"] == DOCUMENT_ROOT_SCHEMA_V2

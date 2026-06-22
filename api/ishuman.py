@@ -85,10 +85,16 @@ def _default_credential_lifetime_seconds(site_id: Optional[str]) -> int:
     return ISHUMAN_CREDENTIAL_TTL_DAYS * 86400
 
 
-def _document_expiration_date_from_record(record) -> Optional[str]:
-    meta = getattr(record, "metadata_json", None) or {}
-    raw = meta.get("document_expiration_date")
-    return str(raw).strip() if raw else None
+def _document_expiration_date_from_record(record, db=None) -> Optional[str]:
+    """Load document expiration from encrypted document-root row (not metadata)."""
+    person_id = getattr(record, "lemma_person_id", None)
+    if db and person_id:
+        from api.identity_person import document_expiration_date_for_person
+
+        resolved = document_expiration_date_for_person(db, person_id)
+        if resolved:
+            return resolved
+    return None
 
 
 def _master_expires_at_datetime(
@@ -119,11 +125,6 @@ def _apply_master_expiry_to_record(record, document_expiration_date: Optional[st
     """Bind server-side master expiry to the verified document when available."""
     issued = datetime.utcnow()
     record.expires_at = _master_expires_at_datetime(issued, document_expiration_date)
-    if document_expiration_date:
-        record.metadata_json = {
-            **(record.metadata_json or {}),
-            "document_expiration_date": document_expiration_date,
-        }
 
 
 # ---------------------------------------------------------------------------
@@ -520,11 +521,6 @@ def _complete_verified_ishuman_from_didit(
     record.document_root_hash = encrypt_column(resolved.document_root_hash)
     record.root_version = active_root_version()
     record.confidence_level = resolved.confidence_level
-    record.metadata_json = {
-        **(record.metadata_json or {}),
-        "issuing_subdivision": resolved.issuing_subdivision,
-        "document_expiration_date": resolved.document_expiration_date,
-    }
 
     try:
         _maybe_store_seed_envelopes(record, wallet_id, resolved.person_root_hash)
@@ -608,7 +604,7 @@ def _maybe_pull_issue_didit(db, record) -> bool:
         "issued_via": "pull_fallback",
     }
     if not record.expires_at:
-        _apply_master_expiry_to_record(record, _document_expiration_date_from_record(record))
+        _apply_master_expiry_to_record(record, _document_expiration_date_from_record(record, db))
     db.commit()
     logger.info(
         "isHuman credential issued via didit pull-fallback: credential_id=%s session=%s",
@@ -1520,7 +1516,7 @@ def didit_identity_webhook():
             if not record.expires_at:
                 _apply_master_expiry_to_record(
                     record,
-                    _document_expiration_date_from_record(record),
+                    _document_expiration_date_from_record(record, db),
                 )
             record.metadata_json = {
                 **(record.metadata_json or {}),
@@ -1614,7 +1610,7 @@ def _resolve_verification_status_record(db, session_id: str):
     return record
 
 
-def _reissue_verification_credential(record) -> Optional[dict]:
+def _reissue_verification_credential(record, db) -> Optional[dict]:
     """Re-issue the master credential for wallet storage (stable credential id)."""
     if record.status != "verified" or not record.credential_id or not record.ppid:
         return None
@@ -1628,7 +1624,7 @@ def _reissue_verification_credential(record) -> Optional[dict]:
         ppid_derivation=ppid_deriv,
         verification_method=(record.issuer_id or "didit"),
         ttl_seconds=_master_credential_ttl_seconds(
-            _document_expiration_date_from_record(record),
+            _document_expiration_date_from_record(record, db),
         ),
     )
     credential["id"] = record.credential_id
@@ -1719,7 +1715,7 @@ def verification_status_claim(session_id: str):
             })
 
         try:
-            credential = _reissue_verification_credential(record)
+            credential = _reissue_verification_credential(record, db)
         except Exception:
             logger.exception("Failed to re-issue credential for claim")
             return jsonify({"success": False, "error": "credential_reissue_failed"}), 500
@@ -2611,7 +2607,7 @@ def reissue_master_credential():
             ppid_derivation=ppid_derivation,
             verification_method=(verified.issuer_id or "didit"),
             ttl_seconds=_master_credential_ttl_seconds(
-                _document_expiration_date_from_record(verified),
+                _document_expiration_date_from_record(verified, db),
             ),
         )
         verified.credential_id = new_credential["id"]

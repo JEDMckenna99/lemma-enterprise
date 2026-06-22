@@ -47,6 +47,28 @@ def test_none_and_double_encrypt_are_safe():
 
 
 @pytest.mark.unit
+def test_explicit_key_matches_salt_derivation(monkeypatch):
+    from api.column_crypto import _derive_column_key, reset_key_cache
+
+    material = "test_column_encryption_material_32chars!"
+    monkeypatch.setenv("LEMMA_COLUMN_ENCRYPTION_KEY", material)
+    monkeypatch.delenv("LEMMA_PERSON_ROOT_SALT_V1", raising=False)
+    reset_key_cache()
+
+    from api.column_crypto import _column_key
+
+    via_explicit = _column_key()
+
+    monkeypatch.delenv("LEMMA_COLUMN_ENCRYPTION_KEY", raising=False)
+    monkeypatch.setenv("LEMMA_PERSON_ROOT_SALT_V1", material)
+    monkeypatch.setattr("api.config.get_person_root_salt", lambda: material)
+    reset_key_cache()
+    via_salt = _column_key()
+
+    assert via_explicit == via_salt == _derive_column_key(material)
+
+
+@pytest.mark.unit
 def test_no_key_degrades_to_plaintext(monkeypatch):
     import api.column_crypto as cc
 

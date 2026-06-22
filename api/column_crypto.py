@@ -41,6 +41,16 @@ _PREFIX = "lc1:"
 _HKDF_INFO = b"lemma.id/column-encryption/v1"
 
 
+def _derive_column_key(material: str) -> bytes:
+    """Domain-separated column key from secret material (>= 32 bytes)."""
+    return HKDF(
+        algorithm=hashes.SHA256(),
+        length=32,
+        salt=None,
+        info=_HKDF_INFO,
+    ).derive(material.encode("utf-8"))
+
+
 @functools.lru_cache(maxsize=1)
 def _column_key() -> bytes:
     """Return the 32-byte at-rest column key, or b"" when none is configured.
@@ -51,12 +61,16 @@ def _column_key() -> bytes:
          works without new ops config. The HKDF ``info`` keeps this key domain
          separated from the salt's primary derivation use.
 
+    Both paths use the same HKDF derivation so operators may set
+    ``LEMMA_COLUMN_ENCRYPTION_KEY`` to a dedicated secret, or mirror
+    ``LEMMA_PERSON_ROOT_SALT_V1`` for the same effective key bytes.
+
     When neither is available (e.g. a minimal dev shell) an empty key is
     returned and callers store plaintext -- the legacy behaviour.
     """
     explicit = os.environ.get("LEMMA_COLUMN_ENCRYPTION_KEY")
     if explicit and len(explicit) >= 32:
-        return hashlib.sha256(explicit.encode("utf-8")).digest()
+        return _derive_column_key(explicit)
 
     base = ""
     try:
@@ -69,12 +83,28 @@ def _column_key() -> bytes:
     if not base:
         return b""
 
-    return HKDF(
-        algorithm=hashes.SHA256(),
-        length=32,
-        salt=None,
-        info=_HKDF_INFO,
-    ).derive(base.encode("utf-8"))
+    return _derive_column_key(base)
+
+
+def column_encryption_active() -> bool:
+    """True when at-rest column encryption key material is configured."""
+    return bool(_column_key())
+
+
+def require_column_encryption_in_production() -> None:
+    """Fail fast in production when identity columns would store plaintext."""
+    try:
+        from api.config import is_production
+
+        if is_production() and not column_encryption_active():
+            raise RuntimeError(
+                "CRITICAL: production requires LEMMA_COLUMN_ENCRYPTION_KEY or "
+                "LEMMA_PERSON_ROOT_SALT_V1 for at-rest identity column encryption"
+            )
+    except RuntimeError:
+        raise
+    except Exception:
+        pass
 
 
 def reset_key_cache() -> None:

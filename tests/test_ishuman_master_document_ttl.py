@@ -119,7 +119,7 @@ def test_issue_master_credential_honors_document_expiration(monkeypatch):
 
 
 @pytest.mark.unit
-def test_apply_master_expiry_to_record_stores_metadata():
+def test_apply_master_expiry_to_record_sets_expires_at_only():
     from api.ishuman import _apply_master_expiry_to_record
 
     class Record:
@@ -129,6 +129,6 @@ def test_apply_master_expiry_to_record_stores_metadata():
     record = Record()
     _apply_master_expiry_to_record(record, "2030-12-31")
 
-    assert record.metadata_json["document_expiration_date"] == "2030-12-31"
+    assert "document_expiration_date" not in record.metadata_json
     assert record.metadata_json["pending"] is True
     assert record.expires_at == datetime(2030, 12, 31, 23, 59, 59)

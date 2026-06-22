@@ -6,6 +6,10 @@ write (api.column_crypto). Rows written before the cutover still hold legacy
 64-hex plaintext. This script upgrades them so a DB dump never reveals the
 PPID-enumeration key for already-verified people.
 
+Also encrypts ``lemma_document_roots`` policy fields (DOB, expiration,
+subdivision) and strips duplicated expiration/subdivision keys from
+``ishuman_verifications.metadata_json``.
+
 Idempotent: already-encrypted values (``lc1:`` envelope) are skipped. Requires
 the same key material as the running app (LEMMA_COLUMN_ENCRYPTION_KEY or
 LEMMA_PERSON_ROOT_SALT_V1); aborts if no key is configured so it cannot silently
@@ -21,9 +25,17 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 
+def _encrypt_if_plain(value):
+    from api.column_crypto import encrypt_column, is_encrypted
+
+    if not value or is_encrypted(value):
+        return value, False
+    return encrypt_column(value), True
+
+
 def run_backfill() -> None:
     from api.column_crypto import _column_key, encrypt_column, is_encrypted
-    from api.database import IsHumanVerification, LemmaPerson, get_db
+    from api.database import IsHumanVerification, LemmaDocumentRoot, LemmaPerson, get_db
 
     if not _column_key():
         raise SystemExit(
@@ -32,7 +44,12 @@ def run_backfill() -> None:
         )
 
     db = get_db()
-    updated = {"lemma_persons": 0, "ishuman_verifications": 0}
+    updated = {
+        "lemma_persons": 0,
+        "ishuman_verifications": 0,
+        "lemma_document_roots": 0,
+        "metadata_scrubbed": 0,
+    }
     try:
         for person in db.query(LemmaPerson).all():
             value = person.person_root_hash
@@ -45,6 +62,27 @@ def run_backfill() -> None:
             if value and not is_encrypted(value):
                 row.document_root_hash = encrypt_column(value)
                 updated["ishuman_verifications"] += 1
+
+            meta = dict(row.metadata_json or {})
+            scrubbed = False
+            for key in ("document_expiration_date", "issuing_subdivision", "date_of_birth"):
+                if key in meta:
+                    meta.pop(key, None)
+                    scrubbed = True
+            if scrubbed:
+                row.metadata_json = meta
+                updated["metadata_scrubbed"] += 1
+
+        for doc in db.query(LemmaDocumentRoot).all():
+            changed = False
+            for attr in ("date_of_birth", "document_expiration_date", "issuing_subdivision"):
+                value = getattr(doc, attr, None)
+                enc, did = _encrypt_if_plain(value)
+                if did:
+                    setattr(doc, attr, enc)
+                    changed = True
+            if changed:
+                updated["lemma_document_roots"] += 1
 
         db.commit()
         print(f"backfill complete: {updated}")
