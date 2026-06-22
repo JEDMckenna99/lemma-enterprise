@@ -213,6 +213,32 @@ def test_lemma_keys_uses_async_noble_ed25519_signing():
 
 
 @pytest.mark.browser
+def test_idv_popup_has_lifecycle_guards():
+    idv_html = IDV_HTML.read_text(encoding="utf-8")
+    assert "lemma-ishuman-popup" in idv_html
+    assert "ISHUMAN_POPUP_SUPERSEDE" in idv_html
+    assert "isHandoffProtected" in idv_html
+    assert "idle_timeout" in idv_html
+    assert "withIdvBusy" in idv_html
+
+
+@pytest.mark.browser
+def test_ishuman_verifier_manages_popup_dedup():
+    verifier_js = VERIFIER_JS.read_text(encoding="utf-8")
+    assert "_openManagedLemmaPopup" in verifier_js
+    assert "POPUP_CHANNEL_NAME" in verifier_js
+    assert "ISHUMAN_POPUP_SUPERSEDE" in verifier_js
+    assert "popup_token" in verifier_js
+
+
+@pytest.mark.browser
+def test_unlock_popup_has_lifecycle_guards():
+    popup_html = POPUP_HTML.read_text(encoding="utf-8")
+    assert "lemma-ishuman-popup" in popup_html
+    assert "initUnlockLifecycle" in popup_html
+
+
+@pytest.mark.browser
 def test_unlock_popup_ishuman_flag():
     popup_html = POPUP_HTML.read_text(encoding="utf-8")
     assert "isHumanIssuance" in popup_html

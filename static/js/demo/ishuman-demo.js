@@ -610,10 +610,41 @@
     return false;
   }
 
+  let _demoIdvPopup = null;
+
+  function broadcastIdvPopupSupersede(flow, token) {
+    try {
+      const ch = new BroadcastChannel('lemma-ishuman-popup');
+      ch.postMessage({
+        type: 'ISHUMAN_POPUP_SUPERSEDE',
+        flow,
+        token,
+        ts: Date.now(),
+      });
+      ch.close();
+    } catch (_) { /* non-fatal */ }
+  }
+
+  function randomPopupToken() {
+    const bytes = crypto.getRandomValues(new Uint8Array(12));
+    let str = '';
+    for (let i = 0; i < bytes.length; i += 1) str += String.fromCharCode(bytes[i]);
+    return btoa(str).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
+  }
+
   function openIdvPopup({ demoQr = false } = {}) {
+    if (_demoIdvPopup && !_demoIdvPopup.closed) {
+      try { _demoIdvPopup.focus(); } catch (_) { /* non-fatal */ }
+      return _demoIdvPopup;
+    }
+
+    const popupToken = randomPopupToken();
+    broadcastIdvPopupSupersede(demoQr ? 'demo_qr' : 'idv', popupToken);
+
     const popupUrl = new URL(`${window.location.origin}/wallet/ishuman-idv`);
     popupUrl.searchParams.set('origin', window.location.origin);
     popupUrl.searchParams.set('site_id', 'lemma.id');
+    popupUrl.searchParams.set('popup_token', popupToken);
     if (demoQr) {
       popupUrl.searchParams.set('flow_mode', 'demo_qr');
     }
@@ -630,8 +661,11 @@
     if (!popup) {
       setPill('ih-lemma-status', 'POPUP BLOCKED', 'warn');
       log('Identity popup blocked', 'Allow popups for lemma.id and retry');
+      _demoIdvPopup = null;
       return null;
     }
+
+    _demoIdvPopup = popup;
 
     setPill('ih-lemma-status', demoQr ? 'DEMO POPUP' : 'VERIFYING', 'warn');
     log(demoQr ? 'Opened demo QR popup' : 'Opened identity check popup for lemma.id');
@@ -640,6 +674,7 @@
     const finish = async (outcome) => {
       if (settled) return;
       settled = true;
+      _demoIdvPopup = null;
       window.removeEventListener('message', onMessage);
       clearInterval(closedTimer);
       log(demoQr ? 'Demo QR popup closed' : 'Identity check popup closed', outcome);

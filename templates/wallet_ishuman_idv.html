@@ -216,6 +216,7 @@
             window.history.replaceState(window.history.state, document.title, nextUrl);
         }
         scrubHandoffSecretsFromUrl();
+        const popupToken = (params.get('popup_token') || '').trim();
         const flowMode = (params.get('flow_mode') || '').trim();
         const redirectReturn = (params.get('redirect_return') || '').trim();
         const root = document.getElementById('ishuman-idv-root');
@@ -407,6 +408,8 @@
         }
 
         async function closeWith(type, detail) {
+            idvLifecycle.settled = true;
+            idvLifecycle.clearIdleTimer();
             const syncTypes = new Set(['ISHUMAN_IDV_COMPLETE', 'ISHUMAN_SITE_PROOF_ISSUED']);
             if (syncTypes.has(type) && wallet) {
                 try {
@@ -507,6 +510,74 @@
             window.close();
         }
 
+        const POPUP_IDLE_MS = 15 * 60 * 1000;
+        const idvLifecycle = {
+            settled: false,
+            busyDepth: 0,
+            idleTimer: null,
+            popupToken,
+            clearIdleTimer() {
+                if (this.idleTimer) {
+                    clearTimeout(this.idleTimer);
+                    this.idleTimer = null;
+                }
+            },
+            isHandoffProtected() {
+                if (flowMode === 'redirect') return true;
+                if (isVerificationReturn) return true;
+                if (handoffId || handoffMk || ishumanSessionParam) return true;
+                return false;
+            },
+            isProtected() {
+                if (this.settled || this.busyDepth > 0) return true;
+                if (this.isHandoffProtected()) return true;
+                const qrPanel = document.getElementById('qr-demo-panel');
+                if (isDemoQrFlow && qrPanel && !qrPanel.classList.contains('hidden')) return true;
+                return false;
+            },
+            resetIdleTimer() {
+                this.clearIdleTimer();
+                if (this.isProtected()) return;
+                this.idleTimer = setTimeout(() => {
+                    if (this.isProtected()) return;
+                    closeWith('ISHUMAN_IDV_CANCELLED', { reason: 'idle_timeout' });
+                }, POPUP_IDLE_MS);
+            },
+            init() {
+                if (flowMode === 'redirect') return;
+                ['click', 'keydown', 'touchstart'].forEach((evt) => {
+                    document.addEventListener(evt, () => this.resetIdleTimer(), { passive: true });
+                });
+                try {
+                    const popupChannel = new BroadcastChannel('lemma-ishuman-popup');
+                    popupChannel.onmessage = (event) => {
+                        const data = event.data || {};
+                        if (data.type !== 'ISHUMAN_POPUP_SUPERSEDE') return;
+                        const flow = String(data.flow || '');
+                        const flowMatches = flow === 'idv' || (isDemoQrFlow && flow === 'demo_qr');
+                        if (!flowMatches) return;
+                        if (data.token && data.token === this.popupToken) return;
+                        if (this.isProtected()) return;
+                        closeWith('ISHUMAN_IDV_CANCELLED', { reason: 'superseded' });
+                    };
+                } catch (err) {
+                    console.warn('[isHuman IDV] popup lifecycle channel unavailable:', err.message);
+                }
+                this.resetIdleTimer();
+            },
+        };
+
+        async function withIdvBusy(task) {
+            idvLifecycle.busyDepth += 1;
+            idvLifecycle.resetIdleTimer();
+            try {
+                return await task();
+            } finally {
+                idvLifecycle.busyDepth -= 1;
+                idvLifecycle.resetIdleTimer();
+            }
+        }
+
         async function hasHandoffLinkedWallet() {
             wallet = wallet || new LemmaWallet();
             await wallet.init();
@@ -588,6 +659,7 @@
         }
 
         async function ensureWalletUnlocked() {
+            return withIdvBusy(async () => {
             if (typeof LemmaWallet === 'undefined') {
                 throw new Error('Wallet SDK failed to load — allow scripts for lemma.id and refresh.');
             }
@@ -599,6 +671,7 @@
             }
             await adoptWalletState();
             if (!walletId) throw new Error('Wallet unlock failed');
+            });
         }
 
         async function canAutoFinishVerificationReturn() {
@@ -695,6 +768,7 @@
         }
 
         async function pollAndStoreMaster() {
+            return withIdvBusy(async () => {
             if (!sessionId) throw new Error('Missing verification session');
             setStatus(consumerCopy().status?.waitingVerification || 'Finishing your verification…', 'loading');
             // The IDV provider's webhook (which issues the master server-side)
@@ -725,6 +799,7 @@
                 }
             }
             throw new Error('Verification is still finalizing — close this window and click “Create my lemma.id” again in a moment.');
+            });
         }
 
         let qrDemoExpireTimer = null;
@@ -798,6 +873,7 @@
         }
 
         async function runDemoQrVerification() {
+            return withIdvBusy(async () => {
             if (!qrDemoEnabled) {
                 throw new Error('Demo QR flow is not enabled on this environment.');
             }
@@ -867,6 +943,7 @@
                 await new Promise((resolve) => setTimeout(resolve, 2000));
             }
             throw new Error('Timed out waiting for phone scan — close and try again.');
+            });
         }
 
         async function bootDemoQrPopup() {
@@ -1032,6 +1109,7 @@
         }
 
         async function finishMobileHandoffStoreMaster({ autoClose = true } = {}) {
+            return withIdvBusy(async () => {
             setStatus(consumerCopy().status?.finalizing || 'Almost done…', 'loading');
             wallet = wallet || new LemmaWallet();
             await wallet.init();
@@ -1060,6 +1138,7 @@
             if (autoClose) {
                 await showMobileHandoffCompleteUi('mobile_handoff_verified');
             }
+            });
         }
 
         async function runSilentMobileHandoffCompletion() {
@@ -1067,6 +1146,7 @@
         }
 
         async function startHostedVerification() {
+            return withIdvBusy(async () => {
             const returnParams = new URLSearchParams(params.toString());
             returnParams.set('verification_return', 'true');
 
@@ -1134,6 +1214,7 @@
                 return null;
             }
             throw new Error('Verification URL missing');
+            });
         }
 
         /**
@@ -1177,6 +1258,7 @@
         }
 
         async function issueSiteProofAndClose() {
+            return withIdvBusy(async () => {
             setStatus(consumerCopy().status?.siteProofIssuing || 'Confirming you\u2019re human…', 'loading');
             if (await needsMobileHandoffClaim()) {
                 await claimMobileHandoffIfPresent();
@@ -1213,9 +1295,11 @@
                 ppid_migration: pkg.ppid_migration || null,
             }), 400);
             return true;
+            });
         }
 
         async function runFreshIdvAndClose() {
+            return withIdvBusy(async () => {
             setStatus(consumerCopy().status?.freshStarting || 'Starting a fresh verification…', 'loading');
             await ensureWalletUnlocked();
 
@@ -1300,6 +1384,7 @@
                 ppid_migration: pkg.ppid_migration || null,
             }), 400);
             return true;
+            });
         }
 
         async function runVerification() {
@@ -1361,6 +1446,8 @@
                 btn.disabled = false;
             }
         });
+
+        idvLifecycle.init();
 
         (async function boot() {
             // A cross-origin IDV round-trip (e.g. Didit) can sever window.opener

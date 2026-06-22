@@ -33,7 +33,7 @@
  *   // -> { action: 'post_comment', lemma: { ppid, verified, ..., credential } }
  *   // POST `event` to YOUR backend. Lemma stores none of it.
  *
- * @version 1.8.2
+ * @version 1.8.3
  */
 
 (function () {
@@ -65,7 +65,20 @@ const IDV_POPUP_PATH = '/wallet/ishuman-idv';
 const UNLOCK_POPUP_PATH = '/wallet/popup';
 const IDV_POPUP_TIMEOUT_MS = 10 * 60 * 1000;
 const UNLOCK_POPUP_TIMEOUT_MS = 5 * 60 * 1000;
+const POPUP_CHANNEL_NAME = 'lemma-ishuman-popup';
+const POPUP_WINDOW_NAMES = {
+    idv: 'lemma_ishuman_idv',
+    unlock: 'lemma_wallet_unlock',
+};
 const PROVISIONED_STORAGE_KEY = 'ishuman_master_provisioned_v1';
+
+/** @type {{ idv: PopupFlowState, unlock: PopupFlowState }} */
+const _popupFlows = {
+    idv: { promise: null, popup: null },
+    unlock: { promise: null, popup: null },
+};
+/** @type {BroadcastChannel|null} */
+let _popupChannel = null;
 
 function isMobileLikeUserAgent(ua) {
     return /iPhone|iPad|iPod|Android|Mobi/i.test(String(ua || ''));
@@ -441,6 +454,131 @@ function randomNonceB64(length = 32) {
     let str = '';
     for (let i = 0; i < bytes.length; i += 1) str += String.fromCharCode(bytes[i]);
     return btoa(str).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
+}
+
+function _getPopupChannel() {
+    if (_popupChannel) return _popupChannel;
+    try {
+        if (typeof BroadcastChannel === 'function') {
+            _popupChannel = new BroadcastChannel(POPUP_CHANNEL_NAME);
+        }
+    } catch { /* non-fatal */ }
+    return _popupChannel;
+}
+
+function _broadcastPopupSupersede(flowKind, popupToken) {
+    const ch = _getPopupChannel();
+    if (!ch) return;
+    try {
+        ch.postMessage({
+            type: 'ISHUMAN_POPUP_SUPERSEDE',
+            flow: flowKind,
+            token: popupToken,
+            ts: Date.now(),
+        });
+    } catch { /* non-fatal */ }
+}
+
+function _safeClosePopup(popup) {
+    try {
+        if (popup && !popup.closed) popup.close();
+    } catch { /* cross-origin or user gesture */ }
+}
+
+function _safeFocusPopup(popup) {
+    try {
+        if (popup && !popup.closed) popup.focus();
+    } catch { /* non-fatal */ }
+}
+
+/**
+ * Open (or focus) a Lemma popup with single-flight dedup, cross-tab supersede,
+ * parent-side timeout, and close detection.
+ *
+ * @param {'idv'|'unlock'} flowKind
+ * @param {(popupToken: string) => string} buildUrl
+ * @param {number} timeoutMs
+ * @param {(event: MessageEvent, ctx: { finish: Function, state: { gotMessage: boolean } }) => void} onMessage
+ */
+function _openManagedLemmaPopup(flowKind, buildUrl, timeoutMs, onMessage) {
+    const flow = _popupFlows[flowKind];
+    if (flow.promise) {
+        _safeFocusPopup(flow.popup);
+        return flow.promise;
+    }
+
+    flow.promise = new Promise((resolve) => {
+        const popupToken = randomNonceB64(12);
+        _broadcastPopupSupersede(flowKind, popupToken);
+
+        const popupUrl = buildUrl(popupToken);
+        const windowName = POPUP_WINDOW_NAMES[flowKind] || `lemma_popup_${flowKind}`;
+        const width = flowKind === 'unlock' ? 420 : 480;
+        const height = flowKind === 'unlock' ? 560 : 640;
+        const left = Math.max(0, Math.round(window.screenX + (window.outerWidth - width) / 2));
+        const top = Math.max(0, Math.round(window.screenY + (window.outerHeight - height) / 2));
+        const popup = window.open(
+            popupUrl,
+            windowName,
+            `popup=yes,width=${width},height=${height},left=${left},top=${top}`,
+        );
+        flow.popup = popup;
+
+        if (!popup) {
+            flow.promise = null;
+            flow.popup = null;
+            resolve(flowKind === 'unlock' ? false : { ok: false, blocked: true });
+            return;
+        }
+
+        let settled = false;
+        const state = { gotMessage: false };
+
+        const finish = (value) => {
+            if (settled) return;
+            settled = true;
+            window.removeEventListener('message', messageHandler);
+            clearTimeout(timeoutId);
+            clearInterval(closedTimer);
+            flow.promise = null;
+            flow.popup = null;
+            resolve(value);
+        };
+
+        const messageHandler = (event) => {
+            onMessage(event, finish, state);
+        };
+
+        const timeoutId = setTimeout(() => {
+            _safeClosePopup(popup);
+            if (flowKind === 'unlock') {
+                finish(false);
+                return;
+            }
+            finish({ ok: false, reason: 'idv_timeout', detail: null });
+        }, timeoutMs);
+
+        const closedTimer = setInterval(() => {
+            if (settled || !popup.closed) return;
+            if (state.gotMessage) {
+                if (flowKind === 'unlock') {
+                    finish(false);
+                    return;
+                }
+                finish({ ok: false, reason: 'idv_timeout', detail: null });
+                return;
+            }
+            if (flowKind === 'unlock') {
+                finish(false);
+                return;
+            }
+            finish({ ok: false, reason: 'popup_closed', detail: null });
+        }, 500);
+
+        window.addEventListener('message', messageHandler);
+    });
+
+    return flow.promise;
 }
 
 // ========================================================================
@@ -1435,68 +1573,42 @@ class IsHumanVerifier {
     }
 
     _issueSiteProofViaPopup(options = {}) {
-        return new Promise((resolve) => {
-            const requestNonce = randomNonceB64(16);
-            const sessionNonce = randomNonceB64(32);
-            const bloomSequence = Number(this._bloomSnapshot?.sequence_number ?? 0);
+        const requestNonce = randomNonceB64(16);
+        const sessionNonce = randomNonceB64(32);
+        const bloomSequence = Number(this._bloomSnapshot?.sequence_number ?? 0);
 
-            const popupUrl = new URL(`${this.lemmaOrigin}${this.idvPopupPath}`);
-            popupUrl.searchParams.set('origin', window.location.origin);
-            popupUrl.searchParams.set('site_id', this.siteId);
-            // 'fresh_idv' forces the popup to run a brand-new identity check
-            // (or the test-mode mock in demo) and re-issue a credential after
-            // a revocation. 'site_proof' keeps the existing master and just
-            // derives a fresh per-site credential.
-            popupUrl.searchParams.set('issue_mode', options.freshIdv ? 'fresh_idv' : 'site_proof');
-            if (options.refreshReason) {
-                popupUrl.searchParams.set('refresh_reason', String(options.refreshReason));
-            }
-            popupUrl.searchParams.set('request_nonce', requestNonce);
-            popupUrl.searchParams.set('session_nonce', sessionNonce);
-            popupUrl.searchParams.set('bloom_sequence', String(bloomSequence));
-            popupUrl.searchParams.set('session_ttl_sec', String(this.sessionTtlSec));
+        const popupUrl = new URL(`${this.lemmaOrigin}${this.idvPopupPath}`);
+        popupUrl.searchParams.set('origin', window.location.origin);
+        popupUrl.searchParams.set('site_id', this.siteId);
+        popupUrl.searchParams.set('issue_mode', options.freshIdv ? 'fresh_idv' : 'site_proof');
+        if (options.refreshReason) {
+            popupUrl.searchParams.set('refresh_reason', String(options.refreshReason));
+        }
+        popupUrl.searchParams.set('request_nonce', requestNonce);
+        popupUrl.searchParams.set('session_nonce', sessionNonce);
+        popupUrl.searchParams.set('bloom_sequence', String(bloomSequence));
+        popupUrl.searchParams.set('session_ttl_sec', String(this.sessionTtlSec));
 
-            const useRedirect = this._isMobileLike();
-            if (useRedirect) {
-                popupUrl.searchParams.set('flow_mode', 'redirect');
-                popupUrl.searchParams.set('redirect_return', window.location.href);
-                window.location.assign(popupUrl.toString());
-                return;
-            }
+        const useRedirect = this._isMobileLike();
+        if (useRedirect) {
+            popupUrl.searchParams.set('flow_mode', 'redirect');
+            popupUrl.searchParams.set('redirect_return', window.location.href);
+            window.location.assign(popupUrl.toString());
+            return new Promise(() => {});
+        }
 
-            const width = 480;
-            const height = 640;
-            const left = Math.max(0, Math.round(window.screenX + (window.outerWidth - width) / 2));
-            const top = Math.max(0, Math.round(window.screenY + (window.outerHeight - height) / 2));
-            const popup = window.open(
-                popupUrl.toString(),
-                'lemma_ishuman_idv',
-                `popup=yes,width=${width},height=${height},left=${left},top=${top}`,
-            );
-
-            if (!popup) {
-                if (this.debug) console.warn('[isHuman] site proof popup blocked — falling back to redirect');
-                popupUrl.searchParams.set('flow_mode', 'redirect');
-                popupUrl.searchParams.set('redirect_return', window.location.href);
-                window.location.assign(popupUrl.toString());
-                return;
-            }
-
-            let settled = false;
-            let gotMessage = false;
-            const finish = (value) => {
-                if (settled) return;
-                settled = true;
-                window.removeEventListener('message', onMessage);
-                clearTimeout(timeoutId);
-                clearInterval(closedTimer);
-                resolve(value);
-            };
-
-            const onMessage = (event) => {
+        return _openManagedLemmaPopup(
+            'idv',
+            (popupToken) => {
+                const url = new URL(popupUrl.toString());
+                url.searchParams.set('popup_token', popupToken);
+                return url.toString();
+            },
+            IDV_POPUP_TIMEOUT_MS,
+            (event, finish, state) => {
                 if (event.origin !== this.lemmaOrigin) return;
                 if (event.data?.type === 'ISHUMAN_SITE_PROOF_ISSUED') {
-                    gotMessage = true;
+                    state.gotMessage = true;
                     const detail = event.data.detail || {};
                     if (detail.request_nonce && detail.request_nonce !== requestNonce) {
                         if (this.debug) console.warn('[isHuman] popup request nonce mismatch');
@@ -1504,127 +1616,77 @@ class IsHumanVerifier {
                     }
                     finish({ ok: true, detail });
                 } else if (event.data?.type === 'ISHUMAN_IDV_CANCELLED') {
-                    gotMessage = true;
+                    state.gotMessage = true;
                     finish({ ok: false, reason: 'idv_cancelled', detail: event.data.detail || null });
                 }
-            };
-
-            const timeoutId = setTimeout(
-                () => finish({ ok: false, reason: 'idv_timeout', detail: null }),
-                IDV_POPUP_TIMEOUT_MS,
-            );
-            const closedTimer = setInterval(() => {
-                if (settled || !popup.closed) return;
-                if (gotMessage) {
-                    finish({ ok: false, reason: 'idv_timeout', detail: null });
-                    return;
-                }
-                finish({ ok: false, reason: 'popup_closed', detail: null });
-            }, 500);
-            window.addEventListener('message', onMessage);
+            },
+        ).then((result) => {
+            if (result?.blocked) {
+                if (this.debug) console.warn('[isHuman] site proof popup blocked — falling back to redirect');
+                popupUrl.searchParams.set('flow_mode', 'redirect');
+                popupUrl.searchParams.set('redirect_return', window.location.href);
+                window.location.assign(popupUrl.toString());
+                return { ok: false, reason: 'redirect_started', detail: null };
+            }
+            return result;
         });
     }
 
     _unlockViaPopup() {
-        return new Promise((resolve) => {
-            const popupUrl = new URL(`${this.lemmaOrigin}${UNLOCK_POPUP_PATH}`);
-            popupUrl.searchParams.set('origin', window.location.origin);
-            popupUrl.searchParams.set('ishuman', '1');
+        const popupUrl = new URL(`${this.lemmaOrigin}${UNLOCK_POPUP_PATH}`);
+        popupUrl.searchParams.set('origin', window.location.origin);
+        popupUrl.searchParams.set('ishuman', '1');
 
-            const width = 420;
-            const height = 560;
-            const left = Math.max(0, Math.round(window.screenX + (window.outerWidth - width) / 2));
-            const top = Math.max(0, Math.round(window.screenY + (window.outerHeight - height) / 2));
-            const popup = window.open(
-                popupUrl.toString(),
-                'lemma_wallet_unlock',
-                `popup=yes,width=${width},height=${height},left=${left},top=${top}`,
-            );
-
-            if (!popup) {
-                if (this.debug) console.warn('[isHuman] wallet unlock popup blocked by browser');
-                resolve(false);
-                return;
-            }
-
-            let settled = false;
-            const finish = async (value, detail) => {
-                if (settled) return;
-                settled = true;
-                window.removeEventListener('message', onMessage);
-                clearTimeout(timeoutId);
-                resolve(value);
-            };
-
-            const onMessage = (event) => {
+        return _openManagedLemmaPopup(
+            'unlock',
+            (popupToken) => {
+                const url = new URL(popupUrl.toString());
+                url.searchParams.set('popup_token', popupToken);
+                return url.toString();
+            },
+            UNLOCK_POPUP_TIMEOUT_MS,
+            (event, finish, state) => {
                 if (event.origin !== this.lemmaOrigin) return;
                 if (event.data?.type === 'LEMMA_UNLOCK_SUCCESS') {
-                    finish(true, event.data);
+                    state.gotMessage = true;
+                    finish(true);
                 } else if (event.data?.type === 'LEMMA_UNLOCK_CANCELLED') {
-                    finish(false, null);
+                    state.gotMessage = true;
+                    finish(false);
                 }
-            };
-
-            const timeoutId = setTimeout(() => finish(false, null), UNLOCK_POPUP_TIMEOUT_MS);
-            window.addEventListener('message', onMessage);
+            },
+        ).then((result) => {
+            if (result === false && this.debug) {
+                // blocked popup is indistinguishable from cancel/timeout here
+            }
+            return result === true;
         });
     }
 
     _provisionViaPopup() {
-        return new Promise((resolve) => {
-            const popupUrl = new URL(`${this.lemmaOrigin}${this.idvPopupPath}`);
-            popupUrl.searchParams.set('origin', window.location.origin);
-            popupUrl.searchParams.set('site_id', this.siteId);
+        const popupUrl = new URL(`${this.lemmaOrigin}${this.idvPopupPath}`);
+        popupUrl.searchParams.set('origin', window.location.origin);
+        popupUrl.searchParams.set('site_id', this.siteId);
 
-            const width = 480;
-            const height = 640;
-            const left = Math.max(0, Math.round(window.screenX + (window.outerWidth - width) / 2));
-            const top = Math.max(0, Math.round(window.screenY + (window.outerHeight - height) / 2));
-            const popup = window.open(
-                popupUrl.toString(),
-                'lemma_ishuman_idv',
-                `popup=yes,width=${width},height=${height},left=${left},top=${top}`,
-            );
-
-            if (!popup) {
-                if (this.debug) console.warn('[isHuman] IDV popup blocked by browser');
-                resolve({ ok: false, detail: null });
-                return;
-            }
-
-            let settled = false;
-            let gotMessage = false;
-            const finish = (value) => {
-                if (settled) return;
-                settled = true;
-                window.removeEventListener('message', onMessage);
-                clearTimeout(timeoutId);
-                clearInterval(closedTimer);
-                resolve(value);
-            };
-
-            const onMessage = (event) => {
+        return _openManagedLemmaPopup(
+            'idv',
+            (popupToken) => {
+                const url = new URL(popupUrl.toString());
+                url.searchParams.set('popup_token', popupToken);
+                return url.toString();
+            },
+            IDV_POPUP_TIMEOUT_MS,
+            (event, finish, state) => {
                 if (event.origin !== this.lemmaOrigin) return;
                 if (event.data?.type === 'ISHUMAN_IDV_COMPLETE') {
-                    gotMessage = true;
+                    state.gotMessage = true;
                     finish({ ok: true, detail: event.data.detail || {} });
                 } else if (event.data?.type === 'ISHUMAN_IDV_CANCELLED') {
-                    gotMessage = true;
-                    finish({ ok: false, detail: event.data.detail || null });
+                    state.gotMessage = true;
+                    finish({ ok: false, detail: event.data.detail || null, reason: 'idv_cancelled' });
                 }
-            };
-
-            const timeoutId = setTimeout(() => finish({ ok: false, detail: null }), IDV_POPUP_TIMEOUT_MS);
-            const closedTimer = setInterval(() => {
-                if (settled || !popup.closed) return;
-                if (gotMessage) {
-                    finish({ ok: false, detail: null });
-                    return;
-                }
-                finish({ ok: false, detail: null, reason: 'popup_closed' });
-            }, 500);
-            window.addEventListener('message', onMessage);
-        });
+            },
+        );
     }
 
     _result(human, ppid, reason, t0, error, presentation) {

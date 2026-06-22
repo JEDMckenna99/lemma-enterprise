@@ -157,13 +157,61 @@
     <script nonce="{{ csp_nonce }}">
         let wallet = null;
         const params = new URLSearchParams(window.location.search);
+        const popupToken = (params.get('popup_token') || '').trim();
         const isHumanIssuance = params.get('ishuman') === '1';
         const issuanceOpts = () => (isHumanIssuance ? { isHumanIssuance: true } : {});
+        const POPUP_IDLE_MS = 15 * 60 * 1000;
+        let unlockSettled = false;
+        let unlockBusy = false;
+        let unlockIdleTimer = null;
+
+        function clearUnlockIdleTimer() {
+            if (unlockIdleTimer) {
+                clearTimeout(unlockIdleTimer);
+                unlockIdleTimer = null;
+            }
+        }
+
+        function isUnlockLifecycleProtected() {
+            return unlockSettled || unlockBusy;
+        }
+
+        function resetUnlockIdleTimer() {
+            clearUnlockIdleTimer();
+            if (isUnlockLifecycleProtected()) return;
+            unlockIdleTimer = setTimeout(() => {
+                if (isUnlockLifecycleProtected()) return;
+                cancelUnlock();
+            }, POPUP_IDLE_MS);
+        }
+
+        function initUnlockLifecycle() {
+            ['click', 'keydown', 'touchstart'].forEach((evt) => {
+                document.addEventListener(evt, resetUnlockIdleTimer, { passive: true });
+            });
+            try {
+                const popupChannel = new BroadcastChannel('lemma-ishuman-popup');
+                popupChannel.onmessage = (event) => {
+                    const data = event.data || {};
+                    if (data.type !== 'ISHUMAN_POPUP_SUPERSEDE') return;
+                    if (data.flow !== 'unlock') return;
+                    if (data.token && data.token === popupToken) return;
+                    if (isUnlockLifecycleProtected()) return;
+                    cancelUnlock();
+                };
+            } catch (err) {
+                console.warn('[Lemma] unlock popup lifecycle channel unavailable:', err.message);
+            }
+            resetUnlockIdleTimer();
+        }
         
         // PRIVACY: Don't display or log referrer
         // The popup just unlocks the wallet, doesn't track which site requested it
         
         async function init() {
+            initUnlockLifecycle();
+            unlockBusy = true;
+            resetUnlockIdleTimer();
             // PRIVACY: Site info hidden - we don't track which site requested unlock
             
             try {
@@ -198,6 +246,9 @@
                 }
             } catch (e) {
                 showStatus('Error: ' + e.message, 'error');
+            } finally {
+                unlockBusy = false;
+                resetUnlockIdleTimer();
             }
         }
         
@@ -210,6 +261,8 @@
         async function unlockWallet() {
             showStatus('🔓 Unlocking...', 'loading');
             document.getElementById('unlock-btn').disabled = true;
+            unlockBusy = true;
+            resetUnlockIdleTimer();
             
             try {
                 const result = await wallet.unlock(issuanceOpts());
@@ -224,12 +277,17 @@
             } catch (e) {
                 showStatus('❌ ' + e.message, 'error');
                 document.getElementById('unlock-btn').disabled = false;
+            } finally {
+                unlockBusy = false;
+                resetUnlockIdleTimer();
             }
         }
         
         async function registerPasskey() {
             showStatus('🔑 Creating passkey...', 'loading');
             document.getElementById('register-btn').disabled = true;
+            unlockBusy = true;
+            resetUnlockIdleTimer();
             
             try {
                 const result = await wallet.registerPasskey(issuanceOpts());
@@ -244,10 +302,15 @@
             } catch (e) {
                 showStatus('❌ ' + e.message, 'error');
                 document.getElementById('register-btn').disabled = false;
+            } finally {
+                unlockBusy = false;
+                resetUnlockIdleTimer();
             }
         }
         
         async function sendSuccessAndClose() {
+            unlockSettled = true;
+            clearUnlockIdleTimer();
             // Send success message to opener with session details
             if (window.opener) {
                 // Get full session info to help bridge sync
@@ -281,6 +344,8 @@
         }
         
         function cancelUnlock() {
+            unlockSettled = true;
+            clearUnlockIdleTimer();
             if (window.opener) {
                 window.opener.postMessage({
                     type: 'LEMMA_UNLOCK_CANCELLED'
