@@ -46,4 +46,9 @@ LEMMA_PERSON_ROOT_SOURCE=document_derived_v1
 
 # New identities get assigned person_root
 LEMMA_PERSON_ROOT_SOURCE=assigned_v1
+
+# Document-root claim schema (default v2 includes issuing_subdivision)
+LEMMA_DOCUMENT_ROOT_SCHEMA=v2
 ```
+
+See also: document attestation fields on `lemma_document_roots` (expiration, subdivision, encrypted DOB) for age/state policy gates without re-IDV.

@@ -22,6 +22,7 @@ from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 
 DOCUMENT_ROOT_SCHEMA = "lemma.identity.document-root.v1"
+DOCUMENT_ROOT_SCHEMA_V2 = "lemma.identity.document-root.v2"
 PERSON_ROOT_VERSION = "v1"
 PERSON_ROOT_HKDF_INFO = b"lemma.id/person-root/v1"
 SITE_PPID_MSG_PREFIX = "lemma.id/site-ppid/v1"
@@ -45,7 +46,8 @@ class StripeIdentityRootMaterial:
     document_type: str
     document_number: str
     date_of_birth: str  # YYYY-MM-DD
-    document_expiration_date: Optional[str] = None  # YYYY-MM-DD from IDV; not in document_root
+    document_expiration_date: Optional[str] = None  # YYYY-MM-DD from IDV
+    issuing_subdivision: Optional[str] = None  # ISO 3166-2 style, e.g. US-CA
     id_number_type: Optional[str] = None
     id_number_last4: Optional[str] = None
     stripe_session_id: Optional[str] = None
@@ -60,6 +62,17 @@ def active_root_version() -> str:
     and setting ``LEMMA_ACTIVE_ROOT_VERSION``.
     """
     return (os.environ.get("LEMMA_ACTIVE_ROOT_VERSION") or PERSON_ROOT_VERSION).strip()
+
+
+def document_root_schema() -> str:
+    """Claim-set schema for new document roots (v2 adds ``issuing_subdivision``).
+
+    Env: ``LEMMA_DOCUMENT_ROOT_SCHEMA=v2`` (default) or ``v1`` for legacy bytes.
+    """
+    mode = (os.environ.get("LEMMA_DOCUMENT_ROOT_SCHEMA") or "v2").strip().lower()
+    if mode in ("v1", "1", "legacy", "document_derived_v1"):
+        return DOCUMENT_ROOT_SCHEMA
+    return DOCUMENT_ROOT_SCHEMA_V2
 
 
 def _is_v1(version: str) -> bool:
@@ -145,12 +158,7 @@ def normalize_document_number(value: str) -> str:
 
 
 def normalize_document_expiration_date(value: Any) -> Optional[str]:
-    """Parse IDV document expiration to YYYY-MM-DD.
-
-    Returns ``None`` when the field is absent or unparseable. Expiration is
-    optional metadata used for master-credential TTL — it is never part of
-    ``document_root`` claims.
-    """
+    """Parse IDV document expiration to YYYY-MM-DD (returns None if absent/invalid)."""
     if value is None:
         return None
     if isinstance(value, dict):
@@ -205,9 +213,21 @@ def format_dob_from_stripe(dob: Any) -> str:
     return f"{year:04d}-{month:02d}-{day:02d}"
 
 
+def age_years_from_dob(date_of_birth: str, *, on: Optional[datetime] = None) -> int:
+    """Whole years since ``date_of_birth`` (YYYY-MM-DD) for policy gates."""
+    ref = on or datetime.utcnow()
+    year, month, day = (int(part) for part in date_of_birth.split("-"))
+    years = ref.year - year
+    if (ref.month, ref.day) < (month, day):
+        years -= 1
+    return years
+
+
 def build_document_root_claims(
     material: StripeIdentityRootMaterial,
     provider: str = "stripe_identity",
+    *,
+    schema: str | None = None,
 ) -> dict[str, Any]:
     """Build the canonical document-root claim set.
 
@@ -216,15 +236,33 @@ def build_document_root_claims(
     derives a distinct document_root and therefore a distinct person_root/PPID
     (Phase 3.2 Option A: provider-namespaced identities). Defaults to
     ``stripe_identity`` so the pinned Stripe invariants stay byte-stable.
+
+    Schema v2 adds ``issuing_subdivision`` when present (required for US/CA/AU
+    driving licences) to avoid cross-jurisdiction document-number collisions.
     """
+    from api.issuing_subdivision import requires_issuing_subdivision
+
+    schema_id = schema or document_root_schema()
+    country = normalize_country(material.country)
+    document_type = normalize_document_type(material.document_type)
     claims: dict[str, Any] = {
-        "schema": DOCUMENT_ROOT_SCHEMA,
+        "schema": schema_id,
         "provider": provider,
-        "country": normalize_country(material.country),
-        "document_type": normalize_document_type(material.document_type),
+        "country": country,
+        "document_type": document_type,
         "document_number": normalize_document_number(material.document_number),
         "date_of_birth": material.date_of_birth,
     }
+    if schema_id == DOCUMENT_ROOT_SCHEMA_V2:
+        subdivision = (material.issuing_subdivision or "").strip().upper() or None
+        if requires_issuing_subdivision(country, document_type):
+            if not subdivision:
+                raise IdentityRootMaterialError(
+                    f"issuing_subdivision required for {country} {document_type}"
+                )
+            claims["issuing_subdivision"] = subdivision
+        elif subdivision:
+            claims["issuing_subdivision"] = subdivision
     if material.id_number_type:
         claims["id_number_type"] = str(material.id_number_type).strip().lower()
     if material.id_number_last4:
@@ -324,6 +362,15 @@ def extract_root_material_from_stripe_session(session: Any) -> StripeIdentityRoo
     doc_number = _doc_field("number")
     doc_type = _doc_field("type")
     document_expiration_date = normalize_document_expiration_date(_doc_field("expiration_date"))
+    from api.issuing_subdivision import extract_stripe_issuing_subdivision
+
+    raw_country = str(country or "").strip()
+    country_alpha2 = normalize_country(raw_country) if raw_country else ""
+    issuing_subdivision = extract_stripe_issuing_subdivision(
+        country_alpha2=country_alpha2,
+        document=document,
+        verified=verified,
+    )
 
     id_number = getattr(verified, "id_number", None) if not isinstance(verified, dict) else verified.get("id_number")
     id_number_type = (
@@ -334,11 +381,12 @@ def extract_root_material_from_stripe_session(session: Any) -> StripeIdentityRoo
     report_id = getattr(report, "id", None) if not isinstance(report, dict) else report.get("id")
 
     return StripeIdentityRootMaterial(
-        country=str(country or ""),
+        country=country_alpha2 or raw_country,
         document_type=str(doc_type or ""),
         document_number=str(doc_number or ""),
         date_of_birth=dob,
         document_expiration_date=document_expiration_date,
+        issuing_subdivision=issuing_subdivision,
         id_number_type=str(id_number_type) if id_number_type else None,
         id_number_last4=str(id_number)[-4:] if id_number else None,
         stripe_session_id=str(session_id) if session_id else None,
@@ -446,8 +494,11 @@ def extract_root_material_from_didit_decision(decision: dict[str, Any]) -> Strip
     if idv is None:
         raise IdentityRootMaterialError("no approved didit id_verification")
 
-    country = map_didit_country(idv.get("issuing_state") or idv.get("issuing_country") or "")
+    country = map_didit_country(idv.get("issuing_country") or idv.get("issuing_state") or "")
     document_type = map_didit_document_type(idv.get("document_type") or "")
+    from api.issuing_subdivision import extract_didit_issuing_subdivision
+
+    issuing_subdivision = extract_didit_issuing_subdivision(idv, country)
     document_number = str(idv.get("document_number") or "")
     if not document_number:
         raise IdentityRootMaterialError("didit id_verification missing document_number")
@@ -460,6 +511,7 @@ def extract_root_material_from_didit_decision(decision: dict[str, Any]) -> Strip
         document_number=document_number,
         date_of_birth=dob,
         document_expiration_date=document_expiration_date,
+        issuing_subdivision=issuing_subdivision,
         stripe_session_id=None,
         stripe_report_id=None,
     )

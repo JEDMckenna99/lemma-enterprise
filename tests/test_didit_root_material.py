@@ -95,6 +95,16 @@ def test_extract_picks_approved_entry_and_normalizes():
 
 
 @pytest.mark.unit
+def test_extract_us_dl_subdivision_from_subtype():
+    decision = _approved_poh_decision(
+        document_type="Driver's License",
+        document_subtype="CALIFORNIA_DRIVER_LICENSE_GENERIC",
+    )
+    material = extract_root_material_from_didit_decision(decision)
+    assert material.issuing_subdivision == "US-CA"
+
+
+@pytest.mark.unit
 def test_extract_reads_document_expiration_date():
     decision = _approved_poh_decision(expiration_date="2031-06-02")
     material = extract_root_material_from_didit_decision(decision)

@@ -44,6 +44,7 @@ class ResolvedLemmaPerson:
     document_country: Optional[str] = None
     document_type: Optional[str] = None
     document_expiration_date: Optional[str] = None
+    issuing_subdivision: Optional[str] = None
     merged_from_person_id: Optional[str] = None
     document_attached: bool = False
 
@@ -68,6 +69,7 @@ def _add_document_link(
     material: StripeIdentityRootMaterial,
     claims: dict,
 ) -> None:
+    from api.column_crypto import encrypt_column
     from api.database import LemmaDocumentRoot
 
     db.add(
@@ -80,6 +82,10 @@ def _add_document_link(
             stripe_verification_report_id=material.stripe_report_id,
             document_country=claims.get("country"),
             document_type=claims.get("document_type"),
+            issuing_subdivision=claims.get("issuing_subdivision") or material.issuing_subdivision,
+            document_expiration_date=material.document_expiration_date,
+            date_of_birth=encrypt_column(material.date_of_birth) if material.date_of_birth else None,
+            document_root_schema=claims.get("schema"),
             confidence_level=CONFIDENCE_DOCUMENT_ROOT_V1,
         )
     )
@@ -225,6 +231,7 @@ def resolve_or_create_person_from_material(
         document_country=claims.get("country"),
         document_type=claims.get("document_type"),
         document_expiration_date=material.document_expiration_date,
+        issuing_subdivision=material.issuing_subdivision,
         merged_from_person_id=merged_from_person_id,
         document_attached=document_attached,
     )
@@ -303,8 +310,36 @@ def material_from_test_fixture(**kwargs) -> StripeIdentityRootMaterial:
         document_number=kwargs.get("document_number", "X12345678"),
         date_of_birth=kwargs.get("date_of_birth", "1990-01-15"),
         document_expiration_date=kwargs.get("document_expiration_date"),
+        issuing_subdivision=kwargs.get("issuing_subdivision"),
         id_number_type=kwargs.get("id_number_type", "us_ssn"),
         id_number_last4=kwargs.get("id_number_last4", "1234"),
         stripe_session_id=kwargs.get("stripe_session_id"),
         stripe_report_id=kwargs.get("stripe_report_id"),
     )
+
+
+def load_latest_person_idv_attributes(db, lemma_person_id: str) -> Optional[dict]:
+    """Latest active document row for age/state policy gates (no re-IDV)."""
+    from api.column_crypto import decrypt_column
+    from api.database import LemmaDocumentRoot
+    from api.identity_roots import age_years_from_dob
+
+    row = (
+        db.query(LemmaDocumentRoot)
+        .filter_by(lemma_person_id=lemma_person_id)
+        .filter(LemmaDocumentRoot.revoked_at.is_(None))
+        .order_by(LemmaDocumentRoot.created_at.desc())
+        .first()
+    )
+    if not row:
+        return None
+    dob = decrypt_column(row.date_of_birth) if row.date_of_birth else None
+    return {
+        "document_country": row.document_country,
+        "document_type": row.document_type,
+        "issuing_subdivision": row.issuing_subdivision,
+        "document_expiration_date": row.document_expiration_date,
+        "date_of_birth": dob,
+        "age_years": age_years_from_dob(dob) if dob else None,
+        "document_root_schema": row.document_root_schema,
+    }

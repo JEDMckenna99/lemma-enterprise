@@ -520,6 +520,11 @@ def _complete_verified_ishuman_from_didit(
     record.document_root_hash = encrypt_column(resolved.document_root_hash)
     record.root_version = active_root_version()
     record.confidence_level = resolved.confidence_level
+    record.metadata_json = {
+        **(record.metadata_json or {}),
+        "issuing_subdivision": resolved.issuing_subdivision,
+        "document_expiration_date": resolved.document_expiration_date,
+    }
 
     try:
         _maybe_store_seed_envelopes(record, wallet_id, resolved.person_root_hash)
