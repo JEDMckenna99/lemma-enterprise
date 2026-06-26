@@ -79,7 +79,7 @@
         <div style="max-width: 860px; margin: 0 auto; text-align: center;">
             <p style="font-size: var(--font-size-sm); font-weight: 600; text-transform: uppercase; letter-spacing: 2px; color: var(--primary); margin-bottom: 16px;">Trust &amp; transparency</p>
             <h1 style="font-size: clamp(2.5rem, 5vw, 3.5rem); line-height: 1.1; margin-bottom: 24px;">Identity-grade enforcement<br>without identity-grade liability.</h1>
-            <p style="font-size: var(--font-size-xl); font-weight: 500; margin-bottom: var(--space-4); color: var(--gray-700);">lemma.id is a <strong>personal data minimizer</strong> — not a neutral pipe and not a surveillance network. We hold the minimum derived identifiers needed to make bans stick; your site holds an opaque per-site ID; users carry signed credentials in their browser wallet. Everyone knows what each party stores, processes, and never sees.</p>
+            <p style="font-size: var(--font-size-xl); font-weight: 500; margin-bottom: var(--space-4); color: var(--gray-700);">lemma.id is a <strong>personal data minimizer</strong> — not a neutral pipe and not a surveillance network. Each site sees only its own private ID for a verified human; users do not reveal their name, document, selfie, date of birth, or a reusable cross-site ID. Everyone knows what each party stores, processes, and never sees.</p>
             <div style="display: flex; gap: 16px; justify-content: center; flex-wrap: wrap; margin-top: 28px;">
                 <a href="/docs/ishuman" class="btn btn-primary">Integration docs</a>
                 <a href="/privacy" class="btn btn-secondary">Privacy policy</a>
@@ -94,7 +94,7 @@
         <div style="text-align: center; margin-bottom: 48px;">
             <p style="font-size: var(--font-size-sm); font-weight: 700; text-transform: uppercase; letter-spacing: 2px; color: var(--primary); margin-bottom: 12px;">Data footprint</p>
             <h2>What each party actually holds</h2>
-            <p class="text-gray" style="max-width: 720px; margin: 16px auto 0;">The privacy win is practical and bounded: relying sites avoid becoming KYC operators, users avoid a reusable global ID, and lemma.id stores derived anchors — not raw government documents.</p>
+            <p class="text-gray" style="max-width: 720px; margin: 16px auto 0;">The privacy win is practical and bounded: relying sites avoid becoming KYC operators, users avoid a reusable global ID, and lemma.id keeps only the internal linkage needed for issuance, recovery, and revocation — not raw government documents.</p>
         </div>
         <div class="trust-footprint" style="max-width: 960px; margin: 0 auto;">
             <div class="trust-footprint-item">
@@ -105,8 +105,8 @@
             </div>
             <div class="trust-footprint-item" style="border-color: var(--primary);">
                 <span class="trust-badge trust-badge--neutral">lemma.id</span>
-                <div class="trust-footprint-size">~200 bytes</div>
-                <h3>Derived identity anchors</h3>
+                <div class="trust-footprint-size">Minimal</div>
+                <h3>Internal verification linkage</h3>
                 <p style="color: var(--gray-600); font-size: var(--font-size-sm); margin: 0;">Encrypted hashes derived from IDV outcomes, plus wallet↔person linkage for revocation. No raw documents, face images, or legal name at rest.</p>
             </div>
             <div class="trust-footprint-item">
@@ -207,7 +207,7 @@
 
                 <p style="font-size: var(--font-size-lg); color: var(--gray-700); line-height: 1.7; margin-bottom: 20px;"><strong>What lemma.id persists:</strong> HMAC-derived document and person-root hashes (encrypted at rest), wallet↔person bindings, per-site PPID mappings for revocation, and verification metadata. This is roughly <strong>200 bytes of derived identifiers per person</strong> — not a document vault.</p>
 
-                <p style="font-size: var(--font-size-lg); color: var(--gray-700); line-height: 1.7; margin-bottom: 20px;"><strong>What lemma.id does not expose to sites:</strong> cross-site linkage. Sites receive only their own PPID. Lemma can correlate identities internally on the <em>enforcement plane</em> (revocation) — by design, so network-wide bans work — but that linkage is never returned to relying sites.</p>
+                <p style="font-size: var(--font-size-lg); color: var(--gray-700); line-height: 1.7; margin-bottom: 20px;"><strong>What lemma.id does not expose to sites:</strong> cross-site linkage. Sites receive only their own PPID. Relying sites can block their own site-private IDs; for severe abuse, lemma.id can support operator-reviewed network revocation internally, but that cross-site linkage is never returned to relying sites.</p>
 
                 <p style="font-size: var(--font-size-lg); color: var(--gray-700); line-height: 1.7; margin-bottom: 20px;"><strong>No advertising to end users:</strong> lemma.id does not use verification outcomes, credentials, wallet data, or PPIDs to advertise to people who verify through Lemma-powered sites. We do not monetize end-user identity data through ad targeting — on lemma.id or elsewhere. Product analytics and fraud prevention are separate from marketing; developer accounts may still receive service communications under our <a href="/privacy">privacy policy</a>.</p>
 
