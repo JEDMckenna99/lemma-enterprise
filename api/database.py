@@ -750,8 +750,10 @@ class LemmaDocumentRoot(Base):
     provider = Column(String, default='stripe_identity')
     stripe_verification_session_id = Column(String, index=True)
     stripe_verification_report_id = Column(String)
-    document_country = Column(String(8))
-    document_type = Column(String(32))
+    provider_session_id_hash = Column(String(80), index=True)
+    provider_report_id_hash = Column(String(80))
+    document_country = Column(String(255))  # encrypted at rest (ISO country)
+    document_type = Column(String(255))  # encrypted at rest (document enum)
     issuing_subdivision = Column(String(255))  # encrypted at rest (e.g. US-CA)
     document_expiration_date = Column(String(255))  # encrypted at rest (YYYY-MM-DD)
     date_of_birth = Column(String(255))  # encrypted at rest (YYYY-MM-DD)
@@ -810,6 +812,7 @@ class IsHumanVerification(Base):
     # v2 (Phase 3.2): generic upstream IDV session id for any issuer. The didit
     # webhook looks up records by this column (Stripe keys on stripe_session_id).
     provider_session_id = Column(String, index=True)
+    provider_session_id_hash = Column(String(80), index=True)
     wallet_id = Column(String, index=True)
     ppid = Column(String, index=True)
     credential_id = Column(String, index=True)

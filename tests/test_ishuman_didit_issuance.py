@@ -67,6 +67,7 @@ def test_start_verification_routes_to_didit(
     assert len(rows) == 1
     assert rows[0].issuer_id == "didit"
     assert rows[0].provider_session_id == "didit_sess_abc"
+    assert rows[0].provider_session_id_hash is None
     assert rows[0].stripe_session_id is None
     assert rows[0].status == "pending"
 
@@ -133,8 +134,11 @@ def test_didit_webhook_verified_issues_master(
     monkeypatch,
 ):
     from api.database import IsHumanVerification
+    from api.privacy_hashes import reset_provider_hash_key_cache
 
     db = fake_ishuman_db_session_factory
+    monkeypatch.setenv("LEMMA_PROVIDER_ID_HASH_KEY", "p" * 40)
+    reset_provider_hash_key_cache()
     db.store.data["IsHumanVerification"].append(
         make_ishuman_verification(
             session_id="ishuman_sess_didit_2",
@@ -205,7 +209,12 @@ def test_didit_webhook_verified_issues_master(
     assert row.metadata_json["credential_issuer_did"] == "did:lemma:issuer:test"
     # process-and-purge: the upstream didit session is deleted after issuance.
     assert purged["session_id"] == "didit_sess_002"
+    assert row.provider_session_id is None
+    assert row.provider_session_id_hash
+    assert row.provider_session_id_hash.startswith("ph1:")
     assert row.metadata_json["didit_purged_at"]
+    assert "decision" not in row.metadata_json
+    assert "document_number" not in row.metadata_json
 
 
 @pytest.mark.integration
@@ -216,8 +225,11 @@ def test_didit_webhook_terminal_failure_purges_session(
     monkeypatch,
 ):
     from api.database import IsHumanVerification
+    from api.privacy_hashes import reset_provider_hash_key_cache
 
     db = fake_ishuman_db_session_factory
+    monkeypatch.setenv("LEMMA_PROVIDER_ID_HASH_KEY", "p" * 40)
+    reset_provider_hash_key_cache()
     db.store.data["IsHumanVerification"].append(
         make_ishuman_verification(
             session_id="ishuman_sess_didit_fail",
@@ -258,6 +270,9 @@ def test_didit_webhook_terminal_failure_purges_session(
     row = db.store.data[IsHumanVerification.__name__][0]
     assert row.status == "abandoned"
     assert purged["session_id"] == "didit_sess_fail"
+    assert row.provider_session_id is None
+    assert row.provider_session_id_hash
+    assert row.provider_session_id_hash.startswith("ph1:")
     assert row.metadata_json["didit_purged_at"]
 
 

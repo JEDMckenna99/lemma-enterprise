@@ -105,3 +105,20 @@ def test_person_root_hash_stored_encrypted_and_readable(
 
     recovered = load_person_root_bytes(session, resolved.person_id)
     assert recovered == bytes.fromhex(resolved.person_root_hash)
+
+
+@pytest.mark.unit
+def test_provider_identifier_hash_is_keyed_and_stable(monkeypatch):
+    from api.privacy_hashes import hash_provider_identifier, reset_provider_hash_key_cache
+
+    monkeypatch.setenv("LEMMA_PROVIDER_ID_HASH_KEY", "h" * 40)
+    reset_provider_hash_key_cache()
+
+    first = hash_provider_identifier("didit", "didit_sess_123", label="session")
+    second = hash_provider_identifier("didit", "didit_sess_123", label="session")
+    other_label = hash_provider_identifier("didit", "didit_sess_123", label="report")
+
+    assert first == second
+    assert first != other_label
+    assert first.startswith("ph1:")
+    assert "didit_sess_123" not in first

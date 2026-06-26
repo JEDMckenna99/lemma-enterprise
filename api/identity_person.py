@@ -71,8 +71,19 @@ def _add_document_link(
 ) -> None:
     from api.column_crypto import encrypt_column
     from api.database import LemmaDocumentRoot
+    from api.privacy_hashes import hash_provider_identifier
 
     subdivision = claims.get("issuing_subdivision") or material.issuing_subdivision
+    provider_session_hash = hash_provider_identifier(
+        provider,
+        material.stripe_session_id,
+        label="session",
+    )
+    provider_report_hash = hash_provider_identifier(
+        provider,
+        material.stripe_report_id,
+        label="report",
+    )
 
     db.add(
         LemmaDocumentRoot(
@@ -80,10 +91,12 @@ def _add_document_link(
             lemma_person_id=person_id,
             root_version=root_version,
             provider=provider,
-            stripe_verification_session_id=material.stripe_session_id,
-            stripe_verification_report_id=material.stripe_report_id,
-            document_country=claims.get("country"),
-            document_type=claims.get("document_type"),
+            stripe_verification_session_id=None,
+            stripe_verification_report_id=None,
+            provider_session_id_hash=provider_session_hash,
+            provider_report_id_hash=provider_report_hash,
+            document_country=encrypt_column(claims.get("country")) if claims.get("country") else None,
+            document_type=encrypt_column(claims.get("document_type")) if claims.get("document_type") else None,
             issuing_subdivision=encrypt_column(subdivision) if subdivision else None,
             document_expiration_date=encrypt_column(material.document_expiration_date)
             if material.document_expiration_date
@@ -338,13 +351,15 @@ def load_latest_person_idv_attributes(db, lemma_person_id: str) -> Optional[dict
     if not row:
         return None
     dob = decrypt_column(row.date_of_birth) if row.date_of_birth else None
+    country = decrypt_column(row.document_country) if row.document_country else None
+    doc_type = decrypt_column(row.document_type) if row.document_type else None
     subdivision = decrypt_column(row.issuing_subdivision) if row.issuing_subdivision else None
     expiration = (
         decrypt_column(row.document_expiration_date) if row.document_expiration_date else None
     )
     return {
-        "document_country": row.document_country,
-        "document_type": row.document_type,
+        "document_country": country,
+        "document_type": doc_type,
         "issuing_subdivision": subdivision,
         "document_expiration_date": expiration,
         "date_of_birth": dob,

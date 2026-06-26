@@ -262,7 +262,7 @@ def signup():
 </div>
 
 <div class="docs-section" id="attach-to-your-logs">
-    <h2>Attach verification to your own logs</h2>
+    <h2>Attach the verification to your own logs</h2>
     <p>Once a user is verified, associate their site-scoped PPID with actions you record — a comment, checkout, login, moderation decision. The SDK provides helpers to stamp events. This data lives entirely in <strong>your</strong> systems; lemma.id stores none of it.</p>
 
     <div class="callout callout--info">
@@ -312,14 +312,14 @@ def signup():
             <span>JavaScript</span>
             <button class="copy-btn">Copy</button>
         </div>
-        <code>const verifier = new IsHumanVerifier({ siteId: 'app.example.com' });
+        <code>const ih = new IsHumanVerifier({ siteId: 'app.example.com' });
 
 // 1) Verify once at an entry point (may open a popup on first visit).
-await verifier.verify({ autoProvision: true });
+await ih.verify({ autoProvision: true });
 
 // 2) Stamp actions and POST to YOUR backend.
 async function logAction(action, extra = {}) {
-  const event = await verifier.stamp({ action, ...extra, at: Date.now() }, { includeCredential: true });
+  const event = await ih.stamp({ action, ...extra, at: Date.now() }, { includeCredential: true });
   await fetch('/my/api/audit-log', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -329,7 +329,7 @@ async function logAction(action, extra = {}) {
 
 await logAction('post_comment', { commentId: 123 });
 
-const ppid = await verifier.getPPID();</code>
+const ppid = await ih.getPPID();</code>
     </div>
 
     <h3>Re-verify a stored stamp on your backend</h3>

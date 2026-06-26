@@ -94,12 +94,15 @@ def test_wallet_person_binding_conflict_fails_closed():
     )
 
     binding = SimpleNamespace(wallet_id="wallet_a", lemma_person_id="person_old")
+    existing_link = SimpleNamespace(lemma_person_id="person_new")
     db = SimpleNamespace(
         query=lambda model: SimpleNamespace(
             filter_by=lambda **kwargs: SimpleNamespace(
                 first=lambda: (
                     binding
                     if kwargs.get("wallet_id") == "wallet_a"
+                    else existing_link
+                    if "document_root_hash" in kwargs
                     else None
                 )
             ),
@@ -227,12 +230,19 @@ def test_pull_issue_short_circuits_when_already_verified():
 def test_pull_issue_issues_on_approved_decision(monkeypatch):
     import api.ishuman as ish
     import api.config as config
+    from api.privacy_hashes import reset_provider_hash_key_cache
 
     monkeypatch.setattr(config, "is_ishuman_pull_fallback_enabled", lambda: True)
+    monkeypatch.setattr(config, "is_ishuman_didit_purge_enabled", lambda: True)
+    monkeypatch.setenv("LEMMA_PROVIDER_ID_HASH_KEY", "p" * 40)
+    reset_provider_hash_key_cache()
 
     class _Mgr:
         def retrieve_session_decision(self, _sid):
             return {"success": True, "status": "approved", "decision": {"ok": 1}}
+
+        def purge_verification_data(self, session_id, *, vendor_data=None):
+            return {"success": True, "session_id": session_id, "vendor_data": vendor_data}
 
     import billing.didit_manager as dm
     monkeypatch.setattr(dm, "DiditManager", _Mgr)
@@ -250,15 +260,21 @@ def test_pull_issue_issues_on_approved_decision(monkeypatch):
         credential_id=None,
         issuer_id="didit",
         provider_session_id="sess_1",
+        provider_session_id_hash=None,
         wallet_id="wallet_1",
         metadata_json={},
+        expires_at=None,
     )
     db = _FakeDb()
     assert ish._maybe_pull_issue_didit(db, record) is True
     assert record.status == "verified"
     assert record.credential_id == "ishuman_master_pulled"
     assert record.metadata_json["issued_via"] == "pull_fallback"
-    assert db.commits == 1
+    assert record.metadata_json["didit_purged_at"]
+    assert record.provider_session_id is None
+    assert record.provider_session_id_hash
+    assert record.provider_session_id_hash.startswith("ph1:")
+    assert db.commits == 2
 
 
 @pytest.mark.unit

@@ -638,6 +638,15 @@ def _purge_didit_session_after_issuance(db, record) -> None:
         return
     meta = record.metadata_json or {}
     if meta.get("didit_purged_at"):
+        _scrub_terminal_provider_identifiers(record, session_id)
+        try:
+            db.commit()
+        except Exception:
+            db.rollback()
+            logger.exception(
+                "Failed to scrub provider identifier for already-purged session %s",
+                session_id,
+            )
         return
 
     try:
@@ -660,6 +669,7 @@ def _purge_didit_session_after_issuance(db, record) -> None:
         )
         return
 
+    _scrub_terminal_provider_identifiers(record, session_id)
     record.metadata_json = {
         **meta,
         "didit_purged_at": datetime.utcnow().isoformat() + "Z",
@@ -672,6 +682,20 @@ def _purge_didit_session_after_issuance(db, record) -> None:
             "Failed to persist didit purge marker for session %s", session_id
         )
     logger.info("Purged upstream didit session %s after issuance", session_id)
+
+
+def _scrub_terminal_provider_identifiers(record, session_id: str) -> None:
+    """Keep only a keyed hash of the upstream provider session id."""
+    from api.privacy_hashes import hash_provider_identifier
+
+    provider = getattr(record, "issuer_id", None) or "didit"
+    if not getattr(record, "provider_session_id_hash", None):
+        record.provider_session_id_hash = hash_provider_identifier(
+            provider,
+            session_id,
+            label="session",
+        )
+    record.provider_session_id = None
 
 
 def resolve_wallet_id_for_ppid(db, ppid: str) -> Optional[str]:
@@ -1812,6 +1836,12 @@ def erase_identity():
             v.wallet_seed_envelope = None
             v.person_root_proxy_envelope = None
             v.seed_version = None
+            if hasattr(v, "provider_session_id_hash"):
+                v.provider_session_id_hash = None
+            if hasattr(v, "provider_session_id"):
+                v.provider_session_id = None
+            if hasattr(v, "stripe_session_id"):
+                v.stripe_session_id = None
             v.metadata_json = {"erased": True, "erased_at": datetime.utcnow().isoformat()}
             scrubbed += 1
 
