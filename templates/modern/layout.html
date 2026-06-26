@@ -29,6 +29,8 @@ h1{color:#1e293b;font-weight:600;line-height:1.25;margin-bottom:16px;font-size:4
 .nav-right{display:flex;gap:16px;align-items:center;margin-left:auto}
 .btn{display:inline-flex;align-items:center;justify-content:center;padding:12px 24px;border-radius:8px;font-weight:500;font-size:17px;text-decoration:none;border:none;cursor:pointer}
 .btn-primary{background:linear-gradient(135deg,#667eea,#764ba2);color:#fff}
+@media(max-width:1180px){.nav-container{padding:0 18px}.nav-center{gap:24px;margin-left:36px}.nav-link{font-size:16px}.nav-right .btn{padding:10px 18px}}
+@media(max-width:1040px){.mobile-menu-toggle{display:flex}.nav-center{position:absolute;top:76px;left:0;right:0;background:#fff;flex-direction:column;padding:16px 24px;gap:0;margin-left:0;border-bottom:1px solid #f1f5f9;box-shadow:0 10px 40px rgba(0,0,0,0.1);display:none;z-index:99}.nav-center.mobile-open{display:flex}.nav-center .nav-link{padding:14px 0;border-bottom:1px solid #f1f5f9;width:100%}.nav-center .nav-link:last-child{border-bottom:none}}
 .container{max-width:1200px;margin:0 auto;padding:0 24px}
 .hero{background:linear-gradient(135deg,#1e293b,#0f172a);color:#fff;padding:80px 0 100px;text-align:center}
 .hero h1{color:#fff;font-size:clamp(32px,5vw,56px);font-weight:700;margin-bottom:24px}
@@ -74,7 +76,6 @@ h1{color:#1e293b;font-weight:600;line-height:1.25;margin-bottom:16px;font-size:4
                 <a href="/docs" class="nav-link">Docs</a>
                 <a href="/pricing" class="nav-link" id="nav-pricing">Pricing</a>
                 <a href="/trust" class="nav-link">Trust</a>
-                <a href="/partners" class="nav-link">For IDV Providers</a>
                 <a href="/about" class="nav-link">About</a>
                 {% if not is_public_page %}
                 <a href="/admin" class="nav-link" id="nav-admin" style="display:none;">Admin</a>
@@ -145,6 +146,8 @@ h1{color:#1e293b;font-weight:600;line-height:1.25;margin-bottom:16px;font-size:4
                     <span style="color: var(--gray-400);">|</span>
                     <a href="/trust" style="color: var(--gray-600); text-decoration: none; margin: 0 12px;">Trust</a>
                     <span style="color: var(--gray-400);">|</span>
+                    <a href="/partners" style="color: var(--gray-600); text-decoration: none; margin: 0 12px;">IDV Providers</a>
+                    <span style="color: var(--gray-400);">|</span>
                     <a href="/privacy" style="color: var(--gray-600); text-decoration: none; margin: 0 12px;">Privacy Policy</a>
                     <span style="color: var(--gray-400);">|</span>
                     <a href="/docs" style="color: var(--gray-600); text-decoration: none; margin: 0 12px;">Documentation</a>
@@ -189,7 +192,13 @@ h1{color:#1e293b;font-weight:600;line-height:1.25;margin-bottom:16px;font-size:4
 .logout-item:hover{background:#fef2f2}
 
 /* Mobile Responsive */
-@media(max-width:768px){
+@media(max-width:1180px){
+    .nav-container{padding:0 18px}
+    .nav-center{gap:24px;margin-left:36px}
+    .nav-link{font-size:16px}
+    .nav-right .btn{padding:10px 18px}
+}
+@media(max-width:1040px){
     .mobile-menu-toggle{display:flex}
     .nav-center{position:absolute;top:76px;left:0;right:0;background:#fff;flex-direction:column;padding:16px 24px;gap:0;margin-left:0;border-bottom:1px solid #f1f5f9;box-shadow:0 10px 40px rgba(0,0,0,0.1);display:none;z-index:99}
     .nav-center.mobile-open{display:flex}
