@@ -2,7 +2,7 @@
 {% set is_public_page = true %}
 
 {% block title %}Pricing - lemma.id{% endblock %}
-{% block description %}lemma.id pricing: $0.35 per first site credential issuance, then $0.01 per monthly active user. Unlimited local verification.{% endblock %}
+{% block description %}lemma.id pricing: $0.35 for a user's first verified-human binding on your site, then $0.01 per monthly active user. Unlimited local verification.{% endblock %}
 
 {% block head %}
 {{ super() }}
@@ -294,12 +294,12 @@
 {% block content %}
 <div class="pricing-hero">
     <h1>Simple pricing</h1>
-    <p class="subtitle">Pay when a user gets their first site credential. Pay a small MAU fee only when they come back.</p>
+    <p class="subtitle">Pay when a user receives their first verified-human binding for your site. Pay a small MAU fee only when they come back.</p>
     <p class="description">Unlimited local verification on your servers — no per-check fee. lemma.id is only in the loop when a user needs a new or renewed site credential (about once per month).</p>
     <div class="pricing-hero-highlight">
         <div class="pricing-hero-stat">
             <span class="amount">$0.35</span>
-            <span class="label">first site credential per user</span>
+            <span class="label">first human binding per user</span>
         </div>
         <div class="pricing-hero-stat">
             <span class="amount">$0.01</span>
@@ -318,13 +318,13 @@
 
 <div class="lemma-pricing">
     <h2>How billing works</h2>
-    <p class="intro">Each user gets a site-specific credential (a lemma with their PPID as subject). You are billed on issuance and on monthly activity — not on every login or verification.</p>
+    <p class="intro">Each user gets a verified-human binding for your site: a stable private ID that lets you recognize the same human again without receiving their identity documents or a cross-site account ID. You are billed on issuance and monthly activity — not on every login or verification.</p>
 
     <div class="lemma-pricing-grid">
         <div class="lemma-price-card featured">
-            <h3>Initial site issuance</h3>
+            <h3>Initial human binding</h3>
             <p class="price">$0.35 / user / site</p>
-            <p>Charged once when a user receives their <strong>first site credential</strong> for your site — the lemma.id popup flow that binds their site-private PPID to your domain after one-time identity verification.</p>
+            <p>Charged once when a user receives their <strong>first verified-human binding</strong> for your site — the lemma.id popup flow that creates a site-private human ID for your domain after one-time identity verification.</p>
         </div>
         <div class="lemma-price-card featured">
             <h3>Monthly active user (MAU)</h3>

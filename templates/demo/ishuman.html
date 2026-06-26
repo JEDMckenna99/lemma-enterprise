@@ -2,7 +2,7 @@
 {% set is_public_page = true %}
 
 {% block title %}Demo - lemma.id{% endblock %}
-{% block description %}See identity-level enforcement in action — verify once, then test scoped blocking across two demo sites.{% endblock %}
+{% block description %}See site-private human verification in action — verify once, then test scoped blocking across two demo sites.{% endblock %}
 
 {% block head %}
 {{ super() }}
@@ -16,8 +16,8 @@
 
   <header class="demo-intro">
     <p class="demo-eyebrow">lemma.id demo</p>
-    <h1 class="demo-title">See identity-level enforcement in action</h1>
-    <p class="demo-lead">Verify once, then test two demo sites. Lemma.id gives each site a different private ID, so one site can block abuse without affecting the other.</p>
+    <h1 class="demo-title">See site-private human verification in action</h1>
+    <p class="demo-lead">Verify once, then test two demo sites. Both sites can know you are a verified human, but neither receives your real identity or the same identifier as the other.</p>
     <div class="demo-hero-cta">
       <button class="demo-btn demo-btn-primary" id="ih-start-live-demo" type="button">Start live demo</button>
       <button class="demo-btn demo-btn-secondary" id="ih-start-simulated-demo" type="button">Try simulated demo</button>
@@ -74,7 +74,7 @@
         <div class="workflow-head">
           <div>
             <h2>Step 2 — Use the same lemma.id on two sites</h2>
-            <p class="demo-muted">Each site receives its own private identifier from the same human proof.</p>
+            <p class="demo-muted">Each site receives its own private ID from the same verified-human proof.</p>
           </div>
           <button class="demo-btn demo-btn-secondary" id="ih-verify-sites-btn" type="button">Verify both sites</button>
         </div>
@@ -115,7 +115,7 @@
 
         <div class="ppid-compare">
           <p class="ppid-compare-title">Same person. Different private IDs.</p>
-          <p class="demo-muted ppid-compare-desc">Ticketing and Trials receive different identifiers, even though both proofs come from the same lemma.id.</p>
+          <p class="demo-muted ppid-compare-desc">Ticketing and Trials receive different identifiers, even though both proofs come from the same verified human.</p>
           <div class="ppid-compare-grid">
             <div class="ppid-slot">
               <span class="result-label">Ticketing</span>

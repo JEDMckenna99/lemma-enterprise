@@ -2,8 +2,8 @@
 {% set active_product = 'ishuman' %}
 {% set active_page = 'ishuman' %}
 {% set hero_title = 'lemma.id proof of humanity' %}
-{% set hero_subtitle = 'Integrate verified-human credentials with site-private PPIDs, browser-local verification, and server-side abuse controls.' %}
-{% set page_description = 'lemma.id proof of humanity — integrate verified-human credentials with the browser SDK, site-private PPIDs, and optional API keys for abuse controls.' %}
+{% set hero_subtitle = 'Let users prove they are human, and prove they are the same human to your site, without giving you their identity documents or a reusable cross-site ID.' %}
+{% set page_description = 'lemma.id proof of humanity — integrate verified-human credentials with the browser SDK, site-private PPIDs, signed backend presentations, and optional API keys for abuse controls.' %}
 
 {% block docs_content %}
 <div class="docs-section" id="quickstart">
@@ -87,14 +87,14 @@
                 <td>None after verify</td>
             </tr>
             <tr>
-                <td><strong>T2 — verifyStamp</strong></td>
-                <td><code>stamp({ includeCredential: true })</code> → backend <code>verifyStamp</code></td>
-                <td>Audit logs, moderate-trust signup (recommended default)</td>
+                <td><strong>T2 — Signed presentation or stamp</strong></td>
+                <td><code>verifyForBackend()</code> → backend <code>verify</code>, or <code>stamp({ includeCredential: true })</code> → backend <code>verifyStamp</code></td>
+                <td>Signup, account creation, audit logs, moderate-trust actions (recommended default)</td>
                 <td>Revocation snapshot refresh only</td>
             </tr>
             <tr>
-                <td><strong>T3 — verify-presentation</strong></td>
-                <td>POST <code>/api/ishuman/verify-presentation</code> with credential + session assertion</td>
+                <td><strong>T3 — Fresh session proof</strong></td>
+                <td>Full presentation with credential + session assertion, verified locally or through <code>/api/ishuman/verify-presentation</code></td>
                 <td>High-trust account creation, financial actions</td>
                 <td>Per-request (optional)</td>
             </tr>
@@ -120,8 +120,8 @@ await fetch('/api/signup', {
   body: JSON.stringify({ email, ppid: result.ppid }),
 });</code>
     </div>
-    <h3>T2 — recommended signup (verifyStamp on server)</h3>
-    <p>Stamp at the entry point, then verify cryptographically on your backend before creating the account.</p>
+    <h3>T2 — recommended signup (signed presentation or stamp)</h3>
+    <p>Send a signed presentation from <code>verifyForBackend()</code>, or stamp the entry point, then verify cryptographically on your backend before creating the account.</p>
     <div class="code-block">
         <div class="code-header"><span>Client</span><button class="copy-btn">Copy</button></div>
         <code>const result = await verifier.verify({ autoProvision: true });
@@ -182,7 +182,7 @@ def signup():
 
 <div class="docs-section">
     <h2>What is lemma.id proof of humanity?</h2>
-    <p>lemma.id proof of humanity is an identity-rooted enforcement layer for websites and applications. A user verifies once through a trusted IDV issuer (Didit by default), then receives an Ed25519-signed credential that can be reused on your site while preserving privacy via a site-private PPID.</p>
+    <p>lemma.id proof of humanity lets a user prove they are human, and prove they are the same human to your site, without giving your site their real identity or a reusable cross-site ID. A user verifies once through a trusted IDV issuer (Didit by default), then receives a signed credential that can be reused on your site while preserving privacy via a site-private PPID.</p>
     <div class="callout callout--info">
         <div class="callout-title">Assurance</div>
         <p>Credentials are issued only after a live identity check — liveness detection plus document-to-selfie matching. A bot, AI agent, or stolen ID image cannot obtain a credential, because a live human had to match a genuine government document at issuance.</p>
@@ -192,8 +192,8 @@ def signup():
         <p>The credential is rooted in a <strong>verified-person root</strong> derived from the IDV result. A master credential is issued for <code>lemma.id</code>; on your site, a Lemma-hosted popup derives a site-specific credential (a per-site PPID) on first request and caches it for later checks. Because the binding is to the person root — not to a wallet, email, or device — resetting any of those does not mint a fresh, clean identity.</p>
     </div>
     <div class="callout callout--info">
-        <div class="callout-title">What your servers store: nothing sensitive</div>
-        <p>The live identity check runs at the IDV issuer. <code>verify()</code> returns only <code>{ human, ppid, reason, timeMs }</code>. Your backend never receives the government ID, selfie, legal name, or date of birth — so you get an enforcement-grade human signal <strong>without running a KYC stack or holding the PII that makes identity verification a compliance and breach liability</strong>. Store the <code>ppid</code> on your user record; treat it as an opaque per-site identifier, not as sensitive identity data.</p>
+        <div class="callout-title">What your servers store: no KYC fields</div>
+        <p>The live identity check runs at the IDV issuer. <code>verify()</code> returns only <code>{ human, ppid, reason, timeMs }</code>. Your backend never receives the government ID, selfie, legal name, or date of birth — so you get an enforcement-grade human signal <strong>without running a KYC stack or holding the PII that makes identity verification a compliance and breach liability</strong>. Store the <code>ppid</code> on your user record; treat it as an opaque per-site identifier, not as a KYC field.</p>
     </div>
 </div>
 

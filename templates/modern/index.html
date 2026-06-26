@@ -1,8 +1,8 @@
 {% extends "modern/layout.html" %}
 {% set is_public_page = true %}
 
-{% block title %}lemma.id - Enforcement for Bot Abuse{% endblock %}
-{% block description %}lemma.id gives your site a stable, site-private ID for each verified human — so you can tell when the same person is back, keep one person per account when needed, and make bans stick when they rotate email or proxy.{% endblock %}
+{% block title %}lemma.id - Site-Private Human Verification{% endblock %}
+{% block description %}lemma.id gives your site a stable, site-private human ID for each verified person, so you can recognize the same human again without receiving their identity documents or a reusable cross-site ID.{% endblock %}
 
 {% block head %}
     {{ super() }}
@@ -81,9 +81,9 @@
 <section class="hero">
     <div class="container" style="position: relative; z-index: 1;">
         <div style="max-width: 860px; margin: 0 auto; text-align: center;">
-            <p style="font-size: var(--font-size-sm); font-weight: 600; text-transform: uppercase; letter-spacing: 2px; color: var(--primary); margin-bottom: 16px;">Enforcement for bot abuse &amp; ban evasion</p>
-            <h1 style="font-size: clamp(2.5rem, 5vw, 3.5rem); line-height: 1.1; margin-bottom: 24px;">Make bans cost more<br>than a new email.</h1>
-            <p style="font-size: var(--font-size-xl); font-weight: 500; margin-bottom: var(--space-4); color: var(--gray-700);">lemma.id gives your site a stable, site-private ID for each verified human — so you can tell when the same person is on your platform, keep one person per account when your policy requires it, and make bans stick when they rotate email or proxy. Your servers never store ID documents, legal names, or dates of birth.</p>
+            <p style="font-size: var(--font-size-sm); font-weight: 600; text-transform: uppercase; letter-spacing: 2px; color: var(--primary); margin-bottom: 16px;">Site-private human verification</p>
+            <h1 style="font-size: clamp(2.5rem, 5vw, 3.5rem); line-height: 1.1; margin-bottom: 24px;">Make abuse harder to rotate<br>without becoming an identity database.</h1>
+            <p style="font-size: var(--font-size-xl); font-weight: 500; margin-bottom: var(--space-4); color: var(--gray-700);">lemma.id gives your site a stable, site-private human ID for each verified person. You can recognize the same human across accounts or sessions, enforce one-person policies, and make bans stick, without receiving names, ID documents, selfies, dates of birth, or a reusable cross-site ID.</p>
 
             <div style="display: flex; gap: 16px; justify-content: center; flex-wrap: wrap; margin-top: 28px;">
                 <a href="/docs" class="btn btn-primary">Add to Your Site</a>
@@ -225,7 +225,7 @@
                 </div>
                 <div style="background: linear-gradient(135deg, rgba(102,126,234,0.06), rgba(118,75,162,0.06)); border: 1px solid var(--primary); border-radius: 12px; padding: 24px;">
                     <p style="font-size: var(--font-size-sm); font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--primary); margin-bottom: 16px;">With lemma.id</p>
-                    <p style="margin: 0; font-size: var(--font-size-sm); color: var(--gray-700); line-height: 1.8;">Bot detected → account tied to verified-person root → site-private PPID blocked → <strong>must pass fresh IDV to return</strong></p>
+                    <p style="margin: 0; font-size: var(--font-size-sm); color: var(--gray-700); line-height: 1.8;">Bot detected → account tied to the same verified human → site-private ID blocked → <strong>must pass fresh IDV to return</strong></p>
                 </div>
             </div>
             <p style="text-align: center; margin-top: 32px; color: var(--gray-600); font-size: var(--font-size-sm);">
@@ -240,14 +240,23 @@
     <div class="container">
         <div style="text-align: center; margin-bottom: 32px;">
             <p style="font-size: var(--font-size-sm); font-weight: 700; text-transform: uppercase; letter-spacing: 2px; color: var(--primary); margin-bottom: 12px;">Developer integration</p>
-            <h2>Integrate in two lines</h2>
-            <p class="text-gray" style="max-width: 640px; margin: 16px auto 0;">Most users never see verification. Suspicious users do. Local signed proofs keep routine checks fast and private.</p>
+            <h2>Integrate with a signed presentation</h2>
+            <p class="text-gray" style="max-width: 640px; margin: 16px auto 0;">Most users never see verification. Suspicious users do. Signed presentations let your backend verify the same site-private human ID without storing KYC data.</p>
         </div>
 
         <div style="max-width: 860px; margin: 0 auto; border: 1px solid var(--gray-200); border-radius: 14px; background: var(--white); overflow: hidden;">
-            <div style="padding: 14px 18px; border-bottom: 1px solid var(--gray-200); font-size: var(--font-size-sm); color: var(--gray-600);">Integrate in two lines</div>
+            <div style="padding: 14px 18px; border-bottom: 1px solid var(--gray-200); font-size: var(--font-size-sm); color: var(--gray-600);">Recommended signup gate</div>
             <pre style="margin: 0; padding: 18px; background: #0f172a; color: #e2e8f0; overflow-x: auto;"><code>&lt;script src="https://lemma.id/sdk/ishuman-verifier.js"&gt;&lt;/script&gt;
-&lt;script&gt;new IsHumanVerifier({ siteId: 'your-site-id' }).verify();&lt;/script&gt;</code></pre>
+&lt;script&gt;
+  const verifier = new IsHumanVerifier({ siteId: 'app.example.com' });
+  const { ok, presentation } = await verifier.verifyForBackend({ autoProvision: true });
+  if (!ok) throw new Error('not_verified');
+  await fetch('/api/signup', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ presentation }),
+  });
+&lt;/script&gt;</code></pre>
         </div>
 
         <div style="margin-top: 32px; display: flex; gap: 16px; justify-content: center; flex-wrap: wrap;">
