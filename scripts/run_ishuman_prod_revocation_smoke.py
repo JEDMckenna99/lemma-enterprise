@@ -353,8 +353,8 @@ def main() -> int:
     data = r.json()
     results.append(
         _step(
-            "check synthetic (canonical revoke, no site_id)",
-            data.get("blocked") and data.get("reason") in {"site_ppid_revoked", "network_revocation"},
+            "check synthetic (API-key site scope, no site_id)",
+            data.get("blocked") and data.get("reason") == "site_block",
             str(data),
         )
     )
@@ -414,13 +414,14 @@ def main() -> int:
             timeout=30,
         )
         denied = r.status_code == 403 and (r.json().get("error") or "") in {
+            "ppid_derivation_failed",
             "site_ppid_blocked",
             "site_ppid_revoked",
             "master_credential_revoked",
         }
         results.append(
             _step(
-                "derive-site-proof denied when fixture PPID blocked",
+                "derive-site-proof fails closed while fixture PPID blocked",
                 denied,
                 f"HTTP {r.status_code} {r.text[:200]}",
             )
