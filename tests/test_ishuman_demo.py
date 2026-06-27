@@ -52,6 +52,16 @@ def test_ishuman_demo_page_loads_expected_assets(ishuman_demo_client):
     assert "/sdk/ishuman-verifier.js" in body
     assert "/static/js/demo/ishuman-demo.js" in body
     assert "/static/css/demo/ishuman-demo.css" in body
+    assert "/static/js/demo/ishuman-demo.js?v=22" in body
+
+
+def test_demo_create_button_always_enters_live_issuance():
+    source = (ROOT / "static" / "js" / "demo" / "ishuman-demo.js").read_text(encoding="utf-8")
+    block = source.split("function createLemmaIdViaPopup()", 1)[1]
+    block = block.split("// Cross-origin storage wipe", 1)[0]
+
+    assert "Create lemma.id skipped" not in block
+    assert block.index("setDemoMode('live')") < block.index("openIdvPopup")
 
 
 def test_ishuman_demo_config_includes_network_revocation_flag(ishuman_demo_client):
@@ -564,4 +574,3 @@ def test_qr_demo_idv_enabled_on_production_with_explicit_flag(
     payload = resp.get_json()
     assert resp.status_code == 200, payload
     assert payload["mode"] == "qr_demo_idv_flow"
-

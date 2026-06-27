@@ -17,7 +17,7 @@
         </div>
         <h1 class="wallet-brand-name">lemma.id</h1>
         <p class="wallet-tagline">personal data minimizer</p>
-        <p class="wallet-about-link"><a href="/?home=1">About lemma.id</a></p>
+        <p class="wallet-about-link"><a href="/home">About lemma.id</a></p>
     </header>
 
     <!-- STATUS -->
@@ -38,7 +38,7 @@
 
             <div id="no-wallet-msg" class="hidden" style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #e5e7eb;">
                 <p style="color: #64748b; font-size: 0.9rem; margin-bottom: 12px;">New here?</p>
-                <button id="create-wallet-btn" class="btn btn-primary" style="margin-right: 8px;">Create lemma.id</button>
+                <button id="create-wallet-btn" class="btn btn-primary" style="margin-right: 8px;">Create my lemma.id</button>
                 <a href="/link" class="btn btn-secondary" style="text-decoration: none;">Add this device</a>
             </div>
         </div>
@@ -614,26 +614,58 @@ function disconnectCrossDeviceSSE() {
     sseReconnectAttempts = 0;
 }
 
-// Create new wallet
-async function createWallet() {
+// Create a complete lemma.id (passkey + isHuman proof) through the canonical
+// issuance popup. Creating only a local wallet here left users with an empty
+// shell and never started identity verification.
+function createWallet() {
     const btn = document.getElementById('create-wallet-btn');
     const origText = btn.textContent;
-    
-    try {
-        btn.textContent = 'Creating...';
-        btn.disabled = true;
-        
-        await initWallet();
-        await wallet.registerPasskey();
-        await checkWalletState();
-        
-    } catch (e) {
-        console.error('Create wallet failed:', e);
-        updateStatusDisplay(false, 'Creation Failed', e.message);
-    } finally {
+
+    btn.textContent = 'Opening verification...';
+    btn.disabled = true;
+
+    const popupUrl = new URL('/wallet/ishuman-idv', window.location.origin);
+    popupUrl.searchParams.set('origin', window.location.origin);
+    popupUrl.searchParams.set('site_id', 'lemma.id');
+
+    const popup = window.open(
+        popupUrl.toString(),
+        'lemma_ishuman_idv',
+        'popup=yes,width=520,height=760,resizable=yes,scrollbars=yes',
+    );
+
+    // Popup blockers should not strand creation. The redirect flow returns to
+    // the manager after the proof is stored on this origin.
+    if (!popup) {
+        popupUrl.searchParams.set('flow_mode', 'redirect');
+        popupUrl.searchParams.set('redirect_return', '/app');
+        window.location.assign(popupUrl.toString());
+        return;
+    }
+
+    let settled = false;
+    const finish = async () => {
+        if (settled) return;
+        settled = true;
+        window.removeEventListener('message', onMessage);
+        clearInterval(closedTimer);
         btn.textContent = origText;
         btn.disabled = false;
-    }
+        await checkWalletState().catch((err) => {
+            console.warn('Wallet refresh after issuance failed:', err?.message || err);
+        });
+    };
+    const onMessage = (event) => {
+        if (event.origin !== window.location.origin) return;
+        const type = event.data?.type;
+        if (type === 'ISHUMAN_IDV_COMPLETE' || type === 'ISHUMAN_IDV_CANCELLED') {
+            finish();
+        }
+    };
+    const closedTimer = setInterval(() => {
+        if (popup.closed) finish();
+    }, 800);
+    window.addEventListener('message', onMessage);
 }
 
 // Tab switching

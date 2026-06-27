@@ -656,30 +656,14 @@ def create_app():
 
     @app.route('/')
     def index():
-        """
-        Smart homepage routing:
-        - ?home=1 → always marketing (escape hatch when session cookies exist)
-        - Returning users (have session) → Lemma ID management app
-        - New visitors → Marketing page (SEO optimized)
-        """
-        if request.args.get('home') == '1':
-            logger.info("🏠 Serving marketing page (home=1 bypass)")
-            return render_template('modern/index.html')
-
-        has_session = request.cookies.get('lemma_wallet_session')
-        has_wallet_cookie = request.cookies.get('lemma_wallet_csrf')
-
-        if has_session or has_wallet_cookie:
-            logger.info("🏠 Serving Lemma ID app (returning user)")
-            app.jinja_env.cache = {}
-            return render_template('wallet_simple.html'), 200, {
-                'Cache-Control': 'no-cache, no-store, must-revalidate',
-                'Pragma': 'no-cache',
-                'Expires': '0'
-            }
-
-        logger.info("🏠 Serving marketing page (new visitor)")
-        return render_template('modern/index.html')
+        """Canonical lemma.id URL always opens the personal ID manager."""
+        logger.info("🏠 Serving Lemma ID manager (canonical root)")
+        app.jinja_env.cache = {}
+        return render_template('wallet_simple.html'), 200, {
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            'Pragma': 'no-cache',
+            'Expires': '0'
+        }
 
     @app.route('/home')
     def home():

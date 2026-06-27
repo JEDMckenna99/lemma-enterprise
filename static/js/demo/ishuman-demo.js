@@ -705,10 +705,8 @@
   }
 
   function createLemmaIdViaPopup() {
-    if (state.demoMode === 'simulated') {
-      log('Create lemma.id skipped', 'use Unlock in simulation mode');
-      return null;
-    }
+    // An explicit create request always enters the live flow. The demo starts
+    // in simulation mode, but that default must not make this button a no-op.
     setDemoMode('live');
     return openIdvPopup({ demoQr: false });
   }
