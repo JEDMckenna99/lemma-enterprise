@@ -329,7 +329,12 @@ def main() -> int:
     data = r.json()
     results.append(_step("site-block synthetic", r.ok and data.get("success"), str(data)))
 
-    r = requests.get(f"{base}/api/ishuman/check", params={"ppid": ppid_drill, "site_id": site_id}, timeout=30)
+    r = requests.get(
+        f"{base}/api/ishuman/check",
+        headers=headers,
+        params={"ppid": ppid_drill, "site_id": site_id},
+        timeout=30,
+    )
     data = r.json()
     results.append(
         _step(
@@ -339,7 +344,12 @@ def main() -> int:
         )
     )
 
-    r = requests.get(f"{base}/api/ishuman/check", params={"ppid": ppid_drill}, timeout=30)
+    r = requests.get(
+        f"{base}/api/ishuman/check",
+        headers=headers,
+        params={"ppid": ppid_drill},
+        timeout=30,
+    )
     data = r.json()
     results.append(
         _step(
@@ -394,7 +404,6 @@ def main() -> int:
         derive_body = {
             "master_credential_id": master_id,
             "wallet_id": wallet_id,
-            "wallet_secret": wallet_secret,
             "target_site": target_site,
             "site_signing_pubkey": site_signing_pubkey,
         }
