@@ -67,9 +67,9 @@ def test_sdk_version_bumped_in_lockstep():
     verifier = VERIFIER_PATH.read_text(encoding="utf-8")
     app = APP_PATH.read_text(encoding="utf-8")
     demo = DEMO_PATH.read_text(encoding="utf-8")
-    assert "@version 1.7.0" in verifier
-    assert "response.headers['X-SDK-Version'] = '1.7.0'" in app
-    assert "/sdk/ishuman-verifier.js?v=1.7.0" in demo
+    assert "@version 1.8.3" in verifier
+    assert "response.headers['X-SDK-Version'] = '1.8.3'" in app
+    assert "/sdk/ishuman-verifier.js?v=1.8.3" in demo
 
 
 def test_docs_document_stamp_pattern():

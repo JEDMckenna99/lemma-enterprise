@@ -5,6 +5,7 @@ Persist and resolve LemmaPerson records from Stripe document roots.
 from __future__ import annotations
 
 import logging
+import os
 import secrets
 from dataclasses import dataclass
 from typing import Any, Optional, Tuple
@@ -47,6 +48,33 @@ class ResolvedLemmaPerson:
     issuing_subdivision: Optional[str] = None
     merged_from_person_id: Optional[str] = None
     document_attached: bool = False
+    root_version: str = "v1"
+    document_root_schema: Optional[str] = None
+    matched_legacy_document_root: bool = False
+
+
+@dataclass(frozen=True)
+class DocumentRootAssignment:
+    """Read-only result of resolving verified material to an assigned person."""
+
+    lemma_person_id: Optional[str]
+    matched_document_root_hash: Optional[str]
+    matched_root_version: Optional[str]
+    matched_schema: Optional[str]
+    matched_provider: Optional[str]
+    canonical_document_root_hash: Optional[str]
+    canonical_root_version: str
+    canonical_claims: Optional[dict]
+
+
+@dataclass(frozen=True)
+class _DocumentRootCandidate:
+    document_root_hash: str
+    root_version: str
+    schema: str
+    provider: str
+    claims: dict
+    canonical: bool = False
 
 
 def _new_person_id() -> str:
@@ -57,6 +85,151 @@ def _load_person_root_hash_hex(person) -> str:
     from api.column_crypto import decrypt_column
 
     return decrypt_column(person.person_root_hash)
+
+
+def _ordered_unique(values) -> list[str]:
+    result: list[str] = []
+    seen: set[str] = set()
+    for raw in values:
+        value = str(raw or "").strip()
+        key = value.lower()
+        if value and key not in seen:
+            seen.add(key)
+            result.append(value)
+    return result
+
+
+def _document_root_read_versions(active_version: str) -> list[str]:
+    """Versions whose peppers may identify an existing document assignment."""
+    configured = os.getenv("LEMMA_DOCUMENT_ROOT_READ_VERSIONS", "")
+    return _ordered_unique(
+        [active_version, *configured.split(","), "v1"]
+    )
+
+
+def _document_root_read_providers(provider: str) -> list[str]:
+    """Provider namespaces accepted for continuity during an IDV rail migration."""
+    configured = os.getenv("LEMMA_DOCUMENT_ROOT_READ_PROVIDERS", "")
+    defaults = ["stripe_identity"] if provider == "didit" else []
+    return _ordered_unique([provider, *configured.split(","), *defaults])
+
+
+def _document_root_candidates(
+    material: StripeIdentityRootMaterial,
+    *,
+    provider: str,
+) -> tuple[list[_DocumentRootCandidate], Optional[IdentityRootMaterialError]]:
+    """Derive canonical and backwards-compatible document-root lookup hashes.
+
+    The document root is a lookup key. Schema, pepper-version, and provider
+    transitions must therefore read old key shapes before assigning a new
+    person. The first candidate is always the current write shape when it can
+    be derived; legacy candidates are read-only compatibility keys.
+    """
+    from api.identity_roots import (
+        DOCUMENT_ROOT_SCHEMA,
+        DOCUMENT_ROOT_SCHEMA_V2,
+        active_root_version,
+        document_root_schema,
+    )
+
+    active_version = active_root_version()
+    active_schema = document_root_schema()
+    candidates: list[_DocumentRootCandidate] = []
+    seen_hashes: set[str] = set()
+    canonical_error: Optional[IdentityRootMaterialError] = None
+
+    schemas = _ordered_unique([active_schema, DOCUMENT_ROOT_SCHEMA_V2, DOCUMENT_ROOT_SCHEMA])
+    versions = _document_root_read_versions(active_version)
+    providers = _document_root_read_providers(provider)
+
+    for candidate_provider in providers:
+        for schema in schemas:
+            for version in versions:
+                canonical = (
+                    candidate_provider == provider
+                    and schema == active_schema
+                    and version.lower() == active_version.lower()
+                )
+                try:
+                    claims = build_document_root_claims(
+                        material,
+                        candidate_provider,
+                        schema=schema,
+                    )
+                    document_root_hash = derive_document_root_hash(claims, version)
+                except IdentityRootMaterialError as exc:
+                    if canonical:
+                        canonical_error = exc
+                    continue
+                if document_root_hash in seen_hashes:
+                    continue
+                seen_hashes.add(document_root_hash)
+                candidate = _DocumentRootCandidate(
+                    document_root_hash=document_root_hash,
+                    root_version=version,
+                    schema=schema,
+                    provider=candidate_provider,
+                    claims=claims,
+                    canonical=canonical,
+                )
+                if canonical:
+                    candidates.insert(0, candidate)
+                else:
+                    candidates.append(candidate)
+
+    return candidates, canonical_error
+
+
+def lookup_document_root_assignment(
+    db,
+    *,
+    material: StripeIdentityRootMaterial,
+    provider: str = "stripe_identity",
+) -> DocumentRootAssignment:
+    """Find who is assigned to verified document material without mutating DB."""
+    from api.database import LemmaDocumentRoot
+    from api.identity_roots import active_root_version
+
+    candidates, canonical_error = _document_root_candidates(material, provider=provider)
+    canonical = next((candidate for candidate in candidates if candidate.canonical), None)
+
+    for candidate in candidates:
+        link = (
+            db.query(LemmaDocumentRoot)
+            .filter_by(document_root_hash=candidate.document_root_hash)
+            .first()
+        )
+        if link:
+            return DocumentRootAssignment(
+                lemma_person_id=link.lemma_person_id,
+                matched_document_root_hash=candidate.document_root_hash,
+                matched_root_version=candidate.root_version,
+                matched_schema=candidate.schema,
+                matched_provider=candidate.provider,
+                canonical_document_root_hash=(
+                    canonical.document_root_hash if canonical else None
+                ),
+                canonical_root_version=(
+                    canonical.root_version if canonical else active_root_version()
+                ),
+                canonical_claims=canonical.claims if canonical else None,
+            )
+
+    if canonical_error:
+        raise canonical_error
+    if not canonical:
+        raise IdentityRootMaterialError("unable to derive canonical document root")
+    return DocumentRootAssignment(
+        lemma_person_id=None,
+        matched_document_root_hash=None,
+        matched_root_version=None,
+        matched_schema=None,
+        matched_provider=None,
+        canonical_document_root_hash=canonical.document_root_hash,
+        canonical_root_version=canonical.root_version,
+        canonical_claims=canonical.claims,
+    )
 
 
 def _add_document_link(
@@ -128,18 +301,34 @@ def resolve_or_create_person_from_material(
     """
     from api.config import use_assigned_person_root
     from api.database import LemmaDocumentRoot, LemmaPerson, LemmaWalletBinding
-    from api.identity_roots import active_root_version
-
     from api.column_crypto import encrypt_column
 
-    root_version = active_root_version()
-    claims = build_document_root_claims(material, provider)
-    document_root_hash = derive_document_root_hash(claims, root_version)
-
-    existing_link = (
-        db.query(LemmaDocumentRoot).filter_by(document_root_hash=document_root_hash).first()
+    assignment = lookup_document_root_assignment(
+        db,
+        material=material,
+        provider=provider,
     )
-    doc_person_id = existing_link.lemma_person_id if existing_link else None
+    root_version = assignment.canonical_root_version
+    claims = assignment.canonical_claims
+    document_root_hash = assignment.canonical_document_root_hash
+    doc_person_id = assignment.lemma_person_id
+    matched_legacy_document_root = bool(
+        doc_person_id
+        and assignment.matched_document_root_hash
+        and assignment.matched_document_root_hash != document_root_hash
+    )
+
+    # A legacy match with no derivable current write shape is valid only for
+    # recovery. Keep using the matched lookup key; do not create a weaker v2
+    # document root that omitted required material such as issuing subdivision.
+    if doc_person_id and not document_root_hash:
+        document_root_hash = assignment.matched_document_root_hash
+        root_version = assignment.matched_root_version or root_version
+        claims = build_document_root_claims(
+            material,
+            assignment.matched_provider or provider,
+            schema=assignment.matched_schema,
+        )
 
     binding = (
         db.query(LemmaWalletBinding).filter_by(wallet_id=wallet_id).first()
@@ -166,6 +355,25 @@ def resolve_or_create_person_from_material(
         person_id = person.person_id
         person_root_hash = _load_person_root_hash_hex(person)
         person_root_source = person.person_root_source or PERSON_ROOT_SOURCE_DOCUMENT_DERIVED
+        # Converge a successful compatibility read onto the current write key.
+        # Future issuance/recovery can then resolve directly without changing
+        # the assigned person root or any site PPID.
+        if (
+            matched_legacy_document_root
+            and assignment.canonical_document_root_hash
+            and document_root_hash == assignment.canonical_document_root_hash
+        ):
+            _add_document_link(
+                db,
+                document_root_hash=document_root_hash,
+                person_id=person_id,
+                root_version=root_version,
+                provider=provider,
+                material=material,
+                claims=claims,
+            )
+            created_document_link = True
+            document_attached = True
     elif bound_person_id:
         # New document for an already-bound wallet: attach attestation, keep person_root.
         person = db.query(LemmaPerson).filter_by(person_id=bound_person_id).first()
@@ -251,6 +459,9 @@ def resolve_or_create_person_from_material(
         issuing_subdivision=material.issuing_subdivision,
         merged_from_person_id=merged_from_person_id,
         document_attached=document_attached,
+        root_version=root_version,
+        document_root_schema=claims.get("schema") if claims else assignment.matched_schema,
+        matched_legacy_document_root=matched_legacy_document_root,
     )
 
 

@@ -75,6 +75,10 @@ def _credential_or_agent_present(headers: Mapping[str, str]) -> bool:
     return False
 
 
+def _credential_present(headers: Mapping[str, str]) -> bool:
+    return bool((headers.get("X-Lemma-Credential") or "").strip())
+
+
 def evaluate_mode_policy(
     *,
     expected_mode: str,
@@ -88,6 +92,8 @@ def evaluate_mode_policy(
         effective_mode = MODE_COMPAT_PROOF_WRAPPED
     elif proof_present:
         effective_mode = MODE_PROOF_REQUIRED
+    elif _credential_present(headers):
+        effective_mode = MODE_CREDENTIAL_REQUIRED
 
     # Enforce required mode floor if caller provides one.
     requested_floor = str(headers.get("X-Lemma-Min-Mode") or "").strip().lower()
@@ -131,16 +137,16 @@ def evaluate_mode_policy(
             bearer_present=bearer_present,
         )
 
-    # Hard sunset for legacy bearer-only compatibility (not agent delegation).
+    # Hard sunset for bearer compatibility.
     if expected_mode == MODE_COMPAT_BEARER:
         sunset = _parse_iso_utc(compat_sunset_utc or os.getenv("LEMMA_COMPAT_BEARER_SUNSET_UTC"))
         if sunset and datetime.now(timezone.utc) >= sunset:
-            if _credential_or_agent_present(headers):
+            if _credential_present(headers) or proof_present:
                 return ModeDecision(
                     allowed=True,
                     reason_code=None,
                     expected_mode=expected_mode,
-                    effective_mode=MODE_CREDENTIAL_REQUIRED,
+                    effective_mode=effective_mode,
                     proof_present=proof_present,
                     bearer_present=bearer_present,
                 )
@@ -183,4 +189,3 @@ def evaluate_mode_policy(
         proof_present=proof_present,
         bearer_present=bearer_present,
     )
-

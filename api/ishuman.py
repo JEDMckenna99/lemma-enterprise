@@ -448,7 +448,7 @@ def _complete_verified_ishuman_from_didit(
     Lemma still signs the credential with its own issuer key.
     Returns the credential dict on success, None on root material failure.
     """
-    from api.identity_roots import IdentityRootMaterialError, active_root_version, validate_didit_workflow_id
+    from api.identity_roots import IdentityRootMaterialError, validate_didit_workflow_id
     from api.identity_person import process_verified_didit_identity
     from api.ppid import derive_ppid_from_person_root_hash
 
@@ -519,7 +519,7 @@ def _complete_verified_ishuman_from_didit(
     ppid = derive_ppid_from_person_root_hash(resolved.person_root_hash, "lemma.id")
     record.lemma_person_id = resolved.person_id
     record.document_root_hash = encrypt_column(resolved.document_root_hash)
-    record.root_version = active_root_version()
+    record.root_version = resolved.root_version
     record.confidence_level = resolved.confidence_level
 
     try:

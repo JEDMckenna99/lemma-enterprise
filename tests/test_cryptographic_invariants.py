@@ -65,21 +65,23 @@ def test_document_root_canonicalization_is_stable(monkeypatch):
         document_type="driving_license",
         document_number="D1234567",
         date_of_birth="1985-03-12",
+        issuing_subdivision="CA",
     )
     claims = build_document_root_claims(material)
 
     # Canonical claim set must remain stable (key order is canonicalized later).
     assert claims == {
-        "schema": "lemma.identity.document-root.v1",
+        "schema": "lemma.identity.document-root.v2",
         "provider": "stripe_identity",
         "country": "US",
         "document_type": "driving_license",
         "document_number": "D1234567",
         "date_of_birth": "1985-03-12",
+        "issuing_subdivision": "CA",
     }
 
     digest = derive_document_root_hash(claims)
-    assert digest == "f8ee8a3db8d5c71eecf17096d8133dfe5c9a2927a885817d15c3c755a1209321"
+    assert digest == "f95534fe22f9972bda81fbcda454ae5b45013d52680428beafedc87a4d7ecbbc"
     # Determinism across calls.
     assert derive_document_root_hash(build_document_root_claims(material)) == digest
 
@@ -120,7 +122,7 @@ def test_didit_document_root_canonicalization_is_stable(monkeypatch):
     claims = build_document_root_claims(material, provider="didit")
 
     assert claims == {
-        "schema": "lemma.identity.document-root.v1",
+        "schema": "lemma.identity.document-root.v2",
         "provider": "didit",
         "country": "ES",
         "document_type": "id_card",
@@ -129,7 +131,7 @@ def test_didit_document_root_canonicalization_is_stable(monkeypatch):
     }
 
     digest = derive_document_root_hash(claims)
-    assert digest == "83f8ae39fc27a7ac1894daebb1a929069dfcc8661b377c2112bfd8f76cb86be5"
+    assert digest == "300fead7cfa36c096d79154c88c5534cb9652cf23123bbea3da21c35d1956a5d"
 
     # provider isolation: same document under stripe -> different root.
     stripe_claims = build_document_root_claims(material, provider="stripe_identity")

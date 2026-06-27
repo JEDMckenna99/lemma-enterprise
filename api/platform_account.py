@@ -96,6 +96,7 @@ def upsert_platform_account(
     name: Optional[str] = None,
     company: Optional[str] = None,
     wallet_id: Optional[str] = None,
+    replace_wallet_id: bool = False,
     passkey_credential_id: Optional[str] = None,
     verification_level: Optional[str] = None,
     billing_customer_id: Optional[str] = None,
@@ -155,7 +156,7 @@ def upsert_platform_account(
                 account.name = name
             if company:
                 account.company = company
-            if wallet_id and not account.wallet_id:
+            if wallet_id and (not account.wallet_id or replace_wallet_id):
                 account.wallet_id = wallet_id
             if passkey_credential_id and not account.passkey_credential_id:
                 account.passkey_credential_id = passkey_credential_id

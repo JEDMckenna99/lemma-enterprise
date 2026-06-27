@@ -208,8 +208,10 @@
         </div>
         <div class="ao-row">
           <button id="btn-issue-proof" class="ao-btn">Sign &amp; Issue Proof</button>
-          <span class="ao-note">Creates delegated proof credentials for runtime authorization.</span>
+          <span class="ao-note">Issues a wallet-signed VC via <code>/api/wallet/runtimes/issue-proof</code>. Requires an unlocked wallet session.</span>
         </div>
+        <div class="ao-status" id="issue-proof-status"></div>
+        <p class="ao-note" style="margin:0">For legacy bearer tokens (<code>X-Agent-Token</code>) use <a href="/admin/agent-delegation">Admin Agent Delegation</a>.</p>
       </div>
     </div>
     <div class="ao-card">
@@ -222,6 +224,7 @@
   {% if screen == 'proofs' %}
   <div class="ao-card">
     <h2 style="margin:0 0 10px">Proofs List</h2>
+    <p class="ao-note" style="margin:0 0 10px">Wallet-issued proofs from this browser session. Bearer tokens live under <a href="/admin/agent-delegation">Admin Agent Delegation</a>.</p>
     <div class="ao-row" style="margin-bottom:10px">
       <input id="pf-search" class="ao-input" style="max-width:240px" placeholder="Search by agent or token">
       <select id="pf-status" class="ao-select" style="max-width:160px">
@@ -235,7 +238,7 @@
     <div style="overflow:auto">
       <table class="ao-table">
         <thead>
-          <tr><th>jti</th><th>Agent / Task</th><th>Scope</th><th>Issued / Expires</th><th>Status</th><th>Last seen</th><th>Actions</th></tr>
+          <tr><th>jti</th><th>Agent / Task</th><th>Scope</th><th>Issued / Expires</th><th>Status</th><th>Site</th><th>Actions</th></tr>
         </thead>
         <tbody id="pf-body"><tr><td colspan="7">Loading...</td></tr></tbody>
       </table>
@@ -298,7 +301,8 @@
 
 <script nonce="{{ csp_nonce }}">
 const CURRENT_SCREEN = "{{ screen }}";
-const pageState = { credentials: [], issuers: [], runtimes: [], policies: [], decisions: [], issuedPayload: null, modalType: "proof" };
+const PROOF_HISTORY_KEY = "agentOpsWalletProofHistory";
+const pageState = { proofHistory: [], issuers: [], runtimes: [], policies: [], decisions: [], issuedPayload: null, modalType: "proof" };
 
 function authHeaders(extra) {
   if (typeof window.getLemmaAuthHeaders === "function") return window.getLemmaAuthHeaders(extra || {});
@@ -398,9 +402,9 @@ function setModalType(type) {
     return;
   }
   title.textContent = "Issued Proof";
-  copyBtn.textContent = "Copy signed JSON";
-  dlBtn.textContent = "Download .proof";
-  curlBtn.textContent = "Copy curl command";
+  copyBtn.textContent = "Copy full JSON";
+  dlBtn.textContent = "Download credential (.json)";
+  curlBtn.textContent = "Copy curl (X-Lemma-Credential)";
   curlBtn.style.display = "";
 }
 
@@ -424,10 +428,54 @@ async function loadIssuers() {
 }
 
 async function loadCredentials() {
-  const res = await api("/api/agent/credentials");
-  if (!(res.ok && res.data?.success && Array.isArray(res.data?.credentials))) return [];
-  pageState.credentials = res.data.credentials;
-  return pageState.credentials;
+  pageState.proofHistory = loadProofHistory();
+  return pageState.proofHistory;
+}
+
+function loadProofHistory() {
+  try {
+    const raw = sessionStorage.getItem(PROOF_HISTORY_KEY);
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (_e) {
+    return [];
+  }
+}
+
+function saveProofHistory(entry) {
+  const history = loadProofHistory();
+  history.unshift(entry);
+  sessionStorage.setItem(PROOF_HISTORY_KEY, JSON.stringify(history.slice(0, 50)));
+}
+
+function proofHistoryStatus(item) {
+  const revoked = Boolean(item?.revoked);
+  if (revoked) return "revoked";
+  const expRaw = item?.expires_at || item?.delegated_proof?.expires_at;
+  const expTs = typeof expRaw === "number" ? expRaw * 1000 : Date.parse(String(expRaw || ""));
+  if (Number.isFinite(expTs) && expTs <= Date.now()) return "expired";
+  return "active";
+}
+
+function encodeCredentialHeaderValue(credential) {
+  const headerCred = (typeof window.buildLemmaCredentialForHeader === "function")
+    ? window.buildLemmaCredentialForHeader(credential)
+    : credential;
+  if (typeof window.encodeLemmaCredentialHeader === "function") {
+    return window.encodeLemmaCredentialHeader(headerCred);
+  }
+  try {
+    return btoa(unescape(encodeURIComponent(JSON.stringify(headerCred || {}))))
+      .replace(/\+/g, "-")
+      .replace(/\//g, "_")
+      .replace(/=+$/, "");
+  } catch (_e) {
+    return "";
+  }
+}
+
+function issueContextDefaults() {
+  return { orgId: "org_default", environment: "prod" };
 }
 
 function statusBadge(status) {
@@ -437,10 +485,11 @@ function statusBadge(status) {
 }
 
 async function initDashboard() {
-  const [creds, issuers] = await Promise.all([loadCredentials(), loadIssuers()]);
-  const active = creds.filter((c) => c.status === "active");
+  const [proofHistory, issuers] = await Promise.all([loadCredentials(), loadIssuers()]);
+  const active = proofHistory.filter((c) => proofHistoryStatus(c) === "active");
   const expiringSoon = active.filter((c) => {
-    const ts = Date.parse(c.expires_at || "");
+    const expRaw = c.expires_at || c.delegated_proof?.expires_at;
+    const ts = typeof expRaw === "number" ? expRaw * 1000 : Date.parse(String(expRaw || ""));
     return Number.isFinite(ts) && ts < (Date.now() + (24 * 60 * 60 * 1000));
   });
   document.getElementById("db-active-proofs").textContent = String(active.length);
@@ -449,8 +498,8 @@ async function initDashboard() {
   const issuerList = issuers.slice(0, 6).map((k) => `<li>${esc(k.kid || k.issuer || "issuer")}</li>`).join("");
   document.getElementById("db-issuers").innerHTML = issuerList || "<li>No issuers found.</li>";
 
-  const names = [...new Set(active.map((c) => c.agent_name).filter(Boolean))].slice(0, 8);
-  document.getElementById("db-agents").innerHTML = names.length ? names.map((n) => `<li>${esc(n)}</li>`).join("") : "<li>No agents registered.</li>";
+  const names = [...new Set(active.map((c) => c.runtime_id || c.agent_name).filter(Boolean))].slice(0, 8);
+  document.getElementById("db-agents").innerHTML = names.length ? names.map((n) => `<li>${esc(n)}</li>`).join("") : "<li>No proofs issued this session.</li>";
 
   await Promise.all([loadDashboardRuntimes(), loadDashboardPolicies(), loadDashboardDecisions()]);
   wireDashboardActions();
@@ -793,48 +842,79 @@ async function issueProof() {
     alert("Agent ID / Runtime ID is required.");
     return;
   }
-  const expiresTs = Date.parse(model.expires_at || "");
-  const ttlHours = Number.isFinite(expiresTs) ? Math.max(1, Math.min(24, Math.ceil((expiresTs - Date.now()) / (60 * 60 * 1000)))) : 1;
-  const scope = normalizeScopesForIssue(model.scope);
-  const allowedPaths = parseBoundsToAllowedPaths(model.resource_bounds);
-  const description = JSON.stringify({
-    issuer_id: model.issuer_id,
-    trust_state: model.trust_state,
-    taint_epoch: model.taint_epoch,
-    constraints: model.constraints,
-    resource_bounds: model.resource_bounds,
-  });
-
+  const { orgId, environment } = issueContextDefaults();
   const payload = {
-    agent_name: model.runtime_id,
-    scope,
-    ttl_hours: ttlHours,
-    task: model.task_id || null,
-    allowed_paths: allowedPaths.length ? allowedPaths : null,
-    intended_platform: "lemma.id",
-    description,
-    admin_credential: window.lemmaCredential || null,
+    site_id: "lemma.id",
+    runtime_id: model.runtime_id,
+    agent_key_id: model.runtime_id,
+    task_id: model.task_id || null,
+    granted_by: "agent_ops_ui",
+    policy_version: model.issuer_id && model.issuer_id !== "default" ? model.issuer_id : "authz_policy_v2",
+    root_type: "passkey_root",
+    org_id: orgId,
+    environment,
+    metadata: {
+      trust_state: model.trust_state,
+      taint_epoch: model.taint_epoch,
+      constraints: model.constraints,
+      resource_bounds: model.resource_bounds,
+      scope_preview: model.scope,
+    },
   };
 
-  const res = await api("/api/agent/credentials/issue", {
+  setStatus("issue-proof-status", "warn", "Issuing wallet proof…");
+  const res = await api("/api/wallet/runtimes/issue-proof", {
     method: "POST",
     headers: Object.assign({ "Content-Type": "application/json" }, authHeaders()),
     body: JSON.stringify(payload),
   });
   if (!(res.ok && res.data?.success)) {
-    alert(`Issue failed: ${res.data?.error || res.status}`);
+    const message = res.data?.message || res.data?.error || `HTTP ${res.status}`;
+    setStatus(
+      "issue-proof-status",
+      "err",
+      res.status === 401
+        ? "Wallet unlock required. Open /unlock, unlock your wallet, then retry."
+        : `Issue failed: ${message}`,
+    );
+    alert(`Issue failed: ${message}`);
     return;
   }
+
+  const proofId = res.data?.proof_artifact?.proof_id
+    || res.data?.delegated_proof?.proof_id
+    || res.data?.credential?.id
+    || null;
+  const delegatedExpires = res.data?.delegated_proof?.expires_at;
+  const expiresAt = delegatedExpires
+    ? (typeof delegatedExpires === "number" ? new Date(delegatedExpires * 1000).toISOString() : String(delegatedExpires))
+    : (model.expires_at || null);
 
   const signed = {
     ...model,
     issued_at: new Date().toISOString(),
-    jti: res.data?.credential?.token_id || null,
-    delegated_proof: res.data?.credential || null,
+    jti: proofId,
+    proof_id: proofId,
+    ppid: res.data?.ppid || null,
+    site_id: res.data?.site_id || "lemma.id",
+    expires_at: expiresAt,
+    credential: res.data?.credential || null,
+    root_proof: res.data?.root_proof || null,
+    delegated_proof: res.data?.delegated_proof || null,
+    proof_chain: res.data?.proof_chain || null,
+    proof_artifact: res.data?.proof_artifact || null,
+    org_id: res.data?.org_id || orgId,
+    environment: res.data?.environment || environment,
+    export_hint: {
+      env_var: "LEMMA_PROOF_FILE",
+      header: "X-Lemma-Credential",
+    },
   };
+  saveProofHistory(signed);
   pageState.issuedPayload = signed;
   setModalType("proof");
   openIssuedModal();
+  setStatus("issue-proof-status", "ok", `Proof issued (${proofId || "no jti"}). Save the JSON for LEMMA_PROOF_FILE / MCP.`);
 }
 
 function openIssuedModal() {
@@ -856,21 +936,30 @@ function copyText(value) {
 function copyCurlCommand() {
   if (pageState.modalType !== "proof") return;
   const payload = pageState.issuedPayload || {};
-  const token = payload?.delegated_proof?.token || "<token>";
-  const cmd = `curl -H "X-Agent-Token: ${token}" https://lemma.id/api/agent/monitor/events?hours=1`;
+  const credential = payload.credential || payload;
+  const encoded = encodeCredentialHeaderValue(credential);
+  if (!encoded) {
+    alert("No credential available to build curl command.");
+    return;
+  }
+  const cmd = `curl -H "X-Lemma-Credential: ${encoded}" https://lemma.id/api/developer/stats`;
   copyText(cmd);
 }
 
 function downloadProof() {
-  const raw = JSON.stringify(pageState.issuedPayload || {}, null, 2);
+  const payload = pageState.issuedPayload || {};
+  const exportBody = pageState.modalType === "proof"
+    ? (payload.credential || payload)
+    : payload;
+  const raw = JSON.stringify(exportBody, null, 2);
   const blob = new Blob([raw], { type: "application/json" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
   const base = pageState.modalType === "proof"
-    ? (pageState.issuedPayload?.jti || "issued-proof")
+    ? (payload?.jti || payload?.proof_id || "issued-proof")
     : `${pageState.modalType || "incident-bundle"}-${new Date().toISOString().replace(/[:.]/g, "-")}`;
-  const ext = pageState.modalType === "proof" ? ".proof" : ".json";
+  const ext = pageState.modalType === "proof" ? ".json" : ".json";
   a.download = `${base}${ext}`;
   document.body.appendChild(a);
   a.click();
@@ -882,52 +971,55 @@ function renderProofRows() {
   const tbody = document.getElementById("pf-body");
   const query = String(document.getElementById("pf-search").value || "").toLowerCase();
   const status = document.getElementById("pf-status").value;
-  const rows = pageState.credentials.filter((c) => {
-    const statusOk = status === "all" ? true : c.status === status;
-    const text = `${c.token_id || ""} ${c.agent_name || ""} ${c.task_description || ""}`.toLowerCase();
+  const rows = pageState.proofHistory.filter((c) => {
+    const rowStatus = proofHistoryStatus(c);
+    const statusOk = status === "all" ? true : rowStatus === status;
+    const text = `${c.proof_id || c.jti || ""} ${c.runtime_id || c.agent_name || ""} ${c.task_id || ""}`.toLowerCase();
     const queryOk = !query || text.includes(query);
     return statusOk && queryOk;
   });
   if (!rows.length) {
-    tbody.innerHTML = `<tr><td colspan="7">No proofs found for filters.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="7">No wallet proofs issued this session. Use Issue Proof or <code>lemma setup-openclaw</code>.</td></tr>`;
     return;
   }
-  tbody.innerHTML = rows.map((c) => `
+  tbody.innerHTML = rows.map((c) => {
+    const rowStatus = proofHistoryStatus(c);
+    const scopePreview = Array.isArray(c.scope) ? c.scope : (c.scope_preview || []);
+    const issued = c.issued_at || "-";
+    const expires = c.expires_at || "-";
+    const proofKey = esc(c.proof_id || c.jti || c.issued_at || "proof");
+    return `
     <tr>
-      <td><button class="ao-btn sec" data-view="${esc(c.token_id)}">${esc(c.token_id)}</button></td>
-      <td>${esc(c.agent_name || "-")}<br><span class="ao-note">${esc(c.task_description || "-")}</span></td>
-      <td>${(c.scope || []).map((s) => `<span class="ao-badge ao-valid">${esc(s)}</span>`).join(" ") || "-"}</td>
-      <td>${esc(c.issued_at || "-")}<br>${esc(c.expires_at || "-")}</td>
-      <td>${statusBadge(c.status)}</td>
-      <td>${esc(c.last_used_at || "-")}</td>
+      <td><button class="ao-btn sec" data-view="${proofKey}">${esc(c.proof_id || c.jti || "-")}</button></td>
+      <td>${esc(c.runtime_id || "-")}<br><span class="ao-note">${esc(c.task_id || "-")}</span></td>
+      <td>${(scopePreview || []).map((s) => `<span class="ao-badge ao-valid">${esc(s)}</span>`).join(" ") || "-"}</td>
+      <td>${esc(issued)}<br>${esc(expires)}</td>
+      <td>${statusBadge(rowStatus)}</td>
+      <td>${esc(c.site_id || "lemma.id")}</td>
       <td>
-        <button class="ao-btn sec" data-reissue="${esc(c.token_id)}">Re-issue</button>
-        <button class="ao-btn sec" data-revoke="${esc(c.token_id)}">Revoke</button>
+        <button class="ao-btn sec" data-reissue="${proofKey}">Re-issue</button>
+        <button class="ao-btn sec" data-remove="${proofKey}">Remove</button>
       </td>
     </tr>
-  `).join("");
+  `;
+  }).join("");
 }
 
-async function revokeProof(tokenId) {
-  const res = await api(`/api/agent/credentials/${encodeURIComponent(tokenId)}/revoke`, {
-    method: "POST",
-    headers: Object.assign({ "Content-Type": "application/json" }, authHeaders()),
-    body: JSON.stringify({ reason: "developer_proofs_table_revoke" }),
+function removeProofFromHistory(proofKey) {
+  const history = loadProofHistory().filter((c) => {
+    const key = String(c.proof_id || c.jti || c.issued_at || "");
+    return key !== proofKey;
   });
-  if (!(res.ok && res.data?.success)) {
-    alert(`Revoke failed: ${res.data?.error || res.status}`);
-    return;
-  }
-  await initProofs();
+  sessionStorage.setItem(PROOF_HISTORY_KEY, JSON.stringify(history));
 }
 
-function reissueFromProof(tokenId) {
-  const selected = pageState.credentials.find((c) => c.token_id === tokenId);
+function reissueFromProof(proofKey) {
+  const selected = pageState.proofHistory.find((c) => String(c.proof_id || c.jti || c.issued_at || "") === proofKey);
   if (!selected) return;
   sessionStorage.setItem("issueProofPrefill", JSON.stringify({
-    runtime_id: selected.agent_name || "",
-    task_id: selected.task_description || "",
-    scope: selected.scope || ["read"],
+    runtime_id: selected.runtime_id || "",
+    task_id: selected.task_id || "",
+    scope: selected.scope || selected.scope_preview || ["file.read"],
   }));
   window.location.href = "/admin/agent-ops/issue-proof";
 }
@@ -971,15 +1063,18 @@ async function initProofs() {
   document.getElementById("pf-refresh").addEventListener("click", async () => { await initProofs(); });
   document.getElementById("pf-body").addEventListener("click", async (e) => {
     const viewId = e.target.getAttribute("data-view");
-    const revokeId = e.target.getAttribute("data-revoke");
+    const removeId = e.target.getAttribute("data-remove");
     const reissueId = e.target.getAttribute("data-reissue");
     if (viewId) {
-      const item = pageState.credentials.find((c) => c.token_id === viewId);
+      const item = pageState.proofHistory.find((c) => String(c.proof_id || c.jti || c.issued_at || "") === viewId);
       pageState.issuedPayload = item || {};
       setModalType("proof");
       openIssuedModal();
     }
-    if (revokeId) await revokeProof(revokeId);
+    if (removeId) {
+      removeProofFromHistory(removeId);
+      await initProofs();
+    }
     if (reissueId) reissueFromProof(reissueId);
   });
 }

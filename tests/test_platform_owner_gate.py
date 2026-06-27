@@ -243,6 +243,126 @@ def test_resolve_platform_login_ppid_prefers_binding(monkeypatch):
     assert ppid == OWNER_PPID
 
 
+def test_platform_login_rebinds_internal_iam_wallet_only_after_person_root_recovery(
+    monkeypatch,
+    fake_ishuman_db_session_factory,
+):
+    from api.database import Customer
+
+    db_factory = fake_ishuman_db_session_factory
+    customer = Customer(
+        customer_id="cust_recovery",
+        customer_did=OWNER_PPID,
+        wallet_id="wallet_lost_device",
+        status="active",
+    )
+    db_factory.store.data[Customer.__name__].append(customer)
+
+    monkeypatch.setattr("api.database.get_db", db_factory.session_local)
+    monkeypatch.setattr(
+        "api.platform_owner.enforce_platform_login_wallet",
+        lambda **_kwargs: (OWNER_PPID, None),
+    )
+    monkeypatch.setattr(
+        "api.ishuman._resolve_person_id_for_wallet",
+        lambda _db, wallet_id: "person_owner" if wallet_id == "wallet_recovered" else None,
+    )
+    monkeypatch.setattr(wallet_service, "_has_platform_membership", lambda *_a, **_k: True)
+    monkeypatch.setattr(
+        wallet_service,
+        "_resolve_platform_role_for_ppid",
+        lambda *_a, **_k: {
+            "role": "admin",
+            "permission_id": "admin_access",
+            "permissions": ["admin", "read"],
+            "scope": ["admin", "read"],
+            "source": "platform_accounts",
+        },
+    )
+    monkeypatch.setattr(
+        wallet_service,
+        "issue_permission_lemma",
+        lambda **_kwargs: {"id": "cred_recovered"},
+    )
+    membership_calls = []
+    monkeypatch.setattr(
+        wallet_service,
+        "_upsert_platform_membership",
+        lambda **kwargs: membership_calls.append(kwargs),
+    )
+    monkeypatch.setattr("api.wallet_session_sync._store_global_session", lambda **_kwargs: None)
+
+    app = Flask(__name__)
+    app.config["TESTING"] = True
+    app.register_blueprint(wallet_service_bp)
+    with app.test_client() as client:
+        response = client.post(
+            "/api/wallet-auth/platform-login",
+            json={"ppid": OWNER_PPID, "wallet_id": "wallet_recovered"},
+        )
+
+    assert response.status_code == 200
+    assert response.get_json()["wallet_id"] == "wallet_recovered"
+    assert customer.wallet_id == "wallet_recovered"
+    assert membership_calls[0]["wallet_id"] == "wallet_recovered"
+    assert membership_calls[0]["replace_wallet_id"] is True
+
+
+def test_platform_login_does_not_rebind_wallet_from_bare_client_ppid(
+    monkeypatch,
+    fake_ishuman_db_session_factory,
+):
+    from api.database import Customer
+
+    db_factory = fake_ishuman_db_session_factory
+    customer = Customer(
+        customer_id="cust_no_recovery",
+        customer_did=OWNER_PPID,
+        wallet_id="wallet_canonical",
+        status="active",
+    )
+    db_factory.store.data[Customer.__name__].append(customer)
+
+    monkeypatch.setattr("api.database.get_db", db_factory.session_local)
+    monkeypatch.setattr(
+        "api.platform_owner.enforce_platform_login_wallet",
+        lambda **_kwargs: (OWNER_PPID, None),
+    )
+    monkeypatch.setattr("api.ishuman._resolve_person_id_for_wallet", lambda *_a, **_k: None)
+    monkeypatch.setattr(wallet_service, "_has_platform_membership", lambda *_a, **_k: True)
+    monkeypatch.setattr(
+        wallet_service,
+        "_resolve_platform_role_for_ppid",
+        lambda *_a, **_k: {
+            "role": "admin",
+            "permission_id": "admin_access",
+            "permissions": ["admin", "read"],
+            "scope": ["admin", "read"],
+            "source": "platform_accounts",
+        },
+    )
+    monkeypatch.setattr(
+        wallet_service,
+        "issue_permission_lemma",
+        lambda **_kwargs: {"id": "cred_existing"},
+    )
+    monkeypatch.setattr(wallet_service, "_upsert_platform_membership", lambda **_kwargs: None)
+    monkeypatch.setattr("api.wallet_session_sync._store_global_session", lambda **_kwargs: None)
+
+    app = Flask(__name__)
+    app.config["TESTING"] = True
+    app.register_blueprint(wallet_service_bp)
+    with app.test_client() as client:
+        response = client.post(
+            "/api/wallet-auth/platform-login",
+            json={"ppid": OWNER_PPID, "wallet_id": "wallet_unverified"},
+        )
+
+    assert response.status_code == 200
+    assert response.get_json()["wallet_id"] == "wallet_canonical"
+    assert customer.wallet_id == "wallet_canonical"
+
+
 def test_evaluate_platform_owner_bootstrap_owner_match(monkeypatch):
     from api.platform_owner import evaluate_platform_owner_bootstrap
 

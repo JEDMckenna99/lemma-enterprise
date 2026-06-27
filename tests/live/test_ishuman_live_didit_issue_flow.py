@@ -1,7 +1,6 @@
-"""Live didit sandbox issue-flow (Phase 3.2).
+"""Live Didit sandbox issue-flow (Phase 3.2).
 
-Mirrors test_ishuman_live_stripe_issue_flow.py for the didit rail. Skipped
-unless the live env vars are set AND the target deploy has the didit rail
+Skipped unless live env vars are set AND the target deploy has the Didit rail
 enabled. Drive these against a staging app with:
 
     LEMMA_ISHUMAN_DIDIT_ENABLED=true DIDIT_API_KEY=... DIDIT_WORKFLOW_ID=...
@@ -60,6 +59,8 @@ def test_live_didit_start_routes_to_didit():
     data = _get_json_or_raise(resp)
 
     if resp.status_code == 400 and data.get("error") == "didit_not_enabled":
+        if os.getenv("ISHUMAN_LIVE_REQUIRE_DIDIT_ENABLED") == "1":
+            pytest.fail("Didit rail is not enabled on the strict live smoke target.")
         pytest.skip("Didit rail not enabled on the target deploy (set LEMMA_ISHUMAN_DIDIT_ENABLED + keys).")
 
     assert resp.status_code == 200, data

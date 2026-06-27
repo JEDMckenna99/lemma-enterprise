@@ -1572,6 +1572,12 @@ def _try_wallet_delegation_principal() -> str | None:
     Does not require server-side re-verification of legacy/stale issuer DIDs when
     the PPID is a registered lemma.id platform operator.
     """
+    allow_wallet_delegation = str(
+        os.getenv("LEMMA_ALLOW_WALLET_DELEGATION", "")
+    ).strip().lower() in {"1", "true", "yes", "on"}
+    if not allow_wallet_delegation:
+        return None
+
     if not _has_valid_wallet_unlock_session():
         return None
 

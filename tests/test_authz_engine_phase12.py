@@ -121,7 +121,7 @@ def test_require_authenticated_accepts_verified_lemma_header(monkeypatch):
     payload = resp.get_json()
     assert payload["ok"] is True
     assert payload["ppid"].startswith("did:lemma:ppid_")
-    assert payload["auth_method"] == "credential"
+    assert payload["auth_method"] == "lemma_header"
 
 
 def test_require_authenticated_rejects_ppid_only_header():

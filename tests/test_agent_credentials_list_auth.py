@@ -101,6 +101,7 @@ def test_issue_accepts_wallet_delegation_when_header_invalid(monkeypatch):
     from flask import jsonify
 
     ppid = "did:lemma:ppid_" + ("b" * 64)
+    monkeypatch.setenv("LEMMA_ALLOW_WALLET_DELEGATION", "1")
     monkeypatch.setattr(mod, "_has_valid_wallet_unlock_session", lambda: True)
     monkeypatch.setattr(
         "api.authz_engine.extract_user_lemma_principal",
@@ -138,6 +139,7 @@ def test_try_wallet_delegation_principal_reads_body_admin_credential(monkeypatch
     from api import agent_credentials as mod
 
     ppid = "did:lemma:ppid_" + ("c" * 64)
+    monkeypatch.setenv("LEMMA_ALLOW_WALLET_DELEGATION", "1")
     monkeypatch.setattr(mod, "_has_valid_wallet_unlock_session", lambda: True)
 
     app = Flask(__name__)
@@ -159,6 +161,7 @@ def test_try_wallet_delegation_accepts_site_admin_operator(monkeypatch):
     from api import agent_credentials as mod
 
     ppid = "did:lemma:ppid_" + ("d" * 64)
+    monkeypatch.setenv("LEMMA_ALLOW_WALLET_DELEGATION", "1")
     monkeypatch.setattr(mod, "_has_valid_wallet_unlock_session", lambda: True)
     monkeypatch.setattr(mod, "_admin_lemma_ctx_allows_delegation", lambda _ctx: False)
     monkeypatch.setattr(mod, "_is_lemma_platform_operator", lambda p, e: p == ppid)

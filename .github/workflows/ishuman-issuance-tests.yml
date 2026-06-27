@@ -15,9 +15,18 @@ on:
       - "api/identity_person.py"
       - "api/config.py"
       - "billing/stripe_manager.py"
+      - "billing/didit_manager.py"
+      - "examples/relying_site_offline_verify.py"
+      - "packages/ishuman-verify-js/**"
+      - "packages/ishuman-verify-py/**"
+      - "tests/test_ishuman_didit_issuance.py"
+      - "tests/test_didit_*.py"
+      - "tests/test_ppid_migration.py"
+      - "tests/test_column_crypto.py"
       - "api/database.py"
       - "migrations/024_identity_roots.sql"
       - "static/js/ishuman-verifier.js"
+      - "static/js/lemma-ishuman-verify.mjs"
       - "static/js/lemma-wallet.js"
       - "static/js/wallet-at-rest-crypto.js"
       - "static/js/lemma-passkey.js"
@@ -44,9 +53,18 @@ on:
       - "api/identity_person.py"
       - "api/config.py"
       - "billing/stripe_manager.py"
+      - "billing/didit_manager.py"
+      - "examples/relying_site_offline_verify.py"
+      - "packages/ishuman-verify-js/**"
+      - "packages/ishuman-verify-py/**"
+      - "tests/test_ishuman_didit_issuance.py"
+      - "tests/test_didit_*.py"
+      - "tests/test_ppid_migration.py"
+      - "tests/test_column_crypto.py"
       - "api/database.py"
       - "migrations/024_identity_roots.sql"
       - "static/js/ishuman-verifier.js"
+      - "static/js/lemma-ishuman-verify.mjs"
       - "static/js/lemma-wallet.js"
       - "static/js/wallet-at-rest-crypto.js"
       - "static/js/lemma-passkey.js"
@@ -75,9 +93,7 @@ jobs:
           python-version: ${{ matrix.python-version }}
 
       - name: Install test dependencies
-        run: |
-          python -m pip install --upgrade pip
-          python -m pip install pytest flask requests sqlalchemy stripe flask-cors psycopg2-binary redis cryptography webauthn
+        run: bash scripts/ci_install_test_deps.sh
 
       - name: Run ISHUMAN issuance test suite (non-live)
         env:
@@ -95,10 +111,18 @@ jobs:
           tests/test_ishuman_issuance_integration.py
           tests/test_ishuman_bloom_snapshot.py
           tests/test_wallet_bridge_origin_enforcement.py
+          tests/test_ishuman_browser_signature.py
           tests/test_ishuman_demo.py
           tests/test_site_ppid_revocation.py
           tests/test_wallet_prf_storage.py
           tests/test_ishuman_verifier_session_cache.py
           tests/test_issuer_trust_list.py
+          tests/test_ishuman_verify_packages.py
+          tests/test_ishuman_didit_issuance.py
+          tests/test_didit_webhook_signature.py
+          tests/test_didit_root_material.py
+          tests/test_didit_delete_session.py
+          tests/test_ppid_migration.py
+          tests/test_column_crypto.py
           -m "unit or integration or browser"
           -v

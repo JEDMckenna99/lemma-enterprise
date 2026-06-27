@@ -33,8 +33,9 @@ def reset(*, keep_ppids: set[str], apply: bool) -> int:
             return 1
 
         for row in db.query(PlatformUserSite).all():
-            ppid = normalize_ppid(row.user_did)
-            if not ppid or ppid in keep:
+            raw_ppid = (row.user_did or "").strip()
+            ppid = normalize_ppid(raw_ppid)
+            if raw_ppid in keep or (ppid and ppid in keep):
                 continue
             print(f"  remove platform_user_sites: {ppid[:32]}... site={row.site_id} role={row.role}")
             stats["platform_user_sites_removed"] += 1
@@ -42,10 +43,11 @@ def reset(*, keep_ppids: set[str], apply: bool) -> int:
                 db.delete(row)
 
         for row in db.query(PlatformUser).all():
-            ppid = normalize_ppid(row.user_did)
-            if not ppid or ppid in keep:
+            raw_ppid = (row.user_did or "").strip()
+            ppid = normalize_ppid(raw_ppid)
+            if raw_ppid in keep or (ppid and ppid in keep):
                 continue
-            if is_probe_ppid(ppid):
+            if is_probe_ppid(raw_ppid) or is_probe_ppid(ppid):
                 print(f"  remove platform_users (probe): {ppid[:32]}...")
                 stats["platform_users_removed"] += 1
                 if apply:

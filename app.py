@@ -908,7 +908,7 @@ def create_app():
         response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
         response.headers['Pragma'] = 'no-cache'
         response.headers['Expires'] = '0'
-        response.headers['X-SDK-Version'] = '1.7.2'
+        response.headers['X-SDK-Version'] = '1.8.3'
         response.headers['Access-Control-Allow-Origin'] = '*'
         return response
 
@@ -971,28 +971,28 @@ def create_app():
 
     @app.route('/docs/agents')
     def docs_agents():
-        """Agent Ops and Lemma Firewall documentation."""
-        return render_template('docs/agents.html')
+        """Retired public Agent Ops docs; isHuman is the sole public product."""
+        return redirect(url_for('docs_overview'), code=301)
 
     @app.route('/docs/overview')
     def docs_overview_alias():
-        """Legacy agent overview alias."""
-        return redirect(url_for('docs_agents'), code=301)
+        """Legacy docs alias."""
+        return redirect(url_for('docs_overview'), code=301)
     
     @app.route('/docs/quickstart')
     def docs_quickstart():
-        """Legacy Agent Ops quickstart alias."""
-        return redirect(f"{url_for('docs_agents')}#quickstart", code=301)
+        """Legacy quickstart alias."""
+        return redirect(f"{url_for('docs_overview')}#quickstart", code=301)
     
     @app.route('/docs/installation')
     def docs_installation():
-        """Legacy Agent Ops installation alias."""
-        return redirect(f"{url_for('docs_agents')}#installation", code=301)
+        """Legacy installation alias."""
+        return redirect(url_for('docs_overview'), code=301)
 
     @app.route('/docs/cli')
     def docs_cli():
-        """Legacy Agent Ops CLI alias."""
-        return redirect(f"{url_for('docs_agents')}#cli", code=301)
+        """Retired public CLI docs alias."""
+        return redirect(url_for('docs_overview'), code=301)
     
     @app.route('/docs/wallet-flow')
     def docs_wallet_flow():
@@ -1032,7 +1032,7 @@ def create_app():
     @app.route('/docs/api/auth')
     def docs_api_auth():
         """Legacy auth API alias."""
-        return redirect(f"{url_for('docs_agents')}#api-reference", code=301)
+        return redirect(url_for('docs_overview'), code=301)
     
     @app.route('/docs/api/verification')
     def docs_api_verification():
@@ -1052,7 +1052,7 @@ def create_app():
     @app.route('/docs/examples')
     def docs_examples():
         """Legacy examples alias."""
-        return redirect(f"{url_for('docs_agents')}#examples", code=301)
+        return redirect(url_for('docs_overview'), code=301)
     
     @app.route('/docs/changelog')
     def docs_changelog():

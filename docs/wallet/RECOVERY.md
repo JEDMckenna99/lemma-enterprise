@@ -10,24 +10,45 @@ Lemma identity, and the trust model behind each. It corresponds to Phase 4 of
 ## 1. Re-IDV — the primary recovery path
 
 If a user loses their device, clears IndexedDB, or installs a fresh browser,
-the canonical recovery is to **verify identity again**. Because the
-person-root is derived deterministically from the identity document (not from
-device-local randomness), re-verifying reconstructs the same `person_root`,
-which yields the same per-site PPIDs and therefore the same network identity
-everywhere.
+the canonical recovery is to **verify identity again**. Re-verifying with the
+**same government document** resolves to the same `LemmaPerson` via
+`lemma_document_roots`, which yields the same per-site PPIDs and therefore the
+same network identity everywhere.
+
+> **Assigned person root (`assigned_v1`):** `person_root` is no longer
+> `HKDF(document_root)` for new identities — it is server-assigned and stable.
+> Recovery still works because the server matches the document attestation to
+> the existing person before binding the new wallet. See
+> [`ASSIGNED_PERSON_ROOT.md`](../architecture/ASSIGNED_PERSON_ROOT.md).
+
+Legacy (`document_derived_v1`) identities additionally could re-derive
+`person_root` deterministically from the document hash alone; assigned identities
+require the server document → person link (or a sealed seed envelope on device).
 
 Flow:
 
 1. User opens the wallet and chooses **"Lost your device?"**.
 2. Wallet runs the standard Didit identity verification (default IDV rail).
-3. On completion the server re-derives `person_root`, and the wallet calls
+3. On completion the server derives the document-root lookup key, resolves its
+   existing `LemmaPerson`, and loads that person's assigned `person_root`. The wallet calls
    [`POST /api/ishuman/reissue-master`](../../api/ishuman.py) (Phase 1.3) to
    re-fetch a freshly signed master credential. The old master id is revoked
    and lands in the next Bloom snapshot.
 4. Per-site credentials are re-derived on demand against the restored master.
 
-No special server state is required beyond Phase 1.3 being shipped. Re-IDV +
-reissue-master together give the full recovery story.
+Assigned-root recovery requires the durable `lemma_document_roots` ->
+`lemma_persons` mapping. The resolver checks compatible document-root schema,
+pepper-version, and legacy IDV-provider keys before it may create a person. A
+legacy match is linked to the current write key so later recovery is direct.
+Re-IDV + reissue-master together give the full recovery story.
+
+### Internal IAM continuity
+
+`platform_users.user_did` is the person-root PPID for `lemma.id`. After a lost
+device re-verifies the same document, the new wallet is bound to the existing
+`LemmaPerson`; `resolve_platform_login_ppid()` therefore returns the same PPID
+and the existing internal IAM account, roles, and site links remain in force.
+Recovery must never rewrite IAM ownership from a client-supplied bare PPID.
 
 ### Why this is safe
 

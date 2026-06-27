@@ -32,9 +32,7 @@ jobs:
           python-version: "3.11"
 
       - name: Install Python dependencies
-        run: |
-          python -m pip install --upgrade pip
-          python -m pip install pytest flask requests sqlalchemy stripe flask-cors psycopg2-binary redis
+        run: bash scripts/ci_install_test_deps.sh
 
       - name: Run local security gates
         env:

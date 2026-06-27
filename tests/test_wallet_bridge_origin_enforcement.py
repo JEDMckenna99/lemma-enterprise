@@ -65,4 +65,8 @@ def test_demo_js_gates_test_verify_buttons():
     source = DEMO_JS_PATH.read_text(encoding="utf-8")
     assert "applyTestVerifyGate" in source
     assert "test_verify_enabled" in source
-    assert "ih-test-verify-disabled" in source
+    # Operator-only controls stay hidden unless staging test_verify is enabled.
+    assert "ih-operator-console" in source
+    assert "operatorConsole.hidden" in source
+    assert "ih-start-idv-btn" in source
+    assert "el.hidden" in source

@@ -77,8 +77,9 @@ def test_create_demo_identity_session_returns_success_shape():
     )
     assert session["success"] is True
     assert session["demo_mode"] is True
-    assert session["session_id"].startswith("vs_demo_")
-    assert "client_secret" in session
+    assert session["session_id"].startswith("didit_demo_")
+    assert session["provider"] == "didit_demo"
+    assert "client_secret" not in session
     assert "url" in session
 
 

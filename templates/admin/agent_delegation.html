@@ -29,6 +29,7 @@
         <p>Send the token on every request:</p>
         <pre style="background:#1e1e1e;color:#d4d4d4;padding:12px;border-radius:8px;overflow:auto;">X-Agent-Token: lm_agent_…</pre>
         <p>Tokens are bound to <strong>lemma.id only</strong> with <strong>admin</strong> scope and default access to <code>/api/admin/**</code>. They do not network-revoke users or mutate production without explicit API calls.</p>
+        <p style="margin-top:12px;">For proof-first Agent Ops testing (firewall, runtime kill, <code>X-Lemma-Credential</code>), use <a href="/admin/agent-ops/issue-proof">Agent Ops → Issue Proof</a> or run <code>lemma setup-openclaw --api-base https://lemma.id</code>.</p>
     </div>
 </div>
 

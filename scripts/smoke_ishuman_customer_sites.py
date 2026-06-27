@@ -22,7 +22,10 @@ DEFAULT_SITES = {
 
 SDK_PATTERN = re.compile(r"ishuman-verifier\.js", re.I)
 SITE_ID_PATTERN = re.compile(r"siteId\s*:\s*['\"]([^'\"]+)['\"]")
-AUTO_PROVISION_PATTERN = re.compile(r"autoProvision\s*:\s*true", re.I)
+AUTO_PROVISION_PATTERN = re.compile(
+    r"autoProvision\s*:\s*true|makeVerifier\s*\(\s*true\s*\)",
+    re.I,
+)
 
 
 def fetch(url: str, timeout: int = 30) -> tuple[int, str]:

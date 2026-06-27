@@ -1391,6 +1391,7 @@ def _upsert_platform_membership(
     site_id: str,
     role: str,
     wallet_id: Optional[str] = None,
+    replace_wallet_id: bool = False,
     passkey_credential_id: Optional[str] = None,
 ) -> None:
     """Ensure canonical platform account + site membership reflect latest state."""
@@ -1402,6 +1403,7 @@ def _upsert_platform_membership(
             site_id=site_id,
             site_role=role,
             wallet_id=wallet_id,
+            replace_wallet_id=replace_wallet_id,
             passkey_credential_id=passkey_credential_id,
         )
     except Exception as sync_err:
@@ -1978,6 +1980,22 @@ def platform_login():
         if denied:
             return jsonify(denied[0]), denied[1]
 
+        # A wallet id may replace an existing internal-IAM wallet link only
+        # after IDV bound it to a LemmaPerson. This is the recovery authority;
+        # the client-supplied PPID by itself is never sufficient.
+        person_root_wallet_verified = False
+        if client_wallet_id:
+            from api.database import get_db as get_identity_db
+            from api.ishuman import _resolve_person_id_for_wallet
+
+            identity_db = get_identity_db()
+            try:
+                person_root_wallet_verified = bool(
+                    _resolve_person_id_for_wallet(identity_db, client_wallet_id)
+                )
+            finally:
+                identity_db.close()
+
         denied_membership = _deny_unregistered_platform_login(ppid, site_id='lemma.id')
         if denied_membership:
             return denied_membership
@@ -2005,7 +2023,21 @@ def platform_login():
             
             if customer:
                 # Existing user - use stored wallet_id or store client's
-                if customer.wallet_id:
+                if (
+                    client_wallet_id
+                    and person_root_wallet_verified
+                    and customer.wallet_id != client_wallet_id
+                ):
+                    old_wallet_id = customer.wallet_id
+                    customer.wallet_id = client_wallet_id
+                    canonical_wallet_id = client_wallet_id
+                    db.commit()
+                    logger.info(
+                        "Platform recovery: rebound person-root account wallet %s... -> %s...",
+                        (old_wallet_id or "")[:12],
+                        client_wallet_id[:12],
+                    )
+                elif customer.wallet_id:
                     canonical_wallet_id = customer.wallet_id
                     logger.info(f"Platform login: using stored wallet_id {canonical_wallet_id[:12]}...")
                 elif client_wallet_id:
@@ -2030,6 +2062,11 @@ def platform_login():
             site_id=site_id,
             role=role_profile['role'],
             wallet_id=canonical_wallet_id,
+            replace_wallet_id=bool(
+                person_root_wallet_verified
+                and client_wallet_id
+                and canonical_wallet_id == client_wallet_id
+            ),
             passkey_credential_id=passkey_credential_id,
         )
 
@@ -2520,7 +2557,13 @@ def wallet_firewall_issue_proof():
     payload = request.get_json(silent=True) or {}
     site_id = str(payload.get('site_id') or 'lemma.id').strip().lower()
     granted_by = str(payload.get('granted_by') or 'firewall_wallet_issue').strip()[:120]
-    agent_key_id = str(payload.get('agent_key_id') or 'lemma-firewall-agent-key').strip()[:120] or 'lemma-firewall-agent-key'
+    task_id = str(payload.get('task_id') or '').strip()[:120]
+    runtime_id = str(payload.get('runtime_id') or '').strip()[:120]
+    if task_id and granted_by.startswith('agent_ops'):
+        granted_by = f"{granted_by}:{task_id}"[:120]
+    agent_key_id = str(
+        payload.get('agent_key_id') or runtime_id or 'lemma-firewall-agent-key'
+    ).strip()[:120] or 'lemma-firewall-agent-key'
     policy_version = str(payload.get('policy_version') or 'authz_policy_v2').strip()[:120] or 'authz_policy_v2'
     root_type = _normalize_root_type(payload.get('root_type'))
     org_id, environment = _tenant_context_from_request(payload)
@@ -2549,17 +2592,27 @@ def wallet_firewall_issue_proof():
                 'conditions': [],
                 'priority': 100 if 'admin' in permission_id else 50,
             })
+        custom_claims = {
+            'accountType': role_profile['role'],
+            'permission_level': role_profile['role'],
+            'issued_via': granted_by,
+            'intendedPlatform': 'lemma.id',
+            'useCase': 'lemma_firewall_runtime' if not granted_by.startswith('agent_ops') else 'agent_ops_runtime',
+        }
+        if runtime_id:
+            custom_claims['runtime_id'] = runtime_id
+        if task_id:
+            custom_claims['task_id'] = task_id
+        metadata = payload.get('metadata')
+        if isinstance(metadata, dict):
+            for key in ('trust_state', 'taint_epoch', 'resource_bounds', 'constraints', 'scope_preview'):
+                if metadata.get(key) is not None:
+                    custom_claims[f'agentOps_{key}'] = metadata[key]
         permission_lemma = site_manager.issue_permission_lemma(
             user_did=ppid,
             permission_id=permission_id,
             expiry_days=30,
-            custom_claims={
-                'accountType': role_profile['role'],
-                'permission_level': role_profile['role'],
-                'issued_via': granted_by,
-                'intendedPlatform': 'lemma.id',
-                'useCase': 'lemma_firewall_runtime',
-            },
+            custom_claims=custom_claims,
         )
         proof_artifact = _build_firewall_proof_chain_artifact(
             permission_lemma=permission_lemma if isinstance(permission_lemma, dict) else {},

@@ -2,7 +2,7 @@
 {% set is_public_page = true %}
 
 {% block title %}{{ page_title or 'Documentation' }} - lemma.id{% endblock %}
-{% block description %}{{ page_description or 'lemma.id documentation — proof of humanity for websites and Agent Ops for AI runtime authorization.' }}{% endblock %}
+{% block description %}{{ page_description or 'lemma.id documentation — proof of humanity for websites and applications.' }}{% endblock %}
 
 {% block preload_scripts %}
 <!-- Docs pages skip wallet preload for faster LCP -->
@@ -26,7 +26,7 @@
     <div class="container" style="position: relative; z-index: 1;">
         <p class="docs-hero-eyebrow">Developer documentation</p>
         <h1>{{ hero_title or 'lemma.id Documentation' }}</h1>
-        <p class="docs-hero-subtitle">{{ hero_subtitle or 'Everything you need to integrate lemma.id into your platform.' }}</p>
+        <p class="docs-hero-subtitle">{{ hero_subtitle or 'Everything you need to integrate lemma.id proof of humanity into your platform.' }}</p>
         
         <!-- Docs Search -->
         <div class="docs-search-container">
@@ -62,28 +62,6 @@
                     <a href="/" class="nav-product-link">lemma.id</a>
                 </div>
 
-                <div class="docs-product-switcher">
-                    <a href="{{ url_for('docs_overview') }}" class="docs-product-tab {% if active_product|default('ishuman') == 'ishuman' %}active{% endif %}">Proof of humanity</a>
-                    <a href="{{ url_for('docs_agents') }}" class="docs-product-tab {% if active_product|default('ishuman') == 'agents' %}active{% endif %}">Agent Ops</a>
-                </div>
-
-                {% if active_product|default('ishuman') == 'agents' %}
-                <div class="nav-section">
-                    <div class="nav-title">On this page</div>
-                    <a href="{{ url_for('docs_agents') }}#quickstart" class="nav-link">Quickstart</a>
-                    <a href="{{ url_for('docs_agents') }}#overview" class="nav-link">Overview</a>
-                    <a href="{{ url_for('docs_agents') }}#runtime-contract" class="nav-link">Request contract</a>
-                    <a href="{{ url_for('docs_agents') }}#cli" class="nav-link">CLI reference</a>
-                    <a href="{{ url_for('docs_agents') }}#api-reference" class="nav-link">API reference</a>
-                    <a href="{{ url_for('docs_agents') }}#agent-ops" class="nav-link">Agent Ops console</a>
-                </div>
-                <div class="nav-section">
-                    <div class="nav-title">Resources</div>
-                    <a href="/admin/agent-ops" class="nav-link">Agent Ops console</a>
-                    <a href="{{ url_for('docs_overview') }}" class="nav-link">Proof of humanity docs</a>
-                    <a href="/docs/openclaw/PERSONAL_QUICKSTART.md" class="nav-link">OpenClaw quickstart (md)</a>
-                </div>
-                {% else %}
                 <div class="nav-section">
                     <div class="nav-title">On this page</div>
                     <a href="{{ url_for('docs_overview') }}#quickstart" class="nav-link">Quickstart</a>
@@ -94,11 +72,12 @@
                 </div>
                 <div class="nav-section">
                     <div class="nav-title">Resources</div>
+                    <a href="/docs/integration/ISHUMAN_AGENT_INTEGRATION.md" class="nav-link">AI agent integration guide</a>
                     <a href="/developer/ishuman" class="nav-link">Developer hub</a>
                     <a href="/developer/external-api-keys" class="nav-link">API key manager</a>
-                    <a href="{{ url_for('docs_agents') }}" class="nav-link">Agent Ops docs</a>
+                    <a href="/demo/ishuman" class="nav-link">Live demo</a>
+                    <a href="/llms.txt" class="nav-link">llms.txt</a>
                 </div>
-                {% endif %}
             </nav>
         </aside>
         
@@ -183,7 +162,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const searchInput = document.getElementById('docs-search-input');
     const searchResults = document.getElementById('docs-search-results');
     
-    // Search index - public docs (proof of humanity + Agent Ops)
     const docsIndex = [
         {
             title: 'lemma.id proof of humanity',
@@ -193,11 +171,11 @@ document.addEventListener('DOMContentLoaded', () => {
             excerpt: 'Integrate lemma.id proof of humanity with the browser SDK, site-private PPIDs, local verification, and optional API-key abuse controls. No customer webhooks required.'
         },
         {
-            title: 'Agent Ops',
-            url: '{{ url_for("docs_agents") }}',
-            category: 'getting-started',
-            keywords: 'agent ops firewall lemma-cli runtime X-Lemma-Credential kill switch openclaw setup-openclaw demo authorize decisions control plane',
-            excerpt: 'Proof-first authorization for AI agent runtimes — install lemma-cli, send X-Lemma-Credential, connect runtimes, and operate the Lemma Firewall.'
+            title: 'AI agent integration guide',
+            url: '/docs/integration/ISHUMAN_AGENT_INTEGRATION.md',
+            category: 'agents',
+            keywords: 'ai agent cursor copilot claude coding assistant integration guide ishuman verifyForBackend verifyStamp siteId guardrails checklist',
+            excerpt: 'Machine-oriented guide for AI coding agents integrating isHuman into a developer platform — guardrails, trust tiers, code patterns, and anti-patterns.'
         }
     ];
     
@@ -219,14 +197,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 const searchText = `${doc.title} ${doc.keywords} ${doc.excerpt}`.toLowerCase();
                 let score = 0;
                 
-                // Score based on matches
                 terms.forEach(term => {
                     if (doc.title.toLowerCase().includes(term)) score += 10;
                     if (doc.keywords.includes(term)) score += 5;
                     if (doc.excerpt.toLowerCase().includes(term)) score += 2;
                 });
                 
-                // Exact title match bonus
                 if (doc.title.toLowerCase() === query.toLowerCase()) score += 20;
                 
                 return { ...doc, score };
@@ -253,7 +229,7 @@ document.addEventListener('DOMContentLoaded', () => {
         
         const categoryLabels = {
             'integration': 'Proof of humanity',
-            'getting-started': 'Agent Ops'
+            'agents': 'For AI agents'
         };
         
         let html = results.map((doc, i) => `
@@ -284,7 +260,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     
     if (searchInput) {
-        // Input handler
         searchInput.addEventListener('input', (e) => {
             const query = e.target.value.trim();
             selectedIndex = -1;
@@ -298,7 +273,6 @@ document.addEventListener('DOMContentLoaded', () => {
             renderResults(results, query);
         });
         
-        // Keyboard navigation
         searchInput.addEventListener('keydown', (e) => {
             const results = searchResults.querySelectorAll('.docs-search-result');
             
@@ -319,7 +293,6 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
         
-        // Focus handler
         searchInput.addEventListener('focus', () => {
             if (searchInput.value.trim().length >= 2) {
                 const results = searchDocs(searchInput.value.trim());
@@ -327,14 +300,12 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
         
-        // Click outside to close
         document.addEventListener('click', (e) => {
             if (!e.target.closest('.docs-search-container')) {
                 closeSearch();
             }
         });
         
-        // Global "/" shortcut to focus search
         document.addEventListener('keydown', (e) => {
             if (e.key === '/' && !e.target.matches('input, textarea')) {
                 e.preventDefault();

@@ -361,6 +361,7 @@ def test_check_ppid_reports_site_ppid_revoked_from_revocation_list(
     from api.database import RevocationList
 
     db = fake_ishuman_db_session_factory
+    _seed_site(db)
     ppid = "did:lemma:ppid_revoke_check_001"
     db.store.data[RevocationList.__name__].append(
         RevocationList(
@@ -379,6 +380,7 @@ def test_check_ppid_reports_site_ppid_revoked_from_revocation_list(
 
     resp = ishuman_client.get(
         f"/api/ishuman/check?ppid={ppid}&site_id=site_test_001",
+        headers={"X-API-Key": "test_api_key"},
     )
     payload = resp.get_json()
     assert resp.status_code == 200

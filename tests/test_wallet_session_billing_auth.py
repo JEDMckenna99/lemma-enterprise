@@ -78,6 +78,7 @@ def test_billing_account_status_accepts_wallet_session(monkeypatch):
         subscription_status = "none"
         monthly_usage = {}
         sites = []
+        api_keys = []
 
     class FakeManager:
         def get_customer_by_did(self, _ppid):

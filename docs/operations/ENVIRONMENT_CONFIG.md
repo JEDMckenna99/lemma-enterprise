@@ -46,6 +46,8 @@ value, including `staging` and unset, enables them.**
 | `LEMMA_PERSON_ROOT_SALT_V1`      | HKDF salt for `person_root` derivation (>= 32 bytes).               | Dev fallback used; **never acceptable in production.**  |
 | `LEMMA_PPID_ROOT_KEY`            | Root key for legacy `wallet_secret`-path PPID derivation.            | Legacy anonymous PPID derivation fails.                 |
 | `LEMMA_ACTIVE_ROOT_VERSION`      | Active pepper/salt version for new IDVs (v2 Phase 3.1). Default `V1`.| Defaults to `V1`.                                       |
+| `LEMMA_DOCUMENT_ROOT_READ_VERSIONS` | Comma-separated older pepper versions checked when resolving an existing document assignment. | Defaults to `v1` plus the active version. |
+| `LEMMA_DOCUMENT_ROOT_READ_PROVIDERS` | Additional legacy provider namespaces checked during IDV-rail migration. | Didit checks `stripe_identity` by default for recovery continuity. |
 
 > Rotation: maintain `_V1`, `_V2`, ... pepper/salt env vars concurrently and
 > flip `LEMMA_ACTIVE_ROOT_VERSION`. See Phase 3.1 in
@@ -76,12 +78,11 @@ both the API key and workflow id are present.
 | `DIDIT_DELETE_PATH_TEMPLATE`      | Override the didit delete route. Default tries `/v3/session/{session_id}/delete/` then legacy `/v3/session/{session_id}/`. | Uses the Management API delete route first. |
 | `LEMMA_IDENTITY_ROOT_PEPPER_DIDIT_V1` | Optional per-issuer pepper isolation (Phase 3.2 Option A).                     | Falls back to the shared `LEMMA_IDENTITY_ROOT_PEPPER_V1`. |
 
-> Provider namespacing: `provider` is part of the signed `document_root` claim
-> set, so the same physical document verified through didit derives a *distinct*
-> person_root/PPID from the Stripe rail. This is intentional isolation, not a
-> bug. Because the didit rail ships flag-off with no prior users, the optional
-> per-issuer pepper can be provisioned at any time before first didit issuance
-> without a migration.
+> Provider namespacing: `provider` remains part of the signed `document_root`
+> claim set. New, previously unseen documents retain provider isolation. During
+> recovery, Didit also checks legacy Stripe document-root keys; an existing
+> assignment is reused and linked to the current Didit key so a provider
+> migration cannot silently replace the assigned person or internal-IAM PPID.
 
 ### Demo / test rails (only meaningful when `ENVIRONMENT != production`)
 

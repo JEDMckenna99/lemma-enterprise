@@ -333,3 +333,57 @@ def test_wallet_issue_proof_includes_tenant_and_root_type(monkeypatch):
     assert captured["root_type"] == "workload_root"
     assert captured["org_id"] == "tenant_gamma"
     assert captured["environment"] == "staging"
+
+
+def test_wallet_issue_proof_maps_runtime_id_to_agent_key(monkeypatch):
+    app = _wallet_app()
+    monkeypatch.setattr(wallet_service, "validate_session_token", lambda token: None)
+    monkeypatch.setattr(wallet_service, "validate_unlock_token", lambda token: {"wallet_id": "wallet_hidden"})
+    monkeypatch.setattr(wallet_service, "_resolve_firewall_identity_ppid", lambda wallet_id: "did:lemma:ppid_" + ("2" * 64))
+    monkeypatch.setattr(
+        wallet_service,
+        "_resolve_platform_role_for_ppid",
+        lambda ppid, site_id: {
+            "role": "admin",
+            "permission_id": "admin_access",
+            "scope": ["read", "write", "admin"],
+            "source": "test",
+        },
+    )
+    captured: dict[str, str] = {}
+    monkeypatch.setattr(
+        wallet_service,
+        "_build_firewall_proof_chain_artifact",
+        lambda **kwargs: captured.update({"agent_key_id": str(kwargs.get("agent_key_id") or "")})
+        or {"root_proof": {}, "delegated_proof": {}, "proof_chain": []},
+    )
+
+    class _FakeSiteManager:
+        def __init__(self):
+            self.permissions = {}
+
+        def add_permission(self, _payload):
+            return None
+
+        def issue_permission_lemma(self, **_kwargs):
+            return {"id": "cred_test_issue", "permission_id": "admin_access"}
+
+    import api.real_iam_manager as real_iam_manager
+
+    monkeypatch.setattr(real_iam_manager, "get_site_manager", lambda _sid, _domain: _FakeSiteManager())
+    monkeypatch.setattr(real_iam_manager, "get_or_create_site_manager", lambda _sid, _domain: _FakeSiteManager())
+
+    headers = {"X-Lemma-Unlock": "unlock_test_token"}
+    with app.test_client() as client:
+        resp = client.post(
+            "/api/wallet/runtimes/issue-proof",
+            headers=headers,
+            json={
+                "site_id": "lemma.id",
+                "runtime_id": "openclaw-default",
+                "task_id": "TASK-42",
+                "granted_by": "agent_ops_ui",
+            },
+        )
+    assert resp.status_code == 200
+    assert captured["agent_key_id"] == "openclaw-default"

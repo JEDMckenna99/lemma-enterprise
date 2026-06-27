@@ -44,6 +44,24 @@ def test_mode_policy_compat_bearer_expires_at_sunset():
     assert decision.reason_code == "AUTH_COMPAT_MODE_EXPIRED"
 
 
+def test_mode_policy_sunset_accepts_modern_credential_but_rejects_agent_bearer():
+    modern = evaluate_mode_policy(
+        expected_mode="compat_bearer",
+        headers={"X-Lemma-Credential": "credential"},
+        compat_sunset_utc="2000-01-01T00:00:00Z",
+    )
+    legacy = evaluate_mode_policy(
+        expected_mode="compat_bearer",
+        headers={"X-Agent-Token": "lm_agent_legacy"},
+        compat_sunset_utc="2000-01-01T00:00:00Z",
+    )
+
+    assert modern.allowed is True
+    assert modern.effective_mode == "credential_required"
+    assert legacy.allowed is False
+    assert legacy.reason_code == "AUTH_COMPAT_MODE_EXPIRED"
+
+
 def test_replay_contract_detects_nonce_reuse():
     used = set()
 
@@ -604,4 +622,3 @@ def test_authz_control_plane_endpoints():
             first = delta_payload["changes"][0]
             assert "proof_id" in first
             assert "root_grant_id" in first
-
