@@ -32,7 +32,7 @@
     <!-- LOCKED VIEW -->
     <div id="locked-view">
         <div class="card" style="text-align: center;">
-            <button id="unlock-btn" class="btn btn-primary btn-full btn-lg">
+            <button id="unlock-btn" class="btn btn-primary btn-full btn-lg hidden">
                 Open lemma.id
             </button>
 
@@ -340,7 +340,7 @@ async function hasCompleteLemmaId() {
 }
 
 function showIncompleteLemmaIdState() {
-    updateStatusDisplay(false, 'Finish setup', 'Create your human proof to complete your lemma.id');
+    updateStatusDisplay(false, 'Create a lemma.id', 'Finish your one-time human verification');
     document.getElementById('unlock-btn').classList.add('hidden');
     document.getElementById('no-wallet-msg').classList.remove('hidden');
     showLockedView();
@@ -423,10 +423,11 @@ async function checkWalletState() {
         } else if (info.hasWalletSecret) {
             updateStatusDisplay(false, 'Set up passkey', 'Secure this device to finish setup');
             document.getElementById('unlock-btn').textContent = 'Create passkey';
+            document.getElementById('unlock-btn').classList.remove('hidden');
             document.getElementById('no-wallet-msg').classList.add('hidden');
             showLockedView();
         } else {
-            updateStatusDisplay(false, 'Welcome', 'Create your lemma.id or add this device');
+            updateStatusDisplay(false, 'Create a lemma.id', 'Start with a passkey and one-time human verification');
             document.getElementById('unlock-btn').classList.add('hidden');
             document.getElementById('no-wallet-msg').classList.remove('hidden');
             showLockedView();
@@ -882,21 +883,59 @@ async function clearWallet() {
     }
     
     try {
-        // Delete IndexedDB
+        disconnectCrossDeviceSSE();
+
+        let walletId = '';
+        try {
+            const info = await wallet?.getWalletInfo?.();
+            walletId = info?.walletId || wallet?.session?.walletId || '';
+        } catch (_) {}
+
+        // Clear the server-side/global unlock before removing the local ID.
+        // This also expires HttpOnly session cookies that JavaScript cannot.
+        try {
+            await fetch('/api/wallet/clear-session', {
+                method: 'POST',
+                credentials: 'include',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(walletId ? { wallet_id: walletId } : {}),
+            });
+        } catch (err) {
+            console.warn('Server session cleanup failed; continuing local removal:', err?.message || err);
+        }
+
+        // IndexedDB deletion is blocked while any SDK instance on this page
+        // still owns a connection. The old implementation treated "blocked"
+        // as success, reloaded, and resurrected the wallet it failed to delete.
+        const instances = [wallet, window.globalLemmaWallet, window.lemmaWalletInstance];
+        for (const instance of instances) {
+            try { instance?.stopSessionHeartbeat?.(); } catch (_) {}
+            try { instance?.db?.close?.(); } catch (_) {}
+            if (instance) {
+                instance.db = null;
+                instance._initialized = false;
+            }
+        }
+
         await new Promise((resolve, reject) => {
             const req = indexedDB.deleteDatabase('LemmaWallet');
             req.onsuccess = resolve;
             req.onerror = reject;
-            req.onblocked = resolve;
+            req.onblocked = () => reject(new Error(
+                'Wallet removal is blocked by another lemma.id tab. Close the other tab and try again.',
+            ));
         });
-        
-        // Clear cookies
+
+        localStorage.clear();
+        sessionStorage.clear();
+
+        // Best-effort cleanup for non-HttpOnly compatibility cookies.
         document.cookie = 'lemma_wallet_session=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
         document.cookie = 'lemma_wallet_csrf=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
-        
+
         wallet = null;
-        location.reload();
-        
+        window.location.replace('/?removed=1');
+
     } catch (e) {
         console.error('Clear failed:', e);
         alert('Failed to clear wallet: ' + e.message);

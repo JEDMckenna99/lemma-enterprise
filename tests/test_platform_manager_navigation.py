@@ -40,4 +40,8 @@ def test_brand_and_manager_creation_use_canonical_routes():
     assert "popupUrl.searchParams.set('site_id', 'lemma.id')" in manager
     assert "window.open(" in manager
     assert "async function hasCompleteLemmaId()" in manager
-    assert "Create your human proof to complete your lemma.id" in manager
+    assert "Create a lemma.id" in manager
+    assert "req.onblocked = () => reject" in manager
+    assert "instance?.db?.close?.()" in manager
+    assert "localStorage.clear()" in manager
+    assert "window.location.replace('/?removed=1')" in manager
