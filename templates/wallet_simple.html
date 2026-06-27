@@ -324,13 +324,40 @@ async function checkCrossDeviceLock() {
     }
 }
 
+async function hasCompleteLemmaId() {
+    try {
+        if (typeof wallet.findIsHumanMasterCredential === 'function') {
+            const master = await wallet.findIsHumanMasterCredential();
+            if (master) return true;
+        }
+        if (typeof wallet.hasIsHumanMasterInCache === 'function') {
+            return await wallet.hasIsHumanMasterInCache();
+        }
+    } catch (err) {
+        console.warn('Could not inspect lemma.id proof:', err?.message || err);
+    }
+    return false;
+}
+
+function showIncompleteLemmaIdState() {
+    updateStatusDisplay(false, 'Finish setup', 'Create your human proof to complete your lemma.id');
+    document.getElementById('unlock-btn').classList.add('hidden');
+    document.getElementById('no-wallet-msg').classList.remove('hidden');
+    showLockedView();
+}
+
 // Check wallet state and update UI (does NOT auto-lock - that's checkCrossDeviceLock's job)
 async function checkWalletState() {
     try {
         await initWallet();
         const info = await wallet.getWalletInfo();
-        
+
         if (info.isUnlocked) {
+            if (!(await hasCompleteLemmaId())) {
+                showIncompleteLemmaIdState();
+                return false;
+            }
+
             // Verify global session exists for cross-device sync
             // (signal-unlock sets this during wallet.unlock() on lemma.id)
             if (info.walletId) {
@@ -373,7 +400,12 @@ async function checkWalletState() {
                 // Mark that we have a global session
                 hadGlobalSession = true;
                 localStorage.setItem('lemma_had_global_session', 'true');
-                
+
+                if (!(await hasCompleteLemmaId())) {
+                    showIncompleteLemmaIdState();
+                    return false;
+                }
+
                 updateStatusDisplay(true, 'Open', 'Synced from another device');
                 showUnlockedView();
                 await loadProofSummary();

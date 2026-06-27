@@ -39,3 +39,5 @@ def test_brand_and_manager_creation_use_canonical_routes():
     assert "new URL('/wallet/ishuman-idv', window.location.origin)" in manager
     assert "popupUrl.searchParams.set('site_id', 'lemma.id')" in manager
     assert "window.open(" in manager
+    assert "async function hasCompleteLemmaId()" in manager
+    assert "Create your human proof to complete your lemma.id" in manager
