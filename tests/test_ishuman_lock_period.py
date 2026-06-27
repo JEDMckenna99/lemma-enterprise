@@ -178,6 +178,16 @@ def test_idv_popup_allows_same_origin_demo_hub_master_flow():
 
 
 @pytest.mark.browser
+def test_idv_passkey_actions_require_a_user_click():
+    """Popup boot must not invoke WebAuthn without transient user activation."""
+    idv_html = IDV_HTML.read_text(encoding="utf-8")
+    assert "async function showUserInitiatedPrimaryAction()" in idv_html
+    assert "WebAuthn create/get requires a user gesture" in idv_html
+    assert idv_html.count("await showUserInitiatedPrimaryAction();") == 3
+    assert "Creating your lemma.id with a passkey" in idv_html
+
+
+@pytest.mark.browser
 def test_idv_site_proof_boot_does_not_reference_undefined_copy():
     idv_html = IDV_HTML.read_text(encoding="utf-8")
     site_proof_boot = idv_html.split("if (isSiteProofIssue) {", 1)[1]

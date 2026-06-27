@@ -664,7 +664,17 @@
                 throw new Error('Wallet SDK failed to load — allow scripts for lemma.id and refresh.');
             }
             wallet = wallet || new LemmaWallet();
-            setStatus(consumerCopy().status?.unlocking || 'Unlocking with your passkey…', 'loading');
+            await wallet.init();
+            const walletInfo = await wallet.getWalletInfo();
+            const isFirstWallet = !walletInfo.hasWallet
+                && !walletInfo.hasPasskey
+                && !walletInfo.hasWalletSecret;
+            setStatus(
+                isFirstWallet
+                    ? (consumerCopy().status?.creating || 'Creating your lemma.id with a passkey…')
+                    : (consumerCopy().status?.unlocking || 'Unlocking with your passkey…'),
+                'loading',
+            );
             const result = await wallet.ensureIsHumanIssuanceReady({ isHumanIssuance: true });
             if (!result.ready) {
                 throw new Error('Wallet unlock failed — complete the passkey prompt or try again.');
@@ -1062,6 +1072,17 @@
 
         async function applyPrimaryButtonLabel() {
             document.getElementById('primary-btn').textContent = await resolvePrimaryButtonLabel();
+        }
+
+        async function showUserInitiatedPrimaryAction() {
+            const btn = document.getElementById('primary-btn');
+            btn.disabled = false;
+            await applyPrimaryButtonLabel();
+            btn.classList.remove('hidden');
+            setStatus(
+                consumerCopy().status?.ready || 'Continue when you’re ready.',
+                'info',
+            );
         }
 
         /**
@@ -1515,36 +1536,16 @@
                     ? (copy.intro?.freshBlocked ? copy.intro.freshBlocked(requestingSite) : '')
                     : (copy.intro?.freshRevoked || '');
                 applyConsumerShell({ intro, hideSteps: false });
-                document.getElementById('primary-btn').classList.add('hidden');
-                try {
-                    const done = await runVerification();
-                    if (!done) {
-                        setStatus(copy.status?.ready || 'Takes about a minute. You can stop anytime.', 'info');
-                    }
-                } catch (err) {
-                    console.error('[isHuman IDV] fresh_idv failed:', err);
-                    const detail = err?.message || err?.toString() || 'Could not complete fresh verification';
-                    setStatus(detail, 'error');
-                    document.getElementById('primary-btn').classList.remove('hidden');
-                    document.getElementById('primary-btn').textContent = consumerCopy().primary?.tryAgain || 'Try again';
-                }
+                // WebAuthn create/get requires a user gesture. Never start a
+                // passkey operation from popup boot: first-time users otherwise
+                // sit at "Unlocking" even though no wallet exists yet.
+                await showUserInitiatedPrimaryAction();
                 return;
             }
 
             if (isSiteProofIssue) {
                 applyConsumerShell({ introKey: 'siteProof' });
-                document.getElementById('primary-btn').classList.add('hidden');
-                try {
-                    const done = await runVerification();
-                    if (!done) {
-                        const copy = consumerCopy();
-                        setStatus(copy.status?.ready || 'Takes about a minute. You can stop anytime.', 'info');
-                    }
-                } catch (err) {
-                    setStatus(err.message || consumerCopy().status?.error || 'Something went wrong. Please try again.', 'error');
-                    document.getElementById('primary-btn').classList.remove('hidden');
-                    document.getElementById('primary-btn').textContent = consumerCopy().primary?.tryAgain || 'Try again';
-                }
+                await showUserInitiatedPrimaryAction();
                 return;
             }
 
@@ -1576,16 +1577,7 @@
             }
 
             if (isMasterCreationFlow && (window.opener || isSameOriginMasterFlow)) {
-                document.getElementById('primary-btn').classList.add('hidden');
-                try {
-                    await runVerification();
-                } catch (err) {
-                    console.error('[isHuman IDV] master creation failed:', err);
-                    const detail = err?.message || err?.toString() || 'Verification failed';
-                    setStatus(detail, 'error');
-                    document.getElementById('primary-btn').classList.remove('hidden');
-                    await applyPrimaryButtonLabel();
-                }
+                await showUserInitiatedPrimaryAction();
                 return;
             }
 
