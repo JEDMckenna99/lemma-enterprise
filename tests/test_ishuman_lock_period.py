@@ -111,6 +111,15 @@ def test_wallet_handoff_wallet_id_reconciled_for_site_proof(wallet_source):
 
 
 @pytest.mark.browser
+def test_cleared_device_uses_fresh_wallet_id_and_repairs_key_conflict(wallet_source):
+    assert "storedIdentity?.walletId && storedIdentity?.walletSecret" in wallet_source
+    assert "_rotateIncompleteWalletId" in wallet_source
+    assert "err?.code !== 'wallet_pubkey_mismatch'" in wallet_source
+    assert "if (localMaster || cachedMaster) return null" in wallet_source
+    assert "prfWalletId" in wallet_source
+
+
+@pytest.mark.browser
 def test_idv_site_proof_polls_master_when_session_pending():
     idv_html = IDV_HTML.read_text(encoding="utf-8")
     assert "if (sessionId) {" in idv_html
@@ -276,12 +285,7 @@ def test_wallet_pages_use_current_wallet_bundle():
     for path in wallet_pages:
         source = path.read_text(encoding="utf-8")
         assert "lemma-wallet.js?v=2542" not in source
-        if path == IDV_HTML:
-            assert "lemma-wallet.js?v=2550" in source
-        elif path == MODERN_LAYOUT_HTML:
-            assert "lemma-wallet.js') }}?v=2550" in source or "lemma-wallet.js?v=2550" in source
-        else:
-            assert "lemma-wallet.js?v=2549" in source
+        assert "lemma-wallet.js') }}?v=2660" in source or "lemma-wallet.js?v=2660" in source
         assert "lemma-keys.js?v=2" not in source
         assert "lemma-keys.js?v=3" not in source
         assert "lemma-keys.js') }}?v=5" in source or "lemma-keys.js?v=5" in source

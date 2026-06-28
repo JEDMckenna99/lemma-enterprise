@@ -91,7 +91,7 @@ const AUTH_STATE = {
 class LemmaWallet {
     // SDK version - check with LemmaWallet.VERSION
     // v2.32.0: Redirect-only architecture - removed popup flow for simpler, consistent UX
-    static VERSION = '2.65.0';  // v2.65: isHuman passkey required without force-flag loop; bind handoff wallet_id
+    static VERSION = '2.66.0';  // v2.66: recover cleared-device signing-key conflicts onto a fresh wallet_id
     
     constructor(options = {}) {
         this.db = null;
@@ -2075,15 +2075,16 @@ class LemmaWallet {
             return await this.unlock(options);
         }
         
-        // Get wallet ID — reuse linked/handoff identity; never mint a fresh id when
-        // wallet_secret already exists (would desync from server verification row).
+        // Reuse only a complete linked/handoff identity. A wallet_id left behind
+        // without its wallet_secret is an orphan from an interrupted/legacy
+        // clear; pairing a new secret with that old id causes a signing-key
+        // conflict and must never be attempted.
         let walletId = await this._get('passkey', 'walletId');
         const storedIdentity = await this._resolveStoredWalletIdentity();
-        if (!walletId?.value && storedIdentity?.walletId) {
+        if (storedIdentity?.walletId && storedIdentity?.walletSecret) {
             walletId = { id: 'walletId', value: storedIdentity.walletId };
             await this._put('passkey', walletId);
-        }
-        if (!walletId?.value) {
+        } else {
             walletId = { id: 'walletId', value: this._generateId() };
             await this._put('passkey', walletId);
         }
@@ -2142,6 +2143,7 @@ class LemmaWallet {
             createdAt: Date.now(),
             prfEnabled: prfBound,
             prfSaltRpId: rpId,
+            prfWalletId: walletId.value,
         };
 
         await this._put('passkey', passkeyRecord);
@@ -2290,10 +2292,55 @@ class LemmaWallet {
         // the wallet page and the IDV popup): share a single in-flight request
         // so we don't race two INSERTs against the wallet_signing_keys PK.
         if (this._registerSigningKeyInFlight) return this._registerSigningKeyInFlight;
-        this._registerSigningKeyInFlight = this._registerSigningKeyNow(walletId).finally(() => {
-            this._registerSigningKeyInFlight = null;
-        });
+        this._registerSigningKeyInFlight = this._registerSigningKeyNow(walletId)
+            .catch(async (err) => {
+                if (err?.code !== 'wallet_pubkey_mismatch') throw err;
+                const replacementWalletId = await this._rotateIncompleteWalletId(walletId);
+                if (!replacementWalletId) throw err;
+                return this._registerSigningKeyNow(replacementWalletId);
+            })
+            .finally(() => {
+                this._registerSigningKeyInFlight = null;
+            });
         return this._registerSigningKeyInFlight;
+    }
+
+    async _rotateIncompleteWalletId(conflictingWalletId) {
+        // Never silently rotate an established local identity. This recovery is
+        // only for a newly-created/incomplete wallet with no isHuman master;
+        // fresh IDV will bind the replacement wallet to the assigned person root.
+        const localMaster = await this.findIsHumanMasterCredential().catch(() => null);
+        const cachedMaster = await this.hasIsHumanMasterInCache().catch(() => false);
+        if (localMaster || cachedMaster) return null;
+
+        const replacementWalletId = this._generateId();
+        const passkey = await this._get('passkey', 'primary').catch(() => null);
+        if (passkey) {
+            // PRF encryption salt was chosen when the passkey was created. Keep
+            // it pinned even though the logical/server wallet_id is replaced.
+            passkey.prfWalletId = passkey.prfWalletId || conflictingWalletId;
+            await this._put('passkey', passkey);
+        }
+        await this._put('passkey', { id: 'walletId', value: replacementWalletId });
+        this.session.walletId = replacementWalletId;
+        await this._put('session', { id: 'current', ...this.session });
+        this._signingKeyRegistered = false;
+
+        try {
+            await fetch('/api/wallet/signal-unlock', {
+                method: 'POST',
+                credentials: 'include',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    wallet_id: replacementWalletId,
+                    unlocked_at: this.session.unlockedAt || Date.now(),
+                    expires_at: Math.floor((this.session.expiresAt || Date.now()) / 1000),
+                }),
+            });
+        } catch (_) {
+            // Local recovery remains valid; global-session sync is best effort.
+        }
+        return replacementWalletId;
     }
 
     async _registerSigningKeyNow(walletId) {
@@ -2315,7 +2362,9 @@ class LemmaWallet {
         });
         const data = await response.json().catch(() => ({}));
         if (!response.ok || data.success === false) {
-            throw new Error(data.error || `register-signing-key failed (${response.status})`);
+            const error = new Error(data.error || `register-signing-key failed (${response.status})`);
+            error.code = data.code || '';
+            throw error;
         }
         this._signingKeyRegistered = true;
         return data;
@@ -3354,7 +3403,7 @@ class LemmaWallet {
             }],
             userVerification: 'required',
             timeout: 60000
-        }, walletIdRecord?.value);
+        }, passkey.prfWalletId || walletIdRecord?.value);
 
         const credential = await navigator.credentials.get({
             publicKey: getOptions
@@ -6396,7 +6445,7 @@ class LemmaWallet {
                 }],
                 userVerification: 'required',
                 timeout: 60000
-            }, walletIdRecord?.value);
+            }, passkey.prfWalletId || walletIdRecord?.value);
 
             const credential = await navigator.credentials.get({
                 publicKey: getOptions

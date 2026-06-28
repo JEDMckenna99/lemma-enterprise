@@ -91,7 +91,7 @@ const AUTH_STATE = {
 class LemmaWallet {
     // SDK version - check with LemmaWallet.VERSION
     // v2.32.0: Redirect-only architecture - removed popup flow for simpler, consistent UX
-    static VERSION = '2.65.0';  // v2.65: isHuman passkey required without force-flag loop; bind handoff wallet_id
+    static VERSION = '2.66.0';  // v2.66: recover cleared-device signing-key conflicts onto a fresh wallet_id
     
     constructor(options = {}) {
         this.db = null;
@@ -2075,15 +2075,16 @@ class LemmaWallet {
             return await this.unlock(options);
         }
         
-        // Get wallet ID — reuse linked/handoff identity; never mint a fresh id when
-        // wallet_secret already exists (would desync from server verification row).
+        // Reuse only a complete linked/handoff identity. A wallet_id left behind
+        // without its wallet_secret is an orphan from an interrupted/legacy
+        // clear; pairing a new secret with that old id causes a signing-key
+        // conflict and must never be attempted.
         let walletId = await this._get('passkey', 'walletId');
         const storedIdentity = await this._resolveStoredWalletIdentity();
-        if (!walletId?.value && storedIdentity?.walletId) {
+        if (storedIdentity?.walletId && storedIdentity?.walletSecret) {
             walletId = { id: 'walletId', value: storedIdentity.walletId };
             await this._put('passkey', walletId);
-        }
-        if (!walletId?.value) {
+        } else {
             walletId = { id: 'walletId', value: this._generateId() };
             await this._put('passkey', walletId);
         }
@@ -2142,6 +2143,7 @@ class LemmaWallet {
             createdAt: Date.now(),
             prfEnabled: prfBound,
             prfSaltRpId: rpId,
+            prfWalletId: walletId.value,
         };
 
         await this._put('passkey', passkeyRecord);
@@ -2290,10 +2292,55 @@ class LemmaWallet {
         // the wallet page and the IDV popup): share a single in-flight request
         // so we don't race two INSERTs against the wallet_signing_keys PK.
         if (this._registerSigningKeyInFlight) return this._registerSigningKeyInFlight;
-        this._registerSigningKeyInFlight = this._registerSigningKeyNow(walletId).finally(() => {
-            this._registerSigningKeyInFlight = null;
-        });
+        this._registerSigningKeyInFlight = this._registerSigningKeyNow(walletId)
+            .catch(async (err) => {
+                if (err?.code !== 'wallet_pubkey_mismatch') throw err;
+                const replacementWalletId = await this._rotateIncompleteWalletId(walletId);
+                if (!replacementWalletId) throw err;
+                return this._registerSigningKeyNow(replacementWalletId);
+            })
+            .finally(() => {
+                this._registerSigningKeyInFlight = null;
+            });
         return this._registerSigningKeyInFlight;
+    }
+
+    async _rotateIncompleteWalletId(conflictingWalletId) {
+        // Never silently rotate an established local identity. This recovery is
+        // only for a newly-created/incomplete wallet with no isHuman master;
+        // fresh IDV will bind the replacement wallet to the assigned person root.
+        const localMaster = await this.findIsHumanMasterCredential().catch(() => null);
+        const cachedMaster = await this.hasIsHumanMasterInCache().catch(() => false);
+        if (localMaster || cachedMaster) return null;
+
+        const replacementWalletId = this._generateId();
+        const passkey = await this._get('passkey', 'primary').catch(() => null);
+        if (passkey) {
+            // PRF encryption salt was chosen when the passkey was created. Keep
+            // it pinned even though the logical/server wallet_id is replaced.
+            passkey.prfWalletId = passkey.prfWalletId || conflictingWalletId;
+            await this._put('passkey', passkey);
+        }
+        await this._put('passkey', { id: 'walletId', value: replacementWalletId });
+        this.session.walletId = replacementWalletId;
+        await this._put('session', { id: 'current', ...this.session });
+        this._signingKeyRegistered = false;
+
+        try {
+            await fetch('/api/wallet/signal-unlock', {
+                method: 'POST',
+                credentials: 'include',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    wallet_id: replacementWalletId,
+                    unlocked_at: this.session.unlockedAt || Date.now(),
+                    expires_at: Math.floor((this.session.expiresAt || Date.now()) / 1000),
+                }),
+            });
+        } catch (_) {
+            // Local recovery remains valid; global-session sync is best effort.
+        }
+        return replacementWalletId;
     }
 
     async _registerSigningKeyNow(walletId) {
@@ -2315,7 +2362,9 @@ class LemmaWallet {
         });
         const data = await response.json().catch(() => ({}));
         if (!response.ok || data.success === false) {
-            throw new Error(data.error || `register-signing-key failed (${response.status})`);
+            const error = new Error(data.error || `register-signing-key failed (${response.status})`);
+            error.code = data.code || '';
+            throw error;
         }
         this._signingKeyRegistered = true;
         return data;
@@ -2880,6 +2929,12 @@ class LemmaWallet {
         return !!(cl.site_signing_pubkey || cl.siteSigningPubkey);
     }
 
+    _siteCredentialLocallyVerifiable(credential) {
+        // ishuman-verifier.js verifies proof.signatureValueWeb only; legacy
+        // wallet copies without it must be re-derived server-side.
+        return !!(credential?.proof?.signatureValueWeb);
+    }
+
     _credentialIssuedAtSeconds(credential) {
         if (!credential) return 0;
         const claims = credential.claims || credential.credentialSubject || {};
@@ -2936,14 +2991,20 @@ class LemmaWallet {
         return this._sortCredentialsNewestFirst(masters)[0];
     }
 
-    async deriveAndStoreSiteProof(targetSite) {
+    async deriveAndStoreSiteProof(targetSite, options = {}) {
         await this.ensureIsHumanIssuanceReady({ isHumanIssuance: true });
         await this.reconcileSessionWalletIdForIssuance();
         const keys = this._getLemmaKeys();
         const canonicalSite = keys.canonicalizeSiteDomain(targetSite || '');
+        const issueMode = (options.issueMode || 'site_proof').trim().toLowerCase();
+        const forceServerDerive = issueMode === 'fresh_idv' || !!options.forceServerDerive;
 
-        const existing = await this.findIsHumanSiteCredential(canonicalSite);
-        if (existing) return existing;
+        if (!forceServerDerive) {
+            const existing = await this.findIsHumanSiteCredential(canonicalSite);
+            if (existing && this._siteCredentialLocallyVerifiable(existing)) {
+                return existing;
+            }
+        }
 
         // v2 (Phase 1.2): the master credential is an optional hint. If the
         // local copy is missing, the server falls back to our latest verified
@@ -2981,6 +3042,7 @@ class LemmaWallet {
             target_site: canonicalSite,
             site_signing_pubkey: siteSigningPubkey,
             wallet_assertion: walletAssertion,
+            issue_mode: issueMode === 'fresh_idv' ? 'fresh_idv' : 'site_proof',
         };
         if (masterId) {
             deriveBody.master_credential_id = masterId;
@@ -2995,6 +3057,10 @@ class LemmaWallet {
         const deriveData = await deriveRes.json();
         if (!deriveRes.ok || !deriveData.success || !deriveData.credential) {
             throw new Error(deriveData.error || deriveData.message || 'derivation_failed');
+        }
+
+        if (deriveData.ppid_migration) {
+            await this._storePpidMigration(canonicalSite, deriveData.ppid_migration);
         }
 
         const derived = deriveData.credential;
@@ -3096,20 +3162,58 @@ class LemmaWallet {
         };
     }
 
+    async _storePpidMigration(canonicalSite, migration) {
+        if (!canonicalSite || !migration) return;
+        try {
+            await this._put('ppid_migrations', {
+                id: canonicalSite,
+                siteId: canonicalSite,
+                migration,
+                cachedAt: Date.now(),
+            });
+        } catch (e) {
+            if (!this._isEncryptedStorageLockedError(e)) throw e;
+        }
+    }
+
+    async getPpidMigrationForSite(targetSite) {
+        const keys = this._getLemmaKeys();
+        const canonicalSite = keys.canonicalizeSiteDomain(targetSite || '');
+        if (!canonicalSite) return null;
+        try {
+            const row = await this._get('ppid_migrations', canonicalSite);
+            return row?.migration || null;
+        } catch {
+            return null;
+        }
+    }
+
     async issueSiteProofPackage({
         siteId,
         sessionNonce,
         bloomSequence,
         sessionTtlSec,
+        issueMode,
     }) {
-        const credential = await this.deriveAndStoreSiteProof(siteId);
-        return this.signSiteSessionPresentation({
+        // Popup handoffs must always re-derive from the server so the credential
+        // is signed by the current federated issuer and includes signatureValueWeb.
+        // Reusing a wallet-local copy caused untrusted_issuer after issuer rotation.
+        const credential = await this.deriveAndStoreSiteProof(siteId, {
+            issueMode: issueMode || 'site_proof',
+            forceServerDerive: true,
+        });
+        const signed = await this.signSiteSessionPresentation({
             credential,
             siteId,
             sessionNonce,
             bloomSequence,
             sessionTtlSec,
         });
+        const ppidMigration = await this.getPpidMigrationForSite(siteId);
+        if (ppidMigration) {
+            signed.ppid_migration = ppidMigration;
+        }
+        return signed;
     }
 
     async ensureIsHumanIssuanceReady(options = {}) {
@@ -3299,7 +3403,7 @@ class LemmaWallet {
             }],
             userVerification: 'required',
             timeout: 60000
-        }, walletIdRecord?.value);
+        }, passkey.prfWalletId || walletIdRecord?.value);
 
         const credential = await navigator.credentials.get({
             publicKey: getOptions
@@ -5641,7 +5745,8 @@ class LemmaWallet {
             for (const lemma of candidates) {
                 const claims = lemma.claims || lemma.credentialSubject || {};
                 const personRoot = claims.ppidDerivation === 'person_root_v1'
-                    || claims.verificationMethod === 'stripe_identity';
+                    || claims.verificationMethod === 'stripe_identity'
+                    || claims.verificationMethod === 'didit';
                 if (!personRoot) continue;
                 const ppid = lemma.subject || claims.ppid || claims.id || claims.subject;
                 if (ppid && String(ppid).startsWith('did:lemma:ppid_')) {
@@ -6340,7 +6445,7 @@ class LemmaWallet {
                 }],
                 userVerification: 'required',
                 timeout: 60000
-            }, walletIdRecord?.value);
+            }, passkey.prfWalletId || walletIdRecord?.value);
 
             const credential = await navigator.credentials.get({
                 publicKey: getOptions
@@ -6678,28 +6783,46 @@ class LemmaWallet {
         return {
             handoffId,
             mk,
-            expiresIn: 900,
+            expiresIn: 300,
         };
+    }
+
+    /**
+     * SHA-256 fingerprint of the handoff AES key (server stores this, never mk).
+     */
+    async handoffMkFingerprint(mk) {
+        const data = new TextEncoder().encode(String(mk || ''));
+        const hash = await crypto.subtle.digest('SHA-256', data);
+        return Array.from(new Uint8Array(hash))
+            .map((b) => b.toString(16).padStart(2, '0'))
+            .join('');
+    }
+
+    _idvHandoffAad(handoffId, sessionId, walletId) {
+        return `idv_handoff_v1|${handoffId}|${sessionId}|${walletId}`;
     }
 
     /**
      * Encrypt wallet material for a pending IDV mobile handoff (no session_id yet).
      */
-    async buildIdvMobileHandoffEncryptedBlob({ handoffId, walletSecret, walletId } = {}) {
+    async buildIdvMobileHandoffEncryptedBlob({ handoffId, walletSecret, walletId, sessionId } = {}) {
         const encryptionKey = this._pendingIdvHandoffKey;
-        if (!encryptionKey || !handoffId || !walletSecret || !walletId) {
-            throw new Error('pending handoff key and wallet fields required');
+        if (!encryptionKey || !handoffId || !walletSecret || !walletId || !sessionId) {
+            throw new Error('pending handoff key, wallet fields, and sessionId required');
         }
 
-        const HANDOFF_TTL_MS = 900000;
+        const HANDOFF_TTL_MS = 300000;
         const payload = JSON.stringify({
+            handoffVersion: 'v1',
             walletSecret,
             walletId,
+            sessionId,
             profileId: DEFAULT_PROFILE_ID,
             profileName: 'Personal',
             expiresAt: Date.now() + HANDOFF_TTL_MS,
         });
-        return this._encryptForLink(payload, encryptionKey);
+        const aad = this._idvHandoffAad(handoffId, sessionId, walletId);
+        return this._encryptForLink(payload, encryptionKey, aad);
     }
 
     /**
@@ -6716,17 +6839,23 @@ class LemmaWallet {
             throw new Error('pending handoff key and wallet/session fields required');
         }
 
+        const mkHex = Array.from(encryptionKey)
+            .map((b) => b.toString(16).padStart(2, '0'))
+            .join('');
         const encryptedBlob = await this.buildIdvMobileHandoffEncryptedBlob({
             handoffId,
             walletSecret,
             walletId,
+            sessionId,
         });
         this._pendingIdvHandoffKey = null;
+        const handoffMkFingerprint = await this.handoffMkFingerprint(mkHex);
         await this.depositIdvMobileHandoff({
             handoffId,
             sessionId,
             encryptedBlob,
             walletId,
+            handoffMkFingerprint,
         });
         return { handoffId, sessionId, encryptedBlob };
     }
@@ -6745,9 +6874,10 @@ class LemmaWallet {
         const encryptionKeyHex = Array.from(encryptionKey)
             .map((b) => b.toString(16).padStart(2, '0'))
             .join('');
-        const HANDOFF_TTL_MS = 900000;
+        const HANDOFF_TTL_MS = 300000;
 
         const payload = JSON.stringify({
+            handoffVersion: 'v1',
             walletSecret,
             walletId,
             sessionId,
@@ -6755,7 +6885,8 @@ class LemmaWallet {
             profileName: 'Personal',
             expiresAt: Date.now() + HANDOFF_TTL_MS,
         });
-        const encryptedBlob = await this._encryptForLink(payload, encryptionKey);
+        const aad = this._idvHandoffAad(handoffId, sessionId, walletId);
+        const encryptedBlob = await this._encryptForLink(payload, encryptionKey, aad);
 
         return {
             handoffId,
@@ -6768,9 +6899,9 @@ class LemmaWallet {
     /**
      * Deposit an encrypted IDV mobile handoff blob (source popup, before Didit redirect).
      */
-    async depositIdvMobileHandoff({ handoffId, sessionId, encryptedBlob, walletId } = {}) {
-        if (!handoffId || !sessionId || !encryptedBlob) {
-            throw new Error('handoffId, sessionId, and encryptedBlob required');
+    async depositIdvMobileHandoff({ handoffId, sessionId, encryptedBlob, walletId, handoffMkFingerprint } = {}) {
+        if (!handoffId || !sessionId || !encryptedBlob || !handoffMkFingerprint) {
+            throw new Error('handoffId, sessionId, encryptedBlob, and handoffMkFingerprint required');
         }
 
         const resolvedWalletId = walletId || this.session?.walletId;
@@ -6779,8 +6910,12 @@ class LemmaWallet {
         }
 
         const walletAssertion = await this.buildWalletAssertion(
-            ['handoff_id', 'session_id'],
-            { handoff_id: handoffId, session_id: sessionId },
+            ['handoff_id', 'session_id', 'handoff_mk_fingerprint'],
+            {
+                handoff_id: handoffId,
+                session_id: sessionId,
+                handoff_mk_fingerprint: handoffMkFingerprint,
+            },
         );
 
         const res = await fetch('/api/ishuman/idv-mobile-handoff/deposit', {
@@ -6792,6 +6927,7 @@ class LemmaWallet {
                 handoff_id: handoffId,
                 session_id: sessionId,
                 encrypted_blob: encryptedBlob,
+                handoff_mk_fingerprint: handoffMkFingerprint,
                 wallet_assertion: walletAssertion,
             }),
         });
@@ -6810,37 +6946,30 @@ class LemmaWallet {
         if (!mk) {
             throw new Error('mk required');
         }
-        if (!handoffId && !sessionId) {
-            throw new Error('handoffId or sessionId required');
+        if (!handoffId || !sessionId) {
+            throw new Error('handoffId and sessionId required');
         }
 
-        const claimBody = {};
-        if (handoffId) claimBody.handoff_id = handoffId;
-        if (sessionId) claimBody.session_id = sessionId;
-
-        let res = await fetch('/api/ishuman/idv-mobile-handoff/claim', {
+        const res = await fetch('/api/ishuman/idv-mobile-handoff/claim', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             credentials: 'include',
-            body: JSON.stringify(claimBody),
+            body: JSON.stringify({
+                handoff_id: handoffId,
+                session_id: sessionId,
+                mk,
+            }),
         });
-        if (!res.ok && handoffId && sessionId) {
-            const firstErr = await res.json().catch(() => ({}));
-            if (firstErr.error === 'handoff_not_found') {
-                res = await fetch('/api/ishuman/idv-mobile-handoff/claim', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    credentials: 'include',
-                    body: JSON.stringify({ session_id: sessionId }),
-                });
-            }
-        }
         if (!res.ok) {
             const err = await res.json().catch(() => ({}));
             throw new Error(`mobile handoff claim failed: ${err.error || res.status}`);
         }
         const data = await res.json();
-        const payload = await this._decryptHandoffBlob(data.encrypted_blob, mk);
+        const aad = this._idvHandoffAad(handoffId, sessionId, data.wallet_id);
+        const payload = await this._decryptHandoffBlob(data.encrypted_blob, mk, aad);
+        if (payload.sessionId && payload.sessionId !== sessionId) {
+            throw new Error('Handoff session mismatch');
+        }
         if (payload.expiresAt && payload.expiresAt < Date.now()) {
             throw new Error('Handoff expired');
         }
@@ -6865,7 +6994,7 @@ class LemmaWallet {
      * Decrypt a handoff blob using the URL-supplied AES key (hex).
      * @private
      */
-    async _decryptHandoffBlob(encryptedBlob, keyHex) {
+    async _decryptHandoffBlob(encryptedBlob, keyHex, additionalData = null) {
         if (!encryptedBlob || !keyHex) {
             throw new Error('encrypted blob and key required');
         }
@@ -6882,8 +7011,12 @@ class LemmaWallet {
             false,
             ['decrypt'],
         );
+        const decryptParams = { name: 'AES-GCM', iv: iv };
+        if (additionalData) {
+            decryptParams.additionalData = new TextEncoder().encode(additionalData);
+        }
         const decrypted = await crypto.subtle.decrypt(
-            { name: 'AES-GCM', iv: iv },
+            decryptParams,
             key,
             ciphertext,
         );
@@ -7254,7 +7387,7 @@ class LemmaWallet {
     /**
      * Encrypt payload for device linking using AES-GCM
      */
-    async _encryptForLink(payload, keyBytes) {
+    async _encryptForLink(payload, keyBytes, additionalData = null) {
         // Import key
         const key = await crypto.subtle.importKey(
             'raw',
@@ -7269,8 +7402,12 @@ class LemmaWallet {
         
         // Encrypt
         const encoder = new TextEncoder();
+        const encryptParams = { name: 'AES-GCM', iv: iv };
+        if (additionalData) {
+            encryptParams.additionalData = encoder.encode(additionalData);
+        }
         const encrypted = await crypto.subtle.encrypt(
-            { name: 'AES-GCM', iv: iv },
+            encryptParams,
             key,
             encoder.encode(payload)
         );
