@@ -125,7 +125,10 @@ def test_admin_trust_routes_require_admin(monkeypatch, fake_ishuman_db_session_f
             assert denied.status_code == 401
 
             ok = client.get(path, headers={"X-Lemma-Credential": _encode_lemma_header(_stub_lemma("admin_access"))})
-            assert ok.status_code == 200, path
+            expected = 410 if path in {
+                "/api/admin/trust/queue", "/api/admin/trust/revocations",
+            } else 200
+            assert ok.status_code == expected, path
 
 
 def test_require_site_admin_rejects_missing_credential():

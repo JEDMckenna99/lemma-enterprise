@@ -13,7 +13,7 @@ def test_derive_site_proof_uses_person_root_ppid(
     monkeypatch,
     attach_wallet_assertion,
 ):
-    from api.database import DerivedCredential, IsHumanVerification, LemmaPerson
+    from api.database import IsHumanVerification, LemmaPerson
     from api.identity_person import material_from_test_fixture, resolve_or_create_person_from_material
     from api.ppid import derive_ppid_from_person_root_hash
 
@@ -63,4 +63,4 @@ def test_derive_site_proof_uses_person_root_ppid(
     assert resp.status_code == 200
     assert payload["success"] is True
     assert issued[0] == expected_site_ppid
-    assert len(db.store.data[DerivedCredential.__name__]) == 1
+    assert db.store.data["DerivedCredential"] == []

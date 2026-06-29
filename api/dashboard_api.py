@@ -223,7 +223,7 @@ def _plan_mau_limit(plan: str):
 
 
 def _site_block_counts(site_id: str) -> Dict[str, int]:
-    counts = {'active_blocks_count': 0, 'pending_review_count': 0}
+    counts = {'active_blocks_count': 0}
     try:
         from api.database import SiteBlock, get_db
 
@@ -233,8 +233,6 @@ def _site_block_counts(site_id: str) -> Dict[str, int]:
             for block in blocks:
                 if getattr(block, 'is_active', False):
                     counts['active_blocks_count'] += 1
-                if getattr(block, 'network_revocation_status', None) == 'pending_review':
-                    counts['pending_review_count'] += 1
         finally:
             db.close()
     except Exception as exc:
@@ -244,17 +242,15 @@ def _site_block_counts(site_id: str) -> Dict[str, int]:
 
 def _site_activity_count(site_id: str, site_domain: str) -> int:
     try:
-        from api.database import DerivedCredential, get_db
+        from api.database import IsHumanSiteBillingSubject, get_db
 
         db = get_db()
         try:
-            domain = (site_domain or site_id).strip().lower()
+            scopes = {str(site_id or "").strip(), str(site_domain or "").strip().lower()}
+            scopes.discard("")
             return (
-                db.query(DerivedCredential)
-                .filter(
-                    DerivedCredential.target_site.in_([domain, site_id]),
-                    DerivedCredential.is_active == True,  # noqa: E712
-                )
+                db.query(IsHumanSiteBillingSubject)
+                .filter(IsHumanSiteBillingSubject.site_scope.in_(list(scopes)))
                 .count()
             )
         finally:
@@ -262,6 +258,25 @@ def _site_activity_count(site_id: str, site_domain: str) -> int:
     except Exception as exc:
         logger.warning('Site activity count unavailable for %s: %s', site_id, exc)
         return 0
+
+
+def _site_monthly_active_count(site_id: str) -> int:
+    try:
+        from api.database import IsHumanSiteUsageAggregate, get_db
+
+        db = get_db()
+        try:
+            month = datetime.utcnow().strftime('%Y-%m')
+            row = db.query(IsHumanSiteUsageAggregate).filter_by(
+                site_scope=site_id, month=month,
+            ).first()
+            if row:
+                return int(row.active_subjects or 0)
+        finally:
+            db.close()
+    except Exception as exc:
+        logger.warning('Postgres MAU unavailable for %s: %s', site_id, exc)
+    return int(get_monthly_active_users(site_id) or 0)
 
 
 def _lookup_stripe_customer_for_site(site: Dict[str, Any]) -> str:
@@ -291,7 +306,7 @@ def _enrich_admin_site(site: Dict[str, Any]) -> Dict[str, Any]:
     enriched = dict(site)
     site_id = enriched.get('site_id') or ''
     site_domain = enriched.get('site_domain') or site_id
-    mau_current = int(get_monthly_active_users(site_id) or 0)
+    mau_current = _site_monthly_active_count(site_id)
     plan = (enriched.get('plan') or 'starter').strip().lower()
     mau_limit = _plan_mau_limit(plan)
     block_counts = _site_block_counts(site_id)
@@ -301,7 +316,6 @@ def _enrich_admin_site(site: Dict[str, Any]) -> Dict[str, Any]:
         'mau_limit': mau_limit,
         'mau_overage': max(mau_current - mau_limit, 0) if mau_limit else 0,
         'active_blocks_count': block_counts['active_blocks_count'],
-        'pending_review_count': block_counts['pending_review_count'],
         'activity_count': _site_activity_count(site_id, site_domain),
         'stripe_customer_id': enriched.get('stripe_customer_id') or _lookup_stripe_customer_for_site(enriched),
     })
@@ -542,8 +556,6 @@ def get_ishuman_overview():
     overview = {
         'total_verifications': 0,
         'active_site_blocks': 0,
-        'network_revocations': 0,
-        'pending_review_count': 0,
         'total_sites': 0,
         'new_sites_week': 0,
         'platform_mau': 0,
@@ -571,7 +583,7 @@ def get_ishuman_overview():
         conn.close()
 
     try:
-        from api.database import SessionLocal, IsHumanVerification, RevocationList, SiteBlock
+        from api.database import SessionLocal, IsHumanVerification, SiteBlock
 
         db = SessionLocal()
         try:
@@ -581,15 +593,6 @@ def get_ishuman_overview():
             overview['active_site_blocks'] = (
                 db.query(SiteBlock).filter_by(is_active=True).count()
             )
-            overview['network_revocations'] = (
-                db.query(RevocationList).filter_by(lemma_type='ishuman').count()
-            )
-            overview['pending_review_count'] = (
-                db.query(SiteBlock)
-                .filter_by(network_revocation_status='pending_review')
-                .count()
-            )
-            overview['bloom_revocations_total'] = overview['network_revocations']
         finally:
             db.close()
     except Exception as exc:
@@ -1618,14 +1621,13 @@ def get_admin_monitoring_summary():
                 ]
 
             try:
-                from api.database import IsHumanVerification, RevocationList, SiteBlock, SessionLocal
+                from api.database import IsHumanVerification, SiteBlock, SessionLocal
 
                 idb = SessionLocal()
                 try:
                     summary['ishuman'] = {
                         'total_verifications': idb.query(IsHumanVerification).filter_by(status='verified').count(),
                         'active_site_blocks': idb.query(SiteBlock).filter_by(is_active=True).count(),
-                        'network_revocations': idb.query(RevocationList).filter_by(lemma_type='ishuman').count(),
                     }
                 finally:
                     idb.close()

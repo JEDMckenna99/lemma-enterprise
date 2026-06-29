@@ -61,9 +61,8 @@ def test_demo_test_mode_resets_revocations(demo_source):
 
 
 def test_clear_wallet_revocations_helper_signature(site_ppid_revocation_source):
-    """Helper must drop RevocationList wallet/credential/user entries AND
-    deactivate the corresponding SiteBlock rows AND invalidate the Bloom
-    cache, so the next bloom-filter fetch reflects the cleared state.
+    """Fresh IDV may supersede wallet/master compromise state but must never
+    inspect or clear persistent site decisions.
 
     The helper now lives in api/site_ppid_revocation.py and is shared by the
     production Didit webhook and the demo test-mode IDV endpoint.
@@ -80,12 +79,12 @@ def test_clear_wallet_revocations_helper_signature(site_ppid_revocation_source):
     assert func is not None, "shared helper missing"
     source = ast.get_source_segment(site_ppid_revocation_source, func) or ""
     assert "RevocationList" in source
-    assert "SiteBlock" in source
-    assert "DerivedCredential" in source
+    assert "db.query(SiteBlock)" not in source
+    assert "db.query(DerivedCredential)" not in source
     assert "invalidate_bloom_filter_cache" in source
     assert "revocation_type == \"wallet\"" in source
     assert "revocation_type == \"credential\"" in source
-    assert "revocation_type == \"user\"" in source
+    assert "revocation_type == \"user\"" not in source
 
 
 def test_demo_helper_returns_counts(site_ppid_revocation_source):

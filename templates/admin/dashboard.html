@@ -25,20 +25,6 @@
         </div>
         <div class="stat-change" id="stat-growth">Loading...</div>
     </div>
-    <div class="stat-card stat-card--warning" id="pending-review-card">
-        <div class="stat-label">Pending Review</div>
-        <div class="stat-value stat-loading" id="stat-pending">
-            <span class="stat-skeleton"></span>
-        </div>
-        <div class="stat-change"><a href="{{ url_for('admin_trust_safety') }}" id="pending-review-link">Trust &amp; Safety queue</a></div>
-    </div>
-    <div class="stat-card stat-card--danger">
-        <div class="stat-label">Network Revocations</div>
-        <div class="stat-value stat-loading" id="stat-revocations">
-            <span class="stat-skeleton"></span>
-        </div>
-        <div class="stat-change">isHuman credential kills</div>
-    </div>
 </div>
 <div class="admin-stats" style="margin-top:-8px;">
     <div class="stat-card stat-card--info">
@@ -293,16 +279,8 @@ async function loadDashboardStats() {
 
         updateStatValue('stat-verifications', data.total_verifications ?? 0);
         updateStatValue('stat-sites', data.total_sites ?? 0);
-        updateStatValue('stat-pending', data.pending_review_count ?? 0);
-        updateStatValue('stat-revocations', data.network_revocations ?? 0);
         updateStatValue('stat-blocks', data.active_site_blocks ?? 0);
         updateStatValue('stat-mau', data.platform_mau ?? 0);
-
-        const pendingCard = document.getElementById('pending-review-card');
-        if (pendingCard) {
-            pendingCard.classList.toggle('stat-card--danger', (data.pending_review_count || 0) > 0);
-            pendingCard.classList.toggle('stat-card--warning', !(data.pending_review_count || 0));
-        }
 
         const growthEl = document.getElementById('stat-growth');
         const newThisWeek = data.new_sites_week ?? 0;
@@ -321,7 +299,7 @@ async function loadDashboardStats() {
         }
     } catch (e) {
         console.warn('Could not load stats:', e);
-        ['stat-verifications', 'stat-sites', 'stat-pending', 'stat-revocations', 'stat-blocks', 'stat-mau'].forEach(id => {
+        ['stat-verifications', 'stat-sites', 'stat-blocks', 'stat-mau'].forEach(id => {
             updateStatValue(id, '-');
         });
     }

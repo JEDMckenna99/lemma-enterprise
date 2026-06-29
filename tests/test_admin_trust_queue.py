@@ -68,7 +68,7 @@ def fixture_admin_trust_client(fake_ishuman_db_session_factory, monkeypatch):
 
 
 def _seed_pending_block(factory, ppid: str = "did:lemma:ppid_" + ("c" * 64)):
-    from api.database import DerivedCredential, SiteBlock
+    from api.database import SiteBlock
 
     factory.store.data[SiteBlock.__name__].append(
         SiteBlock(
@@ -82,18 +82,6 @@ def _seed_pending_block(factory, ppid: str = "did:lemma:ppid_" + ("c" * 64)):
             is_active=True,
             network_revocation_requested=True,
             network_revocation_status="pending_review",
-        )
-    )
-    factory.store.data[DerivedCredential.__name__].append(
-        DerivedCredential(
-            id=1,
-            master_credential_id="ishuman_master_test",
-            derived_credential_id="ishuman_derived_test",
-            wallet_id="wallet_trust_test",
-            target_site="tickets.demo.lemma.id",
-            derived_ppid=ppid,
-            is_active=True,
-            created_at=datetime.utcnow(),
         )
     )
 
@@ -115,12 +103,8 @@ def test_trust_queue_lists_pending_only(admin_trust_client):
     )
 
     resp = client.get("/api/admin/trust/queue", headers=_admin_headers())
-    assert resp.status_code == 200
-    body = resp.get_json()
-    assert body["success"] is True
-    assert body["total"] == 1
-    assert body["queue"][0]["block_id"] == 1
-    assert body["queue"][0]["wallet_id"] == "wallet_trust_test"
+    assert resp.status_code == 410
+    assert resp.get_json()["error"] == "network_revocation_retired"
 
 
 def test_trust_queue_rejects_non_admin(admin_trust_client):
@@ -140,16 +124,13 @@ def test_trust_queue_reject_sets_status(admin_trust_client):
         headers={**_admin_headers(), "Content-Type": "application/json"},
         json={"reason": "insufficient evidence"},
     )
-    assert resp.status_code == 200
-    body = resp.get_json()
-    assert body["success"] is True
-    assert body["status"] == "rejected"
-    assert body["site_block_active"] is True
+    assert resp.status_code == 410
+    assert resp.get_json()["error"] == "network_revocation_retired"
 
     from api.database import SiteBlock
 
     block = factory.store.data[SiteBlock.__name__][0]
-    assert block.network_revocation_status == "rejected"
+    assert block.network_revocation_status == "pending_review"
     assert block.is_active is True
 
 
@@ -189,17 +170,14 @@ def test_approve_revocation_with_block_id(admin_trust_client, monkeypatch):
         headers={**_admin_headers(), "Content-Type": "application/json"},
         json={"block_id": 1, "reason": "confirmed abuse"},
     )
-    assert resp.status_code == 200
-    body = resp.get_json()
-    assert body["success"] is True
-    assert body["wallet_id"] == "wallet_trust_test"
-    assert body["total_revoked"] >= 1
+    assert resp.status_code == 410
+    assert resp.get_json()["error"] == "network_revocation_retired"
 
     from api.database import SiteBlock
 
-    assert factory.store.data[SiteBlock.__name__][0].network_revocation_status == "approved"
-    assert forensic_calls
-    assert forensic_calls[0]["action"] == "ishuman.approve_network_revocation"
+    assert factory.store.data[SiteBlock.__name__][0].network_revocation_status == "pending_review"
+    assert forensic_calls == []
+    assert published == []
 
 
 def test_ishuman_overview_route_auth(monkeypatch, fake_ishuman_db_session_factory):

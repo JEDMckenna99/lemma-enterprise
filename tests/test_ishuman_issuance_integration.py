@@ -279,8 +279,6 @@ def test_derive_site_proof_persists_derived_mapping(
     monkeypatch,
     attach_wallet_assertion,
 ):
-    from api.database import DerivedCredential
-
     db = fake_ishuman_db_session_factory
     db.store.data["IsHumanVerification"].append(
         make_ishuman_verification(
@@ -323,5 +321,4 @@ def test_derive_site_proof_persists_derived_mapping(
     assert payload["success"] is True
     assert payload["cached"] is False
     assert payload["credential"]["id"] == "ishuman_site_integration_001"
-    assert len(db.store.data[DerivedCredential.__name__]) == 1
-    assert db.store.data[DerivedCredential.__name__][0].target_site == "customer.example"
+    assert db.store.data["DerivedCredential"] == []

@@ -325,14 +325,8 @@ def ishuman_demo_qr_credential_ttl_seconds() -> int:
 
 
 def is_ishuman_network_revocation_enabled() -> bool:
-    """Customer-facing network-revoke request API (Tier 2 abuse).
-
-    Default off until operator review queue and SLA are GA-ready. Admin approve
-    and user erase paths are unaffected. Set
-    LEMMA_ISHUMAN_NETWORK_REVOCATION_ENABLED=1 to enable
-    ``POST /api/ishuman/network-revoke`` and demo network-revoke drills.
-    """
-    return _env_truthy("LEMMA_ISHUMAN_NETWORK_REVOCATION_ENABLED", False)
+    """Network-wide isHuman revocation is permanently retired."""
+    return False
 
 
 def is_ishuman_pull_fallback_enabled() -> bool:
@@ -386,7 +380,7 @@ def use_assigned_person_root() -> bool:
     of HKDF(document_root). Document roots become renewable attestations; PPIDs
     stay stable across document number changes when the wallet is rebound.
 
-    Env: ``LEMMA_PERSON_ROOT_SOURCE=assigned_v1`` (default: document-derived v1).
+    Env: ``LEMMA_PERSON_ROOT_SOURCE=assigned_v1`` (default and production invariant).
     """
-    mode = (os.environ.get("LEMMA_PERSON_ROOT_SOURCE") or "document_derived_v1").strip().lower()
+    mode = (os.environ.get("LEMMA_PERSON_ROOT_SOURCE") or "assigned_v1").strip().lower()
     return mode in ("assigned_v1", "assigned", "assigned_v2")

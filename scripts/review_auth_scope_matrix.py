@@ -125,7 +125,6 @@ IN_HANDLER_AUTH_ALLOWLIST = {
     "/api/demo/taint-bump",
     "/api/demo/verify",
     "/api/ishuman/approve-revocation",
-    "/api/ishuman/confirm-ppid-migration",
     "/api/ishuman/derive-site-proof",
     "/api/ishuman/erase",
     "/api/ishuman/idv-mobile-handoff/claim",
@@ -219,4 +218,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

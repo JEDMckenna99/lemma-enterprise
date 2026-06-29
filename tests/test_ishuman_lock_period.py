@@ -76,14 +76,14 @@ def test_verifier_site_vc_cache(verifier_source):
 
 
 @pytest.mark.browser
-def test_verifier_routes_revocation_to_fresh_idv_flow(verifier_source):
-    """A revoked credential must open the popup in fresh_idv mode so the user
-    can regain access by completing a new identity check, rather than being
-    permanently blocked."""
-    assert "'revoked'," in verifier_source
-    assert "'site_blocked'," in verifier_source
+def test_verifier_requires_explicit_fresh_idv_for_doubt(verifier_source):
+    """Site bans fail closed; only the explicit doubt API selects fresh IDV."""
+    popup_reasons = verifier_source.split("const popupReasons = new Set([", 1)[1].split("]);", 1)[0]
+    assert "'revoked'," not in popup_reasons
+    assert "'site_blocked'," not in popup_reasons
     assert "'expired'," in verifier_source
-    assert "freshIdv: needsFreshIdv" in verifier_source
+    assert "verifyFreshForBackend" in verifier_source
+    assert "refreshReason: 'site_doubt'" in verifier_source
     assert "options.freshIdv ? 'fresh_idv' : 'site_proof'" in verifier_source
     assert "refresh_reason" in verifier_source
 
@@ -96,7 +96,6 @@ def test_verifier_broadcasts_site_block_updates_cross_tab(verifier_source):
     assert "BroadcastChannel" in verifier_source
     assert "broadcastBlockUpdate" in verifier_source
     assert "SITE_BLOCK_UPDATE" in verifier_source
-    assert "NETWORK_REVOCATION" in verifier_source
 
 
 @pytest.mark.browser

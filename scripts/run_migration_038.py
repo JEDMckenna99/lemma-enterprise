@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Apply migration 033 only (idempotent)."""
+"""Apply migration 038 only (idempotent, additive cutover schema)."""
 
 from __future__ import annotations
 
@@ -18,25 +18,22 @@ def main() -> int:
         return 1
     if db_url.startswith("postgres://"):
         db_url = db_url.replace("postgres://", "postgresql://", 1)
-
-    migration_path = os.path.join(
+    path = os.path.join(
         os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-        "migrations",
-        "033_person_ppid_migration.sql",
+        "migrations", "038_privacy_minimized_site_state.sql",
     )
-    with open(migration_path, "r", encoding="utf-8") as handle:
+    with open(path, "r", encoding="utf-8") as handle:
         sql = handle.read()
-
     conn = psycopg2.connect(db_url, sslmode="require")
     try:
         with conn.cursor() as cur:
             cur.execute(sql)
         conn.commit()
-        print("Migration 033 applied successfully.")
+        print("Migration 038 applied successfully.")
         return 0
     except Exception as exc:
         conn.rollback()
-        print(f"Migration 033 failed: {exc}", file=sys.stderr)
+        print(f"Migration 038 failed: {exc}", file=sys.stderr)
         return 1
     finally:
         conn.close()

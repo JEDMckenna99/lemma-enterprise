@@ -1,4 +1,4 @@
-"""Admin Trust & Safety API for isHuman network operations."""
+"""Admin Trust & Safety API for persistent, site-scoped isHuman decisions."""
 
 from __future__ import annotations
 
@@ -69,9 +69,6 @@ def _resolve_master_credential_id(db, wallet_id: Optional[str]) -> Optional[str]
 
 
 def _serialize_block_row(db, block, site_domains: Dict[str, str]) -> Dict[str, Any]:
-    from api.ishuman import resolve_wallet_id_for_ppid
-
-    wallet_id = resolve_wallet_id_for_ppid(db, block.ppid)
     return {
         "block_id": block.id,
         "site_id": block.site_id,
@@ -83,11 +80,6 @@ def _serialize_block_row(db, block, site_domains: Dict[str, str]) -> Dict[str, A
         "blocked_at": _to_iso(block.blocked_at),
         "blocked_by": block.blocked_by or "",
         "is_active": bool(block.is_active),
-        "network_revocation_requested": bool(block.network_revocation_requested),
-        "network_revocation_status": block.network_revocation_status or "",
-        "wallet_id": wallet_id,
-        "wallet_id_prefix": (wallet_id or "")[:20],
-        "master_credential_id": _resolve_master_credential_id(db, wallet_id),
     }
 
 
@@ -104,25 +96,7 @@ def _require_admin_principal():
 @cross_origin()
 @require_site_admin
 def list_trust_queue():
-    """Pending network-revocation review items."""
-    from api.database import SessionLocal, SiteBlock
-
-    db = SessionLocal()
-    try:
-        site_domains = _site_domain_map()
-        rows = (
-            db.query(SiteBlock)
-            .filter_by(network_revocation_status="pending_review")
-            .order_by(SiteBlock.blocked_at.desc())
-            .all()
-        )
-        items = [_serialize_block_row(db, row, site_domains) for row in rows]
-        return jsonify({"success": True, "queue": items, "total": len(items)})
-    except Exception as exc:
-        logger.exception("Failed to list trust queue: %s", exc)
-        return jsonify({"success": False, "error": "queue_list_failed"}), 500
-    finally:
-        db.close()
+    return jsonify({"success": False, "error": "network_revocation_retired"}), 410
 
 
 @admin_trust_bp.route("/api/admin/trust/blocks", methods=["GET"])
@@ -164,100 +138,11 @@ def list_active_blocks():
 @cross_origin()
 @require_site_admin
 def list_network_revocations():
-    """Recent isHuman network revocations."""
-    from api.database import SessionLocal, RevocationList
-
-    limit = min(int(request.args.get("limit", 100)), 500)
-    offset = max(int(request.args.get("offset", 0)), 0)
-
-    db = SessionLocal()
-    try:
-        query = db.query(RevocationList).filter_by(lemma_type="ishuman")
-        total = query.count()
-        rows = query.order_by(RevocationList.revoked_at.desc()).all()
-        rows = rows[offset:offset + limit]
-        items = [
-            {
-                "lemma_id": row.lemma_id,
-                "credential_id": row.credential_id,
-                "revocation_type": row.revocation_type,
-                "wallet_id_prefix": (row.wallet_id or "")[:20] if row.wallet_id else "",
-                "ppid_display": truncate_ppid(row.ppid),
-                "site_id": row.site_id,
-                "revoked_by": row.revoked_by,
-                "revoked_at": _to_iso(row.revoked_at),
-                "reason": row.reason or "",
-            }
-            for row in rows
-        ]
-        return jsonify({
-            "success": True,
-            "revocations": items,
-            "total": total,
-            "limit": limit,
-            "offset": offset,
-        })
-    except Exception as exc:
-        logger.exception("Failed to list network revocations: %s", exc)
-        return jsonify({"success": False, "error": "revocations_list_failed"}), 500
-    finally:
-        db.close()
+    return jsonify({"success": False, "error": "network_revocation_retired"}), 410
 
 
 @admin_trust_bp.route("/api/admin/trust/queue/<int:block_id>/reject", methods=["POST"])
 @cross_origin()
 @require_site_admin
 def reject_trust_queue_item(block_id: int):
-    """Reject a pending network-revocation request (site block remains active)."""
-    from api.audit_logger import AuditEvent, log_event
-    from api.database import SessionLocal, SiteBlock
-
-    principal, denied = _require_admin_principal()
-    if denied:
-        return denied
-
-    body = request.get_json(silent=True) or {}
-    reason = (body.get("reason") or "Network revocation request rejected after review").strip()
-
-    db = SessionLocal()
-    try:
-        block = db.query(SiteBlock).filter_by(id=block_id).first()
-        if not block:
-            return jsonify({"success": False, "error": "block_not_found"}), 404
-        if block.network_revocation_status != "pending_review":
-            return jsonify({
-                "success": False,
-                "error": "not_pending_review",
-                "status": block.network_revocation_status,
-            }), 400
-
-        block.network_revocation_status = "rejected"
-        db.commit()
-
-        log_event(
-            AuditEvent.ADMIN_ACTION,
-            result="success",
-            site_id="lemma.id",
-            resource="/api/admin/trust/queue",
-            action="reject_network_revocation",
-            user_did=principal.ppid,
-            metadata={
-                "block_id": block_id,
-                "target_ppid": truncate_ppid(block.ppid),
-                "site_id": block.site_id,
-                "reason": reason[:500],
-            },
-        )
-
-        return jsonify({
-            "success": True,
-            "block_id": block_id,
-            "status": "rejected",
-            "site_block_active": bool(block.is_active),
-        })
-    except Exception:
-        db.rollback()
-        logger.exception("Failed to reject trust queue item %s", block_id)
-        return jsonify({"success": False, "error": "reject_failed"}), 500
-    finally:
-        db.close()
+    return jsonify({"success": False, "error": "network_revocation_retired"}), 410

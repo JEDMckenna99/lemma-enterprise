@@ -246,7 +246,7 @@ def signup():
             <tr><td><code>lemmaOrigin</code></td><td>string</td><td><code>https://lemma.id</code></td><td>Override only for non-production testing.</td></tr>
             <tr><td><code>autoProvision</code></td><td>boolean</td><td><code>false</code></td><td>When true on the constructor, every <code>verify()</code> may open the popup if no proof exists. Prefer passing <code>{ autoProvision: true }</code> on entry-point calls only.</td></tr>
             <tr><td><code>debug</code></td><td>boolean</td><td><code>false</code></td><td>Enables SDK console logging.</td></tr>
-            <tr><td><code>isBlockedLocally</code></td><td>function</td><td><code>null</code></td><td>Optional callback <code>(ppid) =&gt; boolean</code> for site-level blocks without a network round-trip.</td></tr>
+            <tr><td><code>isBlockedLocally</code></td><td>function</td><td><code>null</code></td><td>Optional callback returning a boolean or <code>{ blocked, doubt_required }</code> from your backend.</td></tr>
         </tbody>
     </table>
 
@@ -256,7 +256,9 @@ def signup():
     <ul style="color: var(--gray-700); line-height: 1.7;">
         <li><strong>Success:</strong> <code>valid</code>, <code>vc_valid</code>, <code>session_valid</code></li>
         <li><strong>Needs popup / first visit:</strong> <code>no_credential</code>, <code>site_proof_required</code>, <code>wallet_locked</code>, <code>no_ishuman_credential</code></li>
-        <li><strong>Failure:</strong> <code>expired</code>, <code>revoked</code>, <code>invalid_signature</code>, <code>site_blocked</code>, <code>idv_cancelled</code>, <code>not_ishuman</code>, <code>revocation_data_untrusted</code></li>
+        <li><strong>Renewal:</strong> <code>expired</code> uses ordinary 30-day site-proof renewal.</li>
+        <li><strong>Failure:</strong> <code>revoked</code>, <code>invalid_signature</code>, <code>site_blocked</code>, <code>idv_cancelled</code>, <code>not_ishuman</code>, <code>revocation_data_untrusted</code></li>
+        <li><strong>Fresh challenge:</strong> <code>doubt_required</code> requires an explicit <code>verifyFreshForBackend()</code> call.</li>
     </ul>
     <p>After the first successful verification, repeat calls on the same tab typically validate from cache with no network call (local Ed25519 + revocation bloom).</p>
 </div>
@@ -374,11 +376,14 @@ if not check.ok:
         <tbody>
             <tr><td><code>POST</code></td><td><code>/api/ishuman/start-verification</code></td><td>Create a Didit IDV session.</td><td>Wallet assertion</td></tr>
             <tr><td><code>GET</code></td><td><code>/api/ishuman/verification-status/&lt;session_id&gt;</code></td><td>Poll status after IDV (used by the Lemma popup; not required if you use the SDK only).</td><td>None (unguessable session id)</td></tr>
-            <tr><td><code>POST</code></td><td><code>/api/ishuman/derive-site-proof</code></td><td>Derive site-bound credential from master proof.</td><td>Wallet assertion + <code>wallet_secret</code> (popup path)</td></tr>
+            <tr><td><code>POST</code></td><td><code>/api/ishuman/derive-site-proof</code></td><td>Derive site-bound credential from master proof.</td><td>Wallet assertion</td></tr>
             <tr><td><code>POST</code></td><td><code>/api/ishuman/verify-presentation</code></td><td>Optional server-side re-verify (prefer local <code>verifyStamp()</code>).</td><td>None</td></tr>
             <tr><td><code>POST</code></td><td><code>/api/ishuman/site-block</code></td><td>Immediate site-level PPID block.</td><td><code>X-API-Key</code></td></tr>
             <tr><td><code>POST</code></td><td><code>/api/ishuman/site-unblock</code></td><td>Remove site-scoped block.</td><td><code>X-API-Key</code></td></tr>
-            <tr><td><code>GET</code></td><td><code>/api/ishuman/check</code></td><td>Check block / revocation status for a PPID.</td><td><code>X-API-Key</code></td></tr>
+            <tr><td><code>POST</code></td><td><code>/api/ishuman/site-doubt</code></td><td>Require deliberate fresh IDV without creating a ban.</td><td><code>X-API-Key</code></td></tr>
+            <tr><td><code>POST</code></td><td><code>/api/ishuman/site-doubt-clear</code></td><td>Explicitly clear a site doubt.</td><td><code>X-API-Key</code></td></tr>
+            <tr><td><code>GET</code></td><td><code>/api/ishuman/site-doubts</code></td><td>List active doubts for your site.</td><td><code>X-API-Key</code></td></tr>
+            <tr><td><code>GET</code></td><td><code>/api/ishuman/check</code></td><td>Return separate <code>blocked</code> and <code>doubt_required</code> decisions.</td><td><code>X-API-Key</code></td></tr>
             <tr><td><code>GET</code></td><td><code>/api/ishuman/site-blocks</code></td><td>List active blocks for your site.</td><td><code>X-API-Key</code></td></tr>
             <tr><td><code>GET</code></td><td><code>/api/ishuman/stats</code></td><td>Public network statistics.</td><td>None</td></tr>
         </tbody>
@@ -388,13 +393,14 @@ if not check.ok:
 
 <div class="docs-section" id="revocation">
     <h2>Revocation and abuse controls</h2>
-    <p>Revocation is tiered. Do not rely on the abuser&apos;s browser or wallet to enforce a ban.</p>
+    <p>Do not rely on the abuser&apos;s browser or wallet to enforce a ban.</p>
     <h3>Tier 0: Immediate site deny (your app)</h3>
     <p>Deny the current session or action (403, sign-out, etc.) while lemma.id propagates canonical revocation.</p>
     <h3>Tier 1: Site-bound PPID revocation (immediate, canonical)</h3>
     <p>Call <code>POST /api/ishuman/site-block</code> with your site API key. lemma.id writes a <code>SiteBlock</code> row and a canonical <code>RevocationList</code> entry, then publishes a Bloom snapshot so verifiers reject that PPID on your site across devices.</p>
     <p>You can also revoke IAM users via <code>POST /api/developer/sites/&lt;site_id&gt;/users/&lt;ppid&gt;/revoke</code>, which triggers the same canonical PPID path.</p>
     <p>With the verifier SDK, use <code>isBlockedLocally(ppid)</code> or call <code>GET /api/ishuman/check</code> server-side.</p>
+    <p>A site block persists through fresh IDV, recovery, and renewal until your authenticated site-unblock call removes it. Use site doubt when you want a temporary fresh-IDV challenge instead.</p>
     <div class="code-block">
         <div class="code-header">
             <span>curl — site-block</span>

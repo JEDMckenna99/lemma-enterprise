@@ -4,7 +4,7 @@ Stripe Billing catalog constants for lemma.id site-credential metering.
 Three metered events:
   - initial issuance ($0.35)
   - MAU renewal ($0.01)
-  - doubt re-entry after amnesty-eligible block ($0.35)
+  - doubt re-entry after an active site doubt ($0.35)
 
 Site blocks and hard bans never emit meter events.
 """
@@ -37,7 +37,7 @@ UNIT_AMOUNTS_CENTS: Dict[str, int] = {
 STRIPE_PRODUCT_NAME = "Lemma.id — Site Credentials"
 STRIPE_PRODUCT_DESCRIPTION = (
     "Per-site human credential issuance, monthly continuity renewals, "
-    "and doubt re-entry after amnesty-eligible enforcement."
+    "and doubt re-entry after an active site doubt."
 )
 
 PRICE_NICKNAMES: Dict[str, str] = {

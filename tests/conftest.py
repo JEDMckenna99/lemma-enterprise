@@ -73,6 +73,8 @@ def attach_wallet_assertion(wallet_seed):
         for name in field_names:
             key = str(name or "").strip()
             raw = body.get(key, body.get(name))
+            if key == "issue_mode" and raw is None:
+                raw = "site_proof"
             field_values[key] = "" if raw is None else str(raw)
 
         assertion = build_wallet_assertion(
@@ -96,7 +98,7 @@ def attach_wallet_assertion(wallet_seed):
 
 
 # Assertion field lists for wallet Ed25519 endpoint auth (Phase 1)
-DERIVE_ASSERTION_FIELDS = ["master_credential_id", "target_site", "site_signing_pubkey"]
+DERIVE_ASSERTION_FIELDS = ["master_credential_id", "target_site", "site_signing_pubkey", "issue_mode"]
 START_ASSERTION_FIELDS = ["return_url"]
 
 
@@ -127,10 +129,8 @@ def make_ishuman_verification() -> Callable[..., Any]:
 
 @pytest.fixture
 def make_derived_credential() -> Callable[..., Any]:
-    from api.database import DerivedCredential
-
     def _factory(**overrides):
-        row = DerivedCredential(
+        row = SimpleNamespace(
             master_credential_id=overrides.pop("master_credential_id", "ishuman_master_seed_001"),
             derived_credential_id=overrides.pop("derived_credential_id", "ishuman_site_seed_001"),
             wallet_id=overrides.pop("wallet_id", "wallet_test_001"),

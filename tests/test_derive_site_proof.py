@@ -16,7 +16,7 @@ from tests.wallet_test_helpers import (
     SITE_SIGNING_PUBKEY_B64,
 )
 
-NO_MASTER_ASSERTION_FIELDS = ["target_site", "site_signing_pubkey"]
+NO_MASTER_ASSERTION_FIELDS = ["target_site", "site_signing_pubkey", "issue_mode"]
 
 
 def _patch_issuance(monkeypatch):
@@ -44,8 +44,6 @@ def test_derive_without_master_id_succeeds_for_verified_wallet(
     monkeypatch,
     attach_wallet_assertion,
 ):
-    from api.database import DerivedCredential
-
     db = fake_ishuman_db_session_factory
     db.store.data["IsHumanVerification"].append(
         make_ishuman_verification(
@@ -74,9 +72,7 @@ def test_derive_without_master_id_succeeds_for_verified_wallet(
     assert resp.status_code == 200, payload
     assert payload["success"] is True
     assert payload["credential"]["id"] == "ishuman_site_phase12_001"
-    # The derived mapping is recorded against the RESOLVED master id.
-    derived = db.store.data[DerivedCredential.__name__][0]
-    assert derived.master_credential_id == "ishuman_master_verified_001"
+    assert db.store.data["DerivedCredential"] == []
 
 
 @pytest.mark.unit
@@ -169,8 +165,6 @@ def test_derive_with_stale_master_hint_falls_back_to_latest_verified(
     monkeypatch,
     attach_wallet_assertion,
 ):
-    from api.database import DerivedCredential
-
     db = fake_ishuman_db_session_factory
     # Only a fresh verified record exists; the hint references an old id.
     db.store.data["IsHumanVerification"].append(
@@ -200,8 +194,7 @@ def test_derive_with_stale_master_hint_falls_back_to_latest_verified(
     payload = resp.get_json()
     assert resp.status_code == 200, payload
     assert payload["success"] is True
-    derived = db.store.data[DerivedCredential.__name__][0]
-    assert derived.master_credential_id == "ishuman_master_current_001"
+    assert db.store.data["DerivedCredential"] == []
 
 
 @pytest.mark.unit
@@ -218,7 +211,7 @@ def test_derive_uses_person_root_via_binding_under_required_default(
     never the legacy wallet-secret fallback, never ppid_derivation_failed.
     """
     import api.config as config
-    from api.database import DerivedCredential, LemmaPerson, LemmaWalletBinding
+    from api.database import LemmaPerson, LemmaWalletBinding
     from api.ppid import derive_ppid_from_person_root
 
     monkeypatch.setattr(config, "ppid_require_person_root", lambda: True)
@@ -279,8 +272,7 @@ def test_derive_uses_person_root_via_binding_under_required_default(
     expected = derive_ppid_from_person_root(bytes.fromhex("ab" * 32), "example.com")
     assert payload["credential"]["subject"] == expected
     assert payload["credential"]["claims"]["ppidDerivation"] == "person_root_v1"
-    derived = db.store.data[DerivedCredential.__name__][0]
-    assert derived.derived_ppid == expected
+    assert db.store.data["DerivedCredential"] == []
 
 
 @pytest.mark.unit

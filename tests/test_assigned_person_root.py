@@ -34,7 +34,7 @@ def test_assigned_mode_mints_random_person_root(fake_ishuman_db_session_factory,
 
 @pytest.mark.unit
 def test_legacy_mode_still_derives_from_document(fake_ishuman_db_session_factory, monkeypatch):
-    monkeypatch.delenv("LEMMA_PERSON_ROOT_SOURCE", raising=False)
+    monkeypatch.setenv("LEMMA_PERSON_ROOT_SOURCE", "document_derived_v1")
     monkeypatch.setattr("api.config.use_assigned_person_root", lambda: False)
 
     db = fake_ishuman_db_session_factory.session_local()

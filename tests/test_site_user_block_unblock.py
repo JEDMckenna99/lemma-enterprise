@@ -1,13 +1,11 @@
 """Pins the developer-dashboard site-user block / unblock controls.
 
 These cover the operator-facing tier-1 revocation UX:
-1. ``clear_site_bound_ppid`` is the safe inverse of ``revoke_site_bound_ppid``
-   (deactivates the SiteBlock, removes the canonical user-scope RevocationList
-   row, rebuilds the Bloom) and never lifts a governance kill.
+1. ``clear_site_bound_ppid`` is the authenticated inverse of
+   ``revoke_site_bound_ppid`` and is the only path that removes a site block.
 2. The dashboard ``/revoke`` endpoint blocks ANY PPID (upsert, not 404) so an
    operator can paste a PPID straight from their logs.
-3. The dashboard ``/unblock`` endpoint exists, routes to the canonical clear,
-   and refuses governance kills with a 409.
+3. The dashboard ``/unblock`` endpoint routes to the canonical clear.
 4. Both privileged routes are registered in the authz policy at admin scope
    with site binding required.
 """
@@ -42,11 +40,8 @@ def test_clear_site_bound_ppid_signature_and_behavior():
     assert "RevocationList" in source
     # Only acts on the site-scoped user revocation for this PPID.
     assert 'revocation_type == "user"' in source
-    # Governance carve-out: a sticky kill (is_amnesty_eligible False) is never
-    # lifted by an ordinary site unblock, and eligible rows ARE cleared.
-    assert "is_amnesty_eligible.is_(False)" in source
-    assert "is_amnesty_eligible.isnot(False)" in source
-    assert "governance_kill_not_amnesty_eligible" in source
+    assert "is_amnesty_eligible.is_(False)" not in source
+    assert "governance_kill_not_amnesty_eligible" not in source
     # Rebuilds verifier state so the PPID stops being rejected.
     assert "invalidate_bloom_filter_cache" in source
     # Reports what happened to the caller.
@@ -68,9 +63,7 @@ def test_dashboard_revoke_blocks_any_ppid_without_404():
 def test_dashboard_unblock_endpoint_exists():
     source = _func_source(SITE_MANAGEMENT_PY, "unblock_site_user")
     assert "clear_site_bound_ppid" in source
-    # Governance kills cannot be lifted from the site dashboard.
-    assert "governance_kill" in source
-    assert "409" in source
+    assert "governance_kill" not in source
     # Restores the stored user row.
     assert "status = 'active'" in source
 

@@ -20,7 +20,7 @@ def test_derive_site_proof_cache_miss_creates_new_mapping(
     monkeypatch,
     attach_wallet_assertion,
 ):
-    from api.database import DerivedCredential, IsHumanVerification
+    from api.database import IsHumanVerification
 
     db = fake_ishuman_db_session_factory
     db.store.data["IsHumanVerification"].append(
@@ -66,12 +66,11 @@ def test_derive_site_proof_cache_miss_creates_new_mapping(
     assert payload["cached"] is False
     assert payload["credential"]["id"] == "ishuman_site_new_001"
     assert len(db.store.data[IsHumanVerification.__name__]) == 1
-    assert len(db.store.data[DerivedCredential.__name__]) == 1
-    assert db.store.data[DerivedCredential.__name__][0].target_site == "example.com"
+    assert db.store.data["DerivedCredential"] == []
 
 
 @pytest.mark.unit
-def test_derive_site_proof_cached_reuses_existing_credential_id(
+def test_derive_site_proof_ignores_legacy_mapping_and_rotates_credential_id(
     ishuman_client,
     fake_ishuman_db_session_factory,
     make_ishuman_verification,
@@ -79,8 +78,6 @@ def test_derive_site_proof_cached_reuses_existing_credential_id(
     monkeypatch,
     attach_wallet_assertion,
 ):
-    from api.database import DerivedCredential
-
     db = fake_ishuman_db_session_factory
     db.store.data["IsHumanVerification"].append(
         make_ishuman_verification(
@@ -132,9 +129,9 @@ def test_derive_site_proof_cached_reuses_existing_credential_id(
     payload = resp.get_json()
     assert resp.status_code == 200
     assert payload["success"] is True
-    assert payload["cached"] is True
-    assert payload["credential"]["id"] == "ishuman_site_cached_001"
-    assert len(db.store.data[DerivedCredential.__name__]) == 1
+    assert payload["cached"] is False
+    assert payload["credential"]["id"] == "ephemeral_should_be_replaced"
+    assert len(db.store.data["DerivedCredential"]) == 1
 
 
 @pytest.mark.unit
@@ -144,7 +141,7 @@ def test_no_master_then_master_issued_then_site_derived(
     monkeypatch,
     attach_wallet_assertion,
 ):
-    from api.database import IsHumanVerification, DerivedCredential
+    from api.database import IsHumanVerification
 
     db = fake_ishuman_db_session_factory
     monkeypatch.setattr("api.database.SessionLocal", db.session_local)
@@ -243,4 +240,4 @@ def test_no_master_then_master_issued_then_site_derived(
     assert derive_payload["success"] is True
     assert derive_payload["cached"] is False
     assert derive_payload["credential"]["id"] == "ishuman_site_created_123"
-    assert len(db.store.data[DerivedCredential.__name__]) == 1
+    assert db.store.data["DerivedCredential"] == []

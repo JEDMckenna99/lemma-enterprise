@@ -10,6 +10,8 @@ import secrets
 from dataclasses import dataclass
 from typing import Any, Optional, Tuple
 
+from api.column_crypto import encrypt_column
+
 from api.identity_roots import (
     IdentityRootMaterialError,
     PERSON_ROOT_SOURCE_ASSIGNED,
@@ -46,7 +48,6 @@ class ResolvedLemmaPerson:
     document_type: Optional[str] = None
     document_expiration_date: Optional[str] = None
     issuing_subdivision: Optional[str] = None
-    merged_from_person_id: Optional[str] = None
     document_attached: bool = False
     root_version: str = "v1"
     document_root_schema: Optional[str] = None
@@ -82,9 +83,9 @@ def _new_person_id() -> str:
 
 
 def _load_person_root_hash_hex(person) -> str:
-    from api.column_crypto import decrypt_column
+    from api.person_root_crypto import decrypt_person_root
 
-    return decrypt_column(person.person_root_hash)
+    return decrypt_person_root(person.person_id, person.person_root_hash)
 
 
 def _ordered_unique(values) -> list[str]:
@@ -242,7 +243,7 @@ def _add_document_link(
     material: StripeIdentityRootMaterial,
     claims: dict,
 ) -> None:
-    from api.column_crypto import encrypt_column
+    from api.person_root_crypto import encrypt_person_root
     from api.database import LemmaDocumentRoot
     from api.privacy_hashes import hash_provider_identifier
 
@@ -287,8 +288,6 @@ def resolve_or_create_person_from_material(
     material: StripeIdentityRootMaterial,
     wallet_id: Optional[str],
     provider: str = "stripe_identity",
-    allow_wallet_person_merge: bool = False,
-    merge_from_person_id: Optional[str] = None,
 ) -> ResolvedLemmaPerson:
     """Resolve or create a LemmaPerson for verified IDV material.
 
@@ -301,7 +300,7 @@ def resolve_or_create_person_from_material(
     """
     from api.config import use_assigned_person_root
     from api.database import LemmaDocumentRoot, LemmaPerson, LemmaWalletBinding
-    from api.column_crypto import encrypt_column
+    from api.person_root_crypto import encrypt_person_root
 
     assignment = lookup_document_root_assignment(
         db,
@@ -346,7 +345,6 @@ def resolve_or_create_person_from_material(
     created_person = False
     created_document_link = False
     document_attached = False
-    merged_from_person_id: Optional[str] = None
 
     if doc_person_id:
         person = db.query(LemmaPerson).filter_by(person_id=doc_person_id).first()
@@ -406,9 +404,10 @@ def resolve_or_create_person_from_material(
             person_root_hash = derive_person_root_hash(document_root_hash, root_version)
             person_root_source = PERSON_ROOT_SOURCE_DOCUMENT_DERIVED
 
+        person_id = _new_person_id()
         person = LemmaPerson(
-            person_id=_new_person_id(),
-            person_root_hash=encrypt_column(person_root_hash),
+            person_id=person_id,
+            person_root_hash=encrypt_person_root(person_id, person_root_hash),
             root_version=root_version,
             person_root_source=person_root_source,
             primary_wallet_id=wallet_id,
@@ -457,7 +456,6 @@ def resolve_or_create_person_from_material(
         document_type=claims.get("document_type"),
         document_expiration_date=material.document_expiration_date,
         issuing_subdivision=material.issuing_subdivision,
-        merged_from_person_id=merged_from_person_id,
         document_attached=document_attached,
         root_version=root_version,
         document_root_schema=claims.get("schema") if claims else assignment.matched_schema,
@@ -478,12 +476,11 @@ def resolve_person_from_stripe_session(
 def load_person_root_bytes(db, lemma_person_id: str) -> bytes:
     from api.database import LemmaPerson
 
-    from api.column_crypto import decrypt_column
-
     person = db.query(LemmaPerson).filter_by(person_id=lemma_person_id).first()
     if not person or not person.person_root_hash:
         raise ValueError("lemma_person not found")
-    return bytes.fromhex(decrypt_column(person.person_root_hash))
+    from api.person_root_crypto import decrypt_person_root
+    return bytes.fromhex(decrypt_person_root(person.person_id, person.person_root_hash))
 
 
 def process_verified_stripe_identity(
@@ -513,8 +510,6 @@ def process_verified_didit_identity(
     *,
     decision: dict,
     wallet_id: Optional[str],
-    allow_wallet_person_merge: bool = False,
-    merge_from_person_id: Optional[str] = None,
 ) -> ResolvedLemmaPerson:
     """Resolve a LemmaPerson from a verified didit decision payload."""
     from api.identity_roots import extract_root_material_from_didit_decision
@@ -525,8 +520,6 @@ def process_verified_didit_identity(
         material=material,
         wallet_id=wallet_id,
         provider="didit",
-        allow_wallet_person_merge=allow_wallet_person_merge,
-        merge_from_person_id=merge_from_person_id,
     )
 
 

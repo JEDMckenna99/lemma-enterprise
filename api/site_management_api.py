@@ -474,8 +474,7 @@ def unblock_site_user(site_id, ppid):
 
     Reverses tier-1 enforcement: deactivates the SiteBlock, removes the
     canonical user-scope RevocationList row, and rebuilds the Bloom so verifiers
-    stop rejecting the PPID. Governance-approved coordinated-fraud kills are NOT
-    lifted by this route. The site_users row (if any) is set back to 'active'.
+    stop rejecting the PPID. The site_users row (if any) is set back to 'active'.
     """
     try:
         from api.database import get_db_connection
@@ -498,14 +497,6 @@ def unblock_site_user(site_id, ppid):
         except Exception as clear_err:
             logger.warning("Canonical PPID unblock failed: %s", clear_err)
             return jsonify({'success': False, 'error': 'unblock_failed'}), 500
-
-        if canonical_clear and not canonical_clear.get('lifted') \
-                and canonical_clear.get('reason') == 'governance_kill_not_amnesty_eligible':
-            return jsonify({
-                'success': False,
-                'error': 'governance_kill',
-                'message': 'This PPID is under a network governance kill and cannot be unblocked from the site dashboard.',
-            }), 409
 
         conn = get_db_connection(site_id)
         cursor = conn.cursor()

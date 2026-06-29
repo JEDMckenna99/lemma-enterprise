@@ -10,11 +10,9 @@ Flows
    redirect URL.
 2. **Didit webhook** — receive verification outcomes, issue an Ed25519-signed
    isHuman credential on approval.
-3. **Site-block** — a site immediately blocks a PPID on its own domain
-   (first tier of two-tier revocation).
-4. **Network revocation** — a site submits evidence for network-wide
-   credential revocation (second tier, queued for review).
-5. **Check** — quick lookup: is a PPID blocked for a given site?
+3. **Site-block** — a site persistently blocks its site-private PPID.
+4. **Site-doubt** — a site deliberately requests fresh IDV without a ban.
+5. **Check** — return separate block and doubt decisions for one site.
 """
 
 from __future__ import annotations
@@ -454,14 +452,10 @@ def _complete_verified_ishuman_from_didit(
 
     try:
         validate_didit_workflow_id(workflow_id)
-        verification_metadata = record.metadata_json or {}
-        pending_merge = (verification_metadata.get("pending_merge_from_person_id") or "").strip()
         resolved = process_verified_didit_identity(
             db,
             decision=decision,
             wallet_id=wallet_id,
-            allow_wallet_person_merge=bool(pending_merge),
-            merge_from_person_id=pending_merge or None,
         )
     except IdentityRootMaterialError as exc:
         logger.error("Identity root material unavailable for didit decision: %s", exc)
@@ -490,31 +484,6 @@ def _complete_verified_ishuman_from_didit(
             "document_attached": True,
             "document_root_hash": resolved.document_root_hash,
         }
-    elif resolved.merged_from_person_id:
-        from api.database import LemmaDocumentRoot
-        from api.ppid_migration import record_person_merge
-
-        old_doc = (
-            db.query(LemmaDocumentRoot)
-            .filter_by(lemma_person_id=resolved.merged_from_person_id)
-            .order_by(LemmaDocumentRoot.created_at.desc())
-            .first()
-        )
-        merge_id = record_person_merge(
-            db,
-            wallet_id=wallet_id,
-            old_person_id=resolved.merged_from_person_id,
-            new_person_id=resolved.person_id,
-            new_document_root_hash=resolved.document_root_hash,
-            provider_session_id=getattr(record, "provider_session_id", None),
-            old_document_root_hash=old_doc.document_root_hash if old_doc else None,
-        )
-        if merge_id:
-            record.metadata_json = {
-                **(record.metadata_json or {}),
-                "person_merge_id": merge_id,
-                "merged_from_person_id": resolved.merged_from_person_id,
-            }
 
     ppid = derive_ppid_from_person_root_hash(resolved.person_root_hash, "lemma.id")
     record.lemma_person_id = resolved.person_id
@@ -699,20 +668,11 @@ def _scrub_terminal_provider_identifiers(record, session_id: str) -> None:
 
 
 def resolve_wallet_id_for_ppid(db, ppid: str) -> Optional[str]:
-    """Resolve wallet_id from a site-scoped PPID for admin revocation actions."""
+    """Resolve only a master/lemma.id PPID; site PPIDs are intentionally unlinkable."""
     if not ppid:
         return None
 
-    from api.database import DerivedCredential, IsHumanVerification
-
-    derived = (
-        db.query(DerivedCredential)
-        .filter_by(derived_ppid=ppid)
-        .order_by(DerivedCredential.created_at.desc())
-        .first()
-    )
-    if derived and derived.wallet_id:
-        return derived.wallet_id
+    from api.database import IsHumanVerification
 
     master = (
         db.query(IsHumanVerification)
@@ -743,7 +703,7 @@ def revoke_wallet_network_wide(
     reason: str = "network revocation",
     revoked_by: str = "admin",
 ) -> dict:
-    """Revoke a wallet's master + derived isHuman credentials network-wide.
+    """Revoke a wallet and its master credentials without enumerating sites.
 
     Shared core for the admin approve-revocation route and the didit risk feed
     (Phase 2 / M3). Creates wallet/credential RevocationList rows, marks rows
@@ -751,9 +711,7 @@ def revoke_wallet_network_wide(
 
     Raises ValueError if the wallet cannot be resolved.
     """
-    from api.database import (
-        DerivedCredential, IsHumanVerification, RevocationList, SiteBlock,
-    )
+    from api.database import IsHumanVerification, RevocationList
 
     if not wallet_id and master_credential_id:
         master = db.query(IsHumanVerification).filter_by(
@@ -799,36 +757,6 @@ def revoke_wallet_network_wide(
             revoked_ids.append(m.credential_id)
             m.status = "revoked"
 
-    derived_rows = db.query(DerivedCredential).filter_by(
-        wallet_id=wallet_id, is_active=True
-    ).all()
-    for d in derived_rows:
-        db.add(RevocationList(
-            lemma_id=d.derived_credential_id,
-            credential_id=d.derived_credential_id,
-            lemma_type="ishuman",
-            revocation_type="credential",
-            revoked_by=revoked_by,
-            reason=reason,
-        ))
-        revoked_ids.append(d.derived_credential_id)
-        d.is_active = False
-        d.revoked_at = datetime.utcnow()
-
-    pending_blocks = (
-        db.query(SiteBlock)
-        .filter_by(network_revocation_status="pending_review")
-        .filter(
-            SiteBlock.ppid.in_(
-                [d.derived_ppid for d in derived_rows] +
-                [m.ppid for m in masters if m.ppid]
-            )
-        )
-        .all()
-    )
-    for b in pending_blocks:
-        b.network_revocation_status = "approved"
-
     db.commit()
 
     try:
@@ -843,7 +771,7 @@ def revoke_wallet_network_wide(
         "wallet_id": wallet_id,
         "revoked_credential_ids": revoked_ids,
         "master_count": len(masters),
-        "derived_count": len(derived_rows),
+        "derived_count": 0,
     }
 
 
@@ -1320,13 +1248,17 @@ def start_verification_for_body(body: dict) -> tuple[dict, int]:
         # pubkey so the server can seal person-root seed envelopes at IDV
         # completion. Stored as metadata; ignored unless the feature is enabled.
         verification_metadata = {"return_url": return_url}
+        return_params = dict(parse_qsl(urlparse(return_url).query, keep_blank_values=True))
+        if return_params.get("issue_mode") == "fresh_idv":
+            from api.ppid import canonicalize_rp_id
+
+            fresh_site = canonicalize_rp_id(return_params.get("site_id") or "")
+            if fresh_site and fresh_site != "unknown":
+                verification_metadata["fresh_idv_site"] = fresh_site
+                verification_metadata["fresh_idv_consumed"] = False
         enc_pubkey = (body.get("enc_pubkey") or "").strip()
         if enc_pubkey:
             verification_metadata["enc_pubkey"] = enc_pubkey
-        from api.ppid_migration import pin_pending_merge_metadata
-        verification_metadata = pin_pending_merge_metadata(
-            db, wallet_id=str(wallet_id), metadata=verification_metadata
-        )
 
         # Dedup: the provider can reuse one hosted session across repeated
         # start-verification calls (e.g. the user re-clicks before redirect).
@@ -1972,21 +1904,16 @@ def site_unblock():
     if not ppid:
         return jsonify({"success": False, "error": "ppid required"}), 400
 
-    from api.database import SessionLocal, SiteBlock
+    from api.database import SessionLocal
+    from api.site_ppid_revocation import clear_site_bound_ppid
     db = SessionLocal()
     try:
-        block = (
-            db.query(SiteBlock)
-            .filter_by(site_id=site.site_id, ppid=ppid, is_active=True)
-            .first()
+        result = clear_site_bound_ppid(
+            db, site_id=site.site_id, ppid=ppid,
+            cleared_by=site.admin_email or "site_api",
         )
-        if not block:
+        if not result.get("lifted"):
             return jsonify({"success": False, "error": "no active block found"}), 404
-
-        block.is_active = False
-        db.commit()
-
-        logger.info("Site block removed: site=%s ppid=%s", site.site_id, ppid[:40])
         return jsonify({"success": True, "message": "Block removed"})
     except Exception:
         db.rollback()
@@ -1996,50 +1923,92 @@ def site_unblock():
         db.close()
 
 
-@ishuman_bp.route("/api/ishuman/confirm-ppid-migration", methods=["POST"])
+@ishuman_bp.route("/api/ishuman/site-doubt", methods=["POST"])
 @cross_origin()
-def confirm_ppid_migration():
-    """Confirm Lemma approved a document-refresh PPID update for this site.
-
-    For sites with their own auth: after login + fresh verify (new PPID),
-    call with the account's ``legacy_ppid`` and verified ``current_ppid``.
-    Requires ``X-API-Key``.
-    """
+def site_doubt():
+    """Require a fresh IDV for one site PPID without banning it."""
     site = _require_site_api_key()
     if not site:
         return jsonify({"success": False, "error": "valid API key required"}), 401
-
     body = request.get_json(silent=True) or {}
-    legacy_ppid = (body.get("legacy_ppid") or "").strip()
-    current_ppid = (body.get("current_ppid") or "").strip()
-    if not legacy_ppid or not current_ppid:
-        return jsonify({"success": False, "error": "legacy_ppid and current_ppid required"}), 400
+    ppid = (body.get("ppid") or "").strip()
+    if not ppid:
+        return jsonify({"success": False, "error": "ppid required"}), 400
 
-    from api.ppid import canonicalize_rp_id
-    from api.ppid_migration import confirm_ppid_migration_for_site
-    from api.rate_limiter import check_rate_limit
-
-    target_site = canonicalize_rp_id(getattr(site, "site_domain", None) or site.site_id)
-    if not check_rate_limit(f"ppid_mig_confirm:{site.site_id}", 60, 3600):
-        return jsonify({"success": False, "error": "rate_limited"}), 429
-
-    from api.database import SessionLocal
-
+    from api.database import SessionLocal, SiteDoubt
     db = SessionLocal()
     try:
-        result = confirm_ppid_migration_for_site(
-            db,
-            target_site=target_site,
-            legacy_ppid=legacy_ppid,
-            current_ppid=current_ppid,
-        )
-        if result.get("approved"):
-            logger.info(
-                "PPID migration confirmed site=%s merge=%s",
-                target_site,
-                (result.get("merge_id") or "")[:24],
-            )
-        return jsonify({"success": True, **result})
+        row = db.query(SiteDoubt).filter_by(site_id=site.site_id, ppid=ppid).first()
+        if not row:
+            row = SiteDoubt(site_id=site.site_id, ppid=ppid)
+            db.add(row)
+        row.reason = (body.get("reason") or "").strip()
+        row.requested_by = site.admin_email or "site_api"
+        row.requested_at = datetime.utcnow()
+        row.is_active = True
+        row.cleared_at = None
+        row.cleared_by = None
+        db.commit()
+        return jsonify({
+            "success": True,
+            "site_id": site.site_id,
+            "ppid": ppid,
+            "doubt_required": True,
+            "requested_at": row.requested_at.isoformat(),
+        })
+    finally:
+        db.close()
+
+
+@ishuman_bp.route("/api/ishuman/site-doubt-clear", methods=["POST"])
+@cross_origin()
+def site_doubt_clear():
+    """Explicitly clear a temporary doubt; site blocks are untouched."""
+    site = _require_site_api_key()
+    if not site:
+        return jsonify({"success": False, "error": "valid API key required"}), 401
+    body = request.get_json(silent=True) or {}
+    ppid = (body.get("ppid") or "").strip()
+    if not ppid:
+        return jsonify({"success": False, "error": "ppid required"}), 400
+    from api.database import SessionLocal, SiteDoubt
+    db = SessionLocal()
+    try:
+        row = db.query(SiteDoubt).filter_by(site_id=site.site_id, ppid=ppid, is_active=True).first()
+        if not row:
+            return jsonify({"success": False, "error": "no active doubt found"}), 404
+        row.is_active = False
+        row.cleared_at = datetime.utcnow()
+        row.cleared_by = site.admin_email or "site_api"
+        db.commit()
+        return jsonify({"success": True, "doubt_required": False})
+    finally:
+        db.close()
+
+
+@ishuman_bp.route("/api/ishuman/site-doubts", methods=["GET"])
+@cross_origin()
+def site_doubts():
+    """List active doubt requirements for the authenticated site."""
+    site = _require_site_api_key()
+    if not site:
+        return jsonify({"success": False, "error": "valid API key required"}), 401
+    from api.database import SessionLocal, SiteDoubt
+    db = SessionLocal()
+    try:
+        rows = db.query(SiteDoubt).filter_by(site_id=site.site_id, is_active=True).order_by(
+            SiteDoubt.requested_at.desc()
+        ).all()
+        return jsonify({
+            "success": True,
+            "site_id": site.site_id,
+            "doubts": [{
+                "ppid": row.ppid,
+                "reason": row.reason,
+                "requested_at": row.requested_at.isoformat() if row.requested_at else None,
+            } for row in rows],
+            "count": len(rows),
+        })
     finally:
         db.close()
 
@@ -2065,67 +2034,11 @@ def network_revoke():
             "evidence_url": "https://..."
         }
     """
-    from api.config import is_ishuman_network_revocation_enabled
-
-    if not is_ishuman_network_revocation_enabled():
-        return jsonify({
-            "success": False,
-            "error": "network_revocation_disabled",
-            "message": (
-                "Network revocation requests are not available yet. "
-                "Use POST /api/ishuman/site-block for site-scoped enforcement."
-            ),
-        }), 503
-
-    site = _require_site_api_key()
-    if not site:
-        return jsonify({"success": False, "error": "valid API key required"}), 401
-
-    body = request.get_json(silent=True) or {}
-    ppid = body.get("ppid")
-    credential_id = body.get("credential_id")
-    reason = body.get("reason", "")
-    evidence_url = body.get("evidence_url", "")
-
-    if not ppid and not credential_id:
-        return jsonify({"success": False, "error": "ppid or credential_id required"}), 400
-
-    from api.database import SessionLocal
-    from api.site_ppid_revocation import revoke_site_bound_ppid
-
-    db = SessionLocal()
-    try:
-        if ppid:
-            revoke_site_bound_ppid(
-                db,
-                site_id=site.site_id,
-                ppid=ppid,
-                reason=reason,
-                revoked_by=site.admin_email or "site_api",
-                site_domain=getattr(site, "site_domain", None),
-                blocked_by=site.admin_email,
-                evidence_url=evidence_url,
-                network_revocation_requested=True,
-                network_revocation_status="pending_review",
-            )
-
-        logger.info(
-            "Network revocation requested: site=%s ppid=%s credential=%s",
-            site.site_id, (ppid or "")[:40], (credential_id or "")[:40],
-        )
-
-        return jsonify({
-            "success": True,
-            "message": "Network revocation request submitted for review",
-            "status": "pending_review",
-            "site_block_active": True,
-        })
-    except Exception:
-        db.rollback()
-        logger.exception("Failed to submit network revocation request")
-        return jsonify({"success": False, "error": "revocation_request_failed"}), 500
-    finally:
-        db.close()
+    return jsonify({
+        "success": False,
+        "error": "network_revocation_retired",
+        "message": "Use site-block for persistent site-scoped enforcement.",
+    }), 410
 
 
 # ---------------------------------------------------------------------------
@@ -2150,7 +2063,10 @@ def check_ppid():
         return jsonify({"success": False, "error": "valid API key required"}), 401
 
     ppid = request.args.get("ppid")
-    site_id = request.args.get("site_id") or site.site_id
+    requested_site_id = (request.args.get("site_id") or "").strip()
+    if requested_site_id and requested_site_id != site.site_id:
+        return jsonify({"success": False, "error": "site_id_mismatch"}), 403
+    site_id = site.site_id
 
     if not ppid:
         return jsonify({"success": False, "error": "ppid required"}), 400
@@ -2159,11 +2075,14 @@ def check_ppid():
     if not check_rate_limit(f"ishuman_check:{site.site_id}:{ip_hash}", 120, 3600):
         return jsonify({"success": False, "error": "check_rate_limited"}), 429
 
-    result = {"success": True, "ppid": ppid, "blocked": False, "reason": None}
+    result = {
+        "success": True, "ppid": ppid, "blocked": False,
+        "doubt_required": False, "reason": None,
+    }
 
     # Check site-specific block
     if site_id:
-        from api.database import SessionLocal, SiteBlock
+        from api.database import SessionLocal, SiteBlock, SiteDoubt
         db = SessionLocal()
         try:
             block = (
@@ -2175,6 +2094,12 @@ def check_ppid():
                 result["blocked"] = True
                 result["reason"] = "site_block"
                 result["blocked_at"] = block.blocked_at.isoformat() if block.blocked_at else None
+            doubt = db.query(SiteDoubt).filter_by(
+                site_id=site_id, ppid=ppid, is_active=True,
+            ).first()
+            if doubt:
+                result["doubt_required"] = True
+                result["doubt_reason"] = doubt.reason
         finally:
             db.close()
 
@@ -2195,16 +2120,6 @@ def check_ppid():
                 result["reason"] = "site_ppid_revoked"
         finally:
             db.close()
-
-    # Network-wide / Bloom revocation (credential, PPID, wallet_id)
-    if not result["blocked"]:
-        try:
-            from api.revocation_verifier import is_credential_revoked
-            if is_credential_revoked(ppid):
-                result["blocked"] = True
-                result["reason"] = "network_revocation"
-        except Exception as exc:
-            logger.debug("Bloom revocation check failed for %s: %s", ppid[:30], exc)
 
     return jsonify(result)
 
@@ -2239,8 +2154,6 @@ def list_site_blocks():
                     "ppid": b.ppid,
                     "reason": b.reason,
                     "blocked_at": b.blocked_at.isoformat() if b.blocked_at else None,
-                    "network_revocation_requested": b.network_revocation_requested,
-                    "network_revocation_status": b.network_revocation_status,
                 }
                 for b in blocks
             ],
@@ -2257,20 +2170,17 @@ def list_site_blocks():
 @ishuman_bp.route("/api/ishuman/stats", methods=["GET"])
 @cross_origin()
 def ishuman_stats():
-    """Public platform statistics for the isHuman network."""
-    from api.database import SessionLocal, IsHumanVerification, SiteBlock, RevocationList
+    """Public platform statistics for isHuman."""
+    from api.database import SessionLocal, IsHumanVerification, SiteBlock
     db = SessionLocal()
     try:
         total_verifications = db.query(IsHumanVerification).filter_by(status="verified").count()
         active_blocks = db.query(SiteBlock).filter_by(is_active=True).count()
-        network_revocations = db.query(RevocationList).filter_by(lemma_type="ishuman").count()
-
         return jsonify({
             "success": True,
             "network": "isHuman",
             "total_verifications": total_verifications,
             "active_site_blocks": active_blocks,
-            "network_revocations": network_revocations,
             "credential_ttl_days": ISHUMAN_CREDENTIAL_TTL_DAYS,
             "verification_cost_usd": STRIPE_IDENTITY_COST_CENTS / 100,
         })
@@ -2298,43 +2208,20 @@ def _bill_site_credential_event(
     """Classify and record a billable site-credential event (issuance / MAU / doubt)."""
     if not ppid or not credential_id:
         return
-    try:
-        from billing.credential_billing import record_credential_billing_event
+    from billing.credential_billing import record_credential_billing_event
 
-        record_credential_billing_event(
-            db,
-            target_site=target_site,
-            ppid=ppid,
-            credential_id=credential_id,
-            issue_mode=issue_mode,
-            is_cached_reissue=is_cached_reissue,
-        )
-    except Exception as exc:
-        logger.warning("Failed to record credential billing for %s: %s", target_site, exc)
-
-
-def _jsonify_site_proof_with_migration(
-    db,
-    *,
-    wallet_id: str,
-    target_site: str,
-    site_ppid: str,
-    credential: dict,
-    cached: bool,
-) -> "flask.Response":
-    from api.ppid_migration import issue_ppid_migration_for_site
-
-    payload = {"success": True, "credential": credential, "cached": cached}
-    ppid_migration = issue_ppid_migration_for_site(
+    record_credential_billing_event(
         db,
-        wallet_id=wallet_id,
         target_site=target_site,
-        current_ppid=site_ppid,
+        ppid=ppid,
+        credential_id=credential_id,
+        issue_mode=issue_mode,
+        is_cached_reissue=is_cached_reissue,
     )
-    if ppid_migration:
-        db.commit()
-        payload["ppid_migration"] = ppid_migration
-    return jsonify(payload)
+
+
+def _jsonify_site_proof(*, credential: dict, cached: bool) -> "flask.Response":
+    return jsonify({"success": True, "credential": credential, "cached": cached})
 
 
 @ishuman_bp.route("/api/ishuman/derive-site-proof", methods=["POST"])
@@ -2357,8 +2244,7 @@ def derive_site_proof():
     1. Verifies the master credential is valid (exists, not revoked, not expired)
     2. Derives the site-specific PPID
     3. Issues a new credential signed by the platform issuer
-    4. Records the master → derived mapping for revocation
-    5. Returns the per-site credential for the bridge to store
+    4. Returns the per-site credential for the bridge to store
     """
     body = request.get_json(silent=True) or {}
     rejected = _reject_wallet_secret_payload(body)
@@ -2373,6 +2259,9 @@ def derive_site_proof():
     target_site = body.get("target_site")
     site_signing_pubkey_raw = (body.get("site_signing_pubkey") or "").strip()
     issue_mode = (body.get("issue_mode") or "site_proof").strip().lower()
+    if issue_mode not in {"site_proof", "fresh_idv"}:
+        return jsonify({"success": False, "error": "invalid_issue_mode"}), 400
+    body["issue_mode"] = issue_mode
 
     if not wallet_id or not target_site:
         return jsonify({
@@ -2386,7 +2275,7 @@ def derive_site_proof():
 
     # Bind master_credential_id into the signed assertion only when supplied so
     # the wallet and server agree on the signed field set in both modes.
-    assertion_fields = ["target_site", "site_signing_pubkey"]
+    assertion_fields = ["target_site", "site_signing_pubkey", "issue_mode"]
     if master_credential_id:
         assertion_fields = ["master_credential_id"] + assertion_fields
     err, _wid = _require_wallet_assertion(
@@ -2402,29 +2291,44 @@ def derive_site_proof():
     if not target_site or target_site == "unknown":
         return jsonify({"success": False, "error": "invalid target_site"}), 400
 
-    from api.database import (
-        SessionLocal, IsHumanVerification, DerivedCredential, RevocationList,
-    )
+    from api.database import SessionLocal, IsHumanVerification, RevocationList
     db = SessionLocal()
     try:
         # 1. Resolve the master credential. Prefer the body's hint; otherwise
         #    fall back to the wallet's latest verified record (Phase 1.2).
         master = None
         if master_credential_id:
-            master = (
+            master_query = (
                 db.query(IsHumanVerification)
                 .filter_by(credential_id=master_credential_id, wallet_id=wallet_id, status="verified")
-                .first()
             )
+            if issue_mode == "fresh_idv" and hasattr(master_query, "with_for_update"):
+                master_query = master_query.with_for_update()
+            master = master_query.first()
         if not master:
-            master = (
+            master_query = (
                 db.query(IsHumanVerification)
                 .filter_by(wallet_id=wallet_id, status="verified")
                 .order_by(IsHumanVerification.verified_at.desc())
-                .first()
             )
+            if issue_mode == "fresh_idv" and hasattr(master_query, "with_for_update"):
+                master_query = master_query.with_for_update()
+            master = master_query.first()
         if not master:
             return jsonify({"success": False, "error": "wallet_not_verified"}), 403
+
+        # A client label alone must never clear a doubt. Fresh mode is accepted
+        # only immediately after a server-recorded successful IDV ceremony.
+        if issue_mode == "fresh_idv":
+            verified_at = getattr(master, "verified_at", None)
+            master_metadata = dict(getattr(master, "metadata_json", None) or {})
+            if (
+                not verified_at
+                or datetime.utcnow() - verified_at > timedelta(minutes=15)
+                or master_metadata.get("fresh_idv_site") != target_site
+                or master_metadata.get("fresh_idv_consumed") is True
+            ):
+                return jsonify({"success": False, "error": "fresh_idv_required"}), 403
 
         # Bind the resolved credential id for the rest of the flow (revocation
         # checks, derived-credential mapping) regardless of how it was found.
@@ -2471,51 +2375,8 @@ def derive_site_proof():
 
         ppid_derivation = "person_root_v1" if person_id else None
 
-        # 2. Check if derivation already exists
-        existing = (
-            db.query(DerivedCredential)
-            .filter_by(
-                master_credential_id=master_credential_id,
-                target_site=target_site,
-                is_active=True,
-            )
-            .first()
-        )
-        if existing:
-            # Re-issue the credential (same ID) so the caller can store it
-            ppid = _derive_ppid_for_site(
-                rp_id=target_site,
-                wallet_id=wallet_id,
-                lemma_person_id=person_id,
-                db=db,
-            )
-            credential = _issue_ishuman_credential(
-                ppid,
-                wallet_id,
-                site_id=target_site,
-                site_signing_pubkey=site_signing_pubkey or None,
-                ppid_derivation=ppid_derivation,
-                verification_method=(getattr(master, "issuer_id", None) or "didit"),
-            )
-            credential["id"] = existing.derived_credential_id
-            _bill_site_credential_event(
-                db,
-                target_site=target_site,
-                ppid=ppid,
-                credential_id=credential["id"],
-                issue_mode=issue_mode,
-                is_cached_reissue=True,
-            )
-            return _jsonify_site_proof_with_migration(
-                db,
-                wallet_id=wallet_id,
-                target_site=target_site,
-                site_ppid=ppid,
-                credential=credential,
-                cached=True,
-            )
-
-        # 3. Derive site-specific PPID
+        # Derive the deterministic site PPID.  No person/wallet-to-site row is
+        # stored; every renewal receives a fresh random credential id.
         site_ppid = _derive_ppid_for_site(
             rp_id=target_site,
             wallet_id=wallet_id,
@@ -2523,7 +2384,7 @@ def derive_site_proof():
             db=db,
         )
 
-        # 4. Issue per-site credential
+        # Issue the short-lived per-site credential.
         credential = _issue_ishuman_credential(
             site_ppid,
             wallet_id,
@@ -2533,21 +2394,11 @@ def derive_site_proof():
             verification_method=(getattr(master, "issuer_id", None) or "didit"),
         )
 
-        # 5. Record the mapping
-        derived = DerivedCredential(
-            master_credential_id=master_credential_id,
-            derived_credential_id=credential["id"],
-            wallet_id=wallet_id,
-            target_site=target_site,
-            derived_ppid=site_ppid,
-        )
-        db.add(derived)
-        db.commit()
+        logger.info("Issued privacy-minimized site proof")
 
-        logger.info(
-            "Derived site proof: master=%s site=%s derived=%s",
-            master_credential_id[:30], target_site, credential["id"][:30],
-        )
+        if issue_mode == "fresh_idv":
+            master_metadata["fresh_idv_consumed"] = True
+            master.metadata_json = master_metadata
 
         _bill_site_credential_event(
             db,
@@ -2557,14 +2408,7 @@ def derive_site_proof():
             issue_mode=issue_mode,
             is_cached_reissue=False,
         )
-        return _jsonify_site_proof_with_migration(
-            db,
-            wallet_id=wallet_id,
-            target_site=target_site,
-            site_ppid=site_ppid,
-            credential=credential,
-            cached=False,
-        )
+        return _jsonify_site_proof(credential=credential, cached=False)
 
     except Exception:
         db.rollback()
@@ -3323,108 +3167,5 @@ def verify_presentation():
 @ishuman_bp.route("/api/ishuman/approve-revocation", methods=["POST"])
 @cross_origin()
 def approve_network_revocation():
-    """Approve a network-wide revocation after evidence review.
-
-    This is an **admin** action.  It:
-    1. Marks the wallet as revoked (wallet-level kill via Bloom filter)
-    2. Revokes the master credential
-    3. Revokes ALL per-site derived credentials
-    4. Publishes revocation events so the Bloom filter rebuilds
-
-    Request body::
-
-        {
-            "wallet_id": "...",
-            "master_credential_id": "ishuman_master_...",
-            "reason": "Confirmed non-human activity"
-        }
-    """
-    from auth.request_principal import resolve_admin_principal
-
-    principal, error = resolve_admin_principal()
-    if not principal:
-        return jsonify({"success": False, "error": error or "admin_required"}), 403
-
-    body = request.get_json(silent=True) or {}
-    wallet_id = body.get("wallet_id")
-    master_credential_id = body.get("master_credential_id")
-    block_id = body.get("block_id")
-    ppid = body.get("ppid")
-    reason = body.get("reason", "Network revocation approved after evidence review")
-
-    from api.database import SessionLocal, SiteBlock
-    db = SessionLocal()
-    try:
-        if block_id and not wallet_id and not master_credential_id:
-            block = db.query(SiteBlock).filter_by(id=int(block_id)).first()
-            if not block:
-                return jsonify({"success": False, "error": "block_not_found"}), 404
-            ppid = ppid or block.ppid
-            wallet_id = resolve_wallet_id_for_ppid(db, block.ppid)
-
-        if ppid and not wallet_id and not master_credential_id:
-            wallet_id = resolve_wallet_id_for_ppid(db, ppid)
-
-        if not wallet_id and not master_credential_id:
-            return jsonify({
-                "success": False,
-                "error": "wallet_id, master_credential_id, block_id, or ppid required",
-            }), 400
-
-        try:
-            result = revoke_wallet_network_wide(
-                db,
-                wallet_id=wallet_id,
-                master_credential_id=master_credential_id,
-                reason=reason,
-                revoked_by="admin",
-            )
-        except ValueError as exc:
-            return jsonify({"success": False, "error": str(exc)}), 400
-
-        from api.audit_logger import AuditEvent, log_event
-
-        operator_ppid = getattr(principal, "ppid", None) or getattr(principal, "subject", None)
-        log_event(
-            AuditEvent.ADMIN_ACTION,
-            result="success",
-            site_id="lemma.id",
-            resource="/api/ishuman/approve-revocation",
-            action="approve_network_revocation",
-            user_did=operator_ppid,
-            metadata={
-                "block_id": block_id,
-                "target_ppid": (ppid or "")[:24] + "..." if ppid and len(ppid) > 24 else ppid,
-                "wallet_id_prefix": (result["wallet_id"] or "")[:20],
-                "total_revoked": len(result["revoked_credential_ids"]),
-                "reason": reason[:500] if reason else "",
-            },
-        )
-
-        from api.forensic_audit import capture_action_proof
-
-        capture_action_proof(
-            action="ishuman.approve_network_revocation",
-            site_id="lemma.id",
-            resource=str(block_id) if block_id else result.get("wallet_id"),
-        )
-
-        logger.info(
-            "Network revocation approved: wallet=%s master_count=%d derived_count=%d total_revoked=%d",
-            result["wallet_id"][:20], result["master_count"], result["derived_count"],
-            len(result["revoked_credential_ids"]),
-        )
-
-        return jsonify({
-            "success": True,
-            "wallet_id": result["wallet_id"],
-            "revoked_credential_ids": result["revoked_credential_ids"],
-            "total_revoked": len(result["revoked_credential_ids"]),
-        })
-
-    except Exception:
-        db.rollback()
-        logger.exception("Failed to approve network revocation")
-        return jsonify({"success": False, "error": "revocation_failed"}), 500
-    finally:
-        db.close()
+    """Retired: cross-site credential enumeration is no longer retained."""
+    return jsonify({"success": False, "error": "network_revocation_retired"}), 410

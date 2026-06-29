@@ -265,7 +265,6 @@
       'ih-unblock-tickets-btn',
       'ih-abuse-block-btn',
       'ih-abuse-recheck-btn',
-      'ih-abuse-network-btn',
       'ih-force-reverify-btn',
       'ih-run-guided-demo',
     ];
@@ -785,14 +784,14 @@
       log('Server reset skipped', err.message);
     }
 
-    // 2a. Tell open customer-site tabs ON THE SAME ORIGIN (running the SDK) to
-    //     invalidate cached sessions + refresh Bloom. NOTE: BroadcastChannel is
+    // 2a. Tell open tabs on the same origin to invalidate cached sessions.
+    //     NOTE: BroadcastChannel is
     //     origin-scoped, so this only reaches lemma.id tabs, not the customer
     //     demo origins — those are handled by the cross-origin iframe wipe below.
     if (window.IsHumanVerifier && window.IsHumanVerifier.broadcastBlockUpdate) {
       for (const slug of SITE_SLUGS) {
         window.IsHumanVerifier.broadcastBlockUpdate({
-          type: 'NETWORK_REVOCATION',
+          type: 'CREDENTIAL_RESET',
           siteId: SITE_IDS[slug],
           walletId: state.walletId,
           reason: 'demo_clear_lemma_id',
@@ -1148,61 +1147,6 @@
     updateBlockResultsTable();
   }
 
-  async function requestNetworkReview() {
-    const result = state.results.tickets || await verifySite('tickets');
-    if (!result.ppid) throw new Error('Ticketing PPID unavailable');
-    const payload = await requestJson('/api/demo/ishuman/network-revoke-request', {
-      method: 'POST',
-      body: JSON.stringify({
-        site_slug: 'tickets',
-        ppid: result.ppid,
-        credential_id: state.masterCredentialId,
-        reason: 'Demo evidence: site-level block escalated for network review',
-      }),
-    });
-    setPill('ih-network-pill', 'PENDING REVIEW', 'warn');
-    const netJson = $('ih-master-json');
-    if (netJson) netJson.textContent = pretty(payload);
-    log('Network revocation review requested', short(result.ppid));
-    const outcome = $('ih-abuse-network-outcome');
-    if (outcome) outcome.textContent = 'Network review: pending';
-    await refreshStatus();
-  }
-
-  async function approveNetworkRevocation() {
-    if (!state.walletId && !state.masterCredentialId) {
-      throw new Error('Create wallet and complete verification first');
-    }
-    const payload = await requestJson('/api/demo/ishuman/approve-network-revocation', {
-      method: 'POST',
-      headers: demoHeaders(),
-      body: JSON.stringify({
-        wallet_id: state.walletId,
-        master_credential_id: state.masterCredentialId,
-        reason: 'Demo network revocation approved after evidence review',
-      }),
-    });
-    setPill('ih-network-pill', 'REVOKED', 'deny');
-    const netJson = $('ih-master-json');
-    if (netJson) netJson.textContent = pretty(payload);
-    log('Network revocation approved', `${payload.total_revoked} IDs`);
-    const outcome = $('ih-abuse-network-outcome');
-    if (outcome) {
-      outcome.textContent = `Both sites DENY · revoked (${payload.total_revoked} IDs) — user can re-enter by completing fresh IDV.`;
-      outcome.className = 'abuse-outcome deny';
-    }
-    // Broadcast to all listening tabs/origins so cached sessions invalidate.
-    if (window.IsHumanVerifier && window.IsHumanVerifier.broadcastBlockUpdate) {
-      window.IsHumanVerifier.broadcastBlockUpdate({
-        type: 'NETWORK_REVOCATION',
-        walletId: state.walletId,
-        masterCredentialId: state.masterCredentialId,
-        reason: 'demo_network_revocation',
-      });
-    }
-    await verifyBothSites();
-  }
-
   async function forceFreshIdv() {
     const result = state.results.tickets || await verifySite('tickets');
     if (!result.ppid) throw new Error('Ticketing PPID unavailable');
@@ -1307,13 +1251,13 @@
         trialsOutcome.className = trials.human ? 'abuse-outcome' : 'abuse-outcome deny';
       }
 
-      setWizardStep(6, 'Requesting network review…');
-      await requestNetworkReview();
+      setWizardStep(6, 'Confirming persistent site enforcement…');
+      log('Network-wide revocation is retired; the site block remains authoritative.');
 
-      setWizardStep(7, 'Approving network revocation…');
-      await approveNetworkRevocation();
+      setWizardStep(7, 'Rechecking both site-private decisions…');
+      await verifyBothSites();
 
-      setWizardStep(0, 'Demo complete — both sites denied at network layer.');
+      setWizardStep(0, 'Demo complete — ticketing denied; trials remains valid.');
       setDemoReadyBanner(true);
       log('Guided demo complete');
     } catch (err) {
@@ -1399,10 +1343,6 @@
     bind('ih-abuse-block-btn', blockTickets);
     bind('ih-abuse-recheck-btn', recheckBothSitesAfterBlock);
     bind('ih-run-guided-demo', runGuidedDemo);
-    bind('ih-abuse-network-btn', async () => {
-      await requestNetworkReview();
-      await approveNetworkRevocation();
-    });
     bind('ih-force-reverify-btn', forceFreshIdv);
 
     try {

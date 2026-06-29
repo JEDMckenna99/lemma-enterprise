@@ -43,12 +43,10 @@
       },
       claim:
         'You\u2019re verified. Save your lemma.id on this device with a passkey so you can use it again.',
-      freshBlocked(site) {
+      freshDoubt(site) {
         const s = formatSiteLabel(site);
         return `${s} asked for a fresh check before you continue. Verify once more \u2014 your ID still stays out of their hands.`;
       },
-      freshRevoked:
-        'Your previous verification was reset. Verify once more to continue. Sites still never see your ID documents.',
       mobileHandoff:
         'You\u2019re verified. Save your lemma.id on this phone \u2014 a passkey keeps it secure on this device only.',
     },

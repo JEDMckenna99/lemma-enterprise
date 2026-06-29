@@ -3022,12 +3022,14 @@ class LemmaWallet {
         // Bind master_credential_id into the signed assertion only when present
         // so the wallet and server agree on the signed field set (see
         // api/ishuman.py derive_site_proof).
+        const normalizedIssueMode = issueMode === 'fresh_idv' ? 'fresh_idv' : 'site_proof';
         const assertionFieldNames = masterId
-            ? ['master_credential_id', 'target_site', 'site_signing_pubkey']
-            : ['target_site', 'site_signing_pubkey'];
+            ? ['master_credential_id', 'target_site', 'site_signing_pubkey', 'issue_mode']
+            : ['target_site', 'site_signing_pubkey', 'issue_mode'];
         const assertionFieldValues = {
             target_site: canonicalSite,
             site_signing_pubkey: siteSigningPubkey,
+            issue_mode: normalizedIssueMode,
         };
         if (masterId) {
             assertionFieldValues.master_credential_id = masterId;
@@ -3042,7 +3044,7 @@ class LemmaWallet {
             target_site: canonicalSite,
             site_signing_pubkey: siteSigningPubkey,
             wallet_assertion: walletAssertion,
-            issue_mode: issueMode === 'fresh_idv' ? 'fresh_idv' : 'site_proof',
+            issue_mode: normalizedIssueMode,
         };
         if (masterId) {
             deriveBody.master_credential_id = masterId;
@@ -3057,10 +3059,6 @@ class LemmaWallet {
         const deriveData = await deriveRes.json();
         if (!deriveRes.ok || !deriveData.success || !deriveData.credential) {
             throw new Error(deriveData.error || deriveData.message || 'derivation_failed');
-        }
-
-        if (deriveData.ppid_migration) {
-            await this._storePpidMigration(canonicalSite, deriveData.ppid_migration);
         }
 
         const derived = deriveData.credential;
@@ -3162,32 +3160,6 @@ class LemmaWallet {
         };
     }
 
-    async _storePpidMigration(canonicalSite, migration) {
-        if (!canonicalSite || !migration) return;
-        try {
-            await this._put('ppid_migrations', {
-                id: canonicalSite,
-                siteId: canonicalSite,
-                migration,
-                cachedAt: Date.now(),
-            });
-        } catch (e) {
-            if (!this._isEncryptedStorageLockedError(e)) throw e;
-        }
-    }
-
-    async getPpidMigrationForSite(targetSite) {
-        const keys = this._getLemmaKeys();
-        const canonicalSite = keys.canonicalizeSiteDomain(targetSite || '');
-        if (!canonicalSite) return null;
-        try {
-            const row = await this._get('ppid_migrations', canonicalSite);
-            return row?.migration || null;
-        } catch {
-            return null;
-        }
-    }
-
     async issueSiteProofPackage({
         siteId,
         sessionNonce,
@@ -3202,18 +3174,13 @@ class LemmaWallet {
             issueMode: issueMode || 'site_proof',
             forceServerDerive: true,
         });
-        const signed = await this.signSiteSessionPresentation({
+        return this.signSiteSessionPresentation({
             credential,
             siteId,
             sessionNonce,
             bloomSequence,
             sessionTtlSec,
         });
-        const ppidMigration = await this.getPpidMigrationForSite(siteId);
-        if (ppidMigration) {
-            signed.ppid_migration = ppidMigration;
-        }
-        return signed;
     }
 
     async ensureIsHumanIssuanceReady(options = {}) {

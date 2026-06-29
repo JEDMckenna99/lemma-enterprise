@@ -64,15 +64,16 @@ def test_demo_create_button_always_enters_live_issuance():
     assert block.index("setDemoMode('live')") < block.index("openIdvPopup")
 
 
-def test_ishuman_demo_config_includes_network_revocation_flag(ishuman_demo_client):
+def test_ishuman_demo_config_omits_retired_network_revocation(ishuman_demo_client):
     resp = ishuman_demo_client.get("/api/demo/ishuman/config")
     payload = resp.get_json()
 
     assert resp.status_code == 200
-    assert payload.get("network_revocation_enabled") is False
+    assert "network_revocation_enabled" not in payload
+    assert "network_revoke_configured" not in payload
 
 
-def test_ishuman_demo_page_shows_network_revoke_when_enabled(
+def test_ishuman_demo_page_never_shows_retired_network_revoke(
     ishuman_demo_client, monkeypatch,
 ):
     monkeypatch.setenv("LEMMA_ISHUMAN_NETWORK_REVOCATION_ENABLED", "1")
@@ -80,9 +81,9 @@ def test_ishuman_demo_page_shows_network_revoke_when_enabled(
     body = resp.get_data(as_text=True)
 
     assert resp.status_code == 200
-    assert "ih-network-pill" in body
-    assert "Revoke everywhere" in body
-    assert "Network revocation drill" in body
+    assert "ih-network-pill" not in body
+    assert "Revoke everywhere" not in body
+    assert "Network revocation drill" not in body
 
 
 def test_ishuman_idv_popup_page_loads(ishuman_demo_client):
@@ -196,14 +197,10 @@ def test_ishuman_demo_network_review_request_stays_site_scoped(
     )
     payload = resp.get_json()
 
-    assert resp.status_code == 200
-    assert payload["success"] is True
-    assert payload["status"] == "pending_review"
+    assert resp.status_code == 410
+    assert payload["error"] == "network_revocation_retired"
     blocks = fake_ishuman_db_session_factory.store.data[SiteBlock.__name__]
-    assert len(blocks) == 1
-    assert blocks[0].site_id == "site_demo_tickets"
-    assert blocks[0].network_revocation_requested is True
-    assert blocks[0].network_revocation_status == "pending_review"
+    assert blocks == []
 
 
 def test_ishuman_demo_network_review_disabled_by_default(ishuman_demo_client):
@@ -217,8 +214,8 @@ def test_ishuman_demo_network_review_disabled_by_default(ishuman_demo_client):
     )
     payload = resp.get_json()
 
-    assert resp.status_code == 503
-    assert payload["error"] == "network_revocation_disabled"
+    assert resp.status_code == 410
+    assert payload["error"] == "network_revocation_retired"
 
 
 def test_ishuman_demo_network_approve_requires_demo_admin_token(ishuman_demo_client, monkeypatch):
@@ -229,8 +226,8 @@ def test_ishuman_demo_network_approve_requires_demo_admin_token(ishuman_demo_cli
     )
     payload = resp.get_json()
 
-    assert resp.status_code == 403
-    assert payload["error"] == "demo_admin_token_required"
+    assert resp.status_code == 410
+    assert payload["error"] == "network_revocation_retired"
 
 
 def test_ishuman_demo_test_complete_requires_explicit_test_mode(ishuman_demo_client):
@@ -308,7 +305,7 @@ def test_ishuman_demo_network_approve_revokes_demo_wallet_when_token_matches(
     make_derived_credential,
     monkeypatch,
 ):
-    from api.database import IsHumanVerification, DerivedCredential, RevocationList
+    from api.database import IsHumanVerification, RevocationList
 
     monkeypatch.setenv("LEMMA_ISHUMAN_NETWORK_REVOCATION_ENABLED", "1")
     monkeypatch.setenv("LEMMA_ISHUMAN_DEMO_ADMIN_TOKEN", "demo-token")
@@ -319,7 +316,7 @@ def test_ishuman_demo_network_approve_revokes_demo_wallet_when_token_matches(
             status="verified",
         )
     )
-    fake_ishuman_db_session_factory.store.data[DerivedCredential.__name__].append(
+    fake_ishuman_db_session_factory.store.data["DerivedCredential"].append(
         make_derived_credential(
             wallet_id="wallet_demo_001",
             master_credential_id="ishuman_master_demo_001",
@@ -336,14 +333,11 @@ def test_ishuman_demo_network_approve_revokes_demo_wallet_when_token_matches(
     )
     payload = resp.get_json()
 
-    assert resp.status_code == 200
-    assert payload["success"] is True
-    assert "wallet_demo_001" in payload["revoked_credential_ids"]
-    assert "ishuman_master_demo_001" in payload["revoked_credential_ids"]
-    assert "ishuman_site_demo_tickets_001" in payload["revoked_credential_ids"]
-    assert fake_ishuman_db_session_factory.store.data[IsHumanVerification.__name__][0].status == "revoked"
-    assert fake_ishuman_db_session_factory.store.data[DerivedCredential.__name__][0].is_active is False
-    assert len(fake_ishuman_db_session_factory.store.data[RevocationList.__name__]) == 3
+    assert resp.status_code == 410
+    assert payload["error"] == "network_revocation_retired"
+    assert fake_ishuman_db_session_factory.store.data[IsHumanVerification.__name__][0].status == "verified"
+    assert fake_ishuman_db_session_factory.store.data["DerivedCredential"][0].is_active is True
+    assert len(fake_ishuman_db_session_factory.store.data[RevocationList.__name__]) == 0
 
 
 def test_ishuman_demo_js_uses_real_verifier_with_two_site_bindings():

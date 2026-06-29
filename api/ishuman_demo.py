@@ -149,20 +149,13 @@ def _demo_page_context() -> dict:
     """Server-only demo tokens for /demo/ishuman (never exposed on other routes)."""
     from api.config import (
         is_ishuman_demo_qr_idv_enabled,
-        is_ishuman_network_revocation_enabled,
         is_ishuman_skeleton_idv_enabled,
     )
 
     demo_enabled = _demo_enabled()
     expose_token = _demo_exposes_test_token()
-    network_revocation_enabled = is_ishuman_network_revocation_enabled()
     return {
         "demo_sites": list(DEMO_SITES.values()),
-        "network_revocation_enabled": network_revocation_enabled,
-        "network_revoke_configured": (
-            network_revocation_enabled
-            and bool(os.getenv("LEMMA_ISHUMAN_DEMO_ADMIN_TOKEN"))
-        ),
         "demo_test_verify_enabled": (
             demo_enabled
             and os.getenv("LEMMA_ISHUMAN_DEMO_ALLOW_TEST_VERIFY", "").lower() == "true"
@@ -203,22 +196,15 @@ def ishuman_idv_popup():
 def ishuman_demo_config():
     from api.config import (
         is_ishuman_demo_qr_idv_enabled,
-        is_ishuman_network_revocation_enabled,
         is_ishuman_skeleton_idv_enabled,
         ishuman_demo_qr_credential_ttl_seconds,
     )
 
     sites = ensure_demo_sites()
-    network_revocation_enabled = is_ishuman_network_revocation_enabled()
     return jsonify({
         "success": True,
         "sites": sites,
         "stripe_demo_rail": True,
-        "network_revocation_enabled": network_revocation_enabled,
-        "network_revoke_configured": (
-            network_revocation_enabled
-            and bool(os.getenv("LEMMA_ISHUMAN_DEMO_ADMIN_TOKEN"))
-        ),
         "test_verify_enabled": (
             _demo_enabled()
             and os.getenv("LEMMA_ISHUMAN_DEMO_ALLOW_TEST_VERIFY", "").lower() == "true"
@@ -243,7 +229,7 @@ def ishuman_demo_config():
 
 @ishuman_demo_bp.route("/api/demo/ishuman/status", methods=["GET"])
 def ishuman_demo_status():
-    from api.database import DerivedCredential, IsHumanVerification, SessionLocal, SiteBlock
+    from api.database import IsHumanVerification, SessionLocal, SiteBlock
 
     wallet_id = (request.args.get("wallet_id") or "").strip()
     master_credential_id = (request.args.get("master_credential_id") or "").strip()
@@ -262,42 +248,21 @@ def ishuman_demo_status():
             )
             master = masters[-1] if masters else None
 
-        derived_rows = []
-        if master and master.credential_id:
-            derived_rows = (
-                db.query(DerivedCredential)
-                .filter_by(master_credential_id=master.credential_id)
-                .all()
-            )
-
         site_blocks = []
         demo_site_ids = [spec["site_id"] for spec in DEMO_SITES.values()]
-        for row in derived_rows:
-            for block in db.query(SiteBlock).filter_by(ppid=row.derived_ppid, is_active=True).all():
+        requested_ppid = (request.args.get("ppid") or "").strip()
+        if requested_ppid:
+            for block in db.query(SiteBlock).filter_by(ppid=requested_ppid, is_active=True).all():
                 if block.site_id in demo_site_ids:
                     site_blocks.append({
-                        "site_id": block.site_id,
-                        "ppid": block.ppid,
+                        "site_id": block.site_id, "ppid": block.ppid,
                         "reason": block.reason,
-                        "network_revocation_requested": block.network_revocation_requested,
-                        "network_revocation_status": block.network_revocation_status,
                     })
 
         return jsonify({
             "success": True,
             "master": _public_record(master),
-            "derived": [
-                {
-                    "master_credential_id": row.master_credential_id,
-                    "derived_credential_id": row.derived_credential_id,
-                    "target_site": row.target_site,
-                    "derived_ppid": row.derived_ppid,
-                    "is_active": row.is_active,
-                    "created_at": row.created_at.isoformat() if row.created_at else None,
-                    "revoked_at": row.revoked_at.isoformat() if row.revoked_at else None,
-                }
-                for row in derived_rows
-            ],
+            "derived": [],
             "site_blocks": site_blocks,
         })
     finally:
@@ -381,51 +346,7 @@ def ishuman_demo_site_unblock():
 
 @ishuman_demo_bp.route("/api/demo/ishuman/network-revoke-request", methods=["POST"])
 def ishuman_demo_network_revoke_request():
-    from api.config import is_ishuman_network_revocation_enabled
-    from api.database import SessionLocal
-    from api.site_ppid_revocation import revoke_site_bound_ppid
-
-    if not is_ishuman_network_revocation_enabled():
-        return jsonify({"success": False, "error": "network_revocation_disabled"}), 503
-
-    body = request.get_json(silent=True) or {}
-    slug = body.get("site_slug", "tickets")
-    ppid = (body.get("ppid") or "").strip()
-    reason = (body.get("reason") or "Demo evidence package: repeated automated activity").strip()
-    evidence_url = (body.get("evidence_url") or "https://lemma.id/demo/ishuman#evidence").strip()
-    if not ppid:
-        return jsonify({"success": False, "error": "ppid required"}), 400
-
-    _spec, site = _site_for_slug(slug)
-    if not site:
-        return jsonify({"success": False, "error": "unknown demo site"}), 404
-
-    db = SessionLocal()
-    try:
-        revoke_site_bound_ppid(
-            db,
-            site_id=site.site_id,
-            ppid=ppid,
-            reason=reason,
-            revoked_by=site.admin_email or "demo",
-            site_domain=site.site_domain,
-            blocked_by=site.admin_email,
-            evidence_url=evidence_url,
-            network_revocation_requested=True,
-            network_revocation_status="pending_review",
-        )
-        return jsonify({
-            "success": True,
-            "status": "pending_review",
-            "site_block_active": True,
-            "site_id": site.site_id,
-            "ppid": ppid,
-        })
-    except Exception:
-        db.rollback()
-        raise
-    finally:
-        db.close()
+    return jsonify({"success": False, "error": "network_revocation_retired"}), 410
 
 
 def _require_demo_test_verify(*, require_token_header: bool = True) -> tuple[dict | None, tuple | None]:
@@ -1133,10 +1054,9 @@ def ishuman_demo_probe_derive():
 
 @ishuman_demo_bp.route("/api/demo/ishuman/force-reverify", methods=["POST"])
 def ishuman_demo_force_reverify():
-    """Demo-only: block ticketing PPID and clear derived credential for fresh IDV."""
-    from api.database import DerivedCredential, SessionLocal
+    """Demo-only: create a temporary ticketing doubt requiring fresh IDV."""
+    from api.database import SessionLocal, SiteDoubt
     from api.ishuman import _require_wallet_assertion
-    from api.site_ppid_revocation import revoke_site_bound_ppid
 
     body = request.get_json(silent=True) or {}
     err, _wid = _require_wallet_assertion(
@@ -1159,40 +1079,25 @@ def ishuman_demo_force_reverify():
 
     db = SessionLocal()
     try:
-        result = revoke_site_bound_ppid(
-            db,
-            site_id=site.site_id,
-            ppid=ppid,
-            reason=(body.get("reason") or "Demo: force fresh IDV on ticketing").strip(),
-            revoked_by=site.admin_email or "demo",
-            site_domain=site.site_domain,
-            blocked_by=site.admin_email,
-        )
-
-        cleared_derived_ids = []
-        if master_credential_id:
-            derived_rows = (
-                db.query(DerivedCredential)
-                .filter_by(
-                    master_credential_id=master_credential_id,
-                    target_site=site.site_domain,
-                    is_active=True,
-                )
-                .all()
-            )
-            for row in derived_rows:
-                row.is_active = False
-                row.revoked_at = datetime.utcnow()
-                cleared_derived_ids.append(row.derived_credential_id)
-            db.commit()
+        doubt = db.query(SiteDoubt).filter_by(site_id=site.site_id, ppid=ppid).first()
+        if not doubt:
+            doubt = SiteDoubt(site_id=site.site_id, ppid=ppid)
+            db.add(doubt)
+        doubt.reason = (body.get("reason") or "Demo: require fresh IDV on ticketing").strip()
+        doubt.requested_by = site.admin_email or "demo"
+        doubt.requested_at = datetime.utcnow()
+        doubt.is_active = True
+        doubt.cleared_at = None
+        doubt.cleared_by = None
+        db.commit()
 
         return jsonify({
             "success": True,
             "site_id": site.site_id,
             "site_domain": site.site_domain,
             "ppid": ppid,
-            "revocation_synced": result.get("event_published", False),
-            "cleared_derived_credential_ids": cleared_derived_ids,
+            "revocation_synced": False,
+            "cleared_derived_credential_ids": [],
             "reverify_required": True,
             "wallet_id": wallet_id,
         })
@@ -1316,108 +1221,5 @@ def ishuman_demo_reset_wallet():
 
 @ishuman_demo_bp.route("/api/demo/ishuman/approve-network-revocation", methods=["POST"])
 def ishuman_demo_approve_network_revocation():
-    """Token-gated demo-only network revocation drill."""
-    expected = os.getenv("LEMMA_ISHUMAN_DEMO_ADMIN_TOKEN")
-    provided = request.headers.get("X-Demo-Admin-Token") or ""
-    if not expected or provided != expected:
-        return jsonify({
-            "success": False,
-            "error": "demo_admin_token_required",
-            "message": "Set LEMMA_ISHUMAN_DEMO_ADMIN_TOKEN and pass X-Demo-Admin-Token to run the live revocation drill.",
-        }), 403
-
-    from api.database import DerivedCredential, IsHumanVerification, RevocationList, SessionLocal, SiteBlock
-
-    body = request.get_json(silent=True) or {}
-    wallet_id = (body.get("wallet_id") or "").strip()
-    master_credential_id = (body.get("master_credential_id") or "").strip()
-    reason = (body.get("reason") or "Demo network revocation approved").strip()
-    if not wallet_id and not master_credential_id:
-        return jsonify({"success": False, "error": "wallet_id or master_credential_id required"}), 400
-
-    db = SessionLocal()
-    try:
-        if not wallet_id and master_credential_id:
-            master = db.query(IsHumanVerification).filter_by(credential_id=master_credential_id).first()
-            wallet_id = master.wallet_id if master else ""
-        if not wallet_id:
-            return jsonify({"success": False, "error": "could not resolve wallet_id"}), 400
-
-        revoked_ids = []
-        # Governance-approved coordinated-fraud kill: mark every row sticky
-        # (is_amnesty_eligible=False) so a subsequent fresh IDV cannot self-lift
-        # it. Ordinary site self-blocks stay eligible (default True).
-        existing_wallet_revoke = db.query(RevocationList).filter_by(wallet_id=wallet_id, revocation_type="wallet").first()
-        if not existing_wallet_revoke:
-            db.add(RevocationList(
-                lemma_id=f"wallet_revoke_demo_{wallet_id[:32]}_{int(time.time())}",
-                credential_id=None,
-                lemma_type="ishuman",
-                wallet_id=wallet_id,
-                revocation_type="wallet",
-                revoked_by="demo_admin",
-                reason=reason,
-                is_amnesty_eligible=False,
-            ))
-            revoked_ids.append(wallet_id)
-        elif existing_wallet_revoke.is_amnesty_eligible is not False:
-            existing_wallet_revoke.is_amnesty_eligible = False
-
-        masters = db.query(IsHumanVerification).filter_by(wallet_id=wallet_id, status="verified").all()
-        for master in masters:
-            if master.credential_id:
-                db.add(RevocationList(
-                    lemma_id=master.credential_id,
-                    credential_id=master.credential_id,
-                    lemma_type="ishuman",
-                    revocation_type="credential",
-                    revoked_by="demo_admin",
-                    reason=reason,
-                    is_amnesty_eligible=False,
-                ))
-                revoked_ids.append(master.credential_id)
-                master.status = "revoked"
-
-        derived_rows = db.query(DerivedCredential).filter_by(wallet_id=wallet_id, is_active=True).all()
-        for row in derived_rows:
-            db.add(RevocationList(
-                lemma_id=row.derived_credential_id,
-                credential_id=row.derived_credential_id,
-                lemma_type="ishuman",
-                revocation_type="credential",
-                revoked_by="demo_admin",
-                reason=reason,
-                is_amnesty_eligible=False,
-            ))
-            revoked_ids.append(row.derived_credential_id)
-            row.is_active = False
-            row.revoked_at = datetime.utcnow()
-
-        demo_site_ids = [spec["site_id"] for spec in DEMO_SITES.values()]
-        demo_ppids = [row.derived_ppid for row in derived_rows]
-        for block in db.query(SiteBlock).filter_by(network_revocation_status="pending_review").all():
-            if block.site_id in demo_site_ids and block.ppid in demo_ppids:
-                block.network_revocation_status = "approved"
-                block.is_amnesty_eligible = False
-
-        db.commit()
-
-        try:
-            from api.revocation_sync import get_event_bus
-            bus = get_event_bus()
-            for revoked_id in revoked_ids:
-                bus.publish_revocation(revoked_id, reason=reason)
-        except Exception:
-            pass
-
-        return jsonify({
-            "success": True,
-            "wallet_id": wallet_id,
-            "revoked_credential_ids": revoked_ids,
-            "total_revoked": len(revoked_ids),
-        })
-    except Exception:
-        db.rollback()
-        raise
-    finally:
-        db.close()
+    """Retired: demo no longer constructs or exercises a cross-site graph."""
+    return jsonify({"success": False, "error": "network_revocation_retired"}), 410

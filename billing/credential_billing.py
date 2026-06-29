@@ -1,17 +1,19 @@
-"""
-Classify and record billable site-credential events.
+"""Privacy-minimized site credential billing.
 
-lemma.id owns usage classification; Stripe collects payment via Billing Meters.
+Only a keyed token of the already site-private PPID is retained.  No wallet,
+person, master credential, or site credential identifier is stored here.
 """
 
 from __future__ import annotations
 
 import logging
+import hashlib
+import secrets
 from dataclasses import dataclass
-from datetime import datetime
-from typing import Any, Optional
+from datetime import datetime, timedelta
+from typing import Optional
 
-from api.usage_tracking import _hash_ppid_for_mau, track_site_proof_mau
+from api.usage_tracking import _hash_ppid_for_mau
 from billing.stripe_catalog import METER_EVENTS, UNIT_AMOUNTS_CENTS
 from billing.stripe_meter_reporter import report_meter_event
 
@@ -19,7 +21,6 @@ logger = logging.getLogger(__name__)
 
 ISSUE_MODE_SITE_PROOF = "site_proof"
 ISSUE_MODE_FRESH_IDV = "fresh_idv"
-
 EVENT_INITIAL_ISSUANCE = "initial_issuance"
 EVENT_MAU_RENEWAL = "mau_renewal"
 EVENT_DOUBT_REENTRY = "doubt_reentry"
@@ -36,10 +37,7 @@ class BillingEventResult:
 
 
 def normalize_issue_mode(value: Optional[str]) -> str:
-    mode = (value or ISSUE_MODE_SITE_PROOF).strip().lower()
-    if mode == ISSUE_MODE_FRESH_IDV:
-        return ISSUE_MODE_FRESH_IDV
-    return ISSUE_MODE_SITE_PROOF
+    return ISSUE_MODE_FRESH_IDV if (value or "").strip().lower() == ISSUE_MODE_FRESH_IDV else ISSUE_MODE_SITE_PROOF
 
 
 def classify_billing_event(
@@ -48,107 +46,84 @@ def classify_billing_event(
     had_prior_derived: bool,
     first_issuance_month: Optional[str],
     current_month: str,
+    active_doubt: bool = False,
+    monthly_first_seen: bool = True,
 ) -> Optional[str]:
-    """
-    Return a billable event type, or None when no charge applies.
-
-    Rules:
-      - fresh_idv + prior derived row  -> doubt_reentry ($0.35)
-      - fresh_idv + no prior derived  -> initial_issuance (mislabeled first visit)
-      - site_proof + no prior derived -> initial_issuance ($0.35)
-      - site_proof + prior derived, month after first issuance -> mau_renewal ($0.01)
-      - site_proof + prior derived, still in issuance month -> None (free)
-    """
-    mode = normalize_issue_mode(issue_mode)
-
-    if mode == ISSUE_MODE_FRESH_IDV:
-        if had_prior_derived:
-            return EVENT_DOUBT_REENTRY
-        return EVENT_INITIAL_ISSUANCE
-
+    """Pure billing policy retained as a stable public test seam."""
     if not had_prior_derived:
         return EVENT_INITIAL_ISSUANCE
-
-    if first_issuance_month and current_month > first_issuance_month:
+    if normalize_issue_mode(issue_mode) == ISSUE_MODE_FRESH_IDV and active_doubt:
+        return EVENT_DOUBT_REENTRY
+    if first_issuance_month and current_month > first_issuance_month and monthly_first_seen:
         return EVENT_MAU_RENEWAL
     return None
 
 
-def had_prior_derived_credential(
-    db,
-    *,
-    target_site: str,
-    ppid: str,
-    exclude_credential_id: Optional[str] = None,
-) -> bool:
-    from api.database import DerivedCredential
-
-    if not target_site or not ppid:
-        return False
-    rows = (
-        db.query(DerivedCredential)
-        .filter_by(target_site=target_site, derived_ppid=ppid)
-        .all()
-    )
-    if exclude_credential_id:
-        rows = [
-            row
-            for row in rows
-            if getattr(row, "derived_credential_id", None) != exclude_credential_id
-        ]
-    return len(rows) > 0
-
-
-def first_issuance_month_for_ppid(db, *, target_site: str, ppid: str) -> Optional[str]:
-    from api.database import DerivedCredential
-
-    if not target_site or not ppid:
-        return None
-    rows = (
-        db.query(DerivedCredential)
-        .filter_by(target_site=target_site, derived_ppid=ppid)
-        .all()
-    )
-    if not rows:
-        return None
-    earliest = min(
-        rows,
-        key=lambda row: getattr(row, "created_at", None) or datetime.min,
-    )
-    if not getattr(earliest, "created_at", None):
-        return None
-    return earliest.created_at.strftime("%Y-%m")
-
-
 def resolve_stripe_customer_id_for_site(db, target_site: str) -> Optional[str]:
-    """Look up Stripe customer id from registered site admin email."""
-    from api.database import Customer
-    from api.site_ppid_revocation import resolve_site_by_domain
+    from billing.billing_customer import get_registered_site_billing_context
 
-    site = resolve_site_by_domain(db, target_site)
-    if not site:
-        return None
-
-    email = (getattr(site, "admin_email", None) or "").strip().lower()
-    if not email:
-        return None
-
-    customer = (
-        db.query(Customer)
-        .filter(Customer.email.ilike(email))
-        .first()
-    )
-    stripe_id = getattr(customer, "stripe_customer_id", None) if customer else None
-    return (stripe_id or "").strip() or None
+    ctx = get_registered_site_billing_context(db, target_site)
+    return (ctx.get("stripe_customer_id") or "").strip() or None
 
 
 def resolve_billing_site_key(db, target_site: str) -> str:
     from api.site_ppid_revocation import resolve_site_by_domain
 
     site = resolve_site_by_domain(db, target_site)
-    if site and getattr(site, "site_id", None):
-        return site.site_id
-    return (target_site or "").strip()
+    return (getattr(site, "site_id", None) if site else None) or (target_site or "").strip().lower()
+
+
+def _active_doubt(db, *, site_scope: str, ppid: str):
+    from api.database import SiteDoubt
+
+    return db.query(SiteDoubt).filter_by(site_id=site_scope, ppid=ppid, is_active=True).first()
+
+
+def _lock_site_billing_subject_transaction(db, *, site_scope: str, subject_token: str) -> None:
+    """Serialize classification for one site subject on PostgreSQL.
+
+    The uniqueness constraints remain the final invariant; this lock ensures
+    concurrent first issuance/renewal requests do not race into an error or
+    produce duplicate aggregate/outbox events.
+    """
+    try:
+        bind = db.get_bind()
+    except (AttributeError, TypeError):
+        return
+    if getattr(getattr(bind, "dialect", None), "name", "") != "postgresql":
+        return
+    from sqlalchemy import text
+
+    digest = hashlib.sha256(f"{site_scope}\0{subject_token}".encode("utf-8")).digest()
+    lock_key = int.from_bytes(digest[:8], "big", signed=True)
+    db.execute(text("SELECT pg_advisory_xact_lock(:lock_key)"), {"lock_key": lock_key})
+
+
+def _increment_aggregate(db, *, site_scope: str, month: str, event_type: str) -> None:
+    from api.database import IsHumanSiteUsageAggregate
+
+    row = db.query(IsHumanSiteUsageAggregate).filter_by(site_scope=site_scope, month=month).first()
+    if not row:
+        row = IsHumanSiteUsageAggregate(site_scope=site_scope, month=month)
+        db.add(row)
+    field = {
+        EVENT_INITIAL_ISSUANCE: "initial_issuances",
+        EVENT_MAU_RENEWAL: "mau_renewals",
+        EVENT_DOUBT_REENTRY: "doubt_reentries",
+    }[event_type]
+    setattr(row, field, int(getattr(row, field, 0) or 0) + 1)
+    row.updated_at = datetime.utcnow()
+
+
+def _increment_active_subjects(db, *, site_scope: str, month: str) -> None:
+    from api.database import IsHumanSiteUsageAggregate
+
+    row = db.query(IsHumanSiteUsageAggregate).filter_by(site_scope=site_scope, month=month).first()
+    if not row:
+        row = IsHumanSiteUsageAggregate(site_scope=site_scope, month=month)
+        db.add(row)
+    row.active_subjects = int(getattr(row, "active_subjects", 0) or 0) + 1
+    row.updated_at = datetime.utcnow()
 
 
 def record_credential_billing_event(
@@ -156,70 +131,156 @@ def record_credential_billing_event(
     *,
     target_site: str,
     ppid: str,
-    credential_id: str,
+    credential_id: str = "",  # accepted but deliberately never retained
     issue_mode: Optional[str] = None,
-    is_cached_reissue: bool = False,
+    is_cached_reissue: bool = False,  # legacy compatibility; no storage effect
     month: Optional[str] = None,
 ) -> BillingEventResult:
-    """
-    Classify a site-credential issuance, track MAU for ops, and report to Stripe.
-    """
-    current_month = month or datetime.utcnow().strftime("%Y-%m")
-    site_key = resolve_billing_site_key(db, target_site)
-    ppid_hash = _hash_ppid_for_mau(ppid)
-
-    exclude_id = None if is_cached_reissue else (credential_id or None)
-    had_prior = had_prior_derived_credential(
-        db,
-        target_site=target_site,
-        ppid=ppid,
-        exclude_credential_id=exclude_id,
+    """Record one issuance using site-local tokens and a privacy-safe outbox."""
+    from api.database import (
+        IsHumanBillingOutbox,
+        IsHumanSiteMonthlyUsage,
+        IsHumanSiteBillingSubject,
     )
-    first_month = first_issuance_month_for_ppid(db, target_site=target_site, ppid=ppid)
 
+    now = datetime.utcnow()
+    current_month = month or now.strftime("%Y-%m")
+    site_scope = resolve_billing_site_key(db, target_site)
+    subject_token = _hash_ppid_for_mau(ppid)
+    _lock_site_billing_subject_transaction(db, site_scope=site_scope, subject_token=subject_token)
+    subject = db.query(IsHumanSiteBillingSubject).filter_by(
+        site_scope=site_scope, subject_token=subject_token,
+    ).first()
+    had_prior = subject is not None
+    if not subject:
+        subject = IsHumanSiteBillingSubject(
+            site_scope=site_scope,
+            subject_token=subject_token,
+            first_issuance_month=current_month,
+            first_issued_at=now,
+            last_issued_at=now,
+        )
+        db.add(subject)
+    else:
+        subject.last_issued_at = now
+
+    monthly = db.query(IsHumanSiteMonthlyUsage).filter_by(
+        site_scope=site_scope, month=current_month, subject_token=subject_token,
+    ).first()
+    monthly_first_seen = monthly is None
+    if monthly_first_seen:
+        db.add(IsHumanSiteMonthlyUsage(
+            site_scope=site_scope,
+            month=current_month,
+            subject_token=subject_token,
+            first_seen_at=now,
+        ))
+        _increment_active_subjects(db, site_scope=site_scope, month=current_month)
+
+    doubt = _active_doubt(db, site_scope=site_scope, ppid=ppid)
     event_type = classify_billing_event(
         issue_mode=normalize_issue_mode(issue_mode),
         had_prior_derived=had_prior,
-        first_issuance_month=first_month,
+        first_issuance_month=getattr(subject, "first_issuance_month", current_month),
         current_month=current_month,
+        active_doubt=doubt is not None,
+        monthly_first_seen=monthly_first_seen,
     )
 
-    stripe_customer_id = resolve_stripe_customer_id_for_site(db, target_site)
+    if doubt is not None and normalize_issue_mode(issue_mode) == ISSUE_MODE_FRESH_IDV:
+        doubt.is_active = False
+        doubt.cleared_at = now
+        doubt.cleared_by = "fresh_idv_same_ppid"
 
-    if event_type == EVENT_MAU_RENEWAL:
-        if not track_site_proof_mau(site_key, ppid, month=current_month):
-            event_type = None
+    stripe_customer_id = resolve_stripe_customer_id_for_site(db, target_site)
+    outbox = None
+    if event_type:
+        _increment_aggregate(db, site_scope=site_scope, month=current_month, event_type=event_type)
+        outbox = IsHumanBillingOutbox(
+            event_id=f"bevt_{secrets.token_urlsafe(24)}",
+            stripe_customer_id=stripe_customer_id,
+            site_scope=site_scope,
+            month=current_month,
+            event_type=event_type,
+            unit_count=1,
+            status="pending",
+            created_at=now,
+        )
+        db.add(outbox)
+
+    db.commit()
 
     reported = False
-    meter_name = METER_EVENTS.get(event_type) if event_type else None
-    unit_cents = UNIT_AMOUNTS_CENTS.get(event_type, 0) if event_type else 0
-
-    if event_type:
-        logger.info(
-            "Credential billing: event=%s site=%s month=%s credential=%s cached=%s mode=%s",
-            event_type,
-            site_key,
-            current_month,
-            (credential_id or "")[:24],
-            is_cached_reissue,
-            normalize_issue_mode(issue_mode),
-        )
+    if outbox is not None:
         reported = report_meter_event(
             event_type=event_type,
             stripe_customer_id=stripe_customer_id or "",
-            site_id=site_key,
-            ppid_hash=ppid_hash,
+            site_id=site_scope,
             month=current_month,
-            credential_id=credential_id or "",
+            event_id=outbox.event_id,
+            unit_count=1,
         )
-    elif is_cached_reissue:
-        track_site_proof_mau(site_key, ppid, month=current_month)
+        outbox.attempts = int(outbox.attempts or 0) + 1
+        if reported:
+            outbox.status = "reported"
+            outbox.reported_at = datetime.utcnow()
+            outbox.last_error = None
+        else:
+            outbox.last_error = "stripe_report_failed"
+        db.commit()
 
     return BillingEventResult(
         event_type=event_type,
-        meter_event_name=meter_name,
-        unit_amount_cents=unit_cents,
+        meter_event_name=METER_EVENTS.get(event_type) if event_type else None,
+        unit_amount_cents=UNIT_AMOUNTS_CENTS.get(event_type, 0) if event_type else 0,
         stripe_customer_id=stripe_customer_id,
         reported_to_stripe=reported,
         month=current_month,
     )
+
+
+def purge_monthly_subject_usage(db, *, now: Optional[datetime] = None) -> int:
+    """Delete subject-level monthly rows older than the 90-day boundary."""
+    from api.database import IsHumanSiteMonthlyUsage
+
+    cutoff = (now or datetime.utcnow()) - timedelta(days=90)
+    deleted = db.query(IsHumanSiteMonthlyUsage).filter(
+        IsHumanSiteMonthlyUsage.first_seen_at < cutoff
+    ).delete(synchronize_session=False)
+    db.commit()
+    return int(deleted or 0)
+
+
+def retry_pending_billing_outbox(db, *, limit: int = 100) -> dict[str, int]:
+    """Retry aggregate-safe Stripe events without reconstructing user state."""
+    from api.database import IsHumanBillingOutbox
+
+    rows = (
+        db.query(IsHumanBillingOutbox)
+        .filter_by(status="pending")
+        .order_by(IsHumanBillingOutbox.created_at.asc())
+        .limit(max(1, min(int(limit), 1000)))
+        .all()
+    )
+    reported = 0
+    failed = 0
+    for row in rows:
+        ok = report_meter_event(
+            event_type=row.event_type,
+            stripe_customer_id=row.stripe_customer_id or "",
+            site_id=row.site_scope,
+            month=row.month,
+            event_id=row.event_id,
+            unit_count=row.unit_count,
+        )
+        row.attempts = int(row.attempts or 0) + 1
+        if ok:
+            row.status = "reported"
+            row.reported_at = datetime.utcnow()
+            row.last_error = None
+            reported += 1
+        else:
+            row.last_error = "stripe_report_failed"
+            failed += 1
+    db.commit()
+    return {"selected": len(rows), "reported": reported, "failed": failed}

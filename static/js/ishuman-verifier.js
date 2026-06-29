@@ -652,9 +652,9 @@ class IsHumanVerifier {
      * @param {string}  config.siteId     — your registered site identifier
      * @param {string}  [config.lemmaOrigin] — override for dev (default https://lemma.id)
      * @param {boolean} [config.debug]    — enable console logging
-     * @param {Function} [config.isBlockedLocally] — optional sync/async callback: (ppid) => bool.
-     *        Sites should use their own database to check PPID blocks rather
-     *        than round-tripping to lemma.id.  This keeps verification fully local.
+     * @param {Function} [config.isBlockedLocally] — optional sync/async callback returning
+     *        boolean or { blocked, doubt_required }. Sites should resolve this
+     *        from their own backend state rather than exposing a site API key.
      * @param {boolean} [config.autoProvision] — open Lemma IDV popup when no master proof exists.
      * @param {string}  [config.idvPopupPath] — override popup path (default /wallet/ishuman-idv).
      */
@@ -792,6 +792,21 @@ class IsHumanVerifier {
             return redirected;
         }
 
+        // Explicit site-doubt flow. A relying site must deliberately request
+        // this ceremony; a persistent site ban never selects it automatically.
+        if (options.freshIdv === true) {
+            this._clearSessionCache();
+            const issued = await this._issueSiteProofViaPopup({
+                freshIdv: true,
+                refreshReason: 'site_doubt',
+            });
+            if (!issued.ok) {
+                return this._result(false, null, issued.reason || 'idv_cancelled', t0);
+            }
+            this._markProvisionedMaster();
+            return this._applyIssuedSiteProof(issued.detail, t0);
+        }
+
         const autoProvision = options.autoProvision ?? this.autoProvision;
         let result = await this._verifyOnce(t0);
         if (result.human) {
@@ -817,12 +832,10 @@ class IsHumanVerifier {
             // A revoked credential is not a permanent block — it triggers a
             // fresh IDV (or fresh test verification in the demo) so the user
             // can regain access. The popup runs in 'fresh_idv' mode below.
-            'revoked',
-            'site_blocked',
         ]);
 
         if (popupReasons.has(result.reason)) {
-            const needsFreshIdv = result.reason === 'revoked' || result.reason === 'site_blocked';
+            const needsFreshIdv = false;
             // Clear the locally cached site VC so the recovered credential
             // (with a fresh credential_id, signature, and session) replaces it.
             this._clearSessionCache();
@@ -877,6 +890,11 @@ class IsHumanVerifier {
             reason: ok ? result.reason : (result.reason || 'presentation_missing'),
             timeMs: result.timeMs,
         };
+    }
+
+    /** Run deliberate fresh IDV for a temporary site doubt. */
+    async verifyFreshForBackend(options = {}) {
+        return this.verifyForBackend({ ...options, autoProvision: true, freshIdv: true });
     }
 
     /**
@@ -1160,9 +1178,12 @@ class IsHumanVerifier {
             return this._result(false, core.ppid, core.reason, t0, core.error);
         }
 
-        const blocked = await this._checkSiteBlocked(credential.subject);
-        if (blocked) {
+        const siteDecision = await this._checkSiteDecision(credential.subject);
+        if (siteDecision.blocked) {
             return this._result(false, credential.subject, 'site_blocked', t0);
+        }
+        if (siteDecision.doubtRequired) {
+            return this._result(false, credential.subject, 'doubt_required', t0);
         }
 
         const claims = credential.claims || credential.credentialSubject || {};
@@ -1221,9 +1242,12 @@ class IsHumanVerifier {
                 return { ok: false, reason: sessionCheck.reason };
             }
 
-            const blocked = await this._checkSiteBlocked(credential.subject);
-            if (blocked) {
+            const siteDecision = await this._checkSiteDecision(credential.subject);
+            if (siteDecision.blocked) {
                 return { ok: false, reason: 'site_blocked' };
+            }
+            if (siteDecision.doubtRequired) {
+                return { ok: false, reason: 'doubt_required' };
             }
 
             return { ok: true, reason: 'ok' };
@@ -1310,13 +1334,24 @@ class IsHumanVerifier {
         return { ok: true, ppid: credential.subject, reason: 'ok' };
     }
 
-    async _checkSiteBlocked(ppid) {
-        if (!this.isBlockedLocally || !ppid) return false;
+    async _checkSiteDecision(ppid) {
+        if (!this.isBlockedLocally || !ppid) return { blocked: false, doubtRequired: false };
         try {
-            return !!(await Promise.resolve(this.isBlockedLocally(ppid)));
+            const decision = await Promise.resolve(this.isBlockedLocally(ppid));
+            if (decision && typeof decision === 'object') {
+                return {
+                    blocked: !!decision.blocked,
+                    doubtRequired: !!(decision.doubt_required || decision.doubtRequired),
+                };
+            }
+            return { blocked: !!decision, doubtRequired: false };
         } catch {
-            return false;
+            return { blocked: false, doubtRequired: false };
         }
+    }
+
+    async _checkSiteBlocked(ppid) {
+        return (await this._checkSiteDecision(ppid)).blocked;
     }
 
     _loadSessionCache() {
@@ -1508,7 +1543,7 @@ class IsHumanVerifier {
         // fresh /api/revocation/bloom-filter fetch before verifying.
         const wasFreshIdv = detail?.reason === 'fresh_idv_complete'
             || detail?.refresh_reason === 'revoked'
-            || detail?.refresh_reason === 'site_blocked';
+            || detail?.refresh_reason === 'site_doubt';
         if (wasFreshIdv) {
             try {
                 await this._syncBloom({ force: true });
@@ -1565,7 +1600,6 @@ class IsHumanVerifier {
             session_signature: detail.session_signature,
             session_nonce: sessionNonce,
             bloom_sequence: Number(this._bloomSnapshot?.sequence_number ?? 0),
-            ppid_migration: detail.ppid_migration || null,
         };
         this._persistSession(session);
 
@@ -1723,9 +1757,6 @@ class IsHumanVerifier {
                     issuer_did: cred.issuer || cred.issuerInfo?.did || null,
                     issuer_pubkey: cred.issuerInfo?.publicKey || null,
                 };
-                if (presentation.ppid_migration) {
-                    result.presentation.ppid_migration = presentation.ppid_migration;
-                }
             }
         }
         return result;

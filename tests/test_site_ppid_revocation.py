@@ -241,7 +241,7 @@ def test_approve_network_revocation_publishes_ishuman_events_without_reason_kwar
     make_derived_credential,
     monkeypatch,
 ):
-    from api.database import DerivedCredential, IsHumanVerification, RevocationList
+    from api.database import IsHumanVerification, RevocationList
     from api.authz_engine import AuthzPrincipal
 
     db = fake_ishuman_db_session_factory
@@ -251,15 +251,6 @@ def test_approve_network_revocation_publishes_ishuman_events_without_reason_kwar
             wallet_id="wallet_revoke_001",
             status="verified",
             ppid="did:lemma:ppid_master_revoke",
-        )
-    )
-    db.store.data[DerivedCredential.__name__].append(
-        make_derived_credential(
-            master_credential_id="ishuman_master_revoke_001",
-            derived_credential_id="ishuman_site_revoke_001",
-            wallet_id="wallet_revoke_001",
-            target_site="example.com",
-            derived_ppid="did:lemma:ppid_site_revoke",
         )
     )
     monkeypatch.setattr("api.database.SessionLocal", db.session_local)
@@ -304,16 +295,10 @@ def test_approve_network_revocation_publishes_ishuman_events_without_reason_kwar
     )
     payload = resp.get_json()
 
-    assert resp.status_code == 200
-    assert payload["success"] is True
-    assert payload["total_revoked"] == 3
-    assert {event["credential_id"] for event in published} == {
-        "wallet_revoke_001",
-        "ishuman_master_revoke_001",
-        "ishuman_site_revoke_001",
-    }
-    assert all(event["credential_type"] == "ishuman" for event in published)
-    assert len(db.store.data[RevocationList.__name__]) == 3
+    assert resp.status_code == 410
+    assert payload["error"] == "network_revocation_retired"
+    assert published == []
+    assert len(db.store.data[RevocationList.__name__]) == 0
 
 
 @pytest.mark.unit
@@ -460,8 +445,8 @@ def test_network_revoke_disabled_by_default(
         headers={"X-API-Key": "test_api_key"},
     )
     payload = resp.get_json()
-    assert resp.status_code == 503
-    assert payload["error"] == "network_revocation_disabled"
+    assert resp.status_code == 410
+    assert payload["error"] == "network_revocation_retired"
 
 
 @pytest.mark.unit
@@ -483,10 +468,7 @@ def test_network_revoke_enabled_when_flag_set(
         headers={"X-API-Key": "test_api_key"},
     )
     payload = resp.get_json()
-    assert resp.status_code == 200
-    assert payload["success"] is True
-    assert payload["status"] == "pending_review"
+    assert resp.status_code == 410
+    assert payload["error"] == "network_revocation_retired"
     blocks = db.store.data[SiteBlock.__name__]
-    assert len(blocks) == 1
-    assert blocks[0].network_revocation_requested is True
-    assert blocks[0].network_revocation_status == "pending_review"
+    assert blocks == []

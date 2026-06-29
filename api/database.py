@@ -730,7 +730,9 @@ class LemmaPerson(Base):
     person_id = Column(String, unique=True, nullable=False, index=True)
     # Encrypted at rest (api.column_crypto): the no-secret PPID-enumeration key.
     # Widened for the AES-GCM envelope; legacy 64-hex rows remain readable.
-    person_root_hash = Column(String(255), nullable=False, index=True)
+    # AWS-KMS envelope (``kms1:...``).  TEXT avoids depending on provider
+    # ciphertext size; the value is never queried by equality.
+    person_root_hash = Column(Text, nullable=False)
     root_version = Column(String, default='v1', nullable=False)
     person_root_source = Column(String(32), default='document_derived_v1', nullable=False, index=True)
     primary_wallet_id = Column(String, index=True)
@@ -837,39 +839,93 @@ class IsHumanVerification(Base):
     seed_version = Column(String)
 
 
-class DerivedCredential(Base):
-    """Maps a master isHuman credential to its per-site derived credentials.
-
-    When a master is revoked the server iterates all rows with the
-    matching master_credential_id and adds every derived_credential_id
-    to the revocation Bloom filter.  No cross-site linkable identifier
-    is stored in the credential itself — only on the server.
-    """
-    __tablename__ = 'derived_credentials'
+class IsHumanSiteBillingSubject(Base):
+    """Site-local billing continuity without person/wallet linkage."""
+    __tablename__ = 'ishuman_site_billing_subjects'
     __table_args__ = (
-        UniqueConstraint('master_credential_id', 'target_site', name='uq_derived_master_site'),
+        UniqueConstraint('site_scope', 'subject_token', name='uq_ishuman_site_billing_subject'),
     )
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    master_credential_id = Column(String, nullable=False, index=True)
-    derived_credential_id = Column(String, nullable=False, unique=True)
-    wallet_id = Column(String, index=True)
-    target_site = Column(String, nullable=False)
-    derived_ppid = Column(String, nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    revoked_at = Column(DateTime)
-    is_active = Column(Boolean, default=True)
+    site_scope = Column(String(255), nullable=False, index=True)
+    subject_token = Column(String(80), nullable=False)
+    first_issuance_month = Column(String(7), nullable=False)
+    first_issued_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    last_issued_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+
+
+class IsHumanSiteMonthlyUsage(Base):
+    """Deduplicated site-local subject activity retained for 90 days."""
+    __tablename__ = 'ishuman_site_monthly_usage'
+    __table_args__ = (
+        UniqueConstraint(
+            'site_scope', 'month', 'subject_token',
+            name='uq_ishuman_site_monthly_subject',
+        ),
+    )
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    site_scope = Column(String(255), nullable=False, index=True)
+    month = Column(String(7), nullable=False, index=True)
+    subject_token = Column(String(80), nullable=False)
+    first_seen_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+
+
+class IsHumanSiteUsageAggregate(Base):
+    """Non-subject site/month totals retained after detailed usage expires."""
+    __tablename__ = 'ishuman_site_usage_aggregates'
+    __table_args__ = (
+        UniqueConstraint('site_scope', 'month', name='uq_ishuman_site_usage_aggregate'),
+    )
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    site_scope = Column(String(255), nullable=False, index=True)
+    month = Column(String(7), nullable=False, index=True)
+    active_subjects = Column(Integer, nullable=False, default=0)
+    initial_issuances = Column(Integer, nullable=False, default=0)
+    mau_renewals = Column(Integer, nullable=False, default=0)
+    doubt_reentries = Column(Integer, nullable=False, default=0)
+    updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class IsHumanBillingOutbox(Base):
+    """Privacy-safe, retryable Stripe meter event queue."""
+    __tablename__ = 'ishuman_billing_outbox'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    event_id = Column(String(64), unique=True, nullable=False, index=True)
+    stripe_customer_id = Column(String(255))
+    site_scope = Column(String(255), nullable=False, index=True)
+    month = Column(String(7), nullable=False, index=True)
+    event_type = Column(String(32), nullable=False)
+    unit_count = Column(Integer, nullable=False, default=1)
+    status = Column(String(24), nullable=False, default='pending', index=True)
+    attempts = Column(Integer, nullable=False, default=0)
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    reported_at = Column(DateTime)
+    last_error = Column(Text)
+
+
+class SiteDoubt(Base):
+    """Temporary site-scoped demand for a fresh identity verification."""
+    __tablename__ = 'site_doubts'
+    __table_args__ = (
+        UniqueConstraint('site_id', 'ppid', name='uq_site_doubts_site_ppid'),
+    )
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    site_id = Column(String, nullable=False, index=True)
+    ppid = Column(String, nullable=False, index=True)
+    reason = Column(String)
+    requested_by = Column(String)
+    requested_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    is_active = Column(Boolean, nullable=False, default=True, server_default=text('true'))
+    cleared_at = Column(DateTime)
+    cleared_by = Column(String)
 
 
 class SiteBlock(Base):
-    """Site-scoped PPID blocks for the isHuman network.
-
-    When a site believes a user is not acting in good faith it can
-    immediately block the PPID on its own domain.  This is the first
-    tier of the two-tier revocation model — fast, site-local, and
-    reversible.  Network-wide revocation is handled separately via
-    RevocationList after evidence review.
-    """
+    """Persistent site-scoped PPID decision, removable only by site unblock."""
     __tablename__ = 'site_blocks'
     __table_args__ = (
         UniqueConstraint('site_id', 'ppid', name='uq_site_blocks_site_ppid'),
@@ -891,43 +947,6 @@ class SiteBlock(Base):
     is_amnesty_eligible = Column(
         Boolean, nullable=False, default=True, server_default=text('true')
     )
-
-
-class PersonMerge(Base):
-    """Wallet-bound identity refresh when a new document number maps to a new person_root."""
-    __tablename__ = 'person_merges'
-
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    merge_id = Column(String(64), unique=True, nullable=False, index=True)
-    wallet_id = Column(String, nullable=False, index=True)
-    old_person_id = Column(String, nullable=False, index=True)
-    new_person_id = Column(String, nullable=False, index=True)
-    old_document_root_hash = Column(String(64))
-    new_document_root_hash = Column(String(64), nullable=False)
-    provider_session_id = Column(String)
-    status = Column(String(32), default='completed', nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow)
-
-
-class PpidMigrationIssued(Base):
-    """One-time, site-scoped signed migration from legacy_ppid to current_ppid."""
-    __tablename__ = 'ppid_migration_issued'
-    __table_args__ = (
-        UniqueConstraint('merge_id', 'target_site', name='uq_ppid_migration_merge_site'),
-    )
-
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    migration_id = Column(String(64), unique=True, nullable=False, index=True)
-    merge_id = Column(String(64), nullable=False, index=True)
-    wallet_id = Column(String, nullable=False, index=True)
-    target_site = Column(String(255), nullable=False)
-    legacy_ppid = Column(String, nullable=False)
-    current_ppid = Column(String, nullable=False)
-    nonce = Column(String(64), nullable=False)
-    issued_at = Column(DateTime, nullable=False)
-    expires_at = Column(DateTime, nullable=False)
-    consumed_at = Column(DateTime)
-    created_at = Column(DateTime, default=datetime.utcnow)
 
 
 def create_tables():

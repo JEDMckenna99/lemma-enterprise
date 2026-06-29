@@ -90,8 +90,6 @@ both the API key and workflow id are present.
 | ----------------------------------- | ----------------------------------------------------------------- |
 | `LEMMA_ISHUMAN_DEMO_ALLOW_TEST_VERIFY` | `"true"` enables `/api/demo/ishuman/*test*` bypass rails.       |
 | `LEMMA_ISHUMAN_DEMO_TEST_TOKEN`     | Shared secret required in `X-Demo-Test-Token` header.             |
-| `LEMMA_ISHUMAN_DEMO_ADMIN_TOKEN`    | Shared secret required in `X-Demo-Admin-Token` (demo network revoke drill).  |
-| `LEMMA_ISHUMAN_NETWORK_REVOCATION_ENABLED` | Default off. Set `1` to enable customer `POST /api/ishuman/network-revoke` and demo network-revoke UI. Admin approve and erase are unaffected. |
 | `LEMMA_ISHUMAN_SKELETON_IDV_ENABLED`| Default on non-production; Didit-free `/api/demo/ishuman/skeleton-idv-*`. |
 | `LEMMA_ISHUMAN_SKELETON_CREDENTIAL_TTL_SECONDS` | Short-lived skeleton master TTL (default `3600`).          |
 | `LEMMA_ISHUMAN_DEMO_QR_CREDENTIAL_TTL_SECONDS` | QR demo on `/demo/ishuman` master TTL (default `900` / 15 min). |
@@ -104,7 +102,9 @@ both the API key and workflow id are present.
 
 | Variable                              | Default | What it does                                                                  |
 | ------------------------------------- | ------- | ----------------------------------------------------------------------------- |
-| `ISHUMAN_CREDENTIAL_TTL_DAYS`         | `365`   | Lifetime of issued isHuman credentials.                                       |
+| `ISHUMAN_CREDENTIAL_TTL_DAYS`         | `365`   | Master credential fallback lifetime when document expiry is unavailable.               |
+| `ISHUMAN_SITE_CREDENTIAL_TTL_DAYS`    | `30`    | Site credential lifetime; keep at 30 days for bounded compromise exposure.              |
+| `LEMMA_PERSON_ROOT_SOURCE`             | `assigned_v1` | Permanent assigned-person root; document-derived mode is legacy-only.               |
 | `LEMMA_ISHUMAN_REISSUE_LIMIT_PER_DAY` | `5`     | Per-wallet/day cap on `/api/ishuman/reissue-master` (Phase 1.3).              |
 | `LEMMA_DISABLE_BRIDGE_IFRAME`         | unset   | When `"true"`, verifier SDK uses popup-only flow, skips bridge iframe (Phase 2). |
 | `LEMMA_ISHUMAN_USE_PERSON_ROOT_SEEDS` | unset   | When `"true"`, post-IDV wallets use `wallet_local_seed`/`person_root_proxy` derivation (Phase 1.1). |

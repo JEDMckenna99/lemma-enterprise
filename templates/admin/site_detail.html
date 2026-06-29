@@ -18,10 +18,6 @@
         <div class="stat-label">Active Blocks</div>
         <div class="stat-value" id="stat-blocks">-</div>
     </div>
-    <div class="stat-card stat-card--danger">
-        <div class="stat-label">Pending Network Review</div>
-        <div class="stat-value" id="stat-pending">-</div>
-    </div>
     <div class="stat-card stat-card--success">
         <div class="stat-label">Active Credentials</div>
         <div class="stat-value" id="stat-activity">-</div>
@@ -50,7 +46,7 @@
             <div><div class="stat-label">Created</div><div id="field-created">-</div></div>
         </div>
         <p style="margin-top:16px; font-size:0.85rem; color:#64748b;">
-            Suspend site is tier-1 (site suspension only). Network-wide kills remain in Trust &amp; Safety.
+            Suspending a site affects that tenant only. User enforcement remains site-scoped.
         </p>
     </div>
 </div>
@@ -83,7 +79,6 @@ async function loadSiteDetail() {
     document.getElementById('site-subtitle').textContent = site.site_domain || site.site_id;
     document.getElementById('stat-mau').textContent = (site.mau_current ?? 0).toLocaleString();
     document.getElementById('stat-blocks').textContent = site.active_blocks_count ?? 0;
-    document.getElementById('stat-pending').textContent = site.pending_review_count ?? 0;
     document.getElementById('stat-activity').textContent = site.activity_count ?? 0;
     document.getElementById('field-site-id').textContent = site.site_id;
     document.getElementById('field-domain').textContent = site.site_domain || '-';
@@ -105,7 +100,7 @@ async function loadSiteDetail() {
 document.getElementById('revoke-site-btn').addEventListener('click', async () => {
     const reason = prompt('Reason for suspending this site (tier-1 only):', 'manual_admin_site_revoke');
     if (reason === null) return;
-    if (!confirm('Suspend this site? This does not network-revoke users.')) return;
+    if (!confirm('Suspend this site? This affects only this tenant.')) return;
     try {
         const headers = await getAuthHeaders();
         const resp = await fetch(`/api/admin/sites/${encodeURIComponent(SITE_ID)}/revoke`, {

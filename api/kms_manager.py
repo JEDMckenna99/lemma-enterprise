@@ -204,6 +204,58 @@ class LemmaKMSManager:
                 logger.error("   This usually means the encryption context doesn't match")
             
             raise
+
+    def encrypt_identity_secret(
+        self,
+        secret: bytes,
+        *,
+        key_type: str,
+        purpose: str,
+        context_id: str,
+        version: str = "1",
+    ) -> Tuple[str, str]:
+        """Encrypt an identity secret with a purpose-bound KMS context."""
+        if not self.is_enabled():
+            raise RuntimeError("KMS is not enabled - check AWS credentials and LEMMA_KMS_KEY_ID")
+        if not secret:
+            raise ValueError("identity secret required")
+        response = self.kms.encrypt(
+            KeyId=self.master_key_id,
+            Plaintext=secret,
+            EncryptionContext={
+                "key_type": key_type,
+                "purpose": purpose,
+                "context_id": context_id,
+                "version": version,
+            },
+        )
+        return (
+            base64.b64encode(response["CiphertextBlob"]).decode("ascii"),
+            response["KeyId"],
+        )
+
+    def decrypt_identity_secret(
+        self,
+        encrypted_secret_b64: str,
+        *,
+        key_type: str,
+        purpose: str,
+        context_id: str,
+        version: str = "1",
+    ) -> bytes:
+        """Decrypt an identity secret; context mismatch fails in AWS KMS."""
+        if not self.is_enabled():
+            raise RuntimeError("KMS is not enabled - check AWS credentials and LEMMA_KMS_KEY_ID")
+        response = self.kms.decrypt(
+            CiphertextBlob=base64.b64decode(encrypted_secret_b64),
+            EncryptionContext={
+                "key_type": key_type,
+                "purpose": purpose,
+                "context_id": context_id,
+                "version": version,
+            },
+        )
+        return bytes(response["Plaintext"])
     
     def rotate_master_key(self) -> bool:
         """

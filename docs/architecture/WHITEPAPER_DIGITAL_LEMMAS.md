@@ -159,7 +159,7 @@ Unlike per-site identity verification, Lemma credentials create a **shared defen
 **Lemma network verification:**
 - User verifies once; credential works across all participating sites
 - If any site revokes a credential, it is revoked **everywhere**
-- Bad actors caught once are blocked network-wide
+- Relying sites can persistently block their own site-private PPID
 - Revocation set **is** the shared threat intelligence
 
 ### 8.2 Economic comparison
@@ -579,5 +579,4 @@ We invite collaboration and external review, including pilot deployments and ind
 [6] M. Jones et al., “JSON Web Token (JWT),” RFC 7519, 2015.  
 [7] C. A. Wood, R. Barnes, “Oblivious Pseudorandom Functions (OPRFs),” RFC 9497, 2023.  
 [8] W3C WebAuthn Working Group, “Web Authentication: An API for accessing Public Key Credentials,” W3C Recommendation, 2021.  
-
 

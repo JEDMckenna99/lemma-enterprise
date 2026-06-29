@@ -197,7 +197,7 @@
           <ul>
             <li>Block site-private human proofs.</li>
             <li>Require fresh verification.</li>
-            {% if network_revocation_enabled %}<li>Revoke network-wide when confirmed.</li>{% endif %}
+            <li>Keep site bans until the site explicitly unblocks them.</li>
           </ul>
         </div>
       </div>
@@ -221,13 +221,6 @@ const result = await new IsHumanVerifier({
       <h3>Reset demo state</h3>
       <button class="demo-btn demo-btn-ghost-danger" id="ih-clear-lemma-id-btn" type="button">Clear my lemma.id</button>
       <p class="demo-muted">Wipes the master human proof and all site-derived IDs from this browser.</p>
-
-      {% if network_revocation_enabled %}
-      <h3>Network revocation drill</h3>
-      <p class="demo-muted">Status: <span class="demo-pill" id="ih-network-pill">Waiting</span></p>
-      <button class="demo-btn demo-btn-danger" id="ih-abuse-network-btn" type="button">Revoke everywhere</button>
-      <p class="abuse-outcome" id="ih-abuse-network-outcome">Expected: both denied after governance approval</p>
-      {% endif %}
 
       <h3>Operator console</h3>
       <input class="demo-input" id="ih-test-token" type="password" placeholder="Test token override (optional)" autocomplete="off">

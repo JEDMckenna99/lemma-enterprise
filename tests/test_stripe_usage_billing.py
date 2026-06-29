@@ -349,7 +349,7 @@ def test_derive_site_proof_blocked_when_billing_past_due(
                 "target_site": "gate.example",
                 "site_signing_pubkey": SITE_SIGNING_PUBKEY_B64,
             },
-            ["target_site", "site_signing_pubkey"],
+                ["target_site", "site_signing_pubkey", "issue_mode"],
         ),
     )
 

@@ -6,7 +6,7 @@ Tier-1 enforcement:
 - RevocationList with revocation_type='user' and raw site-bound PPID
 - Bloom sync via revocation_sync (raw PPID as the revocation key)
 
-Also exports `clear_amnesty_eligible_wallet_revocations`, the helper called
+Also exports `clear_amnesty_eligible_wallet_revocations`, the legacy-named helper called
 from both the production Stripe Identity webhook and the demo test-mode IDV
 endpoint to lift revocations after a wallet owner has re-proved identity.
 """
@@ -29,88 +29,13 @@ def clear_amnesty_eligible_wallet_revocations(
     new_master_credential_id: str = "",
     reason: str = "fresh_idv_reset",
 ) -> dict:
-    """Clear amnesty-eligible revocation state for a wallet.
+    """Clear only wallet/master compromise state after fresh IDV.
 
-    Called after a wallet owner has re-proved identity by either:
-      * completing a fresh Stripe Identity check (production), or
-      * signing a wallet_assertion proving wallet ownership (demo recovery)
-
-    Policy:
-      * Per-credential revocations for old credentials owned by this wallet
-        are cleared (the new master supersedes them).
-      * Site-scoped PPID blocks (`revocation_type='user'` with a `site_id`)
-        are cleared and the matching SiteBlock rows deactivated. The site
-        remains free to re-block the PPID immediately if its anti-abuse
-        policy still requires it; the network does not litigate that.
-      * Wallet-level kill rows (`revocation_type='wallet'`) for THIS wallet
-        are cleared -- EXCEPT rows marked `is_amnesty_eligible=False`, which are
-        governance-approved coordinated-fraud kills that survive re-IDV and stay
-        sticky until the network explicitly reinstates the subject. The same
-        carve-out applies to site blocks and user/credential revocations below.
-
-    Cross-device recovery: site PPIDs are derived from the deterministic
-    person-root, so the *same* site PPID can be blocked on a prior device's
-    wallet yet re-derived identically on a new wallet after recovery. We resolve
-    the LemmaPerson for the re-verifying wallet and gather every wallet bound to
-    that person, so the site-scoped clears below cover blocks placed against any
-    of the person's devices -- not just the wallet that happens to complete this
-    IDV. Wallet-level kill clearing stays scoped to THIS wallet (a kill on an old
-    device's wallet_id cannot block a freshly recovered wallet anyway).
-
-    Returns a counts dict for the caller to surface in logs / responses.
+    SiteBlock rows and site-scoped user revocations are deliberate site policy
+    and are never cleared here. Temporary site doubts clear later, only for the
+    requesting site and matching PPID, after successful site-proof issuance.
     """
-    from api.database import (
-        RevocationList,
-        SiteBlock,
-        DerivedCredential,
-        IsHumanVerification,
-        LemmaWalletBinding,
-    )
-
-    # Resolve the person and every wallet bound to them so site-scoped amnesty
-    # spans devices (deterministic person-root PPIDs are identical across the
-    # person's wallets). Falls back to the single wallet when no binding exists.
-    person_id = None
-    wallet_ids = {wallet_id} if wallet_id else set()
-    binding = (
-        db.query(LemmaWalletBinding).filter_by(wallet_id=wallet_id).first()
-        if wallet_id
-        else None
-    )
-    if binding and binding.lemma_person_id:
-        person_id = binding.lemma_person_id
-        for sibling in (
-            db.query(LemmaWalletBinding)
-            .filter_by(lemma_person_id=person_id)
-            .all()
-        ):
-            if sibling.wallet_id:
-                wallet_ids.add(sibling.wallet_id)
-
-    logger.info(
-        "[amnesty-reset] start wallet_id=%s person_id=%s person_wallets=%d new_master=%s reason=%s",
-        wallet_id,
-        person_id,
-        len(wallet_ids),
-        (new_master_credential_id or "")[:30],
-        reason,
-    )
-
-    derived_rows = (
-        db.query(DerivedCredential)
-        .filter(DerivedCredential.wallet_id.in_(wallet_ids))
-        .all()
-        if wallet_ids
-        else []
-    )
-    derived_ppids = sorted({row.derived_ppid for row in derived_rows if row.derived_ppid})
-    derived_cred_ids = sorted({
-        row.derived_credential_id for row in derived_rows if row.derived_credential_id
-    })
-    logger.info(
-        "[amnesty-reset] derived_credentials=%d ppids=%d",
-        len(derived_rows), len(derived_ppids),
-    )
+    from api.database import IsHumanVerification, RevocationList
 
     masters = db.query(IsHumanVerification).filter_by(wallet_id=wallet_id).all()
     stale_master_cred_ids = sorted({
@@ -130,10 +55,6 @@ def clear_amnesty_eligible_wallet_revocations(
             old_master.status = "superseded"
             superseded_masters += 1
 
-    # Governance carve-out (gap #2): rows marked is_amnesty_eligible=False are
-    # coordinated-fraud kills approved by Lemma.id governance. A fresh IDV must
-    # NOT lift them; they stay sticky until the network explicitly reinstates the
-    # subject. `.isnot(False)` keeps legacy rows (TRUE / NULL) eligible.
     cleared_entries = 0
     rl_query = db.query(RevocationList)
     cleared_entries += rl_query.filter(
@@ -147,34 +68,6 @@ def clear_amnesty_eligible_wallet_revocations(
             RevocationList.revocation_type == "credential",
             RevocationList.is_amnesty_eligible.isnot(False),
         ).delete(synchronize_session=False)
-    if derived_cred_ids:
-        cleared_entries += rl_query.filter(
-            RevocationList.credential_id.in_(derived_cred_ids),
-            RevocationList.revocation_type == "credential",
-            RevocationList.is_amnesty_eligible.isnot(False),
-        ).delete(synchronize_session=False)
-    if derived_ppids:
-        cleared_entries += rl_query.filter(
-            RevocationList.ppid.in_(derived_ppids),
-            RevocationList.revocation_type == "user",
-            RevocationList.is_amnesty_eligible.isnot(False),
-        ).delete(synchronize_session=False)
-
-    site_blocks_cleared = 0
-    if derived_ppids:
-        site_blocks_cleared = db.query(SiteBlock).filter(
-            SiteBlock.ppid.in_(derived_ppids),
-            SiteBlock.is_active == True,  # noqa: E712
-            SiteBlock.is_amnesty_eligible.isnot(False),
-        ).update({"is_active": False}, synchronize_session=False)
-
-    derived_reactivated = 0
-    if derived_cred_ids:
-        derived_reactivated = db.query(DerivedCredential).filter(
-            DerivedCredential.derived_credential_id.in_(derived_cred_ids),
-            DerivedCredential.is_active == False,  # noqa: E712
-        ).update({"is_active": True, "revoked_at": None}, synchronize_session=False)
-
     db.commit()
 
     try:
@@ -193,13 +86,11 @@ def clear_amnesty_eligible_wallet_revocations(
 
     summary = {
         "wallet_id": wallet_id,
-        "person_id": person_id,
-        "person_wallets": len(wallet_ids),
         "cleared_revocation_entries": int(cleared_entries),
-        "cleared_site_blocks": int(site_blocks_cleared),
-        "reactivated_derived_credentials": int(derived_reactivated),
+        "cleared_site_blocks": 0,
+        "reactivated_derived_credentials": 0,
         "superseded_master_records": int(superseded_masters),
-        "derived_ppids_cleared": derived_ppids,
+        "derived_ppids_cleared": [],
         "reason": reason,
     }
     logger.info(
@@ -207,7 +98,7 @@ def clear_amnesty_eligible_wallet_revocations(
         wallet_id,
         summary["cleared_revocation_entries"],
         summary["cleared_site_blocks"],
-        summary["reactivated_derived_credentials"],
+        0,
         summary["superseded_master_records"],
     )
     return summary
@@ -421,10 +312,8 @@ def clear_site_bound_ppid(
 
     Deactivates the ``SiteBlock`` row AND removes the canonical user-scope
     ``RevocationList`` entry so server + client verifiers stop rejecting the
-    PPID once the Bloom is rebuilt. Governance-approved coordinated-fraud kills
-    (``is_amnesty_eligible=False``) are deliberately left in place — an ordinary
-    site unblock must not lift a network kill. The return dict reports whether
-    anything was actually lifted vs. blocked by a governance kill.
+    PPID once the Bloom is rebuilt. This authenticated site operation is the
+    only path that removes a site decision.
     """
     from api.database import SiteBlock, RevocationList
 
@@ -434,34 +323,12 @@ def clear_site_bound_ppid(
     if not site_id:
         raise ValueError("site_id required")
 
-    # Governance carve-out: never lift a sticky kill via a site unblock.
-    governance_kill = (
-        db.query(SiteBlock)
-        .filter(
-            SiteBlock.site_id == site_id,
-            SiteBlock.ppid == ppid,
-            SiteBlock.is_active == True,  # noqa: E712
-            SiteBlock.is_amnesty_eligible.is_(False),
-        )
-        .first()
-    )
-    if governance_kill is not None:
-        return {
-            "site_id": site_id,
-            "ppid": ppid,
-            "lifted": False,
-            "reason": "governance_kill_not_amnesty_eligible",
-            "blocks_deactivated": 0,
-            "revocations_cleared": 0,
-        }
-
     blocks_deactivated = (
         db.query(SiteBlock)
         .filter(
             SiteBlock.site_id == site_id,
             SiteBlock.ppid == ppid,
             SiteBlock.is_active == True,  # noqa: E712
-            SiteBlock.is_amnesty_eligible.isnot(False),
         )
         .update({"is_active": False}, synchronize_session=False)
     )
@@ -472,7 +339,6 @@ def clear_site_bound_ppid(
             RevocationList.ppid == ppid,
             RevocationList.site_id == site_id,
             RevocationList.revocation_type == "user",
-            RevocationList.is_amnesty_eligible.isnot(False),
         )
         .delete(synchronize_session=False)
     )

@@ -326,7 +326,6 @@ def amnesty_db():
     from api.database import (
         LemmaPerson,
         LemmaWalletBinding,
-        DerivedCredential,
         SiteBlock,
         RevocationList,
         IsHumanVerification,
@@ -336,7 +335,6 @@ def amnesty_db():
     for model in (
         LemmaPerson,
         LemmaWalletBinding,
-        DerivedCredential,
         SiteBlock,
         RevocationList,
         IsHumanVerification,
@@ -358,7 +356,6 @@ def _seed_blocked_person(db, *, with_binding_for_new=True):
     from api.database import (
         LemmaPerson,
         LemmaWalletBinding,
-        DerivedCredential,
         SiteBlock,
         RevocationList,
     )
@@ -375,17 +372,6 @@ def _seed_blocked_person(db, *, with_binding_for_new=True):
     db.add(LemmaWalletBinding(wallet_id="wallet_old", lemma_person_id="person_A"))
     if with_binding_for_new:
         db.add(LemmaWalletBinding(wallet_id="wallet_new", lemma_person_id="person_A"))
-    db.add(
-        DerivedCredential(
-            master_credential_id="m_old",
-            derived_credential_id="d_old",
-            wallet_id="wallet_old",
-            target_site="site1.example",
-            derived_ppid=blocked_ppid,
-            is_active=False,
-            revoked_at=datetime.utcnow(),
-        )
-    )
     db.add(SiteBlock(site_id="site_1", ppid=blocked_ppid, is_active=True))
     db.add(
         RevocationList(
@@ -404,9 +390,8 @@ def _seed_blocked_person(db, *, with_binding_for_new=True):
 
 
 @pytest.mark.integration
-def test_amnesty_lifts_site_block_cross_device(amnesty_db):
-    """Re-IDV on a brand-new wallet (no derived creds of its own) must lift the
-    site block placed against the person's deterministic PPID on a prior device."""
+def test_fresh_idv_preserves_site_block_cross_device(amnesty_db):
+    """Recovery on another wallet must not inspect or clear a site ban."""
     from api.site_ppid_revocation import clear_amnesty_eligible_wallet_revocations
     from api.database import SiteBlock, RevocationList
 
@@ -416,28 +401,24 @@ def test_amnesty_lifts_site_block_cross_device(amnesty_db):
         amnesty_db, wallet_id="wallet_new"
     )
 
-    assert summary["person_id"] == "person_A"
-    assert summary["person_wallets"] == 2
-    assert summary["cleared_site_blocks"] == 1
+    assert summary["cleared_site_blocks"] == 0
     block = amnesty_db.query(SiteBlock).filter_by(ppid=blocked_ppid).first()
-    assert block is not None and block.is_active is False
+    assert block is not None and block.is_active is True
     assert (
         amnesty_db.query(RevocationList)
         .filter_by(ppid=blocked_ppid, revocation_type="user")
         .first()
-        is None
+        is not None
     )
 
 
 @pytest.mark.integration
-def test_amnesty_preserves_governance_kills(amnesty_db):
-    """Governance-approved coordinated-fraud kills (is_amnesty_eligible=False)
-    must survive a fresh IDV, while ordinary eligible blocks are still lifted."""
+def test_fresh_idv_preserves_all_site_blocks(amnesty_db):
+    """Both legacy eligible and sticky site decisions remain site-controlled."""
     from api.site_ppid_revocation import clear_amnesty_eligible_wallet_revocations
     from api.database import (
         LemmaPerson,
         LemmaWalletBinding,
-        DerivedCredential,
         SiteBlock,
         RevocationList,
     )
@@ -454,26 +435,6 @@ def test_amnesty_preserves_governance_kills(amnesty_db):
         )
     )
     db.add(LemmaWalletBinding(wallet_id="wallet_g", lemma_person_id="person_G"))
-    db.add(
-        DerivedCredential(
-            master_credential_id="m",
-            derived_credential_id="d_gov",
-            wallet_id="wallet_g",
-            target_site="s_gov",
-            derived_ppid=gov_ppid,
-            is_active=False,
-        )
-    )
-    db.add(
-        DerivedCredential(
-            master_credential_id="m",
-            derived_credential_id="d_ok",
-            wallet_id="wallet_g",
-            target_site="s_ok",
-            derived_ppid=eligible_ppid,
-            is_active=False,
-        )
-    )
     db.add(SiteBlock(site_id="site_gov", ppid=gov_ppid, is_active=True, is_amnesty_eligible=False))
     db.add(SiteBlock(site_id="site_ok", ppid=eligible_ppid, is_active=True, is_amnesty_eligible=True))
     db.add(
@@ -492,8 +453,7 @@ def test_amnesty_preserves_governance_kills(amnesty_db):
 
     clear_amnesty_eligible_wallet_revocations(db, wallet_id="wallet_g")
 
-    # Ordinary site block lifted; governance block survives.
-    assert db.query(SiteBlock).filter_by(ppid=eligible_ppid).first().is_active is False
+    assert db.query(SiteBlock).filter_by(ppid=eligible_ppid).first().is_active is True
     assert db.query(SiteBlock).filter_by(ppid=gov_ppid).first().is_active is True
     # Governance wallet-level kill survives the reset.
     assert db.query(RevocationList).filter_by(lemma_id="wk_gov").first() is not None
@@ -513,8 +473,6 @@ def test_amnesty_without_binding_stays_wallet_scoped(amnesty_db):
         amnesty_db, wallet_id="wallet_new"
     )
 
-    assert summary["person_id"] is None
-    assert summary["person_wallets"] == 1
     assert summary["cleared_site_blocks"] == 0
     block = amnesty_db.query(SiteBlock).filter_by(ppid=blocked_ppid).first()
     assert block is not None and block.is_active is True

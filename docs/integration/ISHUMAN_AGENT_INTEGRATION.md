@@ -130,6 +130,7 @@ Work through these in order. Stop and ask the developer if hostname or trust tie
 |--------|-----|
 | `verify({ autoProvision })` | Primary human check; may open Lemma popup on first visit |
 | `verifyForBackend({ autoProvision })` | Returns `{ ok, presentation, ppid }` for server-side verify |
+| `verifyFreshForBackend()` | Deliberate fresh IDV for a site-reported `doubt_required` decision |
 | `stamp(payload, { includeCredential: true })` | Attach durable audit evidence to your events |
 | `getPPID()` | Read cached PPID after initial verify (no popup by default) |
 
@@ -139,7 +140,9 @@ Work through these in order. Stop and ask the developer if hostname or trust tie
 |--------|---------|
 | `valid`, `vc_valid`, `session_valid` | Success |
 | `no_credential`, `site_proof_required`, `wallet_locked` | Needs popup — use `autoProvision: true` |
-| `expired`, `revoked`, `invalid_signature`, `site_blocked` | Deny |
+| `expired` | Ordinary 30-day renewal; may open the Lemma popup when auto-provisioning |
+| `revoked`, `invalid_signature`, `site_blocked` | Deny; a site block never starts recovery automatically |
+| `doubt_required` | Deny the current action, then deliberately call `verifyFreshForBackend()` |
 | `idv_cancelled` | User closed popup — prompt retry / allow popups |
 
 ---
@@ -252,7 +255,22 @@ curl -X POST https://lemma.id/api/ishuman/site-block \
   -d '{"ppid":"did:lemma:ppid_...","reason":"Terms violation"}'
 ```
 
-**Network-wide revocation (cross-site, operator-reviewed)** is not available to relying sites yet. Use site-block plus your own app-level deny. lemma.id operators may still revoke network-wide internally for severe abuse.
+Site blocks are persistent. Fresh IDV, wallet recovery, document renewal, and
+credential rotation do not clear them. Only the authenticated
+`POST /api/ishuman/site-unblock` operation removes a site block.
+
+For a temporary challenge instead of a ban, use `POST /api/ishuman/site-doubt`.
+Your backend can expose the resulting `{ blocked, doubt_required }` decision to
+the SDK through `isBlockedLocally`; when `verify()` returns `doubt_required`,
+invoke `verifyFreshForBackend()`. A successful fresh IDV clears only the
+matching doubt when it derives the same site PPID.
+
+Network-wide enumeration revocation is retired. The legacy customer, admin,
+and demo endpoints return HTTP 410 with `network_revocation_retired`.
+
+Site credentials expire after 30 days. Following wallet/master compromise, an
+already-issued credential can remain locally valid until expiry unless its
+relying site blocks the PPID.
 
 ---
 

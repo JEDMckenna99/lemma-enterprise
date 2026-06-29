@@ -9,7 +9,6 @@ from __future__ import annotations
 import logging
 import os
 import time
-from typing import Any, Dict, Optional
 
 from billing.stripe_catalog import METER_EVENTS
 
@@ -49,10 +48,9 @@ def report_meter_event(
     event_type: str,
     stripe_customer_id: str,
     site_id: str,
-    ppid_hash: str,
     month: str,
-    credential_id: str,
-    extra_metadata: Optional[Dict[str, Any]] = None,
+    event_id: str,
+    unit_count: int = 1,
 ) -> bool:
     """
     Emit one Stripe Billing Meter event.
@@ -73,20 +71,15 @@ def report_meter_event(
         )
         return False
 
-    identifier = f"{site_id}:{ppid_hash}:{event_name}:{month}:{credential_id}"
+    identifier = event_id
 
     payload = {
         "stripe_customer_id": stripe_customer_id,
-        "value": "1",
+        "value": str(max(1, int(unit_count))),
         "site_id": site_id,
-        "ppid_hash": ppid_hash,
         "month": month,
-        "credential_id": credential_id,
         "event_type": event_type,
     }
-    if extra_metadata:
-        payload.update(extra_metadata)
-
     if not stripe_meter_reporting_enabled():
         logger.info("Billing meter (dry-run): %s id=%s", event_name, identifier)
         return True
