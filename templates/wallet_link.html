@@ -161,8 +161,8 @@
 
         <div class="security-note">
             <strong>Security Note</strong>
-            Only link devices you physically control. The link code expires in 60 seconds 
-            and can only be used once.
+            Only link devices you physically control. The transfer is encrypted end-to-end,
+            expires in 5 minutes, and includes your human proof — no re-verification needed on the new device.
         </div>
     </div>
 
@@ -294,12 +294,30 @@ async function processLinkCode(qrData, replaceExisting = false) {
         }
 
         if (result.success) {
-            // Show success and completion actions
             linkStatus.innerHTML = '<strong style="font-size: 1.2rem;">Device Added!</strong><br><br>' +
-                'Your Lemma ID is now available on this device.';
+                (result.humanProofRestored
+                    ? 'Your Lemma ID and human proof are now on this device.'
+                    : 'Your Lemma ID is now available on this device.') +
+                '<br><br><span id="passkey-status">Creating passkey for this device...</span>';
             linkStatus.className = 'status-box success';
+
+            try {
+                await wallet.registerPasskey();
+                if (typeof wallet.fetchAndStoreSeedEnvelopes === 'function') {
+                    try { await wallet.fetchAndStoreSeedEnvelopes(); } catch (_) {}
+                }
+                const passkeyEl = document.getElementById('passkey-status');
+                if (passkeyEl) {
+                    passkeyEl.textContent = 'Passkey created — you can sign in with biometrics on this device.';
+                }
+            } catch (passkeyErr) {
+                console.warn('Passkey registration after link:', passkeyErr);
+                const passkeyEl = document.getElementById('passkey-status');
+                if (passkeyEl) {
+                    passkeyEl.textContent = 'Add a passkey from your wallet settings for faster sign-in.';
+                }
+            }
             
-            // Mark step 2 as complete and show actions
             document.getElementById('step2').className = 'step completed';
             document.getElementById('step2').textContent = '✓';
             document.getElementById('complete-actions').classList.remove('hidden');

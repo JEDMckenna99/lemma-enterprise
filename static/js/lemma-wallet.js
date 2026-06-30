@@ -91,7 +91,7 @@ const AUTH_STATE = {
 class LemmaWallet {
     // SDK version - check with LemmaWallet.VERSION
     // v2.32.0: Redirect-only architecture - removed popup flow for simpler, consistent UX
-    static VERSION = '2.71.0';  // v2.71: isHuman browser-signature verify + unified popup unlock
+    static VERSION = '2.72.0';  // v2.72: device link carries isHuman credentials + link unlock token
 
     static DEVICE_IDB_NAMES = ['LemmaWallet', 'LemmaWalletWrap'];
 
@@ -2886,6 +2886,32 @@ class LemmaWallet {
             }
         }
         return { applied };
+    }
+
+    /**
+     * Restore isHuman credentials transferred inside an encrypted device-link payload.
+     * Stores in lemmas + ishuman_cache so the new device can prove humanity without re-IDV.
+     */
+    async _importLinkedIsHumanCredentials(credentials) {
+        if (!Array.isArray(credentials) || !credentials.length) {
+            return { applied: 0, masterRestored: false };
+        }
+        let applied = 0;
+        let masterRestored = false;
+        for (const cred of credentials) {
+            if (!cred || !this._isIsHumanCredentialRecord(cred)) continue;
+            try {
+                await this.storeCredential(cred);
+                applied += 1;
+                if (this._isIsHumanMasterRecord(cred)) masterRestored = true;
+            } catch (e) {
+                console.warn('[Lemma] Could not import linked isHuman credential:', cred.id, e.message);
+            }
+        }
+        if (!masterRestored && applied > 0) {
+            masterRestored = await this.hasIsHumanMasterInCache();
+        }
+        return { applied, masterRestored };
     }
 
     async exportIsHumanCredentialsForBridge() {
@@ -6622,15 +6648,43 @@ class LemmaWallet {
             
             const LINK_TTL_MS = 300000; // 5 minutes — accounts for page load on new device
 
+            let unlockToken = null;
+            if (this._isLemmaDomain()) {
+                try {
+                    const tokenRes = await fetch('/api/wallet/link-unlock-token', {
+                        method: 'POST',
+                        credentials: 'include',
+                        headers: { 'Content-Type': 'application/json' },
+                    });
+                    if (tokenRes.ok) {
+                        const tokenData = await tokenRes.json();
+                        unlockToken = tokenData.unlock_token || null;
+                    }
+                } catch (e) {
+                    console.warn('[Lemma] link-unlock-token unavailable:', e.message);
+                }
+            }
+
+            let ishumanCredentials = [];
+            try {
+                await this.syncIsHumanCacheFromWallet();
+                ishumanCredentials = await this.exportIsHumanCredentialsForBridge();
+            } catch (e) {
+                console.warn('[Lemma] Could not export isHuman credentials for link:', e.message);
+            }
+
             const payload = JSON.stringify({
                 walletSecret: walletSecret,
                 walletId: walletId?.value || null,
                 profileId: profile.id,
                 profileName: profile.name,
                 createdAt: Date.now(),
-                expiresAt: Date.now() + LINK_TTL_MS
+                expiresAt: Date.now() + LINK_TTL_MS,
+                unlockToken,
+                ishumanCredentials,
             });
-            console.log('[Lemma] generateLinkCode: payload created for profile:', profile.name);
+            console.log('[Lemma] generateLinkCode: payload created for profile:', profile.name,
+                `(ishuman: ${ishumanCredentials.length})`);
             
             // Encrypt payload using AES-GCM
             const encryptedPayload = await this._encryptForLink(payload, encryptionKey);
@@ -6654,7 +6708,10 @@ class LemmaWallet {
             // Use URL-safe base64 (replace + with -, / with _) to avoid URL encoding issues
             const qrDataBase64 = btoa(qrData).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
             console.log('[Lemma] generateLinkCode: base64 encoded (URL-safe), length:', qrDataBase64.length);
-            const qrUrl = `https://lemma.id/link#${qrDataBase64}`;
+            const linkOrigin = (typeof window !== 'undefined' && window.location?.origin)
+                ? window.location.origin
+                : 'https://lemma.id';
+            const qrUrl = `${linkOrigin}/link#${qrDataBase64}`;
             console.log('[Lemma] generateLinkCode: qrUrl created, length:', qrUrl.length);
             
             const LINK_TTL_SEC = LINK_TTL_MS / 1000;
@@ -7186,30 +7243,69 @@ class LemmaWallet {
             linkedFrom: payload.walletId || 'unknown',
         });
         console.log('[Lemma]  Local session set after linking');
-        
-        // Signal to server that this device is now unlocked (if on lemma.id)
+
+        let humanProofRestored = false;
+        let credentialsImported = 0;
+        if (Array.isArray(payload.ishumanCredentials) && payload.ishumanCredentials.length) {
+            const imported = await this._importLinkedIsHumanCredentials(payload.ishumanCredentials);
+            credentialsImported = imported.applied;
+            humanProofRestored = imported.masterRestored;
+            console.log(`[Lemma] Imported ${credentialsImported} isHuman credential(s) from link`);
+        }
+
+        let sessionError = null;
         let serverSessionSet = false;
         if (this._isLemmaDomain()) {
-            try {
-                console.log('[Lemma] Signaling unlock to server after device link...');
-                const signalResponse = await fetch('/api/wallet/signal-unlock', {
-                    method: 'POST',
-                    credentials: 'include',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        wallet_id: payload.walletId,
-                        unlocked_at: this.session.unlockedAt,
-                        expires_at: Math.floor(this.session.expiresAt / 1000),
-                        profile_id: profileId,
-                        profile_name: profileName
-                    })
-                });
-                if (signalResponse.ok) {
-                    console.log('[Lemma]  Server notified of linked device unlock');
-                    serverSessionSet = true;
+            if (payload.unlockToken && payload.walletId) {
+                try {
+                    const setRes = await fetch('/api/wallet/set-session', {
+                        method: 'POST',
+                        credentials: 'include',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            wallet_id: payload.walletId,
+                            unlock_token: payload.unlockToken,
+                            profile_id: profileId,
+                            profile_name: profileName,
+                        }),
+                    });
+                    if (setRes.ok) {
+                        serverSessionSet = true;
+                        console.log('[Lemma] Server session established via link unlock token');
+                    } else {
+                        const errData = await setRes.json().catch(() => ({}));
+                        sessionError = errData.error || 'set_session_failed';
+                    }
+                } catch (e) {
+                    sessionError = e.message;
+                    console.warn('[Lemma] set-session via link token failed:', e.message);
                 }
-            } catch (e) {
-                console.warn('[Lemma] Could not signal unlock:', e.message);
+            }
+
+            if (!serverSessionSet) {
+                try {
+                    console.log('[Lemma] Signaling unlock to server after device link...');
+                    const signalResponse = await fetch('/api/wallet/signal-unlock', {
+                        method: 'POST',
+                        credentials: 'include',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            wallet_id: payload.walletId,
+                            unlocked_at: this.session.unlockedAt,
+                            expires_at: Math.floor(this.session.expiresAt / 1000),
+                            profile_id: profileId,
+                            profile_name: profileName
+                        })
+                    });
+                    if (signalResponse.ok) {
+                        console.log('[Lemma]  Server notified of linked device unlock');
+                        serverSessionSet = true;
+                        sessionError = null;
+                    }
+                } catch (e) {
+                    console.warn('[Lemma] Could not signal unlock:', e.message);
+                    if (!sessionError) sessionError = e.message;
+                }
             }
         }
 
@@ -7252,43 +7348,51 @@ class LemmaWallet {
         if (!serverSessionSet && !this.session?.isUnlocked) {
             console.warn('[Lemma]  Server session not set - user will need to create passkey for cross-site auth');
         }
+
+        try {
+            await this.fetchAndStoreSeedEnvelopes();
+        } catch (e) {
+            console.warn('[Lemma] seed envelope fetch after link skipped:', e.message);
+        }
         
         console.log(`[Lemma] Device linked successfully with profile: ${profileName}`);
         
-        // AUTO-RESTORE: Re-issue the role-backed lemma for this PPID on lemma.id.
-        // This ensures newly linked devices restore admin/developer/user access deterministically.
+        // Fall back to server role restore only when isHuman proof was not bundled in the link.
         let platformCredentialIssued = false;
-        try {
-            console.log('[Lemma] Restoring lemma.id role credential for linked device...');
-            
-            const ppid = await this.derivePPID('lemma.id');
-            const issueResponse = await fetch('https://lemma.id/api/wallet-auth/restore-site-access', {
-                method: 'POST',
-                credentials: 'include',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    ppid: ppid,
-                    site_id: 'lemma.id'
-                })
-            });
-            
-            if (issueResponse.ok) {
-                const issueData = await issueResponse.json();
-                if (issueData.success && issueData.permission_lemma) {
-                    // Store the issued credential
-                    await this.storeCredential(issueData.permission_lemma);
-                    platformCredentialIssued = true;
-                    console.log('[Lemma]  Restored role credential issued and stored:', issueData.restored_role || 'unknown');
+        if (!humanProofRestored) {
+            try {
+                console.log('[Lemma] Restoring lemma.id role credential for linked device...');
+                
+                const ppid = await this.derivePPID('lemma.id');
+                const issueResponse = await fetch(`${window.location?.origin || 'https://lemma.id'}/api/wallet-auth/restore-site-access`, {
+                    method: 'POST',
+                    credentials: 'include',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        ppid: ppid,
+                        site_id: 'lemma.id'
+                    })
+                });
+                
+                if (issueResponse.ok) {
+                    const issueData = await issueResponse.json();
+                    if (issueData.success && issueData.permission_lemma) {
+                        await this.storeCredential(issueData.permission_lemma);
+                        platformCredentialIssued = true;
+                        console.log('[Lemma]  Restored role credential issued and stored:', issueData.restored_role || 'unknown');
+                    }
                 }
+            } catch (e) {
+                console.warn('[Lemma] Could not auto-restore platform role credential:', e.message);
             }
-        } catch (e) {
-            console.warn('[Lemma] Could not auto-restore platform role credential:', e.message);
-            // Non-fatal - user can request credential later
         }
         
-        // Build appropriate message based on session state
         let message;
-        if (serverSessionSet && platformCredentialIssued) {
+        if (humanProofRestored && serverSessionSet) {
+            message = `Wallet "${profileName}" linked with your human proof restored. Create a passkey on this device.`;
+        } else if (humanProofRestored) {
+            message = `Wallet "${profileName}" linked with human proof restored. Create a passkey for full access.`;
+        } else if (serverSessionSet && platformCredentialIssued) {
             message = `Wallet "${profileName}" linked with full access! Create a passkey to secure it.`;
         } else if (serverSessionSet) {
             message = `Wallet "${profileName}" linked! Create a passkey to secure it.`;
@@ -7304,11 +7408,13 @@ class LemmaWallet {
             profileId: profileId,
             profileName: profileName,
             needsPasskey: true,
-            sessionSet: serverSessionSet,  // FIXED: Accurately reflects if server session cookie was set
-            localSessionSet: this.session?.isUnlocked || false,  // Whether local session is active
-            sessionSource: this.session?.source || null,  // 'link' or 'global_session'
-            sessionError: sessionError,  // Error message if session setup failed
+            sessionSet: serverSessionSet,
+            localSessionSet: this.session?.isUnlocked || false,
+            sessionSource: this.session?.source || null,
+            sessionError: sessionError,
             credentialIssued: platformCredentialIssued,
+            humanProofRestored,
+            credentialsImported,
             message: message
         };
     }

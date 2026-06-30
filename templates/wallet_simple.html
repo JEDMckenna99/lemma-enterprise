@@ -89,7 +89,7 @@
             <!-- SEND TAB -->
             <div id="send-content">
                 <p class="card-intro">
-                    Link another phone or computer to this lemma.id.
+                    Generate a secure QR or link on this device. Your human proof travels encrypted with your lemma.id.
                 </p>
                 <button id="show-qr-btn" class="btn btn-primary btn-full">Generate QR Code</button>
                 
@@ -106,7 +106,7 @@
             <!-- RECEIVE TAB -->
             <div id="receive-content" class="hidden">
                 <p class="card-intro">
-                    Paste the code from your other device.
+                    Scan the QR or open the link from your other device, or paste the transfer code below.
                 </p>
                 <textarea id="receive-code" class="link-input" placeholder="Paste code here..."></textarea>
                 <button id="link-device-btn" class="btn btn-primary btn-full" style="margin-top: 12px;">Add This Device</button>
@@ -751,7 +751,7 @@ async function showQR() {
         const linkOptionsEl = document.getElementById('link-options');
         if (linkOptionsEl) {
             linkOptionsEl.innerHTML = `
-                <p class="qr-instruction">Scan with your other device's camera</p>
+                <p class="qr-instruction">Scan with your other device, or copy the link below</p>
                 <div class="link-copy-section">
                     <p class="link-copy-label">Or copy link:</p>
                     <div class="link-copy-row">
@@ -849,13 +849,22 @@ async function linkDevice() {
         const result = await wallet.linkDevice({ qrData: code });
 
         if (result.success) {
-            statusEl.innerHTML = '<div class="info-box" style="background: #ecfdf5; border-color: #10b981; color: #065f46;">Device added! Creating passkey...</div>';
+            let statusMsg = 'Device added! Creating passkey...';
+            if (result.humanProofRestored) {
+                statusMsg = 'Device added with human proof restored! Creating passkey...';
+            }
+            statusEl.innerHTML = `<div class="info-box" style="background: #ecfdf5; border-color: #10b981; color: #065f46;">${statusMsg}</div>`;
 
-            // Create passkey for this device
             await wallet.registerPasskey();
+            if (typeof wallet.fetchAndStoreSeedEnvelopes === 'function') {
+                try { await wallet.fetchAndStoreSeedEnvelopes(); } catch (_) {}
+            }
             await checkWalletState();
 
-            statusEl.innerHTML = '<div class="info-box" style="background: #ecfdf5; border-color: #10b981; color: #065f46;">Device added successfully!</div>';
+            const doneMsg = result.humanProofRestored
+                ? 'Device added! Your human proof is ready on this device.'
+                : 'Device added successfully!';
+            statusEl.innerHTML = `<div class="info-box" style="background: #ecfdf5; border-color: #10b981; color: #065f46;">${doneMsg}</div>`;
         } else if (result.conflict) {
             statusEl.innerHTML = '<div class="info-box" style="background: #fef3c7; border-color: #f59e0b; color: #92400e;">A different lemma.id is on this device. Remove it first to add a new one.</div>';
         } else {
