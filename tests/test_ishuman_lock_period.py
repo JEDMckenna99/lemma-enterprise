@@ -103,10 +103,21 @@ def test_wallet_handoff_wallet_id_reconciled_for_site_proof(wallet_source):
     """Handoff-linked wallets must bind passkey to the verified wallet_id, not mint a new one."""
     assert "_resolveStoredWalletIdentity" in wallet_source
     assert "reconcileSessionWalletIdForIssuance" in wallet_source
+    assert "walletId = sess.walletId || walletId" in wallet_source
     assert "requirePasskeyForIssuance" in wallet_source
     assert "mustCreatePasskeyForIssuance" in wallet_source
     assert "canAutoFinishVerificationReturn" in IDV_HTML.read_text(encoding="utf-8")
     assert "ishuman_deferred_passkey" not in wallet_source
+
+
+@pytest.mark.browser
+def test_platform_auth_accepts_combined_master_claims(wallet_source):
+    """lemma.id platform auth must accept the master isHuman credential when it carries IAM claims."""
+    auto_init = (ROOT / "templates" / "modern" / "includes" / "wallet_auto_init_script.html").read_text(encoding="utf-8")
+    assert "hasPlatformPermissionClaims" in wallet_source
+    assert "Get permission lemmas plus combined lemma.id isHuman+IAM master credentials" in wallet_source
+    assert "const allCredentials = await wallet.getCredentials();" in auto_init
+    assert "const hasAccessClaims = !!(" in auto_init
 
 
 @pytest.mark.browser

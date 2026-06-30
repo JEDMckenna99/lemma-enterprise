@@ -114,17 +114,28 @@
                 window.__lemmaLockHandlersBound = true;
             }
 
-            const permissions = await wallet.getCredentials('permission');
+            const allCredentials = await wallet.getCredentials();
             const utils = window.LemmaCredentialUtils;
 
-            const lemmaPermissions = permissions.filter(p => {
+            const lemmaPermissions = allCredentials.filter(p => {
                 if (utils) {
                     const normalized = utils.normalizeCredentialClaims(p);
-                    return normalized.isLemmaSite;
+                    return normalized.isLemmaSite && (
+                        normalized.packageType === 'permission'
+                        || normalized.permissionId
+                        || normalized.accountType
+                    );
                 }
                 const claims = p.claims || p.credentialSubject || {};
                 const siteId = (claims.siteId || claims.site || claims.site_id || claims.siteDomain || '').toLowerCase();
-                return siteId === 'lemma.id' || siteId === 'lemma_platform' || siteId.includes('lemma');
+                const hasAccessClaims = !!(
+                    claims.permissionId
+                    || claims.permission_level
+                    || claims.permission_id
+                    || claims.accountType
+                    || claims.account_type
+                );
+                return hasAccessClaims && (siteId === 'lemma.id' || siteId === 'lemma_platform' || siteId.includes('lemma'));
             });
 
             let cred = null;

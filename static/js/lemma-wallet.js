@@ -6583,7 +6583,7 @@ class LemmaWallet {
                 throw err;
             });
         if (sess?.walletId) {
-            walletId = walletId || sess.walletId;
+            walletId = sess.walletId || walletId;
             walletSecret = walletSecret || sess.walletSecret || '';
             source = source || sess.source || '';
         }
@@ -7676,8 +7676,26 @@ class LemmaWallet {
                 || accountType === 'admin';
         };
         
-        // 1. Get all permission lemmas from IndexedDB
-        const permissions = await this.getCredentials('permission');
+        const hasPlatformPermissionClaims = (credential) => {
+            const claims = credential?.claims || credential?.credentialSubject || {};
+            const site = normalizeSite(claims.siteId || claims.site || claims.site_id || claims.siteDomain || claims.site_domain || '');
+            if (site !== 'lemma.id' && site !== 'lemma_platform') return false;
+            return !!(
+                claims.permissionId
+                || claims.permission_level
+                || claims.permission_id
+                || claims.accountType
+                || claims.account_type
+            );
+        };
+
+        // 1. Get permission lemmas plus combined lemma.id isHuman+IAM master credentials.
+        const permissions = (await this.getCredentials()).filter((credential) => {
+            const pkgType = String(credential.packageType || credential.claims?.type || credential.type?.[1] || '').toLowerCase();
+            return pkgType === 'permission'
+                || pkgType === 'permissionlemma'
+                || hasPlatformPermissionClaims(credential);
+        });
         
         // 2. Filter for requested site
         const normalizedTargetSite = normalizeSite(siteId);
