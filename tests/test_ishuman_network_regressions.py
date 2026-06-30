@@ -310,6 +310,49 @@ def test_ishuman_issue_signs_string_claims_but_returns_typed_claims(monkeypatch)
     credential = _issue_ishuman_credential("did:lemma:ppid_test", "wallet_test")
 
     assert captured["claims"]["isHuman"] == "true"
+    assert captured["claims"]["permissionId"] == "admin_access"
     assert credential["claims"]["isHuman"] is True
     assert credential["credentialSubject"]["isHuman"] is True
     assert credential["claims"]["siteId"] == "lemma.id"
+    assert credential["claims"]["siteDomain"] == "lemma.id"
+    assert credential["claims"]["permissionId"] == "admin_access"
+    assert credential["claims"]["permission_level"] == "admin"
+    assert credential["claims"]["accountType"] == "admin"
+    assert credential["claims"]["scope"] == ["admin", "write", "read", "developer"]
+
+
+def test_ishuman_site_proof_does_not_inherit_platform_admin_claims(monkeypatch):
+    import json
+
+    class _Issuer:
+        def issue_credential(self, ppid, claims):
+            return json.dumps({
+                "issuer": "did:lemma:" + ("a" * 64),
+                "subject": ppid,
+                "claims": claims,
+                "credentialSubject": claims,
+                "proof": {"signatureValue": "ab"},
+            })
+
+        def get_did(self):
+            return "did:lemma:" + ("a" * 64)
+
+        def get_public_key_hex(self):
+            return "a" * 64
+
+    monkeypatch.setattr("api.ishuman._get_ishuman_issuer", lambda: _Issuer())
+
+    from api.ishuman import _issue_ishuman_credential
+
+    credential = _issue_ishuman_credential(
+        "did:lemma:ppid_site",
+        "wallet_test",
+        site_id="tickets-demo.lemma.id",
+    )
+
+    claims = credential["claims"]
+    assert claims["isHuman"] is True
+    assert claims["siteId"] == "tickets-demo.lemma.id"
+    assert "permissionId" not in claims
+    assert "permission_level" not in claims
+    assert "accountType" not in claims

@@ -227,6 +227,16 @@ def _issue_ishuman_credential(
         "issuedAt": str(now),
         "expiresAt": str(now + lifetime_seconds),
     }
+    if not site_id or site_id == "lemma.id":
+        claims.update({
+            "siteDomain": "lemma.id",
+            "permissionId": "admin_access",
+            "permission_level": "admin",
+            "accountType": "admin",
+            "credentialScope": "site_specific",
+            "scope": ["admin", "write", "read", "developer"],
+            "permissions": "admin_access",
+        })
     if site_signing_pubkey:
         claims["site_signing_pubkey"] = site_signing_pubkey
     if ppid_derivation:

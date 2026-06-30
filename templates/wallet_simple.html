@@ -339,6 +339,17 @@ async function hasCompleteLemmaId() {
     return false;
 }
 
+async function recoverMissingMasterFromServer() {
+    try {
+        if (!wallet || typeof wallet.reissueMasterCredential !== 'function') return false;
+        await wallet.reissueMasterCredential();
+        return true;
+    } catch (err) {
+        console.warn('Could not recover lemma.id proof from server:', err?.message || err);
+        return false;
+    }
+}
+
 function showIncompleteLemmaIdState() {
     updateStatusDisplay(false, 'Create a lemma.id', 'Finish your one-time human verification');
     document.getElementById('unlock-btn').classList.add('hidden');
@@ -684,9 +695,16 @@ function createWallet() {
         clearInterval(closedTimer);
         btn.textContent = origText;
         btn.disabled = false;
-        await checkWalletState().catch((err) => {
+        let ready = await checkWalletState().catch((err) => {
             console.warn('Wallet refresh after issuance failed:', err?.message || err);
+            return false;
         });
+        if (!ready && await recoverMissingMasterFromServer()) {
+            ready = await checkWalletState().catch((err) => {
+                console.warn('Wallet refresh after master recovery failed:', err?.message || err);
+                return false;
+            });
+        }
     };
     const onMessage = (event) => {
         if (event.origin !== window.location.origin) return;
@@ -1145,6 +1163,12 @@ async function loadProofSummary() {
             const cl = claimsFor(cred);
             return (pkg === 'permission' || pkg === 'permissionlemma') && !cl.isHuman;
         };
+        const hasLemmaAccessClaims = (cred) => {
+            const cl = claimsFor(cred);
+            const site = normalizeSiteLabel(cl.siteDomain || cl.siteId || cl.site_id || cl.site || '');
+            return isLemmaPlatformSite(site)
+                && !!(cl.permissionId || cl.permission_level || cl.permission_id || cl.accountType || cl.account_type);
+        };
 
         let master = null;
         if (typeof wallet.findIsHumanMasterCredential === 'function') {
@@ -1163,7 +1187,7 @@ async function loadProofSummary() {
         });
 
         const lemmaAccess = credentials.filter((cred) => {
-            if (!isPermissionLemma(cred)) return false;
+            if (!isPermissionLemma(cred) && !hasLemmaAccessClaims(cred)) return false;
             const cl = claimsFor(cred);
             const site = normalizeSiteLabel(cl.siteDomain || cl.siteId || cl.site_id || cl.site || '');
             return isLemmaPlatformSite(site);
