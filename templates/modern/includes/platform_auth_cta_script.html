@@ -64,7 +64,7 @@
             const hasIsHuman = await checkIsHumanProof(wallet);
             const hasDeveloper = await checkDeveloperPermission(wallet);
 
-            if (hasIsHuman && hasDeveloper) {
+            if (hasIsHuman) {
                 return { mode: 'ready_signin', hasWallet: true, hasIsHuman, hasDeveloper };
             }
 

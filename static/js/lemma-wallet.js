@@ -2639,8 +2639,18 @@ class LemmaWallet {
     _isIsHumanMasterRecord(credential) {
         if (!this._isIsHumanCredentialRecord(credential)) return false;
         const cl = credential.claims || credential.credentialSubject || {};
-        const site = cl.siteId || cl.site_id || cl.siteDomain || cl.site_domain || '';
-        return site === 'lemma.id' || !site;
+        const keys = this._getLemmaKeys();
+        const sites = [
+            cl.siteDomain,
+            cl.site_domain,
+            cl.siteId,
+            cl.site_id,
+            cl.site,
+        ]
+            .map((value) => keys.canonicalizeSiteDomain(value || ''))
+            .filter(Boolean);
+        if (!sites.length) return true;
+        return sites.some((site) => site === 'lemma.id' || site === 'lemma_platform');
     }
 
     /**

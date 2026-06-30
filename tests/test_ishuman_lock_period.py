@@ -114,10 +114,20 @@ def test_wallet_handoff_wallet_id_reconciled_for_site_proof(wallet_source):
 def test_platform_auth_accepts_combined_master_claims(wallet_source):
     """lemma.id platform auth must accept the master isHuman credential when it carries IAM claims."""
     auto_init = (ROOT / "templates" / "modern" / "includes" / "wallet_auto_init_script.html").read_text(encoding="utf-8")
+    layout = (ROOT / "templates" / "modern" / "layout.html").read_text(encoding="utf-8")
+    platform_cta = (ROOT / "templates" / "modern" / "includes" / "platform_auth_cta_script.html").read_text(encoding="utf-8")
     assert "hasPlatformPermissionClaims" in wallet_source
     assert "Get permission lemmas plus combined lemma.id isHuman+IAM master credentials" in wallet_source
+    assert "cl.siteDomain" in wallet_source
+    assert "cl.siteId" in wallet_source
+    assert "site === 'lemma.id' || site === 'lemma_platform'" in wallet_source
     assert "const allCredentials = await wallet.getCredentials();" in auto_init
+    assert "|| normalized.isHuman" in auto_init
     assert "const hasAccessClaims = !!(" in auto_init
+    assert "const isLemmaHuman = normalized?.isLemmaSite && normalized?.isHuman;" in auto_init
+    assert "const all = await wallet.getCredentials();" in layout
+    assert "const isHumanMaster = !!claims.isHuman" in layout
+    assert "if (hasIsHuman) {" in platform_cta
 
 
 @pytest.mark.browser
