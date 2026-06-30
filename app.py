@@ -461,13 +461,10 @@ def create_app():
     except Exception as e:
         logger.error(f"❌ Failed to register Platform Statistics API: {e}")
     
-    # SSE Revocation Events API (real-time revocation notifications)
-    try:
-        from api.revocation_events import revocation_events_bp
-        app.register_blueprint(revocation_events_bp)
-        logger.info("✅ SSE Revocation Events API registered")
-    except Exception as e:
-        logger.error(f"❌ Failed to register SSE Revocation Events API: {e}")
+    # NOTE: The real-time SSE event stream (/api/events/revocations) and the
+    # cross-device session-sync layer it powered were removed. Revocation now
+    # propagates via the pull-based, signed Bloom snapshot at
+    # /api/revocation/bloom-filter, and wallet unlock is local-per-device.
 
     # Permission Type Management API (developer dashboard)
     try:

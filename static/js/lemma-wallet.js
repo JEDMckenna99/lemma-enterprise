@@ -894,77 +894,13 @@ class LemmaWallet {
     }
     
     /**
-     * Check if this wallet has an active session on any device (cross-device sync).
+     * Deprecated: cross-device global session sync was removed. Unlock is now
+     * local-per-device, so this always reports no cross-device session and
+     * makes no network call. Callers fall back to the local unlock flow.
      * @private
      */
     async _checkGlobalSession(walletId, options = {}) {
-        // Honor the cross-site lock feature flag. When disabled, treat global
-        // session as "valid" so callers fall back to the local 24h IDB session
-        // and never make a network call.
-        if (typeof window !== 'undefined' && window.LEMMA_CROSS_SITE_LOCK_ENABLED === false) {
-            return { valid: true, reason: 'cross_site_lock_disabled' };
-        }
-
-        const now = Date.now();
-        const cache = this._globalSessionCache;
-        const forceRefresh = options.force === true;
-        const sinceLastNetwork = now - this._lastGlobalSessionNetworkCheck;
-        
-        // Return cached result if fresh (unless force refresh)
-        if (!forceRefresh && cache.result && (now - cache.timestamp) < cache.ttlMs) {
-            console.log('[Lemma]  Using cached global session (age:', now - cache.timestamp, 'ms)');
-            return cache.result;
-        }
-        // If cache is stale but present, and we checked very recently, reuse stale result
-        // to avoid bursty network traffic from tab focus/visibility events.
-        if (!forceRefresh && cache.result && sinceLastNetwork < this._minGlobalSessionCheckMs) {
-            console.log('[Lemma]  Reusing stale global session cache to avoid rapid recheck');
-            return cache.result;
-        }
-        
-        // Deduplicate concurrent requests
-        if (cache.pendingPromise && !forceRefresh) {
-            console.log('[Lemma]  Waiting for pending global session check...');
-            return cache.pendingPromise;
-        }
-        
-        // Make the actual request
-        cache.pendingPromise = (async () => {
-        try {
-            this._lastGlobalSessionNetworkCheck = Date.now();
-            console.log('[Lemma]  Checking global session for wallet:', walletId?.substring(0, 8) + '...');
-            const response = await fetch('https://lemma.id/api/wallet/global-session', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ wallet_id: walletId })
-            });
-            
-            console.log('[Lemma]  Global session response status:', response.status);
-            
-            if (!response.ok) {
-                console.log('[Lemma]  Global session not OK, returning invalid');
-                    const result = { valid: false };
-                    cache.result = result;
-                    cache.timestamp = now;
-                    return result;
-            }
-            
-            const data = await response.json();
-            console.log('[Lemma]  Global session result:', JSON.stringify(data));
-                
-                // Cache the result
-                cache.result = data;
-                cache.timestamp = now;
-            return data;
-        } catch (e) {
-            console.warn('[Lemma] Global session API error:', e.message);
-            return { valid: false };
-            } finally {
-                cache.pendingPromise = null;
-        }
-        })();
-        
-        return cache.pendingPromise;
+        return { valid: false, deprecated: true };
     }
     
     /**
@@ -1321,33 +1257,22 @@ class LemmaWallet {
     }
 
     /**
-     * Start session heartbeat (checks if wallet session is still valid)
-     * 
-     * ARCHITECTURE (v2.33.0):
-     * - PRIMARY: SSE stream for instant cross-device lock/unlock detection (~0ms latency)
-     * - FALLBACK: Polling at 5-minute intervals if SSE is unavailable
-     * - LOCAL: Expiry check on visibility change (always enforced, no network)
-     * 
-     * The SSE connection to /api/events/revocations receives both credential
-     * revocation events and session invalidation events from the same stream.
-     * This eliminates the need for 60-second polling heartbeats.
-     * 
-     * @param {number} intervalMs - Fallback poll interval in ms (default: 300000 = 5 minutes)
+     * Start session heartbeat (checks if the local wallet session is still valid)
+     *
+     * ARCHITECTURE:
+     * - LOCAL ONLY: Enforces the user-chosen session expiry on this device.
+     *   Checked on an interval and on tab visibility/focus changes.
+     *
+     * Cross-device lock/unlock detection (SSE + global-session polling) was
+     * removed: unlock is local-per-device, and revocation propagates via the
+     * pull-based signed Bloom snapshot (/api/revocation/bloom-filter).
+     *
+     * @param {number} intervalMs - Local expiry-check interval in ms (default: 300000 = 5 minutes)
      */
     startSessionHeartbeat(intervalMs = 300000) {
         // Skip only on localhost dev hosts where SSE endpoint may not exist.
         const devHost = window.location.hostname.toLowerCase();
         if (devHost === 'localhost' || devHost === '127.0.0.1') {
-            return;
-        }
-
-        // Cross-site lock propagation (SSE + global-session polling) is the
-        // most network-expensive part of the wallet. When the deployment has
-        // not yet enabled lemma.id as a third-party login provider, this
-        // overhead has marginal utility — local 24h session expiry is still
-        // enforced. Gate the heartbeat on a server-injected feature flag.
-        if (typeof window !== 'undefined' && window.LEMMA_CROSS_SITE_LOCK_ENABLED === false) {
-            console.log('[Lemma] Cross-site lock disabled (LEMMA_CROSS_SITE_LOCK_ENABLED=false) — skipping SSE/polling heartbeat');
             return;
         }
 
@@ -1361,20 +1286,11 @@ class LemmaWallet {
             document.removeEventListener('visibilitychange', this._visibilityHandler);
         }
 
-        // Close any existing SSE connection
-        if (this._sessionEventSource) {
-            this._sessionEventSource.close();
-            this._sessionEventSource = null;
-        }
-
-        // ---- SSE: instant cross-device detection ----
-        this._connectSessionSSE();
-
-        // Heartbeat check function (reused for fallback interval and visibility)
+        // Heartbeat check function: enforces local session expiry only.
         const performHeartbeatCheck = async () => {
             // Skip if no local session
             if (!this.session.isUnlocked) return;
-            
+
             // Debounce: Skip if checked recently (prevents rapid-fire on focus/visibility)
             const now = Date.now();
             if ((now - this._lastHeartbeatCheck) < this._heartbeatDebounceMs) {
@@ -1382,45 +1298,16 @@ class LemmaWallet {
                 return;
             }
             this._lastHeartbeatCheck = now;
-            
-            // Check 1: Local expiry (always enforced)
+
+            // Local expiry (always enforced, no network)
             if (this.session.expiresAt && now > this.session.expiresAt) {
                 console.log('[Lemma] Session expired');
                 await this._clearSessionGracefully('expired', 'Your session has expired. Please sign in again.');
                 return;
             }
-            
-            // Check 2: Cross-device lock detection via global session API (fallback only)
-            // If SSE is connected, skip polling — SSE delivers lock events instantly
-            if (this._sessionEventSource && this._sessionEventSource.readyState === EventSource.OPEN) {
-                return;
-            }
-            
-            try {
-                let walletId = await this._resolveCurrentWalletId();
-                
-                if (walletId) {
-                    const sessionSource = this.session.source;
-                    const localOnlySources = ['local', 'passkey', 'local_passkey'];
-                    const skipGlobalCheck = localOnlySources.includes(sessionSource);
-
-                    if (!skipGlobalCheck) {
-                        console.log('[Lemma] Fallback: checking global session (SSE not connected, source:', sessionSource, ')');
-                        const globalSession = await this._checkGlobalSession(walletId);
-
-                        if (!globalSession.valid) {
-                            console.log('[Lemma] Wallet locked remotely (detected via fallback poll).');
-                            await this._clearSessionGracefully('wallet_locked', 'Your wallet was locked on another device.');
-                            return;
-                        }
-                    }
-                }
-            } catch (e) {
-                // Network issues shouldn't cause sign-out - fail silently
-            }
         };
-        
-        // Fallback polling interval (only fires when SSE is down)
+
+        // Local expiry-check interval
         this._heartbeatInterval = setInterval(performHeartbeatCheck, intervalMs);
         
         // INSTANT CHECK: When user returns to tab, check local expiry immediately
@@ -1456,113 +1343,22 @@ class LemmaWallet {
     }
 
     /**
-     * Connect to SSE event stream for instant session invalidation detection.
-     * Listens for session_invalidated and session_restored events.
-     * Automatically reconnects with exponential backoff on failure.
+     * Deprecated: the real-time SSE event stream was removed. Wallet unlock is
+     * local-per-device and revocation propagates via the pull-based signed
+     * Bloom snapshot (synced by syncRevocations / the periodic sync). Retained
+     * as a no-op so any external callers keep working.
      * @private
      */
     _connectSessionSSE() {
-        if (typeof EventSource === 'undefined') {
-            console.warn('[Lemma] EventSource not supported - using fallback polling');
-            return;
-        }
-
-        this._sseReconnectAttempts = this._sseReconnectAttempts || 0;
-
-        try {
-            this._sessionEventSource = new EventSource('https://lemma.id/api/events/revocations');
-
-            this._sessionEventSource.addEventListener('session_invalidated', async (event) => {
-                try {
-                    const data = JSON.parse(event.data);
-                    const walletId = await this._resolveCurrentWalletId();
-
-                    // Only react if this event is for our wallet
-                    if (!walletId || data.wallet_id !== walletId) return;
-
-                    console.log('[Lemma] SSE: wallet locked remotely (instant detection)');
-                    await this._clearSessionGracefully('wallet_locked', 'Your wallet was locked on another device.');
-                } catch (e) {
-                    console.warn('[Lemma] SSE: failed to process session_invalidated event:', e.message);
-                }
-            });
-
-            this._sessionEventSource.addEventListener('session_restored', async (event) => {
-                try {
-                    const data = JSON.parse(event.data);
-                    const walletId = await this._resolveCurrentWalletId();
-
-                    if (!walletId || data.wallet_id !== walletId) return;
-
-                    console.log('[Lemma] SSE: wallet unlocked on another device');
-                    // Dispatch event for apps that want to react to remote unlock
-                    window.dispatchEvent(new CustomEvent('lemma:session-restored', {
-                        detail: { wallet_id: data.wallet_id, expires_at: data.expires_at }
-                    }));
-                } catch (e) {
-                    console.warn('[Lemma] SSE: failed to process session_restored event:', e.message);
-                }
-            });
-
-            this._sessionEventSource.addEventListener('revocation', async (event) => {
-                try {
-                    const data = JSON.parse(event.data || '{}');
-                    const eventSite = String(data.site_id || '').trim().toLowerCase();
-                    const currentSite = String(window.location.hostname || '').trim().toLowerCase();
-
-                    // Apply event for this site, global events, or lemma.id events.
-                    const appliesToCurrentSite = !eventSite
-                        || eventSite === currentSite
-                        || (eventSite === 'lemma.id' && currentSite.endsWith('lemma.id'));
-
-                    if (!appliesToCurrentSite) return;
-
-                    console.log('[Lemma] SSE: revocation event received, invalidating cache');
-                    this.invalidateRevocationCache();
-                    await this.syncRevocations();
-                } catch (e) {
-                    console.warn('[Lemma] SSE: failed to process revocation event:', e.message);
-                }
-            });
-
-            this._sessionEventSource.addEventListener('connected', () => {
-                this._sseReconnectAttempts = 0;
-                console.log('[Lemma] SSE: connected to event stream (instant lock detection active)');
-            });
-
-            this._sessionEventSource.addEventListener('error', () => {
-                if (this._sessionEventSource && this._sessionEventSource.readyState === EventSource.CLOSED) {
-                    // Connection lost — reconnect with backoff
-                    this._reconnectSessionSSE();
-                }
-            });
-
-        } catch (e) {
-            console.warn('[Lemma] SSE: failed to connect, using fallback polling:', e.message);
-        }
+        return;
     }
 
     /**
-     * Reconnect SSE with exponential backoff (max 5 attempts, max 30s delay).
-     * After max attempts, falls back to polling-only mode.
+     * Deprecated no-op: SSE reconnect was removed (no SSE stream).
      * @private
      */
     _reconnectSessionSSE() {
-        const maxAttempts = 5;
-        if (this._sseReconnectAttempts >= maxAttempts) {
-            console.warn('[Lemma] SSE: max reconnect attempts reached, using fallback polling only');
-            return;
-        }
-
-        this._sseReconnectAttempts++;
-        const delay = Math.min(1000 * Math.pow(2, this._sseReconnectAttempts), 30000);
-
-        console.log(`[Lemma] SSE: reconnecting in ${delay}ms (attempt ${this._sseReconnectAttempts}/${maxAttempts})`);
-        setTimeout(() => {
-            if (this.session.isUnlocked) {
-                this._connectSessionSSE();
-            }
-        }, delay);
+        return;
     }
     
     /**

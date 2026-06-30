@@ -226,23 +226,11 @@ function showUnlockedView() {
 // Track if we've ever had a valid global session (for cross-device lock detection)
 let hadGlobalSession = localStorage.getItem('lemma_had_global_session') === 'true';
 
-// Check global session and sync if needed
+// Deprecated: cross-device global session sync was removed. Unlock is now
+// local-per-device, so this always reports no global session and makes no
+// network call.
 async function syncGlobalSession(walletId) {
-    if (!walletId) return { valid: false };
-    
-    try {
-        const response = await fetch('/api/wallet/global-session', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ wallet_id: walletId })
-        });
-        
-        if (!response.ok) return { valid: false, error: true };
-        return await response.json();
-    } catch (e) {
-        console.warn('Global session check failed:', e);
-        return { valid: false, error: true };
-    }
+    return { valid: false };
 }
 
 // Set global session after unlock (requires unlock_token from server-verified auth)
@@ -288,40 +276,11 @@ async function setGlobalSession(walletId, unlockToken) {
     }
 }
 
-// Cross-device lock detection (runs on tab visibility change)
+// Deprecated no-op: cross-device lock detection was removed. Local session
+// expiry is enforced by the wallet's own heartbeat; this device never locks
+// based on another device's state.
 async function checkCrossDeviceLock() {
-    console.log('[CrossDevice] checkCrossDeviceLock starting...');
-    await initWallet();
-    const info = await wallet.getWalletInfo();
-    
-    console.log('[CrossDevice] info:', { isUnlocked: info.isUnlocked, walletId: info.walletId?.substring(0, 8) });
-    console.log('[CrossDevice] hadGlobalSession:', hadGlobalSession);
-    
-    if (!info.isUnlocked || !info.walletId) {
-        console.log('[CrossDevice] Early return - not unlocked or no walletId');
-        return;
-    }
-    
-    // Only check if we previously HAD a global session
-    // This prevents false positive locks on first unlock
-    if (!hadGlobalSession) {
-        console.log('[CrossDevice] Early return - hadGlobalSession is false');
-        return;
-    }
-    
-    const globalSession = await syncGlobalSession(info.walletId);
-    console.log('[CrossDevice] globalSession result:', globalSession);
-    
-    // If we HAD a global session but now it's invalid, we were locked from another device
-    if (!globalSession.valid && !globalSession.error) {
-        console.log('[CrossDevice] Wallet locked on another device - clearing local session');
-        await wallet.lock();
-        hadGlobalSession = false;
-        localStorage.removeItem('lemma_had_global_session');
-        await checkWalletState();
-    } else {
-        console.log('[CrossDevice] Session still valid or error occurred');
-    }
+    return;
 }
 
 async function hasCompleteLemmaId() {
@@ -525,11 +484,12 @@ async function lockWallet() {
 }
 
 // ============================================================
-// SSE: Instant cross-device lock/unlock detection
+// Cross-device SSE: REMOVED
 // ============================================================
-// Connects to the SSE event stream on lemma.id for real-time
-// session_invalidated and session_restored events.
-// This replaces polling with instant push notifications.
+// The real-time SSE event stream (/api/events/revocations) and cross-device
+// lock/unlock detection were removed. Unlock is local-per-device, and
+// revocation propagates via the pull-based signed Bloom snapshot. These
+// functions are retained as no-ops so existing call sites keep working.
 // ============================================================
 
 let sseConnection = null;
@@ -537,106 +497,11 @@ let sseReconnectAttempts = 0;
 let sseWalletId = null;
 
 function connectCrossDeviceSSE(walletId) {
-    if (!walletId) return;
-    if (typeof EventSource === 'undefined') {
-        console.log('[SSE] EventSource not supported - using polling fallback');
-        return;
-    }
-    
-    // Already connected for this wallet
-    if (sseConnection && sseConnection.readyState !== EventSource.CLOSED && sseWalletId === walletId) {
-        return;
-    }
-    
-    // Close existing connection if any
-    disconnectCrossDeviceSSE();
-    sseWalletId = walletId;
-    
-    try {
-        sseConnection = new EventSource('/api/events/revocations');
-        
-        // --- Session invalidated: another device locked the wallet ---
-        sseConnection.addEventListener('session_invalidated', async (event) => {
-            try {
-                const data = JSON.parse(event.data);
-                if (data.wallet_id !== sseWalletId) return;
-                
-                console.log('[SSE] Wallet locked on another device (instant detection)');
-                await wallet.lock();
-                hadGlobalSession = false;
-                localStorage.removeItem('lemma_had_global_session');
-                disconnectCrossDeviceSSE();
-                await checkWalletState();
-            } catch (e) {
-                console.warn('[SSE] Failed to process session_invalidated:', e);
-            }
-        });
-        
-        // --- Session restored: another device unlocked the wallet ---
-        sseConnection.addEventListener('session_restored', async (event) => {
-            try {
-                const data = JSON.parse(event.data);
-                if (data.wallet_id !== sseWalletId) return;
-                
-                console.log('[SSE] Wallet unlocked on another device (instant detection)');
-                
-                // Only auto-unlock if we're currently locked and have the wallet secret
-                await initWallet();
-                const info = await wallet.getWalletInfo();
-                if (!info.isUnlocked && info.hasWalletSecret) {
-                    const expiresAt = data.expires_at 
-                        ? data.expires_at * 1000 
-                        : Date.now() + 24 * 60 * 60 * 1000;
-                    
-                    // Set local session from SSE event
-                    wallet.session = {
-                        isUnlocked: true,
-                        unlockedAt: Date.now(),
-                        expiresAt: expiresAt,
-                        walletId: sseWalletId,
-                        source: 'sse_sync'
-                    };
-                    await wallet._put('session', { id: 'current', ...wallet.session });
-                    
-                    hadGlobalSession = true;
-                    localStorage.setItem('lemma_had_global_session', 'true');
-                    
-                    console.log('[SSE] Auto-unlocked local wallet from remote session');
-                    updateStatusDisplay(true, 'Open', 'Synced from another device');
-                    showUnlockedView();
-                    loadProofSummary();
-                }
-            } catch (e) {
-                console.warn('[SSE] Failed to process session_restored:', e);
-            }
-        });
-        
-        sseConnection.addEventListener('connected', () => {
-            sseReconnectAttempts = 0;
-            console.log('[SSE] Connected - instant cross-device detection active for wallet', sseWalletId?.substring(0, 8) + '...');
-        });
-        
-        sseConnection.addEventListener('error', () => {
-            if (sseConnection && sseConnection.readyState === EventSource.CLOSED) {
-                reconnectCrossDeviceSSE();
-            }
-        });
-        
-    } catch (e) {
-        console.warn('[SSE] Failed to connect:', e);
-    }
+    return;
 }
 
 function reconnectCrossDeviceSSE() {
-    const maxAttempts = 5;
-    if (sseReconnectAttempts >= maxAttempts) {
-        console.warn('[SSE] Max reconnect attempts reached - using polling fallback');
-        return;
-    }
-    sseReconnectAttempts++;
-    const delay = Math.min(1000 * Math.pow(2, sseReconnectAttempts), 30000);
-    console.log(`[SSE] Reconnecting in ${delay}ms (attempt ${sseReconnectAttempts}/${maxAttempts})`);
-    setTimeout(() => connectCrossDeviceSSE(sseWalletId), delay);
+    return;
 }
 
 function disconnectCrossDeviceSSE() {

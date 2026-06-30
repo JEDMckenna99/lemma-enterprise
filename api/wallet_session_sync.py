@@ -769,15 +769,8 @@ def signal_unlock():
         return response, 500
     
     logger.info(f"Signal-unlock: session stored for wallet {wallet_id[:8]}")
-    
-    # Publish SSE event so other devices detect the unlock instantly
-    try:
-        from api.revocation_events import publish_session_event
-        publish_session_event(wallet_id, 'session_restored', expires_at=expires_at)
-    except Exception as e:
-        logger.warning(f"Signal-unlock: SSE publish failed (non-fatal): {e}")
-    
-    # Also set session cookie for bridge iframe
+
+    # Set session cookie for bridge iframe
     session_token = generate_session_token(wallet_id, unlocked_at)
     csrf_token = secrets.token_urlsafe(32)
     
@@ -849,13 +842,6 @@ def clear_session():
         # so stolen/cached tokens are rejected even before cookie expiry
         from auth.session_manager import revoke_wallet_sessions
         revoke_wallet_sessions(wallet_id)
-        
-        # Publish SSE event so other devices detect the lock instantly
-        try:
-            from api.revocation_events import publish_session_event
-            publish_session_event(wallet_id, 'session_invalidated')
-        except Exception as e:
-            logger.warning(f"Clear-session: SSE publish failed (non-fatal): {e}")
     else:
         logger.warning("Clear-session: no wallet_id available (request or cookie)")
         global_cleared = False
@@ -872,146 +858,44 @@ def clear_session():
 
 
 # ============================================================
-# CROSS-DEVICE SESSION SYNC (Global Sessions)
+# CROSS-DEVICE SESSION SYNC (REMOVED)
 # ============================================================
-# Enables "one passkey per day" across ALL devices with same wallet.
-# When user unlocks on Device A, Device B can check if already unlocked.
+# The "one passkey per day across all devices" cross-device session sync was
+# removed. Wallet unlock is now local-per-device for the user-chosen duration,
+# and revocation propagates via the pull-based signed Bloom snapshot
+# (/api/revocation/bloom-filter).
+#
+# These helpers are retained as inert no-ops so existing callers (and tests
+# that patch them) keep working without writing/reading the global
+# WalletSession table or broadcasting a global wallet_id.
 # ============================================================
 
-def _get_db_session():
-    """Get database session for global session operations."""
-    try:
-        from api.database import get_db, WalletSession
-        session = get_db()
-        logger.debug(f"_get_db_session: got session={session is not None}, WalletSession={WalletSession is not None}")
-        return session, WalletSession
-    except Exception as e:
-        logger.error(f"Database not available for global sessions: {e}")
-        import traceback
-        logger.error(f"Traceback: {traceback.format_exc()}")
-        return None, None
-
-
-def _store_global_session(wallet_id: str, unlocked_at: int, expires_at: int, 
+def _store_global_session(wallet_id: str, unlocked_at: int = 0, expires_at: int = 0,
                           profile_id: str = 'default', profile_name: str = 'Personal',
                           device_hint: str = None):
-    """Store or update global wallet session in database."""
-    db_session, WalletSession = _get_db_session()
-    if not db_session or not WalletSession:
-        logger.error(f"_store_global_session: db_session={db_session is not None}, WalletSession={WalletSession is not None}")
-        return False
-    
-    try:
-        # Convert timestamps (ms to datetime)
-        unlocked_dt = datetime.fromtimestamp(unlocked_at / 1000 if unlocked_at > 10000000000 else unlocked_at)
-        expires_dt = datetime.fromtimestamp(expires_at if expires_at < 10000000000 else expires_at / 1000)
-        
-        # Upsert: update if exists, insert if not
-        existing = db_session.query(WalletSession).filter_by(wallet_id=wallet_id).first()
-        
-        if existing:
-            existing.unlocked_at = unlocked_dt
-            existing.expires_at = expires_dt
-            existing.profile_id = profile_id
-            existing.profile_name = profile_name
-            existing.device_hint = device_hint
-            existing.updated_at = datetime.utcnow()
-        else:
-            new_session = WalletSession(
-                wallet_id=wallet_id,
-                unlocked_at=unlocked_dt,
-                expires_at=expires_dt,
-                profile_id=profile_id,
-                profile_name=profile_name,
-                device_hint=device_hint
-            )
-            db_session.add(new_session)
-        
-        db_session.commit()
-        logger.info(f"Global session stored for wallet {wallet_id[:8]}...")
-        return True
-    except Exception as e:
-        logger.error(f"Failed to store global session: {e}")
-        db_session.rollback()
-        return False
-    finally:
-        db_session.close()
+    """Deprecated no-op: cross-device global session storage was removed."""
+    return False
 
 
 def _get_global_session(wallet_id: str):
-    """Get global session for a wallet_id if valid."""
-    logger.debug(f"_get_global_session called for wallet: {wallet_id[:8] if wallet_id else 'None'}...")
-    db_session, WalletSession = _get_db_session()
-    if not db_session or not WalletSession:
-        logger.error(f"_get_global_session: DB not available")
-        return None
-    
-    try:
-        session = db_session.query(WalletSession).filter_by(wallet_id=wallet_id).first()
-        
-        if not session:
-            logger.info(f"_get_global_session: No session found for {wallet_id[:8]}...")
-            return None
-        
-        # Check if expired
-        if session.expires_at < datetime.utcnow():
-            logger.info(f"_get_global_session: Session EXPIRED for {wallet_id[:8]}... (expired at {session.expires_at})")
-            return None
-        
-        logger.info(f"_get_global_session: Found VALID session for {wallet_id[:8]}... (expires {session.expires_at})")
-        return {
-            'wallet_id': session.wallet_id,
-            'unlocked_at': int(session.unlocked_at.timestamp() * 1000),
-            'expires_at': int(session.expires_at.timestamp()),
-            'profile_id': session.profile_id,
-            'profile_name': session.profile_name,
-            'device_hint': session.device_hint
-        }
-    except Exception as e:
-        logger.error(f"Failed to get global session: {e}")
-        return None
-    finally:
-        db_session.close()
+    """Deprecated no-op: cross-device global session lookup was removed."""
+    return None
 
 
 def _clear_global_session(wallet_id: str):
-    """Clear/invalidate global session for a wallet_id (called on lock)."""
-    db_session, WalletSession = _get_db_session()
-    if not db_session or not WalletSession:
-        return False
-    
-    try:
-        # Delete the session record entirely
-        deleted = db_session.query(WalletSession).filter_by(wallet_id=wallet_id).delete()
-        db_session.commit()
-        
-        if deleted:
-            logger.info(f"Global session cleared for wallet {wallet_id[:8]}...")
-        return deleted > 0
-    except Exception as e:
-        logger.error(f"Failed to clear global session: {e}")
-        db_session.rollback()
-        return False
-    finally:
-        db_session.close()
+    """Deprecated no-op: cross-device global session clearing was removed."""
+    return False
 
 
 @wallet_session_sync_bp.route('/api/wallet/global-session', methods=['POST', 'OPTIONS'])
 def check_global_session():
     """
-    Check if a wallet has an active session on ANY device.
-    
-    This enables cross-device "one passkey per day" - if user unlocked on their phone,
-    their laptop can skip the passkey prompt.
-    
-    Request body:
-        - wallet_id: The wallet identifier to check
-    
-    Returns:
-        - valid: true if wallet was unlocked within 24h on any device
-        - session: Session details if valid
-    
-    PRIVACY: Only wallet_id is required. No tracking of which device/site is checking.
+    Deprecated cross-device session check.
+
+    Cross-device "one passkey per day" sync was removed; wallet unlock is now
+    local-per-device. This endpoint is retained for backward compatibility with
+    older SDKs and always reports no active global session, so callers fall back
+    to the local unlock flow. No global wallet_id is stored or broadcast.
     """
     # Handle CORS preflight
     if request.method == 'OPTIONS':
@@ -1022,43 +906,17 @@ def check_global_session():
             return response, 403
         response.headers['Access-Control-Max-Age'] = '86400'
         return response
-    
+
     origin = request.headers.get('Origin')
     if not _origin_allowed(origin):
         return jsonify({'success': False, 'error': 'origin_not_allowed'}), 403
-    
-    data = request.get_json() or {}
-    wallet_id = data.get('wallet_id')
-    
-    if not wallet_id:
-        response = jsonify({'success': False, 'error': 'wallet_id required'})
-        response.headers.update(_cors_headers(origin))
-        return response, 400
-    
-    # Check global session
-    global_session = _get_global_session(wallet_id)
-    
-    if global_session:
-        response = jsonify({
-            'success': True,
-            'valid': True,
-            'session': {
-                'wallet_id': global_session['wallet_id'],
-                'unlocked_at': global_session['unlocked_at'],
-                'expires_at': global_session['expires_at'],
-                'time_remaining': global_session['expires_at'] - int(time.time()),
-                'profile_id': global_session['profile_id'],
-                'profile_name': global_session['profile_name'],
-                'cross_device': True  # Flag that this came from another device
-            }
-        })
-    else:
-        response = jsonify({
-            'success': True,
-            'valid': False,
-            'message': 'No active global session for this wallet'
-        })
-    
+
+    response = jsonify({
+        'success': True,
+        'valid': False,
+        'deprecated': True,
+        'message': 'Cross-device session sync removed; unlock is local-per-device'
+    })
     response.headers.update(_cors_headers(origin))
     return response
 
@@ -1166,10 +1024,10 @@ def wallet_register_signing_key():
 # ============================================================
 # PRIVACY MODEL
 # ============================================================
-# - Session (unlock status): Server cookie (stateless JWT) + DB for cross-device
+# - Session (unlock status): Server cookie (stateless JWT), local-per-device
 # - Credentials: LOCAL ONLY in each site's IndexedDB
 # - Server stores: wallet_id + timestamps ONLY (no user identity, no site visits)
-# - Cross-device sync: Opt-in, only stores that "wallet X unlocked at time Y"
+# - Cross-device sync: REMOVED (no global wallet_id stored or broadcast)
 # - Redirect auth (v2.30.0+): CLIENT-SIDE ENCRYPTION - wallet secret never touches server
 #   * SDK generates encryption key, stores locally
 #   * lemma.id client-side JS encrypts wallet data
