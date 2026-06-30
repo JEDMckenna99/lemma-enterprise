@@ -2682,6 +2682,86 @@ def wallet_sync_device():
 
 
 # ---------------------------------------------------------------------------
+# 8a-i. Pull-based device link — receiver shows QR, phone scans & sends
+# ---------------------------------------------------------------------------
+
+_LINK_RECEIVE_TTL_SECONDS = 300
+
+
+def _link_receive_key(transfer_id: str) -> str:
+    return f"wallet:link-receive:{transfer_id}"
+
+
+@ishuman_bp.route("/api/wallet/link-receive", methods=["POST"])
+@cross_origin()
+def wallet_link_receive():
+    """Short-lived relay for pull-based device linking.
+
+    Receiver (PC) displays a QR encoding ``/link/send#…`` with a transient
+    X25519 public key. Sender (phone) scans with any camera app, confirms with
+    passkey, seals wallet + isHuman bundle to that key, and deposits here.
+    Receiver polls ``claim`` to open the sealed payload locally.
+
+    Body (deposit): ``{ action, wallet_id, transfer_id, recv_pubkey, bundle,
+    wallet_assertion }``
+    Body (claim):   ``{ action, transfer_id }``
+    """
+    from auth.redis_store import delete as redis_delete
+    from auth.redis_store import get as redis_get
+    from auth.redis_store import store as redis_store
+
+    body = request.get_json(silent=True) or {}
+    action = (body.get("action") or "").strip().lower()
+
+    if action == "deposit":
+        wallet_id = (body.get("wallet_id") or "").strip()
+        transfer_id = (body.get("transfer_id") or "").strip()
+        recv_pubkey = (body.get("recv_pubkey") or "").strip()
+        if not wallet_id or not transfer_id or not recv_pubkey:
+            return jsonify({"success": False, "error": "missing_transfer_fields"}), 400
+        if len(transfer_id) < 16:
+            return jsonify({"success": False, "error": "weak_transfer_id"}), 400
+
+        err, _wid = _require_wallet_assertion(
+            body, field_names=["transfer_id", "recv_pubkey"]
+        )
+        if err:
+            return err
+
+        bundle = body.get("bundle")
+        if not isinstance(bundle, dict) or not bundle.get("sealed_link_payload"):
+            return jsonify({"success": False, "error": "bundle_required"}), 400
+
+        redis_store(
+            _link_receive_key(transfer_id),
+            {
+                "wallet_id": wallet_id,
+                "recv_pubkey": recv_pubkey,
+                "bundle": bundle,
+            },
+            ttl_seconds=_LINK_RECEIVE_TTL_SECONDS,
+        )
+        return jsonify({"success": True, "expires_in": _LINK_RECEIVE_TTL_SECONDS})
+
+    if action == "claim":
+        transfer_id = (body.get("transfer_id") or "").strip()
+        if not transfer_id:
+            return jsonify({"success": False, "error": "transfer_id required"}), 400
+        entry = redis_get(_link_receive_key(transfer_id))
+        if not entry:
+            return jsonify({"success": False, "error": "transfer_not_found"}), 404
+        if not redis_delete(_link_receive_key(transfer_id)):
+            return jsonify({"success": False, "error": "transfer_already_claimed"}), 409
+        return jsonify({
+            "success": True,
+            "wallet_id": entry.get("wallet_id"),
+            "bundle": entry.get("bundle"),
+        })
+
+    return jsonify({"success": False, "error": "unknown_action"}), 400
+
+
+# ---------------------------------------------------------------------------
 # 8a-ii. Silent mobile wallet handoff during Didit IDV return
 # ---------------------------------------------------------------------------
 

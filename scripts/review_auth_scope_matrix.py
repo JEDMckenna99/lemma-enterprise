@@ -145,6 +145,7 @@ IN_HANDLER_AUTH_ALLOWLIST = {
     "/api/wallet/firewall/runtimes/<runtime_id>/authorize",
     "/api/wallet/register-signing-key",
     "/api/wallet/sync-device",
+    "/api/wallet/link-receive",
     "/api/webhooks/didit-identity",
     "/api/webhooks/stripe-billing",
 }

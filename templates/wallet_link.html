@@ -115,6 +115,20 @@
     margin-top: 16px;
 }
 .security-note strong { display: block; margin-bottom: 4px; }
+
+.mode-tabs { display: flex; gap: 8px; margin-bottom: 20px; }
+.mode-tab {
+    flex: 1; padding: 10px 12px; border: 1px solid #e5e7eb; border-radius: 10px;
+    background: #f9fafb; font-weight: 600; cursor: pointer; font-size: 0.9rem;
+}
+.mode-tab.active { background: #667eea; color: #fff; border-color: #667eea; }
+
+.qr-box {
+    display: flex; justify-content: center; margin: 16px 0;
+    padding: 16px; background: #fff; border: 1px solid #e5e7eb; border-radius: 12px;
+}
+.qr-timer { text-align: center; color: #6b7280; font-size: 0.9rem; margin-top: 8px; }
+.qr-timer.expiring { color: #dc2626; font-weight: 600; }
 </style>
 {% endblock %}
 
@@ -125,6 +139,43 @@
         <p>Connect this device to your Lemma ID</p>
     </header>
 
+    <!-- Mode tabs -->
+    <div class="mode-tabs">
+        <button type="button" class="mode-tab active" id="mode-pull">Scan with phone</button>
+        <button type="button" class="mode-tab" id="mode-push">Import code</button>
+    </div>
+
+    <!-- PULL: receiver shows QR, phone camera sends -->
+    <div id="pull-content">
+        <div class="card">
+            <h2 style="margin: 0 0 12px; font-size: 1.1rem;">Receive on this device</h2>
+            <p style="color: #6b7280; margin: 0 0 16px; font-size: 0.95rem;">
+                Show this QR on your computer or tablet. On your phone, open any QR scanner
+                (Camera app) and scan it — no lemma.id scanner needed.
+            </p>
+            <button type="button" class="btn btn-primary" id="show-receive-qr-btn">Show QR Code</button>
+            <div id="receive-qr-display" class="hidden">
+                <div class="qr-box"><div id="receive-qr-container"></div></div>
+                <div id="receive-qr-timer" class="qr-timer">Expires in 5:00</div>
+                <div id="receive-wait-status" class="status-box info" style="margin-top: 16px;">
+                    Waiting for your phone to send lemma.id...
+                </div>
+                <div id="pull-complete-actions" class="hidden" style="margin-top: 16px;">
+                    <button type="button" class="btn btn-primary" onclick="window.location.href='/app'">
+                        Go to lemma.id
+                    </button>
+                </div>
+            </div>
+        </div>
+        <div class="security-note">
+            <strong>How it works</strong>
+            Your phone opens a confirm page after scanning. Wallet data is encrypted to this
+            device only — lemma.id never sees your secret.
+        </div>
+    </div>
+
+    <!-- PUSH: import code from other device's send QR -->
+    <div id="push-content" class="hidden">
     <!-- Step Indicator -->
     <div class="step-indicator">
         <div class="step active" id="step1">1</div>
@@ -182,11 +233,156 @@
             </p>
         </div>
     </div>
+    </div><!-- /push-content -->
 </div>
 
+<script src="/static/js/qrcode.min.js" nonce="{{ csp_nonce }}"></script>
 <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js" nonce="{{ csp_nonce }}"></script>
 <script nonce="{{ csp_nonce }}">
 let wallet = null;
+let receiveQrTimer = null;
+let receivePollAbort = false;
+
+function setLinkMode(mode) {
+    const pull = mode === 'pull';
+    document.getElementById('mode-pull').classList.toggle('active', pull);
+    document.getElementById('mode-push').classList.toggle('active', !pull);
+    document.getElementById('pull-content').classList.toggle('hidden', !pull);
+    document.getElementById('push-content').classList.toggle('hidden', pull);
+    if (!pull) hideReceiveQr();
+}
+
+function hideReceiveQr() {
+    receivePollAbort = true;
+    if (receiveQrTimer) clearInterval(receiveQrTimer);
+    document.getElementById('receive-qr-display')?.classList.add('hidden');
+    document.getElementById('show-receive-qr-btn')?.classList.remove('hidden');
+}
+
+async function showReceiveQr() {
+    try {
+        await initWallet();
+        receivePollAbort = false;
+        const result = await wallet.beginLinkReceive();
+
+        const container = document.getElementById('receive-qr-container');
+        container.innerHTML = '';
+        if (typeof QRCode !== 'undefined') {
+            new QRCode(container, {
+                text: result.qrUrl,
+                width: 220,
+                height: 220,
+                correctLevel: QRCode.CorrectLevel ? QRCode.CorrectLevel.M : 0,
+            });
+        } else {
+            container.innerHTML = '<p style="color:#dc2626">QR library not loaded</p>';
+        }
+
+        document.getElementById('receive-qr-display').classList.remove('hidden');
+        document.getElementById('show-receive-qr-btn').classList.add('hidden');
+        document.getElementById('receive-wait-status').textContent =
+            'Waiting for your phone to send lemma.id...';
+        document.getElementById('receive-wait-status').className = 'status-box info';
+
+        let timeLeft = result.expiresIn || 300;
+        const timerEl = document.getElementById('receive-qr-timer');
+        const formatTime = (s) => {
+            const m = Math.floor(s / 60);
+            const sec = s % 60;
+            return m > 0 ? `${m}:${String(sec).padStart(2, '0')}` : `${sec}s`;
+        };
+        if (receiveQrTimer) clearInterval(receiveQrTimer);
+        timerEl.textContent = `Expires in ${formatTime(timeLeft)}`;
+        receiveQrTimer = setInterval(() => {
+            timeLeft--;
+            timerEl.textContent = `Expires in ${formatTime(timeLeft)}`;
+            timerEl.classList.toggle('expiring', timeLeft <= 30);
+            if (timeLeft <= 0) hideReceiveQr();
+        }, 1000);
+
+        pollForPullTransfer(result.transferId);
+    } catch (e) {
+        console.error('Receive QR failed:', e);
+        alert('Could not start receive: ' + (e.message || e));
+    }
+}
+
+async function pollForPullTransfer(transferId) {
+    const waitEl = document.getElementById('receive-wait-status');
+    try {
+        while (!receivePollAbort) {
+            const result = await wallet.tryClaimLinkReceive(transferId);
+            if (result.ready) {
+                receivePollAbort = true;
+                if (receiveQrTimer) clearInterval(receiveQrTimer);
+                await finishLinkSuccess(result, waitEl);
+                return;
+            }
+            await new Promise(r => setTimeout(r, 2000));
+        }
+    } catch (e) {
+        if (!receivePollAbort) {
+            waitEl.textContent = e.message || 'Transfer failed';
+            waitEl.className = 'status-box error';
+        }
+    }
+}
+
+async function finishLinkSuccess(result, statusEl) {
+    const isPull = document.getElementById('push-content').classList.contains('hidden');
+
+    if (isPull) {
+        receivePollAbort = true;
+        if (receiveQrTimer) clearInterval(receiveQrTimer);
+        const waitEl = statusEl || document.getElementById('receive-wait-status');
+        waitEl.innerHTML = '<strong>Device Added!</strong><br><br>' +
+            (result.humanProofRestored
+                ? 'Your Lemma ID and human proof are ready on this device.'
+                : 'Your Lemma ID is now on this device.') +
+            '<br><br><span id="passkey-status">Creating passkey...</span>';
+        waitEl.className = 'status-box success';
+        try {
+            await wallet.registerPasskey();
+            if (typeof wallet.fetchAndStoreSeedEnvelopes === 'function') {
+                try { await wallet.fetchAndStoreSeedEnvelopes(); } catch (_) {}
+            }
+            const passkeyEl = document.getElementById('passkey-status');
+            if (passkeyEl) passkeyEl.textContent = 'Passkey created — you can sign in with biometrics.';
+        } catch (passkeyErr) {
+            console.warn('Passkey after pull receive:', passkeyErr);
+            const passkeyEl = document.getElementById('passkey-status');
+            if (passkeyEl) passkeyEl.textContent = 'Add a passkey from wallet settings for faster sign-in.';
+        }
+        document.getElementById('pull-complete-actions')?.classList.remove('hidden');
+        return;
+    }
+
+    setStep(2);
+    document.getElementById('step1-content')?.classList.add('hidden');
+    document.getElementById('step2-content')?.classList.remove('hidden');
+    const linkStatus = statusEl || document.getElementById('link-status');
+    linkStatus.innerHTML = '<strong style="font-size: 1.2rem;">Device Added!</strong><br><br>' +
+        (result.humanProofRestored
+            ? 'Your Lemma ID and human proof are now on this device.'
+            : 'Your Lemma ID is now available on this device.') +
+        '<br><br><span id="passkey-status">Creating passkey for this device...</span>';
+    linkStatus.className = 'status-box success';
+    try {
+        await wallet.registerPasskey();
+        if (typeof wallet.fetchAndStoreSeedEnvelopes === 'function') {
+            try { await wallet.fetchAndStoreSeedEnvelopes(); } catch (_) {}
+        }
+        const passkeyEl = document.getElementById('passkey-status');
+        if (passkeyEl) passkeyEl.textContent = 'Passkey created — you can sign in with biometrics on this device.';
+    } catch (passkeyErr) {
+        console.warn('Passkey after pull receive:', passkeyErr);
+        const passkeyEl = document.getElementById('passkey-status');
+        if (passkeyEl) passkeyEl.textContent = 'Add a passkey from your wallet settings for faster sign-in.';
+    }
+    document.getElementById('step2')?.classList && (document.getElementById('step2').className = 'step completed');
+    document.getElementById('step2') && (document.getElementById('step2').textContent = '✓');
+    document.getElementById('complete-actions')?.classList.remove('hidden');
+}
 
 async function initWallet() {
     if (wallet) return wallet;
@@ -294,33 +490,7 @@ async function processLinkCode(qrData, replaceExisting = false) {
         }
 
         if (result.success) {
-            linkStatus.innerHTML = '<strong style="font-size: 1.2rem;">Device Added!</strong><br><br>' +
-                (result.humanProofRestored
-                    ? 'Your Lemma ID and human proof are now on this device.'
-                    : 'Your Lemma ID is now available on this device.') +
-                '<br><br><span id="passkey-status">Creating passkey for this device...</span>';
-            linkStatus.className = 'status-box success';
-
-            try {
-                await wallet.registerPasskey();
-                if (typeof wallet.fetchAndStoreSeedEnvelopes === 'function') {
-                    try { await wallet.fetchAndStoreSeedEnvelopes(); } catch (_) {}
-                }
-                const passkeyEl = document.getElementById('passkey-status');
-                if (passkeyEl) {
-                    passkeyEl.textContent = 'Passkey created — you can sign in with biometrics on this device.';
-                }
-            } catch (passkeyErr) {
-                console.warn('Passkey registration after link:', passkeyErr);
-                const passkeyEl = document.getElementById('passkey-status');
-                if (passkeyEl) {
-                    passkeyEl.textContent = 'Add a passkey from your wallet settings for faster sign-in.';
-                }
-            }
-            
-            document.getElementById('step2').className = 'step completed';
-            document.getElementById('step2').textContent = '✓';
-            document.getElementById('complete-actions').classList.remove('hidden');
+            await finishLinkSuccess(result, linkStatus);
         } else {
             throw new Error(result.message || 'Link failed');
         }
@@ -380,6 +550,10 @@ function keepExistingWallet() {
 
 // Initialize
 document.addEventListener('DOMContentLoaded', async () => {
+    document.getElementById('mode-pull').addEventListener('click', () => setLinkMode('pull'));
+    document.getElementById('mode-push').addEventListener('click', () => setLinkMode('push'));
+    document.getElementById('show-receive-qr-btn').addEventListener('click', showReceiveQr);
+
     try {
         await initWallet();
         
@@ -396,29 +570,23 @@ document.addEventListener('DOMContentLoaded', async () => {
             document.getElementById('status').className = 'status-box info';
         }
         
-        // Check for link code in URL hash (from QR scan or pasted link)
-        // URL format: https://lemma.id/link#BASE64_ENCODED_JSON
+        // Legacy push link in URL hash (v1 send-from-other-device)
         if (window.location.hash && window.location.hash.length > 1) {
-            let hashData = window.location.hash.substring(1); // Remove the #
+            let hashData = window.location.hash.substring(1);
             try {
-                // Convert URL-safe base64 back to standard base64
-                // Replace - with +, _ with /, and add padding if needed
                 hashData = hashData.replace(/-/g, '+').replace(/_/g, '/');
                 while (hashData.length % 4) hashData += '=';
-                
-                // Decode base64 to get the JSON
                 const qrData = atob(hashData);
-                // Validate it's valid JSON
-                JSON.parse(qrData);
-                
-                console.log('Found link code in URL hash - auto-processing...');
-                document.getElementById('status').innerHTML = 'Link code detected from QR scan! Processing...';
-                document.getElementById('status').className = 'status-box success';
-                
-                // Auto-process the link code
-                setTimeout(() => processLinkCode(qrData), 500);
+                const parsed = JSON.parse(qrData);
+                if (parsed.v === 1 && parsed.k && parsed.p) {
+                    setLinkMode('push');
+                    console.log('Found push link code in URL hash - auto-processing...');
+                    document.getElementById('status').innerHTML = 'Link code detected from QR scan! Processing...';
+                    document.getElementById('status').className = 'status-box success';
+                    setTimeout(() => processLinkCode(qrData), 500);
+                }
             } catch (e) {
-                console.log('Invalid hash data, ignoring:', e.message);
+                console.log('Hash not a push link code, ignoring:', e.message);
             }
         }
     } catch (e) {

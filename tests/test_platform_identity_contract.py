@@ -65,7 +65,7 @@ def test_wallet_skips_empty_site_before_canonicalization(wallet_js_source):
 
 @pytest.mark.unit
 def test_wallet_version_bumped_for_platform_identity(wallet_js_source):
-    assert "static VERSION = '2.72.0'" in wallet_js_source
+    assert "static VERSION = '2.73.0'" in wallet_js_source
 
 
 @pytest.mark.unit
@@ -137,7 +137,7 @@ def test_sdk_cache_bust_bumped_in_templates():
         "templates/recover_complete.html",
     ):
         text = (ROOT / rel).read_text(encoding="utf-8")
-        assert "lemma-wallet.js" in text and "v=2672" in text, rel
+        assert "lemma-wallet.js" in text and "v=2673" in text, rel
 
 
 def _encode_credential(credential: dict) -> str:
@@ -202,4 +202,6 @@ def test_device_link_bundles_ishuman_credentials_and_unlock_token(wallet_js_sour
     assert "ishumanCredentials" in wallet_js_source
     assert "link-unlock-token" in wallet_js_source
     assert "humanProofRestored" in wallet_js_source
-    assert "2.72.0" in wallet_js_source
+    assert "beginLinkReceive" in wallet_js_source
+    assert "sendLinkDepositFromScan" in wallet_js_source
+    assert "2.73.0" in wallet_js_source

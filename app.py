@@ -741,6 +741,16 @@ def create_app():
             'Expires': '0'
         }
 
+    @app.route('/link/send')
+    def link_send():
+        """Phone opens this after scanning receive QR with native camera."""
+        logger.info("📤 Serving link send page (pull transfer)")
+        return render_template('wallet_link_send.html'), 200, {
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            'Pragma': 'no-cache',
+            'Expires': '0'
+        }
+
     @app.route('/wallet/link')
     def wallet_link():
         """Legacy redirect: /wallet/link -> /link"""

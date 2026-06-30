@@ -91,7 +91,7 @@ const AUTH_STATE = {
 class LemmaWallet {
     // SDK version - check with LemmaWallet.VERSION
     // v2.32.0: Redirect-only architecture - removed popup flow for simpler, consistent UX
-    static VERSION = '2.72.0';  // v2.72: device link carries isHuman credentials + link unlock token
+    static VERSION = '2.73.0';  // v2.73: pull-based device link — phone camera scans PC QR
 
     static DEVICE_IDB_NAMES = ['LemmaWallet', 'LemmaWalletWrap'];
 
@@ -2555,6 +2555,203 @@ class LemmaWallet {
             walletId: data.wallet_id,
             masterCredentialId: bundle.master_credential_id || null,
         };
+    }
+
+    // ========================================
+    // Pull-based device link — receiver QR, phone camera sends
+    // ========================================
+
+    _parsePullTransferPayload(raw) {
+        let data = String(raw || '').trim();
+        if (!data) throw new Error('Invalid receive QR');
+        if (/^https?:\/\//i.test(data)) {
+            try {
+                const url = new URL(data);
+                if (url.hash && url.hash.length > 1) {
+                    data = url.hash.substring(1);
+                } else if (url.pathname.includes('/link/send')) {
+                    throw new Error('Receive QR missing transfer data');
+                }
+            } catch (e) {
+                if (e.message.includes('Receive QR')) throw e;
+            }
+        }
+        if (data[0] !== '{') {
+            let base64 = data.replace(/-/g, '+').replace(/_/g, '/');
+            while (base64.length % 4) base64 += '=';
+            data = atob(base64);
+        }
+        const parsed = JSON.parse(data);
+        if (parsed.v !== 2 || parsed.mode !== 'pull' || !parsed.transfer_id || !parsed.recv_pubkey) {
+            throw new Error('Invalid receive QR — scan the code shown on the device you are adding');
+        }
+        return parsed;
+    }
+
+    /**
+     * RECEIVER: show QR on this device; phone scans with native camera app.
+     */
+    async beginLinkReceive() {
+        const keys = this._getLemmaKeys();
+        const { privateKey, publicKey } = await keys.generateEncryptionKeypair();
+        const idBytes = crypto.getRandomValues(new Uint8Array(24));
+        const transferId = 'linkrecv_' + keys.base64urlEncode(idBytes);
+        this._pendingLinkReceive = { transferId, privateKey, startedAt: Date.now() };
+        const payload = {
+            v: 2,
+            mode: 'pull',
+            transfer_id: transferId,
+            recv_pubkey: keys.base64urlEncode(publicKey),
+        };
+        const payloadB64 = btoa(JSON.stringify(payload))
+            .replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+        const origin = (typeof window !== 'undefined' && window.location?.origin)
+            ? window.location.origin
+            : 'https://lemma.id';
+        const qrUrl = `${origin}/link/send#${payloadB64}`;
+        const LINK_TTL_SEC = 300;
+        return {
+            transferId,
+            qrUrl,
+            qrPayload: JSON.stringify(payload),
+            expiresIn: LINK_TTL_SEC,
+            expiresAt: Date.now() + LINK_TTL_SEC * 1000,
+        };
+    }
+
+    /**
+     * RECEIVER: try to claim a deposited pull transfer (404 = not ready yet).
+     */
+    async tryClaimLinkReceive(transferId) {
+        const pending = this._pendingLinkReceive;
+        const id = transferId || pending?.transferId;
+        if (!id || !pending?.privateKey || pending.transferId !== id) {
+            throw new Error('No active receive session — show a new QR code');
+        }
+        const res = await fetch('/api/wallet/link-receive', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ action: 'claim', transfer_id: id }),
+        });
+        if (res.status === 404) {
+            return { ready: false };
+        }
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            throw new Error(err.error || `link receive claim failed (${res.status})`);
+        }
+        const data = await res.json();
+        const sealedB64 = data.bundle?.sealed_link_payload;
+        if (!sealedB64) throw new Error('Invalid transfer bundle');
+        const keys = this._getLemmaKeys();
+        const opened = await keys.openSealedEnvelope(
+            pending.privateKey,
+            keys.base64urlDecode(sealedB64),
+        );
+        const payload = JSON.parse(new TextDecoder().decode(opened));
+        this._pendingLinkReceive = null;
+        const result = await this._completeLinkFromPayload(payload);
+        return { ...result, ready: true };
+    }
+
+    /**
+     * RECEIVER: poll until phone sends or timeout.
+     */
+    async pollLinkReceive({ transferId, timeoutMs = 300000, intervalMs = 2000 } = {}) {
+        const deadline = Date.now() + timeoutMs;
+        while (Date.now() < deadline) {
+            const result = await this.tryClaimLinkReceive(transferId);
+            if (result.ready) return result;
+            await new Promise((resolve) => setTimeout(resolve, intervalMs));
+        }
+        throw new Error('Timed out waiting for your phone. Scan the QR again with your camera app.');
+    }
+
+    /**
+     * SENDER: phone opened /link/send after scanning receiver QR — deposit wallet.
+     */
+    async sendLinkDepositFromScan(scanInput) {
+        await this.init();
+        const parsed = this._parsePullTransferPayload(scanInput);
+
+        await this._requireFreshPasskeyAuth({
+            reason: 'Send your lemma.id to your other device',
+        });
+
+        const profile = await this.getActiveProfile();
+        if (!profile?.secret) throw new Error('No wallet found on this device');
+
+        const walletIdRec = await this._get('passkey', 'walletId');
+        const walletId = walletIdRec?.value || this.session?.walletId || null;
+
+        let unlockToken = null;
+        if (this._isLemmaDomain()) {
+            try {
+                const tokenRes = await fetch('/api/wallet/link-unlock-token', {
+                    method: 'POST',
+                    credentials: 'include',
+                    headers: { 'Content-Type': 'application/json' },
+                });
+                if (tokenRes.ok) {
+                    const tokenData = await tokenRes.json();
+                    unlockToken = tokenData.unlock_token || null;
+                }
+            } catch (e) {
+                console.warn('[Lemma] link-unlock-token unavailable for pull send:', e.message);
+            }
+        }
+
+        let ishumanCredentials = [];
+        try {
+            await this.syncIsHumanCacheFromWallet();
+            ishumanCredentials = await this.exportIsHumanCredentialsForBridge();
+        } catch (e) {
+            console.warn('[Lemma] Could not export isHuman credentials for pull send:', e.message);
+        }
+
+        const LINK_TTL_MS = 300000;
+        const inner = {
+            walletSecret: profile.secret,
+            walletId,
+            profileId: profile.id,
+            profileName: profile.name,
+            createdAt: Date.now(),
+            expiresAt: Date.now() + LINK_TTL_MS,
+            unlockToken,
+            ishumanCredentials,
+        };
+
+        const keys = this._getLemmaKeys();
+        const recipientPub = keys.base64urlDecode(parsed.recv_pubkey);
+        const sealed = await keys.sealEnvelope(
+            recipientPub,
+            new TextEncoder().encode(JSON.stringify(inner)),
+        );
+
+        const body = {
+            action: 'deposit',
+            wallet_id: walletId,
+            transfer_id: parsed.transfer_id,
+            recv_pubkey: parsed.recv_pubkey,
+            bundle: { sealed_link_payload: keys.base64urlEncode(sealed) },
+        };
+        body.wallet_assertion = await this.buildWalletAssertion(
+            ['transfer_id', 'recv_pubkey'],
+            { transfer_id: parsed.transfer_id, recv_pubkey: parsed.recv_pubkey },
+        );
+
+        const res = await fetch('/api/wallet/link-receive', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify(body),
+        });
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            throw new Error(err.error || `link send failed (${res.status})`);
+        }
+        return { success: true, transferId: parsed.transfer_id };
     }
 
     // ========================================
@@ -7180,21 +7377,24 @@ class LemmaWallet {
     async linkDevice(options) {
         await this.init();
         
-        // First, decrypt the payload to see what wallet we're linking
         let payload;
-        
         if (options.qrData) {
-            // Full QR code data
             const normalizedQrData = this._normalizeLinkInput(options.qrData);
             payload = await this._decryptLinkQR(normalizedQrData);
         } else if (options.shortCode) {
-            // Short code - need to look up from bridge or prompt QR scan
             throw new Error('Short code linking requires scanning QR on the source device. Please use QR scan.');
         } else {
             throw new Error('Either qrData or shortCode required');
         }
-        
-        // Validate payload
+
+        return this._completeLinkFromPayload(payload);
+    }
+
+    /**
+     * Shared finish path for push link codes and pull receive deposits.
+     * @private
+     */
+    async _completeLinkFromPayload(payload) {
         if (!payload.walletSecret) {
             throw new Error('Invalid link code - no wallet secret');
         }
@@ -7203,12 +7403,10 @@ class LemmaWallet {
             throw new Error('Link code expired. Please generate a new one on your other device.');
         }
         
-        // Check for existing wallet
         const existingSecret = await this._get('secrets', 'master');
         const existingWalletId = await this._get('passkey', 'walletId');
         
         if (existingSecret?.secret) {
-            // Same wallet - already linked
             if (existingSecret.secret === payload.walletSecret) {
                 console.log('[Lemma]  Wallet already linked to this device');
                 return {
@@ -7219,18 +7417,13 @@ class LemmaWallet {
                 };
             }
             
-            // Different wallet - auto-replace with backup (simplest UX)
-            // User can recover old wallet from backup if needed
             console.log('[Lemma]  Replacing existing wallet (backed up for recovery)');
             console.log('[Lemma]    Old wallet:', existingWalletId?.value?.substring(0, 16) + '...');
             console.log('[Lemma]    New wallet:', payload.walletId?.substring(0, 16) + '...');
-            
-            // Backup before clearing (stored in localStorage)
-                await this._backupWalletData();
-                await this._clearWalletData();
+            await this._backupWalletData();
+            await this._clearWalletData();
         }
         
-        // Create or update profile with the linked wallet secret
         const profileId = payload.profileId || DEFAULT_PROFILE_ID;
         const profileName = payload.profileName || 'Personal';
 
@@ -7309,9 +7502,6 @@ class LemmaWallet {
             }
         }
 
-        // Check if there's a valid global session (source device might have unlocked)
-        // This handles the case where the QR was scanned after the unlock token expired
-        // but the source device still has a valid session
         if (!serverSessionSet && payload.walletId) {
             console.log('[Lemma] Trying global session fallback...');
             try {
@@ -7319,10 +7509,6 @@ class LemmaWallet {
 
                 if (globalSession?.valid && globalSession?.session) {
                     console.log('[Lemma]  Global session found! Wallet was unlocked on another device.');
-
-                    // We have a valid global session - set local session state
-                    // The user will still need to create a passkey on this device,
-                    // but they can use the wallet immediately
                     this.session = {
                         isUnlocked: true,
                         unlockedAt: globalSession.session.unlocked_at,
@@ -7332,10 +7518,7 @@ class LemmaWallet {
                         source: 'global_session'
                     };
                     await this._put('session', { id: 'current', ...this.session });
-
-                    // Note: serverSessionSet stays false because we don't have a cookie on this device
-                    // The user will need to create a passkey to get their own session cookie
-                    sessionError = null; // Clear error - we found a workaround
+                    sessionError = null;
                     console.log('[Lemma] Local session set from global session. User should create passkey for full cross-site auth.');
                 } else {
                     console.log('[Lemma] No valid global session found.');
@@ -7357,23 +7540,17 @@ class LemmaWallet {
         
         console.log(`[Lemma] Device linked successfully with profile: ${profileName}`);
         
-        // Fall back to server role restore only when isHuman proof was not bundled in the link.
         let platformCredentialIssued = false;
         if (!humanProofRestored) {
             try {
                 console.log('[Lemma] Restoring lemma.id role credential for linked device...');
-                
                 const ppid = await this.derivePPID('lemma.id');
                 const issueResponse = await fetch(`${window.location?.origin || 'https://lemma.id'}/api/wallet-auth/restore-site-access`, {
                     method: 'POST',
                     credentials: 'include',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        ppid: ppid,
-                        site_id: 'lemma.id'
-                    })
+                    body: JSON.stringify({ ppid, site_id: 'lemma.id' })
                 });
-                
                 if (issueResponse.ok) {
                     const issueData = await issueResponse.json();
                     if (issueData.success && issueData.permission_lemma) {

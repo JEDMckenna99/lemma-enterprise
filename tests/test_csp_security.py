@@ -109,6 +109,7 @@ def test_csp_includes_report_uri():
     ("/wallet/popup", "unlock_idv"),
     ("/wallet/ishuman-idv", "unlock_idv"),
     ("/link", "link_qr"),
+    ("/link/send", "link_qr"),
     ("/wallet/link", "link_qr"),
 ])
 def test_resolve_csp_profile_for_routes(path, expected):
