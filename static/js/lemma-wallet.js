@@ -92,6 +92,124 @@ class LemmaWallet {
     // SDK version - check with LemmaWallet.VERSION
     // v2.32.0: Redirect-only architecture - removed popup flow for simpler, consistent UX
     static VERSION = '2.71.0';  // v2.71: isHuman browser-signature verify + unified popup unlock
+
+    static DEVICE_IDB_NAMES = ['LemmaWallet', 'LemmaWalletWrap'];
+
+    static LEMMA_STORAGE_PREFIXES = ['lemma_', 'ishuman_', '__lemma_'];
+
+    static LEMMA_STORAGE_EXACT_KEYS = [
+        'lemma_ishuman_lock:v1',
+        'lemma_session_hours',
+        'lemma_redirect_state',
+        'lemma_log_level',
+        'lemma_wallet_backups',
+        'lemma_allow_sensitive_local_backup',
+        'lemma_had_global_session',
+        'lemma_debug_auth',
+        'ishuman_idv_popup_session_id',
+        'ishuman_master_provisioned_v1',
+        'ishuman_bloom',
+        'ishuman_trust_list',
+        'lemma_register_pending_v1',
+        'lemma_register_result_v1',
+        'lemma_register_error_v1',
+    ];
+
+    static async deleteIndexedDbDatabase(dbName) {
+        return new Promise((resolve, reject) => {
+            const req = indexedDB.deleteDatabase(dbName);
+            req.onsuccess = () => resolve(true);
+            req.onerror = () => reject(req.error || new Error(`delete_failed:${dbName}`));
+            req.onblocked = () => reject(new Error(
+                'Wallet removal is blocked by another lemma.id tab. Close the other tab and try again.',
+            ));
+        });
+    }
+
+    static _resetWalletInstance(instance) {
+        if (!instance) return;
+        try { instance.stopSessionHeartbeat?.(); } catch (_) {}
+        try { instance.lock?.(); } catch (_) {}
+        try { instance.db?.close?.(); } catch (_) {}
+        instance.db = null;
+        instance._initialized = false;
+        instance._verifiedSignatures?.clear?.();
+        instance.session = {
+            isUnlocked: false,
+            unlockedAt: null,
+            expiresAt: null,
+            walletSecret: null,
+        };
+        instance._walletSigningKey = null;
+        instance._signingKeyRegistered = false;
+        instance._atRestKey = null;
+        instance._atRestKeyReady = false;
+        instance._atRestKeyRaw = null;
+    }
+
+    static async purgeAllDeviceData(options = {}) {
+        const instances = Array.isArray(options.instances) ? options.instances : [];
+        for (const instance of instances) {
+            LemmaWallet._resetWalletInstance(instance);
+        }
+
+        const dbNames = new Set(LemmaWallet.DEVICE_IDB_NAMES);
+        if (typeof indexedDB.databases === 'function') {
+            try {
+                const discovered = await indexedDB.databases();
+                for (const db of discovered) {
+                    const name = String(db?.name || '');
+                    if (/^Lemma/i.test(name)) {
+                        dbNames.add(name);
+                    }
+                }
+            } catch (_) {}
+        }
+
+        for (const dbName of dbNames) {
+            await LemmaWallet.deleteIndexedDbDatabase(dbName);
+        }
+
+        try {
+            const keysToRemove = new Set(LemmaWallet.LEMMA_STORAGE_EXACT_KEYS);
+            for (let i = 0; i < localStorage.length; i += 1) {
+                const key = localStorage.key(i);
+                if (!key) continue;
+                if (LemmaWallet.LEMMA_STORAGE_PREFIXES.some((prefix) => key.startsWith(prefix))) {
+                    keysToRemove.add(key);
+                }
+            }
+            keysToRemove.forEach((key) => localStorage.removeItem(key));
+        } catch (_) {}
+
+        try {
+            const sessionKeys = [];
+            for (let i = 0; i < sessionStorage.length; i += 1) {
+                const key = sessionStorage.key(i);
+                if (!key) continue;
+                if (LemmaWallet.LEMMA_STORAGE_PREFIXES.some((prefix) => key.startsWith(prefix))) {
+                    sessionKeys.push(key);
+                }
+            }
+            sessionKeys.forEach((key) => sessionStorage.removeItem(key));
+        } catch (_) {}
+
+        if (options.clearServiceWorker !== false && typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
+            try {
+                const registrations = await navigator.serviceWorker.getRegistrations();
+                await Promise.all(registrations.map((registration) => registration.unregister()));
+            } catch (_) {}
+        }
+
+        if (options.clearCaches !== false && typeof window !== 'undefined' && window.caches) {
+            try {
+                const cacheNames = await window.caches.keys();
+                await Promise.all(cacheNames.map((name) => window.caches.delete(name)));
+            } catch (_) {}
+        }
+
+        return { success: true, clearedDatabases: [...dbNames] };
+    }
     
     constructor(options = {}) {
         this.db = null;

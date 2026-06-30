@@ -21,6 +21,19 @@
     </header>
 
     <!-- STATUS -->
+    <div id="removed-notice" class="card hidden" style="border-left: 4px solid #4f46e5; margin-bottom: 16px;">
+        <p style="margin: 0 0 12px; color: #1e293b; font-size: 0.95rem; line-height: 1.5;">
+            <strong>lemma.id was removed from this device.</strong>
+            Your passkey may still be saved in your device settings — you do not need a new one unless you want a full security reset.
+        </p>
+        <button id="return-passkey-btn" class="btn btn-primary btn-full" type="button">
+            Open with my passkey
+        </button>
+        <p style="margin: 12px 0 0; color: #64748b; font-size: 0.85rem; line-height: 1.45;">
+            If you already verified, we'll try to restore your proof after unlock. Otherwise use <strong>Create my lemma.id</strong> or <strong>Add this device</strong>.
+        </p>
+    </div>
+
     <div id="wallet-status" class="wallet-status status-locked">
         <div class="status-icon">🔒</div>
         <div class="status-info">
@@ -131,7 +144,7 @@
                 Remove lemma.id
             </button>
             <p class="card-help">
-                Removes lemma.id from this device only. You can add it back from another device.
+                Clears wallet data, human proofs, and lemma.id storage on this device. Your OS passkey is not deleted — you can use it again when you return.
             </p>
         </div>
     </div>
@@ -556,6 +569,76 @@ function disconnectCrossDeviceSSE() {
     sseReconnectAttempts = 0;
 }
 
+function consumeRemovedQueryParam() {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('removed') !== '1') {
+        return false;
+    }
+    params.delete('removed');
+    const query = params.toString();
+    const nextUrl = `${window.location.pathname}${query ? `?${query}` : ''}${window.location.hash || ''}`;
+    window.history.replaceState({}, document.title, nextUrl);
+    return true;
+}
+
+function showRemovedDeviceNotice() {
+    const notice = document.getElementById('removed-notice');
+    if (notice) {
+        notice.classList.remove('hidden');
+    }
+    updateStatusDisplay(
+        false,
+        'Removed from this device',
+        'Use your existing passkey to open lemma.id again, or add this device from another one.',
+    );
+}
+
+async function returnWithExistingPasskey() {
+    const btn = document.getElementById('return-passkey-btn');
+    const origText = btn?.textContent || 'Open with my passkey';
+
+    try {
+        if (btn) {
+            btn.textContent = 'Opening passkey...';
+            btn.disabled = true;
+        }
+
+        await initWallet();
+        const ready = await wallet.ensureIsHumanIssuanceReady({ isHumanIssuance: true });
+        if (!ready?.ready) {
+            throw new Error('Passkey unlock did not complete. Try again or use Create my lemma.id.');
+        }
+
+        if (btn) {
+            btn.textContent = 'Restoring proof...';
+        }
+
+        await recoverMissingMasterFromServer();
+        const complete = await hasCompleteLemmaId();
+        if (complete) {
+            document.getElementById('removed-notice')?.classList.add('hidden');
+            await checkWalletState();
+            return;
+        }
+
+        updateStatusDisplay(
+            false,
+            'Passkey ready — verification needed',
+            'This device has a new local wallet. Create lemma.id again or add this device from another one.',
+        );
+        document.getElementById('no-wallet-msg')?.classList.remove('hidden');
+    } catch (err) {
+        console.error('Return with passkey failed:', err);
+        updateStatusDisplay(false, 'Could not open with passkey', err?.message || String(err));
+        document.getElementById('no-wallet-msg')?.classList.remove('hidden');
+    } finally {
+        if (btn) {
+            btn.textContent = origText;
+            btn.disabled = false;
+        }
+    }
+}
+
 // Create a complete lemma.id (passkey + isHuman proof) through the canonical
 // issuance popup. Creating only a local wallet here left users with an empty
 // shell and never started identity verification.
@@ -792,12 +875,12 @@ async function linkDevice() {
     }
 }
 
-// Clear data from this device
+// Clear all lemma.id data from this device
 async function clearWallet() {
-    if (!confirm('Remove lemma.id from this device? You can add it back later from another device.')) {
+    if (!confirm('Remove lemma.id from this device? This clears your wallet, human proof, passkey binding, and all lemma.id data stored here. You can verify again later from another device.')) {
         return;
     }
-    
+
     try {
         disconnectCrossDeviceSSE();
 
@@ -807,8 +890,6 @@ async function clearWallet() {
             walletId = info?.walletId || wallet?.session?.walletId || '';
         } catch (_) {}
 
-        // Clear the server-side/global unlock before removing the local ID.
-        // This also expires HttpOnly session cookies that JavaScript cannot.
         try {
             await fetch('/api/wallet/clear-session', {
                 method: 'POST',
@@ -820,38 +901,41 @@ async function clearWallet() {
             console.warn('Server session cleanup failed; continuing local removal:', err?.message || err);
         }
 
-        // IndexedDB deletion is blocked while any SDK instance on this page
-        // still owns a connection. The old implementation treated "blocked"
-        // as success, reloaded, and resurrected the wallet it failed to delete.
         const instances = [wallet, window.globalLemmaWallet, window.lemmaWalletInstance];
-        for (const instance of instances) {
-            try { instance?.stopSessionHeartbeat?.(); } catch (_) {}
-            try { instance?.db?.close?.(); } catch (_) {}
-            if (instance) {
-                instance.db = null;
-                instance._initialized = false;
+        if (typeof LemmaWallet?.purgeAllDeviceData === 'function') {
+            await LemmaWallet.purgeAllDeviceData({ instances });
+        } else {
+            for (const instance of instances) {
+                try { instance?.stopSessionHeartbeat?.(); } catch (_) {}
+                try { instance?.db?.close?.(); } catch (_) {}
+                if (instance) {
+                    instance.db = null;
+                    instance._initialized = false;
+                }
             }
+            await new Promise((resolve, reject) => {
+                const req = indexedDB.deleteDatabase('LemmaWallet');
+                req.onsuccess = resolve;
+                req.onerror = reject;
+                req.onblocked = () => reject(new Error(
+                    'Wallet removal is blocked by another lemma.id tab. Close the other tab and try again.',
+                ));
+            });
+            localStorage.clear();
+            sessionStorage.clear();
         }
 
-        await new Promise((resolve, reject) => {
-            const req = indexedDB.deleteDatabase('LemmaWallet');
-            req.onsuccess = resolve;
-            req.onerror = reject;
-            req.onblocked = () => reject(new Error(
-                'Wallet removal is blocked by another lemma.id tab. Close the other tab and try again.',
-            ));
-        });
-
-        localStorage.clear();
-        sessionStorage.clear();
-
-        // Best-effort cleanup for non-HttpOnly compatibility cookies.
         document.cookie = 'lemma_wallet_session=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
         document.cookie = 'lemma_wallet_csrf=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
 
         wallet = null;
-        window.location.replace('/?removed=1');
+        delete window.globalLemmaWallet;
+        delete window.lemmaWalletInstance;
+        delete window.lemmaCredential;
+        delete window.lemmaCredentialForHeader;
+        delete window.lemmaAuth;
 
+        window.location.replace('/?removed=1');
     } catch (e) {
         console.error('Clear failed:', e);
         alert('Failed to clear wallet: ' + e.message);
@@ -1264,6 +1348,10 @@ document.addEventListener('DOMContentLoaded', async () => {
         updateStatusDisplay(false, 'Signing In...', `Returning to ${new URL(redirectParams.returnUrl).origin}`);
     }
 
+    if (consumeRemovedQueryParam()) {
+        showRemovedDeviceNotice();
+    }
+
     const isUnlocked = await checkWalletState();
     if (isUnlocked) {
         await applySessionDuration({ silent: true });
@@ -1315,6 +1403,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('hide-qr-btn').addEventListener('click', hideQR);
     document.getElementById('link-device-btn').addEventListener('click', linkDevice);
     document.getElementById('clear-wallet-btn').addEventListener('click', clearWallet);
+    document.getElementById('return-passkey-btn')?.addEventListener('click', returnWithExistingPasskey);
     document.getElementById('session-duration-select').addEventListener('change', () => applySessionDuration());
 });
 </script>

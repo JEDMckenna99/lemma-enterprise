@@ -69,6 +69,14 @@ def test_lemma_wallet_master_detection_skips_empty_site_fields(wallet_js_source)
 
 
 @pytest.mark.unit
+def test_lemma_wallet_purge_clears_wrap_database(wallet_js_source):
+    assert "purgeAllDeviceData" in wallet_js_source
+    assert "LemmaWalletWrap" in wallet_js_source
+    assert "LEMMA_STORAGE_PREFIXES" in wallet_js_source
+    assert "deleteIndexedDbDatabase" in wallet_js_source
+
+
+@pytest.mark.unit
 def test_lemma_wallet_platform_site_binding_helper(wallet_js_source):
     assert "_isLemmaPlatformSiteBinding" in wallet_js_source
     assert "lemma_platform" in wallet_js_source

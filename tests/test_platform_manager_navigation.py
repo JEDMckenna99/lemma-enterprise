@@ -51,3 +51,7 @@ def test_brand_and_manager_creation_use_canonical_routes():
     assert "instance?.db?.close?.()" in manager
     assert "localStorage.clear()" in manager
     assert "window.location.replace('/?removed=1')" in manager
+    assert "LemmaWallet.purgeAllDeviceData" in manager
+    assert "returnWithExistingPasskey" in manager
+    assert "removed-notice" in manager
+    assert "LemmaWalletWrap" in manager or "purgeAllDeviceData" in (ROOT / "static" / "js" / "lemma-wallet.js").read_text(encoding="utf-8")
