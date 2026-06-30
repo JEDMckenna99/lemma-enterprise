@@ -41,3 +41,15 @@ Or locally: `docs/integration/ISHUMAN_AGENT_INTEGRATION.md`
 Verify on the server with `@lemma/ishuman-verify` or `lemma_ishuman_verify.py`.
 
 See the full guide for trust tiers, abuse APIs, anti-patterns, and framework notes.
+
+## Platform operator identity (lemma.id internal)
+
+Platform operators use the **same wallet + isHuman flow** as all users. Admin/operator access is an additional lemma.id-scoped permission proof, not a separate identity path.
+
+- Runtime site binding key: normalized hostname (`lemma.id` for the platform).
+- Internal `site_...` ids are ownership/database context only — never the sole runtime credential match key.
+- Platform operator = complete lemma.id identity proof + `admin_access` permission bound to `lemma.id`.
+- Canonical admin permission id: `admin_access` (preserve requested level separately as `permission_level`).
+- Skip empty site fields before strict canonicalization; sparse master credentials are valid.
+
+Contract doc: `docs/product/LEMMA_ID_PRESENTATION_MODEL.md`

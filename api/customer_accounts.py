@@ -2224,7 +2224,7 @@ def register_customer_site():
                 'environment': environment,
                 'siteId': site_domain,
                 'accountType': 'admin',
-                'permissionId': 'admin',
+                'permissionId': 'admin_access',
                 'issued_via': 'developer_platform',
             }
         )

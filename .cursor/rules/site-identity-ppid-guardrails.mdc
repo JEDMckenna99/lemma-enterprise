@@ -1,7 +1,21 @@
 ---
-alwaysApply: true
-description: Enforce PPID/site identity guardrails for admin and customer issuance flows
+description: Site identity, PPID derivation, and platform operator credential guardrails
+globs:
+  - api/**/*
+  - auth/**/*
+  - static/js/lemma-wallet.js
+  - static/js/lemma-credential-utils.js
+  - static/js/lemma-session-free-auth.js
+  - static/js/ishuman-verifier.js
+  - templates/wallet*.html
+  - templates/modern/**/*
+  - templates/admin/**/*
+  - tests/test_*wallet*
+  - tests/test_*platform*
+  - tests/test_*ishuman*
+  - tests/test_*authz*
 ---
+
 # Site Identity and PPID Guardrails
 
 Use these rules when editing auth, IAM, wallet, admin bootstrap, or customer-site integration code.
@@ -18,6 +32,13 @@ Use these rules when editing auth, IAM, wallet, admin bootstrap, or customer-sit
 - Normalize host values before use (lowercase, no scheme/path/port, strip `www.` when applicable).
 - On third-party/customer sites, default identity input should align with `window.location.hostname`.
 
+## Platform operator model
+
+- Platform operators use the same wallet + isHuman identity flow as all users.
+- Operator/admin status is represented only as an additional lemma.id-scoped permission proof (`admin_access`), not a separate identity path.
+- A platform operator is: unlocked wallet + complete lemma.id identity proof + `admin_access` permission bound to `lemma.id`.
+- Server/admin session state can improve UX, but must not substitute for wallet-held identity + permission proofs on protected platform flows.
+
 ## Issuance and storage safety
 
 - Fail closed on issued/requested site-binding mismatch.
@@ -32,8 +53,18 @@ Use these rules when editing auth, IAM, wallet, admin bootstrap, or customer-sit
 - Keep timestamps numeric and booleans as booleans.
 - Keep scope canonical as a real array of strings.
 
+## Frontend contract helpers
+
+Use `static/js/lemma-credential-utils.js` for platform checks:
+
+- `canonicalPlatformSite()` / `isPlatformSiteBinding()` — match `lemma.id`, `www.lemma.id`, legacy `lemma_platform`.
+- `isCompleteLemmaIdCredential()` — isHuman master or lemma.id site proof.
+- `isPlatformOperatorCredential()` — `admin_access` bound to platform site.
+- Skip empty site fields before calling strict canonicalizers; never pass empty strings to `canonicalizeSiteDomain()`.
+
 ## Deployment and testing expectations
 
 - Prefer minimal, additive changes that avoid auth-flow rewrites.
 - After auth/IAM changes, run smoke validation on live deployment endpoints.
 - Do not remove PPID-first, wallet-unlocked requirements.
+- Bump cached SDK query strings (`lemma-wallet.js?v=...`) when wallet identity logic changes.

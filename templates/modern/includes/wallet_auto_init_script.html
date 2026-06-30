@@ -117,42 +117,30 @@
             const allCredentials = await wallet.getCredentials();
             const utils = window.LemmaCredentialUtils;
 
-            const lemmaPermissions = allCredentials.filter(p => {
-                if (utils) {
-                    const normalized = utils.normalizeCredentialClaims(p);
-                    return normalized.isLemmaSite && (
-                        normalized.packageType === 'permission'
-                        || normalized.permissionId
-                        || normalized.accountType
-                        || normalized.isHuman
-                    );
-                }
-                const claims = p.claims || p.credentialSubject || {};
-                const siteId = (claims.siteId || claims.site || claims.site_id || claims.siteDomain || '').toLowerCase();
-                const hasAccessClaims = !!(
-                    claims.permissionId
-                    || claims.permission_level
-                    || claims.permission_id
-                    || claims.accountType
-                    || claims.account_type
-                );
-                const isHumanMaster = claims.isHuman && (siteId === 'lemma.id' || siteId === 'lemma_platform' || !siteId);
-                return (hasAccessClaims || isHumanMaster) && (siteId === 'lemma.id' || siteId === 'lemma_platform' || siteId.includes('lemma') || !siteId);
-            });
+            const lemmaPermissions = utils && typeof utils.selectPlatformCredentials === 'function'
+                ? utils.selectPlatformCredentials(allCredentials)
+                : allCredentials.filter((p) => {
+                    const claims = p.claims || p.credentialSubject || {};
+                    const siteId = (claims.siteId || claims.site || claims.site_id || claims.siteDomain || '').toLowerCase();
+                    return siteId === 'lemma.id' || siteId === 'lemma_platform' || !siteId;
+                });
 
             let cred = null;
-            if (utils) {
-                const validCreds = utils.selectBestCredentials(lemmaPermissions);
+            if (utils && typeof utils.selectPlatformCredentials === 'function') {
+                const validCreds = utils.selectPlatformCredentials(allCredentials);
                 cred = validCreds.length > 0 ? validCreds[0] : null;
             } else if (lemmaPermissions.length > 0) {
                 cred = lemmaPermissions[0];
             }
 
-            if (cred) {
-                const normalized = utils ? utils.normalizeCredentialClaims(cred) : null;
+            if (cred && utils) {
+                const normalized = utils.normalizeCredentialClaims(cred);
                 const claims = cred.claims || cred.credentialSubject || {};
-                const isLemmaHuman = normalized?.isLemmaSite && normalized?.isHuman;
-                if (!isDeveloperAccount(normalized, claims) && !isLemmaHuman) {
+                const isLemmaHuman = normalized.isCompleteLemmaId;
+                const isDeveloper = normalized.isAdmin
+                    || ['customer', 'developer', 'admin'].includes(String(normalized.accountType || '').toLowerCase())
+                    || ['admin_access', 'super_admin', 'admin', 'superadmin', 'site_admin'].includes(String(normalized.permissionId || '').toLowerCase());
+                if (!isDeveloper && !isLemmaHuman) {
                     cred = null;
                 }
             }

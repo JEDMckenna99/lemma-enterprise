@@ -5,7 +5,13 @@ import pytest
 from api.identity_person import material_from_test_fixture
 from api.identity_roots import document_root_hash_from_material, derive_ppid_from_document_root_hash
 from api.ppid import canonicalize_rp_id, derive_ppid_from_wallet_secret
-from api.site_hostname import canonicalize_site_hostname, SiteHostnameError, try_canonicalize_site_hostname
+from api.site_hostname import (
+    canonicalize_site_hostname,
+    normalize_runtime_site_binding,
+    SiteHostnameError,
+    try_canonicalize_site_hostname,
+    try_normalize_runtime_site_binding,
+)
 
 
 # Shared vectors with static/js/lemma-keys.js canonicalizeSiteDomain
@@ -50,6 +56,35 @@ def test_try_canonicalize_site_hostname_empty():
     canonical, err = try_canonicalize_site_hostname("")
     assert canonical is None
     assert err == "hostname_required"
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [
+        ("lemma.id", "lemma.id"),
+        ("www.lemma.id", "lemma.id"),
+        ("lemma_platform", "lemma.id"),
+        ("lemma-platform", "lemma.id"),
+        ("app.example.com", "app.example.com"),
+        ("", None),
+        (None, None),
+    ],
+)
+def test_normalize_runtime_site_binding(raw, expected):
+    assert normalize_runtime_site_binding(raw) == expected
+
+
+@pytest.mark.unit
+def test_normalize_runtime_site_binding_rejects_internal_site_id():
+    assert normalize_runtime_site_binding("site_abc123def456") is None
+
+
+@pytest.mark.unit
+def test_try_normalize_runtime_site_binding_internal_site_id():
+    normalized, err = try_normalize_runtime_site_binding("site_abc123def456")
+    assert normalized is None
+    assert err == "internal_site_id_not_allowed"
 
 
 @pytest.mark.unit

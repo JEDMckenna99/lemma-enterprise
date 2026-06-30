@@ -91,7 +91,7 @@ const AUTH_STATE = {
 class LemmaWallet {
     // SDK version - check with LemmaWallet.VERSION
     // v2.32.0: Redirect-only architecture - removed popup flow for simpler, consistent UX
-    static VERSION = '2.66.0';  // v2.66: recover cleared-device signing-key conflicts onto a fresh wallet_id
+    static VERSION = '2.70.0';  // v2.70: platform identity contract + safe site canonicalization
     
     constructor(options = {}) {
         this.db = null;
@@ -2212,12 +2212,29 @@ class LemmaWallet {
         };
     }
 
+    _defaultSiteDomainForProof(explicitSite) {
+        const raw = String(explicitSite || '').trim();
+        if (raw) return raw;
+        if (typeof window !== 'undefined') {
+            const host = String(window.location.hostname || '').trim();
+            if (host) return host;
+        }
+        if (this._isLemmaDomain && this._isLemmaDomain()) {
+            return 'lemma.id';
+        }
+        return 'lemma.id';
+    }
+
+    _canonicalizeSiteDomainForProof(explicitSite) {
+        return this._canonicalizeCredentialSiteValue(this._defaultSiteDomainForProof(explicitSite));
+    }
+
     async deriveSiteSigningKeypair(siteDomain) {
         if (!this.isUnlocked || !this.isUnlocked()) {
             throw new Error('Wallet must be unlocked to derive site signing key');
         }
         const keys = this._getLemmaKeys();
-        const canonicalSite = keys.canonicalizeSiteDomain(siteDomain || window.location.hostname || '');
+        const canonicalSite = this._canonicalizeSiteDomainForProof(siteDomain);
         const secret = this.session?.walletSecret;
         if (!secret) {
             const secretRecord = await this._get('secrets', 'master');
@@ -2429,13 +2446,33 @@ class LemmaWallet {
     _isIsHumanCredentialRecord(credential) {
         if (!credential || typeof credential !== 'object') return false;
         const cl = credential.claims || credential.credentialSubject || {};
-        return !!cl.isHuman;
+        if (cl.isHuman === true || String(cl.isHuman).toLowerCase() === 'true') return true;
+        const id = String(credential.id || '');
+        return id.startsWith('ishuman_master_') || id.startsWith('ishuman_site_');
+    }
+
+    _canonicalizeCredentialSiteValue(value) {
+        if (value == null || value === '') return '';
+        const raw = String(value).trim();
+        if (raw.toLowerCase().startsWith('site_')) return '';
+        try {
+            return this._getLemmaKeys().canonicalizeSiteDomain(raw);
+        } catch {
+            return raw.toLowerCase().replace(/^www\./, '').split(':')[0];
+        }
+    }
+
+    _isLemmaPlatformSiteBinding(site) {
+        const normalized = String(site || '').trim().toLowerCase().replace(/^www\./, '').split(':')[0];
+        return !normalized || normalized === 'lemma.id' || normalized === 'lemma_platform';
     }
 
     _isIsHumanMasterRecord(credential) {
+        if (String(credential?.id || '').startsWith('ishuman_master_')) {
+            return true;
+        }
         if (!this._isIsHumanCredentialRecord(credential)) return false;
         const cl = credential.claims || credential.credentialSubject || {};
-        const keys = this._getLemmaKeys();
         const sites = [
             cl.siteDomain,
             cl.site_domain,
@@ -2443,10 +2480,10 @@ class LemmaWallet {
             cl.site_id,
             cl.site,
         ]
-            .map((value) => keys.canonicalizeSiteDomain(value || ''))
+            .map((value) => this._canonicalizeCredentialSiteValue(value))
             .filter(Boolean);
         if (!sites.length) return true;
-        return sites.some((site) => site === 'lemma.id' || site === 'lemma_platform');
+        return sites.some((site) => this._isLemmaPlatformSiteBinding(site));
     }
 
     /**
@@ -2705,7 +2742,20 @@ class LemmaWallet {
 
     async hasIsHumanMasterInCache() {
         const cached = await this.getIsHumanCredentialsFromCache();
-        return cached.some((credential) => this._isIsHumanMasterRecord(credential));
+        if (cached.some((credential) => this._isIsHumanMasterRecord(credential))) {
+            return true;
+        }
+        try {
+            const canonicalSite = this._canonicalizeSiteDomainForProof('lemma.id');
+            return cached.some((credential) => {
+                if (!this._isIsHumanCredentialRecord(credential)) return false;
+                const cl = credential.claims || credential.credentialSubject || {};
+                return this._canonicalizeCredentialSiteValue(this._getCredentialSiteBinding(cl)) === canonicalSite
+                    && this._siteCredentialHasSigningKey(credential);
+            });
+        } catch {
+            return false;
+        }
     }
 
     async applyIsHumanCredentialsToCache(credentials) {
@@ -2759,19 +2809,12 @@ class LemmaWallet {
     }
 
     async findIsHumanSiteCredential(targetSite) {
-        const keys = this._getLemmaKeys();
-        const canonicalSite = keys.canonicalizeSiteDomain(targetSite || '');
+        const canonicalSite = this._canonicalizeSiteDomainForProof(targetSite);
         const allCreds = await this.exportIsHumanCredentialsForBridge();
-        // Prefer the most recently issued site credential. After a fresh
-        // IDV / re-derivation, the wallet's plaintext cache will contain
-        // both the old (revoked) and new credential for the same site; the
-        // server-side IsHumanVerification status flips to "revoked" on the
-        // old one, so `/api/ishuman/derive-site-proof` would 404 if we used
-        // the stale entry.
         const matches = allCreds.filter((credential) => {
             const cl = credential.claims || credential.credentialSubject || {};
-            if (!cl.isHuman) return false;
-            return this._getCredentialSiteBinding(cl) === canonicalSite
+            if (!this._isIsHumanCredentialRecord(credential)) return false;
+            return this._canonicalizeCredentialSiteValue(this._getCredentialSiteBinding(cl)) === canonicalSite
                 && this._siteCredentialHasSigningKey(credential);
         });
         if (!matches.length) return null;
@@ -2779,6 +2822,9 @@ class LemmaWallet {
     }
 
     async findIsHumanMasterCredential() {
+        if (this.isUnlocked && this.isUnlocked()) {
+            await this.syncIsHumanCacheFromWallet().catch(() => ({ synced: 0 }));
+        }
         const cached = await this.getIsHumanCredentialsFromCache();
         const cachedMasters = cached.filter((credential) => this._isIsHumanMasterRecord(credential));
         if (cachedMasters.length) {
@@ -2793,15 +2839,22 @@ class LemmaWallet {
             throw err;
         }
         const masters = creds.filter((credential) => this._isIsHumanMasterRecord(credential));
-        if (!masters.length) return null;
-        return this._sortCredentialsNewestFirst(masters)[0];
+        if (masters.length) {
+            return this._sortCredentialsNewestFirst(masters)[0];
+        }
+        try {
+            const platformSiteProof = await this.findIsHumanSiteCredential('lemma.id');
+            if (platformSiteProof) return platformSiteProof;
+        } catch (_) {
+            /* ignore lookup errors */
+        }
+        return null;
     }
 
     async deriveAndStoreSiteProof(targetSite, options = {}) {
         await this.ensureIsHumanIssuanceReady({ isHumanIssuance: true });
         await this.reconcileSessionWalletIdForIssuance();
-        const keys = this._getLemmaKeys();
-        const canonicalSite = keys.canonicalizeSiteDomain(targetSite || '');
+        const canonicalSite = this._canonicalizeSiteDomainForProof(targetSite);
         const issueMode = (options.issueMode || 'site_proof').trim().toLowerCase();
         const forceServerDerive = issueMode === 'fresh_idv' || !!options.forceServerDerive;
 
@@ -2927,7 +2980,7 @@ class LemmaWallet {
         const DEFAULT_SESSION_TTL_SECONDS = MAX_SESSION_HOURS * 60 * 60;
 
         const keys = this._getLemmaKeys();
-        const canonicalSite = keys.canonicalizeSiteDomain(siteId || '');
+        const canonicalSite = this._canonicalizeSiteDomainForProof(siteId);
         const siteKeys = await this.deriveSiteSigningKeypair(canonicalSite);
         const requestedTtl = Number(sessionTtlSec || DEFAULT_SESSION_TTL_SECONDS);
         const sessionTtl = Math.min(

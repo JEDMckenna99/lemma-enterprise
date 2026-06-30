@@ -54,17 +54,21 @@ function getCredentialClaims(cred) {
 }
 
 function isLemmaOperatorAdminCredential(cred) {
+    const utils = window.LemmaCredentialUtils;
+    if (utils && typeof utils.isPlatformOperatorCredential === 'function') {
+        return utils.isPlatformOperatorCredential(cred);
+    }
     const claims = getCredentialClaims(cred);
     const perm = String(claims.permissionId || claims.permission_id || claims.permission_level || '').toLowerCase();
     const account = String(claims.accountType || claims.account_type || '').toLowerCase();
-    const type = String(claims.type || '').toLowerCase();
-    return perm === 'admin_access'
-        || perm.includes('admin')
-        || account === 'admin'
-        || type.includes('admin');
+    return perm === 'admin_access' || account === 'admin';
 }
 
 function getCredentialSite(cred) {
+    const utils = window.LemmaCredentialUtils;
+    if (utils && typeof utils.getCredentialSiteBinding === 'function') {
+        return utils.getCredentialSiteBinding(cred);
+    }
     const claims = getCredentialClaims(cred);
     return String(
         claims.siteId || claims.site_id || claims.siteDomain || claims.site_domain || claims.site || ''
@@ -100,7 +104,7 @@ async function loadAdminCredential() {
     adminCredential = null;
 
     if (typeof window.ensureLemmaCredential === 'function') {
-        const cred = await window.ensureLemmaCredential(true);
+        const cred = await window.ensureLemmaCredential(true, { requireAdmin: true });
         if (cred && isLemmaOperatorAdminCredential(cred)) {
             adminCredential = cred;
             return cred;
@@ -118,14 +122,14 @@ async function loadAdminCredential() {
 
         const credentials = await wallet.getCredentials('permission');
         const utils = window.LemmaCredentialUtils;
-        const lemmaPermissions = credentials.filter((c) => {
-            const site = getCredentialSite(c);
-            return !site || OPERATOR_SITES.has(site) || site.includes('lemma.id');
-        });
-        if (utils && typeof utils.selectBestCredentials === 'function') {
-            const adminMatches = utils.selectBestCredentials(lemmaPermissions, { requireAdmin: true });
-            adminCredential = adminMatches[0] || lemmaPermissions.find((c) => isLemmaOperatorAdminCredential(c)) || null;
+        if (utils && typeof utils.selectPlatformCredentials === 'function') {
+            const adminMatches = utils.selectPlatformCredentials(credentials, { requireAdmin: true });
+            adminCredential = adminMatches[0] || null;
         } else {
+            const lemmaPermissions = credentials.filter((c) => {
+                const site = getCredentialSite(c);
+                return !site || OPERATOR_SITES.has(site) || site === 'lemma.id';
+            });
             adminCredential = lemmaPermissions.find((c) => isLemmaOperatorAdminCredential(c)) || null;
         }
 

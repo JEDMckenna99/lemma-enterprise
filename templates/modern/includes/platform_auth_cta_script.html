@@ -27,7 +27,12 @@
         }
 
         async function checkIsHumanProof(wallet) {
+            const utils = window.LemmaCredentialUtils;
             try {
+                if (utils && typeof utils.assessLemmaPlatformIdentity === 'function') {
+                    const state = await utils.assessLemmaPlatformIdentity(wallet);
+                    if (state.completeLemmaId) return true;
+                }
                 if (typeof wallet.findIsHumanMasterCredential === 'function') {
                     const master = await wallet.findIsHumanMasterCredential();
                     if (master) return true;
@@ -36,11 +41,10 @@
                     const cached = await wallet.hasIsHumanMasterInCache();
                     if (cached) return true;
                 }
-                const ppid = await wallet.derivePPID('lemma.id');
-                return !!(ppid && String(ppid).startsWith('did:lemma:ppid_'));
             } catch (_) {
                 return false;
             }
+            return false;
         }
 
         async function checkDeveloperPermission(wallet) {

@@ -1,0 +1,104 @@
+# lemma.id Presentation Model
+
+Status: Active contract  
+Audience: Platform engineers, wallet SDK maintainers, integration partners
+
+## Overview
+
+lemma.id separates **identity proof** from **permission proof**. All users — including platform operators — follow the same wallet and isHuman identity flow. Operator privileges are additional lemma.id-scoped permission credentials, not a parallel identity system.
+
+```
+Unlocked wallet
+  → isHuman identity proof (master or site-bound)
+    → lemma.id permission proof (optional, e.g. admin_access)
+      → platform operator access
+    → normal user access (no admin permission)
+```
+
+## Identity proof
+
+An **identity proof** establishes that a wallet holder is human on lemma.id.
+
+| Property | Rule |
+|----------|------|
+| Primary signals | `claims.isHuman === true`, or credential id prefix `ishuman_master_` / `ishuman_site_` |
+| Runtime site binding | Normalized hostname; platform binding is `lemma.id` |
+| Sparse site fields | Empty `siteId` / `siteDomain` on master records is valid; skip before canonicalization |
+| PPID derivation | Wallet secret + normalized hostname only |
+
+**Complete lemma.id** means the wallet holds a valid isHuman identity proof for the platform (master credential and/or lemma.id site proof).
+
+## Permission proof
+
+A **permission proof** grants scoped access on a site.
+
+| Property | Rule |
+|----------|------|
+| Canonical admin permission | `permissionId: admin_access` |
+| Requested level | Preserve separately as `permission_level` when needed |
+| Platform binding | Runtime `siteId` / `siteDomain` must resolve to `lemma.id` (aliases: `lemma_platform`, `www.lemma.id`) |
+| Scope | Array of strings; admin compatibility scopes include `admin`, `write`, `read` |
+
+**Platform operator** = complete lemma.id identity proof + non-expired `admin_access` permission bound to `lemma.id`.
+
+## Presentation
+
+A **presentation** is the signed credential (or derived session artifact) sent to relying parties and APIs.
+
+### Browser headers (platform/admin flows)
+
+Protected platform routes expect:
+
+- `X-Lemma-Credential` — encoded wallet-selected credential
+- `X-Credential-ID` — credential id when available
+- `X-Permission-ID` — canonical permission id (`admin_access` for operators)
+
+Wallet unlock is required. Server session cookies improve UX but do not replace wallet-held proofs on protected flows.
+
+### Site binding keys
+
+| Key | Purpose |
+|-----|---------|
+| `site_...` (internal) | Database ownership, issuance context — **not** runtime PPID/credential matching |
+| `siteId` / `siteDomain` (hostname) | Runtime binding for PPID derivation and credential matching |
+| `lemma.id` | Platform canonical binding |
+
+Backend helpers:
+
+- `api/site_hostname.canonicalize_site_hostname()` — strict integrator hostname input
+- `api/site_hostname.normalize_runtime_site_binding()` — permissive runtime credential binding normalizer
+
+Frontend helpers (`lemma-credential-utils.js`):
+
+- `canonicalPlatformSite()`, `getCredentialSiteBinding()`
+- `isCompleteLemmaIdCredential()`, `isPlatformOperatorCredential()`
+- `selectPlatformCredentials()`, `assessLemmaPlatformIdentity()`
+
+## Anti-patterns
+
+- Using `site_*` internal ids as the sole runtime credential match key
+- Calling `canonicalizeSiteDomain('')` on empty site fields during credential inspection
+- Treating admin server session alone as sufficient for protected platform mutations
+- Issuing admin credentials with `permissionId: admin` instead of `admin_access`
+- Loose hostname matching (`includes('lemma')`) for platform site detection
+
+## Related docs
+
+- Integration guide: `docs/integration/ISHUMAN_AGENT_INTEGRATION.md`
+- Trust core spec: `docs/architecture/LEMMA_TRUST_CORE_SPEC.md`
+- Cursor guardrails: `.cursor/rules/site-identity-ppid-guardrails.mdc`
+
+## Verification (deploy smoke)
+
+After deploying wallet/auth changes:
+
+1. Hard refresh lemma.id (or unregister service worker + clear site data if SDK version stuck).
+2. Confirm `lemma-wallet.js?v=2670` (or current bump) and SDK `VERSION` ≥ 2.70.0 in console.
+3. Unlock wallet; manager (`/`) should recognize complete lemma.id without `site domain required` errors.
+4. Admin pages should attach `X-Lemma-Credential` with `X-Permission-ID: admin_access`.
+5. Run targeted tests:
+   - `tests/test_wallet_hostname_guard.py`
+   - `tests/test_platform_manager_navigation.py`
+   - `tests/test_platform_identity_contract.py`
+   - `tests/test_authz_engine_phase12.py`
+   - `tests/test_ishuman_ppid_normalization.py`

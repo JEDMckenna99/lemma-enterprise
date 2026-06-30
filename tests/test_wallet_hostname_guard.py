@@ -59,3 +59,16 @@ def test_is_lemma_domain_delegates_to_helper(wallet_js_source):
 def test_lemma_wallet_rejects_hostname_substring_matching(wallet_js_source):
     assert "hostname.includes('lemma.id')" not in wallet_js_source
     assert "includes('localhost')" not in wallet_js_source
+
+
+@pytest.mark.unit
+def test_lemma_wallet_master_detection_skips_empty_site_fields(wallet_js_source):
+    assert "_isIsHumanMasterRecord" in wallet_js_source
+    assert "_canonicalizeCredentialSiteValue" in wallet_js_source
+    assert ".filter(Boolean)" in wallet_js_source
+
+
+@pytest.mark.unit
+def test_lemma_wallet_platform_site_binding_helper(wallet_js_source):
+    assert "_isLemmaPlatformSiteBinding" in wallet_js_source
+    assert "lemma_platform" in wallet_js_source

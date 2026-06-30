@@ -15,6 +15,7 @@ from dataclasses import dataclass
 from typing import Mapping, Optional, Tuple
 
 from auth.permissions import normalize_scopes, is_admin_permission
+from api.site_hostname import normalize_runtime_site_binding
 
 
 @dataclass
@@ -124,12 +125,18 @@ def extract_user_lemma_principal(
     if header_credential_id and credential_id and header_credential_id != credential_id:
         return None, "credential_id_mismatch"
 
-    site_binding = (
-        claims.get("siteId")
-        or claims.get("site_id")
-        or claims.get("siteDomain")
-        or claims.get("site_domain")
-    )
+    site_binding = None
+    for candidate in (
+        claims.get("siteDomain"),
+        claims.get("site_domain"),
+        claims.get("siteId"),
+        claims.get("site_id"),
+        claims.get("site"),
+    ):
+        normalized = normalize_runtime_site_binding(candidate)
+        if normalized:
+            site_binding = normalized
+            break
 
     return AuthzPrincipal(
         principal_type="user_lemma",
@@ -138,7 +145,7 @@ def extract_user_lemma_principal(
         credential_id=credential_id,
         permission_id=str(permission_id),
         scope=scope,
-        site_binding=str(site_binding).strip().lower() if site_binding else None,
+        site_binding=site_binding,
     ), None
 
 
@@ -186,12 +193,18 @@ def build_principal_from_credential_dict(
         else:
             scope = ["read"]
 
-    site_binding = (
-        claims.get("siteId")
-        or claims.get("site_id")
-        or claims.get("siteDomain")
-        or claims.get("site_domain")
-    )
+    site_binding = None
+    for candidate in (
+        claims.get("siteDomain"),
+        claims.get("site_domain"),
+        claims.get("siteId"),
+        claims.get("site_id"),
+        claims.get("site"),
+    ):
+        normalized = normalize_runtime_site_binding(candidate)
+        if normalized:
+            site_binding = normalized
+            break
 
     return AuthzPrincipal(
         principal_type="user_lemma",
@@ -200,7 +213,7 @@ def build_principal_from_credential_dict(
         credential_id=credential.get("id"),
         permission_id=str(permission_id),
         scope=scope,
-        site_binding=str(site_binding).strip().lower() if site_binding else None,
+        site_binding=site_binding,
     )
 
 

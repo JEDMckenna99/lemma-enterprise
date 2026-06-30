@@ -68,13 +68,17 @@ The verifier MUST enforce:
 
 ## Site Identity and PPID Binding Rules
 
-- `site_id` is an ownership/database binding key.
-- normalized host/domain is the PPID derivation and runtime credential matching key.
+- `site_id` is an ownership/database binding key (`site_*`).
+- `siteId` / `site_domain` (normalized hostname) is the PPID derivation and **runtime** credential matching key.
 - PPID derivation MUST use wallet secret + normalized hostname/domain only.
 - Host normalization requires lowercase, no scheme/path/port, and `www.` stripping when applicable.
 - Customer-site default identity input SHOULD align with `window.location.hostname`.
+- Platform runtime binding canonicalizes to `lemma.id` (aliases: `lemma_platform`, `www.lemma.id`).
 - Verifier fails closed on issued/requested site binding mismatch.
 - Verifier MUST NOT silently coerce mismatched bindings.
+- Empty site fields on identity proofs are optional metadata; skip before strict canonicalization.
+
+Presentation model: `docs/product/LEMMA_ID_PRESENTATION_MODEL.md`
 
 ## Core Verification Rules (v1)
 

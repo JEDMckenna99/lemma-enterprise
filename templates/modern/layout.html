@@ -214,10 +214,10 @@ h1{color:#1e293b;font-weight:600;line-height:1.25;margin-bottom:16px;font-size:4
     <!-- Wallet Scripts - end of body for non-blocking -->
     <script src="{{ url_for('static', filename='js/lemma-keys.js') }}?v=5" defer data-cfasync="false"></script>
     <script src="{{ url_for('static', filename='js/wallet-at-rest-crypto.js') }}?v=2" defer data-cfasync="false"></script>
-    <script src="{{ url_for('static', filename='js/lemma-wallet.js') }}?v=2661" defer data-cfasync="false"></script>
+    <script src="{{ url_for('static', filename='js/lemma-wallet.js') }}?v=2670" defer data-cfasync="false"></script>
     <script src="{{ url_for('static', filename='js/encrypted-wallet-transparent.js') }}?v=1121" defer data-cfasync="false"></script>
     <script src="{{ url_for('static', filename='js/lemma-session-free-auth.js') }}?v=1121" defer data-cfasync="false"></script>
-    <script src="{{ url_for('static', filename='js/lemma-credential-utils.js') }}?v=1" defer data-cfasync="false"></script>
+    <script src="{{ url_for('static', filename='js/lemma-credential-utils.js') }}?v=2" defer data-cfasync="false"></script>
     <script src="{{ url_for('static', filename='js/lemma-auth-headers.js') }}?v=1" defer data-cfasync="false"></script>
     {% endblock %}
     
@@ -404,7 +404,7 @@ h1{color:#1e293b;font-weight:600;line-height:1.25;margin-bottom:16px;font-size:4
             }
 
             if (!window.ensureLemmaCredential) {
-                window.ensureLemmaCredential = async function ensureLemmaCredential(forceRefresh = false) {
+                window.ensureLemmaCredential = async function ensureLemmaCredential(forceRefresh = false, options = {}) {
                     if (!forceRefresh && window.lemmaCredential && typeof window.lemmaCredential === 'object') {
                         return window.lemmaCredential;
                     }
@@ -417,36 +417,26 @@ h1{color:#1e293b;font-weight:600;line-height:1.25;margin-bottom:16px;font-size:4
                             await window.globalLemmaWallet.init();
                         }
                         const wallet = window.globalLemmaWallet;
-                        const all = await wallet.getCredentials();
+                        if (!wallet.isUnlocked || !wallet.isUnlocked()) {
+                            return null;
+                        }
                         const utils = window.LemmaCredentialUtils;
-                        const lemmaPermissions = (all || []).filter((cred) => {
-                            const claims = cred.claims || cred.credentialSubject || {};
-                            const siteId = String(claims.siteId || claims.site || claims.site_id || claims.siteDomain || '').toLowerCase();
-                            const packageType = String(cred.packageType || claims.packageType || claims.type || '').toLowerCase();
-                            const hasAccessClaims = !!(
-                                claims.permissionId
-                                || claims.permission_level
-                                || claims.permission_id
-                                || claims.accountType
-                                || claims.account_type
-                            );
-                            const isHumanMaster = !!claims.isHuman && (siteId === 'lemma.id' || siteId === 'lemma_platform' || !siteId);
-                            return (packageType === 'permission' || hasAccessClaims || isHumanMaster)
-                                && (siteId === 'lemma.id' || siteId === 'lemma_platform' || siteId.includes('lemma') || !siteId);
-                        });
-                        const preferAdmin = typeof window.location?.pathname === 'string'
-                            && window.location.pathname.startsWith('/admin');
+                        const all = await wallet.getCredentials();
+                        const preferAdmin = options.requireAdmin === true
+                            || (typeof window.location?.pathname === 'string'
+                                && window.location.pathname.startsWith('/admin'));
                         let selected = null;
-                        if (utils && typeof utils.selectBestCredentials === 'function') {
-                            const adminCreds = utils.selectBestCredentials(lemmaPermissions, { requireAdmin: preferAdmin });
-                            if (adminCreds.length) {
-                                selected = adminCreds[0];
-                            } else if (!preferAdmin) {
-                                const valid = utils.selectBestCredentials(lemmaPermissions);
-                                selected = valid.length ? valid[0] : null;
-                            }
-                        } else {
-                            selected = lemmaPermissions.length ? lemmaPermissions[0] : null;
+                        if (utils && typeof utils.selectPlatformCredentials === 'function') {
+                            const platformCreds = utils.selectPlatformCredentials(all || [], {
+                                requireAdmin: preferAdmin,
+                            });
+                            selected = platformCreds.length ? platformCreds[0] : null;
+                        } else if (utils && typeof utils.selectBestCredentials === 'function') {
+                            const adminCreds = utils.selectBestCredentials(all || [], {
+                                requireAdmin: preferAdmin,
+                                siteId: 'lemma.id',
+                            });
+                            selected = adminCreds.length ? adminCreds[0] : null;
                         }
 
                         if (selected) {

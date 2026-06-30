@@ -3130,8 +3130,19 @@ def verify_presentation():
     claims = credential.get("claims") or credential.get("credentialSubject") or {}
     if not claims.get("isHuman"):
         return jsonify({"success": False, "error": "not_ishuman"}), 400
-    bound_site = claims.get("siteId") or claims.get("site_id") or claims.get("siteDomain") or ""
-    if expected_site_id and bound_site and bound_site != expected_site_id:
+    from api.site_hostname import normalize_runtime_site_binding
+
+    bound_site_raw = (
+        claims.get("siteDomain")
+        or claims.get("site_domain")
+        or claims.get("siteId")
+        or claims.get("site_id")
+        or claims.get("site")
+        or ""
+    )
+    bound_site = normalize_runtime_site_binding(bound_site_raw)
+    expected_site = normalize_runtime_site_binding(expected_site_id) if expected_site_id else None
+    if expected_site and bound_site and bound_site != expected_site:
         return jsonify({"success": False, "error": "site_id_mismatch", "bound_site": bound_site}), 400
 
     try:

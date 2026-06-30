@@ -33,6 +33,9 @@ def test_root_is_manager_and_home_is_product_page(monkeypatch):
 def test_brand_and_manager_creation_use_canonical_routes():
     layout = (ROOT / "templates" / "modern" / "layout.html").read_text(encoding="utf-8")
     manager = (ROOT / "templates" / "wallet_simple.html").read_text(encoding="utf-8")
+    wallet_auto = (ROOT / "templates" / "modern" / "includes" / "wallet_auto_init_script.html").read_text(
+        encoding="utf-8"
+    )
 
     assert '<a href="/" class="nav-logo">' in layout
     assert '<a href="/home" class="nav-link" id="nav-product">' in layout
@@ -40,6 +43,9 @@ def test_brand_and_manager_creation_use_canonical_routes():
     assert "popupUrl.searchParams.set('site_id', 'lemma.id')" in manager
     assert "window.open(" in manager
     assert "async function hasCompleteLemmaId()" in manager
+    assert "assessLemmaPlatformIdentity" in manager
+    assert "selectPlatformCredentials" in layout
+    assert "selectPlatformCredentials" in wallet_auto
     assert "Create a lemma.id" in manager
     assert "req.onblocked = () => reject" in manager
     assert "instance?.db?.close?.()" in manager

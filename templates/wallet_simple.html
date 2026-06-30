@@ -284,13 +284,26 @@ async function checkCrossDeviceLock() {
 }
 
 async function hasCompleteLemmaId() {
+    const utils = window.LemmaCredentialUtils;
     try {
+        if (utils && typeof utils.assessLemmaPlatformIdentity === 'function') {
+            const state = await utils.assessLemmaPlatformIdentity(wallet);
+            if (state.completeLemmaId) return true;
+        }
         if (typeof wallet.findIsHumanMasterCredential === 'function') {
             const master = await wallet.findIsHumanMasterCredential();
             if (master) return true;
         }
+        if (typeof wallet.findIsHumanSiteCredential === 'function') {
+            const siteProof = await wallet.findIsHumanSiteCredential('lemma.id');
+            if (siteProof) return true;
+        }
         if (typeof wallet.hasIsHumanMasterInCache === 'function') {
-            return await wallet.hasIsHumanMasterInCache();
+            if (await wallet.hasIsHumanMasterInCache()) return true;
+        }
+        if (utils && typeof wallet.getCredentials === 'function' && wallet.isUnlocked?.()) {
+            const creds = await wallet.getCredentials();
+            if (creds.some((cred) => utils.isCompleteLemmaIdCredential(cred))) return true;
         }
     } catch (err) {
         console.warn('Could not inspect lemma.id proof:', err?.message || err);
@@ -299,14 +312,27 @@ async function hasCompleteLemmaId() {
 }
 
 async function recoverMissingMasterFromServer() {
-    try {
-        if (!wallet || typeof wallet.reissueMasterCredential !== 'function') return false;
-        await wallet.reissueMasterCredential();
-        return true;
-    } catch (err) {
-        console.warn('Could not recover lemma.id proof from server:', err?.message || err);
-        return false;
+    if (!wallet?.isUnlocked?.()) return false;
+
+    if (typeof wallet.reissueMasterCredential === 'function') {
+        try {
+            const master = await wallet.reissueMasterCredential();
+            if (master) return true;
+        } catch (err) {
+            console.warn('Could not recover lemma.id proof from server:', err?.message || err);
+        }
     }
+
+    if (typeof wallet.deriveAndStoreSiteProof === 'function') {
+        try {
+            await wallet.deriveAndStoreSiteProof('lemma.id');
+            return true;
+        } catch (err) {
+            console.warn('Could not recover lemma.id proof from server:', err?.message || err);
+        }
+    }
+
+    return false;
 }
 
 function showIncompleteLemmaIdState() {
@@ -323,7 +349,11 @@ async function checkWalletState() {
         const info = await wallet.getWalletInfo();
 
         if (info.isUnlocked) {
-            if (!(await hasCompleteLemmaId())) {
+            let complete = await hasCompleteLemmaId();
+            if (!complete) {
+                complete = await recoverMissingMasterFromServer() && await hasCompleteLemmaId();
+            }
+            if (!complete) {
                 showIncompleteLemmaIdState();
                 return false;
             }
@@ -372,8 +402,11 @@ async function checkWalletState() {
                 localStorage.setItem('lemma_had_global_session', 'true');
 
                 if (!(await hasCompleteLemmaId())) {
-                    showIncompleteLemmaIdState();
-                    return false;
+                    const recovered = await recoverMissingMasterFromServer();
+                    if (!recovered || !(await hasCompleteLemmaId())) {
+                        showIncompleteLemmaIdState();
+                        return false;
+                    }
                 }
 
                 updateStatusDisplay(true, 'Open', 'Synced from another device');
