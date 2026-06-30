@@ -5,6 +5,20 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="referrer" content="no-referrer">
     <title>Unlock Lemma Wallet</title>
+    <script nonce="{{ csp_nonce }}">
+        (function redirectToUnifiedPopup() {
+            const params = new URLSearchParams(window.location.search);
+            const target = new URL('/wallet/ishuman-idv', window.location.origin);
+            params.forEach((value, key) => target.searchParams.set(key, value));
+            if (!target.searchParams.get('issue_mode')) {
+                target.searchParams.set('issue_mode', 'unlock');
+            }
+            if (!target.searchParams.get('site_id')) {
+                target.searchParams.set('site_id', 'lemma.id');
+            }
+            window.location.replace(target.toString());
+        })();
+    </script>
     <style nonce="{{ csp_nonce }}">
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body {
@@ -153,7 +167,7 @@
     <script src="/static/js/lemma-keys.js?v=5" nonce="{{ csp_nonce }}"></script>
     <script src="/static/js/wallet-at-rest-crypto.js?v=2" nonce="{{ csp_nonce }}"></script>
     <script nonce="{{ csp_nonce }}">window.LEMMA_ISHUMAN_USE_PERSON_ROOT_SEEDS = {{ 'true' if ishuman_use_person_root_seeds else 'false' }};</script>
-    <script src="/static/js/lemma-wallet.js?v=2670" nonce="{{ csp_nonce }}"></script>
+    <script src="/static/js/lemma-wallet.js?v=2671" nonce="{{ csp_nonce }}"></script>
     <script nonce="{{ csp_nonce }}">
         let wallet = null;
         const params = new URLSearchParams(window.location.search);

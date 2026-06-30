@@ -47,10 +47,45 @@
             return false;
         }
 
-        async function checkDeveloperPermission(wallet) {
-            try {
+        async function checkDeveloperPermission(wallet, options) {
+            const opts = options || {};
+            const tryReissue = opts.tryReissue !== false;
+
+            async function verifyOnce() {
                 const perms = await wallet.getVerifiedPermissions('lemma.id');
                 return !!(perms?.hasAccess && isDeveloperPermission(perms, perms.claims));
+            }
+
+            try {
+                if (await verifyOnce()) return true;
+
+                if (!tryReissue || wallet.__lemmaDevPermReissueAttempted) {
+                    return false;
+                }
+
+                const utils = window.LemmaCredentialUtils;
+                let shouldReissue = false;
+                if (utils && typeof utils.assessLemmaPlatformIdentity === 'function') {
+                    const state = await utils.assessLemmaPlatformIdentity(wallet);
+                    shouldReissue = !!(state.unlocked && state.completeLemmaId);
+                } else if (typeof wallet.findIsHumanMasterCredential === 'function') {
+                    shouldReissue = !!(await wallet.findIsHumanMasterCredential());
+                }
+
+                if (!shouldReissue || typeof wallet.reissueMasterCredential !== 'function') {
+                    return false;
+                }
+
+                wallet.__lemmaDevPermReissueAttempted = true;
+                try {
+                    await wallet.reissueMasterCredential();
+                } catch (err) {
+                    if (String(err?.message || err).includes('reissue_rate_limited')) {
+                        console.warn('[Lemma] Master reissue rate limited');
+                    }
+                    return false;
+                }
+                return await verifyOnce();
             } catch (_) {
                 return false;
             }

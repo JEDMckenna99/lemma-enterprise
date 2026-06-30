@@ -1667,9 +1667,10 @@ class IsHumanVerifier {
     }
 
     _unlockViaPopup() {
-        const popupUrl = new URL(`${this.lemmaOrigin}${UNLOCK_POPUP_PATH}`);
+        const popupUrl = new URL(`${this.lemmaOrigin}${this.idvPopupPath}`);
         popupUrl.searchParams.set('origin', window.location.origin);
-        popupUrl.searchParams.set('ishuman', '1');
+        popupUrl.searchParams.set('site_id', this.siteId || 'lemma.id');
+        popupUrl.searchParams.set('issue_mode', 'unlock');
 
         return _openManagedLemmaPopup(
             'unlock',
@@ -1681,10 +1682,10 @@ class IsHumanVerifier {
             UNLOCK_POPUP_TIMEOUT_MS,
             (event, finish, state) => {
                 if (event.origin !== this.lemmaOrigin) return;
-                if (event.data?.type === 'LEMMA_UNLOCK_SUCCESS') {
+                if (event.data?.type === 'LEMMA_UNLOCK_SUCCESS' || event.data?.type === 'ISHUMAN_UNLOCK_SUCCESS') {
                     state.gotMessage = true;
                     finish(true);
-                } else if (event.data?.type === 'LEMMA_UNLOCK_CANCELLED') {
+                } else if (event.data?.type === 'LEMMA_UNLOCK_CANCELLED' || event.data?.type === 'ISHUMAN_IDV_CANCELLED') {
                     state.gotMessage = true;
                     finish(false);
                 }

@@ -91,7 +91,7 @@ const AUTH_STATE = {
 class LemmaWallet {
     // SDK version - check with LemmaWallet.VERSION
     // v2.32.0: Redirect-only architecture - removed popup flow for simpler, consistent UX
-    static VERSION = '2.70.0';  // v2.70: platform identity contract + safe site canonicalization
+    static VERSION = '2.71.0';  // v2.71: isHuman browser-signature verify + unified popup unlock
     
     constructor(options = {}) {
         this.db = null;
@@ -2791,6 +2791,141 @@ class LemmaWallet {
         return !!(credential?.proof?.signatureValueWeb);
     }
 
+    _shouldVerifyAsIsHumanCredential(credential) {
+        if (!credential || typeof credential !== 'object') return false;
+        const id = String(credential.id || '');
+        if (id.startsWith('ishuman_master_') || id.startsWith('ishuman_site_')) return true;
+        return this._isIsHumanCredentialRecord(credential);
+    }
+
+    _browserCanonicalMessage(credential) {
+        const claims = credential.claims || credential.credentialSubject || {};
+        const sorted = {};
+        for (const key of Object.keys(claims).sort()) {
+            const value = claims[key];
+            if (value === true) sorted[key] = 'true';
+            else if (value === false) sorted[key] = 'false';
+            else if (Array.isArray(value) || (value && typeof value === 'object')) {
+                sorted[key] = JSON.stringify(value);
+            } else {
+                sorted[key] = value;
+            }
+        }
+        const payload = {
+            issuer: credential.issuer,
+            subject: credential.subject,
+            claims: sorted,
+        };
+        if (credential.issuedAt !== undefined && credential.issuedAt !== null) {
+            payload.issuedAt = credential.issuedAt;
+        }
+        if (credential.expiresAt !== undefined && credential.expiresAt !== null) {
+            payload.expiresAt = credential.expiresAt;
+        }
+        return new TextEncoder().encode(JSON.stringify(payload));
+    }
+
+    async _verifyIsHumanCredentialBrowser(credential) {
+        if (!this._initialized) await this.init();
+
+        const claims = credential.claims || credential.credentialSubject || {};
+        const ppid = credential.subject || claims.id || claims.ppid || claims.subject;
+        const revocationStatus = await this.isRevoked(credential.id, ppid);
+        if (revocationStatus.revoked) {
+            const reason = revocationStatus.ppidRevoked ? 'User revoked (all devices)' : 'Credential revoked';
+            return { valid: false, reason, revocationDetails: revocationStatus };
+        }
+
+        const expiredCheck = this._checkExpiration(credential);
+        if (!expiredCheck.valid) {
+            return { valid: false, reason: 'Expired' };
+        }
+
+        const sigHex = String(credential.proof?.signatureValueWeb || '').trim();
+        if (!sigHex) {
+            return { valid: false, reason: 'legacy_credential_format' };
+        }
+
+        let publicKey = credential.issuerInfo?.publicKey || null;
+        if (!publicKey) {
+            const storedIssuer = await this.getIssuer(credential.issuer);
+            publicKey = storedIssuer?.publicKey || null;
+        }
+        if (!publicKey) {
+            return { valid: false, reason: 'No public key available' };
+        }
+
+        try {
+            const message = this._browserCanonicalMessage(credential);
+            const digest = await crypto.subtle.digest('SHA-256', message);
+            const cryptoKey = this._cryptoKeyCache.get(publicKey) || await (async () => {
+                let publicKeyBuffer;
+                if (typeof publicKey === 'string' && /^[0-9a-fA-F]{64}$/.test(publicKey)) {
+                    publicKeyBuffer = new Uint8Array(32);
+                    for (let i = 0; i < 32; i++) {
+                        publicKeyBuffer[i] = parseInt(publicKey.substr(i * 2, 2), 16);
+                    }
+                } else if (typeof publicKey === 'string') {
+                    publicKeyBuffer = this._base64urlToBuffer(publicKey);
+                } else {
+                    throw new Error('Unknown public key format');
+                }
+                const key = await crypto.subtle.importKey(
+                    'raw',
+                    publicKeyBuffer,
+                    { name: 'Ed25519' },
+                    false,
+                    ['verify'],
+                );
+                this._cryptoKeyCache.set(publicKey, key);
+                return key;
+            })();
+
+            let signatureBuffer;
+            if (/^[0-9a-fA-F]{128}$/.test(sigHex)) {
+                signatureBuffer = new Uint8Array(64);
+                for (let i = 0; i < 64; i++) {
+                    signatureBuffer[i] = parseInt(sigHex.substr(i * 2, 2), 16);
+                }
+            } else {
+                signatureBuffer = this._base64urlToBuffer(sigHex);
+            }
+
+            const isValid = await crypto.subtle.verify(
+                { name: 'Ed25519' },
+                cryptoKey,
+                signatureBuffer,
+                digest,
+            );
+            if (!isValid) {
+                return { valid: false, reason: 'Invalid signature' };
+            }
+
+            this._verifiedSignatures.add(credential.id);
+            try {
+                await this._put('session', {
+                    id: `verified_${credential.id}`,
+                    sig: sigHex,
+                    issuer: credential.issuer,
+                    at: Date.now(),
+                });
+            } catch (_) {}
+
+            return {
+                valid: true,
+                issuer: credential.issuerInfo?.name || credential.issuer,
+                verified: true,
+                claims,
+                revocationUnchecked: revocationStatus.unchecked,
+                signatureCached: false,
+                verifyPath: 'browser_signatureValueWeb',
+            };
+        } catch (e) {
+            this._warn('isHuman browser signature verification error:', e.message);
+            return { valid: false, reason: `Verification error: ${e.message}` };
+        }
+    }
+
     _credentialIssuedAtSeconds(credential) {
         if (!credential) return 0;
         const claims = credential.claims || credential.credentialSubject || {};
@@ -2806,6 +2941,11 @@ class LemmaWallet {
         return [...(credentials || [])].sort(
             (a, b) => this._credentialIssuedAtSeconds(b) - this._credentialIssuedAtSeconds(a),
         );
+    }
+
+    needsIsHumanCredentialRepair(credential) {
+        if (!this._shouldVerifyAsIsHumanCredential(credential)) return false;
+        return !this._siteCredentialLocallyVerifiable(credential);
     }
 
     async findIsHumanSiteCredential(targetSite) {
@@ -7557,14 +7697,28 @@ class LemmaWallet {
         });
         
         // 2. Filter for requested site
-        const normalizedTargetSite = normalizeSite(siteId);
-        const sitePermissions = permissions.filter(p => {
-            const claims = p.claims || p.credentialSubject || {};
-            const credSiteId = normalizeSite(claims.siteId || claims.site || claims.site_id || claims.siteDomain || claims.site_domain || '');
-            if (!credSiteId || !normalizedTargetSite) return false;
-            return credSiteId === normalizedTargetSite
-                || credSiteId.includes(normalizedTargetSite)
-                || normalizedTargetSite.includes(credSiteId);
+        const utils = typeof window !== 'undefined' ? window.LemmaCredentialUtils : null;
+        const normalizedTargetSite = utils && typeof utils.canonicalPlatformSite === 'function'
+            ? utils.canonicalPlatformSite(siteId)
+            : normalizeSite(siteId);
+        const sitePermissions = permissions.filter((p) => {
+            let credSiteId = '';
+            if (utils && typeof utils.getCredentialSiteBinding === 'function') {
+                credSiteId = utils.getCredentialSiteBinding(p);
+            } else {
+                const claims = p.claims || p.credentialSubject || {};
+                credSiteId = normalizeSite(
+                    claims.siteId || claims.site || claims.site_id || claims.siteDomain || claims.site_domain || '',
+                );
+            }
+            if (!normalizedTargetSite) return false;
+            if (!credSiteId) {
+                return this._shouldVerifyAsIsHumanCredential(p);
+            }
+            const normalizedCredSite = utils && typeof utils.canonicalPlatformSite === 'function'
+                ? utils.canonicalPlatformSite(credSiteId)
+                : normalizeSite(credSiteId);
+            return normalizedCredSite === normalizedTargetSite;
         });
         
         if (sitePermissions.length === 0) {
@@ -7581,8 +7735,10 @@ class LemmaWallet {
         
         for (const perm of sitePermissions) {
             try {
-                const verification = await this.verifyLemma(perm);
-                
+                const verification = this._shouldVerifyAsIsHumanCredential(perm)
+                    ? await this._verifyIsHumanCredentialBrowser(perm)
+                    : await this.verifyLemma(perm);
+
                 if (verification.valid) {
                     verifiedPermissions.push(perm);
                 } else {

@@ -153,3 +153,59 @@ def test_reissue_is_rate_limited_per_wallet(
     assert statuses[0] == 200
     assert statuses[1] == 200
     assert statuses[2] == 429
+
+
+@pytest.mark.unit
+def test_reissue_master_for_platform_owner_includes_admin_access(
+    ishuman_client,
+    fake_ishuman_db_session_factory,
+    make_ishuman_verification,
+    monkeypatch,
+    attach_wallet_assertion,
+):
+    owner_ppid = "did:lemma:ppid_platform_owner_001"
+
+    def _issue_owner_master(ppid, wallet_id=None, site_id=None, **kwargs):
+        return {
+            "id": "ishuman_master_owner_reissued",
+            "subject": ppid,
+            "issuer": "did:lemma:testissuer",
+            "claims": {
+                "isHuman": True,
+                "siteId": "lemma.id",
+                "permissionId": "admin_access",
+            },
+            "credentialSubject": {
+                "isHuman": True,
+                "siteId": "lemma.id",
+                "permissionId": "admin_access",
+            },
+            "proof": {"signatureValueWeb": "ab" * 64},
+        }
+
+    db = fake_ishuman_db_session_factory
+    db.store.data["IsHumanVerification"].append(
+        make_ishuman_verification(
+            credential_id="ishuman_master_owner_old",
+            wallet_id="wallet_owner_001",
+            ppid=owner_ppid,
+            status="verified",
+        )
+    )
+    monkeypatch.setattr("api.database.SessionLocal", db.session_local)
+    monkeypatch.setattr("api.ishuman._issue_ishuman_credential", _issue_owner_master)
+    monkeypatch.setattr("api.platform_owner.is_platform_owner_ppid", lambda ppid: ppid == owner_ppid)
+
+    resp = ishuman_client.post(
+        "/api/ishuman/reissue-master",
+        json=attach_wallet_assertion(
+            {"wallet_id": "wallet_owner_001", "wallet_secret": "ab" * 32},
+            ["wallet_id"],
+        ),
+    )
+    payload = resp.get_json()
+    assert resp.status_code == 200, payload
+    claims = payload["credential"].get("claims") or payload["credential"].get("credentialSubject") or {}
+    assert claims.get("permissionId") == "admin_access"
+    assert payload["credential"]["proof"].get("signatureValueWeb")
+    assert payload["credential"]["subject"] == owner_ppid

@@ -93,10 +93,11 @@ Frontend helpers (`lemma-credential-utils.js`):
 After deploying wallet/auth changes:
 
 1. Hard refresh lemma.id (or unregister service worker + clear site data if SDK version stuck).
-2. Confirm `lemma-wallet.js?v=2670` (or current bump) and SDK `VERSION` ≥ 2.70.0 in console.
+2. Confirm `lemma-wallet.js?v=2671` (or current bump) and SDK `VERSION` ≥ 2.71.0 in console.
 3. Unlock wallet; manager (`/`) should recognize complete lemma.id without `site domain required` errors.
 4. Admin pages should attach `X-Lemma-Credential` with `X-Permission-ID: admin_access`.
-5. Run targeted tests:
+5. If `Invalid signature` appears on `ishuman_master_*`, hard refresh then unlock; platform login auto-reissues once via `reissueMasterCredential`.
+6. Run targeted tests:
    - `tests/test_wallet_hostname_guard.py`
    - `tests/test_platform_manager_navigation.py`
    - `tests/test_platform_identity_contract.py`

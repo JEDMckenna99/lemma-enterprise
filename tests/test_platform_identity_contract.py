@@ -65,7 +65,47 @@ def test_wallet_skips_empty_site_before_canonicalization(wallet_js_source):
 
 @pytest.mark.unit
 def test_wallet_version_bumped_for_platform_identity(wallet_js_source):
-    assert "static VERSION = '2.70.0'" in wallet_js_source
+    assert "static VERSION = '2.71.0'" in wallet_js_source
+
+
+@pytest.mark.unit
+def test_get_verified_permissions_uses_browser_sig_for_ishuman(wallet_js_source):
+    assert "_verifyIsHumanCredentialBrowser" in wallet_js_source
+    assert "_shouldVerifyAsIsHumanCredential" in wallet_js_source
+    assert "_browserCanonicalMessage" in wallet_js_source
+    assert "signatureValueWeb" in wallet_js_source
+    assert "await this._verifyIsHumanCredentialBrowser(perm)" in wallet_js_source
+
+
+@pytest.mark.unit
+def test_ishuman_verifier_unlock_uses_unified_idv_popup():
+    verifier = (ROOT / "static" / "js" / "ishuman-verifier.js").read_text(encoding="utf-8")
+    assert "issue_mode', 'unlock'" in verifier
+    assert "this.idvPopupPath" in verifier.split("_unlockViaPopup")[1][:400]
+
+
+@pytest.mark.unit
+def test_idv_popup_supports_unlock_mode():
+    idv = (ROOT / "templates" / "wallet_ishuman_idv.html").read_text(encoding="utf-8")
+    assert "isUnlockOnly = issueMode === 'unlock'" in idv
+    assert "runUnlockOnlyFlow" in idv
+    assert "LEMMA_UNLOCK_SUCCESS" in idv
+
+
+@pytest.mark.unit
+def test_wallet_popup_redirects_to_unified_idv():
+    popup = (ROOT / "templates" / "wallet_popup.html").read_text(encoding="utf-8")
+    assert "redirectToUnifiedPopup" in popup
+    assert "/wallet/ishuman-idv" in popup
+
+
+@pytest.mark.unit
+def test_platform_auth_cta_auto_reissue_on_verify_failure():
+    cta = (ROOT / "templates" / "modern" / "includes" / "platform_auth_cta_script.html").read_text(
+        encoding="utf-8"
+    )
+    assert "reissueMasterCredential" in cta
+    assert "__lemmaDevPermReissueAttempted" in cta
 
 
 @pytest.mark.unit
@@ -97,7 +137,7 @@ def test_sdk_cache_bust_bumped_in_templates():
         "templates/recover_complete.html",
     ):
         text = (ROOT / rel).read_text(encoding="utf-8")
-        assert "lemma-wallet.js" in text and "v=2670" in text, rel
+        assert "lemma-wallet.js" in text and "v=2671" in text, rel
 
 
 def _encode_credential(credential: dict) -> str:
