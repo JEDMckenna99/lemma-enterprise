@@ -28,6 +28,14 @@
 
         async function checkIsHumanProof(wallet) {
             try {
+                if (typeof wallet.findIsHumanMasterCredential === 'function') {
+                    const master = await wallet.findIsHumanMasterCredential();
+                    if (master) return true;
+                }
+                if (typeof wallet.hasIsHumanMasterInCache === 'function') {
+                    const cached = await wallet.hasIsHumanMasterInCache();
+                    if (cached) return true;
+                }
                 const ppid = await wallet.derivePPID('lemma.id');
                 return !!(ppid && String(ppid).startsWith('did:lemma:ppid_'));
             } catch (_) {
@@ -82,11 +90,6 @@
 
             let passkeyCredentialId = null;
             let clientWalletId = null;
-            let ppid = null;
-
-            try {
-                ppid = await wallet.derivePPID('lemma.id');
-            } catch (_) {}
 
             try {
                 passkeyCredentialId = await wallet.getPasskeyCredentialId();
@@ -114,7 +117,6 @@
                 headers: loginHeaders,
                 credentials: 'include',
                 body: JSON.stringify({
-                    ppid: ppid || undefined,
                     passkey_credential_id: passkeyCredentialId,
                     wallet_id: clientWalletId,
                 }),

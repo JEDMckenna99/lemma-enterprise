@@ -128,6 +128,11 @@ def test_platform_auth_accepts_combined_master_claims(wallet_source):
     assert "const all = await wallet.getCredentials();" in layout
     assert "const isHumanMaster = !!claims.isHuman" in layout
     assert "if (hasIsHuman) {" in platform_cta
+    assert "wallet.findIsHumanMasterCredential" in platform_cta
+    assert "wallet.hasIsHumanMasterInCache" in platform_cta
+    login_payload = platform_cta.split("fetch('/api/wallet-auth/platform-login'", 1)[1].split("});", 1)[0]
+    assert "ppid:" not in login_payload
+    assert "wallet_id: clientWalletId" in login_payload
 
 
 @pytest.mark.browser
