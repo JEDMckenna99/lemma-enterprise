@@ -270,9 +270,24 @@
             _nobleX25519 = window.x25519;
             return _nobleX25519;
         }
-        const mod = await import(nobleModuleUrl(NOBLE_CURVES_ED25519_MODULE));
-        _nobleX25519 = mod.x25519;
-        return _nobleX25519;
+        const sources = [
+            nobleModuleUrl(NOBLE_CURVES_ED25519_MODULE),
+            'https://cdn.jsdelivr.net/npm/@noble/curves@1.6.0/esm/ed25519.js?+esm',
+        ];
+        let lastErr = null;
+        for (const src of sources) {
+            try {
+                const mod = await import(src);
+                if (mod?.x25519) {
+                    _nobleX25519 = mod.x25519;
+                    return _nobleX25519;
+                }
+            } catch (err) {
+                lastErr = err;
+                console.warn('[LemmaKeys] X25519 load failed for', src, err?.message || err);
+            }
+        }
+        throw lastErr || new Error('Failed to load X25519 (noble/curves)');
     }
 
     async function hkdfRaw(ikmBytes, saltBytes, infoBytes, length) {

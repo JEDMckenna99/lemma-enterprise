@@ -196,6 +196,13 @@ def test_authz_engine_rejects_internal_site_id_as_runtime_binding(monkeypatch):
 
 
 @pytest.mark.unit
+def test_noble_curves_vendor_uses_jsdelivr_not_lemma_npm():
+    vendor = (ROOT / "static" / "js" / "vendor" / "noble-curves-ed25519.mjs").read_text(encoding="utf-8")
+    assert 'from"/npm/' not in vendor
+    assert "cdn.jsdelivr.net/npm/@noble/hashes" in vendor
+
+
+@pytest.mark.unit
 def test_device_link_bundles_ishuman_credentials_and_unlock_token(wallet_js_source):
     """Cross-device QR/link must carry encrypted human proof + session bootstrap."""
     assert "_importLinkedIsHumanCredentials" in wallet_js_source

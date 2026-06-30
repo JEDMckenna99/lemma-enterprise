@@ -312,4 +312,4 @@ def test_wallet_pages_use_current_wallet_bundle():
         )
         assert "lemma-keys.js?v=2" not in source
         assert "lemma-keys.js?v=3" not in source
-        assert "lemma-keys.js') }}?v=5" in source or "lemma-keys.js?v=5" in source
+        assert "lemma-keys.js') }}?v=6" in source or "lemma-keys.js?v=6" in source
