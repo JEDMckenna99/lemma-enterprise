@@ -303,11 +303,13 @@ def test_ishuman_issue_signs_string_claims_but_returns_typed_claims(monkeypatch)
         def get_public_key_hex(self):
             return "a" * 64
 
+    owner_ppid = f"did:lemma:ppid_{'1' * 64}"
+    monkeypatch.setenv("LEMMA_PLATFORM_OWNER_PPID", owner_ppid)
     monkeypatch.setattr("api.ishuman._get_ishuman_issuer", lambda: _Issuer())
 
     from api.ishuman import _issue_ishuman_credential
 
-    credential = _issue_ishuman_credential("did:lemma:ppid_test", "wallet_test")
+    credential = _issue_ishuman_credential(owner_ppid, "wallet_test")
 
     assert captured["claims"]["isHuman"] == "true"
     assert captured["claims"]["permissionId"] == "admin_access"
@@ -319,6 +321,45 @@ def test_ishuman_issue_signs_string_claims_but_returns_typed_claims(monkeypatch)
     assert credential["claims"]["permission_level"] == "admin"
     assert credential["claims"]["accountType"] == "admin"
     assert credential["claims"]["scope"] == ["admin", "write", "read", "developer"]
+
+
+def test_ishuman_master_for_non_owner_does_not_get_platform_admin_claims(monkeypatch):
+    import json
+
+    class _Issuer:
+        def issue_credential(self, ppid, claims):
+            return json.dumps({
+                "issuer": "did:lemma:" + ("a" * 64),
+                "subject": ppid,
+                "claims": claims,
+                "credentialSubject": claims,
+                "proof": {"signatureValue": "ab"},
+            })
+
+        def get_did(self):
+            return "did:lemma:" + ("a" * 64)
+
+        def get_public_key_hex(self):
+            return "a" * 64
+
+    monkeypatch.setenv("LEMMA_PLATFORM_OWNER_PPID", f"did:lemma:ppid_{'1' * 64}")
+    monkeypatch.setattr("api.ishuman._get_ishuman_issuer", lambda: _Issuer())
+
+    from api.ishuman import _issue_ishuman_credential
+
+    credential = _issue_ishuman_credential(
+        f"did:lemma:ppid_{'2' * 64}",
+        "wallet_test",
+    )
+
+    claims = credential["claims"]
+    assert claims["isHuman"] is True
+    assert claims["siteId"] == "lemma.id"
+    assert claims["siteDomain"] == "lemma.id"
+    assert "permissionId" not in claims
+    assert "permission_level" not in claims
+    assert "accountType" not in claims
+    assert "scope" not in claims
 
 
 def test_ishuman_site_proof_does_not_inherit_platform_admin_claims(monkeypatch):

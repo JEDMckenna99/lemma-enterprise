@@ -227,9 +227,15 @@ def _issue_ishuman_credential(
         "issuedAt": str(now),
         "expiresAt": str(now + lifetime_seconds),
     }
-    if not site_id or site_id == "lemma.id":
+    is_lemma_master = not site_id or site_id == "lemma.id"
+    if is_lemma_master:
+        claims["siteDomain"] = "lemma.id"
+
+    if is_lemma_master:
+        from api.platform_owner import is_platform_owner_ppid
+
+    if is_lemma_master and is_platform_owner_ppid(ppid):
         claims.update({
-            "siteDomain": "lemma.id",
             "permissionId": "admin_access",
             "permission_level": "admin",
             "accountType": "admin",
