@@ -3,9 +3,11 @@ Pairwise Tagging Service
 Generates HMAC-based pairwise tags for RP uniqueness enforcement
 """
 
+import os
 import hmac
 import hashlib
 import logging
+import secrets as _secrets
 from typing import Dict, Optional
 from flask import Blueprint, request, jsonify, session
 from flask_cors import cross_origin
@@ -16,17 +18,67 @@ logger = logging.getLogger(__name__)
 # Create blueprint
 pairwise_tagging_bp = Blueprint('pairwise_tagging', __name__)
 
+# Env var holding the pairwise HMAC key material (HSM/KMS-backed in production).
+_PAIRWISE_KEY_ENV = "LEMMA_PAIRWISE_TAG_KEY"
+
+
+def _is_production() -> bool:
+    try:
+        from api.config import is_production
+        return is_production()
+    except Exception:
+        return (
+            os.environ.get("FLASK_ENV") == "production"
+            or os.environ.get("ENVIRONMENT") == "production"
+        )
+
+
 class PairwiseTagManager:
     """Manages pairwise tag generation for RP uniqueness"""
-    
+
     def __init__(self):
-        # In production, this would be stored in HSM/KMS
-        self.k_pair = b"lemma_pairwise_key_production_hsm_2024_secure_key_material_32bytes"[:32]
-        
+        # SECURITY: never hardcode the pairwise key. It is resolved lazily from
+        # the environment (HSM/KMS-backed) on first use so an unconfigured
+        # optional feature cannot crash app startup, while still failing closed
+        # in production when the key is absent.
+        self._k_pair: Optional[bytes] = None
+        self._k_pair_dev_only = False
+
         # Tag cache for performance
         self.tag_cache: Dict[str, str] = {}
-        
+
         logger.info("🏷️ Pairwise Tag Manager initialized")
+
+    @property
+    def k_pair(self) -> bytes:
+        """Resolve the 32-byte HMAC key, deriving a stable value from the
+        configured secret. Raises in production when the key is unset so tags
+        are never generated under a predictable/forgeable key."""
+        if self._k_pair is not None:
+            return self._k_pair
+
+        raw = os.environ.get(_PAIRWISE_KEY_ENV)
+        if raw and len(raw) >= 32:
+            # Normalize arbitrary-length secret material to a fixed 32-byte key.
+            self._k_pair = hashlib.sha256(raw.encode("utf-8")).digest()
+            self._k_pair_dev_only = False
+            return self._k_pair
+
+        if _is_production():
+            raise RuntimeError(
+                f"CRITICAL: {_PAIRWISE_KEY_ENV} not set (or <32 chars) in production; "
+                "refusing to generate pairwise tags under a predictable key."
+            )
+
+        # Development only: stable-per-process random key (never persisted,
+        # never the same across deployments).
+        logger.warning(
+            "⚠️ DEV MODE: generating an ephemeral pairwise tag key; set %s for stable tags.",
+            _PAIRWISE_KEY_ENV,
+        )
+        self._k_pair = _secrets.token_bytes(32)
+        self._k_pair_dev_only = True
+        return self._k_pair
     
     def generate_pairwise_tag(self, rid: str, rp_id: str) -> str:
         """
@@ -100,10 +152,14 @@ class PairwiseTagManager:
     
     def get_tag_stats(self) -> Dict[str, any]:
         """Get pairwise tag statistics"""
+        try:
+            key_available = bool(self.k_pair)
+        except Exception:
+            key_available = False
         return {
             'total_tags_generated': len(self.tag_cache),
             'cache_size': len(self.tag_cache),
-            'k_pair_available': bool(self.k_pair)
+            'k_pair_available': key_available
         }
 
 # Global tag manager
@@ -225,6 +281,7 @@ def validate_tag_uniqueness():
 
 @pairwise_tagging_bp.route('/api/issuer/tag-stats', methods=['GET'])
 @cross_origin()
+@require_api_key
 def get_tag_stats():
     """Get pairwise tag statistics"""
     try:

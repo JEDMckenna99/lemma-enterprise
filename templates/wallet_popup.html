@@ -325,20 +325,30 @@
                     }
                 }
                 
-                window.opener.postMessage({
+                // SECURITY: The master wallet secret must NEVER cross origins.
+                // It is delivered only to a same-origin (lemma.id) opener via an
+                // explicit targetOrigin. A malicious site that opens this popup
+                // directly will not match window.location.origin, so the browser
+                // drops the secret-bearing message. Third-party verifier openers
+                // (which only need to know unlock completed and do not consume the
+                // secret) receive a sanitized signal with no sensitive material.
+                const sameOriginPayload = {
                     type: 'LEMMA_UNLOCK_SUCCESS',
                     walletId: sessionInfo.walletId,
-                    // Include session data so parent/bridge can sync without cookie
+                    // Include session data so the same-origin bridge can sync without cookie
                     sessionData: {
                         isUnlocked: sessionInfo.isUnlocked,
                         unlockedAt: sessionInfo.unlockedAt,
                         expiresAt: sessionInfo.expiresAt,
                         walletId: sessionInfo.walletId
                     },
-                    // Include wallet secret so third-party bridge can decrypt/sync
                     walletSecret: walletSecret,
                     isHumanCredentials,
-                }, '*');
+                };
+                window.opener.postMessage(sameOriginPayload, window.location.origin);
+
+                // Cross-origin completion signal only — no secret, no credentials.
+                window.opener.postMessage({ type: 'LEMMA_UNLOCK_SUCCESS' }, '*');
             }
             window.close();
         }

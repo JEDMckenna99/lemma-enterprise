@@ -235,5 +235,17 @@ def try_wallet_session_principal(headers: Mapping[str, str]) -> Tuple[Optional[A
     if not principal:
         return None, "invalid_lemma_subject"
 
+    # SECURITY: This is the fallback used precisely when strict signature/trust
+    # verification of the credential has already failed. The credential body is
+    # therefore UNVERIFIED and fully attacker-controllable; the only thing
+    # actually proven here is possession of a valid wallet-unlock session cookie.
+    # A stolen/replayed cookie plus a crafted X-Lemma-Credential JSON must never
+    # be able to assert admin or write scope. We establish identity (PPID) for
+    # low-risk read flows only and force least privilege. Privileged actions must
+    # go through a verified credential (extract_user_lemma_principal) or a
+    # proof-native authorization path.
+    principal.scope = ["read"]
+    principal.permission_id = "read"
+
     return principal, None
 

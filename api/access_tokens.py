@@ -53,10 +53,22 @@ def _normalize_scopes(scopes) -> list[str]:
 
 
 def _is_admin_permission(permission_id: Optional[str]) -> bool:
+    # Delegate to the canonical helper so admin recognition stays consistent and
+    # never falls back to an unsafe `"admin" in value` substring match.
     if not permission_id:
         return False
-    value = permission_id.strip().lower()
-    return value in {"admin", "admin_access", "super_admin", "superadmin", "site_admin"} or "admin" in value
+    try:
+        from auth.permissions import is_admin_permission
+        return is_admin_permission(permission_id)
+    except Exception:
+        value = permission_id.strip().lower()
+        if value in {"admin", "admin_access", "super_admin", "superadmin", "site_admin"}:
+            return True
+        if value.endswith("_access") and value[: -len("_access")] in {
+            "admin", "super_admin", "superadmin", "site_admin",
+        }:
+            return True
+        return False
 
 
 def _legacy_token_jti(raw_jwt_token: str) -> str:
