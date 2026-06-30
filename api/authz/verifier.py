@@ -366,7 +366,14 @@ def evaluate_proof_native(
     if top_public_key and delegated_public_key and top_public_key != delegated_public_key:
         return ProofDecision(False, "AUTH_CHAIN_BROKEN", profile, proof_id, root_grant_id, policy_version)
 
-    if len(links) >= 2:
+    # SECURITY: Every proof link must pass cryptographic trust verification,
+    # including the single-link (degenerate) case. Previously this only ran for
+    # chains of >= 2 links, so a single-link proof passed structural checks with
+    # no signature/trust verification at all — letting an attacker craft a JSON
+    # proof that satisfied proof_required routes without any valid issuer
+    # signature. Legitimate proofs always carry a root + delegated chain; a
+    # single link that cannot be anchored to a trusted issuer fails closed.
+    if links:
         try:
             from api.trusted_issuers import verify_credential_with_trust
         except ImportError:

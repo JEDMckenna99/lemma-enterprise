@@ -140,9 +140,15 @@ def _public_record(record) -> dict:
 
 
 def _demo_exposes_test_token() -> bool:
-    from api.config import is_ishuman_demo_qr_idv_enabled
-
-    return _demo_enabled() or is_ishuman_demo_qr_idv_enabled()
+    # SECURITY: never embed the demo test token in a production page. In
+    # production the token is the ONLY guard on no-IDV credential minting
+    # (/api/demo/ishuman/qr-demo-idv-flow and the skeleton/test-verify rails).
+    # Rendering it into the public /demo/ishuman page let any visitor read it
+    # and mint real, network-trusted "verified human" master credentials with
+    # no IDV (and unlimited synthetic person-roots). Operators running the
+    # public QR demo on production must paste the token via the in-page override
+    # field; it is auto-exposed only on non-production deploys.
+    return _demo_enabled()
 
 
 def _demo_page_context() -> dict:

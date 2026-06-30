@@ -174,7 +174,7 @@
     <script src="/static/js/lemma-keys.js?v=5" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
     <script src="/static/js/wallet-at-rest-crypto.js?v=2" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
     <script nonce="{{ csp_nonce }}">window.LEMMA_ISHUMAN_USE_PERSON_ROOT_SEEDS = {{ 'true' if ishuman_use_person_root_seeds else 'false' }};</script>
-    <script src="/sdk/lemma-wallet.js?v=2660" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
+    <script src="/sdk/lemma-wallet.js?v=2661" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
     <script src="/static/js/qrcode.min.js" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
     <script nonce="{{ csp_nonce }}">
         const SESSION_KEY = 'ishuman_idv_popup_session_id';
@@ -410,6 +410,9 @@
         async function closeWith(type, detail) {
             idvLifecycle.settled = true;
             idvLifecycle.clearIdleTimer();
+            // Secret-bearing sync payload for a SAME-ORIGIN (lemma.id) bridge only.
+            // Stays null for cross-origin relying-site openers.
+            let secretSyncDetail = null;
             const syncTypes = new Set(['ISHUMAN_IDV_COMPLETE', 'ISHUMAN_SITE_PROOF_ISSUED']);
             if (syncTypes.has(type) && wallet) {
                 try {
@@ -423,7 +426,13 @@
                             console.warn('[isHuman IDV] credential export for bridge failed:', exportErr.message);
                         }
                     }
-                    detail = {
+                    // SECURITY: the master wallet secret, raw isHuman credentials,
+                    // and wallet session data must NEVER cross origins. They are
+                    // delivered ONLY to a same-origin (lemma.id) bridge opener (see
+                    // notifyOpener below). The third-party relying-site opener
+                    // receives `detail` only (request nonce + site proof), which is
+                    // all the isHuman verifier consumes.
+                    secretSyncDetail = {
                         ...(detail || {}),
                         walletId: sessionInfo.walletId || walletId,
                         sessionData: {
@@ -506,7 +515,26 @@
                 return;
             }
 
-            notifyOpener(type, detail);
+            // SECURITY: deliver the secret-bearing sync payload only to a
+            // same-origin (lemma.id) bridge opener via an explicit targetOrigin;
+            // the browser drops it for any third-party opener. The relying-site
+            // opener receives only the sanitized `detail` (no wallet secret, no
+            // raw credentials, no wallet session data).
+            if (window.opener) {
+                const sameOrigin = window.location.origin;
+                const target = openerOrigin && openerOrigin !== '*' ? openerOrigin : '*';
+                if (secretSyncDetail) {
+                    // Full sync payload only to the same-origin (lemma.id) bridge.
+                    window.opener.postMessage({ type, detail: secretSyncDetail }, sameOrigin);
+                    // Sanitized payload to a cross-origin opener (avoid duplicate to same-origin).
+                    if (target !== sameOrigin) {
+                        window.opener.postMessage({ type, detail: detail || {} }, target);
+                    }
+                } else {
+                    // No secrets in this message type — deliver detail to the opener.
+                    window.opener.postMessage({ type, detail: detail || {} }, target);
+                }
+            }
             window.close();
         }
 

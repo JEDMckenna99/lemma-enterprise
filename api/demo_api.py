@@ -188,6 +188,39 @@ def _log_decision(
         logger.warning("demo decision log write failed: %s", exc)
 
 
+def _demo_issuance_allowed() -> tuple[bool, Any]:
+    """Gate demo credential/proof minting.
+
+    SECURITY: These routes mint real (demo-runtime-scoped) signed credentials
+    with no wallet/IDV. They are enabled by default off-production; in production
+    they fail closed unless an operator explicitly opts in with
+    LEMMA_DEMO_ISSUANCE_ENABLED=1. The runtime allowlist (_require_runtime) still
+    applies on top of this gate.
+    """
+    try:
+        from api.config import is_production
+        production = is_production()
+    except Exception:
+        production = True  # fail closed if environment detection is unavailable
+
+    if not production:
+        return True, None
+
+    if str(os.getenv("LEMMA_DEMO_ISSUANCE_ENABLED", "")).strip().lower() in {"1", "true", "yes", "on"}:
+        return True, None
+
+    return False, (
+        jsonify(
+            {
+                "success": False,
+                "error": "demo_issuance_disabled",
+                "message": "Demo credential issuance is disabled in this environment.",
+            }
+        ),
+        403,
+    )
+
+
 def _require_runtime(runtime_id: str) -> tuple[bool, Any]:
     if runtime_id in ALLOWED_RUNTIMES:
         return True, None
@@ -600,6 +633,10 @@ def demo_issue_credential():
     Returns a full credential JSON that can be passed as X-Lemma-Credential
     to the Lemma Firewall for local verification (no per-request server calls).
     """
+    issuance_ok, issuance_failure = _demo_issuance_allowed()
+    if not issuance_ok:
+        return issuance_failure
+
     body = request.get_json(silent=True) or {}
     runtime_id = str(body.get("runtime_id") or "").strip()
     allowed, failure = _require_runtime(runtime_id)
@@ -667,6 +704,10 @@ def demo_issue_credential():
 @rate_limit("20 per minute")
 def demo_issue_proof_chain():
     """Issue a proof chain with delegation for demo use. Returns X-Lemma-Proof payload."""
+    issuance_ok, issuance_failure = _demo_issuance_allowed()
+    if not issuance_ok:
+        return issuance_failure
+
     body = request.get_json(silent=True) or {}
     runtime_id = str(body.get("runtime_id") or "").strip()
     allowed, failure = _require_runtime(runtime_id)

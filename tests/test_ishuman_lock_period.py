@@ -103,10 +103,36 @@ def test_wallet_handoff_wallet_id_reconciled_for_site_proof(wallet_source):
     """Handoff-linked wallets must bind passkey to the verified wallet_id, not mint a new one."""
     assert "_resolveStoredWalletIdentity" in wallet_source
     assert "reconcileSessionWalletIdForIssuance" in wallet_source
+    assert "walletId = sess.walletId || walletId" in wallet_source
     assert "requirePasskeyForIssuance" in wallet_source
     assert "mustCreatePasskeyForIssuance" in wallet_source
     assert "canAutoFinishVerificationReturn" in IDV_HTML.read_text(encoding="utf-8")
     assert "ishuman_deferred_passkey" not in wallet_source
+
+
+@pytest.mark.browser
+def test_platform_auth_accepts_combined_master_claims(wallet_source):
+    """lemma.id platform auth must accept the master isHuman credential when it carries IAM claims."""
+    auto_init = (ROOT / "templates" / "modern" / "includes" / "wallet_auto_init_script.html").read_text(encoding="utf-8")
+    layout = (ROOT / "templates" / "modern" / "layout.html").read_text(encoding="utf-8")
+    platform_cta = (ROOT / "templates" / "modern" / "includes" / "platform_auth_cta_script.html").read_text(encoding="utf-8")
+    assert "hasPlatformPermissionClaims" in wallet_source
+    assert "Get permission lemmas plus combined lemma.id isHuman+IAM master credentials" in wallet_source
+    assert "cl.siteDomain" in wallet_source
+    assert "cl.siteId" in wallet_source
+    assert "site === 'lemma.id' || site === 'lemma_platform'" in wallet_source
+    assert "const allCredentials = await wallet.getCredentials();" in auto_init
+    assert "|| normalized.isHuman" in auto_init
+    assert "const hasAccessClaims = !!(" in auto_init
+    assert "const isLemmaHuman = normalized?.isLemmaSite && normalized?.isHuman;" in auto_init
+    assert "const all = await wallet.getCredentials();" in layout
+    assert "const isHumanMaster = !!claims.isHuman" in layout
+    assert "if (hasIsHuman) {" in platform_cta
+    assert "wallet.findIsHumanMasterCredential" in platform_cta
+    assert "wallet.hasIsHumanMasterInCache" in platform_cta
+    login_payload = platform_cta.split("fetch('/api/wallet-auth/platform-login'", 1)[1].split("});", 1)[0]
+    assert "ppid:" not in login_payload
+    assert "wallet_id: clientWalletId" in login_payload
 
 
 @pytest.mark.browser
@@ -284,7 +310,7 @@ def test_wallet_pages_use_current_wallet_bundle():
     for path in wallet_pages:
         source = path.read_text(encoding="utf-8")
         assert "lemma-wallet.js?v=2542" not in source
-        assert "lemma-wallet.js') }}?v=2660" in source or "lemma-wallet.js?v=2660" in source
+        assert "lemma-wallet.js') }}?v=2661" in source or "lemma-wallet.js?v=2661" in source
         assert "lemma-keys.js?v=2" not in source
         assert "lemma-keys.js?v=3" not in source
         assert "lemma-keys.js') }}?v=5" in source or "lemma-keys.js?v=5" in source

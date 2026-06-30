@@ -2397,6 +2397,16 @@ def get_customer_sites():
 @customer_accounts_bp.route('/create-test-accounts')
 def create_test_accounts():
     """Create basic test accounts for development - REMOVE IN PRODUCTION"""
+    # SECURITY: This endpoint is unauthenticated and provisions an admin account
+    # with a well-known password (`admin123`) plus a customer account and API
+    # key. It must never be reachable in production.
+    try:
+        from api.config import is_production
+        if is_production():
+            return jsonify({'error': 'not_found'}), 404
+    except Exception:
+        # Fail closed: if environment detection is unavailable, do not expose it.
+        return jsonify({'error': 'not_found'}), 404
     try:
         results = []
         

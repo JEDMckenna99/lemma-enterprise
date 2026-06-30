@@ -227,6 +227,22 @@ def _issue_ishuman_credential(
         "issuedAt": str(now),
         "expiresAt": str(now + lifetime_seconds),
     }
+    is_lemma_master = not site_id or site_id == "lemma.id"
+    if is_lemma_master:
+        claims["siteDomain"] = "lemma.id"
+
+    if is_lemma_master:
+        from api.platform_owner import is_platform_owner_ppid
+
+    if is_lemma_master and is_platform_owner_ppid(ppid):
+        claims.update({
+            "permissionId": "admin_access",
+            "permission_level": "admin",
+            "accountType": "admin",
+            "credentialScope": "site_specific",
+            "scope": ["admin", "write", "read", "developer"],
+            "permissions": "admin_access",
+        })
     if site_signing_pubkey:
         claims["site_signing_pubkey"] = site_signing_pubkey
     if ppid_derivation:
@@ -3067,7 +3083,7 @@ def verify_presentation():
         return jsonify({"success": False, "error": "missing_signature"}), 400
 
     issuer_did = (credential.get("issuer") or (credential.get("issuerInfo") or {}).get("did") or "").strip()
-    issuer_pubkey_hex = ((credential.get("issuerInfo") or {}).get("publicKey") or "").strip()
+    client_supplied_pubkey_hex = ((credential.get("issuerInfo") or {}).get("publicKey") or "").strip().lower()
     if not issuer_did:
         return jsonify({"success": False, "error": "missing_issuer"}), 400
 
@@ -3079,10 +3095,22 @@ def verify_presentation():
         logger.warning("Trust list check unavailable: %s", exc)
         return jsonify({"success": False, "error": "trust_list_unavailable"}), 503
 
-    if not issuer_pubkey_hex and issuer_did.startswith("did:lemma:"):
-        issuer_pubkey_hex = issuer_did.split(":", 2)[2]
+    # SECURITY: derive the verification key from the TRUSTED issuer DID, NEVER
+    # from the client-supplied issuerInfo.publicKey. Lemma issuer DIDs embed the
+    # Ed25519 public key (did:lemma:<pubkey_hex>). Trusting issuerInfo.publicKey
+    # would let an attacker pair any trusted DID with their own keypair and forge
+    # a valid-looking "human: true" presentation for an arbitrary PPID/site.
+    issuer_pubkey_hex = ""
+    if issuer_did.startswith("did:lemma:"):
+        issuer_pubkey_hex = issuer_did.split(":", 2)[2].split("#", 1)[0].split("?", 1)[0].strip()
     if not issuer_pubkey_hex:
-        return jsonify({"success": False, "error": "issuer_pubkey_missing"}), 400
+        # Non-did:lemma trusted issuers do not embed a key here; refuse rather
+        # than trust a client-provided key.
+        return jsonify({"success": False, "error": "issuer_pubkey_unresolvable"}), 400
+    # If the credential also carries issuerInfo.publicKey, it must match the
+    # DID-bound key exactly (no silent override).
+    if client_supplied_pubkey_hex and client_supplied_pubkey_hex != issuer_pubkey_hex.lower():
+        return jsonify({"success": False, "error": "issuer_pubkey_mismatch"}), 400
 
     try:
         pubkey_bytes = bytes.fromhex(issuer_pubkey_hex)

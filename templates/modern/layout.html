@@ -214,7 +214,7 @@ h1{color:#1e293b;font-weight:600;line-height:1.25;margin-bottom:16px;font-size:4
     <!-- Wallet Scripts - end of body for non-blocking -->
     <script src="{{ url_for('static', filename='js/lemma-keys.js') }}?v=5" defer data-cfasync="false"></script>
     <script src="{{ url_for('static', filename='js/wallet-at-rest-crypto.js') }}?v=2" defer data-cfasync="false"></script>
-    <script src="{{ url_for('static', filename='js/lemma-wallet.js') }}?v=2660" defer data-cfasync="false"></script>
+    <script src="{{ url_for('static', filename='js/lemma-wallet.js') }}?v=2661" defer data-cfasync="false"></script>
     <script src="{{ url_for('static', filename='js/encrypted-wallet-transparent.js') }}?v=1121" defer data-cfasync="false"></script>
     <script src="{{ url_for('static', filename='js/lemma-session-free-auth.js') }}?v=1121" defer data-cfasync="false"></script>
     <script src="{{ url_for('static', filename='js/lemma-credential-utils.js') }}?v=1" defer data-cfasync="false"></script>
@@ -417,12 +417,22 @@ h1{color:#1e293b;font-weight:600;line-height:1.25;margin-bottom:16px;font-size:4
                             await window.globalLemmaWallet.init();
                         }
                         const wallet = window.globalLemmaWallet;
-                        const all = await wallet.getCredentials('permission');
+                        const all = await wallet.getCredentials();
                         const utils = window.LemmaCredentialUtils;
                         const lemmaPermissions = (all || []).filter((cred) => {
                             const claims = cred.claims || cred.credentialSubject || {};
                             const siteId = String(claims.siteId || claims.site || claims.site_id || claims.siteDomain || '').toLowerCase();
-                            return siteId === 'lemma.id' || siteId === 'lemma_platform' || siteId.includes('lemma');
+                            const packageType = String(cred.packageType || claims.packageType || claims.type || '').toLowerCase();
+                            const hasAccessClaims = !!(
+                                claims.permissionId
+                                || claims.permission_level
+                                || claims.permission_id
+                                || claims.accountType
+                                || claims.account_type
+                            );
+                            const isHumanMaster = !!claims.isHuman && (siteId === 'lemma.id' || siteId === 'lemma_platform' || !siteId);
+                            return (packageType === 'permission' || hasAccessClaims || isHumanMaster)
+                                && (siteId === 'lemma.id' || siteId === 'lemma_platform' || siteId.includes('lemma') || !siteId);
                         });
                         const preferAdmin = typeof window.location?.pathname === 'string'
                             && window.location.pathname.startsWith('/admin');

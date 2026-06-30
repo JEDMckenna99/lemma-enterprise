@@ -43,7 +43,22 @@ def normalize_scopes(scopes: Iterable[str]) -> list[str]:
 
 
 def is_admin_permission(permission_id: str) -> bool:
+    """Return True only for explicitly recognized admin permission ids.
+
+    SECURITY: This must never use a substring match such as ``"admin" in value``
+    because that treats ``"non_admin"``, ``"badmin"``, ``"readonly_admin_viewer"``
+    and any other attacker-influenced string containing "admin" as admin, which
+    is a direct privilege-escalation primitive. We match against an explicit
+    allowlist, tolerating only a canonical trailing ``_access`` suffix (e.g.
+    ``"super_admin_access"`` -> ``"super_admin"``).
+    """
     if not permission_id:
         return False
     value = permission_id.strip().lower()
-    return value in ADMIN_PERMISSION_IDS or "admin" in value
+    if value in ADMIN_PERMISSION_IDS:
+        return True
+    if value.endswith("_access"):
+        base = value[: -len("_access")]
+        if base in ADMIN_PERMISSION_IDS:
+            return True
+    return False

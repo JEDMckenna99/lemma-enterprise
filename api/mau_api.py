@@ -4,8 +4,9 @@ Provides REST API for MAU tracking, analytics, and billing integration
 """
 
 import logging
+from functools import wraps
 from datetime import datetime, timedelta
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, g
 from typing import Dict, Any, Optional
 from auth.decorators import require_api_key
 
@@ -16,6 +17,54 @@ logger = logging.getLogger(__name__)
 
 # Create blueprint
 mau_api_bp = Blueprint('mau_api', __name__)
+
+
+def _caller_is_platform_admin() -> bool:
+    """True for platform-level admins who may read any tenant's MAU data."""
+    if getattr(g, "is_admin", False):
+        return True
+    scope = getattr(g, "scope", None) or []
+    try:
+        return "admin" in {str(s).strip().lower() for s in scope}
+    except Exception:
+        return False
+
+
+def _caller_can_access_customer(customer_id: Optional[str]) -> bool:
+    """Bind the URL ``customer_id`` (a site identifier) to the authenticated
+    caller. Platform admins may read any tenant; everyone else must own the
+    site (via credential PPID or matching site API key)."""
+    if not customer_id:
+        return False
+    if _caller_is_platform_admin():
+        return True
+    try:
+        from api.site_access import require_site_ownership
+        return require_site_ownership(customer_id, allow_site_api_key=True) is None
+    except Exception as exc:
+        logger.error(f"MAU customer access check failed (failing closed): {exc}")
+        return False
+
+
+def _require_customer_access(f):
+    """Require a valid credential AND that the caller owns ``customer_id``.
+
+    SECURITY: these endpoints previously had no authentication, allowing IDOR
+    enumeration of any customer's billing/analytics/export data.
+    """
+    @wraps(f)
+    def _wrapper(*args, **kwargs):
+        customer_id = kwargs.get("customer_id")
+        if not _caller_can_access_customer(customer_id):
+            return jsonify({
+                "success": False,
+                "error": "You do not have access to this customer",
+                "code": "UNAUTHORIZED_CUSTOMER_ACCESS",
+            }), 403
+        return f(*args, **kwargs)
+
+    # require_api_key establishes the principal (g.ppid / g.api_key / g.scope).
+    return require_api_key(_wrapper)
 
 @mau_api_bp.route('/api/mau/track', methods=['POST'])
 @require_api_key
@@ -115,6 +164,7 @@ def track_stripe_identity():
         return jsonify({'error': 'Failed to track Stripe Identity verification'}), 500
 
 @mau_api_bp.route('/api/mau/billing/<customer_id>', methods=['GET'])
+@_require_customer_access
 def get_billing_data(customer_id):
     """
     Get MAU billing data for a customer
@@ -137,6 +187,7 @@ def get_billing_data(customer_id):
         return jsonify({'error': 'Failed to get billing data'}), 500
 
 @mau_api_bp.route('/api/mau/analytics/<customer_id>', methods=['GET'])
+@_require_customer_access
 def get_analytics(customer_id):
     """
     Get comprehensive MAU analytics for a customer
@@ -162,6 +213,7 @@ def get_analytics(customer_id):
         return jsonify({'error': 'Failed to get analytics'}), 500
 
 @mau_api_bp.route('/api/mau/rolling/<customer_id>', methods=['GET'])
+@_require_customer_access
 def get_rolling_mau(customer_id):
     """
     Get rolling 30-day MAU for a customer
@@ -191,6 +243,7 @@ def get_rolling_mau(customer_id):
         return jsonify({'error': 'Failed to get rolling MAU'}), 500
 
 @mau_api_bp.route('/api/mau/export/<customer_id>', methods=['GET'])
+@_require_customer_access
 def export_billing_data(customer_id):
     """
     Export billing data for Stripe integration

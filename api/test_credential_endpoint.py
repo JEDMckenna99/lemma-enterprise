@@ -32,7 +32,17 @@ def issue_test_credential():
     """
     if request.method == 'OPTIONS':
         return '', 204
-    
+
+    # SECURITY: Mints credentials from an ephemeral issuer keypair with no
+    # authentication. It exists only to test client/server signature parity and
+    # must never be reachable in production.
+    try:
+        from api.config import is_production
+        if is_production():
+            return jsonify({'error': 'not_found'}), 404
+    except Exception:
+        return jsonify({'error': 'not_found'}), 404
+
     try:
         if not RUST_AVAILABLE:
             return jsonify({

@@ -114,17 +114,30 @@
                 window.__lemmaLockHandlersBound = true;
             }
 
-            const permissions = await wallet.getCredentials('permission');
+            const allCredentials = await wallet.getCredentials();
             const utils = window.LemmaCredentialUtils;
 
-            const lemmaPermissions = permissions.filter(p => {
+            const lemmaPermissions = allCredentials.filter(p => {
                 if (utils) {
                     const normalized = utils.normalizeCredentialClaims(p);
-                    return normalized.isLemmaSite;
+                    return normalized.isLemmaSite && (
+                        normalized.packageType === 'permission'
+                        || normalized.permissionId
+                        || normalized.accountType
+                        || normalized.isHuman
+                    );
                 }
                 const claims = p.claims || p.credentialSubject || {};
                 const siteId = (claims.siteId || claims.site || claims.site_id || claims.siteDomain || '').toLowerCase();
-                return siteId === 'lemma.id' || siteId === 'lemma_platform' || siteId.includes('lemma');
+                const hasAccessClaims = !!(
+                    claims.permissionId
+                    || claims.permission_level
+                    || claims.permission_id
+                    || claims.accountType
+                    || claims.account_type
+                );
+                const isHumanMaster = claims.isHuman && (siteId === 'lemma.id' || siteId === 'lemma_platform' || !siteId);
+                return (hasAccessClaims || isHumanMaster) && (siteId === 'lemma.id' || siteId === 'lemma_platform' || siteId.includes('lemma') || !siteId);
             });
 
             let cred = null;
@@ -138,7 +151,8 @@
             if (cred) {
                 const normalized = utils ? utils.normalizeCredentialClaims(cred) : null;
                 const claims = cred.claims || cred.credentialSubject || {};
-                if (!isDeveloperAccount(normalized, claims)) {
+                const isLemmaHuman = normalized?.isLemmaSite && normalized?.isHuman;
+                if (!isDeveloperAccount(normalized, claims) && !isLemmaHuman) {
                     cred = null;
                 }
             }

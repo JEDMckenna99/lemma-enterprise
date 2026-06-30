@@ -278,7 +278,8 @@ def exchange_proof_for_token():
         scopes = _normalize_scopes(claims.get('scope', []))
 
         if not scopes:
-            scopes = ['admin', 'write', 'read'] if 'admin' in str(permission_id).lower() else ['read']
+            from auth.permissions import is_admin_permission
+            scopes = ['admin', 'write', 'read'] if is_admin_permission(str(permission_id)) else ['read']
 
         requested_scope = data.get('requested_scope')
         if requested_scope:

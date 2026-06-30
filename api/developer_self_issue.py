@@ -20,6 +20,47 @@ logger = logging.getLogger(__name__)
 developer_self_issue_bp = Blueprint('developer_self_issue', __name__)
 
 
+def _site_has_existing_owner(site_id: str, site_domain: str, caller_ppid: str) -> bool:
+    """True when the site is already claimed by an account other than the caller.
+
+    Self-issue is a bootstrap/registration path: it may claim a site that has no
+    existing owner, but must NEVER mint credentials for a site already owned by a
+    different account. A site counts as claimed when it has an active SiteAdmin
+    (or its domain is registered under a different site_id with active admins),
+    and none of those admins belong to the caller. Unregistered sites return
+    False so first-time registration still works. Fails closed on error.
+    """
+    try:
+        from api.database import SessionLocal, SiteAdmin, Site
+
+        db = SessionLocal()
+        try:
+            admins = db.query(SiteAdmin).filter(
+                SiteAdmin.site_id == site_id,
+                SiteAdmin.is_active == True,  # noqa: E712
+            ).all()
+            if admins:
+                return not any(a.admin_did == caller_ppid for a in admins)
+
+            # No admins on this exact site_id. Guard against domain takeover where
+            # the domain is already registered under a different site_id.
+            if site_domain:
+                dom_site = db.query(Site).filter(Site.site_domain == site_domain).first()
+                if dom_site and dom_site.site_id and dom_site.site_id != site_id:
+                    other_admins = db.query(SiteAdmin).filter(
+                        SiteAdmin.site_id == dom_site.site_id,
+                        SiteAdmin.is_active == True,  # noqa: E712
+                    ).all()
+                    if other_admins and not any(a.admin_did == caller_ppid for a in other_admins):
+                        return True
+            return False
+        finally:
+            db.close()
+    except Exception as exc:
+        logger.error(f"site ownership pre-check failed (failing closed): {exc}")
+        return True
+
+
 def _authenticate_developer():
     """
     Authenticate developer via wallet credential or API key.
@@ -137,18 +178,33 @@ def issue_self_permission():
                 'error': 'site_id is required'
             }), 400
         
-        # Verify customer owns this site
+        # SECURITY: Enforce site ownership. Self-issue may bootstrap a site that
+        # has no existing owner (first-time registration), but must never mint a
+        # credential (especially admin) for a site already owned by another
+        # account. See _site_has_existing_owner (fails closed).
         from api.customer_accounts import customer_manager
+        from api.site_access import verify_site_ownership
+
         customer = customer_manager.get_customer(customer_id)
-        if customer:
-            owned_sites = [s.get('site_id') for s in (customer.sites or [])]
-            if site_id not in owned_sites:
-                # Allow if they own the domain
-                owned_domains = [s.get('site_domain') for s in (customer.sites or [])]
-                if site_domain not in owned_domains:
-                    logger.warning(f"Developer {customer_id} attempted to issue for unowned site {site_id}")
-                    # Don't block - allow self-issue for site registration flow
-        
+        owned_sites = [s.get('site_id') for s in (customer.sites or [])] if customer else []
+        owned_domains = [s.get('site_domain') for s in (customer.sites or [])] if customer else []
+        caller_owns_site = (
+            site_id in owned_sites
+            or site_domain in owned_domains
+            or verify_site_ownership(site_id, developer_did)
+        )
+
+        if not caller_owns_site and _site_has_existing_owner(site_id, site_domain, developer_did):
+            logger.warning(
+                f"SECURITY: developer {customer_id} attempted self-issue of "
+                f"'{permission_level}' for site {site_id} ({site_domain}) owned by another account"
+            )
+            return jsonify({
+                'success': False,
+                'error': 'You do not have access to this site',
+                'code': 'UNAUTHORIZED_SITE_ACCESS',
+            }), 403
+
         logger.info(f"Developer self-issue: {permission_level} for {site_domain} (customer: {customer_id})")
         
         # Get or create site manager
