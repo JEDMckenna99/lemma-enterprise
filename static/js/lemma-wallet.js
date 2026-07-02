@@ -3014,7 +3014,7 @@ class LemmaWallet {
     }
 
     async _putIsHumanCacheRecord(credential) {
-        if (!credential?.id) return;
+        if (!credential?.id) return false;
         const record = {
             ...credential,
             id: credential.id,
@@ -3022,10 +3022,11 @@ class LemmaWallet {
         };
         try {
             await this._put('ishuman_cache', record);
+            return true;
         } catch (e) {
             if (this._isEncryptedStorageLockedError(e)) {
                 console.warn('[Lemma] ishuman_cache persist skipped — storage key unavailable');
-                return;
+                return false;
             }
             throw e;
         }
@@ -7928,19 +7929,26 @@ class LemmaWallet {
             storedAt: Date.now()
         };
         
+        const isIsHumanCredential = this._isIsHumanCredentialRecord(lemma);
+        let storedInLemmas = false;
+
         // Store locally (encrypted lemmas when PRF available)
         try {
             await this._put('lemmas', lemma);
+            storedInLemmas = true;
         } catch (e) {
-            if (this._isIsHumanCredentialRecord(lemma) && this._isEncryptedStorageLockedError(e)) {
+            if (isIsHumanCredential && this._isEncryptedStorageLockedError(e)) {
                 console.warn('[Lemma] Encrypted lemmas locked — isHuman credential cached only');
             } else {
                 throw e;
             }
         }
 
-        if (this._isIsHumanCredentialRecord(lemma)) {
-            await this._putIsHumanCacheRecord(lemma);
+        if (isIsHumanCredential) {
+            const storedInCache = await this._putIsHumanCacheRecord(lemma);
+            if (!storedInLemmas && !storedInCache) {
+                throw new Error('ishuman_storage_unavailable');
+            }
         }
         console.log(' Credential stored locally:', lemma.id);
         

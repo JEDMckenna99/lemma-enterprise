@@ -55,6 +55,15 @@ def test_wallet_daily_unlock_helpers(wallet_source):
 
 
 @pytest.mark.browser
+def test_wallet_ishuman_storage_fails_when_all_persistence_locked(wallet_source):
+    assert "return false;" in wallet_source.split("async _putIsHumanCacheRecord(credential)", 1)[1].split("async syncIsHumanCacheFromWallet", 1)[0]
+    assert "let storedInLemmas = false;" in wallet_source
+    assert "storedInLemmas = true;" in wallet_source
+    assert "const storedInCache = await this._putIsHumanCacheRecord(lemma);" in wallet_source
+    assert "throw new Error('ishuman_storage_unavailable');" in wallet_source
+
+
+@pytest.mark.browser
 def test_verifier_site_vc_cache(verifier_source):
     assert "SITE_VC_STORAGE_KEY = 'ishuman_site_vc:v1'" in verifier_source
     assert "_verifyFromSiteVcCache" in verifier_source
