@@ -218,6 +218,86 @@ def test_didit_webhook_verified_issues_master(
 
 
 @pytest.mark.integration
+def test_didit_existing_document_reissues_master_to_current_wallet(
+    fake_ishuman_db_session_factory,
+    make_ishuman_verification,
+    monkeypatch,
+):
+    from api.database import LemmaPerson, LemmaWalletBinding
+    from api.ishuman import _complete_verified_ishuman_from_didit
+
+    db = fake_ishuman_db_session_factory.session_local()
+    decision = _approved_poh_decision(document_number="RECOVER-DOC-001")
+    issued: list[dict] = []
+
+    def _fake_issue(ppid, wallet_id=None, site_id=None, **_kwargs):
+        credential = {
+            "id": f"ishuman_master_for_{wallet_id}",
+            "subject": ppid,
+            "wallet_id": wallet_id,
+            "claims": {"isHuman": True, "siteId": site_id or "lemma.id"},
+            "issuerInfo": {"did": "did:lemma:issuer:test"},
+        }
+        issued.append(credential)
+        return credential
+
+    monkeypatch.setattr("api.ishuman._issue_ishuman_credential", _fake_issue)
+
+    old_record = make_ishuman_verification(
+        session_id="ishuman_sess_existing_doc_old",
+        provider_session_id="didit_existing_doc_old",
+        issuer_id="didit",
+        wallet_id="wallet_old_device",
+        ppid=None,
+        credential_id=None,
+        status="pending",
+    )
+    db._store.data["IsHumanVerification"].append(old_record)
+
+    old_credential = _complete_verified_ishuman_from_didit(
+        db,
+        old_record,
+        wallet_id="wallet_old_device",
+        decision=decision,
+        workflow_id=PROOF_OF_HUMANITY_WORKFLOW_ID,
+    )
+    old_record.credential_id = old_credential["id"]
+    old_record.status = "verified"
+
+    new_record = make_ishuman_verification(
+        session_id="ishuman_sess_existing_doc_new",
+        provider_session_id="didit_existing_doc_new",
+        issuer_id="didit",
+        wallet_id="wallet_new_device",
+        ppid=None,
+        credential_id=None,
+        status="pending",
+    )
+    db._store.data["IsHumanVerification"].append(new_record)
+
+    new_credential = _complete_verified_ishuman_from_didit(
+        db,
+        new_record,
+        wallet_id="wallet_new_device",
+        decision=decision,
+        workflow_id=PROOF_OF_HUMANITY_WORKFLOW_ID,
+    )
+
+    assert len(db._store.data[LemmaPerson.__name__]) == 1
+    assert old_record.lemma_person_id == new_record.lemma_person_id
+    assert old_record.ppid == new_record.ppid
+    assert new_credential["subject"] == old_credential["subject"]
+    assert new_credential["wallet_id"] == "wallet_new_device"
+    assert {
+        row.wallet_id: row.lemma_person_id
+        for row in db._store.data[LemmaWalletBinding.__name__]
+    } == {
+        "wallet_old_device": old_record.lemma_person_id,
+        "wallet_new_device": old_record.lemma_person_id,
+    }
+
+
+@pytest.mark.integration
 def test_didit_webhook_terminal_failure_purges_session(
     ishuman_client,
     fake_ishuman_db_session_factory,

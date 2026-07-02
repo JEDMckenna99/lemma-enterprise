@@ -33,6 +33,7 @@ from flask_cors import cross_origin
 from sqlalchemy.exc import IntegrityError
 
 from auth.decorators import require_api_key
+from api.column_crypto import encrypt_column
 
 logger = logging.getLogger(__name__)
 

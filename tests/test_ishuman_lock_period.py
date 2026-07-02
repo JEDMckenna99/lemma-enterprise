@@ -77,11 +77,12 @@ def test_verifier_site_vc_cache(verifier_source):
 
 @pytest.mark.browser
 def test_verifier_requires_explicit_fresh_idv_for_doubt(verifier_source):
-    """Site bans fail closed; only the explicit doubt API selects fresh IDV."""
+    """Site bans fail closed; revocation recovery and explicit doubt select fresh IDV."""
     popup_reasons = verifier_source.split("const popupReasons = new Set([", 1)[1].split("]);", 1)[0]
-    assert "'revoked'," not in popup_reasons
+    assert "'revoked'," in popup_reasons
     assert "'site_blocked'," not in popup_reasons
     assert "'expired'," in verifier_source
+    assert "const needsFreshIdv = result.reason === 'revoked';" in verifier_source
     assert "verifyFreshForBackend" in verifier_source
     assert "refreshReason: 'site_doubt'" in verifier_source
     assert "options.freshIdv ? 'fresh_idv' : 'site_proof'" in verifier_source
