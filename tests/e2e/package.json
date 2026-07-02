@@ -1,0 +1,12 @@
+{
+  "name": "lemma-e2e",
+  "private": true,
+  "scripts": {
+    "test": "playwright test",
+    "test:link-qr": "playwright test link-receive-qr.spec.ts",
+    "install-browsers": "playwright install chromium"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.51.0"
+  }
+}

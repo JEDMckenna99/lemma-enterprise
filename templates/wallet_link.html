@@ -152,6 +152,7 @@
             <p style="color: #6b7280; margin: 0 0 16px; font-size: 0.95rem;">
                 Show this QR on your computer or tablet. On your phone, open any QR scanner
                 (Camera app) and scan it — no lemma.id scanner needed.
+                Your phone will ask for your passkey before sending your lemma.id.
             </p>
             <button type="button" class="btn btn-primary" id="show-receive-qr-btn">Show QR Code</button>
             <div id="receive-qr-display" class="hidden">
@@ -169,8 +170,8 @@
         </div>
         <div class="security-note">
             <strong>How it works</strong>
-            Your phone opens a confirm page after scanning. Wallet data is encrypted to this
-            device only — lemma.id never sees your secret.
+            Your phone opens a confirm page after scanning and prompts for your passkey.
+            Wallet data is encrypted to this device only — lemma.id never sees your secret.
         </div>
     </div>
 

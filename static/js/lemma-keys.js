@@ -15,7 +15,7 @@
     const REGISTER_PREFIX = 'lemma:register-signing-key:v1';
     const SITE_SIGNING_KEY_INFO_PREFIX = 'site-signing-key-v1:';
     const NOBLE_ED25519_MODULE = '/static/js/vendor/noble-ed25519.mjs';
-    const NOBLE_CURVES_ED25519_MODULE = '/static/js/vendor/noble-curves-ed25519.mjs';
+    const NOBLE_CURVES_ED25519_MODULE = '/static/js/vendor/noble-curves-ed25519.mjs?v=2';
 
     let _webCryptoEd25519 = null;
     let _nobleEd25519 = null;
@@ -270,24 +270,17 @@
             _nobleX25519 = window.x25519;
             return _nobleX25519;
         }
-        const sources = [
-            nobleModuleUrl(NOBLE_CURVES_ED25519_MODULE),
-            'https://cdn.jsdelivr.net/npm/@noble/curves@1.6.0/esm/ed25519.js?+esm',
-        ];
-        let lastErr = null;
-        for (const src of sources) {
-            try {
-                const mod = await import(src);
-                if (mod?.x25519) {
-                    _nobleX25519 = mod.x25519;
-                    return _nobleX25519;
-                }
-            } catch (err) {
-                lastErr = err;
-                console.warn('[LemmaKeys] X25519 load failed for', src, err?.message || err);
+        try {
+            const mod = await import(nobleModuleUrl(NOBLE_CURVES_ED25519_MODULE));
+            if (mod?.x25519) {
+                _nobleX25519 = mod.x25519;
+                return _nobleX25519;
             }
+        } catch (err) {
+            console.warn('[LemmaKeys] X25519 load failed for', NOBLE_CURVES_ED25519_MODULE, err?.message || err);
+            throw err;
         }
-        throw lastErr || new Error('Failed to load X25519 (noble/curves)');
+        throw new Error('Failed to load X25519 (noble/curves)');
     }
 
     async function hkdfRaw(ikmBytes, saltBytes, infoBytes, length) {

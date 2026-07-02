@@ -1,7 +1,7 @@
 // Lemma Service Worker - Minimal Implementation
 // This prevents service worker errors and provides basic caching
 
-const CACHE_NAME = 'lemma-v18';  // v18 - popup-first site proof + adoptWalletState envelope_invalid fix
+const CACHE_NAME = 'lemma-v19';  // v19 - local noble vendor bundles; bypass /npm/ fetches
 const STATIC_ASSETS = [
   '/static/css/lemma.css',
   '/static/js/lemma-bot-shield-simple.js',
@@ -10,7 +10,9 @@ const STATIC_ASSETS = [
 
 // JS files that change frequently — use network-first, cache as fallback
 const NETWORK_FIRST_PATTERNS = [
-  '/static/js/lemma-wallet.js'
+  '/static/js/lemma-wallet.js',
+  '/static/js/lemma-keys.js',
+  '/static/js/vendor/noble-',
 ];
 
 // Install event - cache static assets
@@ -79,6 +81,14 @@ self.addEventListener('fetch', event => {
     event.request.url.includes('/admin') ||
     event.request.url.includes('/dashboard') ||
     event.request.url.includes('/platform')
+  ) {
+    return;
+  }
+
+  // Never intercept broken legacy npm proxy paths or crypto vendor bundles.
+  if (
+    event.request.url.includes('/npm/') ||
+    event.request.url.includes('/static/js/vendor/')
   ) {
     return;
   }

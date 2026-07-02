@@ -212,6 +212,12 @@ def create_app():
             nonce = getattr(g, 'csp_nonce', '')
             profile = getattr(g, 'csp_profile', 'strict')
             response.headers['Content-Security-Policy'] = build_content_security_policy(nonce, profile)
+
+        # Crypto vendor bundles and lemma-keys must not be long-cached (X25519 link QR).
+        if path.startswith('/static/js/vendor/') or path.startswith('/static/js/lemma-keys.js'):
+            response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+            response.headers['Pragma'] = 'no-cache'
+            response.headers['Expires'] = '0'
         
         return response
 

@@ -2679,6 +2679,10 @@ class LemmaWallet {
             reason: 'Send your lemma.id to your other device',
         });
 
+        if (!this.isUnlocked()) {
+            await this.unlock({ force: true, isHumanIssuance: false });
+        }
+
         const profile = await this.getActiveProfile();
         if (!profile?.secret) throw new Error('No wallet found on this device');
 
