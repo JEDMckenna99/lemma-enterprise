@@ -159,6 +159,25 @@ def test_mobile_handoff_shows_success_ui():
 
 
 @pytest.mark.browser
+def test_mobile_handoff_return_must_store_master_before_success():
+    """A linked wallet alone is not enough; the popup must persist the master
+    proof before showing the ready state and closing successfully."""
+    idv_html = IDV_HTML.read_text(encoding="utf-8")
+    finish_block = idv_html.split("async function finishMobileHandoffStoreMaster", 1)[1]
+    finish_block = finish_block.split("async function runSilentMobileHandoffCompletion", 1)[0]
+    assert "await pollAndStoreMaster();" in finish_block
+    assert "master poll pending after handoff" not in finish_block
+
+    return_block = idv_html.rsplit("if (isVerificationReturn && sessionId) {", 1)[1]
+    return_block = return_block.split("document.getElementById('primary-btn').classList.add('hidden');", 1)[0]
+    assert "await adoptWalletState();" in return_block
+    assert return_block.index("await adoptWalletState();") < return_block.index("await pollAndStoreMaster();")
+    assert return_block.index("await pollAndStoreMaster();") < return_block.index("await showMobileHandoffCompleteUi")
+    assert "handoff return master store failed" in return_block
+    assert "Retry finish" in return_block
+
+
+@pytest.mark.browser
 def test_mobile_handoff_scrubs_mk_from_url():
     idv_html = IDV_HTML.read_text(encoding="utf-8")
     assert "scrubHandoffSecretsFromUrl" in idv_html

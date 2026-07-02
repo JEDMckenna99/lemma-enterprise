@@ -1241,14 +1241,7 @@
                 throw new Error('Missing verification session');
             }
 
-            try {
-                await pollAndStoreMaster();
-            } catch (pollErr) {
-                if (!(await hasHandoffLinkedWallet())) {
-                    throw pollErr;
-                }
-                console.warn('[isHuman IDV] master poll pending after handoff:', pollErr?.message || pollErr);
-            }
+            await pollAndStoreMaster();
 
             try {
                 await wallet.fetchAndStoreSeedEnvelopes?.();
@@ -1656,13 +1649,22 @@
             if (isVerificationReturn && sessionId) {
                 if (await hasHandoffLinkedWallet()) {
                     try {
+                        await adoptWalletState();
                         if (!(await hasMasterProof())) {
                             await pollAndStoreMaster();
                         }
+                        await showMobileHandoffCompleteUi('mobile_handoff_return');
                     } catch (pollErr) {
-                        console.warn('[isHuman IDV] handoff return poll skipped:', pollErr?.message || pollErr);
+                        console.warn('[isHuman IDV] handoff return master store failed:', pollErr?.message || pollErr);
+                        setStatus(
+                            'This wallet is on the device, but its human proof was not stored yet. Retry finish.',
+                            'error',
+                        );
+                        const btn = document.getElementById('primary-btn');
+                        btn.disabled = false;
+                        btn.classList.remove('hidden');
+                        btn.textContent = consumerCopy().primary?.unlockFinish || 'Retry finish';
                     }
-                    await showMobileHandoffCompleteUi('mobile_handoff_return');
                     return;
                 }
                 document.getElementById('primary-btn').classList.add('hidden');
