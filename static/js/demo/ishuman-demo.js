@@ -897,11 +897,9 @@
     return payload;
   }
 
-  // Cross-origin storage wipe for the customer demo sites. lemma.id JS cannot
-  // reach another origin's IndexedDB/localStorage, so for each site we mount a
-  // hidden iframe of its /lemma-clear page (served from that origin); the page
-  // clears its own storage and posts LEMMA_CLEAR_DONE back. We resolve on that
-  // signal or a timeout so a missing/old site never hangs the reset.
+  // Optional cross-origin demo-site wipe via hidden iframe (demo-only legacy).
+  // Phase 2.1 removed the wallet *bridge* iframe; this is a separate hack for
+  // clearing Heroku demo origins and is NOT used on the main clear path anymore.
   async function clearCustomerSiteCaches({ timeoutMs = 1500 } = {}) {
     const urls = (state.config && state.config.customer_site_urls) || {};
     const origins = SITE_SLUGS.map((slug) => urls[slug]).filter(Boolean);
@@ -955,8 +953,9 @@
   async function clearLemmaId() {
     const confirmed = window.confirm(
       'Clear your lemma.id?\n\n'
-      + 'This wipes the passkey wallet, site proofs, and cached sessions on the demo '
-      + 'sites from this browser. Click "Start live demo" again when finished.',
+      + 'This wipes your passkey wallet and lemma.id caches in this browser. '
+      + 'Demo site tabs (ticketing/trials) keep their own cache — close those tabs '
+      + 'or hard-refresh them before re-running the demo.',
     );
     if (!confirmed) return;
 
@@ -964,7 +963,7 @@
     clearBtns.forEach((btn) => { btn.disabled = true; });
 
     setPill('ih-lemma-status', 'CLEARING', 'warn');
-    log('Clearing lemma.id', 'wiping local wallet + signaling customer sites');
+    log('Clearing lemma.id', 'wiping local wallet on lemma.id');
 
     if (window.IsHumanVerifier && window.IsHumanVerifier.broadcastBlockUpdate) {
       for (const slug of SITE_SLUGS) {
@@ -977,15 +976,10 @@
       }
     }
 
-    // Server reset (needs live wallet) runs in parallel with cross-origin demo
-    // site iframe wipes — the iframe timeout was the main source of delay.
     try {
-      await Promise.all([
-        demoServerSelfReset().catch((err) => log('Server reset skipped', err.message)),
-        clearCustomerSiteCaches(),
-      ]);
+      await demoServerSelfReset().catch((err) => log('Server reset skipped', err.message));
     } catch (err) {
-      log('Parallel clear partial', err.message);
+      log('Server reset skipped', err.message);
     }
 
     // Wipe the lemma.id wallet IndexedDB (master proof, derived site proofs,

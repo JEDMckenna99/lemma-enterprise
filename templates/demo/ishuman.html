@@ -31,7 +31,7 @@
       <button class="demo-btn demo-btn-primary" id="ih-start-live-demo" type="button">Start live demo</button>
       <button class="demo-btn demo-btn-secondary" id="ih-start-simulated-demo" type="button">Try simulated demo</button>
     </div>
-    <p class="demo-muted demo-intro-hint">Stuck or mixing old state? Use <strong>Clear my lemma.id</strong> above, then start again.</p>
+    <p class="demo-muted demo-intro-hint">Stuck or mixing old state? Use <strong>Clear my lemma.id</strong> above, close demo site tabs, then start again.</p>
   </header>
 
   <nav class="demo-progress assurance-only" id="ih-demo-progress" aria-label="Demo steps">
@@ -340,7 +340,7 @@ const { ok, ppid, assurance, presentation } = await new IsHumanVerifier({
       </div>
 
       <h3>Reset demo state</h3>
-      <p class="demo-muted">Use the <strong>Clear my lemma.id</strong> button at the top of the page. It wipes the wallet, demo caches, and cached proofs on the Heroku demo sites.</p>
+      <p class="demo-muted">Use <strong>Clear my lemma.id</strong> at the top — it wipes your lemma.id wallet on this origin only (no hidden iframes). Close or hard-refresh open demo site tabs so they drop stale cached proofs.</p>
 
       <h3>Operator console</h3>
       <form class="demo-operator-form" id="ih-operator-form" autocomplete="off">
