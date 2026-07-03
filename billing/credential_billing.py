@@ -106,6 +106,7 @@ def _increment_aggregate(db, *, site_scope: str, month: str, event_type: str) ->
     if not row:
         row = IsHumanSiteUsageAggregate(site_scope=site_scope, month=month)
         db.add(row)
+        db.flush()
     field = {
         EVENT_INITIAL_ISSUANCE: "initial_issuances",
         EVENT_MAU_RENEWAL: "mau_renewals",
@@ -122,6 +123,7 @@ def _increment_active_subjects(db, *, site_scope: str, month: str) -> None:
     if not row:
         row = IsHumanSiteUsageAggregate(site_scope=site_scope, month=month)
         db.add(row)
+        db.flush()
     row.active_subjects = int(getattr(row, "active_subjects", 0) or 0) + 1
     row.updated_at = datetime.utcnow()
 

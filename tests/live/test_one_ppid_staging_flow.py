@@ -71,7 +71,7 @@ def test_live_staging_passkey_then_ishuman_same_ppid():
     base, token = _require_env()
     wallet_id = "wallet_one_ppid_" + secrets.token_hex(5)
     wallet_secret = "cd" * 32
-    target_site = "tickets-demo.lemma.id"
+    target_site = f"one-ppid-e2e-{secrets.token_hex(4)}.example.com"
     session = requests.Session()
 
     pub_b64, sig_b64 = register_self_signature(wallet_id, wallet_secret)

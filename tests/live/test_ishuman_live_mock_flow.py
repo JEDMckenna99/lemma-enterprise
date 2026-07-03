@@ -96,9 +96,9 @@ def test_live_staging_mock_idv_end_to_end():
         site_priv.public_key().public_bytes(Encoding.Raw, PublicFormat.Raw)
     )
     target_site = "tickets-demo.lemma.id"
-    fields = ["master_credential_id", "target_site", "site_signing_pubkey"]
+    fields = ["master_credential_id", "target_site", "site_signing_pubkey", "issue_mode"]
     fvals = {"master_credential_id": master_id, "target_site": target_site,
-             "site_signing_pubkey": site_pub_b64}
+             "site_signing_pubkey": site_pub_b64, "issue_mode": "site_proof"}
 
     def _derive():
         assertion = build_wallet_assertion(
@@ -106,7 +106,7 @@ def test_live_staging_mock_idv_end_to_end():
             field_names=fields, field_values=fvals, nonce_b64=_challenge(s, base, wallet_id),
         )
         return s.post(f"{base}/api/ishuman/derive-site-proof",
-                      json={**fvals, "wallet_id": wallet_id, "wallet_secret": wallet_secret,
+                      json={**fvals, "wallet_id": wallet_id,
                             "wallet_assertion": {"nonce": assertion.nonce,
                                                  "signature": assertion.signature}})
 
