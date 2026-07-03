@@ -6,7 +6,8 @@
     tickets: 'tickets-demo.lemma.id',
     trials: 'trials-demo.lemma.id',
   };
-  const WIZARD_TOTAL = 7;
+  const WIZARD_TOTAL = 6;
+  const LEGACY_WIZARD_TOTAL = 7;
 
   const PPID_PLACEHOLDER = {
     tickets: 'ppid_ticketing_••••',
@@ -26,6 +27,8 @@
     localBlocks: { tickets: new Set(), trials: new Set() },
     wizardRunning: false,
     lastVerifyMs: { tickets: null, trials: null },
+    passkeyPpids: {},
+    assuranceStatus: null,
     serverTestToken: '',
     serverAdminToken: '',
   };
@@ -62,40 +65,112 @@
     el.className = `demo-pill${tone ? ` ${tone}` : ''}`;
   }
 
+  function assuranceDemoMode() {
+    return !!(state.config && state.config.assurance_demo_mode);
+  }
+
+  function workflowStepCount() {
+    return assuranceDemoMode() ? 5 : 3;
+  }
+
   function isMasterReady() {
     return !!(state.masterCredentialId || state.masterCredential);
   }
 
+  function isStep1Ready() {
+    if (assuranceDemoMode()) {
+      return !!state.walletId;
+    }
+    return isMasterReady();
+  }
+
   function bothSitesVerified() {
-    return !!(state.results.tickets?.human && state.results.trials?.human);
+    return SITE_SLUGS.every((slug) => {
+      const r = state.results[slug];
+      return !!(r && r.human && r.ppid);
+    });
   }
 
   function updateStepLocks() {
-    const ready = isMasterReady();
+    const ready = isStep1Ready();
     const bothVerified = bothSitesVerified();
-    for (let i = 1; i <= 3; i += 1) {
+    const blockStepId = assuranceDemoMode() ? 4 : 4;
+    for (let i = 1; i <= 5; i += 1) {
       const el = $(`ih-step-${i}`);
       if (!el) continue;
+      if (assuranceDemoMode() && i === 3 && el.hidden) continue;
+      if (assuranceDemoMode() && i === 5 && el.hidden) continue;
+      if (!assuranceDemoMode() && (i === 3 || i === 5)) continue;
       if (i === 1) el.classList.remove('is-locked');
       else if (i === 2) el.classList.toggle('is-locked', !ready);
-      else if (i === 3) el.classList.toggle('is-locked', !bothVerified);
+      else if (i === 3 && assuranceDemoMode()) el.classList.toggle('is-locked', !bothVerified);
+      else if (i === blockStepId) el.classList.toggle('is-locked', !bothVerified);
+      else if (i === 5 && assuranceDemoMode()) {
+        const blocked = state.results.tickets && !state.results.tickets.human
+          && state.results.tickets.reason === 'site_blocked';
+        el.classList.toggle('is-locked', !blocked);
+      }
     }
   }
 
   function setWorkflowHighlight(workflowStep) {
-    for (let i = 1; i <= 3; i += 1) {
+    for (let i = 1; i <= 5; i += 1) {
       const el = $(`ih-step-${i}`);
       if (!el) continue;
+      if (!assuranceDemoMode() && (i === 3 || i === 5)) continue;
       el.classList.remove('is-active', 'is-done');
       if (workflowStep > 0 && i < workflowStep) el.classList.add('is-done');
       else if (i === workflowStep) el.classList.add('is-active');
     }
     if (workflowStep === 0) {
-      for (let i = 1; i <= 3; i += 1) {
+      for (let i = 1; i <= 5; i += 1) {
         const el = $(`ih-step-${i}`);
-        if (el) el.classList.add('is-done');
+        if (!el) continue;
+        if (!assuranceDemoMode() && (i === 3 || i === 5)) continue;
+        el.classList.add('is-done');
       }
     }
+    updateStepLocks();
+  }
+
+  function applyAssuranceModeUI() {
+    const on = assuranceDemoMode();
+    document.querySelectorAll('.assurance-only').forEach((el) => {
+      el.hidden = !on;
+    });
+    const blockTitle = $('ih-block-step-title');
+    if (blockTitle) {
+      blockTitle.textContent = on
+        ? 'Step 4 — Block abuse on one site'
+        : 'Step 3 — Block abuse on one site';
+    }
+    const step1Title = $('ih-step1-title');
+    const step1Desc = $('ih-step1-desc');
+    const step2Title = $('ih-step2-title');
+    const step2Desc = $('ih-step2-desc');
+    const intro = $('ih-intro-lead');
+    const createBtn = $('ih-create-lemma-btn');
+    if (!on) {
+      if (step1Title) step1Title.textContent = 'Step 1 — Create or unlock your lemma.id';
+      if (step1Desc) step1Desc.textContent = 'Use an existing lemma.id or complete a one-time identity check.';
+      if (step2Title) step2Title.textContent = 'Step 2 — Use the same lemma.id on two sites';
+      if (step2Desc) step2Desc.textContent = 'Each site receives its own private ID from the same verified-human proof.';
+      if (intro) intro.textContent = 'Verify once, then test two demo sites. Both sites can know you are a verified human, but neither receives your real identity or the same identifier as the other.';
+      if (createBtn) createBtn.textContent = 'Create lemma.id';
+    } else {
+      if (createBtn) createBtn.textContent = 'Create passkey wallet';
+    }
+    const urls = (state.config && state.config.customer_site_urls) || {};
+    const ticketsLink = $('ih-link-tickets-site');
+    const trialsLink = $('ih-link-trials-site');
+    if (ticketsLink && urls.tickets) {
+      ticketsLink.href = `${urls.tickets}?from=demo`;
+    }
+    if (trialsLink && urls.trials) {
+      trialsLink.href = `${urls.trials}?from=demo`;
+    }
+    const personCard = $('ih-person-status-card');
+    if (personCard) personCard.hidden = !on;
     updateStepLocks();
   }
 
@@ -123,7 +198,9 @@
 
   function formatSiteStatus(result) {
     if (!result) return 'Pending';
-    if (result.human) return 'Human verified';
+    if (result.human) {
+      return result.assurance ? `Human (${result.assurance})` : 'Human verified';
+    }
     if (result.reason === 'site_blocked' || result.reason === 'revoked') return 'Blocked';
     return 'Not verified';
   }
@@ -139,19 +216,28 @@
 
   function workflowStepForWizard(wizardStep) {
     if (wizardStep <= 0) return 0;
+    if (assuranceDemoMode()) {
+      if (wizardStep <= 2) return 1;
+      if (wizardStep === 3) return 2;
+      if (wizardStep === 4) return 3;
+      if (wizardStep === 5) return 4;
+      if (wizardStep === 6) return 5;
+      return 5;
+    }
     if (wizardStep <= 2) return 1;
     if (wizardStep === 3) return 2;
-    return 3;
+    return 4;
   }
 
   function setWizardStep(step, statusText) {
     const statusEl = $('ih-wizard-status');
     const labelEl = $('ih-wizard-step-label');
     const shell = $('ih-wizard-shell');
+    const total = assuranceDemoMode() ? WIZARD_TOTAL : LEGACY_WIZARD_TOTAL;
     if (shell) shell.hidden = false;
     if (statusEl && statusText) statusEl.textContent = statusText;
     if (labelEl) {
-      labelEl.textContent = step > 0 ? `Step ${step} of ${WIZARD_TOTAL}` : 'Demo complete';
+      labelEl.textContent = step > 0 ? `Step ${step} of ${total}` : 'Demo complete';
     }
     document.querySelectorAll('.wizard-dot').forEach((dot) => {
       const dotStep = Number(dot.dataset.step || 0);
@@ -265,6 +351,9 @@
       'ih-unblock-tickets-btn',
       'ih-abuse-block-btn',
       'ih-abuse-recheck-btn',
+      'ih-require-ishuman-btn',
+      'ih-complete-ishuman-btn',
+      'ih-reverify-tickets-ishuman-btn',
       'ih-force-reverify-btn',
       'ih-run-guided-demo',
     ];
@@ -364,6 +453,7 @@
       state.serverAdminToken = root.dataset.serverAdminToken || '';
     }
     applyTestVerifyGate();
+    applyAssuranceModeUI();
     log('Demo config loaded', `${state.config.sites.length} sites`);
     updatePpidCompare();
     updateStepLocks();
@@ -704,10 +794,39 @@
   }
 
   function createLemmaIdViaPopup() {
-    // An explicit create request always enters the live flow. The demo starts
-    // in simulation mode, but that default must not make this button a no-op.
     setDemoMode('live');
+    if (assuranceDemoMode()) {
+      return createPasskeyWallet();
+    }
     return openIdvPopup({ demoQr: false });
+  }
+
+  async function createPasskeyWallet() {
+    await initWallet();
+    await refreshAssuranceStatus();
+    setPill('ih-lemma-status', 'UNLOCKED', 'ok');
+    setDemoReadyBanner(true);
+    setWorkflowHighlight(2);
+    scrollToPanel('ih-step-2');
+    log('Passkey wallet ready', short(state.walletId));
+  }
+
+  async function refreshAssuranceStatus() {
+    if (!state.walletId || !assuranceDemoMode()) return null;
+    const payload = await requestJson(
+      `/api/demo/ishuman/assurance-status?wallet_id=${encodeURIComponent(state.walletId)}`,
+    );
+    state.assuranceStatus = payload;
+    if (payload.provisional) {
+      setPill('ih-person-status', 'Provisional', 'warn');
+    } else if (payload.anchored) {
+      setPill('ih-person-status', 'Anchored (IDV)', 'ok');
+    } else if (payload.person_bound) {
+      setPill('ih-person-status', payload.person_status || 'Bound', 'ok');
+    } else {
+      setPill('ih-person-status', 'Unbound', 'warn');
+    }
+    return payload;
   }
 
   // Cross-origin storage wipe for the customer demo sites. lemma.id JS cannot
@@ -976,32 +1095,59 @@
     updateStepLocks();
   }
 
-  function verifierFor(slug) {
+  function verifierFor(slug, options = {}) {
+    if (!window.IsHumanVerifier) throw new Error('IsHumanVerifier SDK not loaded');
+    const requiredAssurance = options.requiredAssurance
+      || (assuranceDemoMode() ? 'passkey' : 'ishuman');
+    const cacheKey = `${slug}:${requiredAssurance}`;
     if (!state.verifiers) state.verifiers = {};
-    if (state.verifiers[slug]) return state.verifiers[slug];
-    state.verifiers[slug] = new window.IsHumanVerifier({
+    if (state.verifiers[cacheKey]) return state.verifiers[cacheKey];
+    state.verifiers[cacheKey] = new window.IsHumanVerifier({
       siteId: SITE_IDS[slug],
       lemmaOrigin: window.location.origin,
       debug: true,
       autoProvision: true,
+      requiredAssurance,
       isBlockedLocally: (ppid) => state.localBlocks[slug].has(ppid),
     });
-    return state.verifiers[slug];
+    return state.verifiers[cacheKey];
   }
 
-  async function verifySite(slug) {
+  async function verifySite(slug, options = {}) {
     if (!window.IsHumanVerifier) throw new Error('IsHumanVerifier SDK not loaded');
-    // Reuse the verifier across calls so the cached Bloom snapshot and
-    // bridge iframe persist — repeat verifications hit the local cache in
-    // ~10–30 ms instead of paying the iframe/bloom bootstrap cost every time.
-    const verifier = verifierFor(slug);
-    const result = await verifier.verify();
+    const requiredAssurance = options.requiredAssurance
+      || (assuranceDemoMode() ? 'passkey' : 'ishuman');
+    const verifier = verifierFor(slug, { requiredAssurance });
+    let result;
+    if (assuranceDemoMode() || options.useBackend) {
+      const backend = await verifier.verifyForBackend({
+        autoProvision: true,
+        requiredAssurance,
+        ...options,
+      });
+      result = {
+        human: !!backend.human,
+        ppid: backend.ppid,
+        assurance: backend.assurance,
+        presentation: backend.presentation,
+        reason: backend.reason,
+        timeMs: backend.timeMs || 0,
+      };
+    } else {
+      result = await verifier.verify();
+    }
     state.results[slug] = result;
     if (Number.isFinite(result.timeMs)) state.lastVerifyMs[slug] = result.timeMs;
+    if (assuranceDemoMode() && requiredAssurance === 'passkey' && result.ppid) {
+      state.passkeyPpids[slug] = result.ppid;
+    }
     renderSite(slug, result);
     updateIntegrationLatency();
     updatePpidCompare();
-    log(`${SITE_IDS[slug]} verifier result`, `${result.reason} in ${result.timeMs.toFixed(1)}ms`);
+    log(
+      `${SITE_IDS[slug]} verifier result`,
+      `${result.reason}${result.assurance ? ` · ${result.assurance}` : ''} in ${(result.timeMs || 0).toFixed(1)}ms`,
+    );
     await refreshStatus();
     return result;
   }
@@ -1010,8 +1156,13 @@
     await verifySite('tickets');
     await verifySite('trials');
     if (bothSitesVerified()) {
-      setWorkflowHighlight(3);
-      scrollToPanel('ih-abuse-panel');
+      if (assuranceDemoMode()) {
+        setWorkflowHighlight(3);
+        scrollToPanel('ih-demo-sites-panel');
+      } else {
+        setWorkflowHighlight(4);
+        scrollToPanel('ih-abuse-panel');
+      }
     }
   }
 
@@ -1033,6 +1184,8 @@
     }
     const ppidEl = $(`ih-${slug}-ppid`);
     if (ppidEl) ppidEl.textContent = maskPpid(slug, result.ppid);
+    const assuranceEl = $(`ih-${slug}-assurance`);
+    if (assuranceEl) assuranceEl.textContent = result.assurance || '—';
     const reasonEl = $(`ih-${slug}-reason`);
     if (reasonEl) reasonEl.textContent = result.reason || '—';
     const latEl = $(`ih-${slug}-latency`);
@@ -1125,9 +1278,75 @@
     await verifySite('trials');
     await refreshAbuseChecks();
     await probeDerive('tickets');
-    setWorkflowHighlight(3);
-    scrollToPanel('ih-abuse-panel');
+    if (assuranceDemoMode()) {
+      setWorkflowHighlight(5);
+      scrollToPanel('ih-stepup-panel');
+    } else {
+      setWorkflowHighlight(4);
+      scrollToPanel('ih-abuse-panel');
+    }
     updateBlockResultsTable();
+  }
+
+  async function requireIsHumanOnTickets() {
+    const result = state.results.tickets
+      || await verifySite('tickets', { requiredAssurance: 'passkey' });
+    if (!result.ppid) throw new Error('Ticketing PPID unavailable');
+    if (result.ppid) state.passkeyPpids.tickets = result.ppid;
+
+    await requestJson('/api/demo/ishuman/require-ishuman', {
+      method: 'POST',
+      body: JSON.stringify({
+        site_slug: 'tickets',
+        ppid: result.ppid,
+        reason: 'Demo: ticketing requires isHuman assurance',
+      }),
+    });
+    log('Site doubt created', 'ticketing requires isHuman step-up');
+    setWorkflowHighlight(5);
+    scrollToPanel('ih-stepup-panel');
+  }
+
+  async function completeIsHumanVerification() {
+    if (state.config?.test_verify_enabled) {
+      await verifyOnceTestMode();
+    } else {
+      await openIdvPopup({ demoQr: false });
+    }
+    await refreshAssuranceStatus();
+    log('isHuman verification complete', 're-verify ticketing with ishuman assurance');
+  }
+
+  function updateStepUpCompare(beforePpid, afterResult) {
+    const panel = $('ih-stepup-compare');
+    const beforeEl = $('ih-ppid-before-stepup');
+    const afterEl = $('ih-ppid-after-stepup');
+    const diffEl = $('ih-stepup-diff');
+    const flipEl = $('ih-assurance-flip');
+    if (!panel || !beforeEl || !afterEl || !diffEl) return;
+    panel.hidden = false;
+    beforeEl.textContent = maskPpid('tickets', beforePpid);
+    afterEl.textContent = maskPpid('tickets', afterResult?.ppid);
+    const same = beforePpid && afterResult?.ppid && beforePpid === afterResult.ppid;
+    diffEl.textContent = same ? 'Same PPID ✓' : 'PPID mismatch (unexpected)';
+    diffEl.className = same ? 'ppid-diff' : 'ppid-diff deny';
+    if (flipEl) {
+      flipEl.textContent = `Assurance: passkey → ${afterResult?.assurance || '?'}`;
+    }
+  }
+
+  async function reverifyTicketsIshuman() {
+    const before = state.passkeyPpids.tickets || state.results.tickets?.ppid;
+    if (!before) throw new Error('No passkey ticketing PPID snapshot — verify step 2 first');
+    const result = await verifySite('tickets', { requiredAssurance: 'ishuman' });
+    updateStepUpCompare(before, result);
+    if (result.ppid === before && result.assurance === 'ishuman') {
+      log('Step-up success', 'same PPID with ishuman assurance');
+      setWorkflowHighlight(0);
+    } else {
+      log('Step-up check', `ppid match=${result.ppid === before} assurance=${result.assurance}`);
+    }
+    return result;
   }
 
   async function unblockTickets() {
@@ -1229,6 +1448,34 @@
     try {
       setWizardStep(1, 'Unlocking wallet…');
       await initWallet();
+
+      if (assuranceDemoMode()) {
+        await refreshAssuranceStatus();
+        setWizardStep(2, 'Passkey proof on both demo sites…');
+        await verifyBothSites();
+
+        setWizardStep(3, 'Open demo sites to stamp actions (optional pause)…');
+        await sleep(1500);
+
+        setWizardStep(4, 'Blocking abusive ticketing PPID…');
+        scrollToPanel('ih-abuse-panel');
+        await blockTickets();
+
+        setWizardStep(5, 'Requiring isHuman on ticketing…');
+        await requireIsHumanOnTickets();
+
+        setWizardStep(6, 'Complete isHuman verification…');
+        if (state.config?.test_verify_enabled) {
+          await verifyOnceTestMode();
+        } else {
+          log('Complete IDV manually', 'use Complete isHuman verification button');
+        }
+
+        setWizardStep(0, 'Demo complete — same ticketing PPID with ishuman assurance.');
+        setDemoReadyBanner(true);
+        log('Assurance guided demo complete');
+        return;
+      }
 
       setWizardStep(2, 'Confirming human proof…');
       await ensureMasterForDemo();
@@ -1342,12 +1589,16 @@
     bind('ih-unblock-tickets-btn', unblockTickets);
     bind('ih-abuse-block-btn', blockTickets);
     bind('ih-abuse-recheck-btn', recheckBothSitesAfterBlock);
+    bind('ih-require-ishuman-btn', requireIsHumanOnTickets);
+    bind('ih-complete-ishuman-btn', completeIsHumanVerification);
+    bind('ih-reverify-tickets-ishuman-btn', reverifyTicketsIshuman);
     bind('ih-run-guided-demo', runGuidedDemo);
     bind('ih-force-reverify-btn', forceFreshIdv);
 
     try {
       await refreshWalletStatus();
       await hydrateSiteVerificationFromCache();
+      if (state.walletId) await refreshAssuranceStatus().catch(() => {});
       if (state.masterCredentialId || state.sessionId) {
         await refreshStatus();
         setPill('ih-lemma-status', 'READY', 'ok');

@@ -350,6 +350,8 @@ Requires platform flags: `LEMMA_ONE_PPID_ASSURANCE_MODEL=1` and `LEMMA_PASSKEY_A
 
 See `docs/product/PASSKEY_STAMP_INPUT_BURN.md` for the full contract.
 
+**Reference implementation:** [Assurance workflow demo](https://lemma.id/demo/ishuman) — passkey wallet → distinct site PPIDs → Heroku demo sites with `verifyStamp` → site block → isHuman step-up (same PPID). Enable flags on staging before recording.
+
 ---
 
 ## Validation before finishing

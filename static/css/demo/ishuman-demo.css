@@ -837,3 +837,22 @@
   border: 1px solid var(--demo-line);
   border-radius: 8px;
 }
+
+.step-up-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 14px;
+  margin-top: 12px;
+}
+
+.ppid-stepup-compare {
+  margin-top: 18px;
+  padding: 16px;
+  border-radius: 14px;
+  border: 1px solid var(--demo-line);
+  background: var(--demo-brand-soft);
+}
+
+.assurance-only[hidden] {
+  display: none !important;
+}

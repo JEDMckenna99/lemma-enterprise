@@ -107,6 +107,18 @@ def ensure_demo_sites() -> list[dict]:
         db.close()
 
 
+def _assurance_demo_config() -> dict:
+    from api.config import one_ppid_assurance_model_enabled, passkey_assurance_enabled
+
+    one_ppid = one_ppid_assurance_model_enabled()
+    passkey = passkey_assurance_enabled()
+    return {
+        "one_ppid_enabled": one_ppid,
+        "passkey_assurance_enabled": passkey,
+        "assurance_demo_mode": one_ppid and passkey,
+    }
+
+
 def _site_for_slug(slug: str):
     slug = (slug or "").strip().lower()
     spec = DEMO_SITES.get(slug)
@@ -221,9 +233,16 @@ def ishuman_demo_config():
         "qr_demo_idv_enabled": is_ishuman_demo_qr_idv_enabled(),
         "demo_qr_credential_ttl_seconds": ishuman_demo_qr_credential_ttl_seconds(),
         "customer_site_urls": {
-            "tickets": "https://lemma-demo-tickets-1d3d7411af33.herokuapp.com",
-            "trials": "https://lemma-demo-trials-7090f46cae0d.herokuapp.com",
+            "tickets": os.getenv(
+                "LEMMA_DEMO_TICKETS_URL",
+                "https://lemma-demo-tickets-1d3d7411af33.herokuapp.com",
+            ),
+            "trials": os.getenv(
+                "LEMMA_DEMO_TRIALS_URL",
+                "https://lemma-demo-trials-7090f46cae0d.herokuapp.com",
+            ),
         },
+        **_assurance_demo_config(),
         "copy": {
             "stripe_notice": (
                 "This demo uses Stripe Identity as the prototype IDV rail. "
@@ -231,6 +250,105 @@ def ishuman_demo_config():
             )
         },
     })
+
+
+@ishuman_demo_bp.route("/api/demo/ishuman/assurance-status", methods=["GET"])
+def ishuman_demo_assurance_status():
+    """Whether a wallet's person root is provisional (passkey-only) or IDV-anchored."""
+    from api.database import LemmaDocumentRoot, LemmaPerson, LemmaWalletBinding, SessionLocal
+    from api.identity_person import PERSON_STATUS_ACTIVE, PERSON_STATUS_PROVISIONAL
+
+    wallet_id = (request.args.get("wallet_id") or "").strip()
+    if not wallet_id:
+        return jsonify({"success": False, "error": "wallet_id required"}), 400
+
+    db = SessionLocal()
+    try:
+        binding = (
+            db.query(LemmaWalletBinding)
+            .filter_by(wallet_id=wallet_id, binding_status="active")
+            .first()
+        )
+        if not binding:
+            return jsonify({
+                "success": True,
+                "wallet_id": wallet_id,
+                "person_bound": False,
+                "person_status": None,
+                "provisional": False,
+                "anchored": False,
+                "has_document_link": False,
+            })
+
+        person = db.query(LemmaPerson).filter_by(person_id=binding.lemma_person_id).first()
+        doc = (
+            db.query(LemmaDocumentRoot)
+            .filter_by(lemma_person_id=binding.lemma_person_id)
+            .filter(LemmaDocumentRoot.revoked_at.is_(None))
+            .first()
+        )
+        status = (person.status if person else None) or ""
+        has_doc = doc is not None
+        provisional = status == PERSON_STATUS_PROVISIONAL
+        anchored = status == PERSON_STATUS_ACTIVE and has_doc
+
+        return jsonify({
+            "success": True,
+            "wallet_id": wallet_id,
+            "person_bound": True,
+            "person_id": binding.lemma_person_id,
+            "person_status": status,
+            "provisional": provisional,
+            "anchored": anchored,
+            "has_document_link": has_doc,
+        })
+    finally:
+        db.close()
+
+
+@ishuman_demo_bp.route("/api/demo/ishuman/require-ishuman", methods=["POST"])
+def ishuman_demo_require_ishuman():
+    """Demo-only: mark a site PPID as requiring isHuman assurance (SiteDoubt, no auto IDV)."""
+    from api.database import SessionLocal, SiteDoubt
+
+    body = request.get_json(silent=True) or {}
+    slug = (body.get("site_slug") or "tickets").strip()
+    ppid = (body.get("ppid") or "").strip()
+    if not ppid:
+        return jsonify({"success": False, "error": "ppid required"}), 400
+
+    _spec, site = _site_for_slug(slug)
+    if not site:
+        return jsonify({"success": False, "error": "unknown demo site"}), 404
+
+    db = SessionLocal()
+    try:
+        doubt = db.query(SiteDoubt).filter_by(site_id=site.site_id, ppid=ppid).first()
+        if not doubt:
+            doubt = SiteDoubt(site_id=site.site_id, ppid=ppid)
+            db.add(doubt)
+        doubt.reason = (
+            body.get("reason") or "Demo: site requires isHuman assurance on this PPID"
+        ).strip()
+        doubt.requested_by = site.admin_email or "demo"
+        doubt.requested_at = datetime.utcnow()
+        doubt.is_active = True
+        doubt.cleared_at = None
+        doubt.cleared_by = None
+        db.commit()
+
+        return jsonify({
+            "success": True,
+            "site_id": site.site_id,
+            "site_domain": site.site_domain,
+            "ppid": ppid,
+            "doubt_required": True,
+        })
+    except Exception:
+        db.rollback()
+        raise
+    finally:
+        db.close()
 
 
 @ishuman_demo_bp.route("/api/demo/ishuman/status", methods=["GET"])

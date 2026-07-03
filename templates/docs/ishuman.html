@@ -106,6 +106,19 @@
     </div>
 </div>
 
+<div class="docs-section" id="assurance-demo">
+    <h2>Assurance workflow demo</h2>
+    <p>The live demo at <a href="/demo/ishuman">/demo/ishuman</a> walks through the one-PPID assurance model when <code>LEMMA_ONE_PPID_ASSURANCE_MODEL</code> and <code>LEMMA_PASSKEY_ASSURANCE_ENABLED</code> are enabled:</p>
+    <ol style="line-height: 1.8; color: var(--gray-700); padding-left: 24px;">
+        <li><strong>Passkey wallet</strong> — create an empty lemma.id (provisional person root, no IDV yet).</li>
+        <li><strong>Passkey proof on two sites</strong> — derive distinct PPIDs with <code>assurance: passkey</code> via <code>verifyForBackend({ requiredAssurance: 'passkey' })</code>.</li>
+        <li><strong>Demo relying sites</strong> — stamp actions and verify server-side with <code>verifyStamp</code> (see <a href="https://lemma-demo-tickets-1d3d7411af33.herokuapp.com" rel="noopener">ticketing demo</a> and <a href="https://lemma-demo-trials-7090f46cae0d.herokuapp.com" rel="noopener">trials demo</a>).</li>
+        <li><strong>Site-local block</strong> — block the ticketing PPID; trials remains valid with passkey assurance.</li>
+        <li><strong>isHuman step-up</strong> — site escalates to IDV; re-verify with <code>requiredAssurance: 'ishuman'</code> — <em>same PPID</em>, stronger assurance.</li>
+    </ol>
+    <p>See also the <a href="/docs/integration/ISHUMAN_AGENT_INTEGRATION.md">agent integration guide</a> assurance table and <a href="/docs/demo/README.md">demo recording checklist</a>.</p>
+</div>
+
 <div class="docs-section" id="signup-trust-recipes">
     <h2>Signup recipes by trust tier</h2>
     <h3>T1 — quick signup (client ppid only)</h3>

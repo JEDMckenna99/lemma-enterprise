@@ -43,34 +43,46 @@ The public `/demo` route demonstrates proof-constrained authorization with live 
 
 ## What this proves
 
-The public `/demo/ishuman` route demonstrates reusable proof-of-humanity using the actual isHuman stack:
+The public `/demo/ishuman` route demonstrates the **one-PPID assurance model** when feature flags are enabled:
 
-- `POST /api/ishuman/start-verification` starts the Stripe Identity prototype IDV rail.
-- `GET /api/ishuman/verification-status/<session_id>` returns the signed master `isHuman` credential after webhook completion.
-- The browser wallet stores the master credential locally.
-- `IsHumanVerifier` requests site-specific credentials through `/wallet/bridge`.
-- `/api/ishuman/derive-site-proof` derives different PPIDs for `tickets-demo.lemma.id` and `trials-demo.lemma.id`.
-- Demo wrappers under `/api/demo/ishuman/*` apply site-local blocks and token-gated network revocation drills without exposing demo site API keys.
+- Passkey wallet + provisional person root (no IDV on step 1).
+- `verifyForBackend({ requiredAssurance: 'passkey' })` derives distinct site PPIDs with passkey assurance.
+- Heroku demo sites stamp actions and verify with `POST /api/demo/action` + offline `verifyStamp`.
+- Demo wrappers under `/api/demo/ishuman/*` apply site-local blocks and `require-ishuman` step-up (SiteDoubt).
+- After IDV, re-verify with `requiredAssurance: 'ishuman'` — **same PPID**, assurance flips to `ishuman`.
+
+Legacy IDV-first copy remains when `assurance_demo_mode` is false (flags off).
 
 ## Required environment variables
 
+- `LEMMA_ONE_PPID_ASSURANCE_MODEL=1` and `LEMMA_PASSKEY_ASSURANCE_ENABLED=1` — enable assurance demo on staging.
 - `STRIPE_SECRET_KEY`: Stripe account key with Identity enabled.
 - `STRIPE_IDENTITY_WEBHOOK_SECRET`: webhook secret for `/api/webhooks/stripe-identity`.
-- `ISHUMAN_RETURN_URL`: optional default return URL. The demo passes `/demo/ishuman?verification_return=true` explicitly.
-- `LEMMA_ISHUMAN_DEMO_ADMIN_TOKEN`: optional. Required only for the live **Approve network revocation** button.
-- `LEMMA_ISHUMAN_DEMO_ALLOW_TEST_VERIFY=true`: optional. Enables the guarded Stripe test-mode completion helper.
-- `LEMMA_ISHUMAN_DEMO_TEST_TOKEN`: optional but required when test-mode completion is enabled. Pass this in the demo UI or as `X-Demo-Test-Token`.
+- `ISHUMAN_RETURN_URL`: optional default return URL.
+- `LEMMA_ISHUMAN_DEMO_ALLOW_TEST_VERIFY=true`: optional staging helper for step 5 without live IDV.
+- `LEMMA_ISHUMAN_DEMO_TEST_TOKEN`: optional; required when test-mode completion is enabled.
+- `LEMMA_DEMO_TICKETS_URL` / `LEMMA_DEMO_TRIALS_URL`: override Heroku demo site URLs in hub config.
 
-## Recording checklist
+Demo Heroku apps:
+
+- `LEMMA_ORIGIN` — lemma.id or staging hub origin (must serve SDK + API).
+- `LEMMA_DEMO_REQUIRED_ASSURANCE=passkey` — site policy (ticketing escalates via hub step 5).
+
+## Recording checklist (assurance workflow)
+
+1. Load `/demo/ishuman` on staging (`assurance_demo_mode: true` in config).
+2. **Step 1** — Create passkey wallet (no IDV popup).
+3. **Step 2** — Verify both sites; show different PPIDs and `assurance: passkey`.
+4. **Step 3** — Open ticketing + trials demo sites; complete an action; show server-verified stamp in action log.
+5. **Step 4** — Block ticketing PPID; recheck — ticketing denied, trials still human.
+6. **Step 5** — Require isHuman on ticketing → complete IDV (or staging test-verify) → re-verify ticketing with ishuman; highlight **same PPID**.
+
+## Legacy recording checklist (flags off)
 
 1. Load `/demo/ishuman`.
-2. Click **Create or unlock wallet** and complete the passkey prompt.
-3. Click **Start Stripe Identity demo rail** and complete the Stripe Identity flow.
-4. Return to the demo and click **Poll and store master proof** if it does not run automatically.
-5. Click **Verify both demo sites** and show the two different PPIDs.
-6. Click **Block ticketing PPID** and show ticketing denied while free trial remains valid.
-7. Click **Request network review** to show the reviewed escalation path.
-8. Optional: enter `LEMMA_ISHUMAN_DEMO_ADMIN_TOKEN`, click **Approve network revocation**, and show both sites denied after revocation sync.
+2. Create lemma.id via IDV popup.
+3. Verify both demo sites (IDV-first flow).
+4. Block ticketing; confirm trials still valid.
 
 ## Demo language guardrail
 
@@ -102,7 +114,7 @@ The cross-site demo also has two standalone Heroku apps that act as third-party 
 - Ticketing: `https://lemma-demo-tickets-1d3d7411af33.herokuapp.com`
 - Free trial: `https://lemma-demo-trials-7090f46cae0d.herokuapp.com`
 
-Both load the hosted verifier from `https://lemma.id/sdk/ishuman-verifier.js` and call `IsHumanVerifier` with distinct site bindings:
+Both load the hosted verifier from your configured `LEMMA_ORIGIN` and call `verifyForBackend` with env-driven `LEMMA_DEMO_REQUIRED_ASSURANCE` (default `passkey`). Stamped actions POST to `/api/demo/action` for server-side `verifyStamp`.
 
 - `tickets-demo.lemma.id`
 - `trials-demo.lemma.id`

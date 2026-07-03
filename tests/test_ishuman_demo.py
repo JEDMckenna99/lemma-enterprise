@@ -30,12 +30,14 @@ def test_ishuman_demo_page_loads_expected_assets(ishuman_demo_client):
     body = resp.get_data(as_text=True)
 
     assert resp.status_code == 200
-    assert "See identity-level enforcement in action" in body
+    assert "One PPID, layered assurance" in body
     assert "Start live demo" in body
     assert "Try simulated demo" in body
-    assert "Step 1 — Create or unlock your lemma.id" in body
-    assert "Step 2 — Use the same lemma.id on two sites" in body
-    assert "Step 3 — Block abuse on one site" in body
+    assert "Step 1 — Create empty lemma.id" in body
+    assert "Step 2 — Passkey proof on two sites" in body
+    assert "Step 4 — Block abuse on one site" in body
+    assert "Step 5 — Escalate to isHuman" in body
+    assert "verifyForBackend" in body
     assert "demo-workflow" in body
     assert "Advanced / Developer details" in body
     assert "autoProvision: true" in body
@@ -52,7 +54,7 @@ def test_ishuman_demo_page_loads_expected_assets(ishuman_demo_client):
     assert "/sdk/ishuman-verifier.js" in body
     assert "/static/js/demo/ishuman-demo.js" in body
     assert "/static/css/demo/ishuman-demo.css" in body
-    assert "/static/js/demo/ishuman-demo.js?v=22" in body
+    assert "/static/js/demo/ishuman-demo.js?v=23" in body
 
 
 def test_demo_create_button_always_enters_live_issuance():
@@ -351,8 +353,8 @@ def test_ishuman_demo_js_uses_real_verifier_with_two_site_bindings():
     assert "runGuidedDemo" in js
     assert "/api/demo/ishuman/verify-once-test-mode" in js
     assert "/api/demo/ishuman/probe-derive" in js
-    assert "/api/demo/ishuman/force-reverify" in js
-    assert "openIdvPopup" in js
+    assert "verifyForBackend" in js
+    assert "/api/demo/ishuman/require-ishuman" in js
     assert "createLemmaIdViaPopup" in js
     assert "startLiveDemo" in js
     assert "startSimulatedDemo" in js
@@ -568,3 +570,48 @@ def test_qr_demo_idv_enabled_on_production_with_explicit_flag(
     payload = resp.get_json()
     assert resp.status_code == 200, payload
     assert payload["mode"] == "qr_demo_idv_flow"
+
+
+def test_ishuman_demo_config_exposes_assurance_flags(ishuman_demo_client, monkeypatch):
+    monkeypatch.setenv("LEMMA_ONE_PPID_ASSURANCE_MODEL", "1")
+    monkeypatch.setenv("LEMMA_PASSKEY_ASSURANCE_ENABLED", "1")
+    resp = ishuman_demo_client.get("/api/demo/ishuman/config")
+    payload = resp.get_json()
+    assert resp.status_code == 200
+    assert payload["one_ppid_enabled"] is True
+    assert payload["passkey_assurance_enabled"] is True
+    assert payload["assurance_demo_mode"] is True
+
+
+def test_require_ishuman_creates_site_doubt(ishuman_demo_client, fake_ishuman_db_session_factory):
+    from api.database import Site, SiteDoubt
+
+    fake_ishuman_db_session_factory.store.data[Site.__name__] = [
+        Site(
+            site_id="site_demo_tickets",
+            site_domain="tickets-demo.lemma.id",
+            company_name="Demo Tickets",
+            admin_email="demo@lemma.id",
+            api_key="test",
+        )
+    ]
+    resp = ishuman_demo_client.post(
+        "/api/demo/ishuman/require-ishuman",
+        json={"site_slug": "tickets", "ppid": "did:lemma:ppid_demo_ticket"},
+    )
+    payload = resp.get_json()
+    assert resp.status_code == 200
+    assert payload["doubt_required"] is True
+    rows = fake_ishuman_db_session_factory.store.data[SiteDoubt.__name__]
+    assert len(rows) == 1
+    assert rows[0].is_active is True
+
+
+def test_assurance_status_unbound_wallet(ishuman_demo_client):
+    resp = ishuman_demo_client.get(
+        "/api/demo/ishuman/assurance-status?wallet_id=wallet_unbound_demo",
+    )
+    payload = resp.get_json()
+    assert resp.status_code == 200
+    assert payload["person_bound"] is False
+    assert payload["provisional"] is False

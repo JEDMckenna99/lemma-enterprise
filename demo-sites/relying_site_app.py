@@ -1,6 +1,10 @@
 import os
+from collections import deque
+from typing import Optional
 
-from flask import Flask, Response
+from flask import Flask, Response, jsonify, request
+
+from lemma_ishuman_verify import VerificationContext
 
 
 app = Flask(__name__)
@@ -10,6 +14,21 @@ SITE_NAME = os.getenv("LEMMA_DEMO_SITE_NAME", "Lemma Demo Site")
 SITE_KIND = os.getenv("LEMMA_DEMO_SITE_KIND", "ticketing")
 LEMMA_ORIGIN = os.getenv("LEMMA_ORIGIN", "https://lemma.id")
 DEMO_HUB_URL = os.getenv("LEMMA_DEMO_HUB_URL", f"{LEMMA_ORIGIN}/demo/ishuman")
+DEMO_REQUIRED_ASSURANCE = os.getenv("LEMMA_DEMO_REQUIRED_ASSURANCE", "passkey").strip().lower()
+
+ACTION_LOG: deque = deque(maxlen=20)
+_VERIFY_CTX: Optional[VerificationContext] = None
+
+
+def _verify_ctx() -> VerificationContext:
+    global _VERIFY_CTX
+    if _VERIFY_CTX is None:
+        _VERIFY_CTX = VerificationContext(
+            site_id=SITE_ID,
+            lemma_origin=LEMMA_ORIGIN,
+            required_assurance=DEMO_REQUIRED_ASSURANCE,
+        )
+    return _VERIFY_CTX
 
 
 def _content():
@@ -17,7 +36,7 @@ def _content():
         return {
             "eyebrow": "SaaS free trial",
             "headline": "Start a 14-day Pro workspace",
-            "subhead": "Protected by Lemma — verify once, reuse your human proof.",
+            "subhead": "Protected by Lemma — passkey proof first; IDV only when this site requires isHuman assurance.",
             "primary": "Start free trial",
             "success": "Trial workspace created",
             "form": "Work email",
@@ -27,7 +46,7 @@ def _content():
     return {
         "eyebrow": "Ticket release",
         "headline": "Reserve 2 tickets for the drop",
-        "subhead": "Protected by Lemma — no CAPTCHA, no ID documents stored here.",
+        "subhead": "Protected by Lemma — passkey proof first; IDV only when this site requires isHuman assurance.",
         "primary": "Reserve tickets",
         "success": "Reservation held",
         "form": "Fan email",
@@ -38,7 +57,51 @@ def _content():
 
 @app.get("/health")
 def health():
-    return {"success": True, "site_id": SITE_ID, "site_name": SITE_NAME}
+    return {
+        "success": True,
+        "site_id": SITE_ID,
+        "site_name": SITE_NAME,
+        "required_assurance": DEMO_REQUIRED_ASSURANCE,
+    }
+
+
+@app.get("/api/demo/config")
+def demo_config():
+    return jsonify({
+        "success": True,
+        "site_id": SITE_ID,
+        "lemma_origin": LEMMA_ORIGIN,
+        "required_assurance": DEMO_REQUIRED_ASSURANCE,
+        "demo_hub_url": DEMO_HUB_URL,
+    })
+
+
+@app.post("/api/demo/action")
+def demo_action():
+    body = request.get_json(silent=True) or {}
+    ctx = _verify_ctx()
+    result = ctx.verify_stamp(body)
+    entry = {
+        "ok": result.ok,
+        "ppid": result.ppid,
+        "assurance": getattr(result, "assurance", None),
+        "reason": result.reason,
+        "action": (body.get("payload") or {}).get("action"),
+    }
+    ACTION_LOG.appendleft(entry)
+    status = 200 if result.ok else 403
+    return jsonify({
+        "success": result.ok,
+        "ppid": result.ppid,
+        "assurance": getattr(result, "assurance", None),
+        "reason": result.reason,
+        "action_log": list(ACTION_LOG),
+    }), status
+
+
+@app.get("/api/demo/action-log")
+def demo_action_log():
+    return jsonify({"success": True, "entries": list(ACTION_LOG)})
 
 
 @app.get("/lemma-clear")
@@ -215,21 +278,26 @@ def index():
         <button id="verify-btn">{copy["primary"]}</button>
         <div class="verdict" id="decision-card">
           <strong>What happens when you click</strong>
-          <p class="tiny">IDV runs once. Passkey unlocks your wallet once per day on lemma.id. After that, this site checks your Lemma-signed credential locally — no repeat IDV on return visits.</p>
+          <p class="tiny">Passkey unlocks your lemma.id wallet. This site derives a site-private PPID with passkey assurance first. If the site later requires isHuman assurance, Lemma opens IDV — your PPID stays the same.</p>
         </div>
       </section>
       <aside class="card">
         <p class="eyebrow">Customer site view</p>
         <p class="muted">Site binding: <code id="site-id">{SITE_ID}</code></p>
-        <p style="margin:12px 0 6px">Decision <span class="pill" id="status-pill">WAITING</span></p>
+        <p style="margin:12px 0 6px">Decision <span class="pill" id="status-pill">WAITING</span>
+          <span class="pill" id="assurance-pill">policy: {DEMO_REQUIRED_ASSURANCE}</span></p>
         <p class="muted" id="decision-copy">Click the protected action to run the SDK.</p>
         <ol class="how">
           <li>SDK checks local site proof cache first.</li>
-          <li>Missing site proof → Lemma popup issues it from your master credential.</li>
-          <li>No master proof yet → one-time IDV in the popup, then site proof.</li>
-          <li>Proof exists → local Ed25519 verify in milliseconds.</li>
+          <li>Missing proof → Lemma popup derives passkey assurance (no IDV yet).</li>
+          <li>Site policy may require isHuman assurance → IDV step-up, same PPID.</li>
+          <li>Server verifies your stamped action with offline revocation checks.</li>
           <li>Business never sees passport, selfie, or cross-site ID.</li>
         </ol>
+        <details>
+          <summary>Server-verified action log</summary>
+          <pre id="action-log">[]</pre>
+        </details>
         <details>
           <summary>SDK result object</summary>
           <pre id="result">{{}}</pre>
@@ -247,11 +315,12 @@ def index():
       document.getElementById('verify-btn').disabled = true;
     }}
     const pill = document.getElementById('status-pill');
+    const assurancePill = document.getElementById('assurance-pill');
     const result = document.getElementById('result');
+    const actionLogEl = document.getElementById('action-log');
     const decisionCard = document.getElementById('decision-card');
     const decisionCopy = document.getElementById('decision-copy');
-    // Single long-lived verifier per site — reuses cached Bloom snapshot and
-    // bridge iframe, so repeat verifications hit the local cache in ~10–30 ms.
+    const SITE_POLICY = '{DEMO_REQUIRED_ASSURANCE}';
     let sharedVerifier = null;
     function makeVerifier(autoProvision) {{
       if (sharedVerifier && sharedVerifier.autoProvision === autoProvision) {{
@@ -262,10 +331,28 @@ def index():
         siteId: '{SITE_ID}',
         lemmaOrigin: '{LEMMA_ORIGIN}',
         autoProvision,
+        requiredAssurance: SITE_POLICY,
         debug: true,
       }});
       sharedVerifier.autoProvision = autoProvision;
       return sharedVerifier;
+    }}
+
+    function setAssurancePill(assurance) {{
+      if (!assurancePill) return;
+      const label = assurance ? ('assurance: ' + assurance) : ('policy: ' + SITE_POLICY);
+      assurancePill.textContent = label;
+    }}
+
+    async function refreshActionLog() {{
+      if (!actionLogEl) return;
+      try {{
+        const res = await fetch('/api/demo/action-log');
+        const data = await res.json();
+        actionLogEl.textContent = JSON.stringify(data.entries || [], null, 2);
+      }} catch (err) {{
+        actionLogEl.textContent = '[]';
+      }}
     }}
 
     function formatMissingProof(reason) {{
@@ -281,16 +368,17 @@ def index():
       return 'No valid isHuman proof on this device (' + (reason || 'unknown') + '). Click the protected action to verify.';
     }}
 
-    function applyVerdict(response, {{ silent = false, stampedEvent = null }} = {{}}) {{
+    function applyVerdict(response, {{ silent = false, stampedEvent = null, serverEntry = null }} = {{}}) {{
       pill.textContent = response.human ? 'HUMAN' : (response.reason === 'session_valid' ? 'HUMAN' : 'DENY');
       pill.className = 'pill ' + (response.human ? 'ok' : (silent ? 'checking' : 'deny'));
+      setAssurancePill(response.assurance || serverEntry?.assurance);
       const lemma = stampedEvent?.lemma || null;
       const ppid = response.ppid || lemma?.ppid || '';
       if (response.human) {{
         decisionCopy.textContent = '{copy["success"]}. PPID: ' + (ppid || '').slice(0, 28) + '…';
         if (!silent) {{
-          const stampNote = lemma?.verified
-            ? ' · PPID stamp attached to your action log'
+          const stampNote = serverEntry?.ok
+            ? ' · server verified stamp (assurance=' + (serverEntry.assurance || response.assurance || '?') + ')'
             : '';
           decisionCard.innerHTML = '<strong>{copy["success"]}</strong><p class="tiny">human=true · reason=' + response.reason + ' · ' + response.timeMs.toFixed(0) + 'ms · site-private PPID issued' + stampNote + '.</p>';
         }}
@@ -328,6 +416,7 @@ def index():
     }}
 
     runBackgroundCheck();
+    refreshActionLog();
 
     document.getElementById('verify-btn').addEventListener('click', async () => {{
       if (typeof IsHumanVerifier === 'undefined') {{
@@ -341,17 +430,28 @@ def index():
       button.disabled = true;
       pill.textContent = 'CHECKING';
       pill.className = 'pill checking';
-      decisionCard.innerHTML = '<strong>Checking Lemma wallet…</strong><p class="tiny">If a site proof is missing, Lemma opens a popup on lemma.id to issue it from your master credential. IDV runs only once if you have no master proof yet.</p>';
+      decisionCard.innerHTML = '<strong>Checking Lemma wallet…</strong><p class="tiny">Derives a site proof with passkey assurance when possible. IDV opens only when this site requires isHuman assurance.</p>';
       try {{
         const verifier = makeVerifier(true);
-        const response = await verifier.verify();
-        if (response.human) {{
+        const {{ ok, ppid, assurance, presentation, human, reason, timeMs }} = await verifier.verifyForBackend({{
+          autoProvision: true,
+          requiredAssurance: SITE_POLICY,
+        }});
+        const response = {{ human: !!human, ppid, assurance, reason, timeMs: timeMs || 0 }};
+        if (ok && human) {{
           const email = document.getElementById('email')?.value || '';
           const stampedEvent = await verifier.stamp(
             {{ action: '{copy["action"]}', email, at: Date.now() }},
             {{ includeCredential: true }},
           );
-          applyVerdict(response, {{ stampedEvent }});
+          const serverRes = await fetch('/api/demo/action', {{
+            method: 'POST',
+            headers: {{ 'Content-Type': 'application/json' }},
+            body: JSON.stringify(stampedEvent),
+          }});
+          const serverEntry = await serverRes.json();
+          await refreshActionLog();
+          applyVerdict(response, {{ stampedEvent, serverEntry }});
         }} else {{
           applyVerdict(response);
         }}
