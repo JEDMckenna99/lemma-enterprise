@@ -190,17 +190,17 @@
       if (step1Title) step1Title.textContent = 'Step 1 — Create or unlock your lemma.id';
       if (step1Desc) step1Desc.textContent = 'Use an existing lemma.id or complete a one-time identity check.';
       if (step2Title) step2Title.textContent = 'Step 2 — Use the same lemma.id on two sites';
-      if (step2Desc) step2Desc.textContent = 'Each site receives its own private ID from the same verified-human proof.';
-      if (intro) intro.textContent = 'Verify once, then test two demo sites. Both sites can know you are a verified human, but neither receives your real identity or the same identifier as the other.';
+      if (step2Desc) step2Desc.textContent = 'Each site asks for the assurance it needs; your wallet mints a site-private stamp the site verifies itself — same verified human, different PPIDs.';
+      if (intro) intro.textContent = 'Verify once on lemma.id, then test two demo sites. Each site asks for the assurance it needs and verifies a site-private stamp on its own backend — both learn you are a verified human, but neither gets your real identity or the same ID as the other.';
       if (createBtn) createBtn.textContent = 'Create a lemma.id';
       if (step1Utility) {
-        step1Utility.querySelector('p').textContent = 'Shows the one-time IDV path: verify once on lemma.id, then reuse that proof across sites.';
+        step1Utility.querySelector('p').textContent = 'The one-time IDV path: verify once on lemma.id, then reuse that proof across sites. Your identity stays in a container only you control.';
       }
       if (step2Utility) {
-        step2Utility.querySelector('p').textContent = 'Proves pairwise privacy: one verified person, two unrelated site-private identifiers.';
+        step2Utility.querySelector('p').textContent = 'The core loop: each site declares the assurance it needs → your wallet mints a site-private stamp → the site verifies it offline. One verified person, two unrelated site-private IDs.';
       }
       if (step4Utility) {
-        step4Utility.querySelector('p').textContent = 'Site-local enforcement: block a human proof on one site without affecting the same person elsewhere.';
+        step4Utility.querySelector('p').textContent = 'Site-scoped enforcement: block a human proof on one site without touching who they are anywhere else — unlike IP or device bans.';
       }
       if (ppidCompareDesc) {
         ppidCompareDesc.textContent = 'Ticketing and Trials receive different identifiers, even though both proofs come from the same verified human.';
@@ -208,13 +208,13 @@
     } else {
       if (createBtn) createBtn.textContent = 'Create a lemma.id';
       if (step1Utility) {
-        step1Utility.querySelector('p').textContent = 'Opens the lemma.id popup to create your wallet with a passkey — same mechanism demo sites use for unlock.';
+        step1Utility.querySelector('p').textContent = 'Passkey-first onboarding: you hold a usable lemma.id at passkey assurance before any identity check. It\'s a container only you control — sites can\'t read it, they can only ask it for proofs.';
       }
       if (step2Utility) {
-        step2Utility.querySelector('p').textContent = 'Proves pairwise privacy: one wallet, two unrelated site-private identifiers. Sites never see your real name or each other\'s ID.';
+        step2Utility.querySelector('p').textContent = 'The core loop: the site declares the assurance it needs → your wallet mints a site-private stamp → the site verifies it offline. One wallet, two unrelated IDs; neither site sees your real identity or the other\'s ID.';
       }
       if (step4Utility) {
-        step4Utility.querySelector('p').textContent = 'Site-local enforcement: ban a human proof on one site without affecting the same person elsewhere — unlike IP bans.';
+        step4Utility.querySelector('p').textContent = 'Site-scoped enforcement: block this person\'s site-private ID on ticketing without touching who they are on trials or anywhere else — unlike IP or device bans.';
       }
       if (ppidCompareDesc) {
         ppidCompareDesc.textContent = 'Ticketing and Trials receive different identifiers, even though both proofs come from the same passkey wallet.';

@@ -67,7 +67,7 @@
 
         <div class="step-utility" id="ih-step1-utility">
           <strong>Why this step</strong>
-          <p>Shows passkey-first onboarding in the lemma.id popup — same unlock mechanism as demo sites, before any identity check.</p>
+          <p>Passkey-first onboarding: you hold a usable lemma.id at passkey assurance before any identity check. It's a container only you control — sites can't read it, they can only ask it for proofs.</p>
         </div>
 
         <div class="demo-ready-banner" id="ih-demo-ready-banner" hidden>
@@ -103,14 +103,14 @@
         <div class="workflow-head">
           <div>
             <h2 id="ih-step2-title">Step 2 — Passkey proof on two sites</h2>
-            <p class="demo-muted" id="ih-step2-desc">Each site receives its own private ID with <code>assurance: passkey</code> — derived from the same wallet, different PPIDs.</p>
+            <p class="demo-muted" id="ih-step2-desc">Each site asks for <code>assurance: passkey</code>. Your wallet derives that site's private ID and mints a signed stamp the site verifies itself — same wallet, different PPIDs.</p>
           </div>
           <button class="demo-btn demo-btn-secondary" id="ih-verify-sites-btn" type="button">Verify both sites</button>
         </div>
 
         <div class="step-utility" id="ih-step2-utility">
           <strong>Why this step</strong>
-          <p>Proves pairwise privacy: one wallet, two unrelated site-private identifiers. Sites never see your real name or each other's ID.</p>
+          <p>The core loop: the site declares the assurance it needs → your wallet mints a site-private stamp → the site verifies it offline. One wallet, two unrelated IDs; neither site sees your real identity or the other's ID.</p>
         </div>
 
         <div class="site-cards">
@@ -183,12 +183,12 @@
         <div class="workflow-head">
           <div>
             <h2>Step 3 — Use demo sites</h2>
-            <p class="demo-muted">Each Heroku demo site stamps your action with a signed presentation and verifies it server-side.</p>
+            <p class="demo-muted">Reserve a ticket or start a trial — the site stamps your action with a signed presentation and verifies it on its own server, with no call back to lemma.id.</p>
           </div>
         </div>
         <div class="step-utility">
           <strong>Why this step</strong>
-          <p>See the integrator path: browser SDK → stamp an action → your backend verifies offline (no lemma.id call per request).</p>
+          <p>The integrator path: the browser SDK mints the stamp, your backend verifies it offline. No per-request call to lemma.id keeps checks fast and private.</p>
         </div>
         <div class="action-row">
           <a class="demo-btn demo-btn-secondary" id="ih-link-tickets-site" href="#" target="_blank" rel="noopener">Open ticketing demo</a>
@@ -214,7 +214,7 @@
 
         <div class="step-utility" id="ih-step4-utility">
           <strong>Why this step</strong>
-          <p>Site-local enforcement: ban a human proof on one site without affecting the same person elsewhere — unlike IP bans.</p>
+          <p>Site-scoped enforcement: block this person's site-private ID on ticketing without touching who they are on trials or anywhere else — unlike IP or device bans.</p>
         </div>
 
         <div class="block-grid">
@@ -260,12 +260,12 @@
         <div class="workflow-head">
           <div>
             <h2>Step 5 — Escalate to isHuman (same PPID)</h2>
-            <p class="demo-muted">Ticketing requires isHuman assurance. Complete IDV, then re-verify — your ticketing PPID stays the same; assurance flips from passkey to ishuman.</p>
+            <p class="demo-muted">On doubt or a high-risk action, ticketing raises its bar to isHuman and demands a fresh verification. Complete IDV, then re-verify — the PPID is unchanged; only the assurance flips from passkey to ishuman.</p>
           </div>
         </div>
         <div class="step-utility">
           <strong>Why this step</strong>
-          <p>Assurance is layered, not a new account: stronger proof on the same site-private ID after abuse or high-trust policy.</p>
+          <p>Step-up strengthens the same account, not a new one: the site-private ID is stable across tiers, so a fresh isHuman proof raises trust without re-registering the user.</p>
         </div>
         <div class="step-up-grid">
           <div class="block-card">
@@ -382,5 +382,5 @@ const { ok, ppid, assurance, presentation } = await new IsHumanVerifier({
 <script src="/static/js/lemma-keys.js?v=5" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
 <script nonce="{{ csp_nonce }}">window.LEMMA_ISHUMAN_USE_PERSON_ROOT_SEEDS = {{ 'true' if ishuman_use_person_root_seeds else 'false' }};</script>
 <script src="/sdk/ishuman-verifier.js?v=1.8.3" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
-<script src="/static/js/demo/ishuman-demo.js?v=27" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
+<script src="/static/js/demo/ishuman-demo.js?v=28" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
 {% endblock %}
