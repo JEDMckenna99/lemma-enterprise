@@ -874,7 +874,7 @@ def _store_global_session(wallet_id: str, unlocked_at: int = 0, expires_at: int 
                           profile_id: str = 'default', profile_name: str = 'Personal',
                           device_hint: str = None):
     """Deprecated no-op: cross-device global session storage was removed."""
-    return False
+    return True
 
 
 def _get_global_session(wallet_id: str):

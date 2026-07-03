@@ -85,6 +85,21 @@
     return !!(state.config && state.config.assurance_demo_mode);
   }
 
+  async function acquireWallet() {
+    if (!window.LemmaWallet) throw new Error('LemmaWallet SDK not loaded');
+    const deadline = Date.now() + 8000;
+    while (!window.globalLemmaWallet && Date.now() < deadline) {
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+    if (window.globalLemmaWallet) {
+      state.wallet = window.globalLemmaWallet;
+      return state.wallet;
+    }
+    state.wallet = state.wallet || new window.LemmaWallet();
+    window.globalLemmaWallet = state.wallet;
+    return state.wallet;
+  }
+
   function workflowStepCount() {
     return assuranceDemoMode() ? 5 : 3;
   }
@@ -177,7 +192,7 @@
       if (step2Title) step2Title.textContent = 'Step 2 — Use the same lemma.id on two sites';
       if (step2Desc) step2Desc.textContent = 'Each site receives its own private ID from the same verified-human proof.';
       if (intro) intro.textContent = 'Verify once, then test two demo sites. Both sites can know you are a verified human, but neither receives your real identity or the same identifier as the other.';
-      if (createBtn) createBtn.textContent = 'Create lemma.id';
+      if (createBtn) createBtn.textContent = 'Create a lemma.id';
       if (step1Utility) {
         step1Utility.querySelector('p').textContent = 'Shows the one-time IDV path: verify once on lemma.id, then reuse that proof across sites.';
       }
@@ -191,7 +206,7 @@
         ppidCompareDesc.textContent = 'Ticketing and Trials receive different identifiers, even though both proofs come from the same verified human.';
       }
     } else {
-      if (createBtn) createBtn.textContent = 'Create passkey wallet';
+      if (createBtn) createBtn.textContent = 'Create a lemma.id';
       if (step1Utility) {
         step1Utility.querySelector('p').textContent = 'Shows passkey-first onboarding: your wallet gets a person root and can issue continuity proofs before any identity check.';
       }
@@ -592,8 +607,7 @@
   }
 
   async function initWallet({ force = false } = {}) {
-    if (!window.LemmaWallet) throw new Error('LemmaWallet SDK not loaded');
-    state.wallet = state.wallet || new window.LemmaWallet();
+    await acquireWallet();
 
     let readyMethod = 'passkey';
     if (typeof state.wallet.ensureIsHumanIssuanceReady === 'function') {
@@ -645,7 +659,7 @@
   // PPID-derived proof from the wallet secret, and is reused for 24h once done.
   async function initWalletPassive() {
     if (!window.LemmaWallet) return false;
-    state.wallet = state.wallet || new window.LemmaWallet();
+    await acquireWallet();
     await state.wallet.init();
     let walletId = state.wallet.session?.walletId || '';
     if (!walletId) {
@@ -838,22 +852,35 @@
     return popup;
   }
 
-  function createLemmaIdViaPopup() {
+  async function createLemmaIdViaPopup() {
     setDemoMode('live');
     if (assuranceDemoMode()) {
-      return createPasskeyWallet();
+      await createPasskeyWallet();
+      return;
     }
     return openIdvPopup({ demoQr: false });
   }
 
   async function createPasskeyWallet() {
-    await initWallet();
-    await refreshAssuranceStatus();
-    setPill('ih-lemma-status', 'UNLOCKED', 'ok');
-    setDemoReadyBanner(true);
-    setWorkflowHighlight(2);
-    scrollToPanel('ih-step-2');
-    log('Passkey wallet ready', short(state.walletId));
+    const createBtn = $('ih-create-lemma-btn');
+    const prevLabel = createBtn ? createBtn.textContent : '';
+    if (createBtn) createBtn.textContent = 'Waiting for passkey…';
+    setPill('ih-lemma-status', 'VERIFYING', 'warn');
+    log('Creating lemma.id', 'complete the passkey prompt from your device');
+    try {
+      await initWallet({ force: true });
+      if (!state.walletId) {
+        throw new Error('Passkey registration did not finish — try again');
+      }
+      await refreshAssuranceStatus();
+      setPill('ih-lemma-status', 'UNLOCKED', 'ok');
+      setDemoReadyBanner(true);
+      setWorkflowHighlight(2);
+      scrollToPanel('ih-step-2');
+      log('lemma.id ready', short(state.walletId));
+    } finally {
+      if (createBtn && prevLabel) createBtn.textContent = prevLabel;
+    }
   }
 
   async function refreshAssuranceStatus() {
@@ -1015,6 +1042,7 @@
 
     // 5. Reset in-memory demo state + UI.
     state.wallet = null;
+    window.globalLemmaWallet = null;
     state.walletId = null;
     state.walletSecret = null;
     state.masterCredential = null;

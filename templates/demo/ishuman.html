@@ -88,7 +88,7 @@
 
         <div class="action-row" id="ih-step1-actions">
           <button class="demo-btn demo-btn-secondary" id="ih-unlock-lemma-btn" type="button">Unlock lemma.id</button>
-          <button class="demo-btn demo-btn-primary" id="ih-create-lemma-btn" type="button">Create passkey wallet</button>
+          <button class="demo-btn demo-btn-primary" id="ih-create-lemma-btn" type="button">Create a lemma.id</button>
         </div>
       </div>
     </section>
@@ -343,8 +343,10 @@ const { ok, ppid, assurance, presentation } = await new IsHumanVerifier({
       <p class="demo-muted">Use the <strong>Clear my lemma.id</strong> button at the top of the page. It wipes the wallet, demo caches, and cached proofs on the Heroku demo sites.</p>
 
       <h3>Operator console</h3>
-      <input class="demo-input" id="ih-test-token" type="password" placeholder="Test token override (optional)" autocomplete="off">
-      <input class="demo-input" id="ih-admin-token" type="password" placeholder="Admin token override (optional)" autocomplete="off">
+      <form class="demo-operator-form" id="ih-operator-form" autocomplete="off">
+        <input class="demo-input" id="ih-test-token" type="password" placeholder="Test token override (optional)" autocomplete="off">
+        <input class="demo-input" id="ih-admin-token" type="password" placeholder="Admin token override (optional)" autocomplete="off">
+      </form>
       <div class="action-row" id="ih-operator-console">
         <button class="demo-btn demo-btn-secondary" id="ih-start-idv-btn" type="button">Start identity check</button>
         <button class="demo-btn demo-btn-secondary" id="ih-test-complete-btn" type="button">Complete test verification</button>
@@ -380,5 +382,5 @@ const { ok, ppid, assurance, presentation } = await new IsHumanVerifier({
 <script src="/static/js/lemma-keys.js?v=5" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
 <script nonce="{{ csp_nonce }}">window.LEMMA_ISHUMAN_USE_PERSON_ROOT_SEEDS = {{ 'true' if ishuman_use_person_root_seeds else 'false' }};</script>
 <script src="/sdk/ishuman-verifier.js?v=1.8.3" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
-<script src="/static/js/demo/ishuman-demo.js?v=24" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
+<script src="/static/js/demo/ishuman-demo.js?v=25" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
 {% endblock %}
