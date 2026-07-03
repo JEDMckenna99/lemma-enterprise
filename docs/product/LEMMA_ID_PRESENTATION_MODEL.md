@@ -21,10 +21,11 @@ An **identity proof** establishes that a wallet holder is human on lemma.id.
 
 | Property | Rule |
 |----------|------|
-| Primary signals | `claims.isHuman === true`, or credential id prefix `ishuman_master_` / `ishuman_site_` |
+| Primary signals | `claims.assurance` (`passkey` \| `ishuman`), legacy `claims.isHuman === true`, or credential id prefix `ishuman_master_` / `ishuman_site_` |
 | Runtime site binding | Normalized hostname; platform binding is `lemma.id` |
 | Sparse site fields | Empty `siteId` / `siteDomain` on master records is valid; skip before canonicalization |
-| PPID derivation | Wallet secret + normalized hostname only |
+| PPID derivation | Assigned **person_root** + normalized hostname (canonical). Legacy wallet-secret derivation is provisional-only behind flags. |
+| Assurance | `passkey` = wallet-bound pre-IDV; `ishuman` = IDV-backed. Same PPID across tiers. |
 
 **Complete lemma.id** means the wallet holds a valid isHuman identity proof for the platform (master credential and/or lemma.id site proof).
 

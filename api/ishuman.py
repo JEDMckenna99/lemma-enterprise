@@ -198,17 +198,12 @@ def _issue_ishuman_credential(
     ppid_derivation: Optional[str] = None,
     verification_method: str = "didit",
     ttl_seconds: Optional[int] = None,
+    assurance: str = "ishuman",
 ) -> dict:
-    """Sign and return a new isHuman credential for *ppid*.
+    """Sign and return a site or master credential for *ppid*.
 
-    If *site_id* is provided, the credential is bound to that site
-    (per-site derived proof).  Otherwise it is the master proof bound
-    to ``lemma.id``.
-
-    *verification_method* records which IDV rail established the underlying
-    proof of personhood (``didit``). It is derived from the verification
-    record's ``issuer_id`` so derived/reissued credentials stay consistent
-    with how the human was originally verified.
+    *assurance* is ``passkey`` (wallet-bound, pre-IDV) or ``ishuman`` (IDV-backed).
+    Site PPIDs are identical across tiers; assurance records proof strength only.
     """
     issuer = _get_ishuman_issuer()
     now = int(time.time())
@@ -221,13 +216,17 @@ def _issue_ishuman_credential(
     )
 
     claims: dict = {
-        "isHuman": True,
+        "assurance": assurance or "ishuman",
         "verificationMethod": (verification_method or "didit"),
         "packageType": "identity",
         "siteId": site_id or "lemma.id",
         "issuedAt": str(now),
         "expiresAt": str(now + lifetime_seconds),
     }
+    if (assurance or "ishuman") == "ishuman":
+        claims["isHuman"] = True
+    else:
+        claims["isHuman"] = False
     is_lemma_master = not site_id or site_id == "lemma.id"
     if is_lemma_master:
         claims["siteDomain"] = "lemma.id"
@@ -2334,6 +2333,70 @@ def derive_site_proof():
                 master_query = master_query.with_for_update()
             master = master_query.first()
         if not master:
+            from api.config import passkey_assurance_enabled
+
+            if passkey_assurance_enabled():
+                person_id = _resolve_person_id_for_wallet(db, wallet_id)
+                if not person_id:
+                    try:
+                        from api.identity_person import ensure_provisional_person_for_wallet
+
+                        person_id = ensure_provisional_person_for_wallet(db, wallet_id=wallet_id)
+                        db.commit()
+                    except Exception as exc:
+                        db.rollback()
+                        logger.exception("Failed to ensure provisional person for passkey proof")
+                        return jsonify({
+                            "success": False,
+                            "error": "provisional_person_failed",
+                            "message": str(exc),
+                        }), 500
+                deny_reason = _deny_if_derivation_revoked(
+                    db,
+                    master_credential_id="",
+                    wallet_id=wallet_id,
+                    target_site=target_site,
+                    lemma_person_id=person_id,
+                )
+                if deny_reason:
+                    return jsonify({"success": False, "error": deny_reason}), 403
+
+                from billing.billing_access import check_site_billing_allows_issuance
+
+                billing_deny = check_site_billing_allows_issuance(db, target_site)
+                if billing_deny:
+                    return jsonify({
+                        "success": False,
+                        "error": billing_deny,
+                        "message": "Site billing is inactive. Update payment method in developer billing.",
+                    }), 402
+
+                site_ppid = _derive_ppid_for_site(
+                    rp_id=target_site,
+                    wallet_id=wallet_id,
+                    lemma_person_id=person_id,
+                    db=db,
+                )
+                credential = _issue_ishuman_credential(
+                    site_ppid,
+                    wallet_id,
+                    site_id=target_site,
+                    site_signing_pubkey=site_signing_pubkey or None,
+                    ppid_derivation="person_root_v1",
+                    verification_method="passkey",
+                    assurance="passkey",
+                )
+                _bill_site_credential_event(
+                    db,
+                    target_site=target_site,
+                    ppid=site_ppid,
+                    credential_id=credential["id"],
+                    issue_mode=issue_mode,
+                    is_cached_reissue=False,
+                )
+                db.commit()
+                return _jsonify_site_proof(credential=credential, cached=False)
+
             return jsonify({"success": False, "error": "wallet_not_verified"}), 403
 
         # A client label alone must never clear a doubt. Fresh mode is accepted

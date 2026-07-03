@@ -344,14 +344,34 @@ class VerificationContext:
         max_session_age_seconds: int = 24 * 60 * 60,
         refresh_seconds: int = 15 * 60,
         require_session_assertion: bool = True,
+        required_assurance: str = "ishuman",
     ) -> None:
         self.site_id = site_id
         self.lemma_origin = lemma_origin.rstrip("/")
         self.max_session_age_seconds = max_session_age_seconds
         self.refresh_seconds = refresh_seconds
         self.require_session_assertion = require_session_assertion
+        self.required_assurance = (required_assurance or "ishuman").strip().lower()
         self._lock = threading.Lock()
         self._snapshot: Optional[_Snapshot] = None
+
+    @staticmethod
+    def _credential_assurance(claims: dict) -> Optional[str]:
+        raw = claims.get("assurance")
+        if raw:
+            return str(raw).strip().lower()
+        if claims.get("isHuman") in (True, "true", "True", 1, "1"):
+            return "ishuman"
+        return None
+
+    @staticmethod
+    def _assurance_meets_policy(actual: Optional[str], required: str) -> bool:
+        if not actual:
+            return False
+        required = (required or "ishuman").strip().lower()
+        if required == "passkey":
+            return actual in ("passkey", "ishuman")
+        return actual == "ishuman"
 
     def _fetch_signed_bundle(self) -> _Snapshot:
         url = f"{self.lemma_origin}/api/revocation/bloom-filter"
@@ -445,6 +465,7 @@ class VerificationContext:
         credential_id: Optional[str] = None
         issuer_did: Optional[str] = None
         bound_site_id: Optional[str] = None
+        assurance: Optional[str] = None
 
     def verify(self, presentation: dict) -> "VerificationContext.Result":
         """Verify a presentation bundle without contacting lemma.id per-request."""
@@ -481,10 +502,15 @@ class VerificationContext:
         if not sig_ok:
             return self.Result(False, "invalid_signature")
 
-        # 2. Claim-level checks: isHuman, site binding, expiry
+        # 2. Claim-level checks: assurance tier, site binding, expiry
         claims = credential.get("claims") or credential.get("credentialSubject") or {}
-        if not claims.get("isHuman"):
+        assurance = self._credential_assurance(claims)
+        if not assurance:
             return self.Result(False, "not_ishuman")
+        if assurance not in ("passkey", "ishuman"):
+            return self.Result(False, "invalid_assurance")
+        if not self._assurance_meets_policy(assurance, self.required_assurance):
+            return self.Result(False, "assurance_insufficient", assurance=assurance)
         bound_site = (
             claims.get("siteId") or claims.get("site_id") or claims.get("siteDomain") or ""
         )
@@ -542,6 +568,7 @@ class VerificationContext:
             credential_id=credential_id or None,
             issuer_did=issuer_did,
             bound_site_id=bound_site,
+            assurance=assurance,
         )
 
     def verify_stamp(

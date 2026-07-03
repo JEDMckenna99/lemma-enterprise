@@ -83,6 +83,17 @@ def _load_registered_pubkey(wallet_id: str) -> tuple[Result, bytes | None]:
         db.close()
 
 
+def _ensure_provisional_person_after_register(db, wallet_id: str) -> None:
+    """Create provisional assigned person_root when one-PPID assurance model is enabled."""
+    from api.config import one_ppid_assurance_model_enabled
+
+    if not one_ppid_assurance_model_enabled():
+        return
+    from api.identity_person import ensure_provisional_person_for_wallet
+
+    ensure_provisional_person_for_wallet(db, wallet_id=wallet_id)
+
+
 def register_wallet_signing_key(
     *,
     wallet_id: str,
@@ -118,6 +129,7 @@ def register_wallet_signing_key(
                 return Result(False, "wallet_pubkey_mismatch", "wallet signing key revoked")
             if bytes(existing.pubkey) == pubkey_bytes:
                 existing.last_used_at = datetime.utcnow()
+                _ensure_provisional_person_after_register(db, wallet_id)
                 db.commit()
                 return Result(True)
             return Result(
@@ -135,6 +147,7 @@ def register_wallet_signing_key(
                 last_used_at=datetime.utcnow(),
             )
         )
+        _ensure_provisional_person_after_register(db, wallet_id)
         try:
             db.commit()
         except IntegrityError:
@@ -148,6 +161,7 @@ def register_wallet_signing_key(
             winner = db.query(WalletSigningKey).filter_by(wallet_id=wallet_id).first()
             if winner and not winner.revoked_at and bytes(winner.pubkey) == pubkey_bytes:
                 winner.last_used_at = datetime.utcnow()
+                _ensure_provisional_person_after_register(db, wallet_id)
                 db.commit()
                 return Result(True)
             if winner and winner.revoked_at:

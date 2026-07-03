@@ -656,6 +656,7 @@ class IsHumanVerifier {
      *        boolean or { blocked, doubt_required }. Sites should resolve this
      *        from their own backend state rather than exposing a site API key.
      * @param {boolean} [config.autoProvision] — open Lemma IDV popup when no master proof exists.
+     * @param {string}  [config.requiredAssurance] — minimum assurance: ``passkey`` or ``ishuman`` (default).
      * @param {string}  [config.idvPopupPath] — override popup path (default /wallet/ishuman-idv).
      */
     constructor(config = {}) {
@@ -664,6 +665,7 @@ class IsHumanVerifier {
         this.debug = !!config.debug;
         this.isBlockedLocally = config.isBlockedLocally || null;
         this.autoProvision = !!config.autoProvision;
+        this.requiredAssurance = (config.requiredAssurance || 'ishuman').toLowerCase();
         this.idvPopupPath = config.idvPopupPath || IDV_POPUP_PATH;
         this.sessionTtlSec = Math.min(
             MAX_SESSION_TTL_SECONDS,
@@ -691,6 +693,27 @@ class IsHumanVerifier {
         this._setupBlockBroadcastChannel();
 
         this._initPromise = this._init();
+    }
+
+    _credentialAssurance(credential) {
+        const claims = credential?.claims || credential?.credentialSubject || {};
+        if (claims.assurance) {
+            return String(claims.assurance).toLowerCase();
+        }
+        if (claims.isHuman === true || claims.isHuman === 'true') {
+            return 'ishuman';
+        }
+        return null;
+    }
+
+    _assuranceMeetsPolicy(assurance, requiredAssurance) {
+        const required = String(requiredAssurance || 'ishuman').toLowerCase();
+        const actual = String(assurance || '').toLowerCase();
+        if (!actual) return false;
+        if (required === 'passkey') {
+            return actual === 'passkey' || actual === 'ishuman';
+        }
+        return actual === 'ishuman';
     }
 
     _canonicalizeSiteDomain(siteDomain) {
@@ -881,14 +904,18 @@ class IsHumanVerifier {
      * @returns {Promise<{ok: boolean, presentation: object|null, ppid: string|null, reason: string, timeMs: number}>}
      */
     async verifyForBackend(options = {}) {
-        const result = await this.verify(options);
+        const requiredAssurance = (options.requiredAssurance || this.requiredAssurance || 'ishuman').toLowerCase();
+        const result = await this.verify({ ...options, requiredAssurance });
         const presentation = result.presentation || null;
-        const ok = !!(result.human && presentation && presentation.credential);
+        const assurance = result.assurance || null;
+        const meetsPolicy = this._assuranceMeetsPolicy(assurance, requiredAssurance);
+        const ok = !!(meetsPolicy && presentation && presentation.credential);
         return {
             ok,
             presentation: ok ? presentation : null,
             ppid: ok ? result.ppid : null,
-            reason: ok ? result.reason : (result.reason || 'presentation_missing'),
+            assurance,
+            reason: ok ? result.reason : (result.reason || 'assurance_insufficient'),
             timeMs: result.timeMs,
         };
     }
@@ -1259,8 +1286,12 @@ class IsHumanVerifier {
 
     async _verifyCredentialCore(credential, t0) {
         const claims = credential.claims || credential.credentialSubject || {};
-        if (!claims.isHuman) {
-            return { ok: false, ppid: null, reason: 'not_ishuman' };
+        const assurance = this._credentialAssurance(credential);
+        if (!assurance) {
+            return { ok: false, ppid: null, reason: 'not_ishuman', assurance: null };
+        }
+        if (assurance !== 'passkey' && assurance !== 'ishuman') {
+            return { ok: false, ppid: null, reason: 'invalid_assurance', assurance };
         }
 
         const boundSite = this._canonicalizeSiteDomain(
@@ -1727,11 +1758,24 @@ class IsHumanVerifier {
 
     _result(human, ppid, reason, t0, error, presentation) {
         const timeMs = performance.now() - t0;
+        let assurance = null;
+        if (presentation?.credential) {
+            assurance = this._credentialAssurance(presentation.credential);
+        }
+        if (assurance === 'ishuman') {
+            human = true;
+        } else if (assurance === 'passkey') {
+            human = false;
+        }
         if (this.debug) {
-            console.log(`[isHuman] ${human ? 'PASS' : 'FAIL'} reason=${reason} time=${timeMs.toFixed(1)}ms ppid=${ppid || '-'}`);
+            console.log(
+                `[isHuman] ${human ? 'PASS' : 'FAIL'} reason=${reason} assurance=${assurance || '-'} `
+                + `time=${timeMs.toFixed(1)}ms ppid=${ppid || '-'}`,
+            );
         }
         const result = {
             human,
+            assurance,
             ppid: ppid || null,
             reason,
             timeMs,

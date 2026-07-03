@@ -319,6 +319,39 @@ For SSR frameworks, keep `IsHumanVerifier` in **client components only** — it 
 
 ---
 
+## Assurance tiers and site-local input burn
+
+One **stable PPID** per site subject; proof strength is **assurance**, not a second identifier.
+
+| Policy | SDK | Backend verifier |
+|--------|-----|------------------|
+| Low-friction signup | `requiredAssurance: 'passkey'` | `required_assurance='passkey'` |
+| Sybil-resistant / post-burn | `requiredAssurance: 'ishuman'` (default) | `required_assurance='ishuman'` |
+
+```javascript
+const { ok, ppid, assurance, presentation } = await verifier.verifyForBackend({
+  autoProvision: true,
+  requiredAssurance: 'passkey',
+});
+if (!ok) throw new Error('not_verified');
+await fetch('/api/signup', { method: 'POST', body: JSON.stringify({ presentation, ppid, assurance }) });
+```
+
+**Site-local burn / re-anchor (Lemma does not store burn graphs):**
+
+| Situation | Site action |
+|-----------|-------------|
+| Account created with passkey assurance | Store `ppid` + input fingerprints locally |
+| Inputs burned; session is passkey-only | Gate restore behind `requiredAssurance: 'ishuman'` |
+| User completes IDV step-up | Update the **same** account row; PPID unchanged |
+| User recovers on new device after IDV | Match on PPID/presentation; rebind session |
+
+Requires platform flags: `LEMMA_ONE_PPID_ASSURANCE_MODEL=1` and `LEMMA_PASSKEY_ASSURANCE_ENABLED=1`. Without them, behavior remains isHuman-first (`wallet_not_verified` until IDV).
+
+See `docs/product/PASSKEY_STAMP_INPUT_BURN.md` for the full contract.
+
+---
+
 ## Validation before finishing
 
 Confirm with the developer:

@@ -6035,7 +6035,7 @@ class LemmaWallet {
      * Use server-issued isHuman credential subject when available (person-root backed).
      * @private
      */
-    async _derivePPIDFromIsHumanCredential(siteId) {
+    async _derivePPIDFromSiteCredential(siteId) {
         const normalizeSite = (value) => String(value || '').trim().toLowerCase()
             .replace(/^www\./, '')
             .replace(/:\d+$/, '');
@@ -6046,7 +6046,8 @@ class LemmaWallet {
             const lemmas = await this._getAll('lemmas');
             const candidates = lemmas.filter((lemma) => {
                 const claims = lemma.claims || lemma.credentialSubject || {};
-                if (!claims.isHuman) return false;
+                const assurance = String(claims.assurance || (claims.isHuman ? 'ishuman' : '')).toLowerCase();
+                if (assurance !== 'ishuman' && assurance !== 'passkey' && !claims.isHuman) return false;
                 const lemmaSite = normalizeSite(
                     claims.siteId || claims.site_id || claims.siteDomain || claims.site_domain || claims.domain || ''
                 );
@@ -6057,8 +6058,11 @@ class LemmaWallet {
             for (const lemma of candidates) {
                 const claims = lemma.claims || lemma.credentialSubject || {};
                 const personRoot = claims.ppidDerivation === 'person_root_v1'
+                    || claims.assurance === 'passkey'
+                    || claims.assurance === 'ishuman'
                     || claims.verificationMethod === 'stripe_identity'
-                    || claims.verificationMethod === 'didit';
+                    || claims.verificationMethod === 'didit'
+                    || claims.verificationMethod === 'passkey';
                 if (!personRoot) continue;
                 const ppid = lemma.subject || claims.ppid || claims.id || claims.subject;
                 if (ppid && String(ppid).startsWith('did:lemma:ppid_')) {
@@ -6069,6 +6073,11 @@ class LemmaWallet {
             return null;
         }
         return null;
+    }
+
+    /** @deprecated use _derivePPIDFromSiteCredential */
+    async _derivePPIDFromIsHumanCredential(siteId) {
+        return this._derivePPIDFromSiteCredential(siteId);
     }
 
     async derivePPID(siteId) {
@@ -6088,9 +6097,9 @@ class LemmaWallet {
             .replace(/^www\./, '')
             .replace(/:\d+$/, '');
 
-        const ppidFromIsHuman = await this._derivePPIDFromIsHumanCredential(siteId);
-        if (ppidFromIsHuman) {
-            return ppidFromIsHuman;
+        const ppidFromCredential = await this._derivePPIDFromSiteCredential(siteId);
+        if (ppidFromCredential) {
+            return ppidFromCredential;
         }
 
         // Third-party-safe path: if a valid lemma is already present for this site,
@@ -6100,6 +6109,8 @@ class LemmaWallet {
                 const lemmas = await this._getAll('lemmas');
                 const matching = lemmas.filter((lemma) => {
                     const claims = lemma.claims || lemma.credentialSubject || {};
+                    const assurance = String(claims.assurance || (claims.isHuman ? 'ishuman' : '')).toLowerCase();
+                    if (assurance !== 'ishuman' && assurance !== 'passkey' && !claims.isHuman) return false;
                     const lemmaSite = String(
                         claims.siteId || claims.site_id || claims.siteDomain || claims.site_domain || claims.domain || ''
                     ).toLowerCase().replace(/^www\./, '').replace(/:\d+$/, '');

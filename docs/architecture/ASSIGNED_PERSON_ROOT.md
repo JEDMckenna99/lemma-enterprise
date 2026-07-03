@@ -25,6 +25,17 @@ person root after assignment.
 4. If neither the document nor wallet resolves an assignment, first-time IDV
    creates a new assigned person root.
 
+## Provisional lifecycle (one-PPID model)
+
+When `LEMMA_ONE_PPID_ASSURANCE_MODEL=1`:
+
+1. Wallet registration assigns a **provisional** person_root (`lemma_persons.status = provisional`).
+2. Site PPIDs derive from that root immediately — before IDV.
+3. First successful IDV on the bound wallet **promotes** the person to `active` and attaches the document root; **PPIDs do not change**.
+4. Provisional wallets are disposable (no cross-device recovery promise) until anchored.
+
+If IDV document resolution conflicts with the wallet-bound provisional person, issuance fails closed (same as wallet/document person mismatch).
+
 Document expiry changes credential validity, not identity. Renewing a document
 updates or adds the document attestation while preserving the person root,
 master identity, and every site PPID.

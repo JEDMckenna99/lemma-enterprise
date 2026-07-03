@@ -16,13 +16,13 @@ Lemma uses a **wallet-based** authentication model with passkey protection. All 
 │   ├─────────────────────────────────────────────────────────────────────┤   │
 │   │ • Passkey-protected wallet on lemma.id                              │   │
 │   │ • Cross-device session sync via global session                      │   │
-│   │ • Privacy-preserving PPIDs (unique per site)                        │   │
-│   │ • Client-side wallet secret (never touches server)                  │   │
+│   │ • Privacy-preserving PPIDs (unique per site, stable person_root)   │   │
+│   │ • Server-issued site credentials (passkey / isHuman assurance)    │   │
 │   │                                                                     │   │
 │   │ ✅ Broad browser support (validate against your supported matrix)    │   │
 │   │ ✅ One passkey per day across all devices                           │   │
 │   │ ✅ Privacy-preserving (no cross-site tracking)                      │   │
-│   │ ✅ Client-side PPID derivation (no server involvement)              │   │
+│   │ ✅ Client-side PPID read from signed site credential (canonical)   │   │
 │   └─────────────────────────────────────────────────────────────────────┘   │
 │                                                                             │
 └─────────────────────────────────────────────────────────────────────────────┘

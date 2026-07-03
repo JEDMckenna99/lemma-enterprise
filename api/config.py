@@ -384,3 +384,24 @@ def use_assigned_person_root() -> bool:
     """
     mode = (os.environ.get("LEMMA_PERSON_ROOT_SOURCE") or "assigned_v1").strip().lower()
     return mode in ("assigned_v1", "assigned", "assigned_v2")
+
+
+def one_ppid_assurance_model_enabled() -> bool:
+    """Enable one-PPID evolution: provisional person root at wallet bind, assurance tiers.
+
+    When on, site PPIDs derive from a stable assigned person_root created before IDV.
+    ``isHuman`` becomes an added proof (assurance escalation), not a PPID root change.
+
+    Env: ``LEMMA_ONE_PPID_ASSURANCE_MODEL=1`` (default off for rollout).
+    """
+    return _env_truthy("LEMMA_ONE_PPID_ASSURANCE_MODEL", False)
+
+
+def passkey_assurance_enabled() -> bool:
+    """Issue passkey-assurance site credentials before IDV when the one-PPID model is on.
+
+    Requires ``LEMMA_ONE_PPID_ASSURANCE_MODEL=1``. Env: ``LEMMA_PASSKEY_ASSURANCE_ENABLED=1``.
+    """
+    if not one_ppid_assurance_model_enabled():
+        return False
+    return _env_truthy("LEMMA_PASSKEY_ASSURANCE_ENABLED", False)

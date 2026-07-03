@@ -36,6 +36,8 @@ Flow:
    and lands in the next Bloom snapshot.
 4. Per-site credentials are re-derived on demand against the restored master.
 
+**Provisional wallets (pre-IDV):** When `LEMMA_ONE_PPID_ASSURANCE_MODEL=1`, a wallet receives an assigned **provisional** person_root at registration. Site PPIDs are stable from that point, but **cross-device recovery is not promised** until the person is **anchored** by first successful IDV. Treat empty pre-IDV wallets as disposable; after anchoring, re-IDV recovery preserves PPIDs as today.
+
 Assigned-root recovery requires the durable `lemma_document_roots` ->
 `lemma_persons` mapping. The resolver checks compatible document-root schema,
 pepper-version, and legacy IDV-provider keys before it may create a person. A

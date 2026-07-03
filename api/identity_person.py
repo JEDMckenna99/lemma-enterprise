@@ -28,6 +28,11 @@ logger = logging.getLogger(__name__)
 
 CONFIDENCE_DOCUMENT_ROOT_V1 = "document_root_v1"
 
+# Lifecycle for one-PPID evolution (see docs/architecture/ASSIGNED_PERSON_ROOT.md).
+PERSON_STATUS_PROVISIONAL = "provisional"
+PERSON_STATUS_ACTIVE = "active"
+PERSON_STATUS_ERASED = "erased"
+
 
 class WalletPersonBindingConflictError(ValueError):
     """Raised when a wallet is already bound to a different LemmaPerson."""
@@ -76,6 +81,84 @@ class _DocumentRootCandidate:
     provider: str
     claims: dict
     canonical: bool = False
+
+
+def _promote_person_to_anchored(person) -> None:
+    """Mark a wallet-bound person as anchored after successful IDV."""
+    if person and getattr(person, "status", None) == PERSON_STATUS_PROVISIONAL:
+        person.status = PERSON_STATUS_ACTIVE
+
+
+def ensure_provisional_person_for_wallet(
+    db,
+    *,
+    wallet_id: str,
+) -> str:
+    """Ensure wallet_id has a stable assigned person_root before IDV (one-PPID model).
+
+    Creates a provisional ``LemmaPerson`` + ``LemmaWalletBinding`` when missing.
+    Returns ``lemma_person_id``. Idempotent for repeated calls with the same wallet.
+    """
+    from api.config import use_assigned_person_root
+    from api.database import LemmaPerson, LemmaWalletBinding
+    from api.identity_roots import active_root_version
+    from api.person_root_crypto import encrypt_person_root
+
+    wallet_id = str(wallet_id or "").strip()
+    if not wallet_id:
+        raise ValueError("wallet_id required")
+
+    binding = db.query(LemmaWalletBinding).filter_by(wallet_id=wallet_id).first()
+    if binding:
+        return binding.lemma_person_id
+
+    if not use_assigned_person_root():
+        raise RuntimeError("provisional person requires assigned person_root mode")
+
+    person_root_hash = generate_assigned_person_root_hash()
+    person_id = _new_person_id()
+    person = LemmaPerson(
+        person_id=person_id,
+        person_root_hash=encrypt_person_root(person_id, person_root_hash),
+        root_version=active_root_version(),
+        person_root_source=PERSON_ROOT_SOURCE_ASSIGNED,
+        primary_wallet_id=wallet_id,
+        status=PERSON_STATUS_PROVISIONAL,
+    )
+    db.add(person)
+    db.add(
+        LemmaWalletBinding(
+            wallet_id=wallet_id,
+            lemma_person_id=person_id,
+            binding_status="active",
+        )
+    )
+    logger.info(
+        "Created provisional person wallet=%s person=%s",
+        wallet_id[:24],
+        person_id[:24],
+    )
+    return person_id
+
+
+def is_person_anchored(db, lemma_person_id: str) -> bool:
+    """True when the person has completed IDV (document linked) or legacy active row."""
+    from api.database import LemmaDocumentRoot, LemmaPerson
+
+    person = db.query(LemmaPerson).filter_by(person_id=lemma_person_id).first()
+    if not person:
+        return False
+    if person.status == PERSON_STATUS_PROVISIONAL:
+        return False
+    if person.status == PERSON_STATUS_ERASED:
+        return False
+    doc = (
+        db.query(LemmaDocumentRoot)
+        .filter_by(lemma_person_id=lemma_person_id)
+        .filter(LemmaDocumentRoot.revoked_at.is_(None))
+        .first()
+    )
+    return doc is not None or person.status == PERSON_STATUS_ACTIVE
 
 
 def _new_person_id() -> str:
@@ -353,6 +436,7 @@ def resolve_or_create_person_from_material(
         person_id = person.person_id
         person_root_hash = _load_person_root_hash_hex(person)
         person_root_source = person.person_root_source or PERSON_ROOT_SOURCE_DOCUMENT_DERIVED
+        _promote_person_to_anchored(person)
         # Converge a successful compatibility read onto the current write key.
         # Future issuance/recovery can then resolve directly without changing
         # the assigned person root or any site PPID.
@@ -391,6 +475,7 @@ def resolve_or_create_person_from_material(
         )
         created_document_link = True
         document_attached = True
+        _promote_person_to_anchored(person)
         logger.info(
             "Attached new document_root to bound person wallet=%s person=%s",
             (wallet_id or "")[:24],
