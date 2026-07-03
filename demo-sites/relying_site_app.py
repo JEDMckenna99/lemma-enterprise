@@ -278,7 +278,7 @@ def index():
         <button id="verify-btn">{copy["primary"]}</button>
         <div class="verdict" id="decision-card">
           <strong>What happens when you click</strong>
-          <p class="tiny">Passkey unlocks your lemma.id wallet. This site derives a site-private PPID with passkey assurance first. If the site later requires isHuman assurance, Lemma opens IDV — your PPID stays the same.</p>
+          <p class="tiny">Passkey unlock + continuity proof only. This site accepts <code>assurance: passkey</code> — no IDV unless you later step up to isHuman.</p>
         </div>
       </section>
       <aside class="card">
@@ -430,7 +430,7 @@ def index():
       button.disabled = true;
       pill.textContent = 'CHECKING';
       pill.className = 'pill checking';
-      decisionCard.innerHTML = '<strong>Checking Lemma wallet…</strong><p class="tiny">Derives a site proof with passkey assurance when possible. IDV opens only when this site requires isHuman assurance.</p>';
+      decisionCard.innerHTML = '<strong>Checking Lemma wallet…</strong><p class="tiny">Continuity proof only — passkey unlock, then a signed site credential. No identity check at this assurance tier.</p>';
       try {{
         const verifier = makeVerifier(true);
         const {{ ok, ppid, assurance, presentation, human, reason, timeMs }} = await verifier.verifyForBackend({{

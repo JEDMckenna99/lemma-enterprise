@@ -196,6 +196,8 @@ def ishuman_demo_page():
 @ishuman_demo_bp.route("/wallet/ishuman-idv")
 def ishuman_idv_popup():
     """Popup flow: unlock wallet + complete IDV when a customer site has no master proof."""
+    from api.config import passkey_assurance_enabled
+
     ctx = _demo_page_context()
     return render_template(
         "wallet_ishuman_idv.html",
@@ -203,6 +205,7 @@ def ishuman_idv_popup():
         demo_test_token=ctx["demo_test_token"],
         skeleton_idv_enabled=ctx["skeleton_idv_enabled"],
         qr_demo_idv_enabled=ctx["qr_demo_idv_enabled"],
+        passkey_assurance_enabled=passkey_assurance_enabled(),
     ), 200, {
         "Cache-Control": "no-cache, no-store, must-revalidate",
         "Pragma": "no-cache",

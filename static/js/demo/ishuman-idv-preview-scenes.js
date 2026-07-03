@@ -19,6 +19,11 @@
       'Complete a one-time identity check, usually under a minute',
       'Return to the site. They see a private proof, not your documents',
     ],
+    stepsContinuity: [
+      'Unlock this device with Face ID, Touch ID, or your passkey',
+      'Lemma issues a private site proof from your wallet \u2014 no ID check',
+      'Return to the site. They see a continuity proof, not your documents',
+    ],
     primary: {
       create: 'Create my lemma.id',
       unlock: 'Unlock my lemma.id',
@@ -40,6 +45,10 @@
       siteProof(site) {
         const s = formatSiteLabel(site);
         return `${s} needs to know you\u2019re a real person. Unlock your lemma.id and we\u2019ll share a private proof \u2014 not your documents.`;
+      },
+      siteProofPasskey(site) {
+        const s = formatSiteLabel(site);
+        return `${s} only needs a continuity proof from your lemma.id wallet \u2014 unlock with your passkey. No identity check unless this site later requires isHuman assurance.`;
       },
       claim:
         'You\u2019re verified. Save your lemma.id on this device with a passkey so you can use it again.',
