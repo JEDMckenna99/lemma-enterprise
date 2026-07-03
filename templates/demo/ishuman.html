@@ -61,13 +61,13 @@
         <div class="workflow-head">
           <div>
             <h2 id="ih-step1-title">Step 1 — Create empty lemma.id</h2>
-            <p class="demo-muted" id="ih-step1-desc">Register a passkey wallet only — no IDV popup yet. Disposable until anchored; recovery not promised pre-IDV.</p>
+            <p class="demo-muted" id="ih-step1-desc">Opens the lemma.id popup to create your wallet with a passkey — no IDV yet. Same mechanism demo sites use for unlock.</p>
           </div>
         </div>
 
         <div class="step-utility" id="ih-step1-utility">
           <strong>Why this step</strong>
-          <p>Shows passkey-first onboarding: your wallet gets a person root and can issue continuity proofs before any identity check.</p>
+          <p>Shows passkey-first onboarding in the lemma.id popup — same unlock mechanism as demo sites, before any identity check.</p>
         </div>
 
         <div class="demo-ready-banner" id="ih-demo-ready-banner" hidden>
@@ -382,5 +382,5 @@ const { ok, ppid, assurance, presentation } = await new IsHumanVerifier({
 <script src="/static/js/lemma-keys.js?v=5" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
 <script nonce="{{ csp_nonce }}">window.LEMMA_ISHUMAN_USE_PERSON_ROOT_SEEDS = {{ 'true' if ishuman_use_person_root_seeds else 'false' }};</script>
 <script src="/sdk/ishuman-verifier.js?v=1.8.3" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
-<script src="/static/js/demo/ishuman-demo.js?v=25" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
+<script src="/static/js/demo/ishuman-demo.js?v=26" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
 {% endblock %}

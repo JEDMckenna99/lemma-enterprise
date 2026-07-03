@@ -202,6 +202,7 @@
         const isSiteProofIssue = issueMode === 'site_proof' && !!clientSessionNonce;
         const isFreshIdv = issueMode === 'fresh_idv' && !!clientSessionNonce;
         const isUnlockOnly = issueMode === 'unlock';
+        const isPasskeySetup = issueMode === 'passkey_setup';
         const isVerificationReturn = params.has('verification_return');
         const handoffId = (params.get('handoff_id') || '').trim();
         const handoffMk = (params.get('mk') || '').trim();
@@ -303,6 +304,32 @@
                 return;
             }
             applyConsumerShell({ introKey: 'siteProof' });
+        }
+
+        function getWalletInstance() {
+            if (typeof LemmaWallet === 'undefined') {
+                throw new Error('Wallet SDK failed to load — allow scripts for lemma.id and refresh.');
+            }
+            wallet = wallet || new LemmaWallet();
+            return wallet;
+        }
+
+        async function ensureWalletInitialized() {
+            const instance = getWalletInstance();
+            if (!walletInitPromise) {
+                walletInitPromise = instance.init().catch((err) => {
+                    walletInitPromise = null;
+                    throw err;
+                });
+            }
+            await walletInitPromise;
+            return instance;
+        }
+
+        function warmWalletInit() {
+            ensureWalletInitialized().catch((err) => {
+                console.warn('[isHuman IDV] wallet warm init failed:', err?.message || err);
+            });
         }
 
         let wallet = null;
@@ -485,7 +512,7 @@
                 }
             }
 
-            if (type === 'LEMMA_UNLOCK_SUCCESS' && wallet) {
+            if ((type === 'LEMMA_UNLOCK_SUCCESS' || type === 'LEMMA_WALLET_READY') && wallet) {
                 try {
                     broadcastUnlock();
                 } catch (_) {}
@@ -729,11 +756,7 @@
 
         async function ensureWalletUnlocked() {
             return withIdvBusy(async () => {
-            if (typeof LemmaWallet === 'undefined') {
-                throw new Error('Wallet SDK failed to load — allow scripts for lemma.id and refresh.');
-            }
-            wallet = wallet || new LemmaWallet();
-            await wallet.init();
+            await ensureWalletInitialized();
             const walletInfo = await wallet.getWalletInfo();
             const isFirstWallet = !walletInfo.hasWallet
                 && !walletInfo.hasPasskey
@@ -750,6 +773,25 @@
             }
             await adoptWalletState();
             if (!walletId) throw new Error('Wallet unlock failed');
+            });
+        }
+
+        async function performPasskeyUnlock({
+            closeType = 'LEMMA_UNLOCK_SUCCESS',
+            closeReason = 'unlocked',
+            statusMessage = 'Wallet unlocked.',
+        } = {}) {
+            return withIdvBusy(async () => {
+                setStatus('Unlocking with your passkey…', 'loading');
+                await ensureWalletInitialized();
+                const result = await wallet.ensureIsHumanIssuanceReady({ isHumanIssuance: true });
+                if (!result.ready) {
+                    throw new Error('Wallet unlock failed — complete the passkey prompt or try again.');
+                }
+                await adoptWalletState();
+                if (!walletId) throw new Error('Wallet unlock failed');
+                setStatus(statusMessage, 'success');
+                closeWith(closeType, { reason: closeReason, wallet_id: walletId });
             });
         }
 
@@ -1146,22 +1188,16 @@
             document.getElementById('primary-btn').textContent = await resolvePrimaryButtonLabel();
         }
 
-        async function runUnlockOnlyFlow() {
+        async function prepareUnlockOnlyUi() {
             applyConsumerShell({
                 intro: 'Unlock your lemma.id with your passkey to continue.',
                 hideSteps: true,
             });
-            document.getElementById('primary-btn').classList.add('hidden');
             document.getElementById('cancel-btn').textContent = consumerCopy().primary?.cancel || 'Cancel';
-            document.getElementById('cancel-btn').onclick = (event) => {
-                event.preventDefault();
-                closeWith('LEMMA_UNLOCK_CANCELLED', { reason: 'user_cancelled' });
-            };
 
             try {
-                wallet = wallet || new LemmaWallet();
                 await Promise.race([
-                    wallet.init(),
+                    ensureWalletInitialized(),
                     new Promise((_, reject) => setTimeout(
                         () => reject(new Error('Wallet status check timed out. Close other lemma.id tabs and retry.')),
                         8000,
@@ -1182,32 +1218,43 @@
                 setStatus('Enter your passkey to unlock.', 'info');
                 document.getElementById('primary-btn').textContent = 'Unlock with passkey';
                 document.getElementById('primary-btn').classList.remove('hidden');
-                document.getElementById('primary-btn').onclick = async (event) => {
-                    event.preventDefault();
-                    document.getElementById('primary-btn').disabled = true;
-                    try {
-                        setStatus('Unlocking with your passkey…', 'loading');
-                        const result = await wallet.ensureIsHumanIssuanceReady({ isHumanIssuance: true });
-                        if (!result.ready) {
-                            throw new Error('Wallet unlock failed — complete the passkey prompt or try again.');
-                        }
-                        await adoptWalletState();
-                        setStatus('Wallet unlocked.', 'success');
-                        closeWith('LEMMA_UNLOCK_SUCCESS', { reason: 'unlocked' });
-                    } catch (err) {
-                        const detail = err?.message || 'Wallet unlock failed';
-                        if (detail.includes('wallet_id') || detail.includes('challenge')) {
-                            setStatus('Wallet session mismatch — close other lemma.id tabs and retry.', 'error');
-                        } else if (detail.includes('envelope_invalid') || detail.includes('encrypted')) {
-                            setStatus('Unlock wallet with passkey to read encrypted human proof.', 'error');
-                        } else {
-                            setStatus(detail, 'error');
-                        }
-                        document.getElementById('primary-btn').disabled = false;
-                    }
-                };
             } catch (err) {
                 setStatus(err?.message || 'Wallet unlock failed', 'error');
+            }
+        }
+
+        async function preparePasskeySetupUi() {
+            applyConsumerShell({
+                intro: 'Create your lemma.id with a passkey. No identity check at this step.',
+                hideSteps: true,
+            });
+            document.getElementById('cancel-btn').textContent = consumerCopy().primary?.cancel || 'Cancel';
+
+            try {
+                await Promise.race([
+                    ensureWalletInitialized(),
+                    new Promise((_, reject) => setTimeout(
+                        () => reject(new Error('Wallet status check timed out. Close other lemma.id tabs and retry.')),
+                        8000,
+                    )),
+                ]);
+
+                const info = await wallet.getWalletInfo();
+                if (info.isUnlocked || (wallet.isIsHumanLockValid && wallet.isIsHumanLockValid())) {
+                    if (!info.isUnlocked && wallet.isIsHumanLockValid && wallet.isIsHumanLockValid()) {
+                        await wallet._restoreIsHumanLockBundleIfValid();
+                    }
+                    await adoptWalletState();
+                    setStatus('lemma.id ready.', 'success');
+                    setTimeout(() => closeWith('LEMMA_WALLET_READY', { reason: 'already_ready', wallet_id: walletId }), 200);
+                    return;
+                }
+
+                setStatus('Tap below to create your lemma.id with a passkey.', 'info');
+                document.getElementById('primary-btn').textContent = 'Create a lemma.id';
+                document.getElementById('primary-btn').classList.remove('hidden');
+            } catch (err) {
+                setStatus(err?.message || 'Wallet setup failed', 'error');
             }
         }
 
@@ -1582,20 +1629,51 @@
         }
 
         document.getElementById('cancel-btn').addEventListener('click', () => {
+            if (isUnlockOnly) {
+                closeWith('LEMMA_UNLOCK_CANCELLED', { reason: 'user_cancelled' });
+                return;
+            }
+            if (isPasskeySetup) {
+                closeWith('LEMMA_WALLET_SETUP_CANCELLED', { reason: 'user_cancelled' });
+                return;
+            }
             closeWith('ISHUMAN_IDV_CANCELLED', { reason: 'user_cancelled' });
         });
 
-        document.getElementById('primary-btn').addEventListener('click', async () => {
+        async function onPrimaryButtonClick() {
             const btn = document.getElementById('primary-btn');
             btn.disabled = true;
             try {
+                if (isUnlockOnly) {
+                    await performPasskeyUnlock();
+                    return;
+                }
+                if (isPasskeySetup) {
+                    await performPasskeyUnlock({
+                        closeType: 'LEMMA_WALLET_READY',
+                        closeReason: 'passkey_setup',
+                        statusMessage: 'lemma.id ready.',
+                    });
+                    return;
+                }
                 await runVerification();
             } catch (err) {
                 console.error('[isHuman IDV] primary action failed:', err);
                 const detail = err?.message || err?.toString() || 'Verification failed';
-                setStatus(detail, 'error');
+                if (detail.includes('wallet_id') || detail.includes('challenge')) {
+                    setStatus('Wallet session mismatch — close other lemma.id tabs and retry.', 'error');
+                } else if (detail.includes('envelope_invalid') || detail.includes('encrypted')) {
+                    setStatus('Unlock wallet with passkey to read encrypted human proof.', 'error');
+                } else {
+                    setStatus(detail, 'error');
+                }
                 btn.disabled = false;
             }
+        }
+
+        document.getElementById('primary-btn').addEventListener('click', (event) => {
+            event.preventDefault();
+            onPrimaryButtonClick();
         });
 
         idvLifecycle.init();
@@ -1615,6 +1693,7 @@
             const hasFlowContext = isFreshIdv
                 || isSiteProofIssue
                 || isUnlockOnly
+                || isPasskeySetup
                 || isDemoQrFlow
                 || isSameOriginMasterFlow
                 || (isVerificationReturn && (sessionId || handoffId || ishumanSessionParam));
@@ -1662,7 +1741,14 @@
             }
 
             if (isUnlockOnly) {
-                await runUnlockOnlyFlow();
+                warmWalletInit();
+                await prepareUnlockOnlyUi();
+                return;
+            }
+
+            if (isPasskeySetup) {
+                warmWalletInit();
+                await preparePasskeySetupUi();
                 return;
             }
 
@@ -1681,6 +1767,7 @@
 
             if (isSiteProofIssue) {
                 applySiteProofShell();
+                warmWalletInit();
                 await showUserInitiatedPrimaryAction();
                 return;
             }

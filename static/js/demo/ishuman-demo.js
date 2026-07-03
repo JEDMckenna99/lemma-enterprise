@@ -208,7 +208,7 @@
     } else {
       if (createBtn) createBtn.textContent = 'Create a lemma.id';
       if (step1Utility) {
-        step1Utility.querySelector('p').textContent = 'Shows passkey-first onboarding: your wallet gets a person root and can issue continuity proofs before any identity check.';
+        step1Utility.querySelector('p').textContent = 'Opens the lemma.id popup to create your wallet with a passkey — same mechanism demo sites use for unlock.';
       }
       if (step2Utility) {
         step2Utility.querySelector('p').textContent = 'Proves pairwise privacy: one wallet, two unrelated site-private identifiers. Sites never see your real name or each other\'s ID.';
@@ -780,7 +780,7 @@
     return btoa(str).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
   }
 
-  function openIdvPopup({ demoQr = false } = {}) {
+  function openIdvPopup({ demoQr = false, issueMode = '' } = {}) {
     if (_demoIdvPopup && !_demoIdvPopup.closed) {
       try { _demoIdvPopup.focus(); } catch (_) { /* non-fatal */ }
       return _demoIdvPopup;
@@ -793,6 +793,9 @@
     popupUrl.searchParams.set('origin', window.location.origin);
     popupUrl.searchParams.set('site_id', 'lemma.id');
     popupUrl.searchParams.set('popup_token', popupToken);
+    if (issueMode) {
+      popupUrl.searchParams.set('issue_mode', issueMode);
+    }
     if (demoQr) {
       popupUrl.searchParams.set('flow_mode', 'demo_qr');
     }
@@ -815,8 +818,11 @@
 
     _demoIdvPopup = popup;
 
-    setPill('ih-lemma-status', demoQr ? 'DEMO POPUP' : 'VERIFYING', 'warn');
-    log(demoQr ? 'Opened demo QR popup' : 'Opened identity check popup for lemma.id');
+    setPill('ih-lemma-status', demoQr ? 'DEMO POPUP' : (issueMode === 'passkey_setup' ? 'POPUP' : 'VERIFYING'), 'warn');
+    log(
+      demoQr ? 'Opened demo QR popup'
+        : (issueMode === 'passkey_setup' ? 'Opened passkey setup popup' : 'Opened identity check popup for lemma.id'),
+    );
 
     let settled = false;
     const finish = async (outcome) => {
@@ -825,9 +831,10 @@
       _demoIdvPopup = null;
       window.removeEventListener('message', onMessage);
       clearInterval(closedTimer);
-      log(demoQr ? 'Demo QR popup closed' : 'Identity check popup closed', outcome);
+      log(demoQr ? 'Demo QR popup closed' : 'Lemma popup closed', outcome);
       await refreshWalletStatus().catch(() => {});
       await syncMasterFromServer().catch(() => {});
+      await refreshAssuranceStatus().catch(() => {});
       await hydrateSiteVerificationFromCache().catch(() => {});
       if (outcome === 'completed') {
         setWorkflowHighlight(2);
@@ -839,9 +846,14 @@
     const onMessage = (event) => {
       if (event.origin !== window.location.origin) return;
       const type = event.data && event.data.type;
-      if (type === 'ISHUMAN_IDV_COMPLETE' || type === 'ISHUMAN_SITE_PROOF_ISSUED') {
+      if (type === 'ISHUMAN_IDV_COMPLETE'
+        || type === 'ISHUMAN_SITE_PROOF_ISSUED'
+        || type === 'LEMMA_WALLET_READY'
+        || type === 'LEMMA_UNLOCK_SUCCESS') {
         finish('completed');
-      } else if (type === 'ISHUMAN_IDV_CANCELLED') {
+      } else if (type === 'ISHUMAN_IDV_CANCELLED'
+        || type === 'LEMMA_WALLET_SETUP_CANCELLED'
+        || type === 'LEMMA_UNLOCK_CANCELLED') {
         finish('cancelled');
       }
     };
@@ -855,32 +867,16 @@
   async function createLemmaIdViaPopup() {
     setDemoMode('live');
     if (assuranceDemoMode()) {
-      await createPasskeyWallet();
+      setPill('ih-lemma-status', 'POPUP', 'warn');
+      log('Opening lemma.id popup', 'passkey setup — same mechanism as demo sites');
+      openIdvPopup({ issueMode: 'passkey_setup' });
       return;
     }
     return openIdvPopup({ demoQr: false });
   }
 
   async function createPasskeyWallet() {
-    const createBtn = $('ih-create-lemma-btn');
-    const prevLabel = createBtn ? createBtn.textContent : '';
-    if (createBtn) createBtn.textContent = 'Waiting for passkey…';
-    setPill('ih-lemma-status', 'VERIFYING', 'warn');
-    log('Creating lemma.id', 'complete the passkey prompt from your device');
-    try {
-      await initWallet({ force: true });
-      if (!state.walletId) {
-        throw new Error('Passkey registration did not finish — try again');
-      }
-      await refreshAssuranceStatus();
-      setPill('ih-lemma-status', 'UNLOCKED', 'ok');
-      setDemoReadyBanner(true);
-      setWorkflowHighlight(2);
-      scrollToPanel('ih-step-2');
-      log('lemma.id ready', short(state.walletId));
-    } finally {
-      if (createBtn && prevLabel) createBtn.textContent = prevLabel;
-    }
+    return createLemmaIdViaPopup();
   }
 
   async function refreshAssuranceStatus() {
@@ -1682,7 +1678,10 @@
     await loadConfig();
     bind('ih-start-live-demo', startLiveDemo);
     bind('ih-start-simulated-demo', startSimulatedDemo);
-    bind('ih-unlock-lemma-btn', initWallet);
+    bind('ih-unlock-lemma-btn', () => {
+      setDemoMode('live');
+      openIdvPopup({ issueMode: 'unlock' });
+    });
     bind('ih-create-lemma-btn', createLemmaIdViaPopup);
     bindClear('ih-clear-lemma-id-top-btn');
     bind('ih-start-idv-btn', startIdentityVerification);
