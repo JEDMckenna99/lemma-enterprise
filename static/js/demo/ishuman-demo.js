@@ -63,6 +63,22 @@
     const display = id === 'ih-lemma-status' ? formatLemmaStatus(label) : label;
     el.textContent = display;
     el.className = `demo-pill${tone ? ` ${tone}` : ''}`;
+    if (id === 'ih-lemma-status') {
+      const top = $('ih-topbar-status');
+      if (top) {
+        top.textContent = display;
+        top.className = el.className;
+      }
+    }
+  }
+
+  function updateProgressStrip(workflowStep) {
+    document.querySelectorAll('.demo-progress-item').forEach((item) => {
+      const step = Number(item.dataset.step || 0);
+      item.classList.remove('is-active', 'is-done');
+      if (workflowStep > 0 && step < workflowStep) item.classList.add('is-done');
+      else if (step === workflowStep) item.classList.add('is-active');
+    });
   }
 
   function assuranceDemoMode() {
@@ -130,6 +146,7 @@
         el.classList.add('is-done');
       }
     }
+    updateProgressStrip(workflowStep);
     updateStepLocks();
   }
 
@@ -148,6 +165,10 @@
     const step1Desc = $('ih-step1-desc');
     const step2Title = $('ih-step2-title');
     const step2Desc = $('ih-step2-desc');
+    const step1Utility = $('ih-step1-utility');
+    const step2Utility = $('ih-step2-utility');
+    const step4Utility = $('ih-step4-utility');
+    const ppidCompareDesc = $('ih-ppid-compare-desc');
     const intro = $('ih-intro-lead');
     const createBtn = $('ih-create-lemma-btn');
     if (!on) {
@@ -157,8 +178,32 @@
       if (step2Desc) step2Desc.textContent = 'Each site receives its own private ID from the same verified-human proof.';
       if (intro) intro.textContent = 'Verify once, then test two demo sites. Both sites can know you are a verified human, but neither receives your real identity or the same identifier as the other.';
       if (createBtn) createBtn.textContent = 'Create lemma.id';
+      if (step1Utility) {
+        step1Utility.querySelector('p').textContent = 'Shows the one-time IDV path: verify once on lemma.id, then reuse that proof across sites.';
+      }
+      if (step2Utility) {
+        step2Utility.querySelector('p').textContent = 'Proves pairwise privacy: one verified person, two unrelated site-private identifiers.';
+      }
+      if (step4Utility) {
+        step4Utility.querySelector('p').textContent = 'Site-local enforcement: block a human proof on one site without affecting the same person elsewhere.';
+      }
+      if (ppidCompareDesc) {
+        ppidCompareDesc.textContent = 'Ticketing and Trials receive different identifiers, even though both proofs come from the same verified human.';
+      }
     } else {
       if (createBtn) createBtn.textContent = 'Create passkey wallet';
+      if (step1Utility) {
+        step1Utility.querySelector('p').textContent = 'Shows passkey-first onboarding: your wallet gets a person root and can issue continuity proofs before any identity check.';
+      }
+      if (step2Utility) {
+        step2Utility.querySelector('p').textContent = 'Proves pairwise privacy: one wallet, two unrelated site-private identifiers. Sites never see your real name or each other\'s ID.';
+      }
+      if (step4Utility) {
+        step4Utility.querySelector('p').textContent = 'Site-local enforcement: ban a human proof on one site without affecting the same person elsewhere — unlike IP bans.';
+      }
+      if (ppidCompareDesc) {
+        ppidCompareDesc.textContent = 'Ticketing and Trials receive different identifiers, even though both proofs come from the same passkey wallet.';
+      }
     }
     const urls = (state.config && state.config.customer_site_urls) || {};
     const ticketsLink = $('ih-link-tickets-site');
@@ -875,11 +920,13 @@
   async function clearLemmaId() {
     const confirmed = window.confirm(
       'Clear your lemma.id?\n\n'
-      + 'This wipes the master human proof and every site-derived ID from this '
-      + 'browser (the lemma.id wallet) and tells open customer-site tabs to drop '
-      + 'their cached sessions. You will need to run "Create my lemma.id" again.',
+      + 'This wipes the passkey wallet, site proofs, and cached sessions on the demo '
+      + 'sites from this browser. Click "Start live demo" again when finished.',
     );
     if (!confirmed) return;
+
+    const clearBtns = ['ih-clear-lemma-id-top-btn'].map($).filter(Boolean);
+    clearBtns.forEach((btn) => { btn.disabled = true; });
 
     setPill('ih-lemma-status', 'CLEARING', 'warn');
     log('Clearing lemma.id', 'wiping local wallet + signaling customer sites');
@@ -974,22 +1021,37 @@
     state.masterCredentialId = '';
     state.sessionId = '';
     state.results = {};
+    state.passkeyPpids = {};
+    state.assuranceStatus = null;
+    state.verifiers = {};
+    state.lastVerifyMs = { tickets: null, trials: null };
     for (const slug of SITE_SLUGS) state.localBlocks[slug].clear();
 
     const wid = $('ih-wallet-id');
     if (wid) wid.textContent = '-';
     setDemoReadyBanner(false);
     setPill('ih-lemma-status', 'CLEARED', 'warn');
+    setPill('ih-person-status', '—', '');
     setDemoMode(null);
-    updateStepLocks();
+    setWorkflowHighlight(1);
     for (const slug of SITE_SLUGS) {
       setPill(`ih-${slug}-pill`, 'Pending', '');
       const ppidEl = $(`ih-${slug}-ppid`);
       if (ppidEl) ppidEl.textContent = PPID_PLACEHOLDER[slug];
+      const assuranceEl = $(`ih-${slug}-assurance`);
+      if (assuranceEl) assuranceEl.textContent = '—';
+      const card = $(`ih-${slug}-card`);
+      if (card) card.classList.remove('is-human', 'is-deny', 'is-pending');
     }
     updatePpidCompare();
     updateBlockResultsTable();
-    log('lemma.id cleared', 'start the live or simulated demo again');
+    const stepupCompare = $('ih-stepup-compare');
+    if (stepupCompare) stepupCompare.hidden = true;
+    const stepupDiff = $('ih-stepup-diff');
+    if (stepupDiff) stepupDiff.textContent = '—';
+    scrollToPanel('ishuman-demo');
+    log('lemma.id cleared', 'click Start live demo to begin again');
+    clearBtns.forEach((btn) => { btn.disabled = false; });
   }
 
   async function claimVerifiedMaster(activeSessionId) {
@@ -1553,6 +1615,22 @@
     return payload;
   }
 
+  function bindClear(id) {
+    const el = $(id);
+    if (!el) return;
+    el.addEventListener('click', async () => {
+      el.disabled = true;
+      try {
+        await clearLemmaId();
+      } catch (err) {
+        log('Clear failed', err.message);
+        setPill('ih-lemma-status', 'ERROR', 'deny');
+      } finally {
+        el.disabled = false;
+      }
+    });
+  }
+
   function bind(id, fn) {
     const el = $(id);
     if (!el) return;
@@ -1578,7 +1656,7 @@
     bind('ih-start-simulated-demo', startSimulatedDemo);
     bind('ih-unlock-lemma-btn', initWallet);
     bind('ih-create-lemma-btn', createLemmaIdViaPopup);
-    bind('ih-clear-lemma-id-btn', clearLemmaId);
+    bindClear('ih-clear-lemma-id-top-btn');
     bind('ih-start-idv-btn', startIdentityVerification);
     bind('ih-test-complete-btn', completeTestModeVerification);
     bind('ih-poll-btn', pollAndStoreMaster);
