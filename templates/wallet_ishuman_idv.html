@@ -171,7 +171,7 @@
         </div>
     </div>
 
-    <script src="/static/js/demo/ishuman-idv-preview-scenes.js?v=8" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
+    <script src="/static/js/demo/ishuman-idv-preview-scenes.js?v=9" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
     <script src="/static/js/lemma-keys.js?v=7" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
     <script src="/static/js/wallet-at-rest-crypto.js?v=2" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
     <script nonce="{{ csp_nonce }}">window.LEMMA_ISHUMAN_USE_PERSON_ROOT_SEEDS = {{ 'true' if ishuman_use_person_root_seeds else 'false' }};</script>
@@ -249,14 +249,14 @@
 
         function applyConsumerShell(options = {}) {
             const copy = consumerCopy();
-            if (!copy.headline) return;
-            document.title = copy.documentTitle || document.title;
+            if (!copy.headline && !options.headline) return;
+            document.title = options.documentTitle || copy.documentTitle || document.title;
             const eyebrow = document.getElementById('eyebrow-copy');
             const headline = document.getElementById('headline-copy');
             const privacy = document.getElementById('privacy-copy');
             const stepsList = document.getElementById('steps-list');
             if (eyebrow) eyebrow.textContent = copy.eyebrow || eyebrow.textContent;
-            if (headline) headline.textContent = copy.headline || headline.textContent;
+            if (headline) headline.textContent = options.headline || copy.headline || headline.textContent;
             if (privacy && !options.hidePrivacy) {
                 privacy.textContent = copy.privacy || privacy.textContent;
             }
@@ -264,7 +264,11 @@
             if (introEl && options.intro) {
                 introEl.textContent = options.intro;
             } else if (introEl && copy.intro) {
-                if (options.introKey === 'siteProofPasskey' && copy.intro.siteProofPasskey) {
+                if (options.introKey === 'passkeySetup' && copy.intro.passkeySetup) {
+                    introEl.textContent = copy.intro.passkeySetup;
+                } else if (options.introKey === 'unlockOnly' && copy.intro.unlockOnly) {
+                    introEl.textContent = copy.intro.unlockOnly;
+                } else if (options.introKey === 'siteProofPasskey' && copy.intro.siteProofPasskey) {
                     introEl.textContent = copy.intro.siteProofPasskey(requestingSite);
                 } else if (options.introKey === 'siteProof' && copy.intro.siteProof) {
                     introEl.textContent = copy.intro.siteProof(requestingSite);
@@ -292,15 +296,38 @@
             }
         }
 
+        function applyPasskeySetupShell() {
+            const copy = consumerCopy();
+            applyConsumerShell({
+                headline: copy.headlinePasskeySetup || 'Create your lemma.id',
+                documentTitle: copy.documentTitlePasskeySetup,
+                introKey: 'passkeySetup',
+                hideSteps: true,
+                hidePrivacy: true,
+            });
+        }
+
+        function applyUnlockOnlyShell() {
+            const copy = consumerCopy();
+            applyConsumerShell({
+                headline: copy.headlineUnlock || 'Unlock your lemma.id',
+                documentTitle: copy.documentTitleUnlock,
+                introKey: 'unlockOnly',
+                hideSteps: true,
+                hidePrivacy: true,
+            });
+        }
+
         function applySiteProofShell() {
+            const copy = consumerCopy();
             if (siteProofUsesContinuityOnly()) {
                 applyConsumerShell({
+                    headline: copy.headlineSiteContinuity || 'Unlock to continue',
+                    documentTitle: copy.documentTitleSiteContinuity,
                     introKey: 'siteProofPasskey',
                     useContinuitySteps: true,
                     hidePrivacy: true,
                 });
-                const headline = document.getElementById('headline-copy');
-                if (headline) headline.textContent = 'Unlock to continue';
                 return;
             }
             applyConsumerShell({ introKey: 'siteProof' });
@@ -347,7 +374,15 @@
         }
 
         document.getElementById('site-chip').textContent = formatSiteLabel(requestingSite);
-        applyConsumerShell();
+        if (isPasskeySetup) {
+            applyPasskeySetupShell();
+        } else if (isUnlockOnly) {
+            applyUnlockOnlyShell();
+        } else if (isSiteProofIssue) {
+            applySiteProofShell();
+        } else {
+            applyConsumerShell();
+        }
 
         function setStatus(message, tone) {
             const el = document.getElementById('status');
@@ -1190,73 +1225,63 @@
         }
 
         async function prepareUnlockOnlyUi() {
-            applyConsumerShell({
-                intro: 'Unlock your lemma.id with your passkey to continue.',
-                hideSteps: true,
-            });
+            applyUnlockOnlyShell();
             document.getElementById('cancel-btn').textContent = consumerCopy().primary?.cancel || 'Cancel';
+            const btn = document.getElementById('primary-btn');
+            btn.textContent = 'Unlock with passkey';
+            btn.classList.remove('hidden');
+            btn.disabled = false;
+            setStatus(
+                consumerCopy().status?.unlockReady || 'Enter your passkey to unlock.',
+                'info',
+            );
+            warmWalletInit();
 
-            try {
-                await Promise.race([
-                    ensureWalletInitialized(),
-                    new Promise((_, reject) => setTimeout(
-                        () => reject(new Error('Wallet status check timed out. Close other lemma.id tabs and retry.')),
-                        8000,
-                    )),
-                ]);
-
-                const info = await wallet.getWalletInfo();
-                if (info.isUnlocked || (wallet.isIsHumanLockValid && wallet.isIsHumanLockValid())) {
-                    if (!info.isUnlocked && wallet.isIsHumanLockValid && wallet.isIsHumanLockValid()) {
-                        await wallet._restoreIsHumanLockBundleIfValid();
+            ensureWalletInitialized()
+                .then(async () => {
+                    const info = await wallet.getWalletInfo();
+                    if (info.isUnlocked || (wallet.isIsHumanLockValid && wallet.isIsHumanLockValid())) {
+                        if (!info.isUnlocked && wallet.isIsHumanLockValid && wallet.isIsHumanLockValid()) {
+                            await wallet._restoreIsHumanLockBundleIfValid();
+                        }
+                        await adoptWalletState();
+                        setStatus('Wallet unlocked.', 'success');
+                        setTimeout(() => closeWith('LEMMA_UNLOCK_SUCCESS', { reason: 'already_unlocked' }), 200);
                     }
-                    await adoptWalletState();
-                    setStatus('Wallet unlocked.', 'success');
-                    setTimeout(() => closeWith('LEMMA_UNLOCK_SUCCESS', { reason: 'already_unlocked' }), 200);
-                    return;
-                }
-
-                setStatus('Enter your passkey to unlock.', 'info');
-                document.getElementById('primary-btn').textContent = 'Unlock with passkey';
-                document.getElementById('primary-btn').classList.remove('hidden');
-            } catch (err) {
-                setStatus(err?.message || 'Wallet unlock failed', 'error');
-            }
+                })
+                .catch((err) => {
+                    console.warn('[isHuman IDV] unlock warm init:', err?.message || err);
+                });
         }
 
         async function preparePasskeySetupUi() {
-            applyConsumerShell({
-                intro: 'Create your lemma.id with a passkey. No identity check at this step.',
-                hideSteps: true,
-            });
+            applyPasskeySetupShell();
             document.getElementById('cancel-btn').textContent = consumerCopy().primary?.cancel || 'Cancel';
+            const btn = document.getElementById('primary-btn');
+            btn.textContent = 'Create a lemma.id';
+            btn.classList.remove('hidden');
+            btn.disabled = false;
+            setStatus(
+                consumerCopy().status?.passkeySetupReady || 'Tap below to create your lemma.id with a passkey.',
+                'info',
+            );
+            warmWalletInit();
 
-            try {
-                await Promise.race([
-                    ensureWalletInitialized(),
-                    new Promise((_, reject) => setTimeout(
-                        () => reject(new Error('Wallet status check timed out. Close other lemma.id tabs and retry.')),
-                        8000,
-                    )),
-                ]);
-
-                const info = await wallet.getWalletInfo();
-                if (info.isUnlocked || (wallet.isIsHumanLockValid && wallet.isIsHumanLockValid())) {
-                    if (!info.isUnlocked && wallet.isIsHumanLockValid && wallet.isIsHumanLockValid()) {
-                        await wallet._restoreIsHumanLockBundleIfValid();
+            ensureWalletInitialized()
+                .then(async () => {
+                    const info = await wallet.getWalletInfo();
+                    if (info.isUnlocked || (wallet.isIsHumanLockValid && wallet.isIsHumanLockValid())) {
+                        if (!info.isUnlocked && wallet.isIsHumanLockValid && wallet.isIsHumanLockValid()) {
+                            await wallet._restoreIsHumanLockBundleIfValid();
+                        }
+                        await adoptWalletState();
+                        setStatus('lemma.id ready.', 'success');
+                        setTimeout(() => closeWith('LEMMA_WALLET_READY', { reason: 'already_ready', wallet_id: walletId }), 200);
                     }
-                    await adoptWalletState();
-                    setStatus('lemma.id ready.', 'success');
-                    setTimeout(() => closeWith('LEMMA_WALLET_READY', { reason: 'already_ready', wallet_id: walletId }), 200);
-                    return;
-                }
-
-                setStatus('Tap below to create your lemma.id with a passkey.', 'info');
-                document.getElementById('primary-btn').textContent = 'Create a lemma.id';
-                document.getElementById('primary-btn').classList.remove('hidden');
-            } catch (err) {
-                setStatus(err?.message || 'Wallet setup failed', 'error');
-            }
+                })
+                .catch((err) => {
+                    console.warn('[isHuman IDV] passkey setup warm init:', err?.message || err);
+                });
         }
 
         async function showUserInitiatedPrimaryAction() {
