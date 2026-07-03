@@ -6,13 +6,22 @@
 
 {% block head %}
 {{ super() }}
-<link rel="stylesheet" href="/static/css/demo/ishuman-demo.css?v=6">
+<link rel="stylesheet" href="/static/css/demo/ishuman-demo.css?v=7">
 {% endblock %}
 
 {% block content %}
 <div class="demo-page" id="ishuman-demo"
   data-server-test-token="{{ demo_test_token }}"
   data-server-admin-token="{{ demo_admin_token }}">
+
+  <div class="demo-topbar" id="ih-demo-topbar">
+    <div class="demo-topbar-main">
+      <span class="demo-topbar-label">Session</span>
+      <span class="demo-pill" id="ih-topbar-status">Checking…</span>
+    </div>
+    <button class="demo-btn demo-btn-ghost-danger" id="ih-clear-lemma-id-top-btn" type="button"
+      title="Wipe this browser's lemma.id wallet and demo site caches — start fresh">Clear my lemma.id</button>
+  </div>
 
   <header class="demo-intro">
     <p class="demo-eyebrow">lemma.id demo</p>
@@ -22,7 +31,18 @@
       <button class="demo-btn demo-btn-primary" id="ih-start-live-demo" type="button">Start live demo</button>
       <button class="demo-btn demo-btn-secondary" id="ih-start-simulated-demo" type="button">Try simulated demo</button>
     </div>
+    <p class="demo-muted demo-intro-hint">Stuck or mixing old state? Use <strong>Clear my lemma.id</strong> above, then start again.</p>
   </header>
+
+  <nav class="demo-progress assurance-only" id="ih-demo-progress" aria-label="Demo steps">
+    <ol class="demo-progress-list">
+      <li class="demo-progress-item is-active" data-step="1"><span class="demo-progress-num">1</span><span class="demo-progress-label">Wallet</span></li>
+      <li class="demo-progress-item" data-step="2"><span class="demo-progress-num">2</span><span class="demo-progress-label">Site PPIDs</span></li>
+      <li class="demo-progress-item" data-step="3"><span class="demo-progress-num">3</span><span class="demo-progress-label">Demo sites</span></li>
+      <li class="demo-progress-item" data-step="4"><span class="demo-progress-num">4</span><span class="demo-progress-label">Site block</span></li>
+      <li class="demo-progress-item" data-step="5"><span class="demo-progress-num">5</span><span class="demo-progress-label">Step-up</span></li>
+    </ol>
+  </nav>
 
   <div class="demo-simulation-banner" id="ih-simulation-banner" hidden>
     <strong>Simulation mode</strong>
@@ -43,6 +63,11 @@
             <h2 id="ih-step1-title">Step 1 — Create empty lemma.id</h2>
             <p class="demo-muted" id="ih-step1-desc">Register a passkey wallet only — no IDV popup yet. Disposable until anchored; recovery not promised pre-IDV.</p>
           </div>
+        </div>
+
+        <div class="step-utility" id="ih-step1-utility">
+          <strong>Why this step</strong>
+          <p>Shows passkey-first onboarding: your wallet gets a person root and can issue continuity proofs before any identity check.</p>
         </div>
 
         <div class="demo-ready-banner" id="ih-demo-ready-banner" hidden>
@@ -81,6 +106,11 @@
             <p class="demo-muted" id="ih-step2-desc">Each site receives its own private ID with <code>assurance: passkey</code> — derived from the same wallet, different PPIDs.</p>
           </div>
           <button class="demo-btn demo-btn-secondary" id="ih-verify-sites-btn" type="button">Verify both sites</button>
+        </div>
+
+        <div class="step-utility" id="ih-step2-utility">
+          <strong>Why this step</strong>
+          <p>Proves pairwise privacy: one wallet, two unrelated site-private identifiers. Sites never see your real name or each other's ID.</p>
         </div>
 
         <div class="site-cards">
@@ -126,8 +156,8 @@
         </div>
 
         <div class="ppid-compare">
-          <p class="ppid-compare-title">Same person. Different private IDs.</p>
-          <p class="demo-muted ppid-compare-desc">Ticketing and Trials receive different identifiers, even though both proofs come from the same verified human.</p>
+          <p class="ppid-compare-title">Same wallet. Different private IDs.</p>
+          <p class="demo-muted ppid-compare-desc" id="ih-ppid-compare-desc">Ticketing and Trials receive different identifiers, even though both proofs come from the same passkey wallet.</p>
           <div class="ppid-compare-grid">
             <div class="ppid-slot">
               <span class="result-label">Ticketing</span>
@@ -156,6 +186,10 @@
             <p class="demo-muted">Each Heroku demo site stamps your action with a signed presentation and verifies it server-side.</p>
           </div>
         </div>
+        <div class="step-utility">
+          <strong>Why this step</strong>
+          <p>See the integrator path: browser SDK → stamp an action → your backend verifies offline (no lemma.id call per request).</p>
+        </div>
         <div class="action-row">
           <a class="demo-btn demo-btn-secondary" id="ih-link-tickets-site" href="#" target="_blank" rel="noopener">Open ticketing demo</a>
           <a class="demo-btn demo-btn-secondary" id="ih-link-trials-site" href="#" target="_blank" rel="noopener">Open trials demo</a>
@@ -176,6 +210,11 @@
             <h2 id="ih-block-step-title">Step 4 — Block abuse on one site</h2>
             <p class="demo-muted">The block is scoped to the ticketing site. Trials can remain valid with passkey assurance.</p>
           </div>
+        </div>
+
+        <div class="step-utility" id="ih-step4-utility">
+          <strong>Why this step</strong>
+          <p>Site-local enforcement: ban a human proof on one site without affecting the same person elsewhere — unlike IP bans.</p>
         </div>
 
         <div class="block-grid">
@@ -223,6 +262,10 @@
             <h2>Step 5 — Escalate to isHuman (same PPID)</h2>
             <p class="demo-muted">Ticketing requires isHuman assurance. Complete IDV, then re-verify — your ticketing PPID stays the same; assurance flips from passkey to ishuman.</p>
           </div>
+        </div>
+        <div class="step-utility">
+          <strong>Why this step</strong>
+          <p>Assurance is layered, not a new account: stronger proof on the same site-private ID after abuse or high-trust policy.</p>
         </div>
         <div class="step-up-grid">
           <div class="block-card">
@@ -297,8 +340,7 @@ const { ok, ppid, assurance, presentation } = await new IsHumanVerifier({
       </div>
 
       <h3>Reset demo state</h3>
-      <button class="demo-btn demo-btn-ghost-danger" id="ih-clear-lemma-id-btn" type="button">Clear my lemma.id</button>
-      <p class="demo-muted">Wipes the master human proof and all site-derived IDs from this browser.</p>
+      <p class="demo-muted">Use the <strong>Clear my lemma.id</strong> button at the top of the page. It wipes the wallet, demo caches, and cached proofs on the Heroku demo sites.</p>
 
       <h3>Operator console</h3>
       <input class="demo-input" id="ih-test-token" type="password" placeholder="Test token override (optional)" autocomplete="off">
@@ -338,5 +380,5 @@ const { ok, ppid, assurance, presentation } = await new IsHumanVerifier({
 <script src="/static/js/lemma-keys.js?v=5" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
 <script nonce="{{ csp_nonce }}">window.LEMMA_ISHUMAN_USE_PERSON_ROOT_SEEDS = {{ 'true' if ishuman_use_person_root_seeds else 'false' }};</script>
 <script src="/sdk/ishuman-verifier.js?v=1.8.3" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
-<script src="/static/js/demo/ishuman-demo.js?v=23" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
+<script src="/static/js/demo/ishuman-demo.js?v=24" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
 {% endblock %}
