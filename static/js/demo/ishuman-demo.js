@@ -902,7 +902,7 @@
   // hidden iframe of its /lemma-clear page (served from that origin); the page
   // clears its own storage and posts LEMMA_CLEAR_DONE back. We resolve on that
   // signal or a timeout so a missing/old site never hangs the reset.
-  async function clearCustomerSiteCaches() {
+  async function clearCustomerSiteCaches({ timeoutMs = 1500 } = {}) {
     const urls = (state.config && state.config.customer_site_urls) || {};
     const origins = SITE_SLUGS.map((slug) => urls[slug]).filter(Boolean);
     if (!origins.length) {
@@ -932,8 +932,20 @@
       iframe.src = `${origin}/lemma-clear`;
       iframe.onerror = () => finish(`${origin} (load error)`);
       document.body.appendChild(iframe);
-      setTimeout(() => finish(`${origin} (timeout)`), 3000);
+      setTimeout(() => finish(`${origin} (timeout)`), timeoutMs);
     })));
+  }
+
+  async function demoServerSelfReset() {
+    if (!state.walletId || !state.wallet?.buildWalletAssertion) return;
+    const assertion = await state.wallet
+      .buildWalletAssertion(['wallet_id'], { wallet_id: state.walletId })
+      .catch(() => null);
+    if (!assertion) return;
+    await requestJson('/api/demo/ishuman/self-reset', {
+      method: 'POST',
+      body: JSON.stringify({ wallet_id: state.walletId, wallet_assertion: assertion }),
+    }).catch((err) => log('Server self-reset skipped', err.message));
   }
 
   // Full demo reset: wipe the lemma.id (master human proof) and every
@@ -954,29 +966,6 @@
     setPill('ih-lemma-status', 'CLEARING', 'warn');
     log('Clearing lemma.id', 'wiping local wallet + signaling customer sites');
 
-    // 1. Best-effort server reset of this wallet's revocation state so a
-    //    re-created lemma.id starts clean. Needs a wallet assertion while the
-    //    wallet is still live, so do it before wiping IndexedDB.
-    try {
-      if (state.walletId && state.wallet && state.wallet.buildWalletAssertion) {
-        const assertion = await state.wallet
-          .buildWalletAssertion(['wallet_id'], { wallet_id: state.walletId })
-          .catch(() => null);
-        if (assertion) {
-          await requestJson('/api/demo/ishuman/self-reset', {
-            method: 'POST',
-            body: JSON.stringify({ wallet_id: state.walletId, wallet_assertion: assertion }),
-          }).catch((err) => log('Server self-reset skipped', err.message));
-        }
-      }
-    } catch (err) {
-      log('Server reset skipped', err.message);
-    }
-
-    // 2a. Tell open tabs on the same origin to invalidate cached sessions.
-    //     NOTE: BroadcastChannel is
-    //     origin-scoped, so this only reaches lemma.id tabs, not the customer
-    //     demo origins — those are handled by the cross-origin iframe wipe below.
     if (window.IsHumanVerifier && window.IsHumanVerifier.broadcastBlockUpdate) {
       for (const slug of SITE_SLUGS) {
         window.IsHumanVerifier.broadcastBlockUpdate({
@@ -988,14 +977,18 @@
       }
     }
 
-    // 2b. Clear the cached site proof / session that the demo tickets + trials
-    //     sites stored in THEIR OWN origin storage. Same-origin policy forbids
-    //     lemma.id from touching another origin's IndexedDB/localStorage, so we
-    //     embed each site's /lemma-clear page in a hidden iframe — it runs in
-    //     that origin and wipes its own storage, then posts confirmation back.
-    await clearCustomerSiteCaches();
+    // Server reset (needs live wallet) runs in parallel with cross-origin demo
+    // site iframe wipes — the iframe timeout was the main source of delay.
+    try {
+      await Promise.all([
+        demoServerSelfReset().catch((err) => log('Server reset skipped', err.message)),
+        clearCustomerSiteCaches(),
+      ]);
+    } catch (err) {
+      log('Parallel clear partial', err.message);
+    }
 
-    // 3. Wipe the lemma.id wallet IndexedDB (master proof, derived site proofs,
+    // Wipe the lemma.id wallet IndexedDB (master proof, derived site proofs,
     //    passkey, wallet secret, at-rest key material, isHuman cache). Close the
     //    live connection first so deleteDatabase isn't blocked.
     try {

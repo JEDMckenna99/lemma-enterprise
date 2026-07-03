@@ -26,7 +26,7 @@
   <header class="demo-intro">
     <p class="demo-eyebrow">lemma.id demo</p>
     <h1 class="demo-title">One PPID, layered assurance</h1>
-    <p class="demo-lead" id="ih-intro-lead">Create a passkey wallet, derive distinct site PPIDs with passkey assurance, stamp actions on demo sites, block one site locally, then step up to isHuman — same PPID, stronger assurance.</p>
+    <p class="demo-lead" id="ih-intro-lead">Your lemma.id is a passkey-controlled proof container. A site asks for the assurance it needs, your wallet mints a site-private stamp, and the site verifies it on its own backend — no shared identity, no call home. See one identity work across two sites, get blocked on one, then step up to isHuman on the same private ID.</p>
     <div class="demo-hero-cta">
       <button class="demo-btn demo-btn-primary" id="ih-start-live-demo" type="button">Start live demo</button>
       <button class="demo-btn demo-btn-secondary" id="ih-start-simulated-demo" type="button">Try simulated demo</button>
@@ -382,5 +382,5 @@ const { ok, ppid, assurance, presentation } = await new IsHumanVerifier({
 <script src="/static/js/lemma-keys.js?v=5" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
 <script nonce="{{ csp_nonce }}">window.LEMMA_ISHUMAN_USE_PERSON_ROOT_SEEDS = {{ 'true' if ishuman_use_person_root_seeds else 'false' }};</script>
 <script src="/sdk/ishuman-verifier.js?v=1.8.3" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
-<script src="/static/js/demo/ishuman-demo.js?v=26" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
+<script src="/static/js/demo/ishuman-demo.js?v=27" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
 {% endblock %}

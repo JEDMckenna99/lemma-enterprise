@@ -54,7 +54,7 @@ def test_ishuman_demo_page_loads_expected_assets(ishuman_demo_client):
     assert "/sdk/ishuman-verifier.js" in body
     assert "/static/js/demo/ishuman-demo.js" in body
     assert "/static/css/demo/ishuman-demo.css" in body
-    assert "/static/js/demo/ishuman-demo.js?v=26" in body
+    assert "/static/js/demo/ishuman-demo.js?v=27" in body
 
 
 def test_demo_create_button_always_enters_live_issuance():
