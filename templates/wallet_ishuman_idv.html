@@ -335,6 +335,7 @@
         let wallet = null;
         let walletId = '';
         let walletSecret = '';
+        let walletInitPromise = null;
         let sessionId = localStorage.getItem(SESSION_KEY) || ishumanSessionParam || '';
         if (ishumanSessionParam && !localStorage.getItem(SESSION_KEY)) {
             localStorage.setItem(SESSION_KEY, ishumanSessionParam);
