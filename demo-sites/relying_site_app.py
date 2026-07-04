@@ -1,8 +1,11 @@
+import logging
 import os
 from collections import deque
 from typing import Optional
 
 from flask import Flask, Response, jsonify, request
+
+logger = logging.getLogger(__name__)
 
 from lemma_ishuman_verify import VerificationContext, InMemoryNonceStore
 
@@ -84,15 +87,23 @@ def demo_action():
     ctx = _verify_ctx()
     payload = body.get("payload") if isinstance(body.get("payload"), dict) else body
     action_name = (payload or {}).get("action") or (body.get("lemma") or {}).get("action")
-    result = ctx.verify_action_stamp(
-        body,
-        action=action_name or "unknown",
-        method="POST",
-        path="/api/demo/action",
-        body=payload or body,
-        required_assurance=DEMO_REQUIRED_ASSURANCE,
-        nonce_store=_NONCE_STORE,
-    )
+    try:
+        result = ctx.verify_action_stamp(
+            body,
+            action=action_name or "unknown",
+            method="POST",
+            path="/api/demo/action",
+            body=payload or body,
+            required_assurance=DEMO_REQUIRED_ASSURANCE,
+            nonce_store=_NONCE_STORE,
+        )
+    except Exception:
+        logger.exception("demo_action stamp verification failed")
+        return jsonify({
+            "success": False,
+            "reason": "verify_error",
+            "error": "Stamp verification failed on the server",
+        }), 500
     entry = {
         "ok": result.ok,
         "ppid": result.ppid,
@@ -472,7 +483,16 @@ def index():
             headers: {{ 'Content-Type': 'application/json' }},
             body: JSON.stringify(stampedEvent),
           }});
-          const serverEntry = await serverRes.json();
+          const serverRaw = await serverRes.text();
+          let serverEntry;
+          try {{
+            serverEntry = JSON.parse(serverRaw);
+          }} catch (parseErr) {{
+            throw new Error(
+              'Server returned non-JSON (HTTP ' + serverRes.status + '). '
+              + 'Redeploy the demo site app if this persists.',
+            );
+          }}
           await refreshActionLog();
           applyVerdict(response, {{ stampedEvent, serverEntry }});
         }} else {{
