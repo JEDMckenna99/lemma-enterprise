@@ -47,6 +47,8 @@ def test_brand_and_manager_creation_use_canonical_routes():
     assert "getWalletInfo({ lite: true })" in manager
     assert "globalLemmaWallet" in manager
     assert "deferUnlockedProofCheck" in manager
+    assert "Identity check not anchored yet" in manager
+    assert "showIncompleteLemmaIdState();\n            return;" not in manager
     assert 'rel="preload"' in manager and "lemma-wallet.js" in manager
     assert "assessLemmaPlatformIdentity" in manager
     assert "selectPlatformCredentials" in layout

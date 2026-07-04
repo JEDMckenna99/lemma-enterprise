@@ -417,8 +417,7 @@ async function deferUnlockedProofCheck(submessage = 'Your lemma.id is ready') {
         }
         if (gen !== proofCheckGeneration) return;
         if (!complete) {
-            showIncompleteLemmaIdState();
-            return;
+            updateStatusDisplay(true, 'Open', 'Identity check not anchored yet');
         }
         if (gen !== proofCheckGeneration) return;
         await loadProofSummary();
