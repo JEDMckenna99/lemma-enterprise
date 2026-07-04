@@ -1,8 +1,8 @@
 {% extends "modern/layout.html" %}
 {% set is_public_page = true %}
 
-{% block title %}Demo - lemma.id{% endblock %}
-{% block description %}Walk through the one-PPID assurance model: passkey wallet → site PPIDs → stamped actions → site block → isHuman step-up on the same PPID.{% endblock %}
+{% block title %}lemma.id demo — proof of humanity{% endblock %}
+{% block description %}Walk through lemma.id: passkey wallet, site-private PPIDs, relying-site verification, optional isHuman assurance step-up, and site-scoped revocation.{% endblock %}
 
 {% block head %}
 {{ super() }}
@@ -10,7 +10,7 @@
 {% endblock %}
 
 {% block content %}
-<div class="demo-page" id="ishuman-demo"
+<div class="demo-page" id="lemma-demo"
   data-server-test-token="{{ demo_test_token }}"
   data-server-admin-token="{{ demo_admin_token }}">
 
@@ -25,8 +25,8 @@
 
   <header class="demo-intro">
     <p class="demo-eyebrow">lemma.id demo</p>
-    <h1 class="demo-title">One PPID, layered assurance</h1>
-    <p class="demo-lead" id="ih-intro-lead">Your lemma.id is a passkey-controlled proof container. A site asks for the assurance it needs, your wallet mints a site-private stamp, and the site verifies it on its own backend — no shared identity, no call home. See one identity work across two sites, get blocked on one, then step up to isHuman on the same private ID.</p>
+    <h1 class="demo-title">Proof of humanity, layered assurance</h1>
+    <p class="demo-lead" id="ih-intro-lead">lemma.id is your passkey-controlled proof container. Sites request the assurance they need — usually <code>passkey</code> first — and your wallet mints a site-private stamp they verify on their own backend. <strong>isHuman</strong> is the stronger assurance tier a site can require later; it uses the same private site ID, not a new account. This demo walks wallet → site proofs → relying sites → optional isHuman step-up → site-scoped revocation.</p>
     <div class="demo-hero-cta">
       <button class="demo-btn demo-btn-primary" id="ih-start-live-demo" type="button">Start live demo</button>
       <button class="demo-btn demo-btn-secondary" id="ih-start-simulated-demo" type="button">Try simulated demo</button>
@@ -39,7 +39,7 @@
       <li class="demo-progress-item is-active" data-step="1"><span class="demo-progress-num">1</span><span class="demo-progress-label">Wallet</span></li>
       <li class="demo-progress-item" data-step="2"><span class="demo-progress-num">2</span><span class="demo-progress-label">Site PPIDs</span></li>
       <li class="demo-progress-item" data-step="3"><span class="demo-progress-num">3</span><span class="demo-progress-label">Demo sites</span></li>
-      <li class="demo-progress-item" data-step="4"><span class="demo-progress-num">4</span><span class="demo-progress-label">Step-up</span></li>
+      <li class="demo-progress-item" data-step="4"><span class="demo-progress-num">4</span><span class="demo-progress-label">isHuman tier</span></li>
       <li class="demo-progress-item" data-step="5"><span class="demo-progress-num">5</span><span class="demo-progress-label">Revoke</span></li>
       <li class="demo-progress-item" data-step="6"><span class="demo-progress-num">6</span><span class="demo-progress-label">Reset</span></li>
     </ol>
@@ -61,14 +61,14 @@
       <div class="workflow-body">
         <div class="workflow-head">
           <div>
-            <h2 id="ih-step1-title">Step 1 — Create empty lemma.id</h2>
-            <p class="demo-muted" id="ih-step1-desc">Opens the lemma.id popup to create your wallet with a passkey — no IDV yet. Same mechanism demo sites use for unlock.</p>
+            <h2 id="ih-step1-title">Step 1 — Create your lemma.id</h2>
+            <p class="demo-muted" id="ih-step1-desc">Create a passkey-controlled wallet — no identity check yet. Sites will ask this wallet for proofs at the assurance level they require.</p>
           </div>
         </div>
 
         <div class="step-utility" id="ih-step1-utility">
           <strong>Why this step</strong>
-          <p>Passkey-first onboarding: you hold a usable lemma.id at passkey assurance before any identity check. It's a container only you control — sites can't read it, they can only ask it for proofs.</p>
+          <p>lemma.id is the container only you control. Passkey assurance is enough for many flows; isHuman is optional and site-driven, not something you must complete up front.</p>
         </div>
 
         <div class="demo-ready-banner" id="ih-demo-ready-banner" hidden>
@@ -103,15 +103,15 @@
       <div class="workflow-body" id="ih-demo-cockpit">
         <div class="workflow-head">
           <div>
-            <h2 id="ih-step2-title">Step 2 — Passkey proof on two sites</h2>
-            <p class="demo-muted" id="ih-step2-desc">Each site asks for <code>assurance: passkey</code>. Your wallet derives that site's private ID and mints a signed stamp the site verifies itself — same wallet, different PPIDs.</p>
+            <h2 id="ih-step2-title">Step 2 — Passkey proofs on two sites</h2>
+            <p class="demo-muted" id="ih-step2-desc">Each demo site requests <code>assurance: passkey</code>. Your wallet derives that site's private ID and mints a signed stamp the site verifies itself — same wallet, different PPIDs.</p>
           </div>
           <button class="demo-btn demo-btn-secondary" id="ih-verify-sites-btn" type="button">Verify both sites</button>
         </div>
 
         <div class="step-utility" id="ih-step2-utility">
           <strong>Why this step</strong>
-          <p>The core loop: the site declares the assurance it needs → your wallet mints a site-private stamp → the site verifies it offline. One wallet, two unrelated IDs; neither site sees your real identity or the other's ID.</p>
+          <p>The core integrator loop: the site declares required assurance → your wallet mints a site-private stamp → the site verifies offline. Neither site sees your real identity or the other's ID.</p>
         </div>
 
         <div class="site-cards">
@@ -174,7 +174,7 @@
       </div>
     </section>
 
-    <!-- Step 3 — demo sites (assurance workflow) -->
+    <!-- Step 3 — demo sites -->
     <section class="workflow-step is-locked assurance-only" id="ih-step-3" data-step="3">
       <div class="workflow-rail">
         <span class="workflow-num">3</span>
@@ -183,23 +183,23 @@
       <div class="workflow-body" id="ih-demo-sites-panel">
         <div class="workflow-head">
           <div>
-            <h2>Step 3 — Use demo sites</h2>
-            <p class="demo-muted">Reserve a ticket or start a trial — the site stamps your action with a signed presentation and verifies it on its own server, with no call back to lemma.id.</p>
+            <h2>Step 3 — Use relying-site demos</h2>
+            <p class="demo-muted">Reserve a ticket or start a trial — each site stamps your action and verifies it on its own server, with no call back to lemma.id.</p>
           </div>
         </div>
         <div class="step-utility">
           <strong>Why this step</strong>
-          <p>The integrator path: the browser SDK mints the stamp, your backend verifies it offline. No per-request call to lemma.id keeps checks fast and private.</p>
+          <p>This is what integrators ship: browser SDK mints the stamp, your backend verifies it offline. No per-request call to lemma.id.</p>
         </div>
         <div class="action-row">
           <a class="demo-btn demo-btn-secondary" id="ih-link-tickets-site" href="#" target="_blank" rel="noopener">Open ticketing demo</a>
           <a class="demo-btn demo-btn-secondary" id="ih-link-trials-site" href="#" target="_blank" rel="noopener">Open trials demo</a>
         </div>
-        <p class="demo-muted">Reserve tickets or start a trial — the site POSTs your stamp to <code>/api/demo/action</code> for offline verification.</p>
+        <p class="demo-muted">Each site POSTs your stamp to <code>/api/demo/action</code> for offline verification.</p>
       </div>
     </section>
 
-    <!-- Step 4 — isHuman step-up (assurance workflow) -->
+    <!-- Step 4 — isHuman assurance tier -->
     <section class="workflow-step is-locked assurance-only" id="ih-step-4" data-step="4">
       <div class="workflow-rail">
         <span class="workflow-num">4</span>
@@ -208,18 +208,18 @@
       <div class="workflow-body" id="ih-stepup-panel">
         <div class="workflow-head">
           <div>
-            <h2 id="ih-stepup-step-title">Step 4 — Escalate to isHuman (same PPID)</h2>
-            <p class="demo-muted">On doubt or a high-risk action, ticketing raises its bar to isHuman and demands a fresh verification. Complete IDV, then re-verify — the PPID is unchanged; only the assurance flips from passkey to ishuman.</p>
+            <h2 id="ih-stepup-step-title">Step 4 — Site requires isHuman assurance</h2>
+            <p class="demo-muted"><strong>isHuman</strong> is the higher assurance proof a site can request — not a separate product. Ticketing raises its policy to <code>ishuman</code>, you complete IDV, then re-verify. The PPID stays the same; only the assurance tier changes.</p>
           </div>
         </div>
         <div class="step-utility" id="ih-step4-utility">
           <strong>Why this step</strong>
-          <p>Step-up strengthens the same account, not a new one: the site-private ID is stable across tiers, so a fresh isHuman proof raises trust without re-registering the user.</p>
+          <p>Sites choose their bar: passkey for low-friction flows, isHuman when they need stronger proof of humanity. Step-up strengthens the same site-private account — no re-registration.</p>
         </div>
         <div class="step-up-grid">
           <div class="block-card">
-            <h3>Require isHuman on ticketing</h3>
-            <p class="demo-muted">Creates site doubt — no auto test-IDV.</p>
+            <h3>Raise ticketing policy to isHuman</h3>
+            <p class="demo-muted">Simulates a site requiring stronger assurance on this PPID.</p>
             <button class="demo-btn demo-btn-secondary" id="ih-require-ishuman-btn" type="button">Require isHuman on ticketing</button>
           </div>
           <div class="block-card">
@@ -263,13 +263,13 @@
 
         <div class="step-utility" id="ih-step5-utility">
           <strong>Why this step</strong>
-          <p>Site-scoped enforcement: revoke or block this site-private ID on ticketing without touching who they are on trials or anywhere else — unlike IP or device bans.</p>
+          <p>Enforcement is per-site. A ticketing ban does not follow the user to trials or leak across the network — unlike IP or device bans.</p>
         </div>
 
         <div class="block-grid">
           <div class="block-card">
             <h3>Block on Ticketing</h3>
-            <p class="demo-muted">This simulates a site revoking an abusive identity.</p>
+            <p class="demo-muted">Simulates a site revoking an abusive proof.</p>
             <button class="demo-btn demo-btn-danger" id="ih-abuse-block-btn" type="button">Block on ticketing</button>
           </div>
           <div class="block-card">
@@ -326,7 +326,7 @@
   <details class="demo-operations" id="ih-operations-check">
     <summary>Operations Check</summary>
     <div class="demo-operations-body">
-      <p class="demo-muted">Run the full lemma.id lifecycle and see pass/fail evidence for each operation. Use this before a demo or deploy to confirm wallet, proofs, escalation, and site-scoped revocation still work.</p>
+      <p class="demo-muted">Run the full lemma.id lifecycle and see pass/fail evidence for each operation. Use this before a demo or deploy to confirm wallet, passkey proofs, isHuman step-up, and site-scoped revocation still work.</p>
       <div class="demo-operations-toolbar">
         <button class="demo-btn demo-btn-primary" id="ih-run-all-operations" type="button">Run all checks</button>
         <span class="demo-pill" id="ih-operations-summary">Not run</span>
@@ -339,35 +339,35 @@
   <details class="demo-details">
     <summary>Developer details</summary>
     <div class="demo-details-body">
-      <h3>From IP bans to human accountability</h3>
+      <h3>Assurance tiers</h3>
       <div class="compare-grid">
-        <div class="compare-box bad">
-          <h4>Current bot defense</h4>
+        <div class="compare-box good">
+          <h4><code>passkey</code></h4>
           <ul>
-            <li>Ban IPs, ISPs, VPNs, and regions.</li>
-            <li>Real users caught in the blast radius.</li>
-            <li>Attackers rotate infrastructure.</li>
+            <li>Default for most site flows.</li>
+            <li>Fast unlock; no IDV required.</li>
+            <li>Site verifies a signed site-private stamp offline.</li>
           </ul>
         </div>
         <div class="compare-box good">
-          <h4>With Lemma</h4>
+          <h4><code>ishuman</code></h4>
           <ul>
-            <li>Block site-private human proofs.</li>
-            <li>Require fresh verification.</li>
-            <li>Keep site bans until the site explicitly unblocks them.</li>
+            <li>Stronger proof a site can require on doubt or high-risk actions.</li>
+            <li>Same PPID — assurance tier changes, not the account.</li>
+            <li>Completed via IDV when the site policy demands it.</li>
           </ul>
         </div>
       </div>
 
       <h3>Integration snippet</h3>
-      <p class="demo-muted">A human verdict, site-scoped private ID, and reason — no passport or cross-site user ID.</p>
+      <p class="demo-muted">Start with passkey assurance; raise to isHuman only when your site policy requires it.</p>
       <div class="code-block">&lt;script src="https://lemma.id/sdk/ishuman-verifier.js"&gt;&lt;/script&gt;
 const { ok, ppid, assurance, presentation } = await new IsHumanVerifier({
   siteId: 'tickets-demo.lemma.id',
   autoProvision: true,
   requiredAssurance: 'passkey',
 }).verifyForBackend({ requiredAssurance: 'passkey' });
-// Step-up: requiredAssurance: 'ishuman' — same ppid, assurance: ishuman</div>
+// Site step-up: requiredAssurance: 'ishuman' — same ppid, assurance: ishuman</div>
       <p class="demo-muted" id="ih-integration-latency">Last verify: —</p>
 
       <h3>Demo site links</h3>
@@ -377,7 +377,7 @@ const { ok, ppid, assurance, presentation } = await new IsHumanVerifier({
       </div>
 
       <h3>Reset demo state</h3>
-      <p class="demo-muted">Use <strong>Clear my lemma.id</strong> at the top — it wipes your lemma.id wallet on this origin only (no hidden iframes). Close or hard-refresh open demo site tabs so they drop stale cached proofs.</p>
+      <p class="demo-muted">Use <strong>Clear my lemma.id</strong> at the top — it wipes your lemma.id wallet on this origin only. Close or hard-refresh open demo site tabs so they drop stale cached proofs.</p>
 
       <h3>Operator console</h3>
       <form class="demo-operator-form" id="ih-operator-form" autocomplete="off">
@@ -419,5 +419,5 @@ const { ok, ppid, assurance, presentation } = await new IsHumanVerifier({
 <script src="/static/js/lemma-keys.js?v=5" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
 <script nonce="{{ csp_nonce }}">window.LEMMA_ISHUMAN_USE_PERSON_ROOT_SEEDS = {{ 'true' if ishuman_use_person_root_seeds else 'false' }};</script>
 <script src="/sdk/ishuman-verifier.js?v={{ ishuman_verifier_sdk_version }}" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
-<script src="/static/js/demo/ishuman-demo.js?v=31" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
+<script src="/static/js/demo/ishuman-demo.js?v=32" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
 {% endblock %}

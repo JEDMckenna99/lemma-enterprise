@@ -26,18 +26,20 @@ def fixture_ishuman_demo_client(fake_ishuman_db_session_factory, monkeypatch):
 
 
 def test_ishuman_demo_page_loads_expected_assets(ishuman_demo_client):
-    resp = ishuman_demo_client.get("/demo/ishuman")
+    resp = ishuman_demo_client.get("/demo")
     body = resp.get_data(as_text=True)
 
     assert resp.status_code == 200
-    assert "One PPID, layered assurance" in body
+    assert "Proof of humanity, layered assurance" in body
+    assert "lemma.id demo" in body
     assert "Start live demo" in body
     assert "Try simulated demo" in body
-    assert "Step 1 — Create empty lemma.id" in body
-    assert "Step 2 — Passkey proof on two sites" in body
-    assert "Step 4 — Escalate to isHuman" in body
+    assert "Step 1 — Create your lemma.id" in body
+    assert "Step 2 — Passkey proofs on two sites" in body
+    assert "Step 4 — Site requires isHuman assurance" in body
     assert "Step 5 — Revoke on one site" in body
     assert "Step 6 — Reset demo" in body
+    assert "stronger assurance" in body
     assert "verifyForBackend" in body
     assert "demo-workflow" in body
     assert "Operations Check" in body
@@ -56,10 +58,17 @@ def test_ishuman_demo_page_loads_expected_assets(ishuman_demo_client):
     assert "Unlock wallet" not in body
     assert "ih-try-qr-demo-btn" not in body
     assert "Popup &amp; redirect UI preview" not in body
+    assert "id=\"lemma-demo\"" in body
     assert "/sdk/ishuman-verifier.js" in body
     assert "/static/js/demo/ishuman-demo.js" in body
     assert "/static/css/demo/ishuman-demo.css" in body
-    assert "/static/js/demo/ishuman-demo.js?v=31" in body
+    assert "/static/js/demo/ishuman-demo.js?v=32" in body
+
+
+def test_legacy_demo_ishuman_url_redirects_to_canonical_demo(ishuman_demo_client):
+    resp = ishuman_demo_client.get("/demo/ishuman", follow_redirects=False)
+    assert resp.status_code == 301
+    assert resp.headers["Location"].endswith("/demo")
 
 
 def test_demo_create_button_always_enters_live_issuance():
@@ -85,7 +94,7 @@ def test_ishuman_demo_page_never_shows_retired_network_revoke(
     ishuman_demo_client, monkeypatch,
 ):
     monkeypatch.setenv("LEMMA_ISHUMAN_NETWORK_REVOCATION_ENABLED", "1")
-    resp = ishuman_demo_client.get("/demo/ishuman")
+    resp = ishuman_demo_client.get("/demo/ishuman", follow_redirects=True)
     body = resp.get_data(as_text=True)
 
     assert resp.status_code == 200
@@ -421,7 +430,7 @@ def test_ishuman_demo_page_omits_tokens_on_production(ishuman_demo_client, monke
     monkeypatch.setenv("LEMMA_ISHUMAN_DEMO_TEST_TOKEN", "super-secret-test-token")
     monkeypatch.setenv("LEMMA_ISHUMAN_DEMO_ADMIN_TOKEN", "super-secret-admin-token")
 
-    resp = ishuman_demo_client.get("/demo/ishuman")
+    resp = ishuman_demo_client.get("/demo/ishuman", follow_redirects=True)
     body = resp.get_data(as_text=True)
     assert resp.status_code == 200
     assert "super-secret-test-token" not in body

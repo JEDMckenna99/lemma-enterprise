@@ -43,7 +43,7 @@ The public `/demo` route demonstrates proof-constrained authorization with live 
 
 ## What this proves
 
-The public `/demo/ishuman` route demonstrates the **one-PPID assurance model** when feature flags are enabled:
+The public `/demo` route demonstrates the **one-PPID assurance model** when feature flags are enabled:
 
 - Passkey wallet + provisional person root (no IDV on step 1).
 - `verifyForBackend({ requiredAssurance: 'passkey' })` derives distinct site PPIDs with passkey assurance.
@@ -70,7 +70,7 @@ Demo Heroku apps:
 
 ## Recording checklist (assurance workflow)
 
-1. Load `/demo/ishuman` on staging (`assurance_demo_mode: true` in config).
+1. Load `/demo` on staging (`assurance_demo_mode: true` in config).
 2. **Step 1** — Create passkey wallet (no IDV popup).
 3. **Step 2** — Verify both sites; show different PPIDs and `assurance: passkey`.
 4. **Step 3** — Open ticketing + trials demo sites; complete an action; show server-verified stamp in action log.
@@ -79,7 +79,7 @@ Demo Heroku apps:
 
 ## Legacy recording checklist (flags off)
 
-1. Load `/demo/ishuman`.
+1. Load `/demo`.
 2. Create lemma.id via IDV popup.
 3. Verify both demo sites (IDV-first flow).
 4. Block ticketing; confirm trials still valid.
@@ -119,4 +119,4 @@ Both load the hosted verifier from your configured `LEMMA_ORIGIN` and call `veri
 - `tickets-demo.lemma.id`
 - `trials-demo.lemma.id`
 
-Use these after creating/storing a master proof through `https://lemma.id/demo/ishuman` to show real separate origins requesting site-private credentials from the Lemma wallet bridge.
+Use these after creating/storing a master proof through `https://lemma.id/demo` to show real separate origins requesting site-private credentials from the Lemma wallet bridge.

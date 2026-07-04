@@ -13,7 +13,7 @@
 | Browser SDK | https://lemma.id/sdk/ishuman-verifier.js |
 | JS verifier (backend) | https://lemma.id/sdk/lemma-ishuman-verify.mjs |
 | Python verifier (backend) | https://lemma.id/sdk/lemma_ishuman_verify.py |
-| Live demo | https://lemma.id/demo/ishuman |
+| Live demo | https://lemma.id/demo |
 | API key manager (abuse only) | https://lemma.id/developer/external-api-keys |
 | Pointer file | https://lemma.id/llms.txt |
 
@@ -384,7 +384,7 @@ Requires platform flags: `LEMMA_ONE_PPID_ASSURANCE_MODEL=1` and `LEMMA_PASSKEY_A
 
 See `docs/product/PASSKEY_STAMP_INPUT_BURN.md` for the full contract.
 
-**Reference implementation:** [Assurance workflow demo](https://lemma.id/demo/ishuman) — passkey wallet → distinct site PPIDs → Heroku demo sites with `verifyStamp` → site block → isHuman step-up (same PPID). Enable flags on staging before recording.
+**Reference implementation:** [lemma.id integration demo](https://lemma.id/demo) — passkey wallet → distinct site PPIDs → Heroku demo sites with `verifyStamp` → optional isHuman step-up (same PPID) → site-scoped revocation. Enable flags on staging before recording.
 
 ---
 
@@ -398,7 +398,7 @@ Confirm with the developer:
 - [ ] `ppid` stored on account; no KYC fields stored.
 - [ ] Popup flows work on first visit (`autoProvision: true`).
 - [ ] If abuse APIs used, API key `site_domain` matches `siteId`.
-- [ ] Test on `/demo/ishuman` or staging hostname before production.
+- [ ] Test on `/demo` or staging hostname before production.
 
 ---
 

@@ -39,7 +39,7 @@ def _base_env(**overrides):
         "LEMMA_PPID_ROOT_KEY": "x" * 32,
         "STRIPE_SECRET_KEY": "sk_test_123",
         "STRIPE_IDENTITY_WEBHOOK_SECRET": "whsec_123",
-        "ISHUMAN_RETURN_URL": "https://staging.example/demo/ishuman?verification_return=true",
+        "ISHUMAN_RETURN_URL": "https://staging.example/demo?verification_return=true",
         "AWS_REGION": "us-east-1",
         "LEMMA_KMS_KEY_ID": "kms-staging",
         "LEMMA_ISHUMAN_DEMO_ALLOW_TEST_VERIFY": "true",
@@ -81,7 +81,7 @@ def test_production_rejects_demo_test_helper():
         ENVIRONMENT="production",
         STRIPE_SECRET_KEY="sk_live_123",
         LEMMA_BASE_URL="https://lemma.id",
-        ISHUMAN_RETURN_URL="https://lemma.id/demo/ishuman?verification_return=true",
+        ISHUMAN_RETURN_URL="https://lemma.id/demo?verification_return=true",
         LEMMA_ISHUMAN_DEMO_ALLOW_TEST_VERIFY="true",
     )
     errors, _warnings = validate(env, "production")
@@ -110,7 +110,7 @@ def test_production_accepts_live_key_and_disabled_test_helper():
         ENVIRONMENT="production",
         STRIPE_SECRET_KEY="sk_live_123",
         LEMMA_BASE_URL="https://lemma.id",
-        ISHUMAN_RETURN_URL="https://lemma.id/demo/ishuman?verification_return=true",
+        ISHUMAN_RETURN_URL="https://lemma.id/demo?verification_return=true",
         LEMMA_ISHUMAN_DEMO_ALLOW_TEST_VERIFY="false",
         LEMMA_ISHUMAN_DEMO_TEST_TOKEN="",
         LEMMA_ISHUMAN_DEMO_ADMIN_TOKEN="",

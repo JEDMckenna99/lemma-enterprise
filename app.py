@@ -1113,11 +1113,7 @@ def create_app():
     # DEVELOPER PLATFORM ROUTES
     # ================================================================================
 
-    @app.route('/demo')
-    def public_demo_playground():
-        """Public demo entrypoint: isHuman is the core product demo."""
-        return redirect('/demo/ishuman', code=302)
-
+    # Demo route is served by ishuman_demo_bp at /demo (lemma.id integration demo).
     @app.route('/demo/firewall')
     def public_firewall_demo_playground():
         """Deprecated Agent Ops / Lemma Firewall demo retained as a legacy deep link."""

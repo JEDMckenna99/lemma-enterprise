@@ -260,7 +260,7 @@
     }
     const stepupTitle = $('ih-stepup-step-title');
     if (stepupTitle && on) {
-      stepupTitle.textContent = 'Step 4 — Escalate to isHuman (same PPID)';
+      stepupTitle.textContent = 'Step 4 — Site requires isHuman assurance';
     }
     const step1Title = $('ih-step1-title');
     const step1Desc = $('ih-step1-desc');
@@ -278,7 +278,7 @@
       if (step1Desc) step1Desc.textContent = 'Use an existing lemma.id or complete a one-time identity check.';
       if (step2Title) step2Title.textContent = 'Step 2 — Use the same lemma.id on two sites';
       if (step2Desc) step2Desc.textContent = 'Each site asks for the assurance it needs; your wallet mints a site-private stamp the site verifies itself — same verified human, different PPIDs.';
-      if (intro) intro.textContent = 'Verify once on lemma.id, then test two demo sites. Each site asks for the assurance it needs and verifies a site-private stamp on its own backend — both learn you are a verified human, but neither gets your real identity or the same ID as the other.';
+      if (intro) intro.textContent = 'lemma.id is your passkey-controlled proof container. Sites request the assurance they need — usually passkey first. isHuman is the stronger tier a site can require later on the same private site ID. Verify once on lemma.id, then test two demo sites with distinct PPIDs, optional isHuman step-up, and site-scoped revocation.';
       if (createBtn) createBtn.textContent = 'Create a lemma.id';
       if (step1Utility) {
         step1Utility.querySelector('p').textContent = 'The one-time IDV path: verify once on lemma.id, then reuse that proof across sites. Your identity stays in a container only you control.';
@@ -605,7 +605,7 @@
 
   async function loadConfig() {
     state.config = await requestJson('/api/demo/ishuman/config');
-    const root = $('ishuman-demo');
+    const root = $('lemma-demo') || $('ishuman-demo');
     if (root) {
       state.serverTestToken = root.dataset.serverTestToken || '';
       state.serverAdminToken = root.dataset.serverAdminToken || '';
@@ -1158,7 +1158,7 @@
     if (stepupCompare) stepupCompare.hidden = true;
     const stepupDiff = $('ih-stepup-diff');
     if (stepupDiff) stepupDiff.textContent = '—';
-    scrollToPanel('ishuman-demo');
+    scrollToPanel('lemma-demo');
     log('lemma.id cleared', 'click Start live demo to begin again');
     clearBtns.forEach((btn) => { btn.disabled = false; });
   }

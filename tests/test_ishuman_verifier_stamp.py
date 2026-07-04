@@ -15,7 +15,7 @@ import pytest
 ROOT = Path(__file__).resolve().parents[1]
 VERIFIER_PATH = ROOT / "static" / "js" / "ishuman-verifier.js"
 APP_PATH = ROOT / "app.py"
-DEMO_PATH = ROOT / "templates" / "demo" / "ishuman.html"
+DEMO_PATH = ROOT / "templates" / "demo" / "lemma.html"
 DOCS_PATH = ROOT / "templates" / "docs" / "ishuman.html"
 
 

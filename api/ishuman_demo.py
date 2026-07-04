@@ -14,7 +14,7 @@ import time
 import logging
 from datetime import datetime
 
-from flask import Blueprint, jsonify, render_template, request
+from flask import Blueprint, jsonify, redirect, render_template, request
 
 logger = logging.getLogger(__name__)
 
@@ -188,10 +188,16 @@ def _demo_page_context() -> dict:
     }
 
 
+@ishuman_demo_bp.route("/demo")
+def lemma_demo_page():
+    """Canonical public demo for lemma.id proof-of-humanity integration."""
+    return render_template("demo/lemma.html", **_demo_page_context())
+
+
 @ishuman_demo_bp.route("/demo/ishuman")
-def ishuman_demo_page():
-    """Guided public demo for reusable proof-of-humanity."""
-    return render_template("demo/ishuman.html", **_demo_page_context())
+def ishuman_demo_page_legacy_redirect():
+    """Legacy URL — isHuman is an assurance tier inside the lemma.id demo, not the demo itself."""
+    return redirect("/demo", code=301)
 
 
 @ishuman_demo_bp.route("/wallet/ishuman-idv")

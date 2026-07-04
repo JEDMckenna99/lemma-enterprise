@@ -304,7 +304,7 @@ def is_ishuman_skeleton_idv_enabled() -> bool:
 
 
 def is_ishuman_demo_qr_idv_enabled() -> bool:
-    """Public QR shell demo on /demo/ishuman (short-lived, no Didit).
+    """Public QR shell demo on /demo (short-lived, no Didit).
 
     Enabled explicitly on production via LEMMA_ISHUMAN_DEMO_QR_IDV_ENABLED.
     On non-production, follows skeleton IDV unless disabled.
