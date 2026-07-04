@@ -1007,3 +1007,135 @@
 .assurance-only[hidden] {
   display: none !important;
 }
+
+.demo-progress-list-6 {
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+}
+
+@media (max-width: 720px) {
+  .demo-progress-list-6 {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+.demo-operations,
+.demo-details {
+  margin-top: 24px;
+  border: 1px solid var(--demo-line);
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: 0 4px 18px rgba(15, 23, 42, 0.05);
+}
+
+.demo-operations > summary,
+.demo-details > summary {
+  cursor: pointer;
+  font-weight: 800;
+  font-size: 15px;
+  padding: 16px 20px;
+  list-style: none;
+}
+
+.demo-operations > summary::-webkit-details-marker,
+.demo-details > summary::-webkit-details-marker {
+  display: none;
+}
+
+.demo-operations-body,
+.demo-details-body {
+  padding: 0 20px 20px;
+  border-top: 1px solid var(--demo-line);
+}
+
+.demo-operations-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 14px;
+  margin: 14px 0;
+}
+
+.demo-operations-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.demo-operations-item {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 10px 12px;
+  align-items: start;
+  padding: 10px 12px;
+  border: 1px solid var(--demo-line);
+  border-radius: 12px;
+  background: #f8fafc;
+  font-size: 13px;
+}
+
+.demo-operations-item.is-pass {
+  border-color: #86efac;
+  background: #f0fdf4;
+}
+
+.demo-operations-item.is-fail {
+  border-color: #fca5a5;
+  background: #fef2f2;
+}
+
+.demo-operations-item.is-run {
+  border-color: #93c5fd;
+  background: #eff6ff;
+}
+
+.demo-operations-item.is-skip {
+  opacity: 0.75;
+}
+
+.demo-operations-status {
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: #e2e8f0;
+  color: #475569;
+}
+
+.demo-operations-item.is-pass .demo-operations-status {
+  background: var(--demo-ok-bg);
+  color: var(--demo-ok);
+}
+
+.demo-operations-item.is-fail .demo-operations-status {
+  background: var(--demo-deny-bg);
+  color: var(--demo-deny);
+}
+
+.demo-operations-item.is-run .demo-operations-status {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+.demo-operations-label {
+  font-weight: 700;
+  color: var(--demo-ink);
+}
+
+.demo-operations-detail {
+  grid-column: 2 / -1;
+  margin: 0;
+  font-size: 12px;
+  color: var(--demo-muted);
+  word-break: break-word;
+}
+
+#ih-operations-evidence {
+  margin-top: 12px;
+  max-height: 220px;
+  overflow: auto;
+  font-size: 11px;
+}

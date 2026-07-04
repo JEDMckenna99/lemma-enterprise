@@ -35,11 +35,16 @@ def test_ishuman_demo_page_loads_expected_assets(ishuman_demo_client):
     assert "Try simulated demo" in body
     assert "Step 1 — Create empty lemma.id" in body
     assert "Step 2 — Passkey proof on two sites" in body
-    assert "Step 4 — Block abuse on one site" in body
-    assert "Step 5 — Escalate to isHuman" in body
+    assert "Step 4 — Escalate to isHuman" in body
+    assert "Step 5 — Revoke on one site" in body
+    assert "Step 6 — Reset demo" in body
     assert "verifyForBackend" in body
     assert "demo-workflow" in body
-    assert "Advanced / Developer details" in body
+    assert "Operations Check" in body
+    assert "ih-operations-check" in body
+    assert "ih-run-all-operations" in body
+    assert "Developer details" in body
+    assert "Advanced / Developer details" not in body
     assert "autoProvision: true" in body
     assert "ih-step-1" in body
     assert "ih-demo-ready-banner" in body
@@ -54,7 +59,7 @@ def test_ishuman_demo_page_loads_expected_assets(ishuman_demo_client):
     assert "/sdk/ishuman-verifier.js" in body
     assert "/static/js/demo/ishuman-demo.js" in body
     assert "/static/css/demo/ishuman-demo.css" in body
-    assert "/static/js/demo/ishuman-demo.js?v=28" in body
+    assert "/static/js/demo/ishuman-demo.js?v=30" in body
 
 
 def test_demo_create_button_always_enters_live_issuance():
@@ -352,6 +357,11 @@ def test_ishuman_demo_js_uses_real_verifier_with_two_site_bindings():
     assert "lemmaOrigin: window.location.origin" in js
     assert "autoProvision: true" in js
     assert "runGuidedDemo" in js
+    assert "runAllOperations" in js
+    assert "runPreflightCheck" in js
+    assert "assertSamePpidAfterStepUp" in js
+    assert "assertSiteScopedRevocation" in js
+    assert "/api/demo/ishuman/relying-site-preflight" in js
     assert "/api/demo/ishuman/verify-once-test-mode" in js
     assert "/api/demo/ishuman/probe-derive" in js
     assert "verifyForBackend" in js

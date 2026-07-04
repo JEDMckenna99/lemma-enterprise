@@ -260,6 +260,48 @@ def ishuman_demo_config():
     })
 
 
+@ishuman_demo_bp.route("/api/demo/ishuman/relying-site-preflight", methods=["GET"])
+def ishuman_demo_relying_site_preflight():
+    """Server-side health check for deployed relying-site demo apps."""
+    import json
+    import urllib.error
+    import urllib.request
+
+    site_urls = {
+        "tickets": os.getenv(
+            "LEMMA_DEMO_TICKETS_URL",
+            "https://lemma-demo-tickets-1d3d7411af33.herokuapp.com",
+        ),
+        "trials": os.getenv(
+            "LEMMA_DEMO_TRIALS_URL",
+            "https://lemma-demo-trials-7090f46cae0d.herokuapp.com",
+        ),
+    }
+
+    results: dict[str, dict] = {}
+    for slug, base_url in site_urls.items():
+        health_url = f"{base_url.rstrip('/')}/health"
+        config_url = f"{base_url.rstrip('/')}/api/demo/config"
+        entry = {"base_url": base_url, "success": False}
+        try:
+            with urllib.request.urlopen(health_url, timeout=8) as resp:
+                health = json.loads(resp.read().decode("utf-8"))
+            entry["health"] = health
+            entry["site_id"] = health.get("site_id")
+            with urllib.request.urlopen(config_url, timeout=8) as resp:
+                config = json.loads(resp.read().decode("utf-8"))
+            entry["config"] = config
+            entry["success"] = bool(health.get("success") and config.get("success"))
+        except urllib.error.URLError as exc:
+            entry["error"] = str(exc.reason or exc)
+        except Exception as exc:
+            entry["error"] = str(exc)
+        results[slug] = entry
+
+    all_ok = all(row.get("success") for row in results.values())
+    return jsonify({"success": all_ok, "sites": results})
+
+
 @ishuman_demo_bp.route("/api/demo/ishuman/assurance-status", methods=["GET"])
 def ishuman_demo_assurance_status():
     """Whether a wallet's person root is provisional (passkey-only) or IDV-anchored."""

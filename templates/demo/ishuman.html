@@ -6,7 +6,7 @@
 
 {% block head %}
 {{ super() }}
-<link rel="stylesheet" href="/static/css/demo/ishuman-demo.css?v=7">
+<link rel="stylesheet" href="/static/css/demo/ishuman-demo.css?v=8">
 {% endblock %}
 
 {% block content %}
@@ -35,12 +35,13 @@
   </header>
 
   <nav class="demo-progress assurance-only" id="ih-demo-progress" aria-label="Demo steps">
-    <ol class="demo-progress-list">
+    <ol class="demo-progress-list demo-progress-list-6">
       <li class="demo-progress-item is-active" data-step="1"><span class="demo-progress-num">1</span><span class="demo-progress-label">Wallet</span></li>
       <li class="demo-progress-item" data-step="2"><span class="demo-progress-num">2</span><span class="demo-progress-label">Site PPIDs</span></li>
       <li class="demo-progress-item" data-step="3"><span class="demo-progress-num">3</span><span class="demo-progress-label">Demo sites</span></li>
-      <li class="demo-progress-item" data-step="4"><span class="demo-progress-num">4</span><span class="demo-progress-label">Site block</span></li>
-      <li class="demo-progress-item" data-step="5"><span class="demo-progress-num">5</span><span class="demo-progress-label">Step-up</span></li>
+      <li class="demo-progress-item" data-step="4"><span class="demo-progress-num">4</span><span class="demo-progress-label">Step-up</span></li>
+      <li class="demo-progress-item" data-step="5"><span class="demo-progress-num">5</span><span class="demo-progress-label">Revoke</span></li>
+      <li class="demo-progress-item" data-step="6"><span class="demo-progress-num">6</span><span class="demo-progress-label">Reset</span></li>
     </ol>
   </nav>
 
@@ -198,72 +199,20 @@
       </div>
     </section>
 
-    <!-- Step 4 — site block -->
-    <section class="workflow-step is-locked" id="ih-step-4" data-step="4">
+    <!-- Step 4 — isHuman step-up (assurance workflow) -->
+    <section class="workflow-step is-locked assurance-only" id="ih-step-4" data-step="4">
       <div class="workflow-rail">
         <span class="workflow-num">4</span>
-        <span class="workflow-line assurance-only" aria-hidden="true"></span>
-      </div>
-      <div class="workflow-body" id="ih-abuse-panel">
-        <div class="workflow-head">
-          <div>
-            <h2 id="ih-block-step-title">Step 4 — Block abuse on one site</h2>
-            <p class="demo-muted">The block is scoped to the ticketing site. Trials can remain valid with passkey assurance.</p>
-          </div>
-        </div>
-
-        <div class="step-utility" id="ih-step4-utility">
-          <strong>Why this step</strong>
-          <p>Site-scoped enforcement: block this person's site-private ID on ticketing without touching who they are on trials or anywhere else — unlike IP or device bans.</p>
-        </div>
-
-        <div class="block-grid">
-          <div class="block-card">
-            <h3>Block on Ticketing</h3>
-            <p class="demo-muted">This simulates a site banning an abusive identity.</p>
-            <button class="demo-btn demo-btn-danger" id="ih-abuse-block-btn" type="button">Block on ticketing</button>
-          </div>
-          <div class="block-card">
-            <h3>Check both sites again</h3>
-            <p class="demo-muted">Confirm trials still passes after the ticketing block.</p>
-            <button class="demo-btn demo-btn-secondary" id="ih-abuse-recheck-btn" type="button">Check both sites</button>
-            <table class="demo-results-table" id="ih-block-results-table" hidden>
-              <thead>
-                <tr>
-                  <th scope="col">Site</th>
-                  <th scope="col">Result</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td>Ticketing</td>
-                  <td id="ih-block-result-tickets">—</td>
-                </tr>
-                <tr>
-                  <td>Trials</td>
-                  <td id="ih-block-result-trials">—</td>
-                </tr>
-              </tbody>
-            </table>
-            <button class="demo-btn demo-btn-secondary demo-btn-quiet" id="ih-unblock-tickets-btn" type="button" hidden>Unblock ticketing</button>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- Step 5 — isHuman step-up (assurance workflow) -->
-    <section class="workflow-step is-locked assurance-only" id="ih-step-5" data-step="5">
-      <div class="workflow-rail">
-        <span class="workflow-num">5</span>
+        <span class="workflow-line" aria-hidden="true"></span>
       </div>
       <div class="workflow-body" id="ih-stepup-panel">
         <div class="workflow-head">
           <div>
-            <h2>Step 5 — Escalate to isHuman (same PPID)</h2>
+            <h2 id="ih-stepup-step-title">Step 4 — Escalate to isHuman (same PPID)</h2>
             <p class="demo-muted">On doubt or a high-risk action, ticketing raises its bar to isHuman and demands a fresh verification. Complete IDV, then re-verify — the PPID is unchanged; only the assurance flips from passkey to ishuman.</p>
           </div>
         </div>
-        <div class="step-utility">
+        <div class="step-utility" id="ih-step4-utility">
           <strong>Why this step</strong>
           <p>Step-up strengthens the same account, not a new one: the site-private ID is stable across tiers, so a fresh isHuman proof raises trust without re-registering the user.</p>
         </div>
@@ -297,10 +246,98 @@
         </div>
       </div>
     </section>
+
+    <!-- Step 5 — site block / revocation -->
+    <section class="workflow-step is-locked" id="ih-step-5" data-step="5">
+      <div class="workflow-rail">
+        <span class="workflow-num">5</span>
+        <span class="workflow-line assurance-only" aria-hidden="true"></span>
+      </div>
+      <div class="workflow-body" id="ih-abuse-panel">
+        <div class="workflow-head">
+          <div>
+            <h2 id="ih-block-step-title">Step 5 — Revoke on one site</h2>
+            <p class="demo-muted">Site-scoped revocation: block this person's ticketing proof without touching trials or any other site.</p>
+          </div>
+        </div>
+
+        <div class="step-utility" id="ih-step5-utility">
+          <strong>Why this step</strong>
+          <p>Site-scoped enforcement: revoke or block this site-private ID on ticketing without touching who they are on trials or anywhere else — unlike IP or device bans.</p>
+        </div>
+
+        <div class="block-grid">
+          <div class="block-card">
+            <h3>Block on Ticketing</h3>
+            <p class="demo-muted">This simulates a site revoking an abusive identity.</p>
+            <button class="demo-btn demo-btn-danger" id="ih-abuse-block-btn" type="button">Block on ticketing</button>
+          </div>
+          <div class="block-card">
+            <h3>Check both sites again</h3>
+            <p class="demo-muted">Confirm trials still passes after the ticketing block.</p>
+            <button class="demo-btn demo-btn-secondary" id="ih-abuse-recheck-btn" type="button">Check both sites</button>
+            <table class="demo-results-table" id="ih-block-results-table" hidden>
+              <thead>
+                <tr>
+                  <th scope="col">Site</th>
+                  <th scope="col">Result</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>Ticketing</td>
+                  <td id="ih-block-result-tickets">—</td>
+                </tr>
+                <tr>
+                  <td>Trials</td>
+                  <td id="ih-block-result-trials">—</td>
+                </tr>
+              </tbody>
+            </table>
+            <button class="demo-btn demo-btn-secondary demo-btn-quiet" id="ih-unblock-tickets-btn" type="button" hidden>Unblock ticketing</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Step 6 — reset -->
+    <section class="workflow-step assurance-only" id="ih-step-6" data-step="6">
+      <div class="workflow-rail">
+        <span class="workflow-num">6</span>
+      </div>
+      <div class="workflow-body" id="ih-reset-panel">
+        <div class="workflow-head">
+          <div>
+            <h2>Step 6 — Reset demo</h2>
+            <p class="demo-muted">Clear your lemma.id wallet and demo caches so you can run the full flow again from a clean state.</p>
+          </div>
+        </div>
+        <div class="step-utility">
+          <strong>Why this step</strong>
+          <p>Repeatable demos and smoke tests need a known starting point. Reset wipes local wallet state on lemma.id; close or hard-refresh open demo site tabs to drop their cached proofs.</p>
+        </div>
+        <div class="action-row">
+          <button class="demo-btn demo-btn-secondary" id="ih-reset-demo-btn" type="button">Reset demo state</button>
+        </div>
+      </div>
+    </section>
   </div>
 
+  <details class="demo-operations" id="ih-operations-check">
+    <summary>Operations Check</summary>
+    <div class="demo-operations-body">
+      <p class="demo-muted">Run the full lemma.id lifecycle and see pass/fail evidence for each operation. Use this before a demo or deploy to confirm wallet, proofs, escalation, and site-scoped revocation still work.</p>
+      <div class="demo-operations-toolbar">
+        <button class="demo-btn demo-btn-primary" id="ih-run-all-operations" type="button">Run all checks</button>
+        <span class="demo-pill" id="ih-operations-summary">Not run</span>
+      </div>
+      <ul class="demo-operations-list" id="ih-operations-list" aria-label="Operation check results"></ul>
+      <pre class="code-block" id="ih-operations-evidence">{}</pre>
+    </div>
+  </details>
+
   <details class="demo-details">
-    <summary>Advanced / Developer details</summary>
+    <summary>Developer details</summary>
     <div class="demo-details-body">
       <h3>From IP bans to human accountability</h3>
       <div class="compare-grid">
@@ -352,7 +389,7 @@ const { ok, ppid, assurance, presentation } = await new IsHumanVerifier({
         <button class="demo-btn demo-btn-secondary" id="ih-test-complete-btn" type="button">Complete test verification</button>
         <button class="demo-btn demo-btn-secondary" id="ih-poll-btn" type="button">Poll / store proof</button>
         <button class="demo-btn demo-btn-secondary" id="ih-refresh-status-btn" type="button">Refresh status</button>
-        <button class="demo-btn demo-btn-secondary" id="ih-run-guided-demo" type="button">Run full automated demo</button>
+        <button class="demo-btn demo-btn-secondary" id="ih-run-guided-demo" type="button">Run guided demo</button>
         <button class="demo-btn demo-btn-danger" id="ih-force-reverify-btn" type="button">Force fresh verification</button>
       </div>
       <div class="dev-detail-row">
@@ -382,5 +419,5 @@ const { ok, ppid, assurance, presentation } = await new IsHumanVerifier({
 <script src="/static/js/lemma-keys.js?v=5" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
 <script nonce="{{ csp_nonce }}">window.LEMMA_ISHUMAN_USE_PERSON_ROOT_SEEDS = {{ 'true' if ishuman_use_person_root_seeds else 'false' }};</script>
 <script src="/sdk/ishuman-verifier.js?v={{ ishuman_verifier_sdk_version }}" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
-<script src="/static/js/demo/ishuman-demo.js?v=29" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
+<script src="/static/js/demo/ishuman-demo.js?v=30" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
 {% endblock %}

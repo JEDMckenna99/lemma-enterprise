@@ -8,8 +8,24 @@
     tickets: 'tickets-demo.lemma.id',
     trials: 'trials-demo.lemma.id',
   };
-  const WIZARD_TOTAL = 6;
+  const WIZARD_TOTAL = 7;
   const LEGACY_WIZARD_TOTAL = 7;
+
+  const OPERATION_DEFS = [
+    { id: 'preflight', label: 'Preflight: SDK, config, demo sites' },
+    { id: 'wallet', label: 'lemma.id wallet ready' },
+    { id: 'site_proofs', label: 'Two distinct site PPIDs' },
+    { id: 'relying_sites', label: 'Relying-site endpoints reachable' },
+    { id: 'escalation', label: 'Require isHuman on ticketing' },
+    { id: 'step_up', label: 'Complete isHuman step-up' },
+    { id: 'same_ppid', label: 'Same PPID after step-up' },
+    { id: 'site_block', label: 'Block ticketing PPID' },
+    { id: 'scoped_revocation', label: 'Trials still allowed after block' },
+    { id: 'reset', label: 'Reset demo state' },
+  ];
+
+  const operationResults = {};
+  let operationsRunning = false;
 
   const PPID_PLACEHOLDER = {
     tickets: 'ppid_ticketing_••••',
@@ -116,7 +132,62 @@
   }
 
   function workflowStepCount() {
-    return assuranceDemoMode() ? 5 : 3;
+    return assuranceDemoMode() ? 6 : 3;
+  }
+
+  function stepUpComplete() {
+    const tickets = state.results.tickets;
+    return !!(tickets && tickets.assurance === 'ishuman' && isSiteVerified(tickets));
+  }
+
+  function makeOperationResult(id, status, detail, evidence) {
+    const def = OPERATION_DEFS.find((row) => row.id === id) || { id, label: id };
+    return {
+      id,
+      label: def.label,
+      status,
+      detail: detail || '',
+      evidence: evidence || {},
+    };
+  }
+
+  function initOperationsUI() {
+    const list = $('ih-operations-list');
+    if (!list || list.childElementCount) return;
+    for (const def of OPERATION_DEFS) {
+      const item = document.createElement('li');
+      item.className = 'demo-operations-item';
+      item.id = `ih-op-${def.id}`;
+      item.innerHTML = `
+        <span class="demo-operations-status">pending</span>
+        <span class="demo-operations-label">${def.label}</span>
+        <span class="demo-operations-detail">Waiting</span>`;
+      list.appendChild(item);
+    }
+  }
+
+  function setOperationResult(result) {
+    operationResults[result.id] = result;
+    const item = $(`ih-op-${result.id}`);
+    if (!item) return;
+    item.className = `demo-operations-item is-${result.status}`;
+    const statusEl = item.querySelector('.demo-operations-status');
+    const detailEl = item.querySelector('.demo-operations-detail');
+    if (statusEl) statusEl.textContent = result.status;
+    if (detailEl) detailEl.textContent = result.detail || result.status;
+    const evidenceEl = $('ih-operations-evidence');
+    if (evidenceEl) evidenceEl.textContent = pretty(operationResults);
+  }
+
+  function setOperationsSummary(status, detail) {
+    const summary = $('ih-operations-summary');
+    if (!summary) return;
+    summary.textContent = detail || status;
+    summary.className = `demo-pill${status === 'pass' ? ' ok' : status === 'fail' ? ' deny' : ''}`;
+  }
+
+  function markOperationRunning(id) {
+    setOperationResult(makeOperationResult(id, 'run', 'Running…'));
   }
 
   function isMasterReady() {
@@ -137,43 +208,42 @@
   function updateStepLocks() {
     const ready = isStep1Ready();
     const bothVerified = bothSitesVerified();
-    const blockStepId = assuranceDemoMode() ? 4 : 4;
-    for (let i = 1; i <= 5; i += 1) {
+    const escalated = stepUpComplete();
+    const maxStep = assuranceDemoMode() ? 6 : 5;
+
+    for (let i = 1; i <= maxStep; i += 1) {
       const el = $(`ih-step-${i}`);
       if (!el) continue;
-      if (assuranceDemoMode() && i === 3 && el.hidden) continue;
-      if (assuranceDemoMode() && i === 5 && el.hidden) continue;
-      if (!assuranceDemoMode() && (i === 3 || i === 5)) continue;
-      if (i === 1) el.classList.remove('is-locked');
+      if (assuranceDemoMode() && el.hidden) continue;
+      if (!assuranceDemoMode() && (i === 3 || i === 4 || i === 6)) continue;
+
+      if (i === 1 || i === 6) el.classList.remove('is-locked');
       else if (i === 2) el.classList.toggle('is-locked', !ready);
       else if (i === 3 && assuranceDemoMode()) el.classList.toggle('is-locked', !bothVerified);
-      else if (i === blockStepId) el.classList.toggle('is-locked', !bothVerified);
-      else if (i === 5 && assuranceDemoMode()) {
-        const blocked = state.results.tickets && !state.results.tickets.human
-          && state.results.tickets.reason === 'site_blocked';
-        el.classList.toggle('is-locked', !blocked);
-      }
+      else if (i === 4 && assuranceDemoMode()) el.classList.toggle('is-locked', !bothVerified);
+      else if (i === 5) el.classList.toggle('is-locked', assuranceDemoMode() ? !escalated : !bothVerified);
     }
   }
 
   function setWorkflowHighlight(workflowStep) {
-    for (let i = 1; i <= 5; i += 1) {
+    const max = assuranceDemoMode() ? 6 : 5;
+    for (let i = 1; i <= max; i += 1) {
       const el = $(`ih-step-${i}`);
       if (!el) continue;
-      if (!assuranceDemoMode() && (i === 3 || i === 5)) continue;
+      if (!assuranceDemoMode() && (i === 3 || i === 4 || i === 6)) continue;
       el.classList.remove('is-active', 'is-done');
       if (workflowStep > 0 && i < workflowStep) el.classList.add('is-done');
       else if (i === workflowStep) el.classList.add('is-active');
     }
     if (workflowStep === 0) {
-      for (let i = 1; i <= 5; i += 1) {
+      for (let i = 1; i <= max; i += 1) {
         const el = $(`ih-step-${i}`);
         if (!el) continue;
-        if (!assuranceDemoMode() && (i === 3 || i === 5)) continue;
+        if (!assuranceDemoMode() && (i === 3 || i === 4 || i === 6)) continue;
         el.classList.add('is-done');
       }
     }
-    updateProgressStrip(workflowStep);
+    updateProgressStrip(workflowStep === 0 ? max : workflowStep);
     updateStepLocks();
   }
 
@@ -185,8 +255,12 @@
     const blockTitle = $('ih-block-step-title');
     if (blockTitle) {
       blockTitle.textContent = on
-        ? 'Step 4 — Block abuse on one site'
-        : 'Step 3 — Block abuse on one site';
+        ? 'Step 5 — Revoke on one site'
+        : 'Step 3 — Revoke on one site';
+    }
+    const stepupTitle = $('ih-stepup-step-title');
+    if (stepupTitle && on) {
+      stepupTitle.textContent = 'Step 4 — Escalate to isHuman (same PPID)';
     }
     const step1Title = $('ih-step1-title');
     const step1Desc = $('ih-step1-desc');
@@ -195,6 +269,7 @@
     const step1Utility = $('ih-step1-utility');
     const step2Utility = $('ih-step2-utility');
     const step4Utility = $('ih-step4-utility');
+    const step5Utility = $('ih-step5-utility');
     const ppidCompareDesc = $('ih-ppid-compare-desc');
     const intro = $('ih-intro-lead');
     const createBtn = $('ih-create-lemma-btn');
@@ -212,7 +287,10 @@
         step2Utility.querySelector('p').textContent = 'The core loop: each site declares the assurance it needs → your wallet mints a site-private stamp → the site verifies it offline. One verified person, two unrelated site-private IDs.';
       }
       if (step4Utility) {
-        step4Utility.querySelector('p').textContent = 'Site-scoped enforcement: block a human proof on one site without touching who they are anywhere else — unlike IP or device bans.';
+        step4Utility.querySelector('p').textContent = 'Step-up strengthens the same account, not a new one: the site-private ID is stable across tiers, so a fresh isHuman proof raises trust without re-registering the user.';
+      }
+      if (step5Utility) {
+        step5Utility.querySelector('p').textContent = 'Site-scoped enforcement: revoke or block this site-private ID on ticketing without touching who they are on trials or anywhere else — unlike IP or device bans.';
       }
       if (ppidCompareDesc) {
         ppidCompareDesc.textContent = 'Ticketing and Trials receive different identifiers, even though both proofs come from the same verified human.';
@@ -226,7 +304,10 @@
         step2Utility.querySelector('p').textContent = 'The core loop: the site declares the assurance it needs → your wallet mints a site-private stamp → the site verifies it offline. One wallet, two unrelated IDs; neither site sees your real identity or the other\'s ID.';
       }
       if (step4Utility) {
-        step4Utility.querySelector('p').textContent = 'Site-scoped enforcement: block this person\'s site-private ID on ticketing without touching who they are on trials or anywhere else — unlike IP or device bans.';
+        step4Utility.querySelector('p').textContent = 'Step-up strengthens the same account, not a new one: the site-private ID is stable across tiers, so a fresh isHuman proof raises trust without re-registering the user.';
+      }
+      if (step5Utility) {
+        step5Utility.querySelector('p').textContent = 'Site-scoped enforcement: revoke or block this site-private ID on ticketing without touching who they are on trials or anywhere else — unlike IP or device bans.';
       }
       if (ppidCompareDesc) {
         ppidCompareDesc.textContent = 'Ticketing and Trials receive different identifiers, even though both proofs come from the same passkey wallet.';
@@ -294,11 +375,12 @@
       if (wizardStep === 4) return 3;
       if (wizardStep === 5) return 4;
       if (wizardStep === 6) return 5;
-      return 5;
+      if (wizardStep === 7) return 6;
+      return 6;
     }
     if (wizardStep <= 2) return 1;
     if (wizardStep === 3) return 2;
-    return 4;
+    return 5;
   }
 
   function setWizardStep(step, statusText) {
@@ -428,6 +510,8 @@
       'ih-reverify-tickets-ishuman-btn',
       'ih-force-reverify-btn',
       'ih-run-guided-demo',
+      'ih-run-all-operations',
+      'ih-reset-demo-btn',
     ];
     for (const id of ids) {
       const el = $(id);
@@ -1359,10 +1443,10 @@
     await refreshAbuseChecks();
     await probeDerive('tickets');
     if (assuranceDemoMode()) {
-      setWorkflowHighlight(5);
-      scrollToPanel('ih-stepup-panel');
+      setWorkflowHighlight(6);
+      scrollToPanel('ih-reset-panel');
     } else {
-      setWorkflowHighlight(4);
+      setWorkflowHighlight(5);
       scrollToPanel('ih-abuse-panel');
     }
     updateBlockResultsTable();
@@ -1422,7 +1506,8 @@
     updateStepUpCompare(before, result);
     if (result.ppid === before && result.assurance === 'ishuman') {
       log('Step-up success', 'same PPID with ishuman assurance');
-      setWorkflowHighlight(0);
+      setWorkflowHighlight(5);
+      scrollToPanel('ih-abuse-panel');
     } else {
       log('Step-up check', `ppid match=${result.ppid === before} assurance=${result.assurance}`);
     }
@@ -1521,6 +1606,216 @@
     throw new Error('No verified master proof yet. Complete verification on a demo site, or start an identity check from the operator console.');
   }
 
+  async function runPreflightCheck() {
+    markOperationRunning('preflight');
+    if (!window.IsHumanVerifier) {
+      return makeOperationResult('preflight', 'fail', 'IsHumanVerifier SDK not loaded');
+    }
+    if (!state.config) {
+      await loadConfig();
+    }
+    const sites = state.config?.sites || [];
+    const domains = new Set(sites.map((site) => site.site_domain));
+    const ok = domains.has(SITE_IDS.tickets) && domains.has(SITE_IDS.trials);
+    return makeOperationResult(
+      'preflight',
+      ok ? 'pass' : 'fail',
+      ok ? `${sites.length} demo sites seeded` : 'Demo sites missing from config',
+      { sites: domains, sdkLoaded: true },
+    );
+  }
+
+  async function ensureLemmaWallet() {
+    markOperationRunning('wallet');
+    await initWalletPassive();
+    if (!state.walletId) {
+      await initWallet();
+    }
+    if (!state.walletId && state.config?.test_verify_enabled) {
+      await verifyOnceTestMode();
+    }
+    const ready = !!state.walletId || isMasterReady();
+    return makeOperationResult(
+      'wallet',
+      ready ? 'pass' : 'fail',
+      ready ? `Wallet ${short(state.walletId)}` : 'Create or unlock lemma.id first',
+      { walletId: state.walletId, masterCredentialId: state.masterCredentialId },
+    );
+  }
+
+  async function verifyDemoSites() {
+    markOperationRunning('site_proofs');
+    await verifySite('tickets');
+    await verifySite('trials');
+    const tickets = state.results.tickets;
+    const trials = state.results.trials;
+    const bothOk = isSiteVerified(tickets) && isSiteVerified(trials);
+    const distinct = !!(tickets?.ppid && trials?.ppid && tickets.ppid !== trials.ppid);
+    const status = bothOk && distinct ? 'pass' : 'fail';
+    return makeOperationResult(
+      'site_proofs',
+      status,
+      status === 'pass'
+        ? 'Distinct PPIDs on ticketing and trials'
+        : 'Both sites must verify with different PPIDs',
+      { tickets: { ppid: tickets?.ppid, assurance: tickets?.assurance }, trials: { ppid: trials?.ppid, assurance: trials?.assurance } },
+    );
+  }
+
+  async function verifyRelyingSiteActions() {
+    markOperationRunning('relying_sites');
+    const payload = await requestJson('/api/demo/ishuman/relying-site-preflight');
+    const sites = payload.sites || {};
+    const ticketsOk = sites.tickets?.success === true;
+    const trialsOk = sites.trials?.success === true;
+    const ok = ticketsOk && trialsOk;
+    return makeOperationResult(
+      'relying_sites',
+      ok ? 'pass' : 'fail',
+      ok ? 'Ticketing and trials demo apps reachable' : 'One or more relying-site health checks failed',
+      sites,
+    );
+  }
+
+  async function requireIsHumanOnTicketing() {
+    markOperationRunning('escalation');
+    await requireIsHumanOnTickets();
+    return makeOperationResult(
+      'escalation',
+      'pass',
+      'Site doubt created on ticketing',
+      { ppid: state.results.tickets?.ppid },
+    );
+  }
+
+  async function completeIsHumanStepUp() {
+    markOperationRunning('step_up');
+    if (state.config?.test_verify_enabled) {
+      await verifyOnceTestMode();
+    } else if (!isMasterReady()) {
+      return makeOperationResult(
+        'step_up',
+        'skip',
+        'Complete isHuman verification manually, then re-run checks',
+        {},
+      );
+    }
+    const result = await reverifyTicketsIshuman();
+    const ok = result.assurance === 'ishuman' && isSiteVerified(result);
+    return makeOperationResult(
+      'step_up',
+      ok ? 'pass' : 'fail',
+      ok ? 'Ticketing verified with ishuman assurance' : `Unexpected assurance: ${result.assurance || 'none'}`,
+      { ppid: result.ppid, assurance: result.assurance },
+    );
+  }
+
+  async function assertSamePpidAfterStepUp() {
+    markOperationRunning('same_ppid');
+    const before = state.passkeyPpids.tickets;
+    const after = state.results.tickets?.ppid;
+    const ok = !!(before && after && before === after && state.results.tickets?.assurance === 'ishuman');
+    return makeOperationResult(
+      'same_ppid',
+      ok ? 'pass' : 'fail',
+      ok ? 'Same PPID before and after step-up' : 'PPID changed or assurance not ishuman',
+      { beforePpid: before, afterPpid: after, assurance: state.results.tickets?.assurance },
+    );
+  }
+
+  async function blockTicketingPpid() {
+    markOperationRunning('site_block');
+    await blockTickets();
+    const tickets = state.results.tickets;
+    const blocked = !!(tickets && !tickets.human && tickets.reason === 'site_blocked');
+    return makeOperationResult(
+      'site_block',
+      blocked ? 'pass' : 'fail',
+      blocked ? 'Ticketing denied after site block' : `Ticketing result: ${tickets?.reason || 'unknown'}`,
+      { tickets: { human: tickets?.human, reason: tickets?.reason } },
+    );
+  }
+
+  async function assertSiteScopedRevocation() {
+    markOperationRunning('scoped_revocation');
+    const tickets = state.results.tickets;
+    const trials = state.results.trials;
+    const ok = !!(tickets && !tickets.human && isSiteVerified(trials));
+    return makeOperationResult(
+      'scoped_revocation',
+      ok ? 'pass' : 'fail',
+      ok ? 'Ticketing blocked; trials still verified' : 'Trials should remain verified after ticketing block',
+      {
+        tickets: { human: tickets?.human, reason: tickets?.reason },
+        trials: { human: trials?.human, reason: trials?.reason },
+      },
+    );
+  }
+
+  async function resetDemoState() {
+    markOperationRunning('reset');
+    const ppid = state.results.tickets?.ppid;
+    let unblocked = false;
+    if (ppid && state.results.tickets?.reason === 'site_blocked') {
+      await unblockTickets();
+      unblocked = true;
+    }
+    await refreshStatus().catch(() => {});
+    return makeOperationResult(
+      'reset',
+      'pass',
+      unblocked ? 'Ticketing unblocked for next run' : 'Demo state refreshed',
+      { unblocked },
+    );
+  }
+
+  async function runAllOperations() {
+    if (operationsRunning) return operationResults;
+    operationsRunning = true;
+    initOperationsUI();
+    setOperationsSummary('run', 'Running checks…');
+    const runBtn = $('ih-run-all-operations');
+    if (runBtn) runBtn.disabled = true;
+
+    const steps = [
+      runPreflightCheck,
+      ensureLemmaWallet,
+      verifyDemoSites,
+      verifyRelyingSiteActions,
+      requireIsHumanOnTicketing,
+      completeIsHumanStepUp,
+      assertSamePpidAfterStepUp,
+      blockTicketingPpid,
+      assertSiteScopedRevocation,
+      resetDemoState,
+    ];
+
+    try {
+      for (const step of steps) {
+        const result = await step();
+        setOperationResult(result);
+        if (result.status === 'fail') {
+          setOperationsSummary('fail', `Failed: ${result.label}`);
+          return operationResults;
+        }
+        if (result.status === 'skip') {
+          setOperationsSummary('fail', `Skipped: ${result.label}`);
+          return operationResults;
+        }
+      }
+      setOperationsSummary('pass', `${steps.length} checks passed`);
+      setWorkflowHighlight(0);
+      log('Operations check complete', `${steps.length} checks passed`);
+    } catch (err) {
+      setOperationsSummary('fail', err.message);
+      log('Operations check stopped', err.message);
+    } finally {
+      operationsRunning = false;
+      if (runBtn) runBtn.disabled = false;
+    }
+    return operationResults;
+  }
+
   async function runGuidedDemo() {
     if (state.wizardRunning) return;
     setWizardBusy(true);
@@ -1535,23 +1830,26 @@
         await verifyBothSites();
 
         setWizardStep(3, 'Open demo sites to stamp actions (optional pause)…');
+        scrollToPanel('ih-demo-sites-panel');
         await sleep(1500);
 
-        setWizardStep(4, 'Blocking abusive ticketing PPID…');
-        scrollToPanel('ih-abuse-panel');
-        await blockTickets();
-
-        setWizardStep(5, 'Requiring isHuman on ticketing…');
+        setWizardStep(4, 'Requiring isHuman on ticketing…');
+        scrollToPanel('ih-stepup-panel');
         await requireIsHumanOnTickets();
 
-        setWizardStep(6, 'Complete isHuman verification…');
+        setWizardStep(5, 'Complete isHuman verification…');
         if (state.config?.test_verify_enabled) {
           await verifyOnceTestMode();
+          await reverifyTicketsIshuman();
         } else {
           log('Complete IDV manually', 'use Complete isHuman verification button');
         }
 
-        setWizardStep(0, 'Demo complete — same ticketing PPID with ishuman assurance.');
+        setWizardStep(6, 'Blocking abusive ticketing PPID…');
+        scrollToPanel('ih-abuse-panel');
+        await blockTickets();
+
+        setWizardStep(7, 'Demo complete — same ticketing PPID with ishuman assurance, then site-scoped revoke.');
         setDemoReadyBanner(true);
         log('Assurance guided demo complete');
         return;
@@ -1697,7 +1995,11 @@
     bind('ih-complete-ishuman-btn', completeIsHumanVerification);
     bind('ih-reverify-tickets-ishuman-btn', reverifyTicketsIshuman);
     bind('ih-run-guided-demo', runGuidedDemo);
+    bind('ih-run-all-operations', runAllOperations);
+    bind('ih-reset-demo-btn', clearLemmaId);
     bind('ih-force-reverify-btn', forceFreshIdv);
+
+    initOperationsUI();
 
     try {
       await refreshWalletStatus();
@@ -1718,4 +2020,6 @@
   } else {
     boot();
   }
+
+  window.runAllOperations = runAllOperations;
 })();
