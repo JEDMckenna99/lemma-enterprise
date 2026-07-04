@@ -106,7 +106,11 @@ def test_protected_page_redirects_to_login_with_next_path():
 
     app = create_app()
     client = app.test_client()
-    for path in ("/developer/external-api-keys", "/developer/ishuman"):
+    for path in ("/developer/external-api-keys", "/developer"):
         response = client.get(path)
         assert response.status_code == 302
         assert response.location == f"/login?redirect={path}"
+
+    legacy = client.get("/developer/ishuman", follow_redirects=False)
+    assert legacy.status_code == 301
+    assert legacy.location.endswith("/developer")

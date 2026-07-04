@@ -1,6 +1,6 @@
-# AI agent instructions — lemma.id isHuman
+# AI agent instructions — lemma.id
 
-You are helping a developer integrate **lemma.id proof of humanity** into their web platform.
+You are helping a developer integrate **lemma.id human proofs** into their web platform. **isHuman** is an optional assurance tier sites can require — not the product name.
 
 ## Read this first
 

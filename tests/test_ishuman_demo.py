@@ -30,16 +30,19 @@ def test_ishuman_demo_page_loads_expected_assets(ishuman_demo_client):
     body = resp.get_data(as_text=True)
 
     assert resp.status_code == 200
-    assert "Proof of humanity, layered assurance" in body
+    assert "Human proofs on your site" in body
     assert "lemma.id demo" in body
-    assert "Start live demo" in body
-    assert "Try simulated demo" in body
+    assert "Run 3-minute demo" in body
+    assert "Quick demo" in body
+    assert "Integrator demo" in body
+    assert "ih-run-quick-demo" in body
+    assert "ih-quick-progress" in body
+    assert "ih-problem-contrast" in body
     assert "Step 1 — Create your lemma.id" in body
     assert "Step 2 — Passkey proofs on two sites" in body
     assert "Step 4 — Site requires isHuman assurance" in body
     assert "Step 5 — Revoke on one site" in body
     assert "Step 6 — Reset demo" in body
-    assert "stronger assurance" in body
     assert "verifyForBackend" in body
     assert "demo-workflow" in body
     assert "Operations Check" in body
@@ -58,11 +61,32 @@ def test_ishuman_demo_page_loads_expected_assets(ishuman_demo_client):
     assert "Unlock wallet" not in body
     assert "ih-try-qr-demo-btn" not in body
     assert "Popup &amp; redirect UI preview" not in body
+    assert "Start live demo" not in body
     assert "id=\"lemma-demo\"" in body
     assert "/sdk/ishuman-verifier.js" in body
     assert "/static/js/demo/ishuman-demo.js" in body
     assert "/static/css/demo/ishuman-demo.css" in body
-    assert "/static/js/demo/ishuman-demo.js?v=33" in body
+    assert "/static/js/demo/ishuman-demo.js?v=34" in body
+
+
+def test_ishuman_demo_js_exposes_quick_demo_entrypoint():
+    js = (ROOT / "static" / "js" / "demo" / "ishuman-demo.js").read_text(encoding="utf-8")
+    assert "async function runQuickDemo()" in js
+    assert "window.runQuickDemo = runQuickDemo" in js
+    assert "lemma_demo_ui_mode" in js
+
+
+def test_legacy_developer_ishuman_url_redirects_to_canonical_developer(monkeypatch):
+    monkeypatch.setenv("DATABASE_URL", "sqlite:///:memory:")
+    monkeypatch.setenv("SESSION_SECRET", "test-session-secret")
+    from app import create_app
+
+    app = create_app()
+    app.config["TESTING"] = True
+    with app.test_client() as client:
+        resp = client.get("/developer/ishuman", follow_redirects=False)
+        assert resp.status_code == 301
+        assert resp.headers["Location"].endswith("/developer")
 
 
 def test_ishuman_demo_js_preserves_ppid_when_backend_denies():

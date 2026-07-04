@@ -1124,19 +1124,8 @@ def create_app():
     
     @app.route('/developer')
     def developer_overview():
-        """Public developer entrypoint redirects to isHuman hub."""
-        logger.info("↪️ Redirecting /developer to /developer/ishuman")
-        response = redirect('/developer/ishuman', code=302)
-        response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
-        response.headers['Pragma'] = 'no-cache'
-        response.headers['Expires'] = '0'
-        response.headers['X-Lemma-Developer-Platform'] = 'ishuman-redirect-v1'
-        return response
-
-    @app.route('/developer/ishuman')
-    def developer_ishuman():
-        """Authenticated developer hub — isHuman integration overview."""
-        logger.info("Serving isHuman developer hub")
+        """Authenticated developer hub — lemma.id integration overview."""
+        logger.info("Serving lemma.id developer hub")
         return _require_wallet_session(
             'developer/ishuman_platform.html',
             active_page='overview',
@@ -1146,10 +1135,15 @@ def create_app():
             is_admin=request.headers.get('X-Permission-ID', '').lower() in ['super_admin', 'admin_access'],
         )
 
+    @app.route('/developer/ishuman')
+    def developer_ishuman_legacy():
+        """Legacy URL — lemma.id is the product; isHuman is an assurance tier."""
+        return redirect('/developer', code=301)
+
     @app.route('/developer/')
     def developer_trailing_slash():
         """Trailing-slash alias for the developer hub."""
-        return redirect('/developer/ishuman', code=302)
+        return redirect('/developer', code=302)
 
     @app.route('/developer/platform')
     def developer_platform():

@@ -1,8 +1,8 @@
 {% extends "modern/layout.html" %}
 {% set is_public_page = true %}
 
-{% block title %}lemma.id demo — proof of humanity{% endblock %}
-{% block description %}Walk through lemma.id: passkey wallet, site-private PPIDs, relying-site verification, optional isHuman assurance step-up, and site-scoped revocation.{% endblock %}
+{% block title %}lemma.id demo — human proofs for your site{% endblock %}
+{% block description %}Three-minute walkthrough: passkey wallet, site-private IDs, offline backend verification, and site-scoped enforcement. Optional isHuman assurance when your policy needs it.{% endblock %}
 
 {% block head %}
 {{ super() }}
@@ -10,7 +10,7 @@
 {% endblock %}
 
 {% block content %}
-<div class="demo-page" id="lemma-demo"
+<div class="demo-page demo-ui-quick" id="lemma-demo"
   data-server-test-token="{{ demo_test_token }}"
   data-server-admin-token="{{ demo_admin_token }}">
 
@@ -25,16 +25,55 @@
 
   <header class="demo-intro">
     <p class="demo-eyebrow">lemma.id demo</p>
-    <h1 class="demo-title">Proof of humanity, layered assurance</h1>
-    <p class="demo-lead" id="ih-intro-lead">lemma.id is your passkey-controlled proof container. Sites request the assurance they need — usually <code>passkey</code> first — and your wallet mints a site-private stamp they verify on their own backend. <strong>isHuman</strong> is the stronger assurance tier a site can require later; it uses the same private site ID, not a new account. This demo walks wallet → site proofs → relying sites → optional isHuman step-up → site-scoped revocation.</p>
+    <h1 class="demo-title">Human proofs on your site</h1>
+    <p class="demo-lead" id="ih-intro-lead">lemma.id gives your users a passkey wallet that mints site-private proofs your backend verifies offline — no per-request call back to lemma.id. Same person, different opaque ID on every site. You block abuse on your site only.</p>
+    <div class="demo-mode-switch" role="tablist" aria-label="Demo mode">
+      <button class="demo-mode-btn is-active" id="ih-mode-quick" type="button" role="tab" aria-selected="true">Quick demo</button>
+      <button class="demo-mode-btn" id="ih-mode-integrator" type="button" role="tab" aria-selected="false">Integrator demo</button>
+    </div>
     <div class="demo-hero-cta">
-      <button class="demo-btn demo-btn-primary" id="ih-start-live-demo" type="button">Start live demo</button>
-      <button class="demo-btn demo-btn-secondary" id="ih-start-simulated-demo" type="button">Try simulated demo</button>
+      <button class="demo-btn demo-btn-primary" id="ih-run-quick-demo" type="button">Run 3-minute demo</button>
+      <button class="demo-btn demo-btn-secondary integrator-only" id="ih-start-simulated-demo" type="button">Try simulated demo</button>
     </div>
     <p class="demo-muted demo-intro-hint">Stuck or mixing old state? Use <strong>Clear my lemma.id</strong> above, close demo site tabs, then start again.</p>
   </header>
 
-  <nav class="demo-progress assurance-only" id="ih-demo-progress" aria-label="Demo steps">
+  <div class="demo-problem-contrast quick-only" id="ih-problem-contrast">
+    <p class="demo-problem-title">What integrators are replacing</p>
+    <div class="demo-problem-grid">
+      <div class="demo-problem-col demo-problem-without">
+        <h3>Without lemma.id</h3>
+        <ul>
+          <li>CAPTCHAs and device fingerprints — easy to bypass, bad UX</li>
+          <li>Email or phone verification — reusable identity you must store</li>
+          <li>Network-wide bans — one block leaks across unrelated sites</li>
+        </ul>
+      </div>
+      <div class="demo-problem-col demo-problem-with">
+        <h3>With lemma.id</h3>
+        <ul>
+          <li>Signed human proof your server verifies locally</li>
+          <li>Site-private ID — neither site sees the other's identifier</li>
+          <li>Revoke on your site only; other sites unaffected</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="demo-quick-insight quick-only" id="ih-quick-insight" hidden>
+    <strong id="ih-quick-insight-label">Ready</strong>
+    <span id="ih-quick-insight-text">Tap Run 3-minute demo to walk through prove → privacy → control.</span>
+  </div>
+
+  <nav class="demo-progress quick-only" id="ih-quick-progress" aria-label="Quick demo acts">
+    <ol class="demo-progress-list demo-progress-list-3">
+      <li class="demo-progress-item is-active" data-quick-act="1"><span class="demo-progress-num">1</span><span class="demo-progress-label">Prove</span></li>
+      <li class="demo-progress-item" data-quick-act="2"><span class="demo-progress-num">2</span><span class="demo-progress-label">Privacy</span></li>
+      <li class="demo-progress-item" data-quick-act="3"><span class="demo-progress-num">3</span><span class="demo-progress-label">Control</span></li>
+    </ol>
+  </nav>
+
+  <nav class="demo-progress integrator-only assurance-only" id="ih-demo-progress" aria-label="Demo steps">
     <ol class="demo-progress-list demo-progress-list-6">
       <li class="demo-progress-item is-active" data-step="1"><span class="demo-progress-num">1</span><span class="demo-progress-label">Wallet</span></li>
       <li class="demo-progress-item" data-step="2"><span class="demo-progress-num">2</span><span class="demo-progress-label">Site PPIDs</span></li>
@@ -174,8 +213,8 @@
       </div>
     </section>
 
-    <!-- Step 3 — demo sites -->
-    <section class="workflow-step is-locked assurance-only" id="ih-step-3" data-step="3">
+    <!-- Step 3 — demo sites (integrator) -->
+    <section class="workflow-step is-locked integrator-only assurance-only" id="ih-step-3" data-step="3">
       <div class="workflow-rail">
         <span class="workflow-num">3</span>
         <span class="workflow-line" aria-hidden="true"></span>
@@ -199,8 +238,8 @@
       </div>
     </section>
 
-    <!-- Step 4 — isHuman assurance tier -->
-    <section class="workflow-step is-locked assurance-only" id="ih-step-4" data-step="4">
+    <!-- Step 4 — isHuman assurance tier (integrator) -->
+    <section class="workflow-step is-locked integrator-only assurance-only" id="ih-step-4" data-step="4">
       <div class="workflow-rail">
         <span class="workflow-num">4</span>
         <span class="workflow-line" aria-hidden="true"></span>
@@ -300,8 +339,8 @@
       </div>
     </section>
 
-    <!-- Step 6 — reset -->
-    <section class="workflow-step assurance-only" id="ih-step-6" data-step="6">
+    <!-- Step 6 — reset (integrator) -->
+    <section class="workflow-step integrator-only assurance-only" id="ih-step-6" data-step="6">
       <div class="workflow-rail">
         <span class="workflow-num">6</span>
       </div>
@@ -323,7 +362,7 @@
     </section>
   </div>
 
-  <details class="demo-operations" id="ih-operations-check">
+  <details class="demo-operations integrator-only" id="ih-operations-check">
     <summary>Operations Check</summary>
     <div class="demo-operations-body">
       <p class="demo-muted">Run the full lemma.id lifecycle and see pass/fail evidence for each operation. Use this before a demo or deploy to confirm wallet, passkey proofs, isHuman step-up, and site-scoped revocation still work.</p>
@@ -419,5 +458,5 @@ const { ok, ppid, assurance, presentation } = await new IsHumanVerifier({
 <script src="/static/js/lemma-keys.js?v=5" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
 <script nonce="{{ csp_nonce }}">window.LEMMA_ISHUMAN_USE_PERSON_ROOT_SEEDS = {{ 'true' if ishuman_use_person_root_seeds else 'false' }};</script>
 <script src="/sdk/ishuman-verifier.js?v={{ ishuman_verifier_sdk_version }}" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
-<script src="/static/js/demo/ishuman-demo.js?v=33" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
+<script src="/static/js/demo/ishuman-demo.js?v=34" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
 {% endblock %}

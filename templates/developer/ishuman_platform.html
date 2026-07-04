@@ -38,11 +38,11 @@
 <div class="dev-header">
     <div class="dev-header-row">
         <div>
-            <h1 class="dev-title">Proof of humanity</h1>
+            <h1 class="dev-title">lemma.id for developers</h1>
             <p class="dev-subtitle">
-                Integrate verified-human credentials with site-private PPIDs and local browser verification.
-                Embed the SDK, set <code>siteId</code> to your hostname, and register a site API key only when you
-                need server-side PPID blocks.
+                Add passkey-first human proofs to your site — site-private IDs, offline backend verification,
+                and optional <code>ishuman</code> assurance when you need stronger trust. Register a site API key
+                only when you need server-side blocks.
             </p>
         </div>
         <div style="display:flex; gap:10px; flex-wrap:wrap; flex-shrink:0;">
@@ -104,8 +104,8 @@
         </div>
         <div class="dev-card-body">
             <p style="margin: 0 0 16px; color: var(--dev-text-muted); font-size: 14px; line-height: 1.55;">
-                Embed the verifier SDK and gate actions with <code>verify({ autoProvision: true })</code>.
-                No dashboard step required for the basic human check.
+                Embed the lemma.id verifier SDK and gate actions with <code>verify({ autoProvision: true })</code>.
+                Start with <code>passkey</code> assurance; require <code>ishuman</code> only when your policy needs it.
             </p>
             <ul class="dev-hub-list">
                 <li>Set <code>siteId</code> to your canonical hostname (for example <code>app.example.com</code>).</li>

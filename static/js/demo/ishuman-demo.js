@@ -35,6 +35,7 @@
   const state = {
     config: null,
     demoMode: null,
+    uiMode: 'quick',
     wallet: null,
     walletId: null,
     walletSecret: null,
@@ -90,13 +91,120 @@
     }
   }
 
+  function isQuickUiMode() {
+    return state.uiMode === 'quick';
+  }
+
   function updateProgressStrip(workflowStep) {
+    if (isQuickUiMode()) return;
     document.querySelectorAll('.demo-progress-item').forEach((item) => {
       const step = Number(item.dataset.step || 0);
       item.classList.remove('is-active', 'is-done');
       if (workflowStep > 0 && step < workflowStep) item.classList.add('is-done');
       else if (step === workflowStep) item.classList.add('is-active');
     });
+  }
+
+  function showQuickInsight(visible) {
+    const el = $('ih-quick-insight');
+    if (el) el.hidden = !visible;
+  }
+
+  function setQuickInsight(label, text) {
+    showQuickInsight(true);
+    const labelEl = $('ih-quick-insight-label');
+    const textEl = $('ih-quick-insight-text');
+    if (labelEl && label) labelEl.textContent = label;
+    if (textEl && text) textEl.textContent = text;
+  }
+
+  function updateQuickProgress(act) {
+    document.querySelectorAll('#ih-quick-progress .demo-progress-item').forEach((item) => {
+      const step = Number(item.dataset.quickAct || 0);
+      item.classList.remove('is-active', 'is-done');
+      if (act > 0 && step < act) item.classList.add('is-done');
+      else if (step === act) item.classList.add('is-active');
+    });
+  }
+
+  function applyUiMode() {
+    const root = $('lemma-demo');
+    const quick = isQuickUiMode();
+    if (root) {
+      root.classList.toggle('demo-ui-quick', quick);
+      root.classList.toggle('demo-ui-integrator', !quick);
+    }
+    const quickBtn = $('ih-mode-quick');
+    const integratorBtn = $('ih-mode-integrator');
+    if (quickBtn) {
+      quickBtn.classList.toggle('is-active', quick);
+      quickBtn.setAttribute('aria-selected', quick ? 'true' : 'false');
+    }
+    if (integratorBtn) {
+      integratorBtn.classList.toggle('is-active', !quick);
+      integratorBtn.setAttribute('aria-selected', !quick ? 'true' : 'false');
+    }
+    const runBtn = $('ih-run-quick-demo');
+    if (runBtn) runBtn.textContent = quick ? 'Run 3-minute demo' : 'Run guided demo';
+    updateStepLocks();
+  }
+
+  function setUiMode(mode) {
+    state.uiMode = mode === 'integrator' ? 'integrator' : 'quick';
+    try {
+      localStorage.setItem('lemma_demo_ui_mode', state.uiMode);
+    } catch (_) {
+      /* ignore storage errors */
+    }
+    applyUiMode();
+    applyAssuranceModeUI();
+  }
+
+  async function runQuickDemo() {
+    setUiMode('quick');
+    setDemoMode('live');
+    setWizardBusy(true);
+    try {
+      setQuickInsight('Act 1 — Prove', 'Create or unlock your lemma.id, then verify on ticketing.');
+      setWorkflowHighlight(1);
+      scrollToPanel('ih-step-1');
+
+      await refreshWalletStatus();
+      if (!state.walletId) {
+        setQuickInsight('Act 1 — Prove', 'Tap Create a lemma.id below (passkey only). Then run the demo again.');
+        log('Quick demo waiting', 'create lemma.id first');
+        return;
+      }
+
+      await initWallet().catch(() => {});
+
+      updateQuickProgress(1);
+      setQuickInsight('Act 1 — Prove', 'Verifying human proof on ticketing demo site…');
+      setWorkflowHighlight(2);
+      scrollToPanel('ih-step-2');
+      await verifySite('tickets');
+
+      updateQuickProgress(2);
+      setQuickInsight('Act 2 — Privacy', 'Same wallet — minting a different private ID on trials…');
+      await verifySite('trials');
+
+      updateQuickProgress(3);
+      setQuickInsight('Act 3 — Control', 'Blocking on ticketing only. Trials should stay valid.');
+      setWorkflowHighlight(5);
+      scrollToPanel('ih-step-5');
+      await blockTickets();
+      await recheckBothSitesAfterBlock();
+
+      setQuickInsight('Done', 'Ticketing blocked; trials still works. Switch to Integrator demo for isHuman step-up and relying-site tabs.');
+      setWorkflowHighlight(0);
+      log('Quick demo complete');
+    } catch (err) {
+      setQuickInsight('Paused', err.message);
+      log('Quick demo stopped', err.message);
+      throw err;
+    } finally {
+      setWizardBusy(false);
+    }
   }
 
   function assuranceDemoMode() {
@@ -221,7 +329,10 @@
       else if (i === 2) el.classList.toggle('is-locked', !ready);
       else if (i === 3 && assuranceDemoMode()) el.classList.toggle('is-locked', !bothVerified);
       else if (i === 4 && assuranceDemoMode()) el.classList.toggle('is-locked', !bothVerified);
-      else if (i === 5) el.classList.toggle('is-locked', assuranceDemoMode() ? !escalated : !bothVerified);
+      else if (i === 5) {
+        const needEscalation = assuranceDemoMode() && !isQuickUiMode();
+        el.classList.toggle('is-locked', needEscalation ? !escalated : !bothVerified);
+      }
     }
   }
 
@@ -254,9 +365,13 @@
     });
     const blockTitle = $('ih-block-step-title');
     if (blockTitle) {
-      blockTitle.textContent = on
-        ? 'Step 5 — Revoke on one site'
-        : 'Step 3 — Revoke on one site';
+      if (isQuickUiMode()) {
+        blockTitle.textContent = 'Step 3 — Revoke on one site';
+      } else {
+        blockTitle.textContent = on
+          ? 'Step 5 — Revoke on one site'
+          : 'Step 3 — Revoke on one site';
+      }
     }
     const stepupTitle = $('ih-stepup-step-title');
     if (stepupTitle && on) {
@@ -278,7 +393,7 @@
       if (step1Desc) step1Desc.textContent = 'Use an existing lemma.id or complete a one-time identity check.';
       if (step2Title) step2Title.textContent = 'Step 2 — Use the same lemma.id on two sites';
       if (step2Desc) step2Desc.textContent = 'Each site asks for the assurance it needs; your wallet mints a site-private stamp the site verifies itself — same verified human, different PPIDs.';
-      if (intro) intro.textContent = 'lemma.id is your passkey-controlled proof container. Sites request the assurance they need — usually passkey first. isHuman is the stronger tier a site can require later on the same private site ID. Verify once on lemma.id, then test two demo sites with distinct PPIDs, optional isHuman step-up, and site-scoped revocation.';
+      if (intro) intro.textContent = 'lemma.id is your passkey-controlled proof container. Sites request the assurance they need — usually passkey first. isHuman is the stronger tier a site can require later on the same private site ID. Use Integrator demo for the full walkthrough: wallet → site proofs → relying sites → optional isHuman step-up → site-scoped revocation.';
       if (createBtn) createBtn.textContent = 'Create a lemma.id';
       if (step1Utility) {
         step1Utility.querySelector('p').textContent = 'The one-time IDV path: verify once on lemma.id, then reuse that proof across sites. Your identity stays in a container only you control.';
@@ -497,7 +612,7 @@
   function setWizardBusy(running) {
     state.wizardRunning = running;
     const ids = [
-      'ih-start-live-demo',
+      'ih-run-quick-demo',
       'ih-start-simulated-demo',
       'ih-unlock-lemma-btn',
       'ih-create-lemma-btn',
@@ -526,6 +641,12 @@
     }
     const shell = $('ih-wizard-shell');
     if (shell && !running && !state.masterCredentialId) shell.hidden = true;
+  }
+
+  async function startPrimaryDemo() {
+    if (isQuickUiMode()) return runQuickDemo();
+    setDemoMode('live');
+    return runGuidedDemo();
   }
 
   async function startLiveDemo() {
@@ -1987,9 +2108,18 @@
   }
 
   async function boot() {
+    try {
+      const savedMode = localStorage.getItem('lemma_demo_ui_mode');
+      if (savedMode === 'integrator') state.uiMode = 'integrator';
+    } catch (_) {
+      /* ignore storage errors */
+    }
     setWorkflowHighlight(1);
     await loadConfig();
-    bind('ih-start-live-demo', startLiveDemo);
+    applyUiMode();
+    bind('ih-run-quick-demo', startPrimaryDemo);
+    bind('ih-mode-quick', () => setUiMode('quick'));
+    bind('ih-mode-integrator', () => setUiMode('integrator'));
     bind('ih-start-simulated-demo', startSimulatedDemo);
     bind('ih-unlock-lemma-btn', () => {
       setDemoMode('live');
@@ -2038,4 +2168,5 @@
   }
 
   window.runAllOperations = runAllOperations;
+  window.runQuickDemo = runQuickDemo;
 })();

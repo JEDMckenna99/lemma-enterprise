@@ -51,7 +51,7 @@ Agent Ops (lemma-cli, Lemma Firewall, runtime control plane) documentation is op
 | Resource | URL |
 |----------|-----|
 | Live platform | https://lemma.id |
-| Developer hub | https://lemma.id/developer/ishuman |
+| Developer hub | https://lemma.id/developer |
 | Live demo | https://lemma.id/demo/ishuman |
 | Browser SDK | https://lemma.id/sdk/ishuman-verifier.js |
 

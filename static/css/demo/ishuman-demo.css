@@ -1139,3 +1139,121 @@
   overflow: auto;
   font-size: 11px;
 }
+
+.demo-mode-switch {
+  display: inline-flex;
+  gap: 4px;
+  margin: 16px 0 12px;
+  padding: 4px;
+  border-radius: 12px;
+  border: 1px solid var(--demo-line);
+  background: #f8fafc;
+}
+
+.demo-mode-btn {
+  border: 0;
+  border-radius: 9px;
+  padding: 8px 14px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--demo-muted);
+  background: transparent;
+  cursor: pointer;
+}
+
+.demo-mode-btn.is-active {
+  color: var(--demo-ink);
+  background: #fff;
+  box-shadow: 0 1px 4px rgba(15, 23, 42, 0.08);
+}
+
+.demo-page.demo-ui-quick .integrator-only {
+  display: none !important;
+}
+
+.demo-page.demo-ui-integrator .quick-only {
+  display: none !important;
+}
+
+.demo-problem-contrast {
+  margin-bottom: 20px;
+  padding: 18px;
+  border: 1px solid var(--demo-line);
+  border-radius: 16px;
+  background: #fff;
+}
+
+.demo-problem-title {
+  margin: 0 0 14px;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  color: var(--demo-muted);
+}
+
+.demo-problem-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.demo-problem-col {
+  padding: 14px;
+  border-radius: 12px;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.demo-problem-col h3 {
+  margin: 0 0 10px;
+  font-size: 15px;
+}
+
+.demo-problem-col ul {
+  margin: 0;
+  padding-left: 1.1rem;
+}
+
+.demo-problem-col li {
+  margin: 6px 0;
+}
+
+.demo-problem-without {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+}
+
+.demo-problem-with {
+  background: #ecfdf5;
+  border: 1px solid #bbf7d0;
+}
+
+.demo-quick-insight {
+  margin-bottom: 16px;
+  padding: 14px 16px;
+  border-radius: 14px;
+  border: 1px solid #c7d2fe;
+  background: var(--demo-brand-soft);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.demo-quick-insight strong {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 12px;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  color: var(--demo-brand);
+}
+
+.demo-progress-list-3 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+@media (max-width: 720px) {
+  .demo-problem-grid {
+    grid-template-columns: 1fr;
+  }
+}
