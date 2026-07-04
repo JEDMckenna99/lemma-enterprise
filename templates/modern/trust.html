@@ -79,7 +79,7 @@
         <div style="max-width: 860px; margin: 0 auto; text-align: center;">
             <p style="font-size: var(--font-size-sm); font-weight: 600; text-transform: uppercase; letter-spacing: 2px; color: var(--primary); margin-bottom: 16px;">Trust &amp; transparency</p>
             <h1 style="font-size: clamp(2.5rem, 5vw, 3.5rem); line-height: 1.1; margin-bottom: 24px;">Identity-grade enforcement<br>without identity-grade liability.</h1>
-            <p style="font-size: var(--font-size-xl); font-weight: 500; margin-bottom: var(--space-4); color: var(--gray-700);">lemma.id is a <strong>personal data minimizer</strong> — not a neutral pipe and not a surveillance network. Each site sees only its own private ID for a verified human; users do not reveal their name, document, selfie, date of birth, or a reusable cross-site ID. Everyone knows what each party stores, processes, and never sees.</p>
+            <p style="font-size: var(--font-size-xl); font-weight: 500; margin-bottom: var(--space-4); color: var(--gray-700);">lemma.id is a <strong>personal data minimizer</strong> — not a neutral pipe and not a surveillance network. Each site receives only its own site-private PPID: enough to recognize the same <strong>returning user</strong>, not who they are. Require <strong>isHuman</strong> when you need the same human across new accounts. Other sites get different PPIDs. Users do not reveal their name, document, selfie, date of birth, or a reusable cross-site ID.</p>
             <div style="display: flex; gap: 16px; justify-content: center; flex-wrap: wrap; margin-top: 28px;">
                 <a href="/docs/ishuman" class="btn btn-primary">Integration docs</a>
                 <a href="/privacy" class="btn btn-secondary">Privacy policy</a>
@@ -101,7 +101,7 @@
                 <span class="trust-badge trust-badge--good">Your site</span>
                 <div class="trust-footprint-size">~80 chars</div>
                 <h3>Verdict + site-private PPID</h3>
-                <p style="color: var(--gray-600); font-size: var(--font-size-sm); margin: 0;">A boolean human signal and an opaque per-site identifier like <code>did:lemma:ppid_…</code>. No ID document, selfie, legal name, or date of birth.</p>
+                <p style="color: var(--gray-600); font-size: var(--font-size-sm); margin: 0;">A proof verdict and an opaque per-site identifier like <code>did:lemma:ppid_…</code>. Not a legal identity — just &ldquo;same returning user as before&rdquo; on your domain. No ID document, selfie, legal name, or date of birth. With isHuman, that binding can represent one verified human across accounts.</p>
             </div>
             <div class="trust-footprint-item" style="border-color: var(--primary);">
                 <span class="trust-badge trust-badge--neutral">lemma.id</span>
@@ -174,7 +174,7 @@
                         <td>Government ID data exposed</td>
                     </tr>
                     <tr>
-                        <td><strong>Enforcement durability</strong></td>
+                        <td><strong>Enforcement durability</strong><br><span style="font-weight:400;color:var(--gray-600);">with isHuman</span></td>
                         <td class="trust-col-lemma">Person-root binding — bans survive email/SIM rotation</td>
                         <td>Attacker rotates email or creates new OAuth account</td>
                         <td>Strong if you keep artifacts; expensive to operate</td>
@@ -207,7 +207,7 @@
 
                 <p style="font-size: var(--font-size-lg); color: var(--gray-700); line-height: 1.7; margin-bottom: 20px;"><strong>What lemma.id persists:</strong> HMAC-derived document and person-root hashes (encrypted at rest), wallet↔person bindings, per-site PPID mappings for revocation, and verification metadata. This is roughly <strong>200 bytes of derived identifiers per person</strong> — not a document vault.</p>
 
-                <p style="font-size: var(--font-size-lg); color: var(--gray-700); line-height: 1.7; margin-bottom: 20px;"><strong>What lemma.id does not expose to sites:</strong> cross-site linkage. Sites receive only their own PPID. Relying sites can block their own site-private IDs; for severe abuse, lemma.id can support operator-reviewed network revocation internally, but that cross-site linkage is never returned to relying sites.</p>
+                <p style="font-size: var(--font-size-lg); color: var(--gray-700); line-height: 1.7; margin-bottom: 20px;"><strong>What lemma.id does not expose to sites:</strong> cross-site linkage or real-world identity. Sites receive only their own PPID — a site-private pseudonym, not a legal identity. Other Lemma-enabled sites get different PPIDs for the same wallet holder. Relying sites can block their own site-private IDs; for severe abuse, lemma.id can support operator-reviewed network revocation internally, but that cross-site linkage is never returned to relying sites.</p>
 
                 <p style="font-size: var(--font-size-lg); color: var(--gray-700); line-height: 1.7; margin-bottom: 20px;"><strong>No advertising to end users:</strong> lemma.id does not use verification outcomes, credentials, wallet data, or PPIDs to advertise to people who verify through Lemma-powered sites. We do not monetize end-user identity data through ad targeting — on lemma.id or elsewhere. Product analytics and fraud prevention are separate from marketing; developer accounts may still receive service communications under our <a href="/privacy">privacy policy</a>.</p>
 
@@ -226,9 +226,9 @@
                 <h2>Why &ldquo;lemma.id&rdquo;</h2>
             </div>
             <div style="background: var(--white); border: 1px solid var(--gray-200); border-radius: 14px; padding: 32px;">
-                <p style="font-size: var(--font-size-lg); color: var(--gray-700); line-height: 1.7; margin-bottom: 20px;">In mathematics, a <strong>lemma</strong> is a proven intermediate result — something already established that you reuse to prove a larger claim. <strong>lemma.id</strong> is short for <em>lemma identifier</em>: one place where you keep verified proofs of whatever claims a relying site needs — that you are human, that you meet an age threshold, that you are one account per person, and more over time.</p>
+                <p>In mathematics, a <strong>lemma</strong> is a proven intermediate result — something already established that you reuse to prove a larger claim. <strong>lemma.id</strong> is short for <em>lemma identifier</em>: one user-held proof anchor where verified claims live — continuity on your site, signed presentations, and <strong>isHuman</strong> when a site needs proof-of-human uniqueness.</p>
 
-                <p style="font-size: var(--font-size-lg); color: var(--gray-700); line-height: 1.7; margin-bottom: 20px;">Each proof is a signed credential stored in your browser wallet under your lemma.id. Sites do not receive your identity profile; they receive a <strong>proof of the specific claim they asked for</strong>, bound to a site-private identifier. Return visits can verify that proof locally — without a live callback and without exposing one reusable ID across the web.</p>
+                <p style="font-size: var(--font-size-lg); color: var(--gray-700); line-height: 1.7; margin-bottom: 20px;">Each proof is a signed credential stored in your browser wallet under your lemma.id. Sites do not receive your identity profile; they receive a <strong>proof of the specific claim they asked for</strong>, bound to a site-private PPID. Return visits can verify that proof locally — without a live callback and without exposing one reusable ID across the web.</p>
 
                 <p style="font-size: var(--font-size-lg); color: var(--gray-700); line-height: 1.7; margin: 0;"><strong>Multiple different proofs under one lemma.id is itself the trust model.</strong> Verification composes: each new claim builds on anchors already proven, without turning every website into a KYC operator or building a cross-site surveillance graph. The name is not wordplay — it describes how bounded, reusable proofs build trust on the open web.</p>
             </div>
@@ -246,11 +246,11 @@
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 24px; max-width: 960px; margin: 0 auto;">
             <div class="card">
                 <h3 class="card-title">For users</h3>
-                <p>You verify once and carry a signed credential in your browser wallet — like a physical ID you control. Sites see a site-private pseudonym, not your name or document. Return visits verify locally; lemma.id does not observe every check. Lemma does not use your verification data to advertise to you. You can export your wallet and request erasure.</p>
+                <p>You verify once into your lemma.id wallet — like a physical ID you control. Sites see a site-private PPID: same returning user on their domain, not your name or document. Require isHuman when you need one human across accounts. Return visits verify locally; lemma.id does not observe every check. Lemma does not use your verification data to advertise to you. You can export your wallet and request erasure.</p>
             </div>
             <div class="card">
                 <h3 class="card-title">For integrators</h3>
-                <p>You get an enforcement-grade human signal without building a KYC stack or holding document images. Your breach surface is an opaque PPID, not a passport scan. Compliance reviewers can see exactly what your servers store — and what they do not.</p>
+                <p>You get private continuity and optional isHuman assurance without building a KYC stack or holding document images. Your breach surface is an opaque PPID — not a passport scan. Compliance reviewers can see exactly what your servers store — and what they do not.</p>
             </div>
             <div class="card">
                 <h3 class="card-title">For the public web</h3>

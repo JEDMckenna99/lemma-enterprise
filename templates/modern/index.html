@@ -1,8 +1,8 @@
 {% extends "modern/layout.html" %}
 {% set is_public_page = true %}
 
-{% block title %}lemma.id - Site-Private Human Verification{% endblock %}
-{% block description %}lemma.id gives your site a stable, site-private human ID for each verified person, so you can recognize the same human again without receiving their identity documents or a reusable cross-site ID.{% endblock %}
+{% block title %}lemma.id - Private Proof Layer for Trusted Accounts{% endblock %}
+{% block description %}lemma.id lets your site recognize the same returning user privately and require isHuman when you need one human across accounts. Users hold one proof anchor; your site receives a site-private PPID — not a legal identity or cross-site ID.{% endblock %}
 
 {% block head %}
     {{ super() }}
@@ -81,9 +81,9 @@
 <section class="hero">
     <div class="container" style="position: relative; z-index: 1;">
         <div style="max-width: 860px; margin: 0 auto; text-align: center;">
-            <p style="font-size: var(--font-size-sm); font-weight: 600; text-transform: uppercase; letter-spacing: 2px; color: var(--primary); margin-bottom: 16px;">Site-private human verification</p>
-            <h1 style="font-size: clamp(2.5rem, 5vw, 3.5rem); line-height: 1.1; margin-bottom: 24px;">Make abuse harder to rotate<br>without becoming an identity database.</h1>
-            <p style="font-size: var(--font-size-xl); font-weight: 500; margin-bottom: var(--space-4); color: var(--gray-700);">lemma.id gives your site a stable, site-private human ID for each verified person. You can recognize the same human across accounts or sessions, enforce one-person policies, and make bans stick, without receiving names, ID documents, selfies, dates of birth, or a reusable cross-site ID.</p>
+            <p style="font-size: var(--font-size-sm); font-weight: 600; text-transform: uppercase; letter-spacing: 2px; color: var(--primary); margin-bottom: 16px;">Private proof layer for trusted accounts</p>
+            <h1 style="font-size: clamp(2.5rem, 5vw, 3.5rem); line-height: 1.1; margin-bottom: 24px;">Recognize the same user privately.<br>Require stronger proof when you need it.</h1>
+            <p style="font-size: var(--font-size-xl); font-weight: 500; margin-bottom: var(--space-4); color: var(--gray-700);">Users hold one <strong>lemma.id</strong> proof anchor. Your site receives only a site-private PPID — enough to recognize the same <strong>returning user</strong>, not who they are. Require <strong>isHuman</strong> when you need the same <strong>human</strong> across new accounts: Sybil resistance, one account per human, or abuse-resistant signup — without storing names, ID documents, selfies, dates of birth, or a reusable cross-site ID.</p>
 
             <div style="display: flex; gap: 16px; justify-content: center; flex-wrap: wrap; margin-top: 28px;">
                 <a href="/docs" class="btn btn-primary">Add to Your Site</a>
@@ -96,7 +96,7 @@
                         <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
                         <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
                     </svg>
-                    <span>Liveness-checked humans, not bots</span>
+                    <span>User-held proof anchor</span>
                 </div>
                 <div class="home-trust-chip">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
@@ -105,7 +105,7 @@
                         <path d="M22 21v-2a4 4 0 0 0-3-3.87"/>
                         <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
                     </svg>
-                    <span>Same human, stable on your site</span>
+                    <span>Same returning user, stable PPID</span>
                 </div>
                 <div class="home-trust-chip">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
@@ -123,22 +123,47 @@
 <section class="section">
     <div class="container">
         <p style="text-align: center; font-size: var(--font-size-lg); color: var(--gray-700); max-width: 820px; margin: 0 auto 32px; line-height: 1.65;">
-            <strong style="color: var(--gray-900);">Built for platforms where banned users come back</strong> — marketplaces, ticketing, gaming, social apps, free trials, and rewards programs.
+            <strong style="color: var(--gray-900);">Built for platforms where banned users come back</strong> — when you require <strong>isHuman</strong> for marketplaces, ticketing, gaming, social apps, free trials, and rewards programs.
         </p>
         <div style="max-width: 760px; margin: 0 auto; padding: 28px 32px; background: var(--gray-50); border: 1px solid var(--gray-200); border-radius: 14px;">
             <p style="margin: 0 0 12px 0; font-size: var(--font-size-sm); font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--primary);">Example</p>
-            <p style="margin: 0; font-size: var(--font-size-base); color: var(--gray-700); line-height: 1.7;">A scalper creates 500 accounts. Your bot system catches 200 and bans them. Tomorrow, the same operator returns with new emails, SIMs, and proxies. With lemma.id, your site recognizes the same verified person behind each account — so a banned operator can't slip back with a fresh email, and a legitimate user keeps the same human binding across sessions.</p>
+            <p style="margin: 0; font-size: var(--font-size-base); color: var(--gray-700); line-height: 1.7;">A scalper creates 500 accounts. Your bot system catches 200 and bans them. Tomorrow, the same operator returns with new emails, SIMs, and proxies. When you require <strong>isHuman</strong>, your site recognizes the same verified human behind each account — so a banned operator can't slip back with a fresh email. A legitimate user keeps the same site-private PPID across sessions on their wallet.</p>
+        </div>
+    </div>
+</section>
+
+<!-- Assurance levels -->
+<section class="section" id="assurance-levels" style="background: var(--gray-50);">
+    <div class="container">
+        <div style="text-align: center; margin-bottom: 40px;">
+            <p style="font-size: var(--font-size-sm); font-weight: 700; text-transform: uppercase; letter-spacing: 2px; color: var(--primary); margin-bottom: 12px;">Assurance levels</p>
+            <h2>One integration. Request the bar your action needs.</h2>
+            <p class="text-gray" style="max-width: 720px; margin: 16px auto 0;">lemma.id is the product. <strong>isHuman</strong> is the stronger assurance tier for one-account-per-human policies — not a separate signup flow.</p>
+        </div>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 24px; max-width: 960px; margin: 0 auto;">
+            <div class="card">
+                <h3 class="card-title">Continuity</h3>
+                <p>Recognize the same returning user with a stable site-private PPID. Your site knows &ldquo;same wallet as before&rdquo; — not their real-world identity.</p>
+            </div>
+            <div class="card">
+                <h3 class="card-title">Signed presentation</h3>
+                <p>Your backend verifies a signed proof from the user's wallet — never trust a bare client value. No KYC data lands on your servers.</p>
+            </div>
+            <div class="card" style="border-color: var(--primary);">
+                <h3 class="card-title">isHuman</h3>
+                <p>Require this when you need Sybil resistance, one account per human, or abuse-resistant signup. Same PPID — only the assurance tier changes.</p>
+            </div>
         </div>
     </div>
 </section>
 
 <!-- Comparison -->
-<section class="section" id="data-comparison" style="background: var(--gray-50);">
+<section class="section" id="data-comparison">
     <div class="container">
         <div style="text-align: center; margin-bottom: 40px;">
             <p style="font-size: var(--font-size-sm); font-weight: 700; text-transform: uppercase; letter-spacing: 2px; color: var(--primary); margin-bottom: 12px;">Why teams choose lemma.id</p>
             <h2>Enforcement without the data liability</h2>
-            <p class="text-gray" style="max-width: 720px; margin: 16px auto 0;">Your site stores a human verdict and a site-private PPID — a stable per-person ID on your domain, not a KYC record. Verification runs at the IDV issuer; routine checks run locally in the browser.</p>
+            <p class="text-gray" style="max-width: 720px; margin: 16px auto 0;">Your site stores a proof verdict and a site-private PPID — a stable per-user ID on your domain, not a KYC record. Users prove once to their lemma.id; routine checks run locally in the browser.</p>
         </div>
         <div class="home-compare-wrap" style="max-width: 960px; margin: 0 auto 28px; background: var(--white); border: 1px solid var(--gray-200); border-radius: 14px; overflow: hidden;">
             <table class="home-compare-table">
@@ -170,15 +195,21 @@
                         <td>Vendor re-query or re-verify</td>
                     </tr>
                     <tr>
-                        <td><strong>Same person on your site</strong></td>
-                        <td class="col-lemma">Stable site-private PPID per human</td>
+                        <td><strong>Same returning user</strong></td>
+                        <td class="col-lemma">Stable site-private PPID per wallet</td>
                         <td>Lost when email or login changes</td>
                         <td>Manual match across records</td>
                     </tr>
                     <tr>
-                        <td><strong>Ban survives rotation</strong></td>
-                        <td class="col-lemma">Person-root binding</td>
+                        <td><strong>Same human across accounts</strong><br><span style="font-weight:400;color:var(--gray-600);">requires isHuman</span></td>
+                        <td class="col-lemma">Person-root binding — one human, one PPID</td>
                         <td>New email = new account</td>
+                        <td>Strong, but you run KYC</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Ban survives rotation</strong><br><span style="font-weight:400;color:var(--gray-600);">requires isHuman</span></td>
+                        <td class="col-lemma">Block the human root, not just the email</td>
+                        <td>Attacker rotates email or OAuth account</td>
                         <td>Strong, but you run KYC</td>
                     </tr>
                 </tbody>
@@ -196,14 +227,14 @@
         <div style="text-align: center; margin-bottom: 48px;">
             <p style="font-size: var(--font-size-sm); font-weight: 700; text-transform: uppercase; letter-spacing: 2px; color: var(--primary); margin-bottom: 12px;">How it works</p>
             <h2>Bind, detect, enforce</h2>
-            <p class="text-gray" style="max-width: 700px; margin: 16px auto 0;">Know when the same verified human is on your platform — then enforce, limit to one account, or keep a trusted binding when your policy requires it.</p>
+            <p class="text-gray" style="max-width: 700px; margin: 16px auto 0;">Integrate once for private continuity. When you require <strong>isHuman</strong>, bind accounts to one verified human — then enforce, limit to one account, or keep a trusted binding when your policy requires it.</p>
         </div>
 
         <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; max-width: 900px; margin: 0 auto 48px; text-align: center;">
             <div style="padding: 32px 24px;">
                 <div style="width: 56px; height: 56px; border-radius: 50%; background: var(--primary); color: white; font-size: 24px; font-weight: 700; display: flex; align-items: center; justify-content: center; margin: 0 auto 20px;">1</div>
                 <h3 style="font-size: var(--font-size-lg); margin-bottom: 8px;">Bind</h3>
-                <p style="color: var(--gray-600); font-size: var(--font-size-sm);">Each account links to one verified person via a site-private PPID. The same human always presents the same ID on your platform — even after email, device, or password changes.</p>
+                <p style="color: var(--gray-600); font-size: var(--font-size-sm);">With <strong>isHuman</strong>, each account links to one verified human via a site-private PPID. The same human always presents the same ID on your platform — even after email, device, or password changes.</p>
             </div>
             <div style="padding: 32px 24px;">
                 <div style="width: 56px; height: 56px; border-radius: 50%; background: var(--primary); color: white; font-size: 24px; font-weight: 700; display: flex; align-items: center; justify-content: center; margin: 0 auto 20px;">2</div>
@@ -213,7 +244,7 @@
             <div style="padding: 32px 24px;">
                 <div style="width: 56px; height: 56px; border-radius: 50%; background: var(--primary); color: white; font-size: 24px; font-weight: 700; display: flex; align-items: center; justify-content: center; margin: 0 auto 20px;">3</div>
                 <h3 style="font-size: var(--font-size-lg); margin-bottom: 8px;">Enforce</h3>
-                <p style="color: var(--gray-600); font-size: var(--font-size-sm);">Block the person and require fresh IDV to return. Swapping email, SIM, or IP won't mint a clean account.</p>
+                <p style="color: var(--gray-600); font-size: var(--font-size-sm);">With <strong>isHuman</strong>, block the human root and require fresh IDV to return. Swapping email, SIM, or IP won't mint a clean account.</p>
             </div>
         </div>
 
@@ -224,8 +255,8 @@
                     <p style="margin: 0; font-size: var(--font-size-sm); color: var(--gray-700); line-height: 1.8;">Bot detected → account banned → attacker rotates email, SIM, or proxy → <strong>new account, free</strong></p>
                 </div>
                 <div style="background: linear-gradient(135deg, rgba(102,126,234,0.06), rgba(118,75,162,0.06)); border: 1px solid var(--primary); border-radius: 12px; padding: 24px;">
-                    <p style="font-size: var(--font-size-sm); font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--primary); margin-bottom: 16px;">With lemma.id</p>
-                    <p style="margin: 0; font-size: var(--font-size-sm); color: var(--gray-700); line-height: 1.8;">Bot detected → account tied to the same verified human → site-private ID blocked → <strong>must pass fresh IDV to return</strong></p>
+                    <p style="font-size: var(--font-size-sm); font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--primary); margin-bottom: 16px;">With isHuman required</p>
+                    <p style="margin: 0; font-size: var(--font-size-sm); color: var(--gray-700); line-height: 1.8;">Bot detected → account tied to verified human root → site-private PPID blocked → <strong>must pass fresh IDV to return</strong></p>
                 </div>
             </div>
             <p style="text-align: center; margin-top: 32px; color: var(--gray-600); font-size: var(--font-size-sm);">
@@ -241,7 +272,7 @@
         <div style="text-align: center; margin-bottom: 32px;">
             <p style="font-size: var(--font-size-sm); font-weight: 700; text-transform: uppercase; letter-spacing: 2px; color: var(--primary); margin-bottom: 12px;">Developer integration</p>
             <h2>Integrate with a signed presentation</h2>
-            <p class="text-gray" style="max-width: 640px; margin: 16px auto 0;">Most users never see verification. Suspicious users do. Signed presentations let your backend verify the same site-private human ID without storing KYC data.</p>
+            <p class="text-gray" style="max-width: 640px; margin: 16px auto 0;">Most users never see verification. Suspicious users do. Signed presentations let your backend verify the same site-private PPID without storing KYC data.</p>
         </div>
 
         <div style="max-width: 860px; margin: 0 auto; border: 1px solid var(--gray-200); border-radius: 14px; background: var(--white); overflow: hidden;">
@@ -272,23 +303,23 @@
         <div style="text-align: center; margin-bottom: 40px;">
             <p style="font-size: var(--font-size-sm); font-weight: 700; text-transform: uppercase; letter-spacing: 2px; color: var(--primary); margin-bottom: 12px;">Product boundaries</p>
             <h2>What lemma.id is not</h2>
-            <p class="text-gray" style="max-width: 640px; margin: 16px auto 0;">Clear boundaries build trust. It's an enforcement layer — not a full fraud stack replacement.</p>
+            <p class="text-gray" style="max-width: 640px; margin: 16px auto 0;">Clear boundaries build trust. lemma.id is a proof layer — not a full fraud stack replacement.</p>
         </div>
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 24px; max-width: 960px; margin: 0 auto;">
             <div class="card">
                 <h3 class="card-title">Not bot detection</h3>
-                <p>Your tools find suspicious behavior. lemma.id makes the consequence stick.</p>
+                <p>Your tools find suspicious behavior. With <strong>isHuman</strong>, lemma.id makes the consequence stick across new accounts.</p>
             </div>
             <div class="card">
                 <h3 class="card-title">Not a global public identity</h3>
-                <p>Each site gets its own stable ID for the same human — not one shared identifier across the whole web.</p>
+                <p>Each site gets its own stable PPID per user — not one shared identifier across the whole web.</p>
             </div>
             <div class="card">
                 <h3 class="card-title">Not an identity store you run</h3>
                 <p>Your servers hold a verdict and a PPID — not ID documents, names, or dates of birth.</p>
             </div>
         </div>
-        <p style="text-align: center; margin-top: 32px; max-width: 720px; margin-left: auto; margin-right: auto; color: var(--gray-600); font-size: var(--font-size-base);"><strong>What it is:</strong> a site-scoped human binding layer — recognize the same verified person on your platform, keep one person per account when you need to, and make bans stick when they don't. <a href="/about" style="color: var(--primary);">Read more about the approach →</a></p>
+        <p style="text-align: center; margin-top: 32px; max-width: 720px; margin-left: auto; margin-right: auto; color: var(--gray-600); font-size: var(--font-size-base);"><strong>What it is:</strong> a user-held proof anchor for private continuity — recognize the same returning user, step up to <strong>isHuman</strong> when you need one human across accounts, and make bans stick without becoming an identity database. <a href="/about" style="color: var(--primary);">Read more about the approach →</a></p>
     </div>
 </section>
 
@@ -312,8 +343,8 @@
 <!-- CTA -->
 <section class="section" style="background: var(--gray-900); color: var(--white); padding: 80px 0;">
     <div class="container" style="text-align: center;">
-        <h2 style="color: var(--white); font-size: var(--font-size-3xl); margin-bottom: 20px;">Give Your Bans Teeth</h2>
-        <p style="color: var(--gray-400); font-size: var(--font-size-lg); margin-bottom: 48px; max-width: 640px; margin-left: auto; margin-right: auto;">Give your site a stable human ID per person — for enforcement, one-account policies, or keeping the same verified user when you need to.</p>
+        <h2 style="color: var(--white); font-size: var(--font-size-3xl); margin-bottom: 20px;">Add lemma.id to your site</h2>
+        <p style="color: var(--gray-400); font-size: var(--font-size-lg); margin-bottom: 48px; max-width: 640px; margin-left: auto; margin-right: auto;">Private continuity by default. Require isHuman when you need one account per human — without storing identity data or a cross-site tracking ID.</p>
         <div style="display: flex; gap: 20px; justify-content: center; flex-wrap: wrap;">
             <a href="/docs" class="btn btn-primary" style="font-size: var(--font-size-lg); padding: 16px 32px;">Add to Your Site</a>
             <a href="/demo" class="btn btn-secondary" style="background: transparent; border-color: var(--gray-600); color: var(--white);">Watch Demo</a>

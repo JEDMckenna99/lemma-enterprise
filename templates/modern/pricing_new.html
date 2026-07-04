@@ -2,7 +2,7 @@
 {% set is_public_page = true %}
 
 {% block title %}Pricing - lemma.id{% endblock %}
-{% block description %}lemma.id pricing: $0.35 for a user's first verified-human binding on your site, then $0.01 per monthly active user. Unlimited local verification.{% endblock %}
+{% block description %}lemma.id pricing: identity verification passed through at cost, plus a small fee for the reusable site-private proof binding lemma.id builds on top. Unlimited local verification. Require isHuman when you need Sybil resistance.{% endblock %}
 
 {% block head %}
 {{ super() }}
@@ -294,15 +294,19 @@
 {% block content %}
 <div class="pricing-hero">
     <h1>Simple pricing</h1>
-    <p class="subtitle">Pay when a user receives their first verified-human binding for your site. Pay a small MAU fee only when they come back.</p>
-    <p class="description">Unlimited local verification on your servers — no per-check fee. lemma.id is only in the loop when a user needs a new or renewed site credential (about once per month).</p>
+    <p class="subtitle">Pay identity verification at cost when you require isHuman. Pay lemma.id for the reusable site-private proof binding that lets you recognize the same user privately — forever.</p>
+    <p class="description">A raw IDV check tells you someone was human once. lemma.id turns that into a user-held proof anchor and site-private PPID your users carry — recognized again on your own servers, with no identity data stored by you.</p>
     <div class="pricing-hero-highlight">
         <div class="pricing-hero-stat">
-            <span class="amount">$0.35</span>
-            <span class="label">first human binding per user</span>
+            <span class="amount">$0.33</span>
+            <span class="label">identity verification, at cost</span>
         </div>
         <div class="pricing-hero-stat">
-            <span class="amount">$0.01</span>
+            <span class="amount">$0.50</span>
+            <span class="label">lemma.id proof binding, once</span>
+        </div>
+        <div class="pricing-hero-stat">
+            <span class="amount">$0.03</span>
             <span class="label">per MAU, starting month two</span>
         </div>
         <div class="pricing-hero-stat">
@@ -318,97 +322,87 @@
 
 <div class="lemma-pricing">
     <h2>How billing works</h2>
-    <p class="intro">Each user gets a verified-human binding for your site: a stable private ID that lets you recognize the same human again without receiving their identity documents or a cross-site account ID. You are billed on issuance and monthly activity — not on every login or verification.</p>
+    <p class="intro">Pricing has two parts: <strong>identity verification</strong> (for isHuman assurance), passed through at cost, and the <strong>lemma.id proof binding</strong> — the reusable site-private credential and continuity infrastructure we build on top. You pay for the binding once, plus a small monthly fee only when a user returns. Everything else is free.</p>
 
     <div class="lemma-pricing-grid">
+        <div class="lemma-price-card">
+            <h3>Identity verification</h3>
+            <p class="price">$0.33 / user · at cost</p>
+            <p>A one-time isHuman check (document + liveness) the first time a person needs proof-of-human uniqueness on your site. <strong>Passed through at cost — lemma.id adds no markup.</strong> Only required when your policy needs Sybil resistance; not repeated for routine continuity.</p>
+        </div>
         <div class="lemma-price-card featured">
-            <h3>Initial human binding</h3>
-            <p class="price">$0.35 / user / site</p>
-            <p>Charged once when a user receives their <strong>first verified-human binding</strong> for your site — the lemma.id popup flow that creates a site-private human ID for your domain after one-time identity verification.</p>
+            <h3>lemma.id proof binding</h3>
+            <p class="price">$0.50 / user · one-time</p>
+            <p>What lemma.id adds on top: a <strong>site-private, reusable proof credential</strong> your users hold in their own wallet. The same wallet returns with the same PPID — no re-verification, no identity data on your servers. This is the lemma.id platform fee.</p>
         </div>
         <div class="lemma-price-card featured">
             <h3>Monthly active user (MAU)</h3>
-            <p class="price">$0.01 / user / month</p>
-            <p>Charged for each calendar month a user <strong>renews</strong> their site credential on your site, starting the <strong>calendar month after</strong> their first issuance. Inactive months are not billed.</p>
+            <p class="price">$0.03 / user / month</p>
+            <p>Charged for each calendar month a returning user <strong>renews</strong> their credential, starting the <strong>month after</strong> binding. Covers continuity, revocation, and keeping zero identity data on your servers. Inactive months are not billed.</p>
         </div>
         <div class="lemma-price-card">
             <h3>Local verification</h3>
             <p class="price">Free</p>
-            <p>Your site validates credentials locally with the SDK — signature, expiry, and revocation checks. Site credentials expire after <strong>30 days</strong>; renewal opens a lemma.id popup. Routine checks between renewals need no server call and are never metered.</p>
-        </div>
-        <div class="lemma-price-card">
-            <h3>Site integration</h3>
-            <p class="price">Included</p>
-            <p>API keys, developer dashboard, site-block controls, SDK, and hosted platform features at no additional platform fee.</p>
+            <p>Your servers validate credentials locally with the SDK — signature, expiry, and revocation. <strong>Silent, no network call, unlimited, never metered.</strong> Credentials expire after 30 days; renewal opens a lemma.id popup.</p>
         </div>
     </div>
 
     <div class="pricing-rules">
         <h3>Billing rules</h3>
         <ol>
-            <li><strong>First issuance ($0.35):</strong> billed when lemma.id issues the user's first site-bound credential for your site (one-time IDV + wallet setup; passkey secures the wallet on first use).</li>
-            <li><strong>MAU ($0.01):</strong> billed for each calendar month the user renews <em>after</em> the month of their first issuance. The issuance month itself has no MAU charge.</li>
-            <li><strong>Active user:</strong> a user whose site credential is <strong>re-issued</strong> by lemma.id that month — typically when their prior credential expires (~30 days) and they complete the continuity popup (daily unlock when already signed in on lemma.id; passkey if the wallet lock has expired).</li>
-            <li><strong>Same person, same PPID:</strong> renewals re-check the verified person root and issue a fresh credential with the same site-private PPID — no repeat IDV for routine continuity.</li>
+            <li><strong>Identity verification ($0.33):</strong> billed once when a person completes isHuman for your site. Passed through at cost; never marked up and not repeated for routine continuity.</li>
+            <li><strong>Proof binding ($0.50):</strong> the one-time lemma.id platform fee for issuing the user's first site-private, reusable credential and wallet binding (passkey secures the wallet on first use).</li>
+            <li><strong>MAU ($0.03):</strong> billed for each calendar month a user renews <em>after</em> the month of their binding. The binding month itself has no MAU charge.</li>
+            <li><strong>Active user:</strong> a user whose credential is <strong>re-issued</strong> that month — typically when their prior credential expires (~30 days) and they complete the continuity popup. Daily local checks never count.</li>
+            <li><strong>Same wallet, same PPID:</strong> renewals issue a fresh credential with the same site-private PPID — no repeat verification for routine continuity. With isHuman, the person root keeps that PPID stable even across assurance step-ups.</li>
             <li><strong>Local checks:</strong> unlimited presentations and verifications on your infrastructure between renewals — never metered.</li>
-            <li><strong>Per site:</strong> each relying site is billed independently for its own users (pairwise PPIDs).</li>
+            <li><strong>Per site:</strong> each relying site is billed independently for its own users (pairwise, non-correlatable PPIDs).</li>
         </ol>
     </div>
 
     <div class="pricing-example">
         <h3>Example: 1,000 new users in January, 600 return in February</h3>
-        <p><strong>January:</strong> 1,000 × $0.35 = <strong>$350</strong> (initial issuance). No MAU charges — first month after issuance is excluded.</p>
-        <p><strong>February:</strong> 600 returning active users × $0.01 = <strong>$6.00</strong> MAU. Plus any new users who join in February at $0.35 each.</p>
-        <p><strong>All year:</strong> A user who visits daily but renews once when their credential expires still counts as <strong>one MAU</strong> that month — not one charge per login or local verification.</p>
+        <p><strong>January:</strong> 1,000 × ($0.33 verification + $0.50 binding) = <strong>$830</strong>. No MAU charges — the binding month is excluded.</p>
+        <p><strong>February:</strong> 600 returning active users × $0.03 = <strong>$18.00</strong> MAU. Plus any new users who join in February at $0.83 each.</p>
+        <p><strong>All year:</strong> A user who visits daily but renews once when their credential expires counts as <strong>one MAU</strong> that month — not one charge per login or local verification.</p>
     </div>
 </div>
 
 <div class="features-included">
-    <h2>Everything included</h2>
+    <h2>What lemma.id adds on top of verification</h2>
+    <p class="intro" style="max-width:720px;margin:0 auto 48px;color:var(--gray-600);line-height:1.7;">A raw identity check tells you someone was human once, then leaves you holding their data. lemma.id turns that into a user-held proof anchor and site-private PPID — so you recognize the same returning user without re-verifying, phoning a server, or storing a single identity field.</p>
     <div class="features-grid">
         <div class="feature-item">
             <div class="feature-check">✓</div>
-            <div class="feature-text">Site registration and API keys</div>
+            <div class="feature-text"><strong>Reusable credential</strong> — same wallet, same PPID on return. With isHuman, same human across accounts. No repeat verification for routine continuity.</div>
         </div>
         <div class="feature-item">
             <div class="feature-check">✓</div>
-            <div class="feature-text">Unlimited local proof checks</div>
+            <div class="feature-text"><strong>Silent local recognition</strong> — every check runs on your servers in ~1ms. Zero network calls, zero user friction.</div>
         </div>
         <div class="feature-item">
             <div class="feature-check">✓</div>
-            <div class="feature-text">Client-side credentials</div>
+            <div class="feature-text"><strong>Zero identity data on your servers</strong> — no documents, names, or biometrics ever reach you. Smaller compliance surface by design.</div>
         </div>
         <div class="feature-item">
             <div class="feature-check">✓</div>
-            <div class="feature-text">Passkey-secured wallet (first setup)</div>
+            <div class="feature-text"><strong>Unlinkable across sites</strong> — pairwise PPIDs mean the same wallet holder can't be correlated between your site and any other.</div>
         </div>
         <div class="feature-item">
             <div class="feature-check">✓</div>
-            <div class="feature-text">Privacy-preserving PPIDs</div>
+            <div class="feature-text"><strong>User-held wallet</strong> — the human owns and carries the credential, secured by a passkey on first use.</div>
         </div>
         <div class="feature-item">
             <div class="feature-check">✓</div>
-            <div class="feature-text">30-day site credentials with monthly continuity renewal</div>
+            <div class="feature-text"><strong>Revocation you control</strong> — block a PPID and sync revocation across your integration; 30-day credentials with monthly continuity renewal.</div>
         </div>
         <div class="feature-item">
             <div class="feature-check">✓</div>
-            <div class="feature-text">No ID documents or PII stored on your servers</div>
+            <div class="feature-text"><strong>Personal data minimizer</strong> — <a href="/trust">see trust comparison</a>.</div>
         </div>
         <div class="feature-item">
             <div class="feature-check">✓</div>
-            <div class="feature-text">Personal data minimizer — <a href="/trust">see trust comparison</a></div>
-        </div>
-        <div class="feature-item">
-            <div class="feature-check">✓</div>
-            <div class="feature-text">Full API access</div>
-        </div>
-        <div class="feature-item">
-            <div class="feature-check">✓</div>
-            <div class="feature-text">JavaScript SDK</div>
-        </div>
-        <div class="feature-item">
-            <div class="feature-check">✓</div>
-            <div class="feature-text">Developer dashboard</div>
+            <div class="feature-text"><strong>Included platform</strong> — site registration, API keys, JavaScript SDK, site-block controls, and developer dashboard at no extra fee.</div>
         </div>
     </div>
 </div>
