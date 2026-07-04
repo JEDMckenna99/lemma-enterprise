@@ -442,7 +442,7 @@ def index():
       decisionCard.innerHTML = '<strong>Checking Lemma wallet…</strong><p class="tiny">Continuity proof only — passkey unlock, then a signed site credential. No identity check at this assurance tier.</p>';
       try {{
         const verifier = makeVerifier(true);
-        const { ok, ppid, assurance, presentation, reason, timeMs } = await verifier.verifyForBackend({{
+        const {{ ok, ppid, assurance, presentation, reason, timeMs }} = await verifier.verifyForBackend({{
           autoProvision: true,
           requiredAssurance: SITE_POLICY,
         }});
