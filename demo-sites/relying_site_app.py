@@ -4,7 +4,7 @@ from typing import Optional
 
 from flask import Flask, Response, jsonify, request
 
-from lemma_ishuman_verify import VerificationContext
+from lemma_ishuman_verify import VerificationContext, InMemoryNonceStore
 
 
 app = Flask(__name__)
@@ -15,10 +15,11 @@ SITE_KIND = os.getenv("LEMMA_DEMO_SITE_KIND", "ticketing")
 LEMMA_ORIGIN = os.getenv("LEMMA_ORIGIN", "https://lemma.id")
 DEMO_HUB_URL = os.getenv("LEMMA_DEMO_HUB_URL", f"{LEMMA_ORIGIN}/demo/ishuman")
 DEMO_REQUIRED_ASSURANCE = os.getenv("LEMMA_DEMO_REQUIRED_ASSURANCE", "passkey").strip().lower()
-ISHUMAN_VERIFIER_SDK_VERSION = os.getenv("ISHUMAN_VERIFIER_SDK_VERSION", "1.8.5").strip()
+ISHUMAN_VERIFIER_SDK_VERSION = os.getenv("ISHUMAN_VERIFIER_SDK_VERSION", "1.9.0").strip()
 
 ACTION_LOG: deque = deque(maxlen=20)
 _VERIFY_CTX: Optional[VerificationContext] = None
+_NONCE_STORE = InMemoryNonceStore()
 
 
 def _verify_ctx() -> VerificationContext:
@@ -81,7 +82,17 @@ def demo_config():
 def demo_action():
     body = request.get_json(silent=True) or {}
     ctx = _verify_ctx()
-    result = ctx.verify_stamp(body)
+    payload = body.get("payload") if isinstance(body.get("payload"), dict) else body
+    action_name = (payload or {}).get("action") or (body.get("lemma") or {}).get("action")
+    result = ctx.verify_action_stamp(
+        body,
+        action=action_name or "unknown",
+        method="POST",
+        path="/api/demo/action",
+        body=payload or body,
+        required_assurance=DEMO_REQUIRED_ASSURANCE,
+        nonce_store=_NONCE_STORE,
+    )
     entry = {
         "ok": result.ok,
         "ppid": result.ppid,
@@ -292,7 +303,7 @@ def index():
           <li>SDK checks local site proof cache first.</li>
           <li>Missing proof → Lemma popup derives passkey assurance (no IDV yet).</li>
           <li>Site policy may require isHuman assurance → IDV step-up, same PPID.</li>
-          <li>Server verifies your stamped action with offline revocation checks.</li>
+          <li>Server verifies your action stamp with offline revocation checks.</li>
           <li>Business never sees passport, selfie, or cross-site ID.</li>
         </ol>
         <details>
@@ -449,10 +460,13 @@ def index():
         const response = {{ human: !!ok, ppid, assurance, reason, timeMs: timeMs || 0 }};
         if (ok) {{
           const email = document.getElementById('email')?.value || '';
-          const stampedEvent = await verifier.stamp(
-            {{ action: '{copy["action"]}', email, at: Date.now() }},
-            {{ includeCredential: true }},
-          );
+          const actionPayload = {{ action: '{copy["action"]}', email, at: Date.now() }};
+          const stampedEvent = await verifier.stampAction(actionPayload, {{
+            action: '{copy["action"]}',
+            method: 'POST',
+            path: '/api/demo/action',
+            requiredAssurance: SITE_POLICY,
+          }});
           const serverRes = await fetch('/api/demo/action', {{
             method: 'POST',
             headers: {{ 'Content-Type': 'application/json' }},

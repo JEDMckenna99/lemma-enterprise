@@ -63,8 +63,11 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 
 
 SESSION_PRESENTATION_PREFIX = "lemma:site-session-presentation:v1"
+ACTION_PRESENTATION_PREFIX = "lemma:site-action-presentation:v1"
+ACTION_STAMP_VERSION = "action_stamp_v1"
 TRUST_LIST_PREFIX = "lemma:issuer-trust-list:v1"
 TIME_SKEW_SECONDS = 300
+DEFAULT_MAX_ACTION_AGE_SECONDS = 60
 
 
 # ---------------------------------------------------------------------------
@@ -251,6 +254,65 @@ def _build_session_message(assertion: dict) -> bytes:
     return "\n".join(lines).encode("utf-8")
 
 
+def _canonical_json_stringify(value) -> str:
+    if value is None or not isinstance(value, (dict, list)):
+        return json.dumps(value, separators=(",", ":"), ensure_ascii=False)
+    if isinstance(value, list):
+        return "[" + ",".join(_canonical_json_stringify(item) for item in value) + "]"
+    keys = sorted(value.keys())
+    parts = [
+        json.dumps(key, separators=(",", ":"), ensure_ascii=False)
+        + ":"
+        + _canonical_json_stringify(value[key])
+        for key in keys
+    ]
+    return "{" + ",".join(parts) + "}"
+
+
+def hash_action_body(body) -> str:
+    """Stable SHA-256 hex digest of a request body (matches browser SDK)."""
+    canonical = _canonical_json_stringify(body if body is not None else {})
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
+def _build_action_message(assertion: dict) -> bytes:
+    lines = [
+        ACTION_PRESENTATION_PREFIX,
+        str(assertion.get("version") or ACTION_STAMP_VERSION).strip(),
+        str(assertion["site_id"]).strip(),
+        str(assertion["credential_id"]).strip(),
+        str(assertion["subject"]).strip(),
+        str(assertion.get("assurance") or "").strip(),
+        str(assertion["action"]).strip(),
+        str(assertion.get("method") or "POST").strip().upper(),
+        str(assertion.get("path") or "").strip(),
+        str(assertion["body_hash"]).strip(),
+        str(assertion["nonce"]).strip(),
+        str(assertion["issued_at_unix"]),
+        str(assertion["expires_at_unix"]),
+    ]
+    return "\n".join(lines).encode("utf-8")
+
+
+def _verify_site_ed25519_digest(pubkey_bytes: bytes, signature_bytes: bytes, message_bytes: bytes) -> None:
+    digest = hashlib.sha256(message_bytes).digest()
+    Ed25519PublicKey.from_public_bytes(pubkey_bytes).verify(signature_bytes, digest)
+
+
+class InMemoryNonceStore:
+    """Simple replay guard for action-stamp nonces (single-process demos/tests)."""
+
+    def __init__(self) -> None:
+        self._seen: set[str] = set()
+
+    def consume(self, nonce: str) -> bool:
+        text = str(nonce or "").strip()
+        if not text or text in self._seen:
+            return False
+        self._seen.add(text)
+        return True
+
+
 def _looks_like_vc(obj) -> bool:
     """A bare verifiable credential has subject + claims + a proof object."""
     return (
@@ -264,6 +326,23 @@ def _looks_like_vc(obj) -> bool:
 def _has_stamp_fields(obj: dict) -> bool:
     """Does this object carry the flat summary fields a stamp adds?"""
     return any(k in obj for k in ("ppid", "verified", "verifiedAt", "credentialId"))
+
+
+def _has_action_stamp_fields(obj: dict) -> bool:
+    return isinstance(obj, dict) and (
+        obj.get("version") == ACTION_STAMP_VERSION
+        or bool(obj.get("action_assertion") and obj.get("action_signature"))
+    )
+
+
+def _unwrap_action_stamp(value, key: str = "lemma"):
+    if not isinstance(value, dict):
+        return None
+    if value.get(key) and isinstance(value[key], dict) and _has_action_stamp_fields(value[key]):
+        return value[key]
+    if _has_action_stamp_fields(value):
+        return value
+    return None
 
 
 def _unwrap_stamp(value, key: str = "lemma"):
@@ -343,8 +422,9 @@ class VerificationContext:
         lemma_origin: str = "https://lemma.id",
         max_session_age_seconds: int = 24 * 60 * 60,
         refresh_seconds: int = 15 * 60,
-        require_session_assertion: bool = True,
+        require_session_assertion: bool = False,
         required_assurance: str = "ishuman",
+        max_action_age_seconds: int = DEFAULT_MAX_ACTION_AGE_SECONDS,
     ) -> None:
         self.site_id = site_id
         self.lemma_origin = lemma_origin.rstrip("/")
@@ -352,6 +432,7 @@ class VerificationContext:
         self.refresh_seconds = refresh_seconds
         self.require_session_assertion = require_session_assertion
         self.required_assurance = (required_assurance or "ishuman").strip().lower()
+        self.max_action_age_seconds = max_action_age_seconds
         self._lock = threading.Lock()
         self._snapshot: Optional[_Snapshot] = None
 
@@ -542,7 +623,8 @@ class VerificationContext:
             try:
                 pubkey_bytes = _b64url_decode(site_pubkey_b64)
                 signature_bytes = _b64url_decode(signature_b64)
-                Ed25519PublicKey.from_public_bytes(pubkey_bytes).verify(
+                _verify_site_ed25519_digest(
+                    pubkey_bytes,
                     signature_bytes,
                     _build_session_message(assertion),
                 )
@@ -592,7 +674,13 @@ class VerificationContext:
         if unwrapped is None:
             return self.Result(False, "stamp_missing_proof")
         inner, presentation = unwrapped
-        to_verify = {"credential": presentation.get("credential")} if durable else presentation
+        has_session = bool(
+            presentation.get("session_assertion") and presentation.get("session_signature")
+        )
+        if durable or not has_session:
+            to_verify = {"credential": presentation.get("credential")}
+        else:
+            to_verify = presentation
         result = self.verify(to_verify)
         if not result.ok:
             return result
@@ -606,6 +694,105 @@ class VerificationContext:
                     False, "stamp_credential_mismatch", credential_id=result.credential_id,
                 )
         return result
+
+    def verify_action_stamp(
+        self,
+        stamped_event: dict,
+        *,
+        action: str,
+        method: str = "POST",
+        path: str = "",
+        body=None,
+        required_assurance: Optional[str] = None,
+        nonce_store=None,
+        key: str = "lemma",
+    ) -> "VerificationContext.Result":
+        """Verify an action-bound stamp from ``stampAction()`` locally."""
+        inner = _unwrap_action_stamp(stamped_event, key)
+        if inner is None:
+            return self.Result(False, "action_stamp_missing")
+
+        credential = inner.get("credential")
+        assertion = inner.get("action_assertion")
+        signature_b64 = (inner.get("action_signature") or "").strip()
+        if not isinstance(credential, dict) or not isinstance(assertion, dict) or not signature_b64:
+            return self.Result(False, "action_stamp_incomplete")
+
+        cred_result = self.verify({"credential": credential})
+        if not cred_result.ok:
+            return cred_result
+
+        policy = (required_assurance or self.required_assurance or "ishuman").strip().lower()
+        if not self._assurance_meets_policy(cred_result.assurance, policy):
+            return self.Result(False, "assurance_insufficient", assurance=cred_result.assurance)
+
+        expected_body_hash = hash_action_body(body)
+        stamped_hash = str(
+            inner.get("bodyHash") or inner.get("body_hash") or assertion.get("body_hash") or ""
+        ).strip()
+        if stamped_hash and stamped_hash != expected_body_hash:
+            return self.Result(False, "action_body_hash_mismatch")
+
+        expected_action = str(action or "").strip()
+        expected_method = str(method or "POST").strip().upper()
+        expected_path = str(path or "").strip()
+        if str(assertion.get("action") or "").strip() != expected_action:
+            return self.Result(False, "action_name_mismatch")
+        if str(assertion.get("method") or "POST").strip().upper() != expected_method:
+            return self.Result(False, "action_method_mismatch")
+        if str(assertion.get("path") or "").strip() != expected_path:
+            return self.Result(False, "action_path_mismatch")
+        if str(assertion.get("site_id") or "").strip() != self.site_id:
+            return self.Result(False, "action_site_id_mismatch")
+
+        try:
+            expires_at = int(assertion.get("expires_at_unix") or 0)
+            issued_at = int(assertion.get("issued_at_unix") or 0)
+        except (TypeError, ValueError):
+            return self.Result(False, "action_timestamps_invalid")
+        now = int(time.time())
+        if expires_at and now >= expires_at:
+            return self.Result(False, "action_expired")
+        if issued_at and now - issued_at > self.max_action_age_seconds:
+            return self.Result(False, "action_too_old")
+
+        nonce = str(assertion.get("nonce") or inner.get("nonce") or "").strip()
+        if not nonce:
+            return self.Result(False, "action_nonce_missing")
+        if nonce_store is not None:
+            consume = getattr(nonce_store, "consume", None)
+            if callable(consume):
+                if not consume(nonce):
+                    return self.Result(False, "action_nonce_reused")
+            else:
+                return self.Result(False, "action_nonce_store_invalid")
+
+        claims = credential.get("claims") or credential.get("credentialSubject") or {}
+        site_pubkey_b64 = claims.get("site_signing_pubkey") or claims.get("siteSigningPubkey") or ""
+        if not site_pubkey_b64:
+            return self.Result(False, "credential_missing_site_signing_pubkey")
+
+        if inner.get("ppid") and cred_result.ppid and inner.get("ppid") != cred_result.ppid:
+            return self.Result(False, "stamp_ppid_mismatch", ppid=cred_result.ppid)
+        if (
+            inner.get("credentialId")
+            and cred_result.credential_id
+            and inner.get("credentialId") != cred_result.credential_id
+        ):
+            return self.Result(
+                False, "stamp_credential_mismatch", credential_id=cred_result.credential_id,
+            )
+
+        try:
+            _verify_site_ed25519_digest(
+                _b64url_decode(site_pubkey_b64),
+                _b64url_decode(signature_b64),
+                _build_action_message(assertion),
+            )
+        except (InvalidSignature, ValueError, KeyError):
+            return self.Result(False, "invalid_action_signature")
+
+        return cred_result
 
 
 # ---------------------------------------------------------------------------

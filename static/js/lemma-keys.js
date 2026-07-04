@@ -372,6 +372,27 @@
         return new Uint8Array(plain);
     }
 
+    function canonicalJsonStringify(value) {
+        if (value === null || typeof value !== 'object') {
+            return JSON.stringify(value);
+        }
+        if (Array.isArray(value)) {
+            return `[${value.map((item) => canonicalJsonStringify(item)).join(',')}]`;
+        }
+        const keys = Object.keys(value).sort();
+        return `{${keys.map((key) => `${JSON.stringify(key)}:${canonicalJsonStringify(value[key])}`).join(',')}}`;
+    }
+
+    async function hashActionBody(body) {
+        const canonical = canonicalJsonStringify(body ?? {});
+        const digest = await sha256Bytes(new TextEncoder().encode(canonical));
+        let hex = '';
+        for (let i = 0; i < digest.length; i += 1) {
+            hex += digest[i].toString(16).padStart(2, '0');
+        }
+        return hex;
+    }
+
     const LemmaKeys = {
         WALLET_SIGNING_KEY_DOMAIN,
         WALLET_SIGNING_KEY_INFO,
@@ -380,6 +401,8 @@
         deriveWalletSigningKeypair,
         deriveSiteSigningKeypair,
         canonicalizeSiteDomain,
+        canonicalJsonStringify,
+        hashActionBody,
         buildAssertionPayload,
         buildRegisterPayload,
         base64urlEncode,

@@ -3171,7 +3171,8 @@ def _verify_session_assertion_server(
         signature_bytes = base64.urlsafe_b64decode(
             signature_b64url + "=" * ((4 - len(signature_b64url) % 4) % 4)
         )
-        Ed25519PublicKey.from_public_bytes(pubkey_bytes).verify(signature_bytes, message)
+        digest = hashlib.sha256(message).digest()
+        Ed25519PublicKey.from_public_bytes(pubkey_bytes).verify(signature_bytes, digest)
     except InvalidSignature:
         return False, "invalid_session_signature"
     except Exception as exc:  # noqa: BLE001

@@ -132,6 +132,7 @@ Work through these in order. Stop and ask the developer if hostname or trust tie
 | `verifyForBackend({ autoProvision })` | Returns `{ ok, presentation, ppid }` for server-side verify |
 | `verifyFreshForBackend()` | Deliberate fresh IDV for a site-reported `doubt_required` decision |
 | `stamp(payload, { includeCredential: true })` | Attach durable audit evidence to your events |
+| `stampAction(payload, { action, method, path })` | Attach action-bound proof for fraud-sensitive server mutations |
 | `getPPID()` | Read cached PPID after initial verify (no popup by default) |
 
 ### Common `verify()` reasons
@@ -155,7 +156,8 @@ Pick one per endpoint. **Do not default signup to T1.**
 |------|--------------|-----------------|----------|
 | **T1** | `{ ppid }` only | None | Low-risk gates only (waitlists, soft limits) |
 | **T2** (recommended) | `presentation` from `verifyForBackend()` or `stamp(..., { includeCredential: true })` | Local `verify()` / `verifyStamp()` | Signup, account creation, moderate trust |
-| **T3** | Full presentation + session assertion | Local verify with session required, or `POST /api/ishuman/verify-presentation` | High-trust / financial actions |
+| **T2+** | `stampAction(...)` envelope with `action_assertion` + `action_signature` | Local `verifyActionStamp()` / `verify_action_stamp()` + nonce replay store | Checkout, withdrawals, posting, other fraud-sensitive mutations |
+| **T3** | Full presentation + session assertion | Local verify with `requireSessionAssertion: true`, or `POST /api/ishuman/verify-presentation` | High-trust / financial actions needing live session proof |
 
 ### Python backend (T2)
 
@@ -201,7 +203,39 @@ if not check.ok:
 audit = ctx.verify_stamp(old_row["lemma"], durable=True)
 ```
 
-Backend verification is **local-first**: one cached fetch to `GET /api/revocation/bloom-filter` every ~15 minutes — not per user request.
+### Action-bound server mutations (T2+)
+
+```javascript
+const event = await verifier.stampAction(
+  { cartId, amountCents, currency },
+  { action: 'checkout', method: 'POST', path: '/api/checkout', requiredAssurance: 'passkey' },
+);
+await fetch('/api/checkout', { method: 'POST', body: JSON.stringify(event) });
+```
+
+```python
+from lemma_ishuman_verify import VerificationContext, InMemoryNonceStore
+
+ctx = VerificationContext(site_id="app.example.com", required_assurance="passkey")
+nonce_store = InMemoryNonceStore()
+
+@app.post("/api/checkout")
+def checkout():
+    body = request.get_json() or {}
+    result = ctx.verify_action_stamp(
+        body,
+        action="checkout",
+        method=request.method,
+        path=request.path,
+        body=body,
+        nonce_store=nonce_store,
+    )
+    if not result.ok:
+        return {"error": result.reason}, 403
+    return process_checkout(result.ppid, body)
+```
+
+Verification is **local-first**: one cached fetch to `GET /api/revocation/bloom-filter` every ~15 minutes — not per user request or per action.
 
 ---
 

@@ -72,7 +72,7 @@ network calls:
 | `maxSessionAgeSeconds`| `86_400` (24 hours)      | Reject session presentations older than this.             |
 | `fetch`               | `globalThis.fetch`       | Custom fetch (e.g. Cloudflare Workers `env.SOMETHING`).   |
 
-Returns `{ verify(presentation), refresh() }`.
+Returns `{ verify(presentation), verifyStamp(stamp), verifyActionStamp(stampedEvent, options), refresh() }`.
 
 ### `verifier.verify(presentation)`
 

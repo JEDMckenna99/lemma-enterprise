@@ -201,6 +201,16 @@
         const sessionTtlSec = Number(params.get('session_ttl_sec') || (24 * 60 * 60));
         const isSiteProofIssue = issueMode === 'site_proof' && !!clientSessionNonce;
         const isFreshIdv = issueMode === 'fresh_idv' && !!clientSessionNonce;
+        const actionName = (params.get('action') || '').trim();
+        const actionMethod = (params.get('action_method') || 'POST').trim();
+        const actionPath = (params.get('action_path') || '').trim();
+        const actionBodyHash = (params.get('body_hash') || '').trim();
+        const actionNonce = (params.get('action_nonce') || '').trim();
+        const actionTtlSec = Number(params.get('action_ttl_sec') || 60);
+        const isActionSign = issueMode === 'action_sign'
+            && !!actionName
+            && !!actionBodyHash
+            && !!actionNonce;
         const isUnlockOnly = issueMode === 'unlock';
         const isPasskeySetup = issueMode === 'passkey_setup';
         const isVerificationReturn = params.has('verification_return');
@@ -1577,6 +1587,33 @@
             });
         }
 
+        async function runActionSignAndClose() {
+            return withIdvBusy(async () => {
+                setStatus('Signing action…', 'loading');
+                await ensureWalletReadyForSiteProof();
+                const credential = await wallet.deriveAndStoreSiteProof(requestingSite, {
+                    issueMode: 'site_proof',
+                    forceServerDerive: false,
+                });
+                const signed = await wallet.signSiteActionPresentation({
+                    credential,
+                    siteId: requestingSite,
+                    action: actionName,
+                    method: actionMethod,
+                    path: actionPath,
+                    bodyHash: actionBodyHash,
+                    nonce: actionNonce,
+                    ttlSec: actionTtlSec,
+                });
+                setStatus('Action signed.', 'success');
+                setTimeout(() => closeWith('ISHUMAN_ACTION_SIGNED', {
+                    ...signed,
+                    request_nonce: requestNonce,
+                }), 300);
+                return true;
+            });
+        }
+
         async function runFreshIdvAndClose() {
             return withIdvBusy(async () => {
             setStatus(consumerCopy().status?.freshStarting || 'Starting a fresh verification…', 'loading');
@@ -1848,6 +1885,12 @@
             if (isSiteProofIssue) {
                 applySiteProofShell();
                 await prepareSiteProofUi();
+                return;
+            }
+
+            if (isActionSign) {
+                applySiteProofShell();
+                await runActionSignAndClose();
                 return;
             }
 

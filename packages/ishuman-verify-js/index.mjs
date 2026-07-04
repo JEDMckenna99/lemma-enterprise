@@ -35,13 +35,16 @@
  *   // enforced):
  *   const audit = await verifier.verifyStamp(oldRow.lemma, { durable: true });
  *
- * @version 1.2.0
+ * @version 1.3.0
  */
 
 const SESSION_PRESENTATION_PREFIX = "lemma:site-session-presentation:v1";
+const ACTION_PRESENTATION_PREFIX = "lemma:site-action-presentation:v1";
+const ACTION_STAMP_VERSION = "action_stamp_v1";
 const DEFAULT_LEMMA_ORIGIN = "https://lemma.id";
 const DEFAULT_REFRESH_MS = 15 * 60 * 1000;
 const DEFAULT_MAX_SESSION_AGE_S = 24 * 60 * 60;
+const DEFAULT_MAX_ACTION_AGE_S = 60;
 
 // ---------------------------------------------------------------------------
 // Tiny byte / hex / base64url helpers
@@ -168,6 +171,59 @@ function buildSessionPresentationMessage(assertion) {
   ].join("\n"));
 }
 
+function canonicalJsonStringify(value) {
+  if (value === null || typeof value !== "object") {
+    return JSON.stringify(value);
+  }
+  if (Array.isArray(value)) {
+    return `[${value.map((item) => canonicalJsonStringify(item)).join(",")}]`;
+  }
+  const keys = Object.keys(value).sort();
+  return `{${keys.map((key) => `${JSON.stringify(key)}:${canonicalJsonStringify(value[key])}`).join(",")}}`;
+}
+
+export async function hashActionBody(body) {
+  const canonical = canonicalJsonStringify(body ?? {});
+  const digest = await sha256Bytes(new TextEncoder().encode(canonical));
+  return bytesToHex(digest);
+}
+
+function buildActionPresentationMessage(assertion) {
+  return new TextEncoder().encode([
+    ACTION_PRESENTATION_PREFIX,
+    String(assertion.version || ACTION_STAMP_VERSION).trim(),
+    String(assertion.site_id || "").trim(),
+    String(assertion.credential_id || "").trim(),
+    String(assertion.subject || "").trim(),
+    String(assertion.assurance || "").trim(),
+    String(assertion.action || "").trim(),
+    String(assertion.method || "POST").trim().toUpperCase(),
+    String(assertion.path || "").trim(),
+    String(assertion.body_hash || "").trim(),
+    String(assertion.nonce || "").trim(),
+    String(assertion.issued_at_unix ?? ""),
+    String(assertion.expires_at_unix ?? ""),
+  ].join("\n"));
+}
+
+async function verifySiteEd25519Digest(pubkeyBytes, signatureBytes, messageBytes) {
+  const digest = await sha256Bytes(messageBytes);
+  return verifyEd25519(pubkeyBytes, digest, signatureBytes);
+}
+
+export class InMemoryNonceStore {
+  constructor() {
+    this._seen = new Set();
+  }
+
+  consume(nonce) {
+    const text = String(nonce || "").trim();
+    if (!text || this._seen.has(text)) return false;
+    this._seen.add(text);
+    return true;
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Cached signed bundle (trust list + Bloom snapshot) refresh
 // ---------------------------------------------------------------------------
@@ -253,12 +309,27 @@ export function createVerifier({
   lemmaOrigin = DEFAULT_LEMMA_ORIGIN,
   refreshMs = DEFAULT_REFRESH_MS,
   maxSessionAgeSeconds = DEFAULT_MAX_SESSION_AGE_S,
-  requireSessionAssertion = true,
+  requireSessionAssertion = false,
+  requiredAssurance = "ishuman",
+  maxActionAgeSeconds = DEFAULT_MAX_ACTION_AGE_S,
   fetch: fetchImpl,
 } = {}) {
   if (!siteId) throw new Error("siteId required");
   let snapshot = null;
   let inflight = null;
+
+  function credentialAssurance(claims) {
+    if (claims?.assurance) return String(claims.assurance).toLowerCase();
+    if (claims?.isHuman === true || claims?.isHuman === "true") return "ishuman";
+    return null;
+  }
+
+  function assuranceMeetsPolicy(actual, required) {
+    if (!actual) return false;
+    const policy = String(required || "ishuman").toLowerCase();
+    if (policy === "passkey") return actual === "passkey" || actual === "ishuman";
+    return actual === "ishuman";
+  }
 
   async function ensureFresh() {
     const now = Date.now();
@@ -313,7 +384,14 @@ export function createVerifier({
     if (!credSigValid) return { ok: false, reason: "invalid_signature" };
 
     const claims = credential.claims || credential.credentialSubject || {};
-    if (!claims.isHuman) return { ok: false, reason: "not_ishuman" };
+    const assurance = credentialAssurance(claims);
+    if (!assurance) return { ok: false, reason: "not_ishuman" };
+    if (assurance !== "passkey" && assurance !== "ishuman") {
+      return { ok: false, reason: "invalid_assurance" };
+    }
+    if (!assuranceMeetsPolicy(assurance, requiredAssurance)) {
+      return { ok: false, reason: "assurance_insufficient", assurance };
+    }
     const boundSite = claims.siteId || claims.site_id || claims.siteDomain || "";
     if (boundSite !== siteId) {
       return { ok: false, reason: "site_id_mismatch", boundSiteId: boundSite };
@@ -343,7 +421,7 @@ export function createVerifier({
         const pubkey = base64urlToBytes(sitePubkeyB64);
         const sigBytes = base64urlToBytes(sigB64);
         const msg = buildSessionPresentationMessage(assertion);
-        const ok = await verifyEd25519(pubkey, msg, sigBytes);
+        const ok = await verifySiteEd25519Digest(pubkey, sigBytes, msg);
         if (!ok) return { ok: false, reason: "invalid_session_signature" };
       } catch (err) {
         return { ok: false, reason: `session_verify_error:${err.message}` };
@@ -371,6 +449,7 @@ export function createVerifier({
       credentialId: credentialId || null,
       issuerDid,
       boundSiteId: boundSite,
+      assurance,
     };
   }
 
@@ -378,11 +457,10 @@ export function createVerifier({
     const unwrapped = unwrapStamp(stamp, key);
     if (!unwrapped) return { ok: false, reason: "stamp_missing_proof" };
     const { stamp: inner, presentation } = unwrapped;
-    // Durable mode: re-verify the credential + revocation only and treat any
-    // aged session assertion as informational, so historical log rows still
-    // verify long after the session-freshness window has passed. Drop the
-    // session assertion before handing it to verify().
-    const toVerify = durable ? { credential: presentation.credential } : presentation;
+    const hasSession = !!(presentation.session_assertion && presentation.session_signature);
+    const toVerify = (durable || !hasSession)
+      ? { credential: presentation.credential }
+      : presentation;
     const result = await verify(toVerify);
     if (!result.ok) return result;
     // Bind the loggable fields to the cryptographically verified values so a
@@ -406,12 +484,109 @@ export function createVerifier({
     return result;
   }
 
+  async function verifyActionStamp(
+    stampedEvent,
+    {
+      action,
+      method = "POST",
+      path = "",
+      body = null,
+      requiredAssurance: actionAssurance,
+      nonceStore = null,
+      key = "lemma",
+    } = {},
+  ) {
+    const inner = unwrapActionStamp(stampedEvent, key);
+    if (!inner) return { ok: false, reason: "action_stamp_missing" };
+
+    const credential = inner.credential;
+    const assertion = inner.action_assertion;
+    const signatureB64 = String(inner.action_signature || "").trim();
+    if (!credential || !assertion || !signatureB64) {
+      return { ok: false, reason: "action_stamp_incomplete" };
+    }
+
+    const credResult = await verify({ credential });
+    if (!credResult.ok) return credResult;
+
+    const policy = String(actionAssurance || requiredAssurance || "ishuman").toLowerCase();
+    if (!assuranceMeetsPolicy(credResult.assurance, policy)) {
+      return { ok: false, reason: "assurance_insufficient", assurance: credResult.assurance };
+    }
+
+    const expectedBodyHash = await hashActionBody(body);
+    const stampedHash = String(
+      inner.bodyHash || inner.body_hash || assertion.body_hash || "",
+    ).trim();
+    if (stampedHash && stampedHash !== expectedBodyHash) {
+      return { ok: false, reason: "action_body_hash_mismatch" };
+    }
+
+    if (String(assertion.action || "").trim() !== String(action || "").trim()) {
+      return { ok: false, reason: "action_name_mismatch" };
+    }
+    if (String(assertion.method || "POST").trim().toUpperCase() !== String(method || "POST").trim().toUpperCase()) {
+      return { ok: false, reason: "action_method_mismatch" };
+    }
+    if (String(assertion.path || "").trim() !== String(path || "").trim()) {
+      return { ok: false, reason: "action_path_mismatch" };
+    }
+    if (String(assertion.site_id || "").trim() !== siteId) {
+      return { ok: false, reason: "action_site_id_mismatch" };
+    }
+
+    const nowSec = Math.floor(Date.now() / 1000);
+    const expiresAtSec = Number(assertion.expires_at_unix || 0);
+    const issuedAtSec = Number(assertion.issued_at_unix || 0);
+    if (expiresAtSec && nowSec >= expiresAtSec) {
+      return { ok: false, reason: "action_expired" };
+    }
+    if (issuedAtSec && nowSec - issuedAtSec > maxActionAgeSeconds) {
+      return { ok: false, reason: "action_too_old" };
+    }
+
+    const nonce = String(assertion.nonce || inner.nonce || "").trim();
+    if (!nonce) return { ok: false, reason: "action_nonce_missing" };
+    if (nonceStore && typeof nonceStore.consume === "function" && !nonceStore.consume(nonce)) {
+      return { ok: false, reason: "action_nonce_reused" };
+    }
+
+    const claims = credential.claims || credential.credentialSubject || {};
+    const sitePubkeyB64 = claims.site_signing_pubkey || claims.siteSigningPubkey || "";
+    if (!sitePubkeyB64) {
+      return { ok: false, reason: "credential_missing_site_signing_pubkey" };
+    }
+
+    if (inner.ppid && credResult.ppid && inner.ppid !== credResult.ppid) {
+      return { ok: false, reason: "stamp_ppid_mismatch", ppid: credResult.ppid };
+    }
+    if (
+      inner.credentialId && credResult.credentialId
+      && inner.credentialId !== credResult.credentialId
+    ) {
+      return { ok: false, reason: "stamp_credential_mismatch", credentialId: credResult.credentialId };
+    }
+
+    try {
+      const ok = await verifySiteEd25519Digest(
+        base64urlToBytes(sitePubkeyB64),
+        base64urlToBytes(signatureB64),
+        buildActionPresentationMessage(assertion),
+      );
+      if (!ok) return { ok: false, reason: "invalid_action_signature" };
+    } catch (err) {
+      return { ok: false, reason: `action_verify_error:${err.message}` };
+    }
+
+    return credResult;
+  }
+
   async function refresh() {
     snapshot = null;
     await ensureFresh();
   }
 
-  return { verify, verifyStamp, refresh };
+  return { verify, verifyStamp, verifyActionStamp, refresh };
 }
 
 /** A bare verifiable credential has subject + claims + a proof object. */
@@ -422,6 +597,20 @@ function looksLikeVc(obj) {
     && typeof obj.claims !== "undefined"
     && !!obj.proof && typeof obj.proof === "object"
   );
+}
+
+function hasActionStampFields(obj) {
+  return !!obj && typeof obj === "object" && (
+    obj.version === ACTION_STAMP_VERSION
+    || (obj.action_assertion && obj.action_signature)
+  );
+}
+
+function unwrapActionStamp(input, key = "lemma") {
+  if (!input || typeof input !== "object") return null;
+  if (input[key] && hasActionStampFields(input[key])) return input[key];
+  if (hasActionStampFields(input)) return input;
+  return null;
 }
 
 /** Does this object carry the flat summary fields a stamp adds? */
@@ -506,12 +695,19 @@ export async function verifyStamp(stamp, options) {
   return createVerifier(options).verifyStamp(stamp, options);
 }
 
+export async function verifyActionStamp(stamp, options) {
+  return createVerifier(options).verifyActionStamp(stamp, options);
+}
+
 // CommonJS interop for Node.js require()
 if (typeof module !== "undefined" && typeof module.exports !== "undefined") {
   module.exports = {
     createVerifier,
     verifyPresentation,
     verifyStamp,
+    verifyActionStamp,
+    hashActionBody,
+    InMemoryNonceStore,
     browserCanonicalMessage,
   };
 }

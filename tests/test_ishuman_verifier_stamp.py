@@ -57,6 +57,7 @@ def test_sdk_exposes_get_verification_stamp(verifier_source):
 @pytest.mark.browser
 def test_sdk_exposes_stamp_merge_helper(verifier_source):
     assert "async stamp(payload = {}, options = {})" in verifier_source
+    assert "async stampAction(payload = {}, options = {})" in verifier_source
     # Configurable merge key, defaults to 'lemma', and does not mutate input.
     assert "const key = options.key || 'lemma';" in verifier_source
     assert "return { ...payload, [key]: verification };" in verifier_source

@@ -33,7 +33,7 @@
  *   // -> { action: 'post_comment', lemma: { ppid, verified, ..., credential } }
  *   // POST `event` to YOUR backend. Lemma stores none of it.
  *
- * @version 1.8.5
+ * @version 1.9.0
  */
 
 (function () {
@@ -71,6 +71,8 @@ const POPUP_WINDOW_NAMES = {
     unlock: 'lemma_wallet_unlock',
 };
 const PROVISIONED_STORAGE_KEY = 'ishuman_master_provisioned_v1';
+const ACTION_STAMP_VERSION = 'action_stamp_v1';
+const DEFAULT_ACTION_TTL_SECONDS = 60;
 
 /** @type {{ idv: PopupFlowState, unlock: PopupFlowState }} */
 const _popupFlows = {
@@ -148,6 +150,22 @@ async function sha256HexText(value) {
     const hex = Array.from(digest).map((b) => b.toString(16).padStart(2, '0')).join('');
     if (_sha256HexCache.size < 1024) _sha256HexCache.set(text, hex);
     return hex;
+}
+
+function canonicalJsonStringify(value) {
+    if (value === null || typeof value !== 'object') {
+        return JSON.stringify(value);
+    }
+    if (Array.isArray(value)) {
+        return `[${value.map((item) => canonicalJsonStringify(item)).join(',')}]`;
+    }
+    const keys = Object.keys(value).sort();
+    return `{${keys.map((key) => `${JSON.stringify(key)}:${canonicalJsonStringify(value[key])}`).join(',')}}`;
+}
+
+async function hashActionBody(body) {
+    const canonical = canonicalJsonStringify(body ?? {});
+    return sha256HexText(canonical);
 }
 
 function canonicalMessage(credential) {
@@ -1052,6 +1070,173 @@ class IsHumanVerifier {
         const verification = await this.getVerification(options);
         const key = options.key || 'lemma';
         return { ...payload, [key]: verification };
+    }
+
+    /**
+     * Attach an action-bound cryptographic stamp to a server request payload.
+     * Verifies (optionally provisions) the site credential, then signs the
+     * action fields with the wallet's site-private key via Lemma popup or a
+     * co-located unlocked LemmaWallet when present.
+     *
+     * @param {Object} payload   business payload (also used for body hash unless options.body set)
+     * @param {Object} [options] { action, method, path, body, nonce, ttlSec, key, requiredAssurance, autoProvision }
+     * @returns {Promise<Object>}
+     */
+    async stampAction(payload = {}, options = {}) {
+        const key = options.key || 'lemma';
+        const action = String(options.action || payload.action || '').trim();
+        const method = String(options.method || 'POST').trim().toUpperCase();
+        const path = String(options.path || '').trim();
+        const body = options.body !== undefined ? options.body : payload;
+        const ttlSec = Number(options.ttlSec || DEFAULT_ACTION_TTL_SECONDS);
+        const requiredAssurance = (options.requiredAssurance || this.requiredAssurance || 'ishuman').toLowerCase();
+
+        if (!action) {
+            return { ...payload, [key]: { verified: false, reason: 'action_required' } };
+        }
+
+        const backend = await this.verifyForBackend({
+            ...options,
+            autoProvision: options.autoProvision ?? true,
+            requiredAssurance,
+        });
+        if (!backend.ok || !backend.presentation?.credential) {
+            return {
+                ...payload,
+                [key]: {
+                    verified: false,
+                    reason: backend.reason || 'not_verified',
+                },
+            };
+        }
+
+        const bodyHash = await hashActionBody(body);
+        const nonce = String(options.nonce || randomNonceB64(16)).trim();
+        const credential = backend.presentation.credential;
+        const signParams = {
+            credential,
+            siteId: this.siteId,
+            action,
+            method,
+            path,
+            bodyHash,
+            nonce,
+            ttlSec,
+        };
+
+        let signed = await this._trySignActionLocally(signParams);
+        if (!signed) {
+            signed = await this._signActionViaPopup(signParams);
+        }
+        if (!signed?.action_assertion) {
+            return {
+                ...payload,
+                [key]: {
+                    verified: false,
+                    reason: signed?.reason || 'action_sign_failed',
+                },
+            };
+        }
+
+        const assertion = signed.action_assertion;
+        return {
+            ...payload,
+            [key]: {
+                version: ACTION_STAMP_VERSION,
+                verified: true,
+                siteId: this.siteId,
+                ppid: backend.ppid,
+                credentialId: credential.id || null,
+                assurance: backend.assurance,
+                action,
+                method,
+                path,
+                bodyHash,
+                nonce,
+                issuedAtUnix: assertion.issued_at_unix,
+                expiresAtUnix: assertion.expires_at_unix,
+                credential,
+                action_assertion: assertion,
+                action_signature: signed.action_signature,
+            },
+        };
+    }
+
+    async _trySignActionLocally(signParams) {
+        if (typeof LemmaWallet === 'undefined') return null;
+        try {
+            const wallet = (typeof window !== 'undefined' && window.globalLemmaWallet)
+                ? window.globalLemmaWallet
+                : new LemmaWallet({ lemmaOrigin: this.lemmaOrigin });
+            if (!window.globalLemmaWallet) {
+                await wallet.init();
+            }
+            if (!wallet.isUnlocked || !wallet.isUnlocked()) {
+                return null;
+            }
+            if (typeof wallet.signSiteActionPresentation !== 'function') {
+                return null;
+            }
+            return await wallet.signSiteActionPresentation(signParams);
+        } catch (err) {
+            if (this.debug) console.warn('[isHuman] local action sign failed:', err.message);
+            return null;
+        }
+    }
+
+    _signActionViaPopup(signParams) {
+        const requestNonce = randomNonceB64(16);
+        const popupUrl = new URL(`${this.lemmaOrigin}${this.idvPopupPath}`);
+        popupUrl.searchParams.set('origin', window.location.origin);
+        popupUrl.searchParams.set('site_id', this.siteId);
+        popupUrl.searchParams.set('issue_mode', 'action_sign');
+        popupUrl.searchParams.set('request_nonce', requestNonce);
+        popupUrl.searchParams.set('action', signParams.action);
+        popupUrl.searchParams.set('action_method', signParams.method);
+        popupUrl.searchParams.set('action_path', signParams.path);
+        popupUrl.searchParams.set('body_hash', signParams.bodyHash);
+        popupUrl.searchParams.set('action_nonce', signParams.nonce);
+        popupUrl.searchParams.set('action_ttl_sec', String(signParams.ttlSec || DEFAULT_ACTION_TTL_SECONDS));
+
+        if (this._isMobileLike()) {
+            popupUrl.searchParams.set('flow_mode', 'redirect');
+            popupUrl.searchParams.set('redirect_return', window.location.href);
+            window.location.assign(popupUrl.toString());
+            return Promise.resolve({ ok: false, reason: 'redirect_started' });
+        }
+
+        return _openManagedLemmaPopup(
+            'idv',
+            (popupToken) => {
+                const url = new URL(popupUrl.toString());
+                url.searchParams.set('popup_token', popupToken);
+                return url.toString();
+            },
+            IDV_POPUP_TIMEOUT_MS,
+            (event, finish, state) => {
+                if (event.origin !== this.lemmaOrigin) return;
+                if (event.data?.type === 'ISHUMAN_ACTION_SIGNED') {
+                    state.gotMessage = true;
+                    const detail = event.data.detail || {};
+                    if (detail.request_nonce && detail.request_nonce !== requestNonce) {
+                        if (this.debug) console.warn('[isHuman] action sign request nonce mismatch');
+                        return;
+                    }
+                    finish({ ok: true, ...detail });
+                } else if (event.data?.type === 'ISHUMAN_IDV_CANCELLED') {
+                    state.gotMessage = true;
+                    finish({ ok: false, reason: 'idv_cancelled', detail: event.data.detail || null });
+                }
+            },
+        ).then((result) => {
+            if (result?.blocked) {
+                popupUrl.searchParams.set('flow_mode', 'redirect');
+                popupUrl.searchParams.set('redirect_return', window.location.href);
+                window.location.assign(popupUrl.toString());
+                return { ok: false, reason: 'redirect_started' };
+            }
+            return result;
+        });
     }
 
     async _verifyOnce(t0, options = {}) {

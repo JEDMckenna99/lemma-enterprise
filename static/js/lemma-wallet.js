@@ -3528,6 +3528,88 @@ class LemmaWallet {
         });
     }
 
+    async hashActionBody(body) {
+        const keys = this._getLemmaKeys();
+        return keys.hashActionBody(body ?? {});
+    }
+
+    async signSiteActionPresentation({
+        credential,
+        siteId,
+        action,
+        method = 'POST',
+        path = '',
+        body = null,
+        bodyHash = null,
+        nonce,
+        ttlSec = 60,
+    }) {
+        const ACTION_PRESENTATION_PREFIX = 'lemma:site-action-presentation:v1';
+        const ACTION_STAMP_VERSION = 'action_stamp_v1';
+        const MIN_ACTION_TTL_SECONDS = 15;
+        const MAX_ACTION_TTL_SECONDS = 300;
+
+        if (!credential || typeof credential !== 'object') {
+            throw new Error('credential required');
+        }
+        if (!action) {
+            throw new Error('action required');
+        }
+        if (!nonce) {
+            throw new Error('nonce required');
+        }
+
+        const keys = this._getLemmaKeys();
+        const canonicalSite = this._canonicalizeSiteDomainForProof(siteId);
+        const siteKeys = await this.deriveSiteSigningKeypair(canonicalSite);
+        const claims = credential.claims || credential.credentialSubject || {};
+        const assurance = claims.assurance
+            || (claims.isHuman === true || claims.isHuman === 'true' ? 'ishuman' : 'passkey');
+        const resolvedBodyHash = bodyHash || await this.hashActionBody(body ?? {});
+        const requestedTtl = Number(ttlSec || 60);
+        const actionTtl = Math.min(
+            MAX_ACTION_TTL_SECONDS,
+            Math.max(MIN_ACTION_TTL_SECONDS, requestedTtl || 60),
+        );
+        const issuedAtUnix = Math.floor(Date.now() / 1000);
+        const expiresAtUnix = issuedAtUnix + actionTtl;
+        const assertion = {
+            version: ACTION_STAMP_VERSION,
+            site_id: canonicalSite,
+            credential_id: credential?.id || '',
+            subject: credential?.subject || '',
+            assurance: String(assurance || '').toLowerCase(),
+            action: String(action || '').trim(),
+            method: String(method || 'POST').trim().toUpperCase(),
+            path: String(path || '').trim(),
+            body_hash: resolvedBodyHash,
+            nonce: String(nonce || '').trim(),
+            issued_at_unix: issuedAtUnix,
+            expires_at_unix: expiresAtUnix,
+        };
+        const payloadBytes = new TextEncoder().encode([
+            ACTION_PRESENTATION_PREFIX,
+            String(assertion.version || '').trim(),
+            String(assertion.site_id || '').trim(),
+            String(assertion.credential_id || '').trim(),
+            String(assertion.subject || '').trim(),
+            String(assertion.assurance || '').trim(),
+            String(assertion.action || '').trim(),
+            String(assertion.method || '').trim(),
+            String(assertion.path || '').trim(),
+            String(assertion.body_hash || '').trim(),
+            String(assertion.nonce || '').trim(),
+            String(assertion.issued_at_unix ?? ''),
+            String(assertion.expires_at_unix ?? ''),
+        ].join('\n'));
+        const signature = await siteKeys.keypair.sign(payloadBytes);
+        return {
+            action_assertion: assertion,
+            action_signature: keys.base64urlEncode(signature),
+            bodyHash: resolvedBodyHash,
+        };
+    }
+
     async ensureIsHumanIssuanceReady(options = {}) {
         await this.init();
         let forcePasskeyForEncryptedCache = false;

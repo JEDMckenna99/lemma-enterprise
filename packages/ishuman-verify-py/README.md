@@ -64,7 +64,15 @@ network calls:
 Single long-lived instance per process. Lazily fetches the signed bundle
 and caches it. Thread-safe.
 
+### `InMemoryNonceStore`
+
+Simple in-process nonce replay guard for demos/tests.
+
 ### `ctx.verify(presentation) -> Result`
+
+### `ctx.verify_stamp(stamped_event, *, key='lemma', durable=False) -> Result`
+
+### `ctx.verify_action_stamp(stamped_event, *, action, method='POST', path='', body=None, nonce_store=None) -> Result`
 
 ```python
 @dataclass
