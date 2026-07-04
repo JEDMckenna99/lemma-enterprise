@@ -2,6 +2,8 @@
   'use strict';
 
   const SITE_SLUGS = ['tickets', 'trials'];
+  const DEFAULT_DEMO_SITE_ASSURANCE = 'passkey';
+  const PASSKEY_OK_REASONS = new Set(['valid', 'session_valid', 'vc_valid']);
   const SITE_IDS = {
     tickets: 'tickets-demo.lemma.id',
     trials: 'trials-demo.lemma.id',
@@ -85,6 +87,19 @@
     return !!(state.config && state.config.assurance_demo_mode);
   }
 
+  function demoRequiredAssurance(options = {}) {
+    if (options.requiredAssurance) return options.requiredAssurance;
+    return DEFAULT_DEMO_SITE_ASSURANCE;
+  }
+
+  function isSiteVerified(result) {
+    if (!result) return false;
+    if (result.human) return true;
+    return !!(result.ppid
+      && result.assurance === DEFAULT_DEMO_SITE_ASSURANCE
+      && PASSKEY_OK_REASONS.has(result.reason));
+  }
+
   async function acquireWallet() {
     if (!window.LemmaWallet) throw new Error('LemmaWallet SDK not loaded');
     const deadline = Date.now() + 8000;
@@ -116,10 +131,7 @@
   }
 
   function bothSitesVerified() {
-    return SITE_SLUGS.every((slug) => {
-      const r = state.results[slug];
-      return !!(r && r.human && r.ppid);
-    });
+    return SITE_SLUGS.every((slug) => isSiteVerified(state.results[slug]));
   }
 
   function updateStepLocks() {
@@ -258,7 +270,7 @@
 
   function formatSiteStatus(result) {
     if (!result) return 'Pending';
-    if (result.human) {
+    if (isSiteVerified(result)) {
       return result.assurance ? `Human (${result.assurance})` : 'Human verified';
     }
     if (result.reason === 'site_blocked' || result.reason === 'revoked') return 'Blocked';
@@ -1170,8 +1182,7 @@
 
   function verifierFor(slug, options = {}) {
     if (!window.IsHumanVerifier) throw new Error('IsHumanVerifier SDK not loaded');
-    const requiredAssurance = options.requiredAssurance
-      || (assuranceDemoMode() ? 'passkey' : 'ishuman');
+    const requiredAssurance = demoRequiredAssurance(options);
     const cacheKey = `${slug}:${requiredAssurance}`;
     if (!state.verifiers) state.verifiers = {};
     if (state.verifiers[cacheKey]) return state.verifiers[cacheKey];
@@ -1188,27 +1199,22 @@
 
   async function verifySite(slug, options = {}) {
     if (!window.IsHumanVerifier) throw new Error('IsHumanVerifier SDK not loaded');
-    const requiredAssurance = options.requiredAssurance
-      || (assuranceDemoMode() ? 'passkey' : 'ishuman');
+    const requiredAssurance = demoRequiredAssurance(options);
     const verifier = verifierFor(slug, { requiredAssurance });
-    let result;
-    if (assuranceDemoMode() || options.useBackend) {
-      const backend = await verifier.verifyForBackend({
-        autoProvision: true,
-        requiredAssurance,
-        ...options,
-      });
-      result = {
-        human: !!backend.human,
-        ppid: backend.ppid,
-        assurance: backend.assurance,
-        presentation: backend.presentation,
-        reason: backend.reason,
-        timeMs: backend.timeMs || 0,
-      };
-    } else {
-      result = await verifier.verify();
-    }
+    const backend = await verifier.verifyForBackend({
+      autoProvision: true,
+      requiredAssurance,
+      ...options,
+    });
+    const verified = !!(backend.ok || backend.human);
+    const result = {
+      human: verified,
+      ppid: backend.ppid,
+      assurance: backend.assurance,
+      presentation: backend.presentation,
+      reason: backend.reason,
+      timeMs: backend.timeMs || 0,
+    };
     state.results[slug] = result;
     if (Number.isFinite(result.timeMs)) state.lastVerifyMs[slug] = result.timeMs;
     if (assuranceDemoMode() && requiredAssurance === 'passkey' && result.ppid) {
@@ -1246,12 +1252,13 @@
   }
 
   function renderSite(slug, result) {
-    const tone = result.human ? 'ok' : (result.reason === 'site_blocked' || result.reason === 'revoked' ? 'deny' : 'warn');
+    const verified = isSiteVerified(result);
+    const tone = verified ? 'ok' : (result.reason === 'site_blocked' || result.reason === 'revoked' ? 'deny' : 'warn');
     setPill(`ih-${slug}-pill`, formatSiteStatus(result), tone);
     const card = $(`ih-${slug}-card`);
     if (card) {
       card.classList.remove('is-human', 'is-deny', 'is-pending');
-      if (result.human) card.classList.add('is-human');
+      if (verified) card.classList.add('is-human');
       else if (result.reason === 'site_blocked' || result.reason === 'revoked') card.classList.add('is-deny');
       else card.classList.add('is-pending');
     }
@@ -1596,7 +1603,12 @@
     for (const slug of SITE_SLUGS) {
       try {
         const verifier = verifierFor(slug);
-        const result = await verifier.checkStatus();
+        const raw = await verifier.checkStatus({ requiredAssurance: DEFAULT_DEMO_SITE_ASSURANCE });
+        const verified = isSiteVerified(raw);
+        const result = {
+          ...raw,
+          human: verified,
+        };
         state.results[slug] = result;
         if (Number.isFinite(result.timeMs)) state.lastVerifyMs[slug] = result.timeMs;
         renderSite(slug, result);

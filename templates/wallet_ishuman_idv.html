@@ -231,7 +231,7 @@
         const passkeyAssuranceEnabled = root.dataset.passkeyAssuranceEnabled === 'true';
 
         function siteProofUsesContinuityOnly() {
-            return passkeyAssuranceEnabled && isSiteProofIssue && !isFreshIdv;
+            return isSiteProofIssue && !isFreshIdv;
         }
 
         function consumerCopy() {
@@ -812,6 +812,23 @@
             });
         }
 
+        async function ensureWalletReadyForSiteProof() {
+            await ensureWalletInitialized();
+            if (wallet.isIsHumanLockValid && wallet.isIsHumanLockValid()) {
+                await wallet._restoreIsHumanLockBundleIfValid();
+            }
+            if (siteProofUsesContinuityOnly()) {
+                const result = await wallet.ensureIsHumanIssuanceReady({ isHumanIssuance: false });
+                if (!result.ready) {
+                    throw new Error('Wallet unlock failed — complete the passkey prompt or try again.');
+                }
+                await adoptWalletState();
+                if (!walletId) throw new Error('Wallet unlock failed');
+                return;
+            }
+            await ensureWalletUnlocked();
+        }
+
         async function performPasskeyUnlock({
             closeType = 'LEMMA_UNLOCK_SUCCESS',
             closeReason = 'unlocked',
@@ -1295,6 +1312,43 @@
             );
         }
 
+        async function prepareSiteProofUi() {
+            const btn = document.getElementById('primary-btn');
+            document.getElementById('cancel-btn').textContent = consumerCopy().primary?.cancel || 'Cancel';
+            warmWalletInit();
+
+            try {
+                await ensureWalletInitialized();
+                if (wallet.isIsHumanLockValid && wallet.isIsHumanLockValid()) {
+                    await wallet._restoreIsHumanLockBundleIfValid();
+                }
+                const readyResult = await wallet.ensureIsHumanIssuanceReady({ isHumanIssuance: false });
+                if (readyResult?.ready) {
+                    btn.classList.add('hidden');
+                    setStatus(
+                        consumerCopy().status?.siteProofIssuing || 'Confirming you\u2019re human…',
+                        'loading',
+                    );
+                    await issueSiteProofAndClose();
+                    return;
+                }
+            } catch (err) {
+                console.warn('[isHuman IDV] site proof auto-issue skipped:', err?.message || err);
+            }
+
+            if (siteProofUsesContinuityOnly()) {
+                btn.textContent = 'Continue';
+                btn.disabled = false;
+                btn.classList.remove('hidden');
+                setStatus(
+                    'Tap continue — your passkey unlocks this device for the day.',
+                    'info',
+                );
+                return;
+            }
+            await showUserInitiatedPrimaryAction();
+        }
+
         /**
          * Mobile Didit return may land on a device with no master yet, or with a
          * freshly registered passkey wallet that does not match the wallet_id on
@@ -1487,7 +1541,7 @@
             if (await needsMobileHandoffClaim()) {
                 await claimMobileHandoffIfPresent();
             }
-            await ensureWalletUnlocked();
+            await ensureWalletReadyForSiteProof();
 
             if (!siteProofUsesContinuityOnly()) {
                 const masterReady = await ensureMasterProofForIssuance();
@@ -1793,8 +1847,7 @@
 
             if (isSiteProofIssue) {
                 applySiteProofShell();
-                warmWalletInit();
-                await showUserInitiatedPrimaryAction();
+                await prepareSiteProofUi();
                 return;
             }
 

@@ -3531,9 +3531,9 @@ class LemmaWallet {
     async ensureIsHumanIssuanceReady(options = {}) {
         await this.init();
         let forcePasskeyForEncryptedCache = false;
+        const isHumanIssuance = options.isHumanIssuance !== false;
         const existingPasskeyEarly = await this._get('passkey', 'primary');
-        const requirePasskeyForIssuance = !!(options.isHumanIssuance
-            && !existingPasskeyEarly?.credentialId);
+        const requirePasskeyForIssuance = !!(isHumanIssuance && !existingPasskeyEarly?.credentialId);
 
         if (this.isIsHumanLockValid()) {
             await this._restoreIsHumanLockBundleIfValid();
@@ -3568,7 +3568,7 @@ class LemmaWallet {
         const existingPasskey = await this._get('passkey', 'primary');
         const issuanceOpts = {
             ...options,
-            isHumanIssuance: true,
+            isHumanIssuance,
             force: options.force || forcePasskeyForEncryptedCache,
         };
 
@@ -6338,11 +6338,11 @@ class LemmaWallet {
             .join('');
     }
 
-    async getWalletInfo() {
+    async getWalletInfo(options = {}) {
+        const lite = options.lite === true;
         await this.init();
 
         const passkey = await this._get('passkey', 'primary');
-        const issuers = await this._getAll('issuers');
         const walletIdRecord = await this._get('passkey', 'walletId');
         const activeProfileRecord = await this._get('passkey', 'activeProfile');
         const lockedEncryptedStorage = { value: false };
@@ -6357,7 +6357,8 @@ class LemmaWallet {
                 throw error;
             }
         };
-        const lemmas = await readLockedSafe([], () => this._getAll('lemmas'));
+        const issuers = lite ? [] : await this._getAll('issuers');
+        const lemmas = lite ? [] : await readLockedSafe([], () => this._getAll('lemmas'));
         const secretRecord = await readLockedSafe(null, () => this._get('secrets', 'master'));
         
         // Also check profile for secret (device linking stores here)

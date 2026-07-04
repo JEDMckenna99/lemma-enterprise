@@ -43,6 +43,10 @@ def test_brand_and_manager_creation_use_canonical_routes():
     assert "popupUrl.searchParams.set('site_id', 'lemma.id')" in manager
     assert "window.open(" in manager
     assert "async function hasCompleteLemmaId()" in manager
+    assert "getWalletInfo({ lite: true })" in manager
+    assert "globalLemmaWallet" in manager
+    assert "deferUnlockedProofCheck" in manager
+    assert 'rel="preload"' in manager and "lemma-wallet.js" in manager
     assert "assessLemmaPlatformIdentity" in manager
     assert "selectPlatformCredentials" in layout
     assert "selectPlatformCredentials" in wallet_auto

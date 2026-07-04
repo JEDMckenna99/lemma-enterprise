@@ -98,6 +98,14 @@ def test_verifier_cached_bloom_for_fast_cache_hits_and_no_bridge(verifier_source
 
 
 @pytest.mark.browser
+def test_verifier_passkey_assurance_respects_required_policy(verifier_source):
+    assert "_assuranceMeetsPolicy(assurance, policy)" in verifier_source
+    assert "_activeRequiredAssurance" in verifier_source
+    assert "human: ok" in verifier_source
+    assert "_bloomNetworkRefresh = this._syncBloom" in verifier_source
+
+
+@pytest.mark.browser
 def test_verifier_uses_site_vc_cache_on_repeat_verify(verifier_source):
     assert "_verifyFromSiteVcCache" in verifier_source
     assert "'session_valid'" in verifier_source

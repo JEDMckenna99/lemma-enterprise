@@ -15,6 +15,7 @@ SITE_KIND = os.getenv("LEMMA_DEMO_SITE_KIND", "ticketing")
 LEMMA_ORIGIN = os.getenv("LEMMA_ORIGIN", "https://lemma.id")
 DEMO_HUB_URL = os.getenv("LEMMA_DEMO_HUB_URL", f"{LEMMA_ORIGIN}/demo/ishuman")
 DEMO_REQUIRED_ASSURANCE = os.getenv("LEMMA_DEMO_REQUIRED_ASSURANCE", "passkey").strip().lower()
+ISHUMAN_VERIFIER_SDK_VERSION = os.getenv("ISHUMAN_VERIFIER_SDK_VERSION", "1.8.5").strip()
 
 ACTION_LOG: deque = deque(maxlen=20)
 _VERIFY_CTX: Optional[VerificationContext] = None
@@ -305,7 +306,7 @@ def index():
       </aside>
     </div>
   </main>
-  <script src="{LEMMA_ORIGIN}/sdk/ishuman-verifier.js?v=1.8.3" crossorigin="anonymous"
+  <script src="{LEMMA_ORIGIN}/sdk/ishuman-verifier.js?v={ISHUMAN_VERIFIER_SDK_VERSION}" crossorigin="anonymous"
     onerror="window.__lemmaSdkLoadError='ishuman-verifier failed to load from {LEMMA_ORIGIN}'"></script>
   <script>
     if (typeof IsHumanVerifier === 'undefined') {{
@@ -368,13 +369,23 @@ def index():
       return 'No valid isHuman proof on this device (' + (reason || 'unknown') + '). Click the protected action to verify.';
     }}
 
+    function isDemoVerified(response) {{
+      if (response.human) return true;
+      if (SITE_POLICY !== 'passkey') return false;
+      const okReason = response.reason === 'valid'
+        || response.reason === 'session_valid'
+        || response.reason === 'vc_valid';
+      return okReason && !!response.ppid;
+    }}
+
     function applyVerdict(response, {{ silent = false, stampedEvent = null, serverEntry = null }} = {{}}) {{
-      pill.textContent = response.human ? 'HUMAN' : (response.reason === 'session_valid' ? 'HUMAN' : 'DENY');
-      pill.className = 'pill ' + (response.human ? 'ok' : (silent ? 'checking' : 'deny'));
+      const verified = isDemoVerified(response);
+      pill.textContent = verified ? 'HUMAN' : 'DENY';
+      pill.className = 'pill ' + (verified ? 'ok' : (silent ? 'checking' : 'deny'));
       setAssurancePill(response.assurance || serverEntry?.assurance);
       const lemma = stampedEvent?.lemma || null;
       const ppid = response.ppid || lemma?.ppid || '';
-      if (response.human) {{
+      if (verified) {{
         decisionCopy.textContent = '{copy["success"]}. PPID: ' + (ppid || '').slice(0, 28) + '…';
         if (!silent) {{
           const stampNote = serverEntry?.ok
@@ -385,8 +396,6 @@ def index():
       }} else if (!silent) {{
         decisionCopy.textContent = 'Blocked. Reason: ' + response.reason;
         decisionCard.innerHTML = '<strong>Action blocked</strong><p class="tiny">reason=' + response.reason + (response.reason === 'idv_cancelled' ? ' — complete verification in the Lemma popup to continue.' : '') + '</p>';
-      }} else if (response.reason === 'session_valid' || response.reason === 'vc_valid') {{
-        decisionCopy.textContent = 'Returning visitor — verified from local credential cache.';
       }} else {{
         decisionCopy.textContent = formatMissingProof(response.reason);
       }}
@@ -400,7 +409,7 @@ def index():
       try {{
         const verifier = makeVerifier(false);
         const response = await verifier.checkStatus();
-        if (response.human) {{
+        if (isDemoVerified(response)) {{
           applyVerdict(response, {{ silent: true }});
         }} else {{
           pill.textContent = 'NO PROOF';
@@ -433,12 +442,12 @@ def index():
       decisionCard.innerHTML = '<strong>Checking Lemma wallet…</strong><p class="tiny">Continuity proof only — passkey unlock, then a signed site credential. No identity check at this assurance tier.</p>';
       try {{
         const verifier = makeVerifier(true);
-        const {{ ok, ppid, assurance, presentation, human, reason, timeMs }} = await verifier.verifyForBackend({{
+        const { ok, ppid, assurance, presentation, reason, timeMs } = await verifier.verifyForBackend({{
           autoProvision: true,
           requiredAssurance: SITE_POLICY,
         }});
-        const response = {{ human: !!human, ppid, assurance, reason, timeMs: timeMs || 0 }};
-        if (ok && human) {{
+        const response = {{ human: !!ok, ppid, assurance, reason, timeMs: timeMs || 0 }};
+        if (ok) {{
           const email = document.getElementById('email')?.value || '';
           const stampedEvent = await verifier.stamp(
             {{ action: '{copy["action"]}', email, at: Date.now() }},

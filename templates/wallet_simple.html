@@ -3,7 +3,12 @@
 {% block title %}lemma.id{% endblock %}
 {% block description %}Manage your lemma.id — verify once, share less, stay in control.{% endblock %}
 
-{% block preload_scripts %}{% endblock %}
+{% block preload_scripts %}
+<link rel="preload" href="{{ url_for('static', filename='js/lemma-keys.js') }}?v=7" as="script">
+<link rel="preload" href="{{ url_for('static', filename='js/wallet-at-rest-crypto.js') }}?v=2" as="script">
+<link rel="preload" href="{{ url_for('static', filename='js/lemma-wallet.js') }}?v=2674" as="script">
+<link rel="preload" href="{{ url_for('static', filename='js/lemma-credential-utils.js') }}?v=2" as="script">
+{% endblock %}
 
 {% block head %}
 <link rel="stylesheet" href="{{ url_for('static', filename='css/wallet.css') }}?v=5">
@@ -205,10 +210,28 @@ if (sessionChannel) {
     };
 }
 
-// Initialize wallet
+async function waitForLemmaWallet(maxMs = 15000) {
+    const start = Date.now();
+    while (typeof LemmaWallet === 'undefined') {
+        if (Date.now() - start > maxMs) {
+            throw new Error('Wallet SDK not loaded');
+        }
+        await new Promise((resolve) => setTimeout(resolve, 20));
+    }
+}
+
+// Initialize wallet — reuse the layout's global instance to avoid double IndexedDB init.
 async function initWallet() {
-    wallet = new LemmaWallet();
-    await wallet.init();
+    await waitForLemmaWallet();
+    if (window.globalLemmaWallet) {
+        wallet = window.globalLemmaWallet;
+    } else if (!wallet) {
+        wallet = new LemmaWallet();
+        window.globalLemmaWallet = wallet;
+    }
+    if (!wallet._initialized) {
+        await wallet.init();
+    }
     return wallet;
 }
 
@@ -355,52 +378,82 @@ function showIncompleteLemmaIdState() {
     showLockedView();
 }
 
+function showLockedStateFromInfo(info) {
+    if (info.hasPasskey) {
+        updateStatusDisplay(false, 'Locked', 'Use Face ID, Touch ID, or your passkey to open lemma.id');
+        document.getElementById('no-wallet-msg').classList.add('hidden');
+        document.getElementById('unlock-btn').classList.remove('hidden');
+        document.getElementById('unlock-btn').textContent = 'Open lemma.id';
+    } else if (info.hasWalletSecret) {
+        updateStatusDisplay(false, 'Set up passkey', 'Secure this device to finish setup');
+        document.getElementById('unlock-btn').textContent = 'Create passkey';
+        document.getElementById('unlock-btn').classList.remove('hidden');
+        document.getElementById('no-wallet-msg').classList.add('hidden');
+    } else {
+        updateStatusDisplay(false, 'Create a lemma.id', 'Start with a passkey and one-time human verification');
+        document.getElementById('unlock-btn').classList.add('hidden');
+        document.getElementById('no-wallet-msg').classList.remove('hidden');
+    }
+    showLockedView();
+}
+
+function showUnlockedStateFast(submessage = 'Your lemma.id is ready') {
+    updateStatusDisplay(true, 'Open', submessage);
+    showUnlockedView();
+    const container = document.getElementById('proofs-summary');
+    if (container) {
+        container.innerHTML = '<p class="proofs-loading">Loading...</p>';
+    }
+}
+
+let proofCheckGeneration = 0;
+
+async function deferUnlockedProofCheck(submessage = 'Your lemma.id is ready') {
+    const gen = ++proofCheckGeneration;
+    try {
+        let complete = await hasCompleteLemmaId();
+        if (!complete) {
+            complete = await recoverMissingMasterFromServer() && await hasCompleteLemmaId();
+        }
+        if (gen !== proofCheckGeneration) return;
+        if (!complete) {
+            showIncompleteLemmaIdState();
+            return;
+        }
+        if (gen !== proofCheckGeneration) return;
+        await loadProofSummary();
+    } catch (e) {
+        console.warn('[Manager] Deferred proof check failed:', e?.message || e);
+        if (gen === proofCheckGeneration) {
+            loadProofSummary().catch(() => {});
+        }
+    }
+}
+
 // Check wallet state and update UI (does NOT auto-lock - that's checkCrossDeviceLock's job)
 async function checkWalletState() {
     try {
         await initWallet();
-        const info = await wallet.getWalletInfo();
+        const info = await wallet.getWalletInfo({ lite: true });
 
         if (info.isUnlocked) {
-            let complete = await hasCompleteLemmaId();
-            if (!complete) {
-                complete = await recoverMissingMasterFromServer() && await hasCompleteLemmaId();
-            }
-            if (!complete) {
-                showIncompleteLemmaIdState();
-                return false;
-            }
-
-            // Verify global session exists for cross-device sync
-            // (signal-unlock sets this during wallet.unlock() on lemma.id)
-            if (info.walletId) {
-                const globalSession = await syncGlobalSession(info.walletId);
-                if (globalSession.valid) {
-                    hadGlobalSession = true;
-                    localStorage.setItem('lemma_had_global_session', 'true');
-                }
-            }
-            
-            updateStatusDisplay(true, 'Open', 'Your lemma.id is ready');
-            showUnlockedView();
-            await loadProofSummary();
+            showUnlockedStateFast();
+            deferUnlockedProofCheck();
             return true;
         }
-        
+
         // CROSS-DEVICE SYNC: If local shows locked but we have walletId,
         // check global session - user may have unlocked on another device
         if (!info.isUnlocked && info.walletId) {
             console.log('[CrossDevice] Local locked but have wallet - checking global session...');
             const globalSession = await syncGlobalSession(info.walletId);
-            
+
             if (globalSession.valid && globalSession.session) {
                 console.log('[CrossDevice] Global session valid! Auto-unlocking local wallet...');
-                
-                // Set local session from global session
+
                 const expiresAt = (globalSession.session.expires_at || globalSession.session.expiresAt) * 1000;
                 const unlockedAt = globalSession.session.unlocked_at || globalSession.session.unlockedAt || Date.now();
-                
-                // Update wallet's local session state
+
                 wallet.session = {
                     isUnlocked: true,
                     unlockedAt: unlockedAt,
@@ -409,45 +462,17 @@ async function checkWalletState() {
                     source: 'global_sync'
                 };
                 await wallet._put('session', { id: 'current', ...wallet.session });
-                
-                // Mark that we have a global session
+
                 hadGlobalSession = true;
                 localStorage.setItem('lemma_had_global_session', 'true');
 
-                if (!(await hasCompleteLemmaId())) {
-                    const recovered = await recoverMissingMasterFromServer();
-                    if (!recovered || !(await hasCompleteLemmaId())) {
-                        showIncompleteLemmaIdState();
-                        return false;
-                    }
-                }
-
-                updateStatusDisplay(true, 'Open', 'Synced from another device');
-                showUnlockedView();
-                await loadProofSummary();
+                showUnlockedStateFast('Synced from another device');
+                deferUnlockedProofCheck('Synced from another device');
                 return true;
             }
         }
-        
-        // Not signed in - show appropriate state
-        if (info.hasPasskey) {
-            updateStatusDisplay(false, 'Locked', 'Use Face ID, Touch ID, or your passkey to open lemma.id');
-            document.getElementById('no-wallet-msg').classList.add('hidden');
-            document.getElementById('unlock-btn').classList.remove('hidden');
-            document.getElementById('unlock-btn').textContent = 'Open lemma.id';
-            showLockedView();
-        } else if (info.hasWalletSecret) {
-            updateStatusDisplay(false, 'Set up passkey', 'Secure this device to finish setup');
-            document.getElementById('unlock-btn').textContent = 'Create passkey';
-            document.getElementById('unlock-btn').classList.remove('hidden');
-            document.getElementById('no-wallet-msg').classList.add('hidden');
-            showLockedView();
-        } else {
-            updateStatusDisplay(false, 'Create a lemma.id', 'Start with a passkey and one-time human verification');
-            document.getElementById('unlock-btn').classList.add('hidden');
-            document.getElementById('no-wallet-msg').classList.remove('hidden');
-            showLockedView();
-        }
+
+        showLockedStateFromInfo(info);
         return false;
     } catch (e) {
         console.error('Wallet check failed:', e);

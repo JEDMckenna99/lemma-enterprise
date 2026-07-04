@@ -33,7 +33,7 @@
  *   // -> { action: 'post_comment', lemma: { ppid, verified, ..., credential } }
  *   // POST `event` to YOUR backend. Lemma stores none of it.
  *
- * @version 1.8.3
+ * @version 1.8.5
  */
 
 (function () {
@@ -805,6 +805,9 @@ class IsHumanVerifier {
      */
     async verify(options = {}) {
         const t0 = performance.now();
+        this._activeRequiredAssurance = (
+            options.requiredAssurance || this.requiredAssurance || 'ishuman'
+        ).toLowerCase();
         await this._initPromise;
         if (this._redirectReturnResult) {
             const redirected = this._redirectReturnResult;
@@ -906,12 +909,31 @@ class IsHumanVerifier {
     async verifyForBackend(options = {}) {
         const requiredAssurance = (options.requiredAssurance || this.requiredAssurance || 'ishuman').toLowerCase();
         const result = await this.verify({ ...options, requiredAssurance });
-        const presentation = result.presentation || null;
+        let presentation = result.presentation || null;
         const assurance = result.assurance || null;
+        const cacheHit = result.reason === 'valid'
+            || result.reason === 'session_valid'
+            || result.reason === 'vc_valid';
+        if (!presentation?.credential && cacheHit && result.ppid) {
+            const session = this._loadSessionCache();
+            if (session?.credential) {
+                presentation = {
+                    siteId: this.siteId,
+                    credential: session.credential,
+                    session_assertion: session.session_assertion,
+                    session_signature: session.session_signature,
+                    session_nonce: session.session_nonce,
+                    bloom_sequence: Number(
+                        session.bloom_sequence ?? this._bloomSnapshot?.sequence_number ?? 0,
+                    ),
+                };
+            }
+        }
         const meetsPolicy = this._assuranceMeetsPolicy(assurance, requiredAssurance);
-        const ok = !!(meetsPolicy && presentation && presentation.credential);
+        const ok = !!(meetsPolicy && presentation?.credential);
         return {
             ok,
+            human: ok,
             presentation: ok ? presentation : null,
             ppid: ok ? result.ppid : null,
             assurance,
@@ -1087,12 +1109,14 @@ class IsHumanVerifier {
     async _init() {
         // Eagerly hydrate the Bloom snapshot + trust list from localStorage so
         // the cache-hit fast path can proceed without waiting for the network.
-        const cacheOk = await this._hydrateBloomFromCache();
+        await this._hydrateBloomFromCache();
         await detectWebCryptoEd25519();
-        // Always refresh from the network during init. A background-only refresh
-        // left verify() running against a stale issuer trust list after platform
-        // key rotation, which surfaced as untrusted_issuer on cached site proofs.
-        await this._syncBloom({ force: true });
+        // Refresh from the network in the background; block only when we have no
+        // trusted local snapshot to verify against.
+        this._bloomNetworkRefresh = this._syncBloom({ force: true }).catch(() => {});
+        if (!this._bloomTrusted || !this._trustListTrusted) {
+            await this._bloomNetworkRefresh;
+        }
         this._redirectReturnResult = await this._consumeRedirectReturnIfPresent(performance.now());
     }
 
@@ -1762,11 +1786,13 @@ class IsHumanVerifier {
         if (presentation?.credential) {
             assurance = this._credentialAssurance(presentation.credential);
         }
-        if (assurance === 'ishuman') {
-            human = true;
-        } else if (assurance === 'passkey') {
-            human = false;
+        const policy = this._activeRequiredAssurance || this.requiredAssurance || 'ishuman';
+        const credentialVerified = !!human;
+        let verified = credentialVerified;
+        if (credentialVerified && assurance) {
+            verified = this._assuranceMeetsPolicy(assurance, policy);
         }
+        human = verified;
         if (this.debug) {
             console.log(
                 `[isHuman] ${human ? 'PASS' : 'FAIL'} reason=${reason} assurance=${assurance || '-'} `

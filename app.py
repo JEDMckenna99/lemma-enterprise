@@ -167,6 +167,11 @@ def create_app():
             'wallet_debug_enabled': (os.getenv('LEMMA_WALLET_DEBUG') or '').strip().lower() in ('1', 'true', 'yes', 'on'),
         }
 
+    @app.context_processor
+    def inject_sdk_versions():
+        from api.sdk_versions import ISHUMAN_VERIFIER_SDK_VERSION
+        return {'ishuman_verifier_sdk_version': ISHUMAN_VERIFIER_SDK_VERSION}
+
     # ================================================================================
     # SECURITY HEADERS - Industry standard protection
     # ================================================================================
@@ -900,12 +905,13 @@ def create_app():
     @app.route('/sdk/ishuman-verifier.js')
     def ishuman_verifier_sdk():
         """Serve the isHuman verifier SDK with cache-busting headers."""
+        from api.sdk_versions import ISHUMAN_VERIFIER_SDK_VERSION
         from flask import send_from_directory
         response = send_from_directory('static/js', 'ishuman-verifier.js', mimetype='application/javascript')
         response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
         response.headers['Pragma'] = 'no-cache'
         response.headers['Expires'] = '0'
-        response.headers['X-SDK-Version'] = '1.8.3'
+        response.headers['X-SDK-Version'] = ISHUMAN_VERIFIER_SDK_VERSION
         response.headers['Access-Control-Allow-Origin'] = '*'
         return response
 

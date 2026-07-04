@@ -9,6 +9,9 @@ ROOT = Path(__file__).resolve().parents[1]
 def test_demo_hub_js_gates_assurance_workflow():
     js = (ROOT / "static" / "js" / "demo" / "ishuman-demo.js").read_text(encoding="utf-8")
     assert "assuranceDemoMode" in js
+    assert "DEFAULT_DEMO_SITE_ASSURANCE = 'passkey'" in js
+    assert "demoRequiredAssurance" in js
+    assert "isSiteVerified" in js
     assert "verifyForBackend" in js
     assert "requiredAssurance" in js
     assert "/api/demo/ishuman/require-ishuman" in js
