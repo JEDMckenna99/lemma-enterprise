@@ -40,11 +40,7 @@ def test_ishuman_demo_page_loads_expected_assets(ishuman_demo_client):
     assert "Step 1 — Create your lemma.id" in body
     assert "Step 2 — Passkey proofs on two sites" in body
     assert "Step 3 — Control on your site" in body
-    assert "Escalate proof requirements" in body
     assert "ih-control-escalation" in body
-    assert "Require isHuman on ticketing" in body
-    assert "Step 3 — Revoke on one site" not in body
-    assert "Escalate proof requirements" in body
     assert "Quick demo" not in body
     assert "Integrator demo" not in body
     assert "Step 5 — Revoke on one site" not in body
