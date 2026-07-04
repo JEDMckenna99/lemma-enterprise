@@ -62,7 +62,16 @@ def test_ishuman_demo_page_loads_expected_assets(ishuman_demo_client):
     assert "/sdk/ishuman-verifier.js" in body
     assert "/static/js/demo/ishuman-demo.js" in body
     assert "/static/css/demo/ishuman-demo.css" in body
-    assert "/static/js/demo/ishuman-demo.js?v=32" in body
+    assert "/static/js/demo/ishuman-demo.js?v=33" in body
+
+
+def test_ishuman_demo_js_preserves_ppid_when_backend_denies():
+    js = (ROOT / "static" / "js" / "demo" / "ishuman-demo.js").read_text(encoding="utf-8")
+    assert "resolveDisplayedPpid" in js
+    assert "await resolveDisplayedPpid(verifier, backend, slug, options, requiredAssurance)" in js
+    resolver = js.split("async function resolveDisplayedPpid", 1)[1].split("async function verifySite", 1)[0]
+    assert "if (backend.ppid) return backend.ppid" in resolver
+    assert "raw.ppid" in resolver
 
 
 def test_legacy_demo_ishuman_url_redirects_to_canonical_demo(ishuman_demo_client):

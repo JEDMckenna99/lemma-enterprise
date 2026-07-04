@@ -1283,6 +1283,17 @@
     return state.verifiers[cacheKey];
   }
 
+  async function resolveDisplayedPpid(verifier, backend, slug, options, requiredAssurance) {
+    if (backend.ppid) return backend.ppid;
+    const raw = await verifier.verify({
+      autoProvision: false,
+      requiredAssurance,
+      ...options,
+    });
+    if (raw.ppid) return raw.ppid;
+    return state.passkeyPpids[slug] || state.results[slug]?.ppid || null;
+  }
+
   async function verifySite(slug, options = {}) {
     if (!window.IsHumanVerifier) throw new Error('IsHumanVerifier SDK not loaded');
     const requiredAssurance = demoRequiredAssurance(options);
@@ -1292,10 +1303,11 @@
       requiredAssurance,
       ...options,
     });
+    const ppid = await resolveDisplayedPpid(verifier, backend, slug, options, requiredAssurance);
     const verified = !!(backend.ok || backend.human);
     const result = {
       human: verified,
-      ppid: backend.ppid,
+      ppid,
       assurance: backend.assurance,
       presentation: backend.presentation,
       reason: backend.reason,
@@ -1904,9 +1916,11 @@
       try {
         const verifier = verifierFor(slug);
         const raw = await verifier.checkStatus({ requiredAssurance: DEFAULT_DEMO_SITE_ASSURANCE });
-        const verified = isSiteVerified(raw);
+        const ppid = raw.ppid || state.passkeyPpids[slug] || null;
+        const verified = isSiteVerified({ ...raw, ppid });
         const result = {
           ...raw,
+          ppid,
           human: verified,
         };
         state.results[slug] = result;
