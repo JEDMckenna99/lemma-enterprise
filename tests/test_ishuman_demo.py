@@ -417,7 +417,7 @@ def test_ishuman_demo_js_uses_real_verifier_with_two_site_bindings():
     assert "/api/demo/ishuman/require-ishuman" in js
     assert "createLemmaIdViaPopup" in js
     assert "startLiveDemo" in js
-    assert "startSimulatedDemo" in js
+    assert "startSimulatedDemo" not in js
     assert "/api/ishuman/start-verification" in js
     assert "/api/ishuman/verification-status/" in js
 
