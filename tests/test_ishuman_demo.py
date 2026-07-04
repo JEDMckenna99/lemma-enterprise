@@ -67,14 +67,17 @@ def test_ishuman_demo_page_loads_expected_assets(ishuman_demo_client):
     assert "/sdk/ishuman-verifier.js" in body
     assert "/static/js/demo/ishuman-demo.js" in body
     assert "/static/css/demo/ishuman-demo.css" in body
-    assert "/static/js/demo/ishuman-demo.js?v=35" in body
+    assert "/static/js/demo/ishuman-demo.js?v=36" in body
+    assert "ih-exit-simulation-btn" in body
+    assert "Staging simulation only" in body
 
 
 def test_ishuman_demo_js_exposes_quick_demo_entrypoint():
     js = (ROOT / "static" / "js" / "demo" / "ishuman-demo.js").read_text(encoding="utf-8")
     assert "async function runQuickDemo()" in js
     assert "window.runQuickDemo = runQuickDemo" in js
-    assert "MAIN_WORKFLOW_STEPS" in js
+    assert "ensureRealLemmaId" in js
+    assert "waitForWalletId" in js
     assert "lemma_demo_ui_mode" not in js
 
 

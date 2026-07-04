@@ -6,7 +6,7 @@
 
 {% block head %}
 {{ super() }}
-<link rel="stylesheet" href="/static/css/demo/ishuman-demo.css?v=9">
+<link rel="stylesheet" href="/static/css/demo/ishuman-demo.css?v=10">
 {% endblock %}
 
 {% block content %}
@@ -69,8 +69,11 @@
   </details>
 
   <div class="demo-simulation-banner" id="ih-simulation-banner" hidden>
-    <strong>Simulation mode</strong>
-    <span>No real lemma.id is created. Sample credentials run the enforcement loop only.</span>
+    <div class="demo-simulation-banner-main">
+      <strong>Staging simulation only</strong>
+      <span>Test credentials — no real passkey wallet. Use Run 3-minute demo for a real lemma.id.</span>
+    </div>
+    <button class="demo-btn demo-btn-secondary demo-btn-sm" id="ih-exit-simulation-btn" type="button">Use real demo</button>
   </div>
 
   <div class="demo-workflow" id="ih-demo-workflow">
@@ -255,7 +258,7 @@
     <div class="demo-advanced-body">
       <p class="demo-muted">Optional steps for a full integration review: open relying-site demos, raise assurance to isHuman, reset state, or run the automated guided loop.</p>
       <div class="demo-advanced-toolbar">
-        <button class="demo-btn demo-btn-secondary" id="ih-start-simulated-demo" type="button">Try simulated demo</button>
+        <button class="demo-btn demo-btn-secondary" id="ih-start-simulated-demo" type="button" hidden>Staging: test credentials (no passkey)</button>
         <button class="demo-btn demo-btn-secondary" id="ih-run-guided-demo-advanced" type="button">Run full guided demo</button>
       </div>
 
@@ -403,5 +406,5 @@ const { ok, ppid, assurance, presentation } = await new IsHumanVerifier({
 <script src="/static/js/lemma-keys.js?v=5" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
 <script nonce="{{ csp_nonce }}">window.LEMMA_ISHUMAN_USE_PERSON_ROOT_SEEDS = {{ 'true' if ishuman_use_person_root_seeds else 'false' }};</script>
 <script src="/sdk/ishuman-verifier.js?v={{ ishuman_verifier_sdk_version }}" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
-<script src="/static/js/demo/ishuman-demo.js?v=35" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
+<script src="/static/js/demo/ishuman-demo.js?v=36" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
 {% endblock %}

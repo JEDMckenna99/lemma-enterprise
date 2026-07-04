@@ -125,22 +125,60 @@
     });
   }
 
+  async function waitForWalletId({ timeoutMs = 90000 } = {}) {
+    const deadline = Date.now() + timeoutMs;
+    while (Date.now() < deadline) {
+      await initWalletPassive().catch(() => {});
+      await refreshWalletStatus().catch(() => {});
+      if (state.walletId) return true;
+      await sleep(400);
+    }
+    return !!state.walletId;
+  }
+
+  async function ensureRealLemmaId() {
+    setDemoMode('live');
+    await initWalletPassive().catch(() => {});
+    await refreshWalletStatus().catch(() => {});
+    if (state.walletId) {
+      try {
+        await initWallet();
+        return true;
+      } catch (err) {
+        log('Wallet unlock needed', err.message);
+        openIdvPopup({ issueMode: 'unlock' });
+        return waitForWalletId();
+      }
+    }
+    setQuickInsight('Act 1 — Prove', 'Opening passkey setup to create your lemma.id…');
+    const popup = openIdvPopup({ issueMode: 'passkey_setup' });
+    if (!popup) {
+      setQuickInsight('Act 1 — Prove', 'Allow popups for lemma.id, then tap Run 3-minute demo again.');
+      return false;
+    }
+    const ready = await waitForWalletId();
+    if (!ready) {
+      setQuickInsight('Act 1 — Prove', 'Finish passkey setup in the popup, then run the demo again.');
+      return false;
+    }
+    try {
+      await initWallet();
+    } catch (err) {
+      log('Wallet unlock after setup skipped', err.message);
+    }
+    return true;
+  }
+
   async function runQuickDemo() {
     setDemoMode('live');
     setWizardBusy(true);
     try {
-      setQuickInsight('Act 1 — Prove', 'Create or unlock your lemma.id, then verify on ticketing.');
+      setQuickInsight('Act 1 — Prove', 'Create your passkey-controlled lemma.id…');
       setWorkflowHighlight(1);
       scrollToPanel('ih-step-1');
 
-      await refreshWalletStatus();
-      if (!state.walletId) {
-        setQuickInsight('Act 1 — Prove', 'Tap Create a lemma.id below (passkey only). Then run the demo again.');
-        log('Quick demo waiting', 'create lemma.id first');
-        return;
-      }
-
-      await initWallet().catch(() => {});
+      const walletReady = await ensureRealLemmaId();
+      if (!walletReady) return;
 
       updateQuickProgress(1);
       setQuickInsight('Act 1 — Prove', 'Verifying human proof on ticketing demo site…');
@@ -650,8 +688,9 @@
       'ih-run-guided-demo',
     ];
     if (simBtn) {
+      simBtn.hidden = !enabled;
       simBtn.disabled = !enabled;
-      simBtn.title = enabled ? '' : 'Simulated demo is available on staging environments only';
+      simBtn.title = enabled ? 'Staging only — injects test credentials without a passkey' : 'Available on staging environments only';
     }
     if (operatorConsole) operatorConsole.hidden = !enabled;
     for (const id of testIds) {
@@ -1198,7 +1237,7 @@
     setDemoReadyBanner(false);
     setPill('ih-lemma-status', 'CLEARED', 'warn');
     setPill('ih-person-status', '—', '');
-    setDemoMode(null);
+    setDemoMode('live');
     setWorkflowHighlight(1);
     for (const slug of SITE_SLUGS) {
       setPill(`ih-${slug}-pill`, 'Pending', '');
@@ -1700,10 +1739,12 @@
     markOperationRunning('wallet');
     await initWalletPassive();
     if (!state.walletId) {
-      await initWallet();
-    }
-    if (!state.walletId && state.config?.test_verify_enabled) {
-      await verifyOnceTestMode();
+      return makeOperationResult(
+        'wallet',
+        'fail',
+        'Create or unlock lemma.id first (Run 3-minute demo)',
+        { walletId: state.walletId, masterCredentialId: state.masterCredentialId },
+      );
     }
     const ready = !!state.walletId || isMasterReady();
     return makeOperationResult(
@@ -2044,9 +2085,15 @@
   }
 
   async function boot() {
+    setDemoMode('live');
     setWorkflowHighlight(1);
     await loadConfig();
     bind('ih-run-quick-demo', startPrimaryDemo);
+    bind('ih-exit-simulation-btn', () => {
+      setDemoMode('live');
+      setQuickInsight('Live demo', 'Run 3-minute demo to create a real passkey-controlled lemma.id.');
+      log('Exited simulation', 'use Run 3-minute demo');
+    });
     bind('ih-start-simulated-demo', startSimulatedDemo);
     bind('ih-unlock-lemma-btn', () => {
       setDemoMode('live');
