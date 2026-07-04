@@ -378,6 +378,26 @@ def index():
       }}
     }}
 
+    function formatVerdictPill(verified, assurance) {{
+      if (!verified) return 'DENY';
+      if (assurance === 'ishuman') return 'Human (ishuman)';
+      if (assurance === 'passkey') return 'Verified (passkey)';
+      return 'Verified';
+    }}
+
+    function formatVerdictDetail(response, stampNote, assurance) {{
+      const tier = assurance || response.assurance || SITE_POLICY;
+      const tierNote = tier === 'passkey'
+        ? ' · continuity only — IDV not required at this tier'
+        : (tier === 'ishuman' ? ' · IDV-backed human proof' : '');
+      return 'policy satisfied · assurance=' + tier
+        + ' · reason=' + response.reason
+        + ' · ' + response.timeMs.toFixed(0) + 'ms · site-private PPID issued'
+        + stampNote
+        + tierNote
+        + '.';
+    }}
+
     function formatMissingProof(reason) {{
       if (reason === 'site_proof_required') {{
         return 'No isHuman proof cached for this site yet. Click the protected action to issue one from your lemma.id.';
@@ -402,18 +422,21 @@ def index():
 
     function applyVerdict(response, {{ silent = false, stampedEvent = null, serverEntry = null }} = {{}}) {{
       const verified = isDemoVerified(response);
-      pill.textContent = verified ? 'HUMAN' : 'DENY';
+      const assurance = response.assurance || serverEntry?.assurance || null;
+      pill.textContent = formatVerdictPill(verified, assurance);
       pill.className = 'pill ' + (verified ? 'ok' : (silent ? 'checking' : 'deny'));
-      setAssurancePill(response.assurance || serverEntry?.assurance);
+      setAssurancePill(assurance);
       const lemma = stampedEvent?.lemma || null;
       const ppid = response.ppid || lemma?.ppid || '';
       if (verified) {{
         decisionCopy.textContent = '{copy["success"]}. PPID: ' + (ppid || '').slice(0, 28) + '…';
         if (!silent) {{
           const stampNote = serverEntry?.ok
-            ? ' · server verified stamp (assurance=' + (serverEntry.assurance || response.assurance || '?') + ')'
+            ? ' · server verified stamp'
             : '';
-          decisionCard.innerHTML = '<strong>{copy["success"]}</strong><p class="tiny">human=true · reason=' + response.reason + ' · ' + response.timeMs.toFixed(0) + 'ms · site-private PPID issued' + stampNote + '.</p>';
+          decisionCard.innerHTML = '<strong>{copy["success"]}</strong><p class="tiny">'
+            + formatVerdictDetail(response, stampNote, assurance)
+            + '</p>';
         }}
       }} else if (!silent) {{
         decisionCopy.textContent = 'Blocked. Reason: ' + response.reason;

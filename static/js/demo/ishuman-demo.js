@@ -352,7 +352,9 @@
   function formatSiteStatus(result) {
     if (!result) return 'Pending';
     if (isSiteVerified(result)) {
-      return result.assurance ? `Human (${result.assurance})` : 'Human verified';
+      if (result.assurance === 'passkey') return 'Verified (passkey)';
+      if (result.assurance === 'ishuman') return 'Human (ishuman)';
+      return result.assurance ? `Verified (${result.assurance})` : 'Verified';
     }
     if (result.reason === 'site_blocked' || result.reason === 'revoked') return 'Blocked';
     return 'Not verified';
