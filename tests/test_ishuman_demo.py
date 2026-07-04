@@ -33,16 +33,17 @@ def test_ishuman_demo_page_loads_expected_assets(ishuman_demo_client):
     assert "Human proofs on your site" in body
     assert "lemma.id demo" in body
     assert "Run 3-minute demo" in body
-    assert "Quick demo" in body
-    assert "Integrator demo" in body
     assert "ih-run-quick-demo" in body
     assert "ih-quick-progress" in body
-    assert "ih-problem-contrast" in body
+    assert "Why integrators use lemma.id" in body
+    assert "Advanced integrator walkthrough" in body
     assert "Step 1 — Create your lemma.id" in body
     assert "Step 2 — Passkey proofs on two sites" in body
-    assert "Step 4 — Site requires isHuman assurance" in body
-    assert "Step 5 — Revoke on one site" in body
-    assert "Step 6 — Reset demo" in body
+    assert "Step 3 — Revoke on one site" in body
+    assert "Site requires isHuman assurance" in body
+    assert "Quick demo" not in body
+    assert "Integrator demo" not in body
+    assert "Step 5 — Revoke on one site" not in body
     assert "verifyForBackend" in body
     assert "demo-workflow" in body
     assert "Operations Check" in body
@@ -66,14 +67,15 @@ def test_ishuman_demo_page_loads_expected_assets(ishuman_demo_client):
     assert "/sdk/ishuman-verifier.js" in body
     assert "/static/js/demo/ishuman-demo.js" in body
     assert "/static/css/demo/ishuman-demo.css" in body
-    assert "/static/js/demo/ishuman-demo.js?v=34" in body
+    assert "/static/js/demo/ishuman-demo.js?v=35" in body
 
 
 def test_ishuman_demo_js_exposes_quick_demo_entrypoint():
     js = (ROOT / "static" / "js" / "demo" / "ishuman-demo.js").read_text(encoding="utf-8")
     assert "async function runQuickDemo()" in js
     assert "window.runQuickDemo = runQuickDemo" in js
-    assert "lemma_demo_ui_mode" in js
+    assert "MAIN_WORKFLOW_STEPS" in js
+    assert "lemma_demo_ui_mode" not in js
 
 
 def test_legacy_developer_ishuman_url_redirects_to_canonical_developer(monkeypatch):

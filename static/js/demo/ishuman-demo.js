@@ -35,7 +35,6 @@
   const state = {
     config: null,
     demoMode: null,
-    uiMode: 'quick',
     wallet: null,
     walletId: null,
     walletSecret: null,
@@ -91,18 +90,17 @@
     }
   }
 
-  function isQuickUiMode() {
-    return state.uiMode === 'quick';
-  }
+  const MAIN_WORKFLOW_STEPS = [
+    { id: 1, act: 1 },
+    { id: 2, act: 2 },
+    { id: 5, act: 3 },
+  ];
 
-  function updateProgressStrip(workflowStep) {
-    if (isQuickUiMode()) return;
-    document.querySelectorAll('.demo-progress-item').forEach((item) => {
-      const step = Number(item.dataset.step || 0);
-      item.classList.remove('is-active', 'is-done');
-      if (workflowStep > 0 && step < workflowStep) item.classList.add('is-done');
-      else if (step === workflowStep) item.classList.add('is-active');
-    });
+  function workflowToQuickAct(workflowStep) {
+    if (workflowStep <= 0) return 0;
+    if (workflowStep <= 1) return 1;
+    if (workflowStep <= 2) return 2;
+    return 3;
   }
 
   function showQuickInsight(visible) {
@@ -122,46 +120,12 @@
     document.querySelectorAll('#ih-quick-progress .demo-progress-item').forEach((item) => {
       const step = Number(item.dataset.quickAct || 0);
       item.classList.remove('is-active', 'is-done');
-      if (act > 0 && step < act) item.classList.add('is-done');
+      if (act >= 4 || (act > 0 && step < act)) item.classList.add('is-done');
       else if (step === act) item.classList.add('is-active');
     });
   }
 
-  function applyUiMode() {
-    const root = $('lemma-demo');
-    const quick = isQuickUiMode();
-    if (root) {
-      root.classList.toggle('demo-ui-quick', quick);
-      root.classList.toggle('demo-ui-integrator', !quick);
-    }
-    const quickBtn = $('ih-mode-quick');
-    const integratorBtn = $('ih-mode-integrator');
-    if (quickBtn) {
-      quickBtn.classList.toggle('is-active', quick);
-      quickBtn.setAttribute('aria-selected', quick ? 'true' : 'false');
-    }
-    if (integratorBtn) {
-      integratorBtn.classList.toggle('is-active', !quick);
-      integratorBtn.setAttribute('aria-selected', !quick ? 'true' : 'false');
-    }
-    const runBtn = $('ih-run-quick-demo');
-    if (runBtn) runBtn.textContent = quick ? 'Run 3-minute demo' : 'Run guided demo';
-    updateStepLocks();
-  }
-
-  function setUiMode(mode) {
-    state.uiMode = mode === 'integrator' ? 'integrator' : 'quick';
-    try {
-      localStorage.setItem('lemma_demo_ui_mode', state.uiMode);
-    } catch (_) {
-      /* ignore storage errors */
-    }
-    applyUiMode();
-    applyAssuranceModeUI();
-  }
-
   async function runQuickDemo() {
-    setUiMode('quick');
     setDemoMode('live');
     setWizardBusy(true);
     try {
@@ -195,7 +159,7 @@
       await blockTickets();
       await recheckBothSitesAfterBlock();
 
-      setQuickInsight('Done', 'Ticketing blocked; trials still works. Switch to Integrator demo for isHuman step-up and relying-site tabs.');
+      setQuickInsight('Done', 'Ticketing blocked; trials still works. Open Advanced integrator walkthrough for isHuman step-up and relying-site tabs.');
       setWorkflowHighlight(0);
       log('Quick demo complete');
     } catch (err) {
@@ -316,45 +280,24 @@
   function updateStepLocks() {
     const ready = isStep1Ready();
     const bothVerified = bothSitesVerified();
-    const escalated = stepUpComplete();
-    const maxStep = assuranceDemoMode() ? 6 : 5;
-
-    for (let i = 1; i <= maxStep; i += 1) {
-      const el = $(`ih-step-${i}`);
-      if (!el) continue;
-      if (assuranceDemoMode() && el.hidden) continue;
-      if (!assuranceDemoMode() && (i === 3 || i === 4 || i === 6)) continue;
-
-      if (i === 1 || i === 6) el.classList.remove('is-locked');
-      else if (i === 2) el.classList.toggle('is-locked', !ready);
-      else if (i === 3 && assuranceDemoMode()) el.classList.toggle('is-locked', !bothVerified);
-      else if (i === 4 && assuranceDemoMode()) el.classList.toggle('is-locked', !bothVerified);
-      else if (i === 5) {
-        const needEscalation = assuranceDemoMode() && !isQuickUiMode();
-        el.classList.toggle('is-locked', needEscalation ? !escalated : !bothVerified);
-      }
-    }
+    const step1 = $('ih-step-1');
+    const step2 = $('ih-step-2');
+    const step5 = $('ih-step-5');
+    if (step1) step1.classList.remove('is-locked');
+    if (step2) step2.classList.toggle('is-locked', !ready);
+    if (step5) step5.classList.toggle('is-locked', !bothVerified);
   }
 
   function setWorkflowHighlight(workflowStep) {
-    const max = assuranceDemoMode() ? 6 : 5;
-    for (let i = 1; i <= max; i += 1) {
-      const el = $(`ih-step-${i}`);
+    const quickAct = workflowStep === 0 ? 4 : workflowToQuickAct(workflowStep);
+    for (const { id, act } of MAIN_WORKFLOW_STEPS) {
+      const el = $(`ih-step-${id}`);
       if (!el) continue;
-      if (!assuranceDemoMode() && (i === 3 || i === 4 || i === 6)) continue;
       el.classList.remove('is-active', 'is-done');
-      if (workflowStep > 0 && i < workflowStep) el.classList.add('is-done');
-      else if (i === workflowStep) el.classList.add('is-active');
+      if (quickAct >= 4 || act < quickAct) el.classList.add('is-done');
+      else if (act === quickAct) el.classList.add('is-active');
     }
-    if (workflowStep === 0) {
-      for (let i = 1; i <= max; i += 1) {
-        const el = $(`ih-step-${i}`);
-        if (!el) continue;
-        if (!assuranceDemoMode() && (i === 3 || i === 4 || i === 6)) continue;
-        el.classList.add('is-done');
-      }
-    }
-    updateProgressStrip(workflowStep === 0 ? max : workflowStep);
+    updateQuickProgress(quickAct);
     updateStepLocks();
   }
 
@@ -364,15 +307,7 @@
       el.hidden = !on;
     });
     const blockTitle = $('ih-block-step-title');
-    if (blockTitle) {
-      if (isQuickUiMode()) {
-        blockTitle.textContent = 'Step 3 — Revoke on one site';
-      } else {
-        blockTitle.textContent = on
-          ? 'Step 5 — Revoke on one site'
-          : 'Step 3 — Revoke on one site';
-      }
-    }
+    if (blockTitle) blockTitle.textContent = 'Step 3 — Revoke on one site';
     const stepupTitle = $('ih-stepup-step-title');
     if (stepupTitle && on) {
       stepupTitle.textContent = 'Step 4 — Site requires isHuman assurance';
@@ -393,7 +328,7 @@
       if (step1Desc) step1Desc.textContent = 'Use an existing lemma.id or complete a one-time identity check.';
       if (step2Title) step2Title.textContent = 'Step 2 — Use the same lemma.id on two sites';
       if (step2Desc) step2Desc.textContent = 'Each site asks for the assurance it needs; your wallet mints a site-private stamp the site verifies itself — same verified human, different PPIDs.';
-      if (intro) intro.textContent = 'lemma.id is your passkey-controlled proof container. Sites request the assurance they need — usually passkey first. isHuman is the stronger tier a site can require later on the same private site ID. Use Integrator demo for the full walkthrough: wallet → site proofs → relying sites → optional isHuman step-up → site-scoped revocation.';
+      if (intro) intro.textContent = 'lemma.id gives your users a passkey wallet that mints site-private proofs your backend verifies offline — no per-request call back to lemma.id. Same person, different opaque ID on every site. You block abuse on your site only.';
       if (createBtn) createBtn.textContent = 'Create a lemma.id';
       if (step1Utility) {
         step1Utility.querySelector('p').textContent = 'The one-time IDV path: verify once on lemma.id, then reuse that proof across sites. Your identity stays in a container only you control.';
@@ -627,6 +562,7 @@
       'ih-reverify-tickets-ishuman-btn',
       'ih-force-reverify-btn',
       'ih-run-guided-demo',
+      'ih-run-guided-demo-advanced',
       'ih-run-all-operations',
       'ih-reset-demo-btn',
     ];
@@ -635,7 +571,7 @@
       if (el) el.disabled = running;
     }
     const label = running ? 'Running demo…' : 'Run full demo';
-    for (const id of ['ih-run-guided-demo', 'ih-run-guided-demo-hero']) {
+    for (const id of ['ih-run-guided-demo', 'ih-run-guided-demo-advanced', 'ih-run-guided-demo-hero']) {
       const runBtn = $(id);
       if (runBtn) runBtn.textContent = label;
     }
@@ -644,9 +580,7 @@
   }
 
   async function startPrimaryDemo() {
-    if (isQuickUiMode()) return runQuickDemo();
-    setDemoMode('live');
-    return runGuidedDemo();
+    return runQuickDemo();
   }
 
   async function startLiveDemo() {
@@ -662,6 +596,8 @@
       return;
     }
     setDemoMode('simulated');
+    const advanced = $('ih-advanced-walkthrough');
+    if (advanced) advanced.open = true;
     setWorkflowHighlight(1);
     scrollToPanel('ih-step-1');
     log('Simulated demo started', 'no real lemma.id will be created');
@@ -1456,7 +1392,7 @@
     if (bothSitesVerified()) {
       if (assuranceDemoMode()) {
         setWorkflowHighlight(3);
-        scrollToPanel('ih-demo-sites-panel');
+        scrollToPanel('ih-step-3');
       } else {
         setWorkflowHighlight(4);
         scrollToPanel('ih-abuse-panel');
@@ -1579,7 +1515,7 @@
     await probeDerive('tickets');
     if (assuranceDemoMode()) {
       setWorkflowHighlight(6);
-      scrollToPanel('ih-reset-panel');
+      scrollToPanel('ih-step-6');
     } else {
       setWorkflowHighlight(5);
       scrollToPanel('ih-abuse-panel');
@@ -1603,7 +1539,7 @@
     });
     log('Site doubt created', 'ticketing requires isHuman step-up');
     setWorkflowHighlight(5);
-    scrollToPanel('ih-stepup-panel');
+    scrollToPanel('ih-step-4');
   }
 
   async function completeIsHumanVerification() {
@@ -1965,11 +1901,11 @@
         await verifyBothSites();
 
         setWizardStep(3, 'Open demo sites to stamp actions (optional pause)…');
-        scrollToPanel('ih-demo-sites-panel');
+        scrollToPanel('ih-step-3');
         await sleep(1500);
 
         setWizardStep(4, 'Requiring isHuman on ticketing…');
-        scrollToPanel('ih-stepup-panel');
+        scrollToPanel('ih-step-4');
         await requireIsHumanOnTickets();
 
         setWizardStep(5, 'Complete isHuman verification…');
@@ -2108,18 +2044,9 @@
   }
 
   async function boot() {
-    try {
-      const savedMode = localStorage.getItem('lemma_demo_ui_mode');
-      if (savedMode === 'integrator') state.uiMode = 'integrator';
-    } catch (_) {
-      /* ignore storage errors */
-    }
     setWorkflowHighlight(1);
     await loadConfig();
-    applyUiMode();
     bind('ih-run-quick-demo', startPrimaryDemo);
-    bind('ih-mode-quick', () => setUiMode('quick'));
-    bind('ih-mode-integrator', () => setUiMode('integrator'));
     bind('ih-start-simulated-demo', startSimulatedDemo);
     bind('ih-unlock-lemma-btn', () => {
       setDemoMode('live');
@@ -2141,6 +2068,7 @@
     bind('ih-complete-ishuman-btn', completeIsHumanVerification);
     bind('ih-reverify-tickets-ishuman-btn', reverifyTicketsIshuman);
     bind('ih-run-guided-demo', runGuidedDemo);
+    bind('ih-run-guided-demo-advanced', runGuidedDemo);
     bind('ih-run-all-operations', runAllOperations);
     bind('ih-reset-demo-btn', clearLemmaId);
     bind('ih-force-reverify-btn', forceFreshIdv);
