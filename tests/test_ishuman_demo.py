@@ -67,9 +67,11 @@ def test_ishuman_demo_page_loads_expected_assets(ishuman_demo_client):
     assert "/sdk/ishuman-verifier.js" in body
     assert "/static/js/demo/ishuman-demo.js" in body
     assert "/static/css/demo/ishuman-demo.css" in body
-    assert "/static/js/demo/ishuman-demo.js?v=36" in body
-    assert "ih-exit-simulation-btn" in body
-    assert "Staging simulation only" in body
+    assert "/static/js/demo/ishuman-demo.js?v=37" in body
+    assert "One passkey wallet" in body
+    assert "ih-simulation-banner" not in body
+    assert "Staging simulation only" not in body
+    assert "ih-start-simulated-demo" not in body
 
 
 def test_ishuman_demo_js_exposes_quick_demo_entrypoint():

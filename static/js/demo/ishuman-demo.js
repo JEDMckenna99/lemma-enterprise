@@ -366,7 +366,7 @@
       if (step1Desc) step1Desc.textContent = 'Use an existing lemma.id or complete a one-time identity check.';
       if (step2Title) step2Title.textContent = 'Step 2 — Use the same lemma.id on two sites';
       if (step2Desc) step2Desc.textContent = 'Each site asks for the assurance it needs; your wallet mints a site-private stamp the site verifies itself — same verified human, different PPIDs.';
-      if (intro) intro.textContent = 'lemma.id gives your users a passkey wallet that mints site-private proofs your backend verifies offline — no per-request call back to lemma.id. Same person, different opaque ID on every site. You block abuse on your site only.';
+      if (intro) intro.textContent = 'lemma.id is one passkey wallet per user — the isHuman proof lives in that single container. Sites request site-private stamps from it; your backend verifies offline. Same wallet, different opaque ID on every site. You block abuse on your site only.';
       if (createBtn) createBtn.textContent = 'Create a lemma.id';
       if (step1Utility) {
         step1Utility.querySelector('p').textContent = 'The one-time IDV path: verify once on lemma.id, then reuse that proof across sites. Your identity stays in a container only you control.';
@@ -449,11 +449,7 @@
   }
 
   function setDemoMode(mode) {
-    state.demoMode = mode;
-    const banner = $('ih-simulation-banner');
-    if (banner) banner.hidden = mode !== 'simulated';
-    const createBtn = $('ih-create-lemma-btn');
-    if (createBtn) createBtn.hidden = mode === 'simulated';
+    state.demoMode = mode === 'simulated' ? 'live' : (mode || 'live');
     updateStepLocks();
   }
 
@@ -586,7 +582,6 @@
     state.wizardRunning = running;
     const ids = [
       'ih-run-quick-demo',
-      'ih-start-simulated-demo',
       'ih-unlock-lemma-btn',
       'ih-create-lemma-btn',
       'ih-verify-sites-btn',
@@ -628,27 +623,6 @@
     log('Live demo started', 'create or unlock your lemma.id');
   }
 
-  async function startSimulatedDemo() {
-    if (!state.config?.test_verify_enabled) {
-      log('Simulated demo unavailable', 'use Start live demo on this environment');
-      return;
-    }
-    setDemoMode('simulated');
-    const advanced = $('ih-advanced-walkthrough');
-    if (advanced) advanced.open = true;
-    setWorkflowHighlight(1);
-    scrollToPanel('ih-step-1');
-    log('Simulated demo started', 'no real lemma.id will be created');
-    try {
-      await initWallet();
-      await verifyOnceTestMode();
-      setWorkflowHighlight(2);
-      scrollToPanel('ih-step-2');
-    } catch (err) {
-      log('Simulated demo failed', err.message);
-    }
-  }
-
   function demoHeaders() {
     const headers = {};
     const testToken = ($('ih-test-token') && $('ih-test-token').value.trim()) || state.serverTestToken;
@@ -678,7 +652,6 @@
 
   function applyTestVerifyGate() {
     const enabled = !!(state.config && state.config.test_verify_enabled);
-    const simBtn = $('ih-start-simulated-demo');
     const operatorConsole = $('ih-operator-console');
     const testIds = [
       'ih-start-idv-btn',
@@ -687,11 +660,6 @@
       'ih-poll-btn',
       'ih-run-guided-demo',
     ];
-    if (simBtn) {
-      simBtn.hidden = !enabled;
-      simBtn.disabled = !enabled;
-      simBtn.title = enabled ? 'Staging only — injects test credentials without a passkey' : 'Available on staging environments only';
-    }
     if (operatorConsole) operatorConsole.hidden = !enabled;
     for (const id of testIds) {
       const el = $(id);
@@ -2089,12 +2057,6 @@
     setWorkflowHighlight(1);
     await loadConfig();
     bind('ih-run-quick-demo', startPrimaryDemo);
-    bind('ih-exit-simulation-btn', () => {
-      setDemoMode('live');
-      setQuickInsight('Live demo', 'Run 3-minute demo to create a real passkey-controlled lemma.id.');
-      log('Exited simulation', 'use Run 3-minute demo');
-    });
-    bind('ih-start-simulated-demo', startSimulatedDemo);
     bind('ih-unlock-lemma-btn', () => {
       setDemoMode('live');
       openIdvPopup({ issueMode: 'unlock' });

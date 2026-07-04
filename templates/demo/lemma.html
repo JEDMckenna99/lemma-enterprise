@@ -26,7 +26,7 @@
   <header class="demo-intro">
     <p class="demo-eyebrow">lemma.id demo</p>
     <h1 class="demo-title">Human proofs on your site</h1>
-    <p class="demo-lead" id="ih-intro-lead">lemma.id gives your users a passkey wallet that mints site-private proofs your backend verifies offline — no per-request call back to lemma.id. Same person, different opaque ID on every site. You block abuse on your site only.</p>
+    <p class="demo-lead" id="ih-intro-lead">lemma.id is one passkey wallet per user — the isHuman proof lives in that single container. Sites request site-private stamps from it; your backend verifies offline. Same wallet, different opaque ID on every site. You block abuse on your site only.</p>
     <div class="demo-hero-cta">
       <button class="demo-btn demo-btn-primary" id="ih-run-quick-demo" type="button">Run 3-minute demo</button>
     </div>
@@ -52,29 +52,21 @@
       <div class="demo-problem-col demo-problem-without">
         <h3>Without lemma.id</h3>
         <ul>
-          <li>CAPTCHAs and device fingerprints — easy to bypass, bad UX</li>
-          <li>Email or phone verification — reusable identity you must store</li>
-          <li>Network-wide bans — one block leaks across unrelated sites</li>
+          <li>Each site runs its own verification — users repeat signup friction everywhere</li>
+          <li>You store emails, phones, or device signals to recognize the same person</li>
+          <li>Network-wide blocklists — one ban follows users across unrelated sites</li>
         </ul>
       </div>
       <div class="demo-problem-col demo-problem-with">
         <h3>With lemma.id</h3>
         <ul>
-          <li>Signed human proof your server verifies locally</li>
-          <li>Site-private ID — neither site sees the other's identifier</li>
-          <li>Revoke on your site only; other sites unaffected</li>
+          <li>One passkey wallet — the isHuman proof lives in a single lemma.id only the user controls</li>
+          <li>Sites request site-private stamps from that wallet; your backend verifies them offline</li>
+          <li>Revoke a site-private ID on your site only — other sites are unaffected</li>
         </ul>
       </div>
     </div>
   </details>
-
-  <div class="demo-simulation-banner" id="ih-simulation-banner" hidden>
-    <div class="demo-simulation-banner-main">
-      <strong>Staging simulation only</strong>
-      <span>Test credentials — no real passkey wallet. Use Run 3-minute demo for a real lemma.id.</span>
-    </div>
-    <button class="demo-btn demo-btn-secondary demo-btn-sm" id="ih-exit-simulation-btn" type="button">Use real demo</button>
-  </div>
 
   <div class="demo-workflow" id="ih-demo-workflow">
 
@@ -258,7 +250,6 @@
     <div class="demo-advanced-body">
       <p class="demo-muted">Optional steps for a full integration review: open relying-site demos, raise assurance to isHuman, reset state, or run the automated guided loop.</p>
       <div class="demo-advanced-toolbar">
-        <button class="demo-btn demo-btn-secondary" id="ih-start-simulated-demo" type="button" hidden>Staging: test credentials (no passkey)</button>
         <button class="demo-btn demo-btn-secondary" id="ih-run-guided-demo-advanced" type="button">Run full guided demo</button>
       </div>
 
@@ -406,5 +397,5 @@ const { ok, ppid, assurance, presentation } = await new IsHumanVerifier({
 <script src="/static/js/lemma-keys.js?v=5" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
 <script nonce="{{ csp_nonce }}">window.LEMMA_ISHUMAN_USE_PERSON_ROOT_SEEDS = {{ 'true' if ishuman_use_person_root_seeds else 'false' }};</script>
 <script src="/sdk/ishuman-verifier.js?v={{ ishuman_verifier_sdk_version }}" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
-<script src="/static/js/demo/ishuman-demo.js?v=36" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
+<script src="/static/js/demo/ishuman-demo.js?v=37" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
 {% endblock %}
