@@ -197,7 +197,7 @@
       await blockTickets();
       await recheckBothSitesAfterBlock();
 
-      setQuickInsight('Done', 'Ticketing blocked; trials still works. Open Advanced integrator walkthrough for isHuman step-up and relying-site tabs.');
+      setQuickInsight('Done', 'Ticketing blocked; trials still works. Step 3 also supports isHuman step-up when your policy needs it.');
       setWorkflowHighlight(0);
       log('Quick demo complete');
     } catch (err) {
@@ -345,7 +345,7 @@
       el.hidden = !on;
     });
     const blockTitle = $('ih-block-step-title');
-    if (blockTitle) blockTitle.textContent = 'Step 3 — Revoke on one site';
+    if (blockTitle) blockTitle.textContent = 'Step 3 — Control on your site';
     const stepupTitle = $('ih-stepup-step-title');
     if (stepupTitle && on) {
       stepupTitle.textContent = 'Step 4 — Site requires isHuman assurance';
@@ -1546,7 +1546,7 @@
     });
     log('Site doubt created', 'ticketing requires isHuman step-up');
     setWorkflowHighlight(5);
-    scrollToPanel('ih-step-4');
+    scrollToPanel('ih-control-escalation');
   }
 
   async function completeIsHumanVerification() {

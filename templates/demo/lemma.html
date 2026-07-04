@@ -6,7 +6,7 @@
 
 {% block head %}
 {{ super() }}
-<link rel="stylesheet" href="/static/css/demo/ishuman-demo.css?v=10">
+<link rel="stylesheet" href="/static/css/demo/ishuman-demo.css?v=11">
 {% endblock %}
 
 {% block content %}
@@ -200,8 +200,8 @@
       <div class="workflow-body" id="ih-abuse-panel">
         <div class="workflow-head">
           <div>
-            <h2 id="ih-block-step-title">Step 3 — Revoke on one site</h2>
-            <p class="demo-muted">Site-scoped revocation: block this person's ticketing proof without touching trials or any other site.</p>
+            <h2 id="ih-block-step-title">Step 3 — Control on your site</h2>
+            <p class="demo-muted">Revoke abusive proofs on your site only — or raise assurance to <strong>isHuman</strong> when your policy needs stronger trust. Same lemma.id wallet; only the proof tier changes.</p>
           </div>
         </div>
 
@@ -210,6 +210,38 @@
           <p>Enforcement is per-site. A ticketing ban does not follow the user to trials or leak across the network — unlike IP or device bans.</p>
         </div>
 
+        <div class="demo-control-section assurance-only" id="ih-control-escalation">
+          <h3 class="demo-control-subtitle">Escalate proof requirements</h3>
+          <p class="demo-muted">Ticketing can require <code>ishuman</code> instead of <code>passkey</code> — same site-private ID, stronger assurance. Complete IDV, then re-verify.</p>
+          <div class="step-up-grid">
+            <div class="block-card">
+              <h4>Raise ticketing policy</h4>
+              <button class="demo-btn demo-btn-secondary" id="ih-require-ishuman-btn" type="button">Require isHuman on ticketing</button>
+            </div>
+            <div class="block-card">
+              <h4>Complete step-up</h4>
+              <button class="demo-btn demo-btn-primary" id="ih-complete-ishuman-btn" type="button">Complete isHuman verification</button>
+              <button class="demo-btn demo-btn-secondary" id="ih-reverify-tickets-ishuman-btn" type="button">Re-verify ticketing (ishuman)</button>
+            </div>
+          </div>
+          <div class="ppid-stepup-compare" id="ih-stepup-compare" hidden>
+            <p class="ppid-compare-title">Same site-private ID after step-up</p>
+            <div class="ppid-compare-grid">
+              <div class="ppid-slot">
+                <span class="result-label">Before (passkey)</span>
+                <span class="ppid-val" id="ih-ppid-before-stepup">—</span>
+              </div>
+              <div class="ppid-diff" id="ih-stepup-diff">—</div>
+              <div class="ppid-slot">
+                <span class="result-label">After (isHuman)</span>
+                <span class="ppid-val" id="ih-ppid-after-stepup">—</span>
+              </div>
+            </div>
+            <p class="demo-muted" id="ih-assurance-flip">Assurance: —</p>
+          </div>
+        </div>
+
+        <h3 class="demo-control-subtitle">Site-scoped revocation</h3>
         <div class="block-grid">
           <div class="block-card">
             <h3>Block on Ticketing</h3>
@@ -248,7 +280,7 @@
   <details class="demo-advanced-walkthrough assurance-only" id="ih-advanced-walkthrough">
     <summary>Advanced integrator walkthrough</summary>
     <div class="demo-advanced-body">
-      <p class="demo-muted">Optional steps for a full integration review: open relying-site demos, raise assurance to isHuman, reset state, or run the automated guided loop.</p>
+      <p class="demo-muted">Optional steps for a full integration review: open relying-site demos, reset state, or run the automated guided loop. Step-up controls live in Step 3 above.</p>
       <div class="demo-advanced-toolbar">
         <button class="demo-btn demo-btn-secondary" id="ih-run-guided-demo-advanced" type="button">Run full guided demo</button>
       </div>
@@ -259,37 +291,6 @@
         <div class="action-row">
           <a class="demo-btn demo-btn-secondary" id="ih-link-tickets-site" href="#" target="_blank" rel="noopener">Open ticketing demo</a>
           <a class="demo-btn demo-btn-secondary" id="ih-link-trials-site" href="#" target="_blank" rel="noopener">Open trials demo</a>
-        </div>
-      </section>
-
-      <section class="demo-advanced-card" id="ih-step-4" data-step="4">
-        <h3 id="ih-stepup-step-title">Site requires isHuman assurance</h3>
-        <p class="demo-muted"><strong>isHuman</strong> is the higher assurance proof a site can request — not a separate product. Ticketing raises its policy to <code>ishuman</code>, you complete IDV, then re-verify. The PPID stays the same; only the assurance tier changes.</p>
-        <div class="step-up-grid">
-          <div class="block-card">
-            <h4>Raise ticketing policy to isHuman</h4>
-            <button class="demo-btn demo-btn-secondary" id="ih-require-ishuman-btn" type="button">Require isHuman on ticketing</button>
-          </div>
-          <div class="block-card">
-            <h4>Complete isHuman verification</h4>
-            <button class="demo-btn demo-btn-primary" id="ih-complete-ishuman-btn" type="button">Complete isHuman verification</button>
-            <button class="demo-btn demo-btn-secondary" id="ih-reverify-tickets-ishuman-btn" type="button">Re-verify ticketing (ishuman)</button>
-          </div>
-        </div>
-        <div class="ppid-stepup-compare" id="ih-stepup-compare" hidden>
-          <p class="ppid-compare-title">PPID equality check</p>
-          <div class="ppid-compare-grid">
-            <div class="ppid-slot">
-              <span class="result-label">Before step-up</span>
-              <span class="ppid-val" id="ih-ppid-before-stepup">—</span>
-            </div>
-            <div class="ppid-diff" id="ih-stepup-diff">—</div>
-            <div class="ppid-slot">
-              <span class="result-label">After isHuman</span>
-              <span class="ppid-val" id="ih-ppid-after-stepup">—</span>
-            </div>
-          </div>
-          <p class="demo-muted" id="ih-assurance-flip">Assurance: —</p>
         </div>
       </section>
 
@@ -397,5 +398,5 @@ const { ok, ppid, assurance, presentation } = await new IsHumanVerifier({
 <script src="/static/js/lemma-keys.js?v=5" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
 <script nonce="{{ csp_nonce }}">window.LEMMA_ISHUMAN_USE_PERSON_ROOT_SEEDS = {{ 'true' if ishuman_use_person_root_seeds else 'false' }};</script>
 <script src="/sdk/ishuman-verifier.js?v={{ ishuman_verifier_sdk_version }}" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
-<script src="/static/js/demo/ishuman-demo.js?v=37" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
+<script src="/static/js/demo/ishuman-demo.js?v=38" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
 {% endblock %}

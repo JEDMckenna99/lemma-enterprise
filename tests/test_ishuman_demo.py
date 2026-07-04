@@ -39,8 +39,12 @@ def test_ishuman_demo_page_loads_expected_assets(ishuman_demo_client):
     assert "Advanced integrator walkthrough" in body
     assert "Step 1 — Create your lemma.id" in body
     assert "Step 2 — Passkey proofs on two sites" in body
-    assert "Step 3 — Revoke on one site" in body
-    assert "Site requires isHuman assurance" in body
+    assert "Step 3 — Control on your site" in body
+    assert "Escalate proof requirements" in body
+    assert "ih-control-escalation" in body
+    assert "Require isHuman on ticketing" in body
+    assert "Step 3 — Revoke on one site" not in body
+    assert "Escalate proof requirements" in body
     assert "Quick demo" not in body
     assert "Integrator demo" not in body
     assert "Step 5 — Revoke on one site" not in body
@@ -67,7 +71,7 @@ def test_ishuman_demo_page_loads_expected_assets(ishuman_demo_client):
     assert "/sdk/ishuman-verifier.js" in body
     assert "/static/js/demo/ishuman-demo.js" in body
     assert "/static/css/demo/ishuman-demo.css" in body
-    assert "/static/js/demo/ishuman-demo.js?v=37" in body
+    assert "/static/js/demo/ishuman-demo.js?v=38" in body
     assert "One passkey wallet" in body
     assert "ih-simulation-banner" not in body
     assert "Staging simulation only" not in body
