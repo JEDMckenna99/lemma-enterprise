@@ -110,7 +110,7 @@ def test_ishuman_demo_page_loads_expected_assets(ishuman_demo_client):
     assert "/static/js/demo/ishuman-demo.js" in body
     assert "/static/css/demo/ishuman-demo.css" in body
     assert "/static/js/demo/ishuman-demo.js?v=53" in body
-    assert "/static/css/demo/ishuman-demo.css?v=26" in body
+    assert "/static/css/demo/ishuman-demo.css?v=27" in body
     assert "\U0001f511" not in body
     assert "\U0001f6e1" not in body
     assert "site-card-icon" in body
