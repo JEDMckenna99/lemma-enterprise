@@ -30,7 +30,8 @@ def test_ishuman_demo_page_loads_expected_assets(ishuman_demo_client):
     body = resp.get_data(as_text=True)
 
     assert resp.status_code == 200
-    assert "Private IDs per site — free" in body
+    assert "One lemma.id. A different private ID on every site." in body
+    assert "passkey-protected private proof container" in body
     assert "Human proofs + lemma.id demo" in body
     assert "Get started" in body
     assert "View developer docs" in body
@@ -43,9 +44,11 @@ def test_ishuman_demo_page_loads_expected_assets(ishuman_demo_client):
     assert "Why integrators use lemma.id" in body
     assert 'id="ih-advanced-panel"' in body
     assert "Advanced — operator tools" in body
-    assert "1. Create your empty lemma.id" in body
-    assert "2. Prove yourself on two sites" in body
-    assert "3. Control abuse on your site" in body
+    assert "1. Create your lemma.id" in body
+    assert "Prove yourself on two sites" in body
+    assert "2. Enforce on your site" in body
+    assert "3. Match assurance to your risk" in body
+    assert "free" not in body.split("demo-workflow")[1].split("demo-outcome-footer")[0].lower()
     assert "ih-step-rotation" in body
     assert "ih-step-human" in body
     assert "ih-simulate-rotation-btn" in body
@@ -53,11 +56,12 @@ def test_ishuman_demo_page_loads_expected_assets(ishuman_demo_client):
     assert "ih-raise-tickets-policy-btn" in body
     assert "ih-complete-human-main-btn" in body
     assert "ih-control-escalation" in body
-    assert "Same wallet → different private IDs per site" in body
+    assert "One lemma.id → different private IDs per site" in body
     assert "demo-diagram-stage" in body
     assert "demo-diagram-footnotes" in body
     assert "ih-proof-receipt" in body
-    assert "ih-link-tickets-main" in body
+    # Standalone open-site CTA removed — each site card carries its own link.
+    assert "ih-link-tickets-main" not in body
     assert "Quick demo" not in body
     assert "Integrator demo" not in body
     assert "Step 5 — Revoke on one site" not in body
@@ -75,7 +79,7 @@ def test_ishuman_demo_page_loads_expected_assets(ishuman_demo_client):
     assert "ih-step-1" in body
     assert "ih-step1-primary-btn" in body
     assert "ih-step1-continue-banner" in body
-    assert "Continue to step two." in body
+    assert "Your lemma.id is ready" in body
     assert "ih-create-lemma-btn" not in body
     assert "ih-unlock-lemma-btn" not in body
     assert "ih-network-pill" not in body
@@ -92,10 +96,10 @@ def test_ishuman_demo_page_loads_expected_assets(ishuman_demo_client):
     adv_start = body.index('id="ih-advanced-panel"')
     assert body.index("ih-verify-tickets-btn") > adv_start
     step2_start = body.index('id="ih-step-2"')
-    step3_start = body.index("<!-- Step 3")
-    assert "ih-verify-tickets-btn" not in body[step2_start:step3_start]
-    assert "ih-verify-tickets-step2" in body[step2_start:step3_start]
-    assert "ih-verify-trials-step2" in body[step2_start:step3_start]
+    chapter2_start = body.index("<!-- Chapter 2")
+    assert "ih-verify-tickets-btn" not in body[step2_start:chapter2_start]
+    assert "ih-verify-tickets-step2" in body[step2_start:chapter2_start]
+    assert "ih-verify-trials-step2" in body[step2_start:chapter2_start]
     assert "Test-mode automation" not in body
     assert "Unlock wallet" not in body
     assert "ih-try-qr-demo-btn" not in body
@@ -105,13 +109,15 @@ def test_ishuman_demo_page_loads_expected_assets(ishuman_demo_client):
     assert "/sdk/ishuman-verifier.js" in body
     assert "/static/js/demo/ishuman-demo.js" in body
     assert "/static/css/demo/ishuman-demo.css" in body
-    assert "/static/js/demo/ishuman-demo.js?v=51" in body
-    assert "/static/css/demo/ishuman-demo.css?v=23" in body
+    assert "/static/js/demo/ishuman-demo.js?v=52" in body
+    assert "/static/css/demo/ishuman-demo.css?v=24" in body
     assert "ticket drops" in body or "SaaS trials" in body
     assert "ih-simulation-banner" not in body
     assert "Staging simulation only" not in body
     assert "ih-start-simulated-demo" not in body
-    assert 'data-quick-act="5"' in body
+    assert 'data-quick-act="3"' in body
+    assert 'data-quick-act="4"' not in body
+    assert 'data-quick-act="5"' not in body
     human_start = body.index('id="ih-step-human"')
     adv_start = body.index('id="ih-advanced-panel"')
     assert body.index("ih-stepup-compare") < adv_start

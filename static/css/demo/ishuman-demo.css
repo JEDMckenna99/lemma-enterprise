@@ -314,6 +314,25 @@
   box-shadow: 0 2px 10px rgba(15, 23, 42, 0.04);
 }
 
+/* A second beat inside the same chapter card. */
+.workflow-subsection {
+  margin-top: 22px;
+  padding-top: 20px;
+  border-top: 1px dashed var(--demo-line);
+}
+
+.workflow-subsection-head h3 {
+  margin: 0 0 6px;
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.workflow-subsection-head .demo-muted {
+  font-size: 13px;
+  line-height: 1.45;
+  margin: 0 0 12px;
+}
+
 .workflow-head {
   display: flex;
   flex-wrap: wrap;

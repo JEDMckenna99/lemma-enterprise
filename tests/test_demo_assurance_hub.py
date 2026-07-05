@@ -21,7 +21,7 @@ def test_demo_hub_js_gates_assurance_workflow():
     assert "updateStepUpCompare" in js
 
 
-def test_demo_hub_template_has_five_act_narrative_sections():
+def test_demo_hub_template_has_three_chapter_narrative_sections():
     html = (ROOT / "templates" / "demo" / "lemma.html").read_text(encoding="utf-8")
     assert 'id="ih-step-5"' in html
     assert 'id="ih-step-rotation"' in html
@@ -30,4 +30,6 @@ def test_demo_hub_template_has_five_act_narrative_sections():
     assert "ih-stepup-compare" in html
     assert "ih-simulate-rotation-btn" in html
     assert "assurance-only" in html
-    assert 'data-quick-act="5"' in html
+    assert 'data-quick-act="3"' in html
+    assert 'data-quick-act="4"' not in html
+    assert "workflow-subsection" in html
