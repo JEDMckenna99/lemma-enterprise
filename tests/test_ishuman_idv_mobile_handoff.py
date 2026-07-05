@@ -149,6 +149,30 @@ def test_claim_with_wrong_mk_does_not_burn_handoff(
 
 
 @pytest.mark.integration
+def test_claim_with_stale_client_session_uses_stored_handoff_session(
+    ishuman_client,
+    fake_ishuman_db_session_factory,
+    monkeypatch,
+):
+    db = fake_ishuman_db_session_factory
+    monkeypatch.setattr("api.database.SessionLocal", db.session_local)
+    handoff_id = "handoff_" + "s" * 24
+    stored_session_id = "ishuman_sess_stored_handoff"
+    stale_session_id = "ishuman_sess_stale_phone"
+    _seed_verification_row(db, session_id=stored_session_id)
+    _store_handoff_entry(handoff_id=handoff_id, session_id=stored_session_id)
+
+    resp = ishuman_client.post(
+        "/api/ishuman/idv-mobile-handoff/claim",
+        json=_claim_body(handoff_id=handoff_id, session_id=stale_session_id),
+    )
+    payload = resp.get_json()
+    assert resp.status_code == 200, payload
+    assert payload["session_id"] == stored_session_id
+    assert payload["wallet_id"] == WALLET_ID
+
+
+@pytest.mark.integration
 def test_claim_with_session_id_only_returns_400(ishuman_client):
     resp = ishuman_client.post(
         "/api/ishuman/idv-mobile-handoff/claim",

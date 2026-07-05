@@ -7402,9 +7402,10 @@ class LemmaWallet {
             throw new Error(`mobile handoff claim failed: ${err.error || res.status}`);
         }
         const data = await res.json();
-        const aad = this._idvHandoffAad(handoffId, sessionId, data.wallet_id);
+        const claimedSessionId = data.session_id || sessionId;
+        const aad = this._idvHandoffAad(handoffId, claimedSessionId, data.wallet_id);
         const payload = await this._decryptHandoffBlob(data.encrypted_blob, mk, aad);
-        if (payload.sessionId && payload.sessionId !== sessionId) {
+        if (payload.sessionId && payload.sessionId !== claimedSessionId) {
             throw new Error('Handoff session mismatch');
         }
         if (payload.expiresAt && payload.expiresAt < Date.now()) {
@@ -7422,7 +7423,7 @@ class LemmaWallet {
 
         return {
             walletId: payload.walletId || data.wallet_id,
-            sessionId: payload.sessionId || data.session_id,
+            sessionId: payload.sessionId || claimedSessionId,
             walletSecret: payload.walletSecret,
         };
     }

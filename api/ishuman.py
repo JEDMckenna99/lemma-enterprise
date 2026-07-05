@@ -2963,12 +2963,13 @@ def idv_mobile_handoff_claim():
         entry_session_id = str(entry.get("session_id") or "").strip()
         if session_id != entry_session_id:
             _log_handoff_security_event(
-                "handoff_claim_session_invalid",
+                "handoff_claim_session_reconciled",
                 ip=ip_hash,
                 handoff=(handoff_id or "")[:24],
                 session=(session_id or "")[:24],
+                entry_session=entry_session_id[:24],
             )
-            return jsonify({"success": False, "error": "handoff_session_invalid"}), 403
+            session_id = entry_session_id
 
         if not _validate_handoff_mk(mk, entry):
             fail_count = _increment_handoff_mk_fail(handoff_id)

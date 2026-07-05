@@ -198,6 +198,15 @@ def test_mobile_handoff_scrubs_mk_from_url():
 
 
 @pytest.mark.browser
+def test_mobile_handoff_return_session_param_overrides_stale_storage(wallet_source):
+    idv_html = IDV_HTML.read_text(encoding="utf-8")
+    assert "let sessionId = ishumanSessionParam || localStorage.getItem(SESSION_KEY) || '';" in idv_html
+    assert "if (ishumanSessionParam) {" in idv_html
+    assert "const claimedSessionId = data.session_id || sessionId;" in wallet_source
+    assert "this._idvHandoffAad(handoffId, claimedSessionId, data.wallet_id)" in wallet_source
+
+
+@pytest.mark.browser
 def test_idv_popup_issues_site_proof_via_wallet():
     idv_html = IDV_HTML.read_text(encoding="utf-8")
     assert "ensureIsHumanIssuanceReady" in idv_html
@@ -250,7 +259,7 @@ def test_idv_passkey_actions_require_a_user_click():
 @pytest.mark.browser
 def test_idv_site_proof_boot_does_not_reference_undefined_copy():
     idv_html = IDV_HTML.read_text(encoding="utf-8")
-    site_proof_boot = idv_html.split("if (isSiteProofIssue) {", 1)[1]
+    site_proof_boot = idv_html.rsplit("if (isSiteProofIssue) {", 1)[1]
     site_proof_boot = site_proof_boot.split("if (isVerificationReturn && sessionId) {", 1)[0]
     assert "setStatus(copy.status" not in site_proof_boot
 
