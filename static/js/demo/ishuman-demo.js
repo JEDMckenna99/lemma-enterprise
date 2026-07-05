@@ -448,37 +448,27 @@
   }
 
   function updateStepLocks() {
-    const ready = isStep1Ready();
-    const bothVerified = bothSitesVerified();
-    const ticketsBlocked = isSiteBlocked('tickets', state.results.tickets);
-    const step1 = $('ih-step-1');
-    const step2 = $('ih-step-2');
-    const step5 = $('ih-step-5');
-    const stepRotation = $('ih-step-rotation');
-    const stepHuman = $('ih-step-human');
-    if (step1) step1.classList.remove('is-locked');
-    if (step2) step2.classList.toggle('is-locked', !ready);
-    if (step5) step5.classList.toggle('is-locked', !bothVerified);
-    if (stepRotation) stepRotation.classList.toggle('is-locked', !ticketsBlocked);
-    if (stepHuman) stepHuman.classList.toggle('is-locked', !state.rotationDemonstrated);
-
-    const gatedButtons = [
-      { id: 'ih-verify-sites-btn', enabled: ready },
-      { id: 'ih-simulate-rotation-btn', enabled: ticketsBlocked },
-      { id: 'ih-raise-tickets-policy-btn', enabled: state.rotationDemonstrated && !state.ticketsPolicyRaised },
-    ];
-    for (const { id, enabled } of gatedButtons) {
+    // No step is ever locked — every act stays explorable. We only pause
+    // action buttons while the guided wizard is mid-run to avoid re-entrancy.
+    const stepIds = ['ih-step-1', 'ih-step-2', 'ih-step-5', 'ih-step-rotation', 'ih-step-human'];
+    for (const id of stepIds) {
       const el = $(id);
-      if (!el) continue;
-      el.disabled = !enabled || state.wizardRunning;
-      el.classList.toggle('is-gated', !enabled);
+      if (el) el.classList.remove('is-locked');
     }
 
-    const completeHuman = $('ih-complete-human-main-btn');
-    const reverifyHuman = $('ih-reverify-human-main-btn');
-    const hasHuman = stepUpComplete() || isMasterReady();
-    if (completeHuman) completeHuman.disabled = !state.ticketsPolicyRaised || hasHuman || state.wizardRunning;
-    if (reverifyHuman) reverifyHuman.disabled = !hasHuman || state.wizardRunning;
+    const actionButtons = [
+      'ih-verify-sites-btn',
+      'ih-simulate-rotation-btn',
+      'ih-raise-tickets-policy-btn',
+      'ih-complete-human-main-btn',
+      'ih-reverify-human-main-btn',
+    ];
+    for (const id of actionButtons) {
+      const el = $(id);
+      if (!el) continue;
+      el.disabled = !!state.wizardRunning;
+      el.classList.remove('is-gated');
+    }
   }
 
   function setWorkflowHighlight(workflowStep) {
@@ -655,9 +645,15 @@
 
   async function simulateRotation() {
     const yours = resolveSitePpid('tickets');
-    if (!yours) throw new Error('Verify ticketing first — need a blocked PPID to compare');
+    if (!yours) {
+      scrollToPanel('ih-step-2');
+      setQuickInsight('First things first', 'Verify on ticketing (step 2) so there is a PPID to block and compare against.');
+      return;
+    }
     if (!isSiteBlocked('tickets', state.results.tickets)) {
-      throw new Error('Block ticketing first (step 3), then simulate rotation');
+      scrollToPanel('ih-step-5');
+      setQuickInsight('First things first', 'Block your ticketing PPID (step 3), then come back to simulate the abuser\u2019s rotation.');
+      return;
     }
 
     const secretBytes = crypto.getRandomValues(new Uint8Array(32));
@@ -710,9 +706,6 @@
   }
 
   async function raiseTicketsPolicySimulated() {
-    if (!state.rotationDemonstrated) {
-      throw new Error('Complete step 4 first — simulate wallet rotation');
-    }
     state.ticketsPolicyRaised = true;
     const pill = $('ih-tickets-policy-pill');
     const card = $('ih-policy-toggle-card');
@@ -722,7 +715,7 @@
       pill.className = 'demo-pill deny';
     }
     if (card) card.classList.add('is-raised');
-    if (btn) btn.disabled = true;
+    if (btn) btn.textContent = 'Policy raised \u2014 human proof required';
 
     await checkPolicyDenials();
     setQuickInsight(
@@ -2492,6 +2485,7 @@
         await fn();
       } catch (err) {
         log('Error', err.message);
+        setQuickInsight('Heads up', err.message);
         const netJson = $('ih-master-json');
         if (netJson) netJson.textContent = pretty(err.payload || { error: err.message });
       } finally {
@@ -2504,7 +2498,6 @@
     setDemoMode('live');
     setWorkflowHighlight(1);
     showQuickInsight(true);
-    await loadConfig();
     bind('ih-get-started', startLiveDemo);
     bind('ih-step1-primary-btn', async () => {
       setDemoMode('live');
@@ -2551,6 +2544,9 @@
     bind('ih-force-reverify-btn', forceFreshIdv);
 
     initOperationsUI();
+
+    // Config failure must not leave the page dead — buttons are already bound.
+    await loadConfig().catch((err) => log('Demo config load failed', err.message));
 
     try {
       await refreshWalletStatus();

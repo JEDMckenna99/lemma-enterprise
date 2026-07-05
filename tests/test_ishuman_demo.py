@@ -105,8 +105,8 @@ def test_ishuman_demo_page_loads_expected_assets(ishuman_demo_client):
     assert "/sdk/ishuman-verifier.js" in body
     assert "/static/js/demo/ishuman-demo.js" in body
     assert "/static/css/demo/ishuman-demo.css" in body
-    assert "/static/js/demo/ishuman-demo.js?v=50" in body
-    assert "/static/css/demo/ishuman-demo.css?v=22" in body
+    assert "/static/js/demo/ishuman-demo.js?v=51" in body
+    assert "/static/css/demo/ishuman-demo.css?v=23" in body
     assert "ticket drops" in body or "SaaS trials" in body
     assert "ih-simulation-banner" not in body
     assert "Staging simulation only" not in body

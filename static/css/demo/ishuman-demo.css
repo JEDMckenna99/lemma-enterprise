@@ -248,13 +248,15 @@
   display: flex;
   flex-direction: column;
   gap: 0;
+  max-width: 900px;
+  margin: 0 auto;
 }
 
 .workflow-step {
   display: grid;
   grid-template-columns: 52px minmax(0, 1fr);
-  gap: 16px;
-  padding-bottom: 28px;
+  gap: 18px;
+  padding-bottom: 36px;
 }
 
 .workflow-step:last-child {
@@ -291,14 +293,6 @@
   box-shadow: 0 0 0 4px rgba(79, 70, 229, 0.2);
 }
 
-.workflow-step.is-locked .workflow-body {
-  opacity: 0.55;
-}
-
-.workflow-step.is-locked .workflow-body * {
-  pointer-events: none;
-}
-
 .workflow-line {
   flex: 1;
   width: 2px;
@@ -316,7 +310,7 @@
   background: #fff;
   border: 1px solid var(--demo-line);
   border-radius: 14px;
-  padding: 14px 16px;
+  padding: 20px 22px;
   box-shadow: 0 2px 10px rgba(15, 23, 42, 0.04);
 }
 
@@ -1880,45 +1874,14 @@
 }
 
 @media (min-width: 1100px) {
-  .demo-workflow {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 12px;
-    align-items: start;
-  }
-
-  .workflow-step {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 0;
-    padding-bottom: 0;
-  }
-
-  .workflow-rail {
-    display: none;
-  }
-
-  .workflow-step.is-locked .workflow-body {
-    opacity: 0.72;
-  }
-
-  .workflow-body {
-    height: auto;
-    display: block;
-  }
-
-  .workflow-step .demo-moment-cta {
-    margin-top: 10px;
-    padding-top: 10px;
-  }
-
   #ih-step-2 .site-cards {
-    grid-template-columns: 1fr;
-    gap: 6px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
   }
 
   #ih-step-2 .ppid-compare-grid {
     grid-template-columns: 1fr auto 1fr;
-    gap: 6px;
+    gap: 8px;
     align-items: center;
   }
 
@@ -1927,18 +1890,6 @@
     text-align: center;
     padding: 0;
     font-size: 11px;
-  }
-
-  #ih-step-2 .ppid-slot .ppid-val {
-    font-size: 11px;
-  }
-
-  .demo-progress {
-    display: none;
-  }
-
-  .demo-context {
-    margin-bottom: 12px;
   }
 }
 
@@ -2043,6 +1994,13 @@
 .demo-wallet-slot-body .demo-muted {
   font-size: 11px;
   margin: 0;
+}
+
+/* Class display rules would otherwise override the hidden attribute. */
+.rotation-compare[hidden],
+.policy-deny-grid[hidden],
+.demo-outcome-banner[hidden] {
+  display: none !important;
 }
 
 .rotation-compare {

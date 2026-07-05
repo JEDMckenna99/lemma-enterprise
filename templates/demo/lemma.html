@@ -6,7 +6,7 @@
 
 {% block head %}
 {{ super() }}
-<link rel="stylesheet" href="/static/css/demo/ishuman-demo.css?v=22">
+<link rel="stylesheet" href="/static/css/demo/ishuman-demo.css?v=23">
 {% endblock %}
 
 {% block content %}
@@ -245,7 +245,7 @@
     </section>
 
     <!-- Step 2 -->
-    <section class="workflow-step demo-moment-card is-locked" id="ih-step-2" data-step="2">
+    <section class="workflow-step demo-moment-card" id="ih-step-2" data-step="2">
       <div class="workflow-rail">
         <span class="workflow-num">2</span>
         <span class="workflow-line" aria-hidden="true"></span>
@@ -395,7 +395,7 @@
     </section>
 
     <!-- Step 4 — rotation / ban evasion -->
-    <section class="workflow-step demo-moment-card is-locked" id="ih-step-rotation" data-step="rotation">
+    <section class="workflow-step demo-moment-card" id="ih-step-rotation" data-step="rotation">
       <div class="workflow-rail">
         <span class="workflow-num">4</span>
         <span class="workflow-line" aria-hidden="true"></span>
@@ -428,7 +428,7 @@
         </div>
 
         <div class="demo-moment-cta">
-          <button class="demo-btn demo-btn-primary" id="ih-simulate-rotation-btn" type="button" disabled>Simulate abuser's next move</button>
+          <button class="demo-btn demo-btn-primary" id="ih-simulate-rotation-btn" type="button">Simulate abuser's next move</button>
         </div>
 
         <div class="demo-outcome-banner is-warn" id="ih-rotation-outcome-banner" hidden aria-live="polite">
@@ -442,7 +442,7 @@
     </section>
 
     <!-- Step 5 — human proof product payoff -->
-    <section class="workflow-step demo-moment-card is-locked" id="ih-step-human" data-step="human">
+    <section class="workflow-step demo-moment-card" id="ih-step-human" data-step="human">
       <div class="workflow-rail">
         <span class="workflow-num">5</span>
       </div>
@@ -465,7 +465,7 @@
             <span class="demo-pill" id="ih-tickets-policy-pill">passkey</span>
           </div>
           <p class="demo-muted">Simulate what happens when ticketing raises its bar after seeing scalper rotation.</p>
-          <button class="demo-btn demo-btn-secondary" id="ih-raise-tickets-policy-btn" type="button" disabled>Require human proofs on ticketing</button>
+          <button class="demo-btn demo-btn-secondary" id="ih-raise-tickets-policy-btn" type="button">Require human proofs on ticketing</button>
         </div>
 
         <div class="policy-deny-grid" id="ih-policy-deny-grid" hidden>
@@ -485,12 +485,12 @@
           <div class="block-card">
             <h4>Complete human proof step-up</h4>
             <p class="demo-muted">One-time identity check — same site-private ID, stronger assurance tier.</p>
-            <button class="demo-btn demo-btn-primary" id="ih-complete-human-main-btn" type="button" disabled>Complete human proof verification</button>
+            <button class="demo-btn demo-btn-primary" id="ih-complete-human-main-btn" type="button">Complete human proof verification</button>
           </div>
           <div class="block-card">
             <h4>Re-verify ticketing</h4>
             <p class="demo-muted">Confirm assurance flipped to human proof on the same PPID.</p>
-            <button class="demo-btn demo-btn-secondary" id="ih-reverify-human-main-btn" type="button" disabled>Re-verify ticketing (human proof)</button>
+            <button class="demo-btn demo-btn-secondary" id="ih-reverify-human-main-btn" type="button">Re-verify ticketing (human proof)</button>
           </div>
         </div>
 
@@ -695,5 +695,5 @@ const { ok, ppid, assurance, presentation } = await new IsHumanVerifier({
 <script src="/static/js/lemma-keys.js?v=5" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
 <script nonce="{{ csp_nonce }}">window.LEMMA_ISHUMAN_USE_PERSON_ROOT_SEEDS = {{ 'true' if ishuman_use_person_root_seeds else 'false' }};</script>
 <script src="/sdk/ishuman-verifier.js?v={{ ishuman_verifier_sdk_version }}" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
-<script src="/static/js/demo/ishuman-demo.js?v=50" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
+<script src="/static/js/demo/ishuman-demo.js?v=51" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
 {% endblock %}
