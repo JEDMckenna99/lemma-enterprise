@@ -116,6 +116,31 @@
     if (textEl && text) textEl.textContent = text;
   }
 
+  function renderProofReceipt() {
+    const panel = $('ih-proof-receipt');
+    const rowsEl = $('ih-proof-receipt-rows');
+    if (!panel || !rowsEl) return;
+    const slugs = ['tickets', 'trials'];
+    const lines = slugs
+      .map((slug) => {
+        const result = state.results[slug];
+        if (!result || !result.reason) return null;
+        const site = SITE_IDS[slug] || slug;
+        const assurance = result.assurance || '—';
+        const reason = result.reason || '—';
+        const ms = Number.isFinite(result.timeMs) ? `${result.timeMs.toFixed(1)}ms` : '—';
+        return `<div class="demo-proof-receipt-row"><span class="demo-proof-receipt-site">${site}</span><span class="demo-proof-receipt-assurance">${assurance}</span><span class="demo-proof-receipt-reason">${reason}</span><span class="demo-proof-receipt-ms">${ms}</span></div>`;
+      })
+      .filter(Boolean);
+    if (!lines.length) {
+      panel.hidden = true;
+      rowsEl.innerHTML = '';
+      return;
+    }
+    panel.hidden = false;
+    rowsEl.innerHTML = lines.join('');
+  }
+
   function updateQuickProgress(act) {
     document.querySelectorAll('#ih-quick-progress .demo-progress-item').forEach((item) => {
       const step = Number(item.dataset.quickAct || 0);
@@ -153,12 +178,12 @@
     setQuickInsight('Act 1 — Prove', 'Opening passkey setup to create your lemma.id…');
     const popup = openIdvPopup({ issueMode: 'passkey_setup' });
     if (!popup) {
-      setQuickInsight('Act 1 — Prove', 'Allow popups for lemma.id, then tap Run 3-minute demo again.');
+      setQuickInsight('Act 1 — Prove', 'Allow popups for lemma.id, then tap Get started again.');
       return false;
     }
     const ready = await waitForWalletId();
     if (!ready) {
-      setQuickInsight('Act 1 — Prove', 'Finish passkey setup in the popup, then run the demo again.');
+      setQuickInsight('Act 1 — Prove', 'Finish passkey setup in the popup, then continue the demo.');
       return false;
     }
     try {
@@ -170,6 +195,7 @@
   }
 
   async function runQuickDemo() {
+    // Deprecated: passkey/IDV cannot be automated. Kept for console/back-compat only.
     setDemoMode('live');
     setWizardBusy(true);
     try {
@@ -404,11 +430,19 @@
     const urls = (state.config && state.config.customer_site_urls) || {};
     const ticketsLink = $('ih-link-tickets-site');
     const trialsLink = $('ih-link-trials-site');
+    const ticketsMain = $('ih-link-tickets-main');
+    const trialsInline = $('ih-link-trials-inline');
     if (ticketsLink && urls.tickets) {
       ticketsLink.href = `${urls.tickets}?from=demo`;
     }
     if (trialsLink && urls.trials) {
       trialsLink.href = `${urls.trials}?from=demo`;
+    }
+    if (ticketsMain && urls.tickets) {
+      ticketsMain.href = `${urls.tickets}?from=demo`;
+    }
+    if (trialsInline && urls.trials) {
+      trialsInline.href = `${urls.trials}?from=demo`;
     }
     const personCard = $('ih-person-status-card');
     if (personCard) personCard.hidden = !on;
@@ -491,6 +525,10 @@
   function setDemoReadyBanner(visible) {
     const banner = $('ih-demo-ready-banner');
     if (banner) banner.hidden = !visible;
+    if (visible) {
+      setQuickInsight('Act 1 — Prove', 'Wallet ready — open the ticketing demo or continue to Step 2.');
+      updateQuickProgress(1);
+    }
   }
 
   function scrollToPanel(id) {
@@ -581,10 +619,11 @@
   function setWizardBusy(running) {
     state.wizardRunning = running;
     const ids = [
-      'ih-run-quick-demo',
+      'ih-get-started',
       'ih-unlock-lemma-btn',
       'ih-create-lemma-btn',
       'ih-verify-sites-btn',
+      'ih-verify-sites-advanced-btn',
       'ih-verify-tickets-btn',
       'ih-verify-trials-btn',
       'ih-unblock-tickets-btn',
@@ -594,19 +633,12 @@
       'ih-complete-ishuman-btn',
       'ih-reverify-tickets-ishuman-btn',
       'ih-force-reverify-btn',
-      'ih-run-guided-demo',
-      'ih-run-guided-demo-advanced',
       'ih-run-all-operations',
       'ih-reset-demo-btn',
     ];
     for (const id of ids) {
       const el = $(id);
       if (el) el.disabled = running;
-    }
-    const label = running ? 'Running demo…' : 'Run full demo';
-    for (const id of ['ih-run-guided-demo', 'ih-run-guided-demo-advanced', 'ih-run-guided-demo-hero']) {
-      const runBtn = $(id);
-      if (runBtn) runBtn.textContent = label;
     }
     const shell = $('ih-wizard-shell');
     if (shell && !running && !state.masterCredentialId) shell.hidden = true;
@@ -619,8 +651,10 @@
   async function startLiveDemo() {
     setDemoMode('live');
     setWorkflowHighlight(1);
+    updateQuickProgress(1);
+    setQuickInsight('Act 1 — Prove', 'Create or unlock your lemma.id, then open the ticketing demo.');
     scrollToPanel('ih-step-1');
-    log('Live demo started', 'create or unlock your lemma.id');
+    log('Demo started', 'create or unlock your lemma.id');
   }
 
   function demoHeaders() {
@@ -658,7 +692,6 @@
       'ih-test-complete-btn',
       'ih-force-reverify-btn',
       'ih-poll-btn',
-      'ih-run-guided-demo',
     ];
     if (operatorConsole) operatorConsole.hidden = !enabled;
     for (const id of testIds) {
@@ -713,21 +746,44 @@
     const ticketsCell = $('ih-block-result-tickets');
     const trialsCell = $('ih-block-result-trials');
     const unblockBtn = $('ih-unblock-tickets-btn');
+    const outcomeBanner = $('ih-control-outcome-banner');
+    const outcomeText = $('ih-control-outcome-text');
     const tickets = state.results.tickets;
     const trials = state.results.trials;
     if (!table || !ticketsCell || !trialsCell) return;
     if (!tickets && !trials) {
       table.hidden = true;
       if (unblockBtn) unblockBtn.hidden = true;
+      if (outcomeBanner) outcomeBanner.hidden = true;
       return;
     }
     table.hidden = false;
-    ticketsCell.textContent = tickets?.human ? 'Still verified' : 'Blocked';
-    ticketsCell.className = tickets?.human ? 'result-ok' : 'result-deny';
-    trialsCell.textContent = trials?.human ? 'Still verified' : 'Blocked';
-    trialsCell.className = trials?.human ? 'result-ok' : 'result-deny';
+    const ticketsOk = !!tickets?.human;
+    const trialsOk = !!trials?.human;
+    ticketsCell.textContent = ticketsOk ? 'Still verified' : 'Blocked';
+    ticketsCell.className = ticketsOk ? 'result-ok' : 'result-deny';
+    trialsCell.textContent = trialsOk ? 'Still verified' : 'Blocked';
+    trialsCell.className = trialsOk ? 'result-ok' : 'result-deny';
     if (unblockBtn) {
       unblockBtn.hidden = !(tickets && !tickets.human && tickets.reason === 'site_blocked');
+    }
+    if (outcomeBanner && outcomeText) {
+      if (!ticketsOk && trialsOk) {
+        outcomeBanner.hidden = false;
+        outcomeBanner.classList.remove('is-warn');
+        outcomeText.textContent = 'Ticketing is blocked. Trials remains verified.';
+      } else if (!ticketsOk && !trialsOk) {
+        outcomeBanner.hidden = false;
+        outcomeBanner.classList.add('is-warn');
+        outcomeText.textContent = 'Both sites blocked.';
+      } else if (ticketsOk && trialsOk && state.localBlocks.tickets.size > 0) {
+        outcomeBanner.hidden = false;
+        outcomeBanner.classList.remove('is-warn');
+        outcomeText.textContent = 'Both sites verified — unblock ticketing to reset the demo.';
+      } else {
+        outcomeBanner.hidden = true;
+        outcomeBanner.classList.remove('is-warn');
+      }
     }
   }
 
@@ -1383,6 +1439,7 @@
       state.passkeyPpids[slug] = result.ppid;
     }
     renderSite(slug, result);
+    renderProofReceipt();
     updateIntegrationLatency();
     updatePpidCompare();
     log(
@@ -1394,9 +1451,12 @@
   }
 
   async function verifyBothSites() {
+    setQuickInsight('Act 2 — Privacy', 'Minting site-private stamps for ticketing and trials…');
+    updateQuickProgress(2);
     await verifySite('tickets');
     await verifySite('trials');
     if (bothSitesVerified()) {
+      setQuickInsight('Act 2 — Privacy', 'Same wallet — different private IDs on each site.');
       if (assuranceDemoMode()) {
         setWorkflowHighlight(3);
         scrollToPanel('ih-step-3');
@@ -1528,6 +1588,8 @@
       scrollToPanel('ih-abuse-panel');
     }
     updateBlockResultsTable();
+    updateQuickProgress(3);
+    setQuickInsight('Act 3 — Control', 'Ticketing blocked — check both sites to confirm trials still passes.');
   }
 
   async function requireIsHumanOnTickets() {
@@ -2038,7 +2100,7 @@
     const el = $(id);
     if (!el) return;
       el.addEventListener('click', async () => {
-      if (state.wizardRunning && id !== 'ih-run-guided-demo') return;
+      if (state.wizardRunning) return;
       el.disabled = true;
       try {
         await fn();
@@ -2055,8 +2117,9 @@
   async function boot() {
     setDemoMode('live');
     setWorkflowHighlight(1);
+    showQuickInsight(true);
     await loadConfig();
-    bind('ih-run-quick-demo', startPrimaryDemo);
+    bind('ih-get-started', startLiveDemo);
     bind('ih-unlock-lemma-btn', () => {
       setDemoMode('live');
       openIdvPopup({ issueMode: 'unlock' });
@@ -2067,6 +2130,7 @@
     bind('ih-test-complete-btn', completeTestModeVerification);
     bind('ih-poll-btn', pollAndStoreMaster);
     bind('ih-verify-sites-btn', verifyBothSites);
+    bind('ih-verify-sites-advanced-btn', verifyBothSites);
     bind('ih-refresh-status-btn', refreshStatus);
     bind('ih-verify-tickets-btn', () => verifySite('tickets'));
     bind('ih-verify-trials-btn', () => verifySite('trials'));
@@ -2076,8 +2140,6 @@
     bind('ih-require-ishuman-btn', requireIsHumanOnTickets);
     bind('ih-complete-ishuman-btn', completeIsHumanVerification);
     bind('ih-reverify-tickets-ishuman-btn', reverifyTicketsIshuman);
-    bind('ih-run-guided-demo', runGuidedDemo);
-    bind('ih-run-guided-demo-advanced', runGuidedDemo);
     bind('ih-run-all-operations', runAllOperations);
     bind('ih-reset-demo-btn', clearLemmaId);
     bind('ih-force-reverify-btn', forceFreshIdv);

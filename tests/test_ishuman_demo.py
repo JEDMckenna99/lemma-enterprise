@@ -32,15 +32,23 @@ def test_ishuman_demo_page_loads_expected_assets(ishuman_demo_client):
     assert resp.status_code == 200
     assert "Human proofs on your site" in body
     assert "lemma.id demo" in body
-    assert "Run 3-minute demo" in body
-    assert "ih-run-quick-demo" in body
+    assert "Get started" in body
+    assert "View developer docs" in body
+    assert "/static/img/lemma_logo.svg" in body
+    assert "ih-control-outcome-banner" in body
+    assert "demo-outcome-footer" in body
+    assert "ih-get-started" in body
+    assert "ih-run-quick-demo" not in body
     assert "ih-quick-progress" in body
     assert "Why integrators use lemma.id" in body
-    assert "Advanced integrator walkthrough" in body
-    assert "Step 1 — Create your lemma.id" in body
-    assert "Step 2 — Passkey proofs on two sites" in body
-    assert "Step 3 — Control on your site" in body
+    assert 'id="ih-advanced-panel"' in body
+    assert "Advanced — integrator" in body
+    assert "1. Create your lemma.id wallet" in body
+    assert "2. Prove yourself on two sites" in body
+    assert "3. Control abuse on your site" in body
     assert "ih-control-escalation" in body
+    assert "ih-proof-receipt" in body
+    assert "ih-link-tickets-main" in body
     assert "Quick demo" not in body
     assert "Integrator demo" not in body
     assert "Step 5 — Revoke on one site" not in body
@@ -49,8 +57,11 @@ def test_ishuman_demo_page_loads_expected_assets(ishuman_demo_client):
     assert "Operations Check" in body
     assert "ih-operations-check" in body
     assert "ih-run-all-operations" in body
-    assert "Developer details" in body
+    assert "Developer details" not in body
+    assert "Advanced integrator walkthrough" not in body
     assert "Advanced / Developer details" not in body
+    assert "Run full guided demo" not in body
+    assert "ih-run-guided-demo" not in body
     assert "autoProvision: true" in body
     assert "ih-step-1" in body
     assert "ih-demo-ready-banner" in body
@@ -58,6 +69,12 @@ def test_ishuman_demo_page_loads_expected_assets(ishuman_demo_client):
     assert "ih-verify-tickets-btn" in body
     assert "ih-verify-trials-btn" in body
     assert "Verify on ticketing site" in body
+    assert "ih-verify-sites-btn" in body
+    adv_start = body.index('id="ih-advanced-panel"')
+    assert body.index("ih-verify-tickets-btn") > adv_start
+    step2_start = body.index('id="ih-step-2"')
+    step3_start = body.index("<!-- Step 3")
+    assert "ih-verify-tickets-btn" not in body[step2_start:step3_start]
     assert "Test-mode automation" not in body
     assert "Unlock wallet" not in body
     assert "ih-try-qr-demo-btn" not in body
@@ -67,7 +84,8 @@ def test_ishuman_demo_page_loads_expected_assets(ishuman_demo_client):
     assert "/sdk/ishuman-verifier.js" in body
     assert "/static/js/demo/ishuman-demo.js" in body
     assert "/static/css/demo/ishuman-demo.css" in body
-    assert "/static/js/demo/ishuman-demo.js?v=38" in body
+    assert "/static/js/demo/ishuman-demo.js?v=40" in body
+    assert "/static/css/demo/ishuman-demo.css?v=13" in body
     assert "One passkey wallet" in body
     assert "ih-simulation-banner" not in body
     assert "Staging simulation only" not in body
@@ -80,6 +98,7 @@ def test_ishuman_demo_js_exposes_quick_demo_entrypoint():
     assert "window.runQuickDemo = runQuickDemo" in js
     assert "ensureRealLemmaId" in js
     assert "waitForWalletId" in js
+    assert "function renderProofReceipt()" in js
     assert "lemma_demo_ui_mode" not in js
 
 
