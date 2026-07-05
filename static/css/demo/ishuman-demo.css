@@ -299,6 +299,12 @@
   pointer-events: none;
 }
 
+/* Step 3 must stay interactive when blocks exist — unblock/recheck cannot be gated by pointer-events */
+#ih-step-5 .workflow-body,
+#ih-step-5 .workflow-body * {
+  pointer-events: auto;
+}
+
 .workflow-line {
   flex: 1;
   width: 2px;
