@@ -107,6 +107,7 @@ IN_HANDLER_AUTH_ALLOWLIST = {
     "/api/demo/ishuman/force-reverify",
     "/api/demo/ishuman/network-revoke-request",
     "/api/demo/ishuman/probe-derive",
+    "/api/demo/ishuman/require-ishuman",
     "/api/demo/ishuman/reset-wallet",
     "/api/demo/ishuman/self-reset",
     "/api/demo/ishuman/site-block",

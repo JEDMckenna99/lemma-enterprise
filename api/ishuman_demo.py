@@ -367,6 +367,10 @@ def ishuman_demo_require_ishuman():
     """Demo-only: mark a site PPID as requiring isHuman assurance (SiteDoubt, no auto IDV)."""
     from api.database import SessionLocal, SiteDoubt
 
+    _guards, err = _require_demo_admin_token()
+    if err:
+        return err
+
     body = request.get_json(silent=True) or {}
     slug = (body.get("site_slug") or "tickets").strip()
     ppid = (body.get("ppid") or "").strip()
@@ -527,6 +531,19 @@ def ishuman_demo_site_unblock():
 @ishuman_demo_bp.route("/api/demo/ishuman/network-revoke-request", methods=["POST"])
 def ishuman_demo_network_revoke_request():
     return jsonify({"success": False, "error": "network_revocation_retired"}), 410
+
+
+def _require_demo_admin_token() -> tuple[dict | None, tuple | None]:
+    """Guard demo operator-only mutations with an out-of-band admin token."""
+    expected = os.getenv("LEMMA_ISHUMAN_DEMO_ADMIN_TOKEN")
+    provided = request.headers.get("X-Demo-Admin-Token") or ""
+    if not expected or provided != expected:
+        return None, (jsonify({
+            "success": False,
+            "error": "demo_admin_token_required",
+            "message": "Set LEMMA_ISHUMAN_DEMO_ADMIN_TOKEN and pass X-Demo-Admin-Token.",
+        }), 403)
+    return {}, None
 
 
 def _require_demo_test_verify(*, require_token_header: bool = True) -> tuple[dict | None, tuple | None]:
@@ -1359,14 +1376,9 @@ def ishuman_demo_reset_wallet():
     Token-gated by LEMMA_ISHUMAN_DEMO_ADMIN_TOKEN (X-Demo-Admin-Token). Returns
     counts of rows cleared so the caller can confirm the reset landed.
     """
-    expected = os.getenv("LEMMA_ISHUMAN_DEMO_ADMIN_TOKEN")
-    provided = request.headers.get("X-Demo-Admin-Token") or ""
-    if not expected or provided != expected:
-        return jsonify({
-            "success": False,
-            "error": "demo_admin_token_required",
-            "message": "Set LEMMA_ISHUMAN_DEMO_ADMIN_TOKEN and pass X-Demo-Admin-Token.",
-        }), 403
+    _guards, err = _require_demo_admin_token()
+    if err:
+        return err
 
     body = request.get_json(silent=True) or {}
     wallet_id = (body.get("wallet_id") or "").strip()
