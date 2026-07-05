@@ -969,12 +969,12 @@ def create_app():
     # ==================== DOCUMENTATION ====================
     @app.route('/docs')
     def docs_overview():
-        """Public docs entrypoint — lemma.id proof of humanity."""
+        """Public docs entrypoint — lemma.id private proof layer."""
         return render_template('docs/ishuman.html')
 
     @app.route('/docs/agents')
     def docs_agents():
-        """Retired public Agent Ops docs; isHuman is the sole public product."""
+        """Retired public Agent Ops docs; relying-site docs are the public product."""
         return redirect(url_for('docs_overview'), code=301)
 
     @app.route('/docs/overview')

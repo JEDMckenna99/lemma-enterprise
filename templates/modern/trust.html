@@ -1,8 +1,8 @@
 {% extends "modern/layout.html" %}
 {% set is_public_page = true %}
 
-{% block title %}Trust &amp; Personal Data Minimization - lemma.id{% endblock %}
-{% block description %}How lemma.id acts as a personal data minimizer — what each party stores, what sites receive, and why bounded transparency builds trust between users, integrators, and the public.{% endblock %}
+{% block title %}Trust &amp; Personal Data Minimization - isHuman + lemma.id{% endblock %}
+{% block description %}How isHuman and lemma.id minimize data on your servers: passkey PPIDs for continuity, isHuman for one verified human per account, site-private identifiers, and local verification without a cross-site ID.{% endblock %}
 
 {% block head %}
     {{ super() }}
@@ -78,8 +78,8 @@
     <div class="container" style="position: relative; z-index: 1;">
         <div style="max-width: 860px; margin: 0 auto; text-align: center;">
             <p style="font-size: var(--font-size-sm); font-weight: 600; text-transform: uppercase; letter-spacing: 2px; color: var(--primary); margin-bottom: 16px;">Trust &amp; transparency</p>
-            <h1 style="font-size: clamp(2.5rem, 5vw, 3.5rem); line-height: 1.1; margin-bottom: 24px;">Identity-grade enforcement<br>without identity-grade liability.</h1>
-            <p style="font-size: var(--font-size-xl); font-weight: 500; margin-bottom: var(--space-4); color: var(--gray-700);">lemma.id is a <strong>personal data minimizer</strong> — not a neutral pipe and not a surveillance network. Each site receives only its own site-private PPID: enough to recognize the same <strong>returning user</strong>, not who they are. Require <strong>isHuman</strong> when you need the same human across new accounts. Other sites get different PPIDs. Users do not reveal their name, document, selfie, date of birth, or a reusable cross-site ID.</p>
+            <h1 style="font-size: clamp(2.5rem, 5vw, 3.5rem); line-height: 1.1; margin-bottom: 24px;">Enforcement-grade assurance<br>without identity-grade liability.</h1>
+            <p style="font-size: var(--font-size-xl); font-weight: 500; margin-bottom: var(--space-4); color: var(--gray-700);"><strong>lemma.id</strong> is a <strong>personal data minimizer</strong> — not a neutral pipe and not a surveillance network. With <strong>passkey</strong> assurance, each site receives a site-private PPID for the same returning wallet. With <strong>isHuman</strong>, that binding can represent one verified human across accounts. Other sites get different PPIDs. Users do not reveal their name, document, selfie, date of birth, or a reusable cross-site ID.</p>
             <div style="display: flex; gap: 16px; justify-content: center; flex-wrap: wrap; margin-top: 28px;">
                 <a href="/docs/ishuman" class="btn btn-primary">Integration docs</a>
                 <a href="/privacy" class="btn btn-secondary">Privacy policy</a>
@@ -101,7 +101,7 @@
                 <span class="trust-badge trust-badge--good">Your site</span>
                 <div class="trust-footprint-size">~80 chars</div>
                 <h3>Verdict + site-private PPID</h3>
-                <p style="color: var(--gray-600); font-size: var(--font-size-sm); margin: 0;">A proof verdict and an opaque per-site identifier like <code>did:lemma:ppid_…</code>. Not a legal identity — just &ldquo;same returning user as before&rdquo; on your domain. No ID document, selfie, legal name, or date of birth. With isHuman, that binding can represent one verified human across accounts.</p>
+                <p style="color: var(--gray-600); font-size: var(--font-size-sm); margin: 0;">A proof verdict and an opaque per-site identifier like <code>did:lemma:ppid_…</code>. With <code>passkey</code>, same returning wallet. With <code>ishuman</code>, same verified human across accounts. Not a legal identity — no ID document, selfie, legal name, or date of birth on your servers.</p>
             </div>
             <div class="trust-footprint-item" style="border-color: var(--primary);">
                 <span class="trust-badge trust-badge--neutral">lemma.id</span>
@@ -174,8 +174,8 @@
                         <td>Government ID data exposed</td>
                     </tr>
                     <tr>
-                        <td><strong>Enforcement durability</strong><br><span style="font-weight:400;color:var(--gray-600);">with isHuman</span></td>
-                        <td class="trust-col-lemma">Person-root binding — bans survive email/SIM rotation</td>
+                        <td><strong>Enforcement durability</strong><br><span style="font-weight:400;color:var(--gray-600);">passkey: same wallet · isHuman: same human</span></td>
+                        <td class="trust-col-lemma">Passkey: wallet continuity. isHuman: person-root binding — bans survive email/SIM rotation</td>
                         <td>Attacker rotates email or creates new OAuth account</td>
                         <td>Strong if you keep artifacts; expensive to operate</td>
                     </tr>
@@ -246,11 +246,11 @@
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 24px; max-width: 960px; margin: 0 auto;">
             <div class="card">
                 <h3 class="card-title">For users</h3>
-                <p>You verify once into your lemma.id wallet — like a physical ID you control. Sites see a site-private PPID: same returning user on their domain, not your name or document. Require isHuman when you need one human across accounts. Return visits verify locally; lemma.id does not observe every check. Lemma does not use your verification data to advertise to you. You can export your wallet and request erasure.</p>
+                <p>You verify once into your lemma.id wallet — like a physical ID you control. Sites see a site-private PPID: with passkey, same returning wallet on their domain; with isHuman, same verified human across accounts. Return visits verify locally; lemma.id does not observe every check. Lemma does not use your verification data to advertise to you. You can export your wallet and request erasure.</p>
             </div>
             <div class="card">
                 <h3 class="card-title">For integrators</h3>
-                <p>You get private continuity and optional isHuman assurance without building a KYC stack or holding document images. Your breach surface is an opaque PPID — not a passport scan. Compliance reviewers can see exactly what your servers store — and what they do not.</p>
+                <p>You get passkey continuity and optional isHuman assurance without building a KYC stack or holding document images. Passkey PPIDs help recognize returning wallets; isHuman PPIDs bind one verified human when Sybil resistance matters. Your breach surface is an opaque PPID — not a passport scan.</p>
             </div>
             <div class="card">
                 <h3 class="card-title">For the public web</h3>
@@ -311,7 +311,7 @@
 <section class="section" style="background: var(--gray-900); color: var(--white); padding: 80px 0;">
     <div class="container" style="text-align: center;">
         <h2 style="color: var(--white); font-size: var(--font-size-3xl); margin-bottom: 20px;">Enforcement you can explain to legal</h2>
-        <p style="color: var(--gray-400); font-size: var(--font-size-lg); margin-bottom: 40px; max-width: 640px; margin-left: auto; margin-right: auto;">Add identity-rooted bot defense without turning your backend into an identity honeypot. Read the integration docs or review the full privacy policy.</p>
+        <p style="color: var(--gray-400); font-size: var(--font-size-lg); margin-bottom: 40px; max-width: 640px; margin-left: auto; margin-right: auto;">Add isHuman-backed enforcement when one account must mean one human — on top of lemma.id's private proof layer — without turning your backend into an identity honeypot.</p>
         <div style="display: flex; gap: 16px; justify-content: center; flex-wrap: wrap;">
             <a href="/docs/ishuman" class="btn btn-primary">View integration docs</a>
             <a href="/demo" class="btn btn-secondary" style="background: transparent; border-color: var(--gray-600); color: var(--white);">See demo</a>

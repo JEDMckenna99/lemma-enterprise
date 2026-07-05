@@ -1,8 +1,8 @@
 # isHuman integration guide for AI coding agents
 
-> **Audience:** AI coding agents (Cursor, Copilot, Claude Code, etc.) helping a developer add [lemma.id proof of humanity](https://lemma.id/docs) to a web platform.
+> **Audience:** AI coding agents (Cursor, Copilot, Claude Code, etc.) helping a developer add **isHuman** human assurance and the [lemma.id private proof layer](https://lemma.id/docs) to a web platform.
 >
-> **Goal:** Gate sensitive actions behind a cryptographically verified human check using site-private PPIDs — without building KYC, without customer webhooks, and without storing government ID data.
+> **Goal:** Give the platform a site-private PPID for account continuity, plus **isHuman** assurance for one-human-per-account enforcement when Sybil resistance matters — without building KYC, without customer webhooks, and without storing government ID data.
 
 ## Start here
 
@@ -24,10 +24,12 @@
 ## What you are building
 
 1. **Browser:** Load `ishuman-verifier.js`, create `IsHumanVerifier({ siteId })`, call `verify({ autoProvision: true })` before protected actions.
-2. **Backend:** Accept a signed presentation or stamp from the client and verify locally with `@lemma/ishuman-verify` or `lemma_ishuman_verify.py`.
-3. **Optional:** Register a site API key only when the developer needs server-side PPID blocks.
+2. **Account binding:** Store the returned site-private `ppid` as the platform's durable enforcement handle for that user.
+3. **Backend:** Accept a signed presentation or stamp from the client and verify locally with `@lemma/ishuman-verify` or `lemma_ishuman_verify.py`.
+4. **Assurance policy:** Start with `passkey` for continuity when that is enough (not Sybil-resistant alone). Require `ishuman` when the action needs one verified human behind the account — signup, trials, ticketing, payouts, or ban enforcement.
+5. **Optional:** Register a site API key only when the developer needs server-side PPID blocks.
 
-lemma.id runs IDV (Didit by default) in a Lemma-hosted popup. **The relying site does not configure webhooks, Didit, or Stripe Identity.**
+lemma.id runs wallet unlock, proof issuance, and IDV step-up (Didit by default) in a Lemma-hosted popup. **The relying site does not configure webhooks, Didit, or Stripe Identity.**
 
 ---
 
@@ -46,6 +48,7 @@ Apply these on every integration. Do not skip or "simplify" them.
 ### Fail closed
 
 - If `verify()` returns `human: false`, deny the action. Do not fall back to anonymous access.
+- When policy requires IDV-backed humanness, pass `requiredAssurance: 'ishuman'` and verify `assurance === 'ishuman'` on the backend — do not rely on `human: true` alone (passkey success also sets `human: true`).
 - On signup/account creation, **never trust a bare `ppid` from the client** without cryptographic verification (see trust tiers below).
 
 ### Credential invariants
@@ -104,7 +107,10 @@ Work through these in order. Stop and ask the developer if hostname or trust tie
 
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
-    const { ok, presentation, ppid } = await verifier.verifyForBackend({ autoProvision: true });
+    const { ok, presentation, ppid } = await verifier.verifyForBackend({
+    autoProvision: true,
+    requiredAssurance: 'ishuman',
+  });
     if (!ok) { alert('Verification required'); return; }
     await fetch('/api/signup', {
       method: 'POST',
@@ -128,8 +134,8 @@ Work through these in order. Stop and ask the developer if hostname or trust tie
 
 | Method | Use |
 |--------|-----|
-| `verify({ autoProvision })` | Primary human check; may open Lemma popup on first visit |
-| `verifyForBackend({ autoProvision })` | Returns `{ ok, presentation, ppid }` for server-side verify |
+| `verify({ autoProvision, requiredAssurance })` | Primary verification check; may open Lemma popup on first visit |
+| `verifyForBackend({ autoProvision, requiredAssurance })` | Returns `{ ok, presentation, ppid, assurance }` for server-side verify |
 | `verifyFreshForBackend()` | Deliberate fresh IDV for a site-reported `doubt_required` decision |
 | `stamp(payload, { includeCredential: true })` | Attach durable audit evidence to your events |
 | `stampAction(payload, { action, method, path })` | Attach action-bound proof for fraud-sensitive server mutations |
@@ -145,6 +151,12 @@ Work through these in order. Stop and ask the developer if hostname or trust tie
 | `revoked`, `invalid_signature`, `site_blocked` | Deny; a site block never starts recovery automatically |
 | `doubt_required` | Deny the current action, then deliberately call `verifyFreshForBackend()` |
 | `idv_cancelled` | User closed popup — prompt retry / allow popups |
+
+### `human` vs `assurance`
+
+- `human` is the legacy/general success boolean — `true` when the requested assurance tier passed (including `passkey` or `ishuman`).
+- `assurance` tells you which tier passed (`passkey`, `ishuman`, etc.). For Sybil-resistant signup, require `requiredAssurance: 'ishuman'` and verify the backend sees `assurance: ishuman`.
+- Passkey success is useful for continuity; it is **not** IDV-backed humanness.
 
 ---
 

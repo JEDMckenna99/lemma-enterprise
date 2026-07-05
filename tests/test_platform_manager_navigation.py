@@ -27,7 +27,7 @@ def test_root_is_manager_and_home_is_product_page(monkeypatch):
     assert b'id="create-wallet-btn"' in manager.data
     assert b"Create my lemma.id" in manager.data
     assert product.status_code == 200
-    assert b"Recognize the same user privately" in product.data
+    assert b"isHuman proof for abuse-resistant accounts" in product.data
     assert b"assurance-levels" in product.data
 
 
@@ -48,6 +48,9 @@ def test_brand_and_manager_creation_use_canonical_routes():
     assert "globalLemmaWallet" in manager
     assert "deferUnlockedProofCheck" in manager
     assert "Identity check not anchored yet" in manager
+    assert 'id="anchor-wallet-btn"' in manager
+    assert "Anchor this lemma.id" in manager
+    assert "anchorWalletIdentity" in manager
     assert "showIncompleteLemmaIdState();\n            return;" not in manager
     assert 'rel="preload"' in manager and "lemma-wallet.js" in manager
     assert "assessLemmaPlatformIdentity" in manager

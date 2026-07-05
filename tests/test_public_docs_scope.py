@@ -1,4 +1,4 @@
-"""Public documentation exposes only the isHuman product."""
+"""Public documentation exposes the relying-site lemma.id product."""
 
 from __future__ import annotations
 
@@ -27,4 +27,4 @@ def test_legacy_agent_docs_redirect_to_ishuman_docs(monkeypatch):
             response = client.get(path, follow_redirects=True)
             assert response.status_code == 200
             assert response.request.path == "/docs"
-            assert b"proof of humanity" in response.data.lower()
+            assert b"private proof layer" in response.data.lower() or b"ishuman" in response.data.lower()

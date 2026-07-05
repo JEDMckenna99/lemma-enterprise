@@ -149,7 +149,7 @@
                 Remove lemma.id
             </button>
             <p class="card-help">
-                Clears wallet data, human proofs, and lemma.id storage on this device. Your OS passkey is not deleted — you can use it again when you return.
+                Clears wallet data, private proofs, and lemma.id storage on this device. Your OS passkey is not deleted — you can use it again when you return.
             </p>
         </div>
     </div>
@@ -663,11 +663,10 @@ async function returnWithExistingPasskey() {
     }
 }
 
-// Create a complete lemma.id (passkey + isHuman proof) through the canonical
-// issuance popup. Creating only a local wallet here left users with an empty
-// shell and never started identity verification.
-function createWallet() {
-    const btn = document.getElementById('create-wallet-btn');
+// Create or anchor a lemma.id through the canonical identity verification popup.
+// Existing wallets stay manageable; this flow only adds the optional identity anchor.
+function createWallet(triggerButton = null) {
+    const btn = triggerButton || document.getElementById('create-wallet-btn');
     const origText = btn.textContent;
 
     btn.textContent = 'Opening verification...';
@@ -722,6 +721,10 @@ function createWallet() {
         if (popup.closed) finish();
     }, 800);
     window.addEventListener('message', onMessage);
+}
+
+function anchorWalletIdentity(event) {
+    createWallet(event?.currentTarget || document.getElementById('anchor-wallet-btn'));
 }
 
 // Tab switching
@@ -1222,8 +1225,12 @@ async function loadProofSummary() {
             master ? 'Done' : 'Not yet',
             master
                 ? (masterIssued ? `Completed ${masterIssued}` : 'Stored on this device')
-                : 'You only do this once, when a site asks'
+                : 'Anchor this lemma.id with an identity check when you are ready'
         );
+        if (!master) {
+            html += '<button id="anchor-wallet-btn" class="btn btn-primary btn-full" type="button" style="margin: 12px 0 4px;">Anchor this lemma.id</button>';
+            html += '<p class="proofs-privacy-note" style="margin-top: 0;">You can keep managing this lemma.id without anchoring. Anchoring only adds the optional isHuman proof some sites may require.</p>';
+        }
         html += renderProofRow(
             'Sites you\'ve used',
             String(siteSet.size),
@@ -1244,6 +1251,7 @@ async function loadProofSummary() {
 
         html += '<p class="proofs-privacy-note">Each site sees a different private ID. We never show those IDs here — that\'s how your activity stays separate.</p>';
         container.innerHTML = html;
+        document.getElementById('anchor-wallet-btn')?.addEventListener('click', anchorWalletIdentity);
     } catch (e) {
         console.warn('[Proofs] summary failed:', e.message);
         container.innerHTML = '<p class="proofs-error">Could not load your saved info.</p>';

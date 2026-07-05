@@ -1,6 +1,6 @@
 # Lemma Documentation
 
-lemma.id **proof of humanity** — verified-human credentials with site-private PPIDs for web platforms.
+lemma.id is a **private proof layer** for web platforms: site-private PPIDs for account continuity, signed backend verification, and **isHuman** assurance when one account must map to one verified human.
 
 ## Start here
 
@@ -11,12 +11,13 @@ lemma.id **proof of humanity** — verified-human credentials with site-private 
 | [llms.txt](https://lemma.id/llms.txt) | Pointer file for agents | AI coding agents |
 | [AGENTS.md](../AGENTS.md) | Repo-root agent entrypoint | AI coding agents in this repo |
 
-## What isHuman does
+## What lemma.id provides
 
-1. User completes live IDV once in a Lemma-hosted popup (wallet unlock + Didit).
-2. Browser SDK verifies credentials locally (Ed25519 + revocation bloom).
-3. Relying site receives `{ human, ppid }` — no government ID or KYC fields.
-4. Optional site API keys enable server-side PPID blocks.
+1. User creates or unlocks a passkey-backed lemma.id wallet.
+2. Relying sites receive a stable, site-private PPID they can bind to their own user record.
+3. Browser and backend verifiers check signed credentials locally (Ed25519 + revocation bloom).
+4. Sites require isHuman only when policy needs IDV-backed uniqueness.
+5. Optional site API keys enable server-side PPID blocks and site-scoped abuse response.
 
 ## Integration guides
 
