@@ -38,6 +38,7 @@
     wallet: null,
     walletId: null,
     walletSecret: null,
+    hasLocalWallet: false,
     sessionId: localStorage.getItem('ishuman_demo_session_id') || '',
     masterCredential: null,
     masterCredentialId: localStorage.getItem('ishuman_demo_master_id') || '',
@@ -338,27 +339,49 @@
     return isMasterReady();
   }
 
+  function step1NeedsUnlock() {
+    if (isStep1Ready()) return false;
+    return !!(state.walletId || state.hasLocalWallet);
+  }
+
+  async function syncWalletPresence() {
+    state.hasLocalWallet = false;
+    if (!state.wallet) return;
+    try {
+      const info = await state.wallet.getWalletInfo({ lite: true });
+      state.hasLocalWallet = !!info?.hasWallet;
+      if (info?.walletId && !state.walletId) {
+        state.walletId = info.walletId;
+        const wid = $('ih-wallet-id');
+        if (wid) wid.textContent = short(state.walletId);
+      }
+    } catch (err) {
+      if (!isEncryptedWalletLockedError(err)) {
+        log('Wallet presence check skipped', err.message);
+      } else {
+        state.hasLocalWallet = true;
+      }
+    }
+  }
+
   function renderStep1Action() {
     const btn = $('ih-step1-primary-btn');
-    const banner = $('ih-step1-continue-banner');
-    if (!btn || !banner) return;
+    if (!btn) return;
 
-    const ready = isStep1Ready();
-    if (ready) {
-      banner.hidden = false;
+    if (isStep1Ready()) {
       btn.hidden = true;
       setQuickInsight('Act 1 — Prove', 'Wallet ready — open the ticketing demo or continue to Step 2.');
       updateQuickProgress(1);
       return;
     }
-    banner.hidden = true;
+
     btn.hidden = false;
-    if (!state.walletId) {
-      btn.textContent = 'Create a lemma.id';
-      btn.dataset.action = 'create';
-    } else {
+    if (step1NeedsUnlock()) {
       btn.textContent = 'Unlock lemma.id';
       btn.dataset.action = 'unlock';
+    } else {
+      btn.textContent = 'Create a lemma.id';
+      btn.dataset.action = 'create';
     }
   }
 
@@ -587,13 +610,16 @@
   async function refreshWalletStatus() {
     try {
       if (!(await initWalletPassive())) return;
+      await syncWalletPresence();
 
       let master = null;
       try {
         master = await findLocalMasterCredential();
       } catch (err) {
-        if (isEncryptedWalletLockedError(err) && state.masterCredentialId) {
-          setPill('ih-lemma-status', 'READY', 'ok');
+        if (isEncryptedWalletLockedError(err)) {
+          if (!state.walletId && state.hasLocalWallet) {
+            setPill('ih-lemma-status', 'LOCKED', 'deny');
+          }
           return;
         }
         throw err;
@@ -604,20 +630,22 @@
         state.masterCredentialId = master.id;
         localStorage.setItem('ishuman_demo_master_id', state.masterCredentialId);
         renderMaster(master);
-        updateStepLocks();
+        if (assuranceDemoMode()) {
+          const unlocked = !!(state.wallet?.isUnlocked && state.wallet.isUnlocked());
+          setPill('ih-lemma-status', unlocked ? 'UNLOCKED' : 'LOCKED', unlocked ? 'ok' : 'deny');
+        } else {
+          setPill('ih-lemma-status', 'READY', 'ok');
+        }
         return;
       }
 
-      if (state.masterCredentialId) {
+      if (state.masterCredentialId && !assuranceDemoMode()) {
         setPill('ih-lemma-status', 'READY', 'ok');
         return;
       }
 
-      // No proof yet. Distinguish a usable wallet (walletId known, possibly with
-      // a restored 24h session) from a brand-new/locked one. We do NOT prompt a
-      // passkey here — that only happens when the user issues a proof.
       if (!state.walletId) {
-        setPill('ih-lemma-status', 'NONE', 'warn');
+        setPill('ih-lemma-status', state.hasLocalWallet ? 'LOCKED' : 'NONE', state.hasLocalWallet ? 'deny' : 'warn');
       } else {
         const unlocked = !!(state.wallet?.isUnlocked && state.wallet.isUnlocked());
         setPill('ih-lemma-status', unlocked ? 'UNLOCKED' : 'LOCKED', unlocked ? 'ok' : 'deny');
@@ -910,6 +938,7 @@
     if (!state.walletSecret && state.wallet.session?.walletSecret) {
       state.walletSecret = state.wallet.session.walletSecret;
     }
+    await syncWalletPresence();
     return true;
   }
 
@@ -1025,6 +1054,7 @@
     popupUrl.searchParams.set('origin', window.location.origin);
     popupUrl.searchParams.set('site_id', 'lemma.id');
     popupUrl.searchParams.set('popup_token', popupToken);
+    popupUrl.searchParams.set('redirect_return', window.location.href);
     if (issueMode) {
       popupUrl.searchParams.set('issue_mode', issueMode);
     }
@@ -1260,6 +1290,7 @@
     window.globalLemmaWallet = null;
     state.walletId = null;
     state.walletSecret = null;
+    state.hasLocalWallet = false;
     state.masterCredential = null;
     state.masterCredentialId = '';
     state.sessionId = '';
@@ -2134,11 +2165,17 @@
     showQuickInsight(true);
     await loadConfig();
     bind('ih-get-started', startLiveDemo);
-    bind('ih-step1-primary-btn', () => {
+    bind('ih-step1-primary-btn', async () => {
       setDemoMode('live');
       const action = $('ih-step1-primary-btn')?.dataset.action;
       if (action === 'unlock') {
-        openIdvPopup({ issueMode: 'unlock' });
+        try {
+          await initWallet();
+          await refreshWalletStatus();
+        } catch (err) {
+          log('Wallet unlock needed', err.message);
+          openIdvPopup({ issueMode: 'unlock' });
+        }
         return;
       }
       createLemmaIdViaPopup();
@@ -2170,7 +2207,6 @@
       if (state.walletId) await refreshAssuranceStatus().catch(() => {});
       if (state.masterCredentialId || state.sessionId) {
         await refreshStatus();
-        setPill('ih-lemma-status', 'READY', 'ok');
         updateStepLocks();
       }
     } catch (err) {

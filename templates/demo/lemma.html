@@ -203,9 +203,6 @@
           </div>
 
           <div class="demo-step1-action" id="ih-step1-action">
-            <div class="demo-ready-banner" id="ih-step1-continue-banner" hidden>
-              <span>Continue to step 2.</span>
-            </div>
             <button class="demo-btn demo-btn-primary" id="ih-step1-primary-btn" type="button" data-action="create">Create a lemma.id</button>
           </div>
         </div>
@@ -540,5 +537,5 @@ const { ok, ppid, assurance, presentation } = await new IsHumanVerifier({
 <script src="/static/js/lemma-keys.js?v=5" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
 <script nonce="{{ csp_nonce }}">window.LEMMA_ISHUMAN_USE_PERSON_ROOT_SEEDS = {{ 'true' if ishuman_use_person_root_seeds else 'false' }};</script>
 <script src="/sdk/ishuman-verifier.js?v={{ ishuman_verifier_sdk_version }}" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
-<script src="/static/js/demo/ishuman-demo.js?v=40" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
+<script src="/static/js/demo/ishuman-demo.js?v=41" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
 {% endblock %}
