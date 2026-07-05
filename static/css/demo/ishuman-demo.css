@@ -1735,6 +1735,15 @@
   width: 100%;
 }
 
+.demo-step1-action [hidden] {
+  display: none !important;
+}
+
+.demo-step1-action .demo-ready-banner {
+  margin-bottom: 0;
+  justify-content: center;
+}
+
 .demo-privacy-note {
   display: flex;
   align-items: flex-start;

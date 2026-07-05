@@ -68,8 +68,8 @@ def test_ishuman_demo_page_loads_expected_assets(ishuman_demo_client):
     assert "autoProvision: true" in body
     assert "ih-step-1" in body
     assert "ih-step1-primary-btn" in body
-    assert "ih-step1-continue-banner" not in body
-    assert "Continue to step 2." not in body
+    assert "ih-step1-continue-banner" in body
+    assert "Continue to step two." in body
     assert "ih-create-lemma-btn" not in body
     assert "ih-unlock-lemma-btn" not in body
     assert "ih-network-pill" not in body
@@ -91,7 +91,7 @@ def test_ishuman_demo_page_loads_expected_assets(ishuman_demo_client):
     assert "/sdk/ishuman-verifier.js" in body
     assert "/static/js/demo/ishuman-demo.js" in body
     assert "/static/css/demo/ishuman-demo.css" in body
-    assert "/static/js/demo/ishuman-demo.js?v=41" in body
+    assert "/static/js/demo/ishuman-demo.js?v=42" in body
     assert "/static/css/demo/ishuman-demo.css?v=16" in body
     assert "One passkey wallet" in body
     assert "ih-simulation-banner" not in body

@@ -332,9 +332,13 @@
     return !!(state.masterCredentialId || state.masterCredential);
   }
 
+  function isWalletUnlocked() {
+    return !!(state.wallet?.isUnlocked && state.wallet.isUnlocked());
+  }
+
   function isStep1Ready() {
     if (assuranceDemoMode()) {
-      return !!state.walletId && !!(state.wallet?.isUnlocked && state.wallet.isUnlocked());
+      return isWalletUnlocked();
     }
     return isMasterReady();
   }
@@ -355,6 +359,11 @@
         const wid = $('ih-wallet-id');
         if (wid) wid.textContent = short(state.walletId);
       }
+      if (!state.walletId && info?.isUnlocked && state.wallet?.session?.walletId) {
+        state.walletId = state.wallet.session.walletId;
+        const wid = $('ih-wallet-id');
+        if (wid) wid.textContent = short(state.walletId);
+      }
     } catch (err) {
       if (!isEncryptedWalletLockedError(err)) {
         log('Wallet presence check skipped', err.message);
@@ -366,15 +375,18 @@
 
   function renderStep1Action() {
     const btn = $('ih-step1-primary-btn');
-    if (!btn) return;
+    const banner = $('ih-step1-continue-banner');
+    if (!btn || !banner) return;
 
     if (isStep1Ready()) {
+      banner.hidden = false;
       btn.hidden = true;
       setQuickInsight('Act 1 — Prove', 'Wallet ready — open the ticketing demo or continue to Step 2.');
       updateQuickProgress(1);
       return;
     }
 
+    banner.hidden = true;
     btn.hidden = false;
     if (step1NeedsUnlock()) {
       btn.textContent = 'Unlock lemma.id';
