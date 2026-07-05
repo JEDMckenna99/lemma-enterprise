@@ -30,8 +30,8 @@ def test_ishuman_demo_page_loads_expected_assets(ishuman_demo_client):
     body = resp.get_data(as_text=True)
 
     assert resp.status_code == 200
-    assert "step up to isHuman when needed" in body
-    assert "isHuman + lemma.id demo" in body
+    assert "step up to human proofs when needed" in body
+    assert "Human proofs + lemma.id demo" in body
     assert "Get started" in body
     assert "View developer docs" in body
     assert "/static/img/lemma_logo.svg" in body
@@ -42,7 +42,7 @@ def test_ishuman_demo_page_loads_expected_assets(ishuman_demo_client):
     assert "ih-quick-progress" in body
     assert "Why integrators use lemma.id" in body
     assert 'id="ih-advanced-panel"' in body
-    assert "Advanced — isHuman step-up" in body
+    assert "Advanced — human proof step-up" in body
     assert "1. Create a lemma.id" in body
     assert "2. Prove yourself on two sites" in body
     assert "3. Control abuse on your site" in body
@@ -441,6 +441,7 @@ def test_ishuman_demo_js_uses_real_verifier_with_two_site_bindings():
     assert "/api/demo/ishuman/probe-derive" in js
     assert "verifyForBackend" in js
     assert "/api/demo/ishuman/require-ishuman" in js
+    assert "headers: demoHeaders()" in js
     assert "createLemmaIdViaPopup" in js
     assert "startLiveDemo" in js
     assert "startSimulatedDemo" not in js
@@ -669,9 +670,26 @@ def test_ishuman_demo_config_exposes_assurance_flags(ishuman_demo_client, monkey
     assert payload["assurance_demo_mode"] is True
 
 
-def test_require_ishuman_creates_site_doubt(ishuman_demo_client, fake_ishuman_db_session_factory):
+def test_require_ishuman_requires_demo_admin_token(ishuman_demo_client, monkeypatch):
+    monkeypatch.setenv("LEMMA_ISHUMAN_DEMO_ADMIN_TOKEN", "demo-admin-token")
+
+    resp = ishuman_demo_client.post(
+        "/api/demo/ishuman/require-ishuman",
+        json={"site_slug": "tickets", "ppid": "did:lemma:ppid_demo_ticket"},
+    )
+    payload = resp.get_json()
+    assert resp.status_code == 403
+    assert payload["error"] == "demo_admin_token_required"
+
+
+def test_require_ishuman_creates_site_doubt(
+    ishuman_demo_client,
+    fake_ishuman_db_session_factory,
+    monkeypatch,
+):
     from api.database import Site, SiteDoubt
 
+    monkeypatch.setenv("LEMMA_ISHUMAN_DEMO_ADMIN_TOKEN", "demo-admin-token")
     fake_ishuman_db_session_factory.store.data[Site.__name__] = [
         Site(
             site_id="site_demo_tickets",
@@ -683,6 +701,7 @@ def test_require_ishuman_creates_site_doubt(ishuman_demo_client, fake_ishuman_db
     ]
     resp = ishuman_demo_client.post(
         "/api/demo/ishuman/require-ishuman",
+        headers={"X-Demo-Admin-Token": "demo-admin-token"},
         json={"site_slug": "tickets", "ppid": "did:lemma:ppid_demo_ticket"},
     )
     payload = resp.get_json()

@@ -81,9 +81,9 @@
 <section class="hero">
     <div class="container" style="position: relative; z-index: 1;">
         <div style="max-width: 860px; margin: 0 auto; text-align: center;">
-            <p style="font-size: var(--font-size-sm); font-weight: 600; text-transform: uppercase; letter-spacing: 2px; color: var(--primary); margin-bottom: 16px;">isHuman proof for abuse-resistant accounts</p>
+            <p style="font-size: var(--font-size-sm); font-weight: 600; text-transform: uppercase; letter-spacing: 2px; color: var(--primary); margin-bottom: 16px;">Human proofs for abuse-resistant accounts</p>
             <h1 style="font-size: clamp(2.5rem, 5vw, 3.5rem); line-height: 1.1; margin-bottom: 24px;">Stop the same abuser<br>from coming back as a new account.</h1>
-            <p style="font-size: var(--font-size-xl); font-weight: 500; margin-bottom: var(--space-4); color: var(--gray-700);"><strong>isHuman</strong> lets your site require one verified human behind high-risk accounts — without storing ID documents or building a KYC stack. <strong>lemma.id</strong> is the private proof layer underneath: passkey continuity for normal users, site-private PPIDs, and step-up to isHuman when bans need to survive email, SIM, device, and IP rotation.</p>
+            <p style="font-size: var(--font-size-xl); font-weight: 500; margin-bottom: var(--space-4); color: var(--gray-700);"><strong>Human proofs</strong> let your site require one verified human behind high-risk accounts — without storing ID documents or building a KYC stack. <strong>lemma.id</strong> is the private proof layer underneath: passkey continuity for normal users, site-private PPIDs, and step-up to human proofs when bans need to survive email, SIM, device, and IP rotation.</p>
 
             <div style="display: flex; gap: 16px; justify-content: center; flex-wrap: wrap; margin-top: 28px;">
                 <a href="/docs" class="btn btn-primary">Add to Your Site</a>
@@ -127,7 +127,7 @@
         </p>
         <div style="max-width: 760px; margin: 0 auto; padding: 28px 32px; background: var(--gray-50); border: 1px solid var(--gray-200); border-radius: 14px;">
             <p style="margin: 0 0 12px 0; font-size: var(--font-size-sm); font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--primary);">Example</p>
-            <p style="margin: 0; font-size: var(--font-size-base); color: var(--gray-700); line-height: 1.7;">A scalper creates 500 accounts. Your fraud system catches 200 and bans them. Tomorrow, the same operator returns with new emails, SIMs, and proxies. Passkey-only binding recognizes the same wallet on return — useful for continuity, but not Sybil-resistant. When you require <strong>isHuman</strong>, the abusive operator must pass fresh identity verification to come back; email, device, and IP rotation no longer mint a clean account.</p>
+            <p style="margin: 0; font-size: var(--font-size-base); color: var(--gray-700); line-height: 1.7;">A scalper creates 500 accounts. Your fraud system catches 200 and bans them. Tomorrow, the same operator returns with new emails, SIMs, and proxies. Passkey-only binding recognizes the same wallet on return — useful for continuity, but not Sybil-resistant. When you require <strong>human proofs</strong>, the abusive operator must pass fresh identity verification to come back; email, device, and IP rotation no longer mint a clean account.</p>
         </div>
     </div>
 </section>
@@ -138,7 +138,7 @@
         <div style="text-align: center; margin-bottom: 40px;">
             <p style="font-size: var(--font-size-sm); font-weight: 700; text-transform: uppercase; letter-spacing: 2px; color: var(--primary); margin-bottom: 12px;">Assurance levels</p>
             <h2>One integration. Three assurance tiers.</h2>
-            <p class="text-gray" style="max-width: 720px; margin: 16px auto 0;">Start with passkey continuity for low-friction onboarding. Add signed backend verification when you need to trust the request. Require <strong>isHuman</strong> when your policy needs one verified human behind the account — that is where durable ban resistance lives.</p>
+            <p class="text-gray" style="max-width: 720px; margin: 16px auto 0;">Start with passkey continuity for low-friction onboarding. Add signed backend verification when you need to trust the request. Require <strong>human proofs</strong> when your policy needs one verified human behind the account — that is where durable ban resistance lives.</p>
         </div>
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 24px; max-width: 960px; margin: 0 auto;">
             <div class="card">
@@ -162,8 +162,8 @@
     <div class="container">
         <div style="text-align: center; margin-bottom: 40px;">
             <p style="font-size: var(--font-size-sm); font-weight: 700; text-transform: uppercase; letter-spacing: 2px; color: var(--primary); margin-bottom: 12px;">Why teams choose lemma.id</p>
-            <h2>Why customers need isHuman + lemma.id</h2>
-            <p class="text-gray" style="max-width: 720px; margin: 16px auto 0;">Login providers tell you which account signed in. Bot tools tell you which session looks suspicious. <strong>isHuman</strong> gives you the missing enforcement handle when one account must mean one human. <strong>lemma.id</strong> keeps that proof private, reusable, and locally verifiable — without turning your backend into an identity database.</p>
+            <h2>Why customers need human proofs + lemma.id</h2>
+            <p class="text-gray" style="max-width: 720px; margin: 16px auto 0;">Login providers tell you which account signed in. Bot tools tell you which session looks suspicious. <strong>Human proofs</strong> give you the missing enforcement handle when one account must mean one human. <strong>lemma.id</strong> keeps that proof private, reusable, and locally verifiable — without turning your backend into an identity database.</p>
         </div>
         <div class="home-compare-wrap" style="max-width: 960px; margin: 0 auto 28px; background: var(--white); border: 1px solid var(--gray-200); border-radius: 14px; overflow: hidden;">
             <table class="home-compare-table">
@@ -196,18 +196,18 @@
                     </tr>
                     <tr>
                         <td><strong>Why you need it</strong></td>
-                        <td class="col-lemma">Private PPID binding; passkey for continuity, isHuman for Sybil resistance</td>
+                        <td class="col-lemma">Private PPID binding; passkey for continuity, human proofs for Sybil resistance</td>
                         <td>Great for login, weak against new accounts</td>
                         <td>Strong signal, high compliance and breach burden</td>
                     </tr>
                     <tr>
-                        <td><strong>Same human across accounts</strong><br><span style="font-weight:400;color:var(--gray-600);">requires isHuman</span></td>
+                        <td><strong>Same human across accounts</strong><br><span style="font-weight:400;color:var(--gray-600);">requires human proofs</span></td>
                         <td class="col-lemma">Person-root binding — one human, one PPID</td>
                         <td>New email = new account</td>
                         <td>Strong, but you run KYC</td>
                     </tr>
                     <tr>
-                        <td><strong>Ban survives rotation</strong><br><span style="font-weight:400;color:var(--gray-600);">requires isHuman</span></td>
+                        <td><strong>Ban survives rotation</strong><br><span style="font-weight:400;color:var(--gray-600);">requires human proofs</span></td>
                         <td class="col-lemma">Block the human root, not just the email</td>
                         <td>Attacker rotates email or OAuth account</td>
                         <td>Strong, but you run KYC</td>
@@ -227,14 +227,14 @@
         <div style="text-align: center; margin-bottom: 48px;">
             <p style="font-size: var(--font-size-sm); font-weight: 700; text-transform: uppercase; letter-spacing: 2px; color: var(--primary); margin-bottom: 12px;">How it works</p>
             <h2>Bind, detect, enforce</h2>
-            <p class="text-gray" style="max-width: 700px; margin: 16px auto 0;">lemma.id does not replace your login, fraud model, or moderation queue. It gives those systems something durable to act on: a site-private proof binding that can step up to <strong>isHuman</strong> when uniqueness matters.</p>
+            <p class="text-gray" style="max-width: 700px; margin: 16px auto 0;">lemma.id does not replace your login, fraud model, or moderation queue. It gives those systems something durable to act on: a site-private proof binding that can step up to <strong>human proofs</strong> when uniqueness matters.</p>
         </div>
 
         <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; max-width: 900px; margin: 0 auto 48px; text-align: center;">
             <div style="padding: 32px 24px;">
                 <div style="width: 56px; height: 56px; border-radius: 50%; background: var(--primary); color: white; font-size: 24px; font-weight: 700; display: flex; align-items: center; justify-content: center; margin: 0 auto 20px;">1</div>
                 <h3 style="font-size: var(--font-size-lg); margin-bottom: 8px;">Bind</h3>
-                <p style="color: var(--gray-600); font-size: var(--font-size-sm);">Bind your user record to a site-private PPID. For normal continuity, that PPID represents the same wallet. With <strong>isHuman</strong>, it represents the same verified human.</p>
+                <p style="color: var(--gray-600); font-size: var(--font-size-sm);">Bind your user record to a site-private PPID. For normal continuity, that PPID represents the same wallet. With <strong>human proofs</strong>, it represents the same verified human.</p>
             </div>
             <div style="padding: 32px 24px;">
                 <div style="width: 56px; height: 56px; border-radius: 50%; background: var(--primary); color: white; font-size: 24px; font-weight: 700; display: flex; align-items: center; justify-content: center; margin: 0 auto 20px;">2</div>
@@ -244,7 +244,7 @@
             <div style="padding: 32px 24px;">
                 <div style="width: 56px; height: 56px; border-radius: 50%; background: var(--primary); color: white; font-size: 24px; font-weight: 700; display: flex; align-items: center; justify-content: center; margin: 0 auto 20px;">3</div>
                 <h3 style="font-size: var(--font-size-lg); margin-bottom: 8px;">Enforce</h3>
-                <p style="color: var(--gray-600); font-size: var(--font-size-sm);">Block the site-private PPID, raise assurance to isHuman, or require fresh IDV. With isHuman required, swapping email, SIM, device, or IP no longer gives an abuser a clean slate.</p>
+                <p style="color: var(--gray-600); font-size: var(--font-size-sm);">Block the site-private PPID, raise assurance to human proofs, or require fresh IDV. With human proofs required, swapping email, SIM, device, or IP no longer gives an abuser a clean slate.</p>
             </div>
         </div>
 
@@ -255,7 +255,7 @@
                     <p style="margin: 0; font-size: var(--font-size-sm); color: var(--gray-700); line-height: 1.8;">Bot detected → account banned → attacker rotates email, SIM, or proxy → <strong>new account, free</strong></p>
                 </div>
                 <div style="background: linear-gradient(135deg, rgba(102,126,234,0.06), rgba(118,75,162,0.06)); border: 1px solid var(--primary); border-radius: 12px; padding: 24px;">
-                    <p style="font-size: var(--font-size-sm); font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--primary); margin-bottom: 16px;">With isHuman required</p>
+                    <p style="font-size: var(--font-size-sm); font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--primary); margin-bottom: 16px;">With human proofs required</p>
                     <p style="margin: 0; font-size: var(--font-size-sm); color: var(--gray-700); line-height: 1.8;">Bot detected → account tied to verified human root → site-private PPID blocked → <strong>must pass fresh IDV to return</strong></p>
                 </div>
             </div>
@@ -311,7 +311,7 @@
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 24px; max-width: 960px; margin: 0 auto;">
             <div class="card">
                 <h3 class="card-title">Not bot detection</h3>
-                <p>Your tools find suspicious behavior. With <strong>isHuman</strong>, lemma.id makes the consequence stick across new accounts.</p>
+                <p>Your tools find suspicious behavior. With <strong>human proofs</strong>, lemma.id makes the consequence stick across new accounts.</p>
             </div>
             <div class="card">
                 <h3 class="card-title">Not a global public identity</h3>
@@ -322,7 +322,7 @@
                 <p>Your servers hold a verdict and a PPID — not ID documents, names, or dates of birth.</p>
             </div>
         </div>
-        <p style="text-align: center; margin-top: 32px; max-width: 720px; margin-left: auto; margin-right: auto; color: var(--gray-600); font-size: var(--font-size-base);"><strong>What it is:</strong> <strong>isHuman</strong> for one verified human per account when that matters; <strong>lemma.id</strong> as the user-held proof wallet underneath — passkey continuity first, step up to isHuman when bans need to stick, without becoming an identity database. <a href="/about" style="color: var(--primary);">Read more about the approach →</a></p>
+        <p style="text-align: center; margin-top: 32px; max-width: 720px; margin-left: auto; margin-right: auto; color: var(--gray-600); font-size: var(--font-size-base);"><strong>What it is:</strong> <strong>Human proofs</strong> for one verified human per account when that matters; <strong>lemma.id</strong> as the user-held proof wallet underneath — passkey continuity first, step up to human proofs when bans need to stick, without becoming an identity database. <a href="/about" style="color: var(--primary);">Read more about the approach →</a></p>
     </div>
 </section>
 

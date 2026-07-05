@@ -58,7 +58,7 @@
       },
       siteProofPasskey(site) {
         const s = formatSiteLabel(site);
-        return `${s} only needs a continuity proof from your lemma.id wallet \u2014 unlock with your passkey. No identity check unless this site later requires isHuman assurance.`;
+        return `${s} only needs a continuity proof from your lemma.id wallet \u2014 unlock with your passkey. No identity check unless this site later requires human proof assurance.`;
       },
       claim:
         'You\u2019re verified. Save your lemma.id on this device with a passkey so you can use it again.',

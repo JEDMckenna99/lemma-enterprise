@@ -27,7 +27,7 @@ def test_root_is_manager_and_home_is_product_page(monkeypatch):
     assert b'id="create-wallet-btn"' in manager.data
     assert b"Create my lemma.id" in manager.data
     assert product.status_code == 200
-    assert b"isHuman proof for abuse-resistant accounts" in product.data
+    assert b"Human proofs for abuse-resistant accounts" in product.data
     assert b"assurance-levels" in product.data
 
 

@@ -522,7 +522,7 @@
     if (!result) return 'Pending';
     if (isSiteVerified(result)) {
       if (result.assurance === 'passkey') return 'Verified (passkey)';
-      if (result.assurance === 'ishuman') return 'Human (ishuman)';
+      if (result.assurance === 'ishuman') return 'Human proof';
       return result.assurance ? `Verified (${result.assurance})` : 'Verified';
     }
     if (result.reason === 'site_blocked' || result.reason === 'revoked') return 'Blocked';
@@ -1645,6 +1645,7 @@
 
     await requestJson('/api/demo/ishuman/require-ishuman', {
       method: 'POST',
+      headers: demoHeaders(),
       body: JSON.stringify({
         site_slug: 'tickets',
         ppid: result.ppid,
@@ -1663,7 +1664,7 @@
       await openIdvPopup({ demoQr: false });
     }
     await refreshAssuranceStatus();
-    log('Human proof verification complete', 're-verify ticketing with ishuman assurance');
+    log('Human proof verification complete', 're-verify ticketing with human proof assurance');
   }
 
   function updateStepUpCompare(beforePpid, afterResult) {
@@ -1690,7 +1691,7 @@
     const result = await verifySite('tickets', { requiredAssurance: 'ishuman' });
     updateStepUpCompare(before, result);
     if (result.ppid === before && result.assurance === 'ishuman') {
-      log('Step-up success', 'same PPID with ishuman assurance');
+      log('Step-up success', 'same PPID with human proof assurance');
       setWorkflowHighlight(5);
       scrollToPanel('ih-abuse-panel');
     } else {
@@ -1892,7 +1893,7 @@
     return makeOperationResult(
       'step_up',
       ok ? 'pass' : 'fail',
-      ok ? 'Ticketing verified with ishuman assurance' : `Unexpected assurance: ${result.assurance || 'none'}`,
+      ok ? 'Ticketing verified with human proof assurance' : `Unexpected assurance: ${result.assurance || 'none'}`,
       { ppid: result.ppid, assurance: result.assurance },
     );
   }
@@ -1905,7 +1906,7 @@
     return makeOperationResult(
       'same_ppid',
       ok ? 'pass' : 'fail',
-      ok ? 'Same PPID before and after step-up' : 'PPID changed or assurance not ishuman',
+      ok ? 'Same PPID before and after step-up' : 'PPID changed or assurance is not human proof',
       { beforePpid: before, afterPpid: after, assurance: state.results.tickets?.assurance },
     );
   }
@@ -2036,7 +2037,7 @@
         scrollToPanel('ih-abuse-panel');
         await blockTickets();
 
-        setWizardStep(7, 'Demo complete — same ticketing PPID with ishuman assurance, then site-scoped revoke.');
+        setWizardStep(7, 'Demo complete — same ticketing PPID with human proof assurance, then site-scoped revoke.');
         renderStep1Action();
         log('Assurance guided demo complete');
         return;

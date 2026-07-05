@@ -41,7 +41,7 @@ def _content():
         return {
             "eyebrow": "SaaS free trial",
             "headline": "Start a 14-day Pro workspace",
-            "subhead": "Protected by Lemma — passkey proof first; IDV only when this site requires isHuman assurance.",
+            "subhead": "Protected by Lemma — passkey proof first; IDV only when this site requires human proof assurance.",
             "primary": "Start free trial",
             "success": "Trial workspace created",
             "form": "Work email",
@@ -51,7 +51,7 @@ def _content():
     return {
         "eyebrow": "Ticket release",
         "headline": "Reserve 2 tickets for the drop",
-        "subhead": "Protected by Lemma — passkey proof first; IDV only when this site requires isHuman assurance.",
+        "subhead": "Protected by Lemma — passkey proof first; IDV only when this site requires human proof assurance.",
         "primary": "Reserve tickets",
         "success": "Reservation held",
         "form": "Fan email",
@@ -301,7 +301,7 @@ def index():
         <button id="verify-btn">{copy["primary"]}</button>
         <div class="verdict" id="decision-card">
           <strong>What happens when you click</strong>
-          <p class="tiny">Passkey unlock + continuity proof only. This site accepts <code>assurance: passkey</code> — no IDV unless you later step up to isHuman.</p>
+          <p class="tiny">Passkey unlock + continuity proof only. This site accepts <code>assurance: passkey</code> — no IDV unless you later step up to human proofs.</p>
         </div>
       </section>
       <aside class="card">
@@ -313,7 +313,7 @@ def index():
         <ol class="how">
           <li>SDK checks local site proof cache first.</li>
           <li>Missing proof → Lemma popup derives passkey assurance (no IDV yet).</li>
-          <li>Site policy may require isHuman assurance → IDV step-up, same PPID.</li>
+          <li>Site policy may require human proof assurance → IDV step-up, same PPID.</li>
           <li>Server verifies your action stamp with offline revocation checks.</li>
           <li>Business never sees passport, selfie, or cross-site ID.</li>
         </ol>
@@ -400,7 +400,7 @@ def index():
 
     function formatMissingProof(reason) {{
       if (reason === 'site_proof_required') {{
-        return 'No isHuman proof cached for this site yet. Click the protected action to issue one from your lemma.id.';
+        return 'No human proof cached for this site yet. Click the protected action to issue one from your lemma.id.';
       }}
       if (reason === 'no_credential' || reason === 'no_ishuman_credential') {{
         return 'No lemma.id human proof yet. Click the protected action to verify once.';
@@ -408,7 +408,7 @@ def index():
       if (reason === 'wallet_locked') {{
         return 'Your lemma.id wallet is locked. Click the protected action to unlock and verify.';
       }}
-      return 'No valid isHuman proof on this device (' + (reason || 'unknown') + '). Click the protected action to verify.';
+      return 'No valid human proof on this device (' + (reason || 'unknown') + '). Click the protected action to verify.';
     }}
 
     function isDemoVerified(response) {{

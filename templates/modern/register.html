@@ -1,7 +1,7 @@
 {% extends "modern/layout.html" %}
 
 {% block title %}Get Started - lemma.id{% endblock %}
-{% block description %}Register for lemma.id platform access with isHuman verification. Developer credentials are issued after signup.{% endblock %}
+{% block description %}Register for lemma.id platform access with human proof verification. Developer credentials are issued after signup.{% endblock %}
 
 {% block head %}
     {{ super() }}
@@ -361,7 +361,7 @@
                     <div class="register-requirements-title">How registration works</div>
                     <ol class="register-requirements-list">
                         <li>Enter your developer account details below</li>
-                        <li>Submit the form to continue to isHuman verification (passkey + IDV happen there)</li>
+                        <li>Submit the form to continue to human proof verification (passkey + IDV happen there)</li>
                         <li>Your account and developer credential are created only after verification succeeds</li>
                     </ol>
                 </div>
@@ -498,7 +498,7 @@
             savePendingRegistration(data);
             sessionStorage.removeItem(REGISTER_RESULT_KEY);
             sessionStorage.removeItem(REGISTER_ERROR_KEY);
-            setWalletStatus('Continuing to isHuman verification…', 'locked');
+            setWalletStatus('Continuing to human proof verification…', 'locked');
             redirectToPlatformIdv();
         }
 

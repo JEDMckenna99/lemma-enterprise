@@ -2,7 +2,7 @@
 {% set is_public_page = true %}
 
 {% block title %}Pricing - lemma.id{% endblock %}
-{% block description %}lemma.id pricing: pay for the private proof binding that gives your site a durable PPID, with identity verification passed through at cost only when you require isHuman. Unlimited local verification.{% endblock %}
+{% block description %}lemma.id pricing: pay for the private proof binding that gives your site a durable PPID, with identity verification passed through at cost only when you require human proofs. Unlimited local verification.{% endblock %}
 
 {% block head %}
 {{ super() }}
@@ -294,8 +294,8 @@
 {% block content %}
 <div class="pricing-hero">
     <h1>Simple pricing</h1>
-    <p class="subtitle">Pay for isHuman-backed enforcement when you need it — plus reusable lemma.id binding.</p>
-    <p class="description">A raw IDV check tells you someone was human once. lemma.id turns passkey continuity and optional isHuman verification into a reusable site-private PPID your users carry — recognized again on your own servers, with no identity data stored by you. Most users start with passkey; require isHuman only when Sybil resistance matters.</p>
+    <p class="subtitle">Pay for human-proof-backed enforcement when you need it — plus reusable lemma.id binding.</p>
+    <p class="description">A raw IDV check tells you someone was human once. lemma.id turns passkey continuity and optional human proof verification into a reusable site-private PPID your users carry — recognized again on your own servers, with no identity data stored by you. Most users start with passkey; require human proofs only when Sybil resistance matters.</p>
     <div class="pricing-hero-highlight">
         <div class="pricing-hero-stat">
             <span class="amount">$0.33</span>
@@ -322,18 +322,18 @@
 
 <div class="lemma-pricing">
     <h2>How billing works</h2>
-    <p class="intro">Pricing follows the product model: <strong>passkey continuity</strong> gives you a stable site-private PPID without IDV up front, <strong>isHuman</strong> adds IDV-backed uniqueness when your policy needs one verified human, and <strong>local verification</strong> lets your backend check proofs without a per-login meter. You pay for the binding once, plus a small monthly fee only when a user returns.</p>
+    <p class="intro">Pricing follows the product model: <strong>passkey continuity</strong> gives you a stable site-private PPID without IDV up front, <strong>human proofs</strong> add IDV-backed uniqueness when your policy needs one verified human, and <strong>local verification</strong> lets your backend check proofs without a per-login meter. You pay for the binding once, plus a small monthly fee only when a user returns.</p>
 
     <div class="lemma-pricing-grid">
         <div class="lemma-price-card">
             <h3>Identity verification</h3>
             <p class="price">$0.33 / user · at cost</p>
-            <p>A one-time isHuman check (document + liveness) the first time your site requires one verified human behind the account. <strong>Passed through at cost — lemma.id adds no markup.</strong> Only required when your policy needs Sybil resistance; not repeated for routine continuity.</p>
+            <p>A one-time human proof check (document + liveness) the first time your site requires one verified human behind the account. <strong>Passed through at cost — lemma.id adds no markup.</strong> Only required when your policy needs Sybil resistance; not repeated for routine continuity.</p>
         </div>
         <div class="lemma-price-card featured">
             <h3>lemma.id proof binding</h3>
             <p class="price">$0.50 / user · one-time</p>
-            <p>What lemma.id adds on top: a <strong>site-private, reusable proof credential</strong> your users hold in their own wallet. The same returning wallet presents the same PPID; with isHuman, that PPID is backed by the same verified human. This is the lemma.id platform fee.</p>
+            <p>What lemma.id adds on top: a <strong>site-private, reusable proof credential</strong> your users hold in their own wallet. The same returning wallet presents the same PPID; with human proofs, that PPID is backed by the same verified human. This is the lemma.id platform fee.</p>
         </div>
         <div class="lemma-price-card featured">
             <h3>Monthly active user (MAU)</h3>
@@ -350,11 +350,11 @@
     <div class="pricing-rules">
         <h3>Billing rules</h3>
         <ol>
-            <li><strong>Identity verification ($0.33):</strong> billed once when a person completes isHuman for your site. Passed through at cost; never marked up and not repeated for routine continuity.</li>
+            <li><strong>Identity verification ($0.33):</strong> billed once when a person completes human proof verification for your site. Passed through at cost; never marked up and not repeated for routine continuity.</li>
             <li><strong>Proof binding ($0.50):</strong> the one-time lemma.id platform fee for issuing the user's first site-private, reusable credential and wallet binding (passkey secures the wallet on first use).</li>
             <li><strong>MAU ($0.03):</strong> billed for each calendar month a user renews <em>after</em> the month of their binding. The binding month itself has no MAU charge.</li>
             <li><strong>Active user:</strong> a user whose credential is <strong>re-issued</strong> that month — typically when their prior credential expires (~30 days) and they complete the continuity popup. Daily local checks never count.</li>
-            <li><strong>Same wallet, same PPID:</strong> renewals issue a fresh credential with the same site-private PPID — no repeat verification for routine continuity. With isHuman, the person root keeps that PPID stable even across assurance step-ups.</li>
+            <li><strong>Same wallet, same PPID:</strong> renewals issue a fresh credential with the same site-private PPID — no repeat verification for routine continuity. With human proofs, the person root keeps that PPID stable even across assurance step-ups.</li>
             <li><strong>Local checks:</strong> unlimited presentations and verifications on your infrastructure between renewals — never metered.</li>
             <li><strong>Per site:</strong> each relying site is billed independently for its own users (pairwise, non-correlatable PPIDs).</li>
         </ol>
@@ -369,12 +369,12 @@
 </div>
 
 <div class="features-included">
-    <h2>Why teams pay for isHuman + lemma.id</h2>
-    <p class="intro" style="max-width:720px;margin:0 auto 48px;color:var(--gray-600);line-height:1.7;">A raw identity check tells you someone was human once, then leaves you holding their data. Login tells you which account signed in, but not whether the same abuser came back as a new account. <strong>isHuman</strong> is the enforcement tier; <strong>lemma.id</strong> is the private proof binding that connects those systems without turning your backend into an identity store.</p>
+    <h2>Why teams pay for human proofs + lemma.id</h2>
+    <p class="intro" style="max-width:720px;margin:0 auto 48px;color:var(--gray-600);line-height:1.7;">A raw identity check tells you someone was human once, then leaves you holding their data. Login tells you which account signed in, but not whether the same abuser came back as a new account. <strong>Human proofs</strong> are the enforcement tier; <strong>lemma.id</strong> is the private proof binding that connects those systems without turning your backend into an identity store.</p>
     <div class="features-grid">
         <div class="feature-item">
             <div class="feature-check">✓</div>
-            <div class="feature-text"><strong>Durable enforcement handle</strong> — passkey: same wallet, same PPID on return. isHuman: same verified human across accounts. No repeat IDV for routine continuity.</div>
+            <div class="feature-text"><strong>Durable enforcement handle</strong> — passkey: same wallet, same PPID on return. Human proofs: same verified human across accounts. No repeat IDV for routine continuity.</div>
         </div>
         <div class="feature-item">
             <div class="feature-check">✓</div>
