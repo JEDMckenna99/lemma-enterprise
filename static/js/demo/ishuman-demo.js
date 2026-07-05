@@ -2457,8 +2457,6 @@
     const pathWalletPasskey = svg.querySelector('#demo-wire-wallet-passkey');
     const pathPasskeyTicketing = svg.querySelector('#demo-wire-passkey-ticketing');
     const pathPasskeySaas = svg.querySelector('#demo-wire-passkey-saas');
-    const keyTicketing = svg.querySelector('#demo-wire-key-ticketing');
-    const keySaas = svg.querySelector('#demo-wire-key-saas');
     const walletAnchor = stage.querySelector('.demo-diagram-wallet .demo-diagram-icon-square');
     const passkeyAnchor = stage.querySelector('.demo-diagram-passkey .demo-diagram-shield');
     const ticketingAnchor = stage.querySelector('.demo-diagram-site-chip--ticketing');
@@ -2486,11 +2484,13 @@
       return { x, y };
     }
 
-    function placeKeyIcon(group, start, end) {
-      if (!group) return;
-      const midX = (start.x + end.x) / 2;
-      const midY = (start.y + end.y) / 2;
-      group.setAttribute('transform', `translate(${midX - 7} ${midY - 10})`);
+    function insetToward(start, end, amount) {
+      const dx = end.x - start.x;
+      const dy = end.y - start.y;
+      const length = Math.hypot(dx, dy);
+      if (length <= amount) return { x: start.x, y: start.y };
+      const ratio = (length - amount) / length;
+      return { x: start.x + dx * ratio, y: start.y + dy * ratio };
     }
 
     function layout() {
@@ -2505,29 +2505,33 @@
       const passkeyOut = anchorPoint(passkeyAnchor, 'right');
       const ticketingIn = anchorPoint(ticketingAnchor, 'left');
       const saasIn = anchorPoint(saasAnchor, 'left');
+      const ticketingEnd = insetToward(passkeyOut, ticketingIn, 10);
+      const saasEnd = insetToward(passkeyOut, saasIn, 10);
 
       pathWalletPasskey.setAttribute('d', `M${walletOut.x} ${walletOut.y} H${passkeyIn.x}`);
       pathPasskeyTicketing.setAttribute(
         'd',
-        `M${passkeyOut.x} ${passkeyOut.y} L${ticketingIn.x} ${ticketingIn.y}`,
+        `M${passkeyOut.x} ${passkeyOut.y} L${ticketingEnd.x} ${ticketingEnd.y}`,
       );
       pathPasskeySaas.setAttribute(
         'd',
-        `M${passkeyOut.x} ${passkeyOut.y} L${saasIn.x} ${saasIn.y}`,
+        `M${passkeyOut.x} ${passkeyOut.y} L${saasEnd.x} ${saasEnd.y}`,
       );
-
-      placeKeyIcon(keyTicketing, passkeyOut, ticketingIn);
-      placeKeyIcon(keySaas, passkeyOut, saasIn);
     }
 
-    layout();
+    function scheduleLayout() {
+      window.requestAnimationFrame(layout);
+    }
+
+    scheduleLayout();
     if (typeof ResizeObserver !== 'undefined') {
-      const observer = new ResizeObserver(() => layout());
+      const observer = new ResizeObserver(scheduleLayout);
       observer.observe(stage);
+      const hero = stage.closest('.demo-hero');
+      if (hero) observer.observe(hero);
       [walletAnchor, passkeyAnchor, ticketingAnchor, saasAnchor].forEach((el) => observer.observe(el));
-    } else {
-      window.addEventListener('resize', layout);
     }
+    window.addEventListener('resize', scheduleLayout);
   }
 
   async function boot() {
