@@ -2449,6 +2449,87 @@
     });
   }
 
+  function initHeroDiagramWires() {
+    const stage = document.querySelector('.demo-diagram-stage');
+    const svg = stage && stage.querySelector('.demo-diagram-wires');
+    if (!stage || !svg) return;
+
+    const pathWalletPasskey = svg.querySelector('#demo-wire-wallet-passkey');
+    const pathPasskeyTicketing = svg.querySelector('#demo-wire-passkey-ticketing');
+    const pathPasskeySaas = svg.querySelector('#demo-wire-passkey-saas');
+    const keyTicketing = svg.querySelector('#demo-wire-key-ticketing');
+    const keySaas = svg.querySelector('#demo-wire-key-saas');
+    const walletAnchor = stage.querySelector('.demo-diagram-wallet .demo-diagram-icon-square');
+    const passkeyAnchor = stage.querySelector('.demo-diagram-passkey .demo-diagram-shield');
+    const ticketingAnchor = stage.querySelector('.demo-diagram-site-chip--ticketing');
+    const saasAnchor = stage.querySelector('.demo-diagram-site-chip--saas');
+    if (
+      !pathWalletPasskey ||
+      !pathPasskeyTicketing ||
+      !pathPasskeySaas ||
+      !walletAnchor ||
+      !passkeyAnchor ||
+      !ticketingAnchor ||
+      !saasAnchor
+    ) {
+      return;
+    }
+
+    function anchorPoint(el, side) {
+      const stageRect = stage.getBoundingClientRect();
+      const rect = el.getBoundingClientRect();
+      const y = rect.top + rect.height / 2 - stageRect.top;
+      let x;
+      if (side === 'right') x = rect.right - stageRect.left;
+      else if (side === 'left') x = rect.left - stageRect.left;
+      else x = rect.left + rect.width / 2 - stageRect.left;
+      return { x, y };
+    }
+
+    function placeKeyIcon(group, start, end) {
+      if (!group) return;
+      const midX = (start.x + end.x) / 2;
+      const midY = (start.y + end.y) / 2;
+      group.setAttribute('transform', `translate(${midX - 7} ${midY - 10})`);
+    }
+
+    function layout() {
+      const width = stage.clientWidth;
+      const height = stage.clientHeight;
+      if (width < 1 || height < 1) return;
+
+      svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
+
+      const walletOut = anchorPoint(walletAnchor, 'right');
+      const passkeyIn = anchorPoint(passkeyAnchor, 'left');
+      const passkeyOut = anchorPoint(passkeyAnchor, 'right');
+      const ticketingIn = anchorPoint(ticketingAnchor, 'left');
+      const saasIn = anchorPoint(saasAnchor, 'left');
+
+      pathWalletPasskey.setAttribute('d', `M${walletOut.x} ${walletOut.y} H${passkeyIn.x}`);
+      pathPasskeyTicketing.setAttribute(
+        'd',
+        `M${passkeyOut.x} ${passkeyOut.y} L${ticketingIn.x} ${ticketingIn.y}`,
+      );
+      pathPasskeySaas.setAttribute(
+        'd',
+        `M${passkeyOut.x} ${passkeyOut.y} L${saasIn.x} ${saasIn.y}`,
+      );
+
+      placeKeyIcon(keyTicketing, passkeyOut, ticketingIn);
+      placeKeyIcon(keySaas, passkeyOut, saasIn);
+    }
+
+    layout();
+    if (typeof ResizeObserver !== 'undefined') {
+      const observer = new ResizeObserver(() => layout());
+      observer.observe(stage);
+      [walletAnchor, passkeyAnchor, ticketingAnchor, saasAnchor].forEach((el) => observer.observe(el));
+    } else {
+      window.addEventListener('resize', layout);
+    }
+  }
+
   async function boot() {
     setDemoMode('live');
     setWorkflowHighlight(1);
@@ -2499,6 +2580,7 @@
     bind('ih-force-reverify-btn', forceFreshIdv);
 
     initOperationsUI();
+    initHeroDiagramWires();
 
     // Config failure must not leave the page dead — buttons are already bound.
     await loadConfig().catch((err) => log('Demo config load failed', err.message));

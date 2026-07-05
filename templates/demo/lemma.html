@@ -6,7 +6,7 @@
 
 {% block head %}
 {{ super() }}
-<link rel="stylesheet" href="/static/css/demo/ishuman-demo.css?v=25">
+<link rel="stylesheet" href="/static/css/demo/ishuman-demo.css?v=26">
 {% endblock %}
 
 {% block content %}
@@ -44,20 +44,20 @@
       <p class="demo-hero-diagram-title">One lemma.id → different private IDs per site</p>
 
       <div class="demo-diagram-stage">
-        <svg class="demo-diagram-wires" viewBox="0 0 420 92" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
+        <svg class="demo-diagram-wires" aria-hidden="true">
           <defs>
             <marker id="demo-flow-arrow" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto">
               <path d="M0 0 L7 3.5 L0 7 Z" fill="#818cf8"/>
             </marker>
           </defs>
-          <path d="M68 46 H112" stroke="#818cf8" stroke-width="2" stroke-dasharray="5 4" fill="none" marker-end="url(#demo-flow-arrow)"/>
-          <path d="M178 46 L268 30" stroke="#818cf8" stroke-width="2" stroke-dasharray="5 4" fill="none" marker-end="url(#demo-flow-arrow)"/>
-          <path d="M178 46 L268 64" stroke="#818cf8" stroke-width="2" stroke-dasharray="5 4" fill="none" marker-end="url(#demo-flow-arrow)"/>
-          <g transform="translate(214 34)" fill="#6366f1">
+          <path id="demo-wire-wallet-passkey" stroke="#818cf8" stroke-width="2" stroke-dasharray="5 4" fill="none" marker-end="url(#demo-flow-arrow)"/>
+          <path id="demo-wire-passkey-ticketing" stroke="#818cf8" stroke-width="2" stroke-dasharray="5 4" fill="none" marker-end="url(#demo-flow-arrow)"/>
+          <path id="demo-wire-passkey-saas" stroke="#818cf8" stroke-width="2" stroke-dasharray="5 4" fill="none" marker-end="url(#demo-flow-arrow)"/>
+          <g id="demo-wire-key-ticketing" fill="#6366f1">
             <rect x="3" y="6" width="8" height="7" rx="1.5"/>
             <path d="M4.5 6V4.5a3.5 3.5 0 0 1 7 0V6" fill="none" stroke="#6366f1" stroke-width="1.5"/>
           </g>
-          <g transform="translate(214 52)" fill="#6366f1">
+          <g id="demo-wire-key-saas" fill="#6366f1">
             <rect x="3" y="6" width="8" height="7" rx="1.5"/>
             <path d="M4.5 6V4.5a3.5 3.5 0 0 1 7 0V6" fill="none" stroke="#6366f1" stroke-width="1.5"/>
           </g>
@@ -696,5 +696,5 @@ const { ok, ppid, assurance, presentation } = await new IsHumanVerifier({
 <script src="/static/js/lemma-keys.js?v=5" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
 <script nonce="{{ csp_nonce }}">window.LEMMA_ISHUMAN_USE_PERSON_ROOT_SEEDS = {{ 'true' if ishuman_use_person_root_seeds else 'false' }};</script>
 <script src="/sdk/ishuman-verifier.js?v={{ ishuman_verifier_sdk_version }}" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
-<script src="/static/js/demo/ishuman-demo.js?v=52" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
+<script src="/static/js/demo/ishuman-demo.js?v=53" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
 {% endblock %}
