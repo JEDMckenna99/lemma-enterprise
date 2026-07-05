@@ -3,8 +3,8 @@ Stripe Billing catalog constants for lemma.id site-credential metering.
 
 Three metered events, aligned with the public pricing page
 (templates/modern/pricing_new.html):
-  - initial issuance ($0.83 = $0.33 IDV pass-through at cost + $0.50 one-time
-    lemma.id proof binding)
+  - initial issuance ($0.50 — the one-time lemma.id proof binding fee;
+    the $0.33 IDV pass-through is not part of this meter)
   - MAU renewal ($0.03/user/month, starting the month after binding)
   - doubt re-entry after an active site doubt ($0.33 — fresh IDV passed
     through at cost, never marked up)
@@ -31,9 +31,9 @@ METER_EVENTS: Dict[str, str] = {
 }
 
 # Unit amounts in cents (USD). Must match the public pricing page.
-# initial_issuance = $0.33 IDV pass-through + $0.50 proof binding.
+# initial_issuance covers the one-time proof binding fee only.
 UNIT_AMOUNTS_CENTS: Dict[str, int] = {
-    "initial_issuance": 83,
+    "initial_issuance": 50,
     "mau_renewal": 3,
     "doubt_reentry": 33,
 }
@@ -45,7 +45,7 @@ STRIPE_PRODUCT_DESCRIPTION = (
 )
 
 PRICE_NICKNAMES: Dict[str, str] = {
-    "initial_issuance": "Initial site credential (IDV + binding) — $0.83/user/site",
+    "initial_issuance": "Initial site credential (proof binding) — $0.50/user/site",
     "mau_renewal": "MAU renewal — $0.03/user/month",
     "doubt_reentry": "Doubt re-entry (fresh IDV at cost) — $0.33/user",
 }

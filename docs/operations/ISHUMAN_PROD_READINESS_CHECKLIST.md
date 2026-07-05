@@ -28,7 +28,7 @@
 
 ## Billing
 
-- [ ] Concurrent first issuance creates one lifetime site billing subject and one $0.83
+- [ ] Concurrent first issuance creates one lifetime site billing subject and one $0.50
   initial event.
 - [ ] Concurrent later-month renewal creates one monthly row and one $0.03 MAU
   event.

@@ -68,7 +68,7 @@ def test_record_initial_issuance_reports_meter(monkeypatch, fake_ishuman_db_sess
     )
 
     assert result.event_type == EVENT_INITIAL_ISSUANCE
-    assert result.unit_amount_cents == 83
+    assert result.unit_amount_cents == 50
     assert result.reported_to_stripe is True
     assert len(reported) == 1
     assert reported[0]["event_type"] == EVENT_INITIAL_ISSUANCE
