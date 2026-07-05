@@ -403,16 +403,6 @@
     return SITE_SLUGS.every((slug) => isSiteVerified(state.results[slug]));
   }
 
-  function hasStep2Proofs() {
-    return SITE_SLUGS.every((slug) => !!(state.results[slug]?.ppid || state.passkeyPpids[slug]));
-  }
-
-  function isControlStepReady() {
-    if (!isStep1Ready()) return false;
-    if (state.localBlocks.tickets.size > 0 || state.localBlocks.trials.size > 0) return true;
-    return SITE_SLUGS.every((slug) => !!resolveSitePpid(slug));
-  }
-
   function resolveSitePpid(slug) {
     if (state.results[slug]?.ppid) return state.results[slug].ppid;
     if (state.passkeyPpids[slug]) return state.passkeyPpids[slug];
@@ -451,7 +441,7 @@
     const step5 = $('ih-step-5');
     if (step1) step1.classList.remove('is-locked');
     if (step2) step2.classList.toggle('is-locked', !ready);
-    if (step5) step5.classList.toggle('is-locked', !isControlStepReady());
+    if (step5) step5.classList.remove('is-locked');
   }
 
   function setWorkflowHighlight(workflowStep) {
