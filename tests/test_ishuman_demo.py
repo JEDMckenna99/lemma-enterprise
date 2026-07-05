@@ -47,6 +47,9 @@ def test_ishuman_demo_page_loads_expected_assets(ishuman_demo_client):
     assert "2. Prove yourself on two sites" in body
     assert "3. Control abuse on your site" in body
     assert "ih-control-escalation" in body
+    assert "Same wallet → different private IDs per site" in body
+    assert "demo-diagram-stage" in body
+    assert "demo-diagram-footnotes" in body
     assert "ih-proof-receipt" in body
     assert "ih-link-tickets-main" in body
     assert "Quick demo" not in body
@@ -85,7 +88,7 @@ def test_ishuman_demo_page_loads_expected_assets(ishuman_demo_client):
     assert "/static/js/demo/ishuman-demo.js" in body
     assert "/static/css/demo/ishuman-demo.css" in body
     assert "/static/js/demo/ishuman-demo.js?v=40" in body
-    assert "/static/css/demo/ishuman-demo.css?v=13" in body
+    assert "/static/css/demo/ishuman-demo.css?v=15" in body
     assert "One passkey wallet" in body
     assert "ih-simulation-banner" not in body
     assert "Staging simulation only" not in body
