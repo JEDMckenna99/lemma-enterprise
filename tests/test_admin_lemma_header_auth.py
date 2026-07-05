@@ -68,6 +68,24 @@ def test_require_site_admin_rejects_non_admin_lemma_header(monkeypatch):
         assert body["error"] == "missing_scope"
 
 
+def test_require_site_admin_accepts_admin_permission_with_read_scope(monkeypatch):
+    app = _app_with_site_admin_route()
+
+    monkeypatch.setattr(
+        "api.trusted_issuers.verify_credential_with_trust",
+        lambda credential: {"valid": True, "reason": "ok"},
+    )
+
+    lemma = _stub_lemma("admin_access")
+    lemma["claims"]["scope"] = "read"
+    lemma_header = _encode_lemma_header(lemma)
+
+    with app.test_client() as client:
+        resp = client.get("/_test/admin", headers={"X-Lemma-Credential": lemma_header})
+        assert resp.status_code == 200
+        assert resp.get_json()["ok"] is True
+
+
 def test_require_site_admin_rejects_invalid_credential(monkeypatch):
     """When verify_credential_with_trust returns invalid, auth is denied."""
     app = _app_with_site_admin_route()

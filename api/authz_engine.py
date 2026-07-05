@@ -29,6 +29,27 @@ class AuthzPrincipal:
     site_binding: Optional[str]
 
 
+def _scope_from_claims(claims: dict, permission_id: object) -> list[str]:
+    raw_scope = claims.get("scope", [])
+    if isinstance(raw_scope, str):
+        scope = normalize_scopes([part.strip() for part in raw_scope.split(",") if part.strip()])
+    else:
+        scope = normalize_scopes(raw_scope if isinstance(raw_scope, (list, tuple, set)) else [])
+
+    permission_text = str(permission_id or "").strip().lower()
+    if is_admin_permission(permission_text):
+        for required in ("admin", "write", "read"):
+            if required not in scope:
+                scope.append(required)
+    elif not scope:
+        if "developer" in permission_text or permission_text in {"developer_access", "write_access"}:
+            scope = ["write", "read"]
+        else:
+            scope = ["read"]
+
+    return scope
+
+
 def _decode_lemma_header(raw_header: str) -> Optional[dict]:
     """Decode JSON or base64url(JSON) lemma credential header."""
     if not raw_header:
@@ -106,19 +127,7 @@ def extract_user_lemma_principal(
         or "read"
     )
 
-    raw_scope = claims.get("scope", [])
-    if isinstance(raw_scope, str):
-        scope = normalize_scopes([part.strip() for part in raw_scope.split(",") if part.strip()])
-    else:
-        scope = normalize_scopes(raw_scope if isinstance(raw_scope, (list, tuple, set)) else [])
-    if not scope:
-        permission_text = str(permission_id or "").strip().lower()
-        if is_admin_permission(permission_text):
-            scope = ["admin", "write", "read"]
-        elif "developer" in permission_text or permission_text in {"developer_access", "write_access"}:
-            scope = ["write", "read"]
-        else:
-            scope = ["read"]
+    scope = _scope_from_claims(claims, permission_id)
 
     credential_id = credential.get("id")
     header_credential_id = headers.get("X-Credential-ID")
@@ -179,19 +188,7 @@ def build_principal_from_credential_dict(
         or "read"
     )
 
-    raw_scope = claims.get("scope", [])
-    if isinstance(raw_scope, str):
-        scope = normalize_scopes([part.strip() for part in raw_scope.split(",") if part.strip()])
-    else:
-        scope = normalize_scopes(raw_scope if isinstance(raw_scope, (list, tuple, set)) else [])
-    if not scope:
-        permission_text = str(permission_id or "").strip().lower()
-        if is_admin_permission(permission_text):
-            scope = ["admin", "write", "read"]
-        elif "developer" in permission_text or permission_text in {"developer_access", "write_access"}:
-            scope = ["write", "read"]
-        else:
-            scope = ["read"]
+    scope = _scope_from_claims(claims, permission_id)
 
     site_binding = None
     for candidate in (

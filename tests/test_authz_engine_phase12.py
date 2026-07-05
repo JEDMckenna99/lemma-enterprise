@@ -37,7 +37,7 @@ def test_extract_user_lemma_principal_valid_header(monkeypatch):
     assert principal.ppid.startswith("did:lemma:ppid_")
     assert principal.credential_id == "cred_1"
     assert principal.permission_id == "admin_access"
-    assert principal.scope == ["read", "write"]
+    assert principal.scope == ["read", "write", "admin"]
     assert principal.auth_method == "lemma_header"
 
 
