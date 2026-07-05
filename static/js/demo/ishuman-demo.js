@@ -1666,14 +1666,15 @@
 
   function renderSite(slug, result) {
     const verified = isSiteVerified(result);
-    const tone = verified ? 'ok' : (result.reason === 'site_blocked' || result.reason === 'revoked' ? 'deny' : 'warn');
+    const tone = verified
+      ? 'ok'
+      : (result.reason === 'site_blocked' || result.reason === 'revoked' ? 'deny' : '');
     setPill(`ih-${slug}-pill`, formatSiteStatus(result), tone);
     const card = $(`ih-${slug}-card`);
     if (card) {
       card.classList.remove('is-human', 'is-deny', 'is-pending');
       if (verified) card.classList.add('is-human');
       else if (result.reason === 'site_blocked' || result.reason === 'revoked') card.classList.add('is-deny');
-      else card.classList.add('is-pending');
     }
     const ppidEl = $(`ih-${slug}-ppid`);
     if (ppidEl) ppidEl.textContent = maskPpid(slug, result.ppid);
