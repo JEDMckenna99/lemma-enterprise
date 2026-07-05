@@ -44,7 +44,7 @@ def fixture_register_env(fake_ishuman_db_session_factory, monkeypatch):
         email="dev@example.com",
         company="Example Co",
         sites=[],
-        customer_did=None,
+        customer_did=wallet_ppid,
     )
 
     monkeypatch.setattr(
@@ -132,3 +132,36 @@ def test_register_site_issues_admin_to_wallet_and_creates_site_row(register_env)
     assert len(admins) == 1
     assert admins[0].admin_did == wallet_ppid
     assert admins[0].is_active is True
+
+
+@pytest.mark.unit
+def test_register_site_rejects_unlinked_legacy_customer(register_env, monkeypatch):
+    from api.customer_accounts import customer_manager, register_customer_site
+
+    handler = getattr(register_customer_site, "__wrapped__", register_customer_site)
+    app, _factory, wallet_ppid = register_env
+    customer = SimpleNamespace(
+        customer_id="cust_register_test",
+        email="legacy@example.com",
+        company="Legacy Co",
+        sites=[],
+        customer_did=None,
+    )
+    monkeypatch.setattr(customer_manager, "get_customer", lambda cid: customer)
+
+    with app.test_request_context(
+        "/api/customer/register-site",
+        method="POST",
+        json={"site_domain": "app.example.com"},
+    ):
+        g.ppid = wallet_ppid
+        resp = handler()
+        if isinstance(resp, tuple):
+            status = resp[1]
+            body = resp[0].get_json()
+        else:
+            status = resp.status_code
+            body = resp.get_json()
+
+    assert status == 403
+    assert body["error"] == "person_root_customer_required"

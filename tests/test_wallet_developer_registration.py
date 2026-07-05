@@ -145,3 +145,92 @@ def test_register_wallet_developer_rejects_existing_membership(monkeypatch):
         )
         assert response.status_code == 409
         assert response.get_json()["error"] == "platform_membership_exists"
+
+
+def test_register_secure_requires_person_root(monkeypatch):
+    monkeypatch.setattr(
+        "api.platform_owner.enforce_platform_registration_wallet",
+        lambda **kwargs: (
+            None,
+            (
+                {
+                    "success": False,
+                    "error": "person_root_required",
+                    "message": "Complete isHuman IDV on this wallet before creating an account.",
+                },
+                403,
+            ),
+        ),
+    )
+
+    app = _app()
+    with app.test_client() as client:
+        response = client.post(
+            "/api/customer/register-secure",
+            json={
+                "email": "customer@example.com",
+                "name": "Customer User",
+                "company": "Example Inc",
+                "ppid": OWNER_PPID,
+                "wallet_id": "wallet_unverified",
+            },
+        )
+        assert response.status_code == 403
+        assert response.get_json()["error"] == "person_root_required"
+
+
+def test_register_secure_anchors_customer_to_person_root(monkeypatch):
+    created = []
+    platform_upserts = []
+
+    monkeypatch.setattr(
+        "api.platform_owner.enforce_platform_registration_wallet",
+        lambda **kwargs: (OWNER_PPID, None),
+    )
+    monkeypatch.setattr(
+        customer_accounts.customer_manager,
+        "get_customer_by_email",
+        lambda email: None,
+    )
+    monkeypatch.setattr(
+        customer_accounts.customer_manager,
+        "get_customer_by_did",
+        lambda did: None,
+    )
+    monkeypatch.setattr(
+        customer_accounts.customer_manager,
+        "create_customer",
+        lambda **kwargs: created.append(kwargs)
+        or {
+            "success": True,
+            "customer_id": "cus_customer123",
+            "customer_did": kwargs.get("customer_did"),
+            "api_key": "lemma_test_api_key",
+        },
+    )
+    monkeypatch.setattr(
+        "api.platform_account.upsert_platform_account",
+        lambda *args, **kwargs: platform_upserts.append((args, kwargs)),
+    )
+
+    app = _app()
+    with app.test_client() as client:
+        response = client.post(
+            "/api/customer/register-secure",
+            json={
+                "email": "customer@example.com",
+                "name": "Customer User",
+                "company": "Example Inc",
+                "ppid": OWNER_PPID,
+                "wallet_id": "wallet_verified",
+            },
+        )
+
+    assert response.status_code == 200
+    body = response.get_json()
+    assert body["success"] is True
+    assert body["ppid"] == OWNER_PPID
+    assert created[0]["customer_did"] == OWNER_PPID
+    assert created[0]["wallet_id"] == "wallet_verified"
+    assert platform_upserts[0][0] == (OWNER_PPID,)
+    assert platform_upserts[0][1]["account_type"] == "customer"

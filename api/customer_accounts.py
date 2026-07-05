@@ -82,6 +82,28 @@ def _is_valid_invite_code(invite_code: str) -> bool:
     return False
 
 
+def _resolve_person_root_registration(data: Dict[str, Any]) -> tuple[Optional[str], Optional[str], Optional[tuple]]:
+    """Resolve the canonical lemma.id PPID for account creation.
+
+    Account creation must be anchored to the server-side person-root binding
+    produced by isHuman IDV. A client-supplied PPID is only accepted when it
+    matches the server derivation for the wallet.
+    """
+    from api.platform_owner import enforce_platform_registration_wallet
+
+    client_ppid = (data.get('ppid') or '').strip()
+    wallet_id = (data.get('wallet_id') or '').strip()
+    passkey_credential_id = (data.get('passkey_credential_id') or '').strip() or None
+    ppid, denied = enforce_platform_registration_wallet(
+        client_ppid=client_ppid or None,
+        wallet_id=wallet_id or None,
+        passkey_credential_id=passkey_credential_id,
+    )
+    if denied:
+        return None, None, (jsonify(denied[0]), denied[1])
+    return ppid, wallet_id or None, None
+
+
 def _public_cors_origins() -> List[str]:
     """
     CORS origins used for public customer auth endpoints.
@@ -1730,27 +1752,88 @@ def register_secure():
                 'success': False,
                 'error': 'Invite code required or invalid'
             }), 403
+
+        ppid, wallet_id, denied = _resolve_person_root_registration(data)
+        if denied:
+            return denied
         
         # Check if customer already exists
         existing = customer_manager.get_customer_by_email(email)
-        if existing:
+        if existing and (existing.customer_did or '') not in ('', ppid):
             return jsonify({
                 'success': False,
                 'error': 'An account with this email already exists. Please sign in instead.'
             }), 400
+
+        existing_ppid = customer_manager.get_customer_by_did(ppid)
+        if existing_ppid and (not existing or existing_ppid.customer_id != existing.customer_id):
+            return jsonify({
+                'success': False,
+                'error': 'human_proof_already_registered',
+                'message': 'This verified human proof is already bound to a lemma.id account. Sign in instead.',
+            }), 409
         
-        # Create customer account
-        result = customer_manager.create_customer(
-            email=email,
-            name=name,
-            company=company,
-            billing_email=billing_email or email
-        )
+        if existing and existing.customer_did == ppid:
+            result = {
+                'success': True,
+                'customer_id': existing.customer_id,
+                'customer_did': ppid,
+                'api_key': None,
+            }
+        elif existing and not existing.customer_did:
+            try:
+                db = get_db()
+                db_customer = db.query(DBCustomer).filter(DBCustomer.customer_id == existing.customer_id).first()
+                if db_customer:
+                    db_customer.customer_did = ppid
+                    db_customer.wallet_id = wallet_id
+                    db_customer.display_name = name
+                    db.commit()
+                db.close()
+                existing.customer_did = ppid
+                existing.wallet_id = wallet_id
+                existing.display_name = name
+                result = {
+                    'success': True,
+                    'customer_id': existing.customer_id,
+                    'customer_did': ppid,
+                    'api_key': None,
+                }
+            except Exception as exc:
+                logger.error("Failed to bind existing customer to person-root PPID: %s", exc)
+                return jsonify({'success': False, 'error': 'account_binding_failed'}), 500
+        else:
+            # Create customer account anchored to the canonical person-root PPID.
+            result = customer_manager.create_customer(
+                email=email,
+                name=name,
+                company=company,
+                billing_email=billing_email or email,
+                customer_did=ppid,
+                wallet_id=wallet_id,
+                display_name=name,
+            )
         
         if result['success']:
-            # Create user DID for this customer
-            # (No session storage - client receives permission lemma in response)
-            user_did = f"did:lemma:customer:{result['customer_id']}"
+            user_did = ppid
+
+            try:
+                from api.platform_account import upsert_platform_account
+
+                upsert_platform_account(
+                    ppid,
+                    account_type="customer",
+                    email=email,
+                    display_name=name,
+                    name=name,
+                    company=company,
+                    wallet_id=wallet_id,
+                    billing_customer_id=result['customer_id'],
+                    site_id="lemma.id",
+                    site_role="customer",
+                )
+            except Exception as exc:
+                logger.warning("Platform customer account upsert failed for %s: %s", ppid[:24], exc)
             
             # Send email confirmation (in production)
             try:
@@ -1769,6 +1852,7 @@ def register_secure():
             return jsonify({
                 'success': True,
                 'customer_id': result['customer_id'],
+                'ppid': ppid,
                 'message': 'Account created. Please check your email to confirm your account and receive your API keys.',
                 'email_sent': True
             })
@@ -2165,6 +2249,18 @@ def register_customer_site():
         customer = customer_manager.get_customer(customer_id)
         if not customer:
             return jsonify({'error': 'Customer not found'}), 404
+
+        customer_ppid = (getattr(customer, 'customer_did', None) or '').strip()
+        if not customer_ppid.startswith('did:lemma:ppid_'):
+            return jsonify({
+                'error': 'person_root_customer_required',
+                'message': 'Register or link this customer with a verified lemma.id wallet before creating sites.',
+            }), 403
+        if customer_ppid != str(wallet_ppid):
+            return jsonify({
+                'error': 'customer_ppid_mismatch',
+                'message': 'The authenticated wallet does not match this customer account.',
+            }), 403
         
         data = request.get_json() or {}
         raw_domain = (data.get('site_domain') or '').strip()
@@ -2263,10 +2359,6 @@ def register_customer_site():
         
         customer.sites = sites
 
-        # Link wallet DID when customer record lacks one
-        if not getattr(customer, 'customer_did', None):
-            customer.customer_did = user_did
-        
         # Update database record - DUAL WRITE to both JSON column and normalized table
         if customer_manager.db_available:
             db = None
@@ -2276,8 +2368,6 @@ def register_customer_site():
                 if db_customer:
                     # Write to JSON column (legacy)
                     db_customer.sites = sites
-                    if not getattr(db_customer, 'customer_did', None):
-                        db_customer.customer_did = user_did
                     db.commit()
                 
                 # Also write to normalized sites table (new)
