@@ -299,16 +299,6 @@
   pointer-events: none;
 }
 
-/* Step 3 stays full opacity — lock only disables step 2 until the wallet is ready */
-#ih-step-5 .workflow-body {
-  opacity: 1;
-}
-
-#ih-step-5 .workflow-body,
-#ih-step-5 .workflow-body * {
-  pointer-events: auto;
-}
-
 .workflow-line {
   flex: 1;
   width: 2px;
