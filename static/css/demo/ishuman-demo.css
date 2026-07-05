@@ -1735,7 +1735,11 @@
   width: 100%;
 }
 
-.demo-step1-action [hidden] {
+#ih-step1-action.is-ready #ih-step1-primary-btn {
+  display: none !important;
+}
+
+#ih-step1-action:not(.is-ready) #ih-step1-continue-banner {
   display: none !important;
 }
 

@@ -91,8 +91,8 @@ def test_ishuman_demo_page_loads_expected_assets(ishuman_demo_client):
     assert "/sdk/ishuman-verifier.js" in body
     assert "/static/js/demo/ishuman-demo.js" in body
     assert "/static/css/demo/ishuman-demo.css" in body
-    assert "/static/js/demo/ishuman-demo.js?v=42" in body
-    assert "/static/css/demo/ishuman-demo.css?v=16" in body
+    assert "/static/js/demo/ishuman-demo.js?v=43" in body
+    assert "/static/css/demo/ishuman-demo.css?v=17" in body
     assert "One passkey wallet" in body
     assert "ih-simulation-banner" not in body
     assert "Staging simulation only" not in body

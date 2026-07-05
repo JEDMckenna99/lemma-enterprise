@@ -374,20 +374,22 @@
   }
 
   function renderStep1Action() {
+    const root = $('ih-step1-action');
     const btn = $('ih-step1-primary-btn');
     const banner = $('ih-step1-continue-banner');
-    if (!btn || !banner) return;
+    if (!root || !btn || !banner) return;
 
-    if (isStep1Ready()) {
-      banner.hidden = false;
-      btn.hidden = true;
+    const ready = isStep1Ready();
+    root.classList.toggle('is-ready', ready);
+    banner.hidden = !ready;
+    btn.hidden = ready;
+
+    if (ready) {
       setQuickInsight('Act 1 — Prove', 'Wallet ready — open the ticketing demo or continue to Step 2.');
       updateQuickProgress(1);
       return;
     }
 
-    banner.hidden = true;
-    btn.hidden = false;
     if (step1NeedsUnlock()) {
       btn.textContent = 'Unlock lemma.id';
       btn.dataset.action = 'unlock';
