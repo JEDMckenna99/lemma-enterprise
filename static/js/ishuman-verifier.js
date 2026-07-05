@@ -1863,11 +1863,11 @@ class IsHumanVerifier {
         popupUrl.searchParams.set('session_nonce', sessionNonce);
         popupUrl.searchParams.set('bloom_sequence', String(bloomSequence));
         popupUrl.searchParams.set('session_ttl_sec', String(this.sessionTtlSec));
+        popupUrl.searchParams.set('redirect_return', window.location.href);
 
         const useRedirect = this._isMobileLike();
         if (useRedirect) {
             popupUrl.searchParams.set('flow_mode', 'redirect');
-            popupUrl.searchParams.set('redirect_return', window.location.href);
             window.location.assign(popupUrl.toString());
             return new Promise(() => {});
         }
@@ -1899,7 +1899,6 @@ class IsHumanVerifier {
             if (result?.blocked) {
                 if (this.debug) console.warn('[isHuman] site proof popup blocked — falling back to redirect');
                 popupUrl.searchParams.set('flow_mode', 'redirect');
-                popupUrl.searchParams.set('redirect_return', window.location.href);
                 window.location.assign(popupUrl.toString());
                 return { ok: false, reason: 'redirect_started', detail: null };
             }

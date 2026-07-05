@@ -80,6 +80,7 @@ def test_verifier_opens_popup_for_missing_site_proof(verifier_source):
     assert "options.freshIdv ? 'fresh_idv' : 'site_proof'" in verifier_source
     assert "ISHUMAN_SITE_PROOF_ISSUED" in verifier_source
     assert "_applyIssuedSiteProof" in verifier_source
+    assert "popupUrl.searchParams.set('redirect_return', window.location.href);" in verifier_source
 
 
 @pytest.mark.browser

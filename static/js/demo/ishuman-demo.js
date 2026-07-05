@@ -16,8 +16,8 @@
     { id: 'wallet', label: 'lemma.id wallet ready' },
     { id: 'site_proofs', label: 'Two distinct site PPIDs' },
     { id: 'relying_sites', label: 'Relying-site endpoints reachable' },
-    { id: 'escalation', label: 'Require isHuman on ticketing' },
-    { id: 'step_up', label: 'Complete isHuman step-up' },
+    { id: 'escalation', label: 'Require human proofs on ticketing' },
+    { id: 'step_up', label: 'Complete human proof step-up' },
     { id: 'same_ppid', label: 'Same PPID after step-up' },
     { id: 'site_block', label: 'Block ticketing PPID' },
     { id: 'scoped_revocation', label: 'Trials still allowed after block' },
@@ -225,7 +225,7 @@
       await blockTickets();
       await recheckBothSitesAfterBlock();
 
-      setQuickInsight('Done', 'Ticketing blocked; trials still works. Step 3 also supports isHuman step-up when your policy needs it.');
+      setQuickInsight('Done', 'Ticketing blocked; trials still works. Step 3 also supports human proof step-up when your policy needs it.');
       setWorkflowHighlight(0);
       log('Quick demo complete');
     } catch (err) {
@@ -422,7 +422,7 @@
     if (blockTitle) blockTitle.textContent = 'Step 3 — Control on your site';
     const stepupTitle = $('ih-stepup-step-title');
     if (stepupTitle && on) {
-      stepupTitle.textContent = 'Step 4 — Site requires isHuman assurance';
+      stepupTitle.textContent = 'Step 4 — Site requires human proof assurance';
     }
     const step1Title = $('ih-step1-title');
     const step1Desc = $('ih-step1-desc');
@@ -439,7 +439,7 @@
       if (step1Desc) step1Desc.textContent = 'Use an existing lemma.id or complete a one-time identity check.';
       if (step2Title) step2Title.textContent = 'Step 2 — Use the same lemma.id on two sites';
       if (step2Desc) step2Desc.textContent = 'Each site asks for the assurance it needs; your wallet mints a site-private stamp the site verifies itself — same verified human, different PPIDs.';
-      if (intro) intro.textContent = 'lemma.id is one passkey wallet per user — the isHuman proof lives in that single container. Sites request site-private stamps from it; your backend verifies offline. Same wallet, different opaque ID on every site. You block abuse on your site only.';
+      if (intro) intro.textContent = 'lemma.id is one passkey wallet per user — the human proof lives in that single container. Sites request site-private stamps from it; your backend verifies offline. Same wallet, different opaque ID on every site. You block abuse on your site only.';
       if (step1Utility) {
         step1Utility.querySelector('p').textContent = 'The one-time IDV path: verify once on lemma.id, then reuse that proof across sites. Your identity stays in a container only you control.';
       }
@@ -447,7 +447,7 @@
         step2Utility.querySelector('p').textContent = 'The core loop: each site declares the assurance it needs → your wallet mints a site-private stamp → the site verifies it offline. One verified person, two unrelated site-private IDs.';
       }
       if (step4Utility) {
-        step4Utility.querySelector('p').textContent = 'Step-up strengthens the same account, not a new one: the site-private ID is stable across tiers, so a fresh isHuman proof raises trust without re-registering the user.';
+        step4Utility.querySelector('p').textContent = 'Step-up strengthens the same account, not a new one: the site-private ID is stable across tiers, so a fresh human proof raises trust without re-registering the user.';
       }
       if (step5Utility) {
         step5Utility.querySelector('p').textContent = 'Site-scoped enforcement: revoke or block this site-private ID on ticketing without touching who they are on trials or anywhere else — unlike IP or device bans.';
@@ -464,7 +464,7 @@
         step2Utility.querySelector('p').textContent = 'The core loop: the site declares the assurance it needs → your wallet mints a site-private stamp → the site verifies it offline. One wallet, two unrelated IDs; neither site sees your real identity or the other\'s ID.';
       }
       if (step4Utility) {
-        step4Utility.querySelector('p').textContent = 'Step-up strengthens the same account, not a new one: the site-private ID is stable across tiers, so a fresh isHuman proof raises trust without re-registering the user.';
+        step4Utility.querySelector('p').textContent = 'Step-up strengthens the same account, not a new one: the site-private ID is stable across tiers, so a fresh human proof raises trust without re-registering the user.';
       }
       if (step5Utility) {
         step5Utility.querySelector('p').textContent = 'Site-scoped enforcement: revoke or block this site-private ID on ticketing without touching who they are on trials or anywhere else — unlike IP or device bans.';
@@ -1648,10 +1648,10 @@
       body: JSON.stringify({
         site_slug: 'tickets',
         ppid: result.ppid,
-        reason: 'Demo: ticketing requires isHuman assurance',
+        reason: 'Demo: ticketing requires human proof assurance',
       }),
     });
-    log('Site doubt created', 'ticketing requires isHuman step-up');
+    log('Site doubt created', 'ticketing requires human proof step-up');
     setWorkflowHighlight(5);
     scrollToPanel('ih-control-escalation');
   }
@@ -1663,7 +1663,7 @@
       await openIdvPopup({ demoQr: false });
     }
     await refreshAssuranceStatus();
-    log('isHuman verification complete', 're-verify ticketing with ishuman assurance');
+    log('Human proof verification complete', 're-verify ticketing with ishuman assurance');
   }
 
   function updateStepUpCompare(beforePpid, afterResult) {
@@ -1883,7 +1883,7 @@
       return makeOperationResult(
         'step_up',
         'skip',
-        'Complete isHuman verification manually, then re-run checks',
+        'Complete human proof verification manually, then re-run checks',
         {},
       );
     }
@@ -2020,16 +2020,16 @@
         scrollToPanel('ih-step-3');
         await sleep(1500);
 
-        setWizardStep(4, 'Requiring isHuman on ticketing…');
+        setWizardStep(4, 'Requiring human proofs on ticketing…');
         scrollToPanel('ih-step-4');
         await requireIsHumanOnTickets();
 
-        setWizardStep(5, 'Complete isHuman verification…');
+        setWizardStep(5, 'Complete human proof verification…');
         if (state.config?.test_verify_enabled) {
           await verifyOnceTestMode();
           await reverifyTicketsIshuman();
         } else {
-          log('Complete IDV manually', 'use Complete isHuman verification button');
+          log('Complete IDV manually', 'use Complete human proof verification button');
         }
 
         setWizardStep(6, 'Blocking abusive ticketing PPID…');
