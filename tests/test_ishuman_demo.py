@@ -95,7 +95,7 @@ def test_ishuman_demo_page_loads_expected_assets(ishuman_demo_client):
     assert "/sdk/ishuman-verifier.js" in body
     assert "/static/js/demo/ishuman-demo.js" in body
     assert "/static/css/demo/ishuman-demo.css" in body
-    assert "/static/js/demo/ishuman-demo.js?v=44" in body
+    assert "/static/js/demo/ishuman-demo.js?v=45" in body
     assert "/static/css/demo/ishuman-demo.css?v=18" in body
     assert "One passkey wallet" in body
     assert "ih-simulation-banner" not in body
@@ -131,8 +131,10 @@ def test_ishuman_demo_js_preserves_ppid_when_backend_denies():
     assert "resolveDisplayedPpid" in js
     assert "await resolveDisplayedPpid(verifier, backend, slug, options, requiredAssurance)" in js
     resolver = js.split("async function resolveDisplayedPpid", 1)[1].split("async function verifySite", 1)[0]
-    assert "if (backend.ppid) return backend.ppid" in resolver
-    assert "raw.ppid" in resolver
+    assert "raw?.ppid" in resolver
+    assert "resolveSitePpid(slug)" in resolver
+    assert "function resolveSitePpid" in js
+    assert "state.localBlocks[slug]" in js
 
 
 def test_legacy_demo_ishuman_url_redirects_to_canonical_demo(ishuman_demo_client):

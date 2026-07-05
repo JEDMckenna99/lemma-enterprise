@@ -407,16 +407,33 @@
     return SITE_SLUGS.every((slug) => !!(state.results[slug]?.ppid || state.passkeyPpids[slug]));
   }
 
+  function resolveSitePpid(slug) {
+    if (state.results[slug]?.ppid) return state.results[slug].ppid;
+    if (state.passkeyPpids[slug]) return state.passkeyPpids[slug];
+    if (state.localBlocks[slug]?.size) return [...state.localBlocks[slug]][0];
+    return null;
+  }
+
+  function clearVerifierCache(slug) {
+    if (!state.verifiers) return;
+    for (const key of Object.keys(state.verifiers)) {
+      if (key.startsWith(`${slug}:`)) delete state.verifiers[key];
+    }
+  }
+
   function isSiteBlocked(slug, result) {
-    const row = result || state.results[slug];
-    if (!row?.ppid) return false;
-    if (state.localBlocks[slug]?.has(row.ppid)) return true;
-    return !row.human && ['site_blocked', 'site_block', 'revoked'].includes(row.reason);
+    const ppid = result?.ppid || resolveSitePpid(slug);
+    if (ppid && state.localBlocks[slug]?.has(ppid)) return true;
+    if (result && ppid && !result.human && ['site_blocked', 'site_block', 'revoked'].includes(result.reason)) {
+      return true;
+    }
+    return !!(state.localBlocks[slug]?.size);
   }
 
   function formatBlockResult(slug, result) {
-    if (!result?.ppid) return { text: 'Not verified yet', className: '' };
-    if (result.human) return { text: 'Still verified', className: 'result-ok' };
+    const ppid = result?.ppid || resolveSitePpid(slug);
+    if (!ppid) return { text: 'Not verified yet', className: '' };
+    if (result?.human) return { text: 'Still verified', className: 'result-ok' };
     if (isSiteBlocked(slug, result)) return { text: 'Blocked', className: 'result-deny' };
     return { text: 'Not verified', className: 'result-warn' };
   }
@@ -1495,14 +1512,14 @@
   }
 
   async function resolveDisplayedPpid(verifier, backend, slug, options, requiredAssurance) {
-    if (backend.ppid) return backend.ppid;
     const raw = await verifier.verify({
       autoProvision: false,
       requiredAssurance,
       ...options,
     });
-    if (raw.ppid) return raw.ppid;
-    return state.passkeyPpids[slug] || state.results[slug]?.ppid || null;
+    if (raw?.ppid) return raw.ppid;
+    if (backend?.ppid) return backend.ppid;
+    return resolveSitePpid(slug);
   }
 
   async function verifySite(slug, options = {}) {
@@ -1518,7 +1535,7 @@
     const verified = !!(backend.ok || backend.human);
     const result = {
       human: verified,
-      ppid,
+      ppid: ppid || resolveSitePpid(slug),
       assurance: backend.assurance,
       presentation: backend.presentation,
       reason: backend.reason,
@@ -1652,6 +1669,7 @@
       }),
     });
     state.localBlocks.tickets.add(result.ppid);
+    clearVerifierCache('tickets');
     // Instant cross-tab propagation: any IsHumanVerifier on the same origin
     // listening on the 'lemma-ishuman-blocks' BroadcastChannel will drop its
     // cached session and re-check on next verify().
@@ -1747,23 +1765,37 @@
   }
 
   async function unblockTickets() {
-    const ppid = state.results.tickets?.ppid;
-    if (!ppid) throw new Error('Ticketing PPID unavailable');
-    const payload = await requestJson('/api/demo/ishuman/site-unblock', {
-      method: 'POST',
-      body: JSON.stringify({ site_slug: 'tickets', ppid }),
-    });
-    state.localBlocks.tickets.delete(ppid);
+    const ppids = new Set([
+      resolveSitePpid('tickets'),
+      ...state.localBlocks.tickets,
+    ].filter(Boolean));
+    if (!ppids.size) {
+      throw new Error('Ticketing PPID unavailable — verify step 2 first');
+    }
+
+    let unblockedAny = false;
+    for (const ppid of ppids) {
+      const payload = await requestJson('/api/demo/ishuman/site-unblock', {
+        method: 'POST',
+        body: JSON.stringify({ site_slug: 'tickets', ppid }),
+      });
+      if (payload?.unblocked !== false) unblockedAny = true;
+      state.localBlocks.tickets.delete(ppid);
+    }
+    clearVerifierCache('tickets');
+
     const netJson = $('ih-master-json');
-    if (netJson) netJson.textContent = pretty(payload);
-    log('Ticketing site block removed', short(ppid));
+    if (netJson) netJson.textContent = pretty({ unblocked: unblockedAny, ppids: [...ppids] });
+    log('Ticketing site block removed', [...ppids].map(short).join(', '));
     await refreshStatus().catch(() => {});
     await verifySite('tickets');
     await verifySite('trials');
     await refreshAbuseChecks();
     updateBlockResultsTable();
     updateStepLocks();
-    setQuickInsight('Act 3 — Control', 'Ticketing unblocked — block again anytime to retry the demo.');
+    setQuickInsight('Act 3 — Control', unblockedAny
+      ? 'Ticketing unblocked — block again anytime to retry the demo.'
+      : 'No active ticketing block found — both sites rechecked.');
   }
 
   async function forceFreshIdv() {
@@ -2255,10 +2287,9 @@
       await refreshWalletStatus();
       await hydrateSiteVerificationFromCache();
       if (state.walletId) await refreshAssuranceStatus().catch(() => {});
-      if (state.masterCredentialId || state.sessionId) {
-        await refreshStatus();
-        updateStepLocks();
-      }
+      await refreshStatus().catch(() => {});
+      updateBlockResultsTable();
+      updateStepLocks();
     } catch (err) {
       log('Startup check skipped', err.message);
     }
