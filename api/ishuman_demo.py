@@ -541,6 +541,70 @@ def ishuman_demo_site_unblock():
         db.close()
 
 
+@ishuman_demo_bp.route("/api/demo/ishuman/rotation-check", methods=["POST"])
+def ishuman_demo_rotation_check():
+    """Read-only: check whether demo-site PPIDs are blocked (rotation demo act)."""
+    from api.database import RevocationList, SessionLocal, SiteBlock
+    from api.rate_limiter import check_rate_limit
+
+    body = request.get_json(silent=True) or {}
+    slug = (body.get("site_slug") or "tickets").strip().lower()
+    ppids = body.get("ppids") or []
+    if not isinstance(ppids, list) or not ppids:
+        return jsonify({"success": False, "error": "ppids required"}), 400
+    if len(ppids) > 10:
+        return jsonify({"success": False, "error": "too many ppids"}), 400
+
+    _spec, site = _site_for_slug(slug)
+    if not site:
+        return jsonify({"success": False, "error": "unknown demo site"}), 404
+
+    ip_key = (request.remote_addr or "unknown").strip()
+    if not check_rate_limit(f"demo_rotation_check:{ip_key}", 60, 3600):
+        return jsonify({"success": False, "error": "rate_limited"}), 429
+
+    site_id = site.site_id
+    normalized: list[str] = []
+    for raw in ppids:
+        ppid = str(raw or "").strip()
+        if ppid and ppid not in normalized:
+            normalized.append(ppid)
+
+    results: dict[str, dict] = {}
+    db = SessionLocal()
+    try:
+        for ppid in normalized:
+            blocked = False
+            reason = None
+            block = (
+                db.query(SiteBlock)
+                .filter_by(site_id=site_id, ppid=ppid, is_active=True)
+                .first()
+            )
+            if block:
+                blocked = True
+                reason = "site_block"
+            if not blocked:
+                revoke = (
+                    db.query(RevocationList)
+                    .filter_by(ppid=ppid, revocation_type="user", site_id=site_id)
+                    .first()
+                )
+                if revoke:
+                    blocked = True
+                    reason = "site_ppid_revoked"
+            results[ppid] = {"blocked": blocked, "reason": reason}
+    finally:
+        db.close()
+
+    return jsonify({
+        "success": True,
+        "site_id": site_id,
+        "site_domain": site.site_domain,
+        "results": results,
+    })
+
+
 @ishuman_demo_bp.route("/api/demo/ishuman/network-revoke-request", methods=["POST"])
 def ishuman_demo_network_revoke_request():
     return jsonify({"success": False, "error": "network_revocation_retired"}), 410

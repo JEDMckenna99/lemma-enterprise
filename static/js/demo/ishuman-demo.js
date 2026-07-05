@@ -50,6 +50,10 @@
     assuranceStatus: null,
     serverTestToken: '',
     serverAdminToken: '',
+    simulatedAbuserPpid: null,
+    ticketsPolicyRaised: false,
+    rotationDemonstrated: false,
+    lastPopupIssueMode: null,
   };
 
   function $(id) {
@@ -96,13 +100,17 @@
     { id: 1, act: 1 },
     { id: 2, act: 2 },
     { id: 5, act: 3 },
+    { id: 'rotation', act: 4 },
+    { id: 'human', act: 5 },
   ];
 
   function workflowToQuickAct(workflowStep) {
     if (workflowStep <= 0) return 0;
     if (workflowStep <= 1) return 1;
     if (workflowStep <= 2) return 2;
-    return 3;
+    if (workflowStep <= 3) return 3;
+    if (workflowStep <= 4) return 4;
+    return 5;
   }
 
   function showQuickInsight(visible) {
@@ -110,12 +118,17 @@
     if (el) el.hidden = !visible;
   }
 
-  function setQuickInsight(label, text) {
+  function setQuickInsight(label, text, options = {}) {
     showQuickInsight(true);
     const labelEl = $('ih-quick-insight-label');
     const textEl = $('ih-quick-insight-text');
+    const retryBtn = $('ih-popup-retry-btn');
     if (labelEl && label) labelEl.textContent = label;
     if (textEl && text) textEl.textContent = text;
+    if (retryBtn) {
+      const showRetry = !!(options.showPopupRetry && state.lastPopupIssueMode);
+      retryBtn.hidden = !showRetry;
+    }
   }
 
   function renderProofReceipt() {
@@ -147,7 +160,7 @@
     document.querySelectorAll('#ih-quick-progress .demo-progress-item').forEach((item) => {
       const step = Number(item.dataset.quickAct || 0);
       item.classList.remove('is-active', 'is-done');
-      if (act >= 4 || (act > 0 && step < act)) item.classList.add('is-done');
+      if (act >= 6 || (act > 0 && step < act)) item.classList.add('is-done');
       else if (step === act) item.classList.add('is-active');
     });
   }
@@ -436,25 +449,50 @@
 
   function updateStepLocks() {
     const ready = isStep1Ready();
+    const bothVerified = bothSitesVerified();
+    const ticketsBlocked = isSiteBlocked('tickets', state.results.tickets);
     const step1 = $('ih-step-1');
     const step2 = $('ih-step-2');
     const step5 = $('ih-step-5');
+    const stepRotation = $('ih-step-rotation');
+    const stepHuman = $('ih-step-human');
     if (step1) step1.classList.remove('is-locked');
     if (step2) step2.classList.toggle('is-locked', !ready);
-    if (step5) step5.classList.remove('is-locked');
+    if (step5) step5.classList.toggle('is-locked', !bothVerified);
+    if (stepRotation) stepRotation.classList.toggle('is-locked', !ticketsBlocked);
+    if (stepHuman) stepHuman.classList.toggle('is-locked', !state.rotationDemonstrated);
+
+    const gatedButtons = [
+      { id: 'ih-verify-sites-btn', enabled: ready },
+      { id: 'ih-simulate-rotation-btn', enabled: ticketsBlocked },
+      { id: 'ih-raise-tickets-policy-btn', enabled: state.rotationDemonstrated && !state.ticketsPolicyRaised },
+    ];
+    for (const { id, enabled } of gatedButtons) {
+      const el = $(id);
+      if (!el) continue;
+      el.disabled = !enabled || state.wizardRunning;
+      el.classList.toggle('is-gated', !enabled);
+    }
+
+    const completeHuman = $('ih-complete-human-main-btn');
+    const reverifyHuman = $('ih-reverify-human-main-btn');
+    const hasHuman = stepUpComplete() || isMasterReady();
+    if (completeHuman) completeHuman.disabled = !state.ticketsPolicyRaised || hasHuman || state.wizardRunning;
+    if (reverifyHuman) reverifyHuman.disabled = !hasHuman || state.wizardRunning;
   }
 
   function setWorkflowHighlight(workflowStep) {
-    const quickAct = workflowStep === 0 ? 4 : workflowToQuickAct(workflowStep);
+    const quickAct = workflowStep === 0 ? 6 : workflowToQuickAct(workflowStep);
     for (const { id, act } of MAIN_WORKFLOW_STEPS) {
       const el = $(`ih-step-${id}`);
       if (!el) continue;
       el.classList.remove('is-active', 'is-done');
-      if (quickAct >= 4 || act < quickAct) el.classList.add('is-done');
+      if (quickAct >= 6 || act < quickAct) el.classList.add('is-done');
       else if (act === quickAct) el.classList.add('is-active');
     }
     updateQuickProgress(quickAct);
     updateStepLocks();
+    renderWalletSlots();
   }
 
   function applyAssuranceModeUI() {
@@ -478,12 +516,12 @@
     const step5Utility = $('ih-step5-utility');
     const ppidCompareDesc = $('ih-ppid-compare-desc');
     const intro = $('ih-intro-lead');
-    if (step1Title) step1Title.textContent = '1. Create a lemma.id';
+    if (step1Title) step1Title.textContent = on ? '1. Create your empty lemma.id' : '1. Create a lemma.id';
     if (!on) {
       if (step1Desc) step1Desc.textContent = 'Use an existing lemma.id or complete a one-time identity check.';
       if (step2Title) step2Title.textContent = 'Step 2 — Use the same lemma.id on two sites';
       if (step2Desc) step2Desc.textContent = 'Each site asks for the assurance it needs; your wallet mints a site-private stamp the site verifies itself — same verified human, different PPIDs.';
-      if (intro) intro.textContent = 'lemma.id is one passkey wallet per user — the human proof lives in that single container. Sites request site-private stamps from it; your backend verifies offline. Same wallet, different opaque ID on every site. You block abuse on your site only.';
+      if (intro) intro.textContent = 'Give every user a passkey lemma.id with no identity check — perfect for ticket drops and SaaS trials. See site-private IDs and enforcement, then watch why empty wallets let abusers rotate past passkey-only bans — and how human proofs fix it.';
       if (step1Utility) {
         step1Utility.querySelector('p').textContent = 'The one-time IDV path: verify once on lemma.id, then reuse that proof across sites. Your identity stays in a container only you control.';
       }
@@ -544,7 +582,178 @@
     }
     const personCard = $('ih-person-status-card');
     if (personCard) personCard.hidden = !on;
+    renderWalletSlots();
     renderStep1Action();
+    updateStepLocks();
+  }
+
+  function renderWalletSlots() {
+    const passkeySlot = $('ih-wallet-slot-passkey');
+    const humanSlot = $('ih-wallet-slot-human');
+    const passkeyPill = $('ih-wallet-slot-passkey-pill');
+    const humanPill = $('ih-wallet-slot-human-pill');
+    const passkeyLabel = $('ih-wallet-slot-passkey-label');
+    if (!passkeySlot || !humanSlot) return;
+
+    const unlocked = isWalletUnlocked();
+    const hasHuman = isMasterReady() || stepUpComplete();
+
+    passkeySlot.classList.toggle('is-filled', unlocked);
+    humanSlot.classList.toggle('is-filled', hasHuman);
+    humanSlot.classList.toggle('is-empty', !hasHuman);
+
+    if (passkeyPill) {
+      passkeyPill.textContent = unlocked ? 'Ready' : 'Empty';
+      passkeyPill.className = `demo-pill${unlocked ? ' ok' : ''}`;
+    }
+    if (humanPill) {
+      humanPill.textContent = hasHuman ? 'Verified' : 'Empty';
+      humanPill.className = `demo-pill${hasHuman ? ' ok' : ' warn'}`;
+    }
+    if (passkeyLabel) {
+      passkeyLabel.textContent = unlocked ? 'On this device' : 'Create wallet to fill';
+    }
+  }
+
+  async function hmacSha256Hex(secretHex, message) {
+    const secretBytes = new Uint8Array(
+      secretHex.match(/.{1,2}/g).map((byte) => parseInt(byte, 16)),
+    );
+    const key = await crypto.subtle.importKey(
+      'raw',
+      secretBytes,
+      { name: 'HMAC', hash: 'SHA-256' },
+      false,
+      ['sign'],
+    );
+    const signature = await crypto.subtle.sign(
+      'HMAC',
+      key,
+      new TextEncoder().encode(message),
+    );
+    return Array.from(new Uint8Array(signature))
+      .map((b) => b.toString(16).padStart(2, '0'))
+      .join('');
+  }
+
+  function normalizeSiteDomainForPpid(siteDomain) {
+    if (window.LemmaKeys && typeof window.LemmaKeys.canonicalizeSiteDomain === 'function') {
+      return window.LemmaKeys.canonicalizeSiteDomain(siteDomain);
+    }
+    return String(siteDomain || '')
+      .trim()
+      .toLowerCase()
+      .replace(/^www\./, '')
+      .replace(/:\d+$/, '');
+  }
+
+  async function deriveProvisionalPpidFromSecret(secretHex, siteDomain) {
+    const canonical = normalizeSiteDomainForPpid(siteDomain);
+    const ppidHash = await hmacSha256Hex(secretHex, canonical);
+    return `did:lemma:ppid_${ppidHash}`;
+  }
+
+  async function simulateRotation() {
+    const yours = resolveSitePpid('tickets');
+    if (!yours) throw new Error('Verify ticketing first — need a blocked PPID to compare');
+    if (!isSiteBlocked('tickets', state.results.tickets)) {
+      throw new Error('Block ticketing first (step 3), then simulate rotation');
+    }
+
+    const secretBytes = crypto.getRandomValues(new Uint8Array(32));
+    const abuserSecret = Array.from(secretBytes)
+      .map((b) => b.toString(16).padStart(2, '0'))
+      .join('');
+    const abuserPpid = await deriveProvisionalPpidFromSecret(abuserSecret, SITE_IDS.tickets);
+    state.simulatedAbuserPpid = abuserPpid;
+
+    const payload = await requestJson('/api/demo/ishuman/rotation-check', {
+      method: 'POST',
+      body: JSON.stringify({
+        site_slug: 'tickets',
+        ppids: [yours, abuserPpid],
+      }),
+    });
+
+    const yoursResult = payload.results?.[yours] || { blocked: true };
+    const abuserResult = payload.results?.[abuserPpid] || { blocked: false };
+
+    const compare = $('ih-rotation-compare');
+    const yoursPpidEl = $('ih-rotation-yours-ppid');
+    const abuserPpidEl = $('ih-rotation-abuser-ppid');
+    const yoursStatus = $('ih-rotation-yours-status');
+    const abuserStatus = $('ih-rotation-abuser-status');
+    const banner = $('ih-rotation-outcome-banner');
+
+    if (compare) compare.hidden = false;
+    if (yoursPpidEl) yoursPpidEl.textContent = maskPpid('tickets', yours);
+    if (abuserPpidEl) abuserPpidEl.textContent = maskPpid('tickets', abuserPpid);
+    if (yoursStatus) {
+      yoursStatus.textContent = yoursResult.blocked ? 'Blocked' : 'Not blocked';
+      yoursStatus.className = `demo-pill${yoursResult.blocked ? ' deny' : ' ok'}`;
+    }
+    if (abuserStatus) {
+      abuserStatus.textContent = abuserResult.blocked ? 'Blocked' : 'Not blocked';
+      abuserStatus.className = `demo-pill${abuserResult.blocked ? ' deny' : ' ok'}`;
+    }
+    if (banner) banner.hidden = false;
+
+    state.rotationDemonstrated = true;
+    setWorkflowHighlight(5);
+    scrollToPanel('ih-step-human');
+    setQuickInsight(
+      'Act 5 — Human proof',
+      'Fresh empty wallet evaded your block. Raise ticketing policy to require human proofs.',
+    );
+    log('Rotation simulated', `abuser ${short(abuserPpid)} not blocked`);
+    updateStepLocks();
+  }
+
+  async function raiseTicketsPolicySimulated() {
+    if (!state.rotationDemonstrated) {
+      throw new Error('Complete step 4 first — simulate wallet rotation');
+    }
+    state.ticketsPolicyRaised = true;
+    const pill = $('ih-tickets-policy-pill');
+    const card = $('ih-policy-toggle-card');
+    const btn = $('ih-raise-tickets-policy-btn');
+    if (pill) {
+      pill.textContent = 'human proof required';
+      pill.className = 'demo-pill deny';
+    }
+    if (card) card.classList.add('is-raised');
+    if (btn) btn.disabled = true;
+
+    await checkPolicyDenials();
+    setQuickInsight(
+      'Act 5 — Human proof',
+      'Policy raised — empty wallets cannot satisfy human proof assurance. Complete step-up to see durable enforcement.',
+    );
+    log('Ticketing policy raised (simulated)', 'requires human proof assurance');
+    updateStepLocks();
+  }
+
+  async function checkPolicyDenials() {
+    const panel = $('ih-policy-deny-grid');
+    if (!panel) return;
+    panel.hidden = !state.ticketsPolicyRaised;
+
+    const yoursEl = $('ih-policy-deny-yours');
+    const abuserEl = $('ih-policy-deny-abuser');
+    const hasHuman = stepUpComplete() || isMasterReady();
+
+    if (yoursEl) {
+      yoursEl.textContent = hasHuman ? 'Has human proof' : 'Deny — passkey only';
+      yoursEl.className = `demo-pill${hasHuman ? ' ok' : ' deny'}`;
+    }
+    if (abuserEl) {
+      abuserEl.textContent = 'Deny — no human proof';
+      abuserEl.className = 'demo-pill deny';
+    }
+
+    const humanBanner = $('ih-human-outcome-banner');
+    if (humanBanner) humanBanner.hidden = !hasHuman;
+    renderWalletSlots();
     updateStepLocks();
   }
 
@@ -725,6 +934,10 @@
       'ih-unblock-tickets-btn',
       'ih-abuse-block-btn',
       'ih-abuse-recheck-btn',
+      'ih-simulate-rotation-btn',
+      'ih-raise-tickets-policy-btn',
+      'ih-complete-human-main-btn',
+      'ih-reverify-human-main-btn',
       'ih-require-ishuman-btn',
       'ih-complete-ishuman-btn',
       'ih-reverify-tickets-ishuman-btn',
@@ -1133,11 +1346,19 @@
       `popup=yes,width=${width},height=${height},left=${left},top=${top}`,
     );
     if (!popup) {
+      state.lastPopupIssueMode = issueMode || 'passkey_setup';
       setPill('ih-lemma-status', 'POPUP BLOCKED', 'warn');
       log('Identity popup blocked', 'Allow popups for lemma.id and retry');
+      setQuickInsight(
+        'Popup blocked',
+        'Allow popups for lemma.id, then click Retry popup or try Create again.',
+        { showPopupRetry: true },
+      );
       _demoIdvPopup = null;
       return null;
     }
+
+    state.lastPopupIssueMode = issueMode || null;
 
     _demoIdvPopup = popup;
 
@@ -1162,8 +1383,10 @@
       if (outcome === 'completed') {
         setWorkflowHighlight(2);
         renderStep1Action();
+        renderWalletSlots();
         updateStepLocks();
         scrollToPanel('ih-step-2');
+        setQuickInsight('Act 1 — Prove', 'Wallet ready — continue to step 2.');
       }
     };
     const onMessage = (event) => {
@@ -1358,6 +1581,10 @@
     state.results = {};
     state.passkeyPpids = {};
     state.assuranceStatus = null;
+    state.simulatedAbuserPpid = null;
+    state.ticketsPolicyRaised = false;
+    state.rotationDemonstrated = false;
+    state.lastPopupIssueMode = null;
     state.verifiers = {};
     state.lastVerifyMs = { tickets: null, trials: null };
     for (const slug of SITE_SLUGS) state.localBlocks[slug].clear();
@@ -1382,10 +1609,29 @@
     updateBlockResultsTable();
     const stepupCompare = $('ih-stepup-compare');
     if (stepupCompare) stepupCompare.hidden = true;
-    const stepupDiff = $('ih-stepup-diff');
-    if (stepupDiff) stepupDiff.textContent = '—';
+    const rotationCompare = $('ih-rotation-compare');
+    if (rotationCompare) rotationCompare.hidden = true;
+    const rotationBanner = $('ih-rotation-outcome-banner');
+    if (rotationBanner) rotationBanner.hidden = true;
+    const policyGrid = $('ih-policy-deny-grid');
+    if (policyGrid) policyGrid.hidden = true;
+    const policyCard = $('ih-policy-toggle-card');
+    if (policyCard) policyCard.classList.remove('is-raised');
+    const policyPill = $('ih-tickets-policy-pill');
+    if (policyPill) {
+      policyPill.textContent = 'passkey';
+      policyPill.className = 'demo-pill';
+    }
+    const humanBanner = $('ih-human-outcome-banner');
+    if (humanBanner) humanBanner.hidden = true;
+    const retryBtn = $('ih-popup-retry-btn');
+    if (retryBtn) retryBtn.hidden = true;
+    if (window.LemmaPlatformAuth && typeof window.LemmaPlatformAuth.applyNavButtons === 'function') {
+      window.LemmaPlatformAuth.applyNavButtons({ mode: 'none' });
+    }
+    renderWalletSlots();
     scrollToPanel('lemma-demo');
-    log('lemma.id cleared', 'click Start live demo to begin again');
+    log('lemma.id cleared', 'click Get started to begin again');
     clearBtns.forEach((btn) => { btn.disabled = false; });
   }
 
@@ -1565,7 +1811,7 @@
       setQuickInsight('Act 2 — Privacy', 'Same wallet — different private IDs on each site.');
       if (assuranceDemoMode()) {
         setWorkflowHighlight(3);
-        scrollToPanel('ih-step-3');
+        scrollToPanel('ih-step-5');
       } else {
         setWorkflowHighlight(4);
         scrollToPanel('ih-abuse-panel');
@@ -1687,16 +1933,14 @@
     await verifySite('trials');
     await refreshAbuseChecks();
     await probeDerive('tickets');
-    if (assuranceDemoMode()) {
-      setWorkflowHighlight(6);
-      scrollToPanel('ih-step-6');
-    } else {
-      setWorkflowHighlight(5);
-      scrollToPanel('ih-abuse-panel');
-    }
+    setWorkflowHighlight(4);
+    scrollToPanel('ih-step-rotation');
     updateBlockResultsTable();
-    updateQuickProgress(3);
-    setQuickInsight('Act 3 — Control', 'Ticketing blocked — check both sites to confirm trials still passes.');
+    updateQuickProgress(4);
+    setQuickInsight(
+      'Act 4 — Rotation',
+      'Ticketing blocked — simulate what an abuser does with a fresh empty wallet.',
+    );
   }
 
   async function requireIsHumanOnTickets() {
@@ -1726,6 +1970,7 @@
       await openIdvPopup({ demoQr: false });
     }
     await refreshAssuranceStatus();
+    await checkPolicyDenials();
     log('Human proof verification complete', 're-verify ticketing with human proof assurance');
   }
 
@@ -1752,10 +1997,14 @@
     if (!before) throw new Error('No passkey ticketing PPID snapshot — verify step 2 first');
     const result = await verifySite('tickets', { requiredAssurance: 'ishuman' });
     updateStepUpCompare(before, result);
+    await checkPolicyDenials();
     if (result.ppid === before && result.assurance === 'ishuman') {
       log('Step-up success', 'same PPID with human proof assurance');
-      setWorkflowHighlight(5);
-      scrollToPanel('ih-abuse-panel');
+      setWorkflowHighlight(0);
+      scrollToPanel('ih-step-human');
+      setQuickInsight('Done', 'Same private ID, human proof assurance — bans bind to one verified human.');
+      const humanBanner = $('ih-human-outcome-banner');
+      if (humanBanner) humanBanner.hidden = false;
     } else {
       log('Step-up check', `ppid match=${result.ppid === before} assurance=${result.assurance}`);
     }
@@ -2289,6 +2538,14 @@
     bind('ih-require-ishuman-btn', requireIsHumanOnTickets);
     bind('ih-complete-ishuman-btn', completeIsHumanVerification);
     bind('ih-reverify-tickets-ishuman-btn', reverifyTicketsIshuman);
+    bind('ih-simulate-rotation-btn', simulateRotation);
+    bind('ih-raise-tickets-policy-btn', raiseTicketsPolicySimulated);
+    bind('ih-complete-human-main-btn', completeIsHumanVerification);
+    bind('ih-reverify-human-main-btn', reverifyTicketsIshuman);
+    bind('ih-popup-retry-btn', () => {
+      const mode = state.lastPopupIssueMode || 'passkey_setup';
+      openIdvPopup({ issueMode: mode === 'unlock' ? 'unlock' : mode });
+    });
     bind('ih-run-all-operations', runAllOperations);
     bind('ih-reset-demo-btn', clearLemmaId);
     bind('ih-force-reverify-btn', forceFreshIdv);
@@ -2302,6 +2559,7 @@
       await refreshStatus().catch(() => {});
       updateBlockResultsTable();
       updateStepLocks();
+      renderWalletSlots();
     } catch (err) {
       log('Startup check skipped', err.message);
     }

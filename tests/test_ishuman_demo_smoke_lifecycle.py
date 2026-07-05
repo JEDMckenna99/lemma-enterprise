@@ -29,8 +29,11 @@ def fixture_ishuman_demo_client(fake_ishuman_db_session_factory, monkeypatch):
 def test_demo_lifecycle_site_block_unblock_and_escalation(
     ishuman_demo_client,
     fake_ishuman_db_session_factory,
+    monkeypatch,
 ):
     from api.database import Site, SiteBlock, SiteDoubt
+
+    monkeypatch.setenv("LEMMA_ISHUMAN_DEMO_ADMIN_TOKEN", "demo-admin-token")
 
     fake_ishuman_db_session_factory.store.data[Site.__name__] = [
         Site(
@@ -60,6 +63,7 @@ def test_demo_lifecycle_site_block_unblock_and_escalation(
 
     doubt = ishuman_demo_client.post(
         "/api/demo/ishuman/require-ishuman",
+        headers={"X-Demo-Admin-Token": "demo-admin-token"},
         json={"site_slug": "tickets", "ppid": ppid},
     ).get_json()
     assert doubt["doubt_required"] is True
@@ -75,17 +79,13 @@ def test_demo_lifecycle_site_block_unblock_and_escalation(
     assert len(blocks) == 1
     assert blocks[0].site_id == "site_demo_tickets"
 
-    unblock = ishuman_demo_client.post(
-        "/api/demo/ishuman/site-unblock",
-        json={"site_slug": "tickets", "ppid": ppid},
+    rotation = ishuman_demo_client.post(
+        "/api/demo/ishuman/rotation-check",
+        json={"site_slug": "tickets", "ppids": [ppid, "did:lemma:ppid_fresh_rotation"]},
     ).get_json()
-    assert unblock["success"] is True
-    assert unblock.get("unblocked") is True
-    active_blocks = [
-        row for row in fake_ishuman_db_session_factory.store.data[SiteBlock.__name__]
-        if row.is_active
-    ]
-    assert active_blocks == []
+    assert rotation["success"] is True
+    assert rotation["results"][ppid]["blocked"] is True
+    assert rotation["results"]["did:lemma:ppid_fresh_rotation"]["blocked"] is False
 
 
 def test_relying_site_preflight_endpoint_shape(ishuman_demo_client, monkeypatch):

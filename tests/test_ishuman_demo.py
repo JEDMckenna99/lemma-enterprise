@@ -30,7 +30,7 @@ def test_ishuman_demo_page_loads_expected_assets(ishuman_demo_client):
     body = resp.get_data(as_text=True)
 
     assert resp.status_code == 200
-    assert "step up to human proofs when needed" in body
+    assert "Private IDs per site — free" in body
     assert "Human proofs + lemma.id demo" in body
     assert "Get started" in body
     assert "View developer docs" in body
@@ -42,10 +42,16 @@ def test_ishuman_demo_page_loads_expected_assets(ishuman_demo_client):
     assert "ih-quick-progress" in body
     assert "Why integrators use lemma.id" in body
     assert 'id="ih-advanced-panel"' in body
-    assert "Advanced — human proof step-up" in body
-    assert "1. Create a lemma.id" in body
+    assert "Advanced — operator tools" in body
+    assert "1. Create your empty lemma.id" in body
     assert "2. Prove yourself on two sites" in body
     assert "3. Control abuse on your site" in body
+    assert "ih-step-rotation" in body
+    assert "ih-step-human" in body
+    assert "ih-simulate-rotation-btn" in body
+    assert "ih-wallet-slots" in body
+    assert "ih-raise-tickets-policy-btn" in body
+    assert "ih-complete-human-main-btn" in body
     assert "ih-control-escalation" in body
     assert "Same wallet → different private IDs per site" in body
     assert "demo-diagram-stage" in body
@@ -99,12 +105,73 @@ def test_ishuman_demo_page_loads_expected_assets(ishuman_demo_client):
     assert "/sdk/ishuman-verifier.js" in body
     assert "/static/js/demo/ishuman-demo.js" in body
     assert "/static/css/demo/ishuman-demo.css" in body
-    assert "/static/js/demo/ishuman-demo.js?v=49" in body
-    assert "/static/css/demo/ishuman-demo.css?v=21" in body
-    assert "One passkey wallet" in body
+    assert "/static/js/demo/ishuman-demo.js?v=50" in body
+    assert "/static/css/demo/ishuman-demo.css?v=22" in body
+    assert "ticket drops" in body or "SaaS trials" in body
     assert "ih-simulation-banner" not in body
     assert "Staging simulation only" not in body
     assert "ih-start-simulated-demo" not in body
+    assert 'data-quick-act="5"' in body
+    human_start = body.index('id="ih-step-human"')
+    adv_start = body.index('id="ih-advanced-panel"')
+    assert body.index("ih-stepup-compare") < adv_start
+    assert human_start < adv_start
+
+
+def test_ishuman_demo_js_references_rotation_check():
+    js = (ROOT / "static" / "js" / "demo" / "ishuman-demo.js").read_text(encoding="utf-8")
+    assert "/api/demo/ishuman/rotation-check" in js
+    assert "simulateRotation" in js
+    assert "raiseTicketsPolicySimulated" in js
+    assert "deriveProvisionalPpidFromSecret" in js
+
+
+def test_ishuman_demo_rotation_check_unknown_site(ishuman_demo_client):
+    resp = ishuman_demo_client.post(
+        "/api/demo/ishuman/rotation-check",
+        json={"site_slug": "unknown", "ppids": ["did:lemma:ppid_test"]},
+    )
+    payload = resp.get_json()
+    assert resp.status_code == 404
+    assert payload["error"] == "unknown demo site"
+
+
+def test_ishuman_demo_rotation_check_requires_ppids(ishuman_demo_client):
+    resp = ishuman_demo_client.post(
+        "/api/demo/ishuman/rotation-check",
+        json={"site_slug": "tickets", "ppids": []},
+    )
+    payload = resp.get_json()
+    assert resp.status_code == 400
+    assert payload["error"] == "ppids required"
+
+
+def test_ishuman_demo_rotation_check_reads_block_state(
+    ishuman_demo_client,
+    fake_ishuman_db_session_factory,
+):
+    from api.database import SiteBlock
+
+    ishuman_demo_client.get("/api/demo/ishuman/config")
+    blocked_ppid = "did:lemma:ppid_rotation_blocked"
+    fresh_ppid = "did:lemma:ppid_rotation_fresh"
+    ishuman_demo_client.post(
+        "/api/demo/ishuman/site-block",
+        json={"site_slug": "tickets", "ppid": blocked_ppid, "reason": "demo"},
+    )
+
+    resp = ishuman_demo_client.post(
+        "/api/demo/ishuman/rotation-check",
+        json={"site_slug": "tickets", "ppids": [blocked_ppid, fresh_ppid]},
+    )
+    payload = resp.get_json()
+
+    assert resp.status_code == 200
+    assert payload["success"] is True
+    assert payload["results"][blocked_ppid]["blocked"] is True
+    assert payload["results"][fresh_ppid]["blocked"] is False
+    blocks = fake_ishuman_db_session_factory.store.data[SiteBlock.__name__]
+    assert len(blocks) == 1
 
 
 def test_ishuman_demo_js_exposes_quick_demo_entrypoint():
