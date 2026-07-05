@@ -79,6 +79,8 @@ def test_ishuman_demo_page_loads_expected_assets(ishuman_demo_client):
     assert "ih-verify-sites-btn" in body
     assert "ih-link-tickets-step2" in body
     assert "ih-link-trials-step2" in body
+    assert "ih-verify-tickets-step2" in body
+    assert "ih-verify-trials-step2" in body
     assert "Open ticketing demo →" in body
     assert "Open trials demo →" in body
     adv_start = body.index('id="ih-advanced-panel"')
@@ -86,6 +88,8 @@ def test_ishuman_demo_page_loads_expected_assets(ishuman_demo_client):
     step2_start = body.index('id="ih-step-2"')
     step3_start = body.index("<!-- Step 3")
     assert "ih-verify-tickets-btn" not in body[step2_start:step3_start]
+    assert "ih-verify-tickets-step2" in body[step2_start:step3_start]
+    assert "ih-verify-trials-step2" in body[step2_start:step3_start]
     assert "Test-mode automation" not in body
     assert "Unlock wallet" not in body
     assert "ih-try-qr-demo-btn" not in body
@@ -95,8 +99,8 @@ def test_ishuman_demo_page_loads_expected_assets(ishuman_demo_client):
     assert "/sdk/ishuman-verifier.js" in body
     assert "/static/js/demo/ishuman-demo.js" in body
     assert "/static/css/demo/ishuman-demo.css" in body
-    assert "/static/js/demo/ishuman-demo.js?v=48" in body
-    assert "/static/css/demo/ishuman-demo.css?v=20" in body
+    assert "/static/js/demo/ishuman-demo.js?v=49" in body
+    assert "/static/css/demo/ishuman-demo.css?v=21" in body
     assert "One passkey wallet" in body
     assert "ih-simulation-banner" not in body
     assert "Staging simulation only" not in body

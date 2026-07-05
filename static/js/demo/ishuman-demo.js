@@ -717,6 +717,8 @@
       'ih-get-started',
       'ih-step1-primary-btn',
       'ih-verify-sites-btn',
+      'ih-verify-tickets-step2',
+      'ih-verify-trials-step2',
       'ih-verify-sites-advanced-btn',
       'ih-verify-tickets-btn',
       'ih-verify-trials-btn',
@@ -2276,6 +2278,8 @@
     bind('ih-poll-btn', pollAndStoreMaster);
     bind('ih-verify-sites-btn', verifyBothSites);
     bind('ih-verify-sites-advanced-btn', verifyBothSites);
+    bind('ih-verify-tickets-step2', () => verifySite('tickets'));
+    bind('ih-verify-trials-step2', () => verifySite('trials'));
     bind('ih-refresh-status-btn', refreshStatus);
     bind('ih-verify-tickets-btn', () => verifySite('tickets'));
     bind('ih-verify-trials-btn', () => verifySite('trials'));

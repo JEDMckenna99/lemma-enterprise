@@ -655,7 +655,6 @@
 .demo-site-open-link {
   display: inline-flex;
   align-items: center;
-  margin-top: 10px;
   font-size: 12px;
   font-weight: 800;
   color: var(--demo-brand);
@@ -664,6 +663,20 @@
 
 .demo-site-open-link:hover {
   text-decoration: underline;
+}
+
+.site-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 10px;
+  margin-top: 10px;
+}
+
+.demo-site-verify-btn {
+  margin-top: 0;
+  padding: 6px 12px;
+  font-size: 12px;
 }
 
 .result-warn {
