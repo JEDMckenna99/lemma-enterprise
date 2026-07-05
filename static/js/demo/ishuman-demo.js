@@ -1779,6 +1779,16 @@
       state.localBlocks.tickets.delete(ppid);
     }
     clearVerifierCache('tickets');
+    if (window.IsHumanVerifier?.broadcastBlockUpdate) {
+      for (const ppid of ppids) {
+        window.IsHumanVerifier.broadcastBlockUpdate({
+          type: 'NETWORK_REVOCATION',
+          siteId: SITE_IDS.tickets,
+          ppid,
+          reason: 'demo_site_unblock',
+        });
+      }
+    }
 
     const netJson = $('ih-master-json');
     if (netJson) netJson.textContent = pretty({ unblocked: unblockedAny, ppids: [...ppids] });

@@ -80,6 +80,7 @@ def test_demo_lifecycle_site_block_unblock_and_escalation(
         json={"site_slug": "tickets", "ppid": ppid},
     ).get_json()
     assert unblock["success"] is True
+    assert unblock.get("unblocked") is True
     active_blocks = [
         row for row in fake_ishuman_db_session_factory.store.data[SiteBlock.__name__]
         if row.is_active

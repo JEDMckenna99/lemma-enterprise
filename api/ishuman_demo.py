@@ -435,13 +435,18 @@ def ishuman_demo_status():
         site_blocks = []
         demo_site_ids = [spec["site_id"] for spec in DEMO_SITES.values()]
         requested_ppid = (request.args.get("ppid") or "").strip()
+        block_query = db.query(SiteBlock).filter(
+            SiteBlock.site_id.in_(demo_site_ids),
+            SiteBlock.is_active.is_(True),
+        )
         if requested_ppid:
-            for block in db.query(SiteBlock).filter_by(ppid=requested_ppid, is_active=True).all():
-                if block.site_id in demo_site_ids:
-                    site_blocks.append({
-                        "site_id": block.site_id, "ppid": block.ppid,
-                        "reason": block.reason,
-                    })
+            block_query = block_query.filter(SiteBlock.ppid == requested_ppid)
+        for block in block_query.all():
+            site_blocks.append({
+                "site_id": block.site_id,
+                "ppid": block.ppid,
+                "reason": block.reason,
+            })
 
         return jsonify({
             "success": True,
@@ -501,7 +506,8 @@ def ishuman_demo_site_block():
 
 @ishuman_demo_bp.route("/api/demo/ishuman/site-unblock", methods=["POST"])
 def ishuman_demo_site_unblock():
-    from api.database import SessionLocal, SiteBlock
+    from api.database import SessionLocal
+    from api.site_ppid_revocation import clear_site_bound_ppid
 
     body = request.get_json(silent=True) or {}
     slug = body.get("site_slug", "tickets")
@@ -515,12 +521,19 @@ def ishuman_demo_site_unblock():
 
     db = SessionLocal()
     try:
-        block = db.query(SiteBlock).filter_by(site_id=site.site_id, ppid=ppid, is_active=True).first()
-        if not block:
-            return jsonify({"success": True, "unblocked": False})
-        block.is_active = False
-        db.commit()
-        return jsonify({"success": True, "unblocked": True, "site_id": site.site_id, "ppid": ppid})
+        result = clear_site_bound_ppid(
+            db,
+            site_id=site.site_id,
+            ppid=ppid,
+            cleared_by=site.admin_email or "demo",
+        )
+        return jsonify({
+            "success": True,
+            "unblocked": bool(result.get("lifted")),
+            "site_id": site.site_id,
+            "ppid": ppid,
+            **result,
+        })
     except Exception:
         db.rollback()
         raise
