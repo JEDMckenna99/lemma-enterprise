@@ -639,6 +639,22 @@
   line-height: 1.3;
 }
 
+.site-card-title {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+}
+
+.site-card-icon {
+  display: inline-flex;
+  flex-shrink: 0;
+}
+
+.site-card-icon svg {
+  display: block;
+}
+
 .site-card-field {
   padding: 0;
 }
@@ -1995,8 +2011,13 @@
 }
 
 .demo-wallet-slot-icon {
-  font-size: 18px;
+  display: inline-flex;
+  align-items: center;
   line-height: 1;
+}
+
+.demo-wallet-slot-icon svg {
+  display: block;
 }
 
 .demo-wallet-slot-body {
