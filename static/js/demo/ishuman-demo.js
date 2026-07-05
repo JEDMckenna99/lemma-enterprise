@@ -87,6 +87,7 @@
         top.textContent = display;
         top.className = el.className;
       }
+      renderStep1Action();
     }
   }
 
@@ -207,7 +208,7 @@
       if (!walletReady) return;
 
       updateQuickProgress(1);
-      setQuickInsight('Act 1 — Prove', 'Verifying human proof on ticketing demo site…');
+      setQuickInsight('Act 1 — Prove', 'Minting passkey proof on ticketing demo site…');
       setWorkflowHighlight(2);
       scrollToPanel('ih-step-2');
       await verifySite('tickets');
@@ -332,9 +333,33 @@
 
   function isStep1Ready() {
     if (assuranceDemoMode()) {
-      return !!state.walletId;
+      return !!state.walletId && !!(state.wallet?.isUnlocked && state.wallet.isUnlocked());
     }
     return isMasterReady();
+  }
+
+  function renderStep1Action() {
+    const btn = $('ih-step1-primary-btn');
+    const banner = $('ih-step1-continue-banner');
+    if (!btn || !banner) return;
+
+    const ready = isStep1Ready();
+    if (ready) {
+      banner.hidden = false;
+      btn.hidden = true;
+      setQuickInsight('Act 1 — Prove', 'Wallet ready — open the ticketing demo or continue to Step 2.');
+      updateQuickProgress(1);
+      return;
+    }
+    banner.hidden = true;
+    btn.hidden = false;
+    if (!state.walletId) {
+      btn.textContent = 'Create a lemma.id';
+      btn.dataset.action = 'create';
+    } else {
+      btn.textContent = 'Unlock lemma.id';
+      btn.dataset.action = 'unlock';
+    }
   }
 
   function bothSitesVerified() {
@@ -386,14 +411,12 @@
     const step5Utility = $('ih-step5-utility');
     const ppidCompareDesc = $('ih-ppid-compare-desc');
     const intro = $('ih-intro-lead');
-    const createBtn = $('ih-create-lemma-btn');
+    if (step1Title) step1Title.textContent = '1. Create a lemma.id';
     if (!on) {
-      if (step1Title) step1Title.textContent = 'Step 1 — Create or unlock your lemma.id';
       if (step1Desc) step1Desc.textContent = 'Use an existing lemma.id or complete a one-time identity check.';
       if (step2Title) step2Title.textContent = 'Step 2 — Use the same lemma.id on two sites';
       if (step2Desc) step2Desc.textContent = 'Each site asks for the assurance it needs; your wallet mints a site-private stamp the site verifies itself — same verified human, different PPIDs.';
       if (intro) intro.textContent = 'lemma.id is one passkey wallet per user — the isHuman proof lives in that single container. Sites request site-private stamps from it; your backend verifies offline. Same wallet, different opaque ID on every site. You block abuse on your site only.';
-      if (createBtn) createBtn.textContent = 'Create a lemma.id';
       if (step1Utility) {
         step1Utility.querySelector('p').textContent = 'The one-time IDV path: verify once on lemma.id, then reuse that proof across sites. Your identity stays in a container only you control.';
       }
@@ -410,7 +433,7 @@
         ppidCompareDesc.textContent = 'Ticketing and Trials receive different identifiers, even though both proofs come from the same verified human.';
       }
     } else {
-      if (createBtn) createBtn.textContent = 'Create a lemma.id';
+      if (step1Desc) step1Desc.textContent = 'A passkey-controlled wallet — no identity check yet. Sites will ask this wallet for proofs at the assurance level they require.';
       if (step1Utility) {
         step1Utility.querySelector('p').textContent = 'Passkey-first onboarding: you hold a usable lemma.id at passkey assurance before any identity check. It\'s a container only you control — sites can\'t read it, they can only ask it for proofs.';
       }
@@ -446,6 +469,7 @@
     }
     const personCard = $('ih-person-status-card');
     if (personCard) personCard.hidden = !on;
+    renderStep1Action();
     updateStepLocks();
   }
 
@@ -522,15 +546,6 @@
     setWorkflowHighlight(workflowStepForWizard(step));
   }
 
-  function setDemoReadyBanner(visible) {
-    const banner = $('ih-demo-ready-banner');
-    if (banner) banner.hidden = !visible;
-    if (visible) {
-      setQuickInsight('Act 1 — Prove', 'Wallet ready — open the ticketing demo or continue to Step 2.');
-      updateQuickProgress(1);
-    }
-  }
-
   function scrollToPanel(id) {
     const el = $(id);
     if (el && el.scrollIntoView) {
@@ -579,7 +594,6 @@
       } catch (err) {
         if (isEncryptedWalletLockedError(err) && state.masterCredentialId) {
           setPill('ih-lemma-status', 'READY', 'ok');
-          setDemoReadyBanner(true);
           return;
         }
         throw err;
@@ -596,8 +610,6 @@
 
       if (state.masterCredentialId) {
         setPill('ih-lemma-status', 'READY', 'ok');
-        setDemoReadyBanner(true);
-        updateStepLocks();
         return;
       }
 
@@ -613,6 +625,9 @@
     } catch (err) {
       setPill('ih-lemma-status', 'NONE', 'warn');
       log('Wallet status check skipped', err.message);
+    } finally {
+      renderStep1Action();
+      updateStepLocks();
     }
   }
 
@@ -620,8 +635,7 @@
     state.wizardRunning = running;
     const ids = [
       'ih-get-started',
-      'ih-unlock-lemma-btn',
-      'ih-create-lemma-btn',
+      'ih-step1-primary-btn',
       'ih-verify-sites-btn',
       'ih-verify-sites-advanced-btn',
       'ih-verify-tickets-btn',
@@ -970,7 +984,7 @@
       state.masterCredentialId = status.master.credential_id;
       localStorage.setItem('ishuman_demo_master_id', state.masterCredentialId);
       setPill('ih-lemma-status', 'READY', 'ok');
-      setDemoReadyBanner(true);
+      renderStep1Action();
       return true;
     }
     return false;
@@ -1056,7 +1070,7 @@
       await hydrateSiteVerificationFromCache().catch(() => {});
       if (outcome === 'completed') {
         setWorkflowHighlight(2);
-        setDemoReadyBanner(true);
+        renderStep1Action();
         updateStepLocks();
         scrollToPanel('ih-step-2');
       }
@@ -1258,7 +1272,7 @@
 
     const wid = $('ih-wallet-id');
     if (wid) wid.textContent = '-';
-    setDemoReadyBanner(false);
+    renderStep1Action();
     setPill('ih-lemma-status', 'CLEARED', 'warn');
     setPill('ih-person-status', '—', '');
     setDemoMode('live');
@@ -1382,7 +1396,7 @@
       });
     }
     setPill('ih-lemma-status', 'READY', 'ok');
-    setDemoReadyBanner(true);
+    renderStep1Action();
     updateStepLocks();
   }
 
@@ -1721,7 +1735,7 @@
         localStorage.setItem('ishuman_demo_master_id', state.masterCredentialId);
       }
       setPill('ih-lemma-status', 'READY', 'ok');
-      setDemoReadyBanner(true);
+      renderStep1Action();
       log('Using verified master proof from server', short(state.masterCredentialId));
       return status;
     }
@@ -1992,12 +2006,12 @@
         await blockTickets();
 
         setWizardStep(7, 'Demo complete — same ticketing PPID with ishuman assurance, then site-scoped revoke.');
-        setDemoReadyBanner(true);
+        renderStep1Action();
         log('Assurance guided demo complete');
         return;
       }
 
-      setWizardStep(2, 'Confirming human proof…');
+      setWizardStep(2, 'Confirming passkey proofs…');
       await ensureMasterForDemo();
 
       setWizardStep(3, 'Verifying both customer sites…');
@@ -2025,7 +2039,7 @@
       await verifyBothSites();
 
       setWizardStep(0, 'Demo complete — ticketing denied; trials remains valid.');
-      setDemoReadyBanner(true);
+      renderStep1Action();
       log('Guided demo complete');
     } catch (err) {
       log('Wizard stopped', err.message);
@@ -2075,7 +2089,7 @@
     const netJson = $('ih-master-json');
     if (netJson) netJson.textContent = pretty(payload);
     if (state.masterCredentialId) {
-      setDemoReadyBanner(true);
+      renderStep1Action();
     }
     return payload;
   }
@@ -2120,11 +2134,15 @@
     showQuickInsight(true);
     await loadConfig();
     bind('ih-get-started', startLiveDemo);
-    bind('ih-unlock-lemma-btn', () => {
+    bind('ih-step1-primary-btn', () => {
       setDemoMode('live');
-      openIdvPopup({ issueMode: 'unlock' });
+      const action = $('ih-step1-primary-btn')?.dataset.action;
+      if (action === 'unlock') {
+        openIdvPopup({ issueMode: 'unlock' });
+        return;
+      }
+      createLemmaIdViaPopup();
     });
-    bind('ih-create-lemma-btn', createLemmaIdViaPopup);
     bindClear('ih-clear-lemma-id-top-btn');
     bind('ih-start-idv-btn', startIdentityVerification);
     bind('ih-test-complete-btn', completeTestModeVerification);

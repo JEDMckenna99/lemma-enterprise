@@ -30,8 +30,8 @@ def test_ishuman_demo_page_loads_expected_assets(ishuman_demo_client):
     body = resp.get_data(as_text=True)
 
     assert resp.status_code == 200
-    assert "Human proofs on your site" in body
-    assert "lemma.id demo" in body
+    assert "step up to isHuman when needed" in body
+    assert "isHuman + lemma.id demo" in body
     assert "Get started" in body
     assert "View developer docs" in body
     assert "/static/img/lemma_logo.svg" in body
@@ -42,8 +42,8 @@ def test_ishuman_demo_page_loads_expected_assets(ishuman_demo_client):
     assert "ih-quick-progress" in body
     assert "Why integrators use lemma.id" in body
     assert 'id="ih-advanced-panel"' in body
-    assert "Advanced — integrator" in body
-    assert "1. Create your lemma.id wallet" in body
+    assert "Advanced — isHuman step-up" in body
+    assert "1. Create a lemma.id" in body
     assert "2. Prove yourself on two sites" in body
     assert "3. Control abuse on your site" in body
     assert "ih-control-escalation" in body
@@ -67,7 +67,10 @@ def test_ishuman_demo_page_loads_expected_assets(ishuman_demo_client):
     assert "ih-run-guided-demo" not in body
     assert "autoProvision: true" in body
     assert "ih-step-1" in body
-    assert "ih-demo-ready-banner" in body
+    assert "ih-step1-continue-banner" in body
+    assert "ih-step1-primary-btn" in body
+    assert "ih-create-lemma-btn" not in body
+    assert "ih-unlock-lemma-btn" not in body
     assert "ih-network-pill" not in body
     assert "ih-verify-tickets-btn" in body
     assert "ih-verify-trials-btn" in body
@@ -88,7 +91,7 @@ def test_ishuman_demo_page_loads_expected_assets(ishuman_demo_client):
     assert "/static/js/demo/ishuman-demo.js" in body
     assert "/static/css/demo/ishuman-demo.css" in body
     assert "/static/js/demo/ishuman-demo.js?v=40" in body
-    assert "/static/css/demo/ishuman-demo.css?v=15" in body
+    assert "/static/css/demo/ishuman-demo.css?v=16" in body
     assert "One passkey wallet" in body
     assert "ih-simulation-banner" not in body
     assert "Staging simulation only" not in body

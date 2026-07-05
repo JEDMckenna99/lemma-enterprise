@@ -1725,16 +1725,23 @@
   font-size: 10px;
 }
 
-.demo-wallet-actions {
-  margin-top: 0;
+.demo-step1-action {
+  display: flex;
+  flex-direction: column;
   gap: 8px;
 }
 
-.demo-wallet-actions .demo-btn {
-  flex: 1 1 auto;
-  min-width: 0;
-  padding: 9px 12px;
-  font-size: 13px;
+.demo-step1-action .demo-btn-primary {
+  width: 100%;
+}
+
+.demo-step1-action .demo-ready-banner {
+  margin-bottom: 0;
+  justify-content: center;
+}
+
+.demo-step1-action .demo-ready-banner strong {
+  display: none;
 }
 
 .demo-privacy-note {
