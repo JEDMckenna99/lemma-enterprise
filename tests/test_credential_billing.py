@@ -68,7 +68,7 @@ def test_record_initial_issuance_reports_meter(monkeypatch, fake_ishuman_db_sess
     )
 
     assert result.event_type == EVENT_INITIAL_ISSUANCE
-    assert result.unit_amount_cents == 35
+    assert result.unit_amount_cents == 83
     assert result.reported_to_stripe is True
     assert len(reported) == 1
     assert reported[0]["event_type"] == EVENT_INITIAL_ISSUANCE
@@ -117,7 +117,7 @@ def test_record_mau_requires_redis_dedup(monkeypatch, fake_ishuman_db_session_fa
     )
 
     assert result.event_type == EVENT_MAU_RENEWAL
-    assert result.unit_amount_cents == 1
+    assert result.unit_amount_cents == 3
     assert len(reported) == 1
 
 
@@ -213,7 +213,7 @@ def test_record_doubt_reentry_after_block(monkeypatch, fake_ishuman_db_session_f
     )
 
     assert result.event_type == EVENT_DOUBT_REENTRY
-    assert result.unit_amount_cents == 35
+    assert result.unit_amount_cents == 33
     assert reported[0]["event_type"] == EVENT_DOUBT_REENTRY
     assert doubt.is_active is False
 

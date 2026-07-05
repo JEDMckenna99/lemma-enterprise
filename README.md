@@ -1,84 +1,73 @@
-# Lemma.id
+# lemma.id
 
-**Local-first authorization and dynamic trust for AI agents.**
+**Stop the same abuser from coming back as a new account.**
 
-Lemma.id is a credential-based authorization platform that gives AI agents scoped, cryptographically verifiable permissions — and automatically contains them when trust degrades.
+lemma.id is a **private proof layer** for web platforms: site-private PPIDs for account continuity, signed backend verification, and **isHuman** assurance when one account must map to one verified human. Bans survive email, SIM, device, and IP rotation — without your site storing ID documents or building a KYC stack.
 
-## Problem
+- **Live:** https://lemma.id · **Docs:** https://lemma.id/docs · **AI integration guide:** [`docs/integration/ISHUMAN_AGENT_INTEGRATION.md`](docs/integration/ISHUMAN_AGENT_INTEGRATION.md)
 
-AI agents that call APIs, read files, and execute code operate on static permissions. Once granted access, nothing prevents a prompt-injected or misbehaving agent from escalating — there's no mechanism to *revoke authority mid-session* based on what the agent just did.
+## The problem
 
-## Approach
+Fraud is an economic problem, not a tech one. The industry can already detect abuse — what it can't do is make a ban stick when the next account is free. Login tells you which account signed in, not whether the same abuser came back as a new account. Bot detection finds suspicious behavior but gives you no durable enforcement handle. Direct KYC works but leaves you holding identity documents and breach liability.
 
-Lemma.id introduces **dynamic trust degradation**: a local HTTP firewall that sits between the agent and external services, enforcing scoped credentials with proof-of-possession and a taint epoch that invalidates an agent's authority the moment it ingests untrusted content.
+## How it works
 
-### Key capabilities
+**Bind → Detect → Enforce.** lemma.id doesn't replace your login, fraud detection, or moderation — it gives those systems an enforcement handle that survives credential rotation.
+
+1. A user unlocks their passkey-protected lemma.id wallet in the browser (optional identity-verification step-up when your policy requires **isHuman**).
+2. Your site receives a **site-private PPID** (pairwise pseudonymous ID — different per site, so no cross-site tracking) and a **signed presentation**.
+3. Your backend verifies the presentation **locally** (Ed25519, ~1ms) — no per-request call to lemma.id, no rate limits, no meter.
+4. When you ban a PPID, the ban is persistent: fresh IDV, wallet recovery, and credential rotation do not clear it.
+
+### Quick integration
+
+```html
+<script src="https://lemma.id/sdk/ishuman-verifier.js"></script>
+<script>
+  const verifier = new IsHumanVerifier({ siteId: 'app.example.com' });
+  const { ok, presentation } = await verifier.verifyForBackend({ autoProvision: true });
+  if (!ok) throw new Error('not_verified');
+  await fetch('/api/signup', { method: 'POST', body: JSON.stringify({ presentation }) });
+</script>
+```
+
+Verify on the server with `@lemma/ishuman-verify` (Node) or `lemma_ishuman_verify.py` (Python). For signup and account creation, always verify the signed `presentation` server-side — never trust a bare client `ppid`.
+
+### Assurance tiers
+
+| Tier | What it proves | Sybil-resistant? |
+|------|----------------|------------------|
+| Passkey continuity | Same wallet returning | No |
+| Signed presentation | Cryptographically verified proof | Depends on assurance level |
+| **isHuman** | One verified human per account (IDV-backed) | Yes — bans survive rotation |
+
+## Pricing
+
+| Line item | Price |
+|-----------|-------|
+| Identity verification (only when isHuman is required) | $0.33/user · passed through at cost |
+| lemma.id proof binding | $0.50/user · one-time |
+| MAU renewal | $0.03/user/month, starting the month after binding |
+| Local verification | $0 · unlimited, never metered |
+
+Basic `verify()` gating requires no registration or API key. Site API keys unlock abuse controls: persistent site blocks, unblocks, and temporary doubt challenges.
+
+## Agent Ops (operator-only)
+
+The same wallet and proof infrastructure extends to AI agents. **Agent Ops** — lemma-cli, the Lemma Firewall, and the MCP server — gives agent operators scoped, cryptographically verifiable permissions with dynamic trust degradation:
 
 - **Scoped credentials** — Ed25519-signed proofs with `read`, `write`, `admin` scopes bound to specific APIs and actions
 - **Proof-of-possession** — every request cryptographically bound to method, path, body hash, and nonce (replay-proof)
-- **Taint epoch** — the firewall bumps a monotonic counter when the agent touches external content; stale credentials are rejected until a human re-approves
+- **Taint epoch** — the firewall bumps a monotonic counter when the agent ingests untrusted content; stale credentials are rejected until a human re-approves
 - **Monotonic attenuation** — delegated credentials can only narrow authority, never widen it
-- **Risk-tiered freshness** — high-risk actions require more recent revocation data than low-risk reads
-- **Action taxonomy** — 24 canonical actions with predefined risk tiers (`file.read`, `shell.exec`, `api.call.write`, etc.)
 - **Full audit trail** — every allow/deny decision logged in JSONL for post-session replay
 
-## Architecture
+Agent Ops is operator-only tooling — it is **not** part of relying-site integration. The roadmap connects the two: human-backed agent passports and site-private agent acting IDs rooted in the same verified-human wallet (see [`docs/product/HUMAN_BACKED_AGENT_PASSPORT.md`](docs/product/HUMAN_BACKED_AGENT_PASSPORT.md) and [`docs/product/AGENT_ACTING_PPID.md`](docs/product/AGENT_ACTING_PPID.md)).
 
-```
-Agent ──► Lemma Firewall (local HTTP proxy)
-              │
-              ├─ credential verification (Ed25519 + scope check)
-              ├─ taint epoch enforcement
-              ├─ risk-tier freshness gate
-              ├─ action taxonomy mapping
-              └─ audit log (JSONL)
-              │
-              ▼
-         Upstream APIs (scoped, proxied)
-```
-
-### Core components
-
-| Component | Path | Description |
-|-----------|------|-------------|
-| Firewall | `scripts/lemma_firewall.py` | Local proxy enforcing policy, taint, and auth |
-| CLI | `scripts/lemma_cli.py` | Session management, credential bootstrapping |
-| Crypto engine | `lemma-crypto/` | Rust Ed25519 signing and verification |
-| Action taxonomy | `api/action_taxonomy.py` | Canonical actions, risk tiers, scope mapping |
-| Proof chain verifier | `api/authz/verifier.py` | Monotonic attenuation and delegation chain validation |
-| Replay protection | `api/authz/replay.py` | Nonce-based PoP with request binding |
-| Policy engine | `api/authz/mode_policy.py` | Auth mode evaluation (bearer / proof-required) |
-| Platform API | `app.py` | Flask app with IAM, wallet, and credential endpoints |
-| MCP server | `mcp-server/` | Model Context Protocol integration for agent hosts |
-
-## Quick start
-
-### Run the prompt injection containment demo
+Try the prompt-injection containment demo:
 
 ```bash
 python3 scripts/run_prompt_injection_containment_demo.py
-```
-
-This self-contained demo simulates an agent that:
-1. Reads an internal API (allowed)
-2. Writes data (allowed, no taint)
-3. Fetches external content containing hidden instructions (allowed, taint epoch bumps)
-4. Attempts a privileged write (denied — credential taint epoch is stale)
-5. Gets human re-approval with fresh credential (allowed)
-
-### Run the CLI
-
-```bash
-pip install -e .
-lemma start --scope read,write --policy default
-lemma replay
-lemma stop
-```
-
-### Run tests
-
-```bash
-python3 -m pytest tests/ -q
 ```
 
 ## Repo layout
@@ -87,7 +76,7 @@ python3 -m pytest tests/ -q
 api/            API endpoints, IAM, credential issuance
 api/authz/      Authorization: proof chains, replay, freshness, mode policy
 auth/           Decorators, session management, rate limiting
-billing/        Stripe integration (optional)
+billing/        Stripe metered billing
 lemma-crypto/   Rust native extension (Ed25519, HPKE)
 scripts/        CLI, firewall, demo scripts
 sdk/            Python and Node integration SDKs
@@ -97,9 +86,14 @@ tests/          Test suites
 docs/           Architecture, protocol design, threat model
 ```
 
-## Configuration
+## Development
 
-All secrets are loaded from environment variables. No credentials are committed to this repository.
+```bash
+pip install -e .
+python3 -m pytest tests/ -q
+```
+
+All secrets are loaded from environment variables; no credentials are committed to this repository.
 
 Required for full platform operation:
 - `DATABASE_URL` — PostgreSQL connection string
@@ -114,11 +108,19 @@ The local CLI and firewall run standalone without any of these.
 
 ## Tech stack
 
-- **Python 3.11+** / Flask — API and firewall
+- **Python 3.11+** / Flask — API and platform
 - **Rust** — cryptographic verification engine (Ed25519, HPKE)
 - **PostgreSQL** — persistent storage
 - **Redis** — revocation sync, rate limiting
 - **Docker Compose** — local development stack
+
+## Privacy model
+
+- Document images, selfies, and legal names are never persisted on the isHuman path.
+- Sites receive only a site-private PPID and a signed human claim — no cross-site identifier.
+- Person roots are stored as KMS-encrypted ciphertext; production fails closed without KMS.
+
+See [`docs/architecture/PRIVACY_ARCHITECTURE.md`](docs/architecture/PRIVACY_ARCHITECTURE.md).
 
 ## Security
 

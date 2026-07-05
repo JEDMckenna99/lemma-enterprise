@@ -28,12 +28,12 @@
 
 ## Billing
 
-- [ ] Concurrent first issuance creates one lifetime site billing subject and one $0.35
+- [ ] Concurrent first issuance creates one lifetime site billing subject and one $0.83
   initial event.
-- [ ] Concurrent later-month renewal creates one monthly row and one $0.01 MAU
+- [ ] Concurrent later-month renewal creates one monthly row and one $0.03 MAU
   event.
 - [ ] Current-month Redis import prevents duplicate billing.
-- [ ] A matching active doubt plus successful fresh IDV bills one $0.35
+- [ ] A matching active doubt plus successful fresh IDV bills one $0.33
   doubt-reentry event.
 - [ ] Stripe payload contains only random event ID, customer/site billing
   identity, month, event type, and unit count.

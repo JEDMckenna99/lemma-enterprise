@@ -218,6 +218,9 @@ class _FakeDbSession:
     def add(self, obj):
         self._store.data[obj.__class__.__name__].append(obj)
 
+    def flush(self):
+        return None
+
     def commit(self):
         self._store.commits += 1
 

@@ -1,12 +1,15 @@
 """
 Stripe Billing catalog constants for lemma.id site-credential metering.
 
-Three metered events:
-  - initial issuance ($0.35)
-  - MAU renewal ($0.01)
-  - doubt re-entry after an active site doubt ($0.35)
+Three metered events, aligned with the public pricing page
+(templates/modern/pricing_new.html):
+  - initial issuance ($0.83 = $0.33 IDV pass-through at cost + $0.50 one-time
+    lemma.id proof binding)
+  - MAU renewal ($0.03/user/month, starting the month after binding)
+  - doubt re-entry after an active site doubt ($0.33 — fresh IDV passed
+    through at cost, never marked up)
 
-Site blocks and hard bans never emit meter events.
+Site blocks, hard bans, and local verification never emit meter events.
 """
 
 from __future__ import annotations
@@ -27,11 +30,12 @@ METER_EVENTS: Dict[str, str] = {
     "doubt_reentry": METER_EVENT_DOUBT_REENTRY,
 }
 
-# Unit amounts in cents (USD).
+# Unit amounts in cents (USD). Must match the public pricing page.
+# initial_issuance = $0.33 IDV pass-through + $0.50 proof binding.
 UNIT_AMOUNTS_CENTS: Dict[str, int] = {
-    "initial_issuance": 35,
-    "mau_renewal": 1,
-    "doubt_reentry": 35,
+    "initial_issuance": 83,
+    "mau_renewal": 3,
+    "doubt_reentry": 33,
 }
 
 STRIPE_PRODUCT_NAME = "Lemma.id — Site Credentials"
@@ -41,9 +45,9 @@ STRIPE_PRODUCT_DESCRIPTION = (
 )
 
 PRICE_NICKNAMES: Dict[str, str] = {
-    "initial_issuance": "Initial site credential — $0.35/user/site",
-    "mau_renewal": "MAU renewal — $0.01/user/month",
-    "doubt_reentry": "Doubt re-entry (fresh IDV) — $0.35/user",
+    "initial_issuance": "Initial site credential (IDV + binding) — $0.83/user/site",
+    "mau_renewal": "MAU renewal — $0.03/user/month",
+    "doubt_reentry": "Doubt re-entry (fresh IDV at cost) — $0.33/user",
 }
 
 CATALOG_KEYS = ("initial_issuance", "mau_renewal", "doubt_reentry")
