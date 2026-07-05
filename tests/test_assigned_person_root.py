@@ -123,6 +123,46 @@ def test_new_wallet_recovers_assigned_person_across_document_schema_change(
 
 
 @pytest.mark.unit
+def test_provisional_wallet_rebinds_to_known_document_person(
+    fake_ishuman_db_session_factory,
+    monkeypatch,
+):
+    from api.database import LemmaPerson, LemmaWalletBinding
+    from api.identity_person import PERSON_STATUS_PROVISIONAL, ensure_provisional_person_for_wallet
+
+    monkeypatch.setattr("api.config.use_assigned_person_root", lambda: True)
+
+    db = fake_ishuman_db_session_factory.session_local()
+    material = material_from_test_fixture(document_number="RECOVERY-PROVISIONAL-001")
+    first = resolve_or_create_person_from_material(
+        db,
+        material=material,
+        wallet_id="wallet_already_anchored",
+        provider="didit",
+    )
+
+    provisional_id = ensure_provisional_person_for_wallet(
+        db,
+        wallet_id="wallet_new_provisional",
+    )
+    provisional = db.query(LemmaPerson).filter_by(person_id=provisional_id).first()
+    assert provisional.status == PERSON_STATUS_PROVISIONAL
+
+    recovered = resolve_or_create_person_from_material(
+        db,
+        material=material,
+        wallet_id="wallet_new_provisional",
+        provider="didit",
+    )
+
+    assert recovered.person_id == first.person_id
+    assert recovered.person_root_hash == first.person_root_hash
+    assert recovered.created_person is False
+    binding = db.query(LemmaWalletBinding).filter_by(wallet_id="wallet_new_provisional").first()
+    assert binding.lemma_person_id == first.person_id
+
+
+@pytest.mark.unit
 def test_new_wallet_recovers_assigned_person_across_pepper_and_provider_change(
     fake_ishuman_db_session_factory,
     monkeypatch,

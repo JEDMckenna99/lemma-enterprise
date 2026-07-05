@@ -420,10 +420,33 @@ def resolve_or_create_person_from_material(
     bound_person_id = binding.lemma_person_id if binding else None
 
     if doc_person_id and bound_person_id and doc_person_id != bound_person_id:
-        raise WalletPersonBindingConflictError(
-            f"wallet {wallet_id} bound to {bound_person_id}; "
-            f"document maps to {doc_person_id}"
+        bound_person = db.query(LemmaPerson).filter_by(person_id=bound_person_id).first()
+        bound_person_has_documents = (
+            db.query(LemmaDocumentRoot)
+            .filter_by(lemma_person_id=bound_person_id)
+            .filter(LemmaDocumentRoot.revoked_at.is_(None))
+            .first()
         )
+        if (
+            bound_person
+            and bound_person.status == PERSON_STATUS_PROVISIONAL
+            and not bound_person_has_documents
+        ):
+            # A provisional person is only a pre-IDV continuity placeholder. If
+            # the document already anchors an active person, adopt that root.
+            binding.lemma_person_id = doc_person_id
+            bound_person_id = doc_person_id
+            logger.info(
+                "Rebound provisional wallet=%s from person=%s to document person=%s",
+                (wallet_id or "")[:24],
+                bound_person.person_id[:24],
+                doc_person_id[:24],
+            )
+        else:
+            raise WalletPersonBindingConflictError(
+                f"wallet {wallet_id} bound to {bound_person_id}; "
+                f"document maps to {doc_person_id}"
+            )
 
     created_person = False
     created_document_link = False

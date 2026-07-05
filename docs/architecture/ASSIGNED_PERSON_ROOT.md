@@ -34,7 +34,10 @@ When `LEMMA_ONE_PPID_ASSURANCE_MODEL=1`:
 3. First successful IDV on the bound wallet **promotes** the person to `active` and attaches the document root; **PPIDs do not change**.
 4. Provisional wallets are disposable (no cross-device recovery promise) until anchored.
 
-If IDV document resolution conflicts with the wallet-bound provisional person, issuance fails closed (same as wallet/document person mismatch).
+If IDV document resolution finds an existing person while the wallet is bound
+only to an unanchored provisional person, the provisional binding is replaced
+with the existing person. Once the wallet-bound person is anchored, conflicts
+fail closed.
 
 Document expiry changes credential validity, not identity. Renewing a document
 updates or adds the document attestation while preserving the person root,
