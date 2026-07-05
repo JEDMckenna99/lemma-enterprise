@@ -6982,8 +6982,11 @@ class LemmaWallet {
             console.log('[Lemma] generateLinkCode: payload created for profile:', profile.name,
                 `(ishuman: ${ishumanCredentials.length})`);
             
-            // Encrypt payload using AES-GCM
-            const encryptedPayload = await this._encryptForLink(payload, encryptionKey);
+            const linkPayload = await this._prepareLinkPayloadBytes(payload);
+
+            // Encrypt payload using AES-GCM. Compression keeps QR transfers within QR capacity
+            // when human-proof credentials are included in the handoff.
+            const encryptedPayload = await this._encryptLinkBytes(linkPayload.bytes, encryptionKey);
             console.log('[Lemma] generateLinkCode: payload encrypted, length:', encryptedPayload?.length);
             
             // Generate a short numeric code (6 digits) for manual entry
@@ -6995,7 +6998,8 @@ class LemmaWallet {
                 v: 1,
                 k: encryptionKeyHex,
                 p: encryptedPayload,
-                e: Date.now() + LINK_TTL_MS
+                e: Date.now() + LINK_TTL_MS,
+                ...(linkPayload.encoding ? { c: linkPayload.encoding } : {})
             });
             console.log('[Lemma] generateLinkCode: qrData created, length:', qrData.length);
             
@@ -7855,6 +7859,14 @@ class LemmaWallet {
      * Encrypt payload for device linking using AES-GCM
      */
     async _encryptForLink(payload, keyBytes, additionalData = null) {
+        const encoder = new TextEncoder();
+        return this._encryptLinkBytes(encoder.encode(payload), keyBytes, additionalData);
+    }
+
+    /**
+     * Encrypt raw payload bytes for device linking using AES-GCM.
+     */
+    async _encryptLinkBytes(payloadBytes, keyBytes, additionalData = null) {
         // Import key
         const key = await crypto.subtle.importKey(
             'raw',
@@ -7868,15 +7880,14 @@ class LemmaWallet {
         const iv = crypto.getRandomValues(new Uint8Array(12));
         
         // Encrypt
-        const encoder = new TextEncoder();
         const encryptParams = { name: 'AES-GCM', iv: iv };
         if (additionalData) {
-            encryptParams.additionalData = encoder.encode(additionalData);
+            encryptParams.additionalData = new TextEncoder().encode(additionalData);
         }
         const encrypted = await crypto.subtle.encrypt(
             encryptParams,
             key,
-            encoder.encode(payload)
+            payloadBytes
         );
         
         // Combine IV + ciphertext and base64 encode
@@ -7884,7 +7895,47 @@ class LemmaWallet {
         combined.set(iv, 0);
         combined.set(new Uint8Array(encrypted), iv.length);
         
-        return btoa(String.fromCharCode(...combined));
+        return this._arrayBufferToStandardBase64(combined);
+    }
+
+    async _prepareLinkPayloadBytes(payload) {
+        const bytes = new TextEncoder().encode(payload);
+        const compressed = await this._gzipBytes(bytes);
+        if (compressed && compressed.byteLength < bytes.byteLength) {
+            return { bytes: compressed, encoding: 'gzip' };
+        }
+        return { bytes, encoding: null };
+    }
+
+    async _gzipBytes(bytes) {
+        if (typeof CompressionStream === 'undefined' || typeof Response === 'undefined' || typeof Blob === 'undefined') {
+            return null;
+        }
+        try {
+            const stream = new Blob([bytes]).stream().pipeThrough(new CompressionStream('gzip'));
+            return new Uint8Array(await new Response(stream).arrayBuffer());
+        } catch (e) {
+            console.warn('[Lemma] Link payload compression unavailable:', e.message);
+            return null;
+        }
+    }
+
+    async _gunzipBytes(bytes) {
+        if (typeof DecompressionStream === 'undefined' || typeof Response === 'undefined' || typeof Blob === 'undefined') {
+            throw new Error('This browser cannot open compressed transfer links. Update your browser or generate a new transfer link from a compatible device.');
+        }
+        const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'));
+        return new Uint8Array(await new Response(stream).arrayBuffer());
+    }
+
+    _arrayBufferToStandardBase64(buffer) {
+        const bytes = buffer instanceof Uint8Array ? buffer : new Uint8Array(buffer);
+        let binary = '';
+        const chunkSize = 0x8000;
+        for (let i = 0; i < bytes.length; i += chunkSize) {
+            binary += String.fromCharCode(...bytes.slice(i, i + chunkSize));
+        }
+        return btoa(binary);
     }
     
     /**
@@ -7963,11 +8014,17 @@ class LemmaWallet {
         );
         
         // Decrypt
-        const decrypted = await crypto.subtle.decrypt(
+        let decrypted = new Uint8Array(await crypto.subtle.decrypt(
             { name: 'AES-GCM', iv: iv },
             key,
             ciphertext
-        );
+        ));
+
+        if (data.c === 'gzip') {
+            decrypted = await this._gunzipBytes(decrypted);
+        } else if (data.c) {
+            throw new Error('Unsupported link compression');
+        }
         
         const decoder = new TextDecoder();
         return JSON.parse(decoder.decode(decrypted));

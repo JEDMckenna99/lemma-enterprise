@@ -97,9 +97,10 @@
                     Generate a secure QR or link on this device. Your human proof travels encrypted with your lemma.id.
                 </p>
                 <button id="show-qr-btn" class="btn btn-primary btn-full">Generate QR Code</button>
+                <button id="show-link-btn" class="btn btn-secondary btn-full" style="margin-top: 10px;">Send Transfer Link</button>
                 
                 <div id="qr-display" class="qr-display hidden">
-                    <div class="qr-box">
+                    <div id="qr-box" class="qr-box">
                         <div id="qr-container"></div>
                     </div>
                     <div id="qr-timer" class="qr-timer">Expires in 5:00</div>
@@ -749,71 +750,97 @@ function showTab(tab) {
     hideQR();
 }
 
+async function generateTransferForDisplay() {
+    await initWallet();
+    // generateLinkCode() requires FRESH passkey verification for security.
+    // It will prompt the user to verify their identity before generating the transfer.
+    return wallet.generateLinkCode();
+}
+
+function startTransferTimer(result) {
+    let timeLeft = result.expiresIn || 300;
+    const timerEl = document.getElementById('qr-timer');
+
+    function formatTime(s) {
+        const m = Math.floor(s / 60);
+        const sec = s % 60;
+        return m > 0 ? `${m}:${String(sec).padStart(2, '0')}` : `${sec}s`;
+    }
+
+    if (qrTimerInterval) clearInterval(qrTimerInterval);
+    timerEl.textContent = `Expires in ${formatTime(timeLeft)}`;
+    timerEl.classList.toggle('expiring', timeLeft <= 30);
+
+    qrTimerInterval = setInterval(() => {
+        timeLeft--;
+        timerEl.textContent = `Expires in ${formatTime(timeLeft)}`;
+        timerEl.classList.toggle('expiring', timeLeft <= 30);
+
+        if (timeLeft <= 0) {
+            hideQR();
+        }
+    }, 1000);
+}
+
+function renderTransferLink(result, { showQr }) {
+    const linkOptionsEl = document.getElementById('link-options');
+    if (!linkOptionsEl) return;
+
+    const label = showQr ? 'Or copy link:' : 'Transfer link:';
+    const instruction = showQr
+        ? 'Scan with your other device, or copy the link below'
+        : 'Open this link on your other device. It expires soon and was created after your passkey check.';
+
+    linkOptionsEl.innerHTML = `
+        <p class="qr-instruction">${instruction}</p>
+        <div class="link-copy-section">
+            <p class="link-copy-label">${label}</p>
+            <div class="link-copy-row">
+                <input type="text" id="link-url" value="${escapeHtml(result.qrUrl)}" readonly class="link-url-input">
+                <button id="copy-link-url-btn" type="button" class="btn btn-secondary btn-copy">Copy</button>
+            </div>
+        </div>
+    `;
+    linkOptionsEl.classList.remove('hidden');
+    document.getElementById('copy-link-url-btn')?.addEventListener('click', copyLinkUrl);
+}
+
+function showTransferDisplay(result, { showQr }) {
+    document.getElementById('qr-display').classList.remove('hidden');
+    document.getElementById('show-qr-btn').classList.add('hidden');
+    document.getElementById('show-link-btn').classList.add('hidden');
+    renderTransferLink(result, { showQr });
+    startTransferTimer(result);
+}
+
 // Show QR code - requires fresh passkey verification (handled by generateLinkCode)
 async function showQR() {
     try {
-        await initWallet();
+        const result = await generateTransferForDisplay();
         
-        // generateLinkCode() requires FRESH passkey verification for security
-        // It will prompt the user to verify their identity before generating the link
-        const result = await wallet.generateLinkCode();
-        
+        const qrBox = document.getElementById('qr-box');
         const qrContainer = document.getElementById('qr-container');
+        qrBox.classList.remove('hidden');
         qrContainer.innerHTML = '';
         
         if (typeof QRCode !== 'undefined') {
-            new QRCode(qrContainer, {
-                text: result.qrUrl,
-                width: 200,
-                height: 200,
-                colorDark: '#000000',
-                colorLight: '#ffffff',
-                correctLevel: QRCode.CorrectLevel ? QRCode.CorrectLevel.M : 0  // Medium error correction (15%)
-            });
+            try {
+                new QRCode(qrContainer, {
+                    text: result.qrUrl,
+                    width: 220,
+                    height: 220,
+                    colorDark: '#000000',
+                    colorLight: '#ffffff',
+                    correctLevel: QRCode.CorrectLevel ? QRCode.CorrectLevel.L : 1
+                });
+            } catch (qrError) {
+                console.warn('QR render failed:', qrError);
+                qrContainer.innerHTML = '<p style="color: #dc2626;">QR is too large for this transfer. Use the link below.</p>';
+            }
         } else {
             qrContainer.innerHTML = '<p style="color: #dc2626;">QR library not loaded</p>';
         }
-        
-        // Show alternative methods for phone→PC linking
-        const linkOptionsEl = document.getElementById('link-options');
-        if (linkOptionsEl) {
-            linkOptionsEl.innerHTML = `
-                <p class="qr-instruction">Scan with your other device, or copy the link below</p>
-                <div class="link-copy-section">
-                    <p class="link-copy-label">Or copy link:</p>
-                    <div class="link-copy-row">
-                        <input type="text" id="link-url" value="${result.qrUrl}" readonly class="link-url-input">
-                        <button onclick="copyLinkUrl()" class="btn btn-secondary btn-copy">Copy</button>
-                    </div>
-                </div>
-            `;
-            linkOptionsEl.classList.remove('hidden');
-        }
-        
-        document.getElementById('qr-display').classList.remove('hidden');
-        document.getElementById('show-qr-btn').classList.add('hidden');
-        
-        let timeLeft = result.expiresIn || 300;
-        const timerEl = document.getElementById('qr-timer');
-
-        function formatTime(s) {
-            const m = Math.floor(s / 60);
-            const sec = s % 60;
-            return m > 0 ? `${m}:${String(sec).padStart(2, '0')}` : `${sec}s`;
-        }
-
-        if (qrTimerInterval) clearInterval(qrTimerInterval);
-        timerEl.textContent = `Expires in ${formatTime(timeLeft)}`;
-
-        qrTimerInterval = setInterval(() => {
-            timeLeft--;
-            timerEl.textContent = `Expires in ${formatTime(timeLeft)}`;
-            timerEl.classList.toggle('expiring', timeLeft <= 30);
-
-            if (timeLeft <= 0) {
-                hideQR();
-            }
-        }, 1000);
+        showTransferDisplay(result, { showQr: true });
         
     } catch (e) {
         console.error('QR generation failed:', e);
@@ -821,12 +848,26 @@ async function showQR() {
     }
 }
 
+// Show transfer link - requires fresh passkey verification (handled by generateLinkCode)
+async function showTransferLink() {
+    try {
+        const result = await generateTransferForDisplay();
+        document.getElementById('qr-box').classList.add('hidden');
+        document.getElementById('qr-container').innerHTML = '';
+        showTransferDisplay(result, { showQr: false });
+    } catch (e) {
+        console.error('Transfer link generation failed:', e);
+        alert('Failed to generate transfer link: ' + e.message);
+    }
+}
+
 // Copy link URL to clipboard
 async function copyLinkUrl() {
     const input = document.getElementById('link-url');
+    if (!input) return;
     try {
         await navigator.clipboard.writeText(input.value);
-        const btn = input.nextElementSibling;
+        const btn = document.getElementById('copy-link-url-btn') || input.nextElementSibling;
         btn.textContent = 'Copied!';
         setTimeout(() => btn.textContent = 'Copy', 2000);
     } catch (e) {
@@ -839,8 +880,14 @@ async function copyLinkUrl() {
 function hideQR() {
     document.getElementById('qr-display').classList.add('hidden');
     document.getElementById('show-qr-btn').classList.remove('hidden');
+    document.getElementById('show-link-btn').classList.remove('hidden');
+    document.getElementById('qr-box').classList.remove('hidden');
+    document.getElementById('qr-container').innerHTML = '';
     const linkOptions = document.getElementById('link-options');
-    if (linkOptions) linkOptions.classList.add('hidden');
+    if (linkOptions) {
+        linkOptions.innerHTML = '';
+        linkOptions.classList.add('hidden');
+    }
     
     if (qrTimerInterval) {
         clearInterval(qrTimerInterval);
@@ -1441,6 +1488,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('tab-send').addEventListener('click', () => showTab('send'));
     document.getElementById('tab-receive').addEventListener('click', () => showTab('receive'));
     document.getElementById('show-qr-btn').addEventListener('click', showQR);
+    document.getElementById('show-link-btn').addEventListener('click', showTransferLink);
     document.getElementById('hide-qr-btn').addEventListener('click', hideQR);
     document.getElementById('link-device-btn').addEventListener('click', linkDevice);
     document.getElementById('clear-wallet-btn').addEventListener('click', clearWallet);
