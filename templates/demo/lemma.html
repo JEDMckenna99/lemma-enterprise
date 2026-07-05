@@ -6,7 +6,7 @@
 
 {% block head %}
 {{ super() }}
-<link rel="stylesheet" href="/static/css/demo/ishuman-demo.css?v=17">
+<link rel="stylesheet" href="/static/css/demo/ishuman-demo.css?v=18">
 {% endblock %}
 
 {% block content %}
@@ -257,6 +257,7 @@
               <span class="result-label">Assurance</span>
               <span class="result-value" id="ih-tickets-assurance">—</span>
             </div>
+            <a class="demo-site-open-link" id="ih-link-tickets-step2" href="#" target="_blank" rel="noopener">Open ticketing demo →</a>
           </article>
 
           <article class="site-card site-card-readonly" id="ih-trials-card">
@@ -274,6 +275,7 @@
               <span class="result-label">Assurance</span>
               <span class="result-value" id="ih-trials-assurance">—</span>
             </div>
+            <a class="demo-site-open-link" id="ih-link-trials-step2" href="#" target="_blank" rel="noopener">Open trials demo →</a>
           </article>
         </div>
 
@@ -350,7 +352,7 @@
                 </tr>
               </tbody>
             </table>
-            <button class="demo-btn demo-btn-secondary demo-btn-quiet" id="ih-unblock-tickets-btn" type="button" hidden>Unblock ticketing</button>
+            <button class="demo-btn demo-btn-secondary demo-btn-quiet" id="ih-unblock-tickets-btn" type="button">Unblock ticketing</button>
           </div>
         </div>
 
@@ -540,5 +542,5 @@ const { ok, ppid, assurance, presentation } = await new IsHumanVerifier({
 <script src="/static/js/lemma-keys.js?v=5" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
 <script nonce="{{ csp_nonce }}">window.LEMMA_ISHUMAN_USE_PERSON_ROOT_SEEDS = {{ 'true' if ishuman_use_person_root_seeds else 'false' }};</script>
 <script src="/sdk/ishuman-verifier.js?v={{ ishuman_verifier_sdk_version }}" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
-<script src="/static/js/demo/ishuman-demo.js?v=43" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
+<script src="/static/js/demo/ishuman-demo.js?v=44" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
 {% endblock %}

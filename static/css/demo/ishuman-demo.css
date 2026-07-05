@@ -652,6 +652,25 @@
   padding: 3px 8px;
 }
 
+.demo-site-open-link {
+  display: inline-flex;
+  align-items: center;
+  margin-top: 10px;
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--demo-brand);
+  text-decoration: none;
+}
+
+.demo-site-open-link:hover {
+  text-decoration: underline;
+}
+
+.result-warn {
+  color: #854d0e;
+  font-weight: 700;
+}
+
 .result-row {
   display: grid;
   gap: 8px;

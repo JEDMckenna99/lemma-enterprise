@@ -403,15 +403,32 @@
     return SITE_SLUGS.every((slug) => isSiteVerified(state.results[slug]));
   }
 
+  function hasStep2Proofs() {
+    return SITE_SLUGS.every((slug) => !!(state.results[slug]?.ppid || state.passkeyPpids[slug]));
+  }
+
+  function isSiteBlocked(slug, result) {
+    const row = result || state.results[slug];
+    if (!row?.ppid) return false;
+    if (state.localBlocks[slug]?.has(row.ppid)) return true;
+    return !row.human && ['site_blocked', 'site_block', 'revoked'].includes(row.reason);
+  }
+
+  function formatBlockResult(slug, result) {
+    if (!result?.ppid) return { text: 'Not verified yet', className: '' };
+    if (result.human) return { text: 'Still verified', className: 'result-ok' };
+    if (isSiteBlocked(slug, result)) return { text: 'Blocked', className: 'result-deny' };
+    return { text: 'Not verified', className: 'result-warn' };
+  }
+
   function updateStepLocks() {
     const ready = isStep1Ready();
-    const bothVerified = bothSitesVerified();
     const step1 = $('ih-step-1');
     const step2 = $('ih-step-2');
     const step5 = $('ih-step-5');
     if (step1) step1.classList.remove('is-locked');
     if (step2) step2.classList.toggle('is-locked', !ready);
-    if (step5) step5.classList.toggle('is-locked', !bothVerified);
+    if (step5) step5.classList.toggle('is-locked', !hasStep2Proofs());
   }
 
   function setWorkflowHighlight(workflowStep) {
@@ -492,6 +509,8 @@
     const trialsLink = $('ih-link-trials-site');
     const ticketsMain = $('ih-link-tickets-main');
     const trialsInline = $('ih-link-trials-inline');
+    const ticketsStep2 = $('ih-link-tickets-step2');
+    const trialsStep2 = $('ih-link-trials-step2');
     if (ticketsLink && urls.tickets) {
       ticketsLink.href = `${urls.tickets}?from=demo`;
     }
@@ -503,6 +522,12 @@
     }
     if (trialsInline && urls.trials) {
       trialsInline.href = `${urls.trials}?from=demo`;
+    }
+    if (ticketsStep2 && urls.tickets) {
+      ticketsStep2.href = `${urls.tickets}?from=demo`;
+    }
+    if (trialsStep2 && urls.trials) {
+      trialsStep2.href = `${urls.trials}?from=demo`;
     }
     const personCard = $('ih-person-status-card');
     if (personCard) personCard.hidden = !on;
@@ -814,25 +839,32 @@
       return;
     }
     table.hidden = false;
-    const ticketsOk = !!tickets?.human;
-    const trialsOk = !!trials?.human;
-    ticketsCell.textContent = ticketsOk ? 'Still verified' : 'Blocked';
-    ticketsCell.className = ticketsOk ? 'result-ok' : 'result-deny';
-    trialsCell.textContent = trialsOk ? 'Still verified' : 'Blocked';
-    trialsCell.className = trialsOk ? 'result-ok' : 'result-deny';
+    const ticketsFmt = formatBlockResult('tickets', tickets);
+    const trialsFmt = formatBlockResult('trials', trials);
+    ticketsCell.textContent = ticketsFmt.text;
+    ticketsCell.className = ticketsFmt.className;
+    trialsCell.textContent = trialsFmt.text;
+    trialsCell.className = trialsFmt.className;
     if (unblockBtn) {
-      unblockBtn.hidden = !(tickets && !tickets.human && tickets.reason === 'site_blocked');
+      unblockBtn.hidden = !isSiteBlocked('tickets', tickets);
     }
     if (outcomeBanner && outcomeText) {
-      if (!ticketsOk && trialsOk) {
+      const ticketsBlocked = isSiteBlocked('tickets', tickets);
+      const trialsBlocked = isSiteBlocked('trials', trials);
+      const trialsVerified = !!(trials?.human);
+      if (ticketsBlocked && trialsVerified) {
         outcomeBanner.hidden = false;
         outcomeBanner.classList.remove('is-warn');
         outcomeText.textContent = 'Ticketing is blocked. Trials remains verified.';
-      } else if (!ticketsOk && !trialsOk) {
+      } else if (ticketsBlocked && trialsBlocked) {
         outcomeBanner.hidden = false;
         outcomeBanner.classList.add('is-warn');
-        outcomeText.textContent = 'Both sites blocked.';
-      } else if (ticketsOk && trialsOk && state.localBlocks.tickets.size > 0) {
+        outcomeText.textContent = 'Both sites blocked — unblock ticketing to reset the demo.';
+      } else if (ticketsBlocked && !trials?.ppid) {
+        outcomeBanner.hidden = false;
+        outcomeBanner.classList.add('is-warn');
+        outcomeText.textContent = 'Ticketing is blocked. Verify trials in step 2, then recheck here.';
+      } else if (tickets?.human && trialsVerified && state.localBlocks.tickets.size > 0) {
         outcomeBanner.hidden = false;
         outcomeBanner.classList.remove('is-warn');
         outcomeText.textContent = 'Both sites verified — unblock ticketing to reset the demo.';
@@ -1725,10 +1757,13 @@
     const netJson = $('ih-master-json');
     if (netJson) netJson.textContent = pretty(payload);
     log('Ticketing site block removed', short(ppid));
+    await refreshStatus().catch(() => {});
     await verifySite('tickets');
     await verifySite('trials');
     await refreshAbuseChecks();
     updateBlockResultsTable();
+    updateStepLocks();
+    setQuickInsight('Act 3 — Control', 'Ticketing unblocked — block again anytime to retry the demo.');
   }
 
   async function forceFreshIdv() {
