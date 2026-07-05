@@ -167,6 +167,35 @@ class TestKMSHardFailure:
         assert "'storage': 'kms_backed'" in source, \
             "Issuer metadata must indicate KMS-backed storage"
 
+    def test_platform_issuer_aliases_share_cache_key(self):
+        """Platform aliases must not create independent issuer DIDs."""
+        from api.issuer_management import _issuer_cache_key
+
+        assert _issuer_cache_key("lemma.id") == "lemma_platform"
+        assert _issuer_cache_key("lemma_platform") == "lemma_platform"
+        assert _issuer_cache_key("www.lemma.id") == "lemma_platform"
+
+    def test_platform_kms_context_candidates_include_legacy_aliases(self):
+        """Existing platform ciphertext can be recovered across historical contexts."""
+        from api.issuer_management import _kms_context_candidates
+
+        class Site:
+            site_id = "lemma_platform"
+            site_domain = "lemma.id"
+
+        assert _kms_context_candidates("lemma_platform", Site()) == [
+            "lemma_platform",
+            "lemma.id",
+        ]
+
+    def test_platform_existing_key_failure_does_not_rotate(self):
+        """Existing platform keys should fail closed instead of minting a new DID."""
+        import inspect
+        from api.issuer_management import LemmaIssuerManager
+
+        source = inspect.getsource(LemmaIssuerManager.get_iam_issuer)
+        assert "refusing to rotate the platform issuer DID implicitly" in source
+
 
 class TestSecurityDocumentation:
     """
