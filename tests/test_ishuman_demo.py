@@ -45,13 +45,15 @@ def test_ishuman_demo_page_loads_expected_assets(ishuman_demo_client):
     assert 'id="ih-advanced-panel"' in body
     assert "Advanced — operator tools" in body
     assert "1. Create your lemma.id" in body
-    assert "Prove yourself on two sites" in body
-    assert "2. Enforce on your site" in body
-    assert "3. Match assurance to your risk" in body
+    assert "2. Verify on two sites" in body
+    assert "3. Enforce on your site" in body
+    assert "Choose the assurance your flow requires" in body
+    assert "Add a human proof to your lemma.id" in body
+    assert "ih-human-cta" in body
     assert "free" not in body.split("demo-workflow")[1].split("demo-outcome-footer")[0].lower()
-    assert "ih-step-rotation" in body
+    assert "ih-step-rotation" not in body
     assert "ih-step-human" in body
-    assert "ih-simulate-rotation-btn" in body
+    assert "ih-simulate-rotation-btn" not in body
     assert "ih-wallet-slots" in body
     assert "ih-raise-tickets-policy-btn" in body
     assert "ih-complete-human-main-btn" in body
@@ -96,7 +98,7 @@ def test_ishuman_demo_page_loads_expected_assets(ishuman_demo_client):
     adv_start = body.index('id="ih-advanced-panel"')
     assert body.index("ih-verify-tickets-btn") > adv_start
     step2_start = body.index('id="ih-step-2"')
-    chapter2_start = body.index("<!-- Chapter 2")
+    chapter2_start = body.index("<!-- Act 3")
     assert "ih-verify-tickets-btn" not in body[step2_start:chapter2_start]
     assert "ih-verify-tickets-step2" in body[step2_start:chapter2_start]
     assert "ih-verify-trials-step2" in body[step2_start:chapter2_start]
@@ -109,8 +111,8 @@ def test_ishuman_demo_page_loads_expected_assets(ishuman_demo_client):
     assert "/sdk/ishuman-verifier.js" in body
     assert "/static/js/demo/ishuman-demo.js" in body
     assert "/static/css/demo/ishuman-demo.css" in body
-    assert "/static/js/demo/ishuman-demo.js?v=54" in body
-    assert "/static/css/demo/ishuman-demo.css?v=29" in body
+    assert "/static/js/demo/ishuman-demo.js?v=55" in body
+    assert "/static/css/demo/ishuman-demo.css?v=30" in body
     assert "\U0001f511" not in body
     assert "\U0001f6e1" not in body
     assert "site-card-icon" in body
@@ -127,12 +129,13 @@ def test_ishuman_demo_page_loads_expected_assets(ishuman_demo_client):
     assert human_start < adv_start
 
 
-def test_ishuman_demo_js_references_rotation_check():
+def test_ishuman_demo_js_has_no_rotation_simulation():
+    # The rotation simulation was cut from the demo narrative; the backend
+    # rotation-check endpoint remains but the page no longer calls it.
     js = (ROOT / "static" / "js" / "demo" / "ishuman-demo.js").read_text(encoding="utf-8")
-    assert "/api/demo/ishuman/rotation-check" in js
-    assert "simulateRotation" in js
+    assert "/api/demo/ishuman/rotation-check" not in js
+    assert "simulateRotation" not in js
     assert "raiseTicketsPolicySimulated" in js
-    assert "deriveProvisionalPpidFromSecret" in js
 
 
 def test_ishuman_demo_rotation_check_unknown_site(ishuman_demo_client):

@@ -50,9 +50,7 @@
     assuranceStatus: null,
     serverTestToken: '',
     serverAdminToken: '',
-    simulatedAbuserPpid: null,
     ticketsPolicyRaised: false,
-    rotationDemonstrated: false,
     lastPopupIssueMode: null,
   };
 
@@ -96,17 +94,18 @@
     }
   }
 
-  // Three visible chapters; internal act numbering (1-5) is mapped onto them.
+  // Three visible acts (create / verify / enforce); internal act numbering (1-5)
+  // is mapped onto them. Acts 4-5 (policy + human step-up) render inside enforce.
   const MAIN_WORKFLOW_STEPS = [
     { id: 1, chapter: 1 },
-    { id: 5, chapter: 2 },
-    { id: 'rotation', chapter: 3 },
+    { id: 2, chapter: 2 },
+    { id: 5, chapter: 3 },
   ];
 
   function chapterForAct(act) {
     if (act <= 0) return 0;
-    if (act <= 2) return 1;
-    if (act <= 3) return 2;
+    if (act === 1) return 1;
+    if (act === 2) return 2;
     if (act <= 5) return 3;
     return 4; // done sentinel
   }
@@ -198,15 +197,15 @@
         return waitForWalletId();
       }
     }
-    setQuickInsight('Chapter 1 — Create & prove', 'Opening passkey setup to create your lemma.id…');
+    setQuickInsight('Act 1 — Create', 'Opening passkey setup to create your lemma.id…');
     const popup = openIdvPopup({ issueMode: 'passkey_setup' });
     if (!popup) {
-      setQuickInsight('Chapter 1 — Create & prove', 'Allow popups for lemma.id, then tap Get started again.');
+      setQuickInsight('Act 1 — Create', 'Allow popups for lemma.id, then tap Get started again.');
       return false;
     }
     const ready = await waitForWalletId();
     if (!ready) {
-      setQuickInsight('Chapter 1 — Create & prove', 'Finish passkey setup in the popup, then continue the demo.');
+      setQuickInsight('Act 1 — Create', 'Finish passkey setup in the popup, then continue the demo.');
       return false;
     }
     try {
@@ -222,7 +221,7 @@
     setDemoMode('live');
     setWizardBusy(true);
     try {
-      setQuickInsight('Chapter 1 — Create & prove', 'Create your passkey-controlled lemma.id…');
+      setQuickInsight('Act 1 — Create', 'Create your passkey-controlled lemma.id…');
       setWorkflowHighlight(1);
       scrollToPanel('ih-step-1');
 
@@ -230,23 +229,23 @@
       if (!walletReady) return;
 
       updateQuickProgress(1);
-      setQuickInsight('Chapter 1 — Create & prove', 'Minting passkey proof on ticketing demo site…');
+      setQuickInsight('Act 2 — Verify', 'Minting passkey proof on ticketing demo site…');
       setWorkflowHighlight(2);
       scrollToPanel('ih-step-2');
       await verifySite('tickets');
 
       updateQuickProgress(2);
-      setQuickInsight('Chapter 1 — Create & prove', 'Same lemma.id — minting a different private ID on trials…');
+      setQuickInsight('Act 2 — Verify', 'Same lemma.id — minting a different private ID on trials…');
       await verifySite('trials');
 
       updateQuickProgress(3);
-      setQuickInsight('Chapter 2 — Enforce', 'Blocking on ticketing only. Trials should stay valid.');
+      setQuickInsight('Act 3 — Enforce', 'Blocking on ticketing only. Trials should stay valid.');
       setWorkflowHighlight(5);
       scrollToPanel('ih-step-5');
       await blockTickets();
       await recheckBothSitesAfterBlock();
 
-      setQuickInsight('Done', 'Ticketing blocked; trials still works. Chapter 3 covers human proof step-up when your policy needs it.');
+      setQuickInsight('Done', 'Ticketing blocked; trials still works. Add a human proof below when your policy needs bans that stick.');
       setWorkflowHighlight(0);
       log('Quick demo complete');
     } catch (err) {
@@ -406,7 +405,7 @@
     btn.hidden = ready;
 
     if (ready) {
-      setQuickInsight('Chapter 1 — Create & prove', 'lemma.id ready — verify on the two demo sites below.');
+      setQuickInsight('Act 1 — Create', 'lemma.id ready — verify on the two demo sites below.');
       updateQuickProgress(1);
       return;
     }
@@ -458,7 +457,7 @@
   function updateStepLocks() {
     // No step is ever locked — every act stays explorable. We only pause
     // action buttons while the guided wizard is mid-run to avoid re-entrancy.
-    const stepIds = ['ih-step-1', 'ih-step-2', 'ih-step-5', 'ih-step-rotation', 'ih-step-human'];
+    const stepIds = ['ih-step-1', 'ih-step-2', 'ih-step-5', 'ih-step-human'];
     for (const id of stepIds) {
       const el = $(id);
       if (el) el.classList.remove('is-locked');
@@ -466,7 +465,6 @@
 
     const actionButtons = [
       'ih-verify-sites-btn',
-      'ih-simulate-rotation-btn',
       'ih-raise-tickets-policy-btn',
       'ih-complete-human-main-btn',
       'ih-reverify-human-main-btn',
@@ -560,106 +558,6 @@
     }
   }
 
-  async function hmacSha256Hex(secretHex, message) {
-    const secretBytes = new Uint8Array(
-      secretHex.match(/.{1,2}/g).map((byte) => parseInt(byte, 16)),
-    );
-    const key = await crypto.subtle.importKey(
-      'raw',
-      secretBytes,
-      { name: 'HMAC', hash: 'SHA-256' },
-      false,
-      ['sign'],
-    );
-    const signature = await crypto.subtle.sign(
-      'HMAC',
-      key,
-      new TextEncoder().encode(message),
-    );
-    return Array.from(new Uint8Array(signature))
-      .map((b) => b.toString(16).padStart(2, '0'))
-      .join('');
-  }
-
-  function normalizeSiteDomainForPpid(siteDomain) {
-    if (window.LemmaKeys && typeof window.LemmaKeys.canonicalizeSiteDomain === 'function') {
-      return window.LemmaKeys.canonicalizeSiteDomain(siteDomain);
-    }
-    return String(siteDomain || '')
-      .trim()
-      .toLowerCase()
-      .replace(/^www\./, '')
-      .replace(/:\d+$/, '');
-  }
-
-  async function deriveProvisionalPpidFromSecret(secretHex, siteDomain) {
-    const canonical = normalizeSiteDomainForPpid(siteDomain);
-    const ppidHash = await hmacSha256Hex(secretHex, canonical);
-    return `did:lemma:ppid_${ppidHash}`;
-  }
-
-  async function simulateRotation() {
-    const yours = resolveSitePpid('tickets');
-    if (!yours) {
-      scrollToPanel('ih-step-2');
-      setQuickInsight('First things first', 'Verify on ticketing (chapter 1) so there is a private ID to block and compare against.');
-      return;
-    }
-    if (!isSiteBlocked('tickets', state.results.tickets)) {
-      scrollToPanel('ih-step-5');
-      setQuickInsight('First things first', 'Block your ticketing ID (chapter 2), then come back to simulate the abuser\u2019s rotation.');
-      return;
-    }
-
-    const secretBytes = crypto.getRandomValues(new Uint8Array(32));
-    const abuserSecret = Array.from(secretBytes)
-      .map((b) => b.toString(16).padStart(2, '0'))
-      .join('');
-    const abuserPpid = await deriveProvisionalPpidFromSecret(abuserSecret, SITE_IDS.tickets);
-    state.simulatedAbuserPpid = abuserPpid;
-
-    const payload = await requestJson('/api/demo/ishuman/rotation-check', {
-      method: 'POST',
-      body: JSON.stringify({
-        site_slug: 'tickets',
-        ppids: [yours, abuserPpid],
-      }),
-    });
-
-    const yoursResult = payload.results?.[yours] || { blocked: true };
-    const abuserResult = payload.results?.[abuserPpid] || { blocked: false };
-
-    const compare = $('ih-rotation-compare');
-    const yoursPpidEl = $('ih-rotation-yours-ppid');
-    const abuserPpidEl = $('ih-rotation-abuser-ppid');
-    const yoursStatus = $('ih-rotation-yours-status');
-    const abuserStatus = $('ih-rotation-abuser-status');
-    const banner = $('ih-rotation-outcome-banner');
-
-    if (compare) compare.hidden = false;
-    if (yoursPpidEl) yoursPpidEl.textContent = maskPpid('tickets', yours);
-    if (abuserPpidEl) abuserPpidEl.textContent = maskPpid('tickets', abuserPpid);
-    if (yoursStatus) {
-      yoursStatus.textContent = yoursResult.blocked ? 'Blocked' : 'Not blocked';
-      yoursStatus.className = `demo-pill${yoursResult.blocked ? ' deny' : ' ok'}`;
-    }
-    if (abuserStatus) {
-      abuserStatus.textContent = abuserResult.blocked ? 'Blocked' : 'Not blocked';
-      abuserStatus.className = `demo-pill${abuserResult.blocked ? ' deny' : ' ok'}`;
-    }
-    if (banner) banner.hidden = false;
-
-    state.rotationDemonstrated = true;
-    setWorkflowHighlight(5);
-    scrollToPanel('ih-step-human');
-    setQuickInsight(
-      'Chapter 3 — Assurance',
-      'A new lemma.id slipped past the passkey-tier block. If rotation matters here, require human proofs below.',
-    );
-    log('Rotation simulated', `abuser ${short(abuserPpid)} not blocked`);
-    updateStepLocks();
-  }
-
   async function raiseTicketsPolicySimulated() {
     state.ticketsPolicyRaised = true;
     const pill = $('ih-tickets-policy-pill');
@@ -674,8 +572,8 @@
 
     await checkPolicyDenials();
     setQuickInsight(
-      'Chapter 3 — Assurance',
-      'Policy raised — passkey-only lemma.ids can\u2019t satisfy it. Complete the step-up to see the ban bind to the human.',
+      'Act 3 — Enforce',
+      'Policy raised — passkey-only lemma.ids can\u2019t satisfy it. Add a human proof below to see the ban bind to you as a verified human.',
     );
     log('Ticketing policy raised (simulated)', 'requires human proof assurance');
     updateStepLocks();
@@ -882,7 +780,6 @@
       'ih-unblock-tickets-btn',
       'ih-abuse-block-btn',
       'ih-abuse-recheck-btn',
-      'ih-simulate-rotation-btn',
       'ih-raise-tickets-policy-btn',
       'ih-complete-human-main-btn',
       'ih-reverify-human-main-btn',
@@ -909,7 +806,7 @@
     setDemoMode('live');
     setWorkflowHighlight(1);
     updateQuickProgress(1);
-    setQuickInsight('Chapter 1 — Create & prove', 'Create or unlock your lemma.id, then open the ticketing demo.');
+    setQuickInsight('Act 1 — Create', 'Create or unlock your lemma.id, then verify on the two sites.');
     scrollToPanel('ih-step-1');
     log('Demo started', 'create or unlock your lemma.id');
   }
@@ -1039,7 +936,7 @@
       } else if (ticketsBlocked && !trials?.ppid) {
         outcomeBanner.hidden = false;
         outcomeBanner.classList.add('is-warn');
-        outcomeText.textContent = 'Ticketing is blocked. Verify trials in chapter 1, then recheck here.';
+        outcomeText.textContent = 'Ticketing is blocked. Verify trials in act 2, then recheck here.';
       } else if (tickets?.human && trialsVerified && state.localBlocks.tickets.size > 0) {
         outcomeBanner.hidden = false;
         outcomeBanner.classList.remove('is-warn');
@@ -1334,7 +1231,7 @@
         renderWalletSlots();
         updateStepLocks();
         scrollToPanel('ih-step-2');
-        setQuickInsight('Chapter 1 — Create & prove', 'lemma.id ready — verify on the two demo sites below.');
+        setQuickInsight('Act 2 — Verify', 'lemma.id ready — verify on the two demo sites below.');
       }
     };
     const onMessage = (event) => {
@@ -1529,9 +1426,7 @@
     state.results = {};
     state.passkeyPpids = {};
     state.assuranceStatus = null;
-    state.simulatedAbuserPpid = null;
     state.ticketsPolicyRaised = false;
-    state.rotationDemonstrated = false;
     state.lastPopupIssueMode = null;
     state.verifiers = {};
     state.lastVerifyMs = { tickets: null, trials: null };
@@ -1557,10 +1452,6 @@
     updateBlockResultsTable();
     const stepupCompare = $('ih-stepup-compare');
     if (stepupCompare) stepupCompare.hidden = true;
-    const rotationCompare = $('ih-rotation-compare');
-    if (rotationCompare) rotationCompare.hidden = true;
-    const rotationBanner = $('ih-rotation-outcome-banner');
-    if (rotationBanner) rotationBanner.hidden = true;
     const policyGrid = $('ih-policy-deny-grid');
     if (policyGrid) policyGrid.hidden = true;
     const policyCard = $('ih-policy-toggle-card');
@@ -1751,12 +1642,12 @@
   }
 
   async function verifyBothSites() {
-    setQuickInsight('Chapter 1 — Create & prove', 'Minting site-private stamps for ticketing and trials…');
+    setQuickInsight('Act 2 — Verify', 'Minting site-private stamps for ticketing and trials…');
     updateQuickProgress(2);
     await verifySite('tickets');
     await verifySite('trials');
     if (bothSitesVerified()) {
-      setQuickInsight('Chapter 1 — Create & prove', 'Same lemma.id — different private IDs on each site. Next: enforce on your site.');
+      setQuickInsight('Act 2 — Verify', 'Same lemma.id — different private IDs on each site. Next: enforce on your site.');
       if (assuranceDemoMode()) {
         setWorkflowHighlight(3);
         scrollToPanel('ih-step-5');
@@ -1882,12 +1773,12 @@
     await refreshAbuseChecks();
     await probeDerive('tickets');
     setWorkflowHighlight(4);
-    scrollToPanel('ih-step-rotation');
+    scrollToPanel('ih-step-human');
     updateBlockResultsTable();
     updateQuickProgress(4);
     setQuickInsight(
-      'Chapter 3 — Assurance',
-      'Ticketing blocked — simulate what an abuser does with a brand-new lemma.id.',
+      'Act 3 — Enforce',
+      'Ticketing blocked; trials untouched. If bans must survive a new lemma.id, require human proofs below.',
     );
   }
 
@@ -1942,14 +1833,14 @@
 
   async function reverifyTicketsIshuman() {
     const before = state.passkeyPpids.tickets || state.results.tickets?.ppid;
-    if (!before) throw new Error('No passkey ticketing PPID snapshot — verify in chapter 1 first');
+    if (!before) throw new Error('No passkey ticketing PPID snapshot — verify in act 2 first');
     const result = await verifySite('tickets', { requiredAssurance: 'ishuman' });
     updateStepUpCompare(before, result);
     await checkPolicyDenials();
     if (result.ppid === before && result.assurance === 'ishuman') {
       log('Step-up success', 'same PPID with human proof assurance');
       setWorkflowHighlight(0);
-      scrollToPanel('ih-step-human');
+      scrollToPanel('ih-human-cta');
       setQuickInsight('Done', 'Same private ID, human proof assurance — bans bind to one verified human.');
       const humanBanner = $('ih-human-outcome-banner');
       if (humanBanner) humanBanner.hidden = false;
@@ -1965,7 +1856,7 @@
       ...state.localBlocks.tickets,
     ].filter(Boolean));
     if (!ppids.size) {
-      throw new Error('Ticketing PPID unavailable — verify in chapter 1 first');
+      throw new Error('Ticketing PPID unavailable — verify in act 2 first');
     }
 
     let unblockedAny = false;
@@ -1998,7 +1889,7 @@
     await refreshAbuseChecks();
     updateBlockResultsTable();
     updateStepLocks();
-    setQuickInsight('Chapter 2 — Enforce', unblockedAny
+    setQuickInsight('Act 3 — Enforce', unblockedAny
       ? 'Ticketing unblocked — block again anytime to retry the demo.'
       : 'No active ticketing block found — both sites rechecked.');
   }
@@ -2571,7 +2462,6 @@
     bind('ih-require-ishuman-btn', requireIsHumanOnTickets);
     bind('ih-complete-ishuman-btn', completeIsHumanVerification);
     bind('ih-reverify-tickets-ishuman-btn', reverifyTicketsIshuman);
-    bind('ih-simulate-rotation-btn', simulateRotation);
     bind('ih-raise-tickets-policy-btn', raiseTicketsPolicySimulated);
     bind('ih-complete-human-main-btn', completeIsHumanVerification);
     bind('ih-reverify-human-main-btn', reverifyTicketsIshuman);
