@@ -2,7 +2,7 @@
 {% set is_public_page = true %}
 
 {% block title %}Pricing - lemma.id{% endblock %}
-{% block description %}lemma.id pricing: pay for the private proof binding that gives your site a durable PPID, with identity verification passed through at cost only when you require human proofs. Unlimited local verification.{% endblock %}
+{% block description %}lemma.id pricing: one $0.50 proof binding that gives your site a durable PPID — identity verification included when you require human proofs. Unlimited local verification.{% endblock %}
 
 {% block head %}
 {{ super() }}
@@ -298,12 +298,8 @@
     <p class="description">A raw IDV check tells you someone was human once. lemma.id turns passkey continuity and optional human proof verification into a reusable site-private PPID your users carry — recognized again on your own servers, with no identity data stored by you. Most users start with passkey; require human proofs only when Sybil resistance matters.</p>
     <div class="pricing-hero-highlight">
         <div class="pricing-hero-stat">
-            <span class="amount">$0.33</span>
-            <span class="label">identity verification, at cost</span>
-        </div>
-        <div class="pricing-hero-stat">
             <span class="amount">$0.50</span>
-            <span class="label">lemma.id proof binding, once</span>
+            <span class="label">proof binding, once — verification included</span>
         </div>
         <div class="pricing-hero-stat">
             <span class="amount">$0.03</span>
@@ -322,18 +318,13 @@
 
 <div class="lemma-pricing">
     <h2>How billing works</h2>
-    <p class="intro">Pricing follows the product model: <strong>passkey continuity</strong> gives you a stable site-private PPID without IDV up front, <strong>human proofs</strong> add IDV-backed uniqueness when your policy needs one verified human, and <strong>local verification</strong> lets your backend check proofs without a per-login meter. You pay for the binding once, plus a small monthly fee only when a user returns.</p>
+    <p class="intro">Pricing follows the product model: <strong>passkey continuity</strong> gives you a stable site-private PPID without IDV up front, <strong>human proofs</strong> add IDV-backed uniqueness when your policy needs one verified human, and <strong>local verification</strong> lets your backend check proofs without a per-login meter. You pay for the binding once — identity verification included — plus a small monthly fee only when a user returns.</p>
 
     <div class="lemma-pricing-grid">
-        <div class="lemma-price-card">
-            <h3>Identity verification</h3>
-            <p class="price">$0.33 / user · at cost</p>
-            <p>A one-time human proof check (document + liveness) the first time your site requires one verified human behind the account. <strong>Passed through at cost — lemma.id adds no markup.</strong> Only required when your policy needs Sybil resistance; not repeated for routine continuity.</p>
-        </div>
         <div class="lemma-price-card featured">
-            <h3>lemma.id proof binding</h3>
+            <h3>Proof binding — verification included</h3>
             <p class="price">$0.50 / user · one-time</p>
-            <p>What lemma.id adds on top: a <strong>site-private, reusable proof credential</strong> your users hold in their own wallet. The same returning wallet presents the same PPID; with human proofs, that PPID is backed by the same verified human. This is the lemma.id platform fee.</p>
+            <p>One price for the user's first site-private credential: the human proof check (document + liveness) when your policy requires one verified human, plus a <strong>site-private, reusable proof credential</strong> held in the user's own wallet. The same returning wallet presents the same PPID, backed by the same verified human. <strong>No separate IDV line item — verification cost is bundled.</strong></p>
         </div>
         <div class="lemma-price-card featured">
             <h3>Monthly active user (MAU)</h3>
@@ -350,8 +341,7 @@
     <div class="pricing-rules">
         <h3>Billing rules</h3>
         <ol>
-            <li><strong>Identity verification ($0.33):</strong> billed once when a person completes human proof verification for your site. Passed through at cost; never marked up and not repeated for routine continuity.</li>
-            <li><strong>Proof binding ($0.50):</strong> the one-time lemma.id platform fee for issuing the user's first site-private, reusable credential and wallet binding (passkey secures the wallet on first use).</li>
+            <li><strong>Proof binding ($0.50, verification included):</strong> the one-time fee for issuing the user's first site-private, reusable credential and wallet binding (passkey secures the wallet on first use). When your policy requires human proofs, the identity verification check is included in this price — no separate IDV charge and no markup games.</li>
             <li><strong>MAU ($0.03):</strong> billed for each calendar month a user renews <em>after</em> the month of their binding. The binding month itself has no MAU charge.</li>
             <li><strong>Active user:</strong> a user whose credential is <strong>re-issued</strong> that month — typically when their prior credential expires (~30 days) and they complete the continuity popup. Daily local checks never count.</li>
             <li><strong>Same wallet, same PPID:</strong> renewals issue a fresh credential with the same site-private PPID — no repeat verification for routine continuity. With human proofs, the person root keeps that PPID stable even across assurance step-ups.</li>
@@ -362,8 +352,8 @@
 
     <div class="pricing-example">
         <h3>Example: 1,000 new users in January, 600 return in February</h3>
-        <p><strong>January:</strong> 1,000 × ($0.33 verification + $0.50 binding) = <strong>$830</strong>. No MAU charges — the binding month is excluded.</p>
-        <p><strong>February:</strong> 600 returning active users × $0.03 = <strong>$18.00</strong> MAU. Plus any new users who join in February at $0.83 each.</p>
+        <p><strong>January:</strong> 1,000 × $0.50 binding (verification included) = <strong>$500</strong>. No MAU charges — the binding month is excluded.</p>
+        <p><strong>February:</strong> 600 returning active users × $0.03 = <strong>$18.00</strong> MAU. Plus any new users who join in February at $0.50 each.</p>
         <p><strong>All year:</strong> A user who visits daily but renews once when their credential expires counts as <strong>one MAU</strong> that month — not one charge per login or local verification.</p>
     </div>
 </div>

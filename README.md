@@ -45,9 +45,9 @@ Verify on the server with `@lemma/ishuman-verify` (Node) or `lemma_ishuman_verif
 
 | Line item | Price |
 |-----------|-------|
-| Identity verification (only when isHuman is required) | $0.33/user · passed through at cost |
-| lemma.id proof binding | $0.50/user · one-time |
+| Proof binding (identity verification included) | $0.50/user · one-time |
 | MAU renewal | $0.03/user/month, starting the month after binding |
+| Doubt re-entry (fresh IDV at cost) | $0.33/user |
 | Local verification | $0 · unlimited, never metered |
 
 Basic `verify()` gating requires no registration or API key. Site API keys unlock abuse controls: persistent site blocks, unblocks, and temporary doubt challenges.
