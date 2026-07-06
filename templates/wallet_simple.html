@@ -84,39 +84,21 @@
 
         <!-- ADD DEVICE -->
         <div class="card">
-            <h2>Add another device</h2>
+            <h2>Add another device or browser</h2>
 
-            <div class="link-tabs">
-                <button id="tab-send" class="link-tab active">Send to Device</button>
-                <button id="tab-receive" class="link-tab">Receive from Device</button>
-            </div>
-
-            <!-- SEND TAB -->
-            <div id="send-content">
-                <p class="card-intro">
-                    Generate a secure QR or link on this device. Your human proof travels encrypted with your lemma.id.
-                </p>
-                <button id="show-qr-btn" class="btn btn-primary btn-full">Generate QR Code</button>
-                <button id="show-link-btn" class="btn btn-secondary btn-full" style="margin-top: 10px;">Send Transfer Link</button>
-                
-                <div id="qr-display" class="qr-display hidden">
-                    <div id="qr-box" class="qr-box">
-                        <div id="qr-container"></div>
-                    </div>
-                    <div id="qr-timer" class="qr-timer">Expires in 5:00</div>
-                    <div id="link-options" class="hidden"></div>
-                    <button id="hide-qr-btn" class="btn btn-secondary" style="margin-top: 16px;">Close</button>
+            <p class="card-intro">
+                Generate a secure QR or link on this device. Your human proof travels encrypted with your lemma.id.
+            </p>
+            <button id="show-qr-btn" class="btn btn-primary btn-full">Generate QR Code</button>
+            <button id="show-link-btn" class="btn btn-secondary btn-full" style="margin-top: 10px;">Send Transfer Link</button>
+            
+            <div id="qr-display" class="qr-display hidden">
+                <div id="qr-box" class="qr-box">
+                    <div id="qr-container"></div>
                 </div>
-            </div>
-
-            <!-- RECEIVE TAB -->
-            <div id="receive-content" class="hidden">
-                <p class="card-intro">
-                    Scan the QR or open the link from your other device, or paste the transfer code below.
-                </p>
-                <textarea id="receive-code" class="link-input" placeholder="Paste code here..."></textarea>
-                <button id="link-device-btn" class="btn btn-primary btn-full" style="margin-top: 12px;">Add This Device</button>
-                <div id="receive-status" class="hidden" style="margin-top: 12px;"></div>
+                <div id="qr-timer" class="qr-timer">Expires in 5:00</div>
+                <div id="link-options" class="hidden"></div>
+                <button id="hide-qr-btn" class="btn btn-secondary" style="margin-top: 16px;">Close</button>
             </div>
         </div>
 
@@ -728,28 +710,6 @@ function anchorWalletIdentity(event) {
     createWallet(event?.currentTarget || document.getElementById('anchor-wallet-btn'));
 }
 
-// Tab switching
-function showTab(tab) {
-    const sendTab = document.getElementById('tab-send');
-    const receiveTab = document.getElementById('tab-receive');
-    const sendContent = document.getElementById('send-content');
-    const receiveContent = document.getElementById('receive-content');
-    
-    if (tab === 'send') {
-        sendTab.classList.add('active');
-        receiveTab.classList.remove('active');
-        sendContent.classList.remove('hidden');
-        receiveContent.classList.add('hidden');
-    } else {
-        receiveTab.classList.add('active');
-        sendTab.classList.remove('active');
-        receiveContent.classList.remove('hidden');
-        sendContent.classList.add('hidden');
-    }
-    
-    hideQR();
-}
-
 async function generateTransferForDisplay() {
     await initWallet();
     // generateLinkCode() requires FRESH passkey verification for security.
@@ -892,69 +852,6 @@ function hideQR() {
     if (qrTimerInterval) {
         clearInterval(qrTimerInterval);
         qrTimerInterval = null;
-    }
-}
-
-// Link device (receive)
-async function linkDevice() {
-    const code = document.getElementById('receive-code').value.trim();
-    const statusEl = document.getElementById('receive-status');
-
-    function escapeHtml(value) {
-        return String(value)
-            .replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;')
-            .replace(/"/g, '&quot;')
-            .replace(/'/g, '&#39;');
-    }
-    
-    if (!code) {
-        statusEl.innerHTML = '<div class="info-box" style="background: #fef2f2; border-color: #ef4444; color: #991b1b;">Please paste the transfer code</div>';
-        statusEl.classList.remove('hidden');
-        return;
-    }
-    
-    try {
-        statusEl.innerHTML = '<div class="info-box">Adding device...</div>';
-        statusEl.classList.remove('hidden');
-
-        await initWallet();
-        const result = await wallet.linkDevice({ qrData: code });
-
-        if (result.success) {
-            let statusMsg = 'Device added! Creating passkey...';
-            if (result.humanProofRestored) {
-                statusMsg = 'Device added with human proof restored! Creating passkey...';
-            }
-            statusEl.innerHTML = `<div class="info-box" style="background: #ecfdf5; border-color: #10b981; color: #065f46;">${statusMsg}</div>`;
-
-            await wallet.registerPasskey();
-            if (typeof wallet.fetchAndStoreSeedEnvelopes === 'function') {
-                try { await wallet.fetchAndStoreSeedEnvelopes(); } catch (_) {}
-            }
-            await checkWalletState();
-
-            const doneMsg = result.humanProofRestored
-                ? 'Device added! Your human proof is ready on this device.'
-                : 'Device added successfully!';
-            statusEl.innerHTML = `<div class="info-box" style="background: #ecfdf5; border-color: #10b981; color: #065f46;">${doneMsg}</div>`;
-        } else if (result.conflict) {
-            statusEl.innerHTML = '<div class="info-box" style="background: #fef3c7; border-color: #f59e0b; color: #92400e;">A different lemma.id is on this device. Remove it first to add a new one.</div>';
-        } else {
-            throw new Error(result.message || 'Link failed');
-        }
-    } catch (e) {
-        console.error('Link failed:', e);
-        const safeMessage = escapeHtml(e && e.message ? e.message : 'Link failed');
-        statusEl.innerHTML = '';
-        const errorBox = document.createElement('div');
-        errorBox.className = 'info-box';
-        errorBox.style.background = '#fef2f2';
-        errorBox.style.borderColor = '#ef4444';
-        errorBox.style.color = '#991b1b';
-        errorBox.textContent = safeMessage;
-        statusEl.appendChild(errorBox);
     }
 }
 
@@ -1485,12 +1382,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('unlock-btn').addEventListener('click', unlockWallet);
     document.getElementById('create-wallet-btn').addEventListener('click', createWallet);
     document.getElementById('lock-btn').addEventListener('click', lockWallet);
-    document.getElementById('tab-send').addEventListener('click', () => showTab('send'));
-    document.getElementById('tab-receive').addEventListener('click', () => showTab('receive'));
     document.getElementById('show-qr-btn').addEventListener('click', showQR);
     document.getElementById('show-link-btn').addEventListener('click', showTransferLink);
     document.getElementById('hide-qr-btn').addEventListener('click', hideQR);
-    document.getElementById('link-device-btn').addEventListener('click', linkDevice);
     document.getElementById('clear-wallet-btn').addEventListener('click', clearWallet);
     document.getElementById('return-passkey-btn')?.addEventListener('click', returnWithExistingPasskey);
     document.getElementById('session-duration-select').addEventListener('change', () => applySessionDuration());
