@@ -6,7 +6,7 @@
 
 {% block head %}
 {{ super() }}
-<link rel="stylesheet" href="/static/css/demo/ishuman-demo.css?v=32">
+<link rel="stylesheet" href="/static/css/demo/ishuman-demo.css?v=33">
 {% endblock %}
 
 {% block content %}
@@ -408,15 +408,6 @@
             <p>Passkey assurance gives continuity and privacy with zero signup friction — the right default for most flows. Sybil resistance is a separate dial: sites turn it on per flow, and users keep the same account and private ID.</p>
           </div>
 
-          <div class="policy-toggle-card" id="ih-policy-toggle-card">
-            <div class="policy-toggle-head">
-              <span class="result-label">Ticketing site policy</span>
-              <span class="demo-pill" id="ih-tickets-policy-pill">passkey</span>
-            </div>
-            <p class="demo-muted">Simulate ticketing requiring one verified human per account.</p>
-            <button class="demo-btn demo-btn-secondary" id="ih-raise-tickets-policy-btn" type="button">Require human proofs on ticketing</button>
-          </div>
-
           <div class="policy-deny-grid" id="ih-policy-deny-grid" hidden>
             <div class="policy-deny-card">
               <h4>Your lemma.id</h4>
@@ -653,5 +644,5 @@ const { ok, ppid, assurance, presentation } = await new IsHumanVerifier({
 <script src="/static/js/lemma-keys.js?v=5" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
 <script nonce="{{ csp_nonce }}">window.LEMMA_ISHUMAN_USE_PERSON_ROOT_SEEDS = {{ 'true' if ishuman_use_person_root_seeds else 'false' }};</script>
 <script src="/sdk/ishuman-verifier.js?v={{ ishuman_verifier_sdk_version }}" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
-<script src="/static/js/demo/ishuman-demo.js?v=58" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
+<script src="/static/js/demo/ishuman-demo.js?v=59" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
 {% endblock %}

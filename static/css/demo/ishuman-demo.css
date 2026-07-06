@@ -2023,27 +2023,6 @@
   max-width: 640px;
 }
 
-.policy-toggle-card {
-  padding: 16px;
-  border-radius: 12px;
-  border: 1px solid var(--demo-line);
-  background: #f8fafc;
-  margin-bottom: 16px;
-}
-
-.policy-toggle-card.is-raised {
-  border-color: #fecaca;
-  background: #fff5f5;
-}
-
-.policy-toggle-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 8px;
-}
-
 .policy-deny-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;

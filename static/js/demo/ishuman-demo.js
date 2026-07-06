@@ -50,7 +50,6 @@
     assuranceStatus: null,
     serverTestToken: '',
     serverAdminToken: '',
-    ticketsPolicyRaised: false,
     trialsRequiresIshuman: false,
     lastPopupIssueMode: null,
   };
@@ -281,6 +280,7 @@
     state.trialsRequiresIshuman = !!enabled;
     clearVerifierCache('trials');
     syncTrialsPolicyToggle();
+    checkPolicyDenials();
     log(
       'Trials assurance policy',
       state.trialsRequiresIshuman ? 'human proof required' : 'passkey',
@@ -495,7 +495,6 @@
 
     const actionButtons = [
       'ih-verify-sites-btn',
-      'ih-raise-tickets-policy-btn',
       'ih-complete-human-main-btn',
       'ih-reverify-human-main-btn',
     ];
@@ -588,31 +587,10 @@
     }
   }
 
-  async function raiseTicketsPolicySimulated() {
-    state.ticketsPolicyRaised = true;
-    const pill = $('ih-tickets-policy-pill');
-    const card = $('ih-policy-toggle-card');
-    const btn = $('ih-raise-tickets-policy-btn');
-    if (pill) {
-      pill.textContent = 'human proof required';
-      pill.className = 'demo-pill deny';
-    }
-    if (card) card.classList.add('is-raised');
-    if (btn) btn.textContent = 'Policy raised \u2014 human proof required';
-
-    await checkPolicyDenials();
-    setQuickInsight(
-      'Act 3 — Enforce',
-      'Policy raised — passkey-only lemma.ids can\u2019t satisfy it. Add a human proof below to see the ban bind to you as a verified human.',
-    );
-    log('Ticketing policy raised (simulated)', 'requires human proof assurance');
-    updateStepLocks();
-  }
-
   async function checkPolicyDenials() {
     const panel = $('ih-policy-deny-grid');
     if (!panel) return;
-    panel.hidden = !state.ticketsPolicyRaised;
+    panel.hidden = !state.trialsRequiresIshuman;
 
     const yoursEl = $('ih-policy-deny-yours');
     const abuserEl = $('ih-policy-deny-abuser');
@@ -810,7 +788,6 @@
       'ih-unblock-tickets-btn',
       'ih-abuse-block-btn',
       'ih-abuse-recheck-btn',
-      'ih-raise-tickets-policy-btn',
       'ih-complete-human-main-btn',
       'ih-reverify-human-main-btn',
       'ih-require-ishuman-btn',
@@ -1456,7 +1433,6 @@
     state.results = {};
     state.passkeyPpids = {};
     state.assuranceStatus = null;
-    state.ticketsPolicyRaised = false;
     state.trialsRequiresIshuman = false;
     state.lastPopupIssueMode = null;
     state.verifiers = {};
@@ -1485,13 +1461,6 @@
     if (stepupCompare) stepupCompare.hidden = true;
     const policyGrid = $('ih-policy-deny-grid');
     if (policyGrid) policyGrid.hidden = true;
-    const policyCard = $('ih-policy-toggle-card');
-    if (policyCard) policyCard.classList.remove('is-raised');
-    const policyPill = $('ih-tickets-policy-pill');
-    if (policyPill) {
-      policyPill.textContent = 'passkey';
-      policyPill.className = 'demo-pill';
-    }
     syncTrialsPolicyToggle();
     const humanBanner = $('ih-human-outcome-banner');
     if (humanBanner) humanBanner.hidden = true;
@@ -2503,7 +2472,6 @@
     bind('ih-require-ishuman-btn', requireIsHumanOnTickets);
     bind('ih-complete-ishuman-btn', completeIsHumanVerification);
     bind('ih-reverify-tickets-ishuman-btn', reverifyTicketsIshuman);
-    bind('ih-raise-tickets-policy-btn', raiseTicketsPolicySimulated);
     bind('ih-complete-human-main-btn', completeIsHumanVerification);
     bind('ih-reverify-human-main-btn', reverifyTicketsIshuman);
     bind('ih-popup-retry-btn', () => {
