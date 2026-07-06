@@ -720,6 +720,70 @@
   margin-bottom: 8px;
 }
 
+.block-card-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 14px;
+}
+
+.demo-policy-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--demo-ink);
+  cursor: pointer;
+  user-select: none;
+}
+
+.demo-policy-toggle input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.demo-policy-toggle-track {
+  position: relative;
+  width: 36px;
+  height: 20px;
+  border-radius: 999px;
+  background: #cbd5e1;
+  flex-shrink: 0;
+  transition: background 0.2s ease;
+}
+
+.demo-policy-toggle-track::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #fff;
+  transition: transform 0.2s ease;
+}
+
+.demo-policy-toggle input:checked + .demo-policy-toggle-track {
+  background: #6366f1;
+}
+
+.demo-policy-toggle input:checked + .demo-policy-toggle-track::after {
+  transform: translateX(16px);
+}
+
+.demo-policy-toggle input:focus-visible + .demo-policy-toggle-track {
+  outline: 2px solid #818cf8;
+  outline-offset: 2px;
+}
+
+.demo-policy-toggle-label {
+  line-height: 1.3;
+}
+
 .demo-results-table {
   width: 100%;
   margin-top: 8px;

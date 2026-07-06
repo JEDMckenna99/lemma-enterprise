@@ -56,6 +56,9 @@ def test_ishuman_demo_page_loads_expected_assets(ishuman_demo_client):
     assert "ih-step-human" in body
     assert "ih-simulate-rotation-btn" not in body
     assert "ih-wallet-slots" in body
+    assert "ih-abuse-block-btn" in body
+    assert "ih-trials-ishuman-toggle" in body
+    assert "Trials requires human proof" in body
     assert "ih-raise-tickets-policy-btn" in body
     assert "ih-complete-human-main-btn" in body
     assert "ih-control-escalation" in body
@@ -112,8 +115,8 @@ def test_ishuman_demo_page_loads_expected_assets(ishuman_demo_client):
     assert "/sdk/ishuman-verifier.js" in body
     assert "/static/js/demo/ishuman-demo.js" in body
     assert "/static/css/demo/ishuman-demo.css" in body
-    assert "/static/js/demo/ishuman-demo.js?v=57" in body
-    assert "/static/css/demo/ishuman-demo.css?v=31" in body
+    assert "/static/js/demo/ishuman-demo.js?v=58" in body
+    assert "/static/css/demo/ishuman-demo.css?v=32" in body
     assert "\U0001f511" not in body
     assert "\U0001f6e1" not in body
     assert "site-card-icon" in body

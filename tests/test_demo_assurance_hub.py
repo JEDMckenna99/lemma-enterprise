@@ -17,7 +17,8 @@ def test_demo_hub_js_gates_assurance_workflow():
     assert "/api/demo/ishuman/require-ishuman" in js
     assert "/api/demo/ishuman/assurance-status" in js
     assert "passkeyPpids" in js
-    assert "updateStepUpCompare" in js
+    assert "trialsRequiresIshuman" in js
+    assert "setTrialsRequiresIshuman" in js
 
 
 def test_demo_hub_template_has_three_act_narrative_sections():
@@ -32,6 +33,7 @@ def test_demo_hub_template_has_three_act_narrative_sections():
     assert "ih-stepup-compare" in html
     assert "ih-simulate-rotation-btn" not in html
     assert "assurance-only" in html
-    assert 'data-quick-act="3"' in html
+    assert "ih-trials-ishuman-toggle" in html
+    assert 'data-quick-act="3"' not in html
     assert 'data-quick-act="4"' not in html
     assert "workflow-subsection" in html

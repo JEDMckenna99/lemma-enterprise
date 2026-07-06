@@ -51,6 +51,7 @@
     serverTestToken: '',
     serverAdminToken: '',
     ticketsPolicyRaised: false,
+    trialsRequiresIshuman: false,
     lastPopupIssueMode: null,
   };
 
@@ -263,9 +264,36 @@
     return !!(state.config && state.config.assurance_demo_mode);
   }
 
-  function demoRequiredAssurance(options = {}) {
+  function demoRequiredAssurance(slug, options = {}) {
     if (options.requiredAssurance) return options.requiredAssurance;
+    if (slug === 'trials' && state.trialsRequiresIshuman) return 'ishuman';
     return DEFAULT_DEMO_SITE_ASSURANCE;
+  }
+
+  function syncTrialsPolicyToggle() {
+    const toggle = $('ih-trials-ishuman-toggle');
+    if (!toggle) return;
+    toggle.checked = !!state.trialsRequiresIshuman;
+    toggle.setAttribute('aria-checked', toggle.checked ? 'true' : 'false');
+  }
+
+  function setTrialsRequiresIshuman(enabled) {
+    state.trialsRequiresIshuman = !!enabled;
+    clearVerifierCache('trials');
+    syncTrialsPolicyToggle();
+    log(
+      'Trials assurance policy',
+      state.trialsRequiresIshuman ? 'human proof required' : 'passkey',
+    );
+  }
+
+  async function onTrialsPolicyToggleChange() {
+    const toggle = $('ih-trials-ishuman-toggle');
+    setTrialsRequiresIshuman(toggle && toggle.checked);
+    if (state.results.trials?.ppid) {
+      await verifySite('trials').catch((err) => log('Trials re-verify skipped', err.message));
+      updateBlockResultsTable();
+    }
   }
 
   function isSiteVerified(result) {
@@ -1429,6 +1457,7 @@
     state.passkeyPpids = {};
     state.assuranceStatus = null;
     state.ticketsPolicyRaised = false;
+    state.trialsRequiresIshuman = false;
     state.lastPopupIssueMode = null;
     state.verifiers = {};
     state.lastVerifyMs = { tickets: null, trials: null };
@@ -1463,6 +1492,7 @@
       policyPill.textContent = 'passkey';
       policyPill.className = 'demo-pill';
     }
+    syncTrialsPolicyToggle();
     const humanBanner = $('ih-human-outcome-banner');
     if (humanBanner) humanBanner.hidden = true;
     const retryBtn = $('ih-popup-retry-btn');
@@ -1581,7 +1611,7 @@
 
   function verifierFor(slug, options = {}) {
     if (!window.IsHumanVerifier) throw new Error('IsHumanVerifier SDK not loaded');
-    const requiredAssurance = demoRequiredAssurance(options);
+    const requiredAssurance = demoRequiredAssurance(slug, options);
     const cacheKey = `${slug}:${requiredAssurance}`;
     if (!state.verifiers) state.verifiers = {};
     if (state.verifiers[cacheKey]) return state.verifiers[cacheKey];
@@ -1609,7 +1639,7 @@
 
   async function verifySite(slug, options = {}) {
     if (!window.IsHumanVerifier) throw new Error('IsHumanVerifier SDK not loaded');
-    const requiredAssurance = demoRequiredAssurance(options);
+    const requiredAssurance = demoRequiredAssurance(slug, options);
     const verifier = verifierFor(slug, { requiredAssurance });
     const backend = await verifier.verifyForBackend({
       autoProvision: true,
@@ -2269,7 +2299,8 @@
     for (const slug of SITE_SLUGS) {
       try {
         const verifier = verifierFor(slug);
-        const raw = await verifier.checkStatus({ requiredAssurance: DEFAULT_DEMO_SITE_ASSURANCE });
+        const requiredAssurance = demoRequiredAssurance(slug);
+        const raw = await verifier.checkStatus({ requiredAssurance });
         const ppid = raw.ppid || state.passkeyPpids[slug] || null;
         const verified = isSiteVerified({ ...raw, ppid });
         const result = {
@@ -2462,6 +2493,13 @@
     bind('ih-unblock-tickets-btn', unblockTickets);
     bind('ih-abuse-block-btn', blockTickets);
     bind('ih-abuse-recheck-btn', recheckBothSitesAfterBlock);
+    const trialsPolicyToggle = $('ih-trials-ishuman-toggle');
+    if (trialsPolicyToggle) {
+      trialsPolicyToggle.addEventListener('change', () => {
+        onTrialsPolicyToggleChange().catch((err) => log('Error', err.message));
+      });
+    }
+    syncTrialsPolicyToggle();
     bind('ih-require-ishuman-btn', requireIsHumanOnTickets);
     bind('ih-complete-ishuman-btn', completeIsHumanVerification);
     bind('ih-reverify-tickets-ishuman-btn', reverifyTicketsIshuman);

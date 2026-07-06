@@ -6,7 +6,7 @@
 
 {% block head %}
 {{ super() }}
-<link rel="stylesheet" href="/static/css/demo/ishuman-demo.css?v=31">
+<link rel="stylesheet" href="/static/css/demo/ishuman-demo.css?v=32">
 {% endblock %}
 
 {% block content %}
@@ -354,7 +354,14 @@
           <div class="block-card">
             <h3>Block on Ticketing</h3>
             <p class="demo-muted">Simulates a site revoking an abusive proof.</p>
-            <button class="demo-btn demo-btn-danger" id="ih-abuse-block-btn" type="button">Block on ticketing</button>
+            <div class="block-card-toolbar">
+              <button class="demo-btn demo-btn-danger" id="ih-abuse-block-btn" type="button">Block on ticketing</button>
+              <label class="demo-policy-toggle" for="ih-trials-ishuman-toggle">
+                <input type="checkbox" id="ih-trials-ishuman-toggle" role="switch" aria-checked="false">
+                <span class="demo-policy-toggle-track" aria-hidden="true"></span>
+                <span class="demo-policy-toggle-label">Trials requires human proof</span>
+              </label>
+            </div>
           </div>
           <div class="block-card">
             <h3>Check both sites again</h3>
@@ -646,5 +653,5 @@ const { ok, ppid, assurance, presentation } = await new IsHumanVerifier({
 <script src="/static/js/lemma-keys.js?v=5" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
 <script nonce="{{ csp_nonce }}">window.LEMMA_ISHUMAN_USE_PERSON_ROOT_SEEDS = {{ 'true' if ishuman_use_person_root_seeds else 'false' }};</script>
 <script src="/sdk/ishuman-verifier.js?v={{ ishuman_verifier_sdk_version }}" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
-<script src="/static/js/demo/ishuman-demo.js?v=57" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
+<script src="/static/js/demo/ishuman-demo.js?v=58" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
 {% endblock %}
