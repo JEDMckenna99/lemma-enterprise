@@ -125,9 +125,9 @@
   }
 
   function setQuickInsight(label, text, options = {}) {
-    showQuickInsight(true);
     const labelEl = $('ih-quick-insight-label');
     const textEl = $('ih-quick-insight-text');
+    if (labelEl || textEl) showQuickInsight(true);
     const retryBtn = $('ih-popup-retry-btn');
     if (labelEl && label) labelEl.textContent = label;
     if (textEl && text) textEl.textContent = text;
@@ -163,8 +163,10 @@
   }
 
   function updateQuickProgress(act) {
+    const progress = $('ih-quick-progress');
+    if (!progress) return;
     const chapter = chapterForAct(act);
-    document.querySelectorAll('#ih-quick-progress .demo-progress-item').forEach((item) => {
+    progress.querySelectorAll('.demo-progress-item').forEach((item) => {
       const step = Number(item.dataset.quickAct || 0);
       item.classList.remove('is-active', 'is-done');
       if (chapter >= 4 || (chapter > 0 && step < chapter)) item.classList.add('is-done');

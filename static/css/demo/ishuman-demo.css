@@ -84,81 +84,6 @@
   max-width: 640px;
 }
 
-.demo-progress {
-  margin-bottom: 24px;
-}
-
-.demo-progress-list {
-  display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 8px;
-  list-style: none;
-  margin: 0;
-  padding: 0;
-}
-
-.demo-progress-item {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-  padding: 10px 6px;
-  border-radius: 12px;
-  border: 1px solid var(--demo-line);
-  background: #f8fafc;
-  text-align: center;
-  transition: border-color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
-}
-
-.demo-progress-num {
-  width: 24px;
-  height: 24px;
-  border-radius: 999px;
-  background: #e2e8f0;
-  color: #475569;
-  font-size: 12px;
-  font-weight: 900;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.demo-progress-label {
-  font-size: 11px;
-  font-weight: 800;
-  color: var(--demo-muted);
-  line-height: 1.2;
-}
-
-.demo-progress-item.is-active {
-  border-color: #c7d2fe;
-  background: var(--demo-brand-soft);
-  box-shadow: 0 0 0 1px rgba(79, 70, 229, 0.12);
-}
-
-.demo-progress-item.is-active .demo-progress-num {
-  background: var(--demo-brand);
-  color: #fff;
-}
-
-.demo-progress-item.is-active .demo-progress-label {
-  color: #4338ca;
-}
-
-.demo-progress-item.is-done {
-  border-color: #86efac;
-  background: #f0fdf4;
-}
-
-.demo-progress-item.is-done .demo-progress-num {
-  background: #22c55e;
-  color: #fff;
-}
-
-.demo-progress-item.is-done .demo-progress-label {
-  color: var(--demo-ok);
-}
-
 .step-utility {
   margin-bottom: 14px;
   padding: 12px 14px;
@@ -1012,10 +937,6 @@
     grid-template-columns: 1fr;
   }
 
-  .demo-progress-list {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
   .demo-topbar .demo-btn {
     width: 100%;
   }
@@ -1156,16 +1077,6 @@
 
 .assurance-only[hidden] {
   display: none !important;
-}
-
-.demo-progress-list-6 {
-  grid-template-columns: repeat(6, minmax(0, 1fr));
-}
-
-@media (max-width: 720px) {
-  .demo-progress-list-6 {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
 }
 
 .demo-operations,
@@ -1392,34 +1303,6 @@
 .demo-problem-with {
   background: #ecfdf5;
   border: 1px solid #bbf7d0;
-}
-
-.demo-quick-insight {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 10px 14px;
-  margin-bottom: 12px;
-  padding: 10px 12px;
-  border-radius: 10px;
-  border: 1px solid #c7d2fe;
-  background: var(--demo-brand-soft);
-  font-size: 13px;
-  line-height: 1.4;
-}
-
-.demo-quick-insight strong {
-  display: block;
-  margin-bottom: 0;
-  flex: 1 1 100%;
-  font-size: 12px;
-  letter-spacing: 0.4px;
-  text-transform: uppercase;
-  color: var(--demo-brand);
-}
-
-.demo-progress-list-3 {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 @media (max-width: 720px) {
@@ -1993,11 +1876,6 @@
   box-shadow: none;
 }
 
-
-.demo-quick-insight-retry {
-  margin-left: auto;
-  flex-shrink: 0;
-}
 
 .demo-wallet-slots {
   display: grid;

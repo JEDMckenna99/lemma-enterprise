@@ -6,7 +6,7 @@
 
 {% block head %}
 {{ super() }}
-<link rel="stylesheet" href="/static/css/demo/ishuman-demo.css?v=30">
+<link rel="stylesheet" href="/static/css/demo/ishuman-demo.css?v=31">
 {% endblock %}
 
 {% block content %}
@@ -126,19 +126,7 @@
     </aside>
   </header>
 
-  <div class="demo-quick-insight" id="ih-quick-insight" hidden>
-    <strong id="ih-quick-insight-label">Ready</strong>
-    <span id="ih-quick-insight-text">Create your lemma.id, then walk create → verify → enforce at your own pace.</span>
-    <button class="demo-btn demo-btn-secondary demo-btn-quiet demo-quick-insight-retry" id="ih-popup-retry-btn" type="button" hidden>Retry popup</button>
-  </div>
-
-  <nav class="demo-progress" id="ih-quick-progress" aria-label="Demo progress">
-    <ol class="demo-progress-list">
-      <li class="demo-progress-item is-active" data-quick-act="1"><span class="demo-progress-num">1</span><span class="demo-progress-label">Create</span></li>
-      <li class="demo-progress-item" data-quick-act="2"><span class="demo-progress-num">2</span><span class="demo-progress-label">Verify</span></li>
-      <li class="demo-progress-item" data-quick-act="3"><span class="demo-progress-num">3</span><span class="demo-progress-label">Enforce</span></li>
-    </ol>
-  </nav>
+  <button class="demo-btn demo-btn-secondary demo-btn-quiet" id="ih-popup-retry-btn" type="button" hidden>Retry popup</button>
 
   <details class="demo-context" id="ih-problem-contrast">
     <summary>Why integrators use lemma.id</summary>
@@ -658,5 +646,5 @@ const { ok, ppid, assurance, presentation } = await new IsHumanVerifier({
 <script src="/static/js/lemma-keys.js?v=5" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
 <script nonce="{{ csp_nonce }}">window.LEMMA_ISHUMAN_USE_PERSON_ROOT_SEEDS = {{ 'true' if ishuman_use_person_root_seeds else 'false' }};</script>
 <script src="/sdk/ishuman-verifier.js?v={{ ishuman_verifier_sdk_version }}" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
-<script src="/static/js/demo/ishuman-demo.js?v=56" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
+<script src="/static/js/demo/ishuman-demo.js?v=57" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
 {% endblock %}

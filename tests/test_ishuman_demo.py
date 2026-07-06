@@ -40,7 +40,8 @@ def test_ishuman_demo_page_loads_expected_assets(ishuman_demo_client):
     assert "demo-outcome-footer" in body
     assert "ih-get-started" in body
     assert "ih-run-quick-demo" not in body
-    assert "ih-quick-progress" in body
+    assert "ih-quick-progress" not in body
+    assert "ih-quick-insight" not in body
     assert "Why integrators use lemma.id" in body
     assert 'id="ih-advanced-panel"' in body
     assert "Advanced — operator tools" in body
@@ -111,8 +112,8 @@ def test_ishuman_demo_page_loads_expected_assets(ishuman_demo_client):
     assert "/sdk/ishuman-verifier.js" in body
     assert "/static/js/demo/ishuman-demo.js" in body
     assert "/static/css/demo/ishuman-demo.css" in body
-    assert "/static/js/demo/ishuman-demo.js?v=56" in body
-    assert "/static/css/demo/ishuman-demo.css?v=30" in body
+    assert "/static/js/demo/ishuman-demo.js?v=57" in body
+    assert "/static/css/demo/ishuman-demo.css?v=31" in body
     assert "\U0001f511" not in body
     assert "\U0001f6e1" not in body
     assert "site-card-icon" in body
@@ -120,7 +121,7 @@ def test_ishuman_demo_page_loads_expected_assets(ishuman_demo_client):
     assert "ih-simulation-banner" not in body
     assert "Staging simulation only" not in body
     assert "ih-start-simulated-demo" not in body
-    assert 'data-quick-act="3"' in body
+    assert 'data-quick-act="3"' not in body
     assert 'data-quick-act="4"' not in body
     assert 'data-quick-act="5"' not in body
     human_start = body.index('id="ih-step-human"')
