@@ -370,26 +370,57 @@ def init_csrf_protection(app):
     import secrets
 
     CSRF_COOKIE_NAME = "lemma_csrf_token"
+    # Double-submit is validated against whichever CSRF cookie is present. The
+    # wallet SDK issues/sends `lemma_wallet_csrf`; server-issued browser sessions
+    # use `lemma_csrf_token`. Accept either so both flows keep working.
+    CSRF_COOKIE_NAMES = ("lemma_csrf_token", "lemma_wallet_csrf")
     CSRF_HEADER_NAMES = ("X-Lemma-CSRF", "X-CSRF-Token")
     PROTECTED_METHODS = ["POST", "PUT", "DELETE", "PATCH"]
+    # Cookies that confer ambient authentication. CSRF only matters when a
+    # request is authenticated by one of these (the browser attaches them
+    # automatically on cross-site requests). Header/bearer-authenticated API
+    # calls cannot be forged cross-origin and are exempt below.
+    AMBIENT_AUTH_COOKIES = ("session", "lemma_wallet_session")
+    # Header credentials prove the request is NOT relying on ambient cookie auth,
+    # so it is not CSRF-exploitable regardless of cookies the browser attached.
+    CREDENTIAL_HEADERS = (
+        "Authorization",
+        "X-Lemma-Credential",
+        "X-Agent-Token",
+        "X-API-Key",
+    )
     CSRF_EXEMPT_PREFIXES = [
         "/api/sdk/",
         "/api/webhook/",
         "/api/passkey/authenticate/",
         "/api/passkey/register/",
+        # wallet session-sync enforces its own origin allowlist + unlock-token
+        # (bearer) checks and per-endpoint _validate_csrf(); its cookies are
+        # SameSite=None so it needs those bespoke defenses rather than this guard.
+        "/api/wallet/",
         "/api/health",
         "/api/revocation/",
     ]
 
     @app.before_request
     def csrf_protect():
-        from flask import request as _req, g as _g
+        from flask import request as _req, g as _g, abort
         if _req.method not in PROTECTED_METHODS:
             return
         for prefix in CSRF_EXEMPT_PREFIXES:
             if _req.path.startswith(prefix):
                 return
-        cookie_token = _req.cookies.get(CSRF_COOKIE_NAME)
+
+        # Header/bearer-authenticated requests are not CSRF-exploitable: a
+        # cross-origin attacker cannot set these headers without a CORS-approved
+        # preflight. Let them through so SDK/server-to-server clients are unaffected.
+        if any(_req.headers.get(h) for h in CREDENTIAL_HEADERS):
+            return
+
+        # No ambient auth cookie => nothing for an attacker to ride on.
+        if not any(_req.cookies.get(name) for name in AMBIENT_AUTH_COOKIES):
+            return
+
         header_token = None
         for header_name in CSRF_HEADER_NAMES:
             header_token = _req.headers.get(header_name)
@@ -397,12 +428,19 @@ def init_csrf_protection(app):
                 break
         if not header_token:
             header_token = _req.form.get("csrf_token")
-        if not cookie_token or not header_token:
-            app.logger.warning(f"CSRF token missing for {_req.method} {_req.path}")
-            return
-        if not secrets.compare_digest(cookie_token, header_token):
-            app.logger.warning(f"CSRF token mismatch for {_req.method} {_req.path}")
-            return
+
+        cookie_tokens = [
+            _req.cookies.get(name) for name in CSRF_COOKIE_NAMES if _req.cookies.get(name)
+        ]
+
+        token_ok = bool(header_token) and any(
+            secrets.compare_digest(cookie_token, header_token) for cookie_token in cookie_tokens
+        )
+        if not token_ok:
+            app.logger.warning(
+                "CSRF validation failed (fail-closed) for %s %s", _req.method, _req.path
+            )
+            abort(403, description="csrf_validation_failed")
         _g.csrf_validated = True
 
     @app.after_request

@@ -567,9 +567,13 @@
 
             sessionStorage.removeItem(REGISTER_ERROR_KEY);
 
+            const headers = (wallet && typeof wallet._getSecureHeaders === 'function')
+                ? wallet._getSecureHeaders()
+                : { 'Content-Type': 'application/json' };
+
             const response = await fetch('/api/customer/register-wallet-developer', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers,
                 body: JSON.stringify(payload),
             });
             const result = await response.json();
