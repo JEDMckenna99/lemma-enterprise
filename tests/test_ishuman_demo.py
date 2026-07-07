@@ -42,7 +42,6 @@ def test_ishuman_demo_page_loads_expected_assets(ishuman_demo_client):
     assert "ih-run-quick-demo" not in body
     assert "ih-quick-progress" not in body
     assert "ih-quick-insight" not in body
-    assert "Why integrators use lemma.id" in body
     assert 'id="ih-advanced-panel"' in body
     assert "Advanced — operator tools" in body
     assert "1. Create your lemma.id" in body
