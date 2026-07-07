@@ -18,6 +18,21 @@
             const wallet = window.globalLemmaWallet;
             wallet._autoStartHeartbeat?.();
 
+            if (window.location.pathname === '/') {
+                const skipManagerRedirect = new URLSearchParams(window.location.search).has('removed');
+                if (!skipManagerRedirect) {
+                    try {
+                        const walletInfo = await wallet.getWalletInfo({ lite: true });
+                        if (walletInfo.hasWallet) {
+                            window.location.replace('/app');
+                            return;
+                        }
+                    } catch (redirectError) {
+                        console.warn('Root wallet redirect check failed:', redirectError.message);
+                    }
+                }
+            }
+
             const isPublicPage = document.body.dataset.publicPage === 'true';
             const SESSION_MS = (typeof getSessionDurationMs === 'function')
                 ? getSessionDurationMs()

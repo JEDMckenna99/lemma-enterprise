@@ -664,14 +664,9 @@ def create_app():
 
     @app.route('/')
     def index():
-        """Canonical lemma.id URL always opens the personal ID manager."""
-        logger.info("🏠 Serving Lemma ID manager (canonical root)")
-        app.jinja_env.cache = {}
-        return render_template('wallet_simple.html'), 200, {
-            'Cache-Control': 'no-cache, no-store, must-revalidate',
-            'Pragma': 'no-cache',
-            'Expires': '0'
-        }
+        """Marketing home for new visitors; existing local wallets redirect client-side to /app."""
+        logger.info("🏠 Serving marketing page (canonical root)")
+        return render_template('modern/index.html')
 
     @app.route('/home')
     def home():

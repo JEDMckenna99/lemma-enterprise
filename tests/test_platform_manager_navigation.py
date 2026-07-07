@@ -11,7 +11,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 @pytest.mark.integration
-def test_root_is_manager_and_home_is_product_page(monkeypatch):
+def test_root_is_home_and_app_is_manager(monkeypatch):
     monkeypatch.setenv("DATABASE_URL", "sqlite:///:memory:")
     monkeypatch.setenv("SESSION_SECRET", "test-session-secret")
 
@@ -20,9 +20,13 @@ def test_root_is_manager_and_home_is_product_page(monkeypatch):
     app = create_app()
     app.config["TESTING"] = True
     with app.test_client() as client:
-        manager = client.get("/")
+        root = client.get("/")
+        manager = client.get("/app")
         product = client.get("/home")
 
+    assert root.status_code == 200
+    assert b"Human proofs for abuse-resistant accounts" in root.data
+    assert b"assurance-levels" in root.data
     assert manager.status_code == 200
     assert b'id="create-wallet-btn"' in manager.data
     assert b"Create my lemma.id" in manager.data
@@ -57,6 +61,8 @@ def test_brand_and_manager_creation_use_canonical_routes():
     assert "selectPlatformCredentials" in layout
     assert "selectPlatformCredentials" in wallet_auto
     assert "Create a lemma.id" in manager
+    assert "window.location.replace('/app')" in wallet_auto
+    assert "walletInfo.hasWallet" in wallet_auto
     assert "req.onblocked = () => reject" in manager
     assert "instance?.db?.close?.()" in manager
     assert "localStorage.clear()" in manager
