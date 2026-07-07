@@ -279,13 +279,26 @@ def cors_headers(f):
 
 
 def rate_limit(max_requests=100, window=60):
-    """Rate limiting stub — to be implemented with real counters."""
-    def decorator(f):
-        @wraps(f)
-        def decorated_function(*args, **kwargs):
-            return f(*args, **kwargs)
-        return decorated_function
-    return decorator
+    """Rate limit decorator backed by the shared flask-limiter instance.
+
+    Historically this was a no-op stub, which silently disabled every
+    ``@rate_limit(max_requests=..., window=...)`` decorator across the SDK API
+    (issuance, revocation, IDV, verify). It now delegates to the real limiter in
+    ``auth.rate_limiter`` so the documented per-endpoint ceilings are actually
+    enforced. The legacy ``(max_requests, window-seconds)`` signature is
+    preserved and translated into a limits-compatible rate string.
+
+    Fails open only when the limiter backend is unavailable (matching the
+    limiter's configured degraded mode), never silently disabled.
+    """
+    from auth.rate_limiter import rate_limit as _limiter_rate_limit
+
+    try:
+        limit_string = f"{int(max_requests)} per {int(window)} seconds"
+    except (TypeError, ValueError):
+        limit_string = "100 per 60 seconds"
+
+    return _limiter_rate_limit(limit_string)
 
 
 def extract_authenticated_ppid_from_request() -> Optional[str]:
