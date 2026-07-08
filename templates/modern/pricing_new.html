@@ -318,7 +318,7 @@
 
 <div class="lemma-pricing">
     <h2>How billing works</h2>
-    <p class="intro">You pay once when a user first binds a credential to your site, and identity verification is included in that price when you require it. After that, a small monthly fee applies only in months where the user actually comes back and renews. Day-to-day proof checks run on your own servers and are never metered, so there's no per-login line item to worry about.</p>
+    <p class="intro">You pay once when a user first binds a credential to your site, and identity verification is included in that price when you require it. Users who already verified on another lemma.id-enabled site skip the ID ceremony at binding. After that, a small monthly fee applies only in months where the user actually comes back and renews. Day-to-day proof checks run on your own servers and are never metered, so there's no per-login line item to worry about.</p>
 
     <div class="lemma-pricing-grid">
         <div class="lemma-price-card featured">
@@ -334,7 +334,12 @@
         <div class="lemma-price-card">
             <h3>Local verification</h3>
             <p class="price">Free</p>
-            <p>Your servers validate credentials themselves with the SDK: signature, expiry, revocation. No network call, no meter, no limit. Credentials expire after 30 days, and renewal is a quick lemma.id popup for the user.</p>
+            <p>Your servers validate credentials themselves with the SDK: signature, expiry, revocation. No network call, no meter, no limit. Your millionth check this month costs the same as your first. Credentials expire after 30 days, and renewal is a quick lemma.id popup for the user.</p>
+        </div>
+        <div class="lemma-price-card">
+            <h3>Doubt re-entry</h3>
+            <p class="price">$0.33 / user</p>
+            <p>Charged only when a user you challenged with site doubt passes a fresh identity verification. Use doubt to force a re-check without a permanent ban. No charge unless they clear the challenge.</p>
         </div>
     </div>
 
@@ -345,6 +350,7 @@
             <li><strong>MAU ($0.03):</strong> billed for each calendar month a user renews after the month they bound. The binding month itself is never billed as an MAU.</li>
             <li><strong>What counts as active:</strong> a user whose credential is re-issued that month, which normally happens when the old one expires after about 30 days and they complete the renewal popup. Daily local checks never count toward this.</li>
             <li><strong>Same wallet, same PPID:</strong> renewals issue a fresh credential with the same site-private PPID, so routine continuity never triggers repeat verification. If a user steps up to a human proof later, the PPID stays stable through that too.</li>
+            <li><strong>Doubt re-entry ($0.33):</strong> billed only when a doubted user passes fresh IDV after a site-doubt challenge. If they fail or abandon, you pay nothing for that attempt.</li>
             <li><strong>Local checks:</strong> unlimited presentations and verifications on your own infrastructure between renewals, never metered.</li>
             <li><strong>Per site:</strong> each relying site is billed for its own users. PPIDs are pairwise, so there's nothing to correlate between sites.</li>
         </ol>
@@ -362,6 +368,18 @@
     <h2>What you're actually paying for</h2>
     <p class="intro" style="max-width:720px;margin:0 auto 48px;color:var(--gray-600);line-height:1.7;">A raw identity check answers one question once, then leaves you holding the user's data. A login provider tells you which account signed in, but not whether it's the same abuser back for round two. The fifty cents buys the thing neither of them gives you: a durable, private handle on the person behind the account, with none of their identity data on your servers.</p>
     <div class="features-grid">
+        <div class="feature-item">
+            <div class="feature-check">✓</div>
+            <div class="feature-text"><strong>Already verified users convert faster.</strong> Someone who proved they're human on another lemma.id site clears your gate without a new ID ceremony. Every integrator on the network makes signup smoother for the next.</div>
+        </div>
+        <div class="feature-item">
+            <div class="feature-check">✓</div>
+            <div class="feature-text"><strong>Verifiable audit stamps.</strong> Stamp checkouts, posts, and moderation actions with offline-verifiable proof a verified human did it. Evidence stays in your systems. <a href="/docs#attach-to-your-logs">See docs</a>.</div>
+        </div>
+        <div class="feature-item">
+            <div class="feature-check">✓</div>
+            <div class="feature-text"><strong>Challenge without banning.</strong> Site doubt forces fresh IDV on a suspect PPID without a permanent block. $0.33 only if they pass the challenge.</div>
+        </div>
         <div class="feature-item">
             <div class="feature-check">✓</div>
             <div class="feature-text"><strong>A ban that holds.</strong> The same wallet always presents the same PPID, and with human proofs that PPID is backed by the same verified person. Routine visits never trigger repeat verification.</div>

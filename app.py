@@ -703,6 +703,18 @@ def create_app():
         logger.info("📄 Serving partners page")
         return render_template('modern/partners.html')
 
+    @app.route('/ticketing')
+    def ticketing():
+        """Ticketing & presale farming - vertical marketing page."""
+        logger.info("📄 Serving ticketing page")
+        return render_template('modern/ticketing.html')
+
+    @app.route('/agents')
+    def agents():
+        """Agent identity roadmap - public flag for human-backed agent passports."""
+        logger.info("📄 Serving agents page")
+        return render_template('modern/agents.html')
+
     @app.route('/lemma-sw.js')
     def service_worker():
         """Serve service worker from root for proper scope"""

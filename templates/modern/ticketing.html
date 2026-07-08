@@ -1,0 +1,243 @@
+{% extends "modern/layout.html" %}
+{% set is_public_page = true %}
+
+{% block title %}Ticketing &amp; presale farming | lemma.id{% endblock %}
+{% block description %}Why ticket and presale farming survives CAPTCHA, fingerprinting, and waiting rooms — and how lemma.id attacks the identity supply stage so one verified human cannot become thousands of accounts.{% endblock %}
+
+{% block head %}
+    {{ super() }}
+    <style>
+        .ticketing-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: var(--font-size-sm);
+        }
+        .ticketing-table th,
+        .ticketing-table td {
+            padding: 14px 16px;
+            border-bottom: 1px solid var(--gray-200);
+            text-align: left;
+            vertical-align: top;
+        }
+        .ticketing-table thead th {
+            background: var(--gray-50);
+            font-weight: 600;
+            color: var(--gray-900);
+        }
+        .ticketing-table tbody tr:last-child td {
+            border-bottom: none;
+        }
+        .ticketing-col-strong {
+            background: rgba(102, 126, 234, 0.04);
+        }
+        @media (max-width: 768px) {
+            .ticketing-table-wrap { overflow-x: auto; }
+            .ticketing-table { min-width: 640px; }
+        }
+    </style>
+{% endblock %}
+
+{% block content %}
+
+<!-- Hero -->
+<section class="hero">
+    <div class="container" style="position: relative; z-index: 1;">
+        <div style="max-width: 860px; margin: 0 auto; text-align: center;">
+            <p style="font-size: var(--font-size-sm); font-weight: 600; text-transform: uppercase; letter-spacing: 2px; color: var(--primary); margin-bottom: 16px;">Ticketing &amp; presale drops</p>
+            <h1 style="font-size: clamp(2.5rem, 5vw, 3.5rem); line-height: 1.1; margin-bottom: 24px;">Farming is a business.<br>Defenses have to change the economics.</h1>
+            <p style="font-size: var(--font-size-xl); font-weight: 500; margin-bottom: var(--space-4); color: var(--gray-700);">Presale and ticket farming is not a hacking stunt. It is industrialized account creation so one operator captures a disproportionate share of scarce inventory and resells it. Defenses win when they raise the operator's cost per captured unit above the resale margin.</p>
+            <p style="font-size: var(--font-size-base); color: var(--gray-600); max-width: 720px; margin: 0 auto;">Most platforms defend stages 2 and 3: devices, bots, queues. lemma.id attacks stage 1: identity supply. That is the stage everything else is built on.</p>
+            <div style="margin-top: 40px; display: flex; gap: 16px; justify-content: center; flex-wrap: wrap;">
+                <a href="/docs" class="btn btn-primary">Add to your drop</a>
+                <a href="#kill-chain" class="btn btn-secondary">See the kill chain</a>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Kill chain -->
+<section class="section" id="kill-chain">
+    <div class="container">
+        <div style="text-align: center; margin-bottom: 40px;">
+            <p style="font-size: var(--font-size-sm); font-weight: 700; text-transform: uppercase; letter-spacing: 2px; color: var(--primary); margin-bottom: 12px;">The kill chain</p>
+            <h2>Five stages. One cheap input.</h2>
+            <p class="text-gray" style="max-width: 720px; margin: 16px auto 0;">A competent farming operation runs like a supply chain. Each stage has a cost. The defenses that work are the ones that move the bottleneck to the most expensive stage.</p>
+        </div>
+        <div class="ticketing-table-wrap" style="max-width: 960px; margin: 0 auto; background: var(--white); border: 1px solid var(--gray-200); border-radius: 14px; overflow: hidden;">
+            <table class="ticketing-table">
+                <thead>
+                    <tr>
+                        <th style="width: 8%;">Stage</th>
+                        <th style="width: 28%;">Operator goal</th>
+                        <th>Common tradecraft</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>1</strong></td>
+                        <td>Identity supply</td>
+                        <td>Bulk email, SIM/eSIM farms, aged accounts, rented and synthetic identities</td>
+                    </tr>
+                    <tr>
+                        <td><strong>2</strong></td>
+                        <td>Presence / access</td>
+                        <td>Residential proxy pools, anti-detect browsers, device fingerprint spoofing</td>
+                    </tr>
+                    <tr>
+                        <td><strong>3</strong></td>
+                        <td>Automation</td>
+                        <td>Checkout bots, queue bypass, CAPTCHA-solving services</td>
+                    </tr>
+                    <tr>
+                        <td><strong>4</strong></td>
+                        <td>Verification defeat</td>
+                        <td>Verification-as-a-service, ID rental, deepfake attacks on liveness</td>
+                    </tr>
+                    <tr>
+                        <td><strong>5</strong></td>
+                        <td>Monetization</td>
+                        <td>Code resale, secondary-market tickets, transfer to buyers</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</section>
+
+<!-- Why current defenses leak -->
+<section class="section" id="why-defenses-leak" style="background: var(--gray-50);">
+    <div class="container">
+        <div style="text-align: center; margin-bottom: 40px;">
+            <p style="font-size: var(--font-size-sm); font-weight: 700; text-transform: uppercase; letter-spacing: 2px; color: var(--primary); margin-bottom: 12px;">Why defenses leak</p>
+            <h2>They make one operator look like many cheap things</h2>
+            <p class="text-gray" style="max-width: 720px; margin: 16px auto 0;">None of them force the operator to look like many expensive, unique humans. Farming lives in that gap.</p>
+        </div>
+        <div class="ticketing-table-wrap" style="max-width: 960px; margin: 0 auto; background: var(--white); border: 1px solid var(--gray-200); border-radius: 14px; overflow: hidden;">
+            <table class="ticketing-table">
+                <thead>
+                    <tr>
+                        <th>Defense</th>
+                        <th>What it targets</th>
+                        <th>Why it leaks</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>Email / phone verification</strong></td>
+                        <td>Stage 1</td>
+                        <td>SIM farms and disposable-email services make identities near-free</td>
+                    </tr>
+                    <tr>
+                        <td><strong>CAPTCHA</strong></td>
+                        <td>Stage 3</td>
+                        <td>Human solving farms defeat it for fractions of a cent</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Device fingerprinting</strong></td>
+                        <td>Stage 2</td>
+                        <td>Anti-detect browsers and residential proxies fragment one operator into thousands of "devices"</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Waiting rooms / queues</strong></td>
+                        <td>Stage 3</td>
+                        <td>Slow the flood; do not reduce the number of distinct identities behind it</td>
+                    </tr>
+                    <tr>
+                        <td><strong>"Verified fan" code gating</strong></td>
+                        <td>Stage 1 (weakly)</td>
+                        <td>Enrollment is cheap; a farmer registers many fans, harvests many codes, resells the codes</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</section>
+
+<!-- What lemma.id changes -->
+<section class="section" id="what-changes">
+    <div class="container">
+        <div style="text-align: center; margin-bottom: 48px;">
+            <p style="font-size: var(--font-size-sm); font-weight: 700; text-transform: uppercase; letter-spacing: 2px; color: var(--primary); margin-bottom: 12px;">What lemma.id changes</p>
+            <h2>Attack identity supply directly</h2>
+            <p class="text-gray" style="max-width: 720px; margin: 16px auto 0;">Below is an honest map of what ships today. Residual limits are stated on purpose.</p>
+        </div>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 24px; max-width: 1000px; margin: 0 auto;">
+            <div class="card" style="border-color: var(--primary);">
+                <h3 class="card-title">One document, one PPID</h3>
+                <p>10,000 emails, SIMs, proxies, and browser profiles that trace to one government document collapse to one site-private PPID. To capture N allocations under a per-person cap, the operator needs N distinct identities that each pass full IDV, not N devices.</p>
+            </div>
+            <div class="card">
+                <h3 class="card-title">Per-human purchase caps</h3>
+                <p>The stable PPID makes "one human = N tickets" enforceable. Your site keys a <code>(site_id, ppid, drop_id)</code> ledger off the verified PPID. lemma.id provides the trustworthy one-human handle; you run the counter.</p>
+            </div>
+            <div class="card">
+                <h3 class="card-title">Purchase-time proof stamps</h3>
+                <p>Bind checkout to a verified PPID with a single-use nonce and offline-verifiable stamp. You get a tamper-evident record that this specific verified human performed this purchase, without a per-request call home.</p>
+            </div>
+            <div class="card">
+                <h3 class="card-title">Site-block and site-doubt</h3>
+                <p>Block a PPID persistently, or challenge a suspect PPID with fresh IDV without banning. A farmer cannot shed the consequence by rotating devices or accounts.</p>
+            </div>
+            <div class="card">
+                <h3 class="card-title">Pairwise privacy</h3>
+                <p>Each site gets its own PPID per user. Operators cannot correlate or launder identities across properties, and your servers never hold ID documents or biometrics.</p>
+            </div>
+            <div class="card">
+                <h3 class="card-title">Free local verification</h3>
+                <p>Every return visit and every purchase-time check runs on your servers in about a millisecond. No per-check meter, no rate limit, no vendor callback on the hot path.</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Example -->
+<section class="section" style="background: var(--gray-50);">
+    <div class="container">
+        <div style="max-width: 760px; margin: 0 auto; padding: 28px 32px; background: var(--white); border: 1px solid var(--gray-200); border-radius: 14px;">
+            <p style="margin: 0 0 12px 0; font-size: var(--font-size-sm); font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--primary);">Worked example</p>
+            <p style="margin: 0; font-size: var(--font-size-base); color: var(--gray-700); line-height: 1.7;">A drop allows two tickets per person. A farmer registers 500 accounts with 500 emails and 500 proxy IPs. With isHuman required at signup, all 500 accounts that trace to the same verified document resolve to the same PPID. Your cap ledger sees one human, not 500. The operator's cheapest input (accounts and devices) has been converted into their most expensive input (verified humans).</p>
+        </div>
+    </div>
+</section>
+
+<!-- Honest limits -->
+<section class="section" id="limits">
+    <div class="container">
+        <div style="max-width: 820px; margin: 0 auto;">
+            <div style="text-align: center; margin-bottom: 40px;">
+                <p style="font-size: var(--font-size-sm); font-weight: 700; text-transform: uppercase; letter-spacing: 2px; color: var(--primary); margin-bottom: 12px;">Honest limits</p>
+                <h2>What this does not solve by itself</h2>
+            </div>
+            <div style="background: var(--white); border: 1px solid var(--gray-200); border-radius: 14px; padding: 32px;">
+                <p style="font-size: var(--font-size-lg); color: var(--gray-700); line-height: 1.7; margin-bottom: 20px;"><strong>Multi-document farming.</strong> lemma.id enforces one document that passes IDV equals one person. A well-capitalized operator can supply multiple genuine identities: rented IDs, purchased identity packages, or synthetic identities engineered to pass liveness. At that point the defense rests on the IDV provider's document authenticity and injection resistance, not lemma.id's layer alone. Event tickets ($100–$1,000/unit) sit in the band where this countermeasure is strongest.</p>
+                <p style="font-size: var(--font-size-lg); color: var(--gray-700); line-height: 1.7; margin-bottom: 20px;"><strong>Post-purchase transfer.</strong> A per-person purchase cap limits how much one verified human can buy. It does not stop them from reselling a freely transferable ticket to a real attendee. Closing that requires binding the ticket to the identity through to entry. That is a separate product decision with real privacy trade-offs.</p>
+                <p style="font-size: var(--font-size-lg); color: var(--gray-700); line-height: 1.7; margin: 0;"><strong>Credential transfer.</strong> Today's model proves a human enrolled, not that the enrolled human is the one acting at a later moment. A verified human can hand their wallet to a buyer. Entry re-verification and device-binding improvements are on the roadmap; they are not shipping claims.</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- IDV providers -->
+<section class="section" style="background: var(--gray-50);">
+    <div class="container">
+        <div style="max-width: 720px; margin: 0 auto; text-align: center;">
+            <h2 style="margin-bottom: 16px;">For IDV providers</h2>
+            <p style="font-size: var(--font-size-lg); color: var(--gray-700); line-height: 1.65; margin-bottom: 24px;">lemma.id does not replace your verification rail. It multiplies its value by turning a one-shot check into a reusable, privacy-preserving, per-site, abuse-responsive one-human credential. The layer and the rail are complementary.</p>
+            <a href="/partners" class="btn btn-secondary">Talk to us about issuance</a>
+        </div>
+    </div>
+</section>
+
+<!-- CTA -->
+<section class="section" style="background: var(--gray-900); color: var(--white); padding: 80px 0;">
+    <div class="container" style="text-align: center;">
+        <h2 style="color: var(--white); font-size: var(--font-size-3xl); margin-bottom: 20px;">Make the next drop cost more than it's worth</h2>
+        <p style="color: var(--gray-400); font-size: var(--font-size-lg); margin-bottom: 48px; max-width: 640px; margin-left: auto; margin-right: auto;">Require isHuman at signup or checkout. Bind purchases to verified humans. Enforce per-person caps on a PPID you can actually trust.</p>
+        <div style="display: flex; gap: 20px; justify-content: center; flex-wrap: wrap;">
+            <a href="/docs" class="btn btn-primary" style="font-size: var(--font-size-lg); padding: 16px 32px;">View integration docs</a>
+            <a href="/demo" class="btn btn-secondary" style="background: transparent; border-color: var(--gray-600); color: var(--white);">See the demo</a>
+        </div>
+    </div>
+</section>
+
+{% endblock %}
