@@ -91,7 +91,7 @@ const AUTH_STATE = {
 class LemmaWallet {
     // SDK version - check with LemmaWallet.VERSION
     // v2.32.0: Redirect-only architecture - removed popup flow for simpler, consistent UX
-    static VERSION = '2.73.0';  // v2.73: pull-based device link — phone camera scans PC QR
+    static VERSION = '2.74.0';  // v2.74: device-bound signing keys + person-root link transfer
 
     static DEVICE_IDB_NAMES = ['LemmaWallet', 'LemmaWalletWrap'];
 
