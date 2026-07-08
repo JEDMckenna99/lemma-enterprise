@@ -311,3 +311,51 @@ def test_revoke_device_marks_key_revoked(
     assert result.ok
     assert count_active_wallet_devices(wallet_fixture["wallet_id"]) == 0
 
+
+def test_legacy_register_defaults_device_id_and_asserts_without_device_id(
+    wallet_fixture,
+    fake_ishuman_db_session_factory,
+    monkeypatch,
+):
+    """Pre-migration wallets register without device_id and keep asserting as legacy."""
+    from api.database import WalletSigningKey
+
+    monkeypatch.setattr("api.database.SessionLocal", fake_ishuman_db_session_factory.session_local)
+    pubkey_b64 = _register(wallet_fixture)
+
+    db = fake_ishuman_db_session_factory.session_local()
+    row = (
+        db.query(WalletSigningKey)
+        .filter_by(wallet_id=wallet_fixture["wallet_id"], device_id="legacy")
+        .first()
+    )
+    db.close()
+    assert row is not None
+    assert row.device_id == "legacy"
+
+    challenge = issue_wallet_challenge(wallet_id=wallet_fixture["wallet_id"])
+    body = {
+        "wallet_id": wallet_fixture["wallet_id"],
+        "master_credential_id": "ishuman_master_x",
+        "target_site": "example.com",
+        "site_signing_pubkey": SITE_SIGNING_PUBKEY_B64,
+    }
+    assertion = build_wallet_assertion(
+        wallet_id=wallet_fixture["wallet_id"],
+        wallet_secret=wallet_fixture["wallet_secret"],
+        field_names=DERIVE_ASSERTION_FIELDS,
+        field_values=body,
+        nonce_b64=challenge["nonce"],
+    )
+    body["wallet_assertion"] = {
+        "nonce": assertion.nonce,
+        "signature": assertion.signature,
+    }
+
+    ok_result, _fields = verify_assertion_from_body(
+        body,
+        wallet_id=wallet_fixture["wallet_id"],
+        field_names=DERIVE_ASSERTION_FIELDS,
+    )
+    assert ok_result.ok
+
