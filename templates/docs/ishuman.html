@@ -2,17 +2,17 @@
 {% set active_product = 'ishuman' %}
 {% set active_page = 'ishuman' %}
 {% set hero_title = 'isHuman + lemma.id for developers' %}
-{% set hero_subtitle = 'Require isHuman when one account must map to one verified human. lemma.id is the private proof layer underneath — stable site-private PPIDs, offline backend verification, and passkey or isHuman assurance tiers.' %}
-{% set page_description = 'isHuman developer docs — integrate IDV-backed human assurance and lemma.id private proofs with the browser SDK, site-private PPIDs, and signed backend presentations.' %}
+{% set hero_subtitle = 'Everything you need to require one verified human per account: the browser SDK, site-private PPIDs, offline backend verification, and the passkey and isHuman assurance tiers.' %}
+{% set page_description = 'isHuman developer docs: integrate IDV-backed human assurance and lemma.id private proofs with the browser SDK, site-private PPIDs, and signed backend presentations.' %}
 
 {% block docs_content %}
 <div class="docs-section" id="quickstart">
     <h2>What lemma.id gives your site</h2>
-    <p><strong>isHuman</strong> is the IDV-backed assurance tier for one verified human per account. <strong>lemma.id</strong> is the user-held proof wallet and relying-site integration underneath: stable, site-private PPIDs bound to your user record — not a legal identity, email, document number, or reusable cross-site ID.</p>
-    <p>Use <strong>passkey assurance</strong> when you need to recognize the same returning wallet (continuity and low-friction onboarding — not Sybil-resistant alone). Require <strong>isHuman assurance</strong> when the policy needs one verified human behind the account: Sybil resistance, one account per human, account recovery after abuse, free-trial abuse, ticketing, rewards, voting, or other flows where account rotation is the attack.</p>
+    <p><strong>isHuman</strong> is the IDV-backed assurance tier: one verified human per account. <strong>lemma.id</strong> is the user-held proof wallet underneath it. Your site gets a stable, site-private PPID bound to your user record. That PPID is not a legal identity, an email, a document number, or an ID that works anywhere else.</p>
+    <p>Use <strong>passkey assurance</strong> when you just need to recognize the same returning wallet. It's low friction and good for onboarding, but keep in mind it isn't Sybil-resistant on its own. Require <strong>isHuman assurance</strong> when your policy needs one verified human behind the account: free-trial abuse, ticketing, rewards, voting, recovery after a ban, and any other flow where the attacker's cheapest move is making a new account.</p>
     <div class="callout callout--info">
-        <div class="callout-title">Why customers need it</div>
-        <p>Login proves control of an account. Bot detection flags suspicious behavior. lemma.id gives your backend a durable, privacy-preserving enforcement handle so a bad actor cannot simply return with a new email, SIM, device, or OAuth account.</p>
+        <div class="callout-title">Why this exists</div>
+        <p>Login proves control of an account. Bot detection flags suspicious behavior. Neither can tell you the person you banned yesterday just signed up again. lemma.id gives your backend a durable handle on the person, so a new email, SIM, device, or OAuth account doesn't reset the slate.</p>
     </div>
 
     <h2>5-minute quickstart</h2>
@@ -20,13 +20,13 @@
         <li><strong>Set <code>siteId</code></strong> to your site&apos;s canonical hostname (for example <code>app.example.com</code>). It must match the hostname users see in the browser on your domain.</li>
         <li><strong>Add the verifier SDK</strong> to your page (see <a href="#sdk-integration">SDK integration</a> below).</li>
         <li><strong>Gate a sensitive action</strong> with <code>await verifier.verify({ autoProvision: true })</code>. The first visit may open a Lemma-hosted popup for wallet unlock, proof issuance, or isHuman step-up depending on the assurance your policy requires. Fail closed when verification fails (see <code>human</code> and <code>assurance</code> below).</li>
-        <li><strong>Store <code>ppid</code></strong> on your user or account record. It is an opaque, site-private identifier — not a government ID or email.</li>
-        <li><strong>Optional — API key:</strong> create one in the <a href="/developer/external-api-keys">API key manager</a> when you need server-side PPID blocks. An API key is <em>not</em> required for the basic human check.</li>
+        <li><strong>Store <code>ppid</code></strong> on your user or account record. It is an opaque, site-private identifier, not a government ID or email.</li>
+        <li><strong>Optional API key:</strong> create one in the <a href="/developer/external-api-keys">API key manager</a> when you need server-side PPID blocks. An API key is <em>not</em> required for the basic human check.</li>
         <li><strong>On confirmed abuse:</strong> call <code>POST /api/ishuman/site-block</code> with your API key (see <a href="#revocation">Revocation</a>). Do not rely on the abuser&apos;s browser to enforce the ban.</li>
     </ol>
     <div class="callout callout--info">
         <div class="callout-title">No webhooks to configure</div>
-        <p>Relying sites do <strong>not</strong> register webhook URLs with lemma.id. Verification completes in the browser (SDK + Lemma-hosted popup). Your backend learns the outcome when the client sends you the <code>ppid</code> or a stamped audit event — not via a lemma.id callback.</p>
+        <p>Relying sites do <strong>not</strong> register webhook URLs with lemma.id. Verification completes in the browser (SDK + Lemma-hosted popup). Your backend learns the outcome when the client sends you the <code>ppid</code> or a stamped audit event. There is no lemma.id callback.</p>
     </div>
     <div class="callout callout--info">
         <div class="callout-title">Using an AI coding agent?</div>
@@ -46,12 +46,12 @@
             <tr><td>Block or revoke a PPID server-side</td><td>Yes</td><td>Register your site domain in the <a href="/developer/external-api-keys">API key manager</a> and use the returned <code>X-API-Key</code>.</td></tr>
         </tbody>
     </table>
-    <p style="color: var(--gray-600); font-size: 14px;">When you register, <code>site_domain</code> must match your SDK <code>siteId</code> after normalization: lowercase, no scheme or path, no port. Strip <code>www.</code> if that is how users reach your app. Internal <code>site_...</code> identifiers are for API keys and database ownership — they are not your SDK <code>siteId</code>.</p>
+    <p style="color: var(--gray-600); font-size: 14px;">When you register, <code>site_domain</code> must match your SDK <code>siteId</code> after normalization: lowercase, no scheme or path, no port. Strip <code>www.</code> if that is how users reach your app. Internal <code>site_...</code> identifiers are for API keys and database ownership; they are not your SDK <code>siteId</code>.</p>
 </div>
 
 <div class="docs-section" id="signup-recipe">
     <h2>End-to-end recipe: gate signup (recommended)</h2>
-    <p>Verify locally on your backend with a signed presentation — do not trust a bare <code>ppid</code> from the browser.</p>
+    <p>Verify locally on your backend with a signed presentation. Do not trust a bare <code>ppid</code> from the browser.</p>
     <div class="code-block">
         <div class="code-header">
             <span>HTML + JavaScript</span>
@@ -122,7 +122,7 @@
         <li><strong>Passkey proof on two sites</strong> — derive distinct PPIDs with <code>assurance: passkey</code> via <code>verifyForBackend({ requiredAssurance: 'passkey' })</code>.</li>
         <li><strong>Demo relying sites</strong> — stamp actions and verify server-side with <code>verifyStamp</code> (see <a href="https://lemma-demo-tickets-1d3d7411af33.herokuapp.com" rel="noopener">ticketing demo</a> and <a href="https://lemma-demo-trials-7090f46cae0d.herokuapp.com" rel="noopener">trials demo</a>).</li>
         <li><strong>Site-local block</strong> — block the ticketing PPID; trials remains valid with passkey assurance.</li>
-        <li><strong>isHuman step-up</strong> — site escalates to IDV; re-verify with <code>requiredAssurance: 'ishuman'</code> — <em>same PPID</em>, stronger assurance.</li>
+        <li><strong>isHuman step-up</strong> — site escalates to IDV; re-verify with <code>requiredAssurance: 'ishuman'</code> and note the <em>same PPID</em> comes back with stronger assurance.</li>
     </ol>
     <p>See also the <a href="/docs/integration/ISHUMAN_AGENT_INTEGRATION.md">agent integration guide</a> assurance table and <a href="/docs/demo/README.md">demo recording checklist</a>.</p>
 </div>
@@ -203,18 +203,18 @@ def signup():
 
 <div class="docs-section">
     <h2>What are lemma.id and isHuman?</h2>
-    <p><strong>isHuman</strong> is the IDV-backed assurance tier: one verified human per account, without giving your site legal identity or a reusable cross-site ID. <strong>lemma.id</strong> is the user-held proof wallet and relying-site integration that issues site-private PPIDs and signed presentations. Passkey assurance handles continuity; isHuman handles Sybil resistance.</p>
+    <p><strong>isHuman</strong> is the IDV-backed assurance tier: one verified human per account, and your site never learns who that human legally is. <strong>lemma.id</strong> is the user-held proof wallet and relying-site integration that issues site-private PPIDs and signed presentations. Passkey assurance handles continuity; isHuman handles Sybil resistance.</p>
     <div class="callout callout--info">
         <div class="callout-title">Assurance</div>
-        <p>Credentials are issued only after a live identity check — liveness detection plus document-to-selfie matching. A bot, AI agent, or stolen ID image cannot obtain a credential, because a live human had to match a genuine government document at issuance.</p>
+        <p>Credentials are only issued after a live identity check with liveness detection and document-to-selfie matching. A bot or a stolen ID image can't get one, because a live human had to match a genuine government document at issuance.</p>
     </div>
     <div class="callout callout--info">
         <div class="callout-title">Core model</div>
-        <p>When isHuman is required, the credential is rooted in a <strong>verified-person root</strong> derived from the IDV result. A master credential is issued for <code>lemma.id</code>; on your site, a Lemma-hosted popup derives a site-specific credential (a per-site PPID) on first request and caches it for later checks. Because the binding is to the person root — not to an email, device, or OAuth account — resetting those cheap identifiers does not mint a fresh, clean identity.</p>
+        <p>When isHuman is required, the credential is rooted in a <strong>verified-person root</strong> derived from the IDV result. A master credential is issued for <code>lemma.id</code>; on your site, a Lemma-hosted popup derives a site-specific credential (a per-site PPID) on first request and caches it for later checks. Because the binding is to the person root rather than to an email, device, or OAuth account, resetting those cheap identifiers does not mint a fresh, clean identity.</p>
     </div>
     <div class="callout callout--info">
         <div class="callout-title">What your servers store: no KYC fields</div>
-        <p>The live identity check runs at the IDV issuer. <code>verify()</code> returns only <code>{ human, ppid, reason, timeMs }</code>. Your backend never receives the government ID, selfie, legal name, or date of birth — so you get an enforcement-grade human signal <strong>without running a KYC stack or holding the PII that makes identity verification a compliance and breach liability</strong>. Store the <code>ppid</code> on your user record; treat it as an opaque per-site identifier, not as a KYC field.</p>
+        <p>The live identity check runs at the IDV issuer, and <code>verify()</code> returns only <code>{ human, ppid, reason, timeMs }</code>. Your backend never sees the government ID, selfie, legal name, or date of birth. You get the human signal without the PII that makes identity verification a compliance and breach liability. Store the <code>ppid</code> on your user record and treat it as an opaque per-site identifier, nothing more.</p>
     </div>
 </div>
 
@@ -230,7 +230,7 @@ def signup():
             <tr><td>2</td><td>Lemma popup</td><td>If the user has no proof yet, a popup at <code>/wallet/ishuman-idv</code> unlocks the wallet (passkey) and runs live IDV at Didit.</td></tr>
             <tr><td>3</td><td>lemma.id</td><td>After approved IDV, lemma.id issues a master verified-human credential and derives a site-bound credential for your <code>siteId</code>.</td></tr>
             <tr><td>4</td><td>Your page</td><td>The SDK validates signature, expiry, and revocation locally, then returns <code>{ human: true, ppid: &quot;did:lemma:ppid_...&quot; }</code>.</td></tr>
-            <tr><td>5</td><td>Your backend</td><td>Accept the <code>ppid</code> (or a stamped event with <code>includeCredential: true</code>) from your client. Optionally re-verify cryptographically on your server — no lemma.id webhook required.</td></tr>
+            <tr><td>5</td><td>Your backend</td><td>Accept the <code>ppid</code> (or a stamped event with <code>includeCredential: true</code>) from your client. Optionally re-verify cryptographically on your server; no lemma.id webhook is required.</td></tr>
         </tbody>
     </table>
 </div>
@@ -275,7 +275,7 @@ def signup():
     <p><code>verify()</code> returns <code>{ human: boolean, ppid: string | null, assurance: string | null, reason: string, timeMs: number, error: string | null }</code>.</p>
     <div class="callout callout--info">
         <div class="callout-title"><code>human</code> vs <code>assurance</code></div>
-        <p><code>human</code> is the legacy/general success gate: <code>true</code> when the requested assurance tier passed (including <code>passkey</code> or <code>ishuman</code>). For policy decisions, also inspect <code>assurance</code> — a passkey success does not mean IDV-backed humanness. Require <code>requiredAssurance: 'ishuman'</code> on signup when one account must map to one verified human.</p>
+        <p><code>human</code> is the legacy/general success gate: <code>true</code> when the requested assurance tier passed (including <code>passkey</code> or <code>ishuman</code>). For policy decisions, also inspect <code>assurance</code>, because a passkey success does not mean IDV-backed humanness. Require <code>requiredAssurance: 'ishuman'</code> on signup when one account must map to one verified human.</p>
     </div>
     <p>Common <code>reason</code> values (grouped):</p>
     <ul style="color: var(--gray-700); line-height: 1.7;">
@@ -290,11 +290,11 @@ def signup():
 
 <div class="docs-section" id="attach-to-your-logs">
     <h2>Attach the verification to your own logs</h2>
-    <p>Once a user is verified, associate their site-scoped PPID with actions you record — a comment, checkout, login, moderation decision. The SDK provides helpers to stamp events. This data lives entirely in <strong>your</strong> systems; lemma.id stores none of it.</p>
+    <p>Once a user is verified, associate their site-scoped PPID with the actions you record: a comment, a checkout, a login, a moderation decision. The SDK provides helpers to stamp events. This data lives entirely in <strong>your</strong> systems; lemma.id stores none of it.</p>
 
     <div class="callout callout--info">
         <div class="callout-title">The pattern</div>
-        <p>Call <code>verify({ autoProvision: true })</code> once at an entry point. After that, <code>getPPID()</code>, <code>getVerification()</code>, and <code>stamp()</code> read the cached session with no popup — safe to use inline anywhere in your app.</p>
+        <p>Call <code>verify({ autoProvision: true })</code> once at an entry point. After that, <code>getPPID()</code>, <code>getVerification()</code>, and <code>stamp()</code> read the cached session with no popup, so they're safe to use inline anywhere in your app.</p>
     </div>
 
     <h3>Helper methods</h3>
@@ -312,7 +312,7 @@ def signup():
 
     <div class="callout callout--info">
         <div class="callout-title">Which evidence should I store?</div>
-        <p><strong>For audit logs, use <code>{ includeCredential: true }</code></strong> — it stores the bare verifiable credential. It is compact, offline-verifiable, and durable until expiry. Use <code>{ includeProof: true }</code> only when you also need the signed session assertion (replay resistance); it ages out and is less suitable for long-lived logs. Both re-verify on your backend without calling lemma.id per check.</p>
+        <p><strong>For audit logs, use <code>{ includeCredential: true }</code></strong>, which stores the bare verifiable credential. It is compact, offline-verifiable, and durable until expiry. Use <code>{ includeProof: true }</code> only when you also need the signed session assertion (replay resistance); it ages out and is less suitable for long-lived logs. Both re-verify on your backend without calling lemma.id per check.</p>
     </div>
 
     <h3>Stamp shape</h3>
@@ -413,7 +413,7 @@ if not check.ok:
             <tr><td><code>GET</code></td><td><code>/api/ishuman/stats</code></td><td>Public network statistics.</td><td>None</td></tr>
         </tbody>
     </table>
-    <p style="color: var(--gray-600); font-size: 14px;"><strong>Wallet assertion</strong> proves control of the user&apos;s wallet signing key (Ed25519 challenge/response). It is used by the Lemma wallet popup — not by typical relying-site server code. <strong><code>X-API-Key</code></strong> is your site API key from the <a href="/developer/external-api-keys">API key manager</a>.</p>
+    <p style="color: var(--gray-600); font-size: 14px;"><strong>Wallet assertion</strong> proves control of the user&apos;s wallet signing key (Ed25519 challenge/response). It is used by the Lemma wallet popup, not by typical relying-site server code. <strong><code>X-API-Key</code></strong> is your site API key from the <a href="/developer/external-api-keys">API key manager</a>.</p>
 </div>
 
 <div class="docs-section" id="revocation">
@@ -443,14 +443,14 @@ if not check.ok:
 
     <h2>Privacy model (PPID by site)</h2>
     <ul>
-        <li>Each site&apos;s PPID is derived from the <strong>verified-person root</strong> and the normalized site hostname. Binding to the person root — not a wallet secret, email, or device — is what makes a ban survive credential rotation on your site.</li>
+        <li>Each site&apos;s PPID is derived from the <strong>verified-person root</strong> and the normalized site hostname. Binding to the person root, rather than a wallet secret, email, or device, is what makes a ban survive credential rotation on your site.</li>
         <li>Derived credentials are site-specific and pairwise-unlinkable; one site&apos;s PPID cannot be correlated with another site&apos;s PPID by the relying sites.</li>
-        <li>Relying sites receive only a human verdict and their own site-private PPID — never the user&apos;s name, ID document, date of birth, or other IDV PII.</li>
+        <li>Relying sites receive only a human verdict and their own site-private PPID. They never receive the user&apos;s name, ID document, date of birth, or other IDV PII.</li>
         <li>Internal site identifiers (<code>site_...</code>, used for API keys and database ownership) are separate from the hostname used as <code>siteId</code> in the SDK.</li>
     </ul>
     <div class="callout callout--info">
         <div class="callout-title">What lemma.id can and can&apos;t see</div>
-        <p>lemma.id holds the verified-person root that links credentials for re-verification and enforcement. After approved issuance (and on declined, expired, or abandoned sessions), lemma.id requests upstream deletion of raw IDV session data at Didit — document images, liveness captures, and selfies. Your site never receives that material. Routine verification on your site runs locally in the browser; lemma.id does not observe which pages users visit or when they pass <code>verify()</code> on your domain.</p>
+        <p>lemma.id holds the verified-person root that links credentials for re-verification and enforcement. After approved issuance (and on declined, expired, or abandoned sessions), lemma.id requests upstream deletion of raw IDV session data at Didit: document images, liveness captures, and selfies. Your site never receives that material. Routine verification on your site runs locally in the browser; lemma.id does not observe which pages users visit or when they pass <code>verify()</code> on your domain.</p>
     </div>
 </div>
 {% endblock %}

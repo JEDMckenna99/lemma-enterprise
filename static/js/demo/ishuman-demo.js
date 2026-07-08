@@ -597,11 +597,11 @@
     const hasHuman = stepUpComplete() || isMasterReady();
 
     if (yoursEl) {
-      yoursEl.textContent = hasHuman ? 'Has human proof' : 'Deny — passkey only';
+      yoursEl.textContent = hasHuman ? 'Has human proof' : 'Deny: passkey only';
       yoursEl.className = `demo-pill${hasHuman ? ' ok' : ' deny'}`;
     }
     if (abuserEl) {
-      abuserEl.textContent = 'Deny — no human proof';
+      abuserEl.textContent = 'Deny: no human proof';
       abuserEl.className = 'demo-pill deny';
     }
 
@@ -939,7 +939,7 @@
       } else if (ticketsBlocked && trialsBlocked) {
         outcomeBanner.hidden = false;
         outcomeBanner.classList.add('is-warn');
-        outcomeText.textContent = 'Both sites blocked — unblock ticketing to reset the demo.';
+        outcomeText.textContent = 'Both sites are blocked. Unblock ticketing to reset the demo.';
       } else if (ticketsBlocked && !trials?.ppid) {
         outcomeBanner.hidden = false;
         outcomeBanner.classList.add('is-warn');
@@ -947,7 +947,7 @@
       } else if (tickets?.human && trialsVerified && state.localBlocks.tickets.size > 0) {
         outcomeBanner.hidden = false;
         outcomeBanner.classList.remove('is-warn');
-        outcomeText.textContent = 'Both sites verified — unblock ticketing to reset the demo.';
+        outcomeText.textContent = 'Both sites verified. Unblock ticketing to reset the demo.';
       } else {
         outcomeBanner.hidden = true;
         outcomeBanner.classList.remove('is-warn');

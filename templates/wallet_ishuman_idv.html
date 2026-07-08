@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="referrer" content="no-referrer">
     <meta name="cloudflare-no-rocket-loader" content="true">
-    <title>Confirm you're human — Lemma.id</title>
+    <title>Confirm you're human | Lemma.id</title>
     <style nonce="{{ csp_nonce }}">
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body {
@@ -159,7 +159,7 @@
         <p class="privacy-line" id="privacy-copy">Your ID documents are used only to create your human proof. After your proof is created, your documents and photos are removed from the verification provider. Lemma.id only stores your human proof, not your ID. Lemma does not use your verification data for advertising.</p>
         <div id="status" class="status info">Takes about a minute. You can stop anytime.</div>
         <div id="qr-demo-panel" class="qr-demo-panel hidden">
-            <p id="qr-demo-copy">Scan with your phone to finish the demo identity check. No Didit — expires in <span class="qr-timer" id="qr-demo-timer">15:00</span>.</p>
+            <p id="qr-demo-copy">Scan with your phone to finish the demo identity check. No Didit involved. Expires in <span class="qr-timer" id="qr-demo-timer">15:00</span>.</p>
             <div class="qr-code-wrap">
                 <div id="qr-demo-code" class="qr-code-box" aria-label="QR code for mobile demo verification"></div>
             </div>
@@ -346,7 +346,7 @@
 
         function getWalletInstance() {
             if (typeof LemmaWallet === 'undefined') {
-                throw new Error('Wallet SDK failed to load — allow scripts for lemma.id and refresh.');
+                throw new Error('Wallet SDK failed to load. Allow scripts for lemma.id and refresh.');
             }
             wallet = wallet || new LemmaWallet();
             return wallet;
@@ -882,7 +882,7 @@
             );
             const result = await wallet.ensureIsHumanIssuanceReady({ isHumanIssuance: true });
             if (!result.ready) {
-                throw new Error('Wallet unlock failed — complete the passkey prompt or try again.');
+                throw new Error('Wallet unlock failed. Complete the passkey prompt or try again.');
             }
             await adoptWalletState();
             if (!walletId) throw new Error('Wallet unlock failed');
@@ -897,7 +897,7 @@
             if (siteProofUsesContinuityOnly()) {
                 const result = await wallet.ensureIsHumanIssuanceReady({ isHumanIssuance: false });
                 if (!result.ready) {
-                    throw new Error('Wallet unlock failed — complete the passkey prompt or try again.');
+                    throw new Error('Wallet unlock failed. Complete the passkey prompt or try again.');
                 }
                 await adoptWalletState();
                 if (!walletId) throw new Error('Wallet unlock failed');
@@ -916,7 +916,7 @@
                 await ensureWalletInitialized();
                 const result = await wallet.ensureIsHumanIssuanceReady({ isHumanIssuance: true });
                 if (!result.ready) {
-                    throw new Error('Wallet unlock failed — complete the passkey prompt or try again.');
+                    throw new Error('Wallet unlock failed. Complete the passkey prompt or try again.');
                 }
                 await adoptWalletState();
                 if (!walletId) throw new Error('Wallet unlock failed');
@@ -1049,7 +1049,7 @@
                     await new Promise((resolve) => setTimeout(resolve, delayMs));
                 }
             }
-            throw new Error('Verification is still finalizing — close this window and click “Create my lemma.id” again in a moment.');
+            throw new Error('Verification is still finalizing. Close this window and click “Create my lemma.id” again in a moment.');
             });
         }
 
@@ -1069,13 +1069,13 @@
             if (intro) {
                 intro.textContent = 'Unlock this browser, scan the QR with your phone, and finish a short demo identity check. Your demo credential expires in about 15 minutes.';
             }
-            if (privacy) privacy.textContent = 'This is a sandbox flow — no Didit, no real ID documents. It mirrors the production popup so you can try Lemma.id before joining for real.';
+            if (privacy) privacy.textContent = 'This is a sandbox flow with no Didit and no real ID documents. It mirrors the production popup so you can try Lemma.id before joining for real.';
             if (siteChip) siteChip.textContent = 'lemma.id demo';
             if (stepsList) {
                 stepsList.innerHTML = [
                     '<li>Unlock this device with Face ID, Touch ID, or your passkey</li>',
                     '<li>Scan the QR code with your phone to finish the demo check</li>',
-                    '<li>Return here — your demo lemma.id is ready on this device and your phone</li>',
+                    '<li>Return here. Your demo lemma.id is ready on this device and your phone</li>',
                 ].join('');
             }
         }
@@ -1131,7 +1131,7 @@
             setStatus('Unlocking your wallet…', 'loading');
             await ensureWalletUnlocked();
             if (typeof wallet.prepareIdvMobileHandoff !== 'function') {
-                throw new Error('Wallet SDK too old — refresh lemma.id and retry.');
+                throw new Error('Wallet SDK too old. Refresh lemma.id and retry.');
             }
 
             const pending = wallet.prepareIdvMobileHandoff();
@@ -1193,7 +1193,7 @@
                 }
                 await new Promise((resolve) => setTimeout(resolve, 2000));
             }
-            throw new Error('Timed out waiting for phone scan — close and try again.');
+            throw new Error('Timed out waiting for phone scan. Close and try again.');
             });
         }
 
@@ -1418,7 +1418,7 @@
                 btn.disabled = false;
                 btn.classList.remove('hidden');
                 setStatus(
-                    'Tap continue — your passkey unlocks this device for the day.',
+                    'Tap continue and your passkey unlocks this device for the day.',
                     'info',
                 );
                 return;
@@ -1701,7 +1701,7 @@
                     );
                     sessionId = '';
                     localStorage.removeItem(SESSION_KEY);
-                    setStatus(consumerCopy().status?.freshRetry || 'That didn\u2019t finish — let\u2019s try again.', 'info');
+                    setStatus(consumerCopy().status?.freshRetry || 'That didn\u2019t finish. Let\u2019s try again.', 'info');
                 }
             }
 
@@ -1845,7 +1845,7 @@
                 console.error('[isHuman IDV] primary action failed:', err);
                 const detail = err?.message || err?.toString() || 'Verification failed';
                 if (detail.includes('wallet_id') || detail.includes('challenge')) {
-                    setStatus('Wallet session mismatch — close other lemma.id tabs and retry.', 'error');
+                    setStatus('Wallet session mismatch. Close other lemma.id tabs and retry.', 'error');
                 } else if (detail.includes('envelope_invalid') || detail.includes('encrypted')) {
                     setStatus('Unlock wallet with passkey to read encrypted human proof.', 'error');
                 } else {

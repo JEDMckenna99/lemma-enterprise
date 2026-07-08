@@ -1,7 +1,7 @@
 {% extends "modern/layout.html" %}
 
 {% block title %}lemma.id{% endblock %}
-{% block description %}Manage your lemma.id — verify once, share less, stay in control.{% endblock %}
+{% block description %}Manage your lemma.id. Verify once, share less, stay in control.{% endblock %}
 
 {% block preload_scripts %}
 <link rel="preload" href="{{ url_for('static', filename='js/lemma-keys.js') }}?v=7" as="script">
@@ -29,7 +29,7 @@
     <div id="removed-notice" class="card hidden" style="border-left: 4px solid #4f46e5; margin-bottom: 16px;">
         <p style="margin: 0 0 12px; color: #1e293b; font-size: 0.95rem; line-height: 1.5;">
             <strong>lemma.id was removed from this device.</strong>
-            Your passkey may still be saved in your device settings — you do not need a new one unless you want a full security reset.
+            Your passkey may still be saved in your device settings. You don't need a new one unless you want a full security reset.
         </p>
         <button id="return-passkey-btn" class="btn btn-primary btn-full" type="button">
             Open with my passkey
@@ -88,7 +88,7 @@
 
             <p class="card-intro">
                 On your new device, open <strong>lemma.id/link</strong> and tap <strong>Show QR Code</strong>.
-                Then scan that QR with this phone's Camera app — you'll confirm with your passkey to send your lemma.id.
+                Then scan that QR with this phone's Camera app. You'll confirm with your passkey to send your lemma.id.
                 Your wallet is encrypted to the new device only; lemma.id never sees your secret.
             </p>
             <a href="/link" class="btn btn-primary btn-full" style="text-align: center; text-decoration: none; display: block;">
@@ -126,7 +126,7 @@
                 Remove lemma.id
             </button>
             <p class="card-help">
-                Clears wallet data, private proofs, and lemma.id storage on this device. Your OS passkey is not deleted — you can use it again when you return.
+                Clears wallet data, private proofs, and lemma.id storage on this device. Your OS passkey is not deleted, so you can use it again when you return.
             </p>
         </div>
     </div>
@@ -622,7 +622,7 @@ async function returnWithExistingPasskey() {
 
         updateStatusDisplay(
             false,
-            'Passkey ready — verification needed',
+            'Passkey ready, verification needed',
             'This device has a new local wallet. Create lemma.id again or add this device from another one.',
         );
         document.getElementById('no-wallet-msg')?.classList.remove('hidden');
@@ -1040,7 +1040,7 @@ async function loadProofSummary() {
             html += renderAccessList(accessLabels);
         }
 
-        html += '<p class="proofs-privacy-note">Each site sees a different private ID. We never show those IDs here — that\'s how your activity stays separate.</p>';
+        html += '<p class="proofs-privacy-note">Each site sees a different private ID. We never show those IDs here; that\'s how your activity stays separate.</p>';
         container.innerHTML = html;
         document.getElementById('anchor-wallet-btn')?.addEventListener('click', anchorWalletIdentity);
     } catch (e) {

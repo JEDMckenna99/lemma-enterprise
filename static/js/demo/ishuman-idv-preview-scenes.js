@@ -8,7 +8,7 @@
   }
 
   const CONSUMER = {
-    documentTitle: "Confirm you're human — Lemma.id",
+    documentTitle: "Confirm you're human | Lemma.id",
     eyebrow: 'Lemma.id',
     headline: "Prove you're human once",
     headlinePasskeySetup: 'Create your lemma.id',

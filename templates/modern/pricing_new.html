@@ -2,7 +2,7 @@
 {% set is_public_page = true %}
 
 {% block title %}Pricing - lemma.id{% endblock %}
-{% block description %}lemma.id pricing: one $0.50 proof binding that gives your site a durable PPID — identity verification included when you require human proofs. Unlimited local verification.{% endblock %}
+{% block description %}lemma.id pricing: $0.50 once per user, verification included, then $0.03 for each month they come back. Local proof checks are free and unmetered.{% endblock %}
 
 {% block head %}
 {{ super() }}
@@ -294,12 +294,12 @@
 {% block content %}
 <div class="pricing-hero">
     <h1>Simple pricing</h1>
-    <p class="subtitle">Pay for human-proof-backed enforcement when you need it — plus reusable lemma.id binding.</p>
-    <p class="description">A raw IDV check tells you someone was human once. lemma.id turns passkey continuity and optional human proof verification into a reusable site-private PPID your users carry — recognized again on your own servers, with no identity data stored by you. Most users start with passkey; require human proofs only when Sybil resistance matters.</p>
+    <p class="subtitle">Fifty cents per user, once. Three cents for each month they come back. That's the whole model.</p>
+    <p class="description">A raw IDV check tells you someone was human once, and then you're on your own. Here, that one check becomes a reusable credential your users carry with them. Your servers recognize it on every return visit, for free, and you never store any identity data to make that work.</p>
     <div class="pricing-hero-highlight">
         <div class="pricing-hero-stat">
             <span class="amount">$0.50</span>
-            <span class="label">proof binding, once — verification included</span>
+            <span class="label">per user, once. Verification included</span>
         </div>
         <div class="pricing-hero-stat">
             <span class="amount">$0.03</span>
@@ -318,81 +318,81 @@
 
 <div class="lemma-pricing">
     <h2>How billing works</h2>
-    <p class="intro">Pricing follows the product model: <strong>passkey continuity</strong> gives you a stable site-private PPID without IDV up front, <strong>human proofs</strong> add IDV-backed uniqueness when your policy needs one verified human, and <strong>local verification</strong> lets your backend check proofs without a per-login meter. You pay for the binding once — identity verification included — plus a small monthly fee only when a user returns.</p>
+    <p class="intro">You pay once when a user first binds a credential to your site, and identity verification is included in that price when you require it. After that, a small monthly fee applies only in months where the user actually comes back and renews. Day-to-day proof checks run on your own servers and are never metered, so there's no per-login line item to worry about.</p>
 
     <div class="lemma-pricing-grid">
         <div class="lemma-price-card featured">
-            <h3>Proof binding — verification included</h3>
+            <h3>Proof binding, verification included</h3>
             <p class="price">$0.50 / user · one-time</p>
-            <p>One price for the user's first site-private credential: the human proof check (document + liveness) when your policy requires one verified human, plus a <strong>site-private, reusable proof credential</strong> held in the user's own wallet. The same returning wallet presents the same PPID, backed by the same verified human. <strong>No separate IDV line item — verification cost is bundled.</strong></p>
+            <p>Covers the user's first credential for your site. If your policy requires a human proof, the document and liveness check is part of this price, not a separate IDV line item. The credential lives in the user's own wallet, and the same wallet presents the same PPID every time it comes back.</p>
         </div>
         <div class="lemma-price-card featured">
-            <h3>Monthly active user (MAU)</h3>
+            <h3>Monthly active user</h3>
             <p class="price">$0.03 / user / month</p>
-            <p>Charged for each calendar month a returning user <strong>renews</strong> their credential, starting the <strong>month after</strong> binding. Covers continuity, revocation, and keeping zero identity data on your servers. Inactive months are not billed.</p>
+            <p>Billed only for calendar months where a returning user renews their credential, starting the month after binding. If a user goes quiet for three months, you pay nothing for those three months.</p>
         </div>
         <div class="lemma-price-card">
             <h3>Local verification</h3>
             <p class="price">Free</p>
-            <p>Your servers validate credentials locally with the SDK — signature, expiry, and revocation. <strong>Silent, no network call, unlimited, never metered.</strong> Credentials expire after 30 days; renewal opens a lemma.id popup.</p>
+            <p>Your servers validate credentials themselves with the SDK: signature, expiry, revocation. No network call, no meter, no limit. Credentials expire after 30 days, and renewal is a quick lemma.id popup for the user.</p>
         </div>
     </div>
 
     <div class="pricing-rules">
         <h3>Billing rules</h3>
         <ol>
-            <li><strong>Proof binding ($0.50, verification included):</strong> the one-time fee for issuing the user's first site-private, reusable credential and wallet binding (passkey secures the wallet on first use). When your policy requires human proofs, the identity verification check is included in this price — no separate IDV charge and no markup games.</li>
-            <li><strong>MAU ($0.03):</strong> billed for each calendar month a user renews <em>after</em> the month of their binding. The binding month itself has no MAU charge.</li>
-            <li><strong>Active user:</strong> a user whose credential is <strong>re-issued</strong> that month — typically when their prior credential expires (~30 days) and they complete the continuity popup. Daily local checks never count.</li>
-            <li><strong>Same wallet, same PPID:</strong> renewals issue a fresh credential with the same site-private PPID — no repeat verification for routine continuity. With human proofs, the person root keeps that PPID stable even across assurance step-ups.</li>
-            <li><strong>Local checks:</strong> unlimited presentations and verifications on your infrastructure between renewals — never metered.</li>
-            <li><strong>Per site:</strong> each relying site is billed independently for its own users (pairwise, non-correlatable PPIDs).</li>
+            <li><strong>Proof binding ($0.50, verification included):</strong> one-time fee for the user's first credential on your site, with the wallet secured by a passkey on first use. If your policy requires human proofs, the identity check is included in the fifty cents. There is no separate IDV charge and no markup hiding in it.</li>
+            <li><strong>MAU ($0.03):</strong> billed for each calendar month a user renews after the month they bound. The binding month itself is never billed as an MAU.</li>
+            <li><strong>What counts as active:</strong> a user whose credential is re-issued that month, which normally happens when the old one expires after about 30 days and they complete the renewal popup. Daily local checks never count toward this.</li>
+            <li><strong>Same wallet, same PPID:</strong> renewals issue a fresh credential with the same site-private PPID, so routine continuity never triggers repeat verification. If a user steps up to a human proof later, the PPID stays stable through that too.</li>
+            <li><strong>Local checks:</strong> unlimited presentations and verifications on your own infrastructure between renewals, never metered.</li>
+            <li><strong>Per site:</strong> each relying site is billed for its own users. PPIDs are pairwise, so there's nothing to correlate between sites.</li>
         </ol>
     </div>
 
     <div class="pricing-example">
         <h3>Example: 1,000 new users in January, 600 return in February</h3>
-        <p><strong>January:</strong> 1,000 × $0.50 binding (verification included) = <strong>$500</strong>. No MAU charges — the binding month is excluded.</p>
-        <p><strong>February:</strong> 600 returning active users × $0.03 = <strong>$18.00</strong> MAU. Plus any new users who join in February at $0.50 each.</p>
-        <p><strong>All year:</strong> A user who visits daily but renews once when their credential expires counts as <strong>one MAU</strong> that month — not one charge per login or local verification.</p>
+        <p><strong>January:</strong> 1,000 × $0.50 = <strong>$500</strong>, verification included. No MAU charges yet, since the binding month is excluded.</p>
+        <p><strong>February:</strong> 600 returning users × $0.03 = <strong>$18.00</strong>, plus $0.50 for each brand-new user who joins that month.</p>
+        <p><strong>Worth noting:</strong> a user who logs in every single day still counts as one MAU in a month, because billing follows renewals, not logins.</p>
     </div>
 </div>
 
 <div class="features-included">
-    <h2>Why teams pay for human proofs + lemma.id</h2>
-    <p class="intro" style="max-width:720px;margin:0 auto 48px;color:var(--gray-600);line-height:1.7;">A raw identity check tells you someone was human once, then leaves you holding their data. Login tells you which account signed in, but not whether the same abuser came back as a new account. <strong>Human proofs</strong> are the enforcement tier; <strong>lemma.id</strong> is the private proof binding that connects those systems without turning your backend into an identity store.</p>
+    <h2>What you're actually paying for</h2>
+    <p class="intro" style="max-width:720px;margin:0 auto 48px;color:var(--gray-600);line-height:1.7;">A raw identity check answers one question once, then leaves you holding the user's data. A login provider tells you which account signed in, but not whether it's the same abuser back for round two. The fifty cents buys the thing neither of them gives you: a durable, private handle on the person behind the account, with none of their identity data on your servers.</p>
     <div class="features-grid">
         <div class="feature-item">
             <div class="feature-check">✓</div>
-            <div class="feature-text"><strong>Durable enforcement handle</strong> — passkey: same wallet, same PPID on return. Human proofs: same verified human across accounts. No repeat IDV for routine continuity.</div>
+            <div class="feature-text"><strong>A ban that holds.</strong> The same wallet always presents the same PPID, and with human proofs that PPID is backed by the same verified person. Routine visits never trigger repeat verification.</div>
         </div>
         <div class="feature-item">
             <div class="feature-check">✓</div>
-            <div class="feature-text"><strong>Silent local recognition</strong> — every check runs on your servers in ~1ms. Zero network calls, zero user friction.</div>
+            <div class="feature-text"><strong>Recognition with no round trip.</strong> Checks run on your servers in about a millisecond. Users don't see anything, and neither does the network.</div>
         </div>
         <div class="feature-item">
             <div class="feature-check">✓</div>
-            <div class="feature-text"><strong>Zero identity data on your servers</strong> — no documents, names, or biometrics ever reach you. Smaller compliance surface by design.</div>
+            <div class="feature-text"><strong>Nothing to leak.</strong> Documents, names, and biometrics never reach your servers, which keeps them out of your compliance scope and your breach headlines.</div>
         </div>
         <div class="feature-item">
             <div class="feature-check">✓</div>
-            <div class="feature-text"><strong>Unlinkable across sites</strong> — pairwise PPIDs mean the same wallet holder can't be correlated between your site and any other.</div>
+            <div class="feature-text"><strong>Unlinkable across sites.</strong> Pairwise PPIDs mean your users can't be correlated between your site and anyone else's.</div>
         </div>
         <div class="feature-item">
             <div class="feature-check">✓</div>
-            <div class="feature-text"><strong>User-held wallet</strong> — the human owns and carries the credential, secured by a passkey on first use.</div>
+            <div class="feature-text"><strong>User-held wallet.</strong> The credential belongs to the person, secured by a passkey from first use. You're never its custodian.</div>
         </div>
         <div class="feature-item">
             <div class="feature-check">✓</div>
-            <div class="feature-text"><strong>Revocation you control</strong> — block a PPID and sync revocation across your integration; 30-day credentials with monthly continuity renewal.</div>
+            <div class="feature-text"><strong>Revocation you control.</strong> Block a PPID and the block syncs across your integration. Credentials run 30 days and renew monthly.</div>
         </div>
         <div class="feature-item">
             <div class="feature-check">✓</div>
-            <div class="feature-text"><strong>Personal data minimizer</strong> — <a href="/trust">see trust comparison</a>.</div>
+            <div class="feature-text"><strong>Less data everywhere.</strong> See <a href="/trust">the trust page</a> for exactly who holds what.</div>
         </div>
         <div class="feature-item">
             <div class="feature-check">✓</div>
-            <div class="feature-text"><strong>Included platform</strong> — site registration, API keys, JavaScript SDK, site-block controls, and developer dashboard at no extra fee.</div>
+            <div class="feature-text"><strong>The platform comes with it.</strong> Site registration, API keys, the JavaScript SDK, block controls, and the developer dashboard, at no extra charge.</div>
         </div>
     </div>
 </div>

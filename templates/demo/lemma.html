@@ -1,8 +1,8 @@
 {% extends "modern/layout.html" %}
 {% set is_public_page = true %}
 
-{% block title %}lemma.id demo — one lemma.id, a private ID on every site{% endblock %}
-{% block description %}Interactive demo: create a lemma.id — a passkey-protected private proof container — mint site-private IDs on two demo sites, enforce site-scoped blocks, and raise assurance to human proofs when your risk model demands it.{% endblock %}
+{% block title %}lemma.id demo | one lemma.id, a private ID on every site{% endblock %}
+{% block description %}Interactive demo: create a passkey-protected lemma.id, mint private IDs on two demo sites, place site-scoped blocks, and step up to human proofs to see how bans stick to a person instead of an account.{% endblock %}
 
 {% block head %}
 {{ super() }}
@@ -25,7 +25,7 @@
         <span class="demo-pill" id="ih-topbar-status">Checking…</span>
       </div>
       <button class="demo-btn demo-btn-ghost-danger" id="ih-clear-lemma-id-top-btn" type="button"
-        title="Wipe this browser's lemma.id and demo site caches — start fresh">Clear demo data</button>
+        title="Wipe this browser's lemma.id and demo site caches to start fresh">Clear demo data</button>
     </div>
   </div>
 
@@ -33,7 +33,7 @@
     <div class="demo-hero-copy">
       <p class="demo-eyebrow">Human proofs + lemma.id demo</p>
       <h1 class="demo-title">One lemma.id. A different private ID on every site.</h1>
-      <p class="demo-lead" id="ih-intro-lead">A lemma.id is a passkey-protected private proof container — no identity check to start, nothing stored about your users. Create one, verify on two demo sites, and enforce blocks that stay site-scoped. When a flow needs one verified human per account, add a human proof — same private IDs, stronger tier.</p>
+      <p class="demo-lead" id="ih-intro-lead">A lemma.id is a passkey-protected proof container. There's no identity check to get started and nothing stored about your users. In this demo you'll create one, verify on two demo sites, and place blocks that stay scoped to a single site. Then you'll add a human proof and watch the private IDs stay exactly the same while the assurance tier rises.</p>
       <div class="demo-hero-cta">
         <button class="demo-btn demo-btn-primary" id="ih-get-started" type="button">Get started</button>
         <a class="demo-btn demo-btn-secondary demo-btn-outline" href="/developer">View developer docs</a>
@@ -140,13 +140,13 @@
         <div class="workflow-head">
           <div>
             <h2 id="ih-step1-title">1. Create your lemma.id</h2>
-            <p class="demo-muted" id="ih-step1-desc">A passkey-protected private proof container. No identity check — sites ask it for proofs at the assurance level they need.</p>
+            <p class="demo-muted" id="ih-step1-desc">A passkey-protected proof container. No identity check yet. Sites ask it for proofs at whatever assurance level they need.</p>
           </div>
         </div>
 
         <div class="step-utility demo-advanced-copy" id="ih-step1-utility" hidden>
           <strong>Why this step</strong>
-          <p>Your lemma.id is a proof container only you control. Sites can't read it — they can only ask it for site-private proofs.</p>
+          <p>Your lemma.id is a proof container only you control. Sites can't read it; all they can do is ask it for site-private proofs.</p>
         </div>
 
         <div class="demo-wallet-card">
@@ -195,7 +195,7 @@
 
           <div class="demo-step1-action" id="ih-step1-action">
             <div class="demo-ready-banner" id="ih-step1-continue-banner" hidden>
-              <span>Your lemma.id is ready — verify on the two sites below.</span>
+              <span>Your lemma.id is ready. Verify on the two sites below.</span>
             </div>
             <button class="demo-btn demo-btn-primary" id="ih-step1-primary-btn" type="button" data-action="create">Create a lemma.id</button>
           </div>
@@ -218,13 +218,13 @@
         <div class="workflow-head" id="ih-demo-cockpit">
           <div>
             <h2 id="ih-step2-title">2. Verify on two sites</h2>
-            <p class="demo-muted" id="ih-step2-desc">Same lemma.id. Different private IDs. Each site verifies the proof on its own backend — no call back to lemma.id.</p>
+            <p class="demo-muted" id="ih-step2-desc">Same lemma.id, but each site gets a different private ID and verifies the proof on its own backend. Nothing calls back to lemma.id.</p>
           </div>
         </div>
 
         <div class="step-utility demo-advanced-copy" id="ih-step2-utility" hidden>
           <strong>Why this step</strong>
-          <p>The core integrator loop: the site declares required assurance → your lemma.id mints a site-private proof → the site verifies offline. Neither site sees your real identity or the other's ID.</p>
+          <p>This is the whole integrator loop: the site declares the assurance it requires, your lemma.id mints a site-private proof, and the site verifies it offline. Neither site sees your real identity, and neither can see the other site's ID.</p>
         </div>
 
         <div class="site-cards">
@@ -319,13 +319,13 @@
         <div class="workflow-head">
           <div>
             <h2 id="ih-block-step-title">3. Enforce on your site</h2>
-            <p class="demo-muted">Block a private ID on ticketing without touching the same lemma.id on trials, then set the assurance your flow requires. Enforcement is site-scoped — no network-wide blocklist.</p>
+            <p class="demo-muted">Block a private ID on ticketing without touching the same lemma.id on trials, then set the assurance your flow requires. There is no network-wide blocklist; every block is scoped to one site.</p>
           </div>
         </div>
 
         <div class="step-utility demo-advanced-copy" id="ih-step5-utility" hidden>
           <strong>Why this step</strong>
-          <p>Enforcement is per-site. A ticketing ban does not follow the user to trials or leak across the network — unlike IP or device bans.</p>
+          <p>Unlike an IP or device ban, a ticketing ban here doesn't follow the user to trials or leak anywhere else on the network. Each site enforces only its own policy.</p>
         </div>
 
         <div class="block-grid">
@@ -378,23 +378,23 @@
         <div class="workflow-subsection" id="ih-step-human" data-step="human">
           <div class="workflow-subsection-head" id="ih-human-proof-panel">
             <h3 id="ih-human-step-title">Choose the assurance your flow requires</h3>
-            <p class="demo-muted">A passkey block binds to one lemma.id — a determined abuser can mint a new one and get a new private ID. Where one account must map to one human (ticket drops, free trials), require human proofs: the ban binds to the verified person, and a new lemma.id changes nothing.</p>
+            <p class="demo-muted">A passkey block only binds to one lemma.id, and a determined abuser can just mint a new one. For flows where one account must map to one human, like ticket drops and free trials, require human proofs. Then the ban binds to the verified person, and a fresh lemma.id changes nothing.</p>
           </div>
 
           <div class="step-utility demo-advanced-copy" id="ih-step-human-utility">
             <strong>A policy dial, not a flaw</strong>
-            <p>Passkey assurance gives continuity and privacy with zero signup friction — the right default for most flows. Sybil resistance is a separate dial: sites turn it on per flow, and users keep the same account and private ID.</p>
+            <p>Passkey assurance gives continuity and privacy with zero signup friction, which makes it the right default for most flows. Sybil resistance is a separate dial that sites turn on per flow, and users keep the same account and private ID when it happens.</p>
           </div>
 
           <div class="policy-deny-grid" id="ih-policy-deny-grid" hidden>
             <div class="policy-deny-card">
               <h4>Your lemma.id</h4>
-              <p class="demo-muted">Passkey assurance only — no human proof yet.</p>
+              <p class="demo-muted">Passkey assurance only, no human proof yet.</p>
               <span class="demo-pill deny" id="ih-policy-deny-yours">Would deny</span>
             </div>
             <div class="policy-deny-card">
               <h4>A brand-new lemma.id</h4>
-              <p class="demo-muted">Rotating to a fresh passkey doesn't help — still no human proof.</p>
+              <p class="demo-muted">Rotating to a fresh passkey doesn't help. Still no human proof.</p>
               <span class="demo-pill deny" id="ih-policy-deny-abuser">Would deny</span>
             </div>
           </div>
@@ -407,13 +407,13 @@
   <section class="demo-human-cta" id="ih-human-cta">
     <div class="demo-human-cta-head">
       <h2 id="ih-human-cta-title">Add a human proof to your lemma.id</h2>
-      <p class="demo-muted">One-time identity check. Your site-private IDs stay the same — the assurance tier rises, and bans bind to you as a verified human instead of a passkey.</p>
+      <p class="demo-muted">A one-time identity check. Your site-private IDs stay exactly the same. What changes is the assurance tier, and that bans now bind to you as a verified human rather than to a passkey.</p>
     </div>
 
     <div class="step-up-grid">
       <div class="block-card">
         <h4>Complete human proof step-up</h4>
-        <p class="demo-muted">One-time identity check — same site-private ID, stronger assurance tier.</p>
+        <p class="demo-muted">One identity check, same site-private ID, stronger assurance tier.</p>
         <button class="demo-btn demo-btn-primary" id="ih-complete-human-main-btn" type="button">Complete human proof verification</button>
       </div>
       <div class="block-card">
@@ -443,7 +443,7 @@
       <img src="/static/img/lemma_logo.svg" alt="" width="22" height="22" class="demo-outcome-banner-logo">
       <div>
         <strong>Human proofs make bans durable</strong>
-        <span id="ih-human-outcome-text">Same private ID, stronger tier — enforcement binds to one verified human, not one passkey.</span>
+        <span id="ih-human-outcome-text">Same private ID, stronger tier. Enforcement now binds to one verified human, not one passkey.</span>
       </div>
     </div>
   </section>
@@ -451,19 +451,19 @@
   <section class="demo-outcome-footer">
     <img src="/static/img/lemma_logo.svg" alt="" width="56" height="56" class="demo-outcome-logo">
     <div class="demo-outcome-footer-body">
-      <h2 class="demo-outcome-footer-title">Outcome: Private continuity by default — human proofs when enforcement must stick</h2>
+      <h2 class="demo-outcome-footer-title">Outcome: private continuity by default, human proofs when enforcement must stick</h2>
       <div class="demo-outcome-grid">
         <article class="demo-outcome-item">
           <h3>Start with a passkey</h3>
-          <p>A lemma.id needs no identity check and stores nothing about your users — private site IDs and offline verification from the first click.</p>
+          <p>A lemma.id needs no identity check and stores nothing about your users. You get private site IDs and offline verification from the first click.</p>
         </article>
         <article class="demo-outcome-item">
           <h3>Reusable, unlinkable proofs</h3>
-          <p>Same lemma.id, different private IDs per site — no correlation across relying parties.</p>
+          <p>Same lemma.id, different private IDs per site, so relying parties can't correlate users with each other.</p>
         </article>
         <article class="demo-outcome-item">
-          <h3>Human proofs — the enforcement tier</h3>
-          <p>When scalpers or trial farmers rotate accounts, require IDV-backed assurance — same private ID, bans that stick.</p>
+          <h3>Human proofs: the enforcement tier</h3>
+          <p>When scalpers or trial farmers start rotating accounts, require IDV-backed assurance. The private ID stays the same and the ban finally sticks.</p>
         </article>
         <article class="demo-outcome-item">
           <h3>Developer friendly</h3>
@@ -474,9 +474,9 @@
   </section>
 
   <details class="demo-advanced-panel assurance-only" id="ih-advanced-panel">
-    <summary>Advanced — operator tools &amp; integrator reference</summary>
+    <summary>Advanced: operator tools &amp; integrator reference</summary>
     <div class="demo-advanced-body">
-      <p class="demo-muted">Manual verification, admin-gated SiteDoubt step-up, ops smoke checks, and operator debug. The main demo flow above covers the product story — use this panel for integration testing.</p>
+      <p class="demo-muted">Manual verification, admin-gated SiteDoubt step-up, ops smoke checks, and operator debug. The main demo flow above covers the product story; this panel is for integration testing.</p>
 
       <section class="demo-advanced-section">
         <h3>Manual site verification</h3>
@@ -490,7 +490,7 @@
 
       <section class="demo-advanced-section demo-control-section assurance-only" id="ih-control-escalation">
         <h3>Admin: SiteDoubt step-up (server-side)</h3>
-        <p class="demo-muted">Creates a SiteDoubt row on the platform — requires admin token. The main flow uses client-side policy simulation instead.</p>
+        <p class="demo-muted">Creates a SiteDoubt row on the platform (requires an admin token). The main flow uses client-side policy simulation instead.</p>
         <div class="step-up-grid">
           <div class="block-card">
             <h4>Raise ticketing policy</h4>
@@ -520,7 +520,7 @@
 
       <section class="demo-advanced-section demo-advanced-card" id="ih-step-3" data-step="3">
         <h3>Relying-site demos</h3>
-        <p class="demo-muted">Reserve a ticket or start a trial — each site stamps your action and verifies it on its own server, with no call back to lemma.id.</p>
+        <p class="demo-muted">Reserve a ticket or start a trial. Each site stamps your action and verifies it on its own server, with no call back to lemma.id.</p>
         <div class="action-row">
           <a class="demo-btn demo-btn-secondary" id="ih-link-tickets-site" href="#" target="_blank" rel="noopener">Open ticketing demo</a>
           <a class="demo-btn demo-btn-secondary" id="ih-link-trials-site" href="#" target="_blank" rel="noopener">Open trials demo</a>
@@ -552,7 +552,7 @@
           <div class="compare-box good">
             <h4><code>passkey</code></h4>
             <ul>
-              <li>Continuity tier — not Sybil-resistant alone.</li>
+              <li>Continuity tier; not Sybil-resistant alone.</li>
               <li>Fast unlock; no IDV required.</li>
               <li>Site verifies a signed site-private stamp offline.</li>
             </ul>
@@ -560,8 +560,8 @@
           <div class="compare-box good">
             <h4>Human proofs <code>ishuman</code></h4>
             <ul>
-              <li>Enforcement tier — one verified human per account.</li>
-              <li>Same PPID — assurance tier changes, not the account.</li>
+              <li>Enforcement tier: one verified human per account.</li>
+              <li>Same PPID. The assurance tier changes, not the account.</li>
               <li>Completed via IDV when the site policy demands it.</li>
             </ul>
           </div>

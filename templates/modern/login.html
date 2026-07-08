@@ -272,16 +272,16 @@
 
             if (state.mode === 'none') {
                 el.className = 'wallet-status';
-                el.innerHTML = 'No wallet yet — use Get Started to create a developer account.';
+                el.innerHTML = 'No wallet yet. Use Get Started to create a developer account.';
             } else if (state.mode === 'locked') {
                 el.className = 'wallet-status locked';
-                el.innerHTML = 'Wallet found — unlock with your passkey to continue.';
+                el.innerHTML = 'Wallet found. Unlock with your passkey to continue.';
             } else if (state.mode === 'ready_signin') {
                 el.className = 'wallet-status ready';
-                el.innerHTML = 'Verified developer wallet ready — signing you in…';
+                el.innerHTML = 'Verified developer wallet ready. Signing you in…';
             } else if (state.hasIsHuman && !state.hasDeveloper) {
                 el.className = 'wallet-status';
-                el.innerHTML = 'Identity verified — complete developer registration with Get Started.';
+                el.innerHTML = 'Identity verified. Complete developer registration with Get Started.';
             } else {
                 el.className = 'wallet-status';
                 el.innerHTML = 'Complete developer registration with Get Started.';
@@ -326,7 +326,7 @@
                     }
                     configurePrimaryButton(nextState);
                     updateStatus('info', nextState.hasIsHuman
-                        ? 'Identity verified — finish developer registration with Get Started.'
+                        ? 'Identity verified. Finish developer registration with Get Started.'
                         : 'Create a developer account with Get Started.');
                 } catch (e) {
                     updateStatus('error', e.message || 'Passkey unlock failed.');

@@ -2,7 +2,7 @@
 {% set is_public_page = true %}
 
 {% block title %}{{ page_title or 'Documentation' }} - lemma.id{% endblock %}
-{% block description %}{{ page_description or 'isHuman developer docs — integrate one verified human per account on top of lemma.id private proofs, site-private PPIDs, and local backend verification.' }}{% endblock %}
+{% block description %}{{ page_description or 'Developer docs for isHuman and lemma.id: add one-verified-human-per-account to your site with the browser SDK, site-private PPIDs, and verification that runs on your own backend.' }}{% endblock %}
 
 {% block preload_scripts %}
 <!-- Docs pages skip wallet preload for faster LCP -->
@@ -26,7 +26,7 @@
     <div class="container" style="position: relative; z-index: 1;">
         <p class="docs-hero-eyebrow">Developer documentation</p>
         <h1>{{ hero_title or 'lemma.id Documentation' }}</h1>
-        <p class="docs-hero-subtitle">{{ hero_subtitle or 'Add isHuman when one account must mean one verified human. lemma.id provides the private proof layer — site-private PPIDs, offline backend verification, and passkey or isHuman assurance tiers.' }}</p>
+        <p class="docs-hero-subtitle">{{ hero_subtitle or 'How to add isHuman to your site: the browser SDK, site-private PPIDs, backend verification that runs offline, and the passkey and isHuman assurance tiers.' }}</p>
         
         <!-- Docs Search -->
         <div class="docs-search-container">
