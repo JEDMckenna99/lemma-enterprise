@@ -49,7 +49,7 @@ def _challenge_key(nonce: str) -> str:
     return f"wallet:challenge:{nonce}"
 
 
-def issue_wallet_challenge(*, wallet_id: str = "") -> dict:
+def issue_wallet_challenge(*, wallet_id: str = "", device_id: str = "") -> dict:
     """Issue a short-lived nonce for wallet assertion signing."""
     nonce_bytes = secrets.token_bytes(32)
     nonce = b64url_encode(nonce_bytes)
@@ -58,6 +58,7 @@ def issue_wallet_challenge(*, wallet_id: str = "") -> dict:
         _challenge_key(nonce),
         {
             "wallet_id": (wallet_id or "").strip(),
+            "device_id": (device_id or "").strip(),
             "created_at": _utcnow().isoformat(),
         },
         ttl_seconds=CHALLENGE_TTL_SECONDS,
@@ -65,20 +66,41 @@ def issue_wallet_challenge(*, wallet_id: str = "") -> dict:
     return {"success": True, "nonce": nonce, "expires_at": expires_at}
 
 
-def _load_registered_pubkey(wallet_id: str) -> tuple[Result, bytes | None]:
+def _load_registered_pubkey(
+    wallet_id: str,
+    *,
+    device_id: str = "",
+    pubkey_b64: str = "",
+) -> tuple[Result, bytes | None, str | None]:
     from api.database import SessionLocal, WalletSigningKey
 
     if not wallet_id:
-        return Result(False, "wallet_assertion_malformed", "wallet_id required"), None
+        return Result(False, "wallet_assertion_malformed", "wallet_id required"), None, None
 
     db = SessionLocal()
     try:
-        row = db.query(WalletSigningKey).filter_by(wallet_id=wallet_id).first()
+        query = db.query(WalletSigningKey).filter_by(wallet_id=wallet_id)
+        device_id = (device_id or "").strip()
+        if device_id:
+            row = query.filter_by(device_id=device_id).first()
+            if not row and device_id != "legacy":
+                row = query.filter_by(device_id="legacy").first()
+        elif pubkey_b64:
+            try:
+                target = bytes(b64url_decode(pubkey_b64))
+            except Exception:
+                return Result(False, "wallet_assertion_malformed", "invalid pubkey encoding"), None, None
+            row = query.filter(WalletSigningKey.pubkey == target).first()
+        else:
+            row = query.filter(WalletSigningKey.revoked_at.is_(None)).order_by(
+                WalletSigningKey.last_used_at.desc().nullslast(),
+                WalletSigningKey.created_at.desc(),
+            ).first()
         if not row or row.revoked_at:
-            return Result(False, "wallet_not_registered", "wallet signing key not registered"), None
+            return Result(False, "wallet_not_registered", "wallet signing key not registered"), None, None
         if not row.pubkey:
-            return Result(False, "wallet_not_registered", "wallet signing key missing"), None
-        return Result(True), bytes(row.pubkey)
+            return Result(False, "wallet_not_registered", "wallet signing key missing"), None, None
+        return Result(True), bytes(row.pubkey), str(row.device_id or "legacy")
     finally:
         db.close()
 
@@ -99,11 +121,14 @@ def register_wallet_signing_key(
     wallet_id: str,
     pubkey_b64: str,
     signature_b64: str,
+    device_id: str = "legacy",
+    device_name: str = "",
 ) -> Result:
     """Register wallet Ed25519 public key after self-signature proof."""
     from api.database import SessionLocal, WalletSigningKey
 
     wallet_id = (wallet_id or "").strip()
+    device_id = (device_id or "legacy").strip() or "legacy"
     pubkey_b64 = (pubkey_b64 or "").strip()
     signature_b64 = (signature_b64 or "").strip()
 
@@ -123,26 +148,33 @@ def register_wallet_signing_key(
 
     db = SessionLocal()
     try:
-        existing = db.query(WalletSigningKey).filter_by(wallet_id=wallet_id).first()
+        existing = db.query(WalletSigningKey).filter_by(
+            wallet_id=wallet_id,
+            device_id=device_id,
+        ).first()
         if existing:
             if existing.revoked_at:
                 return Result(False, "wallet_pubkey_mismatch", "wallet signing key revoked")
             if bytes(existing.pubkey) == pubkey_bytes:
                 existing.last_used_at = datetime.utcnow()
+                if device_name:
+                    existing.device_name = device_name
                 _ensure_provisional_person_after_register(db, wallet_id)
                 db.commit()
                 return Result(True)
             return Result(
                 False,
                 "wallet_pubkey_mismatch",
-                "wallet already registered with a different public key",
+                "device already registered with a different public key",
             )
 
         db.add(
             WalletSigningKey(
                 wallet_id=wallet_id,
+                device_id=device_id,
                 pubkey=pubkey_bytes,
                 algorithm="ed25519",
+                device_name=(device_name or None),
                 created_at=datetime.utcnow(),
                 last_used_at=datetime.utcnow(),
             )
@@ -151,14 +183,11 @@ def register_wallet_signing_key(
         try:
             db.commit()
         except IntegrityError:
-            # Concurrent registration: the wallet page and the IDV popup can both
-            # call register-signing-key in the same instant, so two requests pass
-            # the "no existing row" check and race to INSERT the same wallet_id
-            # primary key. Treat this as idempotent: re-read the winning row and
-            # accept it when the public key matches (which it must, since the key
-            # is deterministically derived from the wallet secret).
             db.rollback()
-            winner = db.query(WalletSigningKey).filter_by(wallet_id=wallet_id).first()
+            winner = db.query(WalletSigningKey).filter_by(
+                wallet_id=wallet_id,
+                device_id=device_id,
+            ).first()
             if winner and not winner.revoked_at and bytes(winner.pubkey) == pubkey_bytes:
                 winner.last_used_at = datetime.utcnow()
                 _ensure_provisional_person_after_register(db, wallet_id)
@@ -169,12 +198,57 @@ def register_wallet_signing_key(
             return Result(
                 False,
                 "wallet_pubkey_mismatch",
-                "wallet already registered with a different public key",
+                "device already registered with a different public key",
             )
         return Result(True)
     except Exception:
         db.rollback()
         raise
+    finally:
+        db.close()
+
+
+def revoke_wallet_device(
+    *,
+    wallet_id: str,
+    device_id: str,
+) -> Result:
+    from api.database import SessionLocal, WalletSigningKey
+
+    wallet_id = (wallet_id or "").strip()
+    device_id = (device_id or "").strip()
+    if not wallet_id or not device_id:
+        return Result(False, "wallet_assertion_malformed", "wallet_id and device_id required")
+
+    db = SessionLocal()
+    try:
+        row = db.query(WalletSigningKey).filter_by(
+            wallet_id=wallet_id,
+            device_id=device_id,
+        ).first()
+        if not row or row.revoked_at:
+            return Result(False, "device_not_found", "device signing key not found")
+        row.revoked_at = datetime.utcnow()
+        db.commit()
+        return Result(True)
+    except Exception:
+        db.rollback()
+        raise
+    finally:
+        db.close()
+
+
+def count_active_wallet_devices(wallet_id: str, *, exclude_device_id: str = "") -> int:
+    from api.database import SessionLocal, WalletSigningKey
+
+    db = SessionLocal()
+    try:
+        rows = db.query(WalletSigningKey).filter_by(wallet_id=wallet_id).all()
+        active = [row for row in rows if not getattr(row, "revoked_at", None)]
+        exclude_device_id = (exclude_device_id or "").strip()
+        if exclude_device_id:
+            active = [row for row in active if str(row.device_id or "") != exclude_device_id]
+        return len(active)
     finally:
         db.close()
 
@@ -213,7 +287,15 @@ def verify_assertion_from_body(
     if bound_wallet and bound_wallet != wallet_id:
         return Result(False, "wallet_assertion_malformed", "wallet_id does not match challenge"), {}
 
-    reg_result, pubkey_bytes = _load_registered_pubkey(wallet_id)
+    bound_device = str(challenge_entry.get("device_id") or "").strip()
+    requested_device = str(body.get("device_id") or _raw.get("device_id") or "").strip()
+    if bound_device and requested_device and bound_device != requested_device:
+        return Result(False, "wallet_assertion_malformed", "device_id does not match challenge"), {}
+
+    reg_result, pubkey_bytes, registered_device_id = _load_registered_pubkey(
+        wallet_id,
+        device_id=requested_device or bound_device,
+    )
     if not reg_result.ok:
         return reg_result, {}
 
@@ -242,16 +324,19 @@ def verify_assertion_from_body(
     if not redis_delete(_challenge_key(nonce)):
         return Result(False, "wallet_assertion_nonce_replay", "challenge nonce already used"), {}
 
-    _touch_last_used(wallet_id)
+    _touch_last_used(wallet_id, registered_device_id or requested_device or bound_device or "legacy")
     return Result(True), field_values
 
 
-def _touch_last_used(wallet_id: str) -> None:
+def _touch_last_used(wallet_id: str, device_id: str = "legacy") -> None:
     from api.database import SessionLocal, WalletSigningKey
 
     db = SessionLocal()
     try:
-        row = db.query(WalletSigningKey).filter_by(wallet_id=wallet_id).first()
+        row = db.query(WalletSigningKey).filter_by(
+            wallet_id=wallet_id,
+            device_id=(device_id or "legacy").strip() or "legacy",
+        ).first()
         if row:
             row.last_used_at = datetime.utcnow()
             db.commit()

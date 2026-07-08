@@ -241,7 +241,7 @@ def test_register_concurrent_insert_is_idempotent(
     assert calls["n"] >= 1
 
 
-def test_register_replace_pubkey_blocked_in_phase1(
+def test_register_replace_pubkey_blocked_for_same_device(
     wallet_fixture,
     fake_ishuman_db_session_factory,
     monkeypatch,
@@ -262,9 +262,52 @@ def test_register_replace_pubkey_blocked_in_phase1(
 
     result = register_wallet_signing_key(
         wallet_id=wallet_fixture["wallet_id"],
+        device_id="legacy",
         pubkey_b64=other_pubkey,
         signature_b64=b64url_encode(sig),
     )
     assert not result.ok
     assert result.code == "wallet_pubkey_mismatch"
+
+
+def test_register_allows_multiple_devices(
+    wallet_fixture,
+    fake_ishuman_db_session_factory,
+    monkeypatch,
+):
+    monkeypatch.setattr("api.database.SessionLocal", fake_ishuman_db_session_factory.session_local)
+    _register(wallet_fixture)
+
+    _priv, pub = derive_wallet_signing_keypair("ef" * 32)
+    other_pubkey = pubkey_to_b64url(pub)
+    from api.wallet_keys import build_register_payload, sign_message, b64url_encode
+
+    payload = build_register_payload(
+        wallet_id=wallet_fixture["wallet_id"],
+        pubkey_b64=other_pubkey,
+    )
+    sig = sign_message(_priv, payload)
+    result = register_wallet_signing_key(
+        wallet_id=wallet_fixture["wallet_id"],
+        device_id="dev_phone",
+        pubkey_b64=other_pubkey,
+        signature_b64=b64url_encode(sig),
+    )
+    assert result.ok
+
+
+def test_revoke_device_marks_key_revoked(
+    wallet_fixture,
+    fake_ishuman_db_session_factory,
+    monkeypatch,
+):
+    from api.database import WalletSigningKey
+    from api.wallet_authn import count_active_wallet_devices, revoke_wallet_device
+
+    monkeypatch.setattr("api.database.SessionLocal", fake_ishuman_db_session_factory.session_local)
+    _register(wallet_fixture)
+    assert count_active_wallet_devices(wallet_fixture["wallet_id"]) == 1
+    result = revoke_wallet_device(wallet_id=wallet_fixture["wallet_id"], device_id="legacy")
+    assert result.ok
+    assert count_active_wallet_devices(wallet_fixture["wallet_id"]) == 0
 

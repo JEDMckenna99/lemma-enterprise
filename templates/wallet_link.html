@@ -11,33 +11,33 @@
 .link-header h1 { font-size: 1.8rem; font-weight: 600; color: #111827; margin: 0 0 8px; }
 .link-header p { color: #6b7280; font-size: 1rem; }
 
-.card { 
-    background: #fff; 
-    border: 1px solid #e5e7eb; 
-    border-radius: 16px; 
-    padding: 24px; 
+.card {
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 16px;
+    padding: 24px;
     margin-bottom: 24px;
     box-shadow: 0 2px 8px rgba(0,0,0,0.04);
 }
 
-.status-box { 
-    padding: 16px; 
-    border-radius: 12px; 
-    margin-bottom: 16px; 
+.status-box {
+    padding: 16px;
+    border-radius: 12px;
+    margin-bottom: 16px;
     text-align: center;
 }
 .status-box.info { background: #e0f2fe; border: 1px solid #0ea5e9; color: #0c4a6e; }
 .status-box.success { background: #d1fae5; border: 1px solid #10b981; color: #065f46; }
-.status-box.error { background: #fee2e2; border: 1px solid #ef4444; color: #991b1b; }
+.status-box.error { background: #e0f2fe; border: 1px solid #ef4444; color: #991b1b; }
 .status-box.warning { background: #fef3cd; border: 1px solid #f59e0b; color: #92400e; }
 
-.btn { 
+.btn {
     display: block;
     width: 100%;
-    padding: 14px 24px; 
-    border-radius: 10px; 
-    font-weight: 600; 
-    cursor: pointer; 
+    padding: 14px 24px;
+    border-radius: 10px;
+    font-weight: 600;
+    cursor: pointer;
     border: none;
     font-size: 1rem;
     transition: all 0.2s;
@@ -47,61 +47,6 @@
 .btn:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
 .btn-primary { background: linear-gradient(135deg, #667eea, #764ba2); color: white; }
 .btn-secondary { background: #6b7280; color: white; }
-.btn-success { background: #10b981; color: white; }
-
-.input-group { margin-bottom: 16px; }
-.input-group label { display: block; font-weight: 500; margin-bottom: 8px; color: #374151; }
-.input-group textarea {
-    width: 100%;
-    padding: 12px;
-    border: 1px solid #d1d5db;
-    border-radius: 8px;
-    font-family: monospace;
-    font-size: 0.85rem;
-    resize: vertical;
-    min-height: 100px;
-}
-.input-group textarea:focus {
-    outline: none;
-    border-color: #667eea;
-    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
-}
-
-.divider {
-    display: flex;
-    align-items: center;
-    margin: 24px 0;
-    color: #9ca3af;
-    font-size: 0.85rem;
-}
-.divider::before, .divider::after {
-    content: '';
-    flex: 1;
-    border-bottom: 1px solid #e5e7eb;
-}
-.divider::before { margin-right: 16px; }
-.divider::after { margin-left: 16px; }
-
-.step-indicator {
-    display: flex;
-    justify-content: center;
-    gap: 8px;
-    margin-bottom: 24px;
-}
-.step {
-    width: 32px;
-    height: 32px;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-weight: 600;
-    font-size: 0.85rem;
-}
-.step.active { background: #667eea; color: white; }
-.step.completed { background: #10b981; color: white; }
-.step.pending { background: #e5e7eb; color: #9ca3af; }
-
 
 .hidden { display: none !important; }
 
@@ -139,10 +84,11 @@
         <p>Connect this device to your Lemma ID</p>
     </header>
 
-    <!-- Mode tabs -->
+    <div id="status" class="status-box info hidden"></div>
+
     <div class="mode-tabs">
         <button type="button" class="mode-tab active" id="mode-pull">Scan with phone</button>
-        <button type="button" class="mode-tab" id="mode-push">Import code</button>
+        <button type="button" class="mode-tab" id="mode-sync">Seed transfer</button>
     </div>
 
     <!-- PULL: receiver shows QR, phone camera sends -->
@@ -175,82 +121,53 @@
         </div>
     </div>
 
-    <!-- PUSH: import code from other device's send QR -->
-    <div id="push-content" class="hidden">
-    <!-- Step Indicator -->
-    <div class="step-indicator">
-        <div class="step active" id="step1">1</div>
-        <div class="step pending" id="step2">2</div>
-    </div>
-
-    <!-- Step 1: Enter Link Code -->
-    <div id="step1-content" class="card">
-        <h2 style="margin: 0 0 16px; font-size: 1.1rem;">Enter Link Code</h2>
-        
-        <div id="status" class="status-box info">
-            Get a link code from your existing device at<br>
-            <strong>lemma.id → Add Another Device</strong>
-        </div>
-
-        <!-- QR scanning - label directly triggers file input (required for mobile) -->
-        <input type="file" id="qr-input" accept="image/*" capture="environment" style="display:none" onchange="handleQrPhoto(this)">
-        <div id="temp-scanner" style="display:none"></div>
-        
-        <label for="qr-input" class="btn btn-primary" style="text-align:center; cursor:pointer; margin-bottom:12px;">
-            Scan QR Code with Camera
-        </label>
-
-        <div class="divider">or paste code manually</div>
-
-        <div class="input-group">
-            <label for="qr-data">QR Code Data (JSON)</label>
-            <textarea id="qr-data" placeholder='Paste the QR data here...'></textarea>
-        </div>
-
-        <button class="btn btn-secondary" onclick="submitManualCode()">
-            Submit Code
-        </button>
-
-        <div class="security-note">
-            <strong>Security Note</strong>
-            Only link devices you physically control. The transfer is encrypted end-to-end,
-            expires in 5 minutes, and includes your human proof — no re-verification needed on the new device.
-        </div>
-    </div>
-
-    <!-- Step 2: Linking / Complete -->
-    <div id="step2-content" class="card hidden">
-        <div id="link-status" class="status-box info">
-            Adding device...
-        </div>
-
-        <div id="complete-actions" class="hidden">
-            <button class="btn btn-primary" onclick="window.location.href='/'">
-                Go to Lemma ID
-            </button>
-
-            <p style="text-align: center; color: #6b7280; font-size: 0.85rem; margin-top: 16px;">
-                Add a passkey from settings for faster sign-in.
+    <!-- SYNC: person-root seed relay (post-IDV wallets) -->
+    <div id="sync-content" class="hidden">
+        <div class="card">
+            <h2 style="margin: 0 0 12px; font-size: 1.1rem;">Person-root seed transfer</h2>
+            <p style="color: #6b7280; margin: 0 0 16px; font-size: 0.95rem;">
+                For verified wallets: show this QR on the new device, then scan it from your
+                existing device to transfer person-root seeds only (no raw wallet secret).
             </p>
+            <button type="button" class="btn btn-primary" id="show-sync-qr-btn">Show transfer QR</button>
+            <div id="sync-qr-display" class="hidden">
+                <div class="qr-box"><div id="sync-qr-container"></div></div>
+                <div id="sync-qr-timer" class="qr-timer">Expires in 1:00</div>
+                <div id="sync-wait-status" class="status-box info" style="margin-top: 16px;">
+                    Waiting for your existing device to deposit seeds...
+                </div>
+                <div id="sync-complete-actions" class="hidden" style="margin-top: 16px;">
+                    <button type="button" class="btn btn-primary" onclick="window.location.href='/app'">
+                        Go to lemma.id
+                    </button>
+                </div>
+            </div>
+        </div>
+        <div class="security-note">
+            <strong>Seed-only transfer</strong>
+            Each device keeps its own signing key. Only person-root material crosses devices,
+            sealed to an ephemeral key with a 60-second one-time relay.
         </div>
     </div>
-    </div><!-- /push-content -->
 </div>
 
 <script src="/static/js/qrcode.min.js" nonce="{{ csp_nonce }}"></script>
-<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js" nonce="{{ csp_nonce }}"></script>
 <script nonce="{{ csp_nonce }}">
 let wallet = null;
 let receiveQrTimer = null;
+let syncQrTimer = null;
 let receivePollAbort = false;
+let syncPollAbort = false;
 
 function setLinkMode(mode) {
     const pull = mode === 'pull';
+    const sync = mode === 'sync';
     document.getElementById('mode-pull').classList.toggle('active', pull);
-    document.getElementById('mode-push').classList.toggle('active', !pull);
+    document.getElementById('mode-sync').classList.toggle('active', sync);
     document.getElementById('pull-content').classList.toggle('hidden', !pull);
-    document.getElementById('push-content').classList.toggle('hidden', pull);
+    document.getElementById('sync-content').classList.toggle('hidden', !sync);
     if (!pull) hideReceiveQr();
+    if (!sync) hideSyncQr();
 }
 
 function hideReceiveQr() {
@@ -258,6 +175,20 @@ function hideReceiveQr() {
     if (receiveQrTimer) clearInterval(receiveQrTimer);
     document.getElementById('receive-qr-display')?.classList.add('hidden');
     document.getElementById('show-receive-qr-btn')?.classList.remove('hidden');
+}
+
+function hideSyncQr() {
+    syncPollAbort = true;
+    if (syncQrTimer) clearInterval(syncQrTimer);
+    document.getElementById('sync-qr-display')?.classList.add('hidden');
+    document.getElementById('show-sync-qr-btn')?.classList.remove('hidden');
+}
+
+async function initWallet() {
+    if (wallet) return wallet;
+    wallet = new LemmaWallet();
+    await wallet.init();
+    return wallet;
 }
 
 async function showReceiveQr() {
@@ -308,6 +239,50 @@ async function showReceiveQr() {
     }
 }
 
+async function showSyncQr() {
+    try {
+        await initWallet();
+        syncPollAbort = false;
+        const result = await wallet.beginDeviceTransfer();
+
+        const container = document.getElementById('sync-qr-container');
+        container.innerHTML = '';
+        if (typeof QRCode !== 'undefined') {
+            new QRCode(container, {
+                text: result.qrPayload,
+                width: 220,
+                height: 220,
+                correctLevel: QRCode.CorrectLevel ? QRCode.CorrectLevel.M : 0,
+            });
+        } else {
+            container.innerHTML = '<p style="color:#dc2626">QR library not loaded</p>';
+        }
+
+        document.getElementById('sync-qr-display').classList.remove('hidden');
+        document.getElementById('show-sync-qr-btn').classList.add('hidden');
+        document.getElementById('sync-wait-status').textContent =
+            'Scan this QR from your existing device to deposit seeds...';
+        document.getElementById('sync-wait-status').className = 'status-box info';
+
+        let timeLeft = 60;
+        const timerEl = document.getElementById('sync-qr-timer');
+        const formatTime = (s) => `${s}s`;
+        if (syncQrTimer) clearInterval(syncQrTimer);
+        timerEl.textContent = `Expires in ${formatTime(timeLeft)}`;
+        syncQrTimer = setInterval(() => {
+            timeLeft--;
+            timerEl.textContent = `Expires in ${formatTime(timeLeft)}`;
+            timerEl.classList.toggle('expiring', timeLeft <= 15);
+            if (timeLeft <= 0) hideSyncQr();
+        }, 1000);
+
+        pollForSyncTransfer(result.transferId);
+    } catch (e) {
+        console.error('Sync QR failed:', e);
+        alert('Could not start seed transfer: ' + (e.message || e));
+    }
+}
+
 async function pollForPullTransfer(transferId) {
     const waitEl = document.getElementById('receive-wait-status');
     try {
@@ -316,7 +291,7 @@ async function pollForPullTransfer(transferId) {
             if (result.ready) {
                 receivePollAbort = true;
                 if (receiveQrTimer) clearInterval(receiveQrTimer);
-                await finishLinkSuccess(result, waitEl);
+                await finishLinkSuccess(result, waitEl, 'pull');
                 return;
             }
             await new Promise(r => setTimeout(r, 2000));
@@ -329,266 +304,92 @@ async function pollForPullTransfer(transferId) {
     }
 }
 
-async function finishLinkSuccess(result, statusEl) {
-    const isPull = document.getElementById('push-content').classList.contains('hidden');
-
-    if (isPull) {
-        receivePollAbort = true;
-        if (receiveQrTimer) clearInterval(receiveQrTimer);
-        const waitEl = statusEl || document.getElementById('receive-wait-status');
-        waitEl.innerHTML = '<strong>Device Added!</strong><br><br>' +
-            (result.humanProofRestored
-                ? 'Your Lemma ID and human proof are ready on this device.'
-                : 'Your Lemma ID is now on this device.') +
-            '<br><br><span id="passkey-status">Creating passkey...</span>';
-        waitEl.className = 'status-box success';
-        try {
-            await wallet.registerPasskey();
-            if (typeof wallet.fetchAndStoreSeedEnvelopes === 'function') {
-                try { await wallet.fetchAndStoreSeedEnvelopes(); } catch (_) {}
+async function pollForSyncTransfer(transferId) {
+    const waitEl = document.getElementById('sync-wait-status');
+    try {
+        while (!syncPollAbort) {
+            const result = await wallet.claimDeviceTransfer(transferId);
+            if (result.ok) {
+                syncPollAbort = true;
+                if (syncQrTimer) clearInterval(syncQrTimer);
+                await finishSyncSuccess(result, waitEl);
+                return;
             }
-            const passkeyEl = document.getElementById('passkey-status');
-            if (passkeyEl) passkeyEl.textContent = 'Passkey created — you can sign in with biometrics.';
-        } catch (passkeyErr) {
-            console.warn('Passkey after pull receive:', passkeyErr);
-            const passkeyEl = document.getElementById('passkey-status');
-            if (passkeyEl) passkeyEl.textContent = 'Add a passkey from wallet settings for faster sign-in.';
+            await new Promise(r => setTimeout(r, 2000));
         }
-        document.getElementById('pull-complete-actions')?.classList.remove('hidden');
-        return;
+    } catch (e) {
+        if (!syncPollAbort) {
+            waitEl.textContent = e.message || 'Seed transfer failed';
+            waitEl.className = 'status-box error';
+        }
     }
+}
 
-    setStep(2);
-    document.getElementById('step1-content')?.classList.add('hidden');
-    document.getElementById('step2-content')?.classList.remove('hidden');
-    const linkStatus = statusEl || document.getElementById('link-status');
-    linkStatus.innerHTML = '<strong style="font-size: 1.2rem;">Device Added!</strong><br><br>' +
+async function finishLinkSuccess(result, statusEl, mode) {
+    const waitEl = statusEl || document.getElementById('receive-wait-status');
+    waitEl.innerHTML = '<strong>Device Added!</strong><br><br>' +
         (result.humanProofRestored
-            ? 'Your Lemma ID and human proof are now on this device.'
-            : 'Your Lemma ID is now available on this device.') +
-        '<br><br><span id="passkey-status">Creating passkey for this device...</span>';
-    linkStatus.className = 'status-box success';
+            ? 'Your Lemma ID and human proof are ready on this device.'
+            : 'Your Lemma ID is now on this device.') +
+        '<br><br><span id="passkey-status">Creating passkey...</span>';
+    waitEl.className = 'status-box success';
     try {
         await wallet.registerPasskey();
         if (typeof wallet.fetchAndStoreSeedEnvelopes === 'function') {
             try { await wallet.fetchAndStoreSeedEnvelopes(); } catch (_) {}
         }
         const passkeyEl = document.getElementById('passkey-status');
-        if (passkeyEl) passkeyEl.textContent = 'Passkey created — you can sign in with biometrics on this device.';
+        if (passkeyEl) passkeyEl.textContent = 'Passkey created — you can sign in with biometrics.';
     } catch (passkeyErr) {
         console.warn('Passkey after pull receive:', passkeyErr);
         const passkeyEl = document.getElementById('passkey-status');
-        if (passkeyEl) passkeyEl.textContent = 'Add a passkey from your wallet settings for faster sign-in.';
+        if (passkeyEl) passkeyEl.textContent = 'Add a passkey from wallet settings for faster sign-in.';
     }
-    document.getElementById('step2')?.classList && (document.getElementById('step2').className = 'step completed');
-    document.getElementById('step2') && (document.getElementById('step2').textContent = '✓');
-    document.getElementById('complete-actions')?.classList.remove('hidden');
+    if (mode === 'pull') {
+        document.getElementById('pull-complete-actions')?.classList.remove('hidden');
+    }
 }
 
-async function initWallet() {
-    if (wallet) return wallet;
-    wallet = new LemmaWallet();
-    await wallet.init();
-    return wallet;
-}
-
-function setStep(step) {
-    // Update step indicators (only 2 steps now)
-    for (let i = 1; i <= 2; i++) {
-        const stepEl = document.getElementById(`step${i}`);
-        if (i < step) {
-            stepEl.className = 'step completed';
-            stepEl.textContent = '✓';
-        } else if (i === step) {
-            stepEl.className = 'step active';
-            stepEl.textContent = i;
-        } else {
-            stepEl.className = 'step pending';
-            stepEl.textContent = i;
-        }
-    }
-    
-    // Show/hide content
-    document.getElementById('step1-content').classList.toggle('hidden', step !== 1);
-    document.getElementById('step2-content').classList.toggle('hidden', step !== 2);
-}
-
-
-// Handle photo captured from camera
-async function handleQrPhoto(input) {
-    const status = document.getElementById('status');
-    
-    if (!input.files || !input.files[0]) {
-        return;
-    }
-    
-    const file = input.files[0];
-    status.textContent = 'Reading QR code from photo...';
-    status.className = 'status-box info';
-    
+async function finishSyncSuccess(result, statusEl) {
+    const waitEl = statusEl || document.getElementById('sync-wait-status');
+    waitEl.innerHTML = '<strong>Seeds transferred!</strong><br><br>' +
+        'Person-root material is on this device. Create a passkey to finish setup.' +
+        '<br><br><span id="sync-passkey-status">Creating passkey...</span>';
+    waitEl.className = 'status-box success';
     try {
-        // Use Html5Qrcode to decode QR from image file
-        const html5QrCode = new Html5Qrcode("temp-scanner");
-        const decodedText = await html5QrCode.scanFile(file, true);
-        console.log('QR decoded from photo:', decodedText);
-        
-        // Clear the input so same file can be selected again
-        input.value = '';
-        
-        // Process the code
-        await processLinkCode(decodedText);
-        
-    } catch (e) {
-        console.error('QR decode error:', e);
-        status.innerHTML = 'Could not read QR code from photo.<br>Make sure the QR code is clearly visible and try again, or paste the code manually below.';
-        status.className = 'status-box error';
-        input.value = '';
+        await wallet.ensureDeviceEnrollmentAfterSeedTransfer(result);
+        await wallet.registerPasskey();
+        const passkeyEl = document.getElementById('sync-passkey-status');
+        if (passkeyEl) passkeyEl.textContent = 'Passkey created — you can sign in with biometrics.';
+    } catch (passkeyErr) {
+        console.warn('Passkey after sync transfer:', passkeyErr);
+        const passkeyEl = document.getElementById('sync-passkey-status');
+        if (passkeyEl) passkeyEl.textContent = 'Add a passkey from wallet settings for faster sign-in.';
     }
+    document.getElementById('sync-complete-actions')?.classList.remove('hidden');
 }
 
-async function submitManualCode() {
-    const qrData = document.getElementById('qr-data').value.trim();
-    if (!qrData) {
-        document.getElementById('status').textContent = 'Please paste the QR code data';
-        document.getElementById('status').className = 'status-box error';
-        return;
-    }
-    
-    await processLinkCode(qrData);
-}
-
-// Store pending link data for conflict resolution
-let pendingLinkData = null;
-
-async function processLinkCode(qrData, replaceExisting = false) {
-    setStep(2);
-    
-    const linkStatus = document.getElementById('link-status');
-    linkStatus.textContent = 'Decrypting and verifying link code...';
-    linkStatus.className = 'status-box info';
-    
-    try {
-        await initWallet();
-        
-        const result = await wallet.linkDevice({ 
-            qrData: qrData,
-            replaceExisting: replaceExisting
-        });
-        
-        // Handle conflict - show user choice
-        if (result.conflict) {
-            pendingLinkData = qrData;
-            showConflictResolution(result);
-            return;
-        }
-        
-        // Handle already linked (same Lemma ID)
-        if (result.alreadyLinked) {
-            linkStatus.innerHTML = 'This device is already connected to your Lemma ID.<br><br>' +
-                '<a href="/" style="color: #10b981; font-weight: 600;">Go to Lemma ID</a>';
-            linkStatus.className = 'status-box success';
-            return;
-        }
-
-        if (result.success) {
-            await finishLinkSuccess(result, linkStatus);
-        } else {
-            throw new Error(result.message || 'Link failed');
-        }
-    } catch (e) {
-        console.error('Link error:', e);
-        linkStatus.textContent = e.message;
-        linkStatus.className = 'status-box error';
-        
-        // Add retry button
-        setTimeout(() => {
-            linkStatus.innerHTML += '<br><br><button class="btn btn-secondary" onclick="setStep(1)" style="margin-top: 12px;">Try Again</button>';
-        }, 100);
-    }
-}
-
-function showConflictResolution(conflictResult) {
-    const linkStatus = document.getElementById('link-status');
-    linkStatus.className = 'status-box warning';
-    linkStatus.innerHTML = `
-        <strong style="display: block; margin-bottom: 12px;">Different Lemma ID Exists</strong>
-        <p style="margin-bottom: 16px;">This device has a different Lemma ID. What would you like to do?</p>
-
-        <div style="display: flex; flex-direction: column; gap: 12px;">
-            <button class="btn btn-primary" onclick="replaceExistingWallet()" style="margin: 0;">
-                Replace with New Lemma ID
-            </button>
-            <button class="btn btn-secondary" onclick="keepExistingWallet()" style="margin: 0;">
-                Keep Current Lemma ID
-            </button>
-        </div>
-
-        <p style="font-size: 0.8rem; color: #92400e; margin-top: 16px;">
-            Note: Your current data will be backed up locally before replacement.
-        </p>
-    `;
-}
-
-async function replaceExistingWallet() {
-    if (!pendingLinkData) {
-        setStep(1);
-        return;
-    }
-
-    const linkStatus = document.getElementById('link-status');
-    linkStatus.textContent = 'Replacing Lemma ID...';
-    linkStatus.className = 'status-box info';
-
-    // Re-process with replaceExisting flag
-    await processLinkCode(pendingLinkData, true);
-    pendingLinkData = null;
-}
-
-function keepExistingWallet() {
-    pendingLinkData = null;
-    window.location.href = '/';
-}
-
-// Initialize
 document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('mode-pull').addEventListener('click', () => setLinkMode('pull'));
-    document.getElementById('mode-push').addEventListener('click', () => setLinkMode('push'));
+    document.getElementById('mode-sync').addEventListener('click', () => setLinkMode('sync'));
     document.getElementById('show-receive-qr-btn').addEventListener('click', showReceiveQr);
+    document.getElementById('show-sync-qr-btn').addEventListener('click', showSyncQr);
 
     try {
         await initWallet();
-        
-        // Check if already has Lemma ID - show info but allow linking (smart conflict resolution handles it)
         const info = await wallet.getWalletInfo();
+        const statusEl = document.getElementById('status');
         if (info.hasWalletSecret && info.hasPasskey) {
-            document.getElementById('status').innerHTML =
+            statusEl.innerHTML =
                 'This device already has a Lemma ID.<br>' +
                 'You can add a different one below, or <a href="/" style="color: #0ea5e9;">go to your Lemma ID</a>.';
-            document.getElementById('status').className = 'status-box warning';
+            statusEl.className = 'status-box warning';
+            statusEl.classList.remove('hidden');
         } else if (info.hasWalletSecret && !info.hasPasskey) {
-            document.getElementById('status').innerHTML =
+            statusEl.innerHTML =
                 'Incomplete setup detected. Add your Lemma ID below to complete setup.';
-            document.getElementById('status').className = 'status-box info';
-        }
-        
-        // Legacy push link in URL hash (v1 send-from-other-device)
-        if (window.location.hash && window.location.hash.length > 1) {
-            let hashData = window.location.hash.substring(1);
-            try {
-                hashData = hashData.replace(/-/g, '+').replace(/_/g, '/');
-                while (hashData.length % 4) hashData += '=';
-                const qrData = atob(hashData);
-                const parsed = JSON.parse(qrData);
-                if (parsed.v === 1 && parsed.k && parsed.p) {
-                    setLinkMode('push');
-                    console.log('Found push link code in URL hash - auto-processing...');
-                    document.getElementById('status').innerHTML = 'Link code detected from QR scan! Processing...';
-                    document.getElementById('status').className = 'status-box success';
-                    setTimeout(() => processLinkCode(qrData), 500);
-                }
-            } catch (e) {
-                console.log('Hash not a push link code, ignoring:', e.message);
-            }
+            statusEl.className = 'status-box info';
+            statusEl.classList.remove('hidden');
         }
     } catch (e) {
         console.error('Init error:', e);

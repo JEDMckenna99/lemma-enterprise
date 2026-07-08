@@ -115,7 +115,7 @@
             'raw',
             seedBytes,
             { name: 'Ed25519', namedCurve: 'Ed25519' },
-            true,
+            false,
             ['sign'],
         );
         const jwk = await crypto.subtle.exportKey('jwk', privateKey);
@@ -125,6 +125,7 @@
         const publicKey = base64urlDecode(jwk.x);
         return {
             publicKey,
+            extractable: false,
             async sign(messageBytes) {
                 const digest = await sha256Bytes(messageBytes);
                 const signature = await crypto.subtle.sign(
@@ -135,6 +136,71 @@
                 return new Uint8Array(signature);
             },
         };
+    }
+
+    async function generateDeviceSigningKeypair() {
+        const keyPair = await crypto.subtle.generateKey(
+            { name: 'Ed25519' },
+            false,
+            ['sign', 'verify'],
+        );
+        const jwk = await crypto.subtle.exportKey('jwk', keyPair.publicKey);
+        if (!jwk?.x) {
+            throw new Error('Ed25519 public key export failed');
+        }
+        const publicKey = base64urlDecode(jwk.x);
+        return {
+            publicKey,
+            privateKeyHandle: keyPair.privateKey,
+            extractable: false,
+            async sign(messageBytes) {
+                const digest = await sha256Bytes(messageBytes);
+                const signature = await crypto.subtle.sign(
+                    { name: 'Ed25519' },
+                    keyPair.privateKey,
+                    digest,
+                );
+                return new Uint8Array(signature);
+            },
+        };
+    }
+
+    async function wrapDeviceSigningKeypair(privateKeyHandle, publicKeyBytes) {
+        const publicKey = publicKeyBytes instanceof Uint8Array
+            ? publicKeyBytes
+            : new Uint8Array(publicKeyBytes);
+        return {
+            publicKey,
+            privateKeyHandle,
+            extractable: false,
+            async sign(messageBytes) {
+                const digest = await sha256Bytes(messageBytes);
+                const signature = await crypto.subtle.sign(
+                    { name: 'Ed25519' },
+                    privateKeyHandle,
+                    digest,
+                );
+                return new Uint8Array(signature);
+            },
+        };
+    }
+
+    function buildCanonicalPopPayload(popPayload) {
+        const envelope = {
+            agent_key_id: String(popPayload?.agent_key_id || '').trim(),
+            aud: String(popPayload?.aud || '').trim(),
+            body_hash: String(popPayload?.body_hash || '').trim().toLowerCase(),
+            exp: popPayload?.exp,
+            iat: popPayload?.iat,
+            method: String(popPayload?.method || '').trim().toUpperCase(),
+            nonce: String(popPayload?.nonce || '').trim(),
+            path: String(popPayload?.path || '').trim(),
+            proof_id: String(popPayload?.proof_id || '').trim(),
+        };
+        const keys = Object.keys(envelope).sort();
+        const sorted = {};
+        keys.forEach((key) => { sorted[key] = envelope[key]; });
+        return new TextEncoder().encode(JSON.stringify(sorted));
     }
 
     async function ed25519FromSeed(seedBytes) {
@@ -400,6 +466,9 @@
         hkdfSha256,
         deriveWalletSigningKeypair,
         deriveSiteSigningKeypair,
+        generateDeviceSigningKeypair,
+        wrapDeviceSigningKeypair,
+        buildCanonicalPopPayload,
         canonicalizeSiteDomain,
         canonicalJsonStringify,
         hashActionBody,

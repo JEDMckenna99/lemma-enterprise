@@ -87,19 +87,13 @@
             <h2>Add another device or browser</h2>
 
             <p class="card-intro">
-                Generate a secure QR or link on this device. Your human proof travels encrypted with your lemma.id.
+                On your new device, open <strong>lemma.id/link</strong> and tap <strong>Show QR Code</strong>.
+                Then scan that QR with this phone's Camera app — you'll confirm with your passkey to send your lemma.id.
+                Your wallet is encrypted to the new device only; lemma.id never sees your secret.
             </p>
-            <button id="show-qr-btn" class="btn btn-primary btn-full">Generate QR Code</button>
-            <button id="show-link-btn" class="btn btn-secondary btn-full" style="margin-top: 10px;">Send Transfer Link</button>
-            
-            <div id="qr-display" class="qr-display hidden">
-                <div id="qr-box" class="qr-box">
-                    <div id="qr-container"></div>
-                </div>
-                <div id="qr-timer" class="qr-timer">Expires in 5:00</div>
-                <div id="link-options" class="hidden"></div>
-                <button id="hide-qr-btn" class="btn btn-secondary" style="margin-top: 16px;">Close</button>
-            </div>
+            <a href="/link" class="btn btn-primary btn-full" style="text-align: center; text-decoration: none; display: block;">
+                Open add-device page
+            </a>
         </div>
 
         <!-- SETTINGS -->
@@ -138,10 +132,8 @@
     </div>
 </div>
 
-<script src="/static/js/qrcode.min.js" nonce="{{ csp_nonce }}"></script>
 <script nonce="{{ csp_nonce }}">
 let wallet = null;
-let qrTimerInterval = null;
 
 function escapeHtml(value) {
     return String(value)
@@ -710,151 +702,6 @@ function anchorWalletIdentity(event) {
     createWallet(event?.currentTarget || document.getElementById('anchor-wallet-btn'));
 }
 
-async function generateTransferForDisplay() {
-    await initWallet();
-    // generateLinkCode() requires FRESH passkey verification for security.
-    // It will prompt the user to verify their identity before generating the transfer.
-    return wallet.generateLinkCode();
-}
-
-function startTransferTimer(result) {
-    let timeLeft = result.expiresIn || 300;
-    const timerEl = document.getElementById('qr-timer');
-
-    function formatTime(s) {
-        const m = Math.floor(s / 60);
-        const sec = s % 60;
-        return m > 0 ? `${m}:${String(sec).padStart(2, '0')}` : `${sec}s`;
-    }
-
-    if (qrTimerInterval) clearInterval(qrTimerInterval);
-    timerEl.textContent = `Expires in ${formatTime(timeLeft)}`;
-    timerEl.classList.toggle('expiring', timeLeft <= 30);
-
-    qrTimerInterval = setInterval(() => {
-        timeLeft--;
-        timerEl.textContent = `Expires in ${formatTime(timeLeft)}`;
-        timerEl.classList.toggle('expiring', timeLeft <= 30);
-
-        if (timeLeft <= 0) {
-            hideQR();
-        }
-    }, 1000);
-}
-
-function renderTransferLink(result, { showQr }) {
-    const linkOptionsEl = document.getElementById('link-options');
-    if (!linkOptionsEl) return;
-
-    const label = showQr ? 'Or copy link:' : 'Transfer link:';
-    const instruction = showQr
-        ? 'Scan with your other device, or copy the link below'
-        : 'Open this link on your other device. It expires soon and was created after your passkey check.';
-
-    linkOptionsEl.innerHTML = `
-        <p class="qr-instruction">${instruction}</p>
-        <div class="link-copy-section">
-            <p class="link-copy-label">${label}</p>
-            <div class="link-copy-row">
-                <input type="text" id="link-url" value="${escapeHtml(result.qrUrl)}" readonly class="link-url-input">
-                <button id="copy-link-url-btn" type="button" class="btn btn-secondary btn-copy">Copy</button>
-            </div>
-        </div>
-    `;
-    linkOptionsEl.classList.remove('hidden');
-    document.getElementById('copy-link-url-btn')?.addEventListener('click', copyLinkUrl);
-}
-
-function showTransferDisplay(result, { showQr }) {
-    document.getElementById('qr-display').classList.remove('hidden');
-    document.getElementById('show-qr-btn').classList.add('hidden');
-    document.getElementById('show-link-btn').classList.add('hidden');
-    renderTransferLink(result, { showQr });
-    startTransferTimer(result);
-}
-
-// Show QR code - requires fresh passkey verification (handled by generateLinkCode)
-async function showQR() {
-    try {
-        const result = await generateTransferForDisplay();
-        
-        const qrBox = document.getElementById('qr-box');
-        const qrContainer = document.getElementById('qr-container');
-        qrBox.classList.remove('hidden');
-        qrContainer.innerHTML = '';
-        
-        if (typeof QRCode !== 'undefined') {
-            try {
-                new QRCode(qrContainer, {
-                    text: result.qrUrl,
-                    width: 220,
-                    height: 220,
-                    colorDark: '#000000',
-                    colorLight: '#ffffff',
-                    correctLevel: QRCode.CorrectLevel ? QRCode.CorrectLevel.L : 1
-                });
-            } catch (qrError) {
-                console.warn('QR render failed:', qrError);
-                qrContainer.innerHTML = '<p style="color: #dc2626;">QR is too large for this transfer. Use the link below.</p>';
-            }
-        } else {
-            qrContainer.innerHTML = '<p style="color: #dc2626;">QR library not loaded</p>';
-        }
-        showTransferDisplay(result, { showQr: true });
-        
-    } catch (e) {
-        console.error('QR generation failed:', e);
-        alert('Failed to generate QR code: ' + e.message);
-    }
-}
-
-// Show transfer link - requires fresh passkey verification (handled by generateLinkCode)
-async function showTransferLink() {
-    try {
-        const result = await generateTransferForDisplay();
-        document.getElementById('qr-box').classList.add('hidden');
-        document.getElementById('qr-container').innerHTML = '';
-        showTransferDisplay(result, { showQr: false });
-    } catch (e) {
-        console.error('Transfer link generation failed:', e);
-        alert('Failed to generate transfer link: ' + e.message);
-    }
-}
-
-// Copy link URL to clipboard
-async function copyLinkUrl() {
-    const input = document.getElementById('link-url');
-    if (!input) return;
-    try {
-        await navigator.clipboard.writeText(input.value);
-        const btn = document.getElementById('copy-link-url-btn') || input.nextElementSibling;
-        btn.textContent = 'Copied!';
-        setTimeout(() => btn.textContent = 'Copy', 2000);
-    } catch (e) {
-        input.select();
-        document.execCommand('copy');
-    }
-}
-
-// Hide QR code
-function hideQR() {
-    document.getElementById('qr-display').classList.add('hidden');
-    document.getElementById('show-qr-btn').classList.remove('hidden');
-    document.getElementById('show-link-btn').classList.remove('hidden');
-    document.getElementById('qr-box').classList.remove('hidden');
-    document.getElementById('qr-container').innerHTML = '';
-    const linkOptions = document.getElementById('link-options');
-    if (linkOptions) {
-        linkOptions.innerHTML = '';
-        linkOptions.classList.add('hidden');
-    }
-    
-    if (qrTimerInterval) {
-        clearInterval(qrTimerInterval);
-        qrTimerInterval = null;
-    }
-}
-
 // Clear all lemma.id data from this device
 async function clearWallet() {
     if (!confirm('Remove lemma.id from this device? This clears your wallet, human proof, passkey binding, and all lemma.id data stored here. You can verify again later from another device.')) {
@@ -1382,9 +1229,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('unlock-btn').addEventListener('click', unlockWallet);
     document.getElementById('create-wallet-btn').addEventListener('click', createWallet);
     document.getElementById('lock-btn').addEventListener('click', lockWallet);
-    document.getElementById('show-qr-btn').addEventListener('click', showQR);
-    document.getElementById('show-link-btn').addEventListener('click', showTransferLink);
-    document.getElementById('hide-qr-btn').addEventListener('click', hideQR);
     document.getElementById('clear-wallet-btn').addEventListener('click', clearWallet);
     document.getElementById('return-passkey-btn')?.addEventListener('click', returnWithExistingPasskey);
     document.getElementById('session-duration-select').addEventListener('change', () => applySessionDuration());

@@ -992,7 +992,8 @@ def wallet_challenge():
 
     body = request.get_json(silent=True) or {}
     wallet_id = (body.get("wallet_id") or "").strip()
-    payload = issue_wallet_challenge(wallet_id=wallet_id)
+    device_id = (body.get("device_id") or "").strip()
+    payload = issue_wallet_challenge(wallet_id=wallet_id, device_id=device_id)
     response = jsonify(payload)
     response.headers.update(_cors_headers(request.headers.get("Origin")))
     return response
@@ -1007,6 +1008,8 @@ def wallet_register_signing_key():
     body = request.get_json(silent=True) or {}
     result = register_wallet_signing_key(
         wallet_id=(body.get("wallet_id") or "").strip(),
+        device_id=(body.get("device_id") or "legacy").strip() or "legacy",
+        device_name=(body.get("device_name") or "").strip(),
         pubkey_b64=(body.get("pubkey") or "").strip(),
         signature_b64=(body.get("signature") or "").strip(),
     )
@@ -1016,6 +1019,92 @@ def wallet_register_signing_key():
             "error": result.error,
             "code": result.code,
         }), 403
+    response = jsonify({"success": True, "registered": True})
+    response.headers.update(_cors_headers(request.headers.get("Origin")))
+    return response
+
+
+@wallet_session_sync_bp.route("/api/wallet/revoke-device", methods=["POST"])
+@cross_origin()
+def wallet_revoke_device():
+    """Revoke a single enrolled device signing key."""
+    from api.wallet_authn import assertion_error_response, revoke_wallet_device, verify_assertion_from_body
+
+    body = request.get_json(silent=True) or {}
+    wallet_id = (body.get("wallet_id") or "").strip()
+    device_id = (body.get("device_id") or "").strip()
+    if not wallet_id or not device_id:
+        return jsonify({"success": False, "error": "wallet_id and device_id required"}), 400
+
+    verify_result, _fields = verify_assertion_from_body(
+        body,
+        wallet_id=wallet_id,
+        field_names=["wallet_id", "device_id"],
+    )
+    if not verify_result.ok:
+        return assertion_error_response(verify_result)
+
+    result = revoke_wallet_device(wallet_id=wallet_id, device_id=device_id)
+    if not result.ok:
+        return jsonify({"success": False, "error": result.error, "code": result.code}), 403
+    response = jsonify({"success": True, "revoked": True, "device_id": device_id})
+    response.headers.update(_cors_headers(request.headers.get("Origin")))
+    return response
+
+
+@wallet_session_sync_bp.route("/api/wallet/register-device-passkey", methods=["POST"])
+@cross_origin()
+def wallet_register_device_passkey():
+    """Bind a wallet-scoped WebAuthn passkey to a device enrollment."""
+    from api.database import SessionLocal, WalletPasskey
+    from api.wallet_authn import assertion_error_response, verify_assertion_from_body
+
+    body = request.get_json(silent=True) or {}
+    wallet_id = (body.get("wallet_id") or "").strip()
+    device_id = (body.get("device_id") or "").strip()
+    credential_id = (body.get("credential_id") or "").strip()
+    public_key = (body.get("public_key") or "").strip()
+    attestation_format = (body.get("attestation_format") or "").strip() or None
+    device_name = (body.get("device_name") or "").strip() or None
+
+    if not wallet_id or not device_id or not credential_id or not public_key:
+        return jsonify({"success": False, "error": "missing_passkey_fields"}), 400
+
+    verify_result, _fields = verify_assertion_from_body(
+        body,
+        wallet_id=wallet_id,
+        field_names=["wallet_id", "device_id", "credential_id"],
+    )
+    if not verify_result.ok:
+        return assertion_error_response(verify_result)
+
+    db = SessionLocal()
+    try:
+        existing = db.query(WalletPasskey).filter_by(credential_id=credential_id).first()
+        if existing and existing.revoked_at:
+            return jsonify({"success": False, "error": "passkey_revoked"}), 403
+        if not existing:
+            db.add(
+                WalletPasskey(
+                    wallet_id=wallet_id,
+                    device_id=device_id,
+                    credential_id=credential_id,
+                    public_key=public_key,
+                    attestation_format=attestation_format,
+                    device_name=device_name,
+                    created_at=datetime.utcnow(),
+                    last_used_at=datetime.utcnow(),
+                )
+            )
+        else:
+            existing.last_used_at = datetime.utcnow()
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+    finally:
+        db.close()
+
     response = jsonify({"success": True, "registered": True})
     response.headers.update(_cors_headers(request.headers.get("Origin")))
     return response

@@ -109,7 +109,7 @@ def evaluate_mode_policy(
 
     if expected_mode == MODE_PROOF_REQUIRED and not proof_present:
         agent_token = (headers.get("X-Agent-Token") or "").strip()
-        if agent_token.startswith("lm_agent_"):
+        if agent_token.startswith("lm_agent_") and not _bool_env("LEMMA_ENFORCE_PROOF_REQUIRED", default=False):
             return ModeDecision(
                 allowed=True,
                 reason_code=None,

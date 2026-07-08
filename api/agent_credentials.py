@@ -2590,6 +2590,21 @@ def require_agent_or_user_auth(required_scope=None, enforce_task_bounds=True):
                     )
                 )
 
+            if (
+                expected_mode == "proof_required"
+                and not mode_decision.proof_present
+                and str(os.environ.get("LEMMA_ENFORCE_PROOF_REQUIRED", "0") or "0").strip().lower()
+                in {"1", "true", "yes", "on"}
+            ):
+                return _finalize_auth_response(
+                    _error_with_decision(
+                        status_code=403,
+                        error="AUTH_PROOF_REQUIRED",
+                        message="Proof header required on this route; bearer fallback is disabled.",
+                        reason="auth_proof_required",
+                    )
+                )
+
             if _shadow_proof_eval_enabled():
                 revoked_proof_ids, revoked_root_grant_ids, min_revocation_epoch = _proof_revocation_context(
                     getattr(g, "org_id", "org_default"),

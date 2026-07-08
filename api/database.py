@@ -631,8 +631,27 @@ class WalletSigningKey(Base):
     __tablename__ = 'wallet_signing_keys'
 
     wallet_id = Column(String(128), primary_key=True)
+    device_id = Column(String(128), primary_key=True, default='legacy')
     pubkey = Column(LargeBinary, nullable=False)
     algorithm = Column(String(32), nullable=False, default='ed25519')
+    device_name = Column(String(256))
+    created_at = Column(DateTime, default=datetime.utcnow)
+    last_used_at = Column(DateTime)
+    revoked_at = Column(DateTime)
+
+
+class WalletPasskey(Base):
+    """WebAuthn passkey bound to a wallet device for co-signing enrollment."""
+    __tablename__ = 'wallet_passkeys'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    wallet_id = Column(String(128), nullable=False, index=True)
+    device_id = Column(String(128), nullable=False)
+    credential_id = Column(String, unique=True, nullable=False)
+    public_key = Column(Text, nullable=False)
+    sign_count = Column(Integer, default=0)
+    attestation_format = Column(String(64))
+    device_name = Column(String(256))
     created_at = Column(DateTime, default=datetime.utcnow)
     last_used_at = Column(DateTime)
     revoked_at = Column(DateTime)

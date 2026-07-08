@@ -43,6 +43,24 @@
         });
     }
 
+    function buildCanonicalPopPayload(popPayload) {
+        var envelope = {
+            agent_key_id: String(popPayload.agent_key_id || '').trim(),
+            aud: String(popPayload.aud || '').trim(),
+            body_hash: String(popPayload.body_hash || '').trim().toLowerCase(),
+            exp: popPayload.exp,
+            iat: popPayload.iat,
+            method: String(popPayload.method || '').trim().toUpperCase(),
+            nonce: String(popPayload.nonce || '').trim(),
+            path: String(popPayload.path || '').trim(),
+            proof_id: String(popPayload.proof_id || '').trim(),
+        };
+        var keys = Object.keys(envelope).sort();
+        var sorted = {};
+        keys.forEach(function(key) { sorted[key] = envelope[key]; });
+        return JSON.stringify(sorted);
+    }
+
     global.buildLemmaProofFromCredential = function buildLemmaProofFromCredential(credential, options) {
         if (!credential || typeof credential !== 'object') {
             return null;
@@ -100,6 +118,23 @@
         };
     };
 
+    function signPopEnvelopeIfAvailable(pop) {
+        if (!pop || typeof global.signLemmaPopEnvelope !== 'function') {
+            return Promise.resolve(pop);
+        }
+        return Promise.resolve(global.signLemmaPopEnvelope(pop)).then(function(signed) {
+            if (!signed || typeof signed !== 'object') {
+                return pop;
+            }
+            if (signed.sig) pop.sig = signed.sig;
+            if (signed.public_key) pop.public_key = signed.public_key;
+            if (signed.agent_key_id) pop.agent_key_id = signed.agent_key_id;
+            return pop;
+        }).catch(function() {
+            return pop;
+        });
+    }
+
     global.attachLemmaProofHeaders = function attachLemmaProofHeaders(headers, requestContext) {
         var out = Object.assign({}, headers || {});
         var credential = global.lemmaCredentialForHeader
@@ -135,13 +170,17 @@
             try {
                 var pop = JSON.parse(out['X-Lemma-PoP']);
                 pop.body_hash = bodyHash;
-                out['X-Lemma-PoP'] = JSON.stringify(pop);
+                return signPopEnvelopeIfAvailable(pop).then(function(signedPop) {
+                    out['X-Lemma-PoP'] = JSON.stringify(signedPop);
+                    return out;
+                });
             } catch (_) {
-                /* keep envelope without body hash */
+                return out;
             }
-            return out;
         });
     };
+
+    global.buildCanonicalPopPayload = buildCanonicalPopPayload;
 
     function installWrappers() {
         var priorGetHeaders = global.getLemmaAuthHeaders;

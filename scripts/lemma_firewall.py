@@ -983,6 +983,21 @@ def _authorize_local_op(
             "risk": risk_tier,
         }, 403
 
+    if (
+        expected_mode == MODE_PROOF_REQUIRED
+        and not mode_decision.proof_present
+        and str(os.environ.get("LEMMA_ENFORCE_PROOF_REQUIRED", "0") or "0").strip().lower()
+        in {"1", "true", "yes", "on"}
+    ):
+        _LOCAL_OPS_COUNTERS["deny"] += 1
+        return {
+            "allowed": False,
+            "error": "AUTH_PROOF_REQUIRED",
+            "decision_id": decision_id,
+            "action": action,
+            "risk": risk_tier,
+        }, 403
+
     auth_payload = {}
     used_proof = False
 
@@ -1534,6 +1549,15 @@ def firewall(api_id: str, upstream_path: str):
     if not mode_decision.allowed:
         _log_proxy_decision(api_id, upstream_path, method, False, error=mode_decision.reason_code or "auth_mode_denied")
         return jsonify({"success": False, "error": mode_decision.reason_code or "auth_mode_denied"}), 403
+
+    if (
+        expected_mode == MODE_PROOF_REQUIRED
+        and not mode_decision.proof_present
+        and str(os.environ.get("LEMMA_ENFORCE_PROOF_REQUIRED", "0") or "0").strip().lower()
+        in {"1", "true", "yes", "on"}
+    ):
+        _log_proxy_decision(api_id, upstream_path, method, False, error="AUTH_PROOF_REQUIRED")
+        return jsonify({"success": False, "error": "AUTH_PROOF_REQUIRED"}), 403
 
     auth_payload = {}
     used_proof = False

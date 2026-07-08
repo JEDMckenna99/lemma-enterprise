@@ -2534,6 +2534,34 @@ def reissue_master_credential():
     if err:
         return err
 
+    from api.wallet_authn import count_active_wallet_devices
+
+    primary_assertion = body.get("wallet_assertion") if isinstance(body.get("wallet_assertion"), dict) else {}
+    primary_device_id = str(body.get("device_id") or primary_assertion.get("device_id") or "").strip()
+    if count_active_wallet_devices(wallet_id) > 1:
+        second_assertion = body.get("second_factor_assertion")
+        if not isinstance(second_assertion, dict):
+            return jsonify({
+                "success": False,
+                "error": "second_factor_required",
+                "code": "second_factor_required",
+            }), 403
+        second_body = {
+            "wallet_id": wallet_id,
+            "device_id": str(body.get("second_device_id") or second_assertion.get("device_id") or "").strip(),
+            "wallet_assertion": second_assertion,
+        }
+        err2, _ = _require_wallet_assertion(second_body, field_names=["wallet_id"])
+        if err2:
+            return err2
+        second_device_id = str(second_body.get("device_id") or second_assertion.get("device_id") or "").strip()
+        if second_device_id and primary_device_id and second_device_id == primary_device_id:
+            return jsonify({
+                "success": False,
+                "error": "second_factor_same_device",
+                "code": "second_factor_same_device",
+            }), 403
+
     # Per-wallet/day rate limit (env-tunable). Checked at call time so the
     # limit can be tuned per deploy and exercised deterministically in tests.
     from api.rate_limiter import check_rate_limit
@@ -2793,7 +2821,12 @@ def wallet_link_receive():
             return err
 
         bundle = body.get("bundle")
-        if not isinstance(bundle, dict) or not bundle.get("sealed_link_payload"):
+        if not isinstance(bundle, dict):
+            return jsonify({"success": False, "error": "bundle_required"}), 400
+        has_person_root = bool(
+            bundle.get("sealed_wallet_seed") and bundle.get("sealed_person_root_proxy")
+        )
+        if not bundle.get("sealed_link_payload") and not has_person_root:
             return jsonify({"success": False, "error": "bundle_required"}), 400
 
         redis_store(
