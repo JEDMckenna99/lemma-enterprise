@@ -1634,6 +1634,22 @@
   margin-bottom: 4px;
 }
 
+.demo-diagram-logo {
+  align-items: center;
+  width: 52px;
+  height: 52px;
+  margin: 0 auto 6px;
+  border: 1px solid #c7d2fe;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 2px 8px rgba(79, 70, 229, 0.1);
+}
+
+.demo-diagram-logo img {
+  width: 40px;
+  height: 40px;
+}
+
 .demo-diagram-caption {
   margin: 0;
   font-size: 10px;
@@ -1644,6 +1660,15 @@
 
 .demo-diagram-caption strong {
   font-weight: 800;
+}
+
+.demo-diagram-detail {
+  display: block;
+  max-width: 112px;
+  margin-top: 1px;
+  color: #64748b;
+  font-size: 8px;
+  font-weight: 500;
 }
 
 .demo-diagram-site-chip {

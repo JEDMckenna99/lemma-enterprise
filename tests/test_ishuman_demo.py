@@ -31,7 +31,7 @@ def test_ishuman_demo_page_loads_expected_assets(ishuman_demo_client):
 
     assert resp.status_code == 200
     assert "One lemma.id. A different private ID on every site." in body
-    assert "passkey-protected private proof container" in body
+    assert "passkey-protected proof container" in body
     assert "Human proofs + lemma.id demo" in body
     assert "Get started" in body
     assert "View developer docs" in body
@@ -43,7 +43,7 @@ def test_ishuman_demo_page_loads_expected_assets(ishuman_demo_client):
     assert "ih-quick-progress" not in body
     assert "ih-quick-insight" not in body
     assert 'id="ih-advanced-panel"' in body
-    assert "Advanced — operator tools" in body
+    assert "Advanced: operator tools &amp; integrator reference" in body
     assert "1. Create your lemma.id" in body
     assert "2. Verify on two sites" in body
     assert "3. Enforce on your site" in body
@@ -62,7 +62,11 @@ def test_ishuman_demo_page_loads_expected_assets(ishuman_demo_client):
     assert "ih-policy-toggle-card" not in body
     assert "ih-complete-human-main-btn" in body
     assert "ih-control-escalation" in body
-    assert "One lemma.id → different private IDs per site" in body
+    assert "One private wallet → a different ID for every site" in body
+    assert "Passkey + encrypted proofs" in body
+    assert "Creates a site-specific proof" in body
+    assert "ppid_7f2…" in body
+    assert "ppid_c91…" in body
     assert "demo-diagram-stage" in body
     assert "demo-diagram-footnotes" in body
     assert "ih-proof-receipt" in body
@@ -116,7 +120,7 @@ def test_ishuman_demo_page_loads_expected_assets(ishuman_demo_client):
     assert "/static/js/demo/ishuman-demo.js" in body
     assert "/static/css/demo/ishuman-demo.css" in body
     assert "/static/js/demo/ishuman-demo.js?v=59" in body
-    assert "/static/css/demo/ishuman-demo.css?v=33" in body
+    assert "/static/css/demo/ishuman-demo.css?v=34" in body
     assert "\U0001f511" not in body
     assert "\U0001f6e1" not in body
     assert "site-card-icon" in body
