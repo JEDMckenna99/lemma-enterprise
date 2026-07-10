@@ -2385,8 +2385,8 @@
     const pathPasskeySaas = svg.querySelector('#demo-wire-passkey-saas');
     const walletAnchor = stage.querySelector('.demo-diagram-wallet .demo-diagram-icon-square');
     const passkeyAnchor = stage.querySelector('.demo-diagram-passkey .demo-diagram-shield');
-    const ticketingAnchor = stage.querySelector('.demo-diagram-site-chip--ticketing');
-    const saasAnchor = stage.querySelector('.demo-diagram-site-chip--saas');
+    const ticketingAnchor = stage.querySelector('.demo-diagram-site-square--ticketing');
+    const saasAnchor = stage.querySelector('.demo-diagram-site-square--saas');
     if (
       !pathWalletPasskey ||
       !pathPasskeyTicketing ||

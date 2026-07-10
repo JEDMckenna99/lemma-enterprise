@@ -1614,8 +1614,8 @@
   gap: 14px;
   justify-self: center;
   align-self: center;
-  align-items: stretch;
-  width: min(100%, 168px);
+  align-items: center;
+  width: min(100%, 120px);
   min-width: 0;
 }
 
@@ -1690,51 +1690,30 @@
   font-weight: 500;
 }
 
-.demo-diagram-site-chip {
+.demo-diagram-site {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 8px;
-  padding: 10px 10px;
-  border-radius: 10px;
-  border: 1px solid transparent;
+  text-align: center;
   width: 100%;
-  min-height: 48px;
-  box-sizing: border-box;
 }
 
-.demo-diagram-site-chip--ticketing {
+.demo-diagram-site-square {
+  margin-bottom: 8px;
+}
+
+.demo-diagram-site-square--ticketing {
   background: #fffbeb;
   border-color: #fde68a;
 }
 
-.demo-diagram-site-chip--saas {
+.demo-diagram-site-square--saas {
   background: #f0fdf4;
   border-color: #bbf7d0;
 }
 
 .demo-diagram-site-icon {
   flex-shrink: 0;
-}
-
-.demo-diagram-site-text {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-  min-width: 0;
-  white-space: nowrap;
-}
-
-.demo-diagram-site-text strong {
-  font-size: 11px;
-  font-weight: 800;
-  color: #0f172a;
-  line-height: 1.2;
-}
-
-.demo-diagram-site-text span {
-  font-size: 10px;
-  color: #64748b;
-  line-height: 1.2;
 }
 
 .demo-diagram-footnotes {
@@ -1946,7 +1925,7 @@
   }
 
   .demo-diagram-sites {
-    width: min(100%, 148px);
+    width: min(100%, 100px);
     gap: 10px;
   }
 
@@ -1972,9 +1951,9 @@
     height: 36px;
   }
 
-  .demo-diagram-site-chip {
-    min-height: 42px;
-    padding: 8px;
+  .demo-diagram-site-icon {
+    width: 22px;
+    height: 22px;
   }
 
   .demo-diagram-footnotes {
