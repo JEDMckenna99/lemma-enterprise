@@ -80,3 +80,18 @@ def test_lemma_wallet_purge_clears_wrap_database(wallet_js_source):
 def test_lemma_wallet_platform_site_binding_helper(wallet_js_source):
     assert "_isLemmaPlatformSiteBinding" in wallet_js_source
     assert "lemma_platform" in wallet_js_source
+
+
+@pytest.mark.unit
+def test_lemma_wallet_secure_headers_cover_server_csrf_cookie(wallet_js_source):
+    assert "lemma_csrf_token" in wallet_js_source
+    assert "lemma_wallet_csrf" in wallet_js_source
+    assert "_getSecureHeaders(" in wallet_js_source
+    assert "_readJsonResponse(" in wallet_js_source
+    assert "headers: this._getSecureHeaders()" in wallet_js_source
+    assert "/api/ishuman/derive-site-proof" in wallet_js_source
+    # Critical isHuman mutations must send CSRF headers.
+    derive_idx = wallet_js_source.index("/api/ishuman/derive-site-proof")
+    seed_idx = wallet_js_source.index("/api/ishuman/seed-envelope")
+    assert "this._getSecureHeaders()" in wallet_js_source[derive_idx - 200:derive_idx + 200]
+    assert "this._getSecureHeaders()" in wallet_js_source[seed_idx - 200:seed_idx + 200]

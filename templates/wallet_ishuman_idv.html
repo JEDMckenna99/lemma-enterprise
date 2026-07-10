@@ -176,7 +176,7 @@
     <script src="/static/js/lemma-keys.js?v=8" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
     <script src="/static/js/wallet-at-rest-crypto.js?v=2" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
     <script nonce="{{ csp_nonce }}">window.LEMMA_ISHUMAN_USE_PERSON_ROOT_SEEDS = {{ 'true' if ishuman_use_person_root_seeds else 'false' }};</script>
-    <script src="/sdk/lemma-wallet.js?v=2674" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
+    <script src="/sdk/lemma-wallet.js?v=2676" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
     <script src="/static/js/qrcode.min.js" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
     <script nonce="{{ csp_nonce }}">
         const SESSION_KEY = 'ishuman_idv_popup_session_id';
@@ -408,14 +408,26 @@
         }
 
         async function requestJson(url, options) {
+            const secureHeaders = (wallet && typeof wallet._getSecureHeaders === 'function')
+                ? wallet._getSecureHeaders()
+                : { 'Content-Type': 'application/json' };
             const res = await fetch(url, {
+                credentials: 'include',
                 ...options,
                 headers: {
-                    'Content-Type': 'application/json',
+                    ...secureHeaders,
                     ...(options && options.headers ? options.headers : {}),
                 },
             });
-            const data = await res.json().catch(() => ({}));
+            const raw = await res.text();
+            let data = {};
+            if (raw) {
+                try {
+                    data = JSON.parse(raw);
+                } catch (_) {
+                    throw new Error(res.ok ? 'invalid_json_response' : `HTTP ${res.status}`);
+                }
+            }
             if (!res.ok) {
                 throw new Error(data.error || data.message || `HTTP ${res.status}`);
             }

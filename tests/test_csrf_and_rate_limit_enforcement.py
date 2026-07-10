@@ -42,6 +42,8 @@ def test_cookie_auth_mutation_without_token_is_blocked():
     client.set_cookie("session", "ambient-auth-value")
     resp = client.post("/api/customer/mutate")
     assert resp.status_code == 403
+    assert resp.is_json
+    assert resp.get_json()["error"] == "csrf_validation_failed"
 
 
 def test_cookie_auth_mutation_with_valid_double_submit_passes():

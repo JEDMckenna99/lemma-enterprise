@@ -1357,21 +1357,52 @@ class LemmaWallet {
      * @returns {string|null} CSRF token or null if not set
      */
     _getCsrfToken() {
-        const match = document.cookie.match(/lemma_wallet_csrf=([^;]+)/);
-        return match ? match[1] : null;
+        // Server after_request sets lemma_csrf_token; wallet session flows may
+        // also set lemma_wallet_csrf. Accept either for double-submit.
+        const names = ['lemma_wallet_csrf', 'lemma_csrf_token'];
+        const cookies = String(document.cookie || '').split(';');
+        for (const name of names) {
+            const prefix = `${name}=`;
+            for (const part of cookies) {
+                const trimmed = part.trim();
+                if (trimmed.startsWith(prefix)) {
+                    const value = decodeURIComponent(trimmed.slice(prefix.length));
+                    if (value) return value;
+                }
+            }
+        }
+        return null;
     }
 
     /**
      * Get headers with CSRF token for credentialed requests
      * @returns {Object} Headers object with Content-Type and X-Lemma-CSRF
      */
-    _getSecureHeaders() {
-        const headers = { 'Content-Type': 'application/json' };
+    _getSecureHeaders(extraHeaders = {}) {
+        const headers = { 'Content-Type': 'application/json', ...extraHeaders };
         const csrf = this._getCsrfToken();
         if (csrf) {
             headers['X-Lemma-CSRF'] = csrf;
         }
         return headers;
+    }
+
+    async _readJsonResponse(response, fallbackError = 'request_failed') {
+        const raw = await response.text();
+        let data = {};
+        if (raw) {
+            try {
+                data = JSON.parse(raw);
+            } catch (_) {
+                const snippet = raw.trim().slice(0, 80).replace(/\s+/g, ' ');
+                throw new Error(
+                    response.ok
+                        ? `invalid_json_response: ${snippet}`
+                        : `${fallbackError} (HTTP ${response.status})`,
+                );
+            }
+        }
+        return data;
     }
 
     /**
@@ -2557,12 +2588,12 @@ class LemmaWallet {
         );
         const res = await fetch('/api/ishuman/seed-envelope', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: this._getSecureHeaders(),
             credentials: 'include',
             body: JSON.stringify({ wallet_id: walletId, wallet_assertion: walletAssertion }),
         });
         if (!res.ok) return null;
-        const data = await res.json().catch(() => null);
+        const data = await this._readJsonResponse(res, 'seed_envelope_failed').catch(() => null);
         if (!data || !data.success) return null;
 
         const keys = this._getLemmaKeys();
@@ -3568,11 +3599,11 @@ class LemmaWallet {
 
         const deriveRes = await fetch('/api/ishuman/derive-site-proof', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: this._getSecureHeaders(),
             credentials: 'include',
             body: JSON.stringify(deriveBody),
         });
-        const deriveData = await deriveRes.json();
+        const deriveData = await this._readJsonResponse(deriveRes, 'derivation_failed');
         if (!deriveRes.ok || !deriveData.success || !deriveData.credential) {
             throw new Error(deriveData.error || deriveData.message || 'derivation_failed');
         }
@@ -3604,14 +3635,14 @@ class LemmaWallet {
 
         const res = await fetch('/api/ishuman/reissue-master', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: this._getSecureHeaders(),
             credentials: 'include',
             body: JSON.stringify({
                 wallet_id: walletId,
                 wallet_assertion: walletAssertion,
             }),
         });
-        const data = await res.json();
+        const data = await this._readJsonResponse(res, 'reissue_failed');
         if (res.status === 403 && data.code === 'second_factor_required') {
             throw new Error('Reissue requires confirmation from another enrolled device when one is still active.');
         }
@@ -7386,7 +7417,7 @@ class LemmaWallet {
 
         const res = await fetch('/api/ishuman/idv-mobile-handoff/deposit', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: this._getSecureHeaders(),
             credentials: 'include',
             body: JSON.stringify({
                 wallet_id: resolvedWalletId,
@@ -7397,11 +7428,11 @@ class LemmaWallet {
                 wallet_assertion: walletAssertion,
             }),
         });
+        const data = await this._readJsonResponse(res, 'mobile_handoff_deposit_failed');
         if (!res.ok) {
-            const err = await res.json().catch(() => ({}));
-            throw new Error(`mobile handoff deposit failed: ${err.error || res.status}`);
+            throw new Error(`mobile handoff deposit failed: ${data.error || res.status}`);
         }
-        return res.json();
+        return data;
     }
 
     /**
@@ -7418,7 +7449,7 @@ class LemmaWallet {
 
         const res = await fetch('/api/ishuman/idv-mobile-handoff/claim', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: this._getSecureHeaders(),
             credentials: 'include',
             body: JSON.stringify({
                 handoff_id: handoffId,
@@ -7426,11 +7457,10 @@ class LemmaWallet {
                 mk,
             }),
         });
+        const data = await this._readJsonResponse(res, 'mobile_handoff_claim_failed');
         if (!res.ok) {
-            const err = await res.json().catch(() => ({}));
-            throw new Error(`mobile handoff claim failed: ${err.error || res.status}`);
+            throw new Error(`mobile handoff claim failed: ${data.error || res.status}`);
         }
-        const data = await res.json();
         const claimedSessionId = data.session_id || sessionId;
         const aad = this._idvHandoffAad(handoffId, claimedSessionId, data.wallet_id);
         const payload = await this._decryptHandoffBlob(data.encrypted_blob, mk, aad);

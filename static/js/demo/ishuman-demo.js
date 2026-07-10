@@ -827,15 +827,47 @@
     return headers;
   }
 
+  function getCsrfToken() {
+    const names = ['lemma_wallet_csrf', 'lemma_csrf_token'];
+    const cookies = String(document.cookie || '').split(';');
+    for (const name of names) {
+      const prefix = `${name}=`;
+      for (const part of cookies) {
+        const trimmed = part.trim();
+        if (trimmed.startsWith(prefix)) {
+          const value = decodeURIComponent(trimmed.slice(prefix.length));
+          if (value) return value;
+        }
+      }
+    }
+    return null;
+  }
+
   async function requestJson(url, options) {
+    const headers = {
+      'Content-Type': 'application/json',
+      ...(options && options.headers ? options.headers : {}),
+    };
+    const csrf = getCsrfToken();
+    if (csrf && !headers['X-Lemma-CSRF'] && !headers['X-CSRF-Token']) {
+      headers['X-Lemma-CSRF'] = csrf;
+    }
     const res = await fetch(url, {
+      credentials: 'include',
       ...options,
-      headers: {
-        'Content-Type': 'application/json',
-        ...(options && options.headers ? options.headers : {}),
-      },
+      headers,
     });
-    const data = await res.json().catch(() => ({}));
+    const raw = await res.text();
+    let data = {};
+    if (raw) {
+      try {
+        data = JSON.parse(raw);
+      } catch (_) {
+        const err = new Error(res.ok ? 'invalid_json_response' : `HTTP ${res.status}`);
+        err.status = res.status;
+        throw err;
+      }
+    }
     if (!res.ok) {
       const err = new Error(data.error || data.message || `HTTP ${res.status}`);
       err.payload = data;

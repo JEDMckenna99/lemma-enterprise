@@ -404,7 +404,7 @@ def init_csrf_protection(app):
 
     @app.before_request
     def csrf_protect():
-        from flask import request as _req, g as _g, abort
+        from flask import request as _req, g as _g, jsonify
         if _req.method not in PROTECTED_METHODS:
             return
         for prefix in CSRF_EXEMPT_PREFIXES:
@@ -440,7 +440,11 @@ def init_csrf_protection(app):
             app.logger.warning(
                 "CSRF validation failed (fail-closed) for %s %s", _req.method, _req.path
             )
-            abort(403, description="csrf_validation_failed")
+            return jsonify({
+                "success": False,
+                "error": "csrf_validation_failed",
+                "code": "csrf_validation_failed",
+            }), 403
         _g.csrf_validated = True
 
     @app.after_request
