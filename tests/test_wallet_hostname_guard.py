@@ -95,3 +95,15 @@ def test_lemma_wallet_secure_headers_cover_server_csrf_cookie(wallet_js_source):
     seed_idx = wallet_js_source.index("/api/ishuman/seed-envelope")
     assert "this._getSecureHeaders()" in wallet_js_source[derive_idx - 200:derive_idx + 200]
     assert "this._getSecureHeaders()" in wallet_js_source[seed_idx - 200:seed_idx + 200]
+
+
+@pytest.mark.unit
+def test_lemma_wallet_persists_device_signing_via_structured_clone(wallet_js_source):
+    assert "_loadDeviceSigningRecord" in wallet_js_source
+    assert "_isUsableDeviceSigningKey" in wallet_js_source
+    assert "value?.id === 'device_signing'" in wallet_js_source
+    assert "Regenerating device signing key" in wallet_js_source
+    put_idx = wallet_js_source.index("id: 'device_signing'")
+    window = wallet_js_source[max(0, put_idx - 160):put_idx + 240]
+    assert "_putRaw('secrets'" in window
+    assert "await this._put('secrets', {\n            id: 'device_signing'" not in wallet_js_source

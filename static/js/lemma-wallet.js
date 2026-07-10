@@ -2210,12 +2210,16 @@ class LemmaWallet {
     }
 
     async _getOrCreateDeviceId() {
-        let record = await this._get('secrets', 'device_meta').catch(() => null);
+        // device_meta has no CryptoKey; raw read avoids envelope decrypt noise.
+        let record = await this._getRaw('secrets', 'device_meta').catch(() => null);
+        if (!record) {
+            record = await this._get('secrets', 'device_meta').catch(() => null);
+        }
         if (record?.deviceId) return record.deviceId;
         const keys = this._getLemmaKeys();
         const idBytes = crypto.getRandomValues(new Uint8Array(16));
         const deviceId = 'dev_' + keys.base64urlEncode(idBytes);
-        await this._put('secrets', {
+        await this._putRaw('secrets', {
             id: 'device_meta',
             deviceId,
             deviceName: (typeof navigator !== 'undefined' && navigator.userAgent) ? navigator.userAgent.slice(0, 120) : 'browser',
@@ -2224,25 +2228,58 @@ class LemmaWallet {
         return deviceId;
     }
 
+    _isUsableDeviceSigningKey(handle) {
+        return typeof CryptoKey !== 'undefined' && handle instanceof CryptoKey;
+    }
+
+    async _loadDeviceSigningRecord() {
+        // Device signing private keys are non-extractable CryptoKey objects and
+        // MUST be persisted via IndexedDB structured clone (_putRaw). JSON AES
+        // envelopes destroy the handle into a plain object, which later fails
+        // SubtleCrypto.sign with "parameter 2 is not of type 'CryptoKey'".
+        const raw = await this._getRaw('secrets', 'device_signing').catch(() => null);
+        if (!raw) return null;
+        const mod = this._walletAtRest();
+        if (mod?.isEncryptedEnvelope?.(raw)) {
+            return { corrupt: true };
+        }
+        if (raw.privateKeyHandle && raw.publicKeyB64) {
+            if (this._isUsableDeviceSigningKey(raw.privateKeyHandle)) {
+                return { record: raw };
+            }
+            return { corrupt: true };
+        }
+        return null;
+    }
+
     async _deriveWalletSigningKey() {
         if (this._walletSigningKey) return this._walletSigningKey;
         if (!this.isUnlocked || !this.isUnlocked()) {
             throw new Error('Wallet must be unlocked to derive signing key');
         }
         const keys = this._getLemmaKeys();
-        const stored = await this._get('secrets', 'device_signing').catch(() => null);
-        if (stored?.privateKeyHandle && stored?.publicKeyB64) {
+        const loaded = await this._loadDeviceSigningRecord();
+        if (loaded?.record) {
             this._walletSigningKey = await keys.wrapDeviceSigningKeypair(
-                stored.privateKeyHandle,
-                keys.base64urlDecode(stored.publicKeyB64),
+                loaded.record.privateKeyHandle,
+                keys.base64urlDecode(loaded.record.publicKeyB64),
             );
-            this._deviceId = stored.deviceId || await this._getOrCreateDeviceId();
+            this._deviceId = loaded.record.deviceId || await this._getOrCreateDeviceId();
             return this._walletSigningKey;
+        }
+        if (loaded?.corrupt) {
+            console.warn('[Lemma] Regenerating device signing key (stored handle was not a CryptoKey)');
+            await this._delete('secrets', 'device_signing').catch(() => null);
+            // Old device_id may already be registered with a different pubkey.
+            // Mint a fresh device identity so registration can succeed.
+            await this._delete('secrets', 'device_meta').catch(() => null);
+            this._deviceId = null;
+            this._signingKeyRegistered = false;
         }
 
         const generated = await keys.generateDeviceSigningKeypair();
         const deviceId = await this._getOrCreateDeviceId();
-        await this._put('secrets', {
+        await this._putRaw('secrets', {
             id: 'device_signing',
             deviceId,
             publicKeyB64: keys.base64urlEncode(generated.publicKey),
@@ -6066,6 +6103,11 @@ class LemmaWallet {
 
     async _encryptStoredValue(storeName, value) {
         if (!this._isSensitiveStore(storeName)) return value;
+        // Non-extractable CryptoKey handles cannot survive JSON envelopes.
+        // Persist device_signing via structured clone only (_putRaw).
+        if (storeName === 'secrets' && value?.id === 'device_signing') {
+            return value;
+        }
         const mod = this._walletAtRest();
         if (!this._atRestKey || !mod) {
             if (storeName === 'ishuman_cache') {
@@ -6127,6 +6169,14 @@ class LemmaWallet {
         const master = await this._getRaw('secrets', 'master');
         if (master && !mod.isEncryptedEnvelope(master)) {
             await this._put('secrets', master);
+        }
+
+        // Never JSON-encrypt device_signing — it holds a non-extractable CryptoKey.
+        for (const secret of await this._getAllRaw('secrets')) {
+            if (!secret || mod.isEncryptedEnvelope(secret)) continue;
+            if (secret.id === 'device_signing' || secret.id === 'device_meta') continue;
+            if (secret.id === 'master') continue;
+            await this._put('secrets', secret);
         }
 
         for (const profile of await this._getAllRaw('profiles')) {
