@@ -1614,8 +1614,8 @@
   gap: 14px;
   justify-self: center;
   align-self: center;
-  align-items: center;
-  width: min(100%, 120px);
+  align-items: stretch;
+  width: min(100%, 168px);
   min-width: 0;
 }
 
@@ -1692,14 +1692,17 @@
 
 .demo-diagram-site {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   align-items: center;
-  text-align: center;
+  gap: 10px;
+  text-align: left;
   width: 100%;
 }
 
 .demo-diagram-site-square {
-  margin-bottom: 8px;
+  flex-shrink: 0;
+  margin: 0;
+  border-radius: 12px;
 }
 
 .demo-diagram-site-square--ticketing {
@@ -1714,6 +1717,18 @@
 
 .demo-diagram-site-icon {
   flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+}
+
+.demo-diagram-site-caption {
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+}
+
+.demo-diagram-site-caption .demo-diagram-detail {
+  max-width: none;
 }
 
 .demo-diagram-footnotes {
@@ -1925,7 +1940,7 @@
   }
 
   .demo-diagram-sites {
-    width: min(100%, 100px);
+    width: min(100%, 148px);
     gap: 10px;
   }
 
@@ -1952,8 +1967,12 @@
   }
 
   .demo-diagram-site-icon {
-    width: 22px;
-    height: 22px;
+    width: 32px;
+    height: 32px;
+  }
+
+  .demo-diagram-site {
+    gap: 8px;
   }
 
   .demo-diagram-footnotes {
