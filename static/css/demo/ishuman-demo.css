@@ -1634,20 +1634,29 @@
   margin-bottom: 4px;
 }
 
-.demo-diagram-logo {
+.demo-diagram-device {
+  position: relative;
+}
+
+.demo-diagram-device-frame {
+  position: absolute;
+}
+
+.demo-diagram-device-logo {
+  position: relative;
+  width: 24px;
+  height: 24px;
+}
+
+.demo-diagram-issuer {
   align-items: center;
   width: 52px;
   height: 52px;
   margin: 0 auto 6px;
   border: 1px solid #c7d2fe;
-  border-radius: 50%;
-  background: #fff;
+  border-radius: 12px;
+  background: #eef2ff;
   box-shadow: 0 2px 8px rgba(79, 70, 229, 0.1);
-}
-
-.demo-diagram-logo img {
-  width: 40px;
-  height: 40px;
 }
 
 .demo-diagram-caption {

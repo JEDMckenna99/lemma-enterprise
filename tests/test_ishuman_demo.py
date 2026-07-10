@@ -62,9 +62,10 @@ def test_ishuman_demo_page_loads_expected_assets(ishuman_demo_client):
     assert "ih-policy-toggle-card" not in body
     assert "ih-complete-human-main-btn" in body
     assert "ih-control-escalation" in body
-    assert "One private wallet → a different ID for every site" in body
-    assert "Passkey + encrypted proofs" in body
-    assert "Creates a site-specific proof" in body
+    assert "Your lemma.id stays with you. Each site gets a private ID." in body
+    assert "Passkey-protected on your device" in body
+    assert "lemma.id issuer" in body
+    assert "Issues a signed, site-specific ID" in body
     assert "ppid_7f2…" in body
     assert "ppid_c91…" in body
     assert "demo-diagram-stage" in body
@@ -120,7 +121,7 @@ def test_ishuman_demo_page_loads_expected_assets(ishuman_demo_client):
     assert "/static/js/demo/ishuman-demo.js" in body
     assert "/static/css/demo/ishuman-demo.css" in body
     assert "/static/js/demo/ishuman-demo.js?v=59" in body
-    assert "/static/css/demo/ishuman-demo.css?v=34" in body
+    assert "/static/css/demo/ishuman-demo.css?v=35" in body
     assert "\U0001f511" not in body
     assert "\U0001f6e1" not in body
     assert "site-card-icon" in body
