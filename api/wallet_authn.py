@@ -271,7 +271,7 @@ def verify_assertion_from_body(
     field_names: list[str],
 ) -> tuple[Result, dict]:
     """Verify wallet_assertion; burn nonce on success."""
-    parse_result, nonce, signature_b64, _raw = _parse_assertion(body or {})
+    parse_result, nonce, signature_b64, assertion = _parse_assertion(body or {})
     if not parse_result.ok:
         return parse_result, {}
 
@@ -288,7 +288,7 @@ def verify_assertion_from_body(
         return Result(False, "wallet_assertion_malformed", "wallet_id does not match challenge"), {}
 
     bound_device = str(challenge_entry.get("device_id") or "").strip()
-    requested_device = str(body.get("device_id") or _raw.get("device_id") or "").strip()
+    requested_device = str(body.get("device_id") or assertion.get("device_id") or "").strip()
     if bound_device and requested_device and bound_device != requested_device:
         return Result(False, "wallet_assertion_malformed", "device_id does not match challenge"), {}
 
@@ -299,16 +299,34 @@ def verify_assertion_from_body(
     if not reg_result.ok:
         return reg_result, {}
 
+    # Wallet SDK buildWalletAssertion always appends device_id to the signed
+    # field set. Mirror that here so derive/seed/start endpoints keep working
+    # after the device-binding migration.
+    effective_field_names = [
+        str(name or "").strip() for name in (field_names or []) if str(name or "").strip()
+    ]
+    if "device_id" not in effective_field_names:
+        effective_field_names.append("device_id")
+
+    device_id_value = (
+        requested_device
+        or bound_device
+        or str(registered_device_id or "").strip()
+        or "legacy"
+    )
+
     field_values = {}
-    for name in field_names:
-        key = str(name or "").strip()
-        raw = body.get(key)
-        field_values[key] = "" if raw is None else str(raw)
+    for name in effective_field_names:
+        if name == "device_id":
+            field_values[name] = device_id_value
+            continue
+        raw = body.get(name)
+        field_values[name] = "" if raw is None else str(raw)
 
     payload = build_assertion_payload(
         wallet_id=wallet_id,
         nonce_b64=nonce,
-        field_names=field_names,
+        field_names=effective_field_names,
         field_values=field_values,
     )
 

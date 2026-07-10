@@ -312,6 +312,58 @@ def test_revoke_device_marks_key_revoked(
     assert count_active_wallet_devices(wallet_fixture["wallet_id"]) == 0
 
 
+def test_assertion_with_device_id_matches_wallet_sdk_binding(
+    wallet_fixture,
+    fake_ishuman_db_session_factory,
+    monkeypatch,
+):
+    """Wallet SDK always signs device_id; server must verify the same payload."""
+    monkeypatch.setattr("api.database.SessionLocal", fake_ishuman_db_session_factory.session_local)
+    pubkey_b64, sig_b64 = register_self_signature(
+        wallet_fixture["wallet_id"],
+        wallet_fixture["wallet_secret"],
+    )
+    result = register_wallet_signing_key(
+        wallet_id=wallet_fixture["wallet_id"],
+        pubkey_b64=pubkey_b64,
+        signature_b64=sig_b64,
+        device_id="dev_browser",
+    )
+    assert result.ok
+
+    challenge = issue_wallet_challenge(
+        wallet_id=wallet_fixture["wallet_id"],
+        device_id="dev_browser",
+    )
+    body = {
+        "wallet_id": wallet_fixture["wallet_id"],
+        "master_credential_id": "ishuman_master_x",
+        "target_site": "example.com",
+        "site_signing_pubkey": SITE_SIGNING_PUBKEY_B64,
+        "issue_mode": "site_proof",
+    }
+    assertion = build_wallet_assertion(
+        wallet_id=wallet_fixture["wallet_id"],
+        wallet_secret=wallet_fixture["wallet_secret"],
+        field_names=DERIVE_ASSERTION_FIELDS,
+        field_values={**body, "device_id": "dev_browser"},
+        nonce_b64=challenge["nonce"],
+    )
+    body["wallet_assertion"] = {
+        "nonce": assertion.nonce,
+        "signature": assertion.signature,
+        "device_id": "dev_browser",
+    }
+
+    ok_result, fields = verify_assertion_from_body(
+        body,
+        wallet_id=wallet_fixture["wallet_id"],
+        field_names=DERIVE_ASSERTION_FIELDS,
+    )
+    assert ok_result.ok
+    assert fields.get("device_id") == "dev_browser"
+
+
 def test_legacy_register_defaults_device_id_and_asserts_without_device_id(
     wallet_fixture,
     fake_ishuman_db_session_factory,
@@ -339,6 +391,7 @@ def test_legacy_register_defaults_device_id_and_asserts_without_device_id(
         "master_credential_id": "ishuman_master_x",
         "target_site": "example.com",
         "site_signing_pubkey": SITE_SIGNING_PUBKEY_B64,
+        "issue_mode": "site_proof",
     }
     assertion = build_wallet_assertion(
         wallet_id=wallet_fixture["wallet_id"],
@@ -352,10 +405,11 @@ def test_legacy_register_defaults_device_id_and_asserts_without_device_id(
         "signature": assertion.signature,
     }
 
-    ok_result, _fields = verify_assertion_from_body(
+    ok_result, fields = verify_assertion_from_body(
         body,
         wallet_id=wallet_fixture["wallet_id"],
         field_names=DERIVE_ASSERTION_FIELDS,
     )
     assert ok_result.ok
+    assert fields.get("device_id") == "legacy"
 

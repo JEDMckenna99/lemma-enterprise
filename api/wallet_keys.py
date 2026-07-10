@@ -133,11 +133,21 @@ def build_wallet_assertion(
 ) -> WalletAssertion:
     priv, _pub = derive_wallet_signing_keypair(wallet_secret)
     nonce = nonce_b64 or b64url_encode(secrets.token_bytes(32))
+    # Mirror static/js/lemma-wallet.js buildWalletAssertion: always bind device_id.
+    names = [str(name or "").strip() for name in (field_names or []) if str(name or "").strip()]
+    values = {
+        str(key or "").strip(): ("" if value is None else str(value))
+        for key, value in (field_values or {}).items()
+    }
+    if "device_id" not in names:
+        names.append("device_id")
+    if not str(values.get("device_id") or "").strip():
+        values["device_id"] = "legacy"
     payload = build_assertion_payload(
         wallet_id=wallet_id,
         nonce_b64=nonce,
-        field_names=field_names,
-        field_values=field_values,
+        field_names=names,
+        field_values=values,
     )
     sig = sign_message(priv, payload)
     return WalletAssertion(nonce=nonce, signature=b64url_encode(sig))
