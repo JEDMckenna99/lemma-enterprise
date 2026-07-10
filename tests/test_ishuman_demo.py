@@ -64,7 +64,7 @@ def test_ishuman_demo_page_loads_expected_assets(ishuman_demo_client):
     assert "ih-control-escalation" in body
     assert "Your lemma.id stays with you. Each site gets a private ID." in body
     assert "Passkey-protected on your device" in body
-    assert "lemma.id issuer" in body
+    assert ">Issuer</strong>" in body
     assert "Issues a signed, site-specific ID" in body
     assert "ppid_7f2…" in body
     assert "ppid_c91…" in body
@@ -121,7 +121,7 @@ def test_ishuman_demo_page_loads_expected_assets(ishuman_demo_client):
     assert "/static/js/demo/ishuman-demo.js" in body
     assert "/static/css/demo/ishuman-demo.css" in body
     assert "/static/js/demo/ishuman-demo.js?v=59" in body
-    assert "/static/css/demo/ishuman-demo.css?v=35" in body
+    assert "/static/css/demo/ishuman-demo.css?v=36" in body
     assert "\U0001f511" not in body
     assert "\U0001f6e1" not in body
     assert "site-card-icon" in body
