@@ -6,12 +6,14 @@ import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
 WALLET_JS = ROOT / "static" / "js" / "lemma-wallet.js"
+KEYS_JS = ROOT / "static" / "js" / "lemma-keys.js"
 VERIFIER_JS = ROOT / "static" / "js" / "ishuman-verifier.js"
 IDV_HTML = ROOT / "templates" / "wallet_ishuman_idv.html"
 POPUP_HTML = ROOT / "templates" / "wallet_popup.html"
 WALLET_UNLOCK_HTML = ROOT / "templates" / "wallet_unlock.html"
 RECOVER_COMPLETE_HTML = ROOT / "templates" / "recover_complete.html"
 MODERN_LAYOUT_HTML = ROOT / "templates" / "modern" / "layout.html"
+WALLET_SIMPLE_HTML = ROOT / "templates" / "wallet_simple.html"
 
 
 @pytest.fixture(name="wallet_source")
@@ -341,11 +343,22 @@ def test_wallet_pages_use_current_wallet_bundle():
         WALLET_UNLOCK_HTML,
         RECOVER_COMPLETE_HTML,
         MODERN_LAYOUT_HTML,
+        WALLET_SIMPLE_HTML,
     ]
     for path in wallet_pages:
         source = path.read_text(encoding="utf-8")
         assert "lemma-wallet.js?v=2542" not in source
-        assert "lemma-wallet.js') }}?v=2674" in source or "lemma-wallet.js?v=2674" in source
+        assert (
+            "lemma-wallet.js') }}?v=2674" in source
+            or "lemma-wallet.js?v=2674" in source
+            or "lemma-wallet.js') }}?v=2675" in source
+            or "lemma-wallet.js?v=2675" in source
+        )
         assert "lemma-keys.js?v=2" not in source
         assert "lemma-keys.js?v=3" not in source
-        assert "lemma-keys.js') }}?v=7" in source or "lemma-keys.js?v=7" in source
+        assert "lemma-keys.js?v=7" not in source
+        assert "lemma-keys.js') }}?v=8" in source or "lemma-keys.js?v=8" in source
+
+    keys_source = KEYS_JS.read_text(encoding="utf-8")
+    assert "generateDeviceSigningKeypair," in keys_source
+    assert "wrapDeviceSigningKeypair," in keys_source
