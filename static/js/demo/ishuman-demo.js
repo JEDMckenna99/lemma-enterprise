@@ -288,6 +288,7 @@
   function syncBlockSegToggle() {
     const tickets = state.results.tickets;
     const blocked = isSiteBlocked('tickets', tickets);
+    // Unblock is index 0 (default); Block is index 1.
     setSegToggleActive('ih-block-seg', blocked);
   }
 
@@ -2507,20 +2508,30 @@
     const unblockBtn = $('ih-unblock-tickets-btn');
     if (blockBtn) {
       blockBtn.addEventListener('click', () => {
+        if (state.wizardRunning) return;
         if (isSiteBlocked('tickets', state.results.tickets)) {
           syncBlockSegToggle();
           return;
         }
-        blockTickets().catch((err) => log('Error', err.message));
+        setSegToggleActive('ih-block-seg', true);
+        blockTickets().catch((err) => {
+          log('Error', err.message);
+          syncBlockSegToggle();
+        });
       });
     }
     if (unblockBtn) {
       unblockBtn.addEventListener('click', () => {
+        if (state.wizardRunning) return;
         if (!isSiteBlocked('tickets', state.results.tickets) && !state.localBlocks.tickets.size) {
           syncBlockSegToggle();
           return;
         }
-        unblockTickets().catch((err) => log('Error', err.message));
+        setSegToggleActive('ih-block-seg', false);
+        unblockTickets().catch((err) => {
+          log('Error', err.message);
+          syncBlockSegToggle();
+        });
       });
     }
     const trialsPasskeyBtn = $('ih-trials-passkey-btn');

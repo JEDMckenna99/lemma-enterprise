@@ -347,10 +347,10 @@
             <h3>Block on Ticketing</h3>
             <p class="demo-muted">Simulates a site revoking an abusive proof.</p>
             <div class="block-card-toolbar">
-              <div class="demo-seg-toggle" id="ih-block-seg" role="group" aria-label="Ticketing block state">
+              <div class="demo-seg-toggle" id="ih-block-seg" role="group" aria-label="Ticketing block state" data-active="0">
                 <span class="demo-seg-toggle-thumb" aria-hidden="true"></span>
-                <button class="demo-seg-toggle-btn is-active" id="ih-abuse-block-btn" type="button" data-seg="block" aria-pressed="true">Block</button>
-                <button class="demo-seg-toggle-btn" id="ih-unblock-tickets-btn" type="button" data-seg="unblock" aria-pressed="false">Unblock</button>
+                <button class="demo-seg-toggle-btn is-active" id="ih-unblock-tickets-btn" type="button" data-seg="unblock" aria-pressed="true">Unblock</button>
+                <button class="demo-seg-toggle-btn" id="ih-abuse-block-btn" type="button" data-seg="block" aria-pressed="false">Block</button>
               </div>
               <div class="demo-seg-toggle-wrap">
                 <div class="demo-seg-toggle" id="ih-trials-assurance-seg" role="group" aria-label="Trials assurance">
@@ -642,5 +642,5 @@ const { ok, ppid, assurance, presentation } = await new IsHumanVerifier({
 <script src="/static/js/lemma-keys.js?v=5" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
 <script nonce="{{ csp_nonce }}">window.LEMMA_ISHUMAN_USE_PERSON_ROOT_SEEDS = {{ 'true' if ishuman_use_person_root_seeds else 'false' }};</script>
 <script src="/sdk/ishuman-verifier.js?v={{ ishuman_verifier_sdk_version }}" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
-<script src="/static/js/demo/ishuman-demo.js?v=62" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
+<script src="/static/js/demo/ishuman-demo.js?v=63" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
 {% endblock %}
