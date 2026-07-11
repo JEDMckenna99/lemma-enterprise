@@ -65,6 +65,10 @@ def test_ishuman_demo_page_loads_expected_assets(ishuman_demo_client):
     assert ">Block</button>" in body
     assert ">Unblock</button>" in body
     assert "Trials assurance" in body
+    assert "<h3>Trials assurance</h3>" in body
+    assert "<h3>Block on Ticketing</h3>" in body
+    assert "demo-seg-toggle-wrap" in body
+    assert "/static/css/demo/ishuman-demo.css?v=41" in body
     assert "ih-raise-tickets-policy-btn" not in body
     assert "ih-policy-toggle-card" not in body
     assert "ih-complete-human-main-btn" in body
@@ -128,7 +132,7 @@ def test_ishuman_demo_page_loads_expected_assets(ishuman_demo_client):
     assert "/static/js/demo/ishuman-demo.js" in body
     assert "/static/css/demo/ishuman-demo.css" in body
     assert "/static/js/demo/ishuman-demo.js?v=64" in body
-    assert "/static/css/demo/ishuman-demo.css?v=40" in body
+    assert "/static/css/demo/ishuman-demo.css?v=41" in body
     assert 'data-seg="unblock"' in body
     assert body.index('id="ih-unblock-tickets-btn"') < body.index('id="ih-abuse-block-btn"')
     js = (ROOT / "static/js/demo/ishuman-demo.js").read_text(encoding="utf-8")

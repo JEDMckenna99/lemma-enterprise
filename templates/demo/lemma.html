@@ -6,7 +6,7 @@
 
 {% block head %}
 {{ super() }}
-<link rel="stylesheet" href="/static/css/demo/ishuman-demo.css?v=40">
+<link rel="stylesheet" href="/static/css/demo/ishuman-demo.css?v=41">
 {% endblock %}
 
 {% block content %}
@@ -344,21 +344,24 @@
 
         <div class="block-grid">
           <div class="block-card">
-            <h3>Block on Ticketing</h3>
-            <p class="demo-muted">Simulates a site revoking an abusive proof.</p>
             <div class="block-card-toolbar">
-              <div class="demo-seg-toggle" id="ih-block-seg" role="group" aria-label="Ticketing block state" data-active="0">
-                <span class="demo-seg-toggle-thumb" aria-hidden="true"></span>
-                <button class="demo-seg-toggle-btn is-active" id="ih-unblock-tickets-btn" type="button" data-seg="unblock" aria-pressed="true">Unblock</button>
-                <button class="demo-seg-toggle-btn" id="ih-abuse-block-btn" type="button" data-seg="block" aria-pressed="false">Block</button>
+              <div class="demo-seg-toggle-wrap">
+                <h3>Block on Ticketing</h3>
+                <p class="demo-muted">Simulates a site revoking an abusive proof.</p>
+                <div class="demo-seg-toggle" id="ih-block-seg" role="group" aria-label="Ticketing block state" data-active="0">
+                  <span class="demo-seg-toggle-thumb" aria-hidden="true"></span>
+                  <button class="demo-seg-toggle-btn is-active" id="ih-unblock-tickets-btn" type="button" data-seg="unblock" aria-pressed="true">Unblock</button>
+                  <button class="demo-seg-toggle-btn" id="ih-abuse-block-btn" type="button" data-seg="block" aria-pressed="false">Block</button>
+                </div>
               </div>
               <div class="demo-seg-toggle-wrap">
+                <h3>Trials assurance</h3>
+                <p class="demo-muted">Passkey continuity or human proof on trials.</p>
                 <div class="demo-seg-toggle" id="ih-trials-assurance-seg" role="group" aria-label="Trials assurance">
                   <span class="demo-seg-toggle-thumb" aria-hidden="true"></span>
                   <button class="demo-seg-toggle-btn is-active" id="ih-trials-passkey-btn" type="button" data-assurance="passkey" aria-pressed="true">Passkey</button>
                   <button class="demo-seg-toggle-btn" id="ih-trials-ishuman-toggle" type="button" data-assurance="ishuman" aria-pressed="false">Human</button>
                 </div>
-                <span class="demo-seg-toggle-hint">Trials assurance</span>
               </div>
             </div>
           </div>
