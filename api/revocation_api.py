@@ -3,7 +3,7 @@ Revocation API - Bloom Filter Distribution
 Provides revocation data for client-side verification
 """
 
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, Response
 from flask_cors import cross_origin
 import logging
 import os
@@ -16,6 +16,31 @@ import math
 logger = logging.getLogger(__name__)
 
 revocation_api = Blueprint('revocation_api', __name__)
+
+
+def _bloom_etag(sequence_number: int) -> str:
+    return f'"bloom-seq-{int(sequence_number)}"'
+
+
+def _bloom_cache_control(ttl_seconds: int) -> str:
+    # Allow shared caches / CDN; clients revalidate via ETag when stale.
+    ttl = max(0, int(ttl_seconds))
+    swr = max(ttl, int(os.getenv("LEMMA_REVOCATION_FILTER_SWR_SECONDS", "300")))
+    return f"public, max-age={ttl}, stale-while-revalidate={swr}"
+
+
+def _attach_bloom_cache_headers(response, *, sequence_number: int, ttl_seconds: int):
+    response.headers["ETag"] = _bloom_etag(sequence_number)
+    response.headers["Cache-Control"] = _bloom_cache_control(ttl_seconds)
+    response.headers["Vary"] = "Accept-Encoding"
+    return response
+
+
+def _bloom_not_modified(sequence_number: int, ttl_seconds: int):
+    resp = Response(status=304)
+    return _attach_bloom_cache_headers(
+        resp, sequence_number=sequence_number, ttl_seconds=ttl_seconds
+    )
 
 
 @revocation_api.route('/api/issuer/trust-list', methods=['GET'])
@@ -131,7 +156,34 @@ def get_bloom_filter():
         # GLOBAL BLOOM FILTER APPROACH
         # All revocations in one filter
         # Sites only check credentials they have (selective disclosure)
-        
+
+        from api.bloom_snapshot import (
+            fetch_revocation_sequence_number,
+            sign_bloom_snapshot,
+            verify_snapshot_matches_payload,
+        )
+        from api.issuer_trust_list import build_signed_trust_list
+
+        sequence_number = fetch_revocation_sequence_number()
+        cache_ttl_seconds = int(os.getenv("LEMMA_REVOCATION_FILTER_CACHE_TTL_SECONDS", "60"))
+        etag = _bloom_etag(sequence_number)
+
+        # Cheap path: matching ETag → 304 without scanning revocation_list.
+        if_none_match = (request.headers.get("If-None-Match") or "").strip()
+        if if_none_match and etag in if_none_match:
+            return _bloom_not_modified(sequence_number, cache_ttl_seconds)
+
+        now_ts = time.time()
+        if (
+            _BLOOM_CACHE["payload"] is not None
+            and _BLOOM_CACHE["sequence"] == sequence_number
+            and (now_ts - _BLOOM_CACHE["built_at"]) < cache_ttl_seconds
+        ):
+            resp = jsonify(_BLOOM_CACHE["payload"])
+            return _attach_bloom_cache_headers(
+                resp, sequence_number=sequence_number, ttl_seconds=cache_ttl_seconds
+            ), 200
+
         # Query database for ALL revoked credentials AND PPIDs (global)
         try:
             from api.database import get_db_connection
@@ -194,26 +246,6 @@ def get_bloom_filter():
             logger.error(f"❌ Failed to query revocations: {e}")
             revoked_ids = []  # Fail safe - return empty list
         
-        from api.bloom_snapshot import (
-            fetch_revocation_sequence_number,
-            sign_bloom_snapshot,
-            verify_snapshot_matches_payload,
-        )
-        from api.issuer_trust_list import build_signed_trust_list
-
-        sequence_number = fetch_revocation_sequence_number()
-
-        # Cache to avoid rebuilding on every request
-        cache_ttl_seconds = int(os.getenv("LEMMA_REVOCATION_FILTER_CACHE_TTL_SECONDS", "60"))
-        now_ts = time.time()
-        if (
-            _BLOOM_CACHE["payload"] is not None
-            and _BLOOM_CACHE["count"] == len(revoked_ids)
-            and _BLOOM_CACHE["sequence"] == sequence_number
-            and (now_ts - _BLOOM_CACHE["built_at"]) < cache_ttl_seconds
-        ):
-            return jsonify(_BLOOM_CACHE["payload"]), 200
-
         valid_until = datetime.now() + timedelta(days=7)
         
         # Hash revoked IDs with SHA-256 (client will hash credential IDs locally to check)
@@ -323,7 +355,10 @@ def get_bloom_filter():
         _BLOOM_CACHE["sequence"] = sequence_number
         _BLOOM_CACHE["payload"] = response
 
-        return jsonify(response), 200
+        resp = jsonify(response)
+        return _attach_bloom_cache_headers(
+            resp, sequence_number=sequence_number, ttl_seconds=cache_ttl_seconds
+        ), 200
         
     except Exception as e:
         logger.error(f"Bloom filter error: {e}")

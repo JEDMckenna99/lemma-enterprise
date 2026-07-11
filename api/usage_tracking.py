@@ -4,32 +4,26 @@ Tracks MAU (Monthly Active Users) and determines billing tier
 """
 
 import os
-import redis
 import logging
+from typing import Dict, Optional, Set
 import hashlib
 import hmac
 from datetime import datetime, timedelta
-from typing import Dict, Optional, Set
 
 logger = logging.getLogger(__name__)
 
-# Initialize Redis for MAU tracking
+# Initialize Redis for MAU tracking (shared factory)
 try:
-    REDIS_URL = os.getenv('REDIS_URL')
-    if REDIS_URL:
-        # Configure SSL for Heroku Redis
-        redis_client = redis.from_url(
-            REDIS_URL,
-            decode_responses=False,
-            ssl_cert_reqs=None  # Disable SSL cert verification for Heroku Redis
-        )
-        redis_client.ping()
-        REDIS_AVAILABLE = True
+    from api.redis_client import get_shared_redis
+
+    redis_client = get_shared_redis(decode_responses=True)
+    REDIS_AVAILABLE = redis_client is not None
+    if REDIS_AVAILABLE:
         logger.info("✅ Usage tracking initialized with Redis")
     else:
-        REDIS_AVAILABLE = False
         logger.warning("⚠️ REDIS_URL not set - usage tracking disabled")
 except Exception as e:
+    redis_client = None
     REDIS_AVAILABLE = False
     logger.warning(f"⚠️ Redis connection failed for usage tracking: {e}")
     logger.warning("   Usage tracking will use fallback (no MAU counting)")

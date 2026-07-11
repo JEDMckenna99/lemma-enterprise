@@ -4,7 +4,6 @@ Redis-based distributed rate limiting for production stability
 """
 
 import os
-import redis
 import logging
 import threading
 import time
@@ -46,23 +45,18 @@ def _memory_window_increment(rate_key: str, period: int) -> tuple[int, int]:
         ttl = max(0, entry["reset_at"] - now)
         return entry["count"], ttl
 
-# Initialize Redis client
+# Initialize Redis client (shared factory — do not open a second pool)
 try:
-    REDIS_URL = os.getenv('REDIS_URL')
-    if REDIS_URL:
-        # Configure SSL for Heroku Redis
-        redis_client = redis.from_url(
-            REDIS_URL,
-            decode_responses=False,
-            ssl_cert_reqs=None  # Disable SSL cert verification for Heroku Redis
-        )
-        redis_client.ping()  # Test connection
-        REDIS_AVAILABLE = True
+    from api.redis_client import get_shared_redis
+
+    redis_client = get_shared_redis(decode_responses=True)
+    REDIS_AVAILABLE = redis_client is not None
+    if REDIS_AVAILABLE:
         logger.info("✅ Redis rate limiting initialized")
     else:
-        REDIS_AVAILABLE = False
         logger.warning("⚠️ REDIS_URL not set - rate limiting disabled")
 except Exception as e:
+    redis_client = None
     REDIS_AVAILABLE = False
     logger.warning(f"⚠️ Redis connection failed: {e}")
     logger.warning("   Redis limiter degraded mode active: %s", _api_rate_limit_degraded_mode())

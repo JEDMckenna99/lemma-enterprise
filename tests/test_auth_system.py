@@ -205,16 +205,13 @@ class TestRedisStore:
     def test_redis_client_handles_connection_failure(self):
         """Should gracefully handle Redis connection failures."""
         from auth import redis_store
+        from api.redis_client import reset_shared_redis_for_tests
 
         with patch.dict(os.environ, {'REDIS_URL': 'redis://invalid:6379'}):
-            # Reset the client
-            redis_store._redis_client = None
-
-            # Should not raise, should return None
-            client = redis_store.get_redis_client()
-            # Either returns None or a client that will fail on use
-            # The important thing is no exception is raised
-
+            reset_shared_redis_for_tests()
+            with patch.object(redis_store, 'REDIS_URL', 'redis://invalid:6379'):
+                # Should not raise
+                redis_store.get_redis_client()
     def test_key_prefixing(self):
         """Keys should be prefixed with 'lemma:'."""
         from auth import redis_store

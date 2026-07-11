@@ -9,7 +9,6 @@ FIXES: VULN-001 (Bloom filter sync delay)
 
 import os
 import json
-import redis
 import logging
 import threading
 import time
@@ -17,24 +16,18 @@ from typing import Optional
 
 logger = logging.getLogger(__name__)
 
-# Initialize Redis client
+# Initialize Redis client (shared; prefer RedisCloud for pub/sub when configured)
 try:
-    REDIS_URL = os.getenv('REDISCLOUD_URL') or os.getenv('REDIS_URL')
-    if REDIS_URL:
-        # Handle SSL Redis with cert issues
-        if REDIS_URL.startswith('rediss://'):
-            redis_client = redis.from_url(REDIS_URL, decode_responses=True, ssl_cert_reqs=None)
-        else:
-            redis_client = redis.from_url(REDIS_URL, decode_responses=True)
-        
-        # Test connection
-        redis_client.ping()
-        REDIS_AVAILABLE = True
+    from api.redis_client import get_shared_redis
+
+    redis_client = get_shared_redis(prefer_cloud=True, decode_responses=True)
+    REDIS_AVAILABLE = redis_client is not None
+    if REDIS_AVAILABLE:
         logger.info("✅ Event-driven revocation sync initialized with Redis pub/sub")
     else:
-        REDIS_AVAILABLE = False
         logger.warning("⚠️ Redis not available - revocation sync will use local-only mode")
 except Exception as e:
+    redis_client = None
     REDIS_AVAILABLE = False
     logger.warning(f"⚠️ Redis connection failed for revocation sync: {e}")
 

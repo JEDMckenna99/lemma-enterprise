@@ -17,22 +17,18 @@ logger = logging.getLogger(__name__)
 
 account_recovery_bp = Blueprint('account_recovery', __name__)
 
-# Redis client for distributed token storage
+# Redis client for distributed token storage (shared factory)
 redis_client = None
 try:
-    import redis
-    REDIS_URL = os.getenv('REDIS_URL')
-    if REDIS_URL:
-        redis_client = redis.from_url(
-            REDIS_URL,
-            decode_responses=True,
-            ssl_cert_reqs=None
-        )
-        redis_client.ping()
+    from api.redis_client import get_shared_redis
+
+    redis_client = get_shared_redis(decode_responses=True)
+    if redis_client:
         logger.info("✅ Redis recovery token storage initialized")
     else:
         logger.warning("⚠️ REDIS_URL not set - using in-memory fallback")
 except Exception as e:
+    redis_client = None
     logger.warning(f"⚠️ Redis connection failed for recovery: {e}")
 
 # In-memory fallback (for local dev only)

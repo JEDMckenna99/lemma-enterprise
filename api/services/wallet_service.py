@@ -83,21 +83,18 @@ _ALLOWED_ORIGIN_SUFFIXES = [
 ]
 _ALLOW_DEV_ORIGINS = os.environ.get('LEMMA_ALLOW_DEV_ORIGINS', '1') != '0'
 
-# Redis setup for multi-dyno support
+# Redis setup for multi-dyno support (shared factory)
 try:
-    import redis
-    REDIS_URL = os.environ.get('REDISCLOUD_URL') or os.environ.get('REDIS_URL')
-    if REDIS_URL:
-        if REDIS_URL.startswith('rediss://'):
-            redis_client = redis.from_url(REDIS_URL, decode_responses=True, ssl_cert_reqs=None)
-        else:
-            redis_client = redis.from_url(REDIS_URL, decode_responses=True)
-        redis_client.ping()
-        USE_REDIS = True
+    from api.redis_client import get_shared_redis
+
+    redis_client = get_shared_redis(prefer_cloud=True, decode_responses=True)
+    USE_REDIS = redis_client is not None
+    if USE_REDIS:
         logger.info("Redis connected for wallet session storage")
     else:
-        USE_REDIS = False
+        logger.warning("Redis not available for wallet session storage")
 except Exception as e:
+    redis_client = None
     USE_REDIS = False
     logger.warning(f"Redis not available: {e}")
 

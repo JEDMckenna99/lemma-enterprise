@@ -84,6 +84,7 @@ def test_derive_ppid_missing_inputs_raises():
 
 
 @pytest.mark.unit
+@pytest.mark.unit
 def test_wallet_person_binding_conflict_fails_closed():
     from types import SimpleNamespace
 
@@ -92,22 +93,41 @@ def test_wallet_person_binding_conflict_fails_closed():
         material_from_test_fixture,
         resolve_or_create_person_from_material,
     )
+    from api.database import LemmaDocumentRoot, LemmaPerson, LemmaWalletBinding
 
-    binding = SimpleNamespace(wallet_id="wallet_a", lemma_person_id="person_old")
+    binding = SimpleNamespace(
+        wallet_id="wallet_a",
+        lemma_person_id="person_old",
+        status="active",
+    )
     existing_link = SimpleNamespace(lemma_person_id="person_new")
+    bound_person = SimpleNamespace(person_id="person_old", status="active")
+
+    class _Query:
+        def __init__(self, model):
+            self.model = model
+            self._kwargs = {}
+
+        def filter_by(self, **kwargs):
+            self._kwargs.update(kwargs)
+            return self
+
+        def filter(self, *args, **kwargs):
+            return self
+
+        def first(self):
+            if self.model is LemmaWalletBinding and self._kwargs.get("wallet_id") == "wallet_a":
+                return binding
+            if "document_root_hash" in self._kwargs:
+                return existing_link
+            if self.model is LemmaPerson and self._kwargs.get("person_id") == "person_old":
+                return bound_person
+            if self.model is LemmaDocumentRoot:
+                return None
+            return None
+
     db = SimpleNamespace(
-        query=lambda model: SimpleNamespace(
-            filter_by=lambda **kwargs: SimpleNamespace(
-                first=lambda: (
-                    binding
-                    if kwargs.get("wallet_id") == "wallet_a"
-                    else existing_link
-                    if "document_root_hash" in kwargs
-                    else None
-                )
-            ),
-            filter=lambda *args, **kwargs: SimpleNamespace(first=lambda: None),
-        ),
+        query=lambda model: _Query(model),
         add=lambda obj: None,
     )
 

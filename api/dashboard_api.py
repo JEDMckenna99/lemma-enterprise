@@ -113,11 +113,20 @@ def _signal_state(value, warning_at=None, critical_at=None):
 
 
 def _get_redis_health_client(redis_url: str):
-    """Create Redis client with TLS-aware defaults for health probing."""
+    """Reuse shared Redis client when URL matches; else probe with a short-lived client."""
+    from api.redis_client import get_shared_redis, resolve_redis_url
+
+    shared_url = resolve_redis_url()
+    if shared_url and redis_url == shared_url:
+        client = get_shared_redis(ping=False)
+        if client is not None:
+            return client
+
     import redis
     options = {
         'socket_connect_timeout': 5,
         'socket_timeout': 5,
+        'max_connections': 2,
     }
     if redis_url.startswith('rediss://'):
         options['ssl_cert_reqs'] = None

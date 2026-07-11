@@ -34,21 +34,16 @@ permission_verification_bp = Blueprint('permission_verification', __name__)
 
 # Redis-based nonce cache (FIXES VULN-002: Multi-dyno nonce sharing)
 try:
-    import redis
-    REDIS_URL = os.getenv('REDISCLOUD_URL') or os.getenv('REDIS_URL')
-    if REDIS_URL:
-        # Handle SSL Redis with cert issues
-        if REDIS_URL.startswith('rediss://'):
-            redis_client = redis.from_url(REDIS_URL, decode_responses=True, ssl_cert_reqs=None)
-        else:
-            redis_client = redis.from_url(REDIS_URL, decode_responses=True)
-        redis_client.ping()
-        REDIS_AVAILABLE = True
+    from api.redis_client import get_shared_redis
+
+    redis_client = get_shared_redis(prefer_cloud=True, decode_responses=True)
+    REDIS_AVAILABLE = redis_client is not None
+    if REDIS_AVAILABLE:
         logger.info("✅ Nonce cache using Redis (multi-dyno safe)")
     else:
-        REDIS_AVAILABLE = False
         logger.warning("⚠️ Redis not available - nonce cache will use in-memory (not multi-dyno safe!)")
 except Exception as e:
+    redis_client = None
     REDIS_AVAILABLE = False
     logger.warning(f"⚠️ Redis connection failed: {e} - nonce cache will use in-memory")
 

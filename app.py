@@ -902,22 +902,19 @@ def create_app():
         """
         from flask import send_from_directory
         response = send_from_directory('static/js', 'lemma-wallet.js', mimetype='application/javascript')
-        response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
-        response.headers['Pragma'] = 'no-cache'
-        response.headers['Expires'] = '0'
+        # Short shared-cache TTL until versioned CDN ships; clients revalidate quickly.
+        response.headers['Cache-Control'] = 'public, max-age=60, stale-while-revalidate=300'
         response.headers['X-SDK-Version'] = '2.36.0'
         response.headers['Access-Control-Allow-Origin'] = '*'
         return response
 
     @app.route('/sdk/ishuman-verifier.js')
     def ishuman_verifier_sdk():
-        """Serve the isHuman verifier SDK with cache-busting headers."""
+        """Serve the isHuman verifier SDK with short shared-cache headers."""
         from api.sdk_versions import ISHUMAN_VERIFIER_SDK_VERSION
         from flask import send_from_directory
         response = send_from_directory('static/js', 'ishuman-verifier.js', mimetype='application/javascript')
-        response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
-        response.headers['Pragma'] = 'no-cache'
-        response.headers['Expires'] = '0'
+        response.headers['Cache-Control'] = 'public, max-age=60, stale-while-revalidate=300'
         response.headers['X-SDK-Version'] = ISHUMAN_VERIFIER_SDK_VERSION
         response.headers['Access-Control-Allow-Origin'] = '*'
         return response

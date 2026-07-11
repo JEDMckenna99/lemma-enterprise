@@ -91,7 +91,125 @@ const AUTH_STATE = {
 class LemmaWallet {
     // SDK version - check with LemmaWallet.VERSION
     // v2.32.0: Redirect-only architecture - removed popup flow for simpler, consistent UX
-    static VERSION = '2.66.0';  // v2.66: recover cleared-device signing-key conflicts onto a fresh wallet_id
+    static VERSION = '2.74.0';  // v2.74: device-bound signing keys + person-root link transfer
+
+    static DEVICE_IDB_NAMES = ['LemmaWallet', 'LemmaWalletWrap'];
+
+    static LEMMA_STORAGE_PREFIXES = ['lemma_', 'ishuman_', '__lemma_'];
+
+    static LEMMA_STORAGE_EXACT_KEYS = [
+        'lemma_ishuman_lock:v1',
+        'lemma_session_hours',
+        'lemma_redirect_state',
+        'lemma_log_level',
+        'lemma_wallet_backups',
+        'lemma_allow_sensitive_local_backup',
+        'lemma_had_global_session',
+        'lemma_debug_auth',
+        'ishuman_idv_popup_session_id',
+        'ishuman_master_provisioned_v1',
+        'ishuman_bloom',
+        'ishuman_trust_list',
+        'lemma_register_pending_v1',
+        'lemma_register_result_v1',
+        'lemma_register_error_v1',
+    ];
+
+    static async deleteIndexedDbDatabase(dbName) {
+        return new Promise((resolve, reject) => {
+            const req = indexedDB.deleteDatabase(dbName);
+            req.onsuccess = () => resolve(true);
+            req.onerror = () => reject(req.error || new Error(`delete_failed:${dbName}`));
+            req.onblocked = () => reject(new Error(
+                'Wallet removal is blocked by another lemma.id tab. Close the other tab and try again.',
+            ));
+        });
+    }
+
+    static _resetWalletInstance(instance) {
+        if (!instance) return;
+        try { instance.stopSessionHeartbeat?.(); } catch (_) {}
+        try { instance.lock?.(); } catch (_) {}
+        try { instance.db?.close?.(); } catch (_) {}
+        instance.db = null;
+        instance._initialized = false;
+        instance._verifiedSignatures?.clear?.();
+        instance.session = {
+            isUnlocked: false,
+            unlockedAt: null,
+            expiresAt: null,
+            walletSecret: null,
+        };
+        instance._walletSigningKey = null;
+        instance._signingKeyRegistered = false;
+        instance._atRestKey = null;
+        instance._atRestKeyReady = false;
+        instance._atRestKeyRaw = null;
+    }
+
+    static async purgeAllDeviceData(options = {}) {
+        const instances = Array.isArray(options.instances) ? options.instances : [];
+        for (const instance of instances) {
+            LemmaWallet._resetWalletInstance(instance);
+        }
+
+        const dbNames = new Set(LemmaWallet.DEVICE_IDB_NAMES);
+        if (typeof indexedDB.databases === 'function') {
+            try {
+                const discovered = await indexedDB.databases();
+                for (const db of discovered) {
+                    const name = String(db?.name || '');
+                    if (/^Lemma/i.test(name)) {
+                        dbNames.add(name);
+                    }
+                }
+            } catch (_) {}
+        }
+
+        for (const dbName of dbNames) {
+            await LemmaWallet.deleteIndexedDbDatabase(dbName);
+        }
+
+        try {
+            const keysToRemove = new Set(LemmaWallet.LEMMA_STORAGE_EXACT_KEYS);
+            for (let i = 0; i < localStorage.length; i += 1) {
+                const key = localStorage.key(i);
+                if (!key) continue;
+                if (LemmaWallet.LEMMA_STORAGE_PREFIXES.some((prefix) => key.startsWith(prefix))) {
+                    keysToRemove.add(key);
+                }
+            }
+            keysToRemove.forEach((key) => localStorage.removeItem(key));
+        } catch (_) {}
+
+        try {
+            const sessionKeys = [];
+            for (let i = 0; i < sessionStorage.length; i += 1) {
+                const key = sessionStorage.key(i);
+                if (!key) continue;
+                if (LemmaWallet.LEMMA_STORAGE_PREFIXES.some((prefix) => key.startsWith(prefix))) {
+                    sessionKeys.push(key);
+                }
+            }
+            sessionKeys.forEach((key) => sessionStorage.removeItem(key));
+        } catch (_) {}
+
+        if (options.clearServiceWorker !== false && typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
+            try {
+                const registrations = await navigator.serviceWorker.getRegistrations();
+                await Promise.all(registrations.map((registration) => registration.unregister()));
+            } catch (_) {}
+        }
+
+        if (options.clearCaches !== false && typeof window !== 'undefined' && window.caches) {
+            try {
+                const cacheNames = await window.caches.keys();
+                await Promise.all(cacheNames.map((name) => window.caches.delete(name)));
+            } catch (_) {}
+        }
+
+        return { success: true, clearedDatabases: [...dbNames] };
+    }
     
     constructor(options = {}) {
         this.db = null;
@@ -894,77 +1012,13 @@ class LemmaWallet {
     }
     
     /**
-     * Check if this wallet has an active session on any device (cross-device sync).
+     * Deprecated: cross-device global session sync was removed. Unlock is now
+     * local-per-device, so this always reports no cross-device session and
+     * makes no network call. Callers fall back to the local unlock flow.
      * @private
      */
     async _checkGlobalSession(walletId, options = {}) {
-        // Honor the cross-site lock feature flag. When disabled, treat global
-        // session as "valid" so callers fall back to the local 24h IDB session
-        // and never make a network call.
-        if (typeof window !== 'undefined' && window.LEMMA_CROSS_SITE_LOCK_ENABLED === false) {
-            return { valid: true, reason: 'cross_site_lock_disabled' };
-        }
-
-        const now = Date.now();
-        const cache = this._globalSessionCache;
-        const forceRefresh = options.force === true;
-        const sinceLastNetwork = now - this._lastGlobalSessionNetworkCheck;
-        
-        // Return cached result if fresh (unless force refresh)
-        if (!forceRefresh && cache.result && (now - cache.timestamp) < cache.ttlMs) {
-            console.log('[Lemma]  Using cached global session (age:', now - cache.timestamp, 'ms)');
-            return cache.result;
-        }
-        // If cache is stale but present, and we checked very recently, reuse stale result
-        // to avoid bursty network traffic from tab focus/visibility events.
-        if (!forceRefresh && cache.result && sinceLastNetwork < this._minGlobalSessionCheckMs) {
-            console.log('[Lemma]  Reusing stale global session cache to avoid rapid recheck');
-            return cache.result;
-        }
-        
-        // Deduplicate concurrent requests
-        if (cache.pendingPromise && !forceRefresh) {
-            console.log('[Lemma]  Waiting for pending global session check...');
-            return cache.pendingPromise;
-        }
-        
-        // Make the actual request
-        cache.pendingPromise = (async () => {
-        try {
-            this._lastGlobalSessionNetworkCheck = Date.now();
-            console.log('[Lemma]  Checking global session for wallet:', walletId?.substring(0, 8) + '...');
-            const response = await fetch('https://lemma.id/api/wallet/global-session', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ wallet_id: walletId })
-            });
-            
-            console.log('[Lemma]  Global session response status:', response.status);
-            
-            if (!response.ok) {
-                console.log('[Lemma]  Global session not OK, returning invalid');
-                    const result = { valid: false };
-                    cache.result = result;
-                    cache.timestamp = now;
-                    return result;
-            }
-            
-            const data = await response.json();
-            console.log('[Lemma]  Global session result:', JSON.stringify(data));
-                
-                // Cache the result
-                cache.result = data;
-                cache.timestamp = now;
-            return data;
-        } catch (e) {
-            console.warn('[Lemma] Global session API error:', e.message);
-            return { valid: false };
-            } finally {
-                cache.pendingPromise = null;
-        }
-        })();
-        
-        return cache.pendingPromise;
+        return { valid: false, deprecated: true };
     }
     
     /**
@@ -1303,16 +1357,29 @@ class LemmaWallet {
      * @returns {string|null} CSRF token or null if not set
      */
     _getCsrfToken() {
-        const match = document.cookie.match(/lemma_wallet_csrf=([^;]+)/);
-        return match ? match[1] : null;
+        // Server after_request sets lemma_csrf_token; wallet session flows may
+        // also set lemma_wallet_csrf. Accept either for double-submit.
+        const names = ['lemma_wallet_csrf', 'lemma_csrf_token'];
+        const cookies = String(document.cookie || '').split(';');
+        for (const name of names) {
+            const prefix = `${name}=`;
+            for (const part of cookies) {
+                const trimmed = part.trim();
+                if (trimmed.startsWith(prefix)) {
+                    const value = decodeURIComponent(trimmed.slice(prefix.length));
+                    if (value) return value;
+                }
+            }
+        }
+        return null;
     }
 
     /**
      * Get headers with CSRF token for credentialed requests
      * @returns {Object} Headers object with Content-Type and X-Lemma-CSRF
      */
-    _getSecureHeaders() {
-        const headers = { 'Content-Type': 'application/json' };
+    _getSecureHeaders(extraHeaders = {}) {
+        const headers = { 'Content-Type': 'application/json', ...extraHeaders };
         const csrf = this._getCsrfToken();
         if (csrf) {
             headers['X-Lemma-CSRF'] = csrf;
@@ -1320,34 +1387,41 @@ class LemmaWallet {
         return headers;
     }
 
+    async _readJsonResponse(response, fallbackError = 'request_failed') {
+        const raw = await response.text();
+        let data = {};
+        if (raw) {
+            try {
+                data = JSON.parse(raw);
+            } catch (_) {
+                const snippet = raw.trim().slice(0, 80).replace(/\s+/g, ' ');
+                throw new Error(
+                    response.ok
+                        ? `invalid_json_response: ${snippet}`
+                        : `${fallbackError} (HTTP ${response.status})`,
+                );
+            }
+        }
+        return data;
+    }
+
     /**
-     * Start session heartbeat (checks if wallet session is still valid)
-     * 
-     * ARCHITECTURE (v2.33.0):
-     * - PRIMARY: SSE stream for instant cross-device lock/unlock detection (~0ms latency)
-     * - FALLBACK: Polling at 5-minute intervals if SSE is unavailable
-     * - LOCAL: Expiry check on visibility change (always enforced, no network)
-     * 
-     * The SSE connection to /api/events/revocations receives both credential
-     * revocation events and session invalidation events from the same stream.
-     * This eliminates the need for 60-second polling heartbeats.
-     * 
-     * @param {number} intervalMs - Fallback poll interval in ms (default: 300000 = 5 minutes)
+     * Start session heartbeat (checks if the local wallet session is still valid)
+     *
+     * ARCHITECTURE:
+     * - LOCAL ONLY: Enforces the user-chosen session expiry on this device.
+     *   Checked on an interval and on tab visibility/focus changes.
+     *
+     * Cross-device lock/unlock detection (SSE + global-session polling) was
+     * removed: unlock is local-per-device, and revocation propagates via the
+     * pull-based signed Bloom snapshot (/api/revocation/bloom-filter).
+     *
+     * @param {number} intervalMs - Local expiry-check interval in ms (default: 300000 = 5 minutes)
      */
     startSessionHeartbeat(intervalMs = 300000) {
         // Skip only on localhost dev hosts where SSE endpoint may not exist.
         const devHost = window.location.hostname.toLowerCase();
         if (devHost === 'localhost' || devHost === '127.0.0.1') {
-            return;
-        }
-
-        // Cross-site lock propagation (SSE + global-session polling) is the
-        // most network-expensive part of the wallet. When the deployment has
-        // not yet enabled lemma.id as a third-party login provider, this
-        // overhead has marginal utility — local 24h session expiry is still
-        // enforced. Gate the heartbeat on a server-injected feature flag.
-        if (typeof window !== 'undefined' && window.LEMMA_CROSS_SITE_LOCK_ENABLED === false) {
-            console.log('[Lemma] Cross-site lock disabled (LEMMA_CROSS_SITE_LOCK_ENABLED=false) — skipping SSE/polling heartbeat');
             return;
         }
 
@@ -1361,20 +1435,11 @@ class LemmaWallet {
             document.removeEventListener('visibilitychange', this._visibilityHandler);
         }
 
-        // Close any existing SSE connection
-        if (this._sessionEventSource) {
-            this._sessionEventSource.close();
-            this._sessionEventSource = null;
-        }
-
-        // ---- SSE: instant cross-device detection ----
-        this._connectSessionSSE();
-
-        // Heartbeat check function (reused for fallback interval and visibility)
+        // Heartbeat check function: enforces local session expiry only.
         const performHeartbeatCheck = async () => {
             // Skip if no local session
             if (!this.session.isUnlocked) return;
-            
+
             // Debounce: Skip if checked recently (prevents rapid-fire on focus/visibility)
             const now = Date.now();
             if ((now - this._lastHeartbeatCheck) < this._heartbeatDebounceMs) {
@@ -1382,45 +1447,16 @@ class LemmaWallet {
                 return;
             }
             this._lastHeartbeatCheck = now;
-            
-            // Check 1: Local expiry (always enforced)
+
+            // Local expiry (always enforced, no network)
             if (this.session.expiresAt && now > this.session.expiresAt) {
                 console.log('[Lemma] Session expired');
                 await this._clearSessionGracefully('expired', 'Your session has expired. Please sign in again.');
                 return;
             }
-            
-            // Check 2: Cross-device lock detection via global session API (fallback only)
-            // If SSE is connected, skip polling — SSE delivers lock events instantly
-            if (this._sessionEventSource && this._sessionEventSource.readyState === EventSource.OPEN) {
-                return;
-            }
-            
-            try {
-                let walletId = await this._resolveCurrentWalletId();
-                
-                if (walletId) {
-                    const sessionSource = this.session.source;
-                    const localOnlySources = ['local', 'passkey', 'local_passkey'];
-                    const skipGlobalCheck = localOnlySources.includes(sessionSource);
-
-                    if (!skipGlobalCheck) {
-                        console.log('[Lemma] Fallback: checking global session (SSE not connected, source:', sessionSource, ')');
-                        const globalSession = await this._checkGlobalSession(walletId);
-
-                        if (!globalSession.valid) {
-                            console.log('[Lemma] Wallet locked remotely (detected via fallback poll).');
-                            await this._clearSessionGracefully('wallet_locked', 'Your wallet was locked on another device.');
-                            return;
-                        }
-                    }
-                }
-            } catch (e) {
-                // Network issues shouldn't cause sign-out - fail silently
-            }
         };
-        
-        // Fallback polling interval (only fires when SSE is down)
+
+        // Local expiry-check interval
         this._heartbeatInterval = setInterval(performHeartbeatCheck, intervalMs);
         
         // INSTANT CHECK: When user returns to tab, check local expiry immediately
@@ -1456,113 +1492,22 @@ class LemmaWallet {
     }
 
     /**
-     * Connect to SSE event stream for instant session invalidation detection.
-     * Listens for session_invalidated and session_restored events.
-     * Automatically reconnects with exponential backoff on failure.
+     * Deprecated: the real-time SSE event stream was removed. Wallet unlock is
+     * local-per-device and revocation propagates via the pull-based signed
+     * Bloom snapshot (synced by syncRevocations / the periodic sync). Retained
+     * as a no-op so any external callers keep working.
      * @private
      */
     _connectSessionSSE() {
-        if (typeof EventSource === 'undefined') {
-            console.warn('[Lemma] EventSource not supported - using fallback polling');
-            return;
-        }
-
-        this._sseReconnectAttempts = this._sseReconnectAttempts || 0;
-
-        try {
-            this._sessionEventSource = new EventSource('https://lemma.id/api/events/revocations');
-
-            this._sessionEventSource.addEventListener('session_invalidated', async (event) => {
-                try {
-                    const data = JSON.parse(event.data);
-                    const walletId = await this._resolveCurrentWalletId();
-
-                    // Only react if this event is for our wallet
-                    if (!walletId || data.wallet_id !== walletId) return;
-
-                    console.log('[Lemma] SSE: wallet locked remotely (instant detection)');
-                    await this._clearSessionGracefully('wallet_locked', 'Your wallet was locked on another device.');
-                } catch (e) {
-                    console.warn('[Lemma] SSE: failed to process session_invalidated event:', e.message);
-                }
-            });
-
-            this._sessionEventSource.addEventListener('session_restored', async (event) => {
-                try {
-                    const data = JSON.parse(event.data);
-                    const walletId = await this._resolveCurrentWalletId();
-
-                    if (!walletId || data.wallet_id !== walletId) return;
-
-                    console.log('[Lemma] SSE: wallet unlocked on another device');
-                    // Dispatch event for apps that want to react to remote unlock
-                    window.dispatchEvent(new CustomEvent('lemma:session-restored', {
-                        detail: { wallet_id: data.wallet_id, expires_at: data.expires_at }
-                    }));
-                } catch (e) {
-                    console.warn('[Lemma] SSE: failed to process session_restored event:', e.message);
-                }
-            });
-
-            this._sessionEventSource.addEventListener('revocation', async (event) => {
-                try {
-                    const data = JSON.parse(event.data || '{}');
-                    const eventSite = String(data.site_id || '').trim().toLowerCase();
-                    const currentSite = String(window.location.hostname || '').trim().toLowerCase();
-
-                    // Apply event for this site, global events, or lemma.id events.
-                    const appliesToCurrentSite = !eventSite
-                        || eventSite === currentSite
-                        || (eventSite === 'lemma.id' && currentSite.endsWith('lemma.id'));
-
-                    if (!appliesToCurrentSite) return;
-
-                    console.log('[Lemma] SSE: revocation event received, invalidating cache');
-                    this.invalidateRevocationCache();
-                    await this.syncRevocations();
-                } catch (e) {
-                    console.warn('[Lemma] SSE: failed to process revocation event:', e.message);
-                }
-            });
-
-            this._sessionEventSource.addEventListener('connected', () => {
-                this._sseReconnectAttempts = 0;
-                console.log('[Lemma] SSE: connected to event stream (instant lock detection active)');
-            });
-
-            this._sessionEventSource.addEventListener('error', () => {
-                if (this._sessionEventSource && this._sessionEventSource.readyState === EventSource.CLOSED) {
-                    // Connection lost — reconnect with backoff
-                    this._reconnectSessionSSE();
-                }
-            });
-
-        } catch (e) {
-            console.warn('[Lemma] SSE: failed to connect, using fallback polling:', e.message);
-        }
+        return;
     }
 
     /**
-     * Reconnect SSE with exponential backoff (max 5 attempts, max 30s delay).
-     * After max attempts, falls back to polling-only mode.
+     * Deprecated no-op: SSE reconnect was removed (no SSE stream).
      * @private
      */
     _reconnectSessionSSE() {
-        const maxAttempts = 5;
-        if (this._sseReconnectAttempts >= maxAttempts) {
-            console.warn('[Lemma] SSE: max reconnect attempts reached, using fallback polling only');
-            return;
-        }
-
-        this._sseReconnectAttempts++;
-        const delay = Math.min(1000 * Math.pow(2, this._sseReconnectAttempts), 30000);
-
-        console.log(`[Lemma] SSE: reconnecting in ${delay}ms (attempt ${this._sseReconnectAttempts}/${maxAttempts})`);
-        setTimeout(() => {
-            if (this.session.isUnlocked) {
-                this._connectSessionSSE();
-            }
-        }, delay);
+        return;
     }
     
     /**
@@ -2147,7 +2092,12 @@ class LemmaWallet {
         };
 
         await this._put('passkey', passkeyRecord);
-        console.log('[Lemma]  Passkey created locally (server never sees it)');
+        console.log('[Lemma]  Passkey created locally');
+        try {
+            await this._registerDevicePasskeyIfPossible(passkeyRecord, walletId.value);
+        } catch (err) {
+            console.warn('[Lemma] Wallet passkey server binding skipped:', err?.message || err);
+        }
         if (prfBound) {
             await this._migratePlaintextStores();
         }
@@ -2259,21 +2209,180 @@ class LemmaWallet {
         return window.LemmaKeys;
     }
 
+    async _getOrCreateDeviceId() {
+        // device_meta has no CryptoKey; raw read avoids envelope decrypt noise.
+        let record = await this._getRaw('secrets', 'device_meta').catch(() => null);
+        if (!record) {
+            record = await this._get('secrets', 'device_meta').catch(() => null);
+        }
+        if (record?.deviceId) return record.deviceId;
+        const keys = this._getLemmaKeys();
+        const idBytes = crypto.getRandomValues(new Uint8Array(16));
+        const deviceId = 'dev_' + keys.base64urlEncode(idBytes);
+        await this._putRaw('secrets', {
+            id: 'device_meta',
+            deviceId,
+            deviceName: (typeof navigator !== 'undefined' && navigator.userAgent) ? navigator.userAgent.slice(0, 120) : 'browser',
+            createdAt: Date.now(),
+        });
+        return deviceId;
+    }
+
+    _isUsableDeviceSigningKey(handle) {
+        return typeof CryptoKey !== 'undefined' && handle instanceof CryptoKey;
+    }
+
+    async _loadDeviceSigningRecord() {
+        // Device signing private keys are non-extractable CryptoKey objects and
+        // MUST be persisted via IndexedDB structured clone (_putRaw). JSON AES
+        // envelopes destroy the handle into a plain object, which later fails
+        // SubtleCrypto.sign with "parameter 2 is not of type 'CryptoKey'".
+        const raw = await this._getRaw('secrets', 'device_signing').catch(() => null);
+        if (!raw) return null;
+        const mod = this._walletAtRest();
+        if (mod?.isEncryptedEnvelope?.(raw)) {
+            return { corrupt: true };
+        }
+        if (raw.privateKeyHandle && raw.publicKeyB64) {
+            if (this._isUsableDeviceSigningKey(raw.privateKeyHandle)) {
+                return { record: raw };
+            }
+            return { corrupt: true };
+        }
+        return null;
+    }
+
     async _deriveWalletSigningKey() {
         if (this._walletSigningKey) return this._walletSigningKey;
         if (!this.isUnlocked || !this.isUnlocked()) {
             throw new Error('Wallet must be unlocked to derive signing key');
         }
-        const secret = this.session?.walletSecret;
-        if (!secret) {
-            const secretRecord = await this._get('secrets', 'master');
-            if (!secretRecord?.secret) throw new Error('wallet_secret unavailable');
-            this.session.walletSecret = secretRecord.secret;
-        }
         const keys = this._getLemmaKeys();
-        const keypair = await keys.deriveWalletSigningKeypair(this.session.walletSecret);
-        this._walletSigningKey = keypair;
-        return keypair;
+        const loaded = await this._loadDeviceSigningRecord();
+        if (loaded?.record) {
+            this._walletSigningKey = await keys.wrapDeviceSigningKeypair(
+                loaded.record.privateKeyHandle,
+                keys.base64urlDecode(loaded.record.publicKeyB64),
+            );
+            this._deviceId = loaded.record.deviceId || await this._getOrCreateDeviceId();
+            return this._walletSigningKey;
+        }
+        if (loaded?.corrupt) {
+            console.warn('[Lemma] Regenerating device signing key (stored handle was not a CryptoKey)');
+            await this._delete('secrets', 'device_signing').catch(() => null);
+            // Old device_id may already be registered with a different pubkey.
+            // Mint a fresh device identity so registration can succeed.
+            await this._delete('secrets', 'device_meta').catch(() => null);
+            this._deviceId = null;
+            this._signingKeyRegistered = false;
+        }
+
+        const generated = await keys.generateDeviceSigningKeypair();
+        const deviceId = await this._getOrCreateDeviceId();
+        await this._putRaw('secrets', {
+            id: 'device_signing',
+            deviceId,
+            publicKeyB64: keys.base64urlEncode(generated.publicKey),
+            privateKeyHandle: generated.privateKeyHandle,
+            createdAt: Date.now(),
+            extractable: false,
+        });
+        this._deviceId = deviceId;
+        this._walletSigningKey = generated;
+        return this._walletSigningKey;
+    }
+
+    async _persistPersonRootSeedsAtRest() {
+        if (!this.session?.walletLocalSeed || !this.session?.personRootProxy) return;
+        if (!this._atRestKey) return;
+        const mod = this._walletAtRest();
+        if (!mod?.encryptStoredValue) return;
+        try {
+            await this._put('secrets', {
+                id: 'person_root_seeds',
+                walletLocalSeed: await this._encryptStoredValue(this.session.walletLocalSeed, 'secrets', 'person_root_seeds:local'),
+                personRootProxy: await this._encryptStoredValue(this.session.personRootProxy, 'secrets', 'person_root_seeds:proxy'),
+                updatedAt: Date.now(),
+            });
+        } catch (err) {
+            console.warn('[Lemma] Could not persist person-root seeds at rest:', err?.message || err);
+        }
+    }
+
+    async ensureDeviceEnrollmentAfterSeedTransfer(result) {
+        await this.init();
+        if (!this.session?.walletLocalSeed || !this.session?.personRootProxy) {
+            throw new Error('Seed transfer incomplete');
+        }
+        if (!this.session?.walletSecret) {
+            const secretBytes = crypto.getRandomValues(new Uint8Array(32));
+            const walletSecret = Array.from(secretBytes).map((b) => b.toString(16).padStart(2, '0')).join('');
+            const walletId = result?.walletId || this.session?.walletId;
+            await this.persistLinkedWallet({
+                walletSecret,
+                walletId,
+                source: 'seed_transfer',
+                linkedFrom: walletId || 'unknown',
+            });
+        }
+        await this._persistPersonRootSeedsAtRest();
+        this._walletSigningKey = null;
+        this._signingKeyRegistered = false;
+        await this._registerSigningKeyIfNeeded();
+        if (result?.masterCredentialId) {
+            try {
+                await this.reissueMasterCredential();
+            } catch (err) {
+                console.warn('[Lemma] Master credential refresh after seed transfer skipped:', err?.message || err);
+            }
+        }
+        return { success: true, walletId: this.session?.walletId || result?.walletId || null };
+    }
+
+    async _registerDevicePasskeyIfPossible(passkeyRecord, walletId) {
+        if (!this._isLemmaDomain() || !passkeyRecord?.credentialId || !passkeyRecord?.publicKey) {
+            return null;
+        }
+        const deviceId = this._deviceId || await this._getOrCreateDeviceId();
+        const walletAssertion = await this.buildWalletAssertion(
+            ['wallet_id', 'device_id', 'credential_id'],
+            {
+                wallet_id: walletId,
+                device_id: deviceId,
+                credential_id: passkeyRecord.credentialId,
+            },
+        );
+        const res = await fetch('/api/wallet/register-device-passkey', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({
+                wallet_id: walletId,
+                device_id: deviceId,
+                credential_id: passkeyRecord.credentialId,
+                public_key: passkeyRecord.publicKey,
+                attestation_format: passkeyRecord.attestationFormat || 'none',
+                device_name: passkeyRecord.deviceName || null,
+                wallet_assertion: walletAssertion,
+            }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || data.success === false) {
+            throw new Error(data.error || `register-device-passkey failed (${res.status})`);
+        }
+        return data;
+    }
+
+    async signLemmaPopEnvelope(popEnvelope) {
+        const keys = this._getLemmaKeys();
+        const keypair = await this._deriveWalletSigningKey();
+        const canonical = keys.buildCanonicalPopPayload(popEnvelope);
+        const signature = await keypair.sign(canonical);
+        return {
+            sig: keys.base64urlEncode(signature),
+            public_key: keys.base64urlEncode(keypair.publicKey),
+            agent_key_id: this._deviceId || await this._getOrCreateDeviceId(),
+        };
     }
 
     async getWalletSigningPubkey() {
@@ -2350,12 +2459,14 @@ class LemmaWallet {
         const registerPayload = keys.buildRegisterPayload({ walletId, pubkeyB64 });
         const signature = await keypair.sign(registerPayload);
 
+        const deviceId = this._deviceId || await this._getOrCreateDeviceId();
         const response = await fetch('/api/wallet/register-signing-key', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             credentials: 'include',
             body: JSON.stringify({
                 wallet_id: walletId,
+                device_id: deviceId,
                 pubkey: pubkeyB64,
                 signature: keys.base64urlEncode(signature),
             }),
@@ -2381,7 +2492,10 @@ class LemmaWallet {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             credentials: 'include',
-            body: JSON.stringify({ wallet_id: walletId }),
+            body: JSON.stringify({
+                wallet_id: walletId,
+                device_id: this._deviceId || '',
+            }),
         });
         const data = await response.json();
         if (!response.ok || !data.nonce) {
@@ -2395,12 +2509,16 @@ class LemmaWallet {
             throw new Error('Wallet must be unlocked to build assertion');
         }
         await this._registerSigningKeyIfNeeded();
+        const deviceId = this._deviceId || await this._getOrCreateDeviceId();
         const challenge = await this.requestWalletChallenge();
         const walletId = this.session.walletId;
         const keys = this._getLemmaKeys();
-        const orderedFields = (fieldNames || []).map((name) => {
+        const fieldSet = new Set((fieldNames || []).map((name) => String(name || '').trim()).filter(Boolean));
+        fieldSet.add('device_id');
+        const mergedValues = { ...(fieldValues || {}), device_id: deviceId };
+        const orderedFields = Array.from(fieldSet).map((name) => {
             const key = String(name || '').trim();
-            const raw = fieldValues[key] ?? fieldValues[name] ?? '';
+            const raw = mergedValues[key] ?? mergedValues[name] ?? '';
             return [key, raw == null ? '' : String(raw)];
         });
         const payload = keys.buildAssertionPayload({
@@ -2413,7 +2531,25 @@ class LemmaWallet {
         return {
             nonce: challenge.nonce,
             signature: keys.base64urlEncode(signature),
+            device_id: deviceId,
         };
+    }
+
+    _defaultSiteDomainForProof(explicitSite) {
+        const raw = String(explicitSite || '').trim();
+        if (raw) return raw;
+        if (typeof window !== 'undefined') {
+            const host = String(window.location.hostname || '').trim();
+            if (host) return host;
+        }
+        if (this._isLemmaDomain && this._isLemmaDomain()) {
+            return 'lemma.id';
+        }
+        return 'lemma.id';
+    }
+
+    _canonicalizeSiteDomainForProof(explicitSite) {
+        return this._canonicalizeCredentialSiteValue(this._defaultSiteDomainForProof(explicitSite));
     }
 
     async deriveSiteSigningKeypair(siteDomain) {
@@ -2421,7 +2557,7 @@ class LemmaWallet {
             throw new Error('Wallet must be unlocked to derive site signing key');
         }
         const keys = this._getLemmaKeys();
-        const canonicalSite = keys.canonicalizeSiteDomain(siteDomain || window.location.hostname || '');
+        const canonicalSite = this._canonicalizeSiteDomainForProof(siteDomain);
         const secret = this.session?.walletSecret;
         if (!secret) {
             const secretRecord = await this._get('secrets', 'master');
@@ -2483,15 +2619,18 @@ class LemmaWallet {
         }
         if (!walletId || !secret) return null;
 
-        const walletAssertion = await this.buildWalletAssertion(['wallet_id'], { wallet_id: walletId });
+        const walletAssertion = await this.buildWalletAssertion(
+            ['wallet_id', 'device_id'],
+            { wallet_id: walletId, device_id: this._deviceId || '' },
+        );
         const res = await fetch('/api/ishuman/seed-envelope', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: this._getSecureHeaders(),
             credentials: 'include',
             body: JSON.stringify({ wallet_id: walletId, wallet_assertion: walletAssertion }),
         });
         if (!res.ok) return null;
-        const data = await res.json().catch(() => null);
+        const data = await this._readJsonResponse(res, 'seed_envelope_failed').catch(() => null);
         if (!data || !data.success) return null;
 
         const keys = this._getLemmaKeys();
@@ -2627,20 +2766,282 @@ class LemmaWallet {
     }
 
     // ========================================
+    // Pull-based device link — receiver QR, phone camera sends
+    // ========================================
+
+    _parsePullTransferPayload(raw) {
+        let data = String(raw || '').trim();
+        if (!data) throw new Error('Invalid receive QR');
+        if (/^https?:\/\//i.test(data)) {
+            try {
+                const url = new URL(data);
+                if (url.hash && url.hash.length > 1) {
+                    data = url.hash.substring(1);
+                } else if (url.pathname.includes('/link/send')) {
+                    throw new Error('Receive QR missing transfer data');
+                }
+            } catch (e) {
+                if (e.message.includes('Receive QR')) throw e;
+            }
+        }
+        if (data[0] !== '{') {
+            let base64 = data.replace(/-/g, '+').replace(/_/g, '/');
+            while (base64.length % 4) base64 += '=';
+            data = atob(base64);
+        }
+        const parsed = JSON.parse(data);
+        if (parsed.v !== 2 || parsed.mode !== 'pull' || !parsed.transfer_id || !parsed.recv_pubkey) {
+            throw new Error('Invalid receive QR — scan the code shown on the device you are adding');
+        }
+        return parsed;
+    }
+
+    /**
+     * RECEIVER: show QR on this device; phone scans with native camera app.
+     */
+    async beginLinkReceive() {
+        const keys = this._getLemmaKeys();
+        const { privateKey, publicKey } = await keys.generateEncryptionKeypair();
+        const idBytes = crypto.getRandomValues(new Uint8Array(24));
+        const transferId = 'linkrecv_' + keys.base64urlEncode(idBytes);
+        this._pendingLinkReceive = { transferId, privateKey, startedAt: Date.now() };
+        const payload = {
+            v: 2,
+            mode: 'pull',
+            transfer_id: transferId,
+            recv_pubkey: keys.base64urlEncode(publicKey),
+        };
+        const payloadB64 = btoa(JSON.stringify(payload))
+            .replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+        const origin = (typeof window !== 'undefined' && window.location?.origin)
+            ? window.location.origin
+            : 'https://lemma.id';
+        const qrUrl = `${origin}/link/send#${payloadB64}`;
+        const LINK_TTL_SEC = 300;
+        return {
+            transferId,
+            qrUrl,
+            qrPayload: JSON.stringify(payload),
+            expiresIn: LINK_TTL_SEC,
+            expiresAt: Date.now() + LINK_TTL_SEC * 1000,
+        };
+    }
+
+    /**
+     * RECEIVER: try to claim a deposited pull transfer (404 = not ready yet).
+     */
+    async tryClaimLinkReceive(transferId) {
+        const pending = this._pendingLinkReceive;
+        const id = transferId || pending?.transferId;
+        if (!id || !pending?.privateKey || pending.transferId !== id) {
+            throw new Error('No active receive session — show a new QR code');
+        }
+        const res = await fetch('/api/wallet/link-receive', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ action: 'claim', transfer_id: id }),
+        });
+        if (res.status === 404) {
+            return { ready: false };
+        }
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            throw new Error(err.error || `link receive claim failed (${res.status})`);
+        }
+        const data = await res.json();
+        const bundle = data.bundle || {};
+        const keys = this._getLemmaKeys();
+        let payload;
+
+        if (bundle.sealed_wallet_seed && bundle.sealed_person_root_proxy) {
+            const seed = await keys.openSealedEnvelope(
+                pending.privateKey,
+                keys.base64urlDecode(bundle.sealed_wallet_seed),
+            );
+            const proxy = await keys.openSealedEnvelope(
+                pending.privateKey,
+                keys.base64urlDecode(bundle.sealed_person_root_proxy),
+            );
+            const toHex = (bytes) => Array.from(bytes).map((b) => b.toString(16).padStart(2, '0')).join('');
+            payload = {
+                walletLocalSeed: toHex(seed),
+                personRootProxy: toHex(proxy),
+                walletId: data.wallet_id || bundle.wallet_id || null,
+                profileId: bundle.profile_id || DEFAULT_PROFILE_ID,
+                profileName: bundle.profile_name || 'Personal',
+                ishumanCredentials: bundle.ishuman_credentials || [],
+                unlockToken: bundle.unlock_token || null,
+                expiresAt: bundle.expires_at || null,
+            };
+        } else {
+            const sealedB64 = bundle.sealed_link_payload;
+            if (!sealedB64) throw new Error('Invalid transfer bundle');
+            const opened = await keys.openSealedEnvelope(
+                pending.privateKey,
+                keys.base64urlDecode(sealedB64),
+            );
+            payload = JSON.parse(new TextDecoder().decode(opened));
+        }
+
+        this._pendingLinkReceive = null;
+        const result = await this._completeLinkFromPayload(payload);
+        return { ...result, ready: true };
+    }
+
+    /**
+     * RECEIVER: poll until phone sends or timeout.
+     */
+    async pollLinkReceive({ transferId, timeoutMs = 300000, intervalMs = 2000 } = {}) {
+        const deadline = Date.now() + timeoutMs;
+        while (Date.now() < deadline) {
+            const result = await this.tryClaimLinkReceive(transferId);
+            if (result.ready) return result;
+            await new Promise((resolve) => setTimeout(resolve, intervalMs));
+        }
+        throw new Error('Timed out waiting for your phone. Scan the QR again with your camera app.');
+    }
+
+    /**
+     * SENDER: phone opened /link/send after scanning receiver QR — deposit wallet.
+     */
+    async sendLinkDepositFromScan(scanInput) {
+        await this.init();
+        const parsed = this._parsePullTransferPayload(scanInput);
+
+        await this._requireFreshPasskeyAuth({
+            reason: 'Send your lemma.id to your other device',
+        });
+
+        if (!this.isUnlocked()) {
+            await this.unlock({ force: true, isHumanIssuance: false });
+        }
+
+        const profile = await this.getActiveProfile();
+        if (!profile?.secret && !this.session?.walletLocalSeed) {
+            throw new Error('No wallet found on this device');
+        }
+
+        const walletIdRec = await this._get('passkey', 'walletId');
+        const walletId = walletIdRec?.value || this.session?.walletId || null;
+
+        await this.fetchAndStoreSeedEnvelopes();
+        const seedHex = this.session?.walletLocalSeed;
+        const proxyHex = this.session?.personRootProxy;
+        if (!seedHex || !proxyHex) {
+            throw new Error('Person-root seeds unavailable; complete IDV or use seed transfer');
+        }
+
+        let unlockToken = null;
+        if (this._isLemmaDomain()) {
+            try {
+                const tokenRes = await fetch('/api/wallet/link-unlock-token', {
+                    method: 'POST',
+                    credentials: 'include',
+                    headers: { 'Content-Type': 'application/json' },
+                });
+                if (tokenRes.ok) {
+                    const tokenData = await tokenRes.json();
+                    unlockToken = tokenData.unlock_token || null;
+                }
+            } catch (e) {
+                console.warn('[Lemma] link-unlock-token unavailable for pull send:', e.message);
+            }
+        }
+
+        let ishumanCredentials = [];
+        try {
+            await this.syncIsHumanCacheFromWallet();
+            ishumanCredentials = await this.exportIsHumanCredentialsForBridge();
+        } catch (e) {
+            console.warn('[Lemma] Could not export isHuman credentials for pull send:', e.message);
+        }
+
+        const LINK_TTL_MS = 300000;
+        const keys = this._getLemmaKeys();
+        const recipientPub = keys.base64urlDecode(parsed.recv_pubkey);
+        const sealedSeed = await keys.sealEnvelope(recipientPub, keys.hexToBytes(seedHex));
+        const sealedProxy = await keys.sealEnvelope(recipientPub, keys.hexToBytes(proxyHex));
+
+        const body = {
+            action: 'deposit',
+            wallet_id: walletId,
+            transfer_id: parsed.transfer_id,
+            recv_pubkey: parsed.recv_pubkey,
+            bundle: {
+                sealed_wallet_seed: keys.base64urlEncode(sealedSeed),
+                sealed_person_root_proxy: keys.base64urlEncode(sealedProxy),
+                wallet_id: walletId,
+                profile_id: profile?.id || DEFAULT_PROFILE_ID,
+                profile_name: profile?.name || 'Personal',
+                ishuman_credentials: ishumanCredentials,
+                unlock_token: unlockToken,
+                expires_at: Date.now() + LINK_TTL_MS,
+            },
+        };
+        body.wallet_assertion = await this.buildWalletAssertion(
+            ['transfer_id', 'recv_pubkey'],
+            { transfer_id: parsed.transfer_id, recv_pubkey: parsed.recv_pubkey },
+        );
+
+        const res = await fetch('/api/wallet/link-receive', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify(body),
+        });
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            throw new Error(err.error || `link send failed (${res.status})`);
+        }
+        return { success: true, transferId: parsed.transfer_id };
+    }
+
+    // ========================================
     // isHuman LOCK-PERIOD (issuance scope, lemma.id tab)
     // ========================================
 
     _isIsHumanCredentialRecord(credential) {
         if (!credential || typeof credential !== 'object') return false;
         const cl = credential.claims || credential.credentialSubject || {};
-        return !!cl.isHuman;
+        if (cl.isHuman === true || String(cl.isHuman).toLowerCase() === 'true') return true;
+        const id = String(credential.id || '');
+        return id.startsWith('ishuman_master_') || id.startsWith('ishuman_site_');
+    }
+
+    _canonicalizeCredentialSiteValue(value) {
+        if (value == null || value === '') return '';
+        const raw = String(value).trim();
+        if (raw.toLowerCase().startsWith('site_')) return '';
+        try {
+            return this._getLemmaKeys().canonicalizeSiteDomain(raw);
+        } catch {
+            return raw.toLowerCase().replace(/^www\./, '').split(':')[0];
+        }
+    }
+
+    _isLemmaPlatformSiteBinding(site) {
+        const normalized = String(site || '').trim().toLowerCase().replace(/^www\./, '').split(':')[0];
+        return !normalized || normalized === 'lemma.id' || normalized === 'lemma_platform';
     }
 
     _isIsHumanMasterRecord(credential) {
+        if (String(credential?.id || '').startsWith('ishuman_master_')) {
+            return true;
+        }
         if (!this._isIsHumanCredentialRecord(credential)) return false;
         const cl = credential.claims || credential.credentialSubject || {};
-        const site = cl.siteId || cl.site_id || cl.siteDomain || cl.site_domain || '';
-        return site === 'lemma.id' || !site;
+        const sites = [
+            cl.siteDomain,
+            cl.site_domain,
+            cl.siteId,
+            cl.site_id,
+            cl.site,
+        ]
+            .map((value) => this._canonicalizeCredentialSiteValue(value))
+            .filter(Boolean);
+        if (!sites.length) return true;
+        return sites.some((site) => this._isLemmaPlatformSiteBinding(site));
     }
 
     /**
@@ -2852,7 +3253,7 @@ class LemmaWallet {
     }
 
     async _putIsHumanCacheRecord(credential) {
-        if (!credential?.id) return;
+        if (!credential?.id) return false;
         const record = {
             ...credential,
             id: credential.id,
@@ -2860,10 +3261,11 @@ class LemmaWallet {
         };
         try {
             await this._put('ishuman_cache', record);
+            return true;
         } catch (e) {
             if (this._isEncryptedStorageLockedError(e)) {
                 console.warn('[Lemma] ishuman_cache persist skipped — storage key unavailable');
-                return;
+                return false;
             }
             throw e;
         }
@@ -2899,7 +3301,20 @@ class LemmaWallet {
 
     async hasIsHumanMasterInCache() {
         const cached = await this.getIsHumanCredentialsFromCache();
-        return cached.some((credential) => this._isIsHumanMasterRecord(credential));
+        if (cached.some((credential) => this._isIsHumanMasterRecord(credential))) {
+            return true;
+        }
+        try {
+            const canonicalSite = this._canonicalizeSiteDomainForProof('lemma.id');
+            return cached.some((credential) => {
+                if (!this._isIsHumanCredentialRecord(credential)) return false;
+                const cl = credential.claims || credential.credentialSubject || {};
+                return this._canonicalizeCredentialSiteValue(this._getCredentialSiteBinding(cl)) === canonicalSite
+                    && this._siteCredentialHasSigningKey(credential);
+            });
+        } catch {
+            return false;
+        }
     }
 
     async applyIsHumanCredentialsToCache(credentials) {
@@ -2912,6 +3327,32 @@ class LemmaWallet {
             }
         }
         return { applied };
+    }
+
+    /**
+     * Restore isHuman credentials transferred inside an encrypted device-link payload.
+     * Stores in lemmas + ishuman_cache so the new device can prove humanity without re-IDV.
+     */
+    async _importLinkedIsHumanCredentials(credentials) {
+        if (!Array.isArray(credentials) || !credentials.length) {
+            return { applied: 0, masterRestored: false };
+        }
+        let applied = 0;
+        let masterRestored = false;
+        for (const cred of credentials) {
+            if (!cred || !this._isIsHumanCredentialRecord(cred)) continue;
+            try {
+                await this.storeCredential(cred);
+                applied += 1;
+                if (this._isIsHumanMasterRecord(cred)) masterRestored = true;
+            } catch (e) {
+                console.warn('[Lemma] Could not import linked isHuman credential:', cred.id, e.message);
+            }
+        }
+        if (!masterRestored && applied > 0) {
+            masterRestored = await this.hasIsHumanMasterInCache();
+        }
+        return { applied, masterRestored };
     }
 
     async exportIsHumanCredentialsForBridge() {
@@ -2935,6 +3376,141 @@ class LemmaWallet {
         return !!(credential?.proof?.signatureValueWeb);
     }
 
+    _shouldVerifyAsIsHumanCredential(credential) {
+        if (!credential || typeof credential !== 'object') return false;
+        const id = String(credential.id || '');
+        if (id.startsWith('ishuman_master_') || id.startsWith('ishuman_site_')) return true;
+        return this._isIsHumanCredentialRecord(credential);
+    }
+
+    _browserCanonicalMessage(credential) {
+        const claims = credential.claims || credential.credentialSubject || {};
+        const sorted = {};
+        for (const key of Object.keys(claims).sort()) {
+            const value = claims[key];
+            if (value === true) sorted[key] = 'true';
+            else if (value === false) sorted[key] = 'false';
+            else if (Array.isArray(value) || (value && typeof value === 'object')) {
+                sorted[key] = JSON.stringify(value);
+            } else {
+                sorted[key] = value;
+            }
+        }
+        const payload = {
+            issuer: credential.issuer,
+            subject: credential.subject,
+            claims: sorted,
+        };
+        if (credential.issuedAt !== undefined && credential.issuedAt !== null) {
+            payload.issuedAt = credential.issuedAt;
+        }
+        if (credential.expiresAt !== undefined && credential.expiresAt !== null) {
+            payload.expiresAt = credential.expiresAt;
+        }
+        return new TextEncoder().encode(JSON.stringify(payload));
+    }
+
+    async _verifyIsHumanCredentialBrowser(credential) {
+        if (!this._initialized) await this.init();
+
+        const claims = credential.claims || credential.credentialSubject || {};
+        const ppid = credential.subject || claims.id || claims.ppid || claims.subject;
+        const revocationStatus = await this.isRevoked(credential.id, ppid);
+        if (revocationStatus.revoked) {
+            const reason = revocationStatus.ppidRevoked ? 'User revoked (all devices)' : 'Credential revoked';
+            return { valid: false, reason, revocationDetails: revocationStatus };
+        }
+
+        const expiredCheck = this._checkExpiration(credential);
+        if (!expiredCheck.valid) {
+            return { valid: false, reason: 'Expired' };
+        }
+
+        const sigHex = String(credential.proof?.signatureValueWeb || '').trim();
+        if (!sigHex) {
+            return { valid: false, reason: 'legacy_credential_format' };
+        }
+
+        let publicKey = credential.issuerInfo?.publicKey || null;
+        if (!publicKey) {
+            const storedIssuer = await this.getIssuer(credential.issuer);
+            publicKey = storedIssuer?.publicKey || null;
+        }
+        if (!publicKey) {
+            return { valid: false, reason: 'No public key available' };
+        }
+
+        try {
+            const message = this._browserCanonicalMessage(credential);
+            const digest = await crypto.subtle.digest('SHA-256', message);
+            const cryptoKey = this._cryptoKeyCache.get(publicKey) || await (async () => {
+                let publicKeyBuffer;
+                if (typeof publicKey === 'string' && /^[0-9a-fA-F]{64}$/.test(publicKey)) {
+                    publicKeyBuffer = new Uint8Array(32);
+                    for (let i = 0; i < 32; i++) {
+                        publicKeyBuffer[i] = parseInt(publicKey.substr(i * 2, 2), 16);
+                    }
+                } else if (typeof publicKey === 'string') {
+                    publicKeyBuffer = this._base64urlToBuffer(publicKey);
+                } else {
+                    throw new Error('Unknown public key format');
+                }
+                const key = await crypto.subtle.importKey(
+                    'raw',
+                    publicKeyBuffer,
+                    { name: 'Ed25519' },
+                    false,
+                    ['verify'],
+                );
+                this._cryptoKeyCache.set(publicKey, key);
+                return key;
+            })();
+
+            let signatureBuffer;
+            if (/^[0-9a-fA-F]{128}$/.test(sigHex)) {
+                signatureBuffer = new Uint8Array(64);
+                for (let i = 0; i < 64; i++) {
+                    signatureBuffer[i] = parseInt(sigHex.substr(i * 2, 2), 16);
+                }
+            } else {
+                signatureBuffer = this._base64urlToBuffer(sigHex);
+            }
+
+            const isValid = await crypto.subtle.verify(
+                { name: 'Ed25519' },
+                cryptoKey,
+                signatureBuffer,
+                digest,
+            );
+            if (!isValid) {
+                return { valid: false, reason: 'Invalid signature' };
+            }
+
+            this._verifiedSignatures.add(credential.id);
+            try {
+                await this._put('session', {
+                    id: `verified_${credential.id}`,
+                    sig: sigHex,
+                    issuer: credential.issuer,
+                    at: Date.now(),
+                });
+            } catch (_) {}
+
+            return {
+                valid: true,
+                issuer: credential.issuerInfo?.name || credential.issuer,
+                verified: true,
+                claims,
+                revocationUnchecked: revocationStatus.unchecked,
+                signatureCached: false,
+                verifyPath: 'browser_signatureValueWeb',
+            };
+        } catch (e) {
+            this._warn('isHuman browser signature verification error:', e.message);
+            return { valid: false, reason: `Verification error: ${e.message}` };
+        }
+    }
+
     _credentialIssuedAtSeconds(credential) {
         if (!credential) return 0;
         const claims = credential.claims || credential.credentialSubject || {};
@@ -2952,20 +3528,18 @@ class LemmaWallet {
         );
     }
 
+    needsIsHumanCredentialRepair(credential) {
+        if (!this._shouldVerifyAsIsHumanCredential(credential)) return false;
+        return !this._siteCredentialLocallyVerifiable(credential);
+    }
+
     async findIsHumanSiteCredential(targetSite) {
-        const keys = this._getLemmaKeys();
-        const canonicalSite = keys.canonicalizeSiteDomain(targetSite || '');
+        const canonicalSite = this._canonicalizeSiteDomainForProof(targetSite);
         const allCreds = await this.exportIsHumanCredentialsForBridge();
-        // Prefer the most recently issued site credential. After a fresh
-        // IDV / re-derivation, the wallet's plaintext cache will contain
-        // both the old (revoked) and new credential for the same site; the
-        // server-side IsHumanVerification status flips to "revoked" on the
-        // old one, so `/api/ishuman/derive-site-proof` would 404 if we used
-        // the stale entry.
         const matches = allCreds.filter((credential) => {
             const cl = credential.claims || credential.credentialSubject || {};
-            if (!cl.isHuman) return false;
-            return this._getCredentialSiteBinding(cl) === canonicalSite
+            if (!this._isIsHumanCredentialRecord(credential)) return false;
+            return this._canonicalizeCredentialSiteValue(this._getCredentialSiteBinding(cl)) === canonicalSite
                 && this._siteCredentialHasSigningKey(credential);
         });
         if (!matches.length) return null;
@@ -2973,6 +3547,9 @@ class LemmaWallet {
     }
 
     async findIsHumanMasterCredential() {
+        if (this.isUnlocked && this.isUnlocked()) {
+            await this.syncIsHumanCacheFromWallet().catch(() => ({ synced: 0 }));
+        }
         const cached = await this.getIsHumanCredentialsFromCache();
         const cachedMasters = cached.filter((credential) => this._isIsHumanMasterRecord(credential));
         if (cachedMasters.length) {
@@ -2987,15 +3564,22 @@ class LemmaWallet {
             throw err;
         }
         const masters = creds.filter((credential) => this._isIsHumanMasterRecord(credential));
-        if (!masters.length) return null;
-        return this._sortCredentialsNewestFirst(masters)[0];
+        if (masters.length) {
+            return this._sortCredentialsNewestFirst(masters)[0];
+        }
+        try {
+            const platformSiteProof = await this.findIsHumanSiteCredential('lemma.id');
+            if (platformSiteProof) return platformSiteProof;
+        } catch (_) {
+            /* ignore lookup errors */
+        }
+        return null;
     }
 
     async deriveAndStoreSiteProof(targetSite, options = {}) {
         await this.ensureIsHumanIssuanceReady({ isHumanIssuance: true });
         await this.reconcileSessionWalletIdForIssuance();
-        const keys = this._getLemmaKeys();
-        const canonicalSite = keys.canonicalizeSiteDomain(targetSite || '');
+        const canonicalSite = this._canonicalizeSiteDomainForProof(targetSite);
         const issueMode = (options.issueMode || 'site_proof').trim().toLowerCase();
         const forceServerDerive = issueMode === 'fresh_idv' || !!options.forceServerDerive;
 
@@ -3022,12 +3606,14 @@ class LemmaWallet {
         // Bind master_credential_id into the signed assertion only when present
         // so the wallet and server agree on the signed field set (see
         // api/ishuman.py derive_site_proof).
+        const normalizedIssueMode = issueMode === 'fresh_idv' ? 'fresh_idv' : 'site_proof';
         const assertionFieldNames = masterId
-            ? ['master_credential_id', 'target_site', 'site_signing_pubkey']
-            : ['target_site', 'site_signing_pubkey'];
+            ? ['master_credential_id', 'target_site', 'site_signing_pubkey', 'issue_mode']
+            : ['target_site', 'site_signing_pubkey', 'issue_mode'];
         const assertionFieldValues = {
             target_site: canonicalSite,
             site_signing_pubkey: siteSigningPubkey,
+            issue_mode: normalizedIssueMode,
         };
         if (masterId) {
             assertionFieldValues.master_credential_id = masterId;
@@ -3042,7 +3628,7 @@ class LemmaWallet {
             target_site: canonicalSite,
             site_signing_pubkey: siteSigningPubkey,
             wallet_assertion: walletAssertion,
-            issue_mode: issueMode === 'fresh_idv' ? 'fresh_idv' : 'site_proof',
+            issue_mode: normalizedIssueMode,
         };
         if (masterId) {
             deriveBody.master_credential_id = masterId;
@@ -3050,17 +3636,13 @@ class LemmaWallet {
 
         const deriveRes = await fetch('/api/ishuman/derive-site-proof', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: this._getSecureHeaders(),
             credentials: 'include',
             body: JSON.stringify(deriveBody),
         });
-        const deriveData = await deriveRes.json();
+        const deriveData = await this._readJsonResponse(deriveRes, 'derivation_failed');
         if (!deriveRes.ok || !deriveData.success || !deriveData.credential) {
             throw new Error(deriveData.error || deriveData.message || 'derivation_failed');
-        }
-
-        if (deriveData.ppid_migration) {
-            await this._storePpidMigration(canonicalSite, deriveData.ppid_migration);
         }
 
         const derived = deriveData.credential;
@@ -3090,14 +3672,17 @@ class LemmaWallet {
 
         const res = await fetch('/api/ishuman/reissue-master', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: this._getSecureHeaders(),
             credentials: 'include',
             body: JSON.stringify({
                 wallet_id: walletId,
                 wallet_assertion: walletAssertion,
             }),
         });
-        const data = await res.json();
+        const data = await this._readJsonResponse(res, 'reissue_failed');
+        if (res.status === 403 && data.code === 'second_factor_required') {
+            throw new Error('Reissue requires confirmation from another enrolled device when one is still active.');
+        }
         if (!res.ok || !data.success || !data.credential) {
             throw new Error(data.error || data.message || 'reissue_failed');
         }
@@ -3123,7 +3708,7 @@ class LemmaWallet {
         const DEFAULT_SESSION_TTL_SECONDS = MAX_SESSION_HOURS * 60 * 60;
 
         const keys = this._getLemmaKeys();
-        const canonicalSite = keys.canonicalizeSiteDomain(siteId || '');
+        const canonicalSite = this._canonicalizeSiteDomainForProof(siteId);
         const siteKeys = await this.deriveSiteSigningKeypair(canonicalSite);
         const requestedTtl = Number(sessionTtlSec || DEFAULT_SESSION_TTL_SECONDS);
         const sessionTtl = Math.min(
@@ -3162,32 +3747,6 @@ class LemmaWallet {
         };
     }
 
-    async _storePpidMigration(canonicalSite, migration) {
-        if (!canonicalSite || !migration) return;
-        try {
-            await this._put('ppid_migrations', {
-                id: canonicalSite,
-                siteId: canonicalSite,
-                migration,
-                cachedAt: Date.now(),
-            });
-        } catch (e) {
-            if (!this._isEncryptedStorageLockedError(e)) throw e;
-        }
-    }
-
-    async getPpidMigrationForSite(targetSite) {
-        const keys = this._getLemmaKeys();
-        const canonicalSite = keys.canonicalizeSiteDomain(targetSite || '');
-        if (!canonicalSite) return null;
-        try {
-            const row = await this._get('ppid_migrations', canonicalSite);
-            return row?.migration || null;
-        } catch {
-            return null;
-        }
-    }
-
     async issueSiteProofPackage({
         siteId,
         sessionNonce,
@@ -3202,26 +3761,103 @@ class LemmaWallet {
             issueMode: issueMode || 'site_proof',
             forceServerDerive: true,
         });
-        const signed = await this.signSiteSessionPresentation({
+        return this.signSiteSessionPresentation({
             credential,
             siteId,
             sessionNonce,
             bloomSequence,
             sessionTtlSec,
         });
-        const ppidMigration = await this.getPpidMigrationForSite(siteId);
-        if (ppidMigration) {
-            signed.ppid_migration = ppidMigration;
+    }
+
+    async hashActionBody(body) {
+        const keys = this._getLemmaKeys();
+        return keys.hashActionBody(body ?? {});
+    }
+
+    async signSiteActionPresentation({
+        credential,
+        siteId,
+        action,
+        method = 'POST',
+        path = '',
+        body = null,
+        bodyHash = null,
+        nonce,
+        ttlSec = 60,
+    }) {
+        const ACTION_PRESENTATION_PREFIX = 'lemma:site-action-presentation:v1';
+        const ACTION_STAMP_VERSION = 'action_stamp_v1';
+        const MIN_ACTION_TTL_SECONDS = 15;
+        const MAX_ACTION_TTL_SECONDS = 300;
+
+        if (!credential || typeof credential !== 'object') {
+            throw new Error('credential required');
         }
-        return signed;
+        if (!action) {
+            throw new Error('action required');
+        }
+        if (!nonce) {
+            throw new Error('nonce required');
+        }
+
+        const keys = this._getLemmaKeys();
+        const canonicalSite = this._canonicalizeSiteDomainForProof(siteId);
+        const siteKeys = await this.deriveSiteSigningKeypair(canonicalSite);
+        const claims = credential.claims || credential.credentialSubject || {};
+        const assurance = claims.assurance
+            || (claims.isHuman === true || claims.isHuman === 'true' ? 'ishuman' : 'passkey');
+        const resolvedBodyHash = bodyHash || await this.hashActionBody(body ?? {});
+        const requestedTtl = Number(ttlSec || 60);
+        const actionTtl = Math.min(
+            MAX_ACTION_TTL_SECONDS,
+            Math.max(MIN_ACTION_TTL_SECONDS, requestedTtl || 60),
+        );
+        const issuedAtUnix = Math.floor(Date.now() / 1000);
+        const expiresAtUnix = issuedAtUnix + actionTtl;
+        const assertion = {
+            version: ACTION_STAMP_VERSION,
+            site_id: canonicalSite,
+            credential_id: credential?.id || '',
+            subject: credential?.subject || '',
+            assurance: String(assurance || '').toLowerCase(),
+            action: String(action || '').trim(),
+            method: String(method || 'POST').trim().toUpperCase(),
+            path: String(path || '').trim(),
+            body_hash: resolvedBodyHash,
+            nonce: String(nonce || '').trim(),
+            issued_at_unix: issuedAtUnix,
+            expires_at_unix: expiresAtUnix,
+        };
+        const payloadBytes = new TextEncoder().encode([
+            ACTION_PRESENTATION_PREFIX,
+            String(assertion.version || '').trim(),
+            String(assertion.site_id || '').trim(),
+            String(assertion.credential_id || '').trim(),
+            String(assertion.subject || '').trim(),
+            String(assertion.assurance || '').trim(),
+            String(assertion.action || '').trim(),
+            String(assertion.method || '').trim(),
+            String(assertion.path || '').trim(),
+            String(assertion.body_hash || '').trim(),
+            String(assertion.nonce || '').trim(),
+            String(assertion.issued_at_unix ?? ''),
+            String(assertion.expires_at_unix ?? ''),
+        ].join('\n'));
+        const signature = await siteKeys.keypair.sign(payloadBytes);
+        return {
+            action_assertion: assertion,
+            action_signature: keys.base64urlEncode(signature),
+            bodyHash: resolvedBodyHash,
+        };
     }
 
     async ensureIsHumanIssuanceReady(options = {}) {
         await this.init();
         let forcePasskeyForEncryptedCache = false;
+        const isHumanIssuance = options.isHumanIssuance !== false;
         const existingPasskeyEarly = await this._get('passkey', 'primary');
-        const requirePasskeyForIssuance = !!(options.isHumanIssuance
-            && !existingPasskeyEarly?.credentialId);
+        const requirePasskeyForIssuance = !!(isHumanIssuance && !existingPasskeyEarly?.credentialId);
 
         if (this.isIsHumanLockValid()) {
             await this._restoreIsHumanLockBundleIfValid();
@@ -3256,7 +3892,7 @@ class LemmaWallet {
         const existingPasskey = await this._get('passkey', 'primary');
         const issuanceOpts = {
             ...options,
-            isHumanIssuance: true,
+            isHumanIssuance,
             force: options.force || forcePasskeyForEncryptedCache,
         };
 
@@ -5467,6 +6103,11 @@ class LemmaWallet {
 
     async _encryptStoredValue(storeName, value) {
         if (!this._isSensitiveStore(storeName)) return value;
+        // Non-extractable CryptoKey handles cannot survive JSON envelopes.
+        // Persist device_signing via structured clone only (_putRaw).
+        if (storeName === 'secrets' && value?.id === 'device_signing') {
+            return value;
+        }
         const mod = this._walletAtRest();
         if (!this._atRestKey || !mod) {
             if (storeName === 'ishuman_cache') {
@@ -5528,6 +6169,14 @@ class LemmaWallet {
         const master = await this._getRaw('secrets', 'master');
         if (master && !mod.isEncryptedEnvelope(master)) {
             await this._put('secrets', master);
+        }
+
+        // Never JSON-encrypt device_signing — it holds a non-extractable CryptoKey.
+        for (const secret of await this._getAllRaw('secrets')) {
+            if (!secret || mod.isEncryptedEnvelope(secret)) continue;
+            if (secret.id === 'device_signing' || secret.id === 'device_meta') continue;
+            if (secret.id === 'master') continue;
+            await this._put('secrets', secret);
         }
 
         for (const profile of await this._getAllRaw('profiles')) {
@@ -5723,7 +6372,7 @@ class LemmaWallet {
      * Use server-issued isHuman credential subject when available (person-root backed).
      * @private
      */
-    async _derivePPIDFromIsHumanCredential(siteId) {
+    async _derivePPIDFromSiteCredential(siteId) {
         const normalizeSite = (value) => String(value || '').trim().toLowerCase()
             .replace(/^www\./, '')
             .replace(/:\d+$/, '');
@@ -5734,7 +6383,8 @@ class LemmaWallet {
             const lemmas = await this._getAll('lemmas');
             const candidates = lemmas.filter((lemma) => {
                 const claims = lemma.claims || lemma.credentialSubject || {};
-                if (!claims.isHuman) return false;
+                const assurance = String(claims.assurance || (claims.isHuman ? 'ishuman' : '')).toLowerCase();
+                if (assurance !== 'ishuman' && assurance !== 'passkey' && !claims.isHuman) return false;
                 const lemmaSite = normalizeSite(
                     claims.siteId || claims.site_id || claims.siteDomain || claims.site_domain || claims.domain || ''
                 );
@@ -5745,8 +6395,11 @@ class LemmaWallet {
             for (const lemma of candidates) {
                 const claims = lemma.claims || lemma.credentialSubject || {};
                 const personRoot = claims.ppidDerivation === 'person_root_v1'
+                    || claims.assurance === 'passkey'
+                    || claims.assurance === 'ishuman'
                     || claims.verificationMethod === 'stripe_identity'
-                    || claims.verificationMethod === 'didit';
+                    || claims.verificationMethod === 'didit'
+                    || claims.verificationMethod === 'passkey';
                 if (!personRoot) continue;
                 const ppid = lemma.subject || claims.ppid || claims.id || claims.subject;
                 if (ppid && String(ppid).startsWith('did:lemma:ppid_')) {
@@ -5757,6 +6410,11 @@ class LemmaWallet {
             return null;
         }
         return null;
+    }
+
+    /** @deprecated use _derivePPIDFromSiteCredential */
+    async _derivePPIDFromIsHumanCredential(siteId) {
+        return this._derivePPIDFromSiteCredential(siteId);
     }
 
     async derivePPID(siteId) {
@@ -5776,9 +6434,9 @@ class LemmaWallet {
             .replace(/^www\./, '')
             .replace(/:\d+$/, '');
 
-        const ppidFromIsHuman = await this._derivePPIDFromIsHumanCredential(siteId);
-        if (ppidFromIsHuman) {
-            return ppidFromIsHuman;
+        const ppidFromCredential = await this._derivePPIDFromSiteCredential(siteId);
+        if (ppidFromCredential) {
+            return ppidFromCredential;
         }
 
         // Third-party-safe path: if a valid lemma is already present for this site,
@@ -5788,6 +6446,8 @@ class LemmaWallet {
                 const lemmas = await this._getAll('lemmas');
                 const matching = lemmas.filter((lemma) => {
                     const claims = lemma.claims || lemma.credentialSubject || {};
+                    const assurance = String(claims.assurance || (claims.isHuman ? 'ishuman' : '')).toLowerCase();
+                    if (assurance !== 'ishuman' && assurance !== 'passkey' && !claims.isHuman) return false;
                     const lemmaSite = String(
                         claims.siteId || claims.site_id || claims.siteDomain || claims.site_domain || claims.domain || ''
                     ).toLowerCase().replace(/^www\./, '').replace(/:\d+$/, '');
@@ -6015,11 +6675,11 @@ class LemmaWallet {
             .join('');
     }
 
-    async getWalletInfo() {
+    async getWalletInfo(options = {}) {
+        const lite = options.lite === true;
         await this.init();
 
         const passkey = await this._get('passkey', 'primary');
-        const issuers = await this._getAll('issuers');
         const walletIdRecord = await this._get('passkey', 'walletId');
         const activeProfileRecord = await this._get('passkey', 'activeProfile');
         const lockedEncryptedStorage = { value: false };
@@ -6034,7 +6694,8 @@ class LemmaWallet {
                 throw error;
             }
         };
-        const lemmas = await readLockedSafe([], () => this._getAll('lemmas'));
+        const issuers = lite ? [] : await this._getAll('issuers');
+        const lemmas = lite ? [] : await readLockedSafe([], () => this._getAll('lemmas'));
         const secretRecord = await readLockedSafe(null, () => this._get('secrets', 'master'));
         
         // Also check profile for secret (device linking stores here)
@@ -6479,120 +7140,6 @@ class LemmaWallet {
     }
 
     /**
-     * Generate a link code for adding another device.
-     * The code contains the encrypted wallet_secret and expires in 60 seconds.
-     * 
-     * SECURITY:
-     * - REQUIRES FRESH PASSKEY AUTH (not cached session) - proves user presence
-     * - One-time use code
-     * - 60 second expiry
-     * - Encrypted with a random key embedded in the code
-     * - Device-to-device transfer, no server involved
-     * 
-     * @param {string} profileId - Optional specific profile to link (defaults to active)
-     * @returns {Object} { code: string, qrData: string, expiresAt: number, expiresIn: number, profileName: string }
-     */
-    async generateLinkCode(profileId = null) {
-        try {
-            console.log('[Lemma] generateLinkCode: starting...');
-            await this.init();
-            console.log('[Lemma] generateLinkCode: init complete, db:', !!this.db);
-            
-            // SECURITY: Require FRESH passkey verification before generating link code
-            // This ensures user is physically present and deliberately creating a link
-            // Even if wallet was unlocked hours ago, user must re-verify NOW
-            console.log('[Lemma] generateLinkCode: requiring fresh passkey verification...');
-            const freshAuth = await this._requireFreshPasskeyAuth({
-                reason: 'Verify your identity to link another device'
-            });
-            
-            if (!freshAuth.success) {
-                throw new Error('Identity verification required to generate link code');
-            }
-            console.log('[Lemma] generateLinkCode: fresh passkey verified at', new Date(freshAuth.timestamp).toISOString());
-            
-            // Get the profile to link (specific or active)
-            const profile = profileId 
-                ? await this._get('profiles', profileId)
-                : await this.getActiveProfile();
-            
-            if (!profile) {
-                throw new Error('Profile not found');
-            }
-            
-            const walletSecret = profile.secret;
-            console.log('[Lemma] generateLinkCode: walletSecret obtained for profile:', profile.name);
-            if (!walletSecret) {
-                throw new Error('No wallet secret found');
-            }
-            
-            const walletId = await this._get('passkey', 'walletId');
-            console.log('[Lemma] generateLinkCode: walletId:', walletId);
-            
-            // Generate a random encryption key (16 bytes = 128 bits)
-            const encryptionKey = crypto.getRandomValues(new Uint8Array(16));
-            const encryptionKeyHex = Array.from(encryptionKey)
-                .map(b => b.toString(16).padStart(2, '0'))
-                .join('');
-            console.log('[Lemma] generateLinkCode: encryption key generated');
-            
-            const LINK_TTL_MS = 300000; // 5 minutes — accounts for page load on new device
-
-            const payload = JSON.stringify({
-                walletSecret: walletSecret,
-                walletId: walletId?.value || null,
-                profileId: profile.id,
-                profileName: profile.name,
-                createdAt: Date.now(),
-                expiresAt: Date.now() + LINK_TTL_MS
-            });
-            console.log('[Lemma] generateLinkCode: payload created for profile:', profile.name);
-            
-            // Encrypt payload using AES-GCM
-            const encryptedPayload = await this._encryptForLink(payload, encryptionKey);
-            console.log('[Lemma] generateLinkCode: payload encrypted, length:', encryptedPayload?.length);
-            
-            // Generate a short numeric code (6 digits) for manual entry
-            // This is derived from the encryption key for consistency
-            const shortCode = this._deriveShortCode(encryptionKey);
-            console.log('[Lemma] generateLinkCode: shortCode:', shortCode);
-            
-            const qrData = JSON.stringify({
-                v: 1,
-                k: encryptionKeyHex,
-                p: encryptedPayload,
-                e: Date.now() + LINK_TTL_MS
-            });
-            console.log('[Lemma] generateLinkCode: qrData created, length:', qrData.length);
-            
-            // Create a URL that opens the link page with the code pre-filled
-            // This makes scanning work properly on mobile devices
-            // Use URL-safe base64 (replace + with -, / with _) to avoid URL encoding issues
-            const qrDataBase64 = btoa(qrData).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
-            console.log('[Lemma] generateLinkCode: base64 encoded (URL-safe), length:', qrDataBase64.length);
-            const qrUrl = `https://lemma.id/link#${qrDataBase64}`;
-            console.log('[Lemma] generateLinkCode: qrUrl created, length:', qrUrl.length);
-            
-            const LINK_TTL_SEC = LINK_TTL_MS / 1000;
-            console.log(`[Lemma] Link code generated for profile "${profile.name}" - expires in ${LINK_TTL_SEC} seconds`);
-            
-            return {
-                shortCode: shortCode,
-                qrData: qrData,
-                qrUrl: qrUrl,
-                expiresAt: Date.now() + LINK_TTL_MS,
-                expiresIn: LINK_TTL_SEC,
-                profileId: profile.id,
-                profileName: profile.name
-            };
-        } catch (e) {
-            console.error('[Lemma] generateLinkCode ERROR:', e);
-            console.error('[Lemma] generateLinkCode ERROR stack:', e.stack);
-            throw e;
-        }
-    }
-    
-    /**
      * Resolve wallet_id + secret already persisted via handoff, QR link, or session.
      * @private
      */
@@ -6616,7 +7163,7 @@ class LemmaWallet {
                 throw err;
             });
         if (sess?.walletId) {
-            walletId = walletId || sess.walletId;
+            walletId = sess.walletId || walletId;
             walletSecret = walletSecret || sess.walletSecret || '';
             source = source || sess.source || '';
         }
@@ -6920,7 +7467,7 @@ class LemmaWallet {
 
         const res = await fetch('/api/ishuman/idv-mobile-handoff/deposit', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: this._getSecureHeaders(),
             credentials: 'include',
             body: JSON.stringify({
                 wallet_id: resolvedWalletId,
@@ -6931,11 +7478,11 @@ class LemmaWallet {
                 wallet_assertion: walletAssertion,
             }),
         });
+        const data = await this._readJsonResponse(res, 'mobile_handoff_deposit_failed');
         if (!res.ok) {
-            const err = await res.json().catch(() => ({}));
-            throw new Error(`mobile handoff deposit failed: ${err.error || res.status}`);
+            throw new Error(`mobile handoff deposit failed: ${data.error || res.status}`);
         }
-        return res.json();
+        return data;
     }
 
     /**
@@ -6952,7 +7499,7 @@ class LemmaWallet {
 
         const res = await fetch('/api/ishuman/idv-mobile-handoff/claim', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: this._getSecureHeaders(),
             credentials: 'include',
             body: JSON.stringify({
                 handoff_id: handoffId,
@@ -6960,14 +7507,14 @@ class LemmaWallet {
                 mk,
             }),
         });
+        const data = await this._readJsonResponse(res, 'mobile_handoff_claim_failed');
         if (!res.ok) {
-            const err = await res.json().catch(() => ({}));
-            throw new Error(`mobile handoff claim failed: ${err.error || res.status}`);
+            throw new Error(`mobile handoff claim failed: ${data.error || res.status}`);
         }
-        const data = await res.json();
-        const aad = this._idvHandoffAad(handoffId, sessionId, data.wallet_id);
+        const claimedSessionId = data.session_id || sessionId;
+        const aad = this._idvHandoffAad(handoffId, claimedSessionId, data.wallet_id);
         const payload = await this._decryptHandoffBlob(data.encrypted_blob, mk, aad);
-        if (payload.sessionId && payload.sessionId !== sessionId) {
+        if (payload.sessionId && payload.sessionId !== claimedSessionId) {
             throw new Error('Handoff session mismatch');
         }
         if (payload.expiresAt && payload.expiresAt < Date.now()) {
@@ -6985,7 +7532,7 @@ class LemmaWallet {
 
         return {
             walletId: payload.walletId || data.wallet_id,
-            sessionId: payload.sessionId || data.session_id,
+            sessionId: payload.sessionId || claimedSessionId,
             walletSecret: payload.walletSecret,
         };
     }
@@ -7025,113 +7572,133 @@ class LemmaWallet {
     }
 
     /**
-     * Link this device to an existing wallet using a link code.
-     * This transfers the wallet_secret from another device.
-     * 
-     * Smart conflict resolution:
-     * - Same wallet: Returns success (already linked)
-     * - Orphaned wallet (no passkey): Auto-replaces
-     * - Different active wallet: Returns conflict for user decision
-     * 
-     * @param {Object} options - { qrData } or { shortCode }, plus optional { replaceExisting: true }
-     * @returns {Object} { success, conflict?, walletId?, needsPasskey?, message }
+     * Shared finish path for pull receive deposits (person-root enrollment).
+     * @private
      */
-    async linkDevice(options) {
-        await this.init();
-        
-        // First, decrypt the payload to see what wallet we're linking
-        let payload;
-        
-        if (options.qrData) {
-            // Full QR code data
-            const normalizedQrData = this._normalizeLinkInput(options.qrData);
-            payload = await this._decryptLinkQR(normalizedQrData);
-        } else if (options.shortCode) {
-            // Short code - need to look up from bridge or prompt QR scan
-            throw new Error('Short code linking requires scanning QR on the source device. Please use QR scan.');
-        } else {
-            throw new Error('Either qrData or shortCode required');
-        }
-        
-        // Validate payload
-        if (!payload.walletSecret) {
-            throw new Error('Invalid link code - no wallet secret');
-        }
-        
+    async _completeLinkFromPayload(payload) {
         if (payload.expiresAt && payload.expiresAt < Date.now()) {
             throw new Error('Link code expired. Please generate a new one on your other device.');
         }
-        
-        // Check for existing wallet
+
+        const hasPersonRoot = Boolean(payload.walletLocalSeed && payload.personRootProxy);
+        if (!hasPersonRoot && !payload.walletSecret) {
+            throw new Error('Invalid link bundle - missing person-root material');
+        }
+
         const existingSecret = await this._get('secrets', 'master');
         const existingWalletId = await this._get('passkey', 'walletId');
-        
-        if (existingSecret?.secret) {
-            // Same wallet - already linked
-            if (existingSecret.secret === payload.walletSecret) {
-                console.log('[Lemma]  Wallet already linked to this device');
-                return {
-                    success: true,
-                    alreadyLinked: true,
-                    walletId: payload.walletId,
-                    message: 'This wallet is already on this device.'
-                };
-            }
-            
-            // Different wallet - auto-replace with backup (simplest UX)
-            // User can recover old wallet from backup if needed
-            console.log('[Lemma]  Replacing existing wallet (backed up for recovery)');
-            console.log('[Lemma]    Old wallet:', existingWalletId?.value?.substring(0, 16) + '...');
-            console.log('[Lemma]    New wallet:', payload.walletId?.substring(0, 16) + '...');
-            
-            // Backup before clearing (stored in localStorage)
-                await this._backupWalletData();
-                await this._clearWalletData();
+
+        if (existingSecret?.secret && payload.walletSecret && existingSecret.secret === payload.walletSecret) {
+            return {
+                success: true,
+                alreadyLinked: true,
+                walletId: payload.walletId,
+                message: 'This wallet is already on this device.',
+            };
         }
-        
-        // Create or update profile with the linked wallet secret
+
+        if (existingSecret?.secret) {
+            console.log('[Lemma] Replacing existing wallet (backed up for recovery)');
+            console.log('[Lemma]   Old wallet:', existingWalletId?.value?.substring(0, 16) + '...');
+            console.log('[Lemma]   New wallet:', payload.walletId?.substring(0, 16) + '...');
+            await this._backupWalletData();
+            await this._clearWalletData();
+        }
+
         const profileId = payload.profileId || DEFAULT_PROFILE_ID;
         const profileName = payload.profileName || 'Personal';
 
+        let walletSecret = payload.walletSecret;
+        if (!walletSecret) {
+            const secretBytes = crypto.getRandomValues(new Uint8Array(32));
+            walletSecret = Array.from(secretBytes).map((b) => b.toString(16).padStart(2, '0')).join('');
+        }
+
         await this.persistLinkedWallet({
-            walletSecret: payload.walletSecret,
+            walletSecret,
             walletId: payload.walletId,
             profileId,
             profileName,
             source: 'link',
             linkedFrom: payload.walletId || 'unknown',
         });
-        console.log('[Lemma]  Local session set after linking');
-        
-        // Signal to server that this device is now unlocked (if on lemma.id)
+
+        if (hasPersonRoot) {
+            this.session.walletLocalSeed = payload.walletLocalSeed;
+            this.session.personRootProxy = payload.personRootProxy;
+            await this._put('session', { id: 'current', ...this.session });
+            await this._persistPersonRootSeedsAtRest();
+        }
+
+        this._walletSigningKey = null;
+        this._signingKeyRegistered = false;
+        await this._registerSigningKeyIfNeeded();
+
+        let humanProofRestored = false;
+        let credentialsImported = 0;
+        if (Array.isArray(payload.ishumanCredentials) && payload.ishumanCredentials.length) {
+            const imported = await this._importLinkedIsHumanCredentials(payload.ishumanCredentials);
+            credentialsImported = imported.applied;
+            humanProofRestored = imported.masterRestored;
+            console.log(`[Lemma] Imported ${credentialsImported} isHuman credential(s) from link`);
+        }
+
+        let sessionError = null;
         let serverSessionSet = false;
         if (this._isLemmaDomain()) {
-            try {
-                console.log('[Lemma] Signaling unlock to server after device link...');
-                const signalResponse = await fetch('/api/wallet/signal-unlock', {
-                    method: 'POST',
-                    credentials: 'include',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        wallet_id: payload.walletId,
-                        unlocked_at: this.session.unlockedAt,
-                        expires_at: Math.floor(this.session.expiresAt / 1000),
-                        profile_id: profileId,
-                        profile_name: profileName
-                    })
-                });
-                if (signalResponse.ok) {
-                    console.log('[Lemma]  Server notified of linked device unlock');
-                    serverSessionSet = true;
+            if (payload.unlockToken && payload.walletId) {
+                try {
+                    const setRes = await fetch('/api/wallet/set-session', {
+                        method: 'POST',
+                        credentials: 'include',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            wallet_id: payload.walletId,
+                            unlock_token: payload.unlockToken,
+                            profile_id: profileId,
+                            profile_name: profileName,
+                        }),
+                    });
+                    if (setRes.ok) {
+                        serverSessionSet = true;
+                        console.log('[Lemma] Server session established via link unlock token');
+                    } else {
+                        const errData = await setRes.json().catch(() => ({}));
+                        sessionError = errData.error || 'set_session_failed';
+                    }
+                } catch (e) {
+                    sessionError = e.message;
+                    console.warn('[Lemma] set-session via link token failed:', e.message);
                 }
-            } catch (e) {
-                console.warn('[Lemma] Could not signal unlock:', e.message);
+            }
+
+            if (!serverSessionSet) {
+                try {
+                    console.log('[Lemma] Signaling unlock to server after device link...');
+                    const signalResponse = await fetch('/api/wallet/signal-unlock', {
+                        method: 'POST',
+                        credentials: 'include',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            wallet_id: payload.walletId,
+                            unlocked_at: this.session.unlockedAt,
+                            expires_at: Math.floor(this.session.expiresAt / 1000),
+                            profile_id: profileId,
+                            profile_name: profileName
+                        })
+                    });
+                    if (signalResponse.ok) {
+                        console.log('[Lemma]  Server notified of linked device unlock');
+                        serverSessionSet = true;
+                        sessionError = null;
+                    }
+                } catch (e) {
+                    console.warn('[Lemma] Could not signal unlock:', e.message);
+                    if (!sessionError) sessionError = e.message;
+                }
             }
         }
 
-        // Check if there's a valid global session (source device might have unlocked)
-        // This handles the case where the QR was scanned after the unlock token expired
-        // but the source device still has a valid session
         if (!serverSessionSet && payload.walletId) {
             console.log('[Lemma] Trying global session fallback...');
             try {
@@ -7139,10 +7706,6 @@ class LemmaWallet {
 
                 if (globalSession?.valid && globalSession?.session) {
                     console.log('[Lemma]  Global session found! Wallet was unlocked on another device.');
-
-                    // We have a valid global session - set local session state
-                    // The user will still need to create a passkey on this device,
-                    // but they can use the wallet immediately
                     this.session = {
                         isUnlocked: true,
                         unlockedAt: globalSession.session.unlocked_at,
@@ -7152,10 +7715,7 @@ class LemmaWallet {
                         source: 'global_session'
                     };
                     await this._put('session', { id: 'current', ...this.session });
-
-                    // Note: serverSessionSet stays false because we don't have a cookie on this device
-                    // The user will need to create a passkey to get their own session cookie
-                    sessionError = null; // Clear error - we found a workaround
+                    sessionError = null;
                     console.log('[Lemma] Local session set from global session. User should create passkey for full cross-site auth.');
                 } else {
                     console.log('[Lemma] No valid global session found.');
@@ -7168,43 +7728,45 @@ class LemmaWallet {
         if (!serverSessionSet && !this.session?.isUnlocked) {
             console.warn('[Lemma]  Server session not set - user will need to create passkey for cross-site auth');
         }
+
+        try {
+            await this.fetchAndStoreSeedEnvelopes();
+        } catch (e) {
+            console.warn('[Lemma] seed envelope fetch after link skipped:', e.message);
+        }
         
         console.log(`[Lemma] Device linked successfully with profile: ${profileName}`);
         
-        // AUTO-RESTORE: Re-issue the role-backed lemma for this PPID on lemma.id.
-        // This ensures newly linked devices restore admin/developer/user access deterministically.
         let platformCredentialIssued = false;
-        try {
-            console.log('[Lemma] Restoring lemma.id role credential for linked device...');
-            
-            const ppid = await this.derivePPID('lemma.id');
-            const issueResponse = await fetch('https://lemma.id/api/wallet-auth/restore-site-access', {
-                method: 'POST',
-                credentials: 'include',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    ppid: ppid,
-                    site_id: 'lemma.id'
-                })
-            });
-            
-            if (issueResponse.ok) {
-                const issueData = await issueResponse.json();
-                if (issueData.success && issueData.permission_lemma) {
-                    // Store the issued credential
-                    await this.storeCredential(issueData.permission_lemma);
-                    platformCredentialIssued = true;
-                    console.log('[Lemma]  Restored role credential issued and stored:', issueData.restored_role || 'unknown');
+        if (!humanProofRestored) {
+            try {
+                console.log('[Lemma] Restoring lemma.id role credential for linked device...');
+                const ppid = await this.derivePPID('lemma.id');
+                const issueResponse = await fetch(`${window.location?.origin || 'https://lemma.id'}/api/wallet-auth/restore-site-access`, {
+                    method: 'POST',
+                    credentials: 'include',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ ppid, site_id: 'lemma.id' })
+                });
+                if (issueResponse.ok) {
+                    const issueData = await issueResponse.json();
+                    if (issueData.success && issueData.permission_lemma) {
+                        await this.storeCredential(issueData.permission_lemma);
+                        platformCredentialIssued = true;
+                        console.log('[Lemma]  Restored role credential issued and stored:', issueData.restored_role || 'unknown');
+                    }
                 }
+            } catch (e) {
+                console.warn('[Lemma] Could not auto-restore platform role credential:', e.message);
             }
-        } catch (e) {
-            console.warn('[Lemma] Could not auto-restore platform role credential:', e.message);
-            // Non-fatal - user can request credential later
         }
         
-        // Build appropriate message based on session state
         let message;
-        if (serverSessionSet && platformCredentialIssued) {
+        if (humanProofRestored && serverSessionSet) {
+            message = `Wallet "${profileName}" linked with your human proof restored. Create a passkey on this device.`;
+        } else if (humanProofRestored) {
+            message = `Wallet "${profileName}" linked with human proof restored. Create a passkey for full access.`;
+        } else if (serverSessionSet && platformCredentialIssued) {
             message = `Wallet "${profileName}" linked with full access! Create a passkey to secure it.`;
         } else if (serverSessionSet) {
             message = `Wallet "${profileName}" linked! Create a passkey to secure it.`;
@@ -7220,11 +7782,13 @@ class LemmaWallet {
             profileId: profileId,
             profileName: profileName,
             needsPasskey: true,
-            sessionSet: serverSessionSet,  // FIXED: Accurately reflects if server session cookie was set
-            localSessionSet: this.session?.isUnlocked || false,  // Whether local session is active
-            sessionSource: this.session?.source || null,  // 'link' or 'global_session'
-            sessionError: sessionError,  // Error message if session setup failed
+            sessionSet: serverSessionSet,
+            localSessionSet: this.session?.isUnlocked || false,
+            sessionSource: this.session?.source || null,
+            sessionError: sessionError,
             credentialIssued: platformCredentialIssued,
+            humanProofRestored,
+            credentialsImported,
             message: message
         };
     }
@@ -7388,6 +7952,14 @@ class LemmaWallet {
      * Encrypt payload for device linking using AES-GCM
      */
     async _encryptForLink(payload, keyBytes, additionalData = null) {
+        const encoder = new TextEncoder();
+        return this._encryptLinkBytes(encoder.encode(payload), keyBytes, additionalData);
+    }
+
+    /**
+     * Encrypt raw payload bytes for device linking using AES-GCM.
+     */
+    async _encryptLinkBytes(payloadBytes, keyBytes, additionalData = null) {
         // Import key
         const key = await crypto.subtle.importKey(
             'raw',
@@ -7401,15 +7973,14 @@ class LemmaWallet {
         const iv = crypto.getRandomValues(new Uint8Array(12));
         
         // Encrypt
-        const encoder = new TextEncoder();
         const encryptParams = { name: 'AES-GCM', iv: iv };
         if (additionalData) {
-            encryptParams.additionalData = encoder.encode(additionalData);
+            encryptParams.additionalData = new TextEncoder().encode(additionalData);
         }
         const encrypted = await crypto.subtle.encrypt(
             encryptParams,
             key,
-            encoder.encode(payload)
+            payloadBytes
         );
         
         // Combine IV + ciphertext and base64 encode
@@ -7417,104 +7988,49 @@ class LemmaWallet {
         combined.set(iv, 0);
         combined.set(new Uint8Array(encrypted), iv.length);
         
-        return btoa(String.fromCharCode(...combined));
-    }
-    
-    /**
-     * Normalize link input to raw QR JSON data.
-     * Accepts full URL, hash-only base64, or raw JSON.
-     */
-    _normalizeLinkInput(linkInput) {
-        if (!linkInput || typeof linkInput !== 'string') {
-            throw new Error('Invalid link code');
-        }
-        
-        let data = linkInput.trim();
-        
-        // If a full URL was pasted, extract the hash
-        if (/^https?:\/\//i.test(data)) {
-            try {
-                const url = new URL(data);
-                if (url.hash && url.hash.length > 1) {
-                    data = url.hash.substring(1);
-                }
-            } catch (e) {
-                // Fall through - treat as raw input
-            }
-        }
-        
-        // If not JSON, try base64url decode to JSON
-        if (data && data[0] !== '{') {
-            let base64 = data.replace(/-/g, '+').replace(/_/g, '/');
-            while (base64.length % 4) base64 += '=';
-            
-            try {
-                const decoded = atob(base64);
-                JSON.parse(decoded);
-                return decoded;
-            } catch (e) {
-                // Fall through - let JSON.parse throw in _decryptLinkQR
-            }
-        }
-        
-        return data;
-    }
-    
-    /**
-     * Decrypt QR data from device linking
-     */
-    async _decryptLinkQR(qrData) {
-        const data = JSON.parse(qrData);
-        
-        if (data.v !== 1) {
-            throw new Error('Unsupported link code version');
-        }
-        
-        if (data.e && data.e < Date.now()) {
-            throw new Error('Link code expired');
-        }
-        
-        // Convert hex key to bytes
-        const keyBytes = new Uint8Array(
-            data.k.match(/.{2}/g).map(byte => parseInt(byte, 16))
-        );
-        
-        // Decode base64 payload
-        const combined = Uint8Array.from(atob(data.p), c => c.charCodeAt(0));
-        
-        // Extract IV and ciphertext
-        const iv = combined.slice(0, 12);
-        const ciphertext = combined.slice(12);
-        
-        // Import key
-        const key = await crypto.subtle.importKey(
-            'raw',
-            keyBytes,
-            { name: 'AES-GCM' },
-            false,
-            ['decrypt']
-        );
-        
-        // Decrypt
-        const decrypted = await crypto.subtle.decrypt(
-            { name: 'AES-GCM', iv: iv },
-            key,
-            ciphertext
-        );
-        
-        const decoder = new TextDecoder();
-        return JSON.parse(decoder.decode(decrypted));
-    }
-    
-    /**
-     * Derive a 6-digit short code from encryption key
-     */
-    _deriveShortCode(keyBytes) {
-        // Use first 4 bytes to derive a 6-digit number
-        const num = (keyBytes[0] << 16) | (keyBytes[1] << 8) | keyBytes[2];
-        return String(num % 1000000).padStart(6, '0');
+        return this._arrayBufferToStandardBase64(combined);
     }
 
+    async _prepareLinkPayloadBytes(payload) {
+        const bytes = new TextEncoder().encode(payload);
+        const compressed = await this._gzipBytes(bytes);
+        if (compressed && compressed.byteLength < bytes.byteLength) {
+            return { bytes: compressed, encoding: 'gzip' };
+        }
+        return { bytes, encoding: null };
+    }
+
+    async _gzipBytes(bytes) {
+        if (typeof CompressionStream === 'undefined' || typeof Response === 'undefined' || typeof Blob === 'undefined') {
+            return null;
+        }
+        try {
+            const stream = new Blob([bytes]).stream().pipeThrough(new CompressionStream('gzip'));
+            return new Uint8Array(await new Response(stream).arrayBuffer());
+        } catch (e) {
+            console.warn('[Lemma] Link payload compression unavailable:', e.message);
+            return null;
+        }
+    }
+
+    async _gunzipBytes(bytes) {
+        if (typeof DecompressionStream === 'undefined' || typeof Response === 'undefined' || typeof Blob === 'undefined') {
+            throw new Error('This browser cannot open compressed transfer links. Update your browser or generate a new transfer link from a compatible device.');
+        }
+        const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'));
+        return new Uint8Array(await new Response(stream).arrayBuffer());
+    }
+
+    _arrayBufferToStandardBase64(buffer) {
+        const bytes = buffer instanceof Uint8Array ? buffer : new Uint8Array(buffer);
+        let binary = '';
+        const chunkSize = 0x8000;
+        for (let i = 0; i < bytes.length; i += chunkSize) {
+            binary += String.fromCharCode(...bytes.slice(i, i + chunkSize));
+        }
+        return btoa(binary);
+    }
+    
     // ========================================
     // BACKWARDS COMPATIBILITY (for old templates)
     // ========================================
@@ -7557,19 +8073,26 @@ class LemmaWallet {
             storedAt: Date.now()
         };
         
+        const isIsHumanCredential = this._isIsHumanCredentialRecord(lemma);
+        let storedInLemmas = false;
+
         // Store locally (encrypted lemmas when PRF available)
         try {
             await this._put('lemmas', lemma);
+            storedInLemmas = true;
         } catch (e) {
-            if (this._isIsHumanCredentialRecord(lemma) && this._isEncryptedStorageLockedError(e)) {
+            if (isIsHumanCredential && this._isEncryptedStorageLockedError(e)) {
                 console.warn('[Lemma] Encrypted lemmas locked — isHuman credential cached only');
             } else {
                 throw e;
             }
         }
 
-        if (this._isIsHumanCredentialRecord(lemma)) {
-            await this._putIsHumanCacheRecord(lemma);
+        if (isIsHumanCredential) {
+            const storedInCache = await this._putIsHumanCacheRecord(lemma);
+            if (!storedInLemmas && !storedInCache) {
+                throw new Error('ishuman_storage_unavailable');
+            }
         }
         console.log(' Credential stored locally:', lemma.id);
         
@@ -7709,18 +8232,50 @@ class LemmaWallet {
                 || accountType === 'admin';
         };
         
-        // 1. Get all permission lemmas from IndexedDB
-        const permissions = await this.getCredentials('permission');
+        const hasPlatformPermissionClaims = (credential) => {
+            const claims = credential?.claims || credential?.credentialSubject || {};
+            const site = normalizeSite(claims.siteId || claims.site || claims.site_id || claims.siteDomain || claims.site_domain || '');
+            if (site !== 'lemma.id' && site !== 'lemma_platform') return false;
+            return !!(
+                claims.permissionId
+                || claims.permission_level
+                || claims.permission_id
+                || claims.accountType
+                || claims.account_type
+            );
+        };
+
+        // 1. Get permission lemmas plus combined lemma.id isHuman+IAM master credentials.
+        const permissions = (await this.getCredentials()).filter((credential) => {
+            const pkgType = String(credential.packageType || credential.claims?.type || credential.type?.[1] || '').toLowerCase();
+            return pkgType === 'permission'
+                || pkgType === 'permissionlemma'
+                || hasPlatformPermissionClaims(credential);
+        });
         
         // 2. Filter for requested site
-        const normalizedTargetSite = normalizeSite(siteId);
-        const sitePermissions = permissions.filter(p => {
-            const claims = p.claims || p.credentialSubject || {};
-            const credSiteId = normalizeSite(claims.siteId || claims.site || claims.site_id || claims.siteDomain || claims.site_domain || '');
-            if (!credSiteId || !normalizedTargetSite) return false;
-            return credSiteId === normalizedTargetSite
-                || credSiteId.includes(normalizedTargetSite)
-                || normalizedTargetSite.includes(credSiteId);
+        const utils = typeof window !== 'undefined' ? window.LemmaCredentialUtils : null;
+        const normalizedTargetSite = utils && typeof utils.canonicalPlatformSite === 'function'
+            ? utils.canonicalPlatformSite(siteId)
+            : normalizeSite(siteId);
+        const sitePermissions = permissions.filter((p) => {
+            let credSiteId = '';
+            if (utils && typeof utils.getCredentialSiteBinding === 'function') {
+                credSiteId = utils.getCredentialSiteBinding(p);
+            } else {
+                const claims = p.claims || p.credentialSubject || {};
+                credSiteId = normalizeSite(
+                    claims.siteId || claims.site || claims.site_id || claims.siteDomain || claims.site_domain || '',
+                );
+            }
+            if (!normalizedTargetSite) return false;
+            if (!credSiteId) {
+                return this._shouldVerifyAsIsHumanCredential(p);
+            }
+            const normalizedCredSite = utils && typeof utils.canonicalPlatformSite === 'function'
+                ? utils.canonicalPlatformSite(credSiteId)
+                : normalizeSite(credSiteId);
+            return normalizedCredSite === normalizedTargetSite;
         });
         
         if (sitePermissions.length === 0) {
@@ -7737,8 +8292,10 @@ class LemmaWallet {
         
         for (const perm of sitePermissions) {
             try {
-                const verification = await this.verifyLemma(perm);
-                
+                const verification = this._shouldVerifyAsIsHumanCredential(perm)
+                    ? await this._verifyIsHumanCredentialBrowser(perm)
+                    : await this.verifyLemma(perm);
+
                 if (verification.valid) {
                     verifiedPermissions.push(perm);
                 } else {
@@ -7906,6 +8463,12 @@ if (typeof window !== 'undefined') {
     const lemmaWalletInstance = new LemmaWallet();
     window.lemmaWallet = lemmaWalletInstance;  // The INSTANCE (lowercase)
     window.globalLemmaWallet = lemmaWalletInstance;  // For templates that use this
+    window.signLemmaPopEnvelope = function signLemmaPopEnvelope(popEnvelope) {
+        if (typeof lemmaWalletInstance.signLemmaPopEnvelope !== 'function') {
+            return Promise.resolve(null);
+        }
+        return lemmaWalletInstance.signLemmaPopEnvelope(popEnvelope);
+    };
     
     // Auto-initialize on load
     if (document.readyState === 'loading') {

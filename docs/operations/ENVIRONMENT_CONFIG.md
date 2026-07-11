@@ -109,6 +109,12 @@ both the API key and workflow id are present.
 | `LEMMA_DISABLE_BRIDGE_IFRAME`         | unset   | When `"true"`, verifier SDK uses popup-only flow, skips bridge iframe (Phase 2). |
 | `LEMMA_ISHUMAN_USE_PERSON_ROOT_SEEDS` | unset   | When `"true"`, post-IDV wallets use `wallet_local_seed`/`person_root_proxy` derivation (Phase 1.1). |
 | `LEMMA_API_RATE_LIMIT_DEGRADED_MODE`  | `memory`| Behavior when Redis limiter is unavailable: `memory` or `fail_open`.          |
+| `LEMMA_REDIS_MAX_CONNECTIONS`         | `8`     | Shared Redis pool size per worker (also honors legacy `LEMMA_DB_REDIS_MAX_CONNECTIONS` / `LEMMA_AUTH_REDIS_MAX_CONNECTIONS`). Keep total under Heroku Mini (~20) across workers + Flask-Limiter. |
+| `LEMMA_PG_POOL_MAX` / `LEMMA_PG_POOL_MIN` | `5` / `1` | Raw psycopg2 pool for IAM/revocation SQL (`get_db_connection`). |
+| `LEMMA_SQLALCHEMY_POOL_SIZE` / `MAX_OVERFLOW` / `POOL_RECYCLE` | `3` / `2` / `280` | SQLAlchemy engine pool tuning. |
+| `LEMMA_REVOCATION_FILTER_CACHE_TTL_SECONDS` | `60` | In-process + HTTP `max-age` for bloom filter. |
+| `LEMMA_REVOCATION_FILTER_SWR_SECONDS` | `300` | `stale-while-revalidate` for bloom HTTP cache. |
+| `LEMMA_DIDIT_CIRCUIT_FAILURES` / `LEMMA_DIDIT_CIRCUIT_RECOVERY_SECONDS` | `5` / `60` | Didit outbound circuit breaker. |
 | `LEMMA_BILLING_ENFORCEMENT`           | unset   | When `"1"`, blocks isHuman issuance (`derive-site-proof`) for customers without active billing. **Do not enable in production without an explicit go-live decision.** |
 
 ### Platform owner (lemma.id admin sole-control)

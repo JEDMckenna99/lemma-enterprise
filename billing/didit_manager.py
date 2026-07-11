@@ -21,16 +21,25 @@ import hashlib
 import hmac
 import json
 import logging
+import os
 import time
 from typing import Any, Dict, Optional
 
 import requests
+
+from api.circuit_breaker import CircuitBreaker
 
 logger = logging.getLogger(__name__)
 
 # Maximum allowed clock skew between X-Timestamp and now (didit spec: 300s).
 WEBHOOK_MAX_SKEW_SECONDS = 300
 _SESSION_TIMEOUT_SECONDS = 15
+
+_didit_breaker = CircuitBreaker(
+    "didit",
+    failure_threshold=int(os.getenv("LEMMA_DIDIT_CIRCUIT_FAILURES", "5")),
+    recovery_seconds=float(os.getenv("LEMMA_DIDIT_CIRCUIT_RECOVERY_SECONDS", "60")),
+)
 
 
 class DiditWebhookError(Exception):
@@ -155,6 +164,10 @@ class DiditManager:
         if not self.enabled:
             return {"success": False, "error": "didit_not_configured"}
 
+        if not _didit_breaker.allow():
+            logger.warning("Didit circuit open — refusing session create")
+            return {"success": False, "error": "didit_circuit_open"}
+
         url = f"{self.api_base}/v3/session/"
         payload: Dict[str, Any] = {
             "workflow_id": self.workflow_id,
@@ -174,10 +187,12 @@ class DiditManager:
                 timeout=_SESSION_TIMEOUT_SECONDS,
             )
         except requests.RequestException as exc:
+            _didit_breaker.record_failure()
             logger.error("Didit session request failed: %s", exc)
             return {"success": False, "error": "didit_request_failed", "message": str(exc)}
 
         if resp.status_code not in (200, 201):
+            _didit_breaker.record_failure()
             logger.error("Didit session creation failed: %s %s", resp.status_code, resp.text[:500])
             return {
                 "success": False,
@@ -189,9 +204,11 @@ class DiditManager:
         session_id = data.get("session_id") or data.get("id")
         hosted_url = data.get("url") or data.get("verification_url") or data.get("session_url")
         if not session_id or not hosted_url:
+            _didit_breaker.record_failure()
             logger.error("Didit session response missing fields: %s", data)
             return {"success": False, "error": "didit_response_incomplete"}
 
+        _didit_breaker.record_success()
         logger.info("Created didit session %s", session_id)
         return {
             "success": True,
@@ -218,6 +235,10 @@ class DiditManager:
         if not session_id:
             return {"success": False, "error": "session_id required"}
 
+        if not _didit_breaker.allow():
+            logger.warning("Didit circuit open — refusing decision fetch")
+            return {"success": False, "error": "didit_circuit_open"}
+
         url = f"{self.api_base}/v3/session/{session_id}/decision/"
         try:
             resp = requests.get(
@@ -229,16 +250,19 @@ class DiditManager:
                 timeout=_SESSION_TIMEOUT_SECONDS,
             )
         except requests.RequestException as exc:
+            _didit_breaker.record_failure()
             logger.error("Didit decision fetch failed: %s", exc)
             return {"success": False, "error": "didit_request_failed", "message": str(exc)}
 
         if resp.status_code != 200:
+            _didit_breaker.record_failure()
             logger.warning(
                 "Didit decision fetch non-200: %s %s", resp.status_code, resp.text[:300]
             )
             return {"success": False, "error": "didit_decision_unavailable",
                     "status_code": resp.status_code}
 
+        _didit_breaker.record_success()
         decision = resp.json() if resp.content else {}
         status = str(decision.get("status") or "").strip().lower()
         return {"success": True, "status": status, "decision": decision}

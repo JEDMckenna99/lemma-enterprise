@@ -1941,7 +1941,6 @@ def site_unblock():
 
 @ishuman_bp.route("/api/ishuman/site-doubt", methods=["POST"])
 @cross_origin()
-@require_api_key
 def site_doubt():
     """Require a fresh IDV for one site PPID without banning it."""
     site = _require_site_api_key()
@@ -1979,7 +1978,6 @@ def site_doubt():
 
 @ishuman_bp.route("/api/ishuman/site-doubt-clear", methods=["POST"])
 @cross_origin()
-@require_api_key
 def site_doubt_clear():
     """Explicitly clear a temporary doubt; site blocks are untouched."""
     site = _require_site_api_key()

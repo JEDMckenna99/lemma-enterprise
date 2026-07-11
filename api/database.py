@@ -4,7 +4,9 @@ Database setup and models for Lemma.id platform
 
 import os
 import logging
+import threading
 import psycopg2
+from psycopg2 import pool as pg_pool
 from datetime import datetime
 from typing import Optional, List, Dict, Any
 from sqlalchemy import (
@@ -25,65 +27,25 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, Session
 from dataclasses import dataclass, asdict
 
+logger = logging.getLogger(__name__)
+
 # Redis for caching and session storage
 try:
-    import redis
+    import redis  # noqa: F401
     redis_available = True
 except ImportError:
     redis_available = False
-    logger.warning("⚠️ Redis library not available")
+    logger.warning("Redis library not available")
 
-logger = logging.getLogger(__name__)
-
-# Redis client (lazy initialization)
-_redis_client = None
 
 def get_redis_client():
-    """Get Redis client (singleton pattern)"""
-    global _redis_client
-    
+    """Get shared Redis client (raises if Redis is required but unavailable)."""
     if not redis_available:
         raise Exception("Redis library not installed")
-    
-    if _redis_client is None:
-        redis_url = os.getenv('REDIS_URL') or os.getenv('REDIS_TLS_URL')
-        
-        if not redis_url:
-            raise Exception("REDIS_URL not set in environment")
-        
-        logger.info(f"🔗 Connecting to Redis...")
 
-        from redis.backoff import ExponentialBackoff
-        from redis.retry import Retry
-        from redis.exceptions import (
-            ConnectionError as RedisConnectionError,
-            TimeoutError as RedisTimeoutError,
-        )
+    from api.redis_client import get_shared_redis
 
-        # Parse URL and connect (disable SSL verification for Heroku self-signed certs).
-        # Bounded pool + retry/backoff keep us resilient to the shared 20-connection
-        # Mini cap and the provider's 300s idle-connection cull.
-        conn_kwargs = dict(
-            decode_responses=True,  # Return strings instead of bytes
-            socket_connect_timeout=5,
-            socket_timeout=5,
-            socket_keepalive=True,
-            health_check_interval=30,
-            max_connections=int(os.getenv('LEMMA_DB_REDIS_MAX_CONNECTIONS', '6')),
-            retry=Retry(ExponentialBackoff(cap=1.0, base=0.1), retries=3),
-            retry_on_error=[RedisConnectionError, RedisTimeoutError],
-        )
-        if redis_url.startswith('rediss://'):
-            import ssl
-            conn_kwargs['ssl_cert_reqs'] = ssl.CERT_NONE  # Heroku uses self-signed certs
-
-        _redis_client = redis.from_url(redis_url, **conn_kwargs)
-        
-        # Test connection
-        _redis_client.ping()
-        logger.info(f"✅ Redis connected successfully")
-    
-    return _redis_client
+    return get_shared_redis(required=True)
 
 # Database setup
 DATABASE_URL = os.getenv('DATABASE_URL')
@@ -91,42 +53,209 @@ if DATABASE_URL and DATABASE_URL.startswith('postgres://'):
     # Fix for SQLAlchemy 1.4+ which requires postgresql://
     DATABASE_URL = DATABASE_URL.replace('postgres://', 'postgresql://', 1)
 
-engine = create_engine(DATABASE_URL, echo=False)
+_engine_kwargs = {
+    "echo": False,
+    "pool_pre_ping": True,
+}
+# QueuePool knobs are Postgres-only; SQLite uses a different pool class.
+if DATABASE_URL and DATABASE_URL.startswith("postgresql"):
+    _engine_kwargs.update(
+        {
+            "pool_recycle": int(os.getenv("LEMMA_SQLALCHEMY_POOL_RECYCLE", "280")),
+            "pool_size": int(os.getenv("LEMMA_SQLALCHEMY_POOL_SIZE", "3")),
+            "max_overflow": int(os.getenv("LEMMA_SQLALCHEMY_MAX_OVERFLOW", "2")),
+        }
+    )
+engine = (
+    create_engine(DATABASE_URL, **_engine_kwargs)
+    if DATABASE_URL
+    else create_engine("sqlite:///:memory:", echo=False)
+)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
-# Raw psycopg2 connection for IAM API (needs cursor access)
+# Process-local raw psycopg2 pool (IAM / revocation paths).
+# Size per worker; total ≈ WEB_CONCURRENCY * (LEMMA_PG_POOL_MAX + SQLAlchemy pools).
+_raw_pg_pool = None
+_raw_pg_pool_lock = threading.Lock()
+_raw_pg_pool_disabled = False
+
+
+def _normalize_database_url(db_url: str) -> str:
+    if db_url.startswith("postgres://"):
+        return db_url.replace("postgres://", "postgresql://", 1)
+    return db_url
+
+
+def _get_raw_pg_pool():
+    """Lazy ThreadedConnectionPool for get_db_connection()."""
+    global _raw_pg_pool, _raw_pg_pool_disabled
+
+    if _raw_pg_pool_disabled:
+        return None
+
+    with _raw_pg_pool_lock:
+        if _raw_pg_pool is not None:
+            return _raw_pg_pool
+
+        db_url = os.getenv("DATABASE_URL")
+        if not db_url:
+            raise Exception("DATABASE_URL not set in environment")
+
+        db_url = _normalize_database_url(db_url)
+        minconn = int(os.getenv("LEMMA_PG_POOL_MIN", "1"))
+        maxconn = int(os.getenv("LEMMA_PG_POOL_MAX", "5"))
+        if maxconn < minconn:
+            maxconn = minconn
+
+        try:
+            _raw_pg_pool = pg_pool.ThreadedConnectionPool(
+                minconn,
+                maxconn,
+                dsn=db_url,
+                sslmode="require",
+            )
+            logger.info(
+                "Postgres raw pool ready (min=%s max=%s)",
+                minconn,
+                maxconn,
+            )
+            return _raw_pg_pool
+        except Exception as exc:
+            # Local SQLite / missing SSL — fall back to unpooled connect.
+            logger.warning("Postgres pool init failed, using direct connects: %s", exc)
+            _raw_pg_pool_disabled = True
+            return None
+
+
+class _PooledConnection:
+    """psycopg2 connection wrapper: close() returns the conn to the pool."""
+
+    __slots__ = ("_conn", "_pool", "_closed")
+
+    def __init__(self, conn, pool_obj):
+        self._conn = conn
+        self._pool = pool_obj
+        self._closed = False
+
+    def cursor(self, *args, **kwargs):
+        return self._conn.cursor(*args, **kwargs)
+
+    def commit(self):
+        return self._conn.commit()
+
+    def rollback(self):
+        return self._conn.rollback()
+
+    def close(self):
+        if self._closed:
+            return
+        self._closed = True
+        conn = self._conn
+        try:
+            try:
+                conn.rollback()
+            except Exception:
+                pass
+            try:
+                with conn.cursor() as cur:
+                    # Clear RLS GUC so the next borrower cannot inherit site scope.
+                    cur.execute("RESET app.current_site_id")
+                conn.commit()
+            except Exception:
+                try:
+                    conn.rollback()
+                except Exception:
+                    pass
+            self._pool.putconn(conn)
+        except Exception:
+            try:
+                conn.close()
+            except Exception:
+                pass
+
+    def __getattr__(self, name):
+        return getattr(self._conn, name)
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc, tb):
+        if exc_type is not None:
+            try:
+                self.rollback()
+            except Exception:
+                pass
+        self.close()
+        return False
+
+    def __del__(self):
+        try:
+            self.close()
+        except Exception:
+            pass
+
+
 def get_db_connection(site_id=None):
     """
-    Get raw psycopg2 database connection for IAM API
-    Returns connection with cursor() method for SQL queries
-    
+    Get a raw psycopg2 database connection for IAM / revocation SQL.
+
+    Connections come from a process-local ThreadedConnectionPool when available.
+    Callers must close() the connection (returns it to the pool).
+
     Args:
         site_id (str, optional): Site ID for Row-Level Security (RLS) context
-    
+
     If site_id is provided, sets PostgreSQL session variable for RLS policies.
     This ensures even with SQL injection, customers only see their own data.
     """
-    db_url = os.getenv('DATABASE_URL')
+    db_url = os.getenv("DATABASE_URL")
     if not db_url:
         raise Exception("DATABASE_URL not set in environment")
-    
-    # Fix URL for psycopg2
-    if db_url.startswith('postgres://'):
-        db_url = db_url.replace('postgres://', 'postgresql://', 1)
-    
-    # Connect with SSL required (Heroku)
-    conn = psycopg2.connect(db_url, sslmode='require')
-    
-    # Set RLS context if site_id provided (for Row-Level Security policies)
-    if site_id:
+
+    pool_obj = _get_raw_pg_pool()
+    if pool_obj is not None:
+        raw = pool_obj.getconn()
+        conn = _PooledConnection(raw, pool_obj)
+    else:
+        db_url = _normalize_database_url(db_url)
+        try:
+            conn = psycopg2.connect(db_url, sslmode="require")
+        except Exception:
+            conn = psycopg2.connect(db_url)
+
+    # Always clear leftover RLS, then set if requested.
+    try:
         cursor = conn.cursor()
-        # Set session variable for RLS policies
-        # This makes all queries automatically filtered by site_id
-        cursor.execute("SET app.current_site_id = %s", (site_id,))
+        if site_id:
+            cursor.execute("SET app.current_site_id = %s", (site_id,))
+        else:
+            try:
+                cursor.execute("RESET app.current_site_id")
+            except Exception:
+                pass
         cursor.close()
-    
+    except Exception:
+        try:
+            conn.close()
+        except Exception:
+            pass
+        raise
+
     return conn
+
+
+def reset_db_pools_for_tests():
+    """Drop raw PG pool state (unit tests only)."""
+    global _raw_pg_pool, _raw_pg_pool_disabled
+    with _raw_pg_pool_lock:
+        if _raw_pg_pool is not None:
+            try:
+                _raw_pg_pool.closeall()
+            except Exception:
+                pass
+        _raw_pg_pool = None
+        _raw_pg_pool_disabled = False
 
 class Customer(Base):
     """

@@ -52,14 +52,10 @@ def get_velocity_redis():
     if _velocity_redis is not None:
         return _velocity_redis
     try:
-        import redis
-        redis_url = os.getenv('REDISCLOUD_URL') or os.getenv('REDIS_URL')
-        if redis_url:
-            if redis_url.startswith('rediss://'):
-                _velocity_redis = redis.from_url(redis_url, decode_responses=True, ssl_cert_reqs=None)
-            else:
-                _velocity_redis = redis.from_url(redis_url, decode_responses=True)
-            _velocity_redis.ping()
+        from api.redis_client import get_shared_redis
+
+        _velocity_redis = get_shared_redis(prefer_cloud=True, decode_responses=True)
+        if _velocity_redis:
             logger.info("Issuance velocity tracking: Redis connected")
             return _velocity_redis
     except Exception as e:

@@ -53,15 +53,15 @@ def _redis_storage_uri() -> str:
         return "memory://"
 
     try:
-        import redis
+        from api.redis_client import get_shared_redis
 
+        client = get_shared_redis()
+        if client is None:
+            raise RuntimeError("shared redis unavailable")
         if REDIS_URL.startswith('rediss://'):
-            client = redis.from_url(REDIS_URL, decode_responses=True, ssl_cert_reqs=None)
             storage_uri = f"{REDIS_URL}?ssl_cert_reqs=none"
         else:
-            client = redis.from_url(REDIS_URL, decode_responses=True)
             storage_uri = REDIS_URL
-        client.ping()
         logger.info("Rate limiter using Redis storage")
         return storage_uri
     except Exception as e:

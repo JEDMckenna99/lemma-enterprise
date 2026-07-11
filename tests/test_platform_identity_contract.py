@@ -65,7 +65,7 @@ def test_wallet_skips_empty_site_before_canonicalization(wallet_js_source):
 
 @pytest.mark.unit
 def test_wallet_version_bumped_for_platform_identity(wallet_js_source):
-    assert "static VERSION = '2.73.0'" in wallet_js_source
+    assert "static VERSION = '2.74.0'" in wallet_js_source
 
 
 @pytest.mark.unit
@@ -88,7 +88,7 @@ def test_ishuman_verifier_unlock_uses_unified_idv_popup():
 def test_idv_popup_supports_unlock_mode():
     idv = (ROOT / "templates" / "wallet_ishuman_idv.html").read_text(encoding="utf-8")
     assert "isUnlockOnly = issueMode === 'unlock'" in idv
-    assert "runUnlockOnlyFlow" in idv
+    assert "prepareUnlockOnlyUi" in idv
     assert "LEMMA_UNLOCK_SUCCESS" in idv
 
 
@@ -137,7 +137,7 @@ def test_sdk_cache_bust_bumped_in_templates():
         "templates/recover_complete.html",
     ):
         text = (ROOT / rel).read_text(encoding="utf-8")
-        assert "lemma-wallet.js" in text and "v=2673" in text, rel
+        assert "lemma-wallet.js" in text and "v=2677" in text, rel
 
 
 def _encode_credential(credential: dict) -> str:
@@ -212,4 +212,4 @@ def test_device_link_bundles_ishuman_credentials_and_unlock_token(wallet_js_sour
     assert "humanProofRestored" in wallet_js_source
     assert "beginLinkReceive" in wallet_js_source
     assert "sendLinkDepositFromScan" in wallet_js_source
-    assert "2.73.0" in wallet_js_source
+    assert "2.74.0" in wallet_js_source
