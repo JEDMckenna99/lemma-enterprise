@@ -727,61 +727,84 @@
   gap: 10px 14px;
 }
 
-.demo-policy-toggle {
+.demo-seg-toggle-wrap {
   display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 12px;
-  font-weight: 700;
-  color: var(--demo-ink);
-  cursor: pointer;
-  user-select: none;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
 }
 
-.demo-policy-toggle input {
-  position: absolute;
-  opacity: 0;
-  width: 0;
-  height: 0;
-}
-
-.demo-policy-toggle-track {
+.demo-seg-toggle {
   position: relative;
-  width: 36px;
-  height: 20px;
+  display: inline-grid;
+  grid-template-columns: 1fr 1fr;
+  align-items: stretch;
+  min-width: 168px;
+  padding: 3px;
   border-radius: 999px;
-  background: #cbd5e1;
-  flex-shrink: 0;
-  transition: background 0.2s ease;
-}
-
-.demo-policy-toggle-track::after {
-  content: "";
-  position: absolute;
-  top: 2px;
-  left: 2px;
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  background: #fff;
-  transition: transform 0.2s ease;
-}
-
-.demo-policy-toggle input:checked + .demo-policy-toggle-track {
   background: #6366f1;
+  box-shadow: inset 0 0 0 1px rgba(79, 70, 229, 0.35);
 }
 
-.demo-policy-toggle input:checked + .demo-policy-toggle-track::after {
-  transform: translateX(16px);
+.demo-seg-toggle-thumb {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: calc(50% - 3px);
+  height: calc(100% - 6px);
+  border-radius: 999px;
+  background: #fff;
+  box-shadow: 0 1px 4px rgba(15, 23, 42, 0.18);
+  transition: transform 0.22s ease;
+  pointer-events: none;
+  z-index: 0;
 }
 
-.demo-policy-toggle input:focus-visible + .demo-policy-toggle-track {
-  outline: 2px solid #818cf8;
+.demo-seg-toggle[data-active="1"] .demo-seg-toggle-thumb {
+  transform: translateX(100%);
+}
+
+.demo-seg-toggle-btn {
+  position: relative;
+  z-index: 1;
+  appearance: none;
+  border: 0;
+  background: transparent;
+  margin: 0;
+  padding: 8px 14px;
+  border-radius: 999px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.2;
+  color: #fff;
+  cursor: pointer;
+  transition: color 0.18s ease;
+}
+
+.demo-seg-toggle-btn.is-active {
+  color: #6366f1;
+}
+
+.demo-seg-toggle-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.demo-seg-toggle-btn:focus-visible {
+  outline: 2px solid #c7d2fe;
   outline-offset: 2px;
 }
 
-.demo-policy-toggle-label {
-  line-height: 1.3;
+.demo-seg-toggle-hint {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--demo-muted);
+  padding-left: 4px;
+}
+
+.demo-policy-toggle {
+  display: none;
 }
 
 .demo-results-table {

@@ -57,7 +57,14 @@ def test_ishuman_demo_page_loads_expected_assets(ishuman_demo_client):
     assert "ih-wallet-slots" in body
     assert "ih-abuse-block-btn" in body
     assert "ih-trials-ishuman-toggle" in body
-    assert "Trials requires human proof" in body
+    assert "ih-unblock-tickets-btn" in body
+    assert "ih-trials-passkey-btn" in body
+    assert "demo-seg-toggle" in body
+    assert ">Passkey</button>" in body
+    assert ">Human</button>" in body
+    assert ">Block</button>" in body
+    assert ">Unblock</button>" in body
+    assert "Trials assurance" in body
     assert "ih-raise-tickets-policy-btn" not in body
     assert "ih-policy-toggle-card" not in body
     assert "ih-complete-human-main-btn" in body
@@ -120,8 +127,8 @@ def test_ishuman_demo_page_loads_expected_assets(ishuman_demo_client):
     assert "/sdk/ishuman-verifier.js" in body
     assert "/static/js/demo/ishuman-demo.js" in body
     assert "/static/css/demo/ishuman-demo.css" in body
-    assert "/static/js/demo/ishuman-demo.js?v=61" in body
-    assert "/static/css/demo/ishuman-demo.css?v=38" in body
+    assert "/static/js/demo/ishuman-demo.js?v=62" in body
+    assert "/static/css/demo/ishuman-demo.css?v=39" in body
     assert "Site A" in body
     assert "Site B" in body
     assert "\U0001f511" not in body

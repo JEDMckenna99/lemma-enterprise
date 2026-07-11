@@ -269,11 +269,26 @@
     return DEFAULT_DEMO_SITE_ASSURANCE;
   }
 
+  function setSegToggleActive(rootId, activeIndex) {
+    const root = $(rootId);
+    if (!root) return;
+    const index = activeIndex ? 1 : 0;
+    root.dataset.active = String(index);
+    root.querySelectorAll('.demo-seg-toggle-btn').forEach((btn, i) => {
+      const on = i === index;
+      btn.classList.toggle('is-active', on);
+      btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+    });
+  }
+
   function syncTrialsPolicyToggle() {
-    const toggle = $('ih-trials-ishuman-toggle');
-    if (!toggle) return;
-    toggle.checked = !!state.trialsRequiresIshuman;
-    toggle.setAttribute('aria-checked', toggle.checked ? 'true' : 'false');
+    setSegToggleActive('ih-trials-assurance-seg', !!state.trialsRequiresIshuman);
+  }
+
+  function syncBlockSegToggle() {
+    const tickets = state.results.tickets;
+    const blocked = isSiteBlocked('tickets', tickets);
+    setSegToggleActive('ih-block-seg', blocked);
   }
 
   function setTrialsRequiresIshuman(enabled) {
@@ -287,9 +302,8 @@
     );
   }
 
-  async function onTrialsPolicyToggleChange() {
-    const toggle = $('ih-trials-ishuman-toggle');
-    setTrialsRequiresIshuman(toggle && toggle.checked);
+  async function onTrialsPolicyToggleChange(enabled) {
+    setTrialsRequiresIshuman(enabled);
     if (state.results.trials?.ppid) {
       await verifySite('trials').catch((err) => log('Trials re-verify skipped', err.message));
       updateBlockResultsTable();
@@ -938,7 +952,6 @@
     const table = $('ih-block-results-table');
     const ticketsCell = $('ih-block-result-tickets');
     const trialsCell = $('ih-block-result-trials');
-    const unblockBtn = $('ih-unblock-tickets-btn');
     const outcomeBanner = $('ih-control-outcome-banner');
     const outcomeText = $('ih-control-outcome-text');
     const tickets = state.results.tickets;
@@ -946,8 +959,8 @@
     if (!table || !ticketsCell || !trialsCell) return;
     if (!tickets && !trials) {
       table.hidden = true;
-      if (unblockBtn) unblockBtn.hidden = true;
       if (outcomeBanner) outcomeBanner.hidden = true;
+      syncBlockSegToggle();
       return;
     }
     table.hidden = false;
@@ -957,9 +970,7 @@
     ticketsCell.className = ticketsFmt.className;
     trialsCell.textContent = trialsFmt.text;
     trialsCell.className = trialsFmt.className;
-    if (unblockBtn) {
-      unblockBtn.hidden = !isSiteBlocked('tickets', tickets);
-    }
+    syncBlockSegToggle();
     if (outcomeBanner && outcomeText) {
       const ticketsBlocked = isSiteBlocked('tickets', tickets);
       const trialsBlocked = isSiteBlocked('trials', trials);
@@ -2491,16 +2502,49 @@
     bind('ih-refresh-status-btn', refreshStatus);
     bind('ih-verify-tickets-btn', () => verifySite('tickets'));
     bind('ih-verify-trials-btn', () => verifySite('trials'));
-    bind('ih-unblock-tickets-btn', unblockTickets);
-    bind('ih-abuse-block-btn', blockTickets);
     bind('ih-abuse-recheck-btn', recheckBothSitesAfterBlock);
-    const trialsPolicyToggle = $('ih-trials-ishuman-toggle');
-    if (trialsPolicyToggle) {
-      trialsPolicyToggle.addEventListener('change', () => {
-        onTrialsPolicyToggleChange().catch((err) => log('Error', err.message));
+    const blockBtn = $('ih-abuse-block-btn');
+    const unblockBtn = $('ih-unblock-tickets-btn');
+    if (blockBtn) {
+      blockBtn.addEventListener('click', () => {
+        if (isSiteBlocked('tickets', state.results.tickets)) {
+          syncBlockSegToggle();
+          return;
+        }
+        blockTickets().catch((err) => log('Error', err.message));
+      });
+    }
+    if (unblockBtn) {
+      unblockBtn.addEventListener('click', () => {
+        if (!isSiteBlocked('tickets', state.results.tickets) && !state.localBlocks.tickets.size) {
+          syncBlockSegToggle();
+          return;
+        }
+        unblockTickets().catch((err) => log('Error', err.message));
+      });
+    }
+    const trialsPasskeyBtn = $('ih-trials-passkey-btn');
+    const trialsIshumanBtn = $('ih-trials-ishuman-toggle');
+    if (trialsPasskeyBtn) {
+      trialsPasskeyBtn.addEventListener('click', () => {
+        if (!state.trialsRequiresIshuman) {
+          syncTrialsPolicyToggle();
+          return;
+        }
+        onTrialsPolicyToggleChange(false).catch((err) => log('Error', err.message));
+      });
+    }
+    if (trialsIshumanBtn) {
+      trialsIshumanBtn.addEventListener('click', () => {
+        if (state.trialsRequiresIshuman) {
+          syncTrialsPolicyToggle();
+          return;
+        }
+        onTrialsPolicyToggleChange(true).catch((err) => log('Error', err.message));
       });
     }
     syncTrialsPolicyToggle();
+    syncBlockSegToggle();
     bind('ih-require-ishuman-btn', requireIsHumanOnTickets);
     bind('ih-complete-ishuman-btn', completeIsHumanVerification);
     bind('ih-reverify-tickets-ishuman-btn', reverifyTicketsIshuman);
