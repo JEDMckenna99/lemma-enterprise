@@ -114,7 +114,7 @@ The cross-site demo also has two standalone Heroku apps that act as third-party 
 - Ticketing: `https://lemma-demo-tickets-1d3d7411af33.herokuapp.com`
 - Free trial: `https://lemma-demo-trials-7090f46cae0d.herokuapp.com`
 
-Both load the hosted verifier from your configured `LEMMA_ORIGIN` and call `verifyForBackend` with env-driven `LEMMA_DEMO_REQUIRED_ASSURANCE` (default `passkey`). Stamped actions POST to `/api/demo/action` for server-side `verifyStamp`.
+Both load the hosted verifier from your configured `LEMMA_ORIGIN` and call `verifyForBackend` with env-driven `LEMMA_DEMO_REQUIRED_ASSURANCE` (default `passkey`). Protected actions POST the returned `presentation` to `/api/demo/action` for server-side offline `verify()`.
 
 - `tickets-demo.lemma.id`
 - `trials-demo.lemma.id`

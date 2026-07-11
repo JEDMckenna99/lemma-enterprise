@@ -62,14 +62,48 @@ def test_relying_site_config(relying_site_client):
     assert payload["required_assurance"] == "passkey"
 
 
-def test_relying_site_action_denies_missing_stamp(relying_site_client):
+def test_relying_site_action_denies_missing_presentation(relying_site_client):
     client, _mod = relying_site_client
     resp = client.post("/api/demo/action", json={})
     payload = resp.get_json()
 
     assert resp.status_code == 403
     assert payload["success"] is False
-    assert payload["reason"] in {"action_stamp_missing", "action_stamp_incomplete", "stamp_missing_proof"}
+    assert payload["reason"] == "presentation_missing"
+
+
+def test_relying_site_action_verifies_presentation(relying_site_client, monkeypatch):
+    client, mod = relying_site_client
+    mod.ACTION_LOG.clear()
+    mod._VERIFY_CTX = None
+
+    class _FakeResult:
+        ok = True
+        ppid = "ppid_demo_123"
+        assurance = "passkey"
+        reason = "session_valid"
+
+    def _fake_verify(self, _presentation):
+        return _FakeResult()
+
+    monkeypatch.setattr(mod.VerificationContext, "verify", _fake_verify)
+
+    resp = client.post(
+        "/api/demo/action",
+        json={
+            "action": "reserve_tickets",
+            "email": "fan@example.com",
+            "presentation": {"credential": {"id": "cred-1"}},
+        },
+    )
+    payload = resp.get_json()
+
+    assert resp.status_code == 200
+    assert payload["success"] is True
+    assert payload["ppid"] == "ppid_demo_123"
+    assert payload["assurance"] == "passkey"
+    assert payload["reason"] == "session_valid"
+    assert payload["action_log"][0]["action"] == "reserve_tickets"
 
 
 def test_relying_site_action_log_empty(relying_site_client):
@@ -99,4 +133,6 @@ def test_relying_site_index_loads_verifier_script(relying_site_client):
     assert resp.status_code == 200
     assert "IsHumanVerifier" in body
     assert "verifyForBackend" in body
+    assert "stampAction" not in body
+    assert "presentation" in body
     assert "tickets-demo.lemma.id" in body

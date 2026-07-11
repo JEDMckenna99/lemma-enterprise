@@ -7,7 +7,7 @@ from flask import Flask, Response, jsonify, request
 
 logger = logging.getLogger(__name__)
 
-from lemma_ishuman_verify import VerificationContext, InMemoryNonceStore
+from lemma_ishuman_verify import VerificationContext
 
 
 app = Flask(__name__)
@@ -22,7 +22,6 @@ ISHUMAN_VERIFIER_SDK_VERSION = os.getenv("ISHUMAN_VERIFIER_SDK_VERSION", "1.9.0"
 
 ACTION_LOG: deque = deque(maxlen=20)
 _VERIFY_CTX: Optional[VerificationContext] = None
-_NONCE_STORE = InMemoryNonceStore()
 
 
 def _verify_ctx() -> VerificationContext:
@@ -81,35 +80,37 @@ def demo_config():
     })
 
 
+def _extract_presentation(body: dict) -> Optional[dict]:
+    presentation = body.get("presentation")
+    if isinstance(presentation, dict):
+        return presentation
+    return None
+
+
 @app.post("/api/demo/action")
 def demo_action():
     body = request.get_json(silent=True) or {}
     ctx = _verify_ctx()
-    payload = body.get("payload") if isinstance(body.get("payload"), dict) else body
-    action_name = (payload or {}).get("action") or (body.get("lemma") or {}).get("action")
-    try:
-        result = ctx.verify_action_stamp(
-            body,
-            action=action_name or "unknown",
-            method="POST",
-            path="/api/demo/action",
-            body=payload or body,
-            required_assurance=DEMO_REQUIRED_ASSURANCE,
-            nonce_store=_NONCE_STORE,
-        )
-    except Exception:
-        logger.exception("demo_action stamp verification failed")
-        return jsonify({
-            "success": False,
-            "reason": "verify_error",
-            "error": "Stamp verification failed on the server",
-        }), 500
+    presentation = _extract_presentation(body)
+    action_name = body.get("action") or "unknown"
+    if not presentation:
+        result = ctx.Result(False, "presentation_missing")
+    else:
+        try:
+            result = ctx.verify(presentation)
+        except Exception:
+            logger.exception("demo_action presentation verification failed")
+            return jsonify({
+                "success": False,
+                "reason": "verify_error",
+                "error": "Presentation verification failed on the server",
+            }), 500
     entry = {
         "ok": result.ok,
         "ppid": result.ppid,
         "assurance": getattr(result, "assurance", None),
         "reason": result.reason,
-        "action": (body.get("payload") or {}).get("action"),
+        "action": action_name,
     }
     ACTION_LOG.appendleft(entry)
     status = 200 if result.ok else 403
@@ -314,7 +315,8 @@ def index():
           <li>SDK checks local site proof cache first.</li>
           <li>Missing proof → Lemma popup derives passkey assurance (no IDV yet).</li>
           <li>Site policy may require human proof assurance → IDV step-up, same PPID.</li>
-          <li>Server verifies your action stamp with offline revocation checks.</li>
+          <li>After first site proof, later clicks reuse the cached presentation — no action-sign popup.</li>
+          <li>Server verifies your presentation with offline revocation checks.</li>
           <li>Business never sees passport, selfie, or cross-site ID.</li>
         </ol>
         <details>
@@ -385,7 +387,7 @@ def index():
       return 'Verified';
     }}
 
-    function formatVerdictDetail(response, stampNote, assurance) {{
+    function formatVerdictDetail(response, serverNote, assurance) {{
       const tier = assurance || response.assurance || SITE_POLICY;
       const tierNote = tier === 'passkey'
         ? ' · continuity only — IDV not required at this tier'
@@ -393,7 +395,7 @@ def index():
       return 'policy satisfied · assurance=' + tier
         + ' · reason=' + response.reason
         + ' · ' + response.timeMs.toFixed(0) + 'ms · site-private PPID issued'
-        + stampNote
+        + serverNote
         + tierNote
         + '.';
     }}
@@ -420,22 +422,21 @@ def index():
       return okReason && !!response.ppid;
     }}
 
-    function applyVerdict(response, {{ silent = false, stampedEvent = null, serverEntry = null }} = {{}}) {{
+    function applyVerdict(response, {{ silent = false, requestPayload = null, serverEntry = null }} = {{}}) {{
       const verified = isDemoVerified(response);
       const assurance = response.assurance || serverEntry?.assurance || null;
       pill.textContent = formatVerdictPill(verified, assurance);
       pill.className = 'pill ' + (verified ? 'ok' : (silent ? 'checking' : 'deny'));
       setAssurancePill(assurance);
-      const lemma = stampedEvent?.lemma || null;
-      const ppid = response.ppid || lemma?.ppid || '';
+      const ppid = response.ppid || serverEntry?.ppid || '';
       if (verified) {{
         decisionCopy.textContent = '{copy["success"]}. PPID: ' + (ppid || '').slice(0, 28) + '…';
         if (!silent) {{
-          const stampNote = serverEntry?.ok
-            ? ' · server verified stamp'
+          const serverNote = serverEntry?.ok
+            ? ' · server verified presentation'
             : '';
           decisionCard.innerHTML = '<strong>{copy["success"]}</strong><p class="tiny">'
-            + formatVerdictDetail(response, stampNote, assurance)
+            + formatVerdictDetail(response, serverNote, assurance)
             + '</p>';
         }}
       }} else if (!silent) {{
@@ -444,7 +445,7 @@ def index():
       }} else {{
         decisionCopy.textContent = formatMissingProof(response.reason);
       }}
-      const payload = stampedEvent || response;
+      const payload = requestPayload || response;
       result.textContent = JSON.stringify(payload, null, 2);
     }}
 
@@ -494,17 +495,16 @@ def index():
         const response = {{ human: !!ok, ppid, assurance, reason, timeMs: timeMs || 0 }};
         if (ok) {{
           const email = document.getElementById('email')?.value || '';
-          const actionPayload = {{ action: '{copy["action"]}', email, at: Date.now() }};
-          const stampedEvent = await verifier.stampAction(actionPayload, {{
+          const requestPayload = {{
             action: '{copy["action"]}',
-            method: 'POST',
-            path: '/api/demo/action',
-            requiredAssurance: SITE_POLICY,
-          }});
+            email,
+            at: Date.now(),
+            presentation,
+          }};
           const serverRes = await fetch('/api/demo/action', {{
             method: 'POST',
             headers: {{ 'Content-Type': 'application/json' }},
-            body: JSON.stringify(stampedEvent),
+            body: JSON.stringify(requestPayload),
           }});
           const serverRaw = await serverRes.text();
           let serverEntry;
@@ -517,7 +517,7 @@ def index():
             );
           }}
           await refreshActionLog();
-          applyVerdict(response, {{ stampedEvent, serverEntry }});
+          applyVerdict(response, {{ requestPayload, serverEntry }});
         }} else {{
           applyVerdict(response);
         }}
