@@ -45,6 +45,7 @@
     results: {},
     localBlocks: { tickets: new Set(), trials: new Set() },
     wizardRunning: false,
+    blockToggleBusy: false,
     lastVerifyMs: { tickets: null, trials: null },
     passkeyPpids: {},
     assuranceStatus: null,
@@ -482,20 +483,24 @@
     }
   }
 
-  function isSiteBlocked(slug, result) {
+  function isSiteBlocked(slug, result = null) {
+    // localBlocks (hydrated from demo status / block actions) is the source of
+    // truth for the Block|Unblock control. Do not treat a stale verify reason
+    // alone as blocked — that leaves the toggle stuck after a successful unblock
+    // when the last result still says site_blocked.
     const ppid = result?.ppid || resolveSitePpid(slug);
     if (ppid && state.localBlocks[slug]?.has(ppid)) return true;
-    if (result && ppid && !result.human && ['site_blocked', 'site_block', 'revoked'].includes(result.reason)) {
-      return true;
-    }
     return !!(state.localBlocks[slug]?.size);
   }
 
   function formatBlockResult(slug, result) {
     const ppid = result?.ppid || resolveSitePpid(slug);
     if (!ppid) return { text: 'Not verified yet', className: '' };
-    if (result?.human) return { text: 'Still verified', className: 'result-ok' };
     if (isSiteBlocked(slug, result)) return { text: 'Blocked', className: 'result-deny' };
+    if (result?.human) return { text: 'Still verified', className: 'result-ok' };
+    if (result && !result.human && ['site_blocked', 'site_block', 'revoked'].includes(result.reason)) {
+      return { text: 'Blocked', className: 'result-deny' };
+    }
     return { text: 'Not verified', className: 'result-warn' };
   }
 
@@ -1914,11 +1919,20 @@
       if (payload?.unblocked !== false) unblockedAny = true;
       state.localBlocks.tickets.delete(ppid);
     }
+    // Drop stale blocked verify results immediately so the Block control can
+    // fire again even if the follow-up verify is slow or fails.
+    if (state.results.tickets && ['site_blocked', 'site_block', 'revoked'].includes(state.results.tickets.reason)) {
+      state.results.tickets = {
+        ...state.results.tickets,
+        human: true,
+        reason: 'unblocked',
+      };
+    }
     clearVerifierCache('tickets');
     if (window.IsHumanVerifier?.broadcastBlockUpdate) {
       for (const ppid of ppids) {
         window.IsHumanVerifier.broadcastBlockUpdate({
-          type: 'NETWORK_REVOCATION',
+          type: 'SITE_BLOCK_UPDATE',
           siteId: SITE_IDS.tickets,
           ppid,
           reason: 'demo_site_unblock',
@@ -1929,12 +1943,16 @@
     const netJson = $('ih-master-json');
     if (netJson) netJson.textContent = pretty({ unblocked: unblockedAny, ppids: [...ppids] });
     log('Ticketing site block removed', [...ppids].map(short).join(', '));
-    await refreshStatus().catch(() => {});
-    await verifySite('tickets');
-    await verifySite('trials');
-    await refreshAbuseChecks();
-    updateBlockResultsTable();
-    updateStepLocks();
+    try {
+      await refreshStatus().catch(() => {});
+      await verifySite('tickets');
+      await verifySite('trials');
+      await refreshAbuseChecks();
+    } finally {
+      syncBlockSegToggle();
+      updateBlockResultsTable();
+      updateStepLocks();
+    }
     setQuickInsight('Act 3 — Enforce', unblockedAny
       ? 'Ticketing unblocked — block again anytime to retry the demo.'
       : 'No active ticketing block found — both sites rechecked.');
@@ -2508,30 +2526,44 @@
     const unblockBtn = $('ih-unblock-tickets-btn');
     if (blockBtn) {
       blockBtn.addEventListener('click', () => {
-        if (state.wizardRunning) return;
+        if (state.wizardRunning || state.blockToggleBusy) return;
         if (isSiteBlocked('tickets', state.results.tickets)) {
           syncBlockSegToggle();
           return;
         }
+        state.blockToggleBusy = true;
         setSegToggleActive('ih-block-seg', true);
-        blockTickets().catch((err) => {
-          log('Error', err.message);
-          syncBlockSegToggle();
-        });
+        blockTickets()
+          .catch((err) => {
+            log('Error', err.message);
+            setQuickInsight('Heads up', err.message);
+          })
+          .finally(() => {
+            state.blockToggleBusy = false;
+            syncBlockSegToggle();
+            updateBlockResultsTable();
+          });
       });
     }
     if (unblockBtn) {
       unblockBtn.addEventListener('click', () => {
-        if (state.wizardRunning) return;
-        if (!isSiteBlocked('tickets', state.results.tickets) && !state.localBlocks.tickets.size) {
+        if (state.wizardRunning || state.blockToggleBusy) return;
+        if (!isSiteBlocked('tickets', state.results.tickets)) {
           syncBlockSegToggle();
           return;
         }
+        state.blockToggleBusy = true;
         setSegToggleActive('ih-block-seg', false);
-        unblockTickets().catch((err) => {
-          log('Error', err.message);
-          syncBlockSegToggle();
-        });
+        unblockTickets()
+          .catch((err) => {
+            log('Error', err.message);
+            setQuickInsight('Heads up', err.message);
+          })
+          .finally(() => {
+            state.blockToggleBusy = false;
+            syncBlockSegToggle();
+            updateBlockResultsTable();
+          });
       });
     }
     const trialsPasskeyBtn = $('ih-trials-passkey-btn');
