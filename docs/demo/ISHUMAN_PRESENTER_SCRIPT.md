@@ -11,6 +11,8 @@
    a site block or touches trials.
 6. Show local backend presentation verification and the privacy-safe billing
    event fields.
+7. On the tickets demo site, claim a unique presale code once; a second claim
+   with the same wallet is denied with `allocation_already_claimed`.
 
 Do not describe or demonstrate network-wide user enumeration or revocation.
 Those legacy endpoints are retired and return HTTP 410.

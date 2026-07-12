@@ -48,6 +48,9 @@ def test_relying_site_health(relying_site_client):
     assert payload["success"] is True
     assert payload["site_id"] == "tickets-demo.lemma.id"
     assert payload["required_assurance"] == "passkey"
+    assert payload["presale_mode"] is True
+    assert payload["presale_drop_id"]
+    assert payload["presale_claim_assurance"] == "ishuman"
 
 
 def test_relying_site_config(relying_site_client):
@@ -135,9 +138,9 @@ def test_relying_site_index_loads_verifier_script(relying_site_client):
 
     assert resp.status_code == 200
     assert "IsHumanVerifier" in body
-    assert "verifyForBackend" in body
-    assert "stampAction" not in body
-    assert "presentation" in body
+    assert "stampAction" in body
+    assert "claim_presale_code" in body
+    assert "unique presale code" in body.lower()
     assert "tickets-demo.lemma.id" in body
 
 
@@ -148,18 +151,16 @@ def test_relying_site_index_exposes_server_receipt_and_hub_return(relying_site_c
 
     assert 'id="server-receipt"' in body
     assert 'id="server-receipt-fields"' in body
-    assert 'id="presentation-json"' in body
+    assert 'id="stamp-json"' in body
     assert "Server verification receipt" in body
     assert "formatDenyReason" in body
-    assert "renderServerReceipt" in body
+    assert "renderReceipt" in body
     assert "isBlockedLocally" in body
     assert "/api/demo/policy/check" in body
-    assert "site_blocked" in body
+    assert "allocation_already_claimed" in body
     assert "assurance_insufficient" in body
-    assert "Verified (passkey)" in body
-    assert "Human (ishuman)" in body
-    assert "?from=demo" in body
-    assert "demo hub" in body.lower()
+    assert "Try again with same wallet" in body
+    assert "/api/presale/claim-code" in body
 
 
 def test_relying_site_action_denies_invalid_presentation(relying_site_client, monkeypatch):
@@ -190,3 +191,60 @@ def test_relying_site_action_denies_invalid_presentation(relying_site_client, mo
     assert resp.status_code == 403
     assert payload["success"] is False
     assert payload["reason"] == "invalid_signature"
+
+
+def test_presale_claim_denies_missing_stamp(relying_site_client):
+    client, mod = relying_site_client
+    mod.ACTION_LOG.clear()
+    mod._PRESALE_LEDGER.reset()
+    mod._NONCE_STORE = mod.InMemoryNonceStore()
+
+    resp = client.post("/api/presale/claim-code", json={"drop_id": "drop-a"})
+    payload = resp.get_json()
+
+    assert resp.status_code == 403
+    assert payload["success"] is False
+    assert payload["reason"] == "action_stamp_missing"
+
+
+def test_presale_claim_issues_code_once(relying_site_client, monkeypatch):
+    client, mod = relying_site_client
+    mod.ACTION_LOG.clear()
+    mod._PRESALE_LEDGER.reset()
+    mod._CLAIM_VERIFY_CTX = None
+    mod._NONCE_STORE = mod.InMemoryNonceStore()
+
+    class _FakeResult:
+        ok = True
+        ppid = "did:lemma:ppid_demo_123"
+        legacy_ppid = None
+        assurance = "ishuman"
+        reason = "valid"
+        credential_id = "cred-1"
+        issuer_did = "did:lemma:test"
+        bound_site_id = "tickets-demo.lemma.id"
+
+    def _fake_verify_action_stamp(self, *_args, **_kwargs):
+        return _FakeResult()
+
+    monkeypatch.setattr(mod.VerificationContext, "verify_action_stamp", _fake_verify_action_stamp)
+
+    body = {
+        "drop_id": mod.PRESALE_DROP_ID,
+        "email": "fan@example.com",
+        "phone": "+15550101234",
+        "lemma": {"verified": True},
+    }
+    first = client.post("/api/presale/claim-code", json=body)
+    second = client.post("/api/presale/claim-code", json=body)
+    first_payload = first.get_json()
+    second_payload = second.get_json()
+
+    assert first.status_code == 200
+    assert first_payload["success"] is True
+    assert len(first_payload["code"]) == 8
+
+    assert second.status_code == 403
+    assert second_payload["success"] is False
+    assert second_payload["reason"] == "allocation_already_claimed"
+    assert second_payload["existing_code"] == first_payload["code"]

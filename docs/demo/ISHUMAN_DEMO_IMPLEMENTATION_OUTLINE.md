@@ -8,7 +8,8 @@ The demo covers the production relying-site contract:
 - persistent site block and authenticated site unblock;
 - separate site doubt and deliberate `verifyFreshForBackend()` flow;
 - same-PPID doubt clearing without cross-site effects;
-- 30-day credential renewal with stable PPID and rotated credential ID.
+- 30-day credential renewal with stable PPID and rotated credential ID;
+- unique presale code ledger keyed by `(drop_id, ppid)` on the tickets demo site.
 
 The demo must not expose API keys or wallet secrets. Test IDV bypasses remain
 disabled in production. Network-wide revocation controls and claims are retired;

@@ -68,11 +68,31 @@ ACTION_STAMP_VERSION = "action_stamp_v1"
 TRUST_LIST_PREFIX = "lemma:issuer-trust-list:v1"
 TIME_SKEW_SECONDS = 300
 DEFAULT_MAX_ACTION_AGE_SECONDS = 60
+CONVERGENCE_PREFIX = "lemma:ppid-convergence:v1"
+CONVERGENCE_SCHEMA = "ppid_convergence.v1"
 
 
-# ---------------------------------------------------------------------------
-# Canonical message helpers (must byte-exactly match the issuer/verifier)
-# ---------------------------------------------------------------------------
+def _import_enforce_site_policy():
+    """Load site-policy helper from package or sibling zero-install file."""
+    try:
+        from lemma_ishuman_site_policy import enforce_site_policy
+
+        return enforce_site_policy
+    except ImportError:
+        import importlib.util
+        import sys
+        from pathlib import Path
+
+        sibling = Path(__file__).resolve().with_name("lemma_ishuman_site_policy.py")
+        if not sibling.exists():
+            raise ImportError("lemma_ishuman_site_policy unavailable") from None
+        spec = importlib.util.spec_from_file_location("lemma_ishuman_site_policy", sibling)
+        if spec is None or spec.loader is None:
+            raise ImportError("lemma_ishuman_site_policy unavailable") from None
+        mod = importlib.util.module_from_spec(spec)
+        sys.modules[spec.name] = mod
+        spec.loader.exec_module(mod)
+        return mod.enforce_site_policy
 
 
 def browser_canonical_message(credential: dict) -> bytes:
@@ -100,6 +120,83 @@ def browser_canonical_message(credential: dict) -> bytes:
     if credential.get("expiresAt") is not None:
         payload["expiresAt"] = credential["expiresAt"]
     return json.dumps(payload, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+
+
+def build_convergence_canonical_message(artifact: dict) -> bytes:
+    lines = [
+        CONVERGENCE_PREFIX,
+        str(artifact.get("site_id") or "").strip(),
+        str(artifact.get("legacy_ppid") or "").strip(),
+        str(artifact.get("canonical_ppid") or "").strip(),
+        str(artifact.get("convergence_id") or "").strip(),
+        str(artifact.get("nonce") or "").strip(),
+        str(int(artifact.get("issued_at_unix") or 0)),
+        str(int(artifact.get("expires_at_unix") or 0)),
+    ]
+    return "\n".join(lines).encode("utf-8")
+
+
+def verify_ppid_convergence_artifact(
+    artifact: dict,
+    *,
+    site_id: str,
+    canonical_ppid: str,
+    trusted_issuer_pubkeys: list[str],
+    now_unix: Optional[int] = None,
+) -> tuple[bool, str]:
+    if not isinstance(artifact, dict):
+        return False, "convergence_missing"
+    if str(artifact.get("schema") or "") != CONVERGENCE_SCHEMA:
+        return False, "convergence_schema_mismatch"
+    if str(artifact.get("site_id") or "").strip() != str(site_id or "").strip():
+        return False, "convergence_site_mismatch"
+    if str(artifact.get("canonical_ppid") or "").strip() != str(canonical_ppid or "").strip():
+        return False, "convergence_canonical_ppid_mismatch"
+    now = int(now_unix if now_unix is not None else time.time())
+    try:
+        expires_at = int(artifact.get("expires_at_unix") or 0)
+        issued_at = int(artifact.get("issued_at_unix") or 0)
+    except (TypeError, ValueError):
+        return False, "convergence_timestamps_invalid"
+    if not issued_at or not expires_at or expires_at < now:
+        return False, "convergence_expired"
+    if issued_at > now + TIME_SKEW_SECONDS:
+        return False, "convergence_issued_in_future"
+    proof = artifact.get("proof") or {}
+    signature_hex = str(proof.get("signatureValueWeb") or "").strip()
+    if not signature_hex:
+        return False, "convergence_signature_missing"
+    try:
+        signature = bytes.fromhex(signature_hex)
+    except ValueError:
+        return False, "convergence_signature_malformed"
+    unsigned = {
+        key: artifact[key]
+        for key in (
+            "schema",
+            "convergence_id",
+            "site_id",
+            "legacy_ppid",
+            "canonical_ppid",
+            "issued_at_unix",
+            "expires_at_unix",
+            "nonce",
+        )
+        if key in artifact
+    }
+    digest = hashlib.sha256(build_convergence_canonical_message(unsigned)).digest()
+    for pubkey_hex in trusted_issuer_pubkeys:
+        try:
+            Ed25519PublicKey.from_public_bytes(bytes.fromhex(pubkey_hex)).verify(signature, digest)
+            return True, "valid"
+        except (InvalidSignature, ValueError):
+            continue
+    return False, "convergence_invalid_signature"
+
+
+# ---------------------------------------------------------------------------
+# Canonical message helpers (must byte-exactly match the issuer/verifier)
+# ---------------------------------------------------------------------------
 
 
 def _b64url_decode(text: str) -> bytes:
@@ -547,6 +644,7 @@ class VerificationContext:
         issuer_did: Optional[str] = None
         bound_site_id: Optional[str] = None
         assurance: Optional[str] = None
+        legacy_ppid: Optional[str] = None
 
     def verify(self, presentation: dict) -> "VerificationContext.Result":
         """Verify a presentation bundle without contacting lemma.id per-request."""
@@ -643,6 +741,22 @@ class VerificationContext:
         elif self.require_session_assertion and site_pubkey_b64:
             return self.Result(False, "session_assertion_required")
 
+        legacy_ppid = None
+        convergence = (presentation or {}).get("ppid_convergence")
+        if convergence:
+            trusted_pubkeys: list[str] = []
+            for trusted_issuer in snapshot.issuers.values():
+                trusted_pubkeys.extend(sorted(trusted_issuer.pubkeys_hex))
+            ok_conv, conv_reason = verify_ppid_convergence_artifact(
+                convergence,
+                site_id=self.site_id,
+                canonical_ppid=credential.get("subject") or "",
+                trusted_issuer_pubkeys=trusted_pubkeys,
+            )
+            if not ok_conv:
+                return self.Result(False, conv_reason)
+            legacy_ppid = str(convergence.get("legacy_ppid") or "").strip() or None
+
         return self.Result(
             ok=True,
             reason="valid",
@@ -651,7 +765,35 @@ class VerificationContext:
             issuer_did=issuer_did,
             bound_site_id=bound_site,
             assurance=assurance,
+            legacy_ppid=legacy_ppid,
         )
+
+    def verify_with_policy(
+        self,
+        presentation: dict,
+        *,
+        policy_store=None,
+        require_policy: bool = True,
+    ) -> "VerificationContext.Result":
+        """Verify presentation crypto, then enforce site block/doubt policy."""
+        result = self.verify(presentation)
+        if not result.ok:
+            return result
+        try:
+            enforce_site_policy = _import_enforce_site_policy()
+        except ImportError:
+            if require_policy:
+                return self.Result(False, "site_policy_not_configured")
+            return result
+        ok, reason, _decision = enforce_site_policy(
+            ppid=result.ppid or "",
+            policy_store=policy_store,
+            legacy_ppid=result.legacy_ppid,
+            require_policy=require_policy,
+        )
+        if not ok:
+            return self.Result(False, reason, ppid=result.ppid, legacy_ppid=result.legacy_ppid)
+        return result
 
     def verify_stamp(
         self, stamp: dict, *, key: str = "lemma", durable: bool = False
