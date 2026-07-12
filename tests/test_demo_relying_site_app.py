@@ -80,14 +80,16 @@ def test_relying_site_action_verifies_presentation(relying_site_client, monkeypa
     class _FakeResult:
         ok = True
         ppid = "ppid_demo_123"
-        legacy_ppid = None
         assurance = "passkey"
         reason = "session_valid"
+        credential_id = "cred-1"
+        issuer_did = "did:lemma:test"
+        bound_site_id = "tickets-demo.lemma.id"
 
-    def _fake_verify_with_policy(self, _presentation, **_kwargs):
+    def _fake_verify(self, _presentation):
         return _FakeResult()
 
-    monkeypatch.setattr(mod.VerificationContext, "verify_with_policy", _fake_verify_with_policy)
+    monkeypatch.setattr(mod.VerificationContext, "verify", _fake_verify)
 
     resp = client.post(
         "/api/demo/action",
@@ -168,14 +170,13 @@ def test_relying_site_action_denies_invalid_presentation(relying_site_client, mo
     class _FakeResult:
         ok = False
         ppid = None
-        legacy_ppid = None
         assurance = None
         reason = "invalid_signature"
 
-    def _fake_verify_with_policy(self, _presentation, **_kwargs):
+    def _fake_verify(self, _presentation):
         return _FakeResult()
 
-    monkeypatch.setattr(mod.VerificationContext, "verify_with_policy", _fake_verify_with_policy)
+    monkeypatch.setattr(mod.VerificationContext, "verify", _fake_verify)
 
     resp = client.post(
         "/api/demo/action",

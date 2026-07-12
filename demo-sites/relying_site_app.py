@@ -140,11 +140,28 @@ def demo_action():
         result = ctx.Result(False, "presentation_missing")
     else:
         try:
-            result = ctx.verify_with_policy(
-                presentation,
-                policy_store=_POLICY_STORE,
-                require_policy=True,
-            )
+            result = ctx.verify(presentation)
+            if result.ok:
+                available, decision, policy_reason = _POLICY_STORE.check(
+                    result.ppid or ""
+                )
+                denial_reason = None
+                if not available:
+                    denial_reason = policy_reason or "site_policy_unavailable"
+                elif decision.blocked:
+                    denial_reason = "site_blocked"
+                elif decision.doubt_required:
+                    denial_reason = "doubt_required"
+                if denial_reason:
+                    result = ctx.Result(
+                        False,
+                        denial_reason,
+                        ppid=result.ppid,
+                        credential_id=result.credential_id,
+                        issuer_did=result.issuer_did,
+                        bound_site_id=result.bound_site_id,
+                        assurance=result.assurance,
+                    )
         except Exception:
             logger.exception("demo_action presentation verification failed")
             return jsonify({
