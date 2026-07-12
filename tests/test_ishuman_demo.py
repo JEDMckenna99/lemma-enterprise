@@ -31,7 +31,7 @@ def test_ishuman_demo_page_loads_expected_assets(ishuman_demo_client):
 
     assert resp.status_code == 200
     assert "One lemma.id. A different private ID on every site." in body
-    assert "passkey-protected proof container" in body
+    assert "passkey-protected proof wallet" in body
     assert "Human proofs + lemma.id demo" in body
     assert "Get started" in body
     assert "View developer docs" in body
@@ -40,35 +40,33 @@ def test_ishuman_demo_page_loads_expected_assets(ishuman_demo_client):
     assert "demo-outcome-footer" in body
     assert "ih-get-started" in body
     assert "ih-run-quick-demo" not in body
-    assert "ih-quick-progress" not in body
-    assert "ih-quick-insight" not in body
+    assert 'id="ih-quick-progress"' in body
+    assert 'id="ih-lifecycle-panel"' in body
+    assert 'id="ih-presentation-inspector"' in body
     assert 'id="ih-advanced-panel"' in body
     assert "Advanced: operator tools &amp; integrator reference" in body
     assert "1. Create your lemma.id" in body
-    assert "2. Verify on two sites" in body
-    assert "3. Enforce on your site" in body
-    assert "Choose the assurance your flow requires" in body
-    assert "Add a human proof to your lemma.id" in body
-    assert "ih-human-cta" in body
+    assert "2. Mint site-private PPIDs" in body
+    assert "3. Inspect signed presentations" in body
+    assert "4. Escalate to human proof" in body
+    assert "5. Doubt and site revocation" in body
+    assert "ih-human-cta" not in body
     assert "free" not in body.split("demo-workflow")[1].split("demo-outcome-footer")[0].lower()
     assert "ih-step-rotation" not in body
     assert "ih-step-human" in body
     assert "ih-simulate-rotation-btn" not in body
     assert "ih-wallet-slots" in body
     assert "ih-abuse-block-btn" in body
-    assert "ih-trials-ishuman-toggle" in body
+    assert "ih-tickets-ishuman-toggle" in body
     assert "ih-unblock-tickets-btn" in body
-    assert "ih-trials-passkey-btn" in body
+    assert "ih-create-doubt-btn" in body
+    assert "ih-resolve-doubt-btn" in body
     assert "demo-seg-toggle" in body
     assert ">Passkey</button>" in body
-    assert ">Human</button>" in body
+    assert ">Human proof</button>" in body
     assert ">Block</button>" in body
     assert ">Unblock</button>" in body
-    assert "Trials assurance" in body
-    assert "<h3>Trials assurance</h3>" in body
-    assert "<h3>Block on Ticketing</h3>" in body
-    assert "demo-seg-toggle-wrap" in body
-    assert "/static/css/demo/ishuman-demo.css?v=41" in body
+    assert "/static/css/demo/ishuman-demo.css?v=42" in body
     assert "ih-raise-tickets-policy-btn" not in body
     assert "ih-policy-toggle-card" not in body
     assert "ih-complete-human-main-btn" in body
@@ -82,8 +80,8 @@ def test_ishuman_demo_page_loads_expected_assets(ishuman_demo_client):
     assert "demo-diagram-stage" in body
     assert "demo-diagram-footnotes" in body
     assert "ih-proof-receipt" in body
-    # Standalone open-site CTA removed — each site card carries its own link.
-    assert "ih-link-tickets-main" not in body
+    assert "ih-link-tickets-main" in body
+    assert "ih-link-trials-inline" in body
     assert "Quick demo" not in body
     assert "Integrator demo" not in body
     assert "Step 5 — Revoke on one site" not in body
@@ -118,10 +116,10 @@ def test_ishuman_demo_page_loads_expected_assets(ishuman_demo_client):
     adv_start = body.index('id="ih-advanced-panel"')
     assert body.index("ih-verify-tickets-btn") > adv_start
     step2_start = body.index('id="ih-step-2"')
-    chapter2_start = body.index("<!-- Act 3")
-    assert "ih-verify-tickets-btn" not in body[step2_start:chapter2_start]
-    assert "ih-verify-tickets-step2" in body[step2_start:chapter2_start]
-    assert "ih-verify-trials-step2" in body[step2_start:chapter2_start]
+    step5_start = body.index('id="ih-step-5"')
+    assert "ih-verify-tickets-btn" not in body[step2_start:step5_start]
+    assert "ih-verify-tickets-step2" in body[step2_start:step5_start]
+    assert "ih-verify-trials-step2" in body[step2_start:step5_start]
     assert "Test-mode automation" not in body
     assert "Unlock wallet" not in body
     assert "ih-try-qr-demo-btn" not in body
@@ -131,8 +129,7 @@ def test_ishuman_demo_page_loads_expected_assets(ishuman_demo_client):
     assert "/sdk/ishuman-verifier.js" in body
     assert "/static/js/demo/ishuman-demo.js" in body
     assert "/static/css/demo/ishuman-demo.css" in body
-    assert "/static/js/demo/ishuman-demo.js?v=64" in body
-    assert "/static/css/demo/ishuman-demo.css?v=41" in body
+    assert "/static/js/demo/ishuman-demo.js?v=65" in body
     assert 'data-seg="unblock"' in body
     assert body.index('id="ih-unblock-tickets-btn"') < body.index('id="ih-abuse-block-btn"')
     js = (ROOT / "static/js/demo/ishuman-demo.js").read_text(encoding="utf-8")
@@ -143,13 +140,13 @@ def test_ishuman_demo_page_loads_expected_assets(ishuman_demo_client):
     assert "\U0001f511" not in body
     assert "\U0001f6e1" not in body
     assert "site-card-icon" in body
-    assert "ticket drops" in body or "SaaS trials" in body
+    assert "Ticketing demo site" in body or "SaaS trial demo site" in body
     assert "ih-simulation-banner" not in body
     assert "Staging simulation only" not in body
     assert "ih-start-simulated-demo" not in body
-    assert 'data-quick-act="3"' not in body
-    assert 'data-quick-act="4"' not in body
-    assert 'data-quick-act="5"' not in body
+    assert 'data-quick-act="3"' in body
+    assert 'data-quick-act="4"' in body
+    assert 'data-quick-act="5"' in body
     human_start = body.index('id="ih-step-human"')
     adv_start = body.index('id="ih-advanced-panel"')
     assert body.index("ih-stepup-compare") < adv_start
@@ -836,3 +833,106 @@ def test_assurance_status_unbound_wallet(ishuman_demo_client):
     assert resp.status_code == 200
     assert payload["person_bound"] is False
     assert payload["provisional"] is False
+
+
+def test_site_doubt_creates_temporary_challenge(
+    ishuman_demo_client,
+    fake_ishuman_db_session_factory,
+    monkeypatch,
+):
+    from api.database import Site, SiteDoubt
+
+    monkeypatch.delenv("ENVIRONMENT", raising=False)
+    fake_ishuman_db_session_factory.store.data[Site.__name__] = [
+        Site(
+            site_id="site_demo_tickets",
+            site_domain="tickets-demo.lemma.id",
+            company_name="Demo Tickets",
+            admin_email="demo@lemma.id",
+            api_key="test",
+        )
+    ]
+    ppid = "did:lemma:ppid_demo_doubt"
+
+    resp = ishuman_demo_client.post(
+        "/api/demo/ishuman/site-doubt",
+        json={"site_slug": "tickets", "ppid": ppid},
+    )
+    payload = resp.get_json()
+    assert resp.status_code == 200
+    assert payload["success"] is True
+    assert payload["doubt_required"] is True
+    rows = fake_ishuman_db_session_factory.store.data[SiteDoubt.__name__]
+    assert len(rows) == 1
+    assert rows[0].is_active is True
+    assert rows[0].ppid == ppid
+
+
+def test_clear_site_doubt_clears_only_matching_doubt(
+    ishuman_demo_client,
+    fake_ishuman_db_session_factory,
+    monkeypatch,
+):
+    from api.database import Site, SiteDoubt
+
+    monkeypatch.delenv("ENVIRONMENT", raising=False)
+    fake_ishuman_db_session_factory.store.data[Site.__name__] = [
+        Site(
+            site_id="site_demo_tickets",
+            site_domain="tickets-demo.lemma.id",
+            company_name="Demo Tickets",
+            admin_email="demo@lemma.id",
+            api_key="test",
+        )
+    ]
+    ppid = "did:lemma:ppid_demo_clear"
+
+    ishuman_demo_client.post(
+        "/api/demo/ishuman/site-doubt",
+        json={"site_slug": "tickets", "ppid": ppid},
+    )
+    resp = ishuman_demo_client.post(
+        "/api/demo/ishuman/clear-site-doubt",
+        json={"site_slug": "tickets", "ppid": ppid},
+    )
+    payload = resp.get_json()
+    assert resp.status_code == 200
+    assert payload["success"] is True
+    assert payload["doubt_required"] is False
+    rows = fake_ishuman_db_session_factory.store.data[SiteDoubt.__name__]
+    assert rows[0].is_active is False
+
+
+def test_status_includes_site_doubts(
+    ishuman_demo_client,
+    fake_ishuman_db_session_factory,
+    monkeypatch,
+):
+    from api.database import Site, SiteDoubt
+
+    monkeypatch.delenv("ENVIRONMENT", raising=False)
+    fake_ishuman_db_session_factory.store.data[Site.__name__] = [
+        Site(
+            site_id="site_demo_tickets",
+            site_domain="tickets-demo.lemma.id",
+            company_name="Demo Tickets",
+            admin_email="demo@lemma.id",
+            api_key="test",
+        )
+    ]
+    ppid = "did:lemma:ppid_status_doubt"
+    fake_ishuman_db_session_factory.store.data[SiteDoubt.__name__] = [
+        SiteDoubt(
+            site_id="site_demo_tickets",
+            ppid=ppid,
+            reason="demo doubt",
+            is_active=True,
+        )
+    ]
+
+    resp = ishuman_demo_client.get("/api/demo/ishuman/status")
+    payload = resp.get_json()
+    assert resp.status_code == 200
+    assert payload["success"] is True
+    assert len(payload["site_doubts"]) == 1
+    assert payload["site_doubts"][0]["ppid"] == ppid

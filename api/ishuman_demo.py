@@ -364,7 +364,11 @@ def ishuman_demo_assurance_status():
 
 @ishuman_demo_bp.route("/api/demo/ishuman/require-ishuman", methods=["POST"])
 def ishuman_demo_require_ishuman():
-    """Demo-only: mark a site PPID as requiring isHuman assurance (SiteDoubt, no auto IDV)."""
+    """Demo-only admin path: legacy SiteDoubt row (not policy escalation).
+
+    Main demo flow uses client-side ``requiredAssurance`` policy toggles for
+    escalation and ``/api/demo/ishuman/site-doubt`` for temporary doubt.
+    """
     from api.database import SessionLocal, SiteDoubt
 
     _guards, err = _require_demo_admin_token()
@@ -411,9 +415,101 @@ def ishuman_demo_require_ishuman():
         db.close()
 
 
+@ishuman_demo_bp.route("/api/demo/ishuman/site-doubt", methods=["POST"])
+def ishuman_demo_site_doubt():
+    """Demo-only: temporary fresh-proof challenge for one site PPID."""
+    if not _demo_enabled():
+        return jsonify({"success": False, "error": "demo_disabled"}), 403
+
+    from api.database import SessionLocal, SiteDoubt
+
+    body = request.get_json(silent=True) or {}
+    slug = (body.get("site_slug") or "tickets").strip()
+    ppid = (body.get("ppid") or "").strip()
+    if not ppid:
+        return jsonify({"success": False, "error": "ppid required"}), 400
+
+    _spec, site = _site_for_slug(slug)
+    if not site:
+        return jsonify({"success": False, "error": "unknown demo site"}), 404
+
+    db = SessionLocal()
+    try:
+        doubt = db.query(SiteDoubt).filter_by(site_id=site.site_id, ppid=ppid).first()
+        if not doubt:
+            doubt = SiteDoubt(site_id=site.site_id, ppid=ppid)
+            db.add(doubt)
+        doubt.reason = (
+            body.get("reason") or "Demo: site requires fresh proof for this PPID"
+        ).strip()
+        doubt.requested_by = site.admin_email or "demo"
+        doubt.requested_at = datetime.utcnow()
+        doubt.is_active = True
+        doubt.cleared_at = None
+        doubt.cleared_by = None
+        db.commit()
+
+        return jsonify({
+            "success": True,
+            "site_id": site.site_id,
+            "site_domain": site.site_domain,
+            "ppid": ppid,
+            "doubt_required": True,
+        })
+    except Exception:
+        db.rollback()
+        raise
+    finally:
+        db.close()
+
+
+@ishuman_demo_bp.route("/api/demo/ishuman/clear-site-doubt", methods=["POST"])
+def ishuman_demo_clear_site_doubt():
+    """Demo-only: clear a temporary site doubt (blocks remain untouched)."""
+    if not _demo_enabled():
+        return jsonify({"success": False, "error": "demo_disabled"}), 403
+
+    from api.database import SessionLocal, SiteDoubt
+
+    body = request.get_json(silent=True) or {}
+    slug = (body.get("site_slug") or "tickets").strip()
+    ppid = (body.get("ppid") or "").strip()
+    if not ppid:
+        return jsonify({"success": False, "error": "ppid required"}), 400
+
+    _spec, site = _site_for_slug(slug)
+    if not site:
+        return jsonify({"success": False, "error": "unknown demo site"}), 404
+
+    db = SessionLocal()
+    try:
+        doubt = db.query(SiteDoubt).filter_by(
+            site_id=site.site_id,
+            ppid=ppid,
+            is_active=True,
+        ).first()
+        if not doubt:
+            return jsonify({"success": False, "error": "no_active_doubt"}), 404
+        doubt.is_active = False
+        doubt.cleared_at = datetime.utcnow()
+        doubt.cleared_by = site.admin_email or "demo"
+        db.commit()
+        return jsonify({
+            "success": True,
+            "site_id": site.site_id,
+            "ppid": ppid,
+            "doubt_required": False,
+        })
+    except Exception:
+        db.rollback()
+        raise
+    finally:
+        db.close()
+
+
 @ishuman_demo_bp.route("/api/demo/ishuman/status", methods=["GET"])
 def ishuman_demo_status():
-    from api.database import IsHumanVerification, SessionLocal, SiteBlock
+    from api.database import IsHumanVerification, SessionLocal, SiteBlock, SiteDoubt
 
     wallet_id = (request.args.get("wallet_id") or "").strip()
     master_credential_id = (request.args.get("master_credential_id") or "").strip()
@@ -433,6 +529,7 @@ def ishuman_demo_status():
             master = masters[-1] if masters else None
 
         site_blocks = []
+        site_doubts = []
         demo_site_ids = [spec["site_id"] for spec in DEMO_SITES.values()]
         requested_ppid = (request.args.get("ppid") or "").strip()
         block_query = db.query(SiteBlock).filter(
@@ -448,11 +545,25 @@ def ishuman_demo_status():
                 "reason": block.reason,
             })
 
+        doubt_query = db.query(SiteDoubt).filter(
+            SiteDoubt.site_id.in_(demo_site_ids),
+            SiteDoubt.is_active.is_(True),
+        )
+        if requested_ppid:
+            doubt_query = doubt_query.filter(SiteDoubt.ppid == requested_ppid)
+        for doubt in doubt_query.all():
+            site_doubts.append({
+                "site_id": doubt.site_id,
+                "ppid": doubt.ppid,
+                "reason": doubt.reason,
+            })
+
         return jsonify({
             "success": True,
             "master": _public_record(master),
             "derived": [],
             "site_blocks": site_blocks,
+            "site_doubts": site_doubts,
         })
     finally:
         db.close()

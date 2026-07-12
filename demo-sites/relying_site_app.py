@@ -8,6 +8,7 @@ from flask import Flask, Response, jsonify, request
 logger = logging.getLogger(__name__)
 
 from lemma_ishuman_verify import VerificationContext
+from lemma_ishuman_site_policy import InMemorySitePolicyStore
 
 
 app = Flask(__name__)
@@ -22,6 +23,7 @@ ISHUMAN_VERIFIER_SDK_VERSION = os.getenv("ISHUMAN_VERIFIER_SDK_VERSION", "1.9.0"
 
 ACTION_LOG: deque = deque(maxlen=20)
 _VERIFY_CTX: Optional[VerificationContext] = None
+_POLICY_STORE = InMemorySitePolicyStore()
 
 
 def _verify_ctx() -> VerificationContext:
@@ -87,6 +89,47 @@ def _extract_presentation(body: dict) -> Optional[dict]:
     return None
 
 
+@app.get("/api/demo/policy/check")
+def demo_policy_check():
+    ppid = (request.args.get("ppid") or "").strip()
+    available, decision, err = _POLICY_STORE.check(ppid)
+    return jsonify({
+        "success": available,
+        "blocked": decision.blocked,
+        "doubt_required": decision.doubt_required,
+        "reason": decision.reason or err,
+        "doubt_reason": decision.doubt_reason,
+    })
+
+
+@app.post("/api/demo/policy/block")
+def demo_policy_block():
+    body = request.get_json(silent=True) or {}
+    ppid = (body.get("ppid") or "").strip()
+    if ppid:
+        _POLICY_STORE.blocked.add(ppid)
+    return jsonify({"success": True, "ppid": ppid, "blocked": True})
+
+
+@app.post("/api/demo/policy/doubt")
+def demo_policy_doubt():
+    body = request.get_json(silent=True) or {}
+    ppid = (body.get("ppid") or "").strip()
+    if ppid:
+        _POLICY_STORE.doubted.add(ppid)
+    return jsonify({"success": True, "ppid": ppid, "doubt_required": True})
+
+
+@app.post("/api/demo/policy/clear")
+def demo_policy_clear():
+    body = request.get_json(silent=True) or {}
+    ppid = (body.get("ppid") or "").strip()
+    if ppid:
+        _POLICY_STORE.blocked.discard(ppid)
+        _POLICY_STORE.doubted.discard(ppid)
+    return jsonify({"success": True, "ppid": ppid})
+
+
 @app.post("/api/demo/action")
 def demo_action():
     body = request.get_json(silent=True) or {}
@@ -97,7 +140,11 @@ def demo_action():
         result = ctx.Result(False, "presentation_missing")
     else:
         try:
-            result = ctx.verify(presentation)
+            result = ctx.verify_with_policy(
+                presentation,
+                policy_store=_POLICY_STORE,
+                require_policy=True,
+            )
         except Exception:
             logger.exception("demo_action presentation verification failed")
             return jsonify({
@@ -108,6 +155,7 @@ def demo_action():
     entry = {
         "ok": result.ok,
         "ppid": result.ppid,
+        "legacy_ppid": getattr(result, "legacy_ppid", None),
         "assurance": getattr(result, "assurance", None),
         "reason": result.reason,
         "action": action_name,
@@ -270,6 +318,25 @@ def index():
     }}
     .verdict strong {{ color: #fff; display: block; margin-bottom: 6px; }}
     .verdict .tiny {{ font-size: 12px; color: #94a3b8; margin: 0; line-height: 1.45; }}
+    .server-receipt {{
+      margin-top: 14px;
+      padding: 14px;
+      border-radius: 12px;
+      border: 1px solid #c7d2fe;
+      background: #eef2ff;
+    }}
+    .server-receipt strong {{ display: block; margin-bottom: 8px; color: #312e81; }}
+    .server-receipt dl {{
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr);
+      gap: 6px 12px;
+      margin: 0;
+      font-size: 12px;
+    }}
+    .server-receipt dt {{ margin: 0; color: #64748b; font-weight: 700; }}
+    .server-receipt dd {{ margin: 0; color: #0f172a; word-break: break-all; }}
+    .hub-return {{ margin-top: 14px; font-size: 13px; }}
+    .hub-return a {{ color: var(--brand); font-weight: 700; text-decoration: none; }}
     .how {{ margin: 0; padding-left: 18px; color: var(--muted); font-size: 14px; line-height: 1.55; }}
     .how li {{ margin-bottom: 8px; }}
     code {{ font-size: 12px; background: #f1f5f9; padding: 2px 6px; border-radius: 6px; }}
@@ -289,7 +356,7 @@ def index():
 <body>
   <header>
     <strong>{SITE_NAME}</strong>
-    <a href="{DEMO_HUB_URL}" target="_blank" rel="noopener">Lemma demo hub</a>
+    <a href="{DEMO_HUB_URL}?from=demo" target="_blank" rel="noopener">Return to demo hub</a>
   </header>
   <main>
     <div class="layout">
@@ -311,6 +378,10 @@ def index():
         <p style="margin:12px 0 6px">Decision <span class="pill" id="status-pill">WAITING</span>
           <span class="pill" id="assurance-pill">policy: {DEMO_REQUIRED_ASSURANCE}</span></p>
         <p class="muted" id="decision-copy">Click the protected action to run the SDK.</p>
+        <div class="server-receipt" id="server-receipt" hidden>
+          <strong>Server verification receipt</strong>
+          <dl id="server-receipt-fields"></dl>
+        </div>
         <ol class="how">
           <li>SDK checks local site proof cache first.</li>
           <li>Missing proof → Lemma popup derives passkey assurance (no IDV yet).</li>
@@ -320,13 +391,14 @@ def index():
           <li>Business never sees passport, selfie, or cross-site ID.</li>
         </ol>
         <details>
+          <summary>Signed presentation JSON</summary>
+          <pre id="presentation-json">{{}}</pre>
+        </details>
+        <details>
           <summary>Server-verified action log</summary>
           <pre id="action-log">[]</pre>
         </details>
-        <details>
-          <summary>SDK result object</summary>
-          <pre id="result">{{}}</pre>
-        </details>
+        <p class="hub-return">Continue the walkthrough on the <a href="{DEMO_HUB_URL}?from=demo" target="_blank" rel="noopener">lemma.id demo hub</a> — stages 3–5 cover presentations, escalation, and doubt/revocation.</p>
       </aside>
     </div>
   </main>
@@ -341,7 +413,9 @@ def index():
     }}
     const pill = document.getElementById('status-pill');
     const assurancePill = document.getElementById('assurance-pill');
-    const result = document.getElementById('result');
+    const presentationJson = document.getElementById('presentation-json');
+    const serverReceipt = document.getElementById('server-receipt');
+    const serverReceiptFields = document.getElementById('server-receipt-fields');
     const actionLogEl = document.getElementById('action-log');
     const decisionCard = document.getElementById('decision-card');
     const decisionCopy = document.getElementById('decision-copy');
@@ -358,6 +432,11 @@ def index():
         autoProvision,
         requiredAssurance: SITE_POLICY,
         debug: true,
+        isBlockedLocally: async (ppid) => {{
+          const res = await fetch('/api/demo/policy/check?ppid=' + encodeURIComponent(ppid));
+          const data = await res.json();
+          return {{ blocked: !!data.blocked, doubt_required: !!data.doubt_required }};
+        }},
       }});
       sharedVerifier.autoProvision = autoProvision;
       return sharedVerifier;
@@ -380,6 +459,40 @@ def index():
       }}
     }}
 
+    function formatDenyReason(reason) {{
+      if (reason === 'site_blocked' || reason === 'revoked') {{
+        return 'Persistent site revocation — fresh verification does not clear this.';
+      }}
+      if (reason === 'doubt_required') {{
+        return 'Temporary doubt — the site requires a deliberate fresh proof.';
+      }}
+      if (reason === 'assurance_insufficient' || reason === 'not_ishuman') {{
+        return 'Valid wallet proof, but this site policy requires stronger assurance.';
+      }}
+      if (reason === 'idv_cancelled') {{
+        return 'Complete verification in the Lemma popup to continue.';
+      }}
+      return reason || 'unknown';
+    }}
+
+    function renderServerReceipt(response, serverEntry) {{
+      if (!serverReceipt || !serverReceiptFields) return;
+      if (!serverEntry) {{
+        serverReceipt.hidden = true;
+        return;
+      }}
+      serverReceipt.hidden = false;
+      const rows = [
+        ['Site binding', '{SITE_ID}'],
+        ['PPID', serverEntry.ppid || response.ppid || '—'],
+        ['Assurance', serverEntry.assurance || response.assurance || '—'],
+        ['Server reason', serverEntry.reason || '—'],
+        ['Decision', serverEntry.ok ? 'accept' : 'deny'],
+        ['Action', serverEntry.action || '{copy["action"]}'],
+      ];
+      serverReceiptFields.innerHTML = rows.map(([label, value]) =>
+        '<dt>' + label + '</dt><dd>' + value + '</dd>'
+      ).join('');
     function formatVerdictPill(verified, assurance) {{
       if (!verified) return 'DENY';
       if (assurance === 'ishuman') return 'Human (ishuman)';
@@ -429,6 +542,13 @@ def index():
       pill.className = 'pill ' + (verified ? 'ok' : (silent ? 'checking' : 'deny'));
       setAssurancePill(assurance);
       const ppid = response.ppid || serverEntry?.ppid || '';
+      renderServerReceipt(response, serverEntry);
+      if (presentationJson) {{
+        const presentation = requestPayload?.presentation || null;
+        presentationJson.textContent = presentation
+          ? JSON.stringify(presentation, null, 2)
+          : '{{}}';
+      }}
       if (verified) {{
         decisionCopy.textContent = '{copy["success"]}. PPID: ' + (ppid || '').slice(0, 28) + '…';
         if (!silent) {{
@@ -440,13 +560,12 @@ def index():
             + '</p>';
         }}
       }} else if (!silent) {{
+        const detail = formatDenyReason(response.reason);
         decisionCopy.textContent = 'Blocked. Reason: ' + response.reason;
-        decisionCard.innerHTML = '<strong>Action blocked</strong><p class="tiny">reason=' + response.reason + (response.reason === 'idv_cancelled' ? ' — complete verification in the Lemma popup to continue.' : '') + '</p>';
+        decisionCard.innerHTML = '<strong>Action blocked</strong><p class="tiny">reason=' + response.reason + ' — ' + detail + '</p>';
       }} else {{
         decisionCopy.textContent = formatMissingProof(response.reason);
       }}
-      const payload = requestPayload || response;
-      result.textContent = JSON.stringify(payload, null, 2);
     }}
 
     async function runBackgroundCheck() {{
@@ -461,7 +580,7 @@ def index():
           pill.textContent = 'NO PROOF';
           pill.className = 'pill deny';
           decisionCopy.textContent = formatMissingProof(response.reason);
-          result.textContent = JSON.stringify(response, null, 2);
+          if (presentationJson) presentationJson.textContent = JSON.stringify(response, null, 2);
         }}
       }} catch (err) {{
         pill.textContent = 'READY';
@@ -488,11 +607,11 @@ def index():
       decisionCard.innerHTML = '<strong>Checking Lemma wallet…</strong><p class="tiny">Continuity proof only — passkey unlock, then a signed site credential. No identity check at this assurance tier.</p>';
       try {{
         const verifier = makeVerifier(true);
-        const {{ ok, ppid, assurance, presentation, reason, timeMs }} = await verifier.verifyForBackend({{
+        const {{ ok, presentation, reason, timeMs }} = await verifier.verifyForBackend({{
           autoProvision: true,
           requiredAssurance: SITE_POLICY,
         }});
-        const response = {{ human: !!ok, ppid, assurance, reason, timeMs: timeMs || 0 }};
+        const response = {{ human: !!ok, assurance: SITE_POLICY, reason, timeMs: timeMs || 0 }};
         if (ok) {{
           const email = document.getElementById('email')?.value || '';
           const requestPayload = {{
@@ -516,6 +635,8 @@ def index():
               + 'Redeploy the demo site app if this persists.',
             );
           }}
+          response.ppid = serverEntry.ppid || null;
+          response.assurance = serverEntry.assurance || SITE_POLICY;
           await refreshActionLog();
           applyVerdict(response, {{ requestPayload, serverEntry }});
         }} else {{
@@ -526,7 +647,7 @@ def index():
         pill.className = 'pill deny';
         decisionCopy.textContent = 'Verification failed: ' + err.message;
         decisionCard.innerHTML = '<strong>Verification unavailable</strong><p class="tiny">' + err.message + '</p>';
-        result.textContent = JSON.stringify({{ error: err.message }}, null, 2);
+        if (presentationJson) presentationJson.textContent = JSON.stringify({{ error: err.message }}, null, 2);
       }} finally {{
         button.disabled = false;
       }}

@@ -47,8 +47,8 @@ The public `/demo` route demonstrates the **one-PPID assurance model** when feat
 
 - Passkey wallet + provisional person root (no IDV on step 1).
 - `verifyForBackend({ requiredAssurance: 'passkey' })` derives distinct site PPIDs with passkey assurance.
-- Heroku demo sites stamp actions and verify with `POST /api/demo/action` + offline `verifyStamp`.
-- Demo wrappers under `/api/demo/ishuman/*` apply site-local blocks and `require-ishuman` step-up (SiteDoubt).
+- Heroku demo sites call `verifyForBackend()` and POST the signed `presentation` to `/api/demo/action` for server-side offline `verify()`.
+- Demo wrappers under `/api/demo/ishuman/*` apply site-local blocks, temporary `site-doubt`, and client-side policy escalation (`passkey` → `ishuman`).
 - After IDV, re-verify with `requiredAssurance: 'ishuman'` — **same PPID**, assurance flips to `ishuman`.
 
 Legacy IDV-first copy remains when `assurance_demo_mode` is false (flags off).
@@ -68,14 +68,14 @@ Demo Heroku apps:
 - `LEMMA_ORIGIN` — lemma.id or staging hub origin (must serve SDK + API).
 - `LEMMA_DEMO_REQUIRED_ASSURANCE=passkey` — site policy (ticketing escalates via hub step 5).
 
-## Recording checklist (assurance workflow)
+## Recording checklist (five-stage assurance workflow)
 
 1. Load `/demo` on staging (`assurance_demo_mode: true` in config).
-2. **Step 1** — Create passkey wallet (no IDV popup).
-3. **Step 2** — Verify both sites; show different PPIDs and `assurance: passkey`.
-4. **Step 3** — Open ticketing + trials demo sites; complete an action; show server-verified stamp in action log.
-5. **Step 4** — Block ticketing PPID; recheck — ticketing denied, trials still human.
-6. **Step 5** — Require isHuman on ticketing → complete IDV (or staging test-verify) → re-verify ticketing with ishuman; highlight **same PPID**.
+2. **Step 1** — Create passkey wallet (no IDV popup). Note: continuity only, not unique humanness.
+3. **Step 2** — Verify both sites; show different PPIDs and `assurance: passkey`. Open ticketing + trials Heroku demos.
+4. **Step 3** — Inspect signed presentations in the hub inspector; on relying sites show the server verification receipt (site binding, PPID, assurance, reason).
+5. **Step 4** — Raise ticketing policy to `ishuman` → show valid-but-insufficient denial → complete IDV (or staging test-verify) → re-verify with **same PPID** at `ishuman`.
+6. **Step 5** — Mark ticketing doubtful (`doubt_required`) and resolve with fresh proof; then revoke ticketing (`site_blocked`) and confirm fresh verification does not clear the block. Trials stays verified throughout.
 
 ## Legacy recording checklist (flags off)
 

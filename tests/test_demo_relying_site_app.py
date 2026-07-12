@@ -80,13 +80,14 @@ def test_relying_site_action_verifies_presentation(relying_site_client, monkeypa
     class _FakeResult:
         ok = True
         ppid = "ppid_demo_123"
+        legacy_ppid = None
         assurance = "passkey"
         reason = "session_valid"
 
-    def _fake_verify(self, _presentation):
+    def _fake_verify_with_policy(self, _presentation, **_kwargs):
         return _FakeResult()
 
-    monkeypatch.setattr(mod.VerificationContext, "verify", _fake_verify)
+    monkeypatch.setattr(mod.VerificationContext, "verify_with_policy", _fake_verify_with_policy)
 
     resp = client.post(
         "/api/demo/action",
@@ -136,3 +137,55 @@ def test_relying_site_index_loads_verifier_script(relying_site_client):
     assert "stampAction" not in body
     assert "presentation" in body
     assert "tickets-demo.lemma.id" in body
+
+
+def test_relying_site_index_exposes_server_receipt_and_hub_return(relying_site_client):
+    client, _mod = relying_site_client
+    resp = client.get("/")
+    body = resp.get_data(as_text=True)
+
+    assert 'id="server-receipt"' in body
+    assert 'id="server-receipt-fields"' in body
+    assert 'id="presentation-json"' in body
+    assert "Server verification receipt" in body
+    assert "formatDenyReason" in body
+    assert "renderServerReceipt" in body
+    assert "isBlockedLocally" in body
+    assert "/api/demo/policy/check" in body
+    assert "site_blocked" in body
+    assert "assurance_insufficient" in body
+    assert "Verified (passkey)" in body
+    assert "Human (ishuman)" in body
+    assert "?from=demo" in body
+    assert "demo hub" in body.lower()
+
+
+def test_relying_site_action_denies_invalid_presentation(relying_site_client, monkeypatch):
+    client, mod = relying_site_client
+    mod.ACTION_LOG.clear()
+    mod._VERIFY_CTX = None
+
+    class _FakeResult:
+        ok = False
+        ppid = None
+        legacy_ppid = None
+        assurance = None
+        reason = "invalid_signature"
+
+    def _fake_verify_with_policy(self, _presentation, **_kwargs):
+        return _FakeResult()
+
+    monkeypatch.setattr(mod.VerificationContext, "verify_with_policy", _fake_verify_with_policy)
+
+    resp = client.post(
+        "/api/demo/action",
+        json={
+            "action": "reserve_tickets",
+            "presentation": {"credential": {"id": "bad"}},
+        },
+    )
+    payload = resp.get_json()
+
+    assert resp.status_code == 403
+    assert payload["success"] is False
+    assert payload["reason"] == "invalid_signature"
