@@ -1675,7 +1675,14 @@ class IsHumanVerifier {
         const prevSequence = this._bloomSnapshot?.sequence_number;
 
         try {
-            const res = await fetch(`${this.lemmaOrigin}/api/revocation/bloom-filter`);
+            // Never let the browser HTTP cache satisfy a trust refresh. The
+            // signed snapshot has a strict staleness bound, and some browsers
+            // can retain an older response beyond its Cache-Control max-age.
+            // The endpoint maintains its own short server-side cache.
+            const res = await fetch(`${this.lemmaOrigin}/api/revocation/bloom-filter`, {
+                cache: 'no-store',
+                credentials: 'omit',
+            });
             const data = await res.json();
             const trustList = data.trust_list || null;
             const snapshot = data.snapshot || {
