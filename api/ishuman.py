@@ -501,6 +501,17 @@ def _complete_verified_ishuman_from_didit(
             "document_root_hash": resolved.document_root_hash,
         }
 
+    if resolved.provisional_rebound and resolved.superseded_person_id:
+        from api.ppid_convergence import record_person_convergence_event
+
+        record_person_convergence_event(
+            db,
+            wallet_id=wallet_id,
+            superseded_person_id=resolved.superseded_person_id,
+            canonical_person_id=resolved.person_id,
+            idv_session_id=getattr(record, "session_id", None),
+        )
+
     ppid = derive_ppid_from_person_root_hash(resolved.person_root_hash, "lemma.id")
     record.lemma_person_id = resolved.person_id
     record.document_root_hash = encrypt_column(resolved.document_root_hash)
@@ -1764,6 +1775,10 @@ def erase_identity():
         except ValueError:
             pass
 
+        from api.ppid_convergence import purge_convergence_for_wallet
+
+        purge_convergence_for_wallet(db, wallet_id)
+
         # 2) Identify every person this wallet is linked to.
         person_ids: set[str] = set()
         for b in db.query(LemmaWalletBinding).filter_by(wallet_id=wallet_id).all():
@@ -2236,8 +2251,44 @@ def _bill_site_credential_event(
     )
 
 
-def _jsonify_site_proof(*, credential: dict, cached: bool) -> "flask.Response":
-    return jsonify({"success": True, "credential": credential, "cached": cached})
+def _jsonify_site_proof(
+    *,
+    credential: dict,
+    cached: bool,
+    ppid_convergence: Optional[dict] = None,
+) -> "flask.Response":
+    body = {"success": True, "credential": credential, "cached": cached}
+    if ppid_convergence:
+        body["ppid_convergence"] = ppid_convergence
+    return jsonify(body)
+
+
+def _finalize_site_proof_response(
+    db,
+    *,
+    credential: dict,
+    cached: bool,
+    wallet_id: str,
+    target_site: str,
+    canonical_person_id: Optional[str],
+) -> "flask.Response":
+    ppid_convergence = None
+    if canonical_person_id:
+        from api.ppid_convergence import issue_ppid_convergence_for_site
+
+        ppid_convergence = issue_ppid_convergence_for_site(
+            db,
+            wallet_id=wallet_id,
+            target_site=target_site,
+            canonical_ppid=credential.get("subject") or "",
+            canonical_person_id=canonical_person_id,
+        )
+    db.commit()
+    return _jsonify_site_proof(
+        credential=credential,
+        cached=cached,
+        ppid_convergence=ppid_convergence,
+    )
 
 
 @ishuman_bp.route("/api/ishuman/derive-site-proof", methods=["POST"])
@@ -2392,8 +2443,14 @@ def derive_site_proof():
                     issue_mode=issue_mode,
                     is_cached_reissue=False,
                 )
-                db.commit()
-                return _jsonify_site_proof(credential=credential, cached=False)
+                return _finalize_site_proof_response(
+                    db,
+                    credential=credential,
+                    cached=False,
+                    wallet_id=wallet_id,
+                    target_site=target_site,
+                    canonical_person_id=person_id,
+                )
 
             return jsonify({"success": False, "error": "wallet_not_verified"}), 403
 
@@ -2488,7 +2545,14 @@ def derive_site_proof():
             issue_mode=issue_mode,
             is_cached_reissue=False,
         )
-        return _jsonify_site_proof(credential=credential, cached=False)
+        return _finalize_site_proof_response(
+            db,
+            credential=credential,
+            cached=False,
+            wallet_id=wallet_id,
+            target_site=target_site,
+            canonical_person_id=person_id,
+        )
 
     except Exception:
         db.rollback()
@@ -3307,8 +3371,18 @@ def verify_presentation():
         return jsonify({"success": False, "error": f"verify_error:{exc}"}), 400
 
     claims = credential.get("claims") or credential.get("credentialSubject") or {}
-    if not claims.get("isHuman"):
+    assurance = str(claims.get("assurance") or "").strip().lower()
+    if not assurance and claims.get("isHuman") in (True, "true", "True", 1, "1"):
+        assurance = "ishuman"
+    if assurance not in ("passkey", "ishuman"):
         return jsonify({"success": False, "error": "not_ishuman"}), 400
+
+    required_assurance = (body.get("required_assurance") or "passkey").strip().lower()
+    if required_assurance == "passkey":
+        if assurance not in ("passkey", "ishuman"):
+            return jsonify({"success": False, "error": "assurance_insufficient"}), 400
+    elif assurance != "ishuman":
+        return jsonify({"success": False, "error": "assurance_insufficient"}), 400
     from api.site_hostname import normalize_runtime_site_binding
 
     bound_site_raw = (
@@ -3369,6 +3443,7 @@ def verify_presentation():
     return jsonify({
         "success": True,
         "human": True,
+        "assurance": assurance,
         "ppid": credential.get("subject"),
         "credential_id": credential_id,
         "site_id": bound_site,

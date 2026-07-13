@@ -155,8 +155,8 @@ def test_node_sdk_exposes_verify_action_stamp():
     assert "async function verifyActionStamp(" in src
     assert "export async function hashActionBody" in src
     assert "export class InMemoryNonceStore" in src
-    assert "@version 1.3.0" in src
-    assert "return { verify, verifyStamp, verifyActionStamp, refresh };" in src
+    assert "@version 1.4.0" in src
+    assert "return { verify, verifyWithPolicy, verifyStamp, verifyActionStamp, refresh };" in src
 
 
 def test_backend_sdk_version_headers():

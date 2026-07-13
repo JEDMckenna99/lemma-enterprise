@@ -1097,6 +1097,40 @@ class SiteBlock(Base):
     )
 
 
+class PersonConvergenceEvent(Base):
+    """Internal record when a provisional wallet rebinds to a known person."""
+    __tablename__ = 'person_convergence_events'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    convergence_id = Column(String(64), unique=True, nullable=False, index=True)
+    wallet_id = Column(String, nullable=False, index=True)
+    superseded_person_id = Column(String, nullable=False, index=True)
+    canonical_person_id = Column(String, nullable=False, index=True)
+    idv_session_id = Column(String)
+    status = Column(String(32), nullable=False, default='pending')
+    created_at = Column(DateTime, default=datetime.utcnow)
+    completed_at = Column(DateTime)
+
+
+class PpidConvergenceIssued(Base):
+    """Per-site issued convergence artifacts (single-use, short TTL)."""
+    __tablename__ = 'ppid_convergence_issued'
+    __table_args__ = (
+        UniqueConstraint('convergence_id', 'target_site', name='uq_ppid_convergence_site'),
+    )
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    convergence_id = Column(String(64), nullable=False, index=True)
+    target_site = Column(String(255), nullable=False)
+    legacy_ppid = Column(String, nullable=False)
+    canonical_ppid = Column(String, nullable=False)
+    nonce = Column(String(64), nullable=False)
+    issued_at = Column(DateTime, nullable=False)
+    expires_at = Column(DateTime, nullable=False)
+    consumed_at = Column(DateTime)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
 def create_tables():
     """Create all database tables"""
     try:

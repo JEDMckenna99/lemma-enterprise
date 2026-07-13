@@ -98,7 +98,44 @@ Work through these in order. Stop and ask the developer if hostname or trust tie
 </script>
 ```
 
-### Recommended signup flow (T2 — server verify)
+### Recommended account-binding flow (T2 — passkey base, server verify)
+
+Use **passkey assurance** for low-friction signup and continuity. Extract the account
+PPID from the **verified server result** (`result.ppid`), never from the parallel client
+`ppid` field alone.
+
+```html
+<script src="https://lemma.id/sdk/ishuman-verifier.js"></script>
+<script>
+  const verifier = new IsHumanVerifier({
+    siteId: 'app.example.com',
+    isBlockedLocally: async (ppid) => {
+      const res = await fetch('/api/policy/check?ppid=' + encodeURIComponent(ppid));
+      const data = await res.json();
+      return { blocked: !!data.blocked, doubt_required: !!data.doubt_required };
+    },
+  });
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const { ok, presentation } = await verifier.verifyForBackend({
+      autoProvision: true,
+      requiredAssurance: 'passkey',
+    });
+    if (!ok) { alert('Verification required'); return; }
+    await fetch('/api/signup', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, presentation }),
+    });
+  });
+</script>
+```
+
+Require `requiredAssurance: 'ishuman'` when Sybil resistance matters (trials, ticketing,
+payouts). The PPID stays stable when upgrading from passkey to isHuman on the same wallet.
+
+### Sybil-resistant signup (T2 — isHuman)
 
 ```html
 <script src="https://lemma.id/sdk/ishuman-verifier.js"></script>
@@ -107,7 +144,7 @@ Work through these in order. Stop and ask the developer if hostname or trust tie
 
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
-    const { ok, presentation, ppid } = await verifier.verifyForBackend({
+    const { ok, presentation } = await verifier.verifyForBackend({
     autoProvision: true,
     requiredAssurance: 'ishuman',
   });
@@ -171,6 +208,42 @@ Pick one per endpoint. **Do not default signup to T1.**
 | **T2+** | `stampAction(...)` envelope with `action_assertion` + `action_signature` | Local `verifyActionStamp()` / `verify_action_stamp()` + nonce replay store | Checkout, withdrawals, posting, other fraud-sensitive mutations |
 | **T3** | Full presentation + session assertion | Local verify with `requireSessionAssertion: true`, or `POST /api/ishuman/verify-presentation` | High-trust / financial actions needing live session proof |
 
+### Python backend (T2 + site policy)
+
+```python
+# pip install lemma-ishuman-verify
+from lemma_ishuman_verify import VerificationContext
+from lemma_ishuman_site_policy import InMemorySitePolicyStore
+
+ctx = VerificationContext(site_id="app.example.com", required_assurance="passkey")
+policy = InMemorySitePolicyStore(blocked={"did:lemma:ppid_banned..."})
+
+@app.post("/api/signup")
+def signup():
+    body = request.get_json() or {}
+    result = ctx.verify_with_policy(body["presentation"], policy_store=policy)
+    if not result.ok:
+        return {"error": result.reason}, 403
+    # create account bound to result.ppid (from verified presentation, not client ppid)
+    if result.legacy_ppid:
+        merge_provisional_account(result.legacy_ppid, result.ppid)
+```
+
+### Node / Workers backend (T2 + site policy)
+
+```javascript
+import { createVerifier, createInMemorySitePolicyStore } from "@lemma/ishuman-verify";
+
+const verifier = createVerifier({ siteId: "app.example.com", requiredAssurance: "passkey" });
+const policy = createInMemorySitePolicyStore({ blocked: new Set(["did:lemma:ppid_banned..."]) });
+
+app.post("/api/signup", async (req, res) => {
+  const result = await verifier.verifyWithPolicy(req.body.presentation, { policyStore: policy });
+  if (!result.ok) return res.status(403).json({ error: result.reason });
+  // bind account to result.ppid
+});
+```
+
 ### Python backend (T2)
 
 ```python
@@ -187,21 +260,6 @@ def signup():
     if not result.ok:
         return {"error": result.reason}, 403
     # create account bound to result.ppid
-```
-
-### Node / Workers backend (T2)
-
-```javascript
-import { createVerifier } from "https://lemma.id/sdk/lemma-ishuman-verify.mjs";
-// npm: @lemma/ishuman-verify
-
-const verifier = createVerifier({ siteId: "app.example.com" });
-
-app.post("/api/signup", async (req, res) => {
-  const result = await verifier.verify(req.body.presentation);
-  if (!result.ok) return res.status(403).json({ error: result.reason });
-  // create account bound to result.ppid
-});
 ```
 
 ### Audit log re-verification
@@ -248,6 +306,46 @@ def checkout():
 ```
 
 Verification is **local-first**: one cached fetch to `GET /api/revocation/bloom-filter` every ~15 minutes — not per user request or per action.
+
+### Fresh passkey for sensitive actions (policy, not assurance tier)
+
+Use `requireFreshPasskey` when a passkey-tier user must prove **present** biometric/PIN
+control for a specific mutation (code claims, withdrawals). This does **not** change
+assurance tier — it adds a server-attested `fresh_passkey_attestation.v1` bound to an
+opaque action commitment so lemma.id never receives action names, resource IDs, or bodies.
+
+```javascript
+// 1. Your backend issues a server nonce + optional action commitment helper
+const challenge = await fetch('/api/presale/challenge', { method: 'POST', body: ... }).then(r => r.json());
+
+// 2. Client stamps with fresh passkey ceremony
+const event = await verifier.stampAction(payload, {
+  action: 'claim_presale_code',
+  method: 'POST',
+  path: '/api/presale/claim-code',
+  nonce: challenge.server_nonce,
+  serverNonce: challenge.server_nonce,
+  requireFreshPasskey: true,
+  requiredAssurance: 'passkey',
+});
+
+// 3. Backend verifies stamp + attestation locally
+result = ctx.verify_action_stamp(
+  body,
+  action='claim_presale_code',
+  method='POST',
+  path='/api/presale/claim-code',
+  body=body,
+  nonce_store=nonce_store,
+  nonce_store_mode='required',
+  require_fresh_passkey=True,
+  server_nonce=body['server_nonce'],
+)
+```
+
+**Replay protection:** configure `nonce_store_mode: required` in production and use
+`InMemoryNonceStore` only for tests. For multi-process deployments, inject
+`RedisNonceStore` from `lemma_ishuman_nonce_store`.
 
 ---
 
@@ -307,9 +405,20 @@ credential rotation do not clear them. Only the authenticated
 
 For a temporary challenge instead of a ban, use `POST /api/ishuman/site-doubt`.
 Your backend can expose the resulting `{ blocked, doubt_required }` decision to
-the SDK through `isBlockedLocally`; when `verify()` returns `doubt_required`,
-invoke `verifyFreshForBackend()`. A successful fresh IDV clears only the
-matching doubt when it derives the same site PPID.
+the SDK through `isBlockedLocally` — **call your own policy endpoint**, never
+lemma.id directly from the browser (API keys are server-only). When
+`verify()` returns `doubt_required`, invoke `verifyFreshForBackend()`. A
+successful fresh IDV clears only the matching doubt when it derives the same
+site PPID.
+
+**Enforcement order on your backend:** cryptographic presentation verification →
+canonical PPID extraction → convergence verification (if present) → site-policy
+lookup for canonical **and** legacy PPIDs → business logic. Stable fail-closed
+reasons: `site_blocked`, `doubt_required`, `site_policy_unavailable`,
+`site_policy_not_configured`.
+
+Site blocks are **not** in the global Bloom filter. Mirror blocks locally or use
+`GET /api/ishuman/check` (server-only, with API key) via `LemmaCheckPolicyStore`.
 
 Network-wide enumeration revocation is retired. The legacy customer, admin,
 and demo endpoints return HTTP 410 with `network_revocation_retired`.
@@ -393,6 +502,29 @@ await fetch('/api/signup', { method: 'POST', body: JSON.stringify({ presentation
 | User recovers on new device after IDV | Match on PPID/presentation; rebind session |
 
 Requires platform flags: `LEMMA_ONE_PPID_ASSURANCE_MODEL=1` and `LEMMA_PASSKEY_ASSURANCE_ENABLED=1`. Without them, behavior remains isHuman-first (`wallet_not_verified` until IDV).
+
+### PPID convergence (provisional → known person)
+
+When a user already verified on wallet A creates a new provisional wallet B and
+completes IDV, lemma.id rebinds B to the known person. The site PPID may change.
+lemma.id issues a signed `ppid_convergence.v1` artifact on the next
+`derive-site-proof` for that site. Your backend verifies it alongside the
+presentation and receives `legacy_ppid` + canonical `ppid`.
+
+**Merge recipe (transactional):**
+
+1. Verify presentation + convergence artifact (`verify_with_policy`).
+2. If `legacy_ppid` is present, look up the provisional account by `legacy_ppid`.
+3. If found: merge rows to canonical `ppid`, carry forward site blocks/doubts from
+   the legacy PPID, then delete or archive the provisional account.
+4. If not found: create a new account for canonical `ppid` (user may have never
+   visited your site with the provisional wallet).
+5. Reject if convergence is invalid, wrong-site, expired, or tampered — fail closed.
+
+Ordinary first IDV on the same wallet preserves PPID and emits **no** convergence artifact.
+
+Enable with `LEMMA_PPID_CONVERGENCE_ENABLED=1` (requires one-PPID model). See
+`docs/cryptographic/CANONICAL_MESSAGES.md` §9.
 
 See `docs/product/PASSKEY_STAMP_INPUT_BURN.md` for the full contract.
 

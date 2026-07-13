@@ -57,6 +57,8 @@ class ResolvedLemmaPerson:
     root_version: str = "v1"
     document_root_schema: Optional[str] = None
     matched_legacy_document_root: bool = False
+    provisional_rebound: bool = False
+    superseded_person_id: Optional[str] = None
 
 
 @dataclass(frozen=True)
@@ -418,6 +420,8 @@ def resolve_or_create_person_from_material(
         else None
     )
     bound_person_id = binding.lemma_person_id if binding else None
+    provisional_rebound = False
+    superseded_person_id: Optional[str] = None
 
     if doc_person_id and bound_person_id and doc_person_id != bound_person_id:
         bound_person = db.query(LemmaPerson).filter_by(person_id=bound_person_id).first()
@@ -434,6 +438,8 @@ def resolve_or_create_person_from_material(
         ):
             # A provisional person is only a pre-IDV continuity placeholder. If
             # the document already anchors an active person, adopt that root.
+            superseded_person_id = bound_person_id
+            provisional_rebound = True
             binding.lemma_person_id = doc_person_id
             bound_person_id = doc_person_id
             logger.info(
@@ -568,6 +574,8 @@ def resolve_or_create_person_from_material(
         root_version=root_version,
         document_root_schema=claims.get("schema") if claims else assignment.matched_schema,
         matched_legacy_document_root=matched_legacy_document_root,
+        provisional_rebound=provisional_rebound,
+        superseded_person_id=superseded_person_id,
     )
 
 

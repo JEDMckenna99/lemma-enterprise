@@ -1789,9 +1789,22 @@ def issue_to_wallet():
         client_ppid = data.get('ppid')
         passkey_credential_id = data.get('passkey_credential_id')
         
+        from api.config import reject_client_ppid_issuance, warn_client_ppid_issuance
         from api.platform_owner import is_platform_site
 
         if client_ppid:
+            if reject_client_ppid_issuance() and not is_platform_site(site_id):
+                return jsonify({
+                    'success': False,
+                    'error': 'client_ppid_deprecated',
+                    'message': 'Use IsHumanVerifier.verifyForBackend() and verify the signed presentation on your backend.',
+                }), 410
+            if warn_client_ppid_issuance():
+                logger.warning(
+                    "Deprecated bare client_ppid issuance for site=%s origin=%s",
+                    site_id,
+                    request.headers.get('Origin', ''),
+                )
             # Validate PPID format: did:lemma:ppid_<64-hex-chars>
             import re
             if not re.match(r'^did:lemma:ppid_[0-9a-f]{64}$', client_ppid):
@@ -1827,15 +1840,18 @@ def issue_to_wallet():
                 permissions=['read', 'write', 'access'],
                 granted_by='wallet_auth'
             )
-        
-        # Return PPID and permission_lemma - client stores in wallet
-        # No server-side session needed (session-free architecture)
-        return jsonify({
+
+        response = jsonify({
             'success': True,
             'ppid': ppid,
             'site_id': site_id,
             'permission_lemma': permission_lemma
         })
+        if client_ppid and warn_client_ppid_issuance():
+            response.headers['Deprecation'] = 'true'
+            response.headers['Link'] = '</docs/integration/ISHUMAN_AGENT_INTEGRATION.md>; rel="deprecation"'
+
+        return response
         
     except Exception as e:
         logger.error(f"Wallet issue failed: {e}")

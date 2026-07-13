@@ -208,6 +208,9 @@
         const actionBodyHash = (params.get('body_hash') || '').trim();
         const actionNonce = (params.get('action_nonce') || '').trim();
         const actionTtlSec = Number(params.get('action_ttl_sec') || 60);
+        const requireFreshPasskey = params.get('require_fresh_passkey') === '1';
+        const serverNonce = (params.get('server_nonce') || '').trim();
+        const actionCommitment = (params.get('action_commitment') || '').trim();
         const isActionSign = issueMode === 'action_sign'
             && !!actionName
             && !!actionBodyHash
@@ -1661,6 +1664,7 @@
                 session_nonce: clientSessionNonce,
                 request_nonce: requestNonce,
                 reason: 'site_proof_issued',
+                ppid_convergence: pkg.ppid_convergence || null,
             }), 400);
             return true;
             });
@@ -1683,6 +1687,9 @@
                     bodyHash: actionBodyHash,
                     nonce: actionNonce,
                     ttlSec: actionTtlSec,
+                    requireFreshPasskey,
+                    serverNonce,
+                    actionCommitment,
                 });
                 setStatus('Action signed.', 'success');
                 setTimeout(() => closeWith('ISHUMAN_ACTION_SIGNED', {
@@ -1776,6 +1783,7 @@
                 request_nonce: requestNonce,
                 reason: 'fresh_idv_complete',
                 refresh_reason: refreshReason,
+                ppid_convergence: pkg.ppid_convergence || null,
             }), 400);
             return true;
             });

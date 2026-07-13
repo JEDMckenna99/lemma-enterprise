@@ -35,7 +35,7 @@
  *   // enforced):
  *   const audit = await verifier.verifyStamp(oldRow.lemma, { durable: true });
  *
- * @version 1.3.0
+ * @version 1.4.0
  */
 
 const SESSION_PRESENTATION_PREFIX = "lemma:site-session-presentation:v1";
@@ -45,6 +45,14 @@ const DEFAULT_LEMMA_ORIGIN = "https://lemma.id";
 const DEFAULT_REFRESH_MS = 15 * 60 * 1000;
 const DEFAULT_MAX_SESSION_AGE_S = 24 * 60 * 60;
 const DEFAULT_MAX_ACTION_AGE_S = 60;
+const CONVERGENCE_PREFIX = "lemma:ppid-convergence:v1";
+const CONVERGENCE_SCHEMA = "ppid_convergence.v1";
+const ACTION_COMMITMENT_PREFIX = "lemma:action-commitment:v1";
+const FRESH_PASSKEY_PREFIX = "lemma:fresh-passkey-attestation:v1";
+const FRESH_PASSKEY_SCHEMA = "fresh_passkey_attestation.v1";
+const DEFAULT_FRESH_PASSKEY_MAX_AGE_S = 120;
+const NONCE_STORE_MODE_OPTIONAL = "optional";
+const NONCE_STORE_MODE_REQUIRED = "required";
 
 // ---------------------------------------------------------------------------
 // Tiny byte / hex / base64url helpers
@@ -157,6 +165,105 @@ export function browserCanonicalMessage(credential) {
   return new TextEncoder().encode(JSON.stringify(payload));
 }
 
+function buildConvergenceCanonicalMessage(artifact) {
+  return new TextEncoder().encode([
+    CONVERGENCE_PREFIX,
+    String(artifact.site_id || "").trim(),
+    String(artifact.legacy_ppid || "").trim(),
+    String(artifact.canonical_ppid || "").trim(),
+    String(artifact.convergence_id || "").trim(),
+    String(artifact.nonce || "").trim(),
+    String(Number(artifact.issued_at_unix || 0)),
+    String(Number(artifact.expires_at_unix || 0)),
+  ].join("\n"));
+}
+
+async function verifyPpidConvergenceArtifact(
+  artifact,
+  { siteId, canonicalPpid, trustedIssuerPubkeys, nowUnix },
+) {
+  if (!artifact || typeof artifact !== "object") {
+    return { ok: false, reason: "convergence_missing" };
+  }
+  if (String(artifact.schema || "") !== CONVERGENCE_SCHEMA) {
+    return { ok: false, reason: "convergence_schema_mismatch" };
+  }
+  if (String(artifact.site_id || "").trim() !== String(siteId || "").trim()) {
+    return { ok: false, reason: "convergence_site_mismatch" };
+  }
+  if (String(artifact.canonical_ppid || "").trim() !== String(canonicalPpid || "").trim()) {
+    return { ok: false, reason: "convergence_canonical_ppid_mismatch" };
+  }
+  const now = Number(nowUnix ?? Math.floor(Date.now() / 1000));
+  const expiresAt = Number(artifact.expires_at_unix || 0);
+  const issuedAt = Number(artifact.issued_at_unix || 0);
+  if (!issuedAt || !expiresAt || expiresAt < now) {
+    return { ok: false, reason: "convergence_expired" };
+  }
+  const signatureHex = String((artifact.proof || {}).signatureValueWeb || "").trim();
+  if (!signatureHex) return { ok: false, reason: "convergence_signature_missing" };
+  const unsigned = {
+    schema: artifact.schema,
+    convergence_id: artifact.convergence_id,
+    site_id: artifact.site_id,
+    legacy_ppid: artifact.legacy_ppid,
+    canonical_ppid: artifact.canonical_ppid,
+    issued_at_unix: artifact.issued_at_unix,
+    expires_at_unix: artifact.expires_at_unix,
+    nonce: artifact.nonce,
+  };
+  const digest = await sha256Bytes(buildConvergenceCanonicalMessage(unsigned));
+  for (const pubkeyHex of trustedIssuerPubkeys) {
+    try {
+      const ok = await verifySiteEd25519Digest(
+        hexToBytes(pubkeyHex),
+        hexToBytes(signatureHex),
+        digest,
+      );
+      if (ok) return { ok: true, reason: "valid", legacyPpid: String(artifact.legacy_ppid || "").trim() || null };
+    } catch {
+      continue;
+    }
+  }
+  return { ok: false, reason: "convergence_invalid_signature" };
+}
+
+export function createInMemorySitePolicyStore({ blocked = [], doubted = [] } = {}) {
+  const blockedSet = new Set(blocked);
+  const doubtedSet = new Set(doubted);
+  return {
+    async check(ppid) {
+      const subject = String(ppid || "").trim();
+      if (!subject) return { available: true, decision: {}, reason: "ppid_missing" };
+      if (blockedSet.has(subject)) {
+        return { available: true, decision: { blocked: true, reason: "site_block" }, reason: "ok" };
+      }
+      if (doubtedSet.has(subject)) {
+        return { available: true, decision: { doubtRequired: true, doubtReason: "site_doubt" }, reason: "ok" };
+      }
+      return { available: true, decision: {}, reason: "ok" };
+    },
+  };
+}
+
+async function enforceSitePolicy({ ppid, legacyPpid, policyStore, requirePolicy = true }) {
+  if (!policyStore) {
+    return requirePolicy
+      ? { ok: false, reason: "site_policy_not_configured" }
+      : { ok: true, reason: "ok" };
+  }
+  for (const candidate of [ppid, legacyPpid]) {
+    if (!candidate) continue;
+    const { available, decision } = await policyStore.check(candidate);
+    if (!available) return { ok: false, reason: "site_policy_unavailable" };
+    if (decision.blocked) return { ok: false, reason: "site_blocked" };
+    if (decision.doubtRequired || decision.doubt_required) {
+      return { ok: false, reason: "doubt_required" };
+    }
+  }
+  return { ok: true, reason: "ok" };
+}
+
 function buildSessionPresentationMessage(assertion) {
   return new TextEncoder().encode([
     SESSION_PRESENTATION_PREFIX,
@@ -188,6 +295,106 @@ export async function hashActionBody(body) {
   return bytesToHex(digest);
 }
 
+export async function buildActionCommitment({
+  serverNonce,
+  siteId,
+  action,
+  method = "POST",
+  path = "",
+  bodyHash = "",
+}) {
+  const lines = [
+    ACTION_COMMITMENT_PREFIX,
+    String(serverNonce || "").trim(),
+    String(siteId || "").trim(),
+    String(action || "").trim(),
+    String(method || "POST").trim().toUpperCase(),
+    String(path || "").trim(),
+    String(bodyHash || "").trim().toLowerCase(),
+  ];
+  const digest = await sha256Bytes(new TextEncoder().encode(lines.join("\n")));
+  return bytesToHex(digest);
+}
+
+function buildFreshPasskeyCanonicalMessage(artifact) {
+  return new TextEncoder().encode([
+    FRESH_PASSKEY_PREFIX,
+    String(artifact.schema || FRESH_PASSKEY_SCHEMA).trim(),
+    String(artifact.site_id || "").trim(),
+    String(artifact.credential_id || "").trim(),
+    String(artifact.subject || "").trim(),
+    String(artifact.action_commitment || "").trim().toLowerCase(),
+    String(artifact.attestation_id || "").trim(),
+    String(artifact.issued_at_unix ?? ""),
+    String(artifact.expires_at_unix ?? ""),
+  ].join("\n"));
+}
+
+export async function verifyFreshPasskeyAttestation(
+  attestation,
+  {
+    siteId,
+    credentialId,
+    subject,
+    actionCommitment,
+    trustedIssuerPubkeys = [],
+    nowUnix = Math.floor(Date.now() / 1000),
+    maxAgeSeconds = DEFAULT_FRESH_PASSKEY_MAX_AGE_S,
+  },
+) {
+  if (!attestation || typeof attestation !== "object") {
+    return { ok: false, reason: "fresh_passkey_missing" };
+  }
+  if (String(attestation.schema || "") !== FRESH_PASSKEY_SCHEMA) {
+    return { ok: false, reason: "fresh_passkey_schema_mismatch" };
+  }
+  if (String(attestation.site_id || "").trim() !== String(siteId || "").trim()) {
+    return { ok: false, reason: "fresh_passkey_site_mismatch" };
+  }
+  if (String(attestation.credential_id || "").trim() !== String(credentialId || "").trim()) {
+    return { ok: false, reason: "fresh_passkey_credential_mismatch" };
+  }
+  if (String(attestation.subject || "").trim() !== String(subject || "").trim()) {
+    return { ok: false, reason: "fresh_passkey_subject_mismatch" };
+  }
+  const expectedCommitment = String(actionCommitment || "").trim().toLowerCase();
+  if (expectedCommitment && String(attestation.action_commitment || "").trim().toLowerCase() !== expectedCommitment) {
+    return { ok: false, reason: "fresh_passkey_commitment_mismatch" };
+  }
+  const issuedAt = Number(attestation.issued_at_unix || 0);
+  const expiresAt = Number(attestation.expires_at_unix || 0);
+  const now = Number(nowUnix || Math.floor(Date.now() / 1000));
+  if (!issuedAt || !expiresAt || expiresAt < now) {
+    return { ok: false, reason: "fresh_passkey_expired" };
+  }
+  if (issuedAt > now + 300) {
+    return { ok: false, reason: "fresh_passkey_issued_in_future" };
+  }
+  if (now - issuedAt > Math.max(1, Number(maxAgeSeconds || DEFAULT_FRESH_PASSKEY_MAX_AGE_S))) {
+    return { ok: false, reason: "fresh_passkey_too_old" };
+  }
+  const signatureHex = String(attestation?.proof?.signatureValueWeb || "").trim();
+  if (!signatureHex) return { ok: false, reason: "fresh_passkey_signature_missing" };
+  const unsigned = {
+    schema: attestation.schema,
+    attestation_id: attestation.attestation_id,
+    site_id: attestation.site_id,
+    credential_id: attestation.credential_id,
+    subject: attestation.subject,
+    action_commitment: attestation.action_commitment,
+    issued_at_unix: attestation.issued_at_unix,
+    expires_at_unix: attestation.expires_at_unix,
+  };
+  const digest = await sha256Bytes(buildFreshPasskeyCanonicalMessage(unsigned));
+  const signature = hexToBytes(signatureHex);
+  for (const pubkeyHex of trustedIssuerPubkeys) {
+    if (await verifyEd25519(hexToBytes(pubkeyHex), digest, signature)) {
+      return { ok: true, reason: "valid" };
+    }
+  }
+  return { ok: false, reason: "fresh_passkey_invalid_signature" };
+}
+
 function buildActionPresentationMessage(assertion) {
   return new TextEncoder().encode([
     ACTION_PRESENTATION_PREFIX,
@@ -216,11 +423,39 @@ export class InMemoryNonceStore {
     this._seen = new Set();
   }
 
-  consume(nonce) {
+  consume(nonce, { siteId = "", ttlSeconds = 300 } = {}) {
+    void siteId;
+    void ttlSeconds;
     const text = String(nonce || "").trim();
     if (!text || this._seen.has(text)) return false;
     this._seen.add(text);
     return true;
+  }
+}
+
+export class RedisNonceStore {
+  constructor(redisClient = null, { keyPrefix = "lemma:action-nonce" } = {}) {
+    this._redis = redisClient;
+    this._keyPrefix = String(keyPrefix || "lemma:action-nonce").replace(/:+$/g, "");
+  }
+
+  _client() {
+    return this._redis;
+  }
+
+  consume(nonce, { siteId = "", ttlSeconds = 300 } = {}) {
+    const client = this._client();
+    if (!client || typeof client.set !== "function") return false;
+    const text = String(nonce || "").trim();
+    if (!text) return false;
+    const site = String(siteId || "global").trim() || "global";
+    const key = `${this._keyPrefix}:${site}:${text}`;
+    const ttl = Math.max(1, Number(ttlSeconds || 300));
+    try {
+      return Boolean(client.set(key, "1", { NX: true, EX: ttl }));
+    } catch (_err) {
+      return false;
+    }
   }
 }
 
@@ -312,6 +547,8 @@ export function createVerifier({
   requireSessionAssertion = false,
   requiredAssurance = "ishuman",
   maxActionAgeSeconds = DEFAULT_MAX_ACTION_AGE_S,
+  nonceStoreMode = NONCE_STORE_MODE_OPTIONAL,
+  freshPasskeyMaxAgeSeconds = DEFAULT_FRESH_PASSKEY_MAX_AGE_S,
   fetch: fetchImpl,
 } = {}) {
   if (!siteId) throw new Error("siteId required");
@@ -442,6 +679,22 @@ export function createVerifier({
       return { ok: false, reason: "session_assertion_required" };
     }
 
+    let legacyPpid = null;
+    const convergence = presentation.ppid_convergence;
+    if (convergence) {
+      const trustedPubkeys = [];
+      for (const issuer of Object.values(bundle.issuers)) {
+        for (const pubkey of issuer.pubkeysHex || []) trustedPubkeys.push(pubkey);
+      }
+      const conv = await verifyPpidConvergenceArtifact(convergence, {
+        siteId,
+        canonicalPpid: credential.subject || "",
+        trustedIssuerPubkeys: trustedPubkeys,
+      });
+      if (!conv.ok) return conv;
+      legacyPpid = conv.legacyPpid || null;
+    }
+
     return {
       ok: true,
       reason: "valid",
@@ -450,7 +703,21 @@ export function createVerifier({
       issuerDid,
       boundSiteId: boundSite,
       assurance,
+      legacyPpid,
     };
+  }
+
+  async function verifyWithPolicy(presentation, { policyStore = null, requirePolicy = true } = {}) {
+    const result = await verify(presentation);
+    if (!result.ok) return result;
+    const policy = await enforceSitePolicy({
+      ppid: result.ppid,
+      legacyPpid: result.legacyPpid,
+      policyStore,
+      requirePolicy,
+    });
+    if (!policy.ok) return { ...result, ok: false, reason: policy.reason };
+    return result;
   }
 
   async function verifyStamp(stamp, { key = "lemma", durable = false } = {}) {
@@ -493,6 +760,9 @@ export function createVerifier({
       body = null,
       requiredAssurance: actionAssurance,
       nonceStore = null,
+      nonceStoreMode: actionNonceStoreMode,
+      requireFreshPasskey = false,
+      serverNonce = "",
       key = "lemma",
     } = {},
   ) {
@@ -547,8 +817,46 @@ export function createVerifier({
 
     const nonce = String(assertion.nonce || inner.nonce || "").trim();
     if (!nonce) return { ok: false, reason: "action_nonce_missing" };
-    if (nonceStore && typeof nonceStore.consume === "function" && !nonceStore.consume(nonce)) {
-      return { ok: false, reason: "action_nonce_reused" };
+    const mode = String(actionNonceStoreMode || nonceStoreMode || NONCE_STORE_MODE_OPTIONAL).toLowerCase();
+    if (mode === NONCE_STORE_MODE_REQUIRED && !nonceStore) {
+      return { ok: false, reason: "action_nonce_store_required" };
+    }
+    if (nonceStore && typeof nonceStore.consume === "function") {
+      const consumed = nonceStore.consume(nonce, {
+        siteId,
+        ttlSeconds: maxActionAgeSeconds + 300,
+      });
+      if (!consumed) return { ok: false, reason: "action_nonce_reused" };
+    }
+
+    if (requireFreshPasskey) {
+      const attestation = inner.fresh_passkey_attestation;
+      if (!attestation || typeof attestation !== "object") {
+        return { ok: false, reason: "fresh_passkey_missing" };
+      }
+      if (!serverNonce) return { ok: false, reason: "fresh_passkey_server_nonce_missing" };
+      const actionCommitment = await buildActionCommitment({
+        serverNonce,
+        siteId,
+        action,
+        method,
+        path,
+        bodyHash: expectedBodyHash,
+      });
+      const bundle = await ensureFresh();
+      const trustedPubkeys = [];
+      for (const pubkeys of bundle.issuers.values()) {
+        for (const pubkeyHex of pubkeys) trustedPubkeys.push(pubkeyHex);
+      }
+      const fp = await verifyFreshPasskeyAttestation(attestation, {
+        siteId,
+        credentialId: String(credential.id || credResult.credentialId || ""),
+        subject: String(credential.subject || credResult.ppid || ""),
+        actionCommitment,
+        trustedIssuerPubkeys: trustedPubkeys,
+        maxAgeSeconds: freshPasskeyMaxAgeSeconds,
+      });
+      if (!fp.ok) return fp;
     }
 
     const claims = credential.claims || credential.credentialSubject || {};
@@ -586,7 +894,7 @@ export function createVerifier({
     await ensureFresh();
   }
 
-  return { verify, verifyStamp, verifyActionStamp, refresh };
+  return { verify, verifyWithPolicy, verifyStamp, verifyActionStamp, refresh };
 }
 
 /** A bare verifiable credential has subject + claims + a proof object. */
@@ -679,6 +987,10 @@ function unwrapStamp(input, key = "lemma") {
  * Convenience one-shot verify: creates a verifier, verifies once, discards.
  * Prefer createVerifier() for long-running servers so the snapshot is cached.
  */
+export async function verifyWithPolicy(presentation, options) {
+  return createVerifier(options).verifyWithPolicy(presentation, options);
+}
+
 export async function verifyPresentation(presentation, options) {
   return createVerifier(options).verify(presentation);
 }
@@ -704,10 +1016,15 @@ if (typeof module !== "undefined" && typeof module.exports !== "undefined") {
   module.exports = {
     createVerifier,
     verifyPresentation,
+    verifyWithPolicy,
     verifyStamp,
     verifyActionStamp,
     hashActionBody,
+    buildActionCommitment,
+    verifyFreshPasskeyAttestation,
     InMemoryNonceStore,
+    RedisNonceStore,
+    createInMemorySitePolicyStore,
     browserCanonicalMessage,
   };
 }

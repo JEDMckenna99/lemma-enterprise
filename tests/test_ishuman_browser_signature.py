@@ -234,6 +234,37 @@ def test_verify_presentation_endpoint_round_trip(monkeypatch):
     assert data["site_id"] == "tickets-demo.lemma.id"
     assert data["session_status"] == "absent"
 
+    passkey_credential = json.loads(json.dumps(credential))
+    passkey_credential["claims"] = {
+        "assurance": "passkey",
+        "siteId": "tickets-demo.lemma.id",
+        "issuedAt": "1700000000",
+        "expiresAt": str(2_000_000_000),
+        "packageType": "identity",
+        "verificationMethod": "passkey",
+    }
+    passkey_credential["credentialSubject"] = dict(passkey_credential["claims"])
+    passkey_credential["proof"]["signatureValueWeb"] = _sign_with_issuer_for_browser(
+        {
+            "issuer": issuer_did,
+            "subject": "did:lemma:ppid_demo",
+            "claims": passkey_credential["claims"],
+        },
+        _FakeIssuer(),
+    )
+    passkey_resp = client.post(
+        "/api/ishuman/verify-presentation",
+        json={
+            "site_id": "tickets-demo.lemma.id",
+            "credential": passkey_credential,
+            "required_assurance": "passkey",
+        },
+    )
+    assert passkey_resp.status_code == 200, passkey_resp.get_json()
+    passkey_data = passkey_resp.get_json()
+    assert passkey_data["success"] is True
+    assert passkey_data["assurance"] == "passkey"
+
     # A tampered claim should now fail signature verification.
     tampered = json.loads(json.dumps(credential))
     tampered["claims"]["siteId"] = "evil.example.com"

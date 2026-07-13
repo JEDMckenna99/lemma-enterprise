@@ -405,3 +405,23 @@ def passkey_assurance_enabled() -> bool:
     if not one_ppid_assurance_model_enabled():
         return False
     return _env_truthy("LEMMA_PASSKEY_ASSURANCE_ENABLED", False)
+
+
+def ppid_convergence_enabled() -> bool:
+    """Issue signed convergence artifacts when a provisional wallet rebinds to a known person.
+
+    Requires ``LEMMA_ONE_PPID_ASSURANCE_MODEL=1``. Env: ``LEMMA_PPID_CONVERGENCE_ENABLED=1``.
+    """
+    if not one_ppid_assurance_model_enabled():
+        return False
+    return _env_truthy("LEMMA_PPID_CONVERGENCE_ENABLED", False)
+
+
+def warn_client_ppid_issuance() -> bool:
+    """Emit deprecation telemetry/headers for bare client-supplied PPID issuance."""
+    return _env_truthy("LEMMA_WARN_CLIENT_PPID_ISSUANCE", True)
+
+
+def reject_client_ppid_issuance() -> bool:
+    """Hard-reject bare client-supplied PPID on wallet-auth issue (except platform allowlist)."""
+    return _env_truthy("LEMMA_REJECT_CLIENT_PPID_ISSUANCE", False)

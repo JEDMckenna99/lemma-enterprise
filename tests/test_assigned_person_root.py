@@ -163,6 +163,39 @@ def test_provisional_wallet_rebinds_to_known_document_person(
 
 
 @pytest.mark.unit
+def test_provisional_rebound_exposes_superseded_person_id(
+    fake_ishuman_db_session_factory,
+    monkeypatch,
+):
+    from api.database import LemmaPerson
+    from api.identity_person import PERSON_STATUS_PROVISIONAL, ensure_provisional_person_for_wallet
+
+    monkeypatch.setattr("api.config.use_assigned_person_root", lambda: True)
+
+    db = fake_ishuman_db_session_factory.session_local()
+    material = material_from_test_fixture(document_number="REBOUND-FLAGS-001")
+    first = resolve_or_create_person_from_material(
+        db,
+        material=material,
+        wallet_id="wallet_anchor_flags",
+        provider="didit",
+    )
+    provisional_id = ensure_provisional_person_for_wallet(db, wallet_id="wallet_rebound_flags")
+    provisional = db.query(LemmaPerson).filter_by(person_id=provisional_id).first()
+    assert provisional.status == PERSON_STATUS_PROVISIONAL
+
+    recovered = resolve_or_create_person_from_material(
+        db,
+        material=material,
+        wallet_id="wallet_rebound_flags",
+        provider="didit",
+    )
+    assert recovered.provisional_rebound is True
+    assert recovered.superseded_person_id == provisional_id
+    assert recovered.person_id == first.person_id
+
+
+@pytest.mark.unit
 def test_new_wallet_recovers_assigned_person_across_pepper_and_provider_change(
     fake_ishuman_db_session_factory,
     monkeypatch,

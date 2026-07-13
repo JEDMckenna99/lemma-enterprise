@@ -49,7 +49,7 @@ network calls:
 2. Bloom snapshot signature + content hash.
 3. Credential `proof.signatureValueWeb` Ed25519 signature against a trusted
    issuer pubkey.
-4. `claims.isHuman` is `True`.
+4. `claims.assurance` meets the configured `required_assurance` policy (`passkey` or `ishuman`).
 5. `claims.siteId` equals the configured `site_id`.
 6. `claims.expiresAt` has not passed.
 7. SHA-256(credential.id) is not in the Bloom revocation set.
@@ -70,6 +70,12 @@ Simple in-process nonce replay guard for demos/tests.
 
 ### `ctx.verify(presentation) -> Result`
 
+### `ctx.verify_with_policy(presentation, *, policy_store=None, require_policy=True) -> Result`
+
+Runs cryptographic verification, optional PPID convergence verification, then
+site block/doubt enforcement. Use `InMemorySitePolicyStore` for local mirrors or
+`LemmaCheckPolicyStore` for server-only `GET /api/ishuman/check`.
+
 ### `ctx.verify_stamp(stamped_event, *, key='lemma', durable=False) -> Result`
 
 ### `ctx.verify_action_stamp(stamped_event, *, action, method='POST', path='', body=None, nonce_store=None) -> Result`
@@ -80,6 +86,7 @@ class Result:
     ok: bool
     reason: str             # "valid" on success, error code on failure
     ppid: str | None = None
+    legacy_ppid: str | None = None
     credential_id: str | None = None
     issuer_did: str | None = None
     bound_site_id: str | None = None

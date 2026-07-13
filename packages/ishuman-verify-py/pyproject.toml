@@ -38,4 +38,4 @@ Documentation = "https://lemma.id/docs"
 Repository = "https://github.com/JEDMckenna99/lemma-enterprise"
 
 [tool.setuptools]
-py-modules = ["lemma_ishuman_verify"]
+py-modules = ["lemma_ishuman_verify", "lemma_ishuman_site_policy", "lemma_ishuman_nonce_store"]

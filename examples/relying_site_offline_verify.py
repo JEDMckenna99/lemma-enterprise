@@ -68,11 +68,37 @@ ACTION_STAMP_VERSION = "action_stamp_v1"
 TRUST_LIST_PREFIX = "lemma:issuer-trust-list:v1"
 TIME_SKEW_SECONDS = 300
 DEFAULT_MAX_ACTION_AGE_SECONDS = 60
+CONVERGENCE_PREFIX = "lemma:ppid-convergence:v1"
+CONVERGENCE_SCHEMA = "ppid_convergence.v1"
+ACTION_COMMITMENT_PREFIX = "lemma:action-commitment:v1"
+FRESH_PASSKEY_PREFIX = "lemma:fresh-passkey-attestation:v1"
+FRESH_PASSKEY_SCHEMA = "fresh_passkey_attestation.v1"
+DEFAULT_FRESH_PASSKEY_MAX_AGE_SECONDS = 120
+NONCE_STORE_MODE_OPTIONAL = "optional"
+NONCE_STORE_MODE_REQUIRED = "required"
 
 
-# ---------------------------------------------------------------------------
-# Canonical message helpers (must byte-exactly match the issuer/verifier)
-# ---------------------------------------------------------------------------
+def _import_enforce_site_policy():
+    """Load site-policy helper from package or sibling zero-install file."""
+    try:
+        from lemma_ishuman_site_policy import enforce_site_policy
+
+        return enforce_site_policy
+    except ImportError:
+        import importlib.util
+        import sys
+        from pathlib import Path
+
+        sibling = Path(__file__).resolve().with_name("lemma_ishuman_site_policy.py")
+        if not sibling.exists():
+            raise ImportError("lemma_ishuman_site_policy unavailable") from None
+        spec = importlib.util.spec_from_file_location("lemma_ishuman_site_policy", sibling)
+        if spec is None or spec.loader is None:
+            raise ImportError("lemma_ishuman_site_policy unavailable") from None
+        mod = importlib.util.module_from_spec(spec)
+        sys.modules[spec.name] = mod
+        spec.loader.exec_module(mod)
+        return mod.enforce_site_policy
 
 
 def browser_canonical_message(credential: dict) -> bytes:
@@ -100,6 +126,83 @@ def browser_canonical_message(credential: dict) -> bytes:
     if credential.get("expiresAt") is not None:
         payload["expiresAt"] = credential["expiresAt"]
     return json.dumps(payload, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+
+
+def build_convergence_canonical_message(artifact: dict) -> bytes:
+    lines = [
+        CONVERGENCE_PREFIX,
+        str(artifact.get("site_id") or "").strip(),
+        str(artifact.get("legacy_ppid") or "").strip(),
+        str(artifact.get("canonical_ppid") or "").strip(),
+        str(artifact.get("convergence_id") or "").strip(),
+        str(artifact.get("nonce") or "").strip(),
+        str(int(artifact.get("issued_at_unix") or 0)),
+        str(int(artifact.get("expires_at_unix") or 0)),
+    ]
+    return "\n".join(lines).encode("utf-8")
+
+
+def verify_ppid_convergence_artifact(
+    artifact: dict,
+    *,
+    site_id: str,
+    canonical_ppid: str,
+    trusted_issuer_pubkeys: list[str],
+    now_unix: Optional[int] = None,
+) -> tuple[bool, str]:
+    if not isinstance(artifact, dict):
+        return False, "convergence_missing"
+    if str(artifact.get("schema") or "") != CONVERGENCE_SCHEMA:
+        return False, "convergence_schema_mismatch"
+    if str(artifact.get("site_id") or "").strip() != str(site_id or "").strip():
+        return False, "convergence_site_mismatch"
+    if str(artifact.get("canonical_ppid") or "").strip() != str(canonical_ppid or "").strip():
+        return False, "convergence_canonical_ppid_mismatch"
+    now = int(now_unix if now_unix is not None else time.time())
+    try:
+        expires_at = int(artifact.get("expires_at_unix") or 0)
+        issued_at = int(artifact.get("issued_at_unix") or 0)
+    except (TypeError, ValueError):
+        return False, "convergence_timestamps_invalid"
+    if not issued_at or not expires_at or expires_at < now:
+        return False, "convergence_expired"
+    if issued_at > now + TIME_SKEW_SECONDS:
+        return False, "convergence_issued_in_future"
+    proof = artifact.get("proof") or {}
+    signature_hex = str(proof.get("signatureValueWeb") or "").strip()
+    if not signature_hex:
+        return False, "convergence_signature_missing"
+    try:
+        signature = bytes.fromhex(signature_hex)
+    except ValueError:
+        return False, "convergence_signature_malformed"
+    unsigned = {
+        key: artifact[key]
+        for key in (
+            "schema",
+            "convergence_id",
+            "site_id",
+            "legacy_ppid",
+            "canonical_ppid",
+            "issued_at_unix",
+            "expires_at_unix",
+            "nonce",
+        )
+        if key in artifact
+    }
+    digest = hashlib.sha256(build_convergence_canonical_message(unsigned)).digest()
+    for pubkey_hex in trusted_issuer_pubkeys:
+        try:
+            Ed25519PublicKey.from_public_bytes(bytes.fromhex(pubkey_hex)).verify(signature, digest)
+            return True, "valid"
+        except (InvalidSignature, ValueError):
+            continue
+    return False, "convergence_invalid_signature"
+
+
+# ---------------------------------------------------------------------------
+# Canonical message helpers (must byte-exactly match the issuer/verifier)
+# ---------------------------------------------------------------------------
 
 
 def _b64url_decode(text: str) -> bytes:
@@ -275,6 +378,111 @@ def hash_action_body(body) -> str:
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
 
+def build_action_commitment(
+    *,
+    server_nonce: str,
+    site_id: str,
+    action: str,
+    method: str = "POST",
+    path: str = "",
+    body_hash: str = "",
+) -> str:
+    """Opaque action binding — lemma.id never receives action details."""
+    lines = [
+        ACTION_COMMITMENT_PREFIX,
+        str(server_nonce or "").strip(),
+        str(site_id or "").strip(),
+        str(action or "").strip(),
+        str(method or "POST").strip().upper(),
+        str(path or "").strip(),
+        str(body_hash or "").strip().lower(),
+    ]
+    return hashlib.sha256("\n".join(lines).encode("utf-8")).hexdigest()
+
+
+def build_fresh_passkey_canonical_message(artifact: dict) -> bytes:
+    lines = [
+        FRESH_PASSKEY_PREFIX,
+        str(artifact.get("schema") or FRESH_PASSKEY_SCHEMA).strip(),
+        str(artifact.get("site_id") or "").strip(),
+        str(artifact.get("credential_id") or "").strip(),
+        str(artifact.get("subject") or "").strip(),
+        str(artifact.get("action_commitment") or "").strip().lower(),
+        str(artifact.get("attestation_id") or "").strip(),
+        str(int(artifact.get("issued_at_unix") or 0)),
+        str(int(artifact.get("expires_at_unix") or 0)),
+    ]
+    return "\n".join(lines).encode("utf-8")
+
+
+def verify_fresh_passkey_attestation(
+    attestation: dict,
+    *,
+    site_id: str,
+    credential_id: str,
+    subject: str,
+    action_commitment: str,
+    trusted_issuer_pubkeys: list[str],
+    now_unix: Optional[int] = None,
+    max_age_seconds: int = DEFAULT_FRESH_PASSKEY_MAX_AGE_SECONDS,
+) -> tuple[bool, str]:
+    if not isinstance(attestation, dict):
+        return False, "fresh_passkey_missing"
+    if str(attestation.get("schema") or "") != FRESH_PASSKEY_SCHEMA:
+        return False, "fresh_passkey_schema_mismatch"
+    if str(attestation.get("site_id") or "").strip() != str(site_id or "").strip():
+        return False, "fresh_passkey_site_mismatch"
+    if str(attestation.get("credential_id") or "").strip() != str(credential_id or "").strip():
+        return False, "fresh_passkey_credential_mismatch"
+    if str(attestation.get("subject") or "").strip() != str(subject or "").strip():
+        return False, "fresh_passkey_subject_mismatch"
+    expected_commitment = str(action_commitment or "").strip().lower()
+    if expected_commitment and str(attestation.get("action_commitment") or "").strip().lower() != expected_commitment:
+        return False, "fresh_passkey_commitment_mismatch"
+    now = int(now_unix if now_unix is not None else time.time())
+    try:
+        expires_at = int(attestation.get("expires_at_unix") or 0)
+        issued_at = int(attestation.get("issued_at_unix") or 0)
+    except (TypeError, ValueError):
+        return False, "fresh_passkey_timestamps_invalid"
+    if not issued_at or not expires_at or expires_at < now:
+        return False, "fresh_passkey_expired"
+    if issued_at > now + TIME_SKEW_SECONDS:
+        return False, "fresh_passkey_issued_in_future"
+    if now - issued_at > max(1, int(max_age_seconds)):
+        return False, "fresh_passkey_too_old"
+    proof = attestation.get("proof") or {}
+    signature_hex = str(proof.get("signatureValueWeb") or "").strip()
+    if not signature_hex:
+        return False, "fresh_passkey_signature_missing"
+    try:
+        signature = bytes.fromhex(signature_hex)
+    except ValueError:
+        return False, "fresh_passkey_signature_malformed"
+    unsigned = {
+        key: attestation[key]
+        for key in (
+            "schema",
+            "attestation_id",
+            "site_id",
+            "credential_id",
+            "subject",
+            "action_commitment",
+            "issued_at_unix",
+            "expires_at_unix",
+        )
+        if key in attestation
+    }
+    digest = hashlib.sha256(build_fresh_passkey_canonical_message(unsigned)).digest()
+    for pubkey_hex in trusted_issuer_pubkeys:
+        try:
+            Ed25519PublicKey.from_public_bytes(bytes.fromhex(pubkey_hex)).verify(signature, digest)
+            return True, "valid"
+        except (InvalidSignature, ValueError):
+            continue
+    return False, "fresh_passkey_invalid_signature"
+
+
 def _build_action_message(assertion: dict) -> bytes:
     lines = [
         ACTION_PRESENTATION_PREFIX,
@@ -305,12 +513,35 @@ class InMemoryNonceStore:
     def __init__(self) -> None:
         self._seen: set[str] = set()
 
-    def consume(self, nonce: str) -> bool:
+    def consume(self, nonce: str, *, site_id: str = "", ttl_seconds: int = 300) -> bool:
+        del site_id, ttl_seconds
         text = str(nonce or "").strip()
         if not text or text in self._seen:
             return False
         self._seen.add(text)
         return True
+
+
+def _import_redis_nonce_store():
+    try:
+        from lemma_ishuman_nonce_store import RedisNonceStore
+
+        return RedisNonceStore
+    except ImportError:
+        import importlib.util
+        import sys
+        from pathlib import Path
+
+        sibling = Path(__file__).resolve().with_name("lemma_ishuman_nonce_store.py")
+        if not sibling.exists():
+            return None
+        spec = importlib.util.spec_from_file_location("lemma_ishuman_nonce_store", sibling)
+        if spec is None or spec.loader is None:
+            return None
+        mod = importlib.util.module_from_spec(spec)
+        sys.modules[spec.name] = mod
+        spec.loader.exec_module(mod)
+        return mod.RedisNonceStore
 
 
 def _looks_like_vc(obj) -> bool:
@@ -425,6 +656,8 @@ class VerificationContext:
         require_session_assertion: bool = False,
         required_assurance: str = "ishuman",
         max_action_age_seconds: int = DEFAULT_MAX_ACTION_AGE_SECONDS,
+        nonce_store_mode: str = NONCE_STORE_MODE_OPTIONAL,
+        fresh_passkey_max_age_seconds: int = DEFAULT_FRESH_PASSKEY_MAX_AGE_SECONDS,
     ) -> None:
         self.site_id = site_id
         self.lemma_origin = lemma_origin.rstrip("/")
@@ -433,6 +666,8 @@ class VerificationContext:
         self.require_session_assertion = require_session_assertion
         self.required_assurance = (required_assurance or "ishuman").strip().lower()
         self.max_action_age_seconds = max_action_age_seconds
+        self.nonce_store_mode = (nonce_store_mode or NONCE_STORE_MODE_OPTIONAL).strip().lower()
+        self.fresh_passkey_max_age_seconds = fresh_passkey_max_age_seconds
         self._lock = threading.Lock()
         self._snapshot: Optional[_Snapshot] = None
 
@@ -547,6 +782,7 @@ class VerificationContext:
         issuer_did: Optional[str] = None
         bound_site_id: Optional[str] = None
         assurance: Optional[str] = None
+        legacy_ppid: Optional[str] = None
 
     def verify(self, presentation: dict) -> "VerificationContext.Result":
         """Verify a presentation bundle without contacting lemma.id per-request."""
@@ -643,6 +879,22 @@ class VerificationContext:
         elif self.require_session_assertion and site_pubkey_b64:
             return self.Result(False, "session_assertion_required")
 
+        legacy_ppid = None
+        convergence = (presentation or {}).get("ppid_convergence")
+        if convergence:
+            trusted_pubkeys: list[str] = []
+            for trusted_issuer in snapshot.issuers.values():
+                trusted_pubkeys.extend(sorted(trusted_issuer.pubkeys_hex))
+            ok_conv, conv_reason = verify_ppid_convergence_artifact(
+                convergence,
+                site_id=self.site_id,
+                canonical_ppid=credential.get("subject") or "",
+                trusted_issuer_pubkeys=trusted_pubkeys,
+            )
+            if not ok_conv:
+                return self.Result(False, conv_reason)
+            legacy_ppid = str(convergence.get("legacy_ppid") or "").strip() or None
+
         return self.Result(
             ok=True,
             reason="valid",
@@ -651,7 +903,35 @@ class VerificationContext:
             issuer_did=issuer_did,
             bound_site_id=bound_site,
             assurance=assurance,
+            legacy_ppid=legacy_ppid,
         )
+
+    def verify_with_policy(
+        self,
+        presentation: dict,
+        *,
+        policy_store=None,
+        require_policy: bool = True,
+    ) -> "VerificationContext.Result":
+        """Verify presentation crypto, then enforce site block/doubt policy."""
+        result = self.verify(presentation)
+        if not result.ok:
+            return result
+        try:
+            enforce_site_policy = _import_enforce_site_policy()
+        except ImportError:
+            if require_policy:
+                return self.Result(False, "site_policy_not_configured")
+            return result
+        ok, reason, _decision = enforce_site_policy(
+            ppid=result.ppid or "",
+            policy_store=policy_store,
+            legacy_ppid=result.legacy_ppid,
+            require_policy=require_policy,
+        )
+        if not ok:
+            return self.Result(False, reason, ppid=result.ppid, legacy_ppid=result.legacy_ppid)
+        return result
 
     def verify_stamp(
         self, stamp: dict, *, key: str = "lemma", durable: bool = False
@@ -705,6 +985,9 @@ class VerificationContext:
         body=None,
         required_assurance: Optional[str] = None,
         nonce_store=None,
+        nonce_store_mode: Optional[str] = None,
+        require_fresh_passkey: bool = False,
+        server_nonce: Optional[str] = None,
         key: str = "lemma",
     ) -> "VerificationContext.Result":
         """Verify an action-bound stamp from ``stampAction()`` locally."""
@@ -759,13 +1042,47 @@ class VerificationContext:
         nonce = str(assertion.get("nonce") or inner.get("nonce") or "").strip()
         if not nonce:
             return self.Result(False, "action_nonce_missing")
+
+        mode = (nonce_store_mode or self.nonce_store_mode or NONCE_STORE_MODE_OPTIONAL).strip().lower()
+        if mode == NONCE_STORE_MODE_REQUIRED and nonce_store is None:
+            return self.Result(False, "action_nonce_store_required")
         if nonce_store is not None:
             consume = getattr(nonce_store, "consume", None)
-            if callable(consume):
-                if not consume(nonce):
-                    return self.Result(False, "action_nonce_reused")
-            else:
+            if not callable(consume):
                 return self.Result(False, "action_nonce_store_invalid")
+            consumed = consume(nonce, site_id=self.site_id, ttl_seconds=self.max_action_age_seconds + 300)
+            if not consumed:
+                return self.Result(False, "action_nonce_reused")
+
+        if require_fresh_passkey:
+            attestation = inner.get("fresh_passkey_attestation")
+            if not isinstance(attestation, dict):
+                return self.Result(False, "fresh_passkey_missing")
+            if not server_nonce:
+                return self.Result(False, "fresh_passkey_server_nonce_missing")
+            action_commitment = build_action_commitment(
+                server_nonce=str(server_nonce),
+                site_id=self.site_id,
+                action=expected_action,
+                method=expected_method,
+                path=expected_path,
+                body_hash=expected_body_hash,
+            )
+            snapshot = self._ensure_fresh_snapshot()
+            trusted_pubkeys: list[str] = []
+            for trusted_issuer in snapshot.issuers.values():
+                trusted_pubkeys.extend(sorted(trusted_issuer.pubkeys_hex))
+            ok_fp, fp_reason = verify_fresh_passkey_attestation(
+                attestation,
+                site_id=self.site_id,
+                credential_id=str(credential.get("id") or cred_result.credential_id or ""),
+                subject=str(credential.get("subject") or cred_result.ppid or ""),
+                action_commitment=action_commitment,
+                trusted_issuer_pubkeys=trusted_pubkeys,
+                max_age_seconds=self.fresh_passkey_max_age_seconds,
+            )
+            if not ok_fp:
+                return self.Result(False, fp_reason)
 
         claims = credential.get("claims") or credential.get("credentialSubject") or {}
         site_pubkey_b64 = claims.get("site_signing_pubkey") or claims.get("siteSigningPubkey") or ""

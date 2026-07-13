@@ -52,7 +52,7 @@ network calls:
 2. Bloom snapshot signature + content hash.
 3. Credential `proof.signatureValueWeb` Ed25519 signature against a trusted
    issuer pubkey.
-4. `claims.isHuman` is true.
+4. `claims.assurance` meets the configured policy (`passkey` or `ishuman`).
 5. `claims.siteId` equals the configured `siteId` (no cross-site replay).
 6. `claims.expiresAt` has not passed.
 7. SHA-256(credential.id) is not in the Bloom revocation set.
@@ -72,7 +72,12 @@ network calls:
 | `maxSessionAgeSeconds`| `86_400` (24 hours)      | Reject session presentations older than this.             |
 | `fetch`               | `globalThis.fetch`       | Custom fetch (e.g. Cloudflare Workers `env.SOMETHING`).   |
 
-Returns `{ verify(presentation), verifyStamp(stamp), verifyActionStamp(stampedEvent, options), refresh() }`.
+Returns `{ verify(presentation), verifyWithPolicy(presentation, options), verifyStamp(stamp), verifyActionStamp(stampedEvent, options), refresh() }`.
+
+### `verifier.verifyWithPolicy(presentation, { policyStore, requirePolicy })`
+
+Cryptographic verify → convergence verify → site block/doubt gate. Import
+`createInMemorySitePolicyStore` for local mirrors.
 
 ### `verifier.verify(presentation)`
 

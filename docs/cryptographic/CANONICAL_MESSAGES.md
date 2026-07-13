@@ -109,5 +109,46 @@ compact separators (`,` and `:`) with no insignificant whitespace.
 - **Trust list:** `api/issuer_trust_list.py` — signed multi-issuer list; clients pin
   trusted issuer DIDs and refetch on rotation.
 
+## 9. PPID convergence artifact (`ppid_convergence.v1`)
+
+- **When issued:** only when a provisional wallet rebinds to a known document-anchored
+  person and the site-scoped legacy PPID differs from the canonical PPID.
+- **Inputs:** `site_id`, `legacy_ppid`, `canonical_ppid`, `convergence_id`, `nonce`,
+  `issued_at_unix`, `expires_at_unix`.
+- **Canonicalization:** newline-joined (`\n`) lines, in this exact order, prefixed by
+  `lemma:ppid-convergence:v1`; each value `.strip()`-ed (numbers stringified). SHA-256
+  digest is Ed25519-signed by the Lemma isHuman issuer key.
+- **Reference:** `api/ppid_convergence.py::build_convergence_canonical_message`;
+  Python verifier `verify_ppid_convergence_artifact`; JS verifier
+  `verifyPpidConvergenceArtifact`.
+- **Test vector:**
+  ```
+  lemma:ppid-convergence:v1
+  example.com
+  did:lemma:ppid_legacy0123456789abcdef0123456789abcdef0123456789abcdef01234567
+  did:lemma:ppid_canon0123456789abcdef0123456789abcdef0123456789abcdef012345678
+  conv_test_vector_001
+  nonce_test_001
+  1700000000
+  1700003600
+  ```
+
 > Third-party SDKs that only need to verify (not issue) must implement sections
-> 1, 4, 5, and 8.
+> 1, 4, 5, 8, 9, and 10 when handling provisional-to-known-person convergence
+> or fresh-passkey action policies.
+
+## 10. Fresh-passkey attestation (`fresh_passkey_attestation.v1`)
+
+- **When issued:** only after lemma.id verifies a new WebAuthn assertion for a
+  wallet/device passkey registered server-side.
+- **Inputs:** `site_id`, `credential_id`, `subject` (PPID), opaque
+  `action_commitment`, `attestation_id`, `issued_at_unix`, `expires_at_unix`.
+- **Action commitment (site-local, privacy-preserving):** SHA-256 hex digest of
+  newline-joined (`\n`) lines prefixed by `lemma:action-commitment:v1` over
+  `server_nonce`, `site_id`, `action`, `method`, `path`, `body_hash`. lemma.id
+  never receives the raw action name or body — only the commitment hash.
+- **Canonicalization:** newline-joined lines prefixed by
+  `lemma:fresh-passkey-attestation:v1`; each value `.strip()`-ed (numbers
+  stringified). SHA-256 digest is Ed25519-signed by the Lemma isHuman issuer key.
+- **Reference:** `api/fresh_passkey_attestation.py`; Python verifier
+  `verify_fresh_passkey_attestation`; JS verifier `verifyFreshPasskeyAttestation`.

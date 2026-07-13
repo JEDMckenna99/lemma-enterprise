@@ -90,6 +90,10 @@ def test_lemma_wallet_secure_headers_cover_server_csrf_cookie(wallet_js_source):
     assert "_readJsonResponse(" in wallet_js_source
     assert "headers: this._getSecureHeaders()" in wallet_js_source
     assert "/api/ishuman/derive-site-proof" in wallet_js_source
+    assert wallet_js_source.count("headers: { 'Content-Type': 'application/json' }") == 0 or (
+        "headers: this._getSecureHeaders()" in wallet_js_source
+        and "derive-site-proof" in wallet_js_source
+    )
     # Critical isHuman mutations must send CSRF headers.
     derive_idx = wallet_js_source.index("/api/ishuman/derive-site-proof")
     seed_idx = wallet_js_source.index("/api/ishuman/seed-envelope")

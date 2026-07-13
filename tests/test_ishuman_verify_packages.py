@@ -72,6 +72,12 @@ def test_py_package_exports_verification_context():
     assert "VerificationContext" in class_names
 
 
+def test_py_package_exports_site_policy_module():
+    source = (PY_PACKAGE / "lemma_ishuman_site_policy.py").read_text(encoding="utf-8")
+    ast.parse(source)
+    assert "enforce_site_policy" in source
+
+
 def test_js_module_exports_create_verifier():
     source = JS_CANONICAL_SOURCE.read_text(encoding="utf-8")
     assert "export function createVerifier" in source

@@ -473,7 +473,7 @@ class LemmaWallet {
         
         return `<div class="${className}" style="margin-top: 12px; text-align: center; font-size: 0.85rem;">
     <span style="color: #6b7280;">${text}</span>
-    <a href="${url}" target="_blank" rel="noopener" style="color: #667eea; margin-left: 4px; text-decoration: none; font-weight: 500;">
+    <a href="${url}" target="_blank" rel="noopener" style="color: #4f46e5; margin-left: 4px; text-decoration: none; font-weight: 500;">
          ${linkText}
     </a>
 </div>`;
@@ -1155,7 +1155,7 @@ class LemmaWallet {
             overlay.id = 'lemma-redirect-overlay';
             overlay.setAttribute('style',
                 'position:fixed;top:0;left:0;width:100%;height:100%;' +
-                'background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);' +
+                'background:#4f46e5;' +
                 'z-index:2147483647;display:flex;flex-direction:column;' +
                 'align-items:center;justify-content:center;opacity:0;' +
                 'transition:opacity 200ms ease-in;'
@@ -3647,6 +3647,9 @@ class LemmaWallet {
 
         const derived = deriveData.credential;
         derived.packageType = derived.packageType || 'identity';
+        if (deriveData.ppid_convergence) {
+            derived.ppidConvergence = deriveData.ppid_convergence;
+        }
         await this.storeCredential(derived);
         await this._putIsHumanCacheRecord(derived);
         await this._finalizeIsHumanIssuance({ isHumanIssuance: true });
@@ -3761,13 +3764,17 @@ class LemmaWallet {
             issueMode: issueMode || 'site_proof',
             forceServerDerive: true,
         });
-        return this.signSiteSessionPresentation({
+        const pkg = await this.signSiteSessionPresentation({
             credential,
             siteId,
             sessionNonce,
             bloomSequence,
             sessionTtlSec,
         });
+        if (credential?.ppidConvergence) {
+            pkg.ppid_convergence = credential.ppidConvergence;
+        }
+        return pkg;
     }
 
     async hashActionBody(body) {
@@ -3785,6 +3792,9 @@ class LemmaWallet {
         bodyHash = null,
         nonce,
         ttlSec = 60,
+        requireFreshPasskey = false,
+        serverNonce = '',
+        actionCommitment = '',
     }) {
         const ACTION_PRESENTATION_PREFIX = 'lemma:site-action-presentation:v1';
         const ACTION_STAMP_VERSION = 'action_stamp_v1';
@@ -3845,11 +3855,124 @@ class LemmaWallet {
             String(assertion.expires_at_unix ?? ''),
         ].join('\n'));
         const signature = await siteKeys.keypair.sign(payloadBytes);
+        let freshPasskeyAttestation = null;
+        if (requireFreshPasskey) {
+            freshPasskeyAttestation = await this.obtainFreshPasskeyAttestation({
+                siteId: canonicalSite,
+                credential,
+                actionCommitment: actionCommitment || await this._buildActionCommitment({
+                    serverNonce,
+                    siteId: canonicalSite,
+                    action,
+                    method,
+                    path,
+                    bodyHash: resolvedBodyHash,
+                }),
+            });
+        }
         return {
             action_assertion: assertion,
             action_signature: keys.base64urlEncode(signature),
             bodyHash: resolvedBodyHash,
+            fresh_passkey_attestation: freshPasskeyAttestation,
         };
+    }
+
+    async _buildActionCommitment({
+        serverNonce,
+        siteId,
+        action,
+        method = 'POST',
+        path = '',
+        bodyHash = '',
+    }) {
+        const keys = this._getLemmaKeys();
+        const lines = [
+            'lemma:action-commitment:v1',
+            String(serverNonce || '').trim(),
+            String(siteId || '').trim(),
+            String(action || '').trim(),
+            String(method || 'POST').trim().toUpperCase(),
+            String(path || '').trim(),
+            String(bodyHash || '').trim().toLowerCase(),
+        ];
+        const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(lines.join('\n')));
+        return keys.bytesToHex(new Uint8Array(digest));
+    }
+
+    async obtainFreshPasskeyAttestation({
+        siteId,
+        credential,
+        actionCommitment,
+    }) {
+        await this.init();
+        await this._requireFreshPasskeyAuth({ reason: 'Confirm this action' });
+        const passkey = await this._get('passkey', 'primary');
+        const walletIdRecord = await this._get('passkey', 'walletId');
+        const walletId = walletIdRecord?.value || this.session?.walletId || '';
+        const credentialId = credential?.id || '';
+        const subject = credential?.subject || '';
+        if (!siteId || !actionCommitment || !credentialId || !subject) {
+            throw new Error('fresh_passkey_inputs_missing');
+        }
+
+        const beginRes = await fetch('/api/ishuman/fresh-passkey/begin', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({
+                site_id: siteId,
+                action_commitment: actionCommitment,
+                credential_id: credentialId,
+                subject,
+                wallet_id: walletId,
+            }),
+        });
+        const beginData = await beginRes.json().catch(() => ({}));
+        if (!beginRes.ok || !beginData.success) {
+            throw new Error(beginData.error || 'fresh_passkey_begin_failed');
+        }
+
+        const challengeBytes = this._base64urlToBuffer(beginData.challenge);
+        const getOptions = await this._publicKeyOptionsWithPrf({
+            challenge: challengeBytes,
+            rpId: this._getRpIdForWebAuthn(),
+            allowCredentials: [{
+                id: this._base64urlToBuffer(passkey.credentialId),
+                type: 'public-key',
+            }],
+            userVerification: 'required',
+            timeout: 60000,
+        }, passkey.prfWalletId || walletId);
+
+        const webauthnCredential = await navigator.credentials.get({ publicKey: getOptions });
+        if (!webauthnCredential) {
+            throw new Error('fresh_passkey_cancelled');
+        }
+
+        const completeRes = await fetch('/api/ishuman/fresh-passkey/complete', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({
+                challenge_key: beginData.challenge_key,
+                credential: {
+                    id: webauthnCredential.id,
+                    rawId: this._bufferToBase64url(webauthnCredential.rawId),
+                    type: webauthnCredential.type,
+                    response: {
+                        authenticatorData: this._bufferToBase64url(webauthnCredential.response.authenticatorData),
+                        clientDataJSON: this._bufferToBase64url(webauthnCredential.response.clientDataJSON),
+                        signature: this._bufferToBase64url(webauthnCredential.response.signature),
+                    },
+                },
+            }),
+        });
+        const completeData = await completeRes.json().catch(() => ({}));
+        if (!completeRes.ok || !completeData.success) {
+            throw new Error(completeData.error || 'fresh_passkey_complete_failed');
+        }
+        return completeData.fresh_passkey_attestation || null;
     }
 
     async ensureIsHumanIssuanceReady(options = {}) {

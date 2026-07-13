@@ -223,7 +223,7 @@ def test_presale_register_denies_missing_presentation(relying_site_client):
 
     assert resp.status_code == 403
     assert payload["success"] is False
-    assert payload["reason"] == "presentation_missing"
+    assert payload["reason"] == "action_stamp_missing"
 
 
 def test_presale_register_stores_signup(relying_site_client, monkeypatch):
@@ -231,6 +231,7 @@ def test_presale_register_stores_signup(relying_site_client, monkeypatch):
     mod.ACTION_LOG.clear()
     mod._PRESALE_REGISTRATIONS.reset()
     mod._VERIFY_CTX = None
+    mod._NONCE_STORE = mod.InMemoryNonceStore()
 
     class _FakeResult:
         ok = True
@@ -239,10 +240,10 @@ def test_presale_register_stores_signup(relying_site_client, monkeypatch):
         assurance = "passkey"
         reason = "session_valid"
 
-    def _fake_verify_with_policy(self, _presentation, **_kwargs):
+    def _fake_verify_action_stamp(self, *_args, **_kwargs):
         return _FakeResult()
 
-    monkeypatch.setattr(mod.VerificationContext, "verify_with_policy", _fake_verify_with_policy)
+    monkeypatch.setattr(mod.VerificationContext, "verify_action_stamp", _fake_verify_action_stamp)
 
     resp = client.post(
         "/api/presale/register",
@@ -250,7 +251,8 @@ def test_presale_register_stores_signup(relying_site_client, monkeypatch):
             "drop_id": mod.PRESALE_DROP_ID,
             "email": "fan@example.com",
             "phone": "+15550101234",
-            "presentation": {"credential": {"id": "cred-1"}},
+            "lemma": {"action_assertion": {}, "action_signature": "abc", "credential": {"id": "cred-1"}},
+            "server_nonce": "nonce-register-1",
         },
     )
     payload = resp.get_json()

@@ -168,6 +168,28 @@ async function hashActionBody(body) {
     return sha256HexText(canonical);
 }
 
+const ACTION_COMMITMENT_PREFIX = 'lemma:action-commitment:v1';
+
+async function buildActionCommitment({
+    serverNonce,
+    siteId,
+    action,
+    method = 'POST',
+    path = '',
+    bodyHash = '',
+}) {
+    const lines = [
+        ACTION_COMMITMENT_PREFIX,
+        String(serverNonce || '').trim(),
+        String(siteId || '').trim(),
+        String(action || '').trim(),
+        String(method || 'POST').trim().toUpperCase(),
+        String(path || '').trim(),
+        String(bodyHash || '').trim().toLowerCase(),
+    ];
+    return sha256HexText(lines.join('\n'));
+}
+
 function canonicalMessage(credential) {
     const claims = credential.claims || credential.credentialSubject || {};
     const sorted = {};
@@ -1090,9 +1112,14 @@ class IsHumanVerifier {
         const body = options.body !== undefined ? options.body : payload;
         const ttlSec = Number(options.ttlSec || DEFAULT_ACTION_TTL_SECONDS);
         const requiredAssurance = (options.requiredAssurance || this.requiredAssurance || 'ishuman').toLowerCase();
+        const requireFreshPasskey = !!options.requireFreshPasskey;
+        const serverNonce = String(options.serverNonce || '').trim();
 
         if (!action) {
             return { ...payload, [key]: { verified: false, reason: 'action_required' } };
+        }
+        if (requireFreshPasskey && !serverNonce) {
+            return { ...payload, [key]: { verified: false, reason: 'server_nonce_required' } };
         }
 
         const backend = await this.verifyForBackend({
@@ -1113,6 +1140,16 @@ class IsHumanVerifier {
         const bodyHash = await hashActionBody(body);
         const nonce = String(options.nonce || randomNonceB64(16)).trim();
         const credential = backend.presentation.credential;
+        const actionCommitment = requireFreshPasskey
+            ? await buildActionCommitment({
+                serverNonce,
+                siteId: this.siteId,
+                action,
+                method,
+                path,
+                bodyHash,
+            })
+            : '';
         const signParams = {
             credential,
             siteId: this.siteId,
@@ -1122,6 +1159,9 @@ class IsHumanVerifier {
             bodyHash,
             nonce,
             ttlSec,
+            requireFreshPasskey,
+            serverNonce,
+            actionCommitment,
         };
 
         let signed = await this._trySignActionLocally(signParams);
@@ -1158,6 +1198,7 @@ class IsHumanVerifier {
                 credential,
                 action_assertion: assertion,
                 action_signature: signed.action_signature,
+                fresh_passkey_attestation: signed.fresh_passkey_attestation || null,
             },
         };
     }
@@ -1197,6 +1238,11 @@ class IsHumanVerifier {
         popupUrl.searchParams.set('body_hash', signParams.bodyHash);
         popupUrl.searchParams.set('action_nonce', signParams.nonce);
         popupUrl.searchParams.set('action_ttl_sec', String(signParams.ttlSec || DEFAULT_ACTION_TTL_SECONDS));
+        if (signParams.requireFreshPasskey) {
+            popupUrl.searchParams.set('require_fresh_passkey', '1');
+            popupUrl.searchParams.set('server_nonce', signParams.serverNonce || '');
+            popupUrl.searchParams.set('action_commitment', signParams.actionCommitment || '');
+        }
 
         if (this._isMobileLike()) {
             popupUrl.searchParams.set('flow_mode', 'redirect');
@@ -1338,6 +1384,7 @@ class IsHumanVerifier {
                 session_signature: data.session_signature,
                 session_nonce: data.session_nonce,
                 request_nonce: requestNonce,
+                ppid_convergence: data.ppid_convergence || null,
             }, t0);
         } catch (err) {
             return this._result(false, null, 'redirect_return_failed', t0, err);
@@ -1848,6 +1895,7 @@ class IsHumanVerifier {
             session_signature: detail.session_signature,
             session_nonce: sessionNonce,
             bloom_sequence: Number(this._bloomSnapshot?.sequence_number ?? 0),
+            ppid_convergence: detail?.ppid_convergence || credential?.ppidConvergence || null,
         };
         this._persistSession(session);
 
@@ -2019,6 +2067,7 @@ class IsHumanVerifier {
                     bloom_sequence: bloomSequence,
                     issuer_did: cred.issuer || cred.issuerInfo?.did || null,
                     issuer_pubkey: cred.issuerInfo?.publicKey || null,
+                    ppid_convergence: presentation?.ppid_convergence || null,
                 };
             }
         }

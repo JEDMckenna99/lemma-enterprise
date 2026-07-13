@@ -564,6 +564,13 @@ def create_app():
     except Exception as e:
         logger.error(f"❌ Failed to register isHuman Network API: {e}")
 
+    try:
+        from api.fresh_passkey_routes import fresh_passkey_bp
+        app.register_blueprint(fresh_passkey_bp)
+        logger.info("✅ Fresh passkey attestation API registered")
+    except Exception as e:
+        logger.error(f"❌ Failed to register Fresh passkey attestation API: {e}")
+
     # isHuman guided demo (thin wrapper around real issuance + verifier flows)
     try:
         from api.ishuman_demo import ishuman_demo_bp

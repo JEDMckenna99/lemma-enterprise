@@ -1,5 +1,7 @@
 import logging
 import os
+import secrets
+import time
 from collections import deque
 from typing import Optional
 
@@ -7,10 +9,15 @@ from flask import Flask, Response, jsonify, request
 
 logger = logging.getLogger(__name__)
 
-from lemma_ishuman_verify import InMemoryNonceStore, VerificationContext
+from lemma_ishuman_verify import (
+    InMemoryNonceStore,
+    VerificationContext,
+    build_action_commitment,
+    hash_action_body,
+)
 from lemma_ishuman_site_policy import InMemorySitePolicyStore, enforce_site_policy
 
-from presale_allocation import PresaleAllocationLedger, PresaleRegistrationStore
+from presale_allocation import create_presale_stores
 
 
 app = Flask(__name__)
@@ -39,9 +46,53 @@ ACTION_LOG: deque = deque(maxlen=20)
 _VERIFY_CTX: Optional[VerificationContext] = None
 _CLAIM_VERIFY_CTX: Optional[VerificationContext] = None
 _POLICY_STORE = InMemorySitePolicyStore()
-_PRESALE_LEDGER = PresaleAllocationLedger()
-_PRESALE_REGISTRATIONS = PresaleRegistrationStore()
+_PRESALE_REGISTRATIONS, _PRESALE_LEDGER = create_presale_stores()
 _NONCE_STORE = InMemoryNonceStore()
+_CHALLENGE_STORE: dict[str, dict] = {}
+_RATE_BUCKETS: dict[str, deque] = {}
+
+
+def _client_ip() -> str:
+    forwarded = (request.headers.get("X-Forwarded-For") or "").split(",")[0].strip()
+    return forwarded or (request.remote_addr or "unknown")
+
+
+def _rate_limit(key: str, *, limit: int, window_seconds: int) -> bool:
+    """Return True when under limit, False when exceeded."""
+    now = time.time()
+    bucket = _RATE_BUCKETS.setdefault(key, deque())
+    while bucket and now - bucket[0] > window_seconds:
+        bucket.popleft()
+    if len(bucket) >= limit:
+        return False
+    bucket.append(now)
+    return True
+
+
+def _issue_presale_challenge(action: str, method: str, path: str, body: dict) -> dict:
+    server_nonce = secrets.token_urlsafe(16)
+    body_hash = hash_action_body(body)
+    action_commitment = build_action_commitment(
+        server_nonce=server_nonce,
+        site_id=SITE_ID,
+        action=action,
+        method=method,
+        path=path,
+        body_hash=body_hash,
+    )
+    _CHALLENGE_STORE[server_nonce] = {
+        "action": action,
+        "method": method,
+        "path": path,
+        "body_hash": body_hash,
+        "action_commitment": action_commitment,
+        "issued_at": time.time(),
+    }
+    return {
+        "server_nonce": server_nonce,
+        "action_commitment": action_commitment,
+        "body_hash": body_hash,
+    }
 
 
 def _verify_ctx() -> VerificationContext:
@@ -51,6 +102,7 @@ def _verify_ctx() -> VerificationContext:
             site_id=SITE_ID,
             lemma_origin=LEMMA_ORIGIN,
             required_assurance=DEMO_REQUIRED_ASSURANCE,
+            nonce_store_mode="required",
         )
     return _VERIFY_CTX
 
@@ -62,6 +114,7 @@ def _claim_verify_ctx() -> VerificationContext:
             site_id=SITE_ID,
             lemma_origin=LEMMA_ORIGIN,
             required_assurance=PRESALE_CODE_CLAIM_ASSURANCE,
+            nonce_store_mode="required",
         )
     return _CLAIM_VERIFY_CTX
 
@@ -260,22 +313,58 @@ def demo_action_log():
     return jsonify({"success": True, "entries": list(ACTION_LOG)})
 
 
-@app.get("/api/presale/status")
+@app.post("/api/presale/challenge")
+def presale_challenge():
+    body = request.get_json(silent=True) or {}
+    action = str(body.get("action") or PRESALE_REGISTER_ACTION).strip()
+    method = str(body.get("method") or "POST").strip().upper()
+    path = str(body.get("path") or PRESALE_REGISTER_PATH).strip()
+    payload = body.get("body") if isinstance(body.get("body"), dict) else _presale_register_body(body)
+    if not _rate_limit(f"challenge:{_client_ip()}", limit=30, window_seconds=60):
+        return jsonify({"success": False, "reason": "rate_limited"}), 429
+    issued = _issue_presale_challenge(action, method, path, payload)
+    return jsonify({"success": True, "site_id": SITE_ID, **issued})
+
+
+@app.post("/api/presale/status")
 def presale_status():
-    drop_id = (request.args.get("drop_id") or PRESALE_DROP_ID).strip()
-    ppid = (request.args.get("ppid") or "").strip()
-    legacy_ppid = (request.args.get("legacy_ppid") or "").strip() or None
-    record = _PRESALE_LEDGER.lookup(drop_id, ppid, legacy_ppid=legacy_ppid)
+    body = request.get_json(silent=True) or {}
+    drop_id = (body.get("drop_id") or PRESALE_DROP_ID).strip()
+    presentation = _extract_presentation(body)
+    if not presentation:
+        return jsonify({"success": False, "reason": "presentation_missing"}), 403
+    if not _rate_limit(f"status:{_client_ip()}", limit=20, window_seconds=60):
+        return jsonify({"success": False, "reason": "rate_limited"}), 429
+    try:
+        result = _verify_ctx().verify_with_policy(
+            presentation,
+            policy_store=_POLICY_STORE,
+            require_policy=True,
+        )
+    except Exception:
+        logger.exception("presale status verification failed")
+        return jsonify({"success": False, "reason": "verify_error"}), 500
+    if not result.ok:
+        return jsonify({"success": False, "reason": result.reason}), 403
+    legacy_ppid = getattr(result, "legacy_ppid", None)
+    record = _PRESALE_LEDGER.lookup(drop_id, result.ppid or "", legacy_ppid=legacy_ppid)
+    registered = _PRESALE_REGISTRATIONS.is_registered(
+        drop_id,
+        result.ppid or "",
+        legacy_ppid=legacy_ppid,
+    )
     if not record:
         return jsonify({
             "success": True,
             "allocated": False,
+            "registered": registered,
             "drop_id": drop_id,
-            "ppid": ppid or None,
+            "ppid": result.ppid,
         })
     return jsonify({
         "success": True,
         "allocated": True,
+        "registered": registered,
         "drop_id": record.drop_id,
         "ppid": record.ppid,
         "code": record.code,
@@ -288,15 +377,21 @@ def presale_status():
 def presale_register():
     body = request.get_json(silent=True) or {}
     register_body = _presale_register_body(body)
-    presentation = _extract_presentation(body)
+    server_nonce = str(body.get("server_nonce") or "").strip()
+    if not _rate_limit(f"register:{_client_ip()}", limit=10, window_seconds=60):
+        return jsonify({"success": False, "reason": "rate_limited"}), 429
     ctx = _verify_ctx()
-    if not presentation:
-        return jsonify({"success": False, "reason": "presentation_missing"}), 403
     try:
-        result = ctx.verify_with_policy(
-            presentation,
-            policy_store=_POLICY_STORE,
-            require_policy=True,
+        result = ctx.verify_action_stamp(
+            body,
+            action=PRESALE_REGISTER_ACTION,
+            method="POST",
+            path=PRESALE_REGISTER_PATH,
+            body=register_body,
+            required_assurance=DEMO_REQUIRED_ASSURANCE,
+            nonce_store=_NONCE_STORE,
+            nonce_store_mode="required",
+            server_nonce=server_nonce or None,
         )
     except Exception:
         logger.exception("presale register verification failed")
@@ -318,6 +413,20 @@ def presale_register():
             "ppid": result.ppid,
             "action_log": list(ACTION_LOG),
         }), 403
+
+    if result.ppid and not _rate_limit(f"register:ppid:{result.ppid}", limit=5, window_seconds=300):
+        return jsonify({"success": False, "reason": "rate_limited"}), 429
+
+    ok_policy, policy_reason, _decision = enforce_site_policy(
+        ppid=result.ppid or "",
+        policy_store=_POLICY_STORE,
+        legacy_ppid=legacy_ppid,
+        require_policy=True,
+    )
+    if not ok_policy:
+        entry = {**entry_base, "ok": False, "reason": policy_reason}
+        ACTION_LOG.appendleft(entry)
+        return jsonify({"success": False, "reason": policy_reason, "ppid": result.ppid}), 403
 
     registered = _PRESALE_REGISTRATIONS.register(
         register_body["drop_id"],
@@ -345,6 +454,9 @@ def presale_claim_code():
     body = request.get_json(silent=True) or {}
     claim_body = _presale_claim_body(body)
     claim_assurance = _resolve_claim_assurance(body)
+    server_nonce = str(body.get("server_nonce") or "").strip()
+    if not _rate_limit(f"claim:{_client_ip()}", limit=10, window_seconds=60):
+        return jsonify({"success": False, "reason": "rate_limited"}), 429
     ctx = _claim_verify_ctx()
     try:
         result = ctx.verify_action_stamp(
@@ -355,6 +467,9 @@ def presale_claim_code():
             body=claim_body,
             required_assurance=claim_assurance,
             nonce_store=_NONCE_STORE,
+            nonce_store_mode="required",
+            require_fresh_passkey=True,
+            server_nonce=server_nonce or None,
         )
     except Exception:
         logger.exception("presale claim verification failed")
@@ -382,6 +497,9 @@ def presale_claim_code():
             "required_assurance": claim_assurance,
             "action_log": list(ACTION_LOG),
         }), 403
+
+    if result.ppid and not _rate_limit(f"claim:ppid:{result.ppid}", limit=5, window_seconds=300):
+        return jsonify({"success": False, "reason": "rate_limited"}), 429
 
     if claim_assurance == PRESALE_ESCALATED_ASSURANCE and result.ppid:
         _POLICY_STORE.doubted.discard(result.ppid)
@@ -1306,6 +1424,24 @@ def _presale_index():
       }}
     }}
 
+    async function fetchPresaleChallenge(action, path, payload) {{
+      const res = await fetch('/api/presale/challenge', {{
+        method: 'POST',
+        headers: {{ 'Content-Type': 'application/json' }},
+        body: JSON.stringify({{
+          action,
+          method: 'POST',
+          path,
+          body: payload,
+        }}),
+      }});
+      const data = await res.json();
+      if (!res.ok || !data.success) {{
+        throw new Error(data.reason || data.error || 'challenge_failed');
+      }}
+      return data;
+    }}
+
     async function runRegister() {{
       if (typeof IsHumanVerifier === 'undefined') return;
       const registerBtn = document.getElementById('register-btn');
@@ -1314,22 +1450,30 @@ def _presale_index():
       pill.className = 'pill checking';
       decisionCard.innerHTML = '<strong>Step 1 — Join presale</strong><p class="tiny">Passkey wallet proof only. Email and phone are stored on this site, not in lemma.id.</p>';
       try {{
+        const payload = contactPayload();
+        const challenge = await fetchPresaleChallenge(REGISTER_ACTION, REGISTER_PATH, payload);
         const verifier = makeVerifier('passkey');
-        const {{ ok, presentation, reason }} = await verifier.verifyForBackend({{
-          autoProvision: true,
+        const stamped = await verifier.stampAction(payload, {{
+          action: REGISTER_ACTION,
+          method: 'POST',
+          path: REGISTER_PATH,
+          nonce: challenge.server_nonce,
           requiredAssurance: 'passkey',
+          autoProvision: true,
         }});
-        if (!ok) {{
+        if (stampJson) stampJson.textContent = JSON.stringify(stamped, null, 2);
+        const stampMeta = stamped.lemma || {{}};
+        if (!stampMeta.verified) {{
           pill.textContent = 'DENY';
           pill.className = 'pill deny';
-          decisionCopy.textContent = 'Blocked: ' + (reason || 'not_verified');
-          decisionCard.innerHTML = '<strong>Registration blocked</strong><p class="tiny">' + formatDenyReason(reason) + '</p>';
+          decisionCopy.textContent = 'Blocked: ' + (stampMeta.reason || 'not_verified');
+          decisionCard.innerHTML = '<strong>Registration blocked</strong><p class="tiny">' + formatDenyReason(stampMeta.reason) + '</p>';
           return;
         }}
         const serverRes = await fetch(REGISTER_PATH, {{
           method: 'POST',
           headers: {{ 'Content-Type': 'application/json' }},
-          body: JSON.stringify({{ ...contactPayload(), presentation }}),
+          body: JSON.stringify({{ ...stamped, server_nonce: challenge.server_nonce }}),
         }});
         const serverEntry = await serverRes.json();
         await refreshActionLog();
@@ -1377,11 +1521,15 @@ def _presale_index():
       try {{
         const verifier = makeVerifier(claimAssurance);
         const payload = {{ ...contactPayload(), required_assurance: claimAssurance }};
+        const challenge = await fetchPresaleChallenge('{copy["claim_action"]}', CLAIM_PATH, payload);
         const stamped = await verifier.stampAction(payload, {{
           action: '{copy["claim_action"]}',
           method: 'POST',
           path: CLAIM_PATH,
+          nonce: challenge.server_nonce,
           requiredAssurance: claimAssurance,
+          requireFreshPasskey: true,
+          serverNonce: challenge.server_nonce,
           autoProvision: true,
         }});
         if (stampJson) stampJson.textContent = JSON.stringify(stamped, null, 2);
@@ -1398,7 +1546,7 @@ def _presale_index():
         const serverRes = await fetch(CLAIM_PATH, {{
           method: 'POST',
           headers: {{ 'Content-Type': 'application/json' }},
-          body: JSON.stringify(stamped),
+          body: JSON.stringify({{ ...stamped, server_nonce: challenge.server_nonce }}),
         }});
         const serverEntry = await serverRes.json();
         await refreshActionLog();
