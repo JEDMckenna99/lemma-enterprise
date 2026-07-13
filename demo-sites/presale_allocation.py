@@ -46,6 +46,73 @@ def _generate_code() -> str:
     return f"{random.randint(10_000_000, 99_999_999)}"
 
 
+@dataclass(frozen=True)
+class RegisterResult:
+    ok: bool
+    reason: str
+    drop_id: Optional[str] = None
+    ppid: Optional[str] = None
+
+
+class PresaleRegistrationStore:
+    """Site-local presale signups keyed by (drop_id, ppid) — Laylo registration step."""
+
+    def __init__(self) -> None:
+        self._lock = threading.Lock()
+        self._registered: dict[tuple[str, str], dict] = {}
+
+    def register(
+        self,
+        drop_id: str,
+        ppid: str,
+        *,
+        email: str = "",
+        phone: str = "",
+    ) -> RegisterResult:
+        drop = _normalize_drop_id(drop_id)
+        subject = _normalize_ppid(ppid)
+        if not drop:
+            return RegisterResult(False, "drop_id_missing")
+        if not subject:
+            return RegisterResult(False, "ppid_missing")
+        with self._lock:
+            self._registered[(drop, subject)] = {
+                "email": str(email or "").strip(),
+                "phone": str(phone or "").strip(),
+                "registered_at": time.time(),
+            }
+        return RegisterResult(True, "ok", drop_id=drop, ppid=subject)
+
+    def is_registered(
+        self,
+        drop_id: str,
+        ppid: str,
+        *,
+        legacy_ppid: Optional[str] = None,
+    ) -> bool:
+        drop = _normalize_drop_id(drop_id)
+        if not drop:
+            return False
+        with self._lock:
+            for candidate in (ppid, legacy_ppid):
+                normalized = _normalize_ppid(candidate or "")
+                if normalized and (drop, normalized) in self._registered:
+                    return True
+        return False
+
+    def reset(self, drop_id: Optional[str] = None) -> int:
+        with self._lock:
+            if drop_id is None:
+                count = len(self._registered)
+                self._registered.clear()
+                return count
+            drop = _normalize_drop_id(drop_id)
+            keys = [key for key in self._registered if key[0] == drop]
+            for key in keys:
+                del self._registered[key]
+            return len(keys)
+
+
 class PresaleAllocationLedger:
     """Thread-safe in-memory ledger: at most one code per (drop_id, ppid)."""
 

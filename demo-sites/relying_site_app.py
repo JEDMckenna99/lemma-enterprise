@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 from lemma_ishuman_verify import InMemoryNonceStore, VerificationContext
 from lemma_ishuman_site_policy import InMemorySitePolicyStore, enforce_site_policy
 
-from presale_allocation import PresaleAllocationLedger
+from presale_allocation import PresaleAllocationLedger, PresaleRegistrationStore
 
 
 app = Flask(__name__)
@@ -23,10 +23,15 @@ DEMO_HUB_URL = os.getenv("LEMMA_DEMO_HUB_URL", f"{LEMMA_ORIGIN}/demo")
 DEMO_REQUIRED_ASSURANCE = os.getenv("LEMMA_DEMO_REQUIRED_ASSURANCE", "passkey").strip().lower()
 PRESALE_DROP_ID = os.getenv("LEMMA_PRESALE_DROP_ID", "artist-presale-2026").strip()
 PRESALE_CODE_CLAIM_ASSURANCE = os.getenv(
-    "LEMMA_PRESALE_CODE_CLAIM_ASSURANCE", "ishuman"
+    "LEMMA_PRESALE_CODE_CLAIM_ASSURANCE", "passkey"
+).strip().lower()
+PRESALE_ESCALATED_ASSURANCE = os.getenv(
+    "LEMMA_PRESALE_ESCALATED_ASSURANCE", "ishuman"
 ).strip().lower()
 ISHUMAN_VERIFIER_SDK_VERSION = os.getenv("ISHUMAN_VERIFIER_SDK_VERSION", "1.9.1").strip()
 
+PRESALE_REGISTER_ACTION = "register_presale"
+PRESALE_REGISTER_PATH = "/api/presale/register"
 PRESALE_CLAIM_ACTION = "claim_presale_code"
 PRESALE_CLAIM_PATH = "/api/presale/claim-code"
 
@@ -35,6 +40,7 @@ _VERIFY_CTX: Optional[VerificationContext] = None
 _CLAIM_VERIFY_CTX: Optional[VerificationContext] = None
 _POLICY_STORE = InMemorySitePolicyStore()
 _PRESALE_LEDGER = PresaleAllocationLedger()
+_PRESALE_REGISTRATIONS = PresaleRegistrationStore()
 _NONCE_STORE = InMemoryNonceStore()
 
 
@@ -72,6 +78,18 @@ def _presale_claim_body(body: dict) -> dict:
     }
 
 
+def _resolve_claim_assurance(body: dict) -> str:
+    requested = str(body.get("required_assurance") or PRESALE_CODE_CLAIM_ASSURANCE).strip().lower()
+    if requested in ("passkey", "ishuman"):
+        return requested
+    return PRESALE_CODE_CLAIM_ASSURANCE
+
+
+def _presale_register_body(body: dict) -> dict:
+    base = _presale_claim_body(body)
+    return base
+
+
 def _content():
     if "trial" in SITE_KIND.lower():
         return {
@@ -85,17 +103,22 @@ def _content():
             "action": "start_trial",
         }
     return {
-        "eyebrow": "Artist presale",
-        "headline": "Get your unique presale code",
-        "subhead": "RealFan-style reference — verify once as a human, receive one single-use code per drop. Phone and email stay on this site; Lemma never receives them.",
-        "primary": "Verify & get code",
+        "eyebrow": "Artist presale · RealFan-style",
+        "headline": "Register, then unlock your unique code",
+        "subhead": "Like Laylo RealFan: join the presale with low-friction wallet proof, then receive one code per verified person. Phone and email stay on this site. IDV runs only when the site flags you for review.",
+        "register": "Step 1 — Join presale",
+        "claim": "Step 2 — Unlock unique code",
         "retry": "Try again with same wallet",
+        "flag": "Simulate Laylo risk flag",
+        "clear_flag": "Clear risk flag",
+        "success_register": "Registered for presale",
         "success": "Your unique code",
         "form_email": "Fan email",
         "form_phone": "Mobile number",
         "placeholder_email": "fan@example.com",
         "placeholder_phone": "+1 555 010 1234",
-        "action": "claim_presale_code",
+        "register_action": "register_presale",
+        "claim_action": "claim_presale_code",
     }
 
 
@@ -111,6 +134,7 @@ def health():
     if _is_presale_site():
         payload["presale_drop_id"] = PRESALE_DROP_ID
         payload["presale_claim_assurance"] = PRESALE_CODE_CLAIM_ASSURANCE
+        payload["presale_escalated_assurance"] = PRESALE_ESCALATED_ASSURANCE
     return payload
 
 
@@ -260,10 +284,67 @@ def presale_status():
     })
 
 
+@app.post("/api/presale/register")
+def presale_register():
+    body = request.get_json(silent=True) or {}
+    register_body = _presale_register_body(body)
+    presentation = _extract_presentation(body)
+    ctx = _verify_ctx()
+    if not presentation:
+        return jsonify({"success": False, "reason": "presentation_missing"}), 403
+    try:
+        result = ctx.verify_with_policy(
+            presentation,
+            policy_store=_POLICY_STORE,
+            require_policy=True,
+        )
+    except Exception:
+        logger.exception("presale register verification failed")
+        return jsonify({"success": False, "reason": "verify_error"}), 500
+
+    legacy_ppid = getattr(result, "legacy_ppid", None)
+    entry_base = {
+        "action": PRESALE_REGISTER_ACTION,
+        "ppid": result.ppid,
+        "legacy_ppid": legacy_ppid,
+        "assurance": getattr(result, "assurance", None),
+    }
+    if not result.ok:
+        entry = {**entry_base, "ok": False, "reason": result.reason}
+        ACTION_LOG.appendleft(entry)
+        return jsonify({
+            "success": False,
+            "reason": result.reason,
+            "ppid": result.ppid,
+            "action_log": list(ACTION_LOG),
+        }), 403
+
+    registered = _PRESALE_REGISTRATIONS.register(
+        register_body["drop_id"],
+        result.ppid or "",
+        email=register_body["email"],
+        phone=register_body["phone"],
+    )
+    if not registered.ok:
+        return jsonify({"success": False, "reason": registered.reason}), 403
+
+    entry = {**entry_base, "ok": True, "reason": "ok", "drop_id": registered.drop_id}
+    ACTION_LOG.appendleft(entry)
+    return jsonify({
+        "success": True,
+        "drop_id": registered.drop_id,
+        "ppid": registered.ppid,
+        "assurance": getattr(result, "assurance", None),
+        "reason": "ok",
+        "action_log": list(ACTION_LOG),
+    })
+
+
 @app.post("/api/presale/claim-code")
 def presale_claim_code():
     body = request.get_json(silent=True) or {}
     claim_body = _presale_claim_body(body)
+    claim_assurance = _resolve_claim_assurance(body)
     ctx = _claim_verify_ctx()
     try:
         result = ctx.verify_action_stamp(
@@ -272,7 +353,7 @@ def presale_claim_code():
             method="POST",
             path=PRESALE_CLAIM_PATH,
             body=claim_body,
-            required_assurance=PRESALE_CODE_CLAIM_ASSURANCE,
+            required_assurance=claim_assurance,
             nonce_store=_NONCE_STORE,
         )
     except Exception:
@@ -298,8 +379,14 @@ def presale_claim_code():
             "success": False,
             "reason": result.reason,
             "ppid": result.ppid,
+            "required_assurance": claim_assurance,
             "action_log": list(ACTION_LOG),
         }), 403
+
+    if claim_assurance == PRESALE_ESCALATED_ASSURANCE and result.ppid:
+        _POLICY_STORE.doubted.discard(result.ppid)
+        if legacy_ppid:
+            _POLICY_STORE.doubted.discard(legacy_ppid)
 
     ok_policy, policy_reason, _decision = enforce_site_policy(
         ppid=result.ppid or "",
@@ -310,9 +397,27 @@ def presale_claim_code():
     if not ok_policy:
         entry = {**entry_base, "ok": False, "reason": policy_reason}
         ACTION_LOG.appendleft(entry)
-        return jsonify({
+        payload = {
             "success": False,
             "reason": policy_reason,
+            "ppid": result.ppid,
+            "required_assurance": PRESALE_ESCALATED_ASSURANCE,
+            "action_log": list(ACTION_LOG),
+        }
+        if policy_reason == "doubt_required":
+            payload["escalation"] = "fresh_idv"
+        return jsonify(payload), 403
+
+    if not _PRESALE_REGISTRATIONS.is_registered(
+        claim_body["drop_id"],
+        result.ppid or "",
+        legacy_ppid=legacy_ppid,
+    ):
+        entry = {**entry_base, "ok": False, "reason": "registration_required"}
+        ACTION_LOG.appendleft(entry)
+        return jsonify({
+            "success": False,
+            "reason": "registration_required",
             "ppid": result.ppid,
             "action_log": list(ACTION_LOG),
         }), 403
@@ -930,7 +1035,29 @@ def _presale_index():
       color: var(--brand);
       border: 1px solid #c7d2fe;
     }}
+    .btn-ghost {{
+      background: #f8fafc;
+      color: #475569;
+      border: 1px solid var(--line);
+    }}
     button:disabled, .btn-secondary:disabled {{ opacity: 0.65; cursor: not-allowed; }}
+    .steps {{
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin: 18px 0 8px;
+    }}
+    .step {{
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 10px 12px;
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--muted);
+      background: #f8fafc;
+    }}
+    .step.active {{ border-color: #c7d2fe; background: #eef2ff; color: #312e81; }}
+    .step.done {{ border-color: #86efac; background: #dcfce7; color: var(--ok); }}
     .code-display {{
       margin-top: 18px;
       font-size: clamp(28px, 6vw, 40px);
@@ -1009,42 +1136,49 @@ def _presale_index():
         <p class="eyebrow">{copy["eyebrow"]}</p>
         <h1>{copy["headline"]}</h1>
         <p class="muted">{copy["subhead"]}</p>
+        <div class="steps">
+          <div class="step active" id="step-register">1 · Join presale</div>
+          <div class="step" id="step-claim">2 · Unlock code</div>
+        </div>
         <label for="email">{copy["form_email"]}</label>
         <input id="email" value="{copy["placeholder_email"]}" aria-label="{copy["form_email"]}">
         <label for="phone">{copy["form_phone"]}</label>
         <input id="phone" value="{copy["placeholder_phone"]}" aria-label="{copy["form_phone"]}">
         <p class="muted" style="margin-top:12px;font-size:13px;">Drop: <code id="drop-id">{PRESALE_DROP_ID}</code></p>
-        <button id="claim-btn">{copy["primary"]}</button>
-        <button type="button" class="btn-secondary" id="retry-btn">{copy["retry"]}</button>
+        <button id="register-btn">{copy["register"]}</button>
+        <button type="button" class="btn-secondary" id="claim-btn" disabled>{copy["claim"]}</button>
+        <button type="button" class="btn-secondary" id="retry-btn" disabled>{copy["retry"]}</button>
+        <button type="button" class="btn-secondary btn-ghost" id="flag-btn">{copy["flag"]}</button>
+        <button type="button" class="btn-secondary btn-ghost" id="clear-flag-btn">{copy["clear_flag"]}</button>
         <div class="code-display" id="code-display" hidden>--------</div>
         <div class="verdict" id="decision-card">
-          <strong>One verified person, one code</strong>
-          <p class="tiny">Code issuance requires <code>assurance: ishuman</code> — wallet unlock plus live IDV. The site ledger keys allocations by <code>(drop_id, ppid)</code>, not phone or email.</p>
+          <strong>Laylo RealFan-style flow</strong>
+          <p class="tiny">Step 1 uses passkey wallet proof only — email and phone stay on this site. Step 2 unlocks your unique code with the same low-friction proof. If the site flags suspicious activity, fresh IDV (<code>verifyFreshForBackend</code>) is the penalty before code issuance.</p>
         </div>
       </section>
       <aside class="card">
         <p class="eyebrow">Reference integration</p>
         <p class="muted">Site binding: <code>{SITE_ID}</code></p>
         <p style="margin:12px 0 6px">Decision <span class="pill" id="status-pill">WAITING</span>
-          <span class="pill" id="assurance-pill">claim: {PRESALE_CODE_CLAIM_ASSURANCE}</span></p>
-        <p class="muted" id="decision-copy">Enter contact info, then claim your code.</p>
+          <span class="pill" id="assurance-pill">default: {PRESALE_CODE_CLAIM_ASSURANCE}</span></p>
+        <p class="muted" id="decision-copy">Join the presale first, then unlock your code.</p>
         <div class="server-receipt" id="server-receipt" hidden>
           <strong>Server verification receipt</strong>
           <dl id="server-receipt-fields"></dl>
         </div>
         <ol class="how">
-          <li>Fan registers email/phone on this site only.</li>
-          <li>SDK runs IDV-backed verification (<code>stampAction</code>).</li>
-          <li>Server verifies action stamp + site policy offline.</li>
-          <li>Ledger enforces one code per PPID per drop.</li>
-          <li>Second claim with the same wallet is denied.</li>
+          <li>Fan registers email/phone on this site only (Step 1).</li>
+          <li>Passkey proof binds a site-private PPID — additive to phone/IP checks.</li>
+          <li>Unlock code with <code>stampAction</code> at passkey assurance (Step 2).</li>
+          <li>Risk flag → fan completes fresh IDV, then retries at <code>ishuman</code>.</li>
+          <li>Ledger enforces one code per PPID per drop; same wallet retry is denied.</li>
         </ol>
         <details>
           <summary>Action stamp JSON</summary>
           <pre id="stamp-json">{{}}</pre>
         </details>
         <details>
-          <summary>Claim log</summary>
+          <summary>Action log</summary>
           <pre id="action-log">[]</pre>
         </details>
       </aside>
@@ -1055,6 +1189,9 @@ def _presale_index():
   <script>
     const DROP_ID = {PRESALE_DROP_ID!r};
     const CLAIM_ASSURANCE = {PRESALE_CODE_CLAIM_ASSURANCE!r};
+    const ESCALATED_ASSURANCE = {PRESALE_ESCALATED_ASSURANCE!r};
+    const REGISTER_PATH = {PRESALE_REGISTER_PATH!r};
+    const REGISTER_ACTION = {copy["register_action"]!r};
     const CLAIM_PATH = {PRESALE_CLAIM_PATH!r};
     const pill = document.getElementById('status-pill');
     const assurancePill = document.getElementById('assurance-pill');
@@ -1065,34 +1202,41 @@ def _presale_index():
     const serverReceipt = document.getElementById('server-receipt');
     const serverReceiptFields = document.getElementById('server-receipt-fields');
     const codeDisplay = document.getElementById('code-display');
+    const stepRegister = document.getElementById('step-register');
+    const stepClaim = document.getElementById('step-claim');
     let sharedVerifier = null;
+    let lastPpid = null;
+    let presaleRegistered = false;
 
     if (typeof IsHumanVerifier === 'undefined') {{
       const msg = window.__lemmaSdkLoadError
         || 'Lemma SDK did not load — check that {LEMMA_ORIGIN} is reachable.';
       decisionCopy.textContent = msg;
-      document.getElementById('claim-btn').disabled = true;
-      document.getElementById('retry-btn').disabled = true;
+      ['register-btn', 'claim-btn', 'retry-btn', 'flag-btn', 'clear-flag-btn'].forEach((id) => {{
+        const el = document.getElementById(id);
+        if (el) el.disabled = true;
+      }});
     }}
 
-    function makeVerifier() {{
-      if (sharedVerifier) return sharedVerifier;
-      sharedVerifier = new IsHumanVerifier({{
-        siteId: '{SITE_ID}',
-        lemmaOrigin: '{LEMMA_ORIGIN}',
-        autoProvision: true,
-        requiredAssurance: CLAIM_ASSURANCE,
-        debug: true,
-        isBlockedLocally: async (ppid) => {{
-          const res = await fetch('/api/demo/policy/check?ppid=' + encodeURIComponent(ppid));
-          const data = await res.json();
-          return {{ blocked: !!data.blocked, doubt_required: !!data.doubt_required }};
-        }},
-      }});
+    function makeVerifier(requiredAssurance) {{
+      if (!sharedVerifier) {{
+        sharedVerifier = new IsHumanVerifier({{
+          siteId: '{SITE_ID}',
+          lemmaOrigin: '{LEMMA_ORIGIN}',
+          autoProvision: true,
+          requiredAssurance: requiredAssurance || CLAIM_ASSURANCE,
+          debug: true,
+          isBlockedLocally: async (ppid) => {{
+            const res = await fetch('/api/demo/policy/check?ppid=' + encodeURIComponent(ppid));
+            const data = await res.json();
+            return {{ blocked: !!data.blocked, doubt_required: !!data.doubt_required }};
+          }},
+        }});
+      }}
       return sharedVerifier;
     }}
 
-    function claimPayload() {{
+    function contactPayload() {{
       return {{
         drop_id: DROP_ID,
         email: document.getElementById('email')?.value || '',
@@ -1100,15 +1244,31 @@ def _presale_index():
       }};
     }}
 
+    function setStepState(registered) {{
+      presaleRegistered = !!registered;
+      if (stepRegister) stepRegister.className = 'step ' + (registered ? 'done' : 'active');
+      if (stepClaim) stepClaim.className = 'step ' + (registered ? 'active' : '');
+      const claimBtn = document.getElementById('claim-btn');
+      const retryBtn = document.getElementById('retry-btn');
+      if (claimBtn) claimBtn.disabled = !registered;
+      if (retryBtn) retryBtn.disabled = !registered;
+    }}
+
     function formatDenyReason(reason) {{
       if (reason === 'allocation_already_claimed') {{
         return 'This verified person already received a code for this drop.';
+      }}
+      if (reason === 'registration_required') {{
+        return 'Complete Step 1 — join the presale before unlocking a code.';
+      }}
+      if (reason === 'doubt_required') {{
+        return 'Site flagged this fan for review — complete fresh IDV, then retry.';
       }}
       if (reason === 'action_nonce_reused') {{
         return 'Replay blocked — each claim needs a fresh action stamp.';
       }}
       if (reason === 'assurance_insufficient') {{
-        return 'IDV-backed human proof is required before code issuance.';
+        return 'Higher assurance is required (IDV-backed human proof).';
       }}
       if (reason === 'idv_cancelled') {{
         return 'Complete verification in the Lemma popup to continue.';
@@ -1126,7 +1286,7 @@ def _presale_index():
         ['Drop', serverEntry.drop_id || DROP_ID],
         ['Code', serverEntry.code || serverEntry.existing_code || '—'],
         ['PPID', serverEntry.ppid || '—'],
-        ['Assurance', serverEntry.assurance || '—'],
+        ['Assurance', serverEntry.assurance || serverEntry.required_assurance || '—'],
         ['Reason', serverEntry.reason || '—'],
         ['Decision', serverEntry.success ? 'accept' : 'deny'],
       ];
@@ -1146,23 +1306,82 @@ def _presale_index():
       }}
     }}
 
-    async function runClaim() {{
+    async function runRegister() {{
       if (typeof IsHumanVerifier === 'undefined') return;
+      const registerBtn = document.getElementById('register-btn');
+      registerBtn.disabled = true;
+      pill.textContent = 'CHECKING';
+      pill.className = 'pill checking';
+      decisionCard.innerHTML = '<strong>Step 1 — Join presale</strong><p class="tiny">Passkey wallet proof only. Email and phone are stored on this site, not in lemma.id.</p>';
+      try {{
+        const verifier = makeVerifier('passkey');
+        const {{ ok, presentation, reason }} = await verifier.verifyForBackend({{
+          autoProvision: true,
+          requiredAssurance: 'passkey',
+        }});
+        if (!ok) {{
+          pill.textContent = 'DENY';
+          pill.className = 'pill deny';
+          decisionCopy.textContent = 'Blocked: ' + (reason || 'not_verified');
+          decisionCard.innerHTML = '<strong>Registration blocked</strong><p class="tiny">' + formatDenyReason(reason) + '</p>';
+          return;
+        }}
+        const serverRes = await fetch(REGISTER_PATH, {{
+          method: 'POST',
+          headers: {{ 'Content-Type': 'application/json' }},
+          body: JSON.stringify({{ ...contactPayload(), presentation }}),
+        }});
+        const serverEntry = await serverRes.json();
+        await refreshActionLog();
+        renderReceipt(serverEntry);
+        if (serverEntry.success) {{
+          lastPpid = serverEntry.ppid || null;
+          setStepState(true);
+          pill.textContent = 'REGISTERED';
+          pill.className = 'pill ok';
+          assurancePill.textContent = 'register: passkey';
+          decisionCopy.textContent = 'Joined drop ' + (serverEntry.drop_id || DROP_ID) + '. Unlock your code in Step 2.';
+          decisionCard.innerHTML = '<strong>{copy["success_register"]}</strong><p class="tiny">PPID '
+            + (serverEntry.ppid || '').slice(0, 24) + '… is registered for this drop. Use Step 2 to claim your unique code.</p>';
+        }} else {{
+          pill.textContent = 'DENY';
+          pill.className = 'pill deny';
+          decisionCopy.textContent = 'Blocked: ' + (serverEntry.reason || 'denied');
+          decisionCard.innerHTML = '<strong>Registration denied</strong><p class="tiny">' + formatDenyReason(serverEntry.reason) + '</p>';
+        }}
+      }} catch (err) {{
+        pill.textContent = 'ERROR';
+        pill.className = 'pill deny';
+        decisionCopy.textContent = err.message;
+        decisionCard.innerHTML = '<strong>Registration failed</strong><p class="tiny">' + err.message + '</p>';
+      }} finally {{
+        registerBtn.disabled = false;
+      }}
+    }}
+
+    async function runClaim(assuranceOverride, depth) {{
+      if (typeof IsHumanVerifier === 'undefined') return;
+      const retryDepth = depth || 0;
+      if (retryDepth > 2) return;
+      const claimAssurance = assuranceOverride || CLAIM_ASSURANCE;
       const claimBtn = document.getElementById('claim-btn');
       const retryBtn = document.getElementById('retry-btn');
       claimBtn.disabled = true;
       retryBtn.disabled = true;
       pill.textContent = 'CHECKING';
       pill.className = 'pill checking';
-      decisionCard.innerHTML = '<strong>Verifying human proof…</strong><p class="tiny">Wallet unlock and live IDV when needed. Then the server issues at most one code for this PPID.</p>';
+      const idvNote = claimAssurance === ESCALATED_ASSURANCE
+        ? 'Fresh IDV-backed proof required after site risk flag.'
+        : 'Passkey wallet proof — no IDV unless the site escalates.';
+      decisionCard.innerHTML = '<strong>Step 2 — Unlock code</strong><p class="tiny">' + idvNote + '</p>';
       try {{
-        const verifier = makeVerifier();
-        const payload = claimPayload();
+        const verifier = makeVerifier(claimAssurance);
+        const payload = {{ ...contactPayload(), required_assurance: claimAssurance }};
         const stamped = await verifier.stampAction(payload, {{
-          action: '{copy["action"]}',
+          action: '{copy["claim_action"]}',
           method: 'POST',
           path: CLAIM_PATH,
-          requiredAssurance: CLAIM_ASSURANCE,
+          requiredAssurance: claimAssurance,
           autoProvision: true,
         }});
         if (stampJson) stampJson.textContent = JSON.stringify(stamped, null, 2);
@@ -1184,7 +1403,24 @@ def _presale_index():
         const serverEntry = await serverRes.json();
         await refreshActionLog();
         renderReceipt(serverEntry);
-        assurancePill.textContent = 'assurance: ' + (serverEntry.assurance || CLAIM_ASSURANCE);
+        assurancePill.textContent = 'claim: ' + (serverEntry.assurance || claimAssurance);
+        if (serverEntry.reason === 'doubt_required' && claimAssurance !== ESCALATED_ASSURANCE) {{
+          pill.textContent = 'IDV REQUIRED';
+          pill.className = 'pill checking';
+          decisionCopy.textContent = 'Site risk flag — complete fresh IDV to unlock your code.';
+          decisionCard.innerHTML = '<strong>Risk flag penalty</strong><p class="tiny">Like Laylo escalating suspicious fans: running fresh IDV via verifyFreshForBackend, then retrying at ishuman assurance.</p>';
+          const fresh = await verifier.verifyFreshForBackend({{
+            requiredAssurance: ESCALATED_ASSURANCE,
+            autoProvision: true,
+          }});
+          if (!fresh.ok) {{
+            pill.textContent = 'DENY';
+            pill.className = 'pill deny';
+            decisionCopy.textContent = 'IDV blocked: ' + (fresh.reason || 'not_verified');
+            return;
+          }}
+          return runClaim(ESCALATED_ASSURANCE, retryDepth + 1);
+        }}
         if (serverEntry.success && serverEntry.code) {{
           pill.textContent = 'CODE ISSUED';
           pill.className = 'pill ok';
@@ -1212,14 +1448,42 @@ def _presale_index():
         decisionCopy.textContent = err.message;
         decisionCard.innerHTML = '<strong>Claim failed</strong><p class="tiny">' + err.message + '</p>';
       }} finally {{
-        claimBtn.disabled = false;
-        retryBtn.disabled = false;
+        claimBtn.disabled = !presaleRegistered;
+        retryBtn.disabled = !presaleRegistered;
       }}
     }}
 
+    async function simulateRiskFlag() {{
+      if (!lastPpid) {{
+        decisionCopy.textContent = 'Join the presale first so we have a PPID to flag.';
+        return;
+      }}
+      await fetch('/api/demo/policy/doubt', {{
+        method: 'POST',
+        headers: {{ 'Content-Type': 'application/json' }},
+        body: JSON.stringify({{ ppid: lastPpid }}),
+      }});
+      pill.textContent = 'FLAGGED';
+      pill.className = 'pill checking';
+      decisionCopy.textContent = 'Simulated Laylo risk flag on ' + lastPpid.slice(0, 20) + '… — Step 2 will require fresh IDV.';
+    }}
+
+    async function clearRiskFlag() {{
+      if (!lastPpid) return;
+      await fetch('/api/demo/policy/clear', {{
+        method: 'POST',
+        headers: {{ 'Content-Type': 'application/json' }},
+        body: JSON.stringify({{ ppid: lastPpid }}),
+      }});
+      decisionCopy.textContent = 'Risk flag cleared for demo reset.';
+    }}
+
     refreshActionLog();
+    document.getElementById('register-btn')?.addEventListener('click', () => runRegister());
     document.getElementById('claim-btn')?.addEventListener('click', () => runClaim());
     document.getElementById('retry-btn')?.addEventListener('click', () => runClaim());
+    document.getElementById('flag-btn')?.addEventListener('click', () => simulateRiskFlag());
+    document.getElementById('clear-flag-btn')?.addEventListener('click', () => clearRiskFlag());
 
     if (new URLSearchParams(window.location.search).get('lemma_ishuman_return') === '1') {{
       document.getElementById('claim-btn')?.click();

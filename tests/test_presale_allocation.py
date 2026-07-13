@@ -94,3 +94,16 @@ def test_reset_clears_drop():
 
     still_blocked = ledger.lookup("drop-b", "did:lemma:ppid_b")
     assert still_blocked is not None
+
+
+def test_registration_store_tracks_drop_ppid():
+    mod = _load_ledger_module()
+    store = mod.PresaleRegistrationStore()
+    registered = store.register("drop-a", "did:lemma:ppid_a", email="a@x.com", phone="+1")
+    assert registered.ok is True
+    assert store.is_registered("drop-a", "did:lemma:ppid_a") is True
+    assert store.is_registered("drop-a", "did:lemma:other") is False
+
+    removed = store.reset("drop-a")
+    assert removed == 1
+    assert store.is_registered("drop-a", "did:lemma:ppid_a") is False

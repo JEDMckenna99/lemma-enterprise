@@ -50,7 +50,8 @@ def test_relying_site_health(relying_site_client):
     assert payload["required_assurance"] == "passkey"
     assert payload["presale_mode"] is True
     assert payload["presale_drop_id"]
-    assert payload["presale_claim_assurance"] == "ishuman"
+    assert payload["presale_claim_assurance"] == "passkey"
+    assert payload["presale_escalated_assurance"] == "ishuman"
 
 
 def test_relying_site_config(relying_site_client):
@@ -140,7 +141,12 @@ def test_relying_site_index_loads_verifier_script(relying_site_client):
     assert "IsHumanVerifier" in body
     assert "stampAction" in body
     assert "claim_presale_code" in body
-    assert "unique presale code" in body.lower()
+    assert "register_presale" in body
+    assert "unique code" in body.lower()
+    assert "Step 1" in body or "Join presale" in body
+    assert "verifyFreshForBackend" in body
+    assert "/api/presale/register" in body
+    assert "Simulate Laylo risk flag" in body
     assert "tickets-demo.lemma.id" in body
 
 
@@ -157,8 +163,8 @@ def test_relying_site_index_exposes_server_receipt_and_hub_return(relying_site_c
     assert "renderReceipt" in body
     assert "isBlockedLocally" in body
     assert "/api/demo/policy/check" in body
-    assert "allocation_already_claimed" in body
-    assert "assurance_insufficient" in body
+    assert "registration_required" in body
+    assert "doubt_required" in body
     assert "Try again with same wallet" in body
     assert "/api/presale/claim-code" in body
 
@@ -207,10 +213,62 @@ def test_presale_claim_denies_missing_stamp(relying_site_client):
     assert payload["reason"] == "action_stamp_missing"
 
 
-def test_presale_claim_issues_code_once(relying_site_client, monkeypatch):
+def test_presale_register_denies_missing_presentation(relying_site_client):
+    client, mod = relying_site_client
+    mod.ACTION_LOG.clear()
+    mod._PRESALE_REGISTRATIONS.reset()
+
+    resp = client.post("/api/presale/register", json={"drop_id": "drop-a"})
+    payload = resp.get_json()
+
+    assert resp.status_code == 403
+    assert payload["success"] is False
+    assert payload["reason"] == "presentation_missing"
+
+
+def test_presale_register_stores_signup(relying_site_client, monkeypatch):
+    client, mod = relying_site_client
+    mod.ACTION_LOG.clear()
+    mod._PRESALE_REGISTRATIONS.reset()
+    mod._VERIFY_CTX = None
+
+    class _FakeResult:
+        ok = True
+        ppid = "did:lemma:ppid_demo_123"
+        legacy_ppid = None
+        assurance = "passkey"
+        reason = "session_valid"
+
+    def _fake_verify_with_policy(self, _presentation, **_kwargs):
+        return _FakeResult()
+
+    monkeypatch.setattr(mod.VerificationContext, "verify_with_policy", _fake_verify_with_policy)
+
+    resp = client.post(
+        "/api/presale/register",
+        json={
+            "drop_id": mod.PRESALE_DROP_ID,
+            "email": "fan@example.com",
+            "phone": "+15550101234",
+            "presentation": {"credential": {"id": "cred-1"}},
+        },
+    )
+    payload = resp.get_json()
+
+    assert resp.status_code == 200
+    assert payload["success"] is True
+    assert payload["ppid"] == "did:lemma:ppid_demo_123"
+    assert mod._PRESALE_REGISTRATIONS.is_registered(
+        mod.PRESALE_DROP_ID,
+        "did:lemma:ppid_demo_123",
+    )
+
+
+def test_presale_claim_requires_registration(relying_site_client, monkeypatch):
     client, mod = relying_site_client
     mod.ACTION_LOG.clear()
     mod._PRESALE_LEDGER.reset()
+    mod._PRESALE_REGISTRATIONS.reset()
     mod._CLAIM_VERIFY_CTX = None
     mod._NONCE_STORE = mod.InMemoryNonceStore()
 
@@ -218,7 +276,44 @@ def test_presale_claim_issues_code_once(relying_site_client, monkeypatch):
         ok = True
         ppid = "did:lemma:ppid_demo_123"
         legacy_ppid = None
-        assurance = "ishuman"
+        assurance = "passkey"
+        reason = "valid"
+
+    def _fake_verify_action_stamp(self, *_args, **_kwargs):
+        return _FakeResult()
+
+    monkeypatch.setattr(mod.VerificationContext, "verify_action_stamp", _fake_verify_action_stamp)
+
+    resp = client.post(
+        "/api/presale/claim-code",
+        json={
+            "drop_id": mod.PRESALE_DROP_ID,
+            "lemma": {"verified": True},
+        },
+    )
+    payload = resp.get_json()
+
+    assert resp.status_code == 403
+    assert payload["success"] is False
+    assert payload["reason"] == "registration_required"
+
+
+def test_presale_claim_issues_code_once(relying_site_client, monkeypatch):
+    client, mod = relying_site_client
+    mod.ACTION_LOG.clear()
+    mod._PRESALE_LEDGER.reset()
+    mod._PRESALE_REGISTRATIONS.reset()
+    mod._CLAIM_VERIFY_CTX = None
+    mod._NONCE_STORE = mod.InMemoryNonceStore()
+
+    ppid = "did:lemma:ppid_demo_123"
+    mod._PRESALE_REGISTRATIONS.register(mod.PRESALE_DROP_ID, ppid)
+
+    class _FakeResult:
+        ok = True
+        ppid = "did:lemma:ppid_demo_123"
+        legacy_ppid = None
+        assurance = "passkey"
         reason = "valid"
         credential_id = "cred-1"
         issuer_did = "did:lemma:test"
@@ -248,3 +343,81 @@ def test_presale_claim_issues_code_once(relying_site_client, monkeypatch):
     assert second_payload["success"] is False
     assert second_payload["reason"] == "allocation_already_claimed"
     assert second_payload["existing_code"] == first_payload["code"]
+
+
+def test_presale_claim_doubt_requires_escalated_assurance(relying_site_client, monkeypatch):
+    client, mod = relying_site_client
+    mod.ACTION_LOG.clear()
+    mod._PRESALE_LEDGER.reset()
+    mod._PRESALE_REGISTRATIONS.reset()
+    mod._POLICY_STORE.doubted.clear()
+    mod._CLAIM_VERIFY_CTX = None
+    mod._NONCE_STORE = mod.InMemoryNonceStore()
+
+    ppid = "did:lemma:ppid_flagged"
+    mod._PRESALE_REGISTRATIONS.register(mod.PRESALE_DROP_ID, ppid)
+    mod._POLICY_STORE.doubted.add(ppid)
+
+    class _FakeResult:
+        ok = True
+        ppid = "did:lemma:ppid_flagged"
+        legacy_ppid = None
+        assurance = "passkey"
+        reason = "valid"
+
+    def _fake_verify_action_stamp(self, *_args, **_kwargs):
+        return _FakeResult()
+
+    monkeypatch.setattr(mod.VerificationContext, "verify_action_stamp", _fake_verify_action_stamp)
+
+    resp = client.post(
+        "/api/presale/claim-code",
+        json={"drop_id": mod.PRESALE_DROP_ID, "lemma": {"verified": True}},
+    )
+    payload = resp.get_json()
+
+    assert resp.status_code == 403
+    assert payload["success"] is False
+    assert payload["reason"] == "doubt_required"
+    assert payload["required_assurance"] == "ishuman"
+    assert payload["escalation"] == "fresh_idv"
+
+
+def test_presale_claim_clears_doubt_after_ishuman(relying_site_client, monkeypatch):
+    client, mod = relying_site_client
+    mod.ACTION_LOG.clear()
+    mod._PRESALE_LEDGER.reset()
+    mod._PRESALE_REGISTRATIONS.reset()
+    mod._POLICY_STORE.doubted.clear()
+    mod._CLAIM_VERIFY_CTX = None
+    mod._NONCE_STORE = mod.InMemoryNonceStore()
+
+    ppid = "did:lemma:ppid_escalated"
+    mod._PRESALE_REGISTRATIONS.register(mod.PRESALE_DROP_ID, ppid)
+    mod._POLICY_STORE.doubted.add(ppid)
+
+    class _FakeResult:
+        ok = True
+        ppid = "did:lemma:ppid_escalated"
+        legacy_ppid = None
+        assurance = "ishuman"
+        reason = "valid"
+
+    def _fake_verify_action_stamp(self, *_args, **kwargs):
+        return _FakeResult()
+
+    monkeypatch.setattr(mod.VerificationContext, "verify_action_stamp", _fake_verify_action_stamp)
+
+    resp = client.post(
+        "/api/presale/claim-code",
+        json={
+            "drop_id": mod.PRESALE_DROP_ID,
+            "required_assurance": "ishuman",
+            "lemma": {"verified": True},
+        },
+    )
+    payload = resp.get_json()
+
+    assert resp.status_code == 200
+    assert payload["success"] is True
+    assert ppid not in mod._POLICY_STORE.doubted
