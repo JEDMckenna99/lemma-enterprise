@@ -580,28 +580,34 @@
     // Copy lives in the template — no runtime rewrites of titles/descriptions.
     const urls = (state.config && state.config.customer_site_urls) || {};
     const ticketsLink = $('ih-link-tickets-site');
-    const trialsLink = $('ih-link-trials-site');
+    const trialsLinkEl = $('ih-link-trials-site');
     const ticketsMain = $('ih-link-tickets-main');
     const trialsInline = $('ih-link-trials-inline');
     const ticketsStep2 = $('ih-link-tickets-step2');
+    const ticketsTour = $('ih-link-tickets-tour');
     const trialsStep2 = $('ih-link-trials-step2');
+    const ticketsTourQuery = '?tour=presale&from=demo';
+    const trialsDemoQuery = '?from=demo';
     if (ticketsLink && urls.tickets) {
-      ticketsLink.href = `${urls.tickets}?from=demo`;
+      ticketsLink.href = `${urls.tickets}${ticketsTourQuery}`;
     }
-    if (trialsLink && urls.trials) {
-      trialsLink.href = `${urls.trials}?from=demo`;
+    if (trialsLinkEl && urls.trials) {
+      trialsLinkEl.href = `${urls.trials}${trialsDemoQuery}`;
     }
     if (ticketsMain && urls.tickets) {
-      ticketsMain.href = `${urls.tickets}?from=demo`;
+      ticketsMain.href = `${urls.tickets}${ticketsTourQuery}`;
     }
     if (trialsInline && urls.trials) {
-      trialsInline.href = `${urls.trials}?from=demo`;
+      trialsInline.href = `${urls.trials}${trialsDemoQuery}`;
     }
     if (ticketsStep2 && urls.tickets) {
-      ticketsStep2.href = `${urls.tickets}?from=demo`;
+      ticketsStep2.href = `${urls.tickets}${ticketsTourQuery}`;
+    }
+    if (ticketsTour && urls.tickets) {
+      ticketsTour.href = `${urls.tickets}${ticketsTourQuery}`;
     }
     if (trialsStep2 && urls.trials) {
-      trialsStep2.href = `${urls.trials}?from=demo`;
+      trialsStep2.href = `${urls.trials}${trialsDemoQuery}`;
     }
     const personCard = $('ih-person-status-card');
     if (personCard) personCard.hidden = !on;

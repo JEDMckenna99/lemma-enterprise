@@ -143,6 +143,70 @@ def _presale_register_body(body: dict) -> dict:
     return base
 
 
+_STAMP_GATE_CHAIN = ("action_stamp", "site_binding", "nonce_consumed", "assurance")
+_FRESH_PASSKEY_GATE = "fresh_passkey_attestation"
+_REASON_FAILED_GATE = {
+    "action_stamp_missing": "action_stamp",
+    "action_stamp_incomplete": "action_stamp",
+    "invalid_action_signature": "action_stamp",
+    "action_name_mismatch": "action_stamp",
+    "action_method_mismatch": "action_stamp",
+    "action_path_mismatch": "action_stamp",
+    "action_site_id_mismatch": "site_binding",
+    "action_body_hash_mismatch": "action_stamp",
+    "action_nonce_reused": "nonce_consumed",
+    "action_nonce_missing": "nonce_consumed",
+    "assurance_insufficient": "assurance",
+    "fresh_passkey_missing": _FRESH_PASSKEY_GATE,
+    "fresh_passkey_expired": _FRESH_PASSKEY_GATE,
+    "fresh_passkey_too_old": _FRESH_PASSKEY_GATE,
+    "fresh_passkey_invalid_signature": _FRESH_PASSKEY_GATE,
+    "fresh_passkey_signature_missing": _FRESH_PASSKEY_GATE,
+    "fresh_passkey_server_nonce_missing": _FRESH_PASSKEY_GATE,
+}
+
+
+def _presale_gate_report(
+    *,
+    phase: str,
+    success: bool,
+    reason: str,
+    require_fresh_passkey: bool = False,
+) -> dict:
+    """Summarize which verification gates passed or failed for demo receipts."""
+    stamp_chain = list(_STAMP_GATE_CHAIN)
+    if require_fresh_passkey:
+        stamp_chain.append(_FRESH_PASSKEY_GATE)
+
+    if success:
+        passed = list(stamp_chain)
+        passed.append("registration_stored" if phase == "register" else "ledger_claim")
+        return {"gates_passed": passed}
+
+    reason = str(reason or "unknown").strip()
+    if reason == "rate_limited":
+        return {"gates_passed": [], "gate_failed": reason}
+
+    failed_gate = _REASON_FAILED_GATE.get(reason)
+    if failed_gate and failed_gate in stamp_chain:
+        idx = stamp_chain.index(failed_gate)
+        passed = list(stamp_chain[:idx])
+    elif reason in (
+        "registration_required",
+        "doubt_required",
+        "allocation_already_claimed",
+        "site_blocked",
+        "site_policy_unavailable",
+    ):
+        passed = list(stamp_chain)
+    elif reason.startswith("fresh_passkey_"):
+        passed = list(_STAMP_GATE_CHAIN)
+    else:
+        passed = []
+
+    return {"gates_passed": passed, "gate_failed": reason}
+
+
 def _content():
     if "trial" in SITE_KIND.lower():
         return {
@@ -156,18 +220,18 @@ def _content():
             "action": "start_trial",
         }
     return {
-        "eyebrow": "Artist presale · RealFan-style",
-        "headline": "Register, then unlock your unique code",
-        "subhead": "Like Laylo RealFan: join the presale with low-friction wallet proof, then receive one code per verified person. Phone and email stay on this site. IDV runs only when the site flags you for review.",
-        "register": "Step 1 — Join presale",
-        "claim": "Step 2 — Unlock unique code",
+        "eyebrow": "Unique presale code distributor",
+        "headline": "Passkey proves who you are — phone is for delivery",
+        "subhead": "Join the drop with an action-bound passkey register. Unlock your one-time code with a fresh passkey ceremony at claim time. Email and phone stay on this site for SMS and CRM — not as identity. No SMS OTP. IDV runs only when the site flags you for review.",
+        "register": "Step 1 — Passkey register for drop",
+        "claim": "Step 2 — Fresh passkey unlocks unique code",
         "retry": "Try again with same wallet",
-        "flag": "Simulate Laylo risk flag",
+        "flag": "Simulate site risk flag",
         "clear_flag": "Clear risk flag",
         "success_register": "Registered for presale",
         "success": "Your unique code",
-        "form_email": "Fan email",
-        "form_phone": "Mobile number",
+        "form_email": "Email for code delivery",
+        "form_phone": "Mobile for SMS alerts",
         "placeholder_email": "fan@example.com",
         "placeholder_phone": "+1 555 010 1234",
         "register_action": "register_presale",
@@ -379,7 +443,11 @@ def presale_register():
     register_body = _presale_register_body(body)
     server_nonce = str(body.get("server_nonce") or "").strip()
     if not _rate_limit(f"register:{_client_ip()}", limit=10, window_seconds=60):
-        return jsonify({"success": False, "reason": "rate_limited"}), 429
+        return jsonify({
+            "success": False,
+            "reason": "rate_limited",
+            **_presale_gate_report(phase="register", success=False, reason="rate_limited"),
+        }), 429
     ctx = _verify_ctx()
     try:
         result = ctx.verify_action_stamp(
@@ -395,7 +463,11 @@ def presale_register():
         )
     except Exception:
         logger.exception("presale register verification failed")
-        return jsonify({"success": False, "reason": "verify_error"}), 500
+        return jsonify({
+            "success": False,
+            "reason": "verify_error",
+            **_presale_gate_report(phase="register", success=False, reason="verify_error"),
+        }), 500
 
     legacy_ppid = getattr(result, "legacy_ppid", None)
     entry_base = {
@@ -412,10 +484,19 @@ def presale_register():
             "reason": result.reason,
             "ppid": result.ppid,
             "action_log": list(ACTION_LOG),
+            **_presale_gate_report(
+                phase="register",
+                success=False,
+                reason=result.reason or "unknown",
+            ),
         }), 403
 
     if result.ppid and not _rate_limit(f"register:ppid:{result.ppid}", limit=5, window_seconds=300):
-        return jsonify({"success": False, "reason": "rate_limited"}), 429
+        return jsonify({
+            "success": False,
+            "reason": "rate_limited",
+            **_presale_gate_report(phase="register", success=False, reason="rate_limited"),
+        }), 429
 
     ok_policy, policy_reason, _decision = enforce_site_policy(
         ppid=result.ppid or "",
@@ -426,7 +507,16 @@ def presale_register():
     if not ok_policy:
         entry = {**entry_base, "ok": False, "reason": policy_reason}
         ACTION_LOG.appendleft(entry)
-        return jsonify({"success": False, "reason": policy_reason, "ppid": result.ppid}), 403
+        return jsonify({
+            "success": False,
+            "reason": policy_reason,
+            "ppid": result.ppid,
+            **_presale_gate_report(
+                phase="register",
+                success=False,
+                reason=policy_reason or "site_blocked",
+            ),
+        }), 403
 
     registered = _PRESALE_REGISTRATIONS.register(
         register_body["drop_id"],
@@ -435,7 +525,15 @@ def presale_register():
         phone=register_body["phone"],
     )
     if not registered.ok:
-        return jsonify({"success": False, "reason": registered.reason}), 403
+        return jsonify({
+            "success": False,
+            "reason": registered.reason,
+            **_presale_gate_report(
+                phase="register",
+                success=False,
+                reason=registered.reason or "registration_store_error",
+            ),
+        }), 403
 
     entry = {**entry_base, "ok": True, "reason": "ok", "drop_id": registered.drop_id}
     ACTION_LOG.appendleft(entry)
@@ -446,6 +544,7 @@ def presale_register():
         "assurance": getattr(result, "assurance", None),
         "reason": "ok",
         "action_log": list(ACTION_LOG),
+        **_presale_gate_report(phase="register", success=True, reason="ok"),
     })
 
 
@@ -456,7 +555,16 @@ def presale_claim_code():
     claim_assurance = _resolve_claim_assurance(body)
     server_nonce = str(body.get("server_nonce") or "").strip()
     if not _rate_limit(f"claim:{_client_ip()}", limit=10, window_seconds=60):
-        return jsonify({"success": False, "reason": "rate_limited"}), 429
+        return jsonify({
+            "success": False,
+            "reason": "rate_limited",
+            **_presale_gate_report(
+                phase="claim",
+                success=False,
+                reason="rate_limited",
+                require_fresh_passkey=True,
+            ),
+        }), 429
     ctx = _claim_verify_ctx()
     try:
         result = ctx.verify_action_stamp(
@@ -477,6 +585,12 @@ def presale_claim_code():
             "success": False,
             "reason": "verify_error",
             "error": "Action stamp verification failed on the server",
+            **_presale_gate_report(
+                phase="claim",
+                success=False,
+                reason="verify_error",
+                require_fresh_passkey=True,
+            ),
         }), 500
 
     legacy_ppid = getattr(result, "legacy_ppid", None)
@@ -496,10 +610,25 @@ def presale_claim_code():
             "ppid": result.ppid,
             "required_assurance": claim_assurance,
             "action_log": list(ACTION_LOG),
+            **_presale_gate_report(
+                phase="claim",
+                success=False,
+                reason=result.reason or "unknown",
+                require_fresh_passkey=True,
+            ),
         }), 403
 
     if result.ppid and not _rate_limit(f"claim:ppid:{result.ppid}", limit=5, window_seconds=300):
-        return jsonify({"success": False, "reason": "rate_limited"}), 429
+        return jsonify({
+            "success": False,
+            "reason": "rate_limited",
+            **_presale_gate_report(
+                phase="claim",
+                success=False,
+                reason="rate_limited",
+                require_fresh_passkey=True,
+            ),
+        }), 429
 
     if claim_assurance == PRESALE_ESCALATED_ASSURANCE and result.ppid:
         _POLICY_STORE.doubted.discard(result.ppid)
@@ -521,6 +650,12 @@ def presale_claim_code():
             "ppid": result.ppid,
             "required_assurance": PRESALE_ESCALATED_ASSURANCE,
             "action_log": list(ACTION_LOG),
+            **_presale_gate_report(
+                phase="claim",
+                success=False,
+                reason=policy_reason or "site_blocked",
+                require_fresh_passkey=True,
+            ),
         }
         if policy_reason == "doubt_required":
             payload["escalation"] = "fresh_idv"
@@ -538,6 +673,12 @@ def presale_claim_code():
             "reason": "registration_required",
             "ppid": result.ppid,
             "action_log": list(ACTION_LOG),
+            **_presale_gate_report(
+                phase="claim",
+                success=False,
+                reason="registration_required",
+                require_fresh_passkey=True,
+            ),
         }), 403
 
     claim = _PRESALE_LEDGER.claim(
@@ -555,6 +696,12 @@ def presale_claim_code():
             "ppid": claim.ppid,
             "drop_id": claim.drop_id,
             "action_log": list(ACTION_LOG),
+            **_presale_gate_report(
+                phase="claim",
+                success=False,
+                reason=claim.reason or "allocation_already_claimed",
+                require_fresh_passkey=True,
+            ),
         }
         if claim.existing:
             payload["existing_code"] = claim.existing.code
@@ -577,6 +724,12 @@ def presale_claim_code():
         "claimed_at": claim.claimed_at,
         "reason": "ok",
         "action_log": list(ACTION_LOG),
+        **_presale_gate_report(
+            phase="claim",
+            success=True,
+            reason="ok",
+            require_fresh_passkey=True,
+        ),
     })
 
 
@@ -1240,7 +1393,142 @@ def _presale_index():
       overflow: auto;
       font-size: 12px;
     }}
-    @media (max-width: 820px) {{ .layout {{ grid-template-columns: 1fr; }} }}
+    .defense-strip {{
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 8px;
+      margin: 16px 0 4px;
+    }}
+    .defense-item {{
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 8px 10px;
+      background: #f8fafc;
+      font-size: 11px;
+      font-weight: 700;
+      color: #312e81;
+    }}
+    .defense-item small {{
+      display: block;
+      margin-top: 2px;
+      font-weight: 500;
+      color: var(--muted);
+    }}
+    .contact-note {{
+      margin: 4px 0 0;
+      font-size: 12px;
+      color: var(--muted);
+    }}
+    .tour-banner {{
+      margin-bottom: 18px;
+      padding: 16px 18px;
+      border: 1px solid #c7d2fe;
+      border-radius: 14px;
+      background: #eef2ff;
+    }}
+    .tour-banner strong {{
+      display: block;
+      margin-bottom: 10px;
+      color: #312e81;
+      font-size: 14px;
+    }}
+    .tour-checklist {{
+      margin: 0;
+      padding-left: 20px;
+      font-size: 13px;
+      line-height: 1.6;
+      color: #334155;
+    }}
+    .tour-checklist li {{ margin-bottom: 4px; }}
+    .tour-checklist li.active {{ font-weight: 800; color: #312e81; }}
+    .tour-checklist li.done {{ color: var(--ok); }}
+    .tour-impact {{
+      margin: 12px 0 0;
+      padding: 10px 12px;
+      border-radius: 10px;
+      background: #fff;
+      border: 1px solid var(--line);
+      font-size: 13px;
+      color: #334155;
+      line-height: 1.45;
+    }}
+    .compare-table {{
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+      margin-top: 8px;
+    }}
+    .compare-table th,
+    .compare-table td {{
+      border: 1px solid var(--line);
+      padding: 8px 10px;
+      text-align: left;
+      vertical-align: top;
+    }}
+    .compare-table th {{
+      background: #f8fafc;
+      font-weight: 800;
+      color: #334155;
+    }}
+    .compare-table td:first-child {{
+      font-weight: 700;
+      color: #475569;
+      width: 34%;
+    }}
+    .gate-chips {{
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 10px;
+    }}
+    .gate-chip {{
+      display: inline-block;
+      border: 1px solid #86efac;
+      background: #dcfce7;
+      color: var(--ok);
+      border-radius: 999px;
+      padding: 3px 8px;
+      font-size: 10px;
+      font-weight: 800;
+    }}
+    .gate-chip.fail {{
+      border-color: #fca5a5;
+      background: #fee2e2;
+      color: var(--deny);
+    }}
+    .dev-toggle {{
+      margin: 14px 0 0;
+      font-size: 12px;
+      color: var(--muted);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }}
+    .engineer-only {{
+      display: none;
+    }}
+    body.show-backend-gates .engineer-only {{
+      display: block;
+    }}
+    .attack-lab {{
+      margin-top: 14px;
+      padding-top: 12px;
+      border-top: 1px solid var(--line);
+      display: none;
+    }}
+    body.show-backend-gates .attack-lab,
+    body.tour-mode .attack-lab {{
+      display: block;
+    }}
+    .attack-lab-buttons {{
+      display: grid;
+      gap: 8px;
+      margin-top: 10px;
+    }}
+    @media (max-width: 820px) {{
+      .layout {{ grid-template-columns: 1fr; }}
+      .defense-strip {{ grid-template-columns: 1fr 1fr; }}
+    }}
   </style>
 </head>
 <body>
@@ -1249,52 +1537,105 @@ def _presale_index():
     <a href="{DEMO_HUB_URL}?from=demo" target="_blank" rel="noopener">Return to demo hub</a>
   </header>
   <main>
+    <div class="tour-banner" id="tour-banner" hidden>
+      <strong>Guided presale demo</strong>
+      <ol class="tour-checklist" id="tour-checklist">
+        <li data-tour-step="register" id="tour-step-register">Register with passkey — phone is delivery only</li>
+        <li data-tour-step="claim" id="tour-step-claim">Unlock code — fresh passkey + server-attested action</li>
+        <li data-tour-step="retry" id="tour-step-retry">Retry same wallet — denied, one code per fan</li>
+        <li data-tour-step="flag" id="tour-step-flag">Simulate risk flag — IDV penalty, then code at isHuman</li>
+        <li data-tour-step="attack" id="tour-step-attack">Attack lab — replay stamp or skip Step 1</li>
+      </ol>
+      <p class="tour-impact" id="tour-impact">Start with Step 1. Passkey is who you are; phone is where the code goes.</p>
+    </div>
     <div class="layout">
       <section class="card">
         <p class="eyebrow">{copy["eyebrow"]}</p>
         <h1>{copy["headline"]}</h1>
         <p class="muted">{copy["subhead"]}</p>
+        <div class="defense-strip" id="defense-strip">
+          <div class="defense-item">Site PPID<small>passkey wallet</small></div>
+          <div class="defense-item">Action stamp<small>bound mutation</small></div>
+          <div class="defense-item">Server nonce<small>replay block</small></div>
+          <div class="defense-item">Fresh passkey<small>claim ceremony</small></div>
+          <div class="defense-item">1 code / fan<small>PPID ledger</small></div>
+        </div>
         <div class="steps">
-          <div class="step active" id="step-register">1 · Join presale</div>
-          <div class="step" id="step-claim">2 · Unlock code</div>
+          <div class="step active" id="step-register">1 · Passkey register</div>
+          <div class="step" id="step-claim">2 · Fresh passkey claim</div>
         </div>
         <label for="email">{copy["form_email"]}</label>
         <input id="email" value="{copy["placeholder_email"]}" aria-label="{copy["form_email"]}">
+        <p class="contact-note">Stored on this site only — not your login.</p>
         <label for="phone">{copy["form_phone"]}</label>
         <input id="phone" value="{copy["placeholder_phone"]}" aria-label="{copy["form_phone"]}">
+        <p class="contact-note">For SMS alerts and CRM — passkey proves identity.</p>
         <p class="muted" style="margin-top:12px;font-size:13px;">Drop: <code id="drop-id">{PRESALE_DROP_ID}</code></p>
         <button id="register-btn">{copy["register"]}</button>
         <button type="button" class="btn-secondary" id="claim-btn" disabled>{copy["claim"]}</button>
         <button type="button" class="btn-secondary" id="retry-btn" disabled>{copy["retry"]}</button>
         <button type="button" class="btn-secondary btn-ghost" id="flag-btn">{copy["flag"]}</button>
         <button type="button" class="btn-secondary btn-ghost" id="clear-flag-btn">{copy["clear_flag"]}</button>
+        <details class="attack-lab" id="attack-lab">
+          <summary>Attack lab</summary>
+          <div class="attack-lab-buttons">
+            <button type="button" class="btn-secondary btn-ghost" id="replay-btn">Replay last stamp</button>
+            <button type="button" class="btn-secondary btn-ghost" id="skip-step-btn">Skip Step 1 (claim without register)</button>
+          </div>
+        </details>
         <div class="code-display" id="code-display" hidden>--------</div>
         <div class="verdict" id="decision-card">
-          <strong>Laylo RealFan-style flow</strong>
-          <p class="tiny">Step 1 uses passkey wallet proof only — email and phone stay on this site. Step 2 unlocks your unique code with the same low-friction proof. If the site flags suspicious activity, fresh IDV (<code>verifyFreshForBackend</code>) is the penalty before code issuance.</p>
+          <strong>Protected presale flow</strong>
+          <p class="tiny">Step 1: action-bound passkey register — email/phone are delivery fields on this site. Step 2: fresh passkey ceremony (Face ID / Touch ID / Windows Hello) unlocks your unique code. If the site flags suspicious activity, fresh IDV (<code>verifyFreshForBackend</code>) is required before issuance.</p>
         </div>
       </section>
       <aside class="card">
-        <p class="eyebrow">Reference integration</p>
+        <p class="eyebrow">Server verification</p>
         <p class="muted">Site binding: <code>{SITE_ID}</code></p>
         <p style="margin:12px 0 6px">Decision <span class="pill" id="status-pill">WAITING</span>
           <span class="pill" id="assurance-pill">default: {PRESALE_CODE_CLAIM_ASSURANCE}</span></p>
         <p class="muted" id="decision-copy">Join the presale first, then unlock your code.</p>
-        <div class="server-receipt" id="server-receipt" hidden>
-          <strong>Server verification receipt</strong>
-          <dl id="server-receipt-fields"></dl>
-        </div>
-        <ol class="how">
-          <li>Fan registers email/phone on this site only (Step 1).</li>
-          <li>Passkey proof binds a site-private PPID — additive to phone/IP checks.</li>
-          <li>Unlock code with <code>stampAction</code> at passkey assurance (Step 2).</li>
-          <li>Risk flag → fan completes fresh IDV, then retries at <code>ishuman</code>.</li>
-          <li>Ledger enforces one code per PPID per drop; same wallet retry is denied.</li>
-        </ol>
-        <details>
-          <summary>Action stamp JSON</summary>
-          <pre id="stamp-json">{{}}</pre>
+        <label class="dev-toggle">
+          <input type="checkbox" id="backend-gates-toggle">
+          Show backend gates (engineer view)
+        </label>
+        <details open>
+          <summary>Fan-visible flow</summary>
+          <ol class="how">
+            <li>Passkey register binds a site-private PPID (Step 1).</li>
+            <li>Email/phone stay on this site — lemma.id never sees them.</li>
+            <li>Fresh passkey + <code>stampAction</code> at claim (Step 2).</li>
+            <li>Risk flag → fresh IDV, then retry at <code>ishuman</code>.</li>
+            <li>Ledger enforces one code per PPID per drop.</li>
+          </ol>
         </details>
+        <details open class="engineer-only" id="receipt-details">
+          <summary>Server verification receipt</summary>
+          <div class="server-receipt" id="server-receipt" hidden>
+            <div id="gate-chips" class="gate-chips"></div>
+            <dl id="server-receipt-fields"></dl>
+          </div>
+          <p class="muted" id="receipt-placeholder" style="font-size:12px;margin-top:8px;">Run a presale action to populate the receipt.</p>
+        </details>
+        <details class="engineer-only" id="crypto-envelope-details">
+          <summary>Cryptographic envelope</summary>
+          <pre id="stamp-json">{{}}</pre>
+          <pre id="fresh-attestation-json" style="margin-top:10px;">{{}}</pre>
+        </details>
+        <p class="eyebrow" style="margin-top:18px;">Typical phone-first vs this demo</p>
+        <table class="compare-table">
+          <thead>
+            <tr><th>Dimension</th><th>Phone-first presale</th><th>This demo</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>Identity</td><td>Phone or email uniqueness</td><td>Site-scoped PPID from passkey</td></tr>
+            <tr><td>Claim presence</td><td>SMS OTP or none</td><td>Fresh passkey at unlock</td></tr>
+            <tr><td>Replay</td><td>Session or none</td><td>Action stamp + server nonce</td></tr>
+            <tr><td>Enumeration</td><td>Rate limits only</td><td>One code per drop + PPID</td></tr>
+            <tr><td>Escalation</td><td>Manual review</td><td>Site doubt → fresh IDV</td></tr>
+            <tr><td>Contact data</td><td>Auth + CRM</td><td>Site-local delivery only</td></tr>
+          </tbody>
+        </table>
         <details>
           <summary>Action log</summary>
           <pre id="action-log">[]</pre>
@@ -1306,14 +1647,28 @@ def _presale_index():
     onerror="window.__lemmaSdkLoadError='ishuman-verifier failed to load from {LEMMA_ORIGIN}'"></script>
   <script>
     const DROP_ID = {PRESALE_DROP_ID!r};
+    const SITE_ID = '{SITE_ID}';
     const CLAIM_ASSURANCE = {PRESALE_CODE_CLAIM_ASSURANCE!r};
     const ESCALATED_ASSURANCE = {PRESALE_ESCALATED_ASSURANCE!r};
     const REGISTER_PATH = {PRESALE_REGISTER_PATH!r};
     const REGISTER_ACTION = {copy["register_action"]!r};
+    const CLAIM_ACTION = {copy["claim_action"]!r};
     const CLAIM_PATH = {PRESALE_CLAIM_PATH!r};
+    const TOUR_MODE = new URLSearchParams(window.location.search).get('tour') === 'presale';
+    const TOUR_IMPACTS = {{
+      register: 'Passkey binds a site-private PPID. Phone and email are delivery-only on this site.',
+      claim: 'Fresh passkey ceremony proves present control — bots cannot replay cached sessions for codes.',
+      retry: 'Ledger enforces one code per verified person. Same wallet cannot farm multiple codes.',
+      flag: 'Site doubt escalates to fresh IDV — policy-driven penalty before code issuance.',
+      attack: 'Attack lab shows replay and skip-step denies that bots hit in production.',
+    }};
     const pill = document.getElementById('status-pill');
     const assurancePill = document.getElementById('assurance-pill');
     const stampJson = document.getElementById('stamp-json');
+    const freshAttestationJson = document.getElementById('fresh-attestation-json');
+    const gateChipsEl = document.getElementById('gate-chips');
+    const receiptPlaceholder = document.getElementById('receipt-placeholder');
+    const backendGatesToggle = document.getElementById('backend-gates-toggle');
     const actionLogEl = document.getElementById('action-log');
     const decisionCard = document.getElementById('decision-card');
     const decisionCopy = document.getElementById('decision-copy');
@@ -1322,9 +1677,75 @@ def _presale_index():
     const codeDisplay = document.getElementById('code-display');
     const stepRegister = document.getElementById('step-register');
     const stepClaim = document.getElementById('step-claim');
+    const tourBanner = document.getElementById('tour-banner');
+    const tourImpact = document.getElementById('tour-impact');
     let sharedVerifier = null;
     let lastPpid = null;
     let presaleRegistered = false;
+    let tourStepIndex = 0;
+    let lastStampedRequest = null;
+    const TOUR_SEQUENCE = ['register', 'claim', 'retry', 'flag', 'attack'];
+    const BACKEND_GATES_KEY = 'lemma_presale_show_backend_gates';
+
+    if (TOUR_MODE) {{
+      document.body.classList.add('tour-mode');
+    }}
+    if (TOUR_MODE && tourBanner) {{
+      tourBanner.hidden = false;
+      setTourHighlight('register');
+    }}
+
+    function applyBackendGatesToggle(enabled) {{
+      document.body.classList.toggle('show-backend-gates', !!enabled);
+      try {{
+        localStorage.setItem(BACKEND_GATES_KEY, enabled ? '1' : '0');
+      }} catch (e) {{}}
+    }}
+
+    if (backendGatesToggle) {{
+      let stored = false;
+      try {{
+        stored = localStorage.getItem(BACKEND_GATES_KEY) === '1';
+      }} catch (e) {{}}
+      backendGatesToggle.checked = stored;
+      applyBackendGatesToggle(stored);
+      backendGatesToggle.addEventListener('change', () => {{
+        applyBackendGatesToggle(backendGatesToggle.checked);
+      }});
+    }}
+
+    function setTourHighlight(stepId) {{
+      if (!TOUR_MODE) return;
+      const idx = TOUR_SEQUENCE.indexOf(stepId);
+      if (idx >= 0) tourStepIndex = idx;
+      TOUR_SEQUENCE.forEach((id, i) => {{
+        const el = document.getElementById('tour-step-' + id);
+        if (!el) return;
+        el.className = i < tourStepIndex ? 'done' : (i === tourStepIndex ? 'active' : '');
+      }});
+      if (tourImpact && TOUR_IMPACTS[stepId]) {{
+        tourImpact.textContent = TOUR_IMPACTS[stepId];
+      }}
+      const target = document.getElementById(
+        stepId === 'register' ? 'register-btn'
+          : stepId === 'claim' ? 'claim-btn'
+          : stepId === 'retry' ? 'retry-btn'
+          : stepId === 'attack' ? 'replay-btn'
+          : 'flag-btn'
+      );
+      if (target) {{
+        try {{ target.scrollIntoView({{ behavior: 'smooth', block: 'nearest' }}); }} catch (e) {{}}
+      }}
+    }}
+
+    function advanceTour(stepId) {{
+      if (!TOUR_MODE) return;
+      const idx = TOUR_SEQUENCE.indexOf(stepId);
+      if (idx < 0) return;
+      tourStepIndex = Math.min(TOUR_SEQUENCE.length - 1, idx + 1);
+      const next = TOUR_SEQUENCE[tourStepIndex] || stepId;
+      setTourHighlight(next);
+    }}
 
     if (typeof IsHumanVerifier === 'undefined') {{
       const msg = window.__lemmaSdkLoadError
@@ -1377,13 +1798,13 @@ def _presale_index():
         return 'This verified person already received a code for this drop.';
       }}
       if (reason === 'registration_required') {{
-        return 'Complete Step 1 — join the presale before unlocking a code.';
+        return 'Complete Step 1 — passkey register before unlocking a code.';
       }}
       if (reason === 'doubt_required') {{
         return 'Site flagged this fan for review — complete fresh IDV, then retry.';
       }}
       if (reason === 'action_nonce_reused') {{
-        return 'Replay blocked — each claim needs a fresh action stamp.';
+        return 'Replay blocked — each mutation needs a fresh server nonce.';
       }}
       if (reason === 'assurance_insufficient') {{
         return 'Higher assurance is required (IDV-backed human proof).';
@@ -1391,21 +1812,107 @@ def _presale_index():
       if (reason === 'idv_cancelled') {{
         return 'Complete verification in the Lemma popup to continue.';
       }}
+      if (reason === 'rate_limited') {{
+        return 'Too many attempts — wait and retry.';
+      }}
+      if (reason === 'fresh_passkey_missing') {{
+        return 'Claim requires a fresh passkey ceremony — unlock with Face ID / Touch ID / Windows Hello.';
+      }}
+      if (reason === 'fresh_passkey_expired' || reason === 'fresh_passkey_too_old') {{
+        return 'Fresh passkey attestation expired — retry the claim to get a new ceremony.';
+      }}
+      if (reason === 'fresh_passkey_invalid_signature' || reason === 'fresh_passkey_signature_missing') {{
+        return 'Fresh passkey attestation failed server verification.';
+      }}
+      if (reason === 'fresh_passkey_server_nonce_missing') {{
+        return 'Server nonce missing for fresh passkey binding.';
+      }}
+      if (String(reason || '').startsWith('fresh_passkey_')) {{
+        return 'Fresh passkey gate failed: ' + reason;
+      }}
       return reason || 'unknown';
     }}
 
-    function renderReceipt(serverEntry) {{
+    function redactFreshPasskeyAttestation(stamped) {{
+      const inner = (stamped && stamped.lemma) ? stamped.lemma : {{}};
+      const att = inner.fresh_passkey_attestation;
+      if (!att || typeof att !== 'object') return null;
+      const commitment = String(att.action_commitment || '');
+      return {{
+        schema: att.schema || 'fresh_passkey_attestation.v1',
+        site_id: att.site_id || SITE_ID,
+        credential_id: att.credential_id || inner.credentialId || '—',
+        action_commitment_prefix: commitment ? commitment.slice(0, 16) + '…' : '—',
+        issued_at_unix: att.issued_at_unix,
+        expires_at_unix: att.expires_at_unix,
+      }};
+    }}
+
+    function renderCryptoEnvelope(stamped) {{
+      if (stampJson) {{
+        stampJson.textContent = stamped ? JSON.stringify(stamped, null, 2) : '{{}}';
+      }}
+      if (freshAttestationJson) {{
+        const redacted = redactFreshPasskeyAttestation(stamped);
+        freshAttestationJson.textContent = redacted
+          ? JSON.stringify(redacted, null, 2)
+          : '{{ "note": "fresh_passkey_attestation appears after Step 2 claim stamp" }}';
+      }}
+    }}
+
+    function renderGateChips(serverEntry) {{
+      if (!gateChipsEl) return;
+      const passed = Array.isArray(serverEntry.gates_passed) ? serverEntry.gates_passed : [];
+      const failed = serverEntry.gate_failed;
+      if (!passed.length && !failed) {{
+        gateChipsEl.innerHTML = '';
+        return;
+      }}
+      const chips = passed.map((gate) =>
+        '<span class="gate-chip">' + gate + '</span>'
+      ).join('');
+      const failChip = failed
+        ? '<span class="gate-chip fail">gate_failed: ' + failed + '</span>'
+        : '';
+      gateChipsEl.innerHTML = chips + failChip;
+    }}
+
+    function renderReceipt(serverEntry, context) {{
       if (!serverReceipt || !serverReceiptFields || !serverEntry) {{
         if (serverReceipt) serverReceipt.hidden = true;
+        if (receiptPlaceholder) receiptPlaceholder.hidden = false;
         return;
       }}
       serverReceipt.hidden = false;
+      if (receiptPlaceholder) receiptPlaceholder.hidden = true;
+      renderGateChips(serverEntry);
+      const ctx = context || {{}};
+      const stampInner = (ctx.stamped && ctx.stamped.lemma) ? ctx.stamped.lemma : {{}};
+      const freshAttestation = stampInner.fresh_passkey_attestation;
+      const freshGate = !!ctx.requireFreshPasskey;
+      let freshStatus = 'not required';
+      if (freshGate) {{
+        freshStatus = freshAttestation ? 'verified' : 'missing';
+      }}
+      const nonceStatus = ctx.serverNonce ? 'consumed' : '—';
+      let registrationStatus = '—';
+      if (ctx.phase === 'register') {{
+        registrationStatus = serverEntry.success ? 'stored' : 'denied';
+      }} else if (ctx.phase === 'claim') {{
+        registrationStatus = presaleRegistered ? 'yes' : 'required';
+      }}
+      const gateReason = serverEntry.reason || stampInner.reason || '—';
       const rows = [
+        ['Site binding', SITE_ID],
+        ['Action', ctx.action || serverEntry.action || '—'],
+        ['Fresh passkey', freshStatus],
+        ['Nonce consumed', nonceStatus],
+        ['Registration', registrationStatus],
+        ['Gate reason', gateReason],
         ['Drop', serverEntry.drop_id || DROP_ID],
         ['Code', serverEntry.code || serverEntry.existing_code || '—'],
         ['PPID', serverEntry.ppid || '—'],
         ['Assurance', serverEntry.assurance || serverEntry.required_assurance || '—'],
-        ['Reason', serverEntry.reason || '—'],
         ['Decision', serverEntry.success ? 'accept' : 'deny'],
       ];
       serverReceiptFields.innerHTML = rows.map(([label, value]) =>
@@ -1448,7 +1955,8 @@ def _presale_index():
       registerBtn.disabled = true;
       pill.textContent = 'CHECKING';
       pill.className = 'pill checking';
-      decisionCard.innerHTML = '<strong>Step 1 — Join presale</strong><p class="tiny">Passkey wallet proof only. Email and phone are stored on this site, not in lemma.id.</p>';
+      setTourHighlight('register');
+      decisionCard.innerHTML = '<strong>Step 1 — Passkey register</strong><p class="tiny">Action-bound passkey proof. Email and phone are delivery fields stored on this site — not your identity and not sent to lemma.id.</p>';
       try {{
         const payload = contactPayload();
         const challenge = await fetchPresaleChallenge(REGISTER_ACTION, REGISTER_PATH, payload);
@@ -1462,6 +1970,7 @@ def _presale_index():
           autoProvision: true,
         }});
         if (stampJson) stampJson.textContent = JSON.stringify(stamped, null, 2);
+        renderCryptoEnvelope(stamped);
         const stampMeta = stamped.lemma || {{}};
         if (!stampMeta.verified) {{
           pill.textContent = 'DENY';
@@ -1475,18 +1984,27 @@ def _presale_index():
           headers: {{ 'Content-Type': 'application/json' }},
           body: JSON.stringify({{ ...stamped, server_nonce: challenge.server_nonce }}),
         }});
+        const requestBody = {{ ...stamped, server_nonce: challenge.server_nonce }};
+        lastStampedRequest = {{ path: REGISTER_PATH, body: requestBody, action: REGISTER_ACTION }};
         const serverEntry = await serverRes.json();
         await refreshActionLog();
-        renderReceipt(serverEntry);
+        renderReceipt(serverEntry, {{
+          phase: 'register',
+          action: REGISTER_ACTION,
+          stamped,
+          serverNonce: challenge.server_nonce,
+          requireFreshPasskey: false,
+        }});
         if (serverEntry.success) {{
           lastPpid = serverEntry.ppid || null;
           setStepState(true);
           pill.textContent = 'REGISTERED';
           pill.className = 'pill ok';
           assurancePill.textContent = 'register: passkey';
-          decisionCopy.textContent = 'Joined drop ' + (serverEntry.drop_id || DROP_ID) + '. Unlock your code in Step 2.';
+          decisionCopy.textContent = 'Joined drop ' + (serverEntry.drop_id || DROP_ID) + '. Use Step 2 for fresh passkey code unlock.';
           decisionCard.innerHTML = '<strong>{copy["success_register"]}</strong><p class="tiny">PPID '
-            + (serverEntry.ppid || '').slice(0, 24) + '… is registered for this drop. Use Step 2 to claim your unique code.</p>';
+            + (serverEntry.ppid || '').slice(0, 24) + '… registered. Step 2 requires a fresh passkey ceremony to issue your unique code.</p>';
+          advanceTour('register');
         }} else {{
           pill.textContent = 'DENY';
           pill.className = 'pill deny';
@@ -1503,8 +2021,10 @@ def _presale_index():
       }}
     }}
 
-    async function runClaim(assuranceOverride, depth) {{
+    async function runClaim(assuranceOverride, depth, options) {{
       if (typeof IsHumanVerifier === 'undefined') return;
+      const opts = options || {{}};
+      const isRetry = !!opts.isRetry;
       const retryDepth = depth || 0;
       if (retryDepth > 2) return;
       const claimAssurance = assuranceOverride || CLAIM_ASSURANCE;
@@ -1514,16 +2034,17 @@ def _presale_index():
       retryBtn.disabled = true;
       pill.textContent = 'CHECKING';
       pill.className = 'pill checking';
+      setTourHighlight(isRetry ? 'retry' : 'claim');
       const idvNote = claimAssurance === ESCALATED_ASSURANCE
         ? 'Fresh IDV-backed proof required after site risk flag.'
-        : 'Passkey wallet proof — no IDV unless the site escalates.';
-      decisionCard.innerHTML = '<strong>Step 2 — Unlock code</strong><p class="tiny">' + idvNote + '</p>';
+        : 'Fresh passkey ceremony required — Face ID / Touch ID / Windows Hello at unlock. Server verifies fresh_passkey_attestation bound to this action.';
+      decisionCard.innerHTML = '<strong>Step 2 — Fresh passkey unlock</strong><p class="tiny">' + idvNote + '</p>';
       try {{
         const verifier = makeVerifier(claimAssurance);
         const payload = {{ ...contactPayload(), required_assurance: claimAssurance }};
-        const challenge = await fetchPresaleChallenge('{copy["claim_action"]}', CLAIM_PATH, payload);
+        const challenge = await fetchPresaleChallenge(CLAIM_ACTION, CLAIM_PATH, payload);
         const stamped = await verifier.stampAction(payload, {{
-          action: '{copy["claim_action"]}',
+          action: CLAIM_ACTION,
           method: 'POST',
           path: CLAIM_PATH,
           nonce: challenge.server_nonce,
@@ -1533,6 +2054,7 @@ def _presale_index():
           autoProvision: true,
         }});
         if (stampJson) stampJson.textContent = JSON.stringify(stamped, null, 2);
+        renderCryptoEnvelope(stamped);
         const stampMeta = stamped.lemma || {{}};
         if (!stampMeta.verified) {{
           pill.textContent = 'DENY';
@@ -1548,15 +2070,23 @@ def _presale_index():
           headers: {{ 'Content-Type': 'application/json' }},
           body: JSON.stringify({{ ...stamped, server_nonce: challenge.server_nonce }}),
         }});
+        const requestBody = {{ ...stamped, server_nonce: challenge.server_nonce }};
+        lastStampedRequest = {{ path: CLAIM_PATH, body: requestBody, action: CLAIM_ACTION }};
         const serverEntry = await serverRes.json();
         await refreshActionLog();
-        renderReceipt(serverEntry);
+        renderReceipt(serverEntry, {{
+          phase: 'claim',
+          action: CLAIM_ACTION,
+          stamped,
+          serverNonce: challenge.server_nonce,
+          requireFreshPasskey: true,
+        }});
         assurancePill.textContent = 'claim: ' + (serverEntry.assurance || claimAssurance);
         if (serverEntry.reason === 'doubt_required' && claimAssurance !== ESCALATED_ASSURANCE) {{
           pill.textContent = 'IDV REQUIRED';
           pill.className = 'pill checking';
           decisionCopy.textContent = 'Site risk flag — complete fresh IDV to unlock your code.';
-          decisionCard.innerHTML = '<strong>Risk flag penalty</strong><p class="tiny">Like Laylo escalating suspicious fans: running fresh IDV via verifyFreshForBackend, then retrying at ishuman assurance.</p>';
+          decisionCard.innerHTML = '<strong>Risk flag penalty</strong><p class="tiny">Site doubt requires fresh IDV via verifyFreshForBackend, then retry at ishuman assurance.</p>';
           const fresh = await verifier.verifyFreshForBackend({{
             requiredAssurance: ESCALATED_ASSURANCE,
             autoProvision: true,
@@ -1567,7 +2097,7 @@ def _presale_index():
             decisionCopy.textContent = 'IDV blocked: ' + (fresh.reason || 'not_verified');
             return;
           }}
-          return runClaim(ESCALATED_ASSURANCE, retryDepth + 1);
+          return runClaim(ESCALATED_ASSURANCE, retryDepth + 1, opts);
         }}
         if (serverEntry.success && serverEntry.code) {{
           pill.textContent = 'CODE ISSUED';
@@ -1579,6 +2109,7 @@ def _presale_index():
           decisionCopy.textContent = 'Code ' + serverEntry.code + ' bound to PPID ' + (serverEntry.ppid || '').slice(0, 24) + '…';
           decisionCard.innerHTML = '<strong>{copy["success"]}</strong><p class="tiny">Single-use code for drop '
             + (serverEntry.drop_id || DROP_ID) + '. Try again with the same wallet to see duplicate denial.</p>';
+          if (!isRetry) advanceTour('claim');
         }} else {{
           pill.textContent = 'DENY';
           pill.className = 'pill deny';
@@ -1588,6 +2119,12 @@ def _presale_index():
           if (codeDisplay && serverEntry.existing_code) {{
             codeDisplay.hidden = false;
             codeDisplay.textContent = serverEntry.existing_code;
+          }}
+          if (isRetry && reason === 'allocation_already_claimed') {{
+            advanceTour('retry');
+          }}
+          if (opts.skipStepDemo && reason === 'registration_required') {{
+            advanceTour('attack');
           }}
         }}
       }} catch (err) {{
@@ -1603,9 +2140,10 @@ def _presale_index():
 
     async function simulateRiskFlag() {{
       if (!lastPpid) {{
-        decisionCopy.textContent = 'Join the presale first so we have a PPID to flag.';
+        decisionCopy.textContent = 'Complete Step 1 first so we have a PPID to flag.';
         return;
       }}
+      setTourHighlight('flag');
       await fetch('/api/demo/policy/doubt', {{
         method: 'POST',
         headers: {{ 'Content-Type': 'application/json' }},
@@ -1613,7 +2151,8 @@ def _presale_index():
       }});
       pill.textContent = 'FLAGGED';
       pill.className = 'pill checking';
-      decisionCopy.textContent = 'Simulated Laylo risk flag on ' + lastPpid.slice(0, 20) + '… — Step 2 will require fresh IDV.';
+      decisionCopy.textContent = 'Simulated site risk flag on ' + lastPpid.slice(0, 20) + '… — Step 2 will require fresh IDV.';
+      advanceTour('flag');
     }}
 
     async function clearRiskFlag() {{
@@ -1626,12 +2165,62 @@ def _presale_index():
       decisionCopy.textContent = 'Risk flag cleared for demo reset.';
     }}
 
+    async function runReplayAttack() {{
+      if (!lastStampedRequest) {{
+        decisionCopy.textContent = 'Complete a register or claim action first to cache a stamped body.';
+        return;
+      }}
+      setTourHighlight('attack');
+      pill.textContent = 'CHECKING';
+      pill.className = 'pill checking';
+      decisionCard.innerHTML = '<strong>Replay attack</strong><p class="tiny">Re-posting the last stamped body and nonce — server should return action_nonce_reused.</p>';
+      try {{
+        const serverRes = await fetch(lastStampedRequest.path, {{
+          method: 'POST',
+          headers: {{ 'Content-Type': 'application/json' }},
+          body: JSON.stringify(lastStampedRequest.body),
+        }});
+        const serverEntry = await serverRes.json();
+        await refreshActionLog();
+        renderReceipt(serverEntry, {{
+          phase: lastStampedRequest.path === CLAIM_PATH ? 'claim' : 'register',
+          action: lastStampedRequest.action,
+          stamped: lastStampedRequest.body,
+          serverNonce: lastStampedRequest.body.server_nonce,
+          requireFreshPasskey: lastStampedRequest.path === CLAIM_PATH,
+        }});
+        const reason = serverEntry.reason || 'unknown';
+        pill.textContent = serverEntry.success ? 'ACCEPT' : 'DENY';
+        pill.className = 'pill ' + (serverEntry.success ? 'ok' : 'deny');
+        decisionCopy.textContent = 'Replay result: ' + reason;
+        decisionCard.innerHTML = '<strong>Replay ' + (serverEntry.success ? 'accepted' : 'denied') + '</strong><p class="tiny">'
+          + formatDenyReason(reason) + '</p>';
+        if (reason === 'action_nonce_reused') advanceTour('attack');
+      }} catch (err) {{
+        pill.textContent = 'ERROR';
+        pill.className = 'pill deny';
+        decisionCopy.textContent = err.message;
+      }}
+    }}
+
+    async function runSkipStepAttack() {{
+      if (presaleRegistered) {{
+        decisionCopy.textContent = 'Already registered on server — reload without Step 1 to demo skip-step deny.';
+        return;
+      }}
+      setTourHighlight('attack');
+      decisionCard.innerHTML = '<strong>Skip Step 1</strong><p class="tiny">Attempting claim before passkey register — server should return registration_required.</p>';
+      await runClaim(undefined, 0, {{ isRetry: false, skipStepDemo: true }});
+    }}
+
     refreshActionLog();
     document.getElementById('register-btn')?.addEventListener('click', () => runRegister());
     document.getElementById('claim-btn')?.addEventListener('click', () => runClaim());
-    document.getElementById('retry-btn')?.addEventListener('click', () => runClaim());
+    document.getElementById('retry-btn')?.addEventListener('click', () => runClaim(undefined, 0, {{ isRetry: true }}));
     document.getElementById('flag-btn')?.addEventListener('click', () => simulateRiskFlag());
     document.getElementById('clear-flag-btn')?.addEventListener('click', () => clearRiskFlag());
+    document.getElementById('replay-btn')?.addEventListener('click', () => runReplayAttack());
+    document.getElementById('skip-step-btn')?.addEventListener('click', () => runSkipStepAttack());
 
     if (new URLSearchParams(window.location.search).get('lemma_ishuman_return') === '1') {{
       document.getElementById('claim-btn')?.click();

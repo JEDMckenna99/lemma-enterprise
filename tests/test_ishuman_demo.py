@@ -75,8 +75,8 @@ def test_ishuman_demo_page_loads_expected_assets(ishuman_demo_client):
     assert "Passkey-protected on your device" in body
     assert ">Issuer</strong>" in body
     assert "Issues a signed, site-specific ID" in body
-    assert "ppid_7f2…" in body
-    assert "ppid_c91…" in body
+    assert "PPID keys code ledger" in body
+    assert "ppid_c91" in body
     assert "demo-diagram-stage" in body
     assert "demo-diagram-footnotes" in body
     assert "ih-proof-receipt" in body
@@ -108,10 +108,11 @@ def test_ishuman_demo_page_loads_expected_assets(ishuman_demo_client):
     assert "Verify on ticketing site" in body
     assert "ih-verify-sites-btn" in body
     assert "ih-link-tickets-step2" in body
-    assert "ih-link-trials-step2" in body
+    assert "ih-link-tickets-tour" in body
     assert "ih-verify-tickets-step2" in body
     assert "ih-verify-trials-step2" in body
-    assert "Open ticketing demo →" in body
+    assert "Open presale demo →" in body
+    assert "Walk presale defenses →" in body
     assert "Open trials demo →" in body
     adv_start = body.index('id="ih-advanced-panel"')
     assert body.index("ih-verify-tickets-btn") > adv_start
@@ -135,12 +136,14 @@ def test_ishuman_demo_page_loads_expected_assets(ishuman_demo_client):
     js = (ROOT / "static/js/demo/ishuman-demo.js").read_text(encoding="utf-8")
     assert "blockToggleBusy" in js
     assert "reason: 'unblocked'" in js or 'reason: "unblocked"' in js
-    assert "Site A" in body
+    assert "tour=presale&from=demo" in js
     assert "Site B" in body
     assert "\U0001f511" not in body
     assert "\U0001f6e1" not in body
     assert "site-card-icon" in body
-    assert "Ticketing demo site" in body or "SaaS trial demo site" in body
+    assert "Presale code demo" in body
+    assert "SaaS trial demo site" in body
+    assert "fresh passkey at unlock" in body.lower() or "fresh passkey ceremony at presale code unlock" in body.lower()
     assert "ih-simulation-banner" not in body
     assert "Staging simulation only" not in body
     assert "ih-start-simulated-demo" not in body

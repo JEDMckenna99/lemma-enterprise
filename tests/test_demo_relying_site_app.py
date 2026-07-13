@@ -143,11 +143,43 @@ def test_relying_site_index_loads_verifier_script(relying_site_client):
     assert "claim_presale_code" in body
     assert "register_presale" in body
     assert "unique code" in body.lower()
-    assert "Step 1" in body or "Join presale" in body
+    assert "Step 1" in body
     assert "verifyFreshForBackend" in body
     assert "/api/presale/register" in body
-    assert "Simulate Laylo risk flag" in body
+    assert "Simulate site risk flag" in body
     assert "tickets-demo.lemma.id" in body
+    assert "Unique presale code distributor" in body
+    assert "requireFreshPasskey: true" in body
+    assert "Laylo" not in body
+    assert "RealFan" not in body
+
+
+def test_relying_site_index_exposes_presale_defense_and_tour_ui(relying_site_client):
+    client, _mod = relying_site_client
+    resp = client.get("/?tour=presale")
+    body = resp.get_data(as_text=True)
+
+    assert resp.status_code == 200
+    assert 'id="defense-strip"' in body
+    assert "Fresh passkey" in body
+    assert "1 code / fan" in body
+    assert 'id="tour-banner"' in body
+    assert 'id="tour-checklist"' in body
+    assert "TOUR_MODE" in body
+    assert "Phone-first presale" in body
+    assert "compare-table" in body
+    assert "fresh_passkey_missing" in body
+    assert "rate_limited" in body
+    assert "Nonce consumed" in body
+    assert "Gate reason" in body
+    assert 'id="backend-gates-toggle"' in body
+    assert 'id="crypto-envelope-details"' in body
+    assert 'id="fresh-attestation-json"' in body
+    assert 'id="attack-lab"' in body
+    assert "Replay last stamp" in body
+    assert "Skip Step 1" in body
+    assert "renderGateChips" in body
+    assert "redactFreshPasskeyAttestation" in body
 
 
 def test_relying_site_index_exposes_server_receipt_and_hub_return(relying_site_client):
@@ -159,6 +191,8 @@ def test_relying_site_index_exposes_server_receipt_and_hub_return(relying_site_c
     assert 'id="server-receipt-fields"' in body
     assert 'id="stamp-json"' in body
     assert "Server verification receipt" in body
+    assert "Fan-visible flow" in body
+    assert "Cryptographic envelope" in body
     assert "formatDenyReason" in body
     assert "renderReceipt" in body
     assert "isBlockedLocally" in body
@@ -260,6 +294,8 @@ def test_presale_register_stores_signup(relying_site_client, monkeypatch):
     assert resp.status_code == 200
     assert payload["success"] is True
     assert payload["ppid"] == "did:lemma:ppid_demo_123"
+    assert "gates_passed" in payload
+    assert "registration_stored" in payload["gates_passed"]
     assert mod._PRESALE_REGISTRATIONS.is_registered(
         mod.PRESALE_DROP_ID,
         "did:lemma:ppid_demo_123",
@@ -340,6 +376,7 @@ def test_presale_claim_issues_code_once(relying_site_client, monkeypatch):
     assert first.status_code == 200
     assert first_payload["success"] is True
     assert len(first_payload["code"]) == 8
+    assert "ledger_claim" in first_payload.get("gates_passed", [])
 
     assert second.status_code == 403
     assert second_payload["success"] is False
@@ -423,3 +460,45 @@ def test_presale_claim_clears_doubt_after_ishuman(relying_site_client, monkeypat
     assert resp.status_code == 200
     assert payload["success"] is True
     assert ppid not in mod._POLICY_STORE.doubted
+
+
+def test_presale_claim_denies_missing_fresh_passkey(relying_site_client, monkeypatch):
+    client, mod = relying_site_client
+    mod.ACTION_LOG.clear()
+    mod._PRESALE_LEDGER.reset()
+    mod._PRESALE_REGISTRATIONS.reset()
+    mod._CLAIM_VERIFY_CTX = None
+    mod._NONCE_STORE = mod.InMemoryNonceStore()
+
+    ppid = "did:lemma:ppid_demo_123"
+    mod._PRESALE_REGISTRATIONS.register(mod.PRESALE_DROP_ID, ppid)
+
+    class _FakeResult:
+        ok = False
+        ppid = "did:lemma:ppid_demo_123"
+        legacy_ppid = None
+        assurance = "passkey"
+        reason = "fresh_passkey_missing"
+
+    def _fake_verify_action_stamp(self, *_args, **kwargs):
+        assert kwargs.get("require_fresh_passkey") is True
+        return _FakeResult()
+
+    monkeypatch.setattr(mod.VerificationContext, "verify_action_stamp", _fake_verify_action_stamp)
+
+    resp = client.post(
+        "/api/presale/claim-code",
+        json={
+            "drop_id": mod.PRESALE_DROP_ID,
+            "server_nonce": "nonce-claim-missing-fp",
+            "lemma": {"verified": True},
+        },
+    )
+    payload = resp.get_json()
+
+    assert resp.status_code == 403
+    assert payload["success"] is False
+    assert payload["reason"] == "fresh_passkey_missing"
+    assert payload.get("gate_failed") == "fresh_passkey_missing"
+    assert "assurance" in payload.get("gates_passed", [])
+    assert "fresh_passkey_attestation" not in payload.get("gates_passed", [])

@@ -347,6 +347,8 @@ result = ctx.verify_action_stamp(
 `InMemoryNonceStore` only for tests. For multi-process deployments, inject
 `RedisNonceStore` from `lemma_ishuman_nonce_store`.
 
+**Live presale reference:** The tickets demo at [tickets-demo.lemma.id/?tour=presale](https://tickets-demo.lemma.id/?tour=presale) walks through challenge → `stampAction` register → fresh-passkey claim with a site-local one-code-per-PPID ledger. Source: `demo-sites/relying_site_app.py` and `docs/demo/PRESALE_DEMO_SCRIPT.md`.
+
 ---
 
 ## Integration flow (end-to-end)
