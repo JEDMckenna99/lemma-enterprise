@@ -97,7 +97,7 @@ def test_live_staging_mock_idv_end_to_end():
     def _derive():
         assertion = build_wallet_assertion(
             wallet_id=wallet_id, wallet_secret=wallet_secret,
-            field_names=fields, field_values=fvals, nonce_b64=_challenge(s, base, wallet_id),
+            field_names=fields, field_values=fvals, nonce_b64=wallet_challenge(s, base, wallet_id),
         )
         return s.post(f"{base}/api/ishuman/derive-site-proof",
                       json={**fvals, "wallet_id": wallet_id,
