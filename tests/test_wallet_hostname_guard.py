@@ -106,6 +106,15 @@ def test_lemma_wallet_secure_headers_cover_server_csrf_cookie(wallet_js_source):
 
 
 @pytest.mark.unit
+def test_obtain_fresh_passkey_backfills_server_passkey_registry(wallet_js_source):
+    obtain_idx = wallet_js_source.index("async obtainFreshPasskeyAttestation(")
+    begin_idx = wallet_js_source.index("/api/ishuman/fresh-passkey/begin", obtain_idx)
+    window = wallet_js_source[obtain_idx:begin_idx]
+    assert "_registerDevicePasskeyIfPossible(passkey, walletId)" in window
+    assert "passkey_public_key_missing" in window
+
+
+@pytest.mark.unit
 def test_lemma_wallet_persists_device_signing_via_structured_clone(wallet_js_source):
     assert "_loadDeviceSigningRecord" in wallet_js_source
     assert "_isUsableDeviceSigningKey" in wallet_js_source

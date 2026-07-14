@@ -3926,6 +3926,15 @@ class LemmaWallet {
             throw new Error('fresh_passkey_inputs_missing');
         }
 
+        // Backfill wallet_passkeys for wallets created before server binding
+        // or when initial register-device-passkey was skipped during setup.
+        if (this._isLemmaDomain()) {
+            if (!passkey?.publicKey) {
+                throw new Error('passkey_public_key_missing');
+            }
+            await this._registerDevicePasskeyIfPossible(passkey, walletId);
+        }
+
         const beginRes = await fetch('/api/ishuman/fresh-passkey/begin', {
             method: 'POST',
             headers: this._getSecureHeaders(),

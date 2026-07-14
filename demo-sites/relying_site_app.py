@@ -1897,6 +1897,9 @@ def _presale_index():
       if (reason === 'fresh_passkey_server_nonce_missing') {{
         return 'Server nonce missing for fresh passkey binding.';
       }}
+      if (reason === 'passkey_not_registered_on_server' || reason === 'passkey_server_binding_failed') {{
+        return 'Wallet passkey is not registered on lemma.id yet — unlock on lemma.id once, then retry Step 2.';
+      }}
       if (String(reason || '').startsWith('fresh_passkey_')) {{
         return 'Fresh passkey gate failed: ' + reason;
       }}
