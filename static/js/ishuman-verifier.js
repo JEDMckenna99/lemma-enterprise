@@ -33,7 +33,7 @@
  *   // -> { action: 'post_comment', lemma: { ppid, verified, ..., credential } }
  *   // POST `event` to YOUR backend. Lemma stores none of it.
  *
- * @version 1.9.1
+ * @version 1.9.2
  */
 
 (function () {
@@ -1130,24 +1130,12 @@ class IsHumanVerifier {
             return { ...payload, [key]: { verified: false, reason: 'server_nonce_required' } };
         }
 
-        const backend = await this.verifyForBackend({
-            ...options,
-            autoProvision: options.autoProvision ?? true,
-            requiredAssurance,
-        });
-        if (!backend.ok || !backend.presentation?.credential) {
-            return {
-                ...payload,
-                [key]: {
-                    verified: false,
-                    reason: backend.reason || 'not_verified',
-                },
-            };
-        }
+        await this._initPromise;
+        const cachedSession = this._loadSessionCache();
+        const hasCachedCredential = !!cachedSession?.credential;
 
         const bodyHash = await hashActionBody(body);
         const nonce = String(options.nonce || randomNonceB64(16)).trim();
-        const credential = backend.presentation.credential;
         const actionCommitment = requireFreshPasskey
             ? await buildActionCommitment({
                 serverNonce,
@@ -1158,6 +1146,32 @@ class IsHumanVerifier {
                 bodyHash,
             })
             : '';
+
+        let backend = null;
+        let credential = null;
+        let ppid = null;
+        let assurance = null;
+
+        if (hasCachedCredential) {
+            backend = await this.verifyForBackend({
+                ...options,
+                autoProvision: options.autoProvision ?? true,
+                requiredAssurance,
+            });
+            if (!backend.ok || !backend.presentation?.credential) {
+                return {
+                    ...payload,
+                    [key]: {
+                        verified: false,
+                        reason: backend.reason || 'not_verified',
+                    },
+                };
+            }
+            credential = backend.presentation.credential;
+            ppid = backend.ppid;
+            assurance = backend.assurance;
+        }
+
         const signParams = {
             credential,
             siteId: this.siteId,
@@ -1172,16 +1186,56 @@ class IsHumanVerifier {
             actionCommitment,
         };
 
-        let signed = await this._trySignActionLocally(signParams);
-        if (!signed) {
+        let signed = null;
+        if (hasCachedCredential && credential) {
+            signed = await this._trySignActionLocally(signParams);
+            if (!signed) {
+                signed = await this._signActionViaPopup({ ...signParams, requiredAssurance });
+            }
+        } else {
+            // First visit: one lemma.id ceremony derives site proof + signs the action.
             signed = await this._signActionViaPopup({ ...signParams, requiredAssurance });
+            if (signed?.reason === 'redirect_started') {
+                return {
+                    ...payload,
+                    [key]: { verified: false, reason: 'redirect_started' },
+                };
+            }
+            if (signed?.credential) {
+                credential = signed.credential;
+                ppid = credential.subject || null;
+                assurance = this._credentialAssurance(credential) || requiredAssurance;
+                if (signed.session_assertion && signed.session_signature) {
+                    const applied = await this._applyIssuedSiteProof({
+                        credential: signed.credential,
+                        session_assertion: signed.session_assertion,
+                        session_signature: signed.session_signature,
+                        session_nonce: signed.session_nonce || '',
+                        request_nonce: signed.request_nonce || '',
+                    }, performance.now());
+                    if (applied.human) {
+                        this._markProvisionedMaster();
+                    }
+                }
+            }
         }
+
         if (!signed?.action_assertion) {
             return {
                 ...payload,
                 [key]: {
                     verified: false,
                     reason: signed?.reason || 'action_sign_failed',
+                },
+            };
+        }
+
+        if (!credential) {
+            return {
+                ...payload,
+                [key]: {
+                    verified: false,
+                    reason: 'no_credential_after_sign',
                 },
             };
         }
@@ -1193,9 +1247,9 @@ class IsHumanVerifier {
                 version: ACTION_STAMP_VERSION,
                 verified: true,
                 siteId: this.siteId,
-                ppid: backend.ppid,
+                ppid,
                 credentialId: credential.id || null,
-                assurance: backend.assurance,
+                assurance,
                 action,
                 method,
                 path,
@@ -1255,6 +1309,10 @@ class IsHumanVerifier {
         if (requiredAssurance === 'passkey' || requiredAssurance === 'ishuman') {
             popupUrl.searchParams.set('required_assurance', requiredAssurance);
         }
+        const actionSessionNonce = randomNonceB64(32);
+        popupUrl.searchParams.set('session_nonce', actionSessionNonce);
+        popupUrl.searchParams.set('bloom_sequence', String(this._bloomSnapshot?.sequence_number ?? 0));
+        popupUrl.searchParams.set('session_ttl_sec', String(this.sessionTtlSec));
 
         if (this._isMobileLike()) {
             popupUrl.searchParams.set('flow_mode', 'redirect');
@@ -1439,6 +1497,18 @@ class IsHumanVerifier {
             window.history.replaceState({}, '', cleanUrl);
 
             const signResult = data.sign_result || {};
+            if (signResult.credential && signResult.session_assertion && signResult.session_signature) {
+                const applied = await this._applyIssuedSiteProof({
+                    credential: signResult.credential,
+                    session_assertion: signResult.session_assertion,
+                    session_signature: signResult.session_signature,
+                    session_nonce: signResult.session_nonce || '',
+                    request_nonce: signResult.request_nonce || requestNonce,
+                }, performance.now());
+                if (applied.human) {
+                    this._markProvisionedMaster();
+                }
+            }
             return { ok: true, signResult, siteId: data.site_id || this.siteId };
         } catch (err) {
             return { ok: false, reason: 'redirect_action_sign_failed', error: err };

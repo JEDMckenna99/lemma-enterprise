@@ -64,6 +64,13 @@ def test_sdk_exposes_stamp_merge_helper(verifier_source):
 
 
 @pytest.mark.browser
+def test_stamp_action_skips_verify_popup_when_no_cached_credential(verifier_source):
+    assert "const hasCachedCredential = !!cachedSession?.credential;" in verifier_source
+    assert "First visit: one lemma.id ceremony derives site proof + signs the action." in verifier_source
+    assert "if (hasCachedCredential && credential) {" in verifier_source
+
+
+@pytest.mark.browser
 def test_sdk_version_bumped_in_lockstep():
     from api.sdk_versions import ISHUMAN_VERIFIER_SDK_VERSION
 

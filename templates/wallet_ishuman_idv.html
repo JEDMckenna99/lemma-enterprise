@@ -176,7 +176,7 @@
     <script src="/static/js/lemma-keys.js?v=8" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
     <script src="/static/js/wallet-at-rest-crypto.js?v=2" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
     <script nonce="{{ csp_nonce }}">window.LEMMA_ISHUMAN_USE_PERSON_ROOT_SEEDS = {{ 'true' if ishuman_use_person_root_seeds else 'false' }};</script>
-    <script src="/sdk/lemma-wallet.js?v=2681" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
+    <script src="/sdk/lemma-wallet.js?v=2682" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
     <script src="/static/js/qrcode.min.js" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
     <script nonce="{{ csp_nonce }}">
         const SESSION_KEY = 'ishuman_idv_popup_session_id';
@@ -651,6 +651,9 @@
                         action_assertion: detail.action_assertion || null,
                         action_signature: detail.action_signature || null,
                         fresh_passkey_attestation: detail.fresh_passkey_attestation || null,
+                        session_assertion: detail.session_assertion || null,
+                        session_signature: detail.session_signature || null,
+                        session_nonce: detail.session_nonce || null,
                         request_nonce: detail.request_nonce,
                     },
                 }),
@@ -1878,14 +1881,18 @@
                 let credential = await wallet.findIsHumanSiteCredential(canonicalSite, {
                     requiredAssurance,
                 });
+                let siteProofPackage = null;
                 if (!credential || !wallet._siteCredentialLocallyVerifiable(credential)) {
-                    credential = await wallet.deriveAndStoreSiteProof(requestingSite, {
+                    const sessionNonce = clientSessionNonce || requestNonce;
+                    siteProofPackage = await wallet.issueSiteProofPackage({
+                        siteId: requestingSite,
+                        sessionNonce,
+                        bloomSequence,
+                        sessionTtlSec,
                         issueMode: 'site_proof',
-                        forceServerDerive: false,
-                        skipIssuanceReady: true,
-                        isHumanIssuance: false,
                         requiredAssurance,
                     });
+                    credential = siteProofPackage.credential;
                 }
                 const signed = await wallet.signSiteActionPresentation({
                     credential,
@@ -1904,6 +1911,10 @@
                 setStatus('Action signed.', 'success');
                 setTimeout(() => closeWith('ISHUMAN_ACTION_SIGNED', {
                     ...signed,
+                    credential,
+                    session_assertion: siteProofPackage?.session_assertion || null,
+                    session_signature: siteProofPackage?.session_signature || null,
+                    session_nonce: clientSessionNonce || requestNonce,
                     request_nonce: requestNonce,
                 }), 300);
                 return true;
