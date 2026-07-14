@@ -751,10 +751,7 @@ class IsHumanVerifier {
         const required = String(requiredAssurance || 'ishuman').toLowerCase();
         const actual = String(assurance || '').toLowerCase();
         if (!actual) return false;
-        if (required === 'passkey') {
-            return actual === 'passkey' || actual === 'ishuman';
-        }
-        return actual === 'ishuman';
+        return actual === required;
     }
 
     _canonicalizeSiteDomain(siteDomain) {
@@ -1176,7 +1173,7 @@ class IsHumanVerifier {
 
         let signed = await this._trySignActionLocally(signParams);
         if (!signed) {
-            signed = await this._signActionViaPopup(signParams);
+            signed = await this._signActionViaPopup({ ...signParams, requiredAssurance });
         }
         if (!signed?.action_assertion) {
             return {
@@ -1252,6 +1249,10 @@ class IsHumanVerifier {
             popupUrl.searchParams.set('require_fresh_passkey', '1');
             popupUrl.searchParams.set('server_nonce', signParams.serverNonce || '');
             popupUrl.searchParams.set('action_commitment', signParams.actionCommitment || '');
+        }
+        const requiredAssurance = String(signParams.requiredAssurance || '').trim().toLowerCase();
+        if (requiredAssurance === 'passkey' || requiredAssurance === 'ishuman') {
+            popupUrl.searchParams.set('required_assurance', requiredAssurance);
         }
 
         if (this._isMobileLike()) {
@@ -1470,6 +1471,18 @@ class IsHumanVerifier {
                 return null;
             }
             return this._result(false, core.ppid, core.reason, t0, core.error);
+        }
+
+        const policy = this._activeRequiredAssurance || this.requiredAssurance || 'ishuman';
+        const cachedAssurance = this._credentialAssurance(credential);
+        if (!this._assuranceMeetsPolicy(cachedAssurance, policy)) {
+            if (this.debug) {
+                console.warn(
+                    `[isHuman] cached assurance ${cachedAssurance || '-'} does not match `
+                    + `policy ${policy}; re-issuing at requested tier`,
+                );
+            }
+            return null;
         }
 
         const siteDecision = await this._checkSiteDecision(credential.subject);
@@ -1929,6 +1942,10 @@ class IsHumanVerifier {
         popupUrl.searchParams.set('bloom_sequence', String(bloomSequence));
         popupUrl.searchParams.set('session_ttl_sec', String(this.sessionTtlSec));
         popupUrl.searchParams.set('redirect_return', window.location.href);
+        const requiredAssurance = this._activeRequiredAssurance || this.requiredAssurance || 'ishuman';
+        if (requiredAssurance === 'passkey' || requiredAssurance === 'ishuman') {
+            popupUrl.searchParams.set('required_assurance', requiredAssurance);
+        }
 
         const useRedirect = this._isMobileLike();
         if (useRedirect) {

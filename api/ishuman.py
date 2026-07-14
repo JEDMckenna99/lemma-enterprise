@@ -2332,6 +2332,13 @@ def derive_site_proof():
         return jsonify({"success": False, "error": "invalid_issue_mode"}), 400
     body["issue_mode"] = issue_mode
 
+    required_assurance = (body.get("required_assurance") or "ishuman").strip().lower()
+    if required_assurance not in {"passkey", "ishuman"}:
+        return jsonify({"success": False, "error": "invalid_required_assurance"}), 400
+    if issue_mode == "fresh_idv":
+        required_assurance = "ishuman"
+    body["required_assurance"] = required_assurance
+
     if not wallet_id or not target_site:
         return jsonify({
             "success": False,
@@ -2345,6 +2352,8 @@ def derive_site_proof():
     # Bind master_credential_id into the signed assertion only when supplied so
     # the wallet and server agree on the signed field set in both modes.
     assertion_fields = ["target_site", "site_signing_pubkey", "issue_mode"]
+    if required_assurance == "passkey":
+        assertion_fields.append("required_assurance")
     if master_credential_id:
         assertion_fields = ["master_credential_id"] + assertion_fields
     err, _wid = _require_wallet_assertion(
@@ -2523,17 +2532,34 @@ def derive_site_proof():
             db=db,
         )
 
-        # Issue the short-lived per-site credential.
-        credential = _issue_ishuman_credential(
-            site_ppid,
-            wallet_id,
-            site_id=target_site,
-            site_signing_pubkey=site_signing_pubkey or None,
-            ppid_derivation=ppid_derivation,
-            verification_method=(getattr(master, "issuer_id", None) or "didit"),
-        )
+        # Issue the short-lived per-site credential. Passkey-only policy must not
+        # disclose latent IDV even when a verified master exists.
+        if required_assurance == "passkey":
+            from api.config import passkey_assurance_enabled
 
-        logger.info("Issued privacy-minimized site proof")
+            if not passkey_assurance_enabled():
+                return jsonify({"success": False, "error": "passkey_assurance_disabled"}), 403
+            credential = _issue_ishuman_credential(
+                site_ppid,
+                wallet_id,
+                site_id=target_site,
+                site_signing_pubkey=site_signing_pubkey or None,
+                ppid_derivation=ppid_derivation,
+                verification_method="passkey",
+                assurance="passkey",
+            )
+            logger.info("Issued passkey-tier site proof (minimum disclosure)")
+        else:
+            credential = _issue_ishuman_credential(
+                site_ppid,
+                wallet_id,
+                site_id=target_site,
+                site_signing_pubkey=site_signing_pubkey or None,
+                ppid_derivation=ppid_derivation,
+                verification_method=(getattr(master, "issuer_id", None) or "didit"),
+                assurance="ishuman",
+            )
+            logger.info("Issued privacy-minimized site proof")
 
         if issue_mode == "fresh_idv":
             master_metadata["fresh_idv_consumed"] = True
@@ -3380,10 +3406,7 @@ def verify_presentation():
         return jsonify({"success": False, "error": "not_ishuman"}), 400
 
     required_assurance = (body.get("required_assurance") or "ishuman").strip().lower()
-    if required_assurance == "passkey":
-        if assurance not in ("passkey", "ishuman"):
-            return jsonify({"success": False, "error": "assurance_insufficient"}), 400
-    elif assurance != "ishuman":
+    if assurance != required_assurance:
         return jsonify({"success": False, "error": "assurance_insufficient"}), 400
     from api.site_hostname import normalize_runtime_site_binding
 

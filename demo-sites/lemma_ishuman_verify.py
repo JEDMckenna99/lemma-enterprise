@@ -739,9 +739,7 @@ class VerificationContext:
         if not actual:
             return False
         required = (required or "ishuman").strip().lower()
-        if required == "passkey":
-            return actual in ("passkey", "ishuman")
-        return actual == "ishuman"
+        return actual.strip().lower() == required
 
     def _fetch_signed_bundle(self) -> _Snapshot:
         url = f"{self.lemma_origin}/api/revocation/bloom-filter"

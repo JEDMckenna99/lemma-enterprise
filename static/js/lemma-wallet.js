@@ -3537,8 +3537,11 @@ class LemmaWallet {
         return !this._siteCredentialLocallyVerifiable(credential);
     }
 
-    async findIsHumanSiteCredential(targetSite) {
+    async findIsHumanSiteCredential(targetSite, options = {}) {
         const canonicalSite = this._canonicalizeSiteDomainForProof(targetSite);
+        const requiredAssurance = String(
+            options.assurance || options.requiredAssurance || '',
+        ).trim().toLowerCase();
         const allCreds = await this.exportIsHumanCredentialsForBridge();
         const matches = allCreds.filter((credential) => {
             const cl = credential.claims || credential.credentialSubject || {};
@@ -3547,7 +3550,22 @@ class LemmaWallet {
                 && this._siteCredentialHasSigningKey(credential);
         });
         if (!matches.length) return null;
+        if (requiredAssurance === 'passkey' || requiredAssurance === 'ishuman') {
+            const tierMatches = matches.filter(
+                (credential) => this._credentialRecordAssurance(credential) === requiredAssurance,
+            );
+            if (!tierMatches.length) return null;
+            return this._sortCredentialsNewestFirst(tierMatches)[0];
+        }
         return this._sortCredentialsNewestFirst(matches)[0];
+    }
+
+    _credentialRecordAssurance(credential) {
+        const claims = credential?.claims || credential?.credentialSubject || {};
+        const raw = String(claims.assurance || '').trim().toLowerCase();
+        if (raw === 'passkey' || raw === 'ishuman') return raw;
+        if (claims.isHuman === true || claims.isHuman === 'true') return 'ishuman';
+        return null;
     }
 
     async findIsHumanMasterCredential() {
@@ -3590,9 +3608,14 @@ class LemmaWallet {
         const canonicalSite = this._canonicalizeSiteDomainForProof(targetSite);
         const issueMode = (options.issueMode || 'site_proof').trim().toLowerCase();
         const forceServerDerive = issueMode === 'fresh_idv' || !!options.forceServerDerive;
+        const requiredAssurance = issueMode === 'fresh_idv'
+            ? 'ishuman'
+            : String(options.requiredAssurance || options.assurance || '').trim().toLowerCase();
 
         if (!forceServerDerive) {
-            const existing = await this.findIsHumanSiteCredential(canonicalSite);
+            const existing = await this.findIsHumanSiteCredential(canonicalSite, {
+                requiredAssurance: requiredAssurance || undefined,
+            });
             if (existing && this._siteCredentialLocallyVerifiable(existing)) {
                 return existing;
             }
@@ -3626,6 +3649,11 @@ class LemmaWallet {
         if (masterId) {
             assertionFieldValues.master_credential_id = masterId;
         }
+        if (requiredAssurance === 'passkey') {
+            assertionFieldNames.push('required_assurance');
+            assertionFieldValues.required_assurance = 'passkey';
+        }
+
         const walletAssertion = await this.buildWalletAssertion(
             assertionFieldNames,
             assertionFieldValues,
@@ -3640,6 +3668,9 @@ class LemmaWallet {
         };
         if (masterId) {
             deriveBody.master_credential_id = masterId;
+        }
+        if (requiredAssurance === 'passkey') {
+            deriveBody.required_assurance = 'passkey';
         }
 
         const deriveRes = await fetch('/api/ishuman/derive-site-proof', {
@@ -3764,13 +3795,19 @@ class LemmaWallet {
         bloomSequence,
         sessionTtlSec,
         issueMode,
+        requiredAssurance,
     }) {
+        const normalizedIssueMode = (issueMode || 'site_proof').trim().toLowerCase();
+        const tierAssurance = normalizedIssueMode === 'fresh_idv'
+            ? 'ishuman'
+            : String(requiredAssurance || '').trim().toLowerCase();
         // Popup handoffs must always re-derive from the server so the credential
         // is signed by the current federated issuer and includes signatureValueWeb.
         // Reusing a wallet-local copy caused untrusted_issuer after issuer rotation.
         const credential = await this.deriveAndStoreSiteProof(siteId, {
-            issueMode: issueMode || 'site_proof',
+            issueMode: normalizedIssueMode,
             forceServerDerive: true,
+            requiredAssurance: tierAssurance || undefined,
         });
         const pkg = await this.signSiteSessionPresentation({
             credential,

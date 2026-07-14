@@ -265,6 +265,17 @@ def test_verify_presentation_endpoint_round_trip(monkeypatch):
     assert passkey_data["success"] is True
     assert passkey_data["assurance"] == "passkey"
 
+    ishuman_with_passkey_policy = client.post(
+        "/api/ishuman/verify-presentation",
+        json={
+            "site_id": "tickets-demo.lemma.id",
+            "credential": credential,
+            "required_assurance": "passkey",
+        },
+    )
+    assert ishuman_with_passkey_policy.status_code == 400, ishuman_with_passkey_policy.get_json()
+    assert ishuman_with_passkey_policy.get_json()["error"] == "assurance_insufficient"
+
     passkey_only_resp = client.post(
         "/api/ishuman/verify-presentation",
         json={

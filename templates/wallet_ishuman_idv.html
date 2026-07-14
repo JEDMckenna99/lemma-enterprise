@@ -195,6 +195,11 @@
         const openerOrigin = openerOriginParam
             || (platformHost && PLATFORM_SITE_IDS.has(requestingSite) ? window.location.origin : '*');
         const issueMode = params.get('issue_mode') || '';
+        const requiredAssurance = (() => {
+            const raw = (params.get('required_assurance') || 'ishuman').trim().toLowerCase();
+            if (issueMode === 'fresh_idv') return 'ishuman';
+            return raw === 'passkey' ? 'passkey' : 'ishuman';
+        })();
         const refreshReason = params.get('refresh_reason') || '';
         const requestNonce = params.get('request_nonce') || '';
         const clientSessionNonce = params.get('session_nonce') || '';
@@ -1656,6 +1661,8 @@
                 sessionNonce: clientSessionNonce,
                 bloomSequence,
                 sessionTtlSec,
+                issueMode: issueMode || 'site_proof',
+                requiredAssurance,
             });
 
             setStatus(consumerCopy().status?.siteProofSuccess || 'You\u2019re verified for this site.', 'success');
@@ -1679,13 +1686,16 @@
                 const canonicalSite = wallet._canonicalizeSiteDomainForProof
                     ? wallet._canonicalizeSiteDomainForProof(requestingSite)
                     : requestingSite;
-                let credential = await wallet.findIsHumanSiteCredential(canonicalSite);
+                let credential = await wallet.findIsHumanSiteCredential(canonicalSite, {
+                    requiredAssurance,
+                });
                 if (!credential || !wallet._siteCredentialLocallyVerifiable(credential)) {
                     credential = await wallet.deriveAndStoreSiteProof(requestingSite, {
                         issueMode: 'site_proof',
                         forceServerDerive: false,
                         skipIssuanceReady: true,
                         isHumanIssuance: false,
+                        requiredAssurance,
                     });
                 }
                 const signed = await wallet.signSiteActionPresentation({
