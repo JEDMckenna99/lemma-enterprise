@@ -53,6 +53,17 @@ def test_build_action_commitment_is_stable(py_sdk):
 
 
 @pytest.mark.unit
+def test_sign_count_replay_detected_matches_pywebauthn_rules():
+    from api.fresh_passkey_attestation import _sign_count_replay_detected
+
+    assert _sign_count_replay_detected(0, 0) is False
+    assert _sign_count_replay_detected(1, 0) is False
+    assert _sign_count_replay_detected(0, 1) is True
+    assert _sign_count_replay_detected(3, 3) is True
+    assert _sign_count_replay_detected(4, 3) is False
+
+
+@pytest.mark.unit
 def test_is_spki_public_key_detects_browser_exports():
     from api.fresh_passkey_attestation import _is_spki_public_key
 

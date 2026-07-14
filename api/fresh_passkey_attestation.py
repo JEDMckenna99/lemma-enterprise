@@ -271,6 +271,13 @@ def _normalize_expected_origins(origin: str | list[str] | None) -> list[str]:
     return normalized
 
 
+def _sign_count_replay_detected(new_sign_count: int, current_sign_count: int) -> bool:
+    """Mirror pywebauthn: zero counters mean the authenticator omits a counter."""
+    current = int(current_sign_count or 0)
+    new = int(new_sign_count or 0)
+    return (new > 0 or current > 0) and new <= current
+
+
 def _verify_spki_wallet_webauthn_assertion(
     *,
     credential: dict,
@@ -285,7 +292,7 @@ def _verify_spki_wallet_webauthn_assertion(
     import json
 
     from cryptography.hazmat.primitives import hashes
-    from cryptography.hazmat.primitives.asymmetric import ec
+    from cryptography.hazmat.primitives.asymmetric import ec, rsa, padding
     from cryptography.hazmat.primitives.serialization import load_der_public_key
     from webauthn.helpers import base64url_to_bytes
     from webauthn.helpers.parse_authenticator_data import parse_authenticator_data
@@ -319,17 +326,46 @@ def _verify_spki_wallet_webauthn_assertion(
         return False, "fresh_passkey_webauthn_invalid", int(sign_count or 0)
 
     new_sign_count = int(auth_data.sign_count or 0)
-    if new_sign_count <= int(sign_count or 0):
+    if _sign_count_replay_detected(new_sign_count, sign_count):
         return False, "fresh_passkey_webauthn_invalid", int(sign_count or 0)
 
     client_data_hash = hashlib.sha256(base64url_to_bytes(client_data_json)).digest()
     signed_data = base64url_to_bytes(authenticator_data_b64) + client_data_hash
     signature = base64url_to_bytes(signature_b64)
     public_key = load_der_public_key(public_key_spki)
-    if not isinstance(public_key, ec.EllipticCurvePublicKey):
+    if isinstance(public_key, ec.EllipticCurvePublicKey):
+        public_key.verify(signature, signed_data, ec.ECDSA(hashes.SHA256()))
+    elif isinstance(public_key, rsa.RSAPublicKey):
+        public_key.verify(signature, signed_data, padding.PKCS1v15(), hashes.SHA256())
+    else:
         return False, "fresh_passkey_webauthn_invalid", int(sign_count or 0)
-    public_key.verify(signature, signed_data, ec.ECDSA(hashes.SHA256()))
     return True, "valid", new_sign_count
+
+
+def _verify_cose_wallet_webauthn_assertion(
+    *,
+    credential: dict,
+    expected_challenge: bytes,
+    rp_id: str,
+    expected_origins: list[str],
+    public_key_cose: bytes,
+    sign_count: int = 0,
+) -> tuple[bool, str, int]:
+    """Verify assertions against COSE-encoded wallet passkey material."""
+    from webauthn import verify_authentication_response
+    from webauthn.helpers import parse_authentication_credential_json
+
+    parsed_credential = parse_authentication_credential_json(credential)
+    verification = verify_authentication_response(
+        credential=parsed_credential,
+        expected_challenge=expected_challenge,
+        expected_rp_id=rp_id,
+        expected_origin=expected_origins,
+        credential_public_key=public_key_cose,
+        credential_current_sign_count=int(sign_count or 0),
+        require_user_verification=True,
+    )
+    return True, "valid", int(verification.new_sign_count)
 
 
 def verify_wallet_webauthn_assertion(
@@ -342,10 +378,24 @@ def verify_wallet_webauthn_assertion(
     sign_count: int = 0,
 ) -> tuple[bool, str, int]:
     """Verify a WebAuthn assertion against a stored wallet/device passkey."""
-    from webauthn import verify_authentication_response
-
     expected_origins = _normalize_expected_origins(origin)
     public_key_raw = _decode_public_key(public_key_b64)
+    failures: list[str] = []
+
+    if not _is_spki_public_key(public_key_raw):
+        try:
+            return _verify_cose_wallet_webauthn_assertion(
+                credential=credential,
+                expected_challenge=expected_challenge,
+                rp_id=rp_id,
+                expected_origins=expected_origins,
+                public_key_cose=public_key_raw,
+                sign_count=sign_count,
+            )
+        except Exception as exc:
+            failures.append(f"cose:{exc}")
+            logger.warning("Fresh passkey COSE WebAuthn verify failed: %s", exc)
+
     if _is_spki_public_key(public_key_raw):
         try:
             return _verify_spki_wallet_webauthn_assertion(
@@ -357,23 +407,12 @@ def verify_wallet_webauthn_assertion(
                 sign_count=sign_count,
             )
         except Exception as exc:
+            failures.append(f"spki:{exc}")
             logger.warning("Fresh passkey SPKI WebAuthn verify failed: %s", exc)
-            return False, "fresh_passkey_webauthn_invalid", int(sign_count or 0)
 
-    try:
-        verification = verify_authentication_response(
-            credential=credential,
-            expected_challenge=expected_challenge,
-            expected_rp_id=rp_id,
-            expected_origin=expected_origins,
-            credential_public_key=public_key_raw,
-            credential_current_sign_count=int(sign_count or 0),
-            require_user_verification=True,
-        )
-        return True, "valid", int(verification.new_sign_count)
-    except Exception as exc:
-        logger.warning("Fresh passkey WebAuthn verify failed: %s", exc)
-        return False, "fresh_passkey_webauthn_invalid", int(sign_count or 0)
+    if failures:
+        logger.warning("Fresh passkey WebAuthn verify exhausted: %s", "; ".join(failures))
+    return False, "fresh_passkey_webauthn_invalid", int(sign_count or 0)
 
 
 def lookup_wallet_passkey_public_key(credential_id_b64: str) -> tuple[Optional[str], int]:

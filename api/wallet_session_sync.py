@@ -1106,7 +1106,7 @@ def wallet_register_device_passkey():
                 )
             )
         else:
-            if attestation_object and stored_public_key and stored_public_key != existing.public_key:
+            if attestation_object and stored_public_key:
                 existing.public_key = stored_public_key
             existing.last_used_at = datetime.utcnow()
         db.commit()
