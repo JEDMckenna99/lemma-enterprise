@@ -505,3 +505,38 @@ def test_presale_claim_denies_missing_fresh_passkey(relying_site_client, monkeyp
     assert payload.get("gate_failed") == "fresh_passkey_missing"
     assert "assurance" in payload.get("gates_passed", [])
     assert "fresh_passkey_attestation" not in payload.get("gates_passed", [])
+
+
+def test_demo_verifier_accepts_platform_signed_trust_bundle(monkeypatch):
+    from api.issuer_trust_list import build_signed_trust_list
+    from api.wallet_keys import derive_wallet_signing_keypair
+
+    private_key, public_key = derive_wallet_signing_keypair("ef" * 32)
+
+    def _material():
+        return private_key, public_key, "did:lemma:" + ("b" * 64)
+
+    monkeypatch.setattr("api.bloom_snapshot._issuer_signing_material", _material)
+
+    demo_path = str(DEMO_SITES)
+    if demo_path not in sys.path:
+        sys.path.insert(0, demo_path)
+    spec = importlib.util.spec_from_file_location(
+        "demo_lemma_ishuman_verify_test",
+        DEMO_SITES / "lemma_ishuman_verify.py",
+    )
+    demo_verify = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = demo_verify
+    spec.loader.exec_module(demo_verify)
+
+    trust = build_signed_trust_list()
+    issuers = demo_verify._verify_signed_trust_list_payload(trust)
+    assert issuers
+
+    ctx = demo_verify.VerificationContext(
+        site_id="tickets-demo.lemma.id",
+        lemma_origin="https://lemma.id",
+    )
+    snap = ctx._fetch_signed_bundle()
+    assert snap.sequence_number > 0
+    assert snap.issuers

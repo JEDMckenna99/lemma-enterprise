@@ -66,6 +66,7 @@ SESSION_PRESENTATION_PREFIX = "lemma:site-session-presentation:v1"
 ACTION_PRESENTATION_PREFIX = "lemma:site-action-presentation:v1"
 ACTION_STAMP_VERSION = "action_stamp_v1"
 TRUST_LIST_PREFIX = "lemma:issuer-trust-list:v1"
+BLOOM_SNAPSHOT_PREFIX = "lemma:bloom-snapshot:v1"
 TIME_SKEW_SECONDS = 300
 DEFAULT_MAX_ACTION_AGE_SECONDS = 60
 CONVERGENCE_PREFIX = "lemma:ppid-convergence:v1"
@@ -247,6 +248,56 @@ def _build_trust_list_signature_message(
     ).encode("utf-8")
 
 
+def _build_bloom_signature_message(
+    *,
+    sequence_number: int,
+    content_hash: str,
+    generated_at_unix: int,
+    valid_until_unix: int,
+) -> bytes:
+    return "\n".join(
+        [
+            BLOOM_SNAPSHOT_PREFIX,
+            str(int(sequence_number)),
+            str(content_hash or "").strip(),
+            str(int(generated_at_unix)),
+            str(int(valid_until_unix)),
+        ]
+    ).encode("utf-8")
+
+
+def _normalize_issuer_did(did: str) -> str:
+    return (
+        str(did or "")
+        .strip()
+        .lower()
+        .split("#", 1)[0]
+        .split("?", 1)[0]
+        .rstrip("/")
+    )
+
+
+def _parse_snapshot_issuer_pubkey_hex(snapshot: dict) -> str:
+    direct = str(snapshot.get("issuer_pubkey") or "").strip().lower()
+    if len(direct) == 64 and all(ch in "0123456789abcdef" for ch in direct):
+        return direct
+    did = str(snapshot.get("issuer_did") or "")
+    if did.startswith("did:lemma:"):
+        maybe = did.replace("did:lemma:", "")[:64].lower()
+        if len(maybe) == 64 and all(ch in "0123456789abcdef" for ch in maybe):
+            return maybe
+    return ""
+
+
+def _decode_signature(value: str) -> bytes:
+    text = str(value or "").strip()
+    if not text:
+        raise ValueError("empty signature")
+    if len(text) == 128 and all(ch in "0123456789abcdef" for ch in text.lower()):
+        return bytes.fromhex(text)
+    return _b64url_decode(text)
+
+
 def _normalize_trust_list_entry(raw: dict) -> dict | None:
     did = str(raw.get("did") or raw.get("issuer_did") or "").strip()
     pubkey = str(raw.get("pubkey") or raw.get("public_key") or raw.get("publicKey") or "").strip().lower()
@@ -307,8 +358,8 @@ def _verify_signed_trust_list_payload(payload: dict, *, now_unix: int | None = N
         raise RuntimeError("trust_list_content_hash_mismatch")
 
     try:
-        signer_key = Ed25519PublicKey.from_public_bytes(bytes.fromhex(str(payload["signer_pubkey"])))
-        signature = _b64url_decode(str(payload["signature"]))
+        signer_key_bytes = bytes.fromhex(str(payload["signer_pubkey"]))
+        signature = _decode_signature(str(payload["signature"]))
     except Exception as exc:
         raise RuntimeError("trust_list_malformed") from exc
 
@@ -319,8 +370,8 @@ def _verify_signed_trust_list_payload(payload: dict, *, now_unix: int | None = N
         valid_until_unix=int(payload["valid_until_unix"]),
     )
     try:
-        signer_key.verify(signature, message)
-    except InvalidSignature as exc:
+        _verify_site_ed25519_digest(signer_key_bytes, signature, message)
+    except (InvalidSignature, ValueError, KeyError) as exc:
         raise RuntimeError("trust_list_invalid_signature") from exc
 
     issuers: dict[str, TrustedIssuer] = {}
@@ -331,11 +382,14 @@ def _verify_signed_trust_list_payload(payload: dict, *, now_unix: int | None = N
             continue
         if valid_until and (now - TIME_SKEW_SECONDS) > valid_until:
             continue
-        existing = issuers.get(entry["did"])
+        existing = issuers.get(_normalize_issuer_did(entry["did"]))
         if existing:
             existing.pubkeys_hex.add(entry["pubkey"])
         else:
-            issuers[entry["did"]] = TrustedIssuer(did=entry["did"], pubkeys_hex={entry["pubkey"]})
+            issuers[_normalize_issuer_did(entry["did"])] = TrustedIssuer(
+                did=_normalize_issuer_did(entry["did"]),
+                pubkeys_hex={entry["pubkey"]},
+            )
 
     if not issuers:
         raise RuntimeError("trust_list_no_active_issuers")
@@ -733,29 +787,30 @@ class VerificationContext:
         if expected_hash != (snapshot.get("content_hash") or ""):
             raise RuntimeError("bloom snapshot content_hash mismatch")
 
-        # Verify the issuer-signed snapshot envelope
-        issuer_did = (snapshot.get("issuer_did") or "").strip()
+        issuer_did = _normalize_issuer_did(snapshot.get("issuer_did") or "")
         trusted = issuers.get(issuer_did)
         if not trusted:
             raise RuntimeError(f"bloom snapshot signed by untrusted issuer {issuer_did}")
-        signature_hex = snapshot.get("signature") or ""
+
+        pubkey_hex = _parse_snapshot_issuer_pubkey_hex(snapshot)
+        if not pubkey_hex or pubkey_hex not in trusted.pubkeys_hex:
+            raise RuntimeError("bloom snapshot issuer pubkey untrusted")
+
         try:
-            signature = bytes.fromhex(signature_hex)
+            signature = _decode_signature(str(snapshot.get("signature") or ""))
         except ValueError as exc:
             raise RuntimeError("bloom snapshot signature malformed") from exc
 
-        envelope = {k: snapshot[k] for k in snapshot if k != "signature"}
-        message = json.dumps(envelope, sort_keys=True, separators=(",", ":")).encode("utf-8")
-        verified = False
-        for pubkey_hex in trusted.pubkeys_hex:
-            try:
-                Ed25519PublicKey.from_public_bytes(bytes.fromhex(pubkey_hex)).verify(signature, message)
-                verified = True
-                break
-            except InvalidSignature:
-                continue
-        if not verified:
-            raise RuntimeError("bloom snapshot signature did not verify")
+        message = _build_bloom_signature_message(
+            sequence_number=int(snapshot.get("sequence_number") or 0),
+            content_hash=str(snapshot.get("content_hash") or ""),
+            generated_at_unix=int(snapshot.get("generated_at_unix") or 0),
+            valid_until_unix=int(snapshot.get("valid_until_unix") or 0),
+        )
+        try:
+            _verify_site_ed25519_digest(bytes.fromhex(pubkey_hex), signature, message)
+        except (InvalidSignature, ValueError, KeyError) as exc:
+            raise RuntimeError("bloom snapshot signature did not verify") from exc
 
     def _ensure_fresh_snapshot(self) -> _Snapshot:
         with self._lock:
