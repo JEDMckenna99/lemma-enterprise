@@ -1734,7 +1734,7 @@ def _presale_index():
     let lastStampedRequest = null;
     const TOUR_SEQUENCE = ['register', 'claim', 'retry', 'flag', 'attack'];
     const BACKEND_GATES_KEY = 'lemma_presale_show_backend_gates';
-    const PRESALE_SESSION_KEY = 'lemma_presale_session_v1';
+    const PRESALE_SESSION_KEY = 'lemma_presale_session_v2';
 
     function savePresaleSession(patch) {{
       try {{
@@ -1851,6 +1851,21 @@ def _presale_index():
         email: document.getElementById('email')?.value || '',
         phone: document.getElementById('phone')?.value || '',
       }};
+    }}
+
+    function stampBody(payload) {{
+      const source = payload || contactPayload();
+      return {{
+        drop_id: String(source.drop_id || DROP_ID).trim(),
+        email: String(source.email || '').trim(),
+        phone: String(source.phone || '').trim(),
+      }};
+    }}
+
+    function stampBodiesMatch(left, right) {{
+      const a = stampBody(left);
+      const b = stampBody(right);
+      return a.drop_id === b.drop_id && a.email === b.email && a.phone === b.phone;
     }}
 
     function setStepState(registered) {{
@@ -2092,7 +2107,7 @@ def _presale_index():
       setTourHighlight('register');
       decisionCard.innerHTML = '<strong>Step 1 — Passkey register</strong><p class="tiny">Action-bound passkey proof. Email and phone are delivery fields stored on this site — not your identity and not sent to lemma.id.</p>';
       try {{
-        const payload = contactPayload();
+        const payload = stampBody(contactPayload());
         const challenge = await fetchPresaleChallenge(REGISTER_ACTION, REGISTER_PATH, payload);
         savePresaleSession({{
           pendingAction: 'register',
@@ -2189,10 +2204,13 @@ def _presale_index():
         decisionCard.innerHTML = '<strong>Step 2 — Fresh passkey unlock</strong><p class="tiny">' + idvNote + '</p>';
       try {{
         const verifier = makeVerifier(claimAssurance);
-        const payload = contactPayload();
+        const payload = stampBody(contactPayload());
         const saved = loadPresaleSession();
         let challenge = saved?.pendingChallenge;
-        if (!challenge?.server_nonce || challenge.action !== CLAIM_ACTION) {{
+        const challengeUsable = challenge?.server_nonce
+          && challenge.action === CLAIM_ACTION
+          && stampBodiesMatch(challenge.payload, payload);
+        if (!challengeUsable) {{
           const issued = await fetchPresaleChallenge(CLAIM_ACTION, CLAIM_PATH, payload);
           challenge = {{
             action: CLAIM_ACTION,
@@ -2200,6 +2218,8 @@ def _presale_index():
             server_nonce: issued.server_nonce,
             payload,
           }};
+        }} else {{
+          challenge.payload = payload;
         }}
         savePresaleSession({{
           pendingAction: isRetry ? 'retry' : 'claim',
@@ -2207,7 +2227,7 @@ def _presale_index():
           claimAssurance,
           pendingChallenge: challenge,
         }});
-        const stamped = await verifier.stampAction(challenge.payload || payload, {{
+        const stamped = await verifier.stampAction(payload, {{
           action: CLAIM_ACTION,
           method: 'POST',
           path: CLAIM_PATH,
@@ -2401,7 +2421,7 @@ def _presale_index():
         const claimed = await verifier.claimRedirectActionSign();
         if (claimed?.ok && claimed.signResult) {{
           const stamped = buildStampedFromRedirectSign(
-            saved.pendingChallenge.payload || contactPayload(),
+            stampBody(saved.pendingChallenge.payload || contactPayload()),
             claimed.signResult,
             saved.claimAssurance || CLAIM_ASSURANCE,
           );

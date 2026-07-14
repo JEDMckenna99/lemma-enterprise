@@ -557,7 +557,9 @@ def test_presale_claim_body_hash_excludes_required_assurance(relying_site_client
 def test_presale_claim_stamp_uses_contact_payload_only(relying_site_client):
     client, _mod = relying_site_client
     body = client.get("/?tour=presale").get_data(as_text=True)
-    assert "const payload = contactPayload();" in body
+    assert "function stampBody(payload)" in body
+    assert "stampAction(payload," in body
+    assert "challenge.payload || payload" not in body
     assert "...contactPayload(), required_assurance: claimAssurance" not in body
 
 
