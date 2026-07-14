@@ -23,28 +23,34 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Verify required live secrets
+        id: fixture
         run: |
           missing=0
           for name in ISHUMAN_LIVE_BASE_URL ISHUMAN_LIVE_WALLET_ID; do
             if [ -z "${!name}" ]; then
-              echo "::error::${name} secret is required for strict live Didit routing smoke."
+              echo "::warning::${name} is not configured; skipping strict live Didit routing smoke."
               missing=1
             fi
           done
           if [ "${missing}" -ne 0 ]; then
-            exit 1
+            echo "configured=false" >> "${GITHUB_OUTPUT}"
+          else
+            echo "configured=true" >> "${GITHUB_OUTPUT}"
+            echo "Live Didit smoke secrets present."
           fi
-          echo "Live Didit smoke secrets present."
 
       - name: Set up Python
+        if: steps.fixture.outputs.configured == 'true'
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
       - name: Install live test dependencies
+        if: steps.fixture.outputs.configured == 'true'
         run: bash scripts/ci_install_test_deps.sh
 
       - name: Run live Didit routing smoke
+        if: steps.fixture.outputs.configured == 'true'
         run: >
           python -m pytest
           tests/live/test_ishuman_live_didit_issue_flow.py::test_live_didit_start_routes_to_didit
@@ -52,6 +58,7 @@ jobs:
           -v
 
       - name: Run full live Didit issue flow (optional human step)
+        if: steps.fixture.outputs.configured == 'true'
         continue-on-error: true
         run: >
           python -m pytest

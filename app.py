@@ -936,7 +936,7 @@ def create_app():
         from flask import send_from_directory
         response = send_from_directory('static/js', 'lemma-ishuman-verify.mjs', mimetype='application/javascript')
         response.headers['Cache-Control'] = 'public, max-age=300'
-        response.headers['X-SDK-Version'] = '1.3.0'
+        response.headers['X-SDK-Version'] = '1.4.0'
         response.headers['Access-Control-Allow-Origin'] = '*'
         return response
 
@@ -953,7 +953,7 @@ def create_app():
             'examples', 'relying_site_offline_verify.py', mimetype='text/x-python',
         )
         response.headers['Cache-Control'] = 'public, max-age=300'
-        response.headers['X-SDK-Version'] = '1.3.0'
+        response.headers['X-SDK-Version'] = '1.4.0'
         response.headers['Access-Control-Allow-Origin'] = '*'
         return response
 
@@ -1268,19 +1268,34 @@ def create_app():
             is_admin=request.headers.get('X-Permission-ID', '').lower() in ['super_admin', 'admin_access'],
         )
     
+    @app.route('/llms.txt')
+    def serve_llms_txt():
+        """Agent pointer file for relying-site integration."""
+        from flask import send_from_directory
+        response = send_from_directory('.', 'llms.txt', mimetype='text/plain; charset=utf-8')
+        response.headers['Cache-Control'] = 'public, max-age=300'
+        return response
+
     @app.route('/docs/<path:filename>')
     def serve_docs(filename):
-        """Serve documentation markdown files"""
-        from flask import send_from_directory, Response
-        logger.info(f"📄 Serving documentation: {filename}")
-        try:
-            # Serve markdown files with correct MIME type
-            response = send_from_directory('docs', filename)
-            if filename.endswith('.md'):
-                response.headers['Content-Type'] = 'text/markdown; charset=utf-8'
-            return response
-        except FileNotFoundError:
+        """Serve allowlisted public documentation markdown only."""
+        from flask import send_file
+        from api.public_docs import is_public_doc_allowed, resolve_public_doc_file
+
+        allowed, normalized = is_public_doc_allowed(filename)
+        if not allowed or not normalized:
+            logger.info("Denied documentation request: %s", filename)
             return "Documentation not found", 404
+
+        docs_root = os.path.join(app.root_path, 'docs')
+        resolved = resolve_public_doc_file(docs_root, normalized)
+        if not resolved:
+            return "Documentation not found", 404
+
+        logger.info("Serving public documentation: %s", normalized)
+        response = send_file(resolved, mimetype='text/markdown; charset=utf-8')
+        response.headers['Cache-Control'] = 'public, max-age=300'
+        return response
 
     # ==================== ADMIN PLATFORM ====================
     # SECURITY: Server-side gate requires active wallet session to serve admin pages.

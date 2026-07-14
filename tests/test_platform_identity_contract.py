@@ -137,15 +137,16 @@ def test_templates_use_shared_platform_helpers():
 
 @pytest.mark.unit
 def test_sdk_cache_bust_bumped_in_templates():
-    for rel in (
-        "templates/modern/layout.html",
-        "templates/wallet_unlock.html",
-        "templates/wallet_popup.html",
-        "templates/wallet_ishuman_idv.html",
-        "templates/recover_complete.html",
-    ):
+    expected_versions = {
+        "templates/modern/layout.html": "2677",
+        "templates/wallet_unlock.html": "2677",
+        "templates/wallet_popup.html": "2677",
+        "templates/wallet_ishuman_idv.html": "2680",
+        "templates/recover_complete.html": "2677",
+    }
+    for rel, version in expected_versions.items():
         text = (ROOT / rel).read_text(encoding="utf-8")
-        assert "lemma-wallet.js" in text and "v=2677" in text, rel
+        assert "lemma-wallet.js" in text and f"v={version}" in text, rel
 
 
 def _encode_credential(credential: dict) -> str:

@@ -234,9 +234,9 @@ def test_node_sdk_exposes_verify_stamp():
     assert "stamp_ppid_mismatch" in src
     assert "stamp_credential_mismatch" in src
     # Exported from the factory and CommonJS interop.
-    assert "return { verify, verifyStamp, verifyActionStamp, refresh };" in src
+    assert "return { verify, verifyWithPolicy, verifyStamp, verifyActionStamp, refresh };" in src
     assert "verifyStamp," in src
-    assert "@version 1.3.0" in src
+    assert "@version 1.4.0" in src
 
 
 def test_node_sdk_durable_drops_session_assertion():
@@ -247,7 +247,7 @@ def test_node_sdk_durable_drops_session_assertion():
 
 def test_backend_sdk_versions_bumped():
     app = APP_PATH.read_text(encoding="utf-8")
-    assert app.count("response.headers['X-SDK-Version'] = '1.3.0'") >= 2
+    assert app.count("response.headers['X-SDK-Version'] = '1.4.0'") >= 2
 
 
 def test_docs_document_backend_verify_stamp():

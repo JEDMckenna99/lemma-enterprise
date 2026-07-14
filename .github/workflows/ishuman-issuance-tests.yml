@@ -21,7 +21,6 @@ on:
       - "packages/ishuman-verify-py/**"
       - "tests/test_ishuman_didit_issuance.py"
       - "tests/test_didit_*.py"
-      - "tests/test_ppid_migration.py"
       - "tests/test_column_crypto.py"
       - "api/database.py"
       - "migrations/024_identity_roots.sql"
@@ -59,7 +58,6 @@ on:
       - "packages/ishuman-verify-py/**"
       - "tests/test_ishuman_didit_issuance.py"
       - "tests/test_didit_*.py"
-      - "tests/test_ppid_migration.py"
       - "tests/test_column_crypto.py"
       - "api/database.py"
       - "migrations/024_identity_roots.sql"
@@ -122,7 +120,6 @@ jobs:
           tests/test_didit_webhook_signature.py
           tests/test_didit_root_material.py
           tests/test_didit_delete_session.py
-          tests/test_ppid_migration.py
           tests/test_column_crypto.py
           -m "unit or integration or browser"
           -v

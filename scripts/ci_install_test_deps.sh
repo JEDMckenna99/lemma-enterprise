@@ -18,5 +18,10 @@ python -m pip install \
   python-dotenv \
   Flask-Limiter \
   qrcode \
+  boto3 \
   build \
   twine
+
+# Application tests exercise the native verifier directly. Install the local
+# extension instead of leaving those paths to fail at runtime.
+python -m pip install -e ./lemma-crypto

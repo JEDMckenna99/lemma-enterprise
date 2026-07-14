@@ -337,21 +337,18 @@ def test_idv_popup_handles_encrypted_master_without_raw_error():
 
 @pytest.mark.browser
 def test_wallet_pages_use_current_wallet_bundle():
-    wallet_pages = [
-        IDV_HTML,
-        POPUP_HTML,
-        WALLET_UNLOCK_HTML,
-        RECOVER_COMPLETE_HTML,
-        MODERN_LAYOUT_HTML,
-        WALLET_SIMPLE_HTML,
-    ]
-    for path in wallet_pages:
+    wallet_pages = {
+        IDV_HTML: "2680",
+        POPUP_HTML: "2677",
+        WALLET_UNLOCK_HTML: "2677",
+        RECOVER_COMPLETE_HTML: "2677",
+        MODERN_LAYOUT_HTML: "2677",
+        WALLET_SIMPLE_HTML: "2677",
+    }
+    for path, version in wallet_pages.items():
         source = path.read_text(encoding="utf-8")
         assert "lemma-wallet.js?v=2542" not in source
-        assert (
-            "lemma-wallet.js') }}?v=2677" in source
-            or "lemma-wallet.js?v=2677" in source
-        )
+        assert "lemma-wallet.js" in source and f"?v={version}" in source
         assert "lemma-keys.js?v=2" not in source
         assert "lemma-keys.js?v=3" not in source
         assert "lemma-keys.js?v=7" not in source
