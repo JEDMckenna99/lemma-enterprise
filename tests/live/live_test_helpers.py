@@ -1,4 +1,4 @@
-"""Shared helpers for live/staging isHuman integration tests."""
+"""Shared helpers for live/staging integration tests."""
 
 from __future__ import annotations
 
@@ -52,6 +52,16 @@ def require_staging_env() -> tuple[str, str]:
     )
 
 
+def require_platform_staging_env() -> str:
+    """Staging URL only — for wallet/platform/billing live smokes (no demo token)."""
+    require_env_vars(
+        ("LEMMA_STAGING_BASE_URL",),
+        strict=staging_tests_strict(),
+        context="platform staging live tests",
+    )
+    return os.environ["LEMMA_STAGING_BASE_URL"].rstrip("/")
+
+
 def require_live_didit_env() -> tuple[str, str, str]:
     require_env_vars(
         ("ISHUMAN_LIVE_BASE_URL", "ISHUMAN_LIVE_WALLET_ID", "ISHUMAN_LIVE_WALLET_SECRET"),
@@ -72,6 +82,50 @@ def get_json_or_raise(resp: requests.Response) -> dict:
         raise AssertionError(
             f"Expected JSON response, got status={resp.status_code}, body={resp.text}"
         ) from exc
+
+
+def assert_status(resp: requests.Response, allowed: int | set[int], *, label: str = "") -> dict:
+    allowed_set = {allowed} if isinstance(allowed, int) else set(allowed)
+    prefix = f"{label}: " if label else ""
+    if resp.status_code not in allowed_set:
+        try:
+            body = resp.json()
+        except ValueError:
+            body = resp.text[:200]
+        raise AssertionError(f"{prefix}HTTP {resp.status_code} not in {sorted(allowed_set)}: {body}")
+    try:
+        return resp.json()
+    except ValueError:
+        return {}
+
+
+def get_json(session: requests.Session, base_url: str, path: str, *, timeout: int = 30) -> tuple[int, dict]:
+    resp = session.get(f"{base_url}{path}", timeout=timeout)
+    try:
+        return resp.status_code, resp.json()
+    except ValueError:
+        return resp.status_code, {}
+
+
+def post_json(
+    session: requests.Session,
+    base_url: str,
+    path: str,
+    body: dict | None = None,
+    *,
+    timeout: int = 30,
+    headers: dict[str, str] | None = None,
+) -> tuple[int, dict]:
+    resp = session.post(
+        f"{base_url}{path}",
+        json=body or {},
+        timeout=timeout,
+        headers=headers,
+    )
+    try:
+        return resp.status_code, resp.json()
+    except ValueError:
+        return resp.status_code, {}
 
 
 def wallet_challenge(session: requests.Session, base_url: str, wallet_id: str) -> str:

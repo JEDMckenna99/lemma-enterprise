@@ -4,8 +4,10 @@ on:
   workflow_dispatch:
   pull_request:
     paths:
+      - "scripts/smoke_platform_prod.py"
       - "scripts/launch_gate_smoke_ci.py"
       - ".github/workflows/launch-gate-smoke.yml"
+      - ".github/workflows/platform-prod-smoke.yml"
       - "docs/status/GA_LAUNCH_READINESS_CHECKLIST.md"
       - "ops/evidence/launch/**"
 
@@ -25,5 +27,5 @@ jobs:
       - name: Run non-destructive launch-gate smoke checks
         env:
           LEMMA_BASE_URL: https://lemma.id
-        run: python scripts/launch_gate_smoke_ci.py
+        run: python scripts/smoke_platform_prod.py
 
