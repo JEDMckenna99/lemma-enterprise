@@ -2111,21 +2111,21 @@ def _presale_index():
       }}
       const retryDepth = depth || 0;
       if (retryDepth > 2) return;
-      const claimAssurance = assuranceOverride || CLAIM_ASSURANCE;
-      const claimBtn = document.getElementById('claim-btn');
-      const retryBtn = document.getElementById('retry-btn');
-      claimBtn.disabled = true;
-      retryBtn.disabled = true;
-      pill.textContent = 'CHECKING';
-      pill.className = 'pill checking';
-      setTourHighlight(isRetry ? 'retry' : 'claim');
-      const idvNote = claimAssurance === ESCALATED_ASSURANCE
-        ? 'Fresh IDV-backed proof required after site risk flag.'
-        : 'Fresh passkey ceremony required — Face ID / Touch ID / Windows Hello at unlock. Server verifies fresh_passkey_attestation bound to this action.';
-      decisionCard.innerHTML = '<strong>Step 2 — Fresh passkey unlock</strong><p class="tiny">' + idvNote + '</p>';
+        const claimAssurance = assuranceOverride || CLAIM_ASSURANCE;
+        const claimBtn = document.getElementById('claim-btn');
+        const retryBtn = document.getElementById('retry-btn');
+        claimBtn.disabled = true;
+        retryBtn.disabled = true;
+        pill.textContent = 'CHECKING';
+        pill.className = 'pill checking';
+        setTourHighlight(isRetry ? 'retry' : 'claim');
+        const idvNote = claimAssurance === ESCALATED_ASSURANCE
+          ? 'Fresh IDV-backed proof required after site risk flag.'
+          : 'Fresh passkey ceremony required — Face ID / Touch ID / Windows Hello at unlock. Server verifies fresh_passkey_attestation bound to this action.';
+        decisionCard.innerHTML = '<strong>Step 2 — Fresh passkey unlock</strong><p class="tiny">' + idvNote + '</p>';
       try {{
         const verifier = makeVerifier(claimAssurance);
-        const payload = {{ ...contactPayload(), required_assurance: claimAssurance }};
+        const payload = contactPayload();
         const challenge = await fetchPresaleChallenge(CLAIM_ACTION, CLAIM_PATH, payload);
         const stamped = await verifier.stampAction(payload, {{
           action: CLAIM_ACTION,
@@ -2152,9 +2152,9 @@ def _presale_index():
         const serverRes = await fetch(CLAIM_PATH, {{
           method: 'POST',
           headers: {{ 'Content-Type': 'application/json' }},
-          body: JSON.stringify({{ ...stamped, server_nonce: challenge.server_nonce }}),
+          body: JSON.stringify({{ ...stamped, required_assurance: claimAssurance, server_nonce: challenge.server_nonce }}),
         }});
-        const requestBody = {{ ...stamped, server_nonce: challenge.server_nonce }};
+        const requestBody = {{ ...stamped, required_assurance: claimAssurance, server_nonce: challenge.server_nonce }};
         lastStampedRequest = {{ path: CLAIM_PATH, body: requestBody, action: CLAIM_ACTION }};
         const serverEntry = await serverRes.json();
         await refreshActionLog();

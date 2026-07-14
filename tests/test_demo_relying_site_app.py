@@ -521,6 +521,46 @@ def test_presale_claim_denies_missing_fresh_passkey(relying_site_client, monkeyp
     assert "fresh_passkey_attestation" not in payload.get("gates_passed", [])
 
 
+def test_presale_claim_body_hash_excludes_required_assurance(relying_site_client):
+    client, mod = relying_site_client
+    contact = {
+        "drop_id": mod.PRESALE_DROP_ID,
+        "email": "fan@example.com",
+        "phone": "+15551234567",
+    }
+    with_assurance = {**contact, "required_assurance": "passkey"}
+
+    correct = client.post(
+        "/api/presale/challenge",
+        json={
+            "action": mod.PRESALE_CLAIM_ACTION,
+            "method": "POST",
+            "path": mod.PRESALE_CLAIM_PATH,
+            "body": contact,
+        },
+    ).get_json()
+    wrong = client.post(
+        "/api/presale/challenge",
+        json={
+            "action": mod.PRESALE_CLAIM_ACTION,
+            "method": "POST",
+            "path": mod.PRESALE_CLAIM_PATH,
+            "body": with_assurance,
+        },
+    ).get_json()
+
+    verify_hash = mod.hash_action_body(mod._presale_claim_body(with_assurance))
+    assert correct["body_hash"] == verify_hash
+    assert wrong["body_hash"] != verify_hash
+
+
+def test_presale_claim_stamp_uses_contact_payload_only(relying_site_client):
+    client, _mod = relying_site_client
+    body = client.get("/?tour=presale").get_data(as_text=True)
+    assert "const payload = contactPayload();" in body
+    assert "...contactPayload(), required_assurance: claimAssurance" not in body
+
+
 def test_demo_verifier_accepts_platform_signed_trust_bundle(monkeypatch):
     from api.issuer_trust_list import build_signed_trust_list
     from api.wallet_keys import derive_wallet_signing_keypair
