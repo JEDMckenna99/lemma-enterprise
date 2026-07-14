@@ -1900,6 +1900,9 @@ def _presale_index():
       if (reason === 'passkey_not_registered_on_server' || reason === 'passkey_server_binding_failed') {{
         return 'Wallet passkey is not registered on lemma.id yet — unlock on lemma.id once, then retry Step 2.';
       }}
+      if (reason === 'fresh_passkey_webauthn_invalid') {{
+        return 'Fresh passkey ceremony failed server verification — unlock on lemma.id and retry Step 2.';
+      }}
       if (String(reason || '').startsWith('fresh_passkey_')) {{
         return 'Fresh passkey gate failed: ' + reason;
       }}

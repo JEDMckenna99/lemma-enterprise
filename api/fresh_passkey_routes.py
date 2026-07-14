@@ -11,6 +11,7 @@ from flask import Blueprint, jsonify, request
 from flask_cors import cross_origin
 
 from api.fresh_passkey_attestation import (
+    allowed_fresh_passkey_origins,
     build_action_commitment,
     delete_fresh_passkey_challenge,
     get_fresh_passkey_challenge,
@@ -109,7 +110,7 @@ def fresh_passkey_complete():
         credential=credential,
         expected_challenge=base64.urlsafe_b64decode(stored["challenge"]),
         rp_id=RP_ID,
-        origin=ORIGIN,
+        origin=allowed_fresh_passkey_origins(),
         public_key_b64=public_key_b64,
         sign_count=sign_count,
     )

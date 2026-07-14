@@ -219,25 +219,154 @@ def _decode_public_key(raw: str) -> bytes:
         return bytes.fromhex(text)
 
 
+def _is_spki_public_key(raw: bytes) -> bool:
+    """Browser getPublicKey() returns DER SubjectPublicKeyInfo (starts with 0x30)."""
+    return bool(raw) and raw[0] == 0x30
+
+
+def allowed_fresh_passkey_origins() -> list[str]:
+    """Origins accepted for wallet fresh-passkey ceremonies."""
+    from api.passkey_auth import ALLOWED_AUTH_ORIGINS, EXPECTED_ORIGIN, ORIGIN
+
+    origins: list[str] = []
+    for value in (ORIGIN, EXPECTED_ORIGIN):
+        text = str(value or "").strip()
+        if text and text not in origins:
+            origins.append(text)
+    for value in sorted(ALLOWED_AUTH_ORIGINS):
+        text = str(value or "").strip()
+        if text and text not in origins:
+            origins.append(text)
+    return origins
+
+
+def extract_cose_public_key_b64(attestation_object_b64: str) -> str:
+    """Extract COSE credential public key from a WebAuthn attestation object."""
+    from webauthn.helpers import bytes_to_base64url
+    from webauthn.helpers.parse_attestation_object import parse_attestation_object
+    from webauthn.helpers.parse_authenticator_data import parse_authenticator_data
+
+    raw = _decode_public_key(str(attestation_object_b64 or "").strip())
+    att_obj = parse_attestation_object(raw)
+    auth_data = parse_authenticator_data(att_obj.auth_data)
+    if not auth_data.attested_credential_data:
+        raise ValueError("no_attested_credential_data")
+    return bytes_to_base64url(auth_data.attested_credential_data.credential_public_key)
+
+
+def _normalize_expected_origins(origin: str | list[str] | None) -> list[str]:
+    if isinstance(origin, list):
+        values = origin
+    elif origin:
+        values = [origin]
+    else:
+        values = []
+    normalized: list[str] = []
+    for value in values:
+        text = str(value or "").strip()
+        if text and text not in normalized:
+            normalized.append(text)
+    if not normalized:
+        normalized = allowed_fresh_passkey_origins()
+    return normalized
+
+
+def _verify_spki_wallet_webauthn_assertion(
+    *,
+    credential: dict,
+    expected_challenge: bytes,
+    rp_id: str,
+    expected_origins: list[str],
+    public_key_spki: bytes,
+    sign_count: int = 0,
+) -> tuple[bool, str, int]:
+    """Verify assertions stored against browser SPKI exports (legacy wallet rows)."""
+    import hashlib
+    import json
+
+    from cryptography.hazmat.primitives import hashes
+    from cryptography.hazmat.primitives.asymmetric import ec
+    from cryptography.hazmat.primitives.serialization import load_der_public_key
+    from webauthn.helpers import base64url_to_bytes
+    from webauthn.helpers.parse_authenticator_data import parse_authenticator_data
+
+    response = credential.get("response") if isinstance(credential, dict) else None
+    if not isinstance(response, dict):
+        return False, "fresh_passkey_webauthn_invalid", int(sign_count or 0)
+
+    client_data_json = response.get("clientDataJSON")
+    authenticator_data_b64 = response.get("authenticatorData")
+    signature_b64 = response.get("signature")
+    if not client_data_json or not authenticator_data_b64 or not signature_b64:
+        return False, "fresh_passkey_webauthn_invalid", int(sign_count or 0)
+
+    client_data = json.loads(base64url_to_bytes(client_data_json))
+    if client_data.get("type") != "webauthn.get":
+        return False, "fresh_passkey_webauthn_invalid", int(sign_count or 0)
+    challenge = base64url_to_bytes(client_data.get("challenge") or "")
+    if challenge != expected_challenge:
+        return False, "fresh_passkey_webauthn_invalid", int(sign_count or 0)
+    origin = str(client_data.get("origin") or "").strip()
+    if origin not in expected_origins:
+        return False, "fresh_passkey_webauthn_invalid", int(sign_count or 0)
+
+    auth_data = parse_authenticator_data(base64url_to_bytes(authenticator_data_b64))
+    if hashlib.sha256(rp_id.encode("utf-8")).digest() != auth_data.rp_id_hash:
+        return False, "fresh_passkey_webauthn_invalid", int(sign_count or 0)
+    if not auth_data.flags.up:
+        return False, "fresh_passkey_webauthn_invalid", int(sign_count or 0)
+    if not auth_data.flags.uv:
+        return False, "fresh_passkey_webauthn_invalid", int(sign_count or 0)
+
+    new_sign_count = int(auth_data.sign_count or 0)
+    if new_sign_count <= int(sign_count or 0):
+        return False, "fresh_passkey_webauthn_invalid", int(sign_count or 0)
+
+    client_data_hash = hashlib.sha256(base64url_to_bytes(client_data_json)).digest()
+    signed_data = base64url_to_bytes(authenticator_data_b64) + client_data_hash
+    signature = base64url_to_bytes(signature_b64)
+    public_key = load_der_public_key(public_key_spki)
+    if not isinstance(public_key, ec.EllipticCurvePublicKey):
+        return False, "fresh_passkey_webauthn_invalid", int(sign_count or 0)
+    public_key.verify(signature, signed_data, ec.ECDSA(hashes.SHA256()))
+    return True, "valid", new_sign_count
+
+
 def verify_wallet_webauthn_assertion(
     *,
     credential: dict,
     expected_challenge: bytes,
     rp_id: str,
-    origin: str,
+    origin: str | list[str],
     public_key_b64: str,
     sign_count: int = 0,
 ) -> tuple[bool, str, int]:
     """Verify a WebAuthn assertion against a stored wallet/device passkey."""
     from webauthn import verify_authentication_response
 
+    expected_origins = _normalize_expected_origins(origin)
+    public_key_raw = _decode_public_key(public_key_b64)
+    if _is_spki_public_key(public_key_raw):
+        try:
+            return _verify_spki_wallet_webauthn_assertion(
+                credential=credential,
+                expected_challenge=expected_challenge,
+                rp_id=rp_id,
+                expected_origins=expected_origins,
+                public_key_spki=public_key_raw,
+                sign_count=sign_count,
+            )
+        except Exception as exc:
+            logger.warning("Fresh passkey SPKI WebAuthn verify failed: %s", exc)
+            return False, "fresh_passkey_webauthn_invalid", int(sign_count or 0)
+
     try:
         verification = verify_authentication_response(
             credential=credential,
             expected_challenge=expected_challenge,
             expected_rp_id=rp_id,
-            expected_origin=origin,
-            credential_public_key=_decode_public_key(public_key_b64),
+            expected_origin=expected_origins,
+            credential_public_key=public_key_raw,
             credential_current_sign_count=int(sign_count or 0),
             require_user_verification=True,
         )

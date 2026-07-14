@@ -2085,6 +2085,9 @@ class LemmaWallet {
             credentialId: this._bufferToBase64url(credential.rawId),
             publicKey: publicKeyData.publicKey,
             algorithm: publicKeyData.algorithm,
+            attestationObject: credential.response.attestationObject
+                ? this._bufferToBase64url(credential.response.attestationObject)
+                : null,
             createdAt: Date.now(),
             prfEnabled: prfBound,
             prfSaltRpId: rpId,
@@ -2361,6 +2364,7 @@ class LemmaWallet {
                 device_id: deviceId,
                 credential_id: passkeyRecord.credentialId,
                 public_key: passkeyRecord.publicKey,
+                attestation_object: passkeyRecord.attestationObject || null,
                 attestation_format: passkeyRecord.attestationFormat || 'none',
                 device_name: passkeyRecord.deviceName || null,
                 wallet_assertion: walletAssertion,

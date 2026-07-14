@@ -53,6 +53,27 @@ def test_build_action_commitment_is_stable(py_sdk):
 
 
 @pytest.mark.unit
+def test_is_spki_public_key_detects_browser_exports():
+    from api.fresh_passkey_attestation import _is_spki_public_key
+
+    assert _is_spki_public_key(b"\x30\x82\x01\x22") is True
+    assert _is_spki_public_key(b"\xa5\x01\x02\x03") is False
+
+
+@pytest.mark.unit
+def test_allowed_fresh_passkey_origins_includes_platform_hosts(monkeypatch):
+    from api.fresh_passkey_attestation import allowed_fresh_passkey_origins
+
+    monkeypatch.setenv("PASSKEY_ORIGIN", "https://lemma.id")
+    monkeypatch.setenv("PASSKEY_EXPECTED_ORIGIN", "https://www.lemma.id")
+    monkeypatch.setenv("LEMMA_ALLOWED_ORIGINS", "https://lemma.id,https://www.lemma.id")
+
+    origins = allowed_fresh_passkey_origins()
+    assert "https://lemma.id" in origins
+    assert "https://www.lemma.id" in origins
+
+
+@pytest.mark.unit
 def test_verify_fresh_passkey_attestation(fake_issuer, py_sdk):
     from api.fresh_passkey_attestation import issue_fresh_passkey_attestation
 

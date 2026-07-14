@@ -1057,6 +1057,7 @@ def wallet_revoke_device():
 def wallet_register_device_passkey():
     """Bind a wallet-scoped WebAuthn passkey to a device enrollment."""
     from api.database import SessionLocal, WalletPasskey
+    from api.fresh_passkey_attestation import extract_cose_public_key_b64
     from api.wallet_authn import assertion_error_response, verify_assertion_from_body
 
     body = request.get_json(silent=True) or {}
@@ -1064,11 +1065,19 @@ def wallet_register_device_passkey():
     device_id = (body.get("device_id") or "").strip()
     credential_id = (body.get("credential_id") or "").strip()
     public_key = (body.get("public_key") or "").strip()
+    attestation_object = (body.get("attestation_object") or "").strip()
     attestation_format = (body.get("attestation_format") or "").strip() or None
     device_name = (body.get("device_name") or "").strip() or None
 
     if not wallet_id or not device_id or not credential_id or not public_key:
         return jsonify({"success": False, "error": "missing_passkey_fields"}), 400
+
+    stored_public_key = public_key
+    if attestation_object:
+        try:
+            stored_public_key = extract_cose_public_key_b64(attestation_object)
+        except Exception as exc:
+            logger.warning("Wallet passkey COSE extraction failed: %s", exc)
 
     verify_result, _fields = verify_assertion_from_body(
         body,
@@ -1089,7 +1098,7 @@ def wallet_register_device_passkey():
                     wallet_id=wallet_id,
                     device_id=device_id,
                     credential_id=credential_id,
-                    public_key=public_key,
+                    public_key=stored_public_key,
                     attestation_format=attestation_format,
                     device_name=device_name,
                     created_at=datetime.utcnow(),
@@ -1097,6 +1106,8 @@ def wallet_register_device_passkey():
                 )
             )
         else:
+            if attestation_object and stored_public_key and stored_public_key != existing.public_key:
+                existing.public_key = stored_public_key
             existing.last_used_at = datetime.utcnow()
         db.commit()
     except Exception:
