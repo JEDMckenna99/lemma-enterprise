@@ -37,6 +37,21 @@ PRESALE_ESCALATED_ASSURANCE = os.getenv(
 ).strip().lower()
 ISHUMAN_VERIFIER_SDK_VERSION = os.getenv("ISHUMAN_VERIFIER_SDK_VERSION", "1.9.1").strip()
 
+TICKETING_ICON_SVG = """<svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+  <rect x="6.8" y="3.4" width="13.6" height="8.4" rx="1.4" stroke="#d97706" stroke-width="1.6" opacity="0.5" transform="rotate(8 13.6 7.6)"/>
+  <rect x="3.6" y="10.6" width="14.8" height="9" rx="1.5" stroke="#d97706" stroke-width="1.6"/>
+  <path d="M13.8 10.6v9" stroke="#d97706" stroke-width="1.4" stroke-dasharray="1.8 2"/>
+</svg>"""
+
+TICKETING_FAVICON_SVG = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="none">
+  <rect x=".5" y=".5" width="31" height="31" rx="7.5" fill="#fffbeb" stroke="#fde68a"/>
+  <g transform="translate(4 4)">
+    <rect x="6.8" y="3.4" width="13.6" height="8.4" rx="1.4" stroke="#d97706" stroke-width="1.6" opacity="0.5" transform="rotate(8 13.6 7.6)"/>
+    <rect x="3.6" y="10.6" width="14.8" height="9" rx="1.5" stroke="#d97706" stroke-width="1.6"/>
+    <path d="M13.8 10.6v9" stroke="#d97706" stroke-width="1.4" stroke-dasharray="1.8 2"/>
+  </g>
+</svg>"""
+
 PRESALE_REGISTER_ACTION = "register_presale"
 PRESALE_REGISTER_PATH = "/api/presale/register"
 PRESALE_CLAIM_ACTION = "claim_presale_code"
@@ -784,6 +799,13 @@ def index():
     return _generic_index()
 
 
+@app.get("/favicon.svg")
+def favicon():
+    if not _is_presale_site():
+        return Response(status=404)
+    return Response(TICKETING_FAVICON_SVG, mimetype="image/svg+xml")
+
+
 def _generic_index():
     copy = _content()
     html = f"""<!doctype html>
@@ -1235,6 +1257,7 @@ def _presale_index():
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{SITE_NAME}</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
   <style>
     :root {{
       --bg: #f8fafc;
@@ -1260,6 +1283,19 @@ def _presale_index():
       justify-content: space-between;
       align-items: center;
     }}
+    .site-brand {{ display: flex; align-items: center; gap: 10px; }}
+    .site-icon {{
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 42px;
+      height: 42px;
+      flex: 0 0 42px;
+      border: 1px solid #fde68a;
+      border-radius: 10px;
+      background: #fffbeb;
+    }}
+    .site-icon svg {{ width: 28px; height: 28px; }}
     header strong {{ font-size: 17px; }}
     header a {{ color: var(--muted); font-size: 13px; text-decoration: none; }}
     main {{ max-width: 920px; margin: 0 auto; padding: 28px 18px 48px; }}
@@ -1533,7 +1569,10 @@ def _presale_index():
 </head>
 <body>
   <header>
-    <strong>{SITE_NAME}</strong>
+    <div class="site-brand">
+      <span class="site-icon">{TICKETING_ICON_SVG}</span>
+      <strong>{SITE_NAME}</strong>
+    </div>
     <a href="{DEMO_HUB_URL}?from=demo" target="_blank" rel="noopener">Return to demo hub</a>
   </header>
   <main>

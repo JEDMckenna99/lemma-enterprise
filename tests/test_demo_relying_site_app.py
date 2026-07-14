@@ -138,6 +138,9 @@ def test_relying_site_index_loads_verifier_script(relying_site_client):
     body = resp.get_data(as_text=True)
 
     assert resp.status_code == 200
+    assert '<link rel="icon" href="/favicon.svg" type="image/svg+xml">' in body
+    assert 'class="site-icon"' in body
+    assert 'stroke="#d97706"' in body
     assert "IsHumanVerifier" in body
     assert "stampAction" in body
     assert "claim_presale_code" in body
@@ -152,6 +155,17 @@ def test_relying_site_index_loads_verifier_script(relying_site_client):
     assert "requireFreshPasskey: true" in body
     assert "Laylo" not in body
     assert "RealFan" not in body
+
+
+def test_relying_site_ticketing_favicon(relying_site_client):
+    client, _mod = relying_site_client
+    resp = client.get("/favicon.svg")
+    body = resp.get_data(as_text=True)
+
+    assert resp.status_code == 200
+    assert resp.mimetype == "image/svg+xml"
+    assert 'fill="#fffbeb"' in body
+    assert 'stroke="#d97706"' in body
 
 
 def test_relying_site_index_exposes_presale_defense_and_tour_ui(relying_site_client):
