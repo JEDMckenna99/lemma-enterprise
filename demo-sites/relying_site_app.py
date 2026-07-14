@@ -1686,6 +1686,24 @@ def _presale_index():
     let lastStampedRequest = null;
     const TOUR_SEQUENCE = ['register', 'claim', 'retry', 'flag', 'attack'];
     const BACKEND_GATES_KEY = 'lemma_presale_show_backend_gates';
+    const PRESALE_SESSION_KEY = 'lemma_presale_session_v1';
+
+    function savePresaleSession(patch) {{
+      try {{
+        const prev = JSON.parse(sessionStorage.getItem(PRESALE_SESSION_KEY) || '{{}}');
+        sessionStorage.setItem(PRESALE_SESSION_KEY, JSON.stringify({{ ...prev, ...patch, dropId: DROP_ID }}));
+      }} catch (e) {{}}
+    }}
+
+    function loadPresaleSession() {{
+      try {{
+        const saved = JSON.parse(sessionStorage.getItem(PRESALE_SESSION_KEY) || '{{}}');
+        if (saved.dropId !== DROP_ID) return null;
+        return saved;
+      }} catch (e) {{
+        return null;
+      }}
+    }}
 
     if (TOUR_MODE) {{
       document.body.classList.add('tour-mode');
@@ -1791,6 +1809,19 @@ def _presale_index():
       const retryBtn = document.getElementById('retry-btn');
       if (claimBtn) claimBtn.disabled = !registered;
       if (retryBtn) retryBtn.disabled = !registered;
+      savePresaleSession({{ registered: presaleRegistered, ppid: lastPpid || null }});
+    }}
+
+    const restoredSession = loadPresaleSession();
+    if (restoredSession?.registered) {{
+      lastPpid = restoredSession.ppid || null;
+      setStepState(true);
+    }}
+    if (restoredSession?.contact) {{
+      const emailEl = document.getElementById('email');
+      const phoneEl = document.getElementById('phone');
+      if (emailEl && restoredSession.contact.email) emailEl.value = restoredSession.contact.email;
+      if (phoneEl && restoredSession.contact.phone) phoneEl.value = restoredSession.contact.phone;
     }}
 
     function formatDenyReason(reason) {{
@@ -1951,6 +1982,7 @@ def _presale_index():
 
     async function runRegister() {{
       if (typeof IsHumanVerifier === 'undefined') return;
+      savePresaleSession({{ pendingAction: 'register', contact: contactPayload() }});
       const registerBtn = document.getElementById('register-btn');
       registerBtn.disabled = true;
       pill.textContent = 'CHECKING';
@@ -1998,6 +2030,7 @@ def _presale_index():
         if (serverEntry.success) {{
           lastPpid = serverEntry.ppid || null;
           setStepState(true);
+          savePresaleSession({{ pendingAction: null }});
           pill.textContent = 'REGISTERED';
           pill.className = 'pill ok';
           assurancePill.textContent = 'register: passkey';
@@ -2025,6 +2058,12 @@ def _presale_index():
       if (typeof IsHumanVerifier === 'undefined') return;
       const opts = options || {{}};
       const isRetry = !!opts.isRetry;
+      if (!opts.skipStepDemo) {{
+        savePresaleSession({{
+          pendingAction: isRetry ? 'retry' : 'claim',
+          contact: contactPayload(),
+        }});
+      }}
       const retryDepth = depth || 0;
       if (retryDepth > 2) return;
       const claimAssurance = assuranceOverride || CLAIM_ASSURANCE;
@@ -2100,6 +2139,7 @@ def _presale_index():
           return runClaim(ESCALATED_ASSURANCE, retryDepth + 1, opts);
         }}
         if (serverEntry.success && serverEntry.code) {{
+          savePresaleSession({{ pendingAction: null }});
           pill.textContent = 'CODE ISSUED';
           pill.className = 'pill ok';
           if (codeDisplay) {{
@@ -2222,9 +2262,22 @@ def _presale_index():
     document.getElementById('replay-btn')?.addEventListener('click', () => runReplayAttack());
     document.getElementById('skip-step-btn')?.addEventListener('click', () => runSkipStepAttack());
 
-    if (new URLSearchParams(window.location.search).get('lemma_ishuman_return') === '1') {{
-      document.getElementById('claim-btn')?.click();
+    async function resumeAfterLemmaRedirect() {{
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('lemma_ishuman_return') !== '1') return;
+      const saved = loadPresaleSession();
+      const pending = saved?.pendingAction;
+      decisionCard.innerHTML = '<strong>Resuming after passkey unlock</strong><p class="tiny">Finishing the presale step you started before returning from lemma.id.</p>';
+      if (pending === 'claim') {{
+        await runClaim();
+      }} else if (pending === 'retry') {{
+        await runClaim(undefined, 0, {{ isRetry: true }});
+      }} else {{
+        await runRegister();
+      }}
     }}
+
+    resumeAfterLemmaRedirect();
   </script>
 </body>
 </html>"""
