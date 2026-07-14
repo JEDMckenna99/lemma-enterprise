@@ -172,7 +172,7 @@
         </div>
     </div>
 
-    <script src="/static/js/demo/ishuman-idv-preview-scenes.js?v=9" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
+    <script src="/static/js/demo/ishuman-idv-preview-scenes.js?v=10" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
     <script src="/static/js/lemma-keys.js?v=8" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
     <script src="/static/js/wallet-at-rest-crypto.js?v=2" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
     <script nonce="{{ csp_nonce }}">window.LEMMA_ISHUMAN_USE_PERSON_ROOT_SEEDS = {{ 'true' if ishuman_use_person_root_seeds else 'false' }};</script>
@@ -241,6 +241,9 @@
         const popupToken = (params.get('popup_token') || '').trim();
         const flowMode = (params.get('flow_mode') || '').trim();
         const redirectReturn = (params.get('redirect_return') || '').trim();
+        const previewType = (params.get('preview_type') || '').trim();
+        const previewState = (params.get('preview_state') || 'ready').trim();
+        const isPreviewMode = !!previewType;
         const root = document.getElementById('ishuman-idv-root');
         const testVerifyEnabled = root.dataset.testVerifyEnabled === 'true';
         const skeletonIdvEnabled = root.dataset.skeletonIdvEnabled === 'true';
@@ -252,7 +255,12 @@
         function siteProofUsesContinuityOnly() {
             // action_sign (Step 2 fresh-passkey stamp) needs the same passkey-only
             // unlock path as site_proof continuity — not full master IDV issuance.
-            return (isSiteProofIssue || isActionSign) && !isFreshIdv;
+            if (isActionSign) {
+                return (isSiteProofIssue || isActionSign) && !isFreshIdv;
+            }
+            return isSiteProofIssue
+                && requiredAssurance === 'passkey'
+                && !isFreshIdv;
         }
 
         function consumerCopy() {
@@ -276,7 +284,7 @@
             const headline = document.getElementById('headline-copy');
             const privacy = document.getElementById('privacy-copy');
             const stepsList = document.getElementById('steps-list');
-            if (eyebrow) eyebrow.textContent = copy.eyebrow || eyebrow.textContent;
+            if (eyebrow) eyebrow.textContent = options.eyebrow || copy.eyebrow || eyebrow.textContent;
             if (headline) headline.textContent = options.headline || copy.headline || headline.textContent;
             if (privacy && !options.hidePrivacy) {
                 privacy.textContent = copy.privacy || privacy.textContent;
@@ -320,6 +328,7 @@
         function applyPasskeySetupShell() {
             const copy = consumerCopy();
             applyConsumerShell({
+                eyebrow: 'Device setup',
                 headline: copy.headlinePasskeySetup || 'Create your lemma.id',
                 documentTitle: copy.documentTitlePasskeySetup,
                 introKey: 'passkeySetup',
@@ -331,6 +340,7 @@
         function applyUnlockOnlyShell() {
             const copy = consumerCopy();
             applyConsumerShell({
+                eyebrow: 'Wallet unlock',
                 headline: copy.headlineUnlock || 'Unlock your lemma.id',
                 documentTitle: copy.documentTitleUnlock,
                 introKey: 'unlockOnly',
@@ -343,6 +353,7 @@
             const copy = consumerCopy();
             if (siteProofUsesContinuityOnly()) {
                 applyConsumerShell({
+                    eyebrow: 'Continuity proof required',
                     headline: copy.headlineSiteContinuity || 'Unlock to continue',
                     documentTitle: copy.documentTitleSiteContinuity,
                     introKey: 'siteProofPasskey',
@@ -351,7 +362,39 @@
                 });
                 return;
             }
-            applyConsumerShell({ introKey: 'siteProof' });
+            applyConsumerShell({
+                eyebrow: 'Human proof required',
+                introKey: 'siteProof',
+            });
+        }
+
+        function applyFreshIdvShell() {
+            const copy = consumerCopy();
+            const intro = copy.intro?.freshDoubt
+                ? copy.intro.freshDoubt(requestingSite)
+                : '';
+            applyConsumerShell({
+                eyebrow: 'Fresh human proof required',
+                headline: copy.headlineFreshHuman || 'Verify your humanity again',
+                documentTitle: copy.documentTitleFreshHuman,
+                intro,
+                hideSteps: false,
+            });
+        }
+
+        function applyActionSignShell() {
+            const copy = consumerCopy();
+            const intro = copy.intro?.actionSign
+                ? copy.intro.actionSign(requestingSite, actionName || 'this action', requiredAssurance)
+                : '';
+            applyConsumerShell({
+                eyebrow: 'Action proof required',
+                headline: copy.headlineAction || 'Confirm this action',
+                documentTitle: copy.documentTitleAction,
+                intro,
+                hideSteps: true,
+                hidePrivacy: true,
+            });
         }
 
         function getWalletInstance() {
@@ -399,16 +442,118 @@
             applyPasskeySetupShell();
         } else if (isUnlockOnly) {
             applyUnlockOnlyShell();
+        } else if (isFreshIdv) {
+            applyFreshIdvShell();
+        } else if (isActionSign) {
+            applyActionSignShell();
         } else if (isSiteProofIssue) {
             applySiteProofShell();
         } else {
-            applyConsumerShell();
+            applyConsumerShell({ eyebrow: 'Human proof setup' });
         }
 
         function setStatus(message, tone) {
             const el = document.getElementById('status');
             el.textContent = message;
             el.className = 'status ' + (tone || 'info');
+        }
+
+        function renderPopupPreview() {
+            if (!isPreviewMode) return false;
+
+            const copy = consumerCopy();
+            const primary = document.getElementById('primary-btn');
+            const returnBtn = document.getElementById('return-btn');
+            const cancel = document.getElementById('cancel-btn');
+            const previewByType = {
+                ishuman: {
+                    shell: () => applyConsumerShell({
+                        eyebrow: 'Human proof required',
+                        introKey: 'siteProof',
+                    }),
+                    ready: copy.status?.siteProofPending || 'One quick identity check, then we\u2019ll confirm you\u2019re human here.',
+                    working: copy.status?.openingIdv || 'Opening secure identity check\u2026',
+                    success: copy.status?.siteProofSuccess || 'You\u2019re verified for this site.',
+                    primary: copy.primary?.verifyIdentity || 'Verify identity',
+                },
+                passkey: {
+                    shell: () => applyConsumerShell({
+                        eyebrow: 'Continuity proof required',
+                        headline: copy.headlineSiteContinuity || 'Unlock to continue',
+                        documentTitle: copy.documentTitleSiteContinuity,
+                        introKey: 'siteProofPasskey',
+                        useContinuitySteps: true,
+                        hidePrivacy: true,
+                    }),
+                    ready: copy.status?.unlockReady || 'Enter your passkey to unlock.',
+                    working: copy.status?.siteProofIssuing || 'Confirming your proof\u2026',
+                    success: copy.status?.siteProofSuccess || 'You\u2019re verified for this site.',
+                    primary: copy.primary?.unlock || 'Unlock my lemma.id',
+                },
+                fresh_ishuman: {
+                    shell: applyFreshIdvShell,
+                    ready: copy.status?.freshStarting || 'Starting a fresh verification\u2026',
+                    working: copy.status?.openingIdv || 'Opening secure identity check\u2026',
+                    success: copy.status?.freshSuccess || 'You\u2019re verified again.',
+                    primary: copy.primary?.verifyIdentity || 'Verify identity',
+                },
+                action: {
+                    shell: applyActionSignShell,
+                    ready: copy.status?.actionReady || 'Review the request, then confirm with your passkey.',
+                    working: copy.status?.actionSigning || 'Signing this action\u2026',
+                    success: copy.status?.actionSuccess || 'Action confirmed.',
+                    primary: copy.primary?.confirmPasskey || 'Confirm with passkey',
+                },
+                unlock: {
+                    shell: applyUnlockOnlyShell,
+                    ready: copy.status?.unlockReady || 'Enter your passkey to unlock.',
+                    working: copy.status?.unlocking || 'Unlocking with your passkey\u2026',
+                    success: 'Wallet unlocked.',
+                    primary: copy.primary?.unlock || 'Unlock my lemma.id',
+                },
+                passkey_setup: {
+                    shell: applyPasskeySetupShell,
+                    ready: copy.status?.passkeySetupReady || 'Create a passkey on this device.',
+                    working: 'Creating your passkey\u2026',
+                    success: copy.status?.stored || 'You\u2019re all set.',
+                    primary: copy.primary?.create || 'Create my lemma.id',
+                },
+            };
+            const scene = previewByType[previewType] || previewByType.ishuman;
+            scene.shell();
+            document.body.classList.add('popup-preview-mode');
+            root.dataset.previewType = previewType;
+            root.dataset.previewState = previewState;
+            primary.classList.add('hidden');
+            returnBtn.classList.add('hidden');
+            cancel.classList.remove('hidden');
+            cancel.textContent = copy.cancel || 'Not now';
+
+            if (previewState === 'working') {
+                setStatus(scene.working, 'loading');
+                primary.textContent = scene.primary;
+                primary.disabled = true;
+                primary.classList.remove('hidden');
+            } else if (previewState === 'success') {
+                setStatus(scene.success, 'success');
+                cancel.classList.add('hidden');
+                returnBtn.textContent = 'Return to site';
+                returnBtn.classList.remove('hidden');
+            } else if (previewState === 'error') {
+                setStatus(copy.status?.error || 'Something went wrong. Please try again.', 'error');
+                primary.textContent = copy.primary?.tryAgain || 'Try again';
+                primary.classList.remove('hidden');
+            } else {
+                setStatus(scene.ready, 'info');
+                primary.textContent = scene.primary;
+                primary.classList.remove('hidden');
+            }
+
+            document.querySelectorAll('#actions button').forEach((button) => {
+                button.setAttribute('aria-disabled', 'true');
+                button.addEventListener('click', (event) => event.preventDefault());
+            });
+            return true;
         }
 
         function demoHeaders() {
@@ -1928,17 +2073,19 @@
             await startHostedVerification();
         }
 
-        document.getElementById('cancel-btn').addEventListener('click', () => {
-            if (isUnlockOnly) {
-                closeWith('LEMMA_UNLOCK_CANCELLED', { reason: 'user_cancelled' });
-                return;
-            }
-            if (isPasskeySetup) {
-                closeWith('LEMMA_WALLET_SETUP_CANCELLED', { reason: 'user_cancelled' });
-                return;
-            }
-            closeWith('ISHUMAN_IDV_CANCELLED', { reason: 'user_cancelled' });
-        });
+        if (!isPreviewMode) {
+            document.getElementById('cancel-btn').addEventListener('click', () => {
+                if (isUnlockOnly) {
+                    closeWith('LEMMA_UNLOCK_CANCELLED', { reason: 'user_cancelled' });
+                    return;
+                }
+                if (isPasskeySetup) {
+                    closeWith('LEMMA_WALLET_SETUP_CANCELLED', { reason: 'user_cancelled' });
+                    return;
+                }
+                closeWith('ISHUMAN_IDV_CANCELLED', { reason: 'user_cancelled' });
+            });
+        }
 
         async function onPrimaryButtonClick() {
             const btn = document.getElementById('primary-btn');
@@ -1975,14 +2122,17 @@
             }
         }
 
-        document.getElementById('primary-btn').addEventListener('click', (event) => {
-            event.preventDefault();
-            onPrimaryButtonClick();
-        });
-
-        idvLifecycle.init();
+        if (!isPreviewMode) {
+            document.getElementById('primary-btn').addEventListener('click', (event) => {
+                event.preventDefault();
+                onPrimaryButtonClick();
+            });
+            idvLifecycle.init();
+        }
 
         (async function boot() {
+            if (renderPopupPreview()) return;
+
             // A cross-origin IDV round-trip (e.g. Didit) can sever window.opener
             // when the provider redirects the popup back here. In that case we must
             // still finish the in-flight flow (store the master, derive/issue the
@@ -1996,10 +2146,12 @@
             const isMasterCreationFlow = PLATFORM_SITE_IDS.has(requestingSite) && !issueMode;
             const hasFlowContext = isFreshIdv
                 || isSiteProofIssue
+                || isActionSign
                 || isUnlockOnly
                 || isPasskeySetup
                 || isDemoQrFlow
                 || isSameOriginMasterFlow
+                || (flowMode === 'redirect' && !!redirectReturn)
                 || (isVerificationReturn && (sessionId || handoffId || ishumanSessionParam));
 
             if (isDemoQrFlow) {
@@ -2057,11 +2209,7 @@
             }
 
             if (isFreshIdv) {
-                const copy = consumerCopy();
-                const intro = copy.intro?.freshDoubt
-                    ? copy.intro.freshDoubt(requestingSite)
-                    : '';
-                applyConsumerShell({ intro, hideSteps: false });
+                applyFreshIdvShell();
                 // WebAuthn create/get requires a user gesture. Never start a
                 // passkey operation from popup boot: first-time users otherwise
                 // sit at "Unlocking" even though no wallet exists yet.
@@ -2076,7 +2224,7 @@
             }
 
             if (isActionSign) {
-                applySiteProofShell();
+                applyActionSignShell();
                 await prepareActionSignUi();
                 return;
             }

@@ -101,6 +101,13 @@ def test_idv_action_sign_uses_passkey_continuity_unlock():
 
 
 @pytest.mark.unit
+def test_idv_redirect_action_sign_has_flow_context_without_opener():
+    idv = (ROOT / "templates" / "wallet_ishuman_idv.html").read_text(encoding="utf-8")
+    assert "|| isActionSign" in idv
+    assert "(flowMode === 'redirect' && !!redirectReturn)" in idv
+
+
+@pytest.mark.unit
 def test_wallet_popup_redirects_to_unified_idv():
     popup = (ROOT / "templates" / "wallet_popup.html").read_text(encoding="utf-8")
     assert "redirectToUnifiedPopup" in popup
