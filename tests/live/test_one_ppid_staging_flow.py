@@ -20,16 +20,9 @@ from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat 
 
 from api.ishuman import _browser_canonical_message  # noqa: E402
 from api.wallet_keys import b64url_encode, build_wallet_assertion, register_self_signature  # noqa: E402
+from tests.live.live_test_helpers import require_staging_env, wallet_challenge  # noqa: E402
 
 pytestmark = pytest.mark.live
-
-
-def _require_env() -> tuple[str, str]:
-    base = os.getenv("LEMMA_STAGING_BASE_URL")
-    token = os.getenv("LEMMA_STAGING_DEMO_TEST_TOKEN")
-    if not base or not token:
-        pytest.skip("requires LEMMA_STAGING_BASE_URL and LEMMA_STAGING_DEMO_TEST_TOKEN")
-    return base.rstrip("/"), token
 
 
 def _verify_browser_sig(credential: dict) -> None:
@@ -37,10 +30,6 @@ def _verify_browser_sig(credential: dict) -> None:
     sig = bytes.fromhex(credential["proof"]["signatureValueWeb"])
     digest = hashlib.sha256(_browser_canonical_message(credential)).digest()
     Ed25519PublicKey.from_public_bytes(pub).verify(sig, digest)
-
-
-def _challenge(session, base: str, wallet_id: str) -> str:
-    return session.post(f"{base}/api/wallet/challenge", json={"wallet_id": wallet_id}).json()["nonce"]
 
 
 def _derive_passkey_site_proof(session, base: str, wallet_id: str, wallet_secret: str, target_site: str, site_pub_b64: str):
@@ -55,7 +44,7 @@ def _derive_passkey_site_proof(session, base: str, wallet_id: str, wallet_secret
         wallet_secret=wallet_secret,
         field_names=fields,
         field_values=fvals,
-        nonce_b64=_challenge(session, base, wallet_id),
+        nonce_b64=wallet_challenge(session, base, wallet_id),
     )
     return session.post(
         f"{base}/api/ishuman/derive-site-proof",
@@ -68,7 +57,7 @@ def _derive_passkey_site_proof(session, base: str, wallet_id: str, wallet_secret
 
 
 def test_live_staging_passkey_then_ishuman_same_ppid():
-    base, token = _require_env()
+    base, token = require_staging_env()
     wallet_id = "wallet_one_ppid_" + secrets.token_hex(5)
     wallet_secret = "cd" * 32
     target_site = f"one-ppid-e2e-{secrets.token_hex(4)}.example.com"
@@ -101,7 +90,7 @@ def test_live_staging_passkey_then_ishuman_same_ppid():
         wallet_secret=wallet_secret,
         field_names=["return_url"],
         field_values={"return_url": return_url},
-        nonce_b64=_challenge(session, base, wallet_id),
+        nonce_b64=wallet_challenge(session, base, wallet_id),
     )
     idv = session.post(
         f"{base}/api/demo/ishuman/verify-once-test-mode",
@@ -129,7 +118,7 @@ def test_live_staging_passkey_then_ishuman_same_ppid():
         wallet_secret=wallet_secret,
         field_names=fields,
         field_values=fvals,
-        nonce_b64=_challenge(session, base, wallet_id),
+        nonce_b64=wallet_challenge(session, base, wallet_id),
     )
     ishuman_resp = session.post(
         f"{base}/api/ishuman/derive-site-proof",

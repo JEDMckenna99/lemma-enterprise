@@ -6,13 +6,26 @@ on:
     - cron: "30 6 * * *"
 
 jobs:
-  production-smoke:
+  customer-sites:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Customer site smoke
+        run: python scripts/smoke_ishuman_customer_sites.py
+
+  production-enforcement:
     runs-on: ubuntu-latest
     timeout-minutes: 25
+    needs: customer-sites
     env:
       ISHUMAN_LIVE_BASE_URL: ${{ secrets.ISHUMAN_LIVE_BASE_URL || 'https://lemma.id' }}
       LEMMA_BASE_URL: ${{ secrets.ISHUMAN_LIVE_BASE_URL || 'https://lemma.id' }}
-      LEMMA_PPID_ROOT_KEY: ${{ secrets.LEMMA_PPID_ROOT_KEY }}
       LEMMA_ISHUMAN_PROD_TEST_MASTER_CREDENTIAL_ID: ${{ secrets.LEMMA_ISHUMAN_PROD_TEST_MASTER_CREDENTIAL_ID }}
       LEMMA_ISHUMAN_PROD_TEST_SITE_API_KEY: ${{ secrets.LEMMA_ISHUMAN_PROD_TEST_SITE_API_KEY }}
       LEMMA_ISHUMAN_PROD_TEST_SITE_ID: ${{ secrets.LEMMA_ISHUMAN_PROD_TEST_SITE_ID }}
@@ -32,39 +45,31 @@ jobs:
         run: bash scripts/ci_install_test_deps.sh
 
       - name: Verify required production fixture secrets
-        id: fixture
         run: |
           missing=0
           for name in \
-            ISHUMAN_LIVE_BASE_URL \
             LEMMA_ISHUMAN_PROD_TEST_MASTER_CREDENTIAL_ID \
             LEMMA_ISHUMAN_PROD_TEST_SITE_API_KEY \
-            LEMMA_ISHUMAN_PROD_TEST_WALLET_SECRET; do
+            LEMMA_ISHUMAN_PROD_TEST_WALLET_SECRET \
+            LEMMA_ISHUMAN_PROD_TEST_SITE_PPID; do
             if [ -z "${!name}" ]; then
-              echo "::warning::${name} is not configured; skipping strict isHuman production smoke."
+              echo "::error::${name} is required for strict isHuman production smoke."
               missing=1
             fi
           done
-          if [ -z "${LEMMA_ISHUMAN_PROD_TEST_SITE_PPID}" ] && [ -z "${LEMMA_PPID_ROOT_KEY}" ]; then
-            echo "::warning::Set LEMMA_ISHUMAN_PROD_TEST_SITE_PPID or LEMMA_PPID_ROOT_KEY to enable fixture PPID checks."
-            missing=1
-          fi
           if [ "${missing}" -ne 0 ]; then
-            echo "configured=false" >> "${GITHUB_OUTPUT}"
-          else
-            echo "configured=true" >> "${GITHUB_OUTPUT}"
+            exit 1
           fi
 
-      - name: Customer site smoke
-        if: steps.fixture.outputs.configured == 'true'
-        run: python scripts/smoke_ishuman_customer_sites.py
+      - name: Verify production isHuman config safety
+        env:
+          ENVIRONMENT: production
+        run: python scripts/check_ishuman_prod_config.py
 
       - name: Wait for production deploy readiness
-        if: steps.fixture.outputs.configured == 'true'
         run: python scripts/wait_for_deploy_health.py
 
       - name: Prod revocation smoke
-        if: steps.fixture.outputs.configured == 'true'
         run: |
           python scripts/run_ishuman_prod_revocation_smoke.py \
             --base-url "${ISHUMAN_LIVE_BASE_URL:-https://lemma.id}"

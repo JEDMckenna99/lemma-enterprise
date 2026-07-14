@@ -1,7 +1,6 @@
-"""Live Didit sandbox issue-flow (Phase 3.2).
+"""Live Didit issue-flow (Phase 3.2).
 
-Skipped unless live env vars are set AND the target deploy has the Didit rail
-enabled. Drive these against a staging app with:
+Requires live env vars and a target deploy with Didit enabled:
 
     LEMMA_ISHUMAN_DIDIT_ENABLED=true DIDIT_API_KEY=... DIDIT_WORKFLOW_ID=...
 
@@ -16,100 +15,68 @@ import time
 import pytest
 import requests
 
-
-REQUIRED_ENV = ("ISHUMAN_LIVE_BASE_URL", "ISHUMAN_LIVE_WALLET_ID")
-
-
-def _require_live_env() -> tuple[str, str]:
-    missing = [name for name in REQUIRED_ENV if not os.getenv(name)]
-    if missing:
-        pytest.skip(
-            "live_didit tests require env vars: "
-            + ", ".join(REQUIRED_ENV)
-            + ". Missing: "
-            + ", ".join(missing)
-        )
-    return os.environ["ISHUMAN_LIVE_BASE_URL"].rstrip("/"), os.environ["ISHUMAN_LIVE_WALLET_ID"]
-
-
-def _get_json_or_raise(resp: requests.Response) -> dict:
-    try:
-        return resp.json()
-    except Exception as exc:  # pragma: no cover - defensive path for live failures
-        raise AssertionError(f"Expected JSON response, got status={resp.status_code}, body={resp.text}") from exc
+from tests.live.live_test_helpers import (
+    derive_site_proof_with_assertion,
+    get_json_or_raise,
+    live_tests_strict,
+    register_wallet_signing_key,
+    require_live_didit_env,
+    start_didit_verification,
+)
 
 
 @pytest.mark.live_didit
 @pytest.mark.integration
 def test_live_didit_start_routes_to_didit():
     """start-verification with provider=didit returns a didit hosted URL."""
-    base_url, wallet_id = _require_live_env()
-    wallet_secret = os.getenv("ISHUMAN_LIVE_WALLET_SECRET", "")
+    base_url, wallet_id, wallet_secret = require_live_didit_env()
+    session = requests.Session()
+    register_wallet_signing_key(session, base_url, wallet_id, wallet_secret)
 
-    resp = requests.post(
-        f"{base_url}/api/ishuman/start-verification",
-        json={
-            "wallet_id": wallet_id,
-            "wallet_secret": wallet_secret,
-            "return_url": os.getenv("ISHUMAN_LIVE_RETURN_URL", f"{base_url}/app"),
-            "provider": "didit",
-        },
-        timeout=30,
+    data = start_didit_verification(
+        session,
+        base_url=base_url,
+        wallet_id=wallet_id,
+        wallet_secret=wallet_secret,
     )
-    data = _get_json_or_raise(resp)
 
-    if resp.status_code == 400 and data.get("error") == "didit_not_enabled":
-        if os.getenv("ISHUMAN_LIVE_REQUIRE_DIDIT_ENABLED") == "1":
-            pytest.fail("Didit rail is not enabled on the strict live smoke target.")
-        pytest.skip("Didit rail not enabled on the target deploy (set LEMMA_ISHUMAN_DIDIT_ENABLED + keys).")
-
-    assert resp.status_code == 200, data
     assert data.get("success") is True, data
     assert data.get("provider") == "didit", data
     assert data.get("provider_session_id"), data
     assert data.get("url"), data
-    # didit is a hosted redirect; no Stripe client_secret expected.
     assert "client_secret" not in data, data
 
 
 @pytest.mark.live_didit
 @pytest.mark.integration
 def test_live_didit_issues_master_then_derives_site_proof():
-    """Full didit issue flow: poll to verified, then derive a site proof.
-
-    Requires a human (or didit sandbox auto-approve) to complete the hosted
-    flow for the created session. Skips on timeout so CI stays green.
-    """
-    base_url, wallet_id = _require_live_env()
-    wallet_secret = os.getenv("ISHUMAN_LIVE_WALLET_SECRET", "")
-    target_site = os.getenv("ISHUMAN_LIVE_TARGET_SITE", "customer-live.example")
+    """Full didit issue flow: poll to verified, then derive a site proof."""
+    base_url, wallet_id, wallet_secret = require_live_didit_env()
+    target_site = os.getenv("ISHUMAN_LIVE_TARGET_SITE", "tickets-demo.lemma.id")
     timeout_seconds = int(os.getenv("ISHUMAN_LIVE_VERIFY_TIMEOUT_SECONDS", "300"))
     poll_interval_seconds = int(os.getenv("ISHUMAN_LIVE_VERIFY_POLL_SECONDS", "5"))
+    session = requests.Session()
+    register_wallet_signing_key(session, base_url, wallet_id, wallet_secret)
 
-    start_resp = requests.post(
-        f"{base_url}/api/ishuman/start-verification",
-        json={
-            "wallet_id": wallet_id,
-            "wallet_secret": wallet_secret,
-            "return_url": os.getenv("ISHUMAN_LIVE_RETURN_URL", f"{base_url}/app"),
-            "provider": "didit",
-        },
-        timeout=30,
+    start_data = start_didit_verification(
+        session,
+        base_url=base_url,
+        wallet_id=wallet_id,
+        wallet_secret=wallet_secret,
     )
-    start_data = _get_json_or_raise(start_resp)
-    if start_resp.status_code == 400 and start_data.get("error") == "didit_not_enabled":
-        pytest.skip("Didit rail not enabled on the target deploy.")
-    assert start_resp.status_code == 200, start_data
     session_id = start_data["session_id"]
+    didit_url = start_data.get("url")
+    if didit_url:
+        print(f"\nComplete Didit verification at: {didit_url}\n")
 
-    master_credential_id = None
+    master_credential_id = os.getenv("ISHUMAN_LIVE_MASTER_CREDENTIAL_ID", "").strip() or None
     deadline = time.time() + timeout_seconds
-    while time.time() < deadline:
-        status_resp = requests.get(
+    while not master_credential_id and time.time() < deadline:
+        status_resp = session.get(
             f"{base_url}/api/ishuman/verification-status/{session_id}",
             timeout=30,
         )
-        status_data = _get_json_or_raise(status_resp)
+        status_data = get_json_or_raise(status_resp)
         assert status_resp.status_code == 200, status_data
         if status_data.get("status") == "verified" and status_data.get("credential_id"):
             master_credential_id = status_data["credential_id"]
@@ -119,24 +86,25 @@ def test_live_didit_issues_master_then_derives_site_proof():
         time.sleep(poll_interval_seconds)
 
     if not master_credential_id:
-        pytest.skip(
+        message = (
             "Timed out waiting for live didit verification. Complete the didit "
             "hosted flow for the created session, then re-run."
         )
+        if live_tests_strict():
+            pytest.fail(message)
+        pytest.skip(message)
 
-    derive_resp = requests.post(
-        f"{base_url}/api/ishuman/derive-site-proof",
-        json={
-            "master_credential_id": master_credential_id,
-            "wallet_id": wallet_id,
-            "wallet_secret": wallet_secret,
-            "target_site": target_site,
-        },
-        timeout=30,
+    derive_data = derive_site_proof_with_assertion(
+        session,
+        base_url=base_url,
+        wallet_id=wallet_id,
+        wallet_secret=wallet_secret,
+        master_credential_id=master_credential_id,
+        target_site=target_site,
     )
-    derive_data = _get_json_or_raise(derive_resp)
-    assert derive_resp.status_code == 200, derive_data
     assert derive_data.get("success") is True, derive_data
-    claims = derive_data["credential"].get("claims") or derive_data["credential"].get("credentialSubject") or {}
+    claims = derive_data["credential"].get("claims") or derive_data["credential"].get(
+        "credentialSubject"
+    ) or {}
     assert claims.get("isHuman") is True, derive_data
     assert claims.get("siteId") == target_site.lower(), derive_data

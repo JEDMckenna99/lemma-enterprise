@@ -1,0 +1,53 @@
+name: isHuman staging smoke
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "45 6 * * *"
+
+jobs:
+  staging-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      LEMMA_STAGING_BASE_URL: ${{ secrets.LEMMA_STAGING_BASE_URL }}
+      LEMMA_STAGING_DEMO_TEST_TOKEN: ${{ secrets.LEMMA_STAGING_DEMO_TEST_TOKEN }}
+      LEMMA_STAGING_STRICT: "1"
+      LEMMA_LIVE_TESTS_STRICT: "1"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Verify required staging secrets
+        run: |
+          missing=0
+          for name in LEMMA_STAGING_BASE_URL LEMMA_STAGING_DEMO_TEST_TOKEN; do
+            if [ -z "${!name}" ]; then
+              echo "::error::${name} is required for strict staging isHuman smoke."
+              missing=1
+            fi
+          done
+          if [ "${missing}" -ne 0 ]; then
+            exit 1
+          fi
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install test dependencies
+        run: bash scripts/ci_install_test_deps.sh
+
+      - name: Wait for staging deploy readiness
+        env:
+          LEMMA_BASE_URL: ${{ secrets.LEMMA_STAGING_BASE_URL }}
+        run: python scripts/wait_for_deploy_health.py
+
+      - name: Run deterministic staging isHuman flows
+        run: >
+          python -m pytest
+          tests/live/test_ishuman_live_mock_flow.py
+          tests/live/test_one_ppid_staging_flow.py
+          -m live
+          -v

@@ -47,7 +47,6 @@ def main() -> int:
             "pytest",
             "tests",
             "--ignore=tests/live",
-            "--ignore=tests/auth_contract",
             "-q",
         ],
         env=test_env,

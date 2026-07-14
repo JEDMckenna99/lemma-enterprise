@@ -2,64 +2,100 @@ name: ISHUMAN Live Didit
 
 on:
   workflow_dispatch:
+    inputs:
+      run_full_issuance:
+        description: Run full Didit issuance flow (requires human verification)
+        required: false
+        default: false
+        type: boolean
   schedule:
     - cron: "15 5 * * *"
 
 jobs:
-  live-didit:
+  live-didit-routing:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 15
     env:
-      ISHUMAN_LIVE_BASE_URL: ${{ secrets.ISHUMAN_LIVE_BASE_URL }}
-      ISHUMAN_LIVE_WALLET_ID: ${{ secrets.ISHUMAN_LIVE_WALLET_ID }}
-      ISHUMAN_LIVE_WALLET_SECRET: ${{ secrets.ISHUMAN_LIVE_WALLET_SECRET }}
-      ISHUMAN_LIVE_MASTER_CREDENTIAL_ID: ${{ secrets.ISHUMAN_LIVE_MASTER_CREDENTIAL_ID }}
-      ISHUMAN_LIVE_TARGET_SITE: ${{ secrets.ISHUMAN_LIVE_TARGET_SITE }}
+      ISHUMAN_LIVE_BASE_URL: ${{ secrets.ISHUMAN_LIVE_BASE_URL || 'https://lemma.id' }}
+      ISHUMAN_LIVE_WALLET_ID: ${{ secrets.ISHUMAN_LIVE_WALLET_ID || secrets.LEMMA_ISHUMAN_PROD_TEST_WALLET_ID }}
+      ISHUMAN_LIVE_WALLET_SECRET: ${{ secrets.ISHUMAN_LIVE_WALLET_SECRET || secrets.LEMMA_ISHUMAN_PROD_TEST_WALLET_SECRET }}
       ISHUMAN_LIVE_REQUIRE_DIDIT_ENABLED: "1"
-      ISHUMAN_LIVE_VERIFY_TIMEOUT_SECONDS: "420"
-      ISHUMAN_LIVE_VERIFY_POLL_SECONDS: "5"
+      ISHUMAN_LIVE_STRICT: "1"
+      LEMMA_LIVE_TESTS_STRICT: "1"
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
       - name: Verify required live secrets
-        id: fixture
         run: |
           missing=0
-          for name in ISHUMAN_LIVE_BASE_URL ISHUMAN_LIVE_WALLET_ID; do
+          for name in ISHUMAN_LIVE_BASE_URL ISHUMAN_LIVE_WALLET_ID ISHUMAN_LIVE_WALLET_SECRET; do
             if [ -z "${!name}" ]; then
-              echo "::warning::${name} is not configured; skipping strict live Didit routing smoke."
+              echo "::error::${name} is required for strict live Didit routing smoke."
               missing=1
             fi
           done
           if [ "${missing}" -ne 0 ]; then
-            echo "configured=false" >> "${GITHUB_OUTPUT}"
-          else
-            echo "configured=true" >> "${GITHUB_OUTPUT}"
-            echo "Live Didit smoke secrets present."
+            exit 1
           fi
 
       - name: Set up Python
-        if: steps.fixture.outputs.configured == 'true'
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
       - name: Install live test dependencies
-        if: steps.fixture.outputs.configured == 'true'
         run: bash scripts/ci_install_test_deps.sh
 
       - name: Run live Didit routing smoke
-        if: steps.fixture.outputs.configured == 'true'
         run: >
           python -m pytest
           tests/live/test_ishuman_live_didit_issue_flow.py::test_live_didit_start_routes_to_didit
           -m "live_didit"
           -v
 
-      - name: Run full live Didit issue flow (optional human step)
-        if: steps.fixture.outputs.configured == 'true'
-        continue-on-error: true
+  live-didit-full-issuance:
+    if: github.event_name == 'workflow_dispatch' && inputs.run_full_issuance == true
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    needs: live-didit-routing
+    env:
+      ISHUMAN_LIVE_BASE_URL: ${{ secrets.ISHUMAN_LIVE_BASE_URL || 'https://lemma.id' }}
+      ISHUMAN_LIVE_WALLET_ID: ${{ secrets.ISHUMAN_LIVE_WALLET_ID || secrets.LEMMA_ISHUMAN_PROD_TEST_WALLET_ID }}
+      ISHUMAN_LIVE_WALLET_SECRET: ${{ secrets.ISHUMAN_LIVE_WALLET_SECRET || secrets.LEMMA_ISHUMAN_PROD_TEST_WALLET_SECRET }}
+      ISHUMAN_LIVE_TARGET_SITE: ${{ secrets.ISHUMAN_LIVE_TARGET_SITE || secrets.LEMMA_ISHUMAN_PROD_TEST_TARGET_SITE || 'tickets-demo.lemma.id' }}
+      ISHUMAN_LIVE_MASTER_CREDENTIAL_ID: ${{ secrets.ISHUMAN_LIVE_MASTER_CREDENTIAL_ID || secrets.LEMMA_ISHUMAN_PROD_TEST_MASTER_CREDENTIAL_ID }}
+      ISHUMAN_LIVE_REQUIRE_DIDIT_ENABLED: "1"
+      ISHUMAN_LIVE_VERIFY_TIMEOUT_SECONDS: "420"
+      ISHUMAN_LIVE_VERIFY_POLL_SECONDS: "5"
+      ISHUMAN_LIVE_STRICT: "1"
+      LEMMA_LIVE_TESTS_STRICT: "1"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Verify required live secrets
+        run: |
+          missing=0
+          for name in ISHUMAN_LIVE_BASE_URL ISHUMAN_LIVE_WALLET_ID ISHUMAN_LIVE_WALLET_SECRET; do
+            if [ -z "${!name}" ]; then
+              echo "::error::${name} is required for strict live Didit full issuance."
+              missing=1
+            fi
+          done
+          if [ "${missing}" -ne 0 ]; then
+            exit 1
+          fi
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install live test dependencies
+        run: bash scripts/ci_install_test_deps.sh
+
+      - name: Run full live Didit issue flow
         run: >
           python -m pytest
           tests/live/test_ishuman_live_didit_issue_flow.py::test_live_didit_issues_master_then_derives_site_proof

@@ -28,20 +28,18 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import (  # noqa: E402
 )
 from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat  # noqa: E402
 
-from api.wallet_keys import (  # noqa: E402
-    b64url_encode, build_wallet_assertion, register_self_signature,
-)
 from api.ishuman import _browser_canonical_message  # noqa: E402
+from api.wallet_keys import (  # noqa: E402
+    b64url_encode,
+    build_wallet_assertion,
+    register_self_signature,
+)
+from tests.live.live_test_helpers import (  # noqa: E402
+    require_staging_env,
+    wallet_challenge,
+)
 
 pytestmark = pytest.mark.live
-
-
-def _require_env() -> tuple[str, str]:
-    base = os.getenv("LEMMA_STAGING_BASE_URL")
-    token = os.getenv("LEMMA_STAGING_DEMO_TEST_TOKEN")
-    if not base or not token:
-        pytest.skip("requires LEMMA_STAGING_BASE_URL and LEMMA_STAGING_DEMO_TEST_TOKEN")
-    return base.rstrip("/"), token
 
 
 def _verify_browser_sig(credential: dict) -> None:
@@ -51,12 +49,8 @@ def _verify_browser_sig(credential: dict) -> None:
     Ed25519PublicKey.from_public_bytes(pub).verify(sig, digest)
 
 
-def _challenge(s, base, wallet_id) -> str:
-    return s.post(f"{base}/api/wallet/challenge", json={"wallet_id": wallet_id}).json()["nonce"]
-
-
 def test_live_staging_mock_idv_end_to_end():
-    base, token = _require_env()
+    base, token = require_staging_env()
     wallet_id = "wallet_live_e2e_" + secrets.token_hex(5)
     wallet_secret = "ab" * 32
     s = requests.Session()
@@ -72,7 +66,7 @@ def test_live_staging_mock_idv_end_to_end():
     start_assertion = build_wallet_assertion(
         wallet_id=wallet_id, wallet_secret=wallet_secret,
         field_names=["return_url"], field_values={"return_url": return_url},
-        nonce_b64=_challenge(s, base, wallet_id),
+        nonce_b64=wallet_challenge(s, base, wallet_id),
     )
     idv = s.post(f"{base}/api/demo/ishuman/verify-once-test-mode",
                  headers={"X-Demo-Test-Token": token},

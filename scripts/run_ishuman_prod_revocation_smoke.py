@@ -31,7 +31,7 @@ import requests
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from api.bloom_snapshot import verify_bloom_snapshot, verify_snapshot_matches_payload  # noqa: E402
-from api.ppid import canonicalize_rp_id, derive_ppid_from_wallet_secret  # noqa: E402
+from api.ppid import canonicalize_rp_id  # noqa: E402
 from api.wallet_authn import issue_wallet_challenge  # noqa: E402
 from api.wallet_keys import (  # noqa: E402
     build_wallet_assertion,
@@ -135,6 +135,35 @@ def _ensure_wallet_registered(base: str, wallet_id: str, wallet_secret: str) -> 
         raise RuntimeError(f"prod register-signing-key failed: HTTP {r.status_code} {r.text[:200]}")
 
 
+def _resolve_canonical_site_ppid(
+    base: str,
+    *,
+    wallet_id: str,
+    wallet_secret: str,
+    master_id: str,
+    target_site: str,
+) -> str:
+    """Derive the authoritative site PPID for fixture enforcement drills."""
+    _priv, pub = derive_wallet_signing_keypair(wallet_secret)
+    site_signing_pubkey = pubkey_to_b64url(pub)
+    derive_body = {
+        "master_credential_id": master_id,
+        "wallet_id": wallet_id,
+        "target_site": target_site,
+        "site_signing_pubkey": site_signing_pubkey,
+        "issue_mode": "site_proof",
+    }
+    derive_body["wallet_assertion"] = _derive_assertion(base, wallet_id, wallet_secret, derive_body)
+    r = requests.post(f"{base}/api/ishuman/derive-site-proof", json=derive_body, timeout=30)
+    if not r.ok:
+        raise RuntimeError(f"derive-site-proof for canonical PPID failed: HTTP {r.status_code} {r.text[:200]}")
+    cred = r.json().get("credential") or {}
+    subject = (cred.get("subject") or "").strip()
+    if not subject:
+        raise RuntimeError("derive-site-proof returned no credential subject")
+    return subject
+
+
 def _derive_assertion(base: str, wallet_id: str, wallet_secret: str, body: dict) -> dict:
     _ensure_wallet_registered(base, wallet_id, wallet_secret)
     challenge = issue_wallet_challenge(wallet_id=wallet_id)
@@ -145,11 +174,13 @@ def _derive_assertion(base: str, wallet_id: str, wallet_secret: str, body: dict)
     )
     if remote.ok and remote.json().get("nonce"):
         challenge = remote.json()
-    field_names = ["master_credential_id", "target_site", "site_signing_pubkey"]
-    field_values = {
-        key: "" if body.get(key) is None else str(body.get(key, ""))
-        for key in field_names
-    }
+    field_names = ["master_credential_id", "target_site", "site_signing_pubkey", "issue_mode"]
+    field_values = {}
+    for key in field_names:
+        if key == "issue_mode":
+            field_values[key] = str(body.get(key) or "site_proof")
+        else:
+            field_values[key] = "" if body.get(key) is None else str(body.get(key, ""))
     assertion = build_wallet_assertion(
         wallet_id=wallet_id,
         wallet_secret=wallet_secret,
@@ -196,14 +227,50 @@ def main() -> int:
     target_site = canonicalize_rp_id(prod_test_target_site())
     site_ppid = prod_test_site_ppid() or _load_fixture_site_ppid(wallet_id, target_site)
     if not site_ppid:
-        if _load_ppid_root_key():
-            site_ppid = derive_ppid_from_wallet_secret(wallet_secret, target_site)
-        else:
-            print(
-                "WARNING: fixture site PPID unavailable — set LEMMA_ISHUMAN_PROD_TEST_SITE_PPID "
-                "or ensure heroku CLI can query derived_credentials.",
+        raise RuntimeError(
+            "LEMMA_ISHUMAN_PROD_TEST_SITE_PPID is required for strict prod smoke. "
+            "Run scripts/provision_ishuman_prod_test_wallet.py after Didit verification."
+        )
+
+    master_id_hint = args.master_credential_id or prod_test_master_credential_id()
+    if not master_id_hint:
+        proc = _run_heroku(
+            [
+                "heroku",
+                "pg:psql",
+                "-a",
+                "lemma-enterprise",
+                "-t",
+                "-A",
+                "-c",
+                f"SELECT credential_id FROM ishuman_verifications WHERE wallet_id='{wallet_id}' AND status='verified' ORDER BY verified_at DESC LIMIT 1;",
+            ],
+        )
+        for line in proc.stdout.splitlines():
+            if line.startswith("ishuman_master_"):
+                master_id_hint = line.strip()
+                break
+
+    canonical_site_ppid = site_ppid
+    if master_id_hint:
+        try:
+            canonical_site_ppid = _resolve_canonical_site_ppid(
+                base,
+                wallet_id=wallet_id,
+                wallet_secret=wallet_secret,
+                master_id=master_id_hint,
+                target_site=target_site,
             )
-            site_ppid = derive_ppid_from_wallet_secret(wallet_secret, target_site)
+        except RuntimeError as exc:
+            print(f"WARNING: could not resolve canonical site PPID: {exc}", file=sys.stderr)
+    if canonical_site_ppid != site_ppid:
+        print(
+            f"WARNING: configured site PPID differs from canonical derive path "
+            f"({site_ppid[:24]}... vs {canonical_site_ppid[:24]}...); "
+            "using canonical PPID for enforcement drill.",
+            file=sys.stderr,
+        )
+        site_ppid = canonical_site_ppid
 
     api_key = _load_site_api_key(site_id)
     headers = {"X-API-Key": api_key, "Content-Type": "application/json"}
@@ -370,25 +437,7 @@ def main() -> int:
     results.append(_step("site-unblock synthetic", r.ok and r.json().get("success"), str(r.json())))
 
     # Block fixture site PPID and deny derive
-    master_id = args.master_credential_id or prod_test_master_credential_id()
-    if not master_id:
-        # Resolve latest verified master for fixture wallet
-        proc = _run_heroku(
-            [
-                "heroku",
-                "pg:psql",
-                "-a",
-                "lemma-enterprise",
-                "-t",
-                "-A",
-                "-c",
-                f"SELECT credential_id FROM ishuman_verifications WHERE wallet_id='{wallet_id}' AND status='verified' ORDER BY verified_at DESC LIMIT 1;",
-            ],
-        )
-        for line in proc.stdout.splitlines():
-            if line.startswith("ishuman_master_"):
-                master_id = line.strip()
-                break
+    master_id = master_id_hint
 
     r = requests.post(
         f"{base}/api/ishuman/site-block",
@@ -407,6 +456,7 @@ def main() -> int:
             "wallet_id": wallet_id,
             "target_site": target_site,
             "site_signing_pubkey": site_signing_pubkey,
+            "issue_mode": "site_proof",
         }
         derive_body["wallet_assertion"] = _derive_assertion(base, wallet_id, wallet_secret, derive_body)
         r = requests.post(
