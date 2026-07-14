@@ -1057,6 +1057,15 @@ def _generic_index():
       if (reason === 'idv_cancelled') {{
         return 'Complete verification in the Lemma popup to continue.';
       }}
+      if (reason === 'site_proof_required' || reason === 'no_credential' || reason === 'wallet_locked') {{
+        return 'No site proof cached yet — tap the step button to unlock with passkey and issue one.';
+      }}
+      if (reason === 'redirect_started') {{
+        return 'Continuing on lemma.id — you will return here automatically after passkey unlock.';
+      }}
+      if (reason === 'session_bloom_sequence_mismatch') {{
+        return 'Session sync race — retry the step once (revocation list refreshed).';
+      }}
       return reason || 'unknown';
     }}
 
@@ -1815,12 +1824,13 @@ def _presale_index():
     }}
 
     function makeVerifier(requiredAssurance) {{
+      const assurance = requiredAssurance || CLAIM_ASSURANCE;
       if (!sharedVerifier) {{
         sharedVerifier = new IsHumanVerifier({{
           siteId: '{SITE_ID}',
           lemmaOrigin: '{LEMMA_ORIGIN}',
           autoProvision: true,
-          requiredAssurance: requiredAssurance || CLAIM_ASSURANCE,
+          requiredAssurance: assurance,
           debug: true,
           isBlockedLocally: async (ppid) => {{
             const res = await fetch('/api/demo/policy/check?ppid=' + encodeURIComponent(ppid));
@@ -1828,6 +1838,9 @@ def _presale_index():
             return {{ blocked: !!data.blocked, doubt_required: !!data.doubt_required }};
           }},
         }});
+      }} else {{
+        sharedVerifier.requiredAssurance = assurance;
+        sharedVerifier.autoProvision = true;
       }}
       return sharedVerifier;
     }}
@@ -2025,6 +2038,50 @@ def _presale_index():
       return data;
     }}
 
+    function buildStampedFromRedirectSign(payload, signResult, claimAssurance) {{
+      const assertion = signResult.action_assertion || {{}};
+      const credential = signResult.credential || {{}};
+      return {{
+        ...payload,
+        lemma: {{
+          version: 1,
+          verified: true,
+          siteId: SITE_ID,
+          ppid: credential.subject || null,
+          credentialId: credential.id || null,
+          assurance: claimAssurance || CLAIM_ASSURANCE,
+          action: assertion.action,
+          method: assertion.method,
+          path: assertion.path,
+          bodyHash: assertion.body_hash,
+          nonce: assertion.nonce,
+          issuedAtUnix: assertion.issued_at_unix,
+          expiresAtUnix: assertion.expires_at_unix,
+          credential,
+          action_assertion: assertion,
+          action_signature: signResult.action_signature,
+          fresh_passkey_attestation: signResult.fresh_passkey_attestation || null,
+        }},
+      }};
+    }}
+
+    async function postPresaleStamp(path, stamped, serverNonce, context) {{
+      const body = {{ ...stamped, server_nonce: serverNonce }};
+      if (context.phase === 'claim' && context.claimAssurance) {{
+        body.required_assurance = context.claimAssurance;
+      }}
+      const serverRes = await fetch(path, {{
+        method: 'POST',
+        headers: {{ 'Content-Type': 'application/json' }},
+        body: JSON.stringify(body),
+      }});
+      lastStampedRequest = {{ path, body, action: context.action }};
+      const serverEntry = await serverRes.json();
+      await refreshActionLog();
+      renderReceipt(serverEntry, context);
+      return serverEntry;
+    }}
+
     async function runRegister() {{
       if (typeof IsHumanVerifier === 'undefined') return;
       savePresaleSession({{ pendingAction: 'register', contact: contactPayload() }});
@@ -2037,6 +2094,16 @@ def _presale_index():
       try {{
         const payload = contactPayload();
         const challenge = await fetchPresaleChallenge(REGISTER_ACTION, REGISTER_PATH, payload);
+        savePresaleSession({{
+          pendingAction: 'register',
+          contact: payload,
+          pendingChallenge: {{
+            action: REGISTER_ACTION,
+            path: REGISTER_PATH,
+            server_nonce: challenge.server_nonce,
+            payload,
+          }},
+        }});
         const verifier = makeVerifier('passkey');
         const stamped = await verifier.stampAction(payload, {{
           action: REGISTER_ACTION,
@@ -2050,22 +2117,19 @@ def _presale_index():
         renderCryptoEnvelope(stamped);
         const stampMeta = stamped.lemma || {{}};
         if (!stampMeta.verified) {{
+          if (stampMeta.reason === 'redirect_started') {{
+            pill.textContent = 'REDIRECT';
+            pill.className = 'pill checking';
+            decisionCopy.textContent = formatDenyReason('redirect_started');
+            return;
+          }}
           pill.textContent = 'DENY';
           pill.className = 'pill deny';
           decisionCopy.textContent = 'Blocked: ' + (stampMeta.reason || 'not_verified');
           decisionCard.innerHTML = '<strong>Registration blocked</strong><p class="tiny">' + formatDenyReason(stampMeta.reason) + '</p>';
           return;
         }}
-        const serverRes = await fetch(REGISTER_PATH, {{
-          method: 'POST',
-          headers: {{ 'Content-Type': 'application/json' }},
-          body: JSON.stringify({{ ...stamped, server_nonce: challenge.server_nonce }}),
-        }});
-        const requestBody = {{ ...stamped, server_nonce: challenge.server_nonce }};
-        lastStampedRequest = {{ path: REGISTER_PATH, body: requestBody, action: REGISTER_ACTION }};
-        const serverEntry = await serverRes.json();
-        await refreshActionLog();
-        renderReceipt(serverEntry, {{
+        const serverEntry = await postPresaleStamp(REGISTER_PATH, stamped, challenge.server_nonce, {{
           phase: 'register',
           action: REGISTER_ACTION,
           stamped,
@@ -2126,8 +2190,24 @@ def _presale_index():
       try {{
         const verifier = makeVerifier(claimAssurance);
         const payload = contactPayload();
-        const challenge = await fetchPresaleChallenge(CLAIM_ACTION, CLAIM_PATH, payload);
-        const stamped = await verifier.stampAction(payload, {{
+        const saved = loadPresaleSession();
+        let challenge = saved?.pendingChallenge;
+        if (!challenge?.server_nonce || challenge.action !== CLAIM_ACTION) {{
+          const issued = await fetchPresaleChallenge(CLAIM_ACTION, CLAIM_PATH, payload);
+          challenge = {{
+            action: CLAIM_ACTION,
+            path: CLAIM_PATH,
+            server_nonce: issued.server_nonce,
+            payload,
+          }};
+        }}
+        savePresaleSession({{
+          pendingAction: isRetry ? 'retry' : 'claim',
+          contact: payload,
+          claimAssurance,
+          pendingChallenge: challenge,
+        }});
+        const stamped = await verifier.stampAction(challenge.payload || payload, {{
           action: CLAIM_ACTION,
           method: 'POST',
           path: CLAIM_PATH,
@@ -2141,6 +2221,12 @@ def _presale_index():
         renderCryptoEnvelope(stamped);
         const stampMeta = stamped.lemma || {{}};
         if (!stampMeta.verified) {{
+          if (stampMeta.reason === 'redirect_started') {{
+            pill.textContent = 'REDIRECT';
+            pill.className = 'pill checking';
+            decisionCopy.textContent = formatDenyReason('redirect_started');
+            return;
+          }}
           pill.textContent = 'DENY';
           pill.className = 'pill deny';
           const reason = stampMeta.reason || 'not_verified';
@@ -2149,18 +2235,10 @@ def _presale_index():
           if (codeDisplay) codeDisplay.hidden = true;
           return;
         }}
-        const serverRes = await fetch(CLAIM_PATH, {{
-          method: 'POST',
-          headers: {{ 'Content-Type': 'application/json' }},
-          body: JSON.stringify({{ ...stamped, required_assurance: claimAssurance, server_nonce: challenge.server_nonce }}),
-        }});
-        const requestBody = {{ ...stamped, required_assurance: claimAssurance, server_nonce: challenge.server_nonce }};
-        lastStampedRequest = {{ path: CLAIM_PATH, body: requestBody, action: CLAIM_ACTION }};
-        const serverEntry = await serverRes.json();
-        await refreshActionLog();
-        renderReceipt(serverEntry, {{
+        const serverEntry = await postPresaleStamp(CLAIM_PATH, stamped, challenge.server_nonce, {{
           phase: 'claim',
           action: CLAIM_ACTION,
+          claimAssurance,
           stamped,
           serverNonce: challenge.server_nonce,
           requireFreshPasskey: true,
@@ -2312,7 +2390,57 @@ def _presale_index():
       if (params.get('lemma_ishuman_return') !== '1') return;
       const saved = loadPresaleSession();
       const pending = saved?.pendingAction;
+      if (!pending) {{
+        decisionCopy.textContent = 'Returned from lemma.id — tap the presale step to continue.';
+        return;
+      }}
       decisionCard.innerHTML = '<strong>Resuming after passkey unlock</strong><p class="tiny">Finishing the presale step you started before returning from lemma.id.</p>';
+      const redirectKind = (params.get('redirect_kind') || 'site_proof').trim().toLowerCase();
+      if (redirectKind === 'action_sign' && saved?.pendingChallenge) {{
+        const verifier = makeVerifier(saved.claimAssurance || CLAIM_ASSURANCE);
+        const claimed = await verifier.claimRedirectActionSign();
+        if (claimed?.ok && claimed.signResult) {{
+          const stamped = buildStampedFromRedirectSign(
+            saved.pendingChallenge.payload || contactPayload(),
+            claimed.signResult,
+            saved.claimAssurance || CLAIM_ASSURANCE,
+          );
+          renderCryptoEnvelope(stamped);
+          const path = saved.pendingChallenge.path || CLAIM_PATH;
+          const serverEntry = await postPresaleStamp(path, stamped, saved.pendingChallenge.server_nonce, {{
+            phase: pending === 'register' ? 'register' : 'claim',
+            action: saved.pendingChallenge.action || CLAIM_ACTION,
+            claimAssurance: saved.claimAssurance || CLAIM_ASSURANCE,
+            stamped,
+            serverNonce: saved.pendingChallenge.server_nonce,
+            requireFreshPasskey: path === CLAIM_PATH,
+          }});
+          if (serverEntry.success && serverEntry.code) {{
+            savePresaleSession({{ pendingAction: null, pendingChallenge: null }});
+            pill.textContent = 'CODE ISSUED';
+            pill.className = 'pill ok';
+            if (codeDisplay) {{
+              codeDisplay.hidden = false;
+              codeDisplay.textContent = serverEntry.code;
+            }}
+            decisionCopy.textContent = 'Code ' + serverEntry.code + ' issued after redirect return.';
+            setStepState(true);
+            return;
+          }}
+          if (serverEntry.success && path === REGISTER_PATH) {{
+            savePresaleSession({{ pendingAction: null, pendingChallenge: null }});
+            setStepState(true);
+            pill.textContent = 'REGISTERED';
+            pill.className = 'pill ok';
+            decisionCopy.textContent = 'Registered after redirect return.';
+            return;
+          }}
+          pill.textContent = 'DENY';
+          pill.className = 'pill deny';
+          decisionCopy.textContent = 'Blocked: ' + (serverEntry.reason || 'denied');
+          return;
+        }}
+      }}
       if (pending === 'claim') {{
         await runClaim();
       }} else if (pending === 'retry') {{

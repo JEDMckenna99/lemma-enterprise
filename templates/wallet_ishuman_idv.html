@@ -176,7 +176,7 @@
     <script src="/static/js/lemma-keys.js?v=8" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
     <script src="/static/js/wallet-at-rest-crypto.js?v=2" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
     <script nonce="{{ csp_nonce }}">window.LEMMA_ISHUMAN_USE_PERSON_ROOT_SEEDS = {{ 'true' if ishuman_use_person_root_seeds else 'false' }};</script>
-    <script src="/sdk/lemma-wallet.js?v=2680" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
+    <script src="/sdk/lemma-wallet.js?v=2681" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
     <script src="/static/js/qrcode.min.js" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
     <script nonce="{{ csp_nonce }}">
         const SESSION_KEY = 'ishuman_idv_popup_session_id';
@@ -485,6 +485,39 @@
             return true;
         }
 
+        async function redirectBackWithActionSign(detail) {
+            if (!redirectReturn || !detail?.request_nonce) return false;
+            const walletAssertion = await wallet.buildWalletAssertion(
+                ['request_nonce', 'site_id'],
+                {
+                    request_nonce: detail.request_nonce,
+                    site_id: requestingSite,
+                },
+            );
+            await requestJson('/api/ishuman/action-sign-redirect/deposit', {
+                method: 'POST',
+                body: JSON.stringify({
+                    wallet_id: walletId,
+                    wallet_assertion: walletAssertion,
+                    request_nonce: detail.request_nonce,
+                    site_id: requestingSite,
+                    sign_result: {
+                        credential: detail.credential || null,
+                        action_assertion: detail.action_assertion || null,
+                        action_signature: detail.action_signature || null,
+                        fresh_passkey_attestation: detail.fresh_passkey_attestation || null,
+                        request_nonce: detail.request_nonce,
+                    },
+                }),
+            });
+            const returnUrl = new URL(redirectReturn);
+            returnUrl.searchParams.set('lemma_ishuman_return', '1');
+            returnUrl.searchParams.set('request_nonce', detail.request_nonce);
+            returnUrl.searchParams.set('redirect_kind', 'action_sign');
+            window.location.replace(returnUrl.toString());
+            return true;
+        }
+
         async function returnToRequestingSite(type, detail) {
             if (type === 'ISHUMAN_SITE_PROOF_ISSUED' && await redirectBackWithSiteProof(detail || {})) {
                 return;
@@ -675,6 +708,17 @@
                         return;
                     } catch (err) {
                         console.error('[isHuman IDV] redirect return deposit failed:', err);
+                        setStatus(err.message || consumerCopy().status?.returnFailed || 'Couldn\u2019t return to the site. Try again.', 'error');
+                        showReturnButton(type, detail);
+                        return;
+                    }
+                }
+                if (type === 'ISHUMAN_ACTION_SIGNED' && detail?.request_nonce) {
+                    try {
+                        await redirectBackWithActionSign(detail);
+                        return;
+                    } catch (err) {
+                        console.error('[isHuman IDV] action-sign redirect deposit failed:', err);
                         setStatus(err.message || consumerCopy().status?.returnFailed || 'Couldn\u2019t return to the site. Try again.', 'error');
                         showReturnButton(type, detail);
                         return;

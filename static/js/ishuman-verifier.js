@@ -921,7 +921,8 @@ class IsHumanVerifier {
                 this._markProvisionedMaster();
                 result = await this._applyIssuedSiteProof(issued.detail, t0);
                 if (!result.human) {
-                    result = await this._verifyOnce(t0);
+                    // Keep the concrete apply failure (e.g. session_bloom_sequence_mismatch)
+                    // instead of masking it as site_proof_required on a cache miss.
                 }
             } else if (issued.reason === 'popup_closed' && !options._retriedAfterPopupClose) {
                 result = await this._verifyOnce(t0);
@@ -1366,6 +1367,10 @@ class IsHumanVerifier {
         if (typeof window === 'undefined') return null;
         const params = new URLSearchParams(window.location.search);
         if (params.get('lemma_ishuman_return') !== '1') return null;
+        const redirectKind = (params.get('redirect_kind') || 'site_proof').trim().toLowerCase();
+        if (redirectKind === 'action_sign') {
+            return null;
+        }
         const requestNonce = (params.get('request_nonce') || '').trim();
         if (!requestNonce) {
             return this._result(false, null, 'redirect_return_missing_nonce', t0);
@@ -1399,6 +1404,44 @@ class IsHumanVerifier {
             }, t0);
         } catch (err) {
             return this._result(false, null, 'redirect_return_failed', t0, err);
+        }
+    }
+
+    /**
+     * Claim a redirect-deposited action-sign bundle after mobile/same-tab return.
+     * Cleans redirect query params from the URL on success.
+     */
+    async claimRedirectActionSign() {
+        if (typeof window === 'undefined') return null;
+        const params = new URLSearchParams(window.location.search);
+        if (params.get('lemma_ishuman_return') !== '1') return null;
+        if ((params.get('redirect_kind') || '').trim().toLowerCase() !== 'action_sign') return null;
+        const requestNonce = (params.get('request_nonce') || '').trim();
+        if (!requestNonce) return null;
+
+        try {
+            const res = await fetch(`${this.lemmaOrigin}/api/ishuman/action-sign-redirect/claim`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'omit',
+                body: JSON.stringify({ request_nonce: requestNonce }),
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok || !data.success) {
+                return { ok: false, reason: data.error || 'redirect_action_sign_not_found' };
+            }
+
+            params.delete('lemma_ishuman_return');
+            params.delete('request_nonce');
+            params.delete('redirect_kind');
+            const cleanQuery = params.toString();
+            const cleanUrl = `${window.location.pathname}${cleanQuery ? `?${cleanQuery}` : ''}${window.location.hash || ''}`;
+            window.history.replaceState({}, '', cleanUrl);
+
+            const signResult = data.sign_result || {};
+            return { ok: true, signResult, siteId: data.site_id || this.siteId };
+        } catch (err) {
+            return { ok: false, reason: 'redirect_action_sign_failed', error: err };
         }
     }
 

@@ -3152,6 +3152,10 @@ def _site_proof_redirect_key(request_nonce: str) -> str:
     return f"ishuman:site-proof-redirect:{request_nonce}"
 
 
+def _action_sign_redirect_key(request_nonce: str) -> str:
+    return f"ishuman:action-sign-redirect:{request_nonce}"
+
+
 @ishuman_bp.route("/api/ishuman/site-proof-redirect/deposit", methods=["POST"])
 @cross_origin()
 def site_proof_redirect_deposit():
@@ -3223,6 +3227,71 @@ def site_proof_redirect_claim():
         "session_assertion": entry.get("session_assertion"),
         "session_signature": entry.get("session_signature"),
         "session_nonce": entry.get("session_nonce"),
+    })
+
+
+@ishuman_bp.route("/api/ishuman/action-sign-redirect/deposit", methods=["POST"])
+@cross_origin()
+def action_sign_redirect_deposit():
+    """Store an action-sign bundle for same-tab mobile redirect return."""
+    from auth.redis_store import store as redis_store
+
+    body = request.get_json(silent=True) or {}
+    request_nonce = (body.get("request_nonce") or "").strip()
+    site_id = (body.get("site_id") or "").strip()
+    wallet_id = (body.get("wallet_id") or "").strip()
+    sign_result = body.get("sign_result")
+
+    if not request_nonce or len(request_nonce) < 8:
+        return jsonify({"success": False, "error": "request_nonce required"}), 400
+    if not site_id or not wallet_id or not isinstance(sign_result, dict):
+        return jsonify({"success": False, "error": "missing_action_sign_fields"}), 400
+    if not sign_result.get("action_assertion") or not sign_result.get("action_signature"):
+        return jsonify({"success": False, "error": "action_sign_incomplete"}), 400
+
+    body["request_nonce"] = request_nonce
+    body["site_id"] = site_id
+    err, _wid = _require_wallet_assertion(
+        body,
+        field_names=["request_nonce", "site_id"],
+    )
+    if err:
+        return err
+
+    redis_store(
+        _action_sign_redirect_key(request_nonce),
+        {
+            "site_id": site_id,
+            "wallet_id": wallet_id,
+            "sign_result": sign_result,
+        },
+        ttl_seconds=_SITE_PROOF_REDIRECT_TTL_SECONDS,
+    )
+    return jsonify({"success": True, "expires_in": _SITE_PROOF_REDIRECT_TTL_SECONDS})
+
+
+@ishuman_bp.route("/api/ishuman/action-sign-redirect/claim", methods=["POST"])
+@cross_origin()
+def action_sign_redirect_claim():
+    """One-time claim of a redirect-deposited action-sign bundle."""
+    from auth.redis_store import delete as redis_delete
+    from auth.redis_store import get as redis_get
+
+    body = request.get_json(silent=True) or {}
+    request_nonce = (body.get("request_nonce") or "").strip()
+    if not request_nonce:
+        return jsonify({"success": False, "error": "request_nonce required"}), 400
+
+    entry = redis_get(_action_sign_redirect_key(request_nonce))
+    if not entry:
+        return jsonify({"success": False, "error": "redirect_action_sign_not_found"}), 404
+    if not redis_delete(_action_sign_redirect_key(request_nonce)):
+        return jsonify({"success": False, "error": "redirect_action_sign_already_claimed"}), 409
+
+    return jsonify({
+        "success": True,
+        "site_id": entry.get("site_id"),
+        "sign_result": entry.get("sign_result"),
     })
 
 
