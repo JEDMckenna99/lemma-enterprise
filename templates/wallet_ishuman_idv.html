@@ -176,7 +176,7 @@
     <script src="/static/js/lemma-keys.js?v=8" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
     <script src="/static/js/wallet-at-rest-crypto.js?v=2" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
     <script nonce="{{ csp_nonce }}">window.LEMMA_ISHUMAN_USE_PERSON_ROOT_SEEDS = {{ 'true' if ishuman_use_person_root_seeds else 'false' }};</script>
-    <script src="/sdk/lemma-wallet.js?v=2677" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
+    <script src="/sdk/lemma-wallet.js?v=2678" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
     <script src="/static/js/qrcode.min.js" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
     <script nonce="{{ csp_nonce }}">
         const SESSION_KEY = 'ishuman_idv_popup_session_id';
@@ -1676,10 +1676,18 @@
             return withIdvBusy(async () => {
                 setStatus('Signing action…', 'loading');
                 await ensureWalletReadyForSiteProof();
-                const credential = await wallet.deriveAndStoreSiteProof(requestingSite, {
-                    issueMode: 'site_proof',
-                    forceServerDerive: false,
-                });
+                const canonicalSite = wallet._canonicalizeSiteDomainForProof
+                    ? wallet._canonicalizeSiteDomainForProof(requestingSite)
+                    : requestingSite;
+                let credential = await wallet.findIsHumanSiteCredential(canonicalSite);
+                if (!credential || !wallet._siteCredentialLocallyVerifiable(credential)) {
+                    credential = await wallet.deriveAndStoreSiteProof(requestingSite, {
+                        issueMode: 'site_proof',
+                        forceServerDerive: false,
+                        skipIssuanceReady: true,
+                        isHumanIssuance: false,
+                    });
+                }
                 const signed = await wallet.signSiteActionPresentation({
                     credential,
                     siteId: requestingSite,
@@ -1692,6 +1700,7 @@
                     requireFreshPasskey,
                     serverNonce,
                     actionCommitment,
+                    skipFreshPasskeyPreflight: true,
                 });
                 setStatus('Action signed.', 'success');
                 setTimeout(() => closeWith('ISHUMAN_ACTION_SIGNED', {
@@ -1700,6 +1709,37 @@
                 }), 300);
                 return true;
             });
+        }
+
+        async function prepareActionSignUi() {
+            const btn = document.getElementById('primary-btn');
+            document.getElementById('cancel-btn').textContent = consumerCopy().primary?.cancel || 'Cancel';
+            warmWalletInit();
+            try {
+                await ensureWalletInitialized();
+                if (wallet.isIsHumanLockValid && wallet.isIsHumanLockValid()) {
+                    await wallet._restoreIsHumanLockBundleIfValid();
+                }
+                if (!requireFreshPasskey) {
+                    btn.classList.add('hidden');
+                    await runActionSignAndClose();
+                    return;
+                }
+            } catch (err) {
+                console.warn('[isHuman IDV] action sign auto-issue skipped:', err?.message || err);
+            }
+
+            btn.textContent = requireFreshPasskey
+                ? (consumerCopy().primary?.confirmPasskey || 'Confirm with passkey')
+                : (consumerCopy().primary?.signAction || 'Sign action');
+            btn.disabled = false;
+            btn.classList.remove('hidden');
+            setStatus(
+                requireFreshPasskey
+                    ? 'Tap confirm — Face ID / Touch ID / Windows Hello unlocks this action.'
+                    : 'Tap to sign this action.',
+                'info',
+            );
         }
 
         async function runFreshIdvAndClose() {
@@ -1862,6 +1902,10 @@
                     });
                     return;
                 }
+                if (isActionSign) {
+                    await runActionSignAndClose();
+                    return;
+                }
                 await runVerification();
             } catch (err) {
                 console.error('[isHuman IDV] primary action failed:', err);
@@ -1979,7 +2023,7 @@
 
             if (isActionSign) {
                 applySiteProofShell();
-                await runActionSignAndClose();
+                await prepareActionSignUi();
                 return;
             }
 

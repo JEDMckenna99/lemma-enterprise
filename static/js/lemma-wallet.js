@@ -3577,7 +3577,11 @@ class LemmaWallet {
     }
 
     async deriveAndStoreSiteProof(targetSite, options = {}) {
-        await this.ensureIsHumanIssuanceReady({ isHumanIssuance: true });
+        if (!options.skipIssuanceReady) {
+            await this.ensureIsHumanIssuanceReady({
+                isHumanIssuance: options.isHumanIssuance !== false,
+            });
+        }
         await this.reconcileSessionWalletIdForIssuance();
         const canonicalSite = this._canonicalizeSiteDomainForProof(targetSite);
         const issueMode = (options.issueMode || 'site_proof').trim().toLowerCase();
@@ -3795,6 +3799,7 @@ class LemmaWallet {
         requireFreshPasskey = false,
         serverNonce = '',
         actionCommitment = '',
+        skipFreshPasskeyPreflight = false,
     }) {
         const ACTION_PRESENTATION_PREFIX = 'lemma:site-action-presentation:v1';
         const ACTION_STAMP_VERSION = 'action_stamp_v1';
@@ -3868,6 +3873,7 @@ class LemmaWallet {
                     path,
                     bodyHash: resolvedBodyHash,
                 }),
+                skipLocalPreflight: skipFreshPasskeyPreflight,
             });
         }
         return {
@@ -3904,9 +3910,12 @@ class LemmaWallet {
         siteId,
         credential,
         actionCommitment,
+        skipLocalPreflight = false,
     }) {
         await this.init();
-        await this._requireFreshPasskeyAuth({ reason: 'Confirm this action' });
+        if (!skipLocalPreflight) {
+            await this._requireFreshPasskeyAuth({ reason: 'Confirm this action' });
+        }
         const passkey = await this._get('passkey', 'primary');
         const walletIdRecord = await this._get('passkey', 'walletId');
         const walletId = walletIdRecord?.value || this.session?.walletId || '';

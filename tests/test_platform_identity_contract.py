@@ -95,8 +95,9 @@ def test_idv_popup_supports_unlock_mode():
 @pytest.mark.unit
 def test_idv_action_sign_uses_passkey_continuity_unlock():
     idv = (ROOT / "templates" / "wallet_ishuman_idv.html").read_text(encoding="utf-8")
-    assert "isActionSign || isActionSign" not in idv
     assert "(isSiteProofIssue || isActionSign) && !isFreshIdv" in idv
+    assert "prepareActionSignUi" in idv
+    assert "skipFreshPasskeyPreflight: true" in idv
 
 
 @pytest.mark.unit
