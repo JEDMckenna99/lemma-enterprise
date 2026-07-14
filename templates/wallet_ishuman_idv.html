@@ -245,7 +245,9 @@
         const passkeyAssuranceEnabled = root.dataset.passkeyAssuranceEnabled === 'true';
 
         function siteProofUsesContinuityOnly() {
-            return isSiteProofIssue && !isFreshIdv;
+            // action_sign (Step 2 fresh-passkey stamp) needs the same passkey-only
+            // unlock path as site_proof continuity — not full master IDV issuance.
+            return (isSiteProofIssue || isActionSign) && !isFreshIdv;
         }
 
         function consumerCopy() {
