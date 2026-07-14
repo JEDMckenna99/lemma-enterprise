@@ -3927,7 +3927,7 @@ class LemmaWallet {
 
         const beginRes = await fetch('/api/ishuman/fresh-passkey/begin', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: this._getSecureHeaders(),
             credentials: 'include',
             body: JSON.stringify({
                 site_id: siteId,
@@ -3961,7 +3961,7 @@ class LemmaWallet {
 
         const completeRes = await fetch('/api/ishuman/fresh-passkey/complete', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: this._getSecureHeaders(),
             credentials: 'include',
             body: JSON.stringify({
                 challenge_key: beginData.challenge_key,

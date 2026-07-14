@@ -97,8 +97,12 @@ def test_lemma_wallet_secure_headers_cover_server_csrf_cookie(wallet_js_source):
     # Critical isHuman mutations must send CSRF headers.
     derive_idx = wallet_js_source.index("/api/ishuman/derive-site-proof")
     seed_idx = wallet_js_source.index("/api/ishuman/seed-envelope")
+    fresh_begin_idx = wallet_js_source.index("/api/ishuman/fresh-passkey/begin")
+    fresh_complete_idx = wallet_js_source.index("/api/ishuman/fresh-passkey/complete")
     assert "this._getSecureHeaders()" in wallet_js_source[derive_idx - 200:derive_idx + 200]
     assert "this._getSecureHeaders()" in wallet_js_source[seed_idx - 200:seed_idx + 200]
+    assert "this._getSecureHeaders()" in wallet_js_source[fresh_begin_idx - 200:fresh_begin_idx + 200]
+    assert "this._getSecureHeaders()" in wallet_js_source[fresh_complete_idx - 200:fresh_complete_idx + 200]
 
 
 @pytest.mark.unit
