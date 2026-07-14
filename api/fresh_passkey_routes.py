@@ -35,6 +35,7 @@ def fresh_passkey_begin():
     site_id = (body.get("site_id") or "").strip()
     action_commitment = (body.get("action_commitment") or "").strip().lower()
     credential_id = (body.get("credential_id") or "").strip()
+    passkey_credential_id = (body.get("passkey_credential_id") or "").strip()
     subject = (body.get("subject") or "").strip()
     wallet_id = (body.get("wallet_id") or "").strip()
 
@@ -42,6 +43,8 @@ def fresh_passkey_begin():
         return jsonify({"success": False, "error": "site_id and action_commitment required"}), 400
     if not credential_id or not subject:
         return jsonify({"success": False, "error": "credential_id and subject required"}), 400
+    if not passkey_credential_id:
+        return jsonify({"success": False, "error": "passkey_credential_id required"}), 400
 
     challenge = secrets.token_bytes(32)
     challenge_key = f"fpa_{secrets.token_urlsafe(16)}"
@@ -53,6 +56,7 @@ def fresh_passkey_begin():
             "site_id": site_id,
             "action_commitment": action_commitment,
             "credential_id": credential_id,
+            "passkey_credential_id": passkey_credential_id,
             "subject": subject,
             "wallet_id": wallet_id,
             "expires": expires,
@@ -91,8 +95,10 @@ def fresh_passkey_complete():
             return jsonify({"success": False, "error": "challenge_expired"}), 401
 
     credential_id_b64 = str(credential.get("id") or "").strip()
-    expected_credential_id = str(stored.get("credential_id") or "").strip()
-    if not credential_id_b64 or credential_id_b64 != expected_credential_id:
+    expected_passkey_credential_id = str(
+        stored.get("passkey_credential_id") or stored.get("credential_id") or ""
+    ).strip()
+    if not credential_id_b64 or credential_id_b64 != expected_passkey_credential_id:
         return jsonify({"success": False, "error": "credential_id_mismatch"}), 403
 
     public_key_b64, sign_count = lookup_wallet_passkey_public_key(credential_id_b64)

@@ -3920,8 +3920,9 @@ class LemmaWallet {
         const walletIdRecord = await this._get('passkey', 'walletId');
         const walletId = walletIdRecord?.value || this.session?.walletId || '';
         const credentialId = credential?.id || '';
+        const passkeyCredentialId = passkey?.credentialId || '';
         const subject = credential?.subject || '';
-        if (!siteId || !actionCommitment || !credentialId || !subject) {
+        if (!siteId || !actionCommitment || !credentialId || !subject || !passkeyCredentialId) {
             throw new Error('fresh_passkey_inputs_missing');
         }
 
@@ -3933,6 +3934,7 @@ class LemmaWallet {
                 site_id: siteId,
                 action_commitment: actionCommitment,
                 credential_id: credentialId,
+                passkey_credential_id: passkeyCredentialId,
                 subject,
                 wallet_id: walletId,
             }),
