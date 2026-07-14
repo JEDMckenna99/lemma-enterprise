@@ -700,7 +700,8 @@ class IsHumanVerifier {
      * @param {string}  [config.idvPopupPath] — override popup path (default /wallet/ishuman-idv).
      */
     constructor(config = {}) {
-        this.siteId = config.siteId || window.location.hostname;
+        const rawSiteId = config.siteId || (typeof window !== 'undefined' ? window.location.hostname : '');
+        this.siteId = this._canonicalizeSiteId(rawSiteId);
         this.lemmaOrigin = config.lemmaOrigin || LEMMA_ORIGIN;
         this.debug = !!config.debug;
         this.isBlockedLocally = config.isBlockedLocally || null;
@@ -770,6 +771,17 @@ class IsHumanVerifier {
         return host.split('/')[0].split(':')[0].replace(/^www\./, '').trim();
     }
 
+    _canonicalizeSiteId(siteId) {
+        const raw = String(siteId || '').trim();
+        if (!raw) throw new Error('siteId required');
+        if (raw.toLowerCase().startsWith('site_')) {
+            throw new Error('internal_site_id_not_allowed');
+        }
+        const host = this._canonicalizeSiteDomain(raw);
+        if (!host || host === 'unknown') throw new Error('invalid_hostname');
+        return host;
+    }
+
     _warnSiteIdHostnameMismatch() {
         try {
             if (typeof window === 'undefined' || !window.location?.hostname) return;
@@ -792,16 +804,15 @@ class IsHumanVerifier {
             this._blockChannel = new BroadcastChannel('lemma-ishuman-blocks');
             this._blockChannel.onmessage = (event) => {
                 const data = event.data || {};
-                if (data.type !== 'SITE_BLOCK_UPDATE' && data.type !== 'NETWORK_REVOCATION') return;
+                if (data.type !== 'SITE_BLOCK_UPDATE' && data.type !== 'REVOCATION_SNAPSHOT_UPDATE') return;
                 if (data.siteId && data.siteId !== this.siteId) return;
                 if (this.debug) {
                     console.log('[isHuman] block broadcast received:', data);
                 }
                 this._clearSessionCache();
-                if (data.type === 'NETWORK_REVOCATION') {
-                    // Refresh the Bloom snapshot in the background; the next
-                    // verify() will rebuild the trust state from the fresh
-                    // snapshot rather than the cached one.
+                if (data.type === 'REVOCATION_SNAPSHOT_UPDATE') {
+                    // Refresh the signed revocation snapshot in the background;
+                    // the next verify() rebuilds trust state from the fresh copy.
                     this._bloomTrusted = false;
                     this._bloomSnapshot = null;
                     this._bloomFilter = new Set();
@@ -812,7 +823,7 @@ class IsHumanVerifier {
     }
 
     /**
-     * Broadcast a site-block or network-revocation event so other tabs on
+     * Broadcast a site-block or revocation-snapshot event so other tabs on
      * the same origin (using the same SDK) invalidate their cached sessions.
      * Sites can call this after triggering a block via their backend.
      */
@@ -891,7 +902,6 @@ class IsHumanVerifier {
             'legacy_credential_format',
             // Stale cached credentials after issuer rotation — re-issue via popup.
             'untrusted_issuer',
-            'invalid_signature',
             // Monthly site VC expiry: renew via daily-unlock popup (passkey only
             // when the lock bundle is missing or stale).
             'expired',
@@ -1634,7 +1644,7 @@ class IsHumanVerifier {
             }
             return { blocked: !!decision, doubtRequired: false };
         } catch {
-            return { blocked: false, doubtRequired: false };
+            return { blocked: true, doubtRequired: false };
         }
     }
 

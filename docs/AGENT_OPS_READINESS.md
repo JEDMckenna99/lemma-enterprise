@@ -8,6 +8,29 @@ This document is a build-and-test tracker: each item should have an owner, statu
 
 ---
 
+## Scope note (2026-07-14)
+
+This tracker covers **Agent Ops / proof-first authorization** only. It is
+**not** the lemma.id GA launch gate sheet — see
+[`docs/status/GA_GATE_STATUS.md`](status/GA_GATE_STATUS.md) for wallet/isHuman
+P0 gates.
+
+**Deploy gate of record for production pushes:** [`.github/workflows/auth-launch-gate.yml`](../.github/workflows/auth-launch-gate.yml)
+(CSP pytest → auth scope matrix → deploy health → strict post-deploy launch gate
+with `LEMMA_PLATFORM_API_KEY`). Agent Ops acceptance tests in this doc
+supplement, but do not replace, that workflow.
+
+Reconciled conflicts:
+
+| Topic | Agent Ops stance | GA / isHuman stance |
+| ----- | ---------------- | ------------------- |
+| Deploy verification | `run_agent_ops_e2e.ps1`, pilot release gates | `auth-launch-gate.yml` on every `main` push |
+| Proof enforcement rollout | `LEMMA_ENFORCE_PROOF_REQUIRED=0` default; shadow via `LEMMA_AUTHZ_PROOF_SHADOW=1` | Enable hard enforcement after client proof headers ship |
+| IDV / demo scope | Out of scope here | Didit default at `/demo`; Stripe legacy only |
+| Network revocation | Agent proof revocation via control plane | isHuman network-revoke retired (HTTP 410); site-block only |
+
+---
+
 ## Product Direction (UX)
 
 Move AIM under the Developer Platform and treat Agent Ops as the primary workflow.

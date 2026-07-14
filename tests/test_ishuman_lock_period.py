@@ -91,6 +91,7 @@ def test_verifier_requires_explicit_fresh_idv_for_doubt(verifier_source):
     """Site bans fail closed; revocation recovery and explicit doubt select fresh IDV."""
     popup_reasons = verifier_source.split("const popupReasons = new Set([", 1)[1].split("]);", 1)[0]
     assert "'revoked'," in popup_reasons
+    assert "'invalid_signature'," not in popup_reasons
     assert "'site_blocked'," not in popup_reasons
     assert "'expired'," in verifier_source
     assert "const needsFreshIdv = result.reason === 'revoked';" in verifier_source
@@ -108,6 +109,13 @@ def test_verifier_broadcasts_site_block_updates_cross_tab(verifier_source):
     assert "BroadcastChannel" in verifier_source
     assert "broadcastBlockUpdate" in verifier_source
     assert "SITE_BLOCK_UPDATE" in verifier_source
+    assert "REVOCATION_SNAPSHOT_UPDATE" in verifier_source
+    assert "NETWORK_REVOCATION" not in verifier_source
+
+
+@pytest.mark.browser
+def test_verifier_isblocked_locally_errors_fail_closed(verifier_source):
+    assert "return { blocked: true, doubtRequired: false };" in verifier_source
 
 
 @pytest.mark.browser

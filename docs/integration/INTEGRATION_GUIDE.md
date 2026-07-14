@@ -1,3 +1,5 @@
+> **Superseded** by [ISHUMAN Agent Integration Guide](ISHUMAN_AGENT_INTEGRATION.md). This document is retained for historical reference only.
+
 # Lemma Integration Guide
 
 > Complete guide for integrating Lemma's wallet-based user authentication. For agent/runtime auth, use the proof-first developer auth contract and runtime docs instead of this user-login guide.

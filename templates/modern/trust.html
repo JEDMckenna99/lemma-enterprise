@@ -28,7 +28,7 @@
             border-bottom: none;
         }
         .trust-col-lemma {
-            background: rgba(102, 126, 234, 0.04);
+            background: rgba(79, 70, 229, 0.04);
         }
         .trust-badge {
             display: inline-block;
@@ -81,7 +81,7 @@
             <h1 style="font-size: clamp(2.5rem, 5vw, 3.5rem); line-height: 1.1; margin-bottom: 24px;">Enforcement-grade assurance<br>without identity-grade liability.</h1>
             <p style="font-size: var(--font-size-xl); font-weight: 500; margin-bottom: var(--space-4); color: var(--gray-700);">This page is a plain accounting of who holds what. The short version: your site gets a private PPID that means "same returning wallet," or "same verified human" if you require human proofs. Other sites get different PPIDs they can't link to yours. And nobody in the chain learns the user's name, document, selfie, or date of birth.</p>
             <div style="display: flex; gap: 16px; justify-content: center; flex-wrap: wrap; margin-top: 28px;">
-                <a href="/docs/ishuman" class="btn btn-primary">Integration docs</a>
+                <a href="/docs" class="btn btn-primary">Integration docs</a>
                 <a href="/privacy" class="btn btn-secondary">Privacy policy</a>
             </div>
         </div>
@@ -207,7 +207,7 @@
 
                 <p style="font-size: var(--font-size-lg); color: var(--gray-700); line-height: 1.7; margin-bottom: 20px;"><strong>What we keep:</strong> HMAC-derived document and person-root hashes (encrypted at rest), wallet-to-person bindings, per-site PPID mappings for revocation, and verification metadata. Per person, that works out to roughly 200 bytes of derived identifiers. It's a ledger of proofs, not a document vault.</p>
 
-                <p style="font-size: var(--font-size-lg); color: var(--gray-700); line-height: 1.7; margin-bottom: 20px;"><strong>What sites never get:</strong> cross-site linkage or real-world identity. A site sees only its own PPID, and other Lemma-enabled sites see different PPIDs for the same person. Sites can block their own PPIDs. For severe abuse we can run operator-reviewed network revocation internally, but the cross-site linkage that requires never leaves lemma.id.</p>
+                <p style="font-size: var(--font-size-lg); color: var(--gray-700); line-height: 1.7; margin-bottom: 20px;"><strong>What sites never get:</strong> cross-site linkage or real-world identity. A site sees only its own PPID, and other Lemma-enabled sites see different PPIDs for the same person. Sites can block their own PPIDs via the site-block API and enforce blocks through their own backend policy layer.</p>
 
                 <p style="font-size: var(--font-size-lg); color: var(--gray-700); line-height: 1.7; margin-bottom: 20px;"><strong>No advertising:</strong> we don't use verification outcomes, credentials, wallet data, or PPIDs to advertise to anyone, on lemma.id or anywhere else. Product analytics and fraud prevention are kept apart from marketing. Developer accounts may still get service emails, as covered in the <a href="/privacy">privacy policy</a>.</p>
 
@@ -313,7 +313,7 @@
         <h2 style="color: var(--white); font-size: var(--font-size-3xl); margin-bottom: 20px;">Enforcement you can explain to legal</h2>
         <p style="color: var(--gray-400); font-size: var(--font-size-lg); margin-bottom: 40px; max-width: 640px; margin-left: auto; margin-right: auto;">Require one verified human per account where it matters, and keep your backend out of the identity-honeypot business. Everything on this page is in the docs, in more detail.</p>
         <div style="display: flex; gap: 16px; justify-content: center; flex-wrap: wrap;">
-            <a href="/docs/ishuman" class="btn btn-primary">View integration docs</a>
+            <a href="/docs" class="btn btn-primary">View integration docs</a>
             <a href="/demo" class="btn btn-secondary" style="background: transparent; border-color: var(--gray-600); color: var(--white);">See demo</a>
             <a href="/privacy" class="btn btn-secondary" style="background: transparent; border-color: var(--gray-600); color: var(--white);">Privacy policy</a>
         </div>

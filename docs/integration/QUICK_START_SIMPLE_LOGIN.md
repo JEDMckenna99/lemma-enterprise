@@ -1,3 +1,5 @@
+> **Superseded** by [ISHUMAN Agent Integration Guide](ISHUMAN_AGENT_INTEGRATION.md). This document is retained for historical reference only.
+
 # Quick Start: Add User Login in 5 Minutes
 
 Lemma provides passkey-protected wallet authentication via a redirect flow. **This guide is for end-user website login, not the default agent runtime auth path.** For agent integrations, use the proof-first developer contract and send `X-Lemma-Credential` on protected requests.

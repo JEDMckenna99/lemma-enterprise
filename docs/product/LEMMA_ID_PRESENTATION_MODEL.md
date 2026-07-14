@@ -87,14 +87,14 @@ Frontend helpers (`lemma-credential-utils.js`):
 
 - Integration guide: `docs/integration/ISHUMAN_AGENT_INTEGRATION.md`
 - Trust core spec: `docs/architecture/LEMMA_TRUST_CORE_SPEC.md`
-- Cursor guardrails: `.cursor/rules/site-identity-ppid-guardrails.mdc`
+- Agent guardrails: `AGENTS.md` (repo root) and `docs/integration/ISHUMAN_AGENT_INTEGRATION.md`
 
 ## Verification (deploy smoke)
 
 After deploying wallet/auth changes:
 
 1. Hard refresh lemma.id (or unregister service worker + clear site data if SDK version stuck).
-2. Confirm `lemma-wallet.js?v=2671` (or current bump) and SDK `VERSION` ≥ 2.71.0 in console.
+2. Confirm `lemma-wallet.js?v=2677` (or current bump) and SDK `VERSION` ≥ 2.74.0 in console.
 3. Unlock wallet; manager (`/`) should recognize complete lemma.id without `site domain required` errors.
 4. Admin pages should attach `X-Lemma-Credential` with `X-Permission-ID: admin_access`.
 5. If `Invalid signature` appears on `ishuman_master_*`, hard refresh then unlock; platform login auto-reissues once via `reissueMasterCredential`.

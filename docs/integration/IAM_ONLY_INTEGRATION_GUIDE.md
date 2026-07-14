@@ -1,3 +1,5 @@
+> **Superseded** by [ISHUMAN Agent Integration Guide](ISHUMAN_AGENT_INTEGRATION.md). This document is retained for historical reference only.
+
 # Lemma IAM - Integration Guide (IAM-Only, No PoH Required)
 
 ## What is Lemma IAM?
@@ -124,7 +126,7 @@ curl -X POST https://lemma.id/api/v1/sites/site_abc123/users/did:lemma:user123/p
     "subject": "did:lemma:user123",
     "claims": {
       "packageType": "permission",
-      "siteId": "site_abc123",
+      "siteId": "app.example.com",
       "permissionId": "admin",
       "scope": ["*"],
       "expiresAt": "1735689600"
@@ -188,7 +190,7 @@ curl -X POST https://lemma.id/api/v1/auth/verify \
 // Initialize Lemma IAM
 const lemmaIAM = new LemmaIAM({
     apiKey: 'lemma_api_xyz789',
-    siteId: 'site_abc123',
+    siteId: 'app.example.com',
     useClientSide: true  // 0.36µs verification!
 });
 
@@ -457,7 +459,7 @@ const hasAccess = user.permissions.includes('admin');
 // After (Lemma IAM)
 const lemmaIAM = new LemmaIAM({
     apiKey: 'lemma_api_xyz789',
-    siteId: 'site_abc123'
+    siteId: 'app.example.com'
 });
 
 const result = await lemmaIAM.verifyAccess('/admin/users', 'read');

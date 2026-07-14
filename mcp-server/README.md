@@ -178,7 +178,7 @@ companyName: "Test Company"
 #### `lemma_test_api_key_generation`
 Test generating an API key for a site.
 ```
-siteId: "site_abc123"
+siteId: "app.example.com"
 ```
 
 #### `lemma_test_agent_token_flow`

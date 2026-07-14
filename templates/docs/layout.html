@@ -66,16 +66,27 @@
                     <div class="nav-title">On this page</div>
                     <a href="{{ url_for('docs_overview') }}#quickstart" class="nav-link">Quickstart</a>
                     <a href="{{ url_for('docs_overview') }}#site-registration" class="nav-link">Site registration</a>
+                    <a href="{{ url_for('docs_overview') }}#signup-recipe" class="nav-link">Signup recipe</a>
+                    <a href="{{ url_for('docs_overview') }}#trust-tiers" class="nav-link">Trust tiers</a>
+                    <a href="{{ url_for('docs_overview') }}#signup-trust-recipes" class="nav-link">Signup by tier</a>
+                    <a href="{{ url_for('docs_overview') }}#t2-plus-stamp-action" class="nav-link">T2+ stampAction</a>
+                    <a href="{{ url_for('docs_overview') }}#ppid-convergence" class="nav-link">PPID convergence</a>
+                    <a href="{{ url_for('docs_overview') }}#site-policy" class="nav-link">Site policy</a>
+                    <a href="{{ url_for('docs_overview') }}#assurance-demo" class="nav-link">Assurance demo</a>
+                    <a href="{{ url_for('docs_overview') }}#integration-flow" class="nav-link">Integration flow</a>
                     <a href="{{ url_for('docs_overview') }}#sdk-integration" class="nav-link">SDK integration</a>
+                    <a href="{{ url_for('docs_overview') }}#attach-to-your-logs" class="nav-link">Audit stamps</a>
                     <a href="{{ url_for('docs_overview') }}#api-reference" class="nav-link">API reference</a>
                     <a href="{{ url_for('docs_overview') }}#revocation" class="nav-link">Revocation</a>
+                    <a href="{{ url_for('docs_overview') }}#framework-notes" class="nav-link">Framework notes</a>
+                    <a href="{{ url_for('docs_overview') }}#troubleshooting" class="nav-link">Troubleshooting</a>
                 </div>
                 <div class="nav-section">
                     <div class="nav-title">Resources</div>
                     <a href="/docs/integration/ISHUMAN_AGENT_INTEGRATION.md" class="nav-link">AI agent integration guide</a>
                     <a href="/developer" class="nav-link">Developer hub</a>
                     <a href="/developer/external-api-keys" class="nav-link">API key manager</a>
-                    <a href="/demo/ishuman" class="nav-link">Live demo</a>
+                    <a href="/demo" class="nav-link">Live demo</a>
                     <a href="/llms.txt" class="nav-link">llms.txt</a>
                 </div>
             </nav>
@@ -167,8 +178,113 @@ document.addEventListener('DOMContentLoaded', () => {
             title: 'lemma.id for developers',
             url: '{{ url_for("docs_overview") }}',
             category: 'integration',
-            keywords: 'lemma.id private proof layer ishuman assurance passkey ppid site block site doubt local verification ed25519 sdk api autoProvision siteId api key no webhook',
+            keywords: 'lemma.id private proof layer ishuman assurance passkey ppid site block site doubt local verification ed25519 sdk api autoProvision siteId api key no webhook quickstart',
             excerpt: 'Integrate lemma.id private proofs with the browser SDK, site-private PPIDs, local verification, and optional API-key abuse controls. isHuman is the stronger assurance tier when your policy needs it.'
+        },
+        {
+            title: '5-minute quickstart',
+            url: '{{ url_for("docs_overview") }}#quickstart',
+            category: 'integration',
+            keywords: 'quickstart siteId verifyForBackend autoProvision ppid signup presentation',
+            excerpt: 'Set siteId, add the verifier SDK, gate sensitive actions, store ppid, optional API key for site blocks.'
+        },
+        {
+            title: 'Signup recipe (T2)',
+            url: '{{ url_for("docs_overview") }}#signup-recipe',
+            category: 'integration',
+            keywords: 'signup account creation verifyForBackend presentation server verify passkey ishuman',
+            excerpt: 'Verify locally on your backend with a signed presentation. Do not trust a bare ppid from the browser.'
+        },
+        {
+            title: 'Backend trust tiers',
+            url: '{{ url_for("docs_overview") }}#trust-tiers',
+            category: 'integration',
+            keywords: 'T1 T2 T2+ T3 trust tier presentation stampAction verifyStamp client ppid',
+            excerpt: 'T1 client ppid (low-risk only), T2 signed presentation, T2+ stampAction, T3 fresh session proof.'
+        },
+        {
+            title: 'Signup recipes by trust tier',
+            url: '{{ url_for("docs_overview") }}#signup-trust-recipes',
+            category: 'integration',
+            keywords: 'signup T1 T2 verifyForBackend requiredAssurance ishuman passkey account creation',
+            excerpt: 'T1 for waitlists only — never account creation. T2 uses verifyForBackend with server-side verify.'
+        },
+        {
+            title: 'T2+ stampAction',
+            url: '{{ url_for("docs_overview") }}#t2-plus-stamp-action',
+            category: 'integration',
+            keywords: 'stampAction verify_action_stamp checkout presale fresh passkey requireFreshPasskey nonce action_assertion',
+            excerpt: 'Action-bound stamps for fraud-sensitive mutations: checkout, withdrawals, presale claims.'
+        },
+        {
+            title: 'PPID convergence',
+            url: '{{ url_for("docs_overview") }}#ppid-convergence',
+            category: 'integration',
+            keywords: 'ppid convergence legacy_ppid provisional wallet merge account rebind',
+            excerpt: 'When a provisional wallet completes IDV, merge accounts using ppid_convergence.v1 artifact.'
+        },
+        {
+            title: 'Site policy and isBlockedLocally',
+            url: '{{ url_for("docs_overview") }}#site-policy',
+            category: 'integration',
+            keywords: 'isBlockedLocally site-block site-doubt doubt_required verifyFreshForBackend policy check enforcement order',
+            excerpt: 'Site blocks are not in the global Bloom. Mirror blocks locally and expose via isBlockedLocally.'
+        },
+        {
+            title: 'Assurance workflow demo',
+            url: '{{ url_for("docs_overview") }}#assurance-demo',
+            category: 'integration',
+            keywords: 'demo passkey ishuman step-up same ppid site block ticketing trials',
+            excerpt: 'Live demo at /demo: passkey wallet, distinct site PPIDs, site-local block, isHuman step-up.'
+        },
+        {
+            title: 'Integration flow',
+            url: '{{ url_for("docs_overview") }}#integration-flow',
+            category: 'integration',
+            keywords: 'integration flow passkey first IDV step-up popup wallet unlock derive-site-proof',
+            excerpt: 'Passkey-first onboarding with optional isHuman step-up; backend verifies presentation locally.'
+        },
+        {
+            title: 'SDK integration',
+            url: '{{ url_for("docs_overview") }}#sdk-integration',
+            category: 'integration',
+            keywords: 'ishuman-verifier.js verify verifyForBackend verifyFreshForBackend stampAction constructor options human assurance reason',
+            excerpt: 'Browser SDK methods, constructor options, verify() result reasons, human vs assurance.'
+        },
+        {
+            title: 'Audit stamps and logging',
+            url: '{{ url_for("docs_overview") }}#attach-to-your-logs',
+            category: 'integration',
+            keywords: 'stamp includeCredential verifyStamp audit log getPPID getVerification',
+            excerpt: 'Attach verification to your logs with stamp() and re-verify stored stamps on your backend.'
+        },
+        {
+            title: 'API reference',
+            url: '{{ url_for("docs_overview") }}#api-reference',
+            category: 'integration',
+            keywords: 'api site-block site-unblock site-doubt check bloom-filter verify-presentation derive-site-proof',
+            excerpt: 'HTTP endpoints for moderation, site policy, and revocation Bloom snapshot.'
+        },
+        {
+            title: 'Revocation and abuse controls',
+            url: '{{ url_for("docs_overview") }}#revocation',
+            category: 'integration',
+            keywords: 'revocation site-block bloom filter global revoked isBlockedLocally abuse ban doubt',
+            excerpt: 'Site blocks via POST /api/ishuman/site-block; global Bloom via GET /api/revocation/bloom-filter.'
+        },
+        {
+            title: 'Framework notes',
+            url: '{{ url_for("docs_overview") }}#framework-notes',
+            category: 'integration',
+            keywords: 'React Next.js Vue Nuxt Rails Django PHP framework SSR client component',
+            excerpt: 'Adapt the same pattern per stack; keep IsHumanVerifier in client components only.'
+        },
+        {
+            title: 'Troubleshooting',
+            url: '{{ url_for("docs_overview") }}#troubleshooting',
+            category: 'integration',
+            keywords: 'troubleshooting siteId mismatch no_credential idv_cancelled revocation_data_untrusted blocks',
+            excerpt: 'Common fixes for hostname mismatch, no_credential, blocks not applying, and popup issues.'
         },
         {
             title: 'AI agent integration guide',

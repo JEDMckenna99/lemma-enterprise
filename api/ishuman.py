@@ -2085,7 +2085,9 @@ def check_ppid():
 
         ?ppid=did:lemma:ppid_...&site_id=site_...
 
-    Also checks network-wide revocation via the Bloom filter when no site_id is given.
+    Enforcement uses site-scoped database policy only: ``SiteBlock``,
+    ``SiteDoubt``, and site-bound ``RevocationList`` rows. The Bloom filter is
+    not consulted for site-block decisions on this endpoint.
     """
     from api.rate_limiter import check_rate_limit
 
@@ -3377,7 +3379,7 @@ def verify_presentation():
     if assurance not in ("passkey", "ishuman"):
         return jsonify({"success": False, "error": "not_ishuman"}), 400
 
-    required_assurance = (body.get("required_assurance") or "passkey").strip().lower()
+    required_assurance = (body.get("required_assurance") or "ishuman").strip().lower()
     if required_assurance == "passkey":
         if assurance not in ("passkey", "ishuman"):
             return jsonify({"success": False, "error": "assurance_insufficient"}), 400

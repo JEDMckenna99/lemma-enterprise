@@ -55,6 +55,51 @@ const NONCE_STORE_MODE_OPTIONAL = "optional";
 const NONCE_STORE_MODE_REQUIRED = "required";
 
 // ---------------------------------------------------------------------------
+// Site hostname canonicalization (mirrors api/site_hostname.py)
+// ---------------------------------------------------------------------------
+
+function canonicalizeRpId(rpId) {
+  let value = String(rpId || "").trim().toLowerCase();
+  if (!value) return "unknown";
+  if (value.includes("://")) {
+    try {
+      value = new URL(value).hostname.toLowerCase();
+    } catch {
+      value = value.split("://").slice(1).join("://") || value;
+    }
+  }
+  let host = value.split("/")[0];
+  if (host.includes(":") && !host.startsWith("[")) {
+    host = host.split(":")[0];
+  }
+  if (host.startsWith("www.")) {
+    host = host.slice(4);
+  }
+  return host || "unknown";
+}
+
+export function canonicalizeSiteHostname(value) {
+  const raw = String(value || "").trim();
+  if (!raw) throw new Error("hostname_required");
+  if (raw.toLowerCase().startsWith("site_")) {
+    throw new Error("internal_site_id_not_allowed");
+  }
+  const canonical = canonicalizeRpId(raw);
+  if (!canonical || canonical === "unknown") {
+    throw new Error("invalid_hostname");
+  }
+  return canonical;
+}
+
+function tryCanonicalizeSiteHostname(value) {
+  try {
+    return { canonical: canonicalizeSiteHostname(value), error: null };
+  } catch (err) {
+    return { canonical: null, error: err.message || "invalid_hostname" };
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Tiny byte / hex / base64url helpers
 // ---------------------------------------------------------------------------
 
@@ -242,6 +287,80 @@ export function createInMemorySitePolicyStore({ blocked = [], doubted = [] } = {
         return { available: true, decision: { doubtRequired: true, doubtReason: "site_doubt" }, reason: "ok" };
       }
       return { available: true, decision: {}, reason: "ok" };
+    },
+  };
+}
+
+/**
+ * Server-only site block/doubt store backed by GET /api/ishuman/check.
+ * Mirrors packages/ishuman-verify-py/lemma_ishuman_site_policy.LemmaCheckPolicyStore.
+ */
+export function createLemmaCheckPolicyStore({
+  siteId,
+  apiKey,
+  lemmaOrigin = DEFAULT_LEMMA_ORIGIN,
+  cacheTtlSeconds = 30,
+  timeoutSeconds = 5,
+  failClosed = true,
+  fetch: fetchImpl,
+} = {}) {
+  if (!siteId) throw new Error("siteId required");
+  if (!apiKey) throw new Error("apiKey required");
+  const canonicalSiteId = canonicalizeSiteHostname(siteId);
+  const cache = new Map();
+
+  return {
+    async check(ppid) {
+      const subject = String(ppid || "").trim();
+      if (!subject) {
+        return { available: false, decision: {}, reason: "ppid_missing" };
+      }
+      const now = Date.now();
+      const cached = cache.get(subject);
+      if (cached && now - cached.at <= cacheTtlSeconds * 1000) {
+        return { available: true, decision: cached.decision, reason: "ok" };
+      }
+      const url = (
+        `${lemmaOrigin.replace(/\/$/, "")}/api/ishuman/check`
+        + `?ppid=${encodeURIComponent(subject)}`
+        + `&site_id=${encodeURIComponent(canonicalSiteId)}`
+      );
+      const fetchFn = fetchImpl || globalThis.fetch;
+      if (typeof fetchFn !== "function") {
+        return failClosed
+          ? { available: false, decision: {}, reason: "site_policy_unavailable" }
+          : { available: true, decision: {}, reason: "site_policy_unavailable" };
+      }
+      try {
+        const controller = typeof AbortController === "function" ? new AbortController() : null;
+        const timer = controller
+          ? setTimeout(() => controller.abort(), Math.max(1, timeoutSeconds) * 1000)
+          : null;
+        const resp = await fetchFn(url, {
+          method: "GET",
+          headers: { "X-API-Key": apiKey },
+          signal: controller?.signal,
+        });
+        if (timer) clearTimeout(timer);
+        const payload = await resp.json();
+        if (!payload?.success) {
+          return failClosed
+            ? { available: false, decision: {}, reason: "site_policy_unavailable" }
+            : { available: true, decision: {}, reason: "site_policy_unavailable" };
+        }
+        const decision = {
+          blocked: !!payload.blocked,
+          doubtRequired: !!payload.doubt_required,
+          reason: payload.reason || null,
+          doubtReason: payload.doubt_reason || null,
+        };
+        cache.set(subject, { at: now, decision });
+        return { available: true, decision, reason: "ok" };
+      } catch {
+        return failClosed
+          ? { available: false, decision: {}, reason: "site_policy_unavailable" }
+          : { available: true, decision: {}, reason: "site_policy_unavailable" };
+      }
     },
   };
 }
@@ -552,6 +671,7 @@ export function createVerifier({
   fetch: fetchImpl,
 } = {}) {
   if (!siteId) throw new Error("siteId required");
+  const canonicalSiteId = canonicalizeSiteHostname(siteId);
   let snapshot = null;
   let inflight = null;
 
@@ -629,9 +749,10 @@ export function createVerifier({
     if (!assuranceMeetsPolicy(assurance, requiredAssurance)) {
       return { ok: false, reason: "assurance_insufficient", assurance };
     }
-    const boundSite = claims.siteId || claims.site_id || claims.siteDomain || "";
-    if (boundSite !== siteId) {
-      return { ok: false, reason: "site_id_mismatch", boundSiteId: boundSite };
+    const boundSiteRaw = claims.siteId || claims.site_id || claims.siteDomain || "";
+    const { canonical: boundSite, error: boundSiteErr } = tryCanonicalizeSiteHostname(boundSiteRaw);
+    if (boundSiteErr || boundSite !== canonicalSiteId) {
+      return { ok: false, reason: "site_id_mismatch", boundSiteId: boundSiteRaw };
     }
     const expiresAt = Number(claims.expiresAt || 0);
     if (expiresAt && expiresAt < Math.floor(Date.now() / 1000)) {
@@ -672,7 +793,10 @@ export function createVerifier({
       if (issuedAtSec && nowSec - issuedAtSec > maxSessionAgeSeconds) {
         return { ok: false, reason: "session_too_old" };
       }
-      if (String(assertion.site_id || "") !== siteId) {
+      const { canonical: sessionSite, error: sessionSiteErr } = tryCanonicalizeSiteHostname(
+        assertion.site_id || "",
+      );
+      if (sessionSiteErr || sessionSite !== canonicalSiteId) {
         return { ok: false, reason: "session_site_id_mismatch" };
       }
     } else if (requireSessionAssertion && sitePubkeyB64) {
@@ -687,7 +811,7 @@ export function createVerifier({
         for (const pubkey of issuer.pubkeysHex || []) trustedPubkeys.push(pubkey);
       }
       const conv = await verifyPpidConvergenceArtifact(convergence, {
-        siteId,
+        siteId: canonicalSiteId,
         canonicalPpid: credential.subject || "",
         trustedIssuerPubkeys: trustedPubkeys,
       });
@@ -801,7 +925,10 @@ export function createVerifier({
     if (String(assertion.path || "").trim() !== String(path || "").trim()) {
       return { ok: false, reason: "action_path_mismatch" };
     }
-    if (String(assertion.site_id || "").trim() !== siteId) {
+    const { canonical: actionSite, error: actionSiteErr } = tryCanonicalizeSiteHostname(
+      assertion.site_id || "",
+    );
+    if (actionSiteErr || actionSite !== canonicalSiteId) {
       return { ok: false, reason: "action_site_id_mismatch" };
     }
 
@@ -823,7 +950,7 @@ export function createVerifier({
     }
     if (nonceStore && typeof nonceStore.consume === "function") {
       const consumed = nonceStore.consume(nonce, {
-        siteId,
+        siteId: canonicalSiteId,
         ttlSeconds: maxActionAgeSeconds + 300,
       });
       if (!consumed) return { ok: false, reason: "action_nonce_reused" };
@@ -837,7 +964,7 @@ export function createVerifier({
       if (!serverNonce) return { ok: false, reason: "fresh_passkey_server_nonce_missing" };
       const actionCommitment = await buildActionCommitment({
         serverNonce,
-        siteId,
+        siteId: canonicalSiteId,
         action,
         method,
         path,
@@ -849,7 +976,7 @@ export function createVerifier({
         for (const pubkeyHex of pubkeys) trustedPubkeys.push(pubkeyHex);
       }
       const fp = await verifyFreshPasskeyAttestation(attestation, {
-        siteId,
+        siteId: canonicalSiteId,
         credentialId: String(credential.id || credResult.credentialId || ""),
         subject: String(credential.subject || credResult.ppid || ""),
         actionCommitment,
@@ -1025,6 +1152,8 @@ if (typeof module !== "undefined" && typeof module.exports !== "undefined") {
     InMemoryNonceStore,
     RedisNonceStore,
     createInMemorySitePolicyStore,
+    createLemmaCheckPolicyStore,
+    canonicalizeSiteHostname,
     browserCanonicalMessage,
   };
 }

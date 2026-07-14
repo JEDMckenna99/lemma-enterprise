@@ -19,7 +19,7 @@
     <ol style="line-height: 1.8; color: var(--gray-700); padding-left: 24px;">
         <li><strong>Set <code>siteId</code></strong> to your site&apos;s canonical hostname (for example <code>app.example.com</code>). It must match the hostname users see in the browser on your domain.</li>
         <li><strong>Add the verifier SDK</strong> to your page (see <a href="#sdk-integration">SDK integration</a> below).</li>
-        <li><strong>Gate a sensitive action</strong> with <code>await verifier.verify({ autoProvision: true })</code>. The first visit may open a Lemma-hosted popup for wallet unlock, proof issuance, or isHuman step-up depending on the assurance your policy requires. Fail closed when verification fails (see <code>human</code> and <code>assurance</code> below).</li>
+        <li><strong>Gate a sensitive action</strong> with <code>await verifier.verifyForBackend({ autoProvision: true })</code> for signup and account creation (T2), or <code>verify({ autoProvision: true })</code> for client-only UX gates. The first visit may open a Lemma-hosted popup for passkey wallet unlock, passkey proof issuance, or isHuman IDV step-up depending on <code>requiredAssurance</code>. Fail closed when verification fails (see <code>human</code> and <code>assurance</code> below).</li>
         <li><strong>Store <code>ppid</code></strong> on your user or account record. It is an opaque, site-private identifier, not a government ID or email.</li>
         <li><strong>Optional API key:</strong> create one in the <a href="/developer/external-api-keys">API key manager</a> when you need server-side PPID blocks. An API key is <em>not</em> required for the basic human check.</li>
         <li><strong>On confirmed abuse:</strong> call <code>POST /api/ishuman/site-block</code> with your API key (see <a href="#revocation">Revocation</a>). Do not rely on the abuser&apos;s browser to enforce the ban.</li>
@@ -63,7 +63,10 @@
 
   document.getElementById('signup-form').addEventListener('submit', async (e) =&gt; {
     e.preventDefault();
-    const { ok, presentation, ppid } = await verifier.verifyForBackend({ autoProvision: true });
+    const { ok, presentation } = await verifier.verifyForBackend({
+      autoProvision: true,
+      requiredAssurance: 'passkey',
+    });
     if (!ok) {
       alert('Verification required');
       return;
@@ -77,7 +80,7 @@
   });
 &lt;/script&gt;</code>
     </div>
-    <p>On your server, verify <code>presentation</code> with <code>@lemma/ishuman-verify</code> or <code>lemma_ishuman_verify.py</code> before creating the account.</p>
+    <p>On your server, verify <code>presentation</code> with <code>@lemma/ishuman-verify</code> or <code>lemma_ishuman_verify.py</code> before creating the account. Bind the user to <code>result.ppid</code> from the verified server result — not the parallel client <code>ppid</code> field.</p>
 </div>
 
 <div class="docs-section" id="trust-tiers">
@@ -91,7 +94,7 @@
             <tr>
                 <td><strong>T1 — Client ppid</strong></td>
                 <td><code>verify()</code> → POST <code>{ ppid }</code> to your API</td>
-                <td>Low-risk UX gates (waitlists, comments)</td>
+                <td>Low-risk UX gates only (waitlists, soft limits) — <strong>never account creation</strong></td>
                 <td>None after verify</td>
             </tr>
             <tr>
@@ -101,9 +104,15 @@
                 <td>Revocation snapshot refresh only</td>
             </tr>
             <tr>
+                <td><strong>T2+ — Action-bound stamp</strong></td>
+                <td><code>stampAction(...)</code> envelope with <code>action_assertion</code> + <code>action_signature</code></td>
+                <td>Checkout, withdrawals, posting, presale claims — fraud-sensitive server mutations</td>
+                <td>Revocation snapshot refresh only</td>
+            </tr>
+            <tr>
                 <td><strong>T3 — Fresh session proof</strong></td>
                 <td>Full presentation with credential + session assertion, verified locally or through <code>/api/ishuman/verify-presentation</code></td>
-                <td>High-trust account creation, financial actions</td>
+                <td>High-trust financial actions needing live session proof</td>
                 <td>Per-request (optional)</td>
             </tr>
         </tbody>
@@ -116,7 +125,7 @@
 
 <div class="docs-section" id="assurance-demo">
     <h2>Assurance workflow demo</h2>
-    <p>The live demo at <a href="/demo/ishuman">/demo/ishuman</a> walks through the one-PPID assurance model when <code>LEMMA_ONE_PPID_ASSURANCE_MODEL</code> and <code>LEMMA_PASSKEY_ASSURANCE_ENABLED</code> are enabled:</p>
+    <p>The live demo at <a href="/demo">/demo</a> walks through the one-PPID assurance model when <code>LEMMA_ONE_PPID_ASSURANCE_MODEL</code> and <code>LEMMA_PASSKEY_ASSURANCE_ENABLED</code> are enabled:</p>
     <ol style="line-height: 1.8; color: var(--gray-700); padding-left: 24px;">
         <li><strong>Passkey wallet</strong> — create an empty lemma.id (provisional person root, no IDV yet).</li>
         <li><strong>Passkey proof on two sites</strong> — derive distinct PPIDs with <code>assurance: passkey</code> via <code>verifyForBackend({ requiredAssurance: 'passkey' })</code>.</li>
@@ -129,49 +138,151 @@
 
 <div class="docs-section" id="signup-trust-recipes">
     <h2>Signup recipes by trust tier</h2>
-    <h3>T1 — quick signup (client ppid only)</h3>
-    <p>Use when abuse risk is low and you accept that a determined attacker could replay a captured ppid until you add server verification.</p>
+    <h3>T1 — client ppid only (low-risk gates, never account creation)</h3>
+    <div class="callout callout--warning">
+        <div class="callout-title">Do not use T1 for signup</div>
+        <p>T1 sends an unverified <code>ppid</code> from the browser. A determined attacker can replay a captured value. Reserve T1 for low-risk UX gates (waitlists, soft rate limits) where you accept client-side trust. For account creation, use T2 below.</p>
+    </div>
     <div class="code-block">
-        <div class="code-header"><span>Client</span><button class="copy-btn">Copy</button></div>
+        <div class="code-header"><span>Client (low-risk gates only)</span><button class="copy-btn">Copy</button></div>
         <code>const result = await verifier.verify({ autoProvision: true });
 if (!result.human) return;
-await fetch('/api/signup', {
+await fetch('/api/waitlist', {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify({ email, ppid: result.ppid }),
 });</code>
     </div>
-    <h3>T2 — recommended signup (signed presentation or stamp)</h3>
-    <p>Send a signed presentation from <code>verifyForBackend()</code>, or stamp the entry point, then verify cryptographically on your backend before creating the account.</p>
+    <h3>T2 — recommended signup (signed presentation)</h3>
+    <p>Send a signed presentation from <code>verifyForBackend()</code>, then verify cryptographically on your backend before creating the account. Bind the user to <code>result.ppid</code> from the verified server result — not the parallel client <code>ppid</code> field.</p>
     <div class="code-block">
         <div class="code-header"><span>Client</span><button class="copy-btn">Copy</button></div>
-        <code>const result = await verifier.verify({ autoProvision: true });
-if (!result.human) return;
-const event = await verifier.stamp(
-  { action: 'signup', email },
-  { includeCredential: true }
-);
+        <code>const { ok, presentation } = await verifier.verifyForBackend({
+  autoProvision: true,
+  requiredAssurance: 'ishuman', // or 'passkey' for low-friction signup
+});
+if (!ok) return;
 await fetch('/api/signup', {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({ email, stamp: event }),
+  body: JSON.stringify({ email, presentation }),
 });</code>
     </div>
     <div class="code-block">
-        <div class="code-header"><span>Python backend (verifyStamp)</span><button class="copy-btn">Copy</button></div>
-        <code>from lemma_ishuman_verify import verify_stamp
+        <div class="code-header"><span>Python backend</span><button class="copy-btn">Copy</button></div>
+        <code>from lemma_ishuman_verify import VerificationContext
+
+ctx = VerificationContext(site_id="app.example.com", required_assurance="ishuman")
 
 @app.post("/api/signup")
 def signup():
     body = request.get_json() or {}
-    stamp = body.get("stamp")
-    ok, ppid, reason = verify_stamp(stamp, expected_action="signup")
-    if not ok:
-        return {"error": reason}, 403
-    # create account bound to ppid
+    result = ctx.verify(body["presentation"])
+    if not result.ok:
+        return {"error": result.reason}, 403
+    # create account bound to result.ppid
     ...</code>
     </div>
-    <p style="color: var(--gray-600); font-size: 14px;">See also <code>examples/relying_site_offline_verify.py</code> and <code>static/js/lemma-ishuman-verify.mjs</code> for full verifyStamp examples.</p>
+    <p style="color: var(--gray-600); font-size: 14px;">See also <code>examples/relying_site_offline_verify.py</code> and <code>static/js/lemma-ishuman-verify.mjs</code> for full verify examples.</p>
+</div>
+
+<div class="docs-section" id="t2-plus-stamp-action">
+    <h2>T2+ — action-bound stamps (<code>stampAction</code>)</h2>
+    <p>For fraud-sensitive mutations (checkout, withdrawals, presale code claims), use <code>stampAction()</code> to bind the verified PPID to a specific action, HTTP method, path, and server nonce. Your backend verifies with <code>verify_action_stamp()</code> / <code>verifyActionStamp()</code> plus a nonce replay store.</p>
+    <div class="code-block">
+        <div class="code-header"><span>Client</span><button class="copy-btn">Copy</button></div>
+        <code>const challenge = await fetch('/api/checkout/challenge', { method: 'POST' }).then(r => r.json());
+
+const event = await verifier.stampAction(
+  { cartId, amountCents, currency },
+  {
+    action: 'checkout',
+    method: 'POST',
+    path: '/api/checkout',
+    nonce: challenge.server_nonce,
+    requiredAssurance: 'passkey',
+  },
+);
+await fetch('/api/checkout', { method: 'POST', body: JSON.stringify(event) });</code>
+    </div>
+    <div class="code-block">
+        <div class="code-header"><span>Python backend</span><button class="copy-btn">Copy</button></div>
+        <code>from lemma_ishuman_verify import VerificationContext, InMemoryNonceStore
+
+ctx = VerificationContext(site_id="app.example.com", required_assurance="passkey")
+nonce_store = InMemoryNonceStore()
+
+@app.post("/api/checkout")
+def checkout():
+    body = request.get_json() or {}
+    result = ctx.verify_action_stamp(
+        body,
+        action="checkout",
+        method=request.method,
+        path=request.path,
+        body=body,
+        nonce_store=nonce_store,
+    )
+    if not result.ok:
+        return {"error": result.reason}, 403
+    return process_checkout(result.ppid, body)</code>
+    </div>
+
+    <h3>Fresh passkey for sensitive actions</h3>
+    <p>When a passkey-tier user must prove <strong>present</strong> biometric/PIN control for a specific mutation, pass <code>requireFreshPasskey: true</code>. This does not change assurance tier — it adds a server-attested fresh-passkey ceremony bound to your server nonce.</p>
+    <div class="code-block">
+        <div class="code-header"><span>Client — fresh passkey claim</span><button class="copy-btn">Copy</button></div>
+        <code>const event = await verifier.stampAction(payload, {
+  action: 'claim_presale_code',
+  method: 'POST',
+  path: '/api/presale/claim-code',
+  nonce: challenge.server_nonce,
+  requireFreshPasskey: true,
+  requiredAssurance: 'passkey',
+});</code>
+    </div>
+    <p style="color: var(--gray-600); font-size: 14px;">Live reference: <a href="https://tickets-demo.lemma.id/?tour=presale" rel="noopener">tickets presale demo</a>. Verification is local-first: backend verifiers cache <code>GET /api/revocation/bloom-filter</code> (~15&nbsp;min), not per request.</p>
+</div>
+
+<div class="docs-section" id="ppid-convergence">
+    <h2>PPID convergence (provisional → known person)</h2>
+    <p>When a user already verified on wallet A creates a new provisional wallet B and completes IDV, lemma.id rebinds B to the known person. The site PPID may change. lemma.id issues a signed <code>ppid_convergence.v1</code> artifact on the next <code>derive-site-proof</code> for that site.</p>
+    <p><strong>Merge recipe (transactional):</strong></p>
+    <ol style="line-height: 1.8; color: var(--gray-700); padding-left: 24px;">
+        <li>Verify presentation + convergence artifact (<code>verify_with_policy</code>).</li>
+        <li>If <code>legacy_ppid</code> is present, look up the provisional account by <code>legacy_ppid</code>.</li>
+        <li>If found: merge rows to canonical <code>ppid</code>, carry forward site blocks/doubts from the legacy PPID, then archive the provisional account.</li>
+        <li>If not found: create a new account for canonical <code>ppid</code>.</li>
+        <li>Reject if convergence is invalid, wrong-site, expired, or tampered — fail closed.</li>
+    </ol>
+    <p style="color: var(--gray-600); font-size: 14px;">Ordinary first IDV on the same wallet preserves PPID and emits no convergence artifact. Requires <code>LEMMA_PPID_CONVERGENCE_ENABLED=1</code> (with one-PPID model).</p>
+</div>
+
+<div class="docs-section" id="site-policy">
+    <h2>Site policy and <code>isBlockedLocally</code></h2>
+    <p>Site blocks are <strong>not</strong> in the global Bloom filter. Mirror blocks on your backend and expose them to the SDK through <code>isBlockedLocally</code> — call <strong>your own policy endpoint</strong>, never lemma.id directly from the browser (API keys are server-only).</p>
+    <div class="code-block">
+        <div class="code-header"><span>SDK constructor</span><button class="copy-btn">Copy</button></div>
+        <code>const verifier = new IsHumanVerifier({
+  siteId: 'app.example.com',
+  isBlockedLocally: async (ppid) => {
+    const res = await fetch('/api/policy/check?ppid=' + encodeURIComponent(ppid));
+    const data = await res.json();
+    return { blocked: !!data.blocked, doubt_required: !!data.doubt_required };
+  },
+});</code>
+    </div>
+    <p>Your policy endpoint should call <code>GET /api/ishuman/check</code> server-side with your site API key, or mirror block state locally after <code>POST /api/ishuman/site-block</code>. When <code>verify()</code> returns <code>doubt_required</code>, invoke <code>verifyFreshForBackend()</code>. A successful fresh IDV clears only the matching doubt when it derives the same site PPID.</p>
+    <h3>Backend enforcement order</h3>
+    <p>On every protected endpoint:</p>
+    <ol style="line-height: 1.8; color: var(--gray-700); padding-left: 24px;">
+        <li>Cryptographic presentation or action-stamp verification</li>
+        <li>Canonical PPID extraction from verified result</li>
+        <li>Convergence verification (if <code>ppid_convergence.v1</code> present)</li>
+        <li>Site-policy lookup for canonical <strong>and</strong> legacy PPIDs</li>
+        <li>Business logic</li>
+    </ol>
+    <p style="color: var(--gray-600); font-size: 14px;">Stable fail-closed reasons: <code>site_blocked</code>, <code>doubt_required</code>, <code>site_policy_unavailable</code>, <code>site_policy_not_configured</code>.</p>
 </div>
 
 <div class="docs-section" id="troubleshooting">
@@ -205,8 +316,8 @@ def signup():
     <h2>What are lemma.id and isHuman?</h2>
     <p><strong>isHuman</strong> is the IDV-backed assurance tier: one verified human per account, and your site never learns who that human legally is. <strong>lemma.id</strong> is the user-held proof wallet and relying-site integration that issues site-private PPIDs and signed presentations. Passkey assurance handles continuity; isHuman handles Sybil resistance.</p>
     <div class="callout callout--info">
-        <div class="callout-title">Assurance</div>
-        <p>Credentials are only issued after a live identity check with liveness detection and document-to-selfie matching. A bot or a stolen ID image can't get one, because a live human had to match a genuine government document at issuance.</p>
+        <div class="callout-title">Assurance tiers</div>
+        <p><strong>Passkey assurance</strong> can issue site credentials without IDV when <code>LEMMA_PASSKEY_ASSURANCE_ENABLED</code> and the one-PPID model are enabled — good for continuity and low-friction signup. <strong>isHuman assurance</strong> always requires live IDV (liveness + document-to-selfie matching). A bot or stolen ID image cannot get isHuman credentials because a live human must match a genuine government document at issuance.</p>
     </div>
     <div class="callout callout--info">
         <div class="callout-title">Core model</div>
@@ -220,17 +331,17 @@ def signup():
 
 <div class="docs-section" id="integration-flow">
     <h2>Integration flow (your site)</h2>
-    <p>This is the path a relying-site developer implements. Platform-side IDV webhooks are handled by lemma.id and are not part of your integration.</p>
+    <p>This is the path a relying-site developer implements. Platform-side IDV webhooks are handled by lemma.id and are not part of your integration. With passkey assurance enabled, first-time users can get a passkey wallet and site proof <strong>without IDV</strong>; isHuman is a deliberate step-up when your policy requires Sybil resistance.</p>
     <table class="docs-table">
         <thead>
             <tr><th>Step</th><th>Where</th><th>What happens</th></tr>
         </thead>
         <tbody>
-            <tr><td>1</td><td>Your page</td><td>You call <code>verify({ autoProvision: true })</code> before a protected action (signup, post, checkout, etc.).</td></tr>
-            <tr><td>2</td><td>Lemma popup</td><td>If the user has no proof yet, a popup at <code>/wallet/ishuman-idv</code> unlocks the wallet (passkey) and runs live IDV at Didit.</td></tr>
-            <tr><td>3</td><td>lemma.id</td><td>After approved IDV, lemma.id issues a master verified-human credential and derives a site-bound credential for your <code>siteId</code>.</td></tr>
-            <tr><td>4</td><td>Your page</td><td>The SDK validates signature, expiry, and revocation locally, then returns <code>{ human: true, ppid: &quot;did:lemma:ppid_...&quot; }</code>.</td></tr>
-            <tr><td>5</td><td>Your backend</td><td>Accept the <code>ppid</code> (or a stamped event with <code>includeCredential: true</code>) from your client. Optionally re-verify cryptographically on your server; no lemma.id webhook is required.</td></tr>
+            <tr><td>1</td><td>Your page</td><td>You call <code>verifyForBackend({ autoProvision: true, requiredAssurance })</code> before a protected action. Use <code>passkey</code> for continuity; <code>ishuman</code> when one verified human per account is required.</td></tr>
+            <tr><td>2</td><td>Lemma popup</td><td>If no proof exists: passkey path unlocks wallet and issues passkey assurance (no IDV). isHuman path runs live IDV at Didit after wallet unlock.</td></tr>
+            <tr><td>3</td><td>lemma.id</td><td>Issues master + site-bound credential for your <code>siteId</code>. Step-up from passkey to isHuman on the same wallet returns the <strong>same PPID</strong> with stronger assurance.</td></tr>
+            <tr><td>4</td><td>Your page</td><td>SDK validates signature, expiry, and global revocation locally, then returns <code>{ ok, presentation, ppid, assurance }</code> (via <code>verifyForBackend</code>) or <code>{ human, ppid, assurance, reason }</code> (via <code>verify</code>).</td></tr>
+            <tr><td>5</td><td>Your backend</td><td>Verify <code>presentation</code> or action stamp cryptographically on your server. Apply site-policy checks (blocks/doubts) — site blocks are not in the global Bloom filter. No lemma.id webhook is required.</td></tr>
         </tbody>
     </table>
 </div>
@@ -267,9 +378,26 @@ def signup():
             <tr><td><code>lemmaOrigin</code></td><td>string</td><td><code>https://lemma.id</code></td><td>Override only for non-production testing.</td></tr>
             <tr><td><code>autoProvision</code></td><td>boolean</td><td><code>false</code></td><td>When true on the constructor, every <code>verify()</code> may open the popup if no proof exists. Prefer passing <code>{ autoProvision: true }</code> on entry-point calls only.</td></tr>
             <tr><td><code>debug</code></td><td>boolean</td><td><code>false</code></td><td>Enables SDK console logging.</td></tr>
-            <tr><td><code>isBlockedLocally</code></td><td>function</td><td><code>null</code></td><td>Optional callback returning a boolean or <code>{ blocked, doubt_required }</code> from your backend.</td></tr>
+            <tr><td><code>isBlockedLocally</code></td><td>function</td><td><code>null</code></td><td>Optional callback returning a boolean or <code>{ blocked, doubt_required }</code> from your backend policy endpoint.</td></tr>
         </tbody>
     </table>
+
+    <h3>Key methods</h3>
+    <table class="docs-table">
+        <thead>
+            <tr><th>Method</th><th>Returns</th><th>Notes</th></tr>
+        </thead>
+        <tbody>
+            <tr><td><code>verify(opts?)</code></td><td><code>{ human, ppid, assurance, reason, timeMs }</code></td><td>Primary check; may open Lemma popup on first visit with <code>autoProvision: true</code>.</td></tr>
+            <tr><td><code>verifyForBackend(opts?)</code></td><td><code>{ ok, presentation, ppid, assurance, reason, timeMs }</code></td><td><strong>Recommended for signup.</strong> Returns a backend-safe presentation bundle.</td></tr>
+            <tr><td><code>verifyFreshForBackend(opts?)</code></td><td>Same as <code>verifyForBackend</code></td><td>Deliberate fresh IDV when your site policy returns <code>doubt_required</code>.</td></tr>
+            <tr><td><code>stampAction(payload, opts?)</code></td><td><code>Promise&lt;Object&gt;</code></td><td>Action-bound proof for T2+ server mutations. Includes <code>action_assertion</code> + <code>action_signature</code>.</td></tr>
+            <tr><td><code>getPPID(opts?)</code></td><td><code>Promise&lt;string | null&gt;</code></td><td>Cached PPID after initial verify; no popup by default.</td></tr>
+            <tr><td><code>getVerification(opts?)</code></td><td><code>Promise&lt;Stamp&gt;</code></td><td>Compact verification stamp for logging.</td></tr>
+            <tr><td><code>stamp(payload, opts?)</code></td><td><code>Promise&lt;Object&gt;</code></td><td>Attach audit evidence to your events (<code>includeCredential: true</code> recommended).</td></tr>
+        </tbody>
+    </table>
+    <p style="color: var(--gray-600); font-size: 14px;"><code>stampAction</code> options: <code>action</code>, <code>method</code>, <code>path</code>, <code>nonce</code>, <code>requireFreshPasskey</code>, <code>requiredAssurance</code>.</p>
 
     <h3><code>verify()</code> result</h3>
     <p><code>verify()</code> returns <code>{ human: boolean, ppid: string | null, assurance: string | null, reason: string, timeMs: number, error: string | null }</code>.</p>
@@ -282,8 +410,12 @@ def signup():
         <li><strong>Success:</strong> <code>valid</code>, <code>vc_valid</code>, <code>session_valid</code></li>
         <li><strong>Needs popup / first visit:</strong> <code>no_credential</code>, <code>site_proof_required</code>, <code>wallet_locked</code>, <code>no_ishuman_credential</code></li>
         <li><strong>Renewal:</strong> <code>expired</code> uses ordinary 30-day site-proof renewal.</li>
-        <li><strong>Failure:</strong> <code>revoked</code>, <code>invalid_signature</code>, <code>site_blocked</code>, <code>idv_cancelled</code>, <code>not_ishuman</code>, <code>revocation_data_untrusted</code></li>
-        <li><strong>Fresh challenge:</strong> <code>doubt_required</code> requires an explicit <code>verifyFreshForBackend()</code> call.</li>
+        <li><strong>Hard fail:</strong> <code>invalid_signature</code> — cryptographic verification failed (tampered or corrupted credential). Fail closed; do not treat as recoverable.</li>
+        <li><strong>Recoverable with <code>autoProvision</code>:</strong> <code>revoked</code> — credential is in the global Bloom filter; with <code>autoProvision: true</code> the SDK may open a popup for fresh issuance (unless your site policy blocks the PPID).</li>
+        <li><strong>Site policy:</strong> <code>site_blocked</code>, <code>doubt_required</code> — enforce via your backend; site blocks never auto-clear through IDV.</li>
+        <li><strong>User action:</strong> <code>idv_cancelled</code>, <code>not_ishuman</code></li>
+        <li><strong>Infrastructure:</strong> <code>revocation_data_untrusted</code></li>
+        <li><strong>Fresh challenge:</strong> <code>doubt_required</code> requires an explicit <code>verifyFreshForBackend()</code> call after your site clears the doubt path.</li>
     </ul>
     <p>After the first successful verification, repeat calls on the same tab typically validate from cache with no network call (local Ed25519 + revocation bloom).</p>
 </div>
@@ -297,7 +429,7 @@ def signup():
         <p>Call <code>verify({ autoProvision: true })</code> once at an entry point. After that, <code>getPPID()</code>, <code>getVerification()</code>, and <code>stamp()</code> read the cached session with no popup, so they're safe to use inline anywhere in your app.</p>
     </div>
 
-    <h3>Helper methods</h3>
+    <h3>Audit helpers</h3>
     <table class="docs-table">
         <thead>
             <tr><th>Method</th><th>Returns</th><th>Notes</th></tr>
@@ -408,7 +540,8 @@ if not check.ok:
             <tr><td><code>POST</code></td><td><code>/api/ishuman/site-doubt</code></td><td>Require deliberate fresh IDV without creating a ban.</td><td><code>X-API-Key</code></td></tr>
             <tr><td><code>POST</code></td><td><code>/api/ishuman/site-doubt-clear</code></td><td>Explicitly clear a site doubt.</td><td><code>X-API-Key</code></td></tr>
             <tr><td><code>GET</code></td><td><code>/api/ishuman/site-doubts</code></td><td>List active doubts for your site.</td><td><code>X-API-Key</code></td></tr>
-            <tr><td><code>GET</code></td><td><code>/api/ishuman/check</code></td><td>Return separate <code>blocked</code> and <code>doubt_required</code> decisions.</td><td><code>X-API-Key</code></td></tr>
+            <tr><td><code>GET</code></td><td><code>/api/ishuman/check</code></td><td>Return separate <code>blocked</code> and <code>doubt_required</code> decisions for a PPID.</td><td><code>X-API-Key</code> (server-only)</td></tr>
+            <tr><td><code>GET</code></td><td><code>/api/revocation/bloom-filter</code></td><td>Signed global revocation Bloom snapshot (backend verifiers cache ~15&nbsp;min).</td><td>None</td></tr>
             <tr><td><code>GET</code></td><td><code>/api/ishuman/site-blocks</code></td><td>List active blocks for your site.</td><td><code>X-API-Key</code></td></tr>
             <tr><td><code>GET</code></td><td><code>/api/ishuman/stats</code></td><td>Public network statistics.</td><td>None</td></tr>
         </tbody>
@@ -420,12 +553,10 @@ if not check.ok:
     <h2>Revocation and abuse controls</h2>
     <p>Do not rely on the abuser&apos;s browser or wallet to enforce a ban.</p>
     <h3>Tier 0: Immediate site deny (your app)</h3>
-    <p>Deny the current session or action (403, sign-out, etc.) while lemma.id propagates canonical revocation.</p>
-    <h3>Tier 1: Site-bound PPID revocation (immediate, canonical)</h3>
-    <p>Call <code>POST /api/ishuman/site-block</code> with your site API key. lemma.id writes a <code>SiteBlock</code> row and a canonical <code>RevocationList</code> entry, then publishes a Bloom snapshot so verifiers reject that PPID on your site across devices.</p>
-    <p>You can also revoke IAM users via <code>POST /api/developer/sites/&lt;site_id&gt;/users/&lt;ppid&gt;/revoke</code>, which triggers the same canonical PPID path.</p>
-    <p>With the verifier SDK, use <code>isBlockedLocally(ppid)</code> or call <code>GET /api/ishuman/check</code> server-side.</p>
-    <p>A site block persists through fresh IDV, recovery, and renewal until your authenticated site-unblock call removes it. Use site doubt when you want a temporary fresh-IDV challenge instead.</p>
+    <p>Deny the current session or action (403, sign-out, etc.) while your site policy propagates.</p>
+    <h3>Tier 1: Site-bound PPID block (canonical abuse path)</h3>
+    <p>Call <code>POST /api/ishuman/site-block</code> with your site API key. lemma.id writes a <code>SiteBlock</code> row scoped to your site. Site blocks are <strong>not</strong> published to the global Bloom filter — they are enforced through your backend site-policy layer.</p>
+    <p>Mirror block state on your server and expose it to the SDK via <code>isBlockedLocally</code>, or query <code>GET /api/ishuman/check</code> server-side (never expose your API key to the browser). A site block persists through fresh IDV, recovery, and renewal until your authenticated <code>POST /api/ishuman/site-unblock</code> call removes it. Use <code>POST /api/ishuman/site-doubt</code> when you want a temporary fresh-IDV challenge instead of a ban.</p>
     <div class="code-block">
         <div class="code-header">
             <span>curl — site-block</span>
@@ -436,6 +567,27 @@ if not check.ok:
   -H "X-API-Key: YOUR_SITE_API_KEY" \
   -d '{"ppid": "did:lemma:ppid_...", "reason": "Terms violation — automated activity"}'</code>
     </div>
+    <h3>Global Bloom revocation (network-wide)</h3>
+    <p>Network-wide credential revocation is reflected in <code>GET /api/revocation/bloom-filter</code>. The SDK checks this locally (~15&nbsp;min cache). A <code>revoked</code> reason means the credential is in the global Bloom; with <code>autoProvision: true</code> the user may recover via fresh issuance unless your site policy blocks them. This is separate from site-local blocks.</p>
+    <p style="color: var(--gray-600); font-size: 14px;">Network-wide enumeration revocation endpoints are retired (HTTP 410). Use site-block for relying-site abuse control.</p>
+</div>
+
+<div class="docs-section" id="framework-notes">
+    <h2>Framework notes</h2>
+    <p>Adapt the same crypto contract; do not change verification semantics per framework.</p>
+    <table class="docs-table">
+        <thead>
+            <tr><th>Stack</th><th>Client</th><th>Server</th></tr>
+        </thead>
+        <tbody>
+            <tr><td><strong>React / Next.js</strong></td><td>Load SDK in a client component or <code>useEffect</code>; call <code>verifyForBackend</code> before submit</td><td>Route handler verifies <code>presentation</code></td></tr>
+            <tr><td><strong>Vue / Nuxt</strong></td><td>Client-only SDK integration</td><td>Server middleware or API route</td></tr>
+            <tr><td><strong>Rails</strong></td><td>Stimulus or vanilla JS for SDK</td><td>Controller action + <code>lemma_ishuman_verify</code></td></tr>
+            <tr><td><strong>Django</strong></td><td>Template script or JS bundle</td><td>View + <code>VerificationContext</code></td></tr>
+            <tr><td><strong>PHP</strong></td><td>Script tag + fetch to your API</td><td>Python helper or port verify logic</td></tr>
+        </tbody>
+    </table>
+    <p style="color: var(--gray-600); font-size: 14px;">For SSR frameworks, keep <code>IsHumanVerifier</code> in <strong>client components only</strong> — it uses <code>window</code>, popups, and browser crypto.</p>
 </div>
 
 <div class="docs-section">

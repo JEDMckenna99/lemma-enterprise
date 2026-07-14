@@ -20,7 +20,7 @@
 <!-- Critical CSS for docs hero and layout - inlined for fast LCP -->
 <style>
     /* Critical above-the-fold styles */
-    .docs-hero{background:linear-gradient(135deg,var(--primary) 0%,#764ba2 100%);color:var(--white);padding:80px 20px;text-align:center;min-height:200px}
+    .docs-hero{background:linear-gradient(135deg,var(--primary) 0%,#4f46e5 100%);color:var(--white);padding:80px 20px;text-align:center;min-height:200px}
     .docs-hero h1{font-size:48px;margin:0 0 16px 0;font-weight:700;color:var(--white)}
     .docs-hero p{font-size:20px;opacity:.95;max-width:600px;margin:0 auto}
     .docs-container{max-width:1200px;margin:0 auto;padding:60px 20px}
@@ -69,10 +69,10 @@
             <div class="nav-section">
                 <div class="nav-title">📚 New Guides</div>
                 <a href="#integration-guides" class="nav-link active">All Guides</a>
-                <a href="/docs/integration/QUICK_START_SIMPLE_LOGIN.md" class="nav-link" target="_blank">Simple Login ↗</a>
-                <a href="/docs/api/IAM_API_REFERENCE.md" class="nav-link" target="_blank">IAM API Ref ↗</a>
+                <a href="/docs" class="nav-link">isHuman integration docs</a>
+                <a href="/docs/integration/ISHUMAN_AGENT_INTEGRATION.md" class="nav-link" target="_blank">AI agent guide ↗</a>
                 <a href="/docs/ERROR_CODES.md" class="nav-link" target="_blank">Error Codes ↗</a>
-                <a href="/examples/complete-integration-example.html" class="nav-link" target="_blank">Complete Example ↗</a>
+                <a href="/docs#quickstart" class="nav-link">Quickstart</a>
             </div>
             
             <div class="nav-section">
@@ -120,22 +120,22 @@
                 
                 <div style="display: grid; gap: 24px; margin-bottom: 48px;">
                     <div style="background: var(--white); border: 2px solid var(--primary-200); border-radius: 12px; padding: 24px;">
-                        <h3 style="color: var(--primary-600); margin-bottom: 12px;">🚀 Simple Login (5 minutes)</h3>
+                        <h3 style="color: var(--primary-600); margin-bottom: 12px;">🚀 isHuman integration (recommended)</h3>
                         <p style="color: var(--gray-600); margin-bottom: 16px;">
-                            Add email-based authentication with built-in bot resistance and reduced tracking surface.
+                            Canonical relying-site guide for site-private PPIDs, passkey and isHuman assurance tiers, and signed backend verification.
                         </p>
-                        <a href="/docs/integration/QUICK_START_SIMPLE_LOGIN.md" target="_blank" style="color: var(--primary-600); font-weight: 600; text-decoration: none;">
-                            Read Guide → docs/integration/QUICK_START_SIMPLE_LOGIN.md
+                        <a href="/docs/integration/ISHUMAN_AGENT_INTEGRATION.md" target="_blank" style="color: var(--primary-600); font-weight: 600; text-decoration: none;">
+                            Read guide → docs/integration/ISHUMAN_AGENT_INTEGRATION.md
                         </a>
                     </div>
                     
                     <div style="background: var(--white); border: 2px solid var(--gray-200); border-radius: 12px; padding: 24px;">
-                        <h3 style="color: var(--gray-900); margin-bottom: 12px;">🏢 IAM API Reference</h3>
+                        <h3 style="color: var(--gray-900); margin-bottom: 12px;">📖 Human-readable docs</h3>
                         <p style="color: var(--gray-600); margin-bottom: 16px;">
-                            Complete API documentation for permissions, roles, user management, and revocation. All endpoints with examples.
+                            SDK quickstart, trust tiers, API reference, and revocation guidance for relying-site developers.
                         </p>
-                        <a href="/docs/api/IAM_API_REFERENCE.md" target="_blank" style="color: var(--primary-600); font-weight: 600; text-decoration: none;">
-                            Read Guide → docs/api/IAM_API_REFERENCE.md
+                        <a href="/docs" style="color: var(--primary-600); font-weight: 600; text-decoration: none;">
+                            Open /docs →
                         </a>
                     </div>
                     
@@ -688,7 +688,7 @@ window.addEventListener('DOMContentLoaded', checkAccess);
             </section>
 
             <!-- Get Started CTA -->
-            <section style="background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%); color: white; padding: 48px; border-radius: 16px; text-align: center; margin: 60px 0;">
+            <section style="background: var(--primary); color: white; padding: 48px; border-radius: 16px; text-align: center; margin: 60px 0;">
                 <h2 style="color: white; margin-bottom: 16px;">Ready to Get Started?</h2>
                 <p style="margin-bottom: 32px; opacity: 0.95;">Start with our free tier - no credit card required</p>
                 <a href="/dashboard" class="btn-primary" style="background: white; color: var(--primary); padding: 16px 48px; font-size: 18px;">

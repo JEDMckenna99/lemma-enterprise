@@ -44,12 +44,12 @@ Read these files first to internalize the current architecture:
 | `static/js/ishuman-verifier.js`           | The relying-site SDK. Embeds in customer sites, verifies isHuman credentials locally with WebCrypto Ed25519. Handles popup-first issuance, Bloom revocation checks, cross-tab broadcast, session-cache hot path. |
 | `static/js/lemma-wallet.js`               | The user-facing wallet SDK. Manages IndexedDB storage, passkey unlock, PRF-derived at-rest encryption, credential issuance helpers, daily-unlock bundle, BroadcastChannel sync.                                  |
 | `static/js/lemma-keys.js`                 | Crypto primitives (HKDF, Ed25519, canonicalization). Shared by wallet and verifier.                                                                                                                              |
-| `api/ishuman.py`                          | Production isHuman API: `/api/ishuman/start-verification`, Stripe Identity webhook, `/api/ishuman/derive-site-proof`, `/api/ishuman/verify-presentation`. Master credential issuance lives here.                 |
-| `api/ishuman_demo.py`                     | Demo orchestration: test-mode IDV, demo site blocks, network revocation drill, reset endpoints. Gated by `LEMMA_ISHUMAN_DEMO_`* env vars.                                                                        |
+| `api/ishuman.py`                          | Production isHuman API: `/api/ishuman/start-verification`, Didit + legacy Stripe webhooks, `/api/ishuman/derive-site-proof`, `/api/ishuman/verify-presentation`. Master credential issuance lives here.                 |
+| `api/ishuman_demo.py`                     | Demo orchestration: test-mode IDV, demo site blocks, reset endpoints. Network-revocation drill **retired** (HTTP 410). Gated by `LEMMA_ISHUMAN_DEMO_`* env vars.                                                                        |
 | `api/site_ppid_revocation.py`             | Canonical PPID revocation + the shared `clear_amnesty_eligible_wallet_revocations` helper.                                                                                                                       |
 | `api/revocation_api.py`                   | Serves `/api/revocation/bloom-filter` — the signed Bloom snapshot + trust list every relying site fetches.                                                                                                       |
 | `api/ppid.py`                             | PPID derivation primitives (HMAC-based, pairwise per (person_root, site)).                                                                                                                                       |
-| `api/identity_roots.py`                   | document_root + person_root derivation from Stripe Identity document fields.                                                                                                                                     |
+| `api/identity_roots.py`                   | document_root + person_root derivation from IDV document fields (Didit default; Stripe legacy).                                                                                                                                     |
 | `api/issuer_trust_list.py`                | Signed multi-issuer trust list construction + verification.                                                                                                                                                      |
 | `api/bloom_snapshot.py`                   | Bloom snapshot building, signing, cache invalidation.                                                                                                                                                            |
 | `templates/wallet_ishuman_idv.html`       | The lemma.id popup that runs IDV and derives site proofs.                                                                                                                                                        |
@@ -104,7 +104,7 @@ After delivering a working popup-first issuance flow, post-revocation fresh-IDV 
 2. **Master credential is a load-bearing dependency** in several server flows it doesn't need to be
 3. **Bridge iframe + popup duality** carries cruft from the pre-storage-partitioning era; both code paths can drift
 4. **Pepper/salt rotation has no story** — single-point-of-failure for the entire network's privacy guarantee
-5. **Single-issuer dependence on Stripe Identity** for IDV
+5. **Single-issuer dependence on Stripe Identity** for IDV — **resolved**: Didit is default; Stripe retained for migration recovery only
 6. **Bloom filter is a single global structure** that won't scale past ~1M revocations
 7. **Cross-device transfer is undocumented** — the explicit token flow exists but isn't the advertised story
 8. **Demo and production share an app** — `ENVIRONMENT=production` on the main app breaks demo flows and vice versa
@@ -399,7 +399,7 @@ SDK.verify():
   3. If no cache hit:
         Open popup at /wallet/ishuman-idv?issue_mode=site_proof&...
         Popup runs ensureIsHumanIssuanceReady, derives site proof, returns
-     If user has no master yet: popup runs IDV first (Stripe or test mode)
+     If user has no master yet: popup runs IDV first (Didit or test mode)
   4. Verify the returned credential locally (browser-canonical Ed25519)
   5. Cache to localStorage
   6. Return result
@@ -687,7 +687,7 @@ Structure:
 - Wallet (browser process + IndexedDB + passkey)
 - Relying site (frontend SDK + backend verifier)
 - Lemma.id network (issuer, trust list publisher, Bloom snapshot publisher)
-- IDV provider (Stripe Identity, etc.)
+- IDV provider (Didit default; Stripe Identity legacy for document-root recovery)
 - Adversaries (see §3)
 
 ## 2. Trust assumptions (the things we believe)
@@ -719,7 +719,7 @@ Structure:
 - Can read decrypted wallet contents during a passkey-unlocked session
 - Cannot persist (each unlock is per-session)
 
-### 3.5 Compromised IDV provider (Stripe Identity fooled by a fake document)
+### 3.5 Compromised IDV provider (fooled by a fake document)
 - Network mints a credential for a fraudulent identity
 - Mitigated by: multi-issuer triangulation, ongoing document quality monitoring
 
@@ -780,7 +780,7 @@ Third-party SDKs (Go, Rust) need this to produce verifiable signatures. Without 
 - Causes `/api/demo/ishuman/verify-once-test-mode` to return `prod_test_verify_forbidden`
 - Causes `/api/demo/ishuman/self-reset` to return `not_available_in_production`
 
-But the same app serves the demo at `lemma.id/demo/ishuman`. Demo and production semantics fight each other.
+But the same app serves the demo at `lemma.id/demo`. Demo and production semantics fight each other.
 
 **v2 design — two apps:**
 

@@ -9,7 +9,14 @@ Provide a repeatable, non-destructive verification process that confirms:
 - core auth/revocation endpoints are healthy,
 - transport and header controls are still enforced,
 - CORS/origin behavior remains constrained,
+- auth scope matrix policy is unchanged,
 - launch evidence is captured for the GA gate.
+
+## Authoritative CI gate
+
+[`.github/workflows/auth-launch-gate.yml`](../../.github/workflows/auth-launch-gate.yml) runs on every push to `main` and is the deploy gate of record. Manual runs below should mirror that workflow.
+
+Required GitHub Actions secret: `LEMMA_PLATFORM_API_KEY` (falls back to `LEMMA_API_KEY`).
 
 ## Prerequisites
 
@@ -17,12 +24,26 @@ Provide a repeatable, non-destructive verification process that confirms:
 - Workspace at repository root.
 - Python available for `scripts/launch_gate_smoke_ci.py`.
 - PowerShell available (Windows runner/local shell).
+- `LEMMA_PLATFORM_API_KEY` set locally for strict scope-matrix enforcement.
 
 ## Command
 
 Run:
 
-`powershell -ExecutionPolicy Bypass -File scripts/post_deploy_launch_gate.ps1 -BaseUrl https://lemma.id`
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/post_deploy_launch_gate.ps1 `
+  -BaseUrl https://lemma.id `
+  -PlatformApiKey $env:LEMMA_PLATFORM_API_KEY `
+  -StrictScopePolicy `
+  -RequirePlatformApiKey
+```
+
+Scope matrix preflight (also run in CI before post-deploy):
+
+```powershell
+python scripts/generate_auth_scope_matrix.py
+python scripts/review_auth_scope_matrix.py --strict-state-changing
+```
 
 ## Output Artifacts
 
@@ -35,6 +56,7 @@ The script writes timestamped artifacts to `ops/evidence/launch/`:
 
 ## Acceptance Criteria
 
+- Scope matrix review passes (`--strict-state-changing`).
 - Smoke checks pass (script returns success).
 - HTTP traffic is redirected to HTTPS.
 - TLS <=1.1 handshake fails; TLS1.2 succeeds.
@@ -57,4 +79,3 @@ After each run, update:
 
 - `docs/status/GA_LAUNCH_READINESS_CHECKLIST.md` (latest verification run + P0 statuses),
 - `docs/security/SECURITY_CHECKLIST.md` (control statuses and notes).
-

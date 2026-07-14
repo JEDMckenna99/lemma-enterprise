@@ -6,9 +6,9 @@ This workflow keeps local development, Heroku staging, and production consistent
 
 Use three separate tiers:
 
-- **Local**: `.env.local`, local database/Redis, Stripe test keys, optional tunnel for Stripe webhooks.
-- **Staging Heroku**: dedicated Heroku app, Heroku Postgres/Redis, Stripe test keys, public HTTPS webhooks.
-- **Production Heroku**: production Heroku app, production Postgres/Redis, Stripe live keys, test helpers disabled.
+- **Local**: `.env.local`, local database/Redis, Didit sandbox credentials (or skeleton IDV), optional tunnel for Didit webhooks.
+- **Staging Heroku**: dedicated Heroku app, Heroku Postgres/Redis, Didit sandbox, public HTTPS webhooks.
+- **Production Heroku**: production Heroku app, production Postgres/Redis, Didit production workflow, test helpers disabled.
 
 Do not commit real `.env` files. The tracked examples are:
 
@@ -30,10 +30,17 @@ Copy-Item .env.local.example .env.local
 - `LEMMA_PPID_ROOT_KEY`
 - `DATABASE_URL`
 - `REDIS_URL`
-- `STRIPE_SECRET_KEY=sk_test_...`
-- `STRIPE_IDENTITY_WEBHOOK_SECRET=whsec_...`
+- `LEMMA_ISHUMAN_DIDIT_ENABLED=true`
+- `DIDIT_API_KEY`
+- `DIDIT_WORKFLOW_ID`
+- `DIDIT_WEBHOOK_SECRET`
 - `LEMMA_ISHUMAN_DEMO_TEST_TOKEN`
 - `LEMMA_ISHUMAN_DEMO_ADMIN_TOKEN`
+
+Optional legacy Stripe keys (migration recovery only):
+
+- `STRIPE_SECRET_KEY=sk_test_...`
+- `STRIPE_IDENTITY_WEBHOOK_SECRET=whsec_...`
 
 3. Validate local config:
 
@@ -41,31 +48,29 @@ Copy-Item .env.local.example .env.local
 python scripts/check_env_parity.py --environment local --env-file .env.local
 ```
 
-## Stripe Test Webhooks
+## Didit Webhooks
 
-For local webhook testing, expose the local app through a tunnel and point Stripe test-mode webhooks at:
-
-```text
-https://<tunnel-host>/api/webhooks/stripe-identity
-```
-
-Subscribe to:
-
-- `identity.verification_session.verified`
-- `identity.verification_session.requires_input`
-- `identity.verification_session.canceled`
-
-For staging, point Stripe test-mode webhooks at:
+For local webhook testing, expose the local app through a tunnel and point Didit webhooks at:
 
 ```text
-https://<staging-app>.herokuapp.com/api/webhooks/stripe-identity
+https://<tunnel-host>/api/webhooks/didit-identity
 ```
 
-Keep production webhooks separate and live-mode only:
+For staging, point Didit webhooks at:
 
 ```text
-https://lemma.id/api/webhooks/stripe-identity
+https://<staging-app>.herokuapp.com/api/webhooks/didit-identity
 ```
+
+Production webhooks:
+
+```text
+https://lemma.id/api/webhooks/didit-identity
+```
+
+### Legacy Stripe webhooks (migration only)
+
+If you still need Stripe document-root recovery on a staging app, optionally point Stripe test-mode webhooks at `/api/webhooks/stripe-identity`. Do not use Stripe as the primary IDV rail for new demos.
 
 ## Heroku Staging Setup
 
@@ -74,8 +79,10 @@ Create or use a staging Heroku app, then set config from `.env.staging.example` 
 ```powershell
 heroku config:set ENVIRONMENT=staging -a <staging-app>
 heroku config:set FLASK_ENV=production -a <staging-app>
-heroku config:set STRIPE_SECRET_KEY=sk_test_... -a <staging-app>
-heroku config:set STRIPE_IDENTITY_WEBHOOK_SECRET=whsec_... -a <staging-app>
+heroku config:set LEMMA_ISHUMAN_DIDIT_ENABLED=true -a <staging-app>
+heroku config:set DIDIT_API_KEY=... -a <staging-app>
+heroku config:set DIDIT_WORKFLOW_ID=... -a <staging-app>
+heroku config:set DIDIT_WEBHOOK_SECRET=... -a <staging-app>
 heroku config:set LEMMA_ISHUMAN_DEMO_ALLOW_TEST_VERIFY=true -a <staging-app>
 heroku config:set LEMMA_ISHUMAN_DEMO_TEST_TOKEN=<random-token> -a <staging-app>
 ```
@@ -88,11 +95,13 @@ powershell -ExecutionPolicy Bypass -File scripts/check_heroku_env_parity.ps1 -Ap
 
 ## Production Guardrails
 
-Production must use live Stripe keys and must not enable automated demo completion:
+Production must use live Didit credentials and must not enable automated demo completion:
 
 ```text
-STRIPE_SECRET_KEY=sk_live_...
 ENVIRONMENT=production
+LEMMA_ISHUMAN_DIDIT_ENABLED=true
+DIDIT_API_KEY=...
+DIDIT_WORKFLOW_ID=...
 LEMMA_ISHUMAN_DEMO_ALLOW_TEST_VERIFY=false
 ```
 
@@ -104,7 +113,6 @@ powershell -ExecutionPolicy Bypass -File scripts/check_heroku_env_parity.ps1 -Ap
 
 The validator fails production if:
 
-- Stripe key is not `sk_live_...`
 - `LEMMA_ISHUMAN_DEMO_ALLOW_TEST_VERIFY` is enabled
 - `ENVIRONMENT` is not `production`
 - HTTPS URLs are missing
@@ -121,14 +129,15 @@ python scripts/check_env_parity.py --environment production --env-file .env.prod
 
 Run locally or on staging:
 
-1. Open `/demo/ishuman`.
+1. Open `https://lemma.id/demo` (alias: `/demo/ishuman` on staging).
 2. Create or unlock the wallet.
-3. Start the Stripe Identity demo rail.
-4. In test mode, enter `LEMMA_ISHUMAN_DEMO_TEST_TOKEN` and click **Test mode: complete verification**.
+3. Start the Didit IDV flow (or use skeleton/test-verify on non-production).
+4. In test mode on staging, enter `LEMMA_ISHUMAN_DEMO_TEST_TOKEN` and click **Test mode: complete verification**.
 5. Poll and store the master proof.
 6. Verify the ticketing and free-trial demo sites.
 7. Block the ticketing PPID and confirm free trial still passes.
-8. Optional: enter `LEMMA_ISHUMAN_DEMO_ADMIN_TOKEN` and approve network revocation.
+
+Site-block is the supported enforcement drill. Network-wide revocation is retired (HTTP 410 `network_revocation_retired`).
 
 ## Recommended Pre-Demo Checks
 

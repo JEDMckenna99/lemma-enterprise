@@ -1,4 +1,4 @@
-"""Public documentation exposes the relying-site lemma.id product."""
+"""Public documentation exposes only the approved relying-site contract."""
 
 from __future__ import annotations
 
@@ -28,3 +28,108 @@ def test_legacy_agent_docs_redirect_to_ishuman_docs(monkeypatch):
             assert response.status_code == 200
             assert response.request.path == "/docs"
             assert b"private proof layer" in response.data.lower() or b"ishuman" in response.data.lower()
+
+
+@pytest.mark.integration
+def test_public_doc_allowlist_serves_approved_markdown(monkeypatch):
+    monkeypatch.setenv("DATABASE_URL", "sqlite:///:memory:")
+    monkeypatch.setenv("SESSION_SECRET", "test-session-secret")
+
+    from app import create_app
+
+    app = create_app()
+    app.config["TESTING"] = True
+    with app.test_client() as client:
+        for path in (
+            "/docs/integration/ISHUMAN_AGENT_INTEGRATION.md",
+            "/docs/ERROR_CODES.md",
+            "/docs/demo/README.md",
+            "/docs/demo/PRESALE_DEMO_SCRIPT.md",
+            "/docs/product/PASSKEY_STAMP_INPUT_BURN.md",
+        ):
+            response = client.get(path)
+            assert response.status_code == 200, path
+            assert response.mimetype.startswith("text/markdown")
+            assert len(response.data) > 100
+
+
+@pytest.mark.integration
+def test_public_doc_allowlist_denies_internal_paths(monkeypatch):
+    monkeypatch.setenv("DATABASE_URL", "sqlite:///:memory:")
+    monkeypatch.setenv("SESSION_SECRET", "test-session-secret")
+
+    from app import create_app
+
+    app = create_app()
+    app.config["TESTING"] = True
+    with app.test_client() as client:
+        denied = (
+            "/docs/operations/ENVIRONMENT_CONFIG.md",
+            "/docs/security/THREAT_MODEL.md",
+            "/docs/product/COMPARTMENTALIZED_PERSONAS.md",
+            "/docs/AGENT_OPS_READINESS.md",
+            "/docs/integration/SIMPLE_INTEGRATION_GUIDE.md",
+            "/docs/integration/IAM_ONLY_INTEGRATION_GUIDE.md",
+            "/docs/operations/INTERNAL_COGS_ESTIMATE.csv",
+            "/docs/README.md",
+        )
+        for path in denied:
+            response = client.get(path)
+            assert response.status_code == 404, path
+
+
+@pytest.mark.integration
+def test_public_doc_allowlist_blocks_traversal_variants(monkeypatch):
+    monkeypatch.setenv("DATABASE_URL", "sqlite:///:memory:")
+    monkeypatch.setenv("SESSION_SECRET", "test-session-secret")
+
+    from app import create_app
+
+    app = create_app()
+    app.config["TESTING"] = True
+    with app.test_client() as client:
+        traversal_paths = (
+            "/docs/../operations/ENVIRONMENT_CONFIG.md",
+            "/docs/integration/../../operations/ENVIRONMENT_CONFIG.md",
+            "/docs/integration/%2e%2e/operations/ENVIRONMENT_CONFIG.md",
+            "/docs/.hidden.md",
+        )
+        for path in traversal_paths:
+            response = client.get(path)
+            assert response.status_code == 404, path
+
+
+@pytest.mark.integration
+def test_llms_txt_is_served(monkeypatch):
+    monkeypatch.setenv("DATABASE_URL", "sqlite:///:memory:")
+    monkeypatch.setenv("SESSION_SECRET", "test-session-secret")
+
+    from app import create_app
+
+    app = create_app()
+    app.config["TESTING"] = True
+    with app.test_client() as client:
+        response = client.get("/llms.txt")
+        assert response.status_code == 200
+        assert b"ISHUMAN_AGENT_INTEGRATION.md" in response.data
+        assert b"ishuman-verifier.js" in response.data
+
+
+def test_public_doc_path_normalization_unit():
+    from api.public_docs import is_public_doc_allowed, normalize_public_doc_path
+
+    assert normalize_public_doc_path("integration/ISHUMAN_AGENT_INTEGRATION.md") == (
+        "integration/ISHUMAN_AGENT_INTEGRATION.md"
+    )
+    assert normalize_public_doc_path("integration\\ISHUMAN_AGENT_INTEGRATION.md") == (
+        "integration/ISHUMAN_AGENT_INTEGRATION.md"
+    )
+    assert normalize_public_doc_path("../operations/ENVIRONMENT_CONFIG.md") is None
+    assert normalize_public_doc_path("integration/../../operations/ENVIRONMENT_CONFIG.md") is None
+
+    allowed, normalized = is_public_doc_allowed("integration/ISHUMAN_AGENT_INTEGRATION.md")
+    assert allowed is True
+    assert normalized == "integration/ISHUMAN_AGENT_INTEGRATION.md"
+
+    allowed, _ = is_public_doc_allowed("operations/ENVIRONMENT_CONFIG.md")
+    assert allowed is False

@@ -1,3 +1,5 @@
+> **Superseded** by [ISHUMAN Agent Integration Guide](ISHUMAN_AGENT_INTEGRATION.md). This document is retained for historical reference only.
+
 # Lemma Platform - Integration Guide
 
 ## What is Lemma?

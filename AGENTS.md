@@ -14,6 +14,8 @@ Or locally: `docs/integration/ISHUMAN_AGENT_INTEGRATION.md`
 
 **Pointer file:** https://lemma.id/llms.txt
 
+Or locally: `llms.txt`
+
 ## Product scope
 
 - **In scope:** Browser SDK (`ishuman-verifier.js`), site-private PPIDs, local backend verification, optional site API keys for abuse controls.

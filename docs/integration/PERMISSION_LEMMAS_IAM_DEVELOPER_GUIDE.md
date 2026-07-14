@@ -1,3 +1,5 @@
+> **Superseded** by [ISHUMAN Agent Integration Guide](ISHUMAN_AGENT_INTEGRATION.md). This document is retained for historical reference only.
+
 # Permission Lemmas IAM - Developer Guide
 
 ## Overview
@@ -331,7 +333,7 @@ import { LemmaIAM } from '@lemma/iam-sdk';
 
 const lemmaIAM = new LemmaIAM({
   apiKey: 'your-api-key',
-  siteId: 'site_abc123',
+  siteId: 'app.example.com',
   baseUrl: 'https://lemma.id/api/v1',
   clientId: 'lemma_oauth_site_abc123',
   redirectUri: 'https://yourcompany.com/callback'
@@ -342,7 +344,7 @@ const hasAccess = await lemmaIAM.verifyAccess({
   userDid: 'did:lemma:user123',
   resource: '/admin/users',
   action: 'read',
-  userLemmas: userWallet.getPermissionLemmas('site_abc123')
+  userLemmas: userWallet.getPermissionLemmas('app.example.com')
 });
 
 // OAuth "Sign in with Lemma"
@@ -359,7 +361,7 @@ from lemma_iam import LemmaIAM
 
 lemma = LemmaIAM(
     api_key='your-api-key',
-    site_id='site_abc123',
+    site_id='app.example.com',
     base_url='https://lemma.id/api/v1'
 )
 
@@ -368,7 +370,7 @@ result = lemma.verify_access(
     user_did='did:lemma:user123',
     resource='/admin/users',
     action='read',
-    user_lemmas=user_wallet.get_permission_lemmas('site_abc123')
+    user_lemmas=user_wallet.get_permission_lemmas('app.example.com')
 )
 
 print(f"Access granted: {result.has_access}")

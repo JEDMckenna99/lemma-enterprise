@@ -12,7 +12,7 @@
 | Wallet             | Browser process + IndexedDB + passkey (PRF-derived at-rest key). See `static/js/lemma-wallet.js`. |
 | Relying site       | Customer frontend SDK (`static/js/ishuman-verifier.js`) + backend verifier package.          |
 | Lemma.id network   | Credential issuer, trust-list publisher, Bloom snapshot publisher (`api/*.py`).              |
-| IDV provider       | Stripe Identity today; pluggable per Phase 3.2.                                              |
+| IDV provider       | Didit (default upstream IDV rail); Stripe Identity retained for legacy document-root recovery only. |
 | Adversaries        | See section 3.                                                                               |
 
 ## 2. Trust assumptions (things we believe)
@@ -68,7 +68,7 @@ wallet compromise until lock + reissue.
 
 ### 3.5 Compromised IDV provider (fooled by a fake document)
 - Network mints a credential for a fraudulent identity.
-- Mitigated by: multi-issuer triangulation (Phase 3.2) and document-quality monitoring.
+- Mitigated by: multi-issuer triangulation (Didit + legacy Stripe recovery paths) and document-quality monitoring.
 
 ### 3.6 Compromised Lemma.id (pepper/salt or issuer key exposed)
 - pepper/salt exposure: attacker can compute PPIDs given documents.

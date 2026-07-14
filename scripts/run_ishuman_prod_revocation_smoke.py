@@ -5,11 +5,12 @@ Production revocation smoke drill for isHuman.
 Uses:
   - site API key from Heroku DB (site_demo_tickets) OR LEMMA_ISHUMAN_PROD_TEST_SITE_API_KEY
   - prod test wallet fixture (LEMMA_ISHUMAN_PROD_TEST_WALLET_*)
-  - optional LEMMA_PLATFORM_ADMIN_CREDENTIAL (JSON or base64url X-Lemma-Credential) for approve-revocation step
+
+Network-wide revocation is permanently retired (HTTP 410 network_revocation_retired).
+Site-block / site-unblock drills below are the supported enforcement path.
 
 Usage:
   export LEMMA_ISHUMAN_PROD_TEST_WALLET_SECRET=...
-  export LEMMA_PLATFORM_ADMIN_CREDENTIAL='{"id":"cred_...","subject":"did:lemma:ppid_...",...}'
   python scripts/run_ishuman_prod_revocation_smoke.py
   python scripts/run_ishuman_prod_revocation_smoke.py --base-url https://lemma.id
 """
@@ -460,20 +461,21 @@ def main() -> int:
             net_data = r.json()
         except ValueError:
             net_data = {}
-        if r.status_code == 503 and net_data.get("error") == "network_revocation_disabled":
+        err = (net_data.get("error") or "") if isinstance(net_data, dict) else ""
+        if r.status_code == 410 and err == "network_revocation_retired":
             results.append(
                 _step(
                     "network-revoke (customer API key)",
                     True,
-                    "disabled (expected — set LEMMA_ISHUMAN_NETWORK_REVOCATION_ENABLED=1 to drill)",
+                    "retired (expected — use site-block for enforcement)",
                 )
             )
         else:
             results.append(
                 _step(
                     "network-revoke (customer API key)",
-                    r.ok and net_data.get("success"),
-                    str(net_data)[:200],
+                    False,
+                    f"expected HTTP 410 network_revocation_retired; got HTTP {r.status_code} {str(net_data)[:200]}",
                 )
             )
         approve_headers = {**admin_headers, "Content-Type": "application/json"}
@@ -487,19 +489,21 @@ def main() -> int:
             timeout=30,
         )
         approve_data = r.json() if r.headers.get("content-type", "").startswith("application/json") else {}
+        approve_err = (approve_data.get("error") or "") if isinstance(approve_data, dict) else ""
+        approve_retired = r.status_code == 410 and approve_err == "network_revocation_retired"
         results.append(
             _step(
                 "admin approve-revocation",
-                r.status_code == 200 and approve_data.get("success"),
+                approve_retired,
                 f"HTTP {r.status_code} {str(approve_data)[:200]}",
             )
         )
     else:
         results.append(
             _step(
-                "admin approve-revocation",
+                "network-revoke + approve-revocation",
                 True,
-                "skipped — set LEMMA_PLATFORM_ADMIN_CREDENTIAL to enable",
+                "skipped — network revocation retired; site-block drills above are authoritative",
             )
         )
 

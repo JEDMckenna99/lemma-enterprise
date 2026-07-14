@@ -185,9 +185,13 @@ payouts). The PPID stays stable when upgrading from passkey to isHuman on the sa
 | `valid`, `vc_valid`, `session_valid` | Success |
 | `no_credential`, `site_proof_required`, `wallet_locked` | Needs popup — use `autoProvision: true` |
 | `expired` | Ordinary 30-day renewal; may open the Lemma popup when auto-provisioning |
-| `revoked`, `invalid_signature`, `site_blocked` | Deny; a site block never starts recovery automatically |
+| `revoked` | Credential in global revocation bloom — deny now; with `autoProvision: true` the SDK opens fresh-IDV recovery (new credential id, same PPID when wallet/person unchanged) |
+| `invalid_signature` | Hard deny — tampered, corrupted, or unverifiable credential; no automatic recovery |
+| `site_blocked` | Permanent site ban — deny; never starts recovery automatically (only `POST /api/ishuman/site-unblock` clears it) |
 | `doubt_required` | Deny the current action, then deliberately call `verifyFreshForBackend()` |
 | `idv_cancelled` | User closed popup — prompt retry / allow popups |
+
+**`isBlockedLocally` errors fail closed:** if your policy callback throws or the fetch fails, the SDK treats the PPID as blocked (`site_blocked` on the next verify path). Implement the callback defensively and keep your policy endpoint highly available.
 
 ### `human` vs `assurance`
 
@@ -201,11 +205,15 @@ payouts). The PPID stays stable when upgrading from passkey to isHuman on the sa
 
 Pick one per endpoint. **Do not default signup to T1.**
 
+### Backend `site_id` must match SDK `siteId`
+
+Pass the same canonical hostname to `VerificationContext(site_id=...)` or `createVerifier({ siteId: ... })` that you set in the browser SDK. Offline verifiers **canonicalize on construction** (lowercase, strip `www.`, no scheme/path/port) and compare credential site binding using the same rules. Mismatches return `site_id_mismatch` even when the raw strings looked equivalent (`WWW.App.Example.com` vs `app.example.com`).
+
 | Tier | Client sends | Server verifies | Use when |
 |------|--------------|-----------------|----------|
 | **T1** | `{ ppid }` only | None | Low-risk gates only (waitlists, soft limits) |
-| **T2** (recommended) | `presentation` from `verifyForBackend()` or `stamp(..., { includeCredential: true })` | Local `verify()` / `verifyStamp()` | Signup, account creation, moderate trust |
-| **T2+** | `stampAction(...)` envelope with `action_assertion` + `action_signature` | Local `verifyActionStamp()` / `verify_action_stamp()` + nonce replay store | Checkout, withdrawals, posting, other fraud-sensitive mutations |
+| **T2** (recommended) | `presentation` from `verifyForBackend()` or `stamp(..., { includeCredential: true })` | Local `verify()` / `verifyStamp()` | **Signup**, account creation, moderate trust |
+| **T2+** | `stampAction(...)` envelope with `action_assertion` + `action_signature` | Local `verifyActionStamp()` / `verify_action_stamp()` + nonce replay store | **Mutations only** — checkout, withdrawals, posting, other fraud-sensitive server actions |
 | **T3** | Full presentation + session assertion | Local verify with `requireSessionAssertion: true`, or `POST /api/ishuman/verify-presentation` | High-trust / financial actions needing live session proof |
 
 ### Python backend (T2 + site policy)
@@ -243,6 +251,34 @@ app.post("/api/signup", async (req, res) => {
   // bind account to result.ppid
 });
 ```
+
+### Remote site policy via lemma.id check API
+
+When you register a site API key, prefer the server-only check store (cached `GET /api/ishuman/check`) over mirroring blocks in memory:
+
+```python
+from lemma_ishuman_site_policy import LemmaCheckPolicyStore
+
+policy = LemmaCheckPolicyStore(
+    site_id="app.example.com",
+    api_key=os.environ["LEMMA_SITE_API_KEY"],
+)
+result = ctx.verify_with_policy(body["presentation"], policy_store=policy)
+```
+
+```javascript
+import { createVerifier, createLemmaCheckPolicyStore } from "@lemma/ishuman-verify";
+
+const verifier = createVerifier({ siteId: "app.example.com" });
+const policy = createLemmaCheckPolicyStore({
+  siteId: "app.example.com",
+  apiKey: process.env.LEMMA_SITE_API_KEY,
+});
+
+const result = await verifier.verifyWithPolicy(req.body.presentation, { policyStore: policy });
+```
+
+Both stores fail closed when the check API is unavailable (`site_policy_unavailable`).
 
 ### Python backend (T2)
 
@@ -419,8 +455,10 @@ lookup for canonical **and** legacy PPIDs → business logic. Stable fail-closed
 reasons: `site_blocked`, `doubt_required`, `site_policy_unavailable`,
 `site_policy_not_configured`.
 
+**Automatic doubt clear:** when a user completes fresh IDV via `verifyFreshForBackend()` and the derived site PPID matches the doubted PPID, lemma.id clears the active doubt during credential billing (`cleared_by: fresh_idv_same_ppid`). Site blocks are untouched. You may also clear explicitly with `POST /api/ishuman/site-doubt-clear`.
+
 Site blocks are **not** in the global Bloom filter. Mirror blocks locally or use
-`GET /api/ishuman/check` (server-only, with API key) via `LemmaCheckPolicyStore`.
+`GET /api/ishuman/check` (server-only, with API key) via `LemmaCheckPolicyStore` (Python) or `createLemmaCheckPolicyStore` (Node/Workers).
 
 Network-wide enumeration revocation is retired. The legacy customer, admin,
 and demo endpoints return HTTP 410 with `network_revocation_retired`.
@@ -449,11 +487,15 @@ Most integrations use **only the browser SDK + local backend verify**. These end
 
 | Method | Path | Auth | Purpose |
 |--------|------|------|---------|
-| `POST` | `/api/ishuman/verify-presentation` | None | Optional server re-verify (prefer local packages) |
+| `POST` | `/api/ishuman/verify-presentation` | None | Optional server re-verify (prefer local packages); `required_assurance` defaults to `ishuman` |
 | `POST` | `/api/ishuman/site-block` | `X-API-Key` | Site-scoped PPID ban |
 | `POST` | `/api/ishuman/site-unblock` | `X-API-Key` | Remove site block |
+| `POST` | `/api/ishuman/site-doubt` | `X-API-Key` | Temporary doubt (requires fresh IDV, not a ban) |
+| `POST` | `/api/ishuman/site-doubt-clear` | `X-API-Key` | Explicitly clear an active doubt |
+| `GET` | `/api/ishuman/site-doubts` | `X-API-Key` | List active doubts for the site |
 | `GET` | `/api/ishuman/check` | `X-API-Key` | Block/revocation status for a PPID |
 | `GET` | `/api/ishuman/site-blocks` | `X-API-Key` | List active blocks |
+| `GET` | `/api/ishuman/site-binding-check` | None | Read-only hostname canonicalization + registration hint for SDK `siteId` alignment |
 | `GET` | `/api/revocation/bloom-filter` | None | Signed trust list + bloom (backend verifiers cache this) |
 
 Wallet-assertion endpoints (`start-verification`, `derive-site-proof`, etc.) are used by the Lemma popup — **not** by typical relying-site server code.
@@ -540,7 +582,7 @@ Confirm with the developer:
 
 - [ ] `siteId` matches production hostname users actually visit.
 - [ ] Protected actions fail closed when verification fails.
-- [ ] Signup/account paths use T2+ (presentation verified on server).
+- [ ] Signup/account paths use **T2** (presentation verified on server); reserve **T2+** (`stampAction`) for fraud-sensitive mutations.
 - [ ] `ppid` stored on account; no KYC fields stored.
 - [ ] Popup flows work on first visit (`autoProvision: true`).
 - [ ] If abuse APIs used, API key `site_domain` matches `siteId`.
@@ -555,7 +597,7 @@ Confirm with the developer:
 | Different PPIDs across environments | Expected — hostname binding is intentional |
 | Persistent `no_credential` | Add `autoProvision: true` on entry-point calls |
 | Block not applying | API key `site_domain` must match `siteId` exactly |
-| `site_id_mismatch` on backend | Server `site_id` must equal client `siteId` |
+| `site_id_mismatch` on backend | Server `site_id` must canonicalize to the same hostname as client `siteId` (offline verifiers lowercase and strip `www.`) |
 | `idv_cancelled` | User closed popup; allow popups and retry |
 | `revocation_data_untrusted` | Clock skew or stale cache; retry; check system time |
 

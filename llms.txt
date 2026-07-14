@@ -1,0 +1,35 @@
+# lemma.id — relying-site integration pointers for AI agents
+
+lemma.id is a private proof layer for web platforms: site-private PPIDs, signed backend verification, and optional isHuman assurance when one account must map to one verified human.
+
+## Start here
+
+- Human-readable docs: https://lemma.id/docs
+- Canonical integration guide (machine-oriented): https://lemma.id/docs/integration/ISHUMAN_AGENT_INTEGRATION.md
+- Repo agent entrypoint (if working in the lemma-enterprise repo): AGENTS.md
+
+## Browser SDK
+
+- isHuman verifier: https://lemma.id/sdk/ishuman-verifier.js
+- Create: `new IsHumanVerifier({ siteId: 'app.example.com' })`
+- Signup/server verify: `await verifier.verifyForBackend({ autoProvision: true })`
+
+## Backend verifiers (local-first)
+
+- Node/Workers: https://lemma.id/sdk/lemma-ishuman-verify.mjs
+- Python: https://lemma.id/sdk/lemma_ishuman_verify.py
+
+## Live demo
+
+- https://lemma.id/demo
+
+## Hard rules
+
+1. `siteId` = canonical hostname (`app.example.com`), not internal `site_...` IDs.
+2. Fail closed when `human` is false.
+3. For signup/account creation, verify a signed `presentation` on the server — never trust a bare client `ppid`.
+4. No customer webhooks, no wallet secret on the developer's backend, no KYC field storage.
+
+## Out of scope for relying-site integration
+
+Agent Ops (lemma-cli, Lemma Firewall, runtime control plane) is operator-only.

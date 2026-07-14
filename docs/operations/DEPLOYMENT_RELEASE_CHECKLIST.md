@@ -2,6 +2,27 @@
 
 Use this checklist for each production deployment to `lemma.id`.
 
+## 0) CI Auth Launch Gate (authoritative)
+
+Every push to `main` runs [`.github/workflows/auth-launch-gate.yml`](../../.github/workflows/auth-launch-gate.yml). Treat a green run as the deploy gate of record.
+
+The workflow:
+
+1. Runs local security gates (CSP pytest + auth scope matrix generation/review).
+2. Waits for production deploy health.
+3. Runs strict post-deploy launch gate with scope-matrix enforcement.
+
+Required GitHub Actions secret:
+
+- `LEMMA_PLATFORM_API_KEY` — live scope-matrix and post-deploy gates (falls back to `LEMMA_API_KEY`).
+
+Local preflight (mirrors CI scope matrix step):
+
+```powershell
+python scripts/generate_auth_scope_matrix.py
+python scripts/review_auth_scope_matrix.py --strict-state-changing
+```
+
 ## 1) Pre-Deploy
 
 - Confirm environment safety for the target Heroku app:
@@ -31,9 +52,15 @@ Use this checklist for each production deployment to `lemma.id`.
 
 ## 3) Post-Deploy Automated Verification
 
-Run:
+Run (same bundle as CI auth launch gate):
 
-`powershell -ExecutionPolicy Bypass -File scripts/post_deploy_launch_gate.ps1 -BaseUrl https://lemma.id`
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/post_deploy_launch_gate.ps1 `
+  -BaseUrl https://lemma.id `
+  -PlatformApiKey $env:LEMMA_PLATFORM_API_KEY `
+  -StrictScopePolicy `
+  -RequirePlatformApiKey
+```
 
 Default MCP-free bundle (can also be run directly):
 
@@ -41,6 +68,7 @@ Default MCP-free bundle (can also be run directly):
 
 Expected:
 
+- Auth launch gate / scope matrix review passes
 - Smoke checks pass
 - Redirect check success
 - TLS <=1.1 check fails (expected)

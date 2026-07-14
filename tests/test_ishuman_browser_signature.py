@@ -265,6 +265,16 @@ def test_verify_presentation_endpoint_round_trip(monkeypatch):
     assert passkey_data["success"] is True
     assert passkey_data["assurance"] == "passkey"
 
+    passkey_only_resp = client.post(
+        "/api/ishuman/verify-presentation",
+        json={
+            "site_id": "tickets-demo.lemma.id",
+            "credential": passkey_credential,
+        },
+    )
+    assert passkey_only_resp.status_code == 400, passkey_only_resp.get_json()
+    assert passkey_only_resp.get_json()["error"] == "assurance_insufficient"
+
     # A tampered claim should now fail signature verification.
     tampered = json.loads(json.dumps(credential))
     tampered["claims"]["siteId"] = "evil.example.com"

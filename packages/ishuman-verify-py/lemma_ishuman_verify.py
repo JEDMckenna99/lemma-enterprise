@@ -54,9 +54,10 @@ import hashlib
 import json
 import threading
 import time
+import urllib.parse
 import urllib.request
 from dataclasses import dataclass
-from typing import Optional
+from typing import Optional, Tuple
 
 from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
@@ -77,6 +78,54 @@ FRESH_PASSKEY_SCHEMA = "fresh_passkey_attestation.v1"
 DEFAULT_FRESH_PASSKEY_MAX_AGE_SECONDS = 120
 NONCE_STORE_MODE_OPTIONAL = "optional"
 NONCE_STORE_MODE_REQUIRED = "required"
+
+
+class SiteHostnameError(ValueError):
+    """Raised when a hostname cannot be canonicalized for site binding."""
+
+
+def _canonicalize_rp_id(rp_id: Optional[str]) -> str:
+    """Mirror api.ppid.canonicalize_rp_id for zero-install usage."""
+    value = (rp_id or "").strip().lower()
+    if not value:
+        return "unknown"
+    if "://" in value:
+        parsed = urllib.parse.urlparse(value)
+        if parsed.hostname:
+            value = parsed.hostname.lower()
+        else:
+            value = value.split("://", 1)[-1]
+    host = value.split("/")[0]
+    if ":" in host and not host.startswith("["):
+        host = host.rsplit(":", 1)[0]
+    if host.startswith("www."):
+        host = host[4:]
+    return host or "unknown"
+
+
+def canonicalize_site_hostname(value: Optional[str]) -> str:
+    """Normalize integrator hostname input (mirrors api.site_hostname)."""
+    try:
+        from api.site_hostname import canonicalize_site_hostname as _api_canonicalize
+
+        return _api_canonicalize(value)
+    except ImportError:
+        raw = (value or "").strip()
+        if not raw:
+            raise SiteHostnameError("hostname_required")
+        if raw.lower().startswith("site_"):
+            raise SiteHostnameError("internal_site_id_not_allowed")
+        canonical = _canonicalize_rp_id(raw)
+        if not canonical or canonical == "unknown":
+            raise SiteHostnameError("invalid_hostname")
+        return canonical
+
+
+def try_canonicalize_site_hostname(value: Optional[str]) -> Tuple[Optional[str], Optional[str]]:
+    try:
+        return canonicalize_site_hostname(value), None
+    except SiteHostnameError as exc:
+        return None, str(exc)
 
 
 def _import_enforce_site_policy():
@@ -713,7 +762,7 @@ class VerificationContext:
         nonce_store_mode: str = NONCE_STORE_MODE_OPTIONAL,
         fresh_passkey_max_age_seconds: int = DEFAULT_FRESH_PASSKEY_MAX_AGE_SECONDS,
     ) -> None:
-        self.site_id = site_id
+        self.site_id = canonicalize_site_hostname(site_id)
         self.lemma_origin = lemma_origin.rstrip("/")
         self.max_session_age_seconds = max_session_age_seconds
         self.refresh_seconds = refresh_seconds
@@ -883,11 +932,12 @@ class VerificationContext:
             return self.Result(False, "invalid_assurance")
         if not self._assurance_meets_policy(assurance, self.required_assurance):
             return self.Result(False, "assurance_insufficient", assurance=assurance)
-        bound_site = (
+        bound_site_raw = (
             claims.get("siteId") or claims.get("site_id") or claims.get("siteDomain") or ""
         )
-        if bound_site != self.site_id:
-            return self.Result(False, "site_id_mismatch", bound_site_id=bound_site)
+        bound_site, bound_err = try_canonicalize_site_hostname(bound_site_raw)
+        if bound_err or bound_site != self.site_id:
+            return self.Result(False, "site_id_mismatch", bound_site_id=bound_site_raw)
         try:
             expires_at = int(claims.get("expiresAt") or 0)
         except (TypeError, ValueError):
@@ -929,7 +979,10 @@ class VerificationContext:
                     return self.Result(False, "session_too_old")
             except (TypeError, ValueError, KeyError):
                 return self.Result(False, "session_timestamps_invalid")
-            if str(assertion.get("site_id") or "") != self.site_id:
+            session_site, session_site_err = try_canonicalize_site_hostname(
+                assertion.get("site_id") or ""
+            )
+            if session_site_err or session_site != self.site_id:
                 return self.Result(False, "session_site_id_mismatch")
         elif self.require_session_assertion and site_pubkey_b64:
             return self.Result(False, "session_assertion_required")
@@ -1080,7 +1133,8 @@ class VerificationContext:
             return self.Result(False, "action_method_mismatch")
         if str(assertion.get("path") or "").strip() != expected_path:
             return self.Result(False, "action_path_mismatch")
-        if str(assertion.get("site_id") or "").strip() != self.site_id:
+        action_site, action_site_err = try_canonicalize_site_hostname(assertion.get("site_id") or "")
+        if action_site_err or action_site != self.site_id:
             return self.Result(False, "action_site_id_mismatch")
 
         try:
