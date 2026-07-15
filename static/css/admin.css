@@ -4,13 +4,13 @@
 
 :root {
     --admin-sidebar-width: 260px;
-    --admin-primary: #667eea;
-    --admin-primary-dark: #5568d3;
-    --admin-bg: #f8fafc;
+    --admin-primary: #4E3D8F;
+    --admin-primary-dark: #3A2D6E;
+    --admin-bg: #F4F4F7;
     --admin-card-bg: #ffffff;
-    --admin-border: #e2e8f0;
-    --admin-text: #1e293b;
-    --admin-text-muted: #64748b;
+    --admin-border: #E8E8EE;
+    --admin-text: #1A1A24;
+    --admin-text-muted: #5E5E70;
 }
 
 /* Container */
@@ -61,7 +61,7 @@
     height: 34px;
     padding: 0;
     border-radius: 999px;
-    border: 1px solid rgba(102, 126, 234, 0.28);
+    border: 1px solid rgba(78, 61, 143, 0.28);
     background: #ffffff;
     color: var(--admin-primary);
     display: inline-flex;
@@ -80,8 +80,8 @@
 }
 
 .admin-sidebar-toggle:hover {
-    background: #eef2ff;
-    box-shadow: 0 2px 8px rgba(102, 126, 234, 0.25);
+    background: #F2F0F8;
+    box-shadow: 0 2px 8px rgba(78, 61, 143, 0.25);
 }
 
 /* Navigation */
@@ -124,7 +124,7 @@
 }
 
 .nav-item.active {
-    background: linear-gradient(90deg, rgba(102, 126, 234, 0.1), transparent);
+    background: linear-gradient(90deg, rgba(78, 61, 143, 0.1), transparent);
     color: var(--admin-primary);
     font-weight: 500;
     border-left: 3px solid var(--admin-primary);
@@ -148,9 +148,9 @@
     align-items: center;
     gap: 12px;
     padding: 12px;
-    background: rgba(102, 126, 234, 0.1);
+    background: rgba(78, 61, 143, 0.1);
     border-radius: 8px;
-    border: 1px solid rgba(102, 126, 234, 0.2);
+    border: 1px solid rgba(78, 61, 143, 0.2);
 }
 
 .badge-icon {
@@ -401,7 +401,7 @@
 }
 
 .admin-btn--secondary:hover {
-    background: rgba(102, 126, 234, 0.05);
+    background: rgba(78, 61, 143, 0.05);
 }
 
 .admin-btn--sm {

@@ -2,16 +2,16 @@
 
 :root {
     --dev-sidebar-width: 260px;
-    --dev-primary: #667eea;
-    --dev-primary-dark: #5568d3;
-    --dev-bg: #f8fafc;
+    --dev-primary: #4E3D8F;
+    --dev-primary-dark: #3A2D6E;
+    --dev-bg: #F4F4F7;
     --dev-card-bg: #ffffff;
-    --dev-border: #e2e8f0;
-    --dev-text: #1e293b;
-    --dev-text-muted: #64748b;
-    --dev-success: #10b981;
-    --dev-warning: #f59e0b;
-    --dev-danger: #ef4444;
+    --dev-border: #E8E8EE;
+    --dev-text: #1A1A24;
+    --dev-text-muted: #5E5E70;
+    --dev-success: #1F7A4C;
+    --dev-warning: #B45309;
+    --dev-danger: #C0392B;
 }
 
 /* Container */
@@ -45,7 +45,7 @@
     border: none;
     background: #ffffff;
     color: var(--dev-primary);
-    border: 1px solid rgba(102, 126, 234, 0.28);
+    border: 1px solid rgba(78, 61, 143, 0.28);
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -62,8 +62,8 @@
 }
 
 .dev-sidebar-toggle:hover {
-    background: #eef2ff;
-    box-shadow: 0 2px 8px rgba(102, 126, 234, 0.25);
+    background: #F2F0F8;
+    box-shadow: 0 2px 8px rgba(78, 61, 143, 0.25);
 }
 
 /* Navigation */
@@ -104,7 +104,7 @@
 }
 
 .dev-nav-item.active {
-    background: linear-gradient(90deg, rgba(102, 126, 234, 0.1), transparent);
+    background: linear-gradient(90deg, rgba(78, 61, 143, 0.1), transparent);
     color: var(--dev-primary);
     font-weight: 500;
     border-left-color: var(--dev-primary);
@@ -311,7 +311,7 @@
 }
 
 .dev-btn-secondary:hover {
-    background: rgba(102, 126, 234, 0.05);
+    background: rgba(78, 61, 143, 0.05);
 }
 
 .dev-btn-danger {
@@ -442,7 +442,7 @@
 
 .dev-action:hover {
     border-color: var(--dev-primary);
-    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.15);
+    box-shadow: 0 4px 12px rgba(78, 61, 143, 0.15);
     transform: translateY(-2px);
 }
 
@@ -552,7 +552,7 @@
     width: 40px;
     height: 40px;
     border-radius: 8px;
-    background: linear-gradient(135deg, var(--dev-primary), #818cf8);
+    background: var(--dev-primary);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -653,7 +653,7 @@
 .dev-input:focus {
     outline: none;
     border-color: var(--dev-primary);
-    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+    box-shadow: 0 0 0 3px rgba(78, 61, 143, 0.1);
 }
 
 .dev-select {
@@ -728,8 +728,8 @@
 .dev-action-icon {
     width: 48px;
     height: 48px;
-    background: linear-gradient(135deg, var(--dev-primary), var(--dev-primary-dark));
-    border-radius: 12px;
+    background: var(--dev-primary);
+    border-radius: 8px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -747,7 +747,7 @@
 
 .dev-action:hover .dev-action-icon {
     transform: translateY(-2px);
-    box-shadow: 0 8px 20px rgba(102, 126, 234, 0.3);
+    box-shadow: 0 8px 20px rgba(78, 61, 143, 0.3);
 }
 
 /* ============================================

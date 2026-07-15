@@ -91,7 +91,7 @@ button:not(.unstyled):active {
 }
 
 .toggle-switch.active {
-    background: var(--primary, #667eea);
+    background: var(--primary, #4E3D8F);
 }
 
 .toggle-switch.active::after {
@@ -158,13 +158,13 @@ button:not(.unstyled):active {
 /* Focus Ring Animation */
 .focus-ring:focus {
     outline: none;
-    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.4);
+    box-shadow: 0 0 0 3px rgba(78, 61, 143, 0.4);
     animation: focus-pulse 1.5s ease infinite;
 }
 
 @keyframes focus-pulse {
-    0%, 100% { box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.4); }
-    50% { box-shadow: 0 0 0 5px rgba(102, 126, 234, 0.2); }
+    0%, 100% { box-shadow: 0 0 0 3px rgba(78, 61, 143, 0.4); }
+    50% { box-shadow: 0 0 0 5px rgba(78, 61, 143, 0.2); }
 }
 
 /* ============================================
@@ -221,12 +221,12 @@ button:not(.unstyled):active {
 }
 
 .table-enhanced th.sortable.asc::after {
-    border-top-color: var(--primary, #667eea);
+    border-top-color: var(--primary, #4E3D8F);
     transform: rotate(180deg);
 }
 
 .table-enhanced th.sortable.desc::after {
-    border-top-color: var(--primary, #667eea);
+    border-top-color: var(--primary, #4E3D8F);
 }
 
 /* Table Body */
@@ -246,11 +246,11 @@ button:not(.unstyled):active {
 
 /* Row Selection */
 .table-enhanced tbody tr.selected {
-    background: rgba(102, 126, 234, 0.08);
+    background: rgba(78, 61, 143, 0.08);
 }
 
 .table-enhanced tbody tr.selected:hover {
-    background: rgba(102, 126, 234, 0.12);
+    background: rgba(78, 61, 143, 0.12);
 }
 
 /* Row Checkbox */
@@ -266,8 +266,8 @@ button:not(.unstyled):active {
 }
 
 .row-checkbox:checked {
-    background: var(--primary, #667eea);
-    border-color: var(--primary, #667eea);
+    background: var(--primary, #4E3D8F);
+    border-color: var(--primary, #4E3D8F);
     background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 16 16' fill='white' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M12.207 4.793a1 1 0 010 1.414l-5 5a1 1 0 01-1.414 0l-2-2a1 1 0 011.414-1.414L6.5 9.086l4.293-4.293a1 1 0 011.414 0z'/%3E%3C/svg%3E");
     background-size: 12px;
     background-position: center;
@@ -275,7 +275,7 @@ button:not(.unstyled):active {
 }
 
 .row-checkbox:hover {
-    border-color: var(--primary, #667eea);
+    border-color: var(--primary, #4E3D8F);
 }
 
 /* Inline Row Actions */
@@ -351,8 +351,8 @@ button:not(.unstyled):active {
 }
 
 .pagination-btn.active {
-    background: var(--primary, #667eea);
-    border-color: var(--primary, #667eea);
+    background: var(--primary, #4E3D8F);
+    border-color: var(--primary, #4E3D8F);
     color: white;
 }
 
@@ -492,12 +492,12 @@ button:not(.unstyled):active {
 .status-badge.info,
 .status-badge.new {
     background: rgba(99, 102, 241, 0.1);
-    color: #4f46e5;
+    color: #4E3D8F;
 }
 
 .status-badge.info .status-dot,
 .status-badge.new .status-dot {
-    background: #6366f1;
+    background: #4E3D8F;
 }
 
 /* ============================================
@@ -635,102 +635,63 @@ button:not(.unstyled):active {
 }
 
 /* ============================================
-   5. GRADIENT ACCENTS
+   5. BRAND ACCENTS (flat — no kit gradients)
    ============================================ */
 
-/* Primary Gradient */
 .gradient-primary {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: var(--primary, #4E3D8F);
 }
 
-/* Subtle gradient for cards */
 .gradient-card {
-    background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+    background: #ffffff;
 }
 
-/* Gradient border effect */
 .gradient-border {
     position: relative;
     background: white;
+    box-shadow: inset 0 0 0 2px var(--primary, #4E3D8F);
 }
 
 .gradient-border::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    border-radius: inherit;
-    padding: 2px;
-    background: linear-gradient(135deg, #667eea, #764ba2);
-    -webkit-mask: 
-        linear-gradient(#fff 0 0) content-box, 
-        linear-gradient(#fff 0 0);
-    mask: 
-        linear-gradient(#fff 0 0) content-box, 
-        linear-gradient(#fff 0 0);
-    -webkit-mask-composite: xor;
-    mask-composite: exclude;
+    content: none;
 }
 
-/* Gradient text */
 .gradient-text {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
+    color: var(--primary, #4E3D8F);
+    background: none;
+    -webkit-text-fill-color: unset;
 }
 
-/* Gradient hover effect for cards */
 .card-gradient-hover {
     position: relative;
-    transition: transform 0.2s ease;
+    transition: transform 0.2s ease, border-color 0.2s ease;
 }
 
 .card-gradient-hover::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    border-radius: inherit;
-    background: linear-gradient(135deg, rgba(102, 126, 234, 0.05) 0%, rgba(118, 75, 162, 0.05) 100%);
-    opacity: 0;
-    transition: opacity 0.3s ease;
-    pointer-events: none;
-}
-
-.card-gradient-hover:hover::before {
-    opacity: 1;
+    content: none;
 }
 
 .card-gradient-hover:hover {
     transform: translateY(-2px);
+    border-color: var(--primary-200, #C9C2E0);
 }
 
-/* Gradient line decoration */
 .gradient-line {
-    height: 3px;
-    background: linear-gradient(90deg, #667eea 0%, #764ba2 50%, #667eea 100%);
-    background-size: 200% 100%;
-    animation: gradient-flow 3s ease infinite;
+    height: 2px;
+    background: var(--primary, #4E3D8F);
 }
 
-@keyframes gradient-flow {
-    0%, 100% { background-position: 0% 0%; }
-    50% { background-position: 100% 0%; }
-}
-
-/* Glow effect for important elements */
 .glow-primary {
-    box-shadow: 0 0 20px rgba(102, 126, 234, 0.3);
+    box-shadow: 0 2px 8px rgba(78, 61, 143, 0.18);
 }
 
 .glow-success {
-    box-shadow: 0 0 20px rgba(16, 185, 129, 0.3);
+    box-shadow: 0 2px 8px rgba(31, 122, 76, 0.18);
 }
 
-/* Hero gradient background */
+/* Hero surface */
 .gradient-hero {
-    background: 
-        radial-gradient(ellipse 80% 50% at 50% -20%, rgba(102, 126, 234, 0.15), transparent),
-        linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+    background: #F4F4F7;
 }
 
 /* ============================================
@@ -744,7 +705,7 @@ html {
 
 /* Better selection color */
 ::selection {
-    background: rgba(102, 126, 234, 0.2);
+    background: rgba(78, 61, 143, 0.2);
 }
 
 /* Custom scrollbar */
@@ -811,7 +772,7 @@ img.loaded {
 
 /* Highlight animation for new items */
 @keyframes highlight-new {
-    0% { background-color: rgba(102, 126, 234, 0.2); }
+    0% { background-color: rgba(78, 61, 143, 0.2); }
     100% { background-color: transparent; }
 }
 

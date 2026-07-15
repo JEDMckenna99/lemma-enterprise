@@ -8,37 +8,42 @@
     
     <!-- Favicon -->
     <link rel="icon" href="{{ url_for('static', filename='img/lemma_logo.svg') }}" type="image/svg+xml">
+
+    <!-- Fonts — IBM Plex (not Inter) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
     
     <!-- Preload critical resources -->
-    <link rel="preload" href="{{ url_for('static', filename='css/lemma.css') }}?v=20250121" as="style">
+    <link rel="preload" href="{{ url_for('static', filename='css/lemma.css') }}?v=20260715" as="style">
     {% block preload_scripts %}{% endblock %}
     
     <!-- Critical CSS - minimal for fast LCP -->
     <style nonce="{{ csp_nonce }}">
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-:root{--primary:#667eea;--secondary:#764ba2;--gray-900:#1e293b;--gray-700:#475569;--gray-200:#f1f5f9;--white:#fff}
+:root{--primary:#4E3D8F;--secondary:#3A2D6E;--gray-900:#1A1A24;--gray-700:#454554;--gray-200:#E8E8EE;--white:#fff;--primary-rgb:78,61,143}
 html{font-size:17px;line-height:1.6}
-body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;color:#475569;background:#fff}
-h1{color:#1e293b;font-weight:600;line-height:1.25;margin-bottom:16px;font-size:48px}
-.nav-header{background:rgba(255,255,255,.95);border-bottom:1px solid #f1f5f9;padding:16px 0;position:sticky;top:0;z-index:100;height:76px}
+body{font-family:"IBM Plex Sans","Segoe UI",system-ui,sans-serif;color:#454554;background:#fff}
+h1{color:#1A1A24;font-weight:600;line-height:1.25;margin-bottom:16px;font-size:48px}
+.nav-header{background:rgba(255,255,255,.95);border-bottom:1px solid #E8E8EE;padding:16px 0;position:sticky;top:0;z-index:100;height:76px}
 .nav-container{display:flex;align-items:center;justify-content:space-between;max-width:1200px;margin:0 auto;padding:0 24px;height:44px}
-.nav-logo{display:flex;align-items:center;gap:12px;font-size:22px;font-weight:700;color:#1e293b;text-decoration:none}
+.nav-logo{display:flex;align-items:center;gap:12px;font-size:22px;font-weight:700;color:#1A1A24;text-decoration:none}
 .nav-logo-icon{width:36px;height:36px}
 .nav-center{display:flex;gap:40px;align-items:center;flex:1;margin-left:60px}
-.nav-link{color:#475569;text-decoration:none;font-weight:500;font-size:17px;padding:8px 4px}
+.nav-link{color:#454554;text-decoration:none;font-weight:500;font-size:17px;padding:8px 4px}
 .nav-right{display:flex;gap:16px;align-items:center;margin-left:auto}
-.btn{display:inline-flex;align-items:center;justify-content:center;padding:12px 24px;border-radius:8px;font-weight:500;font-size:17px;text-decoration:none;border:none;cursor:pointer}
-.btn-primary{background:linear-gradient(135deg,#667eea,#764ba2);color:#fff}
+.btn{display:inline-flex;align-items:center;justify-content:center;padding:12px 24px;border-radius:6px;font-weight:500;font-size:17px;text-decoration:none;border:none;cursor:pointer}
+.btn-primary{background:#4E3D8F;color:#fff}
 @media(max-width:1180px){.nav-container{padding:0 18px}.nav-center{gap:24px;margin-left:36px}.nav-link{font-size:16px}.nav-right .btn{padding:10px 18px}}
-@media(max-width:1040px){.mobile-menu-toggle{display:flex}.nav-center{position:absolute;top:76px;left:0;right:0;background:#fff;flex-direction:column;padding:16px 24px;gap:0;margin-left:0;border-bottom:1px solid #f1f5f9;box-shadow:0 10px 40px rgba(0,0,0,0.1);display:none;z-index:99}.nav-center.mobile-open{display:flex}.nav-center .nav-link{padding:14px 0;border-bottom:1px solid #f1f5f9;width:100%}.nav-center .nav-link:last-child{border-bottom:none}}
+@media(max-width:1040px){.mobile-menu-toggle{display:flex}.nav-center{position:absolute;top:76px;left:0;right:0;background:#fff;flex-direction:column;padding:16px 24px;gap:0;margin-left:0;border-bottom:1px solid #E8E8EE;box-shadow:0 10px 40px rgba(0,0,0,0.1);display:none;z-index:99}.nav-center.mobile-open{display:flex}.nav-center .nav-link{padding:14px 0;border-bottom:1px solid #E8E8EE;width:100%}.nav-center .nav-link:last-child{border-bottom:none}}
 .container{max-width:1200px;margin:0 auto;padding:0 24px}
-.hero{background:linear-gradient(135deg,#1e293b,#0f172a);color:#fff;padding:80px 0 100px;text-align:center}
+.hero{background:#12121A;color:#fff;padding:80px 0 100px;text-align:center}
 .hero h1{color:#fff;font-size:clamp(32px,5vw,56px);font-weight:700;margin-bottom:24px}
     </style>
     
     <!-- Full CSS - async load with CSP-compliant approach -->
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/lemma.css') }}?v=20250121" media="print" id="main-css">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/polish.css') }}?v=20250129" media="print" id="polish-css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/lemma.css') }}?v=20260715" media="print" id="main-css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/polish.css') }}?v=20260715" media="print" id="polish-css">
     <script nonce="{{ csp_nonce }}">
         document.getElementById('main-css').onload = function() { this.media = 'all'; };
         document.getElementById('polish-css').onload = function() { this.media = 'all'; };
@@ -46,8 +51,8 @@ h1{color:#1e293b;font-weight:600;line-height:1.25;margin-bottom:16px;font-size:4
         window.LEMMA_ISHUMAN_USE_PERSON_ROOT_SEEDS = {{ 'true' if ishuman_use_person_root_seeds else 'false' }};
     </script>
     <noscript>
-        <link rel="stylesheet" href="{{ url_for('static', filename='css/lemma.css') }}?v=20250121">
-        <link rel="stylesheet" href="{{ url_for('static', filename='css/polish.css') }}?v=20250129">
+        <link rel="stylesheet" href="{{ url_for('static', filename='css/lemma.css') }}?v=20260715">
+        <link rel="stylesheet" href="{{ url_for('static', filename='css/polish.css') }}?v=20260715">
     </noscript>
     
     {% block head %}{% endblock %}
@@ -174,25 +179,25 @@ h1{color:#1e293b;font-weight:600;line-height:1.25;margin-bottom:16px;font-size:4
 
 /* User Dropdown */
 .user-dropdown{position:relative;display:inline-block}
-.user-dropdown-toggle{display:flex;align-items:center;gap:8px;background:#fff;border:1px solid #e2e8f0;border-radius:50px;padding:6px 14px 6px 6px;cursor:pointer;font-size:0.9rem;color:#475569;transition:all 0.2s}
-.user-dropdown-toggle:hover{border-color:#cbd5e1;box-shadow:0 2px 8px rgba(0,0,0,0.08)}
-.user-avatar{width:32px;height:32px;background:linear-gradient(135deg,#667eea,#764ba2);border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:600;font-size:14px}
+.user-dropdown-toggle{display:flex;align-items:center;gap:8px;background:#fff;border:1px solid #E8E8EE;border-radius:8px;padding:6px 14px 6px 6px;cursor:pointer;font-size:0.9rem;color:#454554;transition:all 0.2s}
+.user-dropdown-toggle:hover{border-color:#D6D6DE;box-shadow:0 2px 8px rgba(0,0,0,0.08)}
+.user-avatar{width:32px;height:32px;background:#4E3D8F;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:600;font-size:14px}
 .avatar-initials{text-transform:uppercase}
 .user-name{font-weight:500;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .dropdown-arrow{transition:transform 0.2s;flex-shrink:0}
 .user-dropdown.open .dropdown-arrow{transform:rotate(180deg)}
-.user-dropdown-menu{position:absolute;top:calc(100% + 8px);right:0;background:#fff;border:1px solid #e2e8f0;border-radius:12px;box-shadow:0 10px 40px rgba(0,0,0,0.12);min-width:240px;z-index:1000;opacity:0;visibility:hidden;transform:translateY(-10px);transition:all 0.2s}
+.user-dropdown-menu{position:absolute;top:calc(100% + 8px);right:0;background:#fff;border:1px solid #E8E8EE;border-radius:8px;box-shadow:0 10px 40px rgba(0,0,0,0.12);min-width:240px;z-index:1000;opacity:0;visibility:hidden;transform:translateY(-10px);transition:all 0.2s}
 .user-dropdown.open .user-dropdown-menu{opacity:1;visibility:visible;transform:translateY(0)}
-.dropdown-header{padding:16px;background:linear-gradient(135deg,#f8fafc,#f1f5f9);border-radius:12px 12px 0 0}
+.dropdown-header{padding:16px;background:#F4F4F7;border-radius:8px 8px 0 0}
 .dropdown-user-info{text-align:left}
-.dropdown-user-name{font-weight:600;color:#1e293b;margin-bottom:2px;font-size:0.95rem}
-.dropdown-user-role{font-size:0.75rem;color:#667eea;text-transform:uppercase;letter-spacing:0.5px;font-weight:600}
-.dropdown-divider{height:1px;background:#f1f5f9;margin:4px 0}
-.dropdown-item{display:flex;align-items:center;padding:12px 16px;color:#475569;text-decoration:none;font-size:0.9rem;transition:all 0.15s}
-.dropdown-item:hover{background:#f8fafc;color:#1e293b}
-.admin-item{color:#667eea}
-.admin-item:hover{background:linear-gradient(135deg,rgba(102,126,234,0.08),rgba(118,75,162,0.08))}
-.logout-item{color:#ef4444}
+.dropdown-user-name{font-weight:600;color:#1A1A24;margin-bottom:2px;font-size:0.95rem}
+.dropdown-user-role{font-size:0.75rem;color:#4E3D8F;text-transform:uppercase;letter-spacing:0.5px;font-weight:600}
+.dropdown-divider{height:1px;background:#E8E8EE;margin:4px 0}
+.dropdown-item{display:flex;align-items:center;padding:12px 16px;color:#454554;text-decoration:none;font-size:0.9rem;transition:all 0.15s}
+.dropdown-item:hover{background:#F4F4F7;color:#1A1A24}
+.admin-item{color:#4E3D8F}
+.admin-item:hover{background:rgba(78,61,143,0.08)}
+.logout-item{color:#C0392B}
 .logout-item:hover{background:#fef2f2}
 
 /* Mobile Responsive */

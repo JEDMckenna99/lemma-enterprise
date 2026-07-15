@@ -3,11 +3,11 @@
  */
 
 .wallet-container {
-    --wallet-ink: #0f172a;
-    --wallet-muted: #64748b;
-    --wallet-line: #e2e8f0;
-    --wallet-brand: #4f46e5;
-    --wallet-brand-soft: #eef2ff;
+    --wallet-ink: #12121A;
+    --wallet-muted: #5E5E70;
+    --wallet-line: #E8E8EE;
+    --wallet-brand: #4E3D8F;
+    --wallet-brand-soft: #F2F0F8;
     --wallet-ok: #166534;
     --wallet-ok-bg: #dcfce7;
     --wallet-warn-bg: #fef3c7;
@@ -74,8 +74,8 @@
     box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
 }
 .wallet-container .card-elevated {
-    box-shadow: 0 8px 24px rgba(79, 70, 229, 0.08);
-    border-color: #e0e7ff;
+    box-shadow: 0 8px 24px rgba(18, 18, 26, 0.08);
+    border-color: #E4E0F0;
 }
 .wallet-container .card h2 {
     font-size: 1.05rem;
@@ -177,11 +177,11 @@
     box-shadow: none;
 }
 .wallet-container .btn-primary {
-    background: linear-gradient(135deg, #4f46e5, #6366f1);
+    background: var(--wallet-brand);
     color: white;
 }
 .wallet-container .btn-primary:hover {
-    background: linear-gradient(135deg, #4338ca, #4f46e5);
+    background: #3A2D6E;
 }
 .wallet-container .btn-secondary {
     background: #fff;
