@@ -1,10 +1,10 @@
-# Presale code distributor — demo script
+# Presale code distributor: demo script
 
 **Live demo:** https://tickets-demo.lemma.id/?tour=presale
 
 **Duration:** ~3 minutes
 
-**Hub context:** This is **Enforce in the wild** — action-level presence stamps on a relying site. The hub demo covers Create · Verify · Enforce at the identity layer; presale shows stamps at claim time.
+**Hub context:** This is **Enforce in the wild**: action-level presence stamps on a relying site. The hub demo covers Create · Verify · Enforce at the identity layer; presale shows stamps at claim time.
 
 ## One-liner
 
@@ -14,20 +14,20 @@ Phone is for delivery; passkey is who you are; Face ID again to get the code.
 
 ### 1. Join presale (Step 1)
 
-- Click **Step 1 — Passkey register for drop**.
-- Say: email and phone are CRM/delivery fields on the relying site only — not identity, not sent to lemma.id.
+- Click **Step 1, Passkey register for drop**.
+- Say: email and phone are CRM/delivery fields on the relying site only, not identity, not sent to lemma.id.
 - Point at the defense strip: site PPID, action stamp, server nonce.
 
 ### 2. Unlock code (Step 2)
 
-- Click **Step 2 — Fresh passkey unlocks unique code**.
-- Say: this is a fresh passkey ceremony at claim time — bots cannot replay a cached session.
+- Click **Step 2, Fresh passkey unlocks unique code**.
+- Say: this is a fresh passkey ceremony at claim time, bots cannot replay a cached session.
 - Toggle **Show backend gates** and show `fresh_passkey_attestation` in the cryptographic envelope (redacted excerpt).
 
 ### 3. Retry same wallet
 
 - Click **Try again with same wallet**.
-- Say: ledger enforces one code per verified person per drop — enumeration without farming.
+- Say: ledger enforces one code per verified person per drop, enumeration without farming.
 
 ### 4. Risk flag + IDV
 
@@ -47,7 +47,7 @@ Phone is for delivery; passkey is who you are; Face ID again to get the code.
 | "We already use SMS OTP" | OTP proves possession of a phone number, not present control of a wallet. Fresh passkey at unlock binds the code to a site-private PPID with replay protection. |
 | "Passkeys add friction" | Step 1 is low-friction passkey register; Step 2 is intentional friction at the high-value moment (code unlock). |
 | "What does lemma.id see?" | Action names, bodies, and contact fields stay on your site. lemma.id attests fresh passkey to an opaque action commitment only. |
-| "Can one person get multiple codes?" | No — ledger keys `(drop_id, ppid)`; same wallet retry is denied. |
+| "Can one person get multiple codes?" | No, ledger keys `(drop_id, ppid)`; same wallet retry is denied. |
 
 ## Manual deploy checklist
 

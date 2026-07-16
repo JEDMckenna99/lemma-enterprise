@@ -165,7 +165,7 @@ class DiditManager:
             return {"success": False, "error": "didit_not_configured"}
 
         if not _didit_breaker.allow():
-            logger.warning("Didit circuit open — refusing session create")
+            logger.warning("Didit circuit open, refusing session create")
             return {"success": False, "error": "didit_circuit_open"}
 
         url = f"{self.api_base}/v3/session/"
@@ -236,7 +236,7 @@ class DiditManager:
             return {"success": False, "error": "session_id required"}
 
         if not _didit_breaker.allow():
-            logger.warning("Didit circuit open — refusing decision fetch")
+            logger.warning("Didit circuit open, refusing decision fetch")
             return {"success": False, "error": "didit_circuit_open"}
 
         url = f"{self.api_base}/v3/session/{session_id}/decision/"
@@ -304,8 +304,7 @@ class DiditManager:
         retention window expires.
 
         Idempotent: ``204 No Content`` (deleted) and genuine API ``404`` (already
-        gone) are treated as success. HTML ``404`` responses are *not* success —
-        they indicate the wrong delete route was used.
+        gone) are treated as success. HTML ``404`` responses are *not* success,         they indicate the wrong delete route was used.
 
         Never raises; the caller treats any failure as non-fatal so issuance is
         never coupled to upstream purge availability.

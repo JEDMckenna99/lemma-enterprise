@@ -227,7 +227,7 @@ def _content():
         return {
             "eyebrow": "SaaS free trial",
             "headline": "Start a 14-day Pro workspace",
-            "subhead": "Protected by Lemma — passkey proof first; IDV only when this site requires human proof assurance.",
+            "subhead": "Protected by Lemma, passkey proof first; IDV only when this site requires human proof assurance.",
             "primary": "Start free trial",
             "success": "Trial workspace created",
             "form": "Work email",
@@ -236,10 +236,10 @@ def _content():
         }
     return {
         "eyebrow": "Unique presale code distributor",
-        "headline": "Passkey proves who you are — phone is for delivery",
-        "subhead": "Join the drop with an action-bound passkey register. Unlock your one-time code with a fresh passkey ceremony at claim time. Email and phone stay on this site for SMS and CRM — not as identity. No SMS OTP. IDV runs only when the site flags you for review.",
-        "register": "Step 1 — Passkey register for drop",
-        "claim": "Step 2 — Fresh passkey unlocks unique code",
+        "headline": "Passkey proves who you are, phone is for delivery",
+        "subhead": "Join the drop with an action-bound passkey register. Unlock your one-time code with a fresh passkey ceremony at claim time. Email and phone stay on this site for SMS and CRM, not as identity. No SMS OTP. IDV runs only when the site flags you for review.",
+        "register": "Step 1, Passkey register for drop",
+        "claim": "Step 2, Fresh passkey unlocks unique code",
         "retry": "Try again with same wallet",
         "flag": "Simulate site risk flag",
         "clear_flag": "Clear risk flag",
@@ -954,7 +954,7 @@ def _generic_index():
         <button id="verify-btn">{copy["primary"]}</button>
         <div class="verdict" id="decision-card">
           <strong>What happens when you click</strong>
-          <p class="tiny">Passkey unlock + continuity proof only. This site accepts <code>assurance: passkey</code> — no IDV unless you later step up to human proofs.</p>
+          <p class="tiny">Passkey unlock + continuity proof only. This site accepts <code>assurance: passkey</code>, no IDV unless you later step up to human proofs.</p>
         </div>
       </section>
       <aside class="card">
@@ -971,7 +971,7 @@ def _generic_index():
           <li>SDK checks local site proof cache first.</li>
           <li>Missing proof → Lemma popup derives passkey assurance (no IDV yet).</li>
           <li>Site policy may require human proof assurance → IDV step-up, same PPID.</li>
-          <li>After first site proof, later clicks reuse the cached presentation — no action-sign popup.</li>
+          <li>After first site proof, later clicks reuse the cached presentation, no action-sign popup.</li>
           <li>Server verifies your presentation with offline revocation checks.</li>
           <li>Business never sees passport, selfie, or cross-site ID.</li>
         </ol>
@@ -983,7 +983,7 @@ def _generic_index():
           <summary>Server-verified action log</summary>
           <pre id="action-log">[]</pre>
         </details>
-        <p class="hub-return">Continue the walkthrough on the <a href="{DEMO_HUB_URL}?from=demo" target="_blank" rel="noopener">lemma.id demo hub</a> — stages 3–5 cover presentations, escalation, and doubt/revocation.</p>
+        <p class="hub-return">Continue the walkthrough on the <a href="{DEMO_HUB_URL}?from=demo" target="_blank" rel="noopener">lemma.id demo hub</a>, stages 3–5 cover presentations, escalation, and doubt/revocation.</p>
       </aside>
     </div>
   </main>
@@ -992,7 +992,7 @@ def _generic_index():
   <script>
     if (typeof IsHumanVerifier === 'undefined') {{
       const msg = window.__lemmaSdkLoadError
-        || 'Lemma SDK (IsHumanVerifier) did not load — check network connection and that {LEMMA_ORIGIN} is reachable.';
+        || 'Lemma SDK (IsHumanVerifier) did not load, check network connection and that {LEMMA_ORIGIN} is reachable.';
       document.getElementById('decision-copy').textContent = msg;
       document.getElementById('verify-btn').disabled = true;
     }}
@@ -1046,10 +1046,10 @@ def _generic_index():
 
     function formatDenyReason(reason) {{
       if (reason === 'site_blocked' || reason === 'revoked') {{
-        return 'Persistent site revocation — fresh verification does not clear this.';
+        return 'Persistent site revocation, fresh verification does not clear this.';
       }}
       if (reason === 'doubt_required') {{
-        return 'Temporary doubt — the site requires a deliberate fresh proof.';
+        return 'Temporary doubt, the site requires a deliberate fresh proof.';
       }}
       if (reason === 'assurance_insufficient' || reason === 'not_ishuman') {{
         return 'Valid wallet proof, but this site policy requires stronger assurance.';
@@ -1058,13 +1058,13 @@ def _generic_index():
         return 'Complete verification in the Lemma popup to continue.';
       }}
       if (reason === 'site_proof_required' || reason === 'no_credential' || reason === 'wallet_locked') {{
-        return 'No site proof cached yet — tap the step button to unlock with passkey and issue one.';
+        return 'No site proof cached yet, tap the step button to unlock with passkey and issue one.';
       }}
       if (reason === 'redirect_started') {{
-        return 'Continuing on lemma.id — you will return here automatically after passkey unlock.';
+        return 'Continuing on lemma.id, you will return here automatically after passkey unlock.';
       }}
       if (reason === 'session_bloom_sequence_mismatch') {{
-        return 'Session sync race — retry the step once (revocation list refreshed).';
+        return 'Session sync race, retry the step once (revocation list refreshed).';
       }}
       return reason || 'unknown';
     }}
@@ -1078,9 +1078,9 @@ def _generic_index():
       serverReceipt.hidden = false;
       const rows = [
         ['Site binding', '{SITE_ID}'],
-        ['PPID', serverEntry.ppid || response.ppid || '—'],
-        ['Assurance', serverEntry.assurance || response.assurance || '—'],
-        ['Server reason', serverEntry.reason || '—'],
+        ['PPID', serverEntry.ppid || response.ppid || 'Not available'],
+        ['Assurance', serverEntry.assurance || response.assurance || 'Not available'],
+        ['Server reason', serverEntry.reason || 'Not available'],
         ['Decision', serverEntry.ok ? 'accept' : 'deny'],
         ['Action', serverEntry.action || '{copy["action"]}'],
       ];
@@ -1099,7 +1099,7 @@ def _generic_index():
     function formatVerdictDetail(response, serverNote, assurance) {{
       const tier = assurance || response.assurance || SITE_POLICY;
       const tierNote = tier === 'passkey'
-        ? ' · continuity only — IDV not required at this tier'
+        ? ' · continuity only, IDV not required at this tier'
         : (tier === 'ishuman' ? ' · IDV-backed human proof' : '');
       return 'policy satisfied · assurance=' + tier
         + ' · reason=' + response.reason
@@ -1158,7 +1158,7 @@ def _generic_index():
       }} else if (!silent) {{
         const detail = formatDenyReason(response.reason);
         decisionCopy.textContent = 'Blocked. Reason: ' + response.reason;
-        decisionCard.innerHTML = '<strong>Action blocked</strong><p class="tiny">reason=' + response.reason + ' — ' + detail + '</p>';
+        decisionCard.innerHTML = '<strong>Action blocked</strong><p class="tiny">reason=' + response.reason + ', ' + detail + '</p>';
       }} else {{
         decisionCopy.textContent = formatMissingProof(response.reason);
       }}
@@ -1200,7 +1200,7 @@ def _generic_index():
       button.disabled = true;
       pill.textContent = 'CHECKING';
       pill.className = 'pill checking';
-      decisionCard.innerHTML = '<strong>Checking Lemma wallet…</strong><p class="tiny">Continuity proof only — passkey unlock, then a signed site credential. No identity check at this assurance tier.</p>';
+      decisionCard.innerHTML = '<strong>Checking Lemma wallet…</strong><p class="tiny">Continuity proof only, passkey unlock, then a signed site credential. No identity check at this assurance tier.</p>';
       try {{
         const verifier = makeVerifier(true);
         const {{ ok, presentation, reason, timeMs }} = await verifier.verifyForBackend({{
@@ -1588,11 +1588,11 @@ def _presale_index():
     <div class="tour-banner" id="tour-banner" hidden>
       <strong>Guided presale demo</strong>
       <ol class="tour-checklist" id="tour-checklist">
-        <li data-tour-step="register" id="tour-step-register">Register with passkey — phone is delivery only</li>
-        <li data-tour-step="claim" id="tour-step-claim">Unlock code — fresh passkey + server-attested action</li>
-        <li data-tour-step="retry" id="tour-step-retry">Retry same wallet — denied, one code per fan</li>
-        <li data-tour-step="flag" id="tour-step-flag">Simulate risk flag — IDV penalty, then code at isHuman</li>
-        <li data-tour-step="attack" id="tour-step-attack">Attack lab — replay stamp or skip Step 1</li>
+        <li data-tour-step="register" id="tour-step-register">Register with passkey, phone is delivery only</li>
+        <li data-tour-step="claim" id="tour-step-claim">Unlock code, fresh passkey + server-attested action</li>
+        <li data-tour-step="retry" id="tour-step-retry">Retry same wallet, denied, one code per fan</li>
+        <li data-tour-step="flag" id="tour-step-flag">Simulate risk flag, IDV penalty, then code at isHuman</li>
+        <li data-tour-step="attack" id="tour-step-attack">Attack lab, replay stamp or skip Step 1</li>
       </ol>
       <p class="tour-impact" id="tour-impact">Start with Step 1. Passkey is who you are; phone is where the code goes.</p>
     </div>
@@ -1614,10 +1614,10 @@ def _presale_index():
         </div>
         <label for="email">{copy["form_email"]}</label>
         <input id="email" value="{copy["placeholder_email"]}" aria-label="{copy["form_email"]}">
-        <p class="contact-note">Stored on this site only — not your login.</p>
+        <p class="contact-note">Stored on this site only, not your login.</p>
         <label for="phone">{copy["form_phone"]}</label>
         <input id="phone" value="{copy["placeholder_phone"]}" aria-label="{copy["form_phone"]}">
-        <p class="contact-note">For SMS alerts and CRM — passkey proves identity.</p>
+        <p class="contact-note">For SMS alerts and CRM, passkey proves identity.</p>
         <p class="muted" style="margin-top:12px;font-size:13px;">Drop: <code id="drop-id">{PRESALE_DROP_ID}</code></p>
         <button id="register-btn">{copy["register"]}</button>
         <button type="button" class="btn-secondary" id="claim-btn" disabled>{copy["claim"]}</button>
@@ -1634,7 +1634,7 @@ def _presale_index():
         <div class="code-display" id="code-display" hidden>--------</div>
         <div class="verdict" id="decision-card">
           <strong>Protected presale flow</strong>
-          <p class="tiny">Step 1: action-bound passkey register — email/phone are delivery fields on this site. Step 2: fresh passkey ceremony (Face ID / Touch ID / Windows Hello) unlocks your unique code. If the site flags suspicious activity, fresh IDV (<code>verifyFreshForBackend</code>) is required before issuance.</p>
+          <p class="tiny">Step 1: action-bound passkey register, email/phone are delivery fields on this site. Step 2: fresh passkey ceremony (Face ID / Touch ID / Windows Hello) unlocks your unique code. If the site flags suspicious activity, fresh IDV (<code>verifyFreshForBackend</code>) is required before issuance.</p>
         </div>
       </section>
       <aside class="card">
@@ -1651,7 +1651,7 @@ def _presale_index():
           <summary>Fan-visible flow</summary>
           <ol class="how">
             <li>Passkey register binds a site-private PPID (Step 1).</li>
-            <li>Email/phone stay on this site — lemma.id never sees them.</li>
+            <li>Email/phone stay on this site, lemma.id never sees them.</li>
             <li>Fresh passkey + <code>stampAction</code> at claim (Step 2).</li>
             <li>Risk flag → fresh IDV, then retry at <code>ishuman</code>.</li>
             <li>Ledger enforces one code per PPID per drop.</li>
@@ -1705,9 +1705,9 @@ def _presale_index():
     const TOUR_MODE = new URLSearchParams(window.location.search).get('tour') === 'presale';
     const TOUR_IMPACTS = {{
       register: 'Passkey binds a site-private PPID. Phone and email are delivery-only on this site.',
-      claim: 'Fresh passkey ceremony proves present control — bots cannot replay cached sessions for codes.',
+      claim: 'Fresh passkey ceremony proves present control, bots cannot replay cached sessions for codes.',
       retry: 'Ledger enforces one code per verified person. Same wallet cannot farm multiple codes.',
-      flag: 'Site doubt escalates to fresh IDV — policy-driven penalty before code issuance.',
+      flag: 'Site doubt escalates to fresh IDV, policy-driven penalty before code issuance.',
       attack: 'Attack lab shows replay and skip-step denies that bots hit in production.',
     }};
     const pill = document.getElementById('status-pill');
@@ -1815,7 +1815,7 @@ def _presale_index():
 
     if (typeof IsHumanVerifier === 'undefined') {{
       const msg = window.__lemmaSdkLoadError
-        || 'Lemma SDK did not load — check that {LEMMA_ORIGIN} is reachable.';
+        || 'Lemma SDK did not load, check that {LEMMA_ORIGIN} is reachable.';
       decisionCopy.textContent = msg;
       ['register-btn', 'claim-btn', 'retry-btn', 'flag-btn', 'clear-flag-btn'].forEach((id) => {{
         const el = document.getElementById(id);
@@ -1896,13 +1896,13 @@ def _presale_index():
         return 'This verified person already received a code for this drop.';
       }}
       if (reason === 'registration_required') {{
-        return 'Complete Step 1 — passkey register before unlocking a code.';
+        return 'Complete Step 1, passkey register before unlocking a code.';
       }}
       if (reason === 'doubt_required') {{
-        return 'Site flagged this fan for review — complete fresh IDV, then retry.';
+        return 'Site flagged this fan for review, complete fresh IDV, then retry.';
       }}
       if (reason === 'action_nonce_reused') {{
-        return 'Replay blocked — each mutation needs a fresh server nonce.';
+        return 'Replay blocked, each mutation needs a fresh server nonce.';
       }}
       if (reason === 'assurance_insufficient') {{
         return 'Higher assurance is required (IDV-backed human proof).';
@@ -1911,13 +1911,13 @@ def _presale_index():
         return 'Complete verification in the Lemma popup to continue.';
       }}
       if (reason === 'rate_limited') {{
-        return 'Too many attempts — wait and retry.';
+        return 'Too many attempts, wait and retry.';
       }}
       if (reason === 'fresh_passkey_missing') {{
-        return 'Claim requires a fresh passkey ceremony — unlock with Face ID / Touch ID / Windows Hello.';
+        return 'Claim requires a fresh passkey ceremony, unlock with Face ID / Touch ID / Windows Hello.';
       }}
       if (reason === 'fresh_passkey_expired' || reason === 'fresh_passkey_too_old') {{
-        return 'Fresh passkey attestation expired — retry the claim to get a new ceremony.';
+        return 'Fresh passkey attestation expired, retry the claim to get a new ceremony.';
       }}
       if (reason === 'fresh_passkey_invalid_signature' || reason === 'fresh_passkey_signature_missing') {{
         return 'Fresh passkey attestation failed server verification.';
@@ -1926,10 +1926,10 @@ def _presale_index():
         return 'Server nonce missing for fresh passkey binding.';
       }}
       if (reason === 'passkey_not_registered_on_server' || reason === 'passkey_server_binding_failed') {{
-        return 'Wallet passkey is not registered on lemma.id yet — unlock on lemma.id once, then retry Step 2.';
+        return 'Wallet passkey is not registered on lemma.id yet, unlock on lemma.id once, then retry Step 2.';
       }}
       if (reason === 'fresh_passkey_webauthn_invalid') {{
-        return 'Fresh passkey ceremony failed server verification — unlock on lemma.id and retry Step 2.';
+        return 'Fresh passkey ceremony failed server verification, unlock on lemma.id and retry Step 2.';
       }}
       if (String(reason || '').startsWith('fresh_passkey_')) {{
         return 'Fresh passkey gate failed: ' + reason;
@@ -1945,8 +1945,8 @@ def _presale_index():
       return {{
         schema: att.schema || 'fresh_passkey_attestation.v1',
         site_id: att.site_id || SITE_ID,
-        credential_id: att.credential_id || inner.credentialId || '—',
-        action_commitment_prefix: commitment ? commitment.slice(0, 16) + '…' : '—',
+        credential_id: att.credential_id || inner.credentialId || 'Not available',
+        action_commitment_prefix: commitment ? commitment.slice(0, 16) + '…' : 'Not available',
         issued_at_unix: att.issued_at_unix,
         expires_at_unix: att.expires_at_unix,
       }};
@@ -1998,25 +1998,25 @@ def _presale_index():
       if (freshGate) {{
         freshStatus = freshAttestation ? 'verified' : 'missing';
       }}
-      const nonceStatus = ctx.serverNonce ? 'consumed' : '—';
-      let registrationStatus = '—';
+      const nonceStatus = ctx.serverNonce ? 'consumed' : 'Not available';
+      let registrationStatus = 'Not available';
       if (ctx.phase === 'register') {{
         registrationStatus = serverEntry.success ? 'stored' : 'denied';
       }} else if (ctx.phase === 'claim') {{
         registrationStatus = presaleRegistered ? 'yes' : 'required';
       }}
-      const gateReason = serverEntry.reason || stampInner.reason || '—';
+      const gateReason = serverEntry.reason || stampInner.reason || 'Not available';
       const rows = [
         ['Site binding', SITE_ID],
-        ['Action', ctx.action || serverEntry.action || '—'],
+        ['Action', ctx.action || serverEntry.action || 'Not available'],
         ['Fresh passkey', freshStatus],
         ['Nonce consumed', nonceStatus],
         ['Registration', registrationStatus],
         ['Gate reason', gateReason],
         ['Drop', serverEntry.drop_id || DROP_ID],
-        ['Code', serverEntry.code || serverEntry.existing_code || '—'],
-        ['PPID', serverEntry.ppid || '—'],
-        ['Assurance', serverEntry.assurance || serverEntry.required_assurance || '—'],
+        ['Code', serverEntry.code || serverEntry.existing_code || 'Not available'],
+        ['PPID', serverEntry.ppid || 'Not available'],
+        ['Assurance', serverEntry.assurance || serverEntry.required_assurance || 'Not available'],
         ['Decision', serverEntry.success ? 'accept' : 'deny'],
       ];
       serverReceiptFields.innerHTML = rows.map(([label, value]) =>
@@ -2105,7 +2105,7 @@ def _presale_index():
       pill.textContent = 'CHECKING';
       pill.className = 'pill checking';
       setTourHighlight('register');
-      decisionCard.innerHTML = '<strong>Step 1 — Passkey register</strong><p class="tiny">Action-bound passkey proof. Email and phone are delivery fields stored on this site — not your identity and not sent to lemma.id.</p>';
+      decisionCard.innerHTML = '<strong>Step 1, Passkey register</strong><p class="tiny">Action-bound passkey proof. Email and phone are delivery fields stored on this site, not your identity and not sent to lemma.id.</p>';
       try {{
         const payload = stampBody(contactPayload());
         const challenge = await fetchPresaleChallenge(REGISTER_ACTION, REGISTER_PATH, payload);
@@ -2200,8 +2200,8 @@ def _presale_index():
         setTourHighlight(isRetry ? 'retry' : 'claim');
         const idvNote = claimAssurance === ESCALATED_ASSURANCE
           ? 'Fresh IDV-backed proof required after site risk flag.'
-          : 'Fresh passkey ceremony required — Face ID / Touch ID / Windows Hello at unlock. Server verifies fresh_passkey_attestation bound to this action.';
-        decisionCard.innerHTML = '<strong>Step 2 — Fresh passkey unlock</strong><p class="tiny">' + idvNote + '</p>';
+          : 'Fresh passkey ceremony required, Face ID / Touch ID / Windows Hello at unlock. Server verifies fresh_passkey_attestation bound to this action.';
+        decisionCard.innerHTML = '<strong>Step 2, Fresh passkey unlock</strong><p class="tiny">' + idvNote + '</p>';
       try {{
         const verifier = makeVerifier(claimAssurance);
         const payload = stampBody(contactPayload());
@@ -2267,7 +2267,7 @@ def _presale_index():
         if (serverEntry.reason === 'doubt_required' && claimAssurance !== ESCALATED_ASSURANCE) {{
           pill.textContent = 'IDV REQUIRED';
           pill.className = 'pill checking';
-          decisionCopy.textContent = 'Site risk flag — complete fresh IDV to unlock your code.';
+          decisionCopy.textContent = 'Site risk flag, complete fresh IDV to unlock your code.';
           decisionCard.innerHTML = '<strong>Risk flag penalty</strong><p class="tiny">Site doubt requires fresh IDV via verifyFreshForBackend, then retry at ishuman assurance.</p>';
           const fresh = await verifier.verifyFreshForBackend({{
             requiredAssurance: ESCALATED_ASSURANCE,
@@ -2334,7 +2334,7 @@ def _presale_index():
       }});
       pill.textContent = 'FLAGGED';
       pill.className = 'pill checking';
-      decisionCopy.textContent = 'Simulated site risk flag on ' + lastPpid.slice(0, 20) + '… — Step 2 will require fresh IDV.';
+      decisionCopy.textContent = 'Simulated site risk flag on ' + lastPpid.slice(0, 20) + '…, Step 2 will require fresh IDV.';
       advanceTour('flag');
     }}
 
@@ -2356,7 +2356,7 @@ def _presale_index():
       setTourHighlight('attack');
       pill.textContent = 'CHECKING';
       pill.className = 'pill checking';
-      decisionCard.innerHTML = '<strong>Replay attack</strong><p class="tiny">Re-posting the last stamped body and nonce — server should return action_nonce_reused.</p>';
+      decisionCard.innerHTML = '<strong>Replay attack</strong><p class="tiny">Re-posting the last stamped body and nonce, server should return action_nonce_reused.</p>';
       try {{
         const serverRes = await fetch(lastStampedRequest.path, {{
           method: 'POST',
@@ -2388,11 +2388,11 @@ def _presale_index():
 
     async function runSkipStepAttack() {{
       if (presaleRegistered) {{
-        decisionCopy.textContent = 'Already registered on server — reload without Step 1 to demo skip-step deny.';
+        decisionCopy.textContent = 'Already registered on server, reload without Step 1 to demo skip-step deny.';
         return;
       }}
       setTourHighlight('attack');
-      decisionCard.innerHTML = '<strong>Skip Step 1</strong><p class="tiny">Attempting claim before passkey register — server should return registration_required.</p>';
+      decisionCard.innerHTML = '<strong>Skip Step 1</strong><p class="tiny">Attempting claim before passkey register, server should return registration_required.</p>';
       await runClaim(undefined, 0, {{ isRetry: false, skipStepDemo: true }});
     }}
 
@@ -2411,7 +2411,7 @@ def _presale_index():
       const saved = loadPresaleSession();
       const pending = saved?.pendingAction;
       if (!pending) {{
-        decisionCopy.textContent = 'Returned from lemma.id — tap the presale step to continue.';
+        decisionCopy.textContent = 'Returned from lemma.id, tap the presale step to continue.';
         return;
       }}
       decisionCard.innerHTML = '<strong>Resuming after passkey unlock</strong><p class="tiny">Finishing the presale step you started before returning from lemma.id.</p>';

@@ -1,4 +1,4 @@
-"""Phase 1.1 — person-root seed derivation + sealed envelopes.
+"""Phase 1.1, person-root seed derivation + sealed envelopes.
 
 Invariants:
   * same person_root + same wallet_id -> same wallet_local_seed (deterministic)

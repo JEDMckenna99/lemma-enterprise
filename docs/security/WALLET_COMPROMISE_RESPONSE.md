@@ -5,7 +5,7 @@ on lemma.id is detected or reported.
 
 ## 1. User actions (immediate)
 
-1. **Lock the wallet** — use Lock in the wallet UI or call `LemmaWallet.lock()`.
+1. **Lock the wallet**: use Lock in the wallet UI or call `LemmaWallet.lock()`.
 2. **Clear site data** for `lemma.id` (IndexedDB + localStorage) if compromise is confirmed.
 3. **Re-unlock with passkey** only after clearing, on a trusted device/browser.
 

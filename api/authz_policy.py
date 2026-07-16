@@ -18,7 +18,7 @@ class RouteAuthPolicy:
     compat_bearer_sunset_utc: Optional[str] = None
 
 
-# Principal sets — mutations require verified credential or agent token (PPID-bound).
+# Principal sets: mutations require verified credential or agent token (PPID-bound).
 READ_PRINCIPALS = ("user_lemma", "agent_token", "access_token", "api_key")
 MUTATE_PRINCIPALS = ("user_lemma", "agent_token", "access_token")
 API_KEY_ONLY_PRINCIPALS = ("api_key",)

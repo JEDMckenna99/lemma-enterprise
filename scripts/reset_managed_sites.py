@@ -42,7 +42,7 @@ def reset(*, apply: bool) -> int:
             print("Managed sites reset applied.")
         else:
             conn.rollback()
-            print("Dry run only — no changes committed.")
+            print("Dry run only, no changes committed.")
     except Exception as exc:
         conn.rollback()
         print(f"ERROR: {exc}", file=sys.stderr)

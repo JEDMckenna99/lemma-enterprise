@@ -1,4 +1,4 @@
-"""Site-local presale code ledger — one allocation per (drop_id, verified person).
+"""Site-local presale code ledger, one allocation per (drop_id, verified person).
 
 Copy-paste reference for relying sites. Lemma.id does not host drop counters;
 the integrator keys allocations off the verified site-private PPID.
@@ -105,7 +105,7 @@ class PresaleAllocationBackend(Protocol):
 
 
 class PresaleRegistrationStore:
-    """Site-local presale signups keyed by (drop_id, ppid) — Laylo registration step."""
+    """Site-local presale signups keyed by (drop_id, ppid), Laylo registration step."""
 
     def __init__(self) -> None:
         self._lock = threading.Lock()

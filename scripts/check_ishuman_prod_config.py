@@ -89,7 +89,7 @@ def _verify_didit_via_live() -> list[str]:
 def main() -> int:
     env = _env("ENVIRONMENT").lower()
     if env != "production":
-        print(f"OK: ENVIRONMENT={env or '(unset)'} — production-only isHuman gate skipped")
+        print(f"OK: ENVIRONMENT={env or '(unset)'}, production-only isHuman gate skipped")
         return 0
 
     errors: list[str] = []

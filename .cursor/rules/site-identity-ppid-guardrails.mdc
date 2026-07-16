@@ -57,9 +57,9 @@ Use these rules when editing auth, IAM, wallet, admin bootstrap, or customer-sit
 
 Use `static/js/lemma-credential-utils.js` for platform checks:
 
-- `canonicalPlatformSite()` / `isPlatformSiteBinding()` — match `lemma.id`, `www.lemma.id`, legacy `lemma_platform`.
-- `isCompleteLemmaIdCredential()` — isHuman master or lemma.id site proof.
-- `isPlatformOperatorCredential()` — `admin_access` bound to platform site.
+- `canonicalPlatformSite()` / `isPlatformSiteBinding()`, match `lemma.id`, `www.lemma.id`, legacy `lemma_platform`.
+- `isCompleteLemmaIdCredential()`, isHuman master or lemma.id site proof.
+- `isPlatformOperatorCredential()`, `admin_access` bound to platform site.
 - Skip empty site fields before calling strict canonicalizers; never pass empty strings to `canonicalizeSiteDomain()`.
 
 ## Deployment and testing expectations

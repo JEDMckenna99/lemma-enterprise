@@ -1,6 +1,6 @@
-> **Unimplemented internal proposal — not shipped.** Do not use for integration planning. Shipped relying-site behavior is documented in public docs at [lemma.id/docs](https://lemma.id/docs).
+> **Unimplemented internal proposal, not shipped.** Do not use for integration planning. Shipped relying-site behavior is documented in public docs at [lemma.id/docs](https://lemma.id/docs).
 
-# Agent Acting PPID (AAP) — Compressed Chain Identity
+# Agent Acting PPID (AAP): Compressed Chain Identity
 
 **Status:** Product / architecture spec (draft, unimplemented)  
 **Date:** 2026-06-17  
@@ -12,7 +12,7 @@ Related: `docs/product/HUMAN_BACKED_AGENT_PASSPORT.md`, `docs/architecture/CHAIN
 
 ## 1. Summary
 
-**Agent Acting PPID (AAP)** is a single pairwise identifier the agent carries when it acts on a site — compressing the human-verified delegation chain into one wire principal, without collapsing the cryptographic guarantees underneath.
+**Agent Acting PPID (AAP)** is a single pairwise identifier the agent carries when it acts on a site, compressing the human-verified delegation chain into one wire principal, without collapsing the cryptographic guarantees underneath.
 
 ```text
 L1  Verified human (isHuman)           → human site PPID (existing)
@@ -76,13 +76,13 @@ aap = HMAC(delegation_root, "lemma.id/agent-acting-ppid/v1" || context) → did:
 
 ## 4. Layer mapping (your L1 → L4 order)
 
-### L1 — Verified human (isHuman)
+### L1: Verified human (isHuman)
 
 - **Gate:** IDV-backed person root; trust tier ≥ policy floor (default T2 for signup-grade actions).
 - **Output:** human site PPID embedded in L1 credential / presentation (not sent on every agent request if AAP mode is used).
-- **End-of-loop:** optional **human re-stamp** on consequential outcomes (checkout, recovery, step-up) — same person root, fresh presentation, same human PPID.
+- **End-of-loop:** optional **human re-stamp** on consequential outcomes (checkout, recovery, step-up), same person root, fresh presentation, same human PPID.
 
-### L2 — Human-consented delegation
+### L2: Human-consented delegation
 
 - **Gate:** wallet unlocked / passkey consent anchor (`consent_epoch`).
 - **Inputs to AAP context:** `profile_id`, `scope_h` (hash of ordered scope + resource_bounds).
@@ -91,15 +91,15 @@ aap = HMAC(delegation_root, "lemma.id/agent-acting-ppid/v1" || context) → did:
   - **Recurring:** stable `profile_id` (e.g. `runtime_id`, `delegation_profile` UUID) → stable AAP across sessions until revoke or re-scope.
   - **One-shot:** `profile_id = jti` (random per grant) → unique AAP per issuance.
 
-### L3 — Site / API access
+### L3: Site / API access
 
 - **Bound in AAP context:** `aud` (canonical hostname), `scope_h`, optional `resource_bounds` hash.
-- **Issued artifact:** compact **Agent Acting Credential (AAC)** — VC-JWT or `authz_profile_v2` child whose **subject** is the AAP.
+- **Issued artifact:** compact **Agent Acting Credential (AAC)**: VC-JWT or `authz_profile_v2` child whose **subject** is the AAP.
 - **Site behavior:** treat AAP like a service account principal; verify AAC + PoP per protected request.
 
-### L4 — Agent Ops (operators)
+### L4: Agent Ops (operators)
 
-- **Not compressed into AAP** — runtime state is dynamic between actions.
+- **Not compressed into AAP**: runtime state is dynamic between actions.
 - **Linkage:** `runtime_id` stored as `profile_id` or extension claim; firewall calls `authorize` / checks kill / taint epoch.
 - **Relying sites:** optional; default verify path is L1–L3 local only.
 
@@ -125,7 +125,7 @@ aap = HMAC(delegation_root, "lemma.id/agent-acting-ppid/v1" || context) → did:
 }
 ```
 
-Stored in agent runtime / CLI secrets — **not** in lemma wallet IndexedDB on the operator machine unless the operator uses browser wallet issuance.
+Stored in agent runtime / CLI secrets, **not** in lemma wallet IndexedDB on the operator machine unless the operator uses browser wallet issuance.
 
 ### 5.2 What the agent sends per request (hot path)
 
@@ -171,7 +171,7 @@ Sites SHOULD NOT accept bare `acting_ppid` without cryptographic verify (same ru
 }
 ```
 
-`scope_h` MUST match verifier-side hash of declared scope + bounds — detects credential tampering vs derivation context.
+`scope_h` MUST match verifier-side hash of declared scope + bounds, detects credential tampering vs derivation context.
 
 ---
 
@@ -291,7 +291,7 @@ result = verify_agent_acting(
 
 1. User approves agent once → store `acting_ppid` on agent config row.
 2. Agent refreshes AAC before expiry (re-consent if consent window exceeded).
-3. Site API checks `acting_ppid` + verify on each call — no human PPID on hot path.
+3. Site API checks `acting_ppid` + verify on each call, no human PPID on hot path.
 
 ---
 
@@ -308,7 +308,7 @@ result = verify_agent_acting(
 | Runtime kill / explain (L4) | DIY | Out of scope | **Agent Ops** |
 | Pairwise privacy | IdP correlates | Issuer-dependent | **Site + AAP pairwise** |
 
-**Win narrative:** OAuth gives the **user’s** token to the agent. Lemma gives an **agent principal** cryptographically tied to a **verified human + consent + scope** — without making every API call look like the human user.
+**Win narrative:** OAuth gives the **user’s** token to the agent. Lemma gives an **agent principal** cryptographically tied to a **verified human + consent + scope**: without making every API call look like the human user.
 
 **Don’t compete:** default MCP authorization server UX; enterprise SSO replacement.
 
@@ -360,19 +360,19 @@ Implement AAP as a **profile** of HBAP issuance, not a second stack:
 
 ## 12. Positioning
 
-**isHuman** — proves the human.  
-**Agent Acting PPID** — the ID the agent uses on your site, backed by that human’s consent and your scope.  
-**Agent Ops** — kill, contain, and explain when the agent runs in your infrastructure.
+**isHuman**: proves the human.  
+**Agent Acting PPID**: the ID the agent uses on your site, backed by that human’s consent and your scope.  
+**Agent Ops**: kill, contain, and explain when the agent runs in your infrastructure.
 
 One-liner for exploration conversations:
 
-> **Give agents a site-private acting ID — not your user’s OAuth token — rooted in verified humanity and revocable delegation.**
+> **Give agents a site-private acting ID, not your user’s OAuth token, rooted in verified humanity and revocable delegation.**
 
 ---
 
 ## 13. Open questions
 
-1. **Prefix:** `did:lemma:aap_` vs `did:lemma:ppid_agent_` — prefer `aap_` for unambiguous principal typing in logs and policy.
-2. **Consent refresh:** widen recurring AAC TTL but narrow `consent_epoch` window — forces wallet re-tap without rotating AAP.
+1. **Prefix:** `did:lemma:aap_` vs `did:lemma:ppid_agent_`, prefer `aap_` for unambiguous principal typing in logs and policy.
+2. **Consent refresh:** widen recurring AAC TTL but narrow `consent_epoch` window, forces wallet re-tap without rotating AAP.
 3. **Subagents:** child AAP with `parent_profile_id` + `delegation_depth` in context (P1).
 4. **Site-issued vs Lemma-issued AAC:** default Lemma-issued; optional site co-signature for L3-native IAM.

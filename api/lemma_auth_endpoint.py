@@ -103,7 +103,7 @@ def issue_credential():
 @cross_origin()
 def lemma_signin():
     """
-    Legacy sign-in endpoint — now a thin wrapper around issue_credential.
+    Legacy sign-in endpoint, now a thin wrapper around issue_credential.
 
     Accepts the old request shape for backwards compatibility but does NOT
     trust client-supplied verification_result.  Instead it requires a valid

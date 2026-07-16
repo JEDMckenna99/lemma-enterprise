@@ -271,7 +271,7 @@ def verify_permission_lemma():
     (Ed25519 + Bloom filter). This endpoint is retained for backwards
     compatibility but will be removed in a future release.
     """
-    logger.warning("Deprecated endpoint called: /api/sdk/verify-permission-lemma — migrate to local verification")
+    logger.warning("Deprecated endpoint called: /api/sdk/verify-permission-lemma, migrate to local verification")
     try:
         data = request.get_json()
         

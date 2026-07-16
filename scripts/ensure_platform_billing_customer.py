@@ -79,7 +79,7 @@ def main() -> int:
         print("Billing customer ready:")
         print(f"  customer_id:       {customer.customer_id}")
         print(f"  email:             {customer.email}")
-        print(f"  stripe_customer_id:{customer.stripe_customer_id or '(pending — complete Checkout)'}")
+        print(f"  stripe_customer_id:{customer.stripe_customer_id or '(pending, complete Checkout)'}")
         print(f"  subscription:      {customer.subscription_status}")
         print(f"  anchor site:       {site_id} ({site_domain})")
         print("Next: open https://lemma.id/developer/billing and complete Stripe Checkout.")

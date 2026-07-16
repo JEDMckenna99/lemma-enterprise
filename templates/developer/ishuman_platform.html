@@ -40,7 +40,7 @@
         <div>
             <h1 class="dev-title">isHuman + lemma.id for developers</h1>
             <p class="dev-subtitle">
-                Add isHuman when Sybil resistance matters — on top of lemma.id private proofs, site-private IDs,
+                Add isHuman when Sybil resistance matters, on top of lemma.id private proofs, site-private IDs,
                 and offline backend verification. Start with <code>passkey</code> assurance for continuity;
                 require <code>ishuman</code> when your policy needs one verified human. Register a site API key
                 only when you need server-side blocks.
@@ -111,7 +111,7 @@
             <ul class="dev-hub-list">
                 <li>Set <code>siteId</code> to your canonical hostname (for example <code>app.example.com</code>).</li>
                 <li>Add <code>ishuman-verifier.js</code> and fail closed when <code>human</code> is false.</li>
-                <li>Store the returned <code>ppid</code> on your user record — no KYC fields.</li>
+                <li>Store the returned <code>ppid</code> on your user record, no KYC fields.</li>
             </ul>
             <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:16px;">
                 <a href="/docs#quickstart" class="dev-btn dev-btn-secondary dev-btn-sm">Quickstart</a>
@@ -131,7 +131,7 @@
             </p>
             <ul class="dev-hub-list">
                 <li>First visit may open a popup (wallet unlock + Didit IDV).</li>
-                <li>Later checks validate locally — no per-page network call.</li>
+                <li>Later checks validate locally, no per-page network call.</li>
                 <li>Optional: stamp actions and re-verify on your backend with <code>verifyStamp()</code>.</li>
             </ul>
             <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:16px;">
@@ -151,8 +151,8 @@
                 The API key is not required for human verification itself.
             </p>
             <ul class="dev-hub-list">
-                <li><code>POST /api/ishuman/site-block</code> — immediate site-scoped PPID ban.</li>
-                <li><code>POST /api/ishuman/site-unblock</code> — remove a site block.</li>
+                <li><code>POST /api/ishuman/site-block</code>, immediate site-scoped PPID ban.</li>
+                <li><code>POST /api/ishuman/site-unblock</code>, remove a site block.</li>
                 <li>Issue keys in the <a href="/developer/external-api-keys">API key manager</a>.</li>
             </ul>
             <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:16px;">

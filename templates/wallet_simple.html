@@ -96,8 +96,8 @@
             <p class="card-intro">
                 <strong>Recommended:</strong> on the <em>new</em> device, open
                 <a href="/link">lemma.id/link</a> and tap <strong>Show QR Code</strong>.
-                Scan that QR with this phone's Camera app. You'll confirm with your passkey to send —
-                your wallet is encrypted to the new device only.
+                Scan that QR with this phone's Camera app. You'll confirm with your passkey to send.
+                Your wallet is encrypted to the new device only.
             </p>
             <a href="/link" class="btn btn-primary btn-full" style="text-align: center; text-decoration: none; display: block;">
                 Open add-device page
@@ -127,7 +127,7 @@
                 <div id="link-options" class="hidden"></div>
                 <div id="push-wait-status" class="card-help" style="margin-top: 12px;"></div>
                 <button id="confirm-push-btn" type="button" class="btn btn-primary btn-full hidden" style="margin-top: 12px;">
-                    Codes match — send with passkey
+                    Codes match. Send with passkey
                 </button>
                 <button id="hide-qr-btn" type="button" class="btn btn-secondary" style="margin-top: 12px;">Cancel</button>
             </div>
@@ -232,7 +232,7 @@ async function waitForLemmaWallet(maxMs = 15000) {
     }
 }
 
-// Initialize wallet — reuse the layout's global instance to avoid double IndexedDB init.
+// Initialize the wallet by reusing the layout's global instance to avoid double IndexedDB init.
 async function initWallet() {
     await waitForLemmaWallet();
     if (window.globalLemmaWallet) {
@@ -819,7 +819,7 @@ async function clearWallet() {
     }
 }
 
-// Session duration setting — persists preference and updates active unlock window
+// The session duration setting persists the preference and updates the active unlock window.
 function getSessionHoursFromSelect() {
     const value = parseInt(document.getElementById('session-duration-select').value, 10);
     return Number.isFinite(value) ? value : 10;
@@ -1175,7 +1175,7 @@ async function handleRedirectReturn(returnUrl) {
 }
 
 // ============================================================
-// Push transfer — QR / link from manager (device that HAS lemma.id)
+// Push transfer via QR or link from the manager (device that HAS lemma.id)
 // ============================================================
 let qrTimerInterval = null;
 let pushPollAbort = false;

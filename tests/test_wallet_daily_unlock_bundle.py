@@ -1,4 +1,4 @@
-"""Invariants for the isHuman "daily unlock" bundle (Phase 2.2 — superseded).
+"""Invariants for the isHuman "daily unlock" bundle (Phase 2.2, superseded).
 
 Phase 2.2 of the v2 plan proposed deleting the localStorage "one passkey per
 24h" bundle because an early *plaintext* version was a recurring source of

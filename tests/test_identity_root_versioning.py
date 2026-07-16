@@ -1,4 +1,4 @@
-"""Phase 3.1 — versioned pepper/salt rotation.
+"""Phase 3.1, versioned pepper/salt rotation.
 
 Rotation is additive: V1 resolution is byte-stable (legacy), the active version
 is selectable via ``LEMMA_ACTIVE_ROOT_VERSION``, distinct versions derive

@@ -1885,7 +1885,7 @@ tr.deny td:first-child{color:#f85149}
 tr.pending td:first-child{color:#d29922}
 .cnt{padding:0 20px;overflow-y:auto;max-height:calc(100vh - 120px)}
 </style></head><body>
-<div class="bar"><h1>Lemma AIM &mdash; Live Dashboard</h1><div class="meta" id="meta">connecting&hellip;</div></div>
+<div class="bar"><h1>Lemma AIM: Live Dashboard</h1><div class="meta" id="meta">connecting&hellip;</div></div>
 <div class="actions">
 <button onclick="killSession()" class="danger">Kill Session</button>
 </div>

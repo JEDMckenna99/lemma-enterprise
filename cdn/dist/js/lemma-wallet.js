@@ -564,7 +564,7 @@ class LemmaWallet {
                             };
                         }
                         
-                        // Issuance failed — still return authenticated with PPID
+                        // Issuance failed, still return authenticated with PPID
                         // (user proved passkey possession, just no lemma yet)
                         console.warn('[Lemma] Lemma issuance failed after redirect, deriving PPID only');
                         const ppid = await this.derivePPID(siteId);
@@ -1683,7 +1683,7 @@ class LemmaWallet {
      */
     async _hydrateVerificationCache() {
         try {
-            // Parallel reads — single IndexedDB open, multiple stores
+            // Parallel reads, single IndexedDB open, multiple stores
             const [revocations, allLemmas] = await Promise.all([
                 this._get('revocations', 'current').catch(() => null),
                 this._getAll('lemmas').catch(() => [])
@@ -1726,7 +1726,7 @@ class LemmaWallet {
                 `${this._revocationCache.set?.size || 0} revocations`
             );
         } catch (e) {
-            // Non-fatal — verification will still work, just slower on first call
+            // Non-fatal, verification will still work, just slower on first call
             this._warn('[Lemma] Cache hydration failed (non-fatal):', e.message);
         }
     }
@@ -1929,7 +1929,7 @@ class LemmaWallet {
             && !existingPasskeyRecord?.credentialId;
 
         // SMART CHECK (any host): if init() already restored a valid 24h
-        // session, don't prompt for passkey again — the user is already
+        // session, don't prompt for passkey again, the user is already
         // authenticated for the rest of the day. Pass { force: true } to
         // require an explicit re-authentication.
         // Site proof issuance always needs passkey when none exists yet (decrypt + bind).
@@ -2648,7 +2648,7 @@ class LemmaWallet {
     }
 
     // ========================================
-    // Phase 4.2 — QR cross-device transfer
+    // Phase 4.2, QR cross-device transfer
     // ========================================
 
     /**
@@ -2766,7 +2766,7 @@ class LemmaWallet {
     }
 
     // ========================================
-    // Pull-based device link — receiver QR, phone camera sends
+    // Pull-based device link, receiver QR, phone camera sends
     // ========================================
 
     _parsePullTransferPayload(raw) {
@@ -2791,7 +2791,7 @@ class LemmaWallet {
         }
         const parsed = JSON.parse(data);
         if (parsed.v !== 2 || parsed.mode !== 'pull' || !parsed.transfer_id || !parsed.recv_pubkey) {
-            throw new Error('Invalid receive QR — scan the code shown on the device you are adding');
+            throw new Error('Invalid receive QR, scan the code shown on the device you are adding');
         }
         return parsed;
     }
@@ -2834,7 +2834,7 @@ class LemmaWallet {
         const pending = this._pendingLinkReceive;
         const id = transferId || pending?.transferId;
         if (!id || !pending?.privateKey || pending.transferId !== id) {
-            throw new Error('No active receive session — show a new QR code');
+            throw new Error('No active receive session, show a new QR code');
         }
         const res = await fetch('/api/wallet/link-receive', {
             method: 'POST',
@@ -2903,7 +2903,7 @@ class LemmaWallet {
     }
 
     /**
-     * SENDER: phone opened /link/send after scanning receiver QR — deposit wallet.
+     * SENDER: phone opened /link/send after scanning receiver QR, deposit wallet.
      */
     async sendLinkDepositFromScan(scanInput) {
         await this.init();
@@ -3264,7 +3264,7 @@ class LemmaWallet {
             return true;
         } catch (e) {
             if (this._isEncryptedStorageLockedError(e)) {
-                console.warn('[Lemma] ishuman_cache persist skipped — storage key unavailable');
+                console.warn('[Lemma] ishuman_cache persist skipped, storage key unavailable');
                 return false;
             }
             throw e;
@@ -3957,7 +3957,7 @@ class LemmaWallet {
                     source: this.session.source || 'local'
                 };
             }
-            console.log('[Lemma] unlock(): session valid but PRF key missing — refreshing passkey for decryption');
+            console.log('[Lemma] unlock(): session valid but PRF key missing, refreshing passkey for decryption');
         }
 
         // SMART CHECK: On third-party sites, check bridge session first
@@ -4334,7 +4334,7 @@ class LemmaWallet {
             };
         }
 
-        // 24h rolling window — "unlocked today" means within the last
+        // 24h rolling window, "unlocked today" means within the last
         // getSessionDurationMs() (default 24h), not the same calendar day.
         // The previous calendar-day check broke shortly after midnight even
         // when the session had hours of remaining TTL.
@@ -4428,7 +4428,7 @@ class LemmaWallet {
      * @returns {Promise<Object>} Extension result
      */
     async extendBridgeSession() {
-        // Phase 2.1: bridge removed — session extension is popup-only now.
+        // Phase 2.1: bridge removed, session extension is popup-only now.
         return { success: false, disabled: true, error: 'bridge_disabled' };
     }
 
@@ -4461,7 +4461,7 @@ class LemmaWallet {
             return this._localFreshAuth(maxAgeMs);
         }
         
-        // Phase 2.1: bridge removed — fresh auth on third-party sites is
+        // Phase 2.1: bridge removed, fresh auth on third-party sites is
         // popup-only; signal that it is unavailable from here.
         return { success: false, fresh: false, disabled: true, error: 'bridge_disabled' };
     }
@@ -4503,7 +4503,7 @@ class LemmaWallet {
             };
         }
         
-        // Phase 2.1: bridge removed — freshness on third-party sites is
+        // Phase 2.1: bridge removed, freshness on third-party sites is
         // popup-only; report unavailable from here.
         return { success: false, authenticated: false, fresh: false, disabled: true, error: 'bridge_disabled' };
     }
@@ -5206,7 +5206,7 @@ class LemmaWallet {
             return { success: false, error: 'credentialId required' };
         }
         
-        // Phase 2.1: bridge removed — third-party sites cannot revoke directly
+        // Phase 2.1: bridge removed, third-party sites cannot revoke directly
         // against lemma.id; revocation is first-party / popup-only now.
         if (this._isThirdPartySite()) {
             return { success: false, disabled: true, error: 'bridge_disabled' };
@@ -5341,7 +5341,7 @@ class LemmaWallet {
      * Result is cached so subsequent quickVerify calls skip crypto
      */
     async verifyLemma(lemma, forceSignatureCheck = false) {
-        // Skip init() — caller (verifyLocalAuthorization) already initialized
+        // Skip init(), caller (verifyLocalAuthorization) already initialized
         if (!this._initialized) await this.init();
         
         const startTime = performance.now();
@@ -5382,7 +5382,7 @@ class LemmaWallet {
             try {
                 const cached = await this._get('session', `verified_${lemma.id}`);
                 if (cached && cached.sig === (lemma.proof?.signatureValue || lemma.signature)) {
-                    // Signature hasn't changed — trust the cached result
+                    // Signature hasn't changed, trust the cached result
                     this._verifiedSignatures.add(lemma.id);
                     const verifyTime = ((performance.now() - startTime) * 1000).toFixed(1);
                     return {
@@ -5472,13 +5472,13 @@ class LemmaWallet {
     // ========================================
     // When a user has a valid session but no lemma for the current site,
     // the SDK requests issuance from lemma.id's API internally.
-    // The wallet_secret NEVER leaves the SDK — only the derived PPID
+    // The wallet_secret NEVER leaves the SDK, only the derived PPID
     // is sent to lemma.id, which returns an HSM-signed credential.
     // ========================================
 
     /**
      * Request lemma issuance from lemma.id for the current site.
-     * The wallet_secret stays in the browser — only the site-specific PPID is sent.
+     * The wallet_secret stays in the browser, only the site-specific PPID is sent.
      * 
      * @param {string} siteId - The site to issue a lemma for
      * @returns {Promise<Object>} { success, ppid, lemma } or { success: false, error }
@@ -5486,7 +5486,7 @@ class LemmaWallet {
      */
     async _autoIssueLemma(siteId) {
         try {
-            // Derive PPID locally — wallet_secret stays in the SDK
+            // Derive PPID locally, wallet_secret stays in the SDK
             const ppid = await this.derivePPID(siteId);
             
             console.log(`[Lemma] Requesting lemma issuance for ${siteId} (PPID-only, no secret transmitted)`);
@@ -6086,7 +6086,7 @@ class LemmaWallet {
         // Stash the raw 32-byte PRF key material so the daily-unlock bundle can
         // carry it for 24h. The bundle already persists walletSecret in plaintext
         // localStorage for the same window, so this does not weaken the at-rest
-        // posture — it just lets ONE passkey/day cover every encrypted read/write
+        // posture, it just lets ONE passkey/day cover every encrypted read/write
         // (master storage + per-site proof derivation) instead of re-prompting on
         // each fresh popup page load that lacks the in-memory CryptoKey.
         try {
@@ -6171,7 +6171,7 @@ class LemmaWallet {
             await this._put('secrets', master);
         }
 
-        // Never JSON-encrypt device_signing — it holds a non-extractable CryptoKey.
+        // Never JSON-encrypt device_signing, it holds a non-extractable CryptoKey.
         for (const secret of await this._getAllRaw('secrets')) {
             if (!secret || mod.isEncryptedEnvelope(secret)) continue;
             if (secret.id === 'device_signing' || secret.id === 'device_meta') continue;
@@ -8037,7 +8037,7 @@ class LemmaWallet {
 
     /**
      * Store credential (backwards compatible alias for storeLemma)
-     * Phase 2.1: bridge removed — credentials are stored locally only.
+     * Phase 2.1: bridge removed, credentials are stored locally only.
      */
     async storeCredential(credential) {
         await this.init();
@@ -8082,7 +8082,7 @@ class LemmaWallet {
             storedInLemmas = true;
         } catch (e) {
             if (isIsHumanCredential && this._isEncryptedStorageLockedError(e)) {
-                console.warn('[Lemma] Encrypted lemmas locked — isHuman credential cached only');
+                console.warn('[Lemma] Encrypted lemmas locked, isHuman credential cached only');
             } else {
                 throw e;
             }
@@ -8103,7 +8103,7 @@ class LemmaWallet {
     
     /**
      * Get credentials (backwards compatible alias for getLemmas)
-     * Phase 2.1: bridge removed — only local credentials are returned.
+     * Phase 2.1: bridge removed, only local credentials are returned.
      * @param {string} type - Optional filter by packageType ('permission', 'identity', etc)
      */
     async getCredentials(type = null) {

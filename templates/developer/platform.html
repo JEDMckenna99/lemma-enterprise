@@ -1360,7 +1360,7 @@ POST /api/auth/exchange-proof</pre>
         }
         
         function formatDate(value) {
-            if (!value) return '—';
+            if (!value) return 'Not available';
             try {
                 return new Date(value).toLocaleString();
             } catch (e) {
@@ -1547,7 +1547,7 @@ POST /api/auth/exchange-proof</pre>
                         : String(token.operations_remaining);
                     const revokeButton = token.status === 'active'
                         ? `<button class="btn btn-sm" style="background: #dc2626; color: white;" onclick="revokeAgentDelegatedLemma('${escapeHTML(token.token_id)}')">Revoke</button>`
-                        : '<span style="color: #9ca3af; font-size: 12px;">—</span>';
+                        : '<span style="color: #9ca3af; font-size: 12px;">Not available</span>';
                     return `
                         <tr>
                             <td>
@@ -1609,7 +1609,7 @@ POST /api/auth/exchange-proof</pre>
                 document.getElementById('agent-stat-total').textContent = String(summary.total_actions || 0);
                 document.getElementById('agent-stat-failures').textContent = String(summary.failure_count || 0);
                 document.getElementById('agent-stat-deviations').textContent = String(summary.deviation_count || 0);
-                document.getElementById('agent-stat-last-seen').textContent = summary.last_seen_at ? formatDate(summary.last_seen_at) : '—';
+                document.getElementById('agent-stat-last-seen').textContent = summary.last_seen_at ? formatDate(summary.last_seen_at) : 'Not available';
                 document.getElementById('agent-stat-unique-paths').textContent = `Unique paths: ${summary.unique_paths || 0}`;
             } catch (error) {
                 console.error('Failed to load agent summary:', error);
@@ -1663,9 +1663,9 @@ POST /api/auth/exchange-proof</pre>
                     return `
                         <tr>
                             <td>${formatDate(event.timestamp)}</td>
-                            <td>${escapeHTML(event.token_id || '—')}</td>
-                            <td>${escapeHTML(event.method || '—')}</td>
-                            <td style="font-family: monospace; font-size: 12px;">${escapeHTML(event.path || '—')}</td>
+                            <td>${escapeHTML(event.token_id || 'Not available')}</td>
+                            <td>${escapeHTML(event.method || 'Not available')}</td>
+                            <td style="font-family: monospace; font-size: 12px;">${escapeHTML(event.path || 'Not available')}</td>
                             <td><span class="badge ${statusClass}">${escapeHTML(String(code || (event.success ? 200 : 500)))}</span></td>
                             <td>${deviationBadge}</td>
                         </tr>
@@ -1735,17 +1735,17 @@ POST /api/auth/exchange-proof</pre>
 
                 const rows = decisions.map((item) => {
                     const decisionClass = String(item.decision || '').toLowerCase() === 'allow' ? 'badge-success' : 'badge-danger';
-                    const statusCode = item.status_code !== null && item.status_code !== undefined ? String(item.status_code) : '—';
+                    const statusCode = item.status_code !== null && item.status_code !== undefined ? String(item.status_code) : 'Not available';
                     return `
                         <tr>
                             <td>${formatDate(item.timestamp)}</td>
-                            <td style="font-family: monospace; font-size: 12px;">${escapeHTML(item.runtime_id || '—')}</td>
-                            <td style="font-family: monospace; font-size: 12px;">${escapeHTML(item.credential_ref || '—')}</td>
-                            <td>${escapeHTML(item.method || '—')}</td>
-                            <td style="font-family: monospace; font-size: 12px;">${escapeHTML(item.path || '—')}</td>
-                            <td><span class="badge ${decisionClass}">${escapeHTML(item.decision || '—')}</span></td>
+                            <td style="font-family: monospace; font-size: 12px;">${escapeHTML(item.runtime_id || 'Not available')}</td>
+                            <td style="font-family: monospace; font-size: 12px;">${escapeHTML(item.credential_ref || 'Not available')}</td>
+                            <td>${escapeHTML(item.method || 'Not available')}</td>
+                            <td style="font-family: monospace; font-size: 12px;">${escapeHTML(item.path || 'Not available')}</td>
+                            <td><span class="badge ${decisionClass}">${escapeHTML(item.decision || 'Not available')}</span></td>
                             <td><span class="badge ${decisionClass}">${escapeHTML(statusCode)}</span></td>
-                            <td style="font-family: monospace; font-size: 12px;">${escapeHTML(item.reason_code || '—')}</td>
+                            <td style="font-family: monospace; font-size: 12px;">${escapeHTML(item.reason_code || 'Not available')}</td>
                             <td>
                                 <button class="btn btn-sm btn-secondary" onclick="explainFirewallDecision(${Number(item.decision_id || 0)})">Explain</button>
                             </td>
@@ -2688,7 +2688,7 @@ POST /api/auth/exchange-proof</pre>
                 
                 // Display masked key using the hint (last 8 chars stored securely on server)
                 const keyHint = key.key_hint || (key.key ? key.key.slice(-8) : '');
-                const maskedKey = keyHint ? `lemma_${'•'.repeat(24)}${keyHint}` : '—';
+                const maskedKey = keyHint ? `lemma_${'•'.repeat(24)}${keyHint}` : 'Not available';
                 // Note: Full key is only available at creation time, not stored
                 
                 return `

@@ -1,4 +1,4 @@
-# Lemma.id Launch Sign-off — v1712
+# Lemma.id Launch Sign-off: v1712
 
 Date: 2026-02-14  
 Environment: Production (`https://lemma.id`)  

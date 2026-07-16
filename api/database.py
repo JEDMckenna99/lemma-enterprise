@@ -122,7 +122,7 @@ def _get_raw_pg_pool():
             )
             return _raw_pg_pool
         except Exception as exc:
-            # Local SQLite / missing SSL — fall back to unpooled connect.
+            # Local SQLite / missing SSL: fall back to unpooled connect.
             logger.warning("Postgres pool init failed, using direct connects: %s", exc)
             _raw_pg_pool_disabled = True
             return None
@@ -288,7 +288,7 @@ class Customer(Base):
 
 class PlatformUser(Base):
     """
-    Canonical lemma.id platform account — one row per person-root PPID.
+    Canonical lemma.id platform account, one row per person-root PPID.
 
     Billing/API keys live on the optional linked customers row (billing_customer_id).
     Site-scoped admin grants remain in site_admins.

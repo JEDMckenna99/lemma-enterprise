@@ -45,7 +45,7 @@ def _memory_window_increment(rate_key: str, period: int) -> tuple[int, int]:
         ttl = max(0, entry["reset_at"] - now)
         return entry["count"], ttl
 
-# Initialize Redis client (shared factory — do not open a second pool)
+# Initialize Redis client (shared factory: do not open a second pool)
 try:
     from api.redis_client import get_shared_redis
 

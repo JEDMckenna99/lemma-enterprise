@@ -178,7 +178,7 @@ For attackers: the cost-benefit calculation changes fundamentally. Getting caugh
 
 ### 8.3 User-initiated revocation
 
-Users can revoke their own credentials if compromised. This protects **all** participating sites simultaneously—analogous to canceling a stolen credit card rather than notifying each merchant individually.
+Users can revoke their own credentials if compromised. This protects **all** participating sites simultaneously, analogous to canceling a stolen credit card rather than notifying each merchant individually.
 
 ### 8.4 Network effects and defense flywheel
 
@@ -305,7 +305,7 @@ Example: \(n = 10^6\) revocations and \(p = 10^{-6}\) yields:
 This illustrates that very low false-positive targets can be achieved with modest, cacheable artifacts if Bloom filter compression is used. The deployed system can also use an exact hashed revocation set (no false positives) at the cost of larger distribution artifacts.
 
 ### 11.3 Why local verification is the differentiator
-The performance advantage is **not** about faster cryptographic operations — Ed25519 verification takes roughly the same time everywhere. The advantage is **eliminating the network call**.
+The performance advantage is **not** about faster cryptographic operations, Ed25519 verification takes roughly the same time everywhere. The advantage is **eliminating the network call**.
 
 | Factor | Local Verification | Centralized Lookup |
 |--------|-------------------|-------------------|

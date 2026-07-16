@@ -86,7 +86,7 @@ def cleanup(*, keep_ppids: set[str], apply: bool) -> int:
             print("Cleanup applied.")
         else:
             db.rollback()
-            print("Dry run only — no changes committed.")
+            print("Dry run only, no changes committed.")
     except Exception as exc:
         db.rollback()
         print(f"ERROR: cleanup failed: {exc}", file=sys.stderr)

@@ -33,7 +33,7 @@ _session_secret = os.environ.get('SESSION_SECRET')
 if not _session_secret:
     if os.environ.get('FLASK_ENV') == 'development' or os.environ.get('LEMMA_DEV_MODE') == '1':
         _session_secret = 'dev-only-' + secrets.token_hex(16)
-        logger.warning("SESSION_SECRET not set — using random dev secret (sessions won't survive restarts)")
+        logger.warning("SESSION_SECRET not set, using random dev secret (sessions won't survive restarts)")
     else:
         raise RuntimeError(
             "SESSION_SECRET environment variable is required in production. "

@@ -5,7 +5,7 @@ Audience: Platform engineers, wallet SDK maintainers, integration partners
 
 ## Overview
 
-lemma.id separates **identity proof** from **permission proof**. All users — including platform operators — follow the same wallet and isHuman identity flow. Operator privileges are additional lemma.id-scoped permission credentials, not a parallel identity system.
+lemma.id separates **identity proof** from **permission proof**. All users, including platform operators, follow the same wallet and isHuman identity flow. Operator privileges are additional lemma.id-scoped permission credentials, not a parallel identity system.
 
 ```
 Unlocked wallet
@@ -50,9 +50,9 @@ A **presentation** is the signed credential (or derived session artifact) sent t
 
 Protected platform routes expect:
 
-- `X-Lemma-Credential` — encoded wallet-selected credential
-- `X-Credential-ID` — credential id when available
-- `X-Permission-ID` — canonical permission id (`admin_access` for operators)
+- `X-Lemma-Credential`, encoded wallet-selected credential
+- `X-Credential-ID`, credential id when available
+- `X-Permission-ID`, canonical permission id (`admin_access` for operators)
 
 Wallet unlock is required. Server session cookies improve UX but do not replace wallet-held proofs on protected flows.
 
@@ -60,14 +60,14 @@ Wallet unlock is required. Server session cookies improve UX but do not replace 
 
 | Key | Purpose |
 |-----|---------|
-| `site_...` (internal) | Database ownership, issuance context — **not** runtime PPID/credential matching |
+| `site_...` (internal) | Database ownership, issuance context, **not** runtime PPID/credential matching |
 | `siteId` / `siteDomain` (hostname) | Runtime binding for PPID derivation and credential matching |
 | `lemma.id` | Platform canonical binding |
 
 Backend helpers:
 
-- `api/site_hostname.canonicalize_site_hostname()` — strict integrator hostname input
-- `api/site_hostname.normalize_runtime_site_binding()` — permissive runtime credential binding normalizer
+- `api/site_hostname.canonicalize_site_hostname()`, strict integrator hostname input
+- `api/site_hostname.normalize_runtime_site_binding()`, permissive runtime credential binding normalizer
 
 Frontend helpers (`lemma-credential-utils.js`):
 

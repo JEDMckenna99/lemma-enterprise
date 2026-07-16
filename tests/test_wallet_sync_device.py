@@ -1,4 +1,4 @@
-"""Phase 4.2 — POST /api/wallet/sync-device QR transfer relay.
+"""Phase 4.2, POST /api/wallet/sync-device QR transfer relay.
 
 The server is a short-lived, one-time relay for an opaque bundle the old device
 reseals to the new device's transient key. The server never sees plaintext

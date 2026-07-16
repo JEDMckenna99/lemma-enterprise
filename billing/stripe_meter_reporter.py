@@ -59,7 +59,7 @@ def report_meter_event(
     """
     event_name = METER_EVENTS.get(event_type)
     if not event_name:
-        logger.warning("Unknown billing event_type=%s — not reported", event_type)
+        logger.warning("Unknown billing event_type=%s, not reported", event_type)
         return False
 
     if not stripe_customer_id:

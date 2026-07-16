@@ -8,11 +8,11 @@ Cloud Functions, plain scripts). Single file, one dependency
 
 ## Why local verification
 
-- **Privacy** — `lemma.id` never sees an individual verification. It only
+- **Privacy**: `lemma.id` never sees an individual verification. It only
   serves a periodic signed Bloom snapshot + trust list (cached, refreshed
   every ~15 minutes by default).
-- **Cost** — zero per-request server cost on `lemma.id` and on your backend.
-- **Security** — every cryptographic anchor is signed by a trusted issuer
+- **Cost**: zero per-request server cost on `lemma.id` and on your backend.
+- **Security**: every cryptographic anchor is signed by a trusted issuer
   key listed in the network trust list.
 
 ## Install
@@ -30,7 +30,7 @@ from lemma_ishuman_verify import VerificationContext
 
 ctx = VerificationContext(site_id="tickets-demo.lemma.id")
 
-# In your request handler — the client posts presentation from
+# In your request handler: the client posts presentation from
 # result.presentation returned by IsHumanVerifier.verify()
 @app.post("/api/reserve")
 def reserve():

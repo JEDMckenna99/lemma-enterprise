@@ -149,7 +149,7 @@ def create_app():
         cross-site / cross-device lock-propagation layer (SSE heartbeat to
         ``lemma.id``, global-session polling, bridge auto-checks). The 24h
         IndexedDB session that gives "one passkey per day" on a single domain
-        is *not* affected by this flag — it always works locally.
+        is *not* affected by this flag, it always works locally.
 
         Default ``true`` to preserve existing behavior; set to ``false`` on
         environments where lemma.id is not yet acting as a third-party login
@@ -677,7 +677,7 @@ def create_app():
 
     @app.route('/home')
     def home():
-        """Marketing homepage — always, even when session cookies are present."""
+        """Marketing homepage, always, even when session cookies are present."""
         logger.info("🏠 Serving marketing page (/home)")
         return render_template('modern/index.html')
 
@@ -980,7 +980,7 @@ def create_app():
     # ==================== DOCUMENTATION ====================
     @app.route('/docs')
     def docs_overview():
-        """Public docs entrypoint — lemma.id private proof layer."""
+        """Public docs entrypoint, lemma.id private proof layer."""
         return render_template('docs/ishuman.html')
 
     @app.route('/docs/agents')
@@ -1025,7 +1025,7 @@ def create_app():
 
     @app.route('/docs/ishuman')
     def docs_ishuman():
-        """Legacy alias — canonical docs live at /docs."""
+        """Legacy alias, canonical docs live at /docs."""
         return redirect(url_for('docs_overview'), code=301)
     
     @app.route('/docs/sdk')
@@ -1135,7 +1135,7 @@ def create_app():
     
     @app.route('/developer')
     def developer_overview():
-        """Authenticated developer hub — lemma.id integration overview."""
+        """Authenticated developer hub, lemma.id integration overview."""
         logger.info("Serving lemma.id developer hub")
         return _require_wallet_session(
             'developer/ishuman_platform.html',
@@ -1148,7 +1148,7 @@ def create_app():
 
     @app.route('/developer/ishuman')
     def developer_ishuman_legacy():
-        """Legacy URL — lemma.id is the product; isHuman is an assurance tier."""
+        """Legacy URL, lemma.id is the product; isHuman is an assurance tier."""
         return redirect('/developer', code=301)
 
     @app.route('/developer/')
@@ -1257,7 +1257,7 @@ def create_app():
     
     @app.route('/developer/billing')
     def developer_billing():
-        """Developer billing — usage-based Stripe metered subscription."""
+        """Developer billing, usage-based Stripe metered subscription."""
         logger.info("Serving developer billing")
         return _require_wallet_session(
             'developer/billing.html',

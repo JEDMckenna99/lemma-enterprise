@@ -1,4 +1,4 @@
-"""Pull-based device link relay — POST /api/wallet/link-receive."""
+"""Pull-based device link relay, POST /api/wallet/link-receive."""
 
 from __future__ import annotations
 

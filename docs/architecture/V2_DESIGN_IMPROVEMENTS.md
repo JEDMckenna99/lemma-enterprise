@@ -1,4 +1,4 @@
-# Lemma isHuman — v2 Design Improvements
+# Lemma isHuman: v2 Design Improvements
 
 > **For the next agent picking this up:** this document is self-contained.
 > You don't need prior conversation context. Read this top-to-bottom before
@@ -22,7 +22,7 @@ Most of v2 is built and shipped. Verified against the codebase:
 | 2.2 Drop daily-unlock bundle            | 🟢 Superseded        | Bundle is now encrypted (non-extractable device key) + fail-closed, which resolves the bug class 2.2 targeted without losing "1 passkey / 24h". Runtime opt-out `LEMMA_DISABLE_DAILY_UNLOCK` remains for validation. Invariants pinned by `tests/test_wallet_daily_unlock_bundle.py` |
 | 3.1 Pepper/salt rotation                | ✅ Done               | `LEMMA_ACTIVE_ROOT_VERSION`, versioned `_get_identity_root_pepper`, `test_identity_root_versioning.py`                                                                                                                                                                               |
 | 3.2 Multi-issuer                        | ✅ Done (live)        | Stripe + Didit; `issuer_id` (migrations 026/027); `billing/didit_manager.py`                                                                                                                                                                                                         |
-| 3.3 Bloom scaling (cascade)             | ⛔ Not viable as-is   | `lemma-crypto` `CascadedBloomFilter` is **not** the CRLite design (adds every item to every level) and hashes with BLAKE3 vs the live path's `sha256_dh32le`, so it cannot be wired or verified by the JS client. Deferred anyway until >500K revocations (prod <100). A real build = greenfield CRLite in pure Python + JS — see 3.3 below |
+| 3.3 Bloom scaling (cascade)             | ⛔ Not viable as-is   | `lemma-crypto` `CascadedBloomFilter` is **not** the CRLite design (adds every item to every level) and hashes with BLAKE3 vs the live path's `sha256_dh32le`, so it cannot be wired or verified by the JS client. Deferred anyway until >500K revocations (prod <100). A real build = greenfield CRLite in pure Python + JS, see 3.3 below |
 | 4.1 Re-IDV recovery                     | ✅ Done               | `RECOVERY.md` + reissue/re-IDV                                                                                                                                                                                                                                                       |
 | 4.2 QR cross-device transfer            | ✅ Done               | `/api/wallet/sync-device`, `test_wallet_sync_device.py`                                                                                                                                                                                                                              |
 | 5.1 Pin crypto invariants               | ✅ Done               | `test_cryptographic_invariants.py`                                                                                                                                                                                                                                                   |
@@ -30,7 +30,7 @@ Most of v2 is built and shipped. Verified against the codebase:
 | 6.1 / 6.2 Demo/prod split + env doc     | ✅ Done               | `lemma-staging` Heroku remote; `ENVIRONMENT_CONFIG.md`                                                                                                                                                                                                                               |
 
 
-Remaining work: none blocking. **1.1** is now live in prod (server flag + client injection). **3.3** is deferred until >500K revocations and, separately, the existing `lemma-crypto` cascade is not viable to wire (wrong algorithm + BLAKE3 vs `sha256_dh32le`) — see 3.3 below. **2.2** is superseded — see below.
+Remaining work: none blocking. **1.1** is now live in prod (server flag + client injection). **3.3** is deferred until >500K revocations and, separately, the existing `lemma-crypto` cascade is not viable to wire (wrong algorithm + BLAKE3 vs `sha256_dh32le`), see 3.3 below. **2.2** is superseded, see below.
 
 ---
 
@@ -47,13 +47,13 @@ Read these files first to internalize the current architecture:
 | `api/ishuman.py`                          | Production isHuman API: `/api/ishuman/start-verification`, Didit + legacy Stripe webhooks, `/api/ishuman/derive-site-proof`, `/api/ishuman/verify-presentation`. Master credential issuance lives here.                 |
 | `api/ishuman_demo.py`                     | Demo orchestration: test-mode IDV, demo site blocks, reset endpoints. Network-revocation drill **retired** (HTTP 410). Gated by `LEMMA_ISHUMAN_DEMO_`* env vars.                                                                        |
 | `api/site_ppid_revocation.py`             | Canonical PPID revocation + the shared `clear_amnesty_eligible_wallet_revocations` helper.                                                                                                                       |
-| `api/revocation_api.py`                   | Serves `/api/revocation/bloom-filter` — the signed Bloom snapshot + trust list every relying site fetches.                                                                                                       |
+| `api/revocation_api.py`                   | Serves `/api/revocation/bloom-filter`, the signed Bloom snapshot + trust list every relying site fetches.                                                                                                       |
 | `api/ppid.py`                             | PPID derivation primitives (HMAC-based, pairwise per (person_root, site)).                                                                                                                                       |
 | `api/identity_roots.py`                   | document_root + person_root derivation from IDV document fields (Didit default; Stripe legacy).                                                                                                                                     |
 | `api/issuer_trust_list.py`                | Signed multi-issuer trust list construction + verification.                                                                                                                                                      |
 | `api/bloom_snapshot.py`                   | Bloom snapshot building, signing, cache invalidation.                                                                                                                                                            |
 | `templates/wallet_ishuman_idv.html`       | The lemma.id popup that runs IDV and derives site proofs.                                                                                                                                                        |
-| `templates/wallet_bridge.html`            | The hidden iframe relying sites embed to talk to the wallet. (Subject of v2 removal — see Phase 2.)                                                                                                              |
+| `templates/wallet_bridge.html`            | The hidden iframe relying sites embed to talk to the wallet. (Subject of v2 removal, see Phase 2.)                                                                                                              |
 | `packages/ishuman-verify-js/`             | Node/Deno/browser backend verifier package (relying-site backends).                                                                                                                                              |
 | `packages/ishuman-verify-py/`             | Python backend verifier package.                                                                                                                                                                                 |
 | `examples/relying_site_offline_verify.py` | Reference Python implementation, also served at `/sdk/lemma_ishuman_verify.py`.                                                                                                                                  |
@@ -68,7 +68,7 @@ Read these files first to internalize the current architecture:
 | `wallet_secret`      | 32-byte random secret generated client-side at wallet creation. Stored in IndexedDB encrypted under passkey PRF key. Used today for site signing keys AND legacy PPID derivation.                                                                                                    |
 | `person_root`        | 32-byte server-derived secret. `person_root = HKDF(document_root_hash, salt=LEMMA_PERSON_ROOT_SALT_V1, info="lemma.id/person-root/v1")`. Same human + same documents → same person_root, forever.                                                                                    |
 | `document_root`      | `HMAC(LEMMA_IDENTITY_ROOT_PEPPER_V1, canonical_json(document_fields))`. Deterministic fingerprint of an identity document.                                                                                                                                                           |
-| `PPID`               | Pairwise pseudonymous identifier. `did:lemma:ppid_<hex>`. Today: `HMAC(person_root, "lemma.id/site-ppid/v1" + canonical_site_domain)` for post-IDV wallets, or `HMAC(HMAC(LEMMA_PPID_ROOT_KEY, wallet_secret), site_domain)` for pre-IDV wallets. Note the two paths — this is debt. |
+| `PPID`               | Pairwise pseudonymous identifier. `did:lemma:ppid_<hex>`. Today: `HMAC(person_root, "lemma.id/site-ppid/v1" + canonical_site_domain)` for post-IDV wallets, or `HMAC(HMAC(LEMMA_PPID_ROOT_KEY, wallet_secret), site_domain)` for pre-IDV wallets. Note the two paths, this is debt. |
 | Master credential    | A signed VC issued at IDV completion. Subject=user's lemma.id PPID, siteId="lemma.id". `credential.id = ishuman_master_<random>`. User holds it in wallet.                                                                                                                           |
 | Per-site VC          | Derived from master + site_domain. Subject=user's site PPID. Includes `claims.site_signing_pubkey` = HKDF-derived per-site keypair pubkey.                                                                                                                                           |
 | Session presentation | A signed assertion (`session_assertion` + `session_signature`) the user produces at verify time. Signed with the site_signing_keypair (proof of possession). Has bloom_sequence binding for freshness.                                                                               |
@@ -80,9 +80,9 @@ Read these files first to internalize the current architecture:
 
 Three Heroku apps:
 
-- `lemma-enterprise` — main app at [https://lemma.id](https://lemma.id), current `ENVIRONMENT=production` (this is causing demo issues; see Phase 6)
-- `lemma-demo-tickets` — at [https://lemma-demo-tickets-1d3d7411af33.herokuapp.com](https://lemma-demo-tickets-1d3d7411af33.herokuapp.com)
-- `lemma-demo-trials` — at [https://lemma-demo-trials-7090f46cae0d.herokuapp.com](https://lemma-demo-trials-7090f46cae0d.herokuapp.com)
+- `lemma-enterprise`, main app at [https://lemma.id](https://lemma.id), current `ENVIRONMENT=production` (this is causing demo issues; see Phase 6)
+- `lemma-demo-tickets`, at [https://lemma-demo-tickets-1d3d7411af33.herokuapp.com](https://lemma-demo-tickets-1d3d7411af33.herokuapp.com)
+- `lemma-demo-trials`, at [https://lemma-demo-trials-7090f46cae0d.herokuapp.com](https://lemma-demo-trials-7090f46cae0d.herokuapp.com)
 
 Deploy via:
 
@@ -103,14 +103,14 @@ After delivering a working popup-first issuance flow, post-revocation fresh-IDV 
 1. **Two parallel identity anchors** (`wallet_secret` + `person_root`) with no unification path
 2. **Master credential is a load-bearing dependency** in several server flows it doesn't need to be
 3. **Bridge iframe + popup duality** carries cruft from the pre-storage-partitioning era; both code paths can drift
-4. **Pepper/salt rotation has no story** — single-point-of-failure for the entire network's privacy guarantee
-5. **Single-issuer dependence on Stripe Identity** for IDV — **resolved**: Didit is default; Stripe retained for migration recovery only
+4. **Pepper/salt rotation has no story**: single-point-of-failure for the entire network's privacy guarantee
+5. **Single-issuer dependence on Stripe Identity** for IDV, **resolved**: Didit is default; Stripe retained for migration recovery only
 6. **Bloom filter is a single global structure** that won't scale past ~1M revocations
-7. **Cross-device transfer is undocumented** — the explicit token flow exists but isn't the advertised story
-8. **Demo and production share an app** — `ENVIRONMENT=production` on the main app breaks demo flows and vice versa
-9. **No threat model document** — invariants live in code only, not in human-readable form
+7. **Cross-device transfer is undocumented**: the explicit token flow exists but isn't the advertised story
+8. **Demo and production share an app**: `ENVIRONMENT=production` on the main app breaks demo flows and vice versa
+9. **No threat model document**: invariants live in code only, not in human-readable form
 
-The core insight of the design — **document-anchored stable identity with pairwise PPIDs and portable signed credentials** — is sound. The smart parts are:
+The core insight of the design: **document-anchored stable identity with pairwise PPIDs and portable signed credentials**: is sound. The smart parts are:
 
 - `person_root` is the right anchor (vs. account or wallet)
 - Pairwise PPIDs are mathematically clean
@@ -125,13 +125,13 @@ This document keeps all of those. It removes the surrounding bookkeeping.
 
 If you're picking one item at a time, do them in this order:
 
-1. **Phase 6** — Split demo from production. Unblocks current operational pain; tiny cost.
-2. **Phase 1.2 + 1.3** — Make master credential non-load-bearing + reissuable. Enables the rest without risk.
-3. **Phase 5** — Pin invariants in tests, document threat model + canonical message spec. Cheap insurance.
-4. **Phase 2** — Remove the bridge iframe. Big simplification, ~1 week of focused work.
-5. **Phase 1.1** — Consolidate `wallet_secret` + `person_root`. Most disruptive; feature-flag rollout.
-6. **Phase 4** — Formalize recovery flows.
-7. **Phase 3** — Operational hardening (pepper rotation, multi-issuer, Bloom scaling). Necessary before scale, not urgent at current volume.
+1. **Phase 6**: Split demo from production. Unblocks current operational pain; tiny cost.
+2. **Phase 1.2 + 1.3**: Make master credential non-load-bearing + reissuable. Enables the rest without risk.
+3. **Phase 5**: Pin invariants in tests, document threat model + canonical message spec. Cheap insurance.
+4. **Phase 2**: Remove the bridge iframe. Big simplification, ~1 week of focused work.
+5. **Phase 1.1**: Consolidate `wallet_secret` + `person_root`. Most disruptive; feature-flag rollout.
+6. **Phase 4**: Formalize recovery flows.
+7. **Phase 3**: Operational hardening (pepper rotation, multi-issuer, Bloom scaling). Necessary before scale, not urgent at current volume.
 
 Each phase is independently shippable. Don't try to do all of them in one PR.
 
@@ -142,9 +142,9 @@ Each phase is independently shippable. Don't try to do all of them in one PR.
 
 ---
 
-## Phase 1 — Identity layer simplification
+## Phase 1: Identity layer simplification
 
-### 1.1 Consolidate `wallet_secret` and `person_root` into a single derivation tree — ✅ LIVE
+### 1.1 Consolidate `wallet_secret` and `person_root` into a single derivation tree: ✅ LIVE
 
 **Status:** Implemented and **active in production**. Server side (`/api/ishuman/seed-envelope` + `_maybe_store_seed_envelopes`, `seed_version` column, `test_ishuman_identity_derivation.py`) is enabled via `LEMMA_ISHUMAN_USE_PERSON_ROOT_SEEDS=true` on prod and staging. The previously-missing client half is now wired: `inject_wallet_feature_flags()` mirrors the server flag and every page that loads the wallet SDK (modern layout + the standalone IDV, popup, unlock, recover, and demo pages) emits `window.LEMMA_ISHUMAN_USE_PERSON_ROOT_SEEDS`, so `fetchAndStoreSeedEnvelopes()` and seed-derived site signing now run.
 
@@ -184,8 +184,8 @@ Mathematically the client-side PPID and server-side PPID are computed from the s
 **Concrete change set:**
 
 1. Add column to `IsHumanVerification`:
-  - `wallet_seed_envelope` (LargeBinary) — encrypted blob, ciphertext only
-  - `person_root_proxy_envelope` (LargeBinary) — encrypted blob for client-side PPID derivation
+  - `wallet_seed_envelope` (LargeBinary), encrypted blob, ciphertext only
+  - `person_root_proxy_envelope` (LargeBinary), encrypted blob for client-side PPID derivation
 2. Modify `_complete_verified_ishuman_from_stripe` in `api/ishuman.py` to:
   - Derive `wallet_local_seed = HKDF(person_root, ...)` and `person_root_proxy = HKDF(person_root, ...)`
   - Encrypt both with the wallet's signing-key-derived envelope key (the wallet posts its current public encryption key during IDV start)
@@ -221,11 +221,11 @@ Mathematically the client-side PPID and server-side PPID are computed from the s
 
 **Risk:** Two derivation paths during migration window. Carefully namespaced (legacy uses `wallet_secret`, post-IDV uses `wallet_local_seed`). Cross-checks: server-derived and client-derived PPIDs must always match.
 
-### 1.2 Make `master_credential_id` optional in server flows — ✅ DONE
+### 1.2 Make `master_credential_id` optional in server flows: ✅ DONE
 
 **Status:** Implemented in `api/ishuman.py` (`/api/ishuman/derive-site-proof` uses hint-based lookup with fallback to the latest verified record, returning `wallet_not_verified` when none). Covered by `tests/test_derive_site_proof.py`.
 
-**Problem:** `/api/ishuman/derive-site-proof` requires `master_credential_id` in the body. The wallet's `findIsHumanMasterCredential()` is on the critical path. This couples the master VC to runtime correctness — a wallet that lost its local master copy can't issue site proofs even though the server has all needed state.
+**Problem:** `/api/ishuman/derive-site-proof` requires `master_credential_id` in the body. The wallet's `findIsHumanMasterCredential()` is on the critical path. This couples the master VC to runtime correctness, a wallet that lost its local master copy can't issue site proofs even though the server has all needed state.
 
 **Concrete change in `api/ishuman.py`:**
 
@@ -272,7 +272,7 @@ Update the wallet's `deriveAndStoreSiteProof` in `lemma-wallet.js` to omit `mast
 - Request with stale hint falls back to latest verified
 - Request for unverified wallet returns `wallet_not_verified`
 
-### 1.3 Add `/api/ishuman/reissue-master` endpoint — ✅ DONE
+### 1.3 Add `/api/ishuman/reissue-master` endpoint: ✅ DONE
 
 **Status:** Implemented (`reissue_master_credential` in `api/ishuman.py`). Covered by `tests/test_ishuman_reissue_master.py`.
 
@@ -287,7 +287,7 @@ def reissue_master_credential():
     """Reissue a fresh master credential for an already-verified wallet.
 
     Auth: wallet_assertion proving possession of the wallet's signing key.
-    No fresh IDV required — the wallet was already verified, we just hand
+    No fresh IDV required, the wallet was already verified, we just hand
     back a fresh signed copy.
 
     Body: { wallet_id, wallet_assertion: { nonce, signature } }
@@ -348,9 +348,9 @@ Rate-limit: at most 5 reissues per wallet per day (env-tunable). Standard `Flask
 
 ---
 
-## Phase 2 — Bridge elimination
+## Phase 2: Bridge elimination
 
-### 2.1 Remove the bridge iframe — ✅ DONE
+### 2.1 Remove the bridge iframe: ✅ DONE
 
 **Status:** Completed (incl. follow-up cleanup). The cross-origin bridge iframe,
 its `/wallet/bridge` route, the `/api/wallet/bridge-audit` telemetry endpoint,
@@ -417,9 +417,9 @@ SDK.verify():
 
 **Risk:** Popup blockers. Mitigation: every popup open is on a user gesture (click handler), never auto-fire.
 
-### 2.2 Drop the daily-unlock bundle, use per-popup unlock — 🟢 SUPERSEDED
+### 2.2 Drop the daily-unlock bundle, use per-popup unlock: 🟢 SUPERSEDED
 
-**Status:** Superseded — **do not implement as written.** The original justification
+**Status:** Superseded, **do not implement as written.** The original justification
 (the localStorage bundle being a recurring source of `envelope_invalid` / stale-state
 bugs) was driven by an early *plaintext* bundle. The bundle is now:
 
@@ -438,7 +438,7 @@ that is already largely paid.
 
 **Escape hatch (no code change needed):** the runtime flag `LEMMA_DISABLE_DAILY_UNLOCK`
 already disables the bundle end-to-end. If product ever wants to push toward per-popup
-unlock, validate the friction by setting that flag on staging/demo first — no deletion
+unlock, validate the friction by setting that flag on staging/demo first, no deletion
 required.
 
 **Invariants pinned:** `tests/test_wallet_daily_unlock_bundle.py` guards the
@@ -466,15 +466,15 @@ In `templates/wallet_ishuman_idv.html`:
 
 ---
 
-## Phase 3 — Operational hardening
+## Phase 3: Operational hardening
 
-### 3.1 Design pepper/salt rotation — ✅ DONE
+### 3.1 Design pepper/salt rotation: ✅ DONE
 
 **Status:** Implemented in `api/identity_roots.py` (versioned `_get_identity_root_pepper(version, issuer)` + `LEMMA_ACTIVE_ROOT_VERSION`, `root_version` on records, migration 024). Covered by `tests/test_identity_root_versioning.py`.
 
 **Problem:** `LEMMA_IDENTITY_ROOT_PEPPER_V1` and `LEMMA_PERSON_ROOT_SALT_V1` are network-root secrets. If compromised, an attacker can compute `person_root` for any documents they know. No rotation path exists today.
 
-**v2 design — versioned, overlapping:**
+**v2 design, versioned, overlapping:**
 
 1. Maintain `LEMMA_IDENTITY_ROOT_PEPPER_V1`, `_V2`, etc. concurrently in env config
 2. Each `IsHumanVerification` row has `root_version` column (already exists, partially used). Mark which pepper version produced its `document_root_hash`.
@@ -515,11 +515,11 @@ A user verified pre-rotation has different PPIDs than post-rotation. To preserve
 - The new master VC issued post-rotation carries a `legacy_ppid` claim if the wallet has a pre-rotation record
 - Sites that opt in honor the legacy PPID for migration (treat user as the same identity)
 
-This is a UX cost — sites must do the migration, or accept that rotation creates a discontinuity. Acceptable as an emergency operation, not a routine one.
+This is a UX cost, sites must do the migration, or accept that rotation creates a discontinuity. Acceptable as an emergency operation, not a routine one.
 
-### 3.2 Multi-issuer trust list — ✅ DONE (live)
+### 3.2 Multi-issuer trust list: ✅ DONE (live)
 
-**Status:** Implemented and live. Two issuers are integrated — Didit (default) and Stripe Identity (legacy) — with per-record `issuer_id` (migrations 026/027) and per-issuer root material (`billing/didit_manager.py`, `tests/test_ishuman_didit_issuance.py`, `tests/test_didit_`*). The original "defer" note below is historical.
+**Status:** Implemented and live. Two issuers are integrated, Didit (default) and Stripe Identity (legacy), with per-record `issuer_id` (migrations 026/027) and per-issuer root material (`billing/didit_manager.py`, `tests/test_ishuman_didit_issuance.py`, `tests/test_didit_`*). The original "defer" note below is historical.
 
 **Problem (historical):** Stripe Identity is the only configured IDV provider. Trust list architecture already supports multiple issuers but only one is integrated.
 
@@ -535,9 +535,9 @@ This is a UX cost — sites must do the migration, or accept that rotation creat
 
 Defer until the first issuer is stable at production scale and there's a business case for redundancy.
 
-### 3.3 Bloom filter scaling — ⛔ NOT VIABLE AS-IS (deferred)
+### 3.3 Bloom filter scaling: ⛔ NOT VIABLE AS-IS (deferred)
 
-**Status:** Production uses a single global Bloom built in `api/revocation_api.py` (`_build_bloom_bitset_sha256_dh32le`, capacity 100K @ 1e-6 FPR), signed via `api/bloom_snapshot.py`, and queried client-side in `static/js/ishuman-verifier.js`. No action is needed at current volume (prod has well under 100 revocations), and — separately — the existing `lemma-crypto` artifact **cannot** simply be wired in.
+**Status:** Production uses a single global Bloom built in `api/revocation_api.py` (`_build_bloom_bitset_sha256_dh32le`, capacity 100K @ 1e-6 FPR), signed via `api/bloom_snapshot.py`, and queried client-side in `static/js/ishuman-verifier.js`. No action is needed at current volume (prod has well under 100 revocations), and, separately, the existing `lemma-crypto` artifact **cannot** simply be wired in.
 
 **Audit finding (2026-06): the `lemma-crypto` `CascadedBloomFilter` is not usable for this path.** Do not assume "lib exists ⇒ ready to wire." Three independent blockers:
 
@@ -553,7 +553,7 @@ Defer until the first issuer is stable at production scale and there's a busines
 
 **Two options:**
 
-**Option A — Cascaded Bloom (CRLite-style):**
+**Option A, Cascaded Bloom (CRLite-style):**
 
 ```text
 Layer 1: large Bloom of all revoked credential IDs (FPR ~1e-3)
@@ -570,7 +570,7 @@ Net FPR: 1e-6 with ~4x smaller total size vs. single Bloom
 
 Add a Rust/C++ helper for cascade construction (Mozilla's `filter-cascade` crate).
 
-**Option B — Per-issuer partitioned Bloom:**
+**Option B, Per-issuer partitioned Bloom:**
 
 Each issuer publishes its own Bloom for credentials it issued. Clients fetch only the Bloom for the issuer whose credential they're verifying.
 
@@ -580,9 +580,9 @@ Simpler than cascaded; requires multi-issuer to be in production first.
 
 ---
 
-## Phase 4 — Recovery & transfer
+## Phase 4: Recovery & transfer
 
-### 4.1 Document re-IDV as the primary recovery path — ✅ DONE
+### 4.1 Document re-IDV as the primary recovery path: ✅ DONE
 
 **Status:** Documented in `docs/wallet/RECOVERY.md`; recovery is backed by reissue (1.3) + re-IDV.
 
@@ -594,9 +594,9 @@ Simpler than cascaded; requires multi-issuer to be in production first.
 2. Add docs at `/docs/wallet/recovery` explaining the model: identity lives in the network, not the device.
 3. Marketing: lead with "you can never lose your verified-human status, only the device that held your wallet."
 
-No code change required beyond ensuring Phase 1.3 (reissue master) is shipped — re-IDV + reissue gives the full recovery story.
+No code change required beyond ensuring Phase 1.3 (reissue master) is shipped, re-IDV + reissue gives the full recovery story.
 
-### 4.2 Explicit cross-device wallet transfer (QR-based) — ✅ DONE
+### 4.2 Explicit cross-device wallet transfer (QR-based): ✅ DONE
 
 **Status:** Implemented (`/api/wallet/sync-device` in `api/ishuman.py`, reusing the seed-envelope machinery). Covered by `tests/test_wallet_sync_device.py`.
 
@@ -620,9 +620,9 @@ No code change required beyond ensuring Phase 1.3 (reissue master) is shipped �
 
 ---
 
-## Phase 5 — Documentation & tests
+## Phase 5: Documentation & tests
 
-### 5.1 Pin cryptographic invariants in tests — ✅ DONE
+### 5.1 Pin cryptographic invariants in tests: ✅ DONE
 
 **Status:** Implemented in `tests/test_cryptographic_invariants.py` (plus the Rust suites under `lemma-crypto/tests/`).
 
@@ -671,7 +671,7 @@ def test_wallet_signing_key_derivation():
 
 These should be the first tests to break if anyone introduces a canonical-format-changing refactor. Each pinned value must be produced by running the live code once and copy-pasting.
 
-### 5.2 Threat model document — ✅ DONE
+### 5.2 Threat model document: ✅ DONE
 
 **Status:** Written at `docs/security/THREAT_MODEL.md`.
 
@@ -744,7 +744,7 @@ Structure:
 
 Fill in details from current implementation. Make it living document; update with each Phase.
 
-### 5.3 Canonical message specification — ✅ DONE
+### 5.3 Canonical message specification: ✅ DONE
 
 **Status:** Written at `docs/cryptographic/CANONICAL_MESSAGES.md`.
 
@@ -768,9 +768,9 @@ Third-party SDKs (Go, Rust) need this to produce verifiable signatures. Without 
 
 ---
 
-## Phase 6 — Demo / production split
+## Phase 6: Demo / production split
 
-### 6.1 Run two Heroku apps — ✅ DONE
+### 6.1 Run two Heroku apps: ✅ DONE
 
 **Status:** A separate `lemma-staging` Heroku app/remote exists alongside `lemma-enterprise` (production). Demo/staging semantics are split from production.
 
@@ -782,7 +782,7 @@ Third-party SDKs (Go, Rust) need this to produce verifiable signatures. Without 
 
 But the same app serves the demo at `lemma.id/demo`. Demo and production semantics fight each other.
 
-**v2 design — two apps:**
+**v2 design, two apps:**
 
 
 | App                                          | Purpose                     | ENVIRONMENT  | Demo endpoints | Real customers |
@@ -810,7 +810,7 @@ The demo subtree apps (`lemma-demo-tickets`, `lemma-demo-trials`) point at the *
 
 **Risk:** Operationally simple but takes a few hours to provision and verify.
 
-### 6.2 Document the env var contract — ✅ DONE
+### 6.2 Document the env var contract: ✅ DONE
 
 **Status:** Written at `docs/operations/ENVIRONMENT_CONFIG.md`.
 
@@ -869,7 +869,7 @@ These are good v3 candidates after v2 lands.
 If you (the next agent picking this up) hit any of these, surface them to a human before guessing:
 
 1. **Pepper rotation policy:** Do we accept identity discontinuity across rotations, or do we publish migration tables? (Section 3.1)
-2. **Master credential expiry:** Today's 2-year default — change for v2, or keep?
+2. **Master credential expiry:** Today's 2-year default, change for v2, or keep?
 3. **Wallet local seed storage format:** Encrypt under passkey PRF directly, or wrap in a per-device key first?
 4. **Demo app domain:** `demo.lemma.id` (clean) or `staging.lemma.id` (clearer)? Branding choice.
 5. **Re-issuance rate limit:** Per wallet per day, per IP per day, both?
@@ -889,6 +889,6 @@ The current design's smart parts are:
 - Per-site signing keys for proof of possession
 - Pepper + salt separation as defense-in-depth
 
-Do not change those. They are the architectural foundation. Everything in this document is about cleaning up the bookkeeping around them — not replacing the core.
+Do not change those. They are the architectural foundation. Everything in this document is about cleaning up the bookkeeping around them, not replacing the core.
 
 If a v2 change you're considering would alter any of those primitives, stop and ask first.

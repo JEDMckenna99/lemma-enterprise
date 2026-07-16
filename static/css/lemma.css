@@ -1,4 +1,4 @@
-/* Lemma Design System — ink + jewel violet (not SaaS blurple) */
+/* Lemma Design System, ink + jewel violet (not SaaS blurple) */
 
 /* === 1. CSS RESET === */
 *, *::before, *::after {
@@ -9,7 +9,7 @@
 
 /* === 2. DESIGN TOKENS === */
 :root {
-    /* Brand — deep violet from the orbit mark, solid (no indigo kit) */
+    /* Brand, deep violet from the orbit mark, solid (no indigo kit) */
     --primary: #4E3D8F;
     --primary-dark: #3A2D6E;
     --primary-light: #6B5CAD;
@@ -23,7 +23,7 @@
     --accent: #4E3D8F;
     --primary-rgb: 78, 61, 143;
 
-    /* Neutrals — cool charcoal, not Tailwind slate defaults */
+    /* Neutrals, cool charcoal, not Tailwind slate defaults */
     --black: #12121A;
     --gray-900: #1A1A24;
     --gray-800: #2C2C38;
@@ -41,7 +41,7 @@
     --warning: #B45309;
     --error: #C0392B;
 
-    /* Spacing — 8pt grid */
+    /* Spacing, 8pt grid */
     --space-1: 4px;
     --space-2: 8px;
     --space-3: 12px;
@@ -55,7 +55,7 @@
     --space-20: 80px;
     --space-24: 96px;
 
-    /* Typography — IBM Plex (institutional, not Inter) */
+    /* Typography, IBM Plex (institutional, not Inter) */
     --font-family: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
     --font-mono: "IBM Plex Mono", "SF Mono", Consolas, monospace;
     --font-size-xs: 13px;
@@ -379,7 +379,7 @@ a:hover {
 .mb-8 { margin-bottom: var(--space-8); }
 
 /* === 11. ADDITIONAL AUTHENTIC STYLING === */
-/* Even sections — flat surface, no wash gradient */
+/* Even sections, flat surface, no wash gradient */
 .section:nth-child(even) {
     background: var(--gray-100);
 }

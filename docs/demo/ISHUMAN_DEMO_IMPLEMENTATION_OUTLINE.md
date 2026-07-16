@@ -11,7 +11,7 @@ The demo covers the production relying-site contract in three hub concepts:
 Additional relying-site depth:
 
 - 30-day credential renewal with stable PPID and rotated credential ID
-- Unique presale code ledger keyed by `(drop_id, ppid)` on the tickets demo site (presence stamps — see presale script)
+- Unique presale code ledger keyed by `(drop_id, ppid)` on the tickets demo site (presence stamps, see presale script)
 
 The demo must not expose API keys or wallet secrets. Test IDV bypasses remain
 disabled in production. Network-wide revocation controls and claims are retired;

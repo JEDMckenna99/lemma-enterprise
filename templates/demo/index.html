@@ -168,7 +168,7 @@
 <div class="demo-wrap" id="demo-root" data-runtime-id="{{ demo_runtime_id }}" data-demo-theme="light">
   <section class="demo-hero">
     <h1>Lemma Firewall Demo</h1>
-    <p>See agent containment in action. Signed credentials verified locally in &lt;1ms. Taint epoch, revocation, kill switch &mdash; zero server calls per request.</p>
+    <p>See agent containment in action. Signed credentials verified locally in &lt;1ms. Taint epoch, revocation, kill switch, zero server calls per request.</p>
     <div class="demo-hero-actions">
       <button class="demo-btn" id="demo-start-tour">Start Guided Demo</button>
       <button class="demo-btn sec" id="demo-issue-top">Issue credential</button>
@@ -176,7 +176,7 @@
     </div>
     <div class="demo-arch-wrap">
       <div id="demo-architecture"></div>
-      <p class="demo-muted" style="margin-top:6px;color:#cbd5e1">Same action. Different trust state. The firewall decides locally &mdash; no server call needed.</p>
+      <p class="demo-muted" style="margin-top:6px;color:#cbd5e1">Same action. Different trust state. The firewall decides locally, no server call needed.</p>
     </div>
     <div class="demo-status" id="demo-human-status" aria-live="polite">Ready to start. Click Step 1 to issue a signed credential.</div>
     <div class="demo-tour-start" id="demo-tour-start-card">
@@ -197,7 +197,7 @@
         <button class="demo-step-btn" id="demo-step-verify">🛡️ 2. Try action<span>Firewall verifies locally and forwards request</span></button>
         <button class="demo-step-btn" id="demo-taint-bump">⚠️ 3. Bump taint<span>Simulate prompt injection / context poisoning</span></button>
         <button class="demo-step-btn" id="demo-step-reissue">♻️ 4. Re-issue credential<span>Fresh credential with current taint epoch</span></button>
-        <button class="demo-step-btn" id="demo-revoke">⛔ 5. Revoke credential<span>Kill switch — firewall denies immediately</span></button>
+        <button class="demo-step-btn" id="demo-revoke">⛔ 5. Revoke credential<span>Kill switch, firewall denies immediately</span></button>
       </div>
       <button class="demo-btn sec" id="demo-reset" style="margin-top:12px;font-size:12px">Reset</button>
       <div class="demo-policy-row" style="display:none">

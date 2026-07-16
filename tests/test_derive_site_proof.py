@@ -1,4 +1,4 @@
-"""Phase 1.2 — master_credential_id is an optional hint in derive-site-proof.
+"""Phase 1.2, master_credential_id is an optional hint in derive-site-proof.
 
 The server must:
   * succeed without master_credential_id when the wallet has a verified IDV,

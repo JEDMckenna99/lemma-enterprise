@@ -7,7 +7,7 @@
     <div class="dev-header-row">
         <div>
             <h1 class="dev-title">Billing</h1>
-            <p class="dev-subtitle">Pay-as-you-go site credentials — $0.50 issuance (verification included), $0.03 MAU, $0.33 doubt re-entry</p>
+            <p class="dev-subtitle">Pay-as-you-go site credentials, $0.50 issuance (verification included), $0.03 MAU, $0.33 doubt re-entry</p>
         </div>
     </div>
 </div>
@@ -21,11 +21,11 @@
         <div class="dev-stats" style="margin-bottom: 1rem;">
             <div class="dev-stat-card">
                 <div class="dev-stat-label">Subscription</div>
-                <div class="dev-stat-value" id="billing-status">—</div>
+                <div class="dev-stat-value" id="billing-status">, </div>
             </div>
             <div class="dev-stat-card">
                 <div class="dev-stat-label">Stripe customer</div>
-                <div class="dev-stat-value" id="billing-stripe-customer" style="font-size: 0.9rem;">—</div>
+                <div class="dev-stat-value" id="billing-stripe-customer" style="font-size: 0.9rem;">, </div>
             </div>
         </div>
         <p id="billing-message" style="color: var(--gray-600); margin: 0 0 1rem;"></p>
@@ -43,10 +43,10 @@
     </div>
     <div class="dev-card-body">
         <ul style="margin: 0; padding-left: 1.25rem; line-height: 1.8; color: var(--gray-700);">
-            <li><strong>$0.50</strong> — first site credential per user, one-time (identity verification included when human proofs are required)</li>
-            <li><strong>$0.03</strong> — monthly active user (renewal starting the month after binding)</li>
-            <li><strong>$0.33</strong> — doubt re-entry after an active site doubt (fresh IDV, passed through at cost)</li>
-            <li><strong>$0</strong> — site blocks, hard bans, local verification</li>
+            <li><strong>$0.50</strong>, first site credential per user, one-time (identity verification included when human proofs are required)</li>
+            <li><strong>$0.03</strong>, monthly active user (renewal starting the month after binding)</li>
+            <li><strong>$0.33</strong>, doubt re-entry after an active site doubt (fresh IDV, passed through at cost)</li>
+            <li><strong>$0</strong>, site blocks, hard bans, local verification</li>
         </ul>
         <p style="margin-top: 1rem; color: var(--gray-600); font-size: 0.9rem;">
             Invoices are generated monthly from metered usage. Failed payments pause new credential issuance until resolved.
@@ -134,7 +134,7 @@ async function loadBillingStatus() {
 
         if (!billing) {
             statusEl.textContent = 'Not set up';
-            stripeEl.textContent = '—';
+            stripeEl.textContent = 'Not available';
             messageEl.textContent = 'Add a billing email and complete Stripe Checkout to enable metered isHuman billing.';
             document.getElementById('billing-email-row').style.display = 'block';
             setupBtn.textContent = 'Create billing account';
@@ -143,7 +143,7 @@ async function loadBillingStatus() {
 
         document.getElementById('billing-email-row').style.display = 'none';
         statusEl.textContent = formatStatus(billing.subscription_status);
-        stripeEl.textContent = billing.stripe_customer_id || '—';
+        stripeEl.textContent = billing.stripe_customer_id || 'Not available';
 
         if (onboarding.next_step === 'register_site') {
             messageEl.textContent = 'Register your first site, then return here to attach metered billing.';
@@ -156,7 +156,7 @@ async function loadBillingStatus() {
             messageEl.textContent = 'Billing is active. New site credentials will be metered on your monthly invoice.';
             setupBtn.textContent = 'Update payment method';
         } else if (billing.subscription_status === 'past_due') {
-            messageEl.textContent = 'Payment failed — new credential issuance is paused until you update your payment method.';
+            messageEl.textContent = 'Payment failed, new credential issuance is paused until you update your payment method.';
             setupBtn.textContent = 'Fix payment method';
         } else {
             messageEl.textContent = 'Add a payment method to enable metered billing for site credentials.';

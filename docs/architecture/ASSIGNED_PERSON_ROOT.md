@@ -30,7 +30,7 @@ person root after assignment.
 When `LEMMA_ONE_PPID_ASSURANCE_MODEL=1`:
 
 1. Wallet registration assigns a **provisional** person_root (`lemma_persons.status = provisional`).
-2. Site PPIDs derive from that root immediately — before IDV.
+2. Site PPIDs derive from that root immediately, before IDV.
 3. First successful IDV on the bound wallet **promotes** the person to `active` and attaches the document root; **PPIDs do not change**.
 4. Provisional wallets are disposable (no cross-device recovery promise) until anchored.
 

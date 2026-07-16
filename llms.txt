@@ -1,4 +1,4 @@
-# lemma.id — relying-site integration pointers for AI agents
+# lemma.id: relying-site integration pointers for AI agents
 
 lemma.id is a private proof layer for web platforms: site-private PPIDs, signed backend verification, and optional isHuman assurance when one account must map to one verified human.
 
@@ -27,7 +27,7 @@ lemma.id is a private proof layer for web platforms: site-private PPIDs, signed 
 
 1. `siteId` = canonical hostname (`app.example.com`), not internal `site_...` IDs.
 2. Fail closed when `human` is false.
-3. For signup/account creation, verify a signed `presentation` on the server — never trust a bare client `ppid`.
+3. For signup/account creation, verify a signed `presentation` on the server, never trust a bare client `ppid`.
 4. No customer webhooks, no wallet secret on the developer's backend, no KYC field storage.
 
 ## Out of scope for relying-site integration

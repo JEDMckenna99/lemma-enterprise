@@ -4,17 +4,17 @@ Local-first verifier for [Lemma isHuman](https://lemma.id) presentations.
 
 Runs in **Node.js 18+**, **Deno**, **Bun**, **Cloudflare Workers**, **Vercel
 Edge**, **Netlify Edge**, and modern **browsers**. Zero required
-dependencies — uses the standard WebCrypto API.
+dependencies, uses the standard WebCrypto API.
 
 ## Why local verification
 
-- **Privacy** — `lemma.id` never sees an individual verification. It only
+- **Privacy**: `lemma.id` never sees an individual verification. It only
   serves a periodic signed Bloom snapshot + trust list (cached, refreshed
   every ~15 minutes by default).
-- **Cost** — zero per-request server cost on `lemma.id` and on your backend.
-- **Latency** — typical verify is a few hundred microseconds (one SHA-256 +
+- **Cost**: zero per-request server cost on `lemma.id` and on your backend.
+- **Latency**: typical verify is a few hundred microseconds (one SHA-256 +
   one or two Ed25519 verifies).
-- **Security** — each layer is signed by a trusted issuer key listed in the
+- **Security**: each layer is signed by a trusted issuer key listed in the
   network trust list.
 
 ## Install
@@ -32,7 +32,7 @@ import { createVerifier } from "@lemma/ishuman-verify";
 
 const verifier = createVerifier({ siteId: "tickets-demo.lemma.id" });
 
-// In your request handler — the client posts presentation from
+// In your request handler, the client posts presentation from
 // result.presentation returned by IsHumanVerifier.verify()
 app.post("/api/reserve", async (req, res) => {
   const result = await verifier.verify(req.body.presentation);

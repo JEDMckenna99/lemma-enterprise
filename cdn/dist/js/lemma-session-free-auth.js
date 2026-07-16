@@ -100,11 +100,11 @@ class SessionFreeAuth {
                 try {
                     const data = JSON.parse(event.data);
                     
-                    // Clear all cached verifications — session is no longer valid
+                    // Clear all cached verifications, session is no longer valid
                     this.verificationCache.clear();
                     
                     if (this.debug) {
-                        console.log(`[SessionFreeAuth] Session invalidated for wallet ${data.wallet_id?.substring(0, 8)}... — cache cleared`);
+                        console.log(`[SessionFreeAuth] Session invalidated for wallet ${data.wallet_id?.substring(0, 8)}..., cache cleared`);
                     }
                     
                     // Dispatch event for app-level handling (e.g. redirect to login)

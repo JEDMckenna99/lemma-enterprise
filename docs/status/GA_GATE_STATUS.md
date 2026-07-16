@@ -12,7 +12,7 @@ Last updated: 2026-07-14
 ## Scope note (2026-07-14)
 
 This tracker covers **lemma.id GA launch** (wallet, isHuman, platform auth). It
-does **not** certify Agent Ops enterprise packaging — see
+does **not** certify Agent Ops enterprise packaging, see
 [`docs/AGENT_OPS_READINESS.md`](../AGENT_OPS_READINESS.md) for that scope.
 
 **Deploy gate of record:** [`.github/workflows/auth-launch-gate.yml`](../../.github/workflows/auth-launch-gate.yml)

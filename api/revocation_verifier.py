@@ -1,5 +1,5 @@
 """
-Canonical revocation verification — Bloom filter only.
+Canonical revocation verification, Bloom filter only.
 
 All runtime revocation checks route through this module.
 Verification uses the in-process Bloom filter populated by
@@ -22,7 +22,7 @@ def is_credential_revoked(credential_id: Optional[str]) -> bool:
     Bloom filter (populated via revocation_sync pub/sub).
 
     Returns False (not revoked) if the Bloom verifier is not yet
-    initialized — this is a documented fail-open choice so that
+    initialized, this is a documented fail-open choice so that
     startup ordering does not block all requests.
 
     Ops note: monitor ``GET /api/health/detailed`` revocation lag signals;

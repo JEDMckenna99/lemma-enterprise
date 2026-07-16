@@ -24,7 +24,7 @@ that share `lemma-wallet.js` and passkey infrastructure:
 **Common confusion:** `scripts/revoke_to_deny_smoke.py` exercises the **platform
 control plane** (issue `developer_access` proof → revoke → deny), not a relying-site
 isHuman site-proof flow. The `ppid_not_linked` error means the session-link wallet
-has not completed **lemma.id platform login/unlock** to bind a network PPID — that is
+has not completed **lemma.id platform login/unlock** to bind a network PPID, that is
 not the same as a user completing isHuman IDV on a customer site.
 
 For isHuman-only assurance, also run relying-site E2E (verifier SDK + IDV popup +
@@ -42,7 +42,7 @@ derive-site-proof) and track separately from platform login sign-off.
 
 - **Environment:** production `https://lemma.id` (Heroku app `lemma-enterprise`)
 - **Release:** v2186 · commit `78d52f68` (security hardening deploy)
-- **Architecture:** popup-first wallet (Phase 2.1 — `/wallet/bridge` iframe **removed**)
+- **Architecture:** popup-first wallet (Phase 2.1, `/wallet/bridge` iframe **removed**)
 - **Primary evidence (local, gitignored):**
   - `ops/evidence/launch/2026-06-08-security-hardening-deploy-summary.md`
   - `ops/evidence/launch/2026-06-08-213645-post-deploy-summary.md`
@@ -82,7 +82,7 @@ derive-site-proof) and track separately from platform login sign-off.
 |-------|--------|-------|
 | Legacy `/wallet/bridge` iframe removed | N/A | Route, template, and audit endpoint removed Phase 2.1; `tests/test_wallet_bridge_origin_enforcement.py` |
 | Wallet verification uses popup flow | IN_PROGRESS | Code path popup-only; full cross-browser E2E capture pending |
-| postMessage uses exact origin match | PASS | `isLemmaTrustedOrigin()` — no `.includes('lemma.id')` substring bypass |
+| postMessage uses exact origin match | PASS | `isLemmaTrustedOrigin()`, no `.includes('lemma.id')` substring bypass |
 | `enc_key` omitted from redirect unlock URL | PASS | `unlockWithRedirect` has no enc_key param; regression test pinned |
 | Legacy redirect tokens return 410 | PASS | `POST /api/wallet/create-redirect-token` and `exchange-redirect-token` → 410 on prod |
 | No sensitive data in URL params | IN_PROGRESS | enc_key removed; device-link QR and other flows need targeted audit capture |
@@ -90,7 +90,7 @@ derive-site-proof) and track separately from platform login sign-off.
 ### Verification (current pattern)
 
 ```javascript
-// Exact origin — do NOT use origin.includes('lemma.id')
+// Exact origin, do NOT use origin.includes('lemma.id')
 window.addEventListener('message', (event) => {
     if (!isLemmaTrustedOrigin(event.origin)) {
         return;
@@ -109,7 +109,7 @@ window.addEventListener('message', (event) => {
 | CSP blocks inline scripts without nonce | PASS | No `unsafe-inline`/`unsafe-eval` in `script-src`; `tests/test_csp_security.py` |
 | CSP violation reporting | PASS | `report-uri` + `POST /api/security/csp-report` → 204; drill `2026-06-08-incident-drill-csp-alert.md` |
 | Daily unlock bundle TTL capped at 10h | PASS | `DEFAULT_SESSION_HOURS = MAX_SESSION_HOURS = 10`; `tests/test_xss_wallet_hardening.py` |
-| Bundle fail-closed on wrap failure | PASS | `_persistIsHumanLockBundle` — no plaintext `walletSecret` fallback |
+| Bundle fail-closed on wrap failure | PASS | `_persistIsHumanLockBundle`, no plaintext `walletSecret` fallback |
 | `ishuman_cache` encrypted at rest (**isHuman**) | PASS | `SENSITIVE_STORES` + `WALLET_DB_VERSION = 7`; `tests/test_ishuman_cache_encryption.py`; bundle v2545 prod |
 | Wallet auto-init scoped to app routes | PASS | Public index empty block; developer/admin/wallet routes opt in; `tests/test_xss_wallet_hardening.py` |
 | Debug panel gated in production | PASS | `LEMMA_WALLET_DEBUG` server flag required |
@@ -240,7 +240,7 @@ Removed from global policy: `static.cloudflareinsights.com`, `cdn.jsdelivr.net` 
 
 | Check | Status | Notes |
 |-------|--------|-------|
-| QR device link minimizes secret exposure | IN_PROGRESS | Encrypted payload in QR (not plaintext); server-relay migration backlog — see `DEVICE_LINKING_REVIEW.md` |
+| QR device link minimizes secret exposure | IN_PROGRESS | Encrypted payload in QR (not plaintext); server-relay migration backlog, see `DEVICE_LINKING_REVIEW.md` |
 
 ---
 
@@ -256,10 +256,10 @@ We follow responsible disclosure and will work with you to resolve issues.
 
 | Date | Auditor | Scope | Result |
 |------|---------|-------|--------|
-| 2026-02-11 | Internal | Launch gate v1676 smoke/transport | Partial — baseline |
-| 2026-03-04 | Internal | GA decision record | NO-GO — P0 gaps documented |
+| 2026-02-11 | Internal | Launch gate v1676 smoke/transport | Partial, baseline |
+| 2026-03-04 | Internal | GA decision record | NO-GO, P0 gaps documented |
 | 2026-03-18 | Internal | Revoke→deny evidence script | PASS deny-path (pre list/bloom steps) |
-| 2026-06-08 | Internal | Security hardening v2186 deploy | Code PASS; assurance gaps remain — see sign-off section below |
+| 2026-06-08 | Internal | Security hardening v2186 deploy | Code PASS; assurance gaps remain, see sign-off section below |
 
 ---
 
@@ -268,7 +268,7 @@ We follow responsible disclosure and will work with you to resolve issues.
 - **GDPR**: Lemma is a data-minimized **controller** (likely joint controller with the IDV provider for the verification step). Relying sites receive only a site-private PPID and a boolean claim. Lemma does **not** store raw documents, face/selfie images, or legal name, but **does** store derived, re-identifiable pseudonymous data (document/person root hashes, PPIDs, wallet↔person bindings, revocation state) and logs IP/UA on some paths. Pseudonymous data is still personal data (GDPR Recital 26). Erasure is implemented via `POST /api/ishuman/erase`. See [`docs/architecture/PRIVACY_ARCHITECTURE.md`](../architecture/PRIVACY_ARCHITECTURE.md). Do **not** claim "no personal data on Lemma servers."
 - **CCPA**: No sale of personal information.
 - **SOC 2**: In progress (server infrastructure only).
-- **PCI DSS**: Not applicable — Stripe.js loads on wallet routes only; card data handled by Stripe.
+- **PCI DSS**: Not applicable, Stripe.js loads on wallet routes only; card data handled by Stripe.
 
 ---
 
@@ -280,7 +280,7 @@ These items block **P0-1 Security Controls Sign-off** and **GA GO**. Code/deploy
 |---|--------|--------|-------------------|
 | 1 | **Platform:** log in on lemma.id, then run `python scripts/revoke_to_deny_smoke.py` | P0-4 (control plane) | `ops/evidence/launch/*-revoke-to-deny-evidence.md` with list+bloom PASS |
 | 2 | **Platform login:** passkey matrix on `/unlock` + `/platform` | P0-5 | `ops/evidence/launch/2026-06-08-passkey-browser-matrix.md` + screenshots |
-| 3 | **Platform + isHuman:** manual E2E — lemma.id unlock *and* relying-site isHuman verify/IDV | P0-2 | Signed `docs/status/SOLO_GA_TEST_EXECUTION_SHEET.md` |
+| 3 | **Platform + isHuman:** manual E2E, lemma.id unlock *and* relying-site isHuman verify/IDV | P0-2 | Signed `docs/status/SOLO_GA_TEST_EXECUTION_SHEET.md` |
 | 4 | Commission scoped external pentest | P0-6 | Report + remediation tracker per `2026-06-08-external-pentest-scope.md` |
 | 5 | Confirm Sentry `security=csp` event from drill POST | P0-7 | Event id in `2026-06-08-incident-drill-csp-alert.md` |
 | 6 | Security Lead reviews this checklist and marks remaining IN_PROGRESS/UNKNOWN rows PASS or accepted risk | P0-1 | Updated rows + approver name/date in `GA_GATE_STATUS.md` |

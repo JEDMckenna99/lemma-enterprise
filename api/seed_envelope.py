@@ -57,7 +57,7 @@ def derive_person_root_proxy(person_root: bytes) -> bytes:
     It is the person_root itself so that the wallet's
     ``derive_ppid_from_person_root_bytes(proxy, site)`` produces byte-identical
     PPIDs to the server's ``derive_ppid_from_person_root_bytes(person_root, site)``
-    — no round-trip needed for display. It is only ever transmitted sealed to the
+, no round-trip needed for display. It is only ever transmitted sealed to the
     wallet's X25519 key (see ``seal_envelope``), never in the clear.
     """
     if len(person_root) != 32:

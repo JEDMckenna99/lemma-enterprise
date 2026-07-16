@@ -160,6 +160,6 @@ powershell -ExecutionPolicy Bypass -File scripts/post_deploy_launch_gate.ps1 -Ba
 |---|---|---|---|
 | isHuman issuance | `CI Regression`, `ISHUMAN Issuance Tests` | `ishuman-staging-smoke` | `ishuman-demo-smoke`, `ishuman-live-didit` |
 | Wallet / platform / billing | `CI Regression` | `platform-staging-smoke` | `platform-prod-smoke` |
-| Auth scope / CSP | `CI Regression`, `Auth Launch Gate` | — | `Auth Launch Gate` |
+| Auth scope / CSP | `CI Regression`, `Auth Launch Gate` |, | `Auth Launch Gate` |
 
 Staging platform smoke requires GitHub secret `LEMMA_STAGING_BASE_URL` only. Staging DB must include wallet device-key migration (`migrations/040_wallet_device_keys.sql`) so `register-signing-key` works.

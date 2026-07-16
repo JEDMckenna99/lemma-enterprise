@@ -1,4 +1,4 @@
-# isHuman — Local-First Hardening Implementation Outline
+# isHuman: Local-First Hardening Implementation Outline
 
 Single checklist for hardening the isHuman wallet + verifier stack into a local-first, Ed25519-signature-everywhere system.
 
@@ -34,7 +34,7 @@ Single checklist for hardening the isHuman wallet + verifier stack into a local-
 
 ---
 
-## Phase 1 — Wallet identity Ed25519 + endpoint authentication (P1)
+## Phase 1: Wallet identity Ed25519 + endpoint authentication (P1)
 
 **Status:** complete (2026-05-20)
 
@@ -44,7 +44,7 @@ Single checklist for hardening the isHuman wallet + verifier stack into a local-
 
 ---
 
-## Phase 2 — Per-site signing keys + per-presentation challenges (P2)
+## Phase 2: Per-site signing keys + per-presentation challenges (P2)
 
 **Status:** complete (2026-05-21)
 
@@ -108,7 +108,7 @@ Single checklist for hardening the isHuman wallet + verifier stack into a local-
 
 ---
 
-## Phase 3 — Signed + timestamped Bloom revocation (P3)
+## Phase 3: Signed + timestamped Bloom revocation (P3)
 
 **Status:** complete (2026-05-21)
 
@@ -139,10 +139,10 @@ Single checklist for hardening the isHuman wallet + verifier stack into a local-
 
 **Implemented**
 
-- `tests/test_ishuman_bloom_snapshot.py` — unit/API tamper/stale/valid paths
-- Extended `tests/test_ishuman_network_regressions.py` — verifier signed-bloom checks
+- `tests/test_ishuman_bloom_snapshot.py`, unit/API tamper/stale/valid paths
+- Extended `tests/test_ishuman_network_regressions.py`, verifier signed-bloom checks
 - `.github/workflows/ishuman-issuance-tests.yml` includes `test_ishuman_bloom_snapshot.py` and `test_site_ppid_revocation.py`
-- `scripts/run_ishuman_prod_revocation_smoke.py` — signed bloom snapshot step + Phase 2 derive pubkey fix
+- `scripts/run_ishuman_prod_revocation_smoke.py`, signed bloom snapshot step + Phase 2 derive pubkey fix
 
 ### 3.4 Acceptance criteria
 
@@ -162,7 +162,7 @@ Single checklist for hardening the isHuman wallet + verifier stack into a local-
 
 ---
 
-## Phase 4 — Bridge hardening + demo prod-guard (P4)
+## Phase 4: Bridge hardening + demo prod-guard (P4)
 
 **Status:** complete (2026-05-21)
 
@@ -197,7 +197,7 @@ Single checklist for hardening the isHuman wallet + verifier stack into a local-
 
 ### 4.4 Validation evidence
 
-- Local: `pytest tests/test_wallet_bridge_origin_enforcement.py tests/test_ishuman_demo.py tests/test_env_parity.py -v` — 38 passed
+- Local: `pytest tests/test_wallet_bridge_origin_enforcement.py tests/test_ishuman_demo.py tests/test_env_parity.py -v`, 38 passed
 - Production deploy:
   - Heroku app `lemma-enterprise` release `v2075` (`Deploy 5e811266`)
 - Production smoke (`scripts/run_ishuman_prod_revocation_smoke.py` against `https://lemma.id`):
@@ -206,7 +206,7 @@ Single checklist for hardening the isHuman wallet + verifier stack into a local-
 
 ---
 
-## Phase 5 — PRF-encrypted at-rest storage (P5)
+## Phase 5: PRF-encrypted at-rest storage (P5)
 
 **Status:** complete (2026-05-21)
 
@@ -235,7 +235,7 @@ Single checklist for hardening the isHuman wallet + verifier stack into a local-
 
 ### 5.3 Validation evidence
 
-- Local: `pytest tests/test_wallet_prf_storage.py tests/test_wallet_bridge_ishuman_flow.py -v` — 14 passed
+- Local: `pytest tests/test_wallet_prf_storage.py tests/test_wallet_bridge_ishuman_flow.py -v`, 14 passed
 - Production deploy:
   - Heroku app `lemma-enterprise` release `v2079` (`Deploy 0df5526b`)
 - Production smoke (`scripts/run_ishuman_prod_revocation_smoke.py` against `https://lemma.id`):
@@ -243,7 +243,7 @@ Single checklist for hardening the isHuman wallet + verifier stack into a local-
 
 ---
 
-## Phase 6 — Local-first verifier (one call per session) (P6)
+## Phase 6: Local-first verifier (one call per session) (P6)
 
 **Status:** complete (2026-05-21)
 
@@ -264,7 +264,7 @@ Single checklist for hardening the isHuman wallet + verifier stack into a local-
 
 - [static/js/ishuman-verifier.js](static/js/ishuman-verifier.js) (v1.3.0):
   - First `verify()` in a tab: bloom sync (if stale) + `GET_SESSION_PRESENTATION` bridge call
-  - Steady-state `verify()` / `checkStatus()`: re-validates cached site VC locally (`session_valid` or `vc_valid`) — no HTTP, no bridge
+  - Steady-state `verify()` / `checkStatus()`: re-validates cached site VC locally (`session_valid` or `vc_valid`), no HTTP, no bridge
   - `localStorage` keys `ishuman_site_vc:v1:{siteId}` (primary) and legacy `ishuman_session_v1:{siteId}`; `invalidateSession()` for explicit logout
   - Bloom refresh tied to `snapshot.max_staleness_seconds` (removed 7-day skip)
   - Session invalidated when bloom `sequence_number` changes
@@ -286,7 +286,7 @@ Single checklist for hardening the isHuman wallet + verifier stack into a local-
 
 **Implemented**
 
-- `tests/test_ishuman_verifier_session_cache.py` — session constants, RPC, signature verify, bloom invalidation
+- `tests/test_ishuman_verifier_session_cache.py`, session constants, RPC, signature verify, bloom invalidation
 - Extended `tests/test_wallet_bridge_ishuman_flow.py`, `tests/test_ishuman_network_regressions.py`
 - `.github/workflows/ishuman-issuance-tests.yml` includes `test_ishuman_verifier_session_cache.py`
 - `scripts/run_ishuman_prod_revocation_smoke.py` adds `phase6-session-shape` step (12/12 target)
@@ -308,7 +308,7 @@ Single checklist for hardening the isHuman wallet + verifier stack into a local-
 
 ---
 
-## Phase 7 — Multi-issuer trust list and key rotation (P7)
+## Phase 7: Multi-issuer trust list and key rotation (P7)
 
 **Status:** complete (2026-05-21)
 
@@ -342,10 +342,10 @@ Single checklist for hardening the isHuman wallet + verifier stack into a local-
 
 **Implemented**
 
-- New `tests/test_issuer_trust_list.py` — trust-list sign/verify/tamper coverage
+- New `tests/test_issuer_trust_list.py`, trust-list sign/verify/tamper coverage
 - Extended:
-  - `tests/test_ishuman_bloom_snapshot.py` — bloom endpoint now asserts signed trust-list validity
-  - `tests/test_ishuman_network_regressions.py` — static checks for trust-list enforcement in verifier
+  - `tests/test_ishuman_bloom_snapshot.py`, bloom endpoint now asserts signed trust-list validity
+  - `tests/test_ishuman_network_regressions.py`, static checks for trust-list enforcement in verifier
 - `.github/workflows/ishuman-issuance-tests.yml` now includes `tests/test_issuer_trust_list.py`
 - `scripts/run_ishuman_prod_revocation_smoke.py` adds `phase7-trust-list-shape` step
 

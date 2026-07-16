@@ -41,7 +41,7 @@ def fixture_site_ppid_revocation_source() -> str:
 @pytest.mark.browser
 def test_verifier_force_bloom_refresh_after_fresh_idv(verifier_source):
     """After the popup returns from fresh_idv, the SDK must force a Bloom
-    refresh before validating the new credential — otherwise the cached
+    refresh before validating the new credential, otherwise the cached
     pre-reset snapshot would still flag the (same) PPID as revoked."""
     assert "_syncBloom({ force: true })" in verifier_source
     assert "fresh_idv_complete" in verifier_source

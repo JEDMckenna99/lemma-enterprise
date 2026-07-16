@@ -75,12 +75,12 @@ def main() -> int:
         all_errors.extend(check_site(name, spec))
 
     if all_errors:
-        print("FAIL — customer site smoke")
+        print("FAIL, customer site smoke")
         for err in all_errors:
             print(f"  - {err}")
         return 1
 
-    print("PASS — customer site smoke (tickets + trials)")
+    print("PASS, customer site smoke (tickets + trials)")
     return 0
 
 

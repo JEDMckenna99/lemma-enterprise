@@ -15,7 +15,7 @@ overnight.
 ### Model
 
 - Peppers and salts are versioned: `LEMMA_IDENTITY_ROOT_PEPPER_V1`,
-  `_V2`, ...; `LEMMA_PERSON_ROOT_SALT_V1`, `_V2`, ... — kept concurrently.
+  `_V2`, ...; `LEMMA_PERSON_ROOT_SALT_V1`, `_V2`, ..., kept concurrently.
 - `LEMMA_ACTIVE_ROOT_VERSION` selects the version new IDVs derive under
   (default `v1`).
 - Each `lemma_persons` / `lemma_document_roots` / `ishuman_verifications` row
@@ -85,7 +85,7 @@ architecture already supports multiple issuers.
   ([`api/database.py`](../../api/database.py)), defaulted to `stripe_identity`,
   indexed; migration
   [`026_ishuman_issuer_id.sql`](../../migrations/026_ishuman_issuer_id.sql).
-- No issuer-routing logic yet — full integration (webhooks, document
+- No issuer-routing logic yet, full integration (webhooks, document
   canonicalization, error handling, billing) is ~2-3 weeks per issuer and is
   deferred until the first issuer is stable at production scale.
 
@@ -94,7 +94,7 @@ architecture already supports multiple issuers.
 The current revocation Bloom is global, sized for ~100K capacity at 1e-6 FPR.
 Beyond ~1M revocations, false positives become operationally meaningful.
 
-### Option A — Cascaded Bloom (CRLite-style)
+### Option A: Cascaded Bloom (CRLite-style)
 
 ```text
 Layer 1: large Bloom of all revoked credential IDs (FPR ~1e-3)
@@ -109,7 +109,7 @@ Net FPR ~1e-6 at ~4x smaller total size than a single Bloom.
 
 Construction needs a cascade builder (e.g. Mozilla's `filter-cascade`).
 
-### Option B — Per-issuer partitioned Bloom
+### Option B: Per-issuer partitioned Bloom
 
 Each issuer publishes a Bloom for the credentials it issued; clients fetch only
 the Bloom for the issuer of the credential they are verifying. Simpler than the

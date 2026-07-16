@@ -376,14 +376,14 @@ class TestAgentCredentialSecurity:
 
 
 # ============================================
-# API KEY VALIDATION TESTS (removed — local-first auth uses credential verification only)
+# API KEY VALIDATION TESTS (removed: local-first auth uses credential verification only)
 # ============================================
 
 import pytest
 
 @pytest.mark.skip(reason="API key validation removed in local-first auth transition; all auth uses signed credentials")
 class TestAPIKeyValidation:
-    """Formerly tested API key validation — API keys replaced by credential auth."""
+    """Formerly tested API key validation, API keys replaced by credential auth."""
 
     def test_placeholder(self):
         pass

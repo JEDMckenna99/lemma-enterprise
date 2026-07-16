@@ -3,10 +3,9 @@ Stripe Billing catalog constants for lemma.id site-credential metering.
 
 Three metered events, aligned with the public pricing page
 (templates/modern/pricing_new.html):
-  - initial issuance ($0.50 one-time, identity verification included —
-    IDV cost is bundled, not billed separately)
+  - initial issuance ($0.50 one-time, identity verification included,     IDV cost is bundled, not billed separately)
   - MAU renewal ($0.03/user/month, starting the month after binding)
-  - doubt re-entry after an active site doubt ($0.33 — fresh IDV passed
+  - doubt re-entry after an active site doubt ($0.33, fresh IDV passed
     through at cost, never marked up)
 
 Site blocks, hard bans, and local verification never emit meter events.
@@ -38,16 +37,16 @@ UNIT_AMOUNTS_CENTS: Dict[str, int] = {
     "doubt_reentry": 33,
 }
 
-STRIPE_PRODUCT_NAME = "Lemma.id — Site Credentials"
+STRIPE_PRODUCT_NAME = "Lemma.id, Site Credentials"
 STRIPE_PRODUCT_DESCRIPTION = (
     "Per-site human credential issuance, monthly continuity renewals, "
     "and doubt re-entry after an active site doubt."
 )
 
 PRICE_NICKNAMES: Dict[str, str] = {
-    "initial_issuance": "Initial site credential (verification included) — $0.50/user/site",
-    "mau_renewal": "MAU renewal — $0.03/user/month",
-    "doubt_reentry": "Doubt re-entry (fresh IDV at cost) — $0.33/user",
+    "initial_issuance": "Initial site credential (verification included), $0.50/user/site",
+    "mau_renewal": "MAU renewal, $0.03/user/month",
+    "doubt_reentry": "Doubt re-entry (fresh IDV at cost), $0.33/user",
 }
 
 CATALOG_KEYS = ("initial_issuance", "mau_renewal", "doubt_reentry")

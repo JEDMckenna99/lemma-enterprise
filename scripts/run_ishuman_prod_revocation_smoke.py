@@ -482,7 +482,7 @@ def main() -> int:
             _step(
                 "derive-site-proof denied when fixture PPID blocked",
                 False,
-                "no verified master for fixture wallet — run provision_ishuman_prod_test_wallet.py",
+                "no verified master for fixture wallet, run provision_ishuman_prod_test_wallet.py",
             )
         )
 
@@ -517,7 +517,7 @@ def main() -> int:
                 _step(
                     "network-revoke (customer API key)",
                     True,
-                    "retired (expected — use site-block for enforcement)",
+                    "retired (expected, use site-block for enforcement)",
                 )
             )
         else:
@@ -553,7 +553,7 @@ def main() -> int:
             _step(
                 "network-revoke + approve-revocation",
                 True,
-                "skipped — network revocation retired; site-block drills above are authoritative",
+                "skipped, network revocation retired; site-block drills above are authoritative",
             )
         )
 

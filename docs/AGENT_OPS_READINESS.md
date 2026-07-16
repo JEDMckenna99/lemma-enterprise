@@ -11,7 +11,7 @@ This document is a build-and-test tracker: each item should have an owner, statu
 ## Scope note (2026-07-14)
 
 This tracker covers **Agent Ops / proof-first authorization** only. It is
-**not** the lemma.id GA launch gate sheet — see
+**not** the lemma.id GA launch gate sheet, see
 [`docs/status/GA_GATE_STATUS.md`](status/GA_GATE_STATUS.md) for wallet/isHuman
 P0 gates.
 

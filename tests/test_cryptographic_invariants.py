@@ -1,11 +1,11 @@
-"""Phase 5.1 — pinned cryptographic invariants.
+"""Phase 5.1, pinned cryptographic invariants.
 
 These tests byte-pin the canonical formats and derivations the whole network
 depends on. They are the FIRST tests that should break if anyone introduces a
 canonicalization-changing refactor. Each pinned value was produced by running
 the live code once with fixed, test-controlled inputs.
 
-If one of these fails, do not "fix" the expected value blindly — a changed
+If one of these fails, do not "fix" the expected value blindly, a changed
 canonical message breaks every already-issued credential and every third-party
 verifier (Go/Rust/Python). Treat a diff here as a protocol-breaking change.
 """

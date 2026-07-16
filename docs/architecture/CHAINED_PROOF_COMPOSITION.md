@@ -6,7 +6,7 @@
 
 ## Abstract
 
-This document presents a formal treatment of **chained proof composition** as applied to AI agent delegation. We define a model where heterogeneous cryptographic proofs—issued by different authorities, using different trust assumptions—can be composed into a single presentation that enables an autonomous agent to act on behalf of a human principal without triggering bot detection mechanisms or revealing the principal's identity.
+This document presents a formal treatment of **chained proof composition** as applied to AI agent delegation. We define a model where heterogeneous cryptographic proofs, issued by different authorities, using different trust assumptions, can be composed into a single presentation that enables an autonomous agent to act on behalf of a human principal without triggering bot detection mechanisms or revealing the principal's identity.
 
 The key insight is that each proof in the chain answers a different trust question, and the composition preserves privacy at each layer while providing the verifier with sufficient assurance to authorize the action.
 

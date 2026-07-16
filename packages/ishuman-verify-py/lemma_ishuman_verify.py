@@ -35,7 +35,7 @@ Example:
     user_ppid = result.ppid
 
     # Or re-verify a stamp you stored earlier (from the browser SDK's
-    # stamp(payload, includeCredential=True)) — checks the credential +
+    # stamp(payload, includeCredential=True)), which checks the credential +
     # revocation AND that the logged ppid/credentialId match it. Accepts a bare
     # VC, a presentation, a stamp, or a stamped event interchangeably:
     check = ctx.verify_stamp(stored_log_row["lemma"])
@@ -490,7 +490,7 @@ def build_action_commitment(
     path: str = "",
     body_hash: str = "",
 ) -> str:
-    """Opaque action binding — lemma.id never receives action details."""
+    """Opaque action binding; lemma.id never receives action details."""
     lines = [
         ACTION_COMMITMENT_PREFIX,
         str(server_nonce or "").strip(),
@@ -792,7 +792,7 @@ class VerificationContext:
 
     def _fetch_signed_bundle(self) -> _Snapshot:
         url = f"{self.lemma_origin}/api/revocation/bloom-filter"
-        with urllib.request.urlopen(url, timeout=10) as resp:  # noqa: S310 — lemma.id only
+        with urllib.request.urlopen(url, timeout=10) as resp:  # noqa: S310, lemma.id only
             data = json.loads(resp.read().decode("utf-8"))
         if not data.get("success"):
             raise RuntimeError("bloom-filter endpoint returned failure")

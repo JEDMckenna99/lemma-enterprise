@@ -2,7 +2,7 @@
 
 > **Audience:** AI coding agents (Cursor, Copilot, Claude Code, etc.) helping a developer add **isHuman** human assurance and the [lemma.id private proof layer](https://lemma.id/docs) to a web platform.
 >
-> **Goal:** Give the platform a site-private PPID for account continuity, plus **isHuman** assurance for one-human-per-account enforcement when Sybil resistance matters — without building KYC, without customer webhooks, and without storing government ID data.
+> **Goal:** Give the platform a site-private PPID for account continuity, plus **isHuman** assurance for one-human-per-account enforcement when Sybil resistance matters, without building KYC, without customer webhooks, and without storing government ID data.
 
 ## Start here
 
@@ -26,7 +26,7 @@
 1. **Browser:** Load `ishuman-verifier.js`, create `IsHumanVerifier({ siteId })`, call `verify({ autoProvision: true })` before protected actions.
 2. **Account binding:** Store the returned site-private `ppid` as the platform's durable enforcement handle for that user.
 3. **Backend:** Accept a signed presentation or stamp from the client and verify locally with `@lemma/ishuman-verify` or `lemma_ishuman_verify.py`.
-4. **Assurance policy:** Start with `passkey` for continuity when that is enough (not Sybil-resistant alone). Require `ishuman` when the action needs one verified human behind the account — signup, trials, ticketing, payouts, or ban enforcement.
+4. **Assurance policy:** Start with `passkey` for continuity when that is enough (not Sybil-resistant alone). Require `ishuman` when the action needs one verified human behind the account, signup, trials, ticketing, payouts, or ban enforcement.
 5. **Optional:** Register a site API key only when the developer needs server-side PPID blocks.
 
 lemma.id runs wallet unlock, proof issuance, and IDV step-up (Didit by default) in a Lemma-hosted popup. **The relying site does not configure webhooks, Didit, or Stripe Identity.**
@@ -42,19 +42,19 @@ Apply these on every integration. Do not skip or "simplify" them.
 - Set `siteId` to the hostname users see in the browser (e.g. `app.example.com`).
 - Normalize: lowercase, no scheme/path/port; strip `www.` when that matches how users reach the app.
 - On customer sites, default to `window.location.hostname`.
-- **Do not** use internal `site_...` database IDs as `siteId`. Those are for API keys and ownership — not SDK binding.
+- **Do not** use internal `site_...` database IDs as `siteId`. Those are for API keys and ownership, not SDK binding.
 - Staging and production hostnames derive **different PPIDs**. Use the exact hostname per environment.
 
 ### Fail closed
 
 - If `verify()` returns `human: false`, deny the action. Do not fall back to anonymous access.
-- When policy requires IDV-backed humanness, pass `requiredAssurance: 'ishuman'` and verify `assurance === 'ishuman'` on the backend — do not rely on `human: true` alone (passkey success also sets `human: true`).
+- When policy requires IDV-backed humanness, pass `requiredAssurance: 'ishuman'` and verify `assurance === 'ishuman'` on the backend, do not rely on `human: true` alone (passkey success also sets `human: true`).
 - On signup/account creation, **never trust a bare `ppid` from the client** without cryptographic verification (see trust tiers below).
 
 ### Credential invariants
 
 - Timestamps stay numeric; booleans stay booleans.
-- Preserve site binding in issued credentials — do not silently coerce mismatched `siteId` / `site_domain`.
+- Preserve site binding in issued credentials, do not silently coerce mismatched `siteId` / `site_domain`.
 - Store `ppid` on the user record as an opaque site-private identifier, not as KYC data.
 
 ### What the developer does **not** need
@@ -70,14 +70,14 @@ Apply these on every integration. Do not skip or "simplify" them.
 
 Work through these in order. Stop and ask the developer if hostname or trust tier is unclear.
 
-- [ ] **1. Identify protected actions** — signup, posting, checkout, voting, account recovery, etc.
-- [ ] **2. Set `siteId`** — canonical hostname for each environment.
-- [ ] **3. Add browser SDK** — script tag or bundler import from `https://lemma.id/sdk/ishuman-verifier.js`.
-- [ ] **4. Gate entry points** — `await verifier.verify({ autoProvision: true })` on first-touch flows; fail closed.
-- [ ] **5. Choose backend trust tier** (see below) — default to **T2 (verifyStamp)** for signup.
-- [ ] **6. Bind `ppid` to account** — store on user row after server verification.
-- [ ] **7. Optional audit stamps** — `stamp(payload, { includeCredential: true })` on actions the developer logs.
-- [ ] **8. Optional abuse controls** — API key + `POST /api/ishuman/site-block` when bans must survive browser clears.
+- [ ] **1. Identify protected actions**: signup, posting, checkout, voting, account recovery, etc.
+- [ ] **2. Set `siteId`**: canonical hostname for each environment.
+- [ ] **3. Add browser SDK**: script tag or bundler import from `https://lemma.id/sdk/ishuman-verifier.js`.
+- [ ] **4. Gate entry points**: `await verifier.verify({ autoProvision: true })` on first-touch flows; fail closed.
+- [ ] **5. Choose backend trust tier** (see below), default to **T2 (verifyStamp)** for signup.
+- [ ] **6. Bind `ppid` to account**: store on user row after server verification.
+- [ ] **7. Optional audit stamps**: `stamp(payload, { includeCredential: true })` on actions the developer logs.
+- [ ] **8. Optional abuse controls**: API key + `POST /api/ishuman/site-block` when bans must survive browser clears.
 
 ---
 
@@ -98,7 +98,7 @@ Work through these in order. Stop and ask the developer if hostname or trust tie
 </script>
 ```
 
-### Recommended account-binding flow (T2 — passkey base, server verify)
+### Recommended account-binding flow (T2: passkey base, server verify)
 
 Use **passkey assurance** for low-friction signup and continuity. Extract the account
 PPID from the **verified server result** (`result.ppid`), never from the parallel client
@@ -135,7 +135,7 @@ PPID from the **verified server result** (`result.ppid`), never from the paralle
 Require `requiredAssurance: 'ishuman'` when Sybil resistance matters (trials, ticketing,
 payouts). The PPID stays stable when upgrading from passkey to isHuman on the same wallet.
 
-### Sybil-resistant signup (T2 — isHuman)
+### Sybil-resistant signup (T2: isHuman)
 
 ```html
 <script src="https://lemma.id/sdk/ishuman-verifier.js"></script>
@@ -162,7 +162,7 @@ payouts). The PPID stays stable when upgrading from passkey to isHuman on the sa
 
 | Option | Default | Notes |
 |--------|---------|-------|
-| `siteId` | `window.location.hostname` | **Required** — canonical hostname binding |
+| `siteId` | `window.location.hostname` | **Required**: canonical hostname binding |
 | `lemmaOrigin` | `https://lemma.id` | Override only for non-production testing |
 | `autoProvision` | `false` | Prefer passing `{ autoProvision: true }` per call on entry points |
 | `debug` | `false` | SDK console logging |
@@ -183,19 +183,19 @@ payouts). The PPID stays stable when upgrading from passkey to isHuman on the sa
 | Reason | Meaning |
 |--------|---------|
 | `valid`, `vc_valid`, `session_valid` | Success |
-| `no_credential`, `site_proof_required`, `wallet_locked` | Needs popup — use `autoProvision: true` |
+| `no_credential`, `site_proof_required`, `wallet_locked` | Needs popup, use `autoProvision: true` |
 | `expired` | Ordinary 30-day renewal; may open the Lemma popup when auto-provisioning |
-| `revoked` | Credential in global revocation bloom — deny now; with `autoProvision: true` the SDK opens fresh-IDV recovery (new credential id, same PPID when wallet/person unchanged) |
-| `invalid_signature` | Hard deny — tampered, corrupted, or unverifiable credential; no automatic recovery |
-| `site_blocked` | Permanent site ban — deny; never starts recovery automatically (only `POST /api/ishuman/site-unblock` clears it) |
+| `revoked` | Credential in global revocation bloom, deny now; with `autoProvision: true` the SDK opens fresh-IDV recovery (new credential id, same PPID when wallet/person unchanged) |
+| `invalid_signature` | Hard deny, tampered, corrupted, or unverifiable credential; no automatic recovery |
+| `site_blocked` | Permanent site ban, deny; never starts recovery automatically (only `POST /api/ishuman/site-unblock` clears it) |
 | `doubt_required` | Deny the current action, then deliberately call `verifyFreshForBackend()` |
-| `idv_cancelled` | User closed popup — prompt retry / allow popups |
+| `idv_cancelled` | User closed popup, prompt retry / allow popups |
 
 **`isBlockedLocally` errors fail closed:** if your policy callback throws or the fetch fails, the SDK treats the PPID as blocked (`site_blocked` on the next verify path). Implement the callback defensively and keep your policy endpoint highly available.
 
 ### `human` vs `assurance`
 
-- `human` is the legacy/general success boolean — `true` when the requested assurance tier passed (including `passkey` or `ishuman`).
+- `human` is the legacy/general success boolean, `true` when the requested assurance tier passed (including `passkey` or `ishuman`).
 - `assurance` tells you which tier passed (`passkey`, `ishuman`, etc.). For Sybil-resistant signup, require `requiredAssurance: 'ishuman'` and verify the backend sees `assurance: ishuman`.
 - Passkey success is useful for continuity; it is **not** IDV-backed humanness.
 
@@ -213,7 +213,7 @@ Pass the same canonical hostname to `VerificationContext(site_id=...)` or `creat
 |------|--------------|-----------------|----------|
 | **T1** | `{ ppid }` only | None | Low-risk gates only (waitlists, soft limits) |
 | **T2** (recommended) | `presentation` from `verifyForBackend()` or `stamp(..., { includeCredential: true })` | Local `verify()` / `verifyStamp()` | **Signup**, account creation, moderate trust |
-| **T2+** | `stampAction(...)` envelope with `action_assertion` + `action_signature` | Local `verifyActionStamp()` / `verify_action_stamp()` + nonce replay store | **Mutations only** — checkout, withdrawals, posting, other fraud-sensitive server actions |
+| **T2+** | `stampAction(...)` envelope with `action_assertion` + `action_signature` | Local `verifyActionStamp()` / `verify_action_stamp()` + nonce replay store | **Mutations only**: checkout, withdrawals, posting, other fraud-sensitive server actions |
 | **T3** | Full presentation + session assertion | Local verify with `requireSessionAssertion: true`, or `POST /api/ishuman/verify-presentation` | High-trust / financial actions needing live session proof |
 
 ### Python backend (T2 + site policy)
@@ -341,13 +341,13 @@ def checkout():
     return process_checkout(result.ppid, body)
 ```
 
-Verification is **local-first**: one cached fetch to `GET /api/revocation/bloom-filter` every ~15 minutes — not per user request or per action.
+Verification is **local-first**: one cached fetch to `GET /api/revocation/bloom-filter` every ~15 minutes, not per user request or per action.
 
 ### Fresh passkey for sensitive actions (policy, not assurance tier)
 
 Use `requireFreshPasskey` when a passkey-tier user must prove **present** biometric/PIN
 control for a specific mutation (code claims, withdrawals). This does **not** change
-assurance tier — it adds a server-attested `fresh_passkey_attestation.v1` bound to an
+assurance tier, it adds a server-attested `fresh_passkey_attestation.v1` bound to an
 opaque action commitment so lemma.id never receives action names, resource IDs, or bodies.
 
 ```javascript
@@ -416,8 +416,8 @@ Steps:
 
 | Goal | Registration required? |
 |------|------------------------|
-| Gate with `verify()` | **No** — set `siteId` to hostname only |
-| `POST /api/ishuman/site-block` | **Yes** — API key from key manager |
+| Gate with `verify()` | **No**: set `siteId` to hostname only |
+| `POST /api/ishuman/site-block` | **Yes**: API key from key manager |
 
 When registering for abuse APIs, `site_domain` must match SDK `siteId` after normalization.
 
@@ -427,8 +427,8 @@ When registering for abuse APIs, `site_domain` must match SDK `siteId` after nor
 
 Do **not** rely on the abuser's browser to enforce bans.
 
-1. **Immediate app deny** — 403 / sign-out in your app.
-2. **Site block (canonical)** — `POST /api/ishuman/site-block` with `X-API-Key`:
+1. **Immediate app deny**: 403 / sign-out in your app.
+2. **Site block (canonical)**: `POST /api/ishuman/site-block` with `X-API-Key`:
 
 ```bash
 curl -X POST https://lemma.id/api/ishuman/site-block \
@@ -443,7 +443,7 @@ credential rotation do not clear them. Only the authenticated
 
 For a temporary challenge instead of a ban, use `POST /api/ishuman/site-doubt`.
 Your backend can expose the resulting `{ blocked, doubt_required }` decision to
-the SDK through `isBlockedLocally` — **call your own policy endpoint**, never
+the SDK through `isBlockedLocally`, **call your own policy endpoint**, never
 lemma.id directly from the browser (API keys are server-only). When
 `verify()` returns `doubt_required`, invoke `verifyFreshForBackend()`. A
 successful fresh IDV clears only the matching doubt when it derives the same
@@ -498,7 +498,7 @@ Most integrations use **only the browser SDK + local backend verify**. These end
 | `GET` | `/api/ishuman/site-binding-check` | None | Read-only hostname canonicalization + registration hint for SDK `siteId` alignment |
 | `GET` | `/api/revocation/bloom-filter` | None | Signed trust list + bloom (backend verifiers cache this) |
 
-Wallet-assertion endpoints (`start-verification`, `derive-site-proof`, etc.) are used by the Lemma popup — **not** by typical relying-site server code.
+Wallet-assertion endpoints (`start-verification`, `derive-site-proof`, etc.) are used by the Lemma popup, **not** by typical relying-site server code.
 
 ---
 
@@ -509,12 +509,12 @@ Adapt the same pattern; do not change the crypto contract.
 | Stack | Client | Server |
 |-------|--------|--------|
 | React / Next.js | Load SDK in client component or `useEffect`; call `verifyForBackend` before submit | Route handler verifies `presentation` |
-| Vue / Nuxt | Same — client-only for SDK | Server middleware or API route |
+| Vue / Nuxt | Same, client-only for SDK | Server middleware or API route |
 | Rails | Stimulus/vanilla JS for SDK | Controller action + `lemma_ishuman_verify` |
 | Django | Template script or JS bundle | View + `VerificationContext` |
 | PHP | Script tag + fetch to your API | Include Python helper or port verify logic |
 
-For SSR frameworks, keep `IsHumanVerifier` in **client components only** — it uses `window`, popups, and browser crypto.
+For SSR frameworks, keep `IsHumanVerifier` in **client components only**: it uses `window`, popups, and browser crypto.
 
 ---
 
@@ -563,7 +563,7 @@ presentation and receives `legacy_ppid` + canonical `ppid`.
    the legacy PPID, then delete or archive the provisional account.
 4. If not found: create a new account for canonical `ppid` (user may have never
    visited your site with the provisional wallet).
-5. Reject if convergence is invalid, wrong-site, expired, or tampered — fail closed.
+5. Reject if convergence is invalid, wrong-site, expired, or tampered, fail closed.
 
 Ordinary first IDV on the same wallet preserves PPID and emits **no** convergence artifact.
 
@@ -572,7 +572,7 @@ Enable with `LEMMA_PPID_CONVERGENCE_ENABLED=1` (requires one-PPID model). See
 
 See `docs/product/PASSKEY_STAMP_INPUT_BURN.md` for the full contract.
 
-**Reference implementation:** [lemma.id integration demo](https://lemma.id/demo) — passkey wallet → distinct site PPIDs → Heroku demo sites with `verifyStamp` → optional isHuman step-up (same PPID) → site-scoped revocation. Enable flags on staging before recording.
+**Reference implementation:** [lemma.id integration demo](https://lemma.id/demo), passkey wallet → distinct site PPIDs → Heroku demo sites with `verifyStamp` → optional isHuman step-up (same PPID) → site-scoped revocation. Enable flags on staging before recording.
 
 ---
 
@@ -594,7 +594,7 @@ Confirm with the developer:
 
 | Symptom | Fix |
 |---------|-----|
-| Different PPIDs across environments | Expected — hostname binding is intentional |
+| Different PPIDs across environments | Expected, hostname binding is intentional |
 | Persistent `no_credential` | Add `autoProvision: true` on entry-point calls |
 | Block not applying | API key `site_domain` must match `siteId` exactly |
 | `site_id_mismatch` on backend | Server `site_id` must canonicalize to the same hostname as client `siteId` (offline verifiers lowercase and strip `www.`) |
@@ -606,7 +606,7 @@ Confirm with the developer:
 ## Privacy summary (for developer communication)
 
 - User completes live IDV once in a Lemma popup.
-- Relying site receives `{ human, ppid }` — never government ID, selfie, or legal name.
+- Relying site receives `{ human, ppid }`, never government ID, selfie, or legal name.
 - Each site gets a **pairwise-unlinkable** PPID derived from verified-person root + hostname.
 - Audit stamps and action logs stay in **the developer's** systems.
 

@@ -26,7 +26,7 @@
     <div class="container" style="position: relative; z-index: 1;">
         <p class="docs-hero-eyebrow">Developer documentation</p>
         <h1>{{ hero_title or 'lemma.id Documentation' }}</h1>
-        <p class="docs-hero-subtitle">{{ hero_subtitle or 'How to add lemma.id to your site: the browser SDK, site-private PPIDs, backend verification that runs offline, and three levels of proof — lemma.id, presence proof, and human proof.' }}</p>
+        <p class="docs-hero-subtitle">{{ hero_subtitle or 'How to add lemma.id to your site: the browser SDK, site-private PPIDs, backend verification that runs offline, and three levels of proof, lemma.id, presence proof, and human proof.' }}</p>
         
         <!-- Docs Search -->
         <div class="docs-search-container">
@@ -207,7 +207,7 @@ document.addEventListener('DOMContentLoaded', () => {
             url: '{{ url_for("docs_overview") }}#signup-trust-recipes',
             category: 'integration',
             keywords: 'signup T1 T2 verifyForBackend requiredAssurance ishuman passkey account creation',
-            excerpt: 'T1 for waitlists only — never account creation. T2 uses verifyForBackend with server-side verify.'
+            excerpt: 'T1 for waitlists only, never account creation. T2 uses verifyForBackend with server-side verify.'
         },
         {
             title: 'T2+ stampAction',
@@ -291,7 +291,7 @@ document.addEventListener('DOMContentLoaded', () => {
             url: '/docs/integration/ISHUMAN_AGENT_INTEGRATION.md',
             category: 'agents',
             keywords: 'ai agent cursor copilot claude coding assistant integration guide ishuman verifyForBackend verifyStamp siteId guardrails checklist',
-            excerpt: 'Machine-oriented guide for AI coding agents integrating isHuman into a developer platform — guardrails, trust tiers, code patterns, and anti-patterns.'
+            excerpt: 'Machine-oriented guide for AI coding agents integrating isHuman into a developer platform, guardrails, trust tiers, code patterns, and anti-patterns.'
         }
     ];
     

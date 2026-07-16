@@ -2,7 +2,7 @@
 
 ## What It Does
 
-The Lemma Firewall is a local enforcement gateway that validates agent credentials on every API request, checks scope/path/method constraints, syncs revocation from the lemma.id control plane, and forwards only allowed calls to upstream APIs. It runs between your agent and the APIs it calls. Credentials are verified locally using Ed25519 signature checks — no per-request server calls required.
+The Lemma Firewall is a local enforcement gateway that validates agent credentials on every API request, checks scope/path/method constraints, syncs revocation from the lemma.id control plane, and forwards only allowed calls to upstream APIs. It runs between your agent and the APIs it calls. Credentials are verified locally using Ed25519 signature checks, no per-request server calls required.
 
 ## OpenClaw Starter Path
 
@@ -20,7 +20,7 @@ That command approves once in the browser, issues a starter-safe proof, starts t
 lemma demo
 ```
 
-This issues a credential, starts the firewall, and runs containment tests — all in one command.
+This issues a credential, starts the firewall, and runs containment tests, all in one command.
 
 ## Prerequisites
 
@@ -106,7 +106,7 @@ Allowed request (should succeed):
 curl -H 'X-Lemma-Credential: <JSON-encoded credential>' http://localhost:8787/firewall/my-api/v1/data
 ```
 
-Denied request (wrong path — should get 403):
+Denied request (wrong path, should get 403):
 
 ```bash
 curl -H 'X-Lemma-Credential: <JSON-encoded credential>' http://localhost:8787/firewall/my-api/admin/secret
@@ -127,10 +127,10 @@ Returns sync status, revocation counts, and taint epoch state.
 | Variable | Default | Description |
 |---|---|---|
 | `LEMMA_BASE_URL` | `https://lemma.id` | Control plane URL for credential validation and sync |
-| `LEMMA_CREDENTIAL` | — | JSON-encoded signed credential (W3C VC format) |
-| `LEMMA_PROOF_FILE` | — | Path to credential proof file (alternative to `LEMMA_CREDENTIAL`) |
-| `LEMMA_AGENT_TOKEN` | — | Compatibility alias for agent token header validation |
-| `LEMMA_FIREWALL_POLICY_FILE` | — | Path to `policy.json` defining allowed API routes |
+| `LEMMA_CREDENTIAL` |, | JSON-encoded signed credential (W3C VC format) |
+| `LEMMA_PROOF_FILE` |, | Path to credential proof file (alternative to `LEMMA_CREDENTIAL`) |
+| `LEMMA_AGENT_TOKEN` |, | Compatibility alias for agent token header validation |
+| `LEMMA_FIREWALL_POLICY_FILE` |, | Path to `policy.json` defining allowed API routes |
 | `LEMMA_FIREWALL_RUNTIME_ID` | `lemma-firewall-default` | Unique identifier for this firewall instance |
 | `LEMMA_FIREWALL_HOST` | `127.0.0.1` | Host address the firewall binds to |
 | `LEMMA_FIREWALL_PORT` | `8787` | Port the firewall listens on |
@@ -144,13 +144,13 @@ Returns sync status, revocation counts, and taint epoch state.
 
 The credential is a **W3C Verifiable Credential** signed with **Ed25519**. On each request the firewall checks:
 
-1. **Signature validity** — the Ed25519 signature on the credential is verified against the issuer's public key.
-2. **Issuer trust** — the issuer must be in the firewall's trusted issuer set.
-3. **Scope** — the credential's scope must cover the requested API operation.
-4. **Expiry** — the credential must not be expired.
-5. **Revocation status** — checked against a locally-cached revocation list (updated via background sync).
+1. **Signature validity**: the Ed25519 signature on the credential is verified against the issuer's public key.
+2. **Issuer trust**: the issuer must be in the firewall's trusted issuer set.
+3. **Scope**: the credential's scope must cover the requested API operation.
+4. **Expiry**: the credential must not be expired.
+5. **Revocation status**: checked against a locally-cached revocation list (updated via background sync).
 
-Zero server calls on the hot path — verification takes <1ms. The control plane is only contacted for background sync (revocation lists, taint epoch, policy updates).
+Zero server calls on the hot path, verification takes <1ms. The control plane is only contacted for background sync (revocation lists, taint epoch, policy updates).
 
 ---
 

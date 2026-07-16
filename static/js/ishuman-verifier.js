@@ -100,7 +100,7 @@ function siteVcCacheKey(siteId) {
 }
 
 // ========================================================================
-// Hex / crypto helpers (self-contained — no dependency on LemmaVerifier)
+// Hex / crypto helpers (self-contained, no dependency on LemmaVerifier)
 // ========================================================================
 
 const _hexCache = new Map();
@@ -689,15 +689,15 @@ async function verifyEd25519(publicKeyBytes, messageBytes, signatureBytes) {
 class IsHumanVerifier {
     /**
      * @param {Object} config
-     * @param {string}  config.siteId     — your registered site identifier
-     * @param {string}  [config.lemmaOrigin] — override for dev (default https://lemma.id)
-     * @param {boolean} [config.debug]    — enable console logging
-     * @param {Function} [config.isBlockedLocally] — optional sync/async callback returning
+     * @param {string}  config.siteId, your registered site identifier
+     * @param {string}  [config.lemmaOrigin], override for dev (default https://lemma.id)
+     * @param {boolean} [config.debug], enable console logging
+     * @param {Function} [config.isBlockedLocally], optional sync/async callback returning
      *        boolean or { blocked, doubt_required }. Sites should resolve this
      *        from their own backend state rather than exposing a site API key.
-     * @param {boolean} [config.autoProvision] — open Lemma IDV popup when no master proof exists.
-     * @param {string}  [config.requiredAssurance] — minimum assurance: ``passkey`` or ``ishuman`` (default).
-     * @param {string}  [config.idvPopupPath] — override popup path (default /wallet/ishuman-idv).
+     * @param {boolean} [config.autoProvision], open Lemma IDV popup when no master proof exists.
+     * @param {string}  [config.requiredAssurance], minimum assurance: ``passkey`` or ``ishuman`` (default).
+     * @param {string}  [config.idvPopupPath], override popup path (default /wallet/ishuman-idv).
      */
     constructor(config = {}) {
         const rawSiteId = config.siteId || (typeof window !== 'undefined' ? window.location.hostname : '');
@@ -816,7 +816,7 @@ class IsHumanVerifier {
                     this._bloomNetworkRefresh = this._syncBloom().catch(() => {});
                 }
             };
-        } catch { /* BroadcastChannel unavailable — non-fatal */ }
+        } catch { /* BroadcastChannel unavailable, non-fatal */ }
     }
 
     /**
@@ -897,12 +897,12 @@ class IsHumanVerifier {
             'no_ishuman_credential',
             'site_proof_required',
             'legacy_credential_format',
-            // Stale cached credentials after issuer rotation — re-issue via popup.
+            // Stale cached credentials after issuer rotation, re-issue via popup.
             'untrusted_issuer',
             // Monthly site VC expiry: renew via daily-unlock popup (passkey only
             // when the lock bundle is missing or stale).
             'expired',
-            // A revoked credential is not a permanent block — it triggers a
+            // A revoked credential is not a permanent block, it triggers a
             // fresh IDV (or fresh test verification in the demo) so the user
             // can regain access. The popup runs in 'fresh_idv' mode below.
             'revoked',
@@ -1000,7 +1000,7 @@ class IsHumanVerifier {
      *
      * This is the simplest way to grab the site-scoped identifier at any point
      * in your flows so you can associate it with an action in YOUR OWN system.
-     * By default it never opens a popup — it reads the cached session — so it's
+     * By default it never opens a popup, it reads the cached session, so it's
      * safe to call inline on a hot path. Pass { autoProvision: true } if you
      * want it to trigger the Lemma popup when no proof exists yet.
      *
@@ -1014,7 +1014,7 @@ class IsHumanVerifier {
     /**
      * Produce a compact, self-contained "verification stamp" describing the
      * current user's isHuman status. This is the object you attach to your own
-     * logs / events. Lemma stores none of this — it lives entirely in your
+     * logs / events. Lemma stores none of this, it lives entirely in your
      * systems and you decide what to do with it.
      *
      * Shape:
@@ -1026,16 +1026,15 @@ class IsHumanVerifier {
      *     verifiedAt:   number,        // unix ms when this stamp was produced
      *     expiresAt:    number|null,   // credential expiry (unix seconds)
      *     credentialId: string|null,
-     *     credential:   object|null,   // the bare VC — only when
+     *     credential:   object|null,   // the bare VC, only when
      *                                  // { includeCredential: true }
-     *     proof:        object|null,   // VC + signed session assertion — only
+     *     proof:        object|null,   // VC + signed session assertion, only
      *                                  // when { includeProof: true }
      *   }
      *
      * Choosing what evidence to store:
      *   - { includeCredential: true } (RECOMMENDED for audit logs): stores the
-     *     bare verifiable credential. It is offline-verifiable and DURABLE —
-     *     re-verifiable at any time until the credential expires — and smaller.
+     *     bare verifiable credential. It is offline-verifiable and DURABLE,      *     re-verifiable at any time until the credential expires, and smaller.
      *   - { includeProof: true }: also stores the signed session assertion,
      *     which adds replay resistance / proof-of-possession but ages out (the
      *     session assertion has an expiry + max age). Use it when you forward
@@ -1721,7 +1720,7 @@ class IsHumanVerifier {
 
         try {
             // The Rust binary-concat signature in proof.signatureValue cannot
-            // be reproduced in JS — only the parallel browser-canonical
+            // be reproduced in JS, only the parallel browser-canonical
             // signature (proof.signatureValueWeb) is locally verifiable.
             const sigHex = credential.proof?.signatureValueWeb;
             if (!sigHex) {
@@ -1804,7 +1803,7 @@ class IsHumanVerifier {
         try {
             localStorage.setItem(key, JSON.stringify(session));
             localStorage.setItem(sessionCacheKey(this.siteId), JSON.stringify(session));
-        } catch { /* quota exceeded — ignore */ }
+        } catch { /* quota exceeded, ignore */ }
     }
 
     _clearSessionCache(clearAll = false) {
@@ -1924,7 +1923,7 @@ class IsHumanVerifier {
                         trust_list: trustList,
                         ts: now,
                     }));
-                } catch { /* quota exceeded — ignore */ }
+                } catch { /* quota exceeded, ignore */ }
             } else {
                 this._bloomTrusted = false;
                 this._trustListTrusted = false;
@@ -1969,7 +1968,7 @@ class IsHumanVerifier {
 
         // The popup just (re-)issued this credential server-side. If the
         // popup ran in fresh_idv mode after a revocation, the server cleared
-        // the prior revocation rows — but our in-memory Bloom snapshot is
+        // the prior revocation rows, but our in-memory Bloom snapshot is
         // pre-reset and would still flag this credential as revoked. Force a
         // fresh /api/revocation/bloom-filter fetch before verifying.
         const wasFreshIdv = detail?.reason === 'fresh_idv_complete'
@@ -2006,7 +2005,7 @@ class IsHumanVerifier {
         // SDK-verify (e.g. another network revocation landed, or the popup
         // and the SDK saw different post-reset snapshots), one extra forced
         // refresh + retry will sync them. We do NOT fall through into a
-        // fresh-IDV loop on this reason — it's a transient race, not a
+        // fresh-IDV loop on this reason, it's a transient race, not a
         // revoked credential.
         if (!sessionCheck.ok && sessionCheck.reason === 'session_bloom_sequence_mismatch') {
             try {
@@ -2016,7 +2015,7 @@ class IsHumanVerifier {
         }
         if (!sessionCheck.ok) {
             // Don't recurse back into the popup-trigger set on a bloom
-            // mismatch — it would spin into a popup loop. Surface the
+            // mismatch, it would spin into a popup loop. Surface the
             // mismatch as a distinct reason instead.
             const reason = sessionCheck.reason === 'session_bloom_sequence_mismatch'
                 ? 'session_bloom_sequence_mismatch'
@@ -2092,7 +2091,7 @@ class IsHumanVerifier {
             },
         ).then((result) => {
             if (result?.blocked) {
-                if (this.debug) console.warn('[isHuman] site proof popup blocked — falling back to redirect');
+                if (this.debug) console.warn('[isHuman] site proof popup blocked, falling back to redirect');
                 popupUrl.searchParams.set('flow_mode', 'redirect');
                 window.location.assign(popupUrl.toString());
                 return { ok: false, reason: 'redirect_started', detail: null };

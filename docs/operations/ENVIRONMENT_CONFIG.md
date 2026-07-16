@@ -38,7 +38,7 @@ value, including `staging` and unset, enables them.**
 | `REDIS_URL`        | Distributed rate-limit + wallet-challenge backend.                           | Redis URL             | Redis URL (optional) | Rate limiter falls back to in-process memory. |
 | `LEMMA_ORIGIN`     | Canonical origin the wallet popup + demo subtree apps point at.              | `https://lemma.id`    | `https://demo.lemma.id` | Wallet/demo cross-origin flows misroute.   |
 
-### Identity-root secrets (network-critical — keep secret)
+### Identity-root secrets (network-critical: keep secret)
 
 | Variable                         | What it does                                                          | If missing                                              |
 | -------------------------------- | -------------------------------------------------------------------- | ------------------------------------------------------- |
@@ -53,7 +53,7 @@ value, including `staging` and unset, enables them.**
 > flip `LEMMA_ACTIVE_ROOT_VERSION`. See Phase 3.1 in
 > [V2_DESIGN_IMPROVEMENTS.md](../architecture/V2_DESIGN_IMPROVEMENTS.md).
 
-### Didit Identity (current IDV rail — Phase 3.2)
+### Didit Identity (current IDV rail: Phase 3.2)
 
 Didit is the **default upstream IDV provider** for new verifications. It feeds
 the same document-root issuance pipeline as the legacy Stripe rail. Lemma
@@ -80,7 +80,7 @@ and workflow id are present (`is_ishuman_didit_enabled()` in
 > assignment is reused and linked to the current Didit key so a provider
 > migration cannot silently replace the assigned person or internal-IAM PPID.
 
-### Stripe Identity (legacy IDV rail — migration only)
+### Stripe Identity (legacy IDV rail: migration only)
 
 Stripe Identity is retained **only for document-root recovery continuity** on
 accounts verified before the Didit cutover. Do not provision Stripe as the
@@ -207,5 +207,5 @@ curl -s -X POST https://demo.lemma.id/api/demo/ishuman/verify-once-test-mode \
 ## 4. Rollback
 
 Phase 6 is reverted purely by env config: leave `lemma-enterprise` on
-`ENVIRONMENT=production`. No code rollback required — `_demo_enabled()`
+`ENVIRONMENT=production`. No code rollback required, `_demo_enabled()`
 preserves the prior behavior (production disables demo) exactly.

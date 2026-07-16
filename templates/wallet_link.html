@@ -141,7 +141,7 @@
         <div class="security-note">
             <strong>How it works</strong>
             Your phone opens a confirm page after scanning and prompts for your passkey.
-            Wallet data is encrypted to this device only — lemma.id never sees your secret.
+            Wallet data is encrypted to this device only, lemma.id never sees your secret.
         </div>
     </div>
 
@@ -367,7 +367,7 @@ async function finishLinkSuccess(result, statusEl, mode) {
             try { await wallet.fetchAndStoreSeedEnvelopes(); } catch (_) {}
         }
         const passkeyEl = document.getElementById('passkey-status');
-        if (passkeyEl) passkeyEl.textContent = 'Passkey created — you can sign in with biometrics.';
+        if (passkeyEl) passkeyEl.textContent = 'Passkey created, you can sign in with biometrics.';
     } catch (passkeyErr) {
         console.warn('Passkey after pull receive:', passkeyErr);
         const passkeyEl = document.getElementById('passkey-status');
@@ -388,7 +388,7 @@ async function finishSyncSuccess(result, statusEl) {
         await wallet.ensureDeviceEnrollmentAfterSeedTransfer(result);
         await wallet.registerPasskey();
         const passkeyEl = document.getElementById('sync-passkey-status');
-        if (passkeyEl) passkeyEl.textContent = 'Passkey created — you can sign in with biometrics.';
+        if (passkeyEl) passkeyEl.textContent = 'Passkey created, you can sign in with biometrics.';
     } catch (passkeyErr) {
         console.warn('Passkey after sync transfer:', passkeyErr);
         const passkeyEl = document.getElementById('sync-passkey-status');

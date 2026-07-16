@@ -1,7 +1,7 @@
 """
 Shared configuration for the production isHuman revocation test wallet.
 
-Secrets are read from environment variables only — never commit wallet_secret.
+Secrets are read from environment variables only, never commit wallet_secret.
 """
 
 from __future__ import annotations

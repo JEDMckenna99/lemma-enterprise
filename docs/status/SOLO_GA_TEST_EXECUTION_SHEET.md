@@ -16,10 +16,10 @@ Automated evidence from Phases A–D (see `lemma-security-hardening-plan.canvas.
 
 | Phase | Result | Evidence |
 |-------|--------|----------|
-| A — ishuman_cache encryption | Code complete | `ops/evidence/launch/*-phase-a-summary.md`, `tests/test_ishuman_cache_encryption.py` |
-| B — revoke→deny smoke | Script ready; prod blocked `ppid_not_linked` | `ops/evidence/launch/2026-06-08-revoke-to-deny-evidence.md`, `scripts/revoke_to_deny_smoke.py` |
-| C — route CSP + innerHTML | Code complete | `ops/evidence/launch/*-phase-c-summary.md`, `tests/test_csp_security.py` |
-| D — CSP alert drill | PASS | `ops/evidence/launch/2026-06-08-incident-drill-csp-alert.md` |
+| A, ishuman_cache encryption | Code complete | `ops/evidence/launch/*-phase-a-summary.md`, `tests/test_ishuman_cache_encryption.py` |
+| B, revoke→deny smoke | Script ready; prod blocked `ppid_not_linked` | `ops/evidence/launch/2026-06-08-revoke-to-deny-evidence.md`, `scripts/revoke_to_deny_smoke.py` |
+| C, route CSP + innerHTML | Code complete | `ops/evidence/launch/*-phase-c-summary.md`, `tests/test_csp_security.py` |
+| D, CSP alert drill | PASS | `ops/evidence/launch/2026-06-08-incident-drill-csp-alert.md` |
 
 - [x] Deploy security hardening to prod (v2186 / `78d52f68`).
   - Result: `PASS`

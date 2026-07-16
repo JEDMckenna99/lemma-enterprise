@@ -16,7 +16,7 @@ presentation = signed credential bundle satisfying the site's policy
 
 Adding `isHuman` after passkey signup **raises assurance** on the **same PPID**. It does not mint a new site subject.
 
-Lemma issues signed credentials and holds wallet ↔ person bindings. **Input burn graphs stay site-local** — Lemma never stores email/phone/card fingerprints or site ban lists.
+Lemma issues signed credentials and holds wallet ↔ person bindings. **Input burn graphs stay site-local**: Lemma never stores email/phone/card fingerprints or site ban lists.
 
 ## Assurance tiers
 
@@ -27,9 +27,9 @@ Lemma issues signed credentials and holds wallet ↔ person bindings. **Input bu
 
 Feature flags (rollout):
 
-- `LEMMA_ONE_PPID_ASSURANCE_MODEL=1` — assign provisional person_root at wallet bind
-- `LEMMA_PASSKEY_ASSURANCE_ENABLED=1` — allow `derive-site-proof` without verified IDV row
-- `LEMMA_PPID_REQUIRE_PERSON_ROOT=1` — canonical PPID from person_root (keep on in production)
+- `LEMMA_ONE_PPID_ASSURANCE_MODEL=1`, assign provisional person_root at wallet bind
+- `LEMMA_PASSKEY_ASSURANCE_ENABLED=1`, allow `derive-site-proof` without verified IDV row
+- `LEMMA_PPID_REQUIRE_PERSON_ROOT=1`, canonical PPID from person_root (keep on in production)
 
 ## Lifecycle
 
@@ -55,9 +55,9 @@ Lemma does **not** implement burn lists. Sites own correlation and escalation:
 
 Store locally:
 
-- `ppid` — current site subject (one column, stable across step-up)
-- Input fingerprints + burn flags — site-only
-- Last seen `assurance` — for policy gates
+- `ppid`, current site subject (one column, stable across step-up)
+- Input fingerprints + burn flags, site-only
+- Last seen `assurance`, for policy gates
 
 ## SDK integration
 

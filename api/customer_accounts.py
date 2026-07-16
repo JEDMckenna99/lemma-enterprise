@@ -2556,7 +2556,7 @@ def create_test_accounts():
 
 @customer_accounts_bp.route('/logout')
 def logout():
-    """Customer logout — clear server session + wallet cookies + global session."""
+    """Customer logout, clear server session + wallet cookies + global session."""
     session.pop('customer_id', None)
 
     # Clear global wallet session so other devices detect the lock

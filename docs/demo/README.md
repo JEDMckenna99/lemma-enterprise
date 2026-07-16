@@ -3,14 +3,13 @@
 ## What this proves
 
 The public **`/demo`** route (alias `/demo/ishuman`) demonstrates the Lemma
-isHuman integration flow in three concepts — **Create**, **Verify**, **Enforce** —
-not Agent Ops.
+isHuman integration flow in three concepts: **Create**, **Verify**, **Enforce**: not Agent Ops.
 
 When one-PPID assurance flags are enabled on staging:
 
-- **Create** — passkey wallet + provisional person root (no IDV required to start).
-- **Verify** — `verifyForBackend({ requiredAssurance: 'passkey' })` derives distinct site PPIDs; Heroku demo sites POST signed `presentation` to `/api/demo/action` for offline `verify()`.
-- **Enforce** — set assurance (`passkey` → `ishuman`), site doubt, and site ban via `/api/demo/ishuman/*`. After Didit IDV, re-verify with `requiredAssurance: 'ishuman'` — **same PPID**, assurance flips to `ishuman`.
+- **Create**: passkey wallet + provisional person root (no IDV required to start).
+- **Verify**: `verifyForBackend({ requiredAssurance: 'passkey' })` derives distinct site PPIDs; Heroku demo sites POST signed `presentation` to `/api/demo/action` for offline `verify()`.
+- **Enforce**: set assurance (`passkey` → `ishuman`), site doubt, and site ban via `/api/demo/ishuman/*`. After Didit IDV, re-verify with `requiredAssurance: 'ishuman'`: **same PPID**, assurance flips to `ishuman`.
 
 Legacy IDV-first copy remains when `assurance_demo_mode` is false (flags off).
 
@@ -30,15 +29,15 @@ and call `verifyForBackend` with env-driven `LEMMA_DEMO_REQUIRED_ASSURANCE`
 (default `passkey`).
 
 > **Agent Ops demo** (proof-constrained authorization with runtime kill/revoke)
-> lives separately at `/demo/firewall` and is operator-only — not the public
+> lives separately at `/demo/firewall` and is operator-only, not the public
 > isHuman integration demo.
 
 ## Required environment variables
 
-- `LEMMA_ONE_PPID_ASSURANCE_MODEL=1` and `LEMMA_PASSKEY_ASSURANCE_ENABLED=1` — enable assurance demo on staging.
-- `LEMMA_ISHUMAN_DIDIT_ENABLED=true` — enable Didit as the IDV rail.
-- `DIDIT_API_KEY`, `DIDIT_WORKFLOW_ID` — Didit session creation.
-- `DIDIT_WEBHOOK_SECRET` — webhook verification for `/api/webhooks/didit-identity`.
+- `LEMMA_ONE_PPID_ASSURANCE_MODEL=1` and `LEMMA_PASSKEY_ASSURANCE_ENABLED=1`, enable assurance demo on staging.
+- `LEMMA_ISHUMAN_DIDIT_ENABLED=true`, enable Didit as the IDV rail.
+- `DIDIT_API_KEY`, `DIDIT_WORKFLOW_ID`, Didit session creation.
+- `DIDIT_WEBHOOK_SECRET`, webhook verification for `/api/webhooks/didit-identity`.
 - `ISHUMAN_RETURN_URL`: optional default return URL.
 - `LEMMA_ISHUMAN_DEMO_ALLOW_TEST_VERIFY=true`: optional staging helper to complete human proof without live IDV.
 - `LEMMA_ISHUMAN_DEMO_TEST_TOKEN`: optional; required when test-mode completion is enabled.
@@ -46,8 +45,8 @@ and call `verifyForBackend` with env-driven `LEMMA_DEMO_REQUIRED_ASSURANCE`
 
 Demo Heroku apps:
 
-- `LEMMA_ORIGIN` — lemma.id or staging hub origin (must serve SDK + API).
-- `LEMMA_DEMO_REQUIRED_ASSURANCE=passkey` — site policy (ticketing can require human proof via hub Enforce chapter).
+- `LEMMA_ORIGIN`, lemma.id or staging hub origin (must serve SDK + API).
+- `LEMMA_DEMO_REQUIRED_ASSURANCE=passkey`, site policy (ticketing can require human proof via hub Enforce chapter).
 
 Legacy Stripe Identity keys (`STRIPE_SECRET_KEY`, `STRIPE_IDENTITY_WEBHOOK_SECRET`)
 are migration-only for document-root recovery; do not provision them for new demos.
@@ -55,11 +54,11 @@ are migration-only for document-root recovery; do not provision them for new dem
 ## Recording checklist (Create · Verify · Enforce)
 
 1. Load `/demo` on staging (`assurance_demo_mode: true` in config).
-2. **Create** — Create passkey wallet (no IDV popup). Note: continuity only, not unique humanness.
-3. **Verify** — Verify both sites; show different PPIDs and `assurance: passkey`. Optional: open Developer view for signed presentations; open ticketing + trials Heroku demos.
-4. **Enforce — set assurance** — Require human proof on ticketing → show valid-but-insufficient denial → complete Didit IDV (or staging test-verify) → re-verify with **same PPID** at `ishuman`.
-5. **Enforce — doubt** — Mark ticketing doubtful (`doubt_required`); resolve with `verifyFreshForBackend()`. Works whether the user only has passkey presence or already has a human proof.
-6. **Enforce — ban** — Ban ticketing PPID (`site_blocked`); confirm fresh verification does not clear the ban. Trials stays verified throughout.
+2. **Create**: Create passkey wallet (no IDV popup). Note: continuity only, not unique humanness.
+3. **Verify**: Verify both sites; show different PPIDs and `assurance: passkey`. Optional: open Developer view for signed presentations; open ticketing + trials Heroku demos.
+4. **Enforce: set assurance**: Require human proof on ticketing → show valid-but-insufficient denial → complete Didit IDV (or staging test-verify) → re-verify with **same PPID** at `ishuman`.
+5. **Enforce: doubt**: Mark ticketing doubtful (`doubt_required`); resolve with `verifyFreshForBackend()`. Works whether the user only has passkey presence or already has a human proof.
+6. **Enforce: ban**: Ban ticketing PPID (`site_blocked`); confirm fresh verification does not clear the ban. Trials stays verified throughout.
 
 ## Legacy recording checklist (flags off)
 
@@ -103,4 +102,4 @@ persistent per-site enforcement drills.
 
 ## Presale deep link (Enforce in the wild)
 
-The presale tour at `?tour=presale` demonstrates **presence stamps** and action-level enforcement on a relying site — not a separate hub story. See `PRESALE_DEMO_SCRIPT.md`.
+The presale tour at `?tour=presale` demonstrates **presence stamps** and action-level enforcement on a relying site, not a separate hub story. See `PRESALE_DEMO_SCRIPT.md`.

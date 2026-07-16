@@ -6,7 +6,7 @@ created its own redis.from_url() pool (often max_connections=4–6). With
 WEB_CONCURRENCY>=2 that exhausts the cap and causes silent degrade-to-memory.
 
 Use one shared client per (url, decode_responses) key per process.
-Flask-Limiter still opens its own storage pool via URI — keep LEMMA_REDIS_MAX_CONNECTIONS
+Flask-Limiter still opens its own storage pool via URI, keep LEMMA_REDIS_MAX_CONNECTIONS
 conservative so the shared pool + limiter fit under the provider cap.
 """
 

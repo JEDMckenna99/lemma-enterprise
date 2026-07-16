@@ -144,7 +144,7 @@ def main() -> int:
         c.fail(f"Expected revocation list 200, got {status}")
     checks.append(c)
 
-    print(f"Platform owner security checks — {BASE_URL}\n")
+    print(f"Platform owner security checks, {BASE_URL}\n")
     failed = 0
     for item in checks:
         mark = "PASS" if item.ok else "FAIL"

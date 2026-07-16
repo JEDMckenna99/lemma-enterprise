@@ -14,7 +14,7 @@
             <h1 style="text-align: center; margin-bottom: 32px;">Admin Bootstrap</h1>
             
             <p style="text-align: center; color: var(--gray-600); margin-bottom: 32px;">
-                Platform owner bootstrap for lemma.id — detects your person-root PPID and issues admin access automatically when configured as owner.
+                Platform owner bootstrap for lemma.id, detects your person-root PPID and issues admin access automatically when configured as owner.
             </p>
 
             <div id="owner-status" class="wallet-status" style="margin-bottom: 24px;">
@@ -275,7 +275,7 @@ async function storeIssuedCredential(wallet, result, permission_level) {
 }
 
 async function autoIssuePlatformOwnerAdmin(wallet) {
-    showStatus('Verified platform owner — issuing admin credential...', 'loading');
+    showStatus('Verified platform owner, issuing admin credential...', 'loading');
     const response = await fetch('/api/v1/iam/admin/platform-bootstrap/auto-issue', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -304,7 +304,7 @@ async function runPlatformOwnerBootstrap() {
         setOwnerStatus('Unlock your wallet with passkey to continue...', 'locked');
         const unlocked = await ensureWalletUnlocked(wallet);
         if (!unlocked) {
-            setOwnerStatus('Wallet locked — unlock with passkey to detect your platform owner PPID.', 'locked');
+            setOwnerStatus('Wallet locked, unlock with passkey to detect your platform owner PPID.', 'locked');
             document.getElementById('manual-bootstrap-section').style.display = 'block';
             return;
         }

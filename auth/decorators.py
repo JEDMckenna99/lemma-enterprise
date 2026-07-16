@@ -1,5 +1,5 @@
 """
-Authentication decorators for Lemma.id — local-first credential verification.
+Authentication decorators for Lemma.id, local-first credential verification.
 
 Single auth path: X-Lemma-Credential header containing a signed credential.
 Verification is local (Ed25519 signature + pinned issuer trust + Bloom filter
@@ -69,7 +69,7 @@ def require_credential(
     required_permission : str, optional
         If set, the credential's permission_id must match (unless admin).
     allow_unauthenticated : bool
-        If True, missing or invalid credentials are allowed — the handler
+        If True, missing or invalid credentials are allowed, the handler
         can inspect ``g.authenticated`` to decide behaviour.
     """
     def decorator(f):
@@ -178,7 +178,7 @@ def require_credential(
 
 
 # ---------------------------------------------------------------------------
-# Legacy aliases — keep existing route decorators working
+# Legacy aliases: keep existing route decorators working
 # ---------------------------------------------------------------------------
 
 def require_site_admin(f):
@@ -213,7 +213,7 @@ def optional_auth(f):
 
 def require_api_key(f):
     """
-    Legacy API-key decorator — now requires a credential instead.
+    Legacy API-key decorator, now requires a credential instead.
     Endpoints previously gated by API key must present a signed credential.
     """
     return require_credential()(f)
@@ -359,7 +359,7 @@ def _set_tenant_context_from_request() -> None:
 
 
 # ---------------------------------------------------------------------------
-# CSRF protection (unchanged — operates on cookies, not credential path)
+# CSRF protection (unchanged: operates on cookies, not credential path)
 # ---------------------------------------------------------------------------
 
 def init_csrf_protection(app):

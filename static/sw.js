@@ -8,7 +8,7 @@ const STATIC_ASSETS = [
   '/static/img/lemma_logo.svg'
 ];
 
-// JS files that change frequently — use network-first, cache as fallback
+// JS files that change frequently, use network-first, cache as fallback
 const NETWORK_FIRST_PATTERNS = [
   '/static/js/lemma-wallet.js',
   '/static/js/lemma-keys.js',
@@ -63,13 +63,13 @@ self.addEventListener('fetch', event => {
     return;
   }
   
-  // Skip SSE event streams — long-lived connections should NOT go through SW
+  // Skip SSE event streams, long-lived connections should NOT go through SW
   if (event.request.url.includes('/api/events/') ||
       event.request.headers.get('Accept') === 'text/event-stream') {
     return;
   }
 
-  // Skip API calls — these should always hit the network directly
+  // Skip API calls, these should always hit the network directly
   if (event.request.url.includes('/api/')) {
     return;
   }

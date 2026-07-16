@@ -21,7 +21,7 @@ _stripe_key = os.getenv('STRIPE_SECRET_KEY')
 if _stripe_key:
     stripe.api_key = _stripe_key
 else:
-    logger.warning("STRIPE_SECRET_KEY not set — billing endpoints will fail")
+    logger.warning("STRIPE_SECRET_KEY not set, billing endpoints will fail")
 
 # Create blueprint
 automated_billing_bp = Blueprint('automated_billing', __name__)

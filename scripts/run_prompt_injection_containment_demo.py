@@ -186,7 +186,7 @@ def run_demo(json_output: bool = False) -> int:
         f.write(mock_code)
 
     if not json_output:
-        _header("Lemma.id — Prompt Injection Containment Demo")
+        _header("Lemma.id, Prompt Injection Containment Demo")
         print(f"  {_DIM}Showing how taint epochs catch prompt injection that")
         print(f"  static policy tools (sandboxes, YAML firewalls) miss.{_RESET}")
 
@@ -342,7 +342,7 @@ def run_demo(json_output: bool = False) -> int:
         if not json_output:
             if step5_denied:
                 _denied(f"POST /aim/authorize file.write /etc/cron.d/exfil → {_RED}DENIED{_RESET}")
-                _info(f"Same stale epoch — {_BOLD}all privileged actions blocked{_RESET}")
+                _info(f"Same stale epoch, {_BOLD}all privileged actions blocked{_RESET}")
 
         # ══════════════════════════════════════════════════════════
         # STEP 6: Human re-approves with fresh proof at new epoch
@@ -366,7 +366,7 @@ def run_demo(json_output: bool = False) -> int:
             if step6_ok:
                 _ok(f"POST /aim/authorize file.write /src/app.ts → {_GREEN}ALLOWED{_RESET}")
                 _info(f"Fresh proof at epoch=1 matches runtime epoch=1")
-                _info(f"Human reviewed the action and approved — agent can write again")
+                _info(f"Human reviewed the action and approved, agent can write again")
 
         # ══════════════════════════════════════════════════════════
         # Summary

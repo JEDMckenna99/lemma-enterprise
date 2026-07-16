@@ -14,7 +14,7 @@ The workflow:
 
 Required GitHub Actions secret:
 
-- `LEMMA_PLATFORM_API_KEY` — live scope-matrix and post-deploy gates (falls back to `LEMMA_API_KEY`).
+- `LEMMA_PLATFORM_API_KEY`, live scope-matrix and post-deploy gates (falls back to `LEMMA_API_KEY`).
 
 Local preflight (mirrors CI scope matrix step):
 

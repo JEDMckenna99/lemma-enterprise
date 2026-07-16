@@ -115,7 +115,7 @@ function authHeaders() {
 }
 
 function formatDate(value) {
-    if (!value) return '—';
+    if (!value) return 'Not available';
     try { return new Date(value).toLocaleString(); } catch { return value; }
 }
 
@@ -166,12 +166,12 @@ async function loadExternalKeys() {
             const siteRows = (data.sites || []);
             if (siteRows.length) {
                 tbody.innerHTML = siteRows.map((s) => {
-                    const domain = safe(s.site_domain || s.site_id || '—');
+                    const domain = safe(s.site_domain || s.site_id || 'Not available');
                     const label = safe(s.site_label || s.company_name || domain);
                     return `<tr>
                         <td style="padding:12px 16px;">${label}</td>
                         <td>${domain}</td>
-                        <td>—</td>
+                        <td>, </td>
                         <td><span style="color:#64748b;">No key in account</span></td>
                         <td>${formatDate(s.created_at)}</td>
                         <td><a class="dev-btn dev-btn-secondary dev-btn-sm" href="/developer/external-api-keys">Issue key</a></td>
@@ -184,7 +184,7 @@ async function loadExternalKeys() {
         }
         tbody.innerHTML = externalKeys.map((k) => {
             const site = siteMap[k.site_id] || {};
-            const siteLabel = site.site_domain || k.site_id || '—';
+            const siteLabel = site.site_domain || k.site_id || 'Not available';
             const status = k.status || 'active';
             return `
                 <tr>

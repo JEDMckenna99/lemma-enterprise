@@ -1,13 +1,13 @@
 # Wallet recovery & cross-device transfer
 
 > Identity lives in the network, not the device. You can never lose your
-> verified-human status — only the device that held your wallet.
+> verified-human status, only the device that held your wallet.
 
 This document describes the two supported ways a user regains access to their
 Lemma identity, and the trust model behind each. It corresponds to Phase 4 of
 [`V2_DESIGN_IMPROVEMENTS.md`](../architecture/V2_DESIGN_IMPROVEMENTS.md).
 
-## 1. Re-IDV — the primary recovery path
+## 1. Re-IDV: the primary recovery path
 
 If a user loses their device, clears IndexedDB, or installs a fresh browser,
 the canonical recovery is to **verify identity again**. Re-verifying with the
@@ -16,7 +16,7 @@ the canonical recovery is to **verify identity again**. Re-verifying with the
 same network identity everywhere.
 
 > **Assigned person root (`assigned_v1`):** `person_root` is no longer
-> `HKDF(document_root)` for new identities — it is server-assigned and stable.
+> `HKDF(document_root)` for new identities, it is server-assigned and stable.
 > Recovery still works because the server matches the document attestation to
 > the existing person before binding the new wallet. See
 > [`ASSIGNED_PERSON_ROOT.md`](../architecture/ASSIGNED_PERSON_ROOT.md).
@@ -60,7 +60,7 @@ Recovery must never rewrite IAM ownership from a client-supplied bare PPID.
 - The old master credential id is revoked, so a stolen old device cannot keep
   presenting it once the user has recovered.
 
-## 2. Explicit cross-device transfer (QR) — no re-IDV
+## 2. Explicit cross-device transfer (QR): no re-IDV
 
 For users who still have their original device and simply want to add another,
 the wallet offers an **"Add device"** QR flow that moves identity material
@@ -114,11 +114,11 @@ Security properties:
 
 ### Wallet SDK helpers
 
-- `beginDeviceTransfer()` — new device: mint transient keypair + `transfer_id`,
+- `beginDeviceTransfer()`, new device: mint transient keypair + `transfer_id`,
   return the QR payload.
 - `depositDeviceTransfer({ transferId, newDeviceEncPubkeyB64, masterCredentialId })`
-  — old device: reseal seeds and deposit.
-- `claimDeviceTransfer(transferId)` — new device: claim and open.
+, old device: reseal seeds and deposit.
+- `claimDeviceTransfer(transferId)`, new device: claim and open.
 
 ## Rollout note
 

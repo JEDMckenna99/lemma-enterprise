@@ -1,5 +1,5 @@
 /**
- * Phase 5 — PRF-derived keys and AES-GCM envelopes for Lemma wallet IndexedDB.
+ * Phase 5, PRF-derived keys and AES-GCM envelopes for Lemma wallet IndexedDB.
  * Loaded before lemma-wallet.js; exposes window.WalletAtRestCrypto.
  */
 (function () {
@@ -114,7 +114,7 @@
     }
 
     // -----------------------------------------------------------------------
-    // Device wrap key — protects the 24h unlock bundle written to localStorage.
+    // Device wrap key, protects the 24h unlock bundle written to localStorage.
     //
     // The daily-unlock bundle has to persist the wallet secret + at-rest key so
     // the user only does ONE passkey per day. Writing those to localStorage in
@@ -122,7 +122,7 @@
     // the sensitive payload with a NON-EXTRACTABLE AES-GCM CryptoKey kept in a
     // dedicated IndexedDB: JS can use it to encrypt/decrypt but can never read
     // its bytes, so a full storage dump (XSS, extension, disk) yields ciphertext
-    // — not the secret.
+    //, not the secret.
     // -----------------------------------------------------------------------
 
     const WRAP_DB_NAME = 'LemmaWalletWrap';

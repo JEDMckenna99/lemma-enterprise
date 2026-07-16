@@ -1,4 +1,4 @@
-# Dockerfile.firewall — Standalone Lemma Firewall (AIM gateway) container.
+# Dockerfile.firewall: Standalone Lemma Firewall (AIM gateway) container.
 # Packages scripts/lemma_firewall.py with its api.authz dependencies as a
 # minimal Flask service that validates Lemma proofs and enforces per-API policy.
 

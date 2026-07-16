@@ -50,7 +50,7 @@
         </ul>
 
         <h3 style="font-size: var(--font-size-lg); margin-top: 24px; color: var(--gray-800);">3.1 No Advertising to End Users</h3>
-        <p>We do not use identity verification outcomes, credentials, wallet data, PPIDs, or verification metadata to deliver advertising, retargeting, or behavioral marketing to people who use Lemma-powered services on third-party sites. This commitment applies to end users of integrated sites, not to developer or business accounts that sign up for Lemma.id directly — those accounts may receive product and service communications, which you can opt out of as described in Section 8.</p>
+        <p>We do not use identity verification outcomes, credentials, wallet data, PPIDs, or verification metadata to deliver advertising, retargeting, or behavioral marketing to people who use Lemma-powered services on third-party sites. This commitment applies to end users of integrated sites, not to developer or business accounts that sign up for Lemma.id directly, those accounts may receive product and service communications, which you can opt out of as described in Section 8.</p>
         <p>Integrator sites remain responsible for their own privacy practices on their properties. This section describes only how Lemma.id uses data within its control.</p>
 
         <h2>4. Privacy-Preserving Features</h2>
@@ -61,7 +61,7 @@
             <li><strong>Pairwise Identifiers (PPIDs):</strong> Each user gets a unique identifier per site, which helps limit cross-site linkability</li>
             <li><strong>Client-Side Storage:</strong> Credentials are stored in the browser wallet for normal sign-in flows; server systems may retain minimal issuance/audit metadata.</li>
             <li><strong>Local Return-Visit Verification:</strong> For routine sign-in checks, your server verifies credentials locally using Ed25519 signatures without contacting Lemma.id, so we do not observe those individual verification events. Initial identity verification (IDV) does involve our servers: we receive the verification outcome from the IDV provider and derive minimal, encrypted identifiers from it (we do not retain raw identity documents, face images, or your legal name).</li>
-            <li><strong>No Advertising Monetization:</strong> We do not sell, share, or use end-user identity data for advertising or behavioral targeting — on Lemma.id or elsewhere</li>
+            <li><strong>No Advertising Monetization:</strong> We do not sell, share, or use end-user identity data for advertising or behavioral targeting, on Lemma.id or elsewhere</li>
         </ul>
 
         <h2>5. Data Sharing and Disclosure</h2>

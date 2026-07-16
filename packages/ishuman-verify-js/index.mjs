@@ -1,5 +1,5 @@
 /**
- * @lemma/ishuman-verify — Local-first isHuman presentation verifier.
+ * @lemma/ishuman-verify, Local-first isHuman presentation verifier.
  *
  * Drop-in ES module that verifies an `IsHumanVerifier.verify()` result
  * **entirely on your backend** with no per-request calls to lemma.id.
@@ -23,7 +23,7 @@
  *   const ppid = result.ppid;
  *
  *   // Or verify a stamp you stored earlier (from the browser SDK's
- *   // stamp(payload, { includeCredential: true })) — re-checks the credential
+ *   // stamp(payload, { includeCredential: true })), re-checks the credential
  *   // + revocation AND that the stamp's logged ppid/credentialId match it.
  *   // verifyStamp accepts a bare VC, a presentation, a stamp, or a stamped
  *   // event interchangeably:

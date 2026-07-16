@@ -1,4 +1,4 @@
-> **Unimplemented internal proposal — not shipped.** Do not use for integration planning. Shipped relying-site behavior is documented in public docs at [lemma.id/docs](https://lemma.id/docs).
+> **Unimplemented internal proposal, not shipped.** Do not use for integration planning. Shipped relying-site behavior is documented in public docs at [lemma.id/docs](https://lemma.id/docs).
 
 # Human-Backed Agent Passport (HBAP)
 
@@ -18,10 +18,10 @@ The **Human-Backed Agent Passport (HBAP)** is a single portable artifact that an
 
 | Layer             | Trust question                                           | Inside the passport                                  |
 | ----------------- | -------------------------------------------------------- | ---------------------------------------------------- |
-| **L1 — Site**     | Does this principal have an account/role on this site?   | Permission lemma (site-scoped VC)                    |
-| **L2 — Human**    | Is a unique verified human behind this delegation?       | isHuman credential (site-bound presentation)         |
-| **L3 — Delegate** | What may this agent do, for how long, on what resources? | Delegated proof (`authz_profile_v2` child hop)       |
-| **L4 — Auth**     | Did the human consent recently (passkey/wallet)?         | Consent anchor (wallet unlock / passkey session ref) |
+| **L1, Site**     | Does this principal have an account/role on this site?   | Permission lemma (site-scoped VC)                    |
+| **L2, Human**    | Is a unique verified human behind this delegation?       | isHuman credential (site-bound presentation)         |
+| **L3, Delegate** | What may this agent do, for how long, on what resources? | Delegated proof (`authz_profile_v2` child hop)       |
+| **L4, Auth**     | Did the human consent recently (passkey/wallet)?         | Consent anchor (wallet unlock / passkey session ref) |
 
 
 **Integrator experience:** one issuance approval → one JSON passport → one local verify function.  
@@ -41,7 +41,7 @@ Transport on the hot path remains what we already ship:
 | Buyer                                            | Pain today                                                                             | HBAP promise                                                     |
 | ------------------------------------------------ | -------------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
 | **Relying sites** (commerce, signup, APIs)       | Cannot distinguish human-authorized agents from bots; OAuth reveals full user identity | Verify human + scoped agent without KYC dossier on their backend |
-| **Regulated enterprises**                        | Audit asks “who authorized the AI?” — logs are operator-controlled                     | Tamper-evident chain: human → delegate → action                  |
+| **Regulated enterprises**                        | Audit asks “who authorized the AI?”, logs are operator-controlled                     | Tamper-evident chain: human → delegate → action                  |
 | **Agent operators** (OpenClaw, Cursor, internal) | Tokens work for APIs; no runtime kill / taint / provenance                             | Same passport powers Agent Ops control plane                     |
 | **MCP / tool hosts**                             | OAuth 2.1 scopes are coarse; stolen bearer tokens replay                               | Key-bound PoP + monotonic scope narrowing                        |
 
@@ -91,13 +91,13 @@ One JSON document. Verifiers parse once; layers are nested claims, not separate 
 }
 ```
 
-**Privacy rule:** pairwise PPIDs per layer — verifiers MUST NOT receive a global correlatable user id unless the relying site already holds that relationship via L1.
+**Privacy rule:** pairwise PPIDs per layer, verifiers MUST NOT receive a global correlatable user id unless the relying site already holds that relationship via L1.
 
 ---
 
 ## 4. Layer → API mapping (single surface per concern)
 
-### 4.1 Issuance (control plane — one orchestrated endpoint)
+### 4.1 Issuance (control plane: one orchestrated endpoint)
 
 
 | Step | Layer       | Canonical API (new)                       | Existing API (today)                             | Gate                                        |
@@ -130,9 +130,9 @@ Content-Type: application/json
 
 **Response:** full `hbap_v1` document + `agent_private_key` (once) for PoP signing.
 
-**UX:** one browser approval (“Authorize agent for app.example.com”) — same mental model as World AgentKit, without fourLemma-specific steps.
+**UX:** one browser approval (“Authorize agent for app.example.com”), same mental model as World AgentKit, without fourLemma-specific steps.
 
-### 4.2 Verification (data plane — one function, local-first)
+### 4.2 Verification (data plane: one function, local-first)
 
 
 | Concern                   | Canonical verify entry                         | Existing implementation                             |
@@ -146,7 +146,7 @@ Content-Type: application/json
 | Runtime policy (operator) | kill / taint / step-up                         | `POST /api/wallet/runtimes/{id}/authorize`          |
 
 
-**Target verify API (SDKs — Node + Python):**
+**Target verify API (SDKs, Node + Python):**
 
 ```python
 result = verify_human_backed_passport(
@@ -186,7 +186,7 @@ Prefer **local verify** for latency and privacy (matches isHuman integration mod
 | ------------------------------ | ------------------------------------------------------ | ------------------------------ |
 | Revoke passport / delegate hop | `POST /api/auth/revoke` (`jti` = `delegated_proof_id`) | Existing control plane         |
 | Revoke human root              | isHuman bloom + site revoke queue                      | Existing trust & safety        |
-| Kill runtime                   | `POST /api/wallet/runtimes/{id}/kill`                  | Agent Ops — denies authorize   |
+| Kill runtime                   | `POST /api/wallet/runtimes/{id}/kill`                  | Agent Ops, denies authorize   |
 | List active                    | `GET /api/passport/list` (wallet-auth)                 | *new*; wraps delegations store |
 
 
@@ -194,17 +194,17 @@ Prefer **local verify** for latency and privacy (matches isHuman integration mod
 
 ## 5. IETF / standards profile choice
 
-**Decision:** ship `**hbap_v1` as a Lemma profile** that **composes** existing standards — do not pick a single IETF draft as the only wire format.
+**Decision:** ship `**hbap_v1` as a Lemma profile** that **composes** existing standards, do not pick a single IETF draft as the only wire format.
 
 
 | Standard track                         | Role in HBAP                           | Rationale                                                                                                                                                                        |
 | -------------------------------------- | -------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **W3C VC Data Model 2.0 + VC-JWT**     | L1 permission + L2 isHuman credentials | Interop with MCP+VC draft ([draft-diaconu-agents-authz-info-sharing](https://datatracker.ietf.org/doc/html/draft-diaconu-agents-authz-info-sharing-00)); portable across domains |
 | **Lemma `authz_profile_v2`**           | L3 delegated proof + PoP               | Already implemented, tested, firewall-integrated (`DEVELOPER_AUTH_CONTRACT_V1.md`)                                                                                               |
-| **HDP-style provenance** (informative) | `provenance` block + human hop at root | Answers “which human authorized this chain?” — gap OAuth txn tokens leave open; map to HDP semantics without requiring HDP registry                                              |
+| **HDP-style provenance** (informative) | `provenance` block + human hop at root | Answers “which human authorized this chain?”, gap OAuth txn tokens leave open; map to HDP semantics without requiring HDP registry                                              |
 | **OAuth 2.1 + RFC 9396 RAR**           | **Bridge, not core**                   | `POST /api/auth/exchange-proof` emits `lm_at_`* for legacy MCP/OAuth consumers; RAR `authorization_details` maps from `resource_bounds`                                          |
 | **IETF AAP**                           | **Claim naming alignment only**        | Reuse `act` / principal / task context field names in `provenance` for enterprise SIEM parity                                                                                    |
-| **PEDIGREE / DRP**                     | **Phase 2**                            | Completion blocks + operator instruction hash (DRP) for regulated drift detection — defer until P1 passport ships                                                                |
+| **PEDIGREE / DRP**                     | **Phase 2**                            | Completion blocks + operator instruction hash (DRP) for regulated drift detection, defer until P1 passport ships                                                                |
 
 
 **Why not OAuth-only:** market default for MCP, but weak on cross-domain VC portability, pairwise privacy, and offline human-provenance verification. HBAP uses OAuth as a **sunsetting compat export**, not the source of truth.
@@ -218,7 +218,7 @@ Prefer **local verify** for latency and privacy (matches isHuman integration mod
 
 | Component              | Today                                  | HBAP P0                          | HBAP P1                   |
 | ---------------------- | -------------------------------------- | -------------------------------- | ------------------------- |
-| L4 passkey gate        | ✅ wallet unlock                        | wrap in orchestrator             | —                         |
+| L4 passkey gate        | ✅ wallet unlock                        | wrap in orchestrator             |, |
 | L1 permission lemma    | ✅ `issue_permission_lemma`             | embed in passport                | site policy templates     |
 | L3 delegated proof     | ✅ `issue-proof`, verifier, PoP         | embed in passport                | multi-hop attenuation     |
 | L2 isHuman in chain    | ❌ parallel only                        | **gate issuance on T2+**         | selective disclosure      |
@@ -232,7 +232,7 @@ Prefer **local verify** for latency and privacy (matches isHuman integration mod
 
 1. `POST /api/passport/issue` returns `hbap_v1` when wallet unlocked + isHuman T2 satisfied.
 2. Python + Node `verify_human_backed_passport()` matches server `evaluate_proof_native` outcomes on golden fixtures.
-3. Agent Ops UI issues passport (already redirected to wallet issue-proof — extend with L2 gate).
+3. Agent Ops UI issues passport (already redirected to wallet issue-proof, extend with L2 gate).
 4. One E2E: issue → protected action with PoP → revoke → deny within SLA.
 5. Evidence bundle script (`lemma incident-bundle` or successor) includes passport + decision receipt.
 
@@ -280,7 +280,7 @@ Stable codes for integrators (extend existing auth taxonomy):
 
 ## 9. Positioning one-liner
 
-**isHuman proves the human. Permission lemmas prove the account. Delegated proofs prove the agent. HBAP packages all three — plus fresh consent — into one verifiable passport for the agentic web.**
+**isHuman proves the human. Permission lemmas prove the account. Delegated proofs prove the agent. HBAP packages all three, plus fresh consent, into one verifiable passport for the agentic web.**
 
 Operator-only surfaces (Firewall, runtime kill, CLI) consume the same passport; relying sites verify locally and never need Agent Ops UI.
 

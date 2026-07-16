@@ -17,7 +17,7 @@ Empty device opens `/link` → **Show QR Code** → `beginLinkReceive()`.
 
 Unlocked `/app` → **Generate QR Code** / **Send Transfer Link** → `beginLinkPush()`.
 
-- QR/link carry only `{ v:2, mode:push, transfer_id }` — never secrets.
+- QR/link carry only `{ v:2, mode:push, transfer_id }`, never secrets.
 - Empty device opens link → `acceptLinkPushOffer` registers its pubkey.
 - Both screens show the same **6-digit confirmation code**.
 - Sender confirms codes match → fresh passkey → `confirmLinkPushDeposit`.
@@ -33,7 +33,7 @@ so a stolen transfer link cannot race-register and receive the deposit.
 
 ## Explicitly removed (do not restore)
 
-`generateLinkCode` / `linkDevice` / `_decryptLinkQR` — embedded ciphertext + AES key
+`generateLinkCode` / `linkDevice` / `_decryptLinkQR`, embedded ciphertext + AES key
 in `/link#…`. Possession of the URL recovered the identity. Guarded by
 `tests/test_device_link_security.py`.
 

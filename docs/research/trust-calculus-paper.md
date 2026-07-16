@@ -11,7 +11,7 @@ Lemma Labs, Inc.
 
 We introduce *Trust Calculus*, a formal system for constructing, composing, and revoking cryptographic trust assertions between arbitrary communicating nodes. A Trust Calculus *lemma* is an Ed25519-signed claim that nodes can verify locally without contacting the issuing authority. In the formal model, lemmas compose: if node A trusts B and B trusts C, the chain A→B→C forms a locally-verifiable proof, with effective authority equal to the intersection of all scopes along the path. The current implementation includes revocation distribution primitives (hashed revocation sets and Bloom-filter payloads) that support local revocation checks. Pairwise Pseudonymous Identifiers (PPIDs) derived via HMAC-SHA256 ensure that the same node participating in multiple trust graphs cannot be correlated across contexts.
 
-We present formal arguments for three safety properties: (1) *monotonic attenuation*—composition can only narrow authority, never widen it; (2) *revocation completeness*—revoking any link invalidates all compositions containing it in the model; and (3) *privacy under composition*—no coalition of verifiers can link a node's participation across independent trust graphs under standard assumptions. We also report implementation benchmarks and comparative observations against OAuth 2.0 introspection, mTLS certificate verification, and blockchain-based credential systems; these are measured results under stated conditions, not universal guarantees.
+We present formal arguments for three safety properties: (1) *monotonic attenuation*, composition can only narrow authority, never widen it; (2) *revocation completeness*, revoking any link invalidates all compositions containing it in the model; and (3) *privacy under composition*, no coalition of verifiers can link a node's participation across independent trust graphs under standard assumptions. We also report implementation benchmarks and comparative observations against OAuth 2.0 introspection, mTLS certificate verification, and blockchain-based credential systems; these are measured results under stated conditions, not universal guarantees.
 
 Trust Calculus generalizes beyond human identity to any node that holds a keypair: servers, AI agents, IoT devices, and software processes. We present the formal system, its properties, a reference implementation anchored to WebAuthn passkeys, and applications to agent delegation, service mesh authentication, content provenance, and supply chain attestation.
 
@@ -21,7 +21,7 @@ Trust Calculus generalizes beyond human identity to any node that holds a keypai
 
 ### 1.1 The Trust Verification Bottleneck
 
-Every distributed system must answer a fundamental question at every interaction: *should this node trust what that node claims?* The dominant approaches to this question—OAuth 2.0, SAML, mTLS, and API key validation—share a structural limitation: they require the verifying node to contact a remote authority at verification time, or to rely on opaque tokens whose validity cannot be independently assessed.
+Every distributed system must answer a fundamental question at every interaction: *should this node trust what that node claims?* The dominant approaches to this question, OAuth 2.0, SAML, mTLS, and API key validation, share a structural limitation: they require the verifying node to contact a remote authority at verification time, or to rely on opaque tokens whose validity cannot be independently assessed.
 
 This creates three problems:
 
@@ -260,7 +260,7 @@ $$\mathcal{S}_{\text{eff}}(\mathcal{T}') = \mathcal{S}_{\text{eff}}(\mathcal{T})
 
 Since for any sets $A$ and $B$, $A \cap B \subseteq A$, the effective scope of the extended chain is a subset of the original. $\square$
 
-**Consequence.** No node in a delegation chain can grant more authority than it was given. An AI agent delegated read-only access cannot delegate write access to a sub-agent. This property holds structurally—it is enforced by the algebra, not by runtime checks.
+**Consequence.** No node in a delegation chain can grant more authority than it was given. An AI agent delegated read-only access cannot delegate write access to a sub-agent. This property holds structurally, it is enforced by the algebra, not by runtime checks.
 
 #### Property 2 (Model): Revocation Completeness
 
@@ -272,7 +272,7 @@ $$\text{verify}(\mathcal{T}, \mathcal{R}, \mathcal{B}) = \bot$$
 
 **Argument.** The verification procedure iterates over every lemma in the chain and checks $\ell_i.id \in \mathcal{B}$ for each. If any check returns true, verification returns $\bot$ immediately. Since $\ell_j \in \mathcal{T}$ and $id_j \in \mathcal{B}$, the check will return true at step $j$. $\square$
 
-**Consequence.** When a human revokes their delegation to an AI agent, every chain rooted in that delegation—including sub-delegations the agent made to other agents—becomes invalid. Revocation cascades without requiring knowledge of the downstream chains.
+**Consequence.** When a human revokes their delegation to an AI agent, every chain rooted in that delegation, including sub-delegations the agent made to other agents, becomes invalid. Revocation cascades without requiring knowledge of the downstream chains.
 
 **Note on Bloom filter false positives.** The cascaded Bloom filter has a false positive rate of $p \leq 0.001$ at the finest level. A false positive causes a valid credential to appear revoked. This is a conservative failure mode: false positives deny access (safe), while false negatives (missed revocations) are structurally impossible in a Bloom filter with correct insertion. In practice, the $0.1\%$ false positive rate means fewer than 1 in 1,000 valid credentials may require a server-side recheck.
 
@@ -288,7 +288,7 @@ where $r_1, r_2$ are uniformly random 256-bit strings and $\lambda$ is the secur
 
 **Argument.** This reduces to the PRF security of HMAC-SHA256. If an adversary could distinguish $\text{PPID}(n, d_1)$ from a random string (or link two PPIDs to the same node), it could distinguish HMAC-SHA256 from a random function, contradicting the PRF assumption. Under the standard model assumption that SHA-256 is a PRF when keyed, the PPIDs are computationally indistinguishable from random. $\square$
 
-**Consequence.** A node (human, agent, or device) can participate in trust chains at thousands of independent sites. No coalition of sites can correlate the node's activity across domains. This is a structural privacy guarantee—not a policy, but a mathematical property of the identifier derivation.
+**Consequence.** A node (human, agent, or device) can participate in trust chains at thousands of independent sites. No coalition of sites can correlate the node's activity across domains. This is a structural privacy guarantee, not a policy, but a mathematical property of the identifier derivation.
 
 ---
 
@@ -350,7 +350,7 @@ where $s_n$ is the node's 256-bit wallet secret (generated randomly at wallet cr
 
 ### 6.3 Implications for Trust Chains
 
-When a node presents a trust chain to a verifier in domain $d$, the chain's terminal subject is identified by $\text{PPID}(n, d)$. The verifier sees a consistent pseudonymous identity within its domain but cannot correlate it to the same node's identity at any other domain. This holds even if the same trust chain (e.g., a KYC-backed identity lemma) is presented at both domains—the credential is the same, but the presented identifier differs.
+When a node presents a trust chain to a verifier in domain $d$, the chain's terminal subject is identified by $\text{PPID}(n, d)$. The verifier sees a consistent pseudonymous identity within its domain but cannot correlate it to the same node's identity at any other domain. This holds even if the same trust chain (e.g., a KYC-backed identity lemma) is presented at both domains, the credential is the same, but the presented identifier differs.
 
 ---
 
@@ -436,7 +436,7 @@ Trust Calculus addresses all five questions through delegation chains:
 ```
 ℓ₀: KYC Provider → Human H
     claims: {isHuman: true, verificationLevel: "high"}
-    scope: {*, *}  (universal — root of authority)
+    scope: {*, *}  (universal, root of authority)
 
 ℓ₁: Human H → Agent A
     claims: {role: "research_assistant", model: "claude-opus-4"}
@@ -445,7 +445,7 @@ Trust Calculus addresses all five questions through delegation chains:
 ℓ₂: Agent A → Sub-Agent A₁
     claims: {role: "data_fetcher", delegatedBy: "agent_a"}
     scope: {(web:read), (api:query)}
-    // Note: budget not delegated — attenuation in action
+    // Note: budget not delegated, attenuation in action
 
 ℓ₃: Sub-Agent A₁ → Service S
     claims: {action: "query", parameters: {...}}
@@ -460,7 +460,7 @@ Service S verifies the full chain $[\ell_0, \ell_1, \ell_2, \ell_3]$ in $\leq 2m
 
 Effective scope: $\{*, *\} \cap \{(\text{web:read}), (\text{api:query}), (\text{budget:500})\} \cap \{(\text{web:read}), (\text{api:query})\} \cap \{(\text{api:query})\} = \{(\text{api:query})\}$
 
-If Human H later revokes $\ell_1$, **all** downstream chains—including ones H has no knowledge of—become invalid at the next Bloom filter sync.
+If Human H later revokes $\ell_1$, **all** downstream chains, including ones H has no knowledge of, become invalid at the next Bloom filter sync.
 
 ### 8.3 Cross-Platform Agent Mobility
 
@@ -681,7 +681,7 @@ This architecture ensures that the root of every human trust chain is attested b
 
 ## 12. Conclusion
 
-Trust Calculus provides a formal system for composable trust between arbitrary communicating nodes. Its core insight is that cryptographic signatures can be composed: if each link in a chain is locally verifiable, the chain can be locally evaluated under explicit continuity and policy rules. By combining Ed25519 signatures (for unforgeable assertions), scope intersection (for monotonic attenuation), revocation distribution primitives, and HMAC-SHA256 PPIDs (for cross-context unlinkability), Trust Calculus targets a combination of properties—local verification, composition, attenuation, revocation, and privacy—that is uncommon in mainstream trust deployments.
+Trust Calculus provides a formal system for composable trust between arbitrary communicating nodes. Its core insight is that cryptographic signatures can be composed: if each link in a chain is locally verifiable, the chain can be locally evaluated under explicit continuity and policy rules. By combining Ed25519 signatures (for unforgeable assertions), scope intersection (for monotonic attenuation), revocation distribution primitives, and HMAC-SHA256 PPIDs (for cross-context unlinkability), Trust Calculus targets a combination of properties, local verification, composition, attenuation, revocation, and privacy, that is uncommon in mainstream trust deployments.
 
 The practical consequence is a shift in the economics of trust. When verification can be performed with low latency and without issuer callback round-trips, trust evaluation can move closer to each interaction point. Messages can carry reusable proofs, delegations can carry explicit constraints, and chain validation can remain locally explainable.
 
@@ -693,7 +693,7 @@ As computing shifts toward autonomous agents, federated services, and ubiquitous
 
 [1] D. J. Bernstein, N. Duif, T. Lange, P. Schwabe, and B.-Y. Yang, "High-speed high-security signatures," *Journal of Cryptographic Engineering*, vol. 2, no. 2, pp. 77–89, 2012. (Ed25519)
 
-[2] M. Bellare, R. Canetti, and H. Krawczyk, "Keying hash functions for message authentication," in *Advances in Cryptology—CRYPTO '96*, pp. 1–15, Springer, 1996. (HMAC)
+[2] M. Bellare, R. Canetti, and H. Krawczyk, "Keying hash functions for message authentication," in *Advances in Cryptology, CRYPTO '96*, pp. 1–15, Springer, 1996. (HMAC)
 
 [3] B. H. Bloom, "Space/time trade-offs in hash coding with allowable errors," *Communications of the ACM*, vol. 13, no. 7, pp. 422–426, 1970. (Bloom filters)
 

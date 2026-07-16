@@ -6,13 +6,13 @@ Core product endpoints for the Lemma isHuman proof-of-humanity network.
 
 Flows
 -----
-1. **Start verification** — create a Didit hosted IDV session and return the
+1. **Start verification**: create a Didit hosted IDV session and return the
    redirect URL.
-2. **Didit webhook** — receive verification outcomes, issue an Ed25519-signed
+2. **Didit webhook**: receive verification outcomes, issue an Ed25519-signed
    isHuman credential on approval.
-3. **Site-block** — a site persistently blocks its site-private PPID.
-4. **Site-doubt** — a site deliberately requests fresh IDV without a ban.
-5. **Check** — return separate block and doubt decisions for one site.
+3. **Site-block**: a site persistently blocks its site-private PPID.
+4. **Site-doubt**: a site deliberately requests fresh IDV without a ban.
+5. **Check**: return separate block and doubt decisions for one site.
 """
 
 from __future__ import annotations
@@ -277,7 +277,7 @@ def _issue_ishuman_credential(
         browser_sig_hex = _sign_with_issuer_for_browser(credential, issuer)
         proof = credential.setdefault("proof", {})
         proof["signatureValueWeb"] = browser_sig_hex
-    except Exception as exc:  # noqa: BLE001 — non-fatal: server still has Rust sig
+    except Exception as exc:  # noqa: BLE001, non-fatal: server still has Rust sig
         logger.warning("Failed to add browser-format signature to credential: %s", exc)
 
     return credential
@@ -808,7 +808,7 @@ def _handle_didit_risk_event(webhook_type: str, status: str, body: dict) -> None
     didit's continuous monitoring (block, AML hit, fraud transaction) is an
     authoritative downstream signal: when a previously-verified human is blocked
     or flagged, we revoke their Lemma credential network-wide so every relying
-    site enforces it locally via the Bloom snapshot — with no per-request didit
+    site enforces it locally via the Bloom snapshot, with no per-request didit
     calls and no PII leaving didit.
 
     Correlation: didit echoes our ``vendor_data`` (the IsHumanVerification id /
@@ -1290,7 +1290,7 @@ def start_verification_for_body(body: dict) -> tuple[dict, int]:
         # Dedup: the provider can reuse one hosted session across repeated
         # start-verification calls (e.g. the user re-clicks before redirect).
         # Reuse the existing in-flight row for this provider session + wallet so
-        # the hosted session maps to exactly ONE local record — otherwise the
+        # the hosted session maps to exactly ONE local record: otherwise the
         # webhook only flips the first sibling to verified and a client polling
         # the other sibling sees 'pending' forever.
         existing = (
@@ -1617,7 +1617,7 @@ def _reissue_verification_credential(record, db) -> Optional[dict]:
 @ishuman_bp.route("/api/ishuman/verification-status/<session_id>", methods=["GET"])
 @cross_origin()
 def verification_status(session_id: str):
-    """Poll verification status (no credential — use POST .../claim with wallet_assertion).
+    """Poll verification status (no credential, use POST .../claim with wallet_assertion).
 
     Returns ``credential_ready: true`` when verified so the wallet can claim the
     master VC without exposing it to unauthenticated callers.
@@ -1739,8 +1739,8 @@ def erase_identity():
         person linkage, PPIDs, and sealed seed envelopes).
       * Removes the wallet -> person binding.
       * If no other wallet remains bound to the person, deletes the person root
-        and its document-root mappings so the underlying identity anchor — the
-        single value from which every site PPID is derivable — is destroyed.
+        and its document-root mappings so the underlying identity anchor, the
+        single value from which every site PPID is derivable, is destroyed.
 
     This is the server-side counterpart to the client 'Clear my lemma.id' (which
     only wipes browser storage) and satisfies erasure obligations for the
@@ -1863,7 +1863,7 @@ def site_block():
 
         {
             "ppid": "did:lemma:ppid_...",
-            "reason": "Terms violation — automated activity detected"
+            "reason": "Terms violation, automated activity detected"
         }
     """
     site = _require_site_api_key()
@@ -2045,7 +2045,7 @@ def site_doubts():
 
 
 # ---------------------------------------------------------------------------
-# 4. Network Revocation (second tier — evidence required)
+# 4. Network Revocation (second tier: evidence required)
 # ---------------------------------------------------------------------------
 
 @ishuman_bp.route("/api/ishuman/network-revoke", methods=["POST"])
@@ -2054,14 +2054,14 @@ def network_revoke():
     """Request network-wide revocation of an isHuman credential.
 
     This queues the request for review.  The credential is NOT revoked
-    immediately — only the site block (tier 1) takes effect right away.
+    immediately, only the site block (tier 1) takes effect right away.
 
     Request body::
 
         {
             "ppid": "did:lemma:ppid_...",
             "credential_id": "ishuman_...",
-            "reason": "Confirmed bot — scripted form submissions",
+            "reason": "Confirmed bot, scripted form submissions",
             "evidence_url": "https://..."
         }
     """
@@ -2073,7 +2073,7 @@ def network_revoke():
 
 
 # ---------------------------------------------------------------------------
-# 5. Check — is a PPID blocked on a site?
+# 5. Check: is a PPID blocked on a site?
 # ---------------------------------------------------------------------------
 
 @ishuman_bp.route("/api/ishuman/check", methods=["GET"])
@@ -2158,7 +2158,7 @@ def check_ppid():
 
 
 # ---------------------------------------------------------------------------
-# 6. Site block list — sites can fetch their full block list
+# 6. Site block list: sites can fetch their full block list
 # ---------------------------------------------------------------------------
 
 @ishuman_bp.route("/api/ishuman/site-blocks", methods=["GET"])
@@ -2608,7 +2608,7 @@ def reissue_master_credential():
     """Reissue a fresh master credential for an already-verified wallet.
 
     Auth: a wallet_assertion proving possession of the wallet's signing key.
-    No fresh IDV required — the wallet was already verified, we just hand back
+    No fresh IDV required, the wallet was already verified, we just hand back
     a freshly signed master. The previously issued master id is revoked so a
     leaked local copy cannot be replayed.
 
@@ -2790,8 +2790,8 @@ def wallet_sync_device():
 
     The server never holds plaintext person-root seeds, so it cannot reseal
     envelopes itself. Instead this is a short-lived (60s), one-time *relay*
-    keyed by a random ``transfer_id`` that the NEW device proposes — together
-    with a transient X25519 public key — in its QR code:
+    keyed by a random ``transfer_id`` that the NEW device proposes, together
+    with a transient X25519 public key, in its QR code:
 
       * ``deposit`` (old device): scans the new device's QR, opens its own
         Phase 1.1 seed envelopes, reseals them to ``new_device_enc_pubkey``,
@@ -2864,7 +2864,7 @@ def wallet_sync_device():
 
 
 # ---------------------------------------------------------------------------
-# 8a-i. Pull-based device link — receiver shows QR, phone scans & sends
+# 8a-i. Pull-based device link: receiver shows QR, phone scans & sends
 # ---------------------------------------------------------------------------
 
 _LINK_RECEIVE_TTL_SECONDS = 300
@@ -2884,11 +2884,11 @@ def wallet_link_receive():
       Sender deposits a sealed person-root bundle; receiver claims once.
 
     Push (manager creates QR / transfer link):
-      ``offer`` — unlocked wallet creates a transfer slot + confirm code
+      ``offer``, unlocked wallet creates a transfer slot + confirm code
         (QR/link carry only ``transfer_id``, never secrets).
-      ``register`` — empty device binds its ephemeral pubkey (first writer wins).
-      ``status`` — sender polls until register, then confirms codes match.
-      ``deposit`` / ``claim`` — same sealed-bundle handoff as pull.
+      ``register``, empty device binds its ephemeral pubkey (first writer wins).
+      ``status``, sender polls until register, then confirms codes match.
+      ``deposit`` / ``claim``, same sealed-bundle handoff as pull.
 
     Body (deposit): ``{ action, wallet_id, transfer_id, recv_pubkey, bundle,
     wallet_assertion }``
@@ -3485,7 +3485,7 @@ def _verify_session_assertion_server(
 @ishuman_bp.route("/api/ishuman/verify-presentation", methods=["POST"])
 @cross_origin()
 def verify_presentation():
-    """OPTIONAL convenience endpoint — re-verify a presentation bundle server-side.
+    """OPTIONAL convenience endpoint, re-verify a presentation bundle server-side.
 
     Relying sites do **not** need to call this endpoint. The recommended path is
     purely local verification on the relying site's own backend using the

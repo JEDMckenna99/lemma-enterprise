@@ -1,5 +1,5 @@
 """
-Trusted Issuer Registry — Local-First
+Trusted Issuer Registry, Local-First
 
 Maintains the set of trusted issuer DIDs loaded from static configuration
 (environment variables or JSON file). No database dependency.
@@ -9,10 +9,10 @@ Without this check, anyone can create a keypair and sign credentials
 that would cryptographically verify but are NOT authorized by the network.
 
 Configuration sources (merged, all optional):
-  1. LEGACY_PLATFORM_ISSUER_DIDS — hardcoded historical platform issuers
-  2. TRUSTED_ISSUER_DIDS env var — comma-separated DID strings
-  3. TRUSTED_ISSUERS_FILE env var — path to a JSON file (list of DID strings)
-  4. Runtime issuer manager (if available) — picks up the current platform signing key
+  1. LEGACY_PLATFORM_ISSUER_DIDS, hardcoded historical platform issuers
+  2. TRUSTED_ISSUER_DIDS env var, comma-separated DID strings
+  3. TRUSTED_ISSUERS_FILE env var, path to a JSON file (list of DID strings)
+  4. Runtime issuer manager (if available), picks up the current platform signing key
 """
 
 from __future__ import annotations
@@ -170,10 +170,10 @@ def verify_credential_with_trust(credential: dict) -> dict:
     Local-first credential verification.
 
     Checks (in order):
-      1. Issuer trust — pinned config set
-      2. Expiration — claim timestamp
-      3. Revocation — in-process Bloom filter only (no DB)
-      4. Ed25519 signature — via lemma_crypto
+      1. Issuer trust, pinned config set
+      2. Expiration, claim timestamp
+      3. Revocation, in-process Bloom filter only (no DB)
+      4. Ed25519 signature, via lemma_crypto
 
     Returns a dict with 'valid' bool and diagnostic fields.
     """

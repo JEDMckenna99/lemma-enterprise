@@ -143,7 +143,7 @@ def test_ishuman_verifier_uses_sha256_revocation_membership():
 
 
 def test_ishuman_verifier_popup_carries_site_id():
-    # Phase 2.1: no bridge iframe — the popup carries the site id so the IDV
+    # Phase 2.1: no bridge iframe: the popup carries the site id so the IDV
     # flow can derive and issue a per-site proof.
     sdk_path = os.path.join(
         os.path.dirname(os.path.dirname(os.path.abspath(__file__))),

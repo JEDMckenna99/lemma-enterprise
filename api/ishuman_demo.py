@@ -196,7 +196,7 @@ def lemma_demo_page():
 
 @ishuman_demo_bp.route("/demo/ishuman")
 def ishuman_demo_page_legacy_redirect():
-    """Legacy URL — isHuman is an assurance tier inside the lemma.id demo, not the demo itself."""
+    """Legacy URL, isHuman is an assurance tier inside the lemma.id demo, not the demo itself."""
     return redirect("/demo", code=301)
 
 
@@ -1363,7 +1363,7 @@ def ishuman_demo_qr_demo_idv_flow():
 
 @ishuman_demo_bp.route("/api/demo/ishuman/probe-derive", methods=["POST"])
 def ishuman_demo_probe_derive():
-    """Server-side derive probe — proves enforcement is not UI-only."""
+    """Server-side derive probe, proves enforcement is not UI-only."""
     from api.database import IsHumanVerification, SessionLocal
     from api.ishuman import _deny_if_derivation_revoked, _require_wallet_assertion
 
@@ -1506,7 +1506,7 @@ def ishuman_demo_self_reset():
       fresh IDV ($1-3 + a real document) plus the audit trail every fresh
       verification leaves under the same person_root. Allowing a wallet owner
       to clear their own amnesty-eligible revocations is therefore safe in
-      production — they still have to complete a real IDV (or pay the IDV
+      production, they still have to complete a real IDV (or pay the IDV
       cost) on the next issuance, and the network sees each attempt.
 
     What still requires governance:

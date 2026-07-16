@@ -1,4 +1,4 @@
-"""Phase 1.3 — /api/ishuman/reissue-master.
+"""Phase 1.3, /api/ishuman/reissue-master.
 
 A verified wallet can re-fetch a freshly signed master credential without a new
 IDV. The old master id is revoked (lands in the Bloom snapshot source), the new

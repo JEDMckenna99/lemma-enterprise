@@ -23,7 +23,7 @@ def check_site_billing_allows_issuance(db, target_site: str) -> Optional[str]:
     """
     Return an error code when new credential issuance must be blocked, else None.
 
-    Unregistered hostnames (no sites row) are allowed — demo and first integration.
+    Unregistered hostnames (no sites row) are allowed, demo and first integration.
     Registered relying sites require an active metered subscription when enforcement
     is enabled. Managed isHuman demo sites are always exempt so public demos keep working.
     """

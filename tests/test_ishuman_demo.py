@@ -94,7 +94,7 @@ def test_ishuman_demo_page_loads_expected_assets(ishuman_demo_client):
     assert "ih-link-trials-inline" in body
     assert "Quick demo" not in body
     assert "Integrator demo" not in body
-    assert "Step 5 — Revoke on one site" not in body
+    assert "Step 5, Revoke on one site" not in body
     assert "verifyForBackend" in body
     assert "demo-workflow" in body
     assert "Operations Check" in body

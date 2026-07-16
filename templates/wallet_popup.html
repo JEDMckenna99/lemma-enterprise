@@ -366,7 +366,7 @@
                 };
                 window.opener.postMessage(sameOriginPayload, window.location.origin);
 
-                // Cross-origin completion signal only — no secret, no credentials.
+                // Cross-origin completion signal only, no secret, no credentials.
                 window.opener.postMessage({ type: 'LEMMA_UNLOCK_SUCCESS' }, '*');
             }
             window.close();

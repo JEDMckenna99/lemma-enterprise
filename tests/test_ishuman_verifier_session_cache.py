@@ -89,7 +89,7 @@ def test_verifier_cached_bloom_for_fast_cache_hits_and_no_bridge(verifier_source
 
     The Bloom snapshot must be hydrated from localStorage during _init() so a
     cached verify() can complete without waiting for /api/revocation/bloom-filter.
-    Phase 2.1: the bridge iframe path is gone entirely — a cache miss returns
+    Phase 2.1: the bridge iframe path is gone entirely, a cache miss returns
     'site_proof_required' so verify() routes to the popup.
     """
     assert "_hydrateBloomFromCache" in verifier_source

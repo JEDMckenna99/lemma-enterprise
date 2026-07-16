@@ -46,7 +46,7 @@ async function runSendFlow() {
                 await new Promise(r => setTimeout(r, 100));
             }
         }
-        if (!window.LemmaWallet) throw new Error('Wallet failed to load — open lemma.id and try again');
+        if (!window.LemmaWallet) throw new Error('Wallet failed to load, open lemma.id and try again');
 
         const wallet = new LemmaWallet();
         await wallet.init();
@@ -61,7 +61,7 @@ async function runSendFlow() {
         if (window.location.hash && window.location.hash.length > 1) {
             scanInput = window.location.hash.substring(1);
         } else {
-            throw new Error('Missing transfer data — scan the QR shown on the device you are adding');
+            throw new Error('Missing transfer data, scan the QR shown on the device you are adding');
         }
 
         show('Confirm with your passkey to send your lemma.id...', 'info');

@@ -1,4 +1,4 @@
-"""Device-link transfer security — person-root bundles and relay validation."""
+"""Device-link transfer security, person-root bundles and relay validation."""
 
 from __future__ import annotations
 

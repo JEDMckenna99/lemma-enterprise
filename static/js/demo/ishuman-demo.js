@@ -144,9 +144,9 @@
         const result = state.results[slug];
         if (!result || !result.reason) return null;
         const site = SITE_IDS[slug] || slug;
-        const assurance = result.assurance || '—';
-        const reason = result.reason || '—';
-        const ms = Number.isFinite(result.timeMs) ? `${result.timeMs.toFixed(1)}ms` : '—';
+        const assurance = result.assurance || 'Not available';
+        const reason = result.reason || 'Not available';
+        const ms = Number.isFinite(result.timeMs) ? `${result.timeMs.toFixed(1)}ms` : 'Not available';
         return `<div class="demo-proof-receipt-row"><span class="demo-proof-receipt-site">${site}</span><span class="demo-proof-receipt-assurance">${assurance}</span><span class="demo-proof-receipt-reason">${reason}</span><span class="demo-proof-receipt-ms">${ms}</span></div>`;
       })
       .filter(Boolean);
@@ -234,7 +234,7 @@
       await verifySite('tickets');
 
       updateQuickProgress(2);
-      setQuickInsight('Verify', 'Same lemma.id — minting a different private ID on trials…');
+      setQuickInsight('Verify', 'Same lemma.id, minting a different private ID on trials…');
       await verifySite('trials');
 
       updateQuickProgress(3);
@@ -477,7 +477,7 @@
     btn.hidden = ready;
 
     if (ready) {
-      setQuickInsight('Create', 'lemma.id ready — verify on the two demo sites below.');
+      setQuickInsight('Create', 'lemma.id ready, verify on the two demo sites below.');
       updateQuickProgress(1);
       return;
     }
@@ -512,7 +512,7 @@
   function isSiteBlocked(slug, result = null) {
     // localBlocks (hydrated from demo status / block actions) is the source of
     // truth for the Block|Unblock control. Do not treat a stale verify reason
-    // alone as blocked — that leaves the toggle stuck after a successful unblock
+    // alone as blocked, that leaves the toggle stuck after a successful unblock
     // when the last result still says site_blocked.
     const ppid = result?.ppid || resolveSitePpid(slug);
     if (ppid && state.localBlocks[slug]?.has(ppid)) return true;
@@ -535,7 +535,7 @@
   }
 
   function updateStepLocks() {
-    // No step is ever locked — every act stays explorable. We only pause
+    // No step is ever locked, every act stays explorable. We only pause
     // action buttons while the guided wizard is mid-run to avoid re-entrancy.
     const stepIds = ['ih-step-1', 'ih-step-2', 'ih-step-3'];
     for (const id of stepIds) {
@@ -576,7 +576,7 @@
     document.querySelectorAll('.assurance-only').forEach((el) => {
       el.hidden = !on;
     });
-    // Copy lives in the template — no runtime rewrites of titles/descriptions.
+    // Copy lives in the template, no runtime rewrites of titles/descriptions.
     const urls = (state.config && state.config.customer_site_urls) || {};
     const ticketsLink = $('ih-link-tickets-site');
     const trialsLinkEl = $('ih-link-trials-site');
@@ -673,7 +673,7 @@
   }
 
   function maskPpid(slug, ppid) {
-    if (!ppid) return PPID_PLACEHOLDER[slug] || '—';
+    if (!ppid) return PPID_PLACEHOLDER[slug] || 'Not available';
     const text = String(ppid);
     if (text.length <= 16) return text;
     return `${text.slice(0, 10)}••••${text.slice(-4)}`;
@@ -697,12 +697,12 @@
   function formatSiteStatus(result) {
     if (!result) return 'Pending';
     if (isSiteVerified(result)) {
-      if (result.assurance === 'passkey') return 'Verified — passkey';
-      if (result.assurance === 'ishuman') return 'Verified human — ishuman';
+      if (result.assurance === 'passkey') return 'Verified, passkey';
+      if (result.assurance === 'ishuman') return 'Verified human, ishuman';
       return result.assurance ? `Verified (${result.assurance})` : 'Verified';
     }
     if (result.reason === 'site_blocked' || result.reason === 'revoked') return 'Blocked';
-    if (result.reason === 'doubt_required') return 'Doubt — fresh proof required';
+    if (result.reason === 'doubt_required') return 'Doubt, fresh proof required';
     if (result.reason === 'assurance_insufficient' || result.reason === 'not_ishuman') {
       return 'Insufficient assurance';
     }
@@ -716,13 +716,13 @@
     const expiresAt = parseInt(credential.expiresAt || claims.expiresAt || '0', 10);
     return [
       ['Hostname binding', SITE_IDS[slug] || slug],
-      ['PPID', result?.ppid || '—'],
-      ['Assurance', result?.assurance || claims.assurance || '—'],
-      ['SDK reason', result?.reason || '—'],
+      ['PPID', result?.ppid || 'Not available'],
+      ['Assurance', result?.assurance || claims.assurance || 'Not available'],
+      ['SDK reason', result?.reason || 'Not available'],
       ['Signature check', presentation.credential ? 'verified locally' : 'no presentation'],
       ['Revocation check', result?.reason === 'site_blocked' ? 'blocked' : 'passed locally'],
-      ['Verify latency', Number.isFinite(result?.timeMs) ? `${result.timeMs.toFixed(1)}ms` : '—'],
-      ['Credential expiry', expiresAt ? new Date(expiresAt * 1000).toLocaleString() : '—'],
+      ['Verify latency', Number.isFinite(result?.timeMs) ? `${result.timeMs.toFixed(1)}ms` : 'Not available'],
+      ['Credential expiry', expiresAt ? new Date(expiresAt * 1000).toLocaleString() : 'Not available'],
       ['Backend decision', isSiteVerified(result) ? 'accept' : 'deny'],
     ];
   }
@@ -777,8 +777,8 @@
     setText('ih-lifecycle-tickets-ppid', maskPpid('tickets', tickets?.ppid));
     setText('ih-lifecycle-trials-ppid', maskPpid('trials', trials?.ppid));
     setText('ih-lifecycle-tickets-policy', ticketsPolicy);
-    setText('ih-lifecycle-tickets-verdict', tickets ? formatSiteStatus(tickets) : '—');
-    setText('ih-lifecycle-trials-verdict', trials ? formatSiteStatus(trials) : '—');
+    setText('ih-lifecycle-tickets-verdict', tickets ? formatSiteStatus(tickets) : 'Not available');
+    setText('ih-lifecycle-trials-verdict', trials ? formatSiteStatus(trials) : 'Not available');
     setText('ih-lifecycle-enforcement', enforcement);
     const doubtStatus = $('ih-doubt-status');
     if (doubtStatus && !doubtStatus.closest('.enforce-footnote')) {
@@ -1056,7 +1056,7 @@
     const parts = [];
     if (state.lastVerifyMs.tickets != null) parts.push(`tickets ${state.lastVerifyMs.tickets.toFixed(0)}ms`);
     if (state.lastVerifyMs.trials != null) parts.push(`trials ${state.lastVerifyMs.trials.toFixed(0)}ms`);
-    el.textContent = parts.length ? `Last verify: ${parts.join(' · ')}` : 'Last verify: —';
+    el.textContent = parts.length ? `Last verify: ${parts.join(' · ')}` : 'Last verify: , ';
   }
 
   function updatePpidCompare() {
@@ -1066,8 +1066,8 @@
     const r = rResult?.ppid ? maskPpid('trials', rResult.ppid) : null;
     const tCmp = $('ih-tickets-ppid-compare');
     const rCmp = $('ih-trials-ppid-compare');
-    if (tCmp) tCmp.textContent = t || '—';
-    if (rCmp) rCmp.textContent = r || '—';
+    if (tCmp) tCmp.textContent = t || 'Not available';
+    if (rCmp) rCmp.textContent = r || 'Not available';
     const diff = $('ih-ppid-diff');
     if (!diff || !t || !r) {
       if (diff) diff.textContent = 'Verify both sites';
@@ -1124,7 +1124,7 @@
       if (!ticketsPpid && !trialsPpid) {
         doubtStatus.textContent = 'Verify both sites above, then enforce on a row.';
       } else if (state.localDoubts.tickets?.size || state.localDoubts.trials?.size) {
-        doubtStatus.textContent = 'Active doubt — resolve with the tier you challenged for.';
+        doubtStatus.textContent = 'Active doubt, resolve with the tier you challenged for.';
       } else if (isSiteBlocked('tickets', state.results.tickets) && isSiteVerified(state.results.trials)) {
         doubtStatus.textContent = 'Presale banned; SaaS trial still verified.';
       } else {
@@ -1158,8 +1158,8 @@
     ticketsCell.className = ticketsFmt.className;
     trialsCell.textContent = trialsFmt.text;
     trialsCell.className = trialsFmt.className;
-    if (ticketsReasonCell) ticketsReasonCell.textContent = tickets?.reason || '—';
-    if (trialsReasonCell) trialsReasonCell.textContent = trials?.reason || '—';
+    if (ticketsReasonCell) ticketsReasonCell.textContent = tickets?.reason || 'Not available';
+    if (trialsReasonCell) trialsReasonCell.textContent = trials?.reason || 'Not available';
     syncBlockSegToggle();
     if (outcomeBanner && outcomeText) {
       const ticketsBlocked = isSiteBlocked('tickets', tickets);
@@ -1361,7 +1361,7 @@
   }
 
   // Open the Lemma IDV popup ON lemma.id (treating lemma.id as the requesting
-  // site) to create the master human proof — the user's "lemma.id" — in the
+  // site) to create the master human proof, the user's "lemma.id", in the
   // lemma.id wallet via the identity check flow. This is the exact same popup
   // customer sites use; here the demo page itself is the opener, which is why
   // the popup must work for an origin of lemma.id. The per-site PPIDs (tickets,
@@ -1472,7 +1472,7 @@
         renderWalletSlots();
         updateStepLocks();
         scrollToPanel('ih-step-2');
-        setQuickInsight('Verify', 'lemma.id ready — verify on the two demo sites below.');
+        setQuickInsight('Verify', 'lemma.id ready, verify on the two demo sites below.');
       }
     };
     const onMessage = (event) => {
@@ -1500,7 +1500,7 @@
     setDemoMode('live');
     if (assuranceDemoMode()) {
       setPill('ih-lemma-status', 'POPUP', 'warn');
-      log('Opening lemma.id popup', 'passkey setup — same mechanism as demo sites');
+      log('Opening lemma.id popup', 'passkey setup, same mechanism as demo sites');
       openIdvPopup({ issueMode: 'passkey_setup' });
       return;
     }
@@ -1586,7 +1586,7 @@
     const confirmed = window.confirm(
       'Clear your lemma.id?\n\n'
       + 'This wipes your passkey wallet and lemma.id caches in this browser. '
-      + 'Demo site tabs (ticketing/trials) keep their own cache — close those tabs '
+      + 'Demo site tabs (ticketing/trials) keep their own cache, close those tabs '
       + 'or hard-refresh them before re-running the demo.',
     );
     if (!confirmed) return;
@@ -1677,7 +1677,7 @@
     if (wid) wid.textContent = '-';
     renderStep1Action();
     setPill('ih-lemma-status', 'CLEARED', 'warn');
-    setPill('ih-person-status', '—', '');
+    setPill('ih-person-status', 'Not available', '');
     setDemoMode('live');
     setWorkflowHighlight(1);
     for (const slug of SITE_SLUGS) {
@@ -1685,7 +1685,7 @@
       const ppidEl = $(`ih-${slug}-ppid`);
       if (ppidEl) ppidEl.textContent = PPID_PLACEHOLDER[slug];
       const assuranceEl = $(`ih-${slug}-assurance`);
-      if (assuranceEl) assuranceEl.textContent = '—';
+      if (assuranceEl) assuranceEl.textContent = 'Not available';
       const card = $(`ih-${slug}-card`);
       if (card) card.classList.remove('is-human', 'is-deny', 'is-pending');
     }
@@ -1884,7 +1884,7 @@
     await verifySite('tickets');
     await verifySite('trials');
     if (bothSitesVerified()) {
-      setQuickInsight('Verify', 'Same lemma.id — different private IDs on each site.');
+      setQuickInsight('Verify', 'Same lemma.id, different private IDs on each site.');
       setWorkflowHighlight(2);
       scrollToPanel('ih-step-2');
     }
@@ -1911,11 +1911,11 @@
     const ppidEl = $(`ih-${slug}-ppid`);
     if (ppidEl) ppidEl.textContent = maskPpid(slug, result.ppid);
     const assuranceEl = $(`ih-${slug}-assurance`);
-    if (assuranceEl) assuranceEl.textContent = result.assurance || '—';
+    if (assuranceEl) assuranceEl.textContent = result.assurance || 'Not available';
     const reasonEl = $(`ih-${slug}-reason`);
-    if (reasonEl) reasonEl.textContent = result.reason || '—';
+    if (reasonEl) reasonEl.textContent = result.reason || 'Not available';
     const latEl = $(`ih-${slug}-latency`);
-    if (latEl) latEl.textContent = Number.isFinite(result.timeMs) ? `${result.timeMs.toFixed(1)}ms` : '—';
+    if (latEl) latEl.textContent = Number.isFinite(result.timeMs) ? `${result.timeMs.toFixed(1)}ms` : 'Not available';
     updatePpidCompare();
     updateStepLocks();
     updateBlockResultsTable();
@@ -1934,7 +1934,7 @@
       const withSite = await fetchCheck(ppid, 'site_demo_tickets');
       const deriveEl = $('ih-abuse-derive');
       if (deriveEl && withSite.blocked) {
-        deriveEl.textContent = `check(site_id): blocked — ${withSite.reason}`;
+        deriveEl.textContent = `check(site_id): blocked, ${withSite.reason}`;
         deriveEl.className = 'abuse-outcome deny';
       }
     } catch (err) {
@@ -2041,7 +2041,7 @@
     scrollToPanel('ih-step-3');
     setQuickInsight(
       'Enforce',
-      `${slug === 'tickets' ? 'Presale' : 'SaaS trial'} returned doubt_required — resolve with ${tier === 'ishuman' ? 'human proof' : 'presence'}.`,
+      `${slug === 'tickets' ? 'Presale' : 'SaaS trial'} returned doubt_required, resolve with ${tier === 'ishuman' ? 'human proof' : 'presence'}.`,
     );
     updateBlockResultsTable();
   }
@@ -2054,7 +2054,7 @@
     const result = state.results[slug] || await verifySite(slug);
     if (!result.ppid) throw new Error(`${slug} PPID unavailable`);
     if (result.reason !== 'doubt_required' && !state.localDoubts[slug].has(result.ppid)) {
-      throw new Error(`No active doubt on ${slug} — create one first`);
+      throw new Error(`No active doubt on ${slug}, create one first`);
     }
     const requiredAssurance = state.pendingDoubtResolve[slug] || demoRequiredAssurance(slug);
     const verifier = verifierFor(slug);
@@ -2129,7 +2129,7 @@
 
   async function reverifyTicketsIshuman() {
     const before = state.passkeyPpids.tickets || state.results.tickets?.ppid;
-    if (!before) throw new Error('No passkey ticketing PPID snapshot — verify on demo sites first');
+    if (!before) throw new Error('No passkey ticketing PPID snapshot, verify on demo sites first');
     const result = await verifySite('tickets', { requiredAssurance: 'ishuman' });
     updateStepUpCompare(before, result);
     await checkPolicyDenials();
@@ -2137,7 +2137,7 @@
       log('Step-up success', 'same PPID with human proof assurance');
       setWorkflowHighlight(3);
       scrollToPanel('ih-step-3');
-      setQuickInsight('Enforce', 'Same private ID, human proof assurance — ready for doubt or ban.');
+      setQuickInsight('Enforce', 'Same private ID, human proof assurance, ready for doubt or ban.');
       const humanBanner = $('ih-human-outcome-banner');
       if (humanBanner) humanBanner.hidden = false;
     } else {
@@ -2152,7 +2152,7 @@
       ...state.localBlocks[slug],
     ].filter(Boolean));
     if (!ppids.size) {
-      throw new Error(`${slug} PPID unavailable — verify on demo sites first`);
+      throw new Error(`${slug} PPID unavailable, verify on demo sites first`);
     }
 
     let unblockedAny = false;
@@ -2197,8 +2197,8 @@
       updateStepLocks();
     }
     setQuickInsight('Enforce', unblockedAny
-      ? `${slug === 'tickets' ? 'Presale' : 'SaaS trial'} unblocked — ban again anytime to retry.`
-      : `No active ban on ${slug} — both sites rechecked.`);
+      ? `${slug === 'tickets' ? 'Presale' : 'SaaS trial'} unblocked, ban again anytime to retry.`
+      : `No active ban on ${slug}, both sites rechecked.`);
   }
 
   async function unblockTickets() {
@@ -2541,7 +2541,7 @@
         scrollToPanel('ih-abuse-panel');
         await blockTickets();
 
-        setWizardStep(7, 'Demo complete — same ticketing PPID with human proof assurance, then site-scoped ban.');
+        setWizardStep(7, 'Demo complete, same ticketing PPID with human proof assurance, then site-scoped ban.');
         renderStep1Action();
         log('Assurance guided demo complete');
         return;
@@ -2557,7 +2557,7 @@
       scrollToPanel('ih-abuse-panel');
       await blockTickets();
 
-      setWizardStep(5, 'Pause — site block is scoped to ticketing only…');
+      setWizardStep(5, 'Pause, site block is scoped to ticketing only…');
       await sleep(2000);
       const trials = await verifySite('trials');
       const trialsOutcome = $('ih-abuse-scoped-outcome');
@@ -2574,7 +2574,7 @@
       setWizardStep(7, 'Rechecking both site-private decisions…');
       await verifyBothSites();
 
-      setWizardStep(0, 'Demo complete — ticketing denied; trials remains valid.');
+      setWizardStep(0, 'Demo complete, ticketing denied; trials remains valid.');
       renderStep1Action();
       log('Guided demo complete');
     } catch (err) {
@@ -2888,7 +2888,7 @@
     initOperationsUI();
     initHeroDiagramWires();
 
-    // Config failure must not leave the page dead — buttons are already bound.
+    // Config failure must not leave the page dead, buttons are already bound.
     await loadConfig().catch((err) => log('Demo config load failed', err.message));
 
     try {

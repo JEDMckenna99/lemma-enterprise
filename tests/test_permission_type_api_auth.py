@@ -1,4 +1,4 @@
-"""Tests for permission type API auth — forged credentials must fail."""
+"""Tests for permission type API auth, forged credentials must fail."""
 
 from __future__ import annotations
 

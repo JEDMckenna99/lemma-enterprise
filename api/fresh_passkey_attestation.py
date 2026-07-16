@@ -28,7 +28,7 @@ def build_action_commitment(
     path: str = "",
     body_hash: str = "",
 ) -> str:
-    """Opaque site-local action binding — lemma.id never receives action details."""
+    """Opaque site-local action binding, lemma.id never receives action details."""
     lines = [
         ACTION_COMMITMENT_PREFIX,
         str(server_nonce or "").strip(),

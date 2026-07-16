@@ -100,7 +100,7 @@ def reset(*, keep_ppids: set[str], apply: bool) -> int:
             print("Reset applied.")
         else:
             db.rollback()
-            print("Dry run only — no changes committed.")
+            print("Dry run only, no changes committed.")
     except Exception as exc:
         db.rollback()
         print(f"ERROR: reset failed: {exc}", file=sys.stderr)

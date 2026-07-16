@@ -3,7 +3,7 @@
 -- When a wallet re-proves with a new government document number, Lemma may
 -- merge the old LemmaPerson into the new one (wallet-bound, IDV-gated).
 -- Sites opt in to honoring signed ppid_migration.v1 objects delivered at
--- derive-site-proof time — never a global cross-site linkage API.
+-- derive-site-proof time, never a global cross-site linkage API.
 
 CREATE TABLE IF NOT EXISTS person_merges (
     id SERIAL PRIMARY KEY,

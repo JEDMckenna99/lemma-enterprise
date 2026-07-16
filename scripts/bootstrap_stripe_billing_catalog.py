@@ -7,7 +7,7 @@ Creates:
   - 3 Meters (initial issuance, MAU renewal, doubt re-entry)
   - 3 metered Prices
 
-Requires STRIPE_SECRET_KEY. Safe to re-run — skips resources that already exist
+Requires STRIPE_SECRET_KEY. Safe to re-run, skips resources that already exist
 when LEMMA_STRIPE_CATALOG_JSON env points at a prior run's output.
 
 Usage:

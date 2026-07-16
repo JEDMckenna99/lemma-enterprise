@@ -4,7 +4,7 @@
 > system. Third-party SDKs (Go, Rust) MUST produce these bytes exactly to
 > generate verifiable signatures. The test vectors below are pinned in
 > [tests/test_cryptographic_invariants.py](../../tests/test_cryptographic_invariants.py)
-> — a diff there is a protocol-breaking change.
+>, a diff there is a protocol-breaking change.
 
 All multi-byte hashes are SHA-256. All signatures are Ed25519. All JSON uses
 compact separators (`,` and `:`) with no insignificant whitespace.
@@ -103,10 +103,10 @@ compact separators (`,` and `:`) with no insignificant whitespace.
 
 ## 8. Bloom snapshot + trust list envelopes
 
-- **Bloom snapshot:** `api/bloom_snapshot.py::build_signature_message` — prefix
+- **Bloom snapshot:** `api/bloom_snapshot.py::build_signature_message`, prefix
   `lemma:bloom-snapshot:v1`, includes the monotonic `sequence_number`. SDK rejects
   sessions whose `bloom_sequence` does not match the current snapshot sequence.
-- **Trust list:** `api/issuer_trust_list.py` — signed multi-issuer list; clients pin
+- **Trust list:** `api/issuer_trust_list.py`, signed multi-issuer list; clients pin
   trusted issuer DIDs and refetch on rotation.
 
 ## 9. PPID convergence artifact (`ppid_convergence.v1`)
@@ -146,7 +146,7 @@ compact separators (`,` and `:`) with no insignificant whitespace.
 - **Action commitment (site-local, privacy-preserving):** SHA-256 hex digest of
   newline-joined (`\n`) lines prefixed by `lemma:action-commitment:v1` over
   `server_nonce`, `site_id`, `action`, `method`, `path`, `body_hash`. lemma.id
-  never receives the raw action name or body — only the commitment hash.
+  never receives the raw action name or body, only the commitment hash.
 - **Canonicalization:** newline-joined lines prefixed by
   `lemma:fresh-passkey-attestation:v1`; each value `.strip()`-ed (numbers
   stringified). SHA-256 digest is Ed25519-signed by the Lemma isHuman issuer key.

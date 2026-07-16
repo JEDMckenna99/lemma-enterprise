@@ -38,7 +38,7 @@ heroku config:set \
   -a lemma-enterprise
 ```
 
-`SITE_PPID` must come from prod provisioning — do not derive locally unless `LEMMA_PPID_ROOT_KEY` matches production.
+`SITE_PPID` must come from prod provisioning, do not derive locally unless `LEMMA_PPID_ROOT_KEY` matches production.
 
 ## Run revocation smoke
 

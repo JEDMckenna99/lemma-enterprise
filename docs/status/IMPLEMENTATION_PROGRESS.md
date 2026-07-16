@@ -214,7 +214,7 @@ function App() {
 | Task | Status | Notes |
 |------|--------|-------|
 | 6.1 Integration guide | ✅ Complete | `docs/integration/INTEGRATION_GUIDE.md` |
-| 6.2 Security audit checklist | 🔄 In progress | `docs/security/SECURITY_CHECKLIST.md` — doc refreshed 2026-06-08; 24/60 controls PASS, GA sign-off pending |
+| 6.2 Security audit checklist | 🔄 In progress | `docs/security/SECURITY_CHECKLIST.md`, doc refreshed 2026-06-08; 24/60 controls PASS, GA sign-off pending |
 | 6.3 Performance benchmarks | ✅ Complete | Included in integration guide |
 | 6.4 Example implementations | ✅ Complete | `sdk/examples/` directory |
 

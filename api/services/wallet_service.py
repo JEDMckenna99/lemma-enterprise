@@ -1758,8 +1758,8 @@ def issue_to_wallet():
     """Issue a permission lemma directly to the user's wallet.
     
     Accepts two authentication methods (in order of preference):
-    1. ppid — client-derived PPID (PREFERRED: wallet_secret stays in browser)
-    2. passkey_credential_id — server-side PPID derivation from passkey
+    1. ppid, client-derived PPID (PREFERRED: wallet_secret stays in browser)
+    2. passkey_credential_id, server-side PPID derivation from passkey
     
     Security: Rate limited (20/min per IP), requires registered site,
     cross-origin requests must match site domain.
@@ -1785,7 +1785,7 @@ def issue_to_wallet():
                 'message': error_msg
             }), 403
         
-        # Accept client-derived PPID directly (preferred — wallet_secret never leaves browser)
+        # Accept client-derived PPID directly (preferred: wallet_secret never leaves browser)
         client_ppid = data.get('ppid')
         passkey_credential_id = data.get('passkey_credential_id')
         

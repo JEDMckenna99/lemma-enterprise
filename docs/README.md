@@ -61,7 +61,7 @@ Agent Ops (lemma-cli, Lemma Firewall, runtime control plane) is operator-only an
 
 ## Draft / unimplemented
 
-Internal product proposals — **not shipped**. Do not link from integrator-facing docs.
+Internal product proposals, **not shipped**. Do not link from integrator-facing docs.
 
 | Document | Status |
 |----------|--------|

@@ -102,7 +102,7 @@ function safe(value) {
 }
 
 function dateFmt(value) {
-  if (!value) return "—";
+  if (!value) return "Not available";
   try { return new Date(value).toLocaleString(); } catch (_e) { return value; }
 }
 
@@ -128,7 +128,7 @@ async function loadKeys() {
     const site = siteMap[k.site_id] || {};
     return `<tr>
       <td><strong>${safe(k.name || "External Key")}</strong></td>
-      <td>${safe(site.site_domain || k.site_id || "—")}</td>
+      <td>${safe(site.site_domain || k.site_id || "Not available")}</td>
       <td><code>...${safe(k.key_hint || "")}</code></td>
       <td><span class="ek-badge ${badge}">${safe(status)}</span></td>
       <td>${safe(dateFmt(k.created_at))}</td>

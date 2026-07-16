@@ -53,7 +53,7 @@ def require_staging_env() -> tuple[str, str]:
 
 
 def require_platform_staging_env() -> str:
-    """Staging URL only — for wallet/platform/billing live smokes (no demo token)."""
+    """Staging URL only, for wallet/platform/billing live smokes (no demo token)."""
     require_env_vars(
         ("LEMMA_STAGING_BASE_URL",),
         strict=staging_tests_strict(),

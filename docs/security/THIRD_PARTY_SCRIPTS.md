@@ -18,7 +18,7 @@ Global pages use the `strict` profile (`'self'` + per-request nonce only).
 | Origin | Reason |
 |--------|--------|
 | `https://static.cloudflareinsights.com` | Not loaded in layout templates |
-| *(none removed)* | — |
+| *(none removed)* |, |
 
 ## Template map
 

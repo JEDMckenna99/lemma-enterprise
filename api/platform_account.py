@@ -1,4 +1,4 @@
-"""Unified lemma.id platform account — one identity row per person-root PPID."""
+"""Unified lemma.id platform account, one identity row per person-root PPID."""
 
 from __future__ import annotations
 

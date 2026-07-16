@@ -33,7 +33,7 @@
 
 ### 3.2 Compromised relying site (RP backend has every byte it receives)
 - Can see: the per-site VC + PPID for users at that site.
-- Cannot see: PPIDs at other sites — pairwise unlinkability via
+- Cannot see: PPIDs at other sites, pairwise unlinkability via
   `HMAC(person_root, "lemma.id/site-ppid/v1" + canonical_site)`
   (pinned in `test_ppid_derivation_is_deterministic_and_byte_pinned`).
 - Cannot forge VCs (issuer Ed25519 signature required, verified locally).
@@ -114,13 +114,13 @@ session-only claim path (deprecated, logged).
 | Behavior                                   | Fails ...  | Rationale                                                        |
 | ------------------------------------------ | ---------- | ---------------------------------------------------------------- |
 | Bloom/trust-list fetch unavailable         | closed     | Verifier requires a trusted Bloom + trust list before asserting human. |
-| Site-binding mismatch on issued credential | closed     | Per site-identity guardrails — never coerce mismatched bindings. |
+| Site-binding mismatch on issued credential | closed     | Per site-identity guardrails, never coerce mismatched bindings. |
 | Unverified wallet requests site proof      | closed     | `derive-site-proof` returns `wallet_not_verified` (Phase 1.2).   |
 | Stale `master_credential_id` hint          | open (graceful) | Falls back to the wallet's latest verified record (Phase 1.2). |
 | Redis rate-limiter unavailable             | open (memory fallback) | In-process fixed-window limiting; `fail_open` only if configured. |
 | Reissue beyond per-day cap                 | closed     | `reissue_rate_limited` 429 (Phase 1.3).                          |
 | Mobile IDV handoff claim without `mk` proof | closed     | `handoff_id_session_id_mk_required` 400 / `handoff_mk_mismatch` 403. |
-| Mobile IDV handoff claim with wrong session | closed     | `handoff_session_invalid` 403 — blob not consumed.               |
+| Mobile IDV handoff claim with wrong session | closed     | `handoff_session_invalid` 403, blob not consumed.               |
 
 ## 5. Things this design does NOT protect against
 

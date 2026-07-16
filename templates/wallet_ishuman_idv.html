@@ -267,7 +267,7 @@
 
         function siteProofUsesContinuityOnly() {
             // action_sign (Step 2 fresh-passkey stamp) needs the same passkey-only
-            // unlock path as site_proof continuity — not full master IDV issuance.
+            // unlock path as site_proof continuity, not full master IDV issuance.
             if (isActionSign) {
                 return (isSiteProofIssue || isActionSign) && !isFreshIdv;
             }
@@ -955,7 +955,7 @@
                         window.opener.postMessage({ type, detail: detail || {} }, target);
                     }
                 } else {
-                    // No secrets in this message type — deliver detail to the opener.
+                    // No secrets in this message type, deliver detail to the opener.
                     window.opener.postMessage({ type, detail: detail || {} }, target);
                 }
             }
@@ -1676,7 +1676,7 @@
          * we have handoff params and no local master proof yet.
          *
          * Desktop popups that already unlocked the originating wallet must NOT
-         * claim the one-time relay — Didit also redirects the PC popup, and
+         * claim the one-time relay, Didit also redirects the PC popup, and
          * consuming the handoff there leaves the phone with handoff_not_found.
          */
         async function needsMobileHandoffClaim() {
@@ -1975,7 +1975,7 @@
             btn.classList.remove('hidden');
             setStatus(
                 requireFreshPasskey
-                    ? 'Tap confirm — Face ID / Touch ID / Windows Hello unlocks this action.'
+                    ? 'Tap confirm, Face ID / Touch ID / Windows Hello unlocks this action.'
                     : 'Tap to sign this action.',
                 'info',
             );
@@ -1987,7 +1987,7 @@
             await ensureWalletUnlocked();
 
             // 1. If we returned from a previous IDV attempt, try
-            //    to use that session first — but if it failed/expired, fall
+            //    to use that session first, but if it failed/expired, fall
             //    through to a fresh verification path instead of throwing.
             let masterIssued = false;
             if (isVerificationReturn && sessionId) {
@@ -2005,7 +2005,7 @@
                 }
             }
 
-            // 2. No usable existing session — start a brand-new IDV.
+            // 2. No usable existing session, start a brand-new IDV.
             if (!masterIssued) {
                 if (testVerifyEnabled && serverTestToken) {
                     setStatus('Completing demo verification…', 'loading');
@@ -2176,7 +2176,7 @@
             // A cross-origin IDV round-trip (e.g. Didit) can sever window.opener
             // when the provider redirects the popup back here. In that case we must
             // still finish the in-flight flow (store the master, derive/issue the
-            // site proof) and self-close — the opener is only needed for the live
+            // site proof) and self-close, the opener is only needed for the live
             // postMessage hand-off, which notifyOpener() already no-ops without.
             // So only block a truly context-free direct open: no opener AND no flow.
             const isSameOriginMasterFlow = PLATFORM_SITE_IDS.has(requestingSite)
