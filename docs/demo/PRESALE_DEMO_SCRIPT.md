@@ -4,6 +4,8 @@
 
 **Duration:** ~3 minutes
 
+**Hub context:** This is **Enforce in the wild** — action-level presence stamps on a relying site. The hub demo covers Create · Verify · Enforce at the identity layer; presale shows stamps at claim time.
+
 ## One-liner
 
 Phone is for delivery; passkey is who you are; Face ID again to get the code.
@@ -30,7 +32,7 @@ Phone is for delivery; passkey is who you are; Face ID again to get the code.
 ### 4. Risk flag + IDV
 
 - Click **Simulate site risk flag**, then claim again.
-- Say: site doubt escalates to fresh IDV (`verifyFreshForBackend`) before code issuance at `ishuman` assurance.
+- Say: site doubt requires fresh IDV (`verifyFreshForBackend`) before code issuance when policy requires `ishuman` assurance.
 
 ### 5. Attack lab (optional)
 

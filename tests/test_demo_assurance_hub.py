@@ -25,10 +25,12 @@ def test_demo_hub_js_gates_assurance_workflow():
     assert "verifyFreshForBackend" in js
 
 
-def test_demo_hub_template_has_five_stage_lifecycle():
+def test_demo_hub_template_has_three_concept_lifecycle():
     html = (ROOT / "templates" / "demo" / "lemma.html").read_text(encoding="utf-8")
-    for step in range(1, 6):
+    for step in range(1, 4):
         assert f'id="ih-step-{step}"' in html
+    assert 'id="ih-step-4"' not in html
+    assert 'id="ih-step-5"' not in html
     assert 'id="ih-lifecycle-panel"' in html
     assert 'id="ih-quick-progress"' in html
     assert 'id="ih-presentation-inspector"' in html
@@ -41,9 +43,9 @@ def test_demo_hub_template_has_five_stage_lifecycle():
     assert "ih-stepup-compare" in html
     assert "ih-simulate-rotation-btn" not in html
     assert "assurance-only" in html
-    assert 'data-quick-act="5"' in html
-    assert "Doubt and site revocation" in html
-    assert "Signed presentations" in html or "presentation" in html
+    assert 'data-quick-act="3"' in html
+    assert "Enforce site decisions" in html
+    assert "Developer view: signed presentations" in html
 
 
 def test_demo_hub_css_supports_lifecycle_and_inspector():
