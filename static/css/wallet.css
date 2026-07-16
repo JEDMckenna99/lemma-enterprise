@@ -29,6 +29,11 @@
     width: 96px;
     height: 96px;
     margin: 0 auto 20px;
+    color: var(--wallet-brand);
+    transition: color 0.2s ease;
+}
+.wallet-logo.is-unlocked {
+    color: var(--success, #1F7A4C);
 }
 .wallet-logo img,
 .wallet-logo svg {

@@ -42,7 +42,13 @@ def test_brand_and_manager_creation_use_canonical_routes():
         encoding="utf-8"
     )
 
-    assert '<a href="/" class="nav-logo">' in layout
+    assert 'class="nav-logo"' in layout
+    assert 'href="/"' in layout and 'nav-logo' in layout
+    assert 'id="nav-logo"' in layout
+    assert 'stroke="currentColor"' in layout
+    assert 'id="wallet-logo"' in manager
+    assert 'stroke="currentColor"' in manager
+    assert 'wallet-logo.is-unlocked' in (ROOT / "static" / "css" / "wallet.css").read_text(encoding="utf-8")
     assert '<a href="/home" class="nav-link" id="nav-product">' in layout
     assert "new URL('/wallet/ishuman-idv', window.location.origin)" in manager
     assert "popupUrl.searchParams.set('site_id', 'lemma.id')" in manager

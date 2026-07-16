@@ -1,5 +1,16 @@
 <script nonce="{{ csp_nonce }}">
     // Wallet auto-init: only included on routes that need globalLemmaWallet at page load.
+    if (typeof window.setNavLogoUnlocked !== 'function') {
+        window.setNavLogoUnlocked = function setNavLogoUnlocked(unlocked) {
+            const logo = document.getElementById('nav-logo') || document.querySelector('.nav-logo');
+            if (!logo) return;
+            const on = !!unlocked;
+            logo.classList.toggle('is-unlocked', on);
+            logo.setAttribute('data-unlocked', on ? 'true' : 'false');
+            logo.title = on ? 'lemma.id unlocked' : 'lemma.id';
+        };
+    }
+
     async function initSessionFreeNav() {
         if (typeof LemmaWallet === 'undefined') {
             setTimeout(initSessionFreeNav, 50);

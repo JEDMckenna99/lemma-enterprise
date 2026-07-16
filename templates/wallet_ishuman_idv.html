@@ -31,8 +31,14 @@
             display: flex;
             justify-content: center;
             margin-bottom: 12px;
+            color: #4E3D8F;
+            transition: color 0.2s ease;
         }
-        .brand-mark img {
+        .brand-mark.is-unlocked {
+            color: #1F7A4C;
+        }
+        .brand-mark img,
+        .brand-mark svg {
             width: 100px;
             height: 100px;
             display: block;
@@ -141,8 +147,15 @@
          data-qr-demo-enabled="{{ 'true' if qr_demo_idv_enabled|default(false) else 'false' }}"
          data-passkey-assurance-enabled="{{ 'true' if passkey_assurance_enabled|default(false) else 'false' }}"
          data-server-test-token="{{ demo_test_token }}">
-        <div class="brand-mark">
-            <img src="/static/img/lemma_logo.svg" alt="Lemma.id" width="100" height="100">
+        <div class="brand-mark" id="brand-mark" aria-hidden="true">
+            <svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 120 120" focusable="false">
+                <g stroke="currentColor" stroke-width="6" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                    <ellipse cx="60" cy="60" rx="38" ry="14"/>
+                    <ellipse cx="60" cy="60" rx="38" ry="14" transform="rotate(90 60 60)"/>
+                    <ellipse cx="60" cy="60" rx="38" ry="14" transform="rotate(45 60 60)"/>
+                    <ellipse cx="60" cy="60" rx="38" ry="14" transform="rotate(-45 60 60)"/>
+                </g>
+            </svg>
         </div>
         <div class="demo-tag-wrap hidden" id="demo-tag-wrap">
             <span class="demo-tag" id="demo-tag">Demo</span>
@@ -452,10 +465,26 @@
             applyConsumerShell({ eyebrow: 'Human proof setup' });
         }
 
+        function setBrandLogoUnlocked(unlocked) {
+            const mark = document.getElementById('brand-mark');
+            if (mark) mark.classList.toggle('is-unlocked', !!unlocked);
+        }
+
         function setStatus(message, tone) {
             const el = document.getElementById('status');
             el.textContent = message;
             el.className = 'status ' + (tone || 'info');
+            if (tone === 'success') {
+                setBrandLogoUnlocked(true);
+            } else if (tone === 'error' || tone === 'loading') {
+                // Keep green if wallet already unlocked; otherwise stay brand violet.
+                try {
+                    const unlocked = !!(wallet && wallet.isUnlocked && wallet.isUnlocked());
+                    setBrandLogoUnlocked(unlocked);
+                } catch (_) {
+                    setBrandLogoUnlocked(false);
+                }
+            }
         }
 
         function renderPopupPreview() {

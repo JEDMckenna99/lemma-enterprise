@@ -43,6 +43,11 @@
             width: 80px;
             height: 80px;
             margin: 0 auto 24px;
+            color: #4E3D8F;
+            transition: color 0.2s ease;
+        }
+        .logo.is-unlocked {
+            color: #1F7A4C;
         }
         .logo img,
         .logo svg {
@@ -117,8 +122,15 @@
 </head>
 <body>
     <div class="card">
-        <div class="logo">
-            <img src="/static/img/lemma_logo.svg" alt="lemma.id" width="80" height="80">
+        <div class="logo" id="popup-logo" aria-hidden="true">
+            <svg xmlns="http://www.w3.org/2000/svg" width="80" height="80" viewBox="0 0 120 120" focusable="false">
+                <g stroke="currentColor" stroke-width="6" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                    <ellipse cx="60" cy="60" rx="38" ry="14"/>
+                    <ellipse cx="60" cy="60" rx="38" ry="14" transform="rotate(90 60 60)"/>
+                    <ellipse cx="60" cy="60" rx="38" ry="14" transform="rotate(45 60 60)"/>
+                    <ellipse cx="60" cy="60" rx="38" ry="14" transform="rotate(-45 60 60)"/>
+                </g>
+            </svg>
         </div>
         <h1>Unlock Your Wallet</h1>
         
@@ -259,6 +271,10 @@
             const el = document.getElementById('status');
             el.textContent = message;
             el.className = 'status ' + type;
+            const logo = document.getElementById('popup-logo');
+            if (logo) {
+                logo.classList.toggle('is-unlocked', type === 'success');
+            }
         }
         
         async function unlockWallet() {

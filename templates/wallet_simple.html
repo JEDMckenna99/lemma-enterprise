@@ -11,14 +11,21 @@
 {% endblock %}
 
 {% block head %}
-<link rel="stylesheet" href="{{ url_for('static', filename='css/wallet.css') }}?v=6">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/wallet.css') }}?v=7">
 {% endblock %}
 
 {% block content %}
 <div class="wallet-container">
     <header class="wallet-header">
-        <div class="wallet-logo">
-            <img src="/static/img/lemma_logo.svg" alt="" width="96" height="96">
+        <div class="wallet-logo" id="wallet-logo" aria-hidden="true">
+            <svg xmlns="http://www.w3.org/2000/svg" width="96" height="96" viewBox="0 0 120 120" focusable="false">
+                <g stroke="currentColor" stroke-width="6" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                    <ellipse cx="60" cy="60" rx="38" ry="14"/>
+                    <ellipse cx="60" cy="60" rx="38" ry="14" transform="rotate(90 60 60)"/>
+                    <ellipse cx="60" cy="60" rx="38" ry="14" transform="rotate(45 60 60)"/>
+                    <ellipse cx="60" cy="60" rx="38" ry="14" transform="rotate(-45 60 60)"/>
+                </g>
+            </svg>
         </div>
         <h1 class="wallet-brand-name">lemma.id</h1>
         <p class="wallet-tagline">personal data minimizer</p>
@@ -221,6 +228,19 @@ function updateStatusDisplay(isUnlocked, message, submessage) {
     iconEl.textContent = isUnlocked ? '🔓' : '🔒';
     titleEl.textContent = message;
     subtitleEl.textContent = submessage;
+
+    const pageLogo = document.getElementById('wallet-logo');
+    if (pageLogo) {
+        pageLogo.classList.toggle('is-unlocked', !!isUnlocked);
+    }
+    const navLogo = document.getElementById('nav-logo');
+    if (navLogo) {
+        navLogo.classList.toggle('is-unlocked', !!isUnlocked);
+        navLogo.setAttribute('data-unlocked', isUnlocked ? 'true' : 'false');
+        navLogo.title = isUnlocked ? 'lemma.id unlocked' : 'lemma.id';
+    } else if (typeof window.setNavLogoUnlocked === 'function') {
+        window.setNavLogoUnlocked(!!isUnlocked);
+    }
 }
 
 // Show/hide views

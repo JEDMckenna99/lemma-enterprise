@@ -15,9 +15,9 @@
         }
         
         :root {
-            --lemma-primary: #667eea;
-            --lemma-secondary: #764ba2;
-            --lemma-success: #10b981;
+            --lemma-primary: #4E3D8F;
+            --lemma-secondary: #3A2D6E;
+            --lemma-success: #1F7A4C;
             --lemma-bg: #f8fafc;
             --lemma-card: #ffffff;
             --lemma-text: #1f2937;
@@ -58,6 +58,12 @@
             margin-bottom: 24px;
             margin-left: auto;
             margin-right: auto;
+            color: var(--lemma-primary);
+            transition: color 0.2s ease;
+        }
+
+        .lemma-logo.is-unlocked {
+            color: var(--lemma-success);
         }
 
         .lemma-logo img,
@@ -271,8 +277,15 @@
     <div class="unlock-container">
         <div class="unlock-card">
             <!-- Lemma Logo -->
-            <div class="lemma-logo">
-                <img src="/static/img/lemma_logo.svg" alt="lemma.id" width="120" height="120">
+            <div class="lemma-logo" id="lemma-logo" aria-hidden="true">
+                <svg xmlns="http://www.w3.org/2000/svg" width="120" height="120" viewBox="0 0 120 120" focusable="false">
+                    <g stroke="currentColor" stroke-width="6" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                        <ellipse cx="60" cy="60" rx="38" ry="14"/>
+                        <ellipse cx="60" cy="60" rx="38" ry="14" transform="rotate(90 60 60)"/>
+                        <ellipse cx="60" cy="60" rx="38" ry="14" transform="rotate(45 60 60)"/>
+                        <ellipse cx="60" cy="60" rx="38" ry="14" transform="rotate(-45 60 60)"/>
+                    </g>
+                </svg>
             </div>
             
             <h1 class="unlock-title">Sign in with Lemma.id</h1>
@@ -359,6 +372,10 @@ function showStatus(message, type = 'info') {
     const el = document.getElementById('status-message');
     el.textContent = message;
     el.className = `status-message ${type}`;
+    const logo = document.getElementById('lemma-logo');
+    if (logo) {
+        logo.classList.toggle('is-unlocked', type === 'success');
+    }
 }
 
 // Handle unlock button click
