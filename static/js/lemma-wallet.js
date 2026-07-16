@@ -3002,6 +3002,275 @@ class LemmaWallet {
     }
 
     // ========================================
+    // Push-based device link — manager QR / transfer link
+    // ========================================
+
+    _parsePushTransferPayload(raw) {
+        let data = String(raw || '').trim();
+        if (!data) throw new Error('Invalid transfer link');
+        if (/^https?:\/\//i.test(data)) {
+            try {
+                const url = new URL(data);
+                if (url.hash && url.hash.length > 1) {
+                    data = url.hash.substring(1);
+                }
+            } catch (_) { /* fall through */ }
+        }
+        if (data[0] !== '{') {
+            let base64 = data.replace(/-/g, '+').replace(/_/g, '/');
+            while (base64.length % 4) base64 += '=';
+            data = atob(base64);
+        }
+        const parsed = JSON.parse(data);
+        if (parsed.v !== 2 || parsed.mode !== 'push' || !parsed.transfer_id) {
+            throw new Error('Invalid transfer link — open the link or scan the QR from your other lemma.id');
+        }
+        return parsed;
+    }
+
+    _randomConfirmCode() {
+        const n = crypto.getRandomValues(new Uint32Array(1))[0] % 1000000;
+        return String(n).padStart(6, '0');
+    }
+
+    /**
+     * SENDER (manager): create a push offer. QR/link carry only transfer_id.
+     * Requires a fresh passkey. Receiver must register before confirmLinkPushDeposit.
+     */
+    async beginLinkPush() {
+        await this.init();
+        await this._requireFreshPasskeyAuth({
+            reason: 'Verify to create a transfer link for another device',
+        });
+        if (!this.isUnlocked()) {
+            await this.unlock({ force: true, isHumanIssuance: false });
+        }
+
+        const walletIdRec = await this._get('passkey', 'walletId');
+        const walletId = walletIdRec?.value || this.session?.walletId || null;
+        if (!walletId) throw new Error('No wallet on this device');
+
+        const keys = this._getLemmaKeys();
+        const idBytes = crypto.getRandomValues(new Uint8Array(24));
+        const transferId = 'linkpush_' + keys.base64urlEncode(idBytes);
+        const confirmCode = this._randomConfirmCode();
+        const LINK_TTL_SEC = 300;
+
+        const body = {
+            action: 'offer',
+            wallet_id: walletId,
+            transfer_id: transferId,
+            confirm_code: confirmCode,
+        };
+        body.wallet_assertion = await this.buildWalletAssertion(
+            ['transfer_id', 'confirm_code'],
+            { transfer_id: transferId, confirm_code: confirmCode },
+        );
+
+        const res = await fetch('/api/wallet/link-receive', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify(body),
+        });
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            throw new Error(err.error || `transfer offer failed (${res.status})`);
+        }
+
+        const payload = { v: 2, mode: 'push', transfer_id: transferId };
+        const payloadB64 = btoa(JSON.stringify(payload))
+            .replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+        const origin = (typeof window !== 'undefined' && window.location?.origin)
+            ? window.location.origin
+            : 'https://lemma.id';
+        const qrUrl = `${origin}/link#${payloadB64}`;
+
+        this._pendingLinkPush = {
+            transferId,
+            confirmCode,
+            startedAt: Date.now(),
+            expiresAt: Date.now() + LINK_TTL_SEC * 1000,
+        };
+
+        return {
+            transferId,
+            confirmCode,
+            qrUrl,
+            qrPayload: JSON.stringify(payload),
+            expiresIn: LINK_TTL_SEC,
+            expiresAt: Date.now() + LINK_TTL_SEC * 1000,
+        };
+    }
+
+    /** SENDER: poll whether the other device has registered its key. */
+    async getLinkPushStatus(transferId) {
+        const id = transferId || this._pendingLinkPush?.transferId;
+        if (!id) throw new Error('No active transfer offer');
+        const res = await fetch('/api/wallet/link-receive', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ action: 'status', transfer_id: id }),
+        });
+        if (res.status === 404) {
+            return { ready: false, status: 'missing' };
+        }
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            throw new Error(err.error || `transfer status failed (${res.status})`);
+        }
+        const data = await res.json();
+        return {
+            ready: data.status === 'registered' && !!data.recv_pubkey,
+            status: data.status,
+            confirmCode: data.confirm_code || null,
+            recvPubkey: data.recv_pubkey || null,
+            hasBundle: !!data.has_bundle,
+        };
+    }
+
+    /**
+     * SENDER: after codes match, seal person-root seeds to the registered device and deposit.
+     */
+    async confirmLinkPushDeposit({ transferId, recvPubkey } = {}) {
+        await this.init();
+        const id = transferId || this._pendingLinkPush?.transferId;
+        let pubkey = recvPubkey;
+        if (!pubkey) {
+            const status = await this.getLinkPushStatus(id);
+            if (!status.ready || !status.recvPubkey) {
+                throw new Error('Other device has not joined yet');
+            }
+            pubkey = status.recvPubkey;
+        }
+        if (!id || !pubkey) throw new Error('transferId and recvPubkey required');
+
+        await this._requireFreshPasskeyAuth({
+            reason: 'Confirm sending your lemma.id to the other device',
+        });
+        if (!this.isUnlocked()) {
+            await this.unlock({ force: true, isHumanIssuance: false });
+        }
+
+        const profile = await this.getActiveProfile();
+        if (!profile?.secret && !this.session?.walletLocalSeed) {
+            throw new Error('No wallet found on this device');
+        }
+
+        const walletIdRec = await this._get('passkey', 'walletId');
+        const walletId = walletIdRec?.value || this.session?.walletId || null;
+
+        await this.fetchAndStoreSeedEnvelopes();
+        const seedHex = this.session?.walletLocalSeed;
+        const proxyHex = this.session?.personRootProxy;
+        if (!seedHex || !proxyHex) {
+            throw new Error('Person-root seeds unavailable; complete IDV or use seed transfer');
+        }
+
+        let unlockToken = null;
+        if (this._isLemmaDomain()) {
+            try {
+                const tokenRes = await fetch('/api/wallet/link-unlock-token', {
+                    method: 'POST',
+                    credentials: 'include',
+                    headers: { 'Content-Type': 'application/json' },
+                });
+                if (tokenRes.ok) {
+                    const tokenData = await tokenRes.json();
+                    unlockToken = tokenData.unlock_token || null;
+                }
+            } catch (e) {
+                console.warn('[Lemma] link-unlock-token unavailable for push send:', e.message);
+            }
+        }
+
+        let ishumanCredentials = [];
+        try {
+            await this.syncIsHumanCacheFromWallet();
+            ishumanCredentials = await this.exportIsHumanCredentialsForBridge();
+        } catch (e) {
+            console.warn('[Lemma] Could not export isHuman credentials for push send:', e.message);
+        }
+
+        const LINK_TTL_MS = 300000;
+        const keys = this._getLemmaKeys();
+        const recipientPub = keys.base64urlDecode(pubkey);
+        const sealedSeed = await keys.sealEnvelope(recipientPub, keys.hexToBytes(seedHex));
+        const sealedProxy = await keys.sealEnvelope(recipientPub, keys.hexToBytes(proxyHex));
+
+        const body = {
+            action: 'deposit',
+            wallet_id: walletId,
+            transfer_id: id,
+            recv_pubkey: pubkey,
+            bundle: {
+                sealed_wallet_seed: keys.base64urlEncode(sealedSeed),
+                sealed_person_root_proxy: keys.base64urlEncode(sealedProxy),
+                wallet_id: walletId,
+                profile_id: profile?.id || DEFAULT_PROFILE_ID,
+                profile_name: profile?.name || 'Personal',
+                ishuman_credentials: ishumanCredentials,
+                unlock_token: unlockToken,
+                expires_at: Date.now() + LINK_TTL_MS,
+            },
+        };
+        body.wallet_assertion = await this.buildWalletAssertion(
+            ['transfer_id', 'recv_pubkey'],
+            { transfer_id: id, recv_pubkey: pubkey },
+        );
+
+        const res = await fetch('/api/wallet/link-receive', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify(body),
+        });
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            throw new Error(err.error || `transfer send failed (${res.status})`);
+        }
+        this._pendingLinkPush = null;
+        return { success: true, transferId: id };
+    }
+
+    /**
+     * RECEIVER (empty device): open a push transfer link/QR, bind ephemeral key, await deposit.
+     */
+    async acceptLinkPushOffer(scanInput) {
+        const parsed = this._parsePushTransferPayload(scanInput);
+        const keys = this._getLemmaKeys();
+        const { privateKey, publicKey } = await keys.generateEncryptionKeypair();
+        const recvPubkey = keys.base64urlEncode(publicKey);
+
+        const res = await fetch('/api/wallet/link-receive', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({
+                action: 'register',
+                transfer_id: parsed.transfer_id,
+                recv_pubkey: recvPubkey,
+            }),
+        });
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            throw new Error(err.error || `Could not join transfer (${res.status})`);
+        }
+        const data = await res.json();
+        this._pendingLinkReceive = {
+            transferId: parsed.transfer_id,
+            privateKey,
+            startedAt: Date.now(),
+        };
+        return {
+            transferId: parsed.transfer_id,
+            confirmCode: data.confirm_code || null,
+            expiresIn: data.expires_in || 300,
+        };
+    }
+
+    // ========================================
     // isHuman LOCK-PERIOD (issuance scope, lemma.id tab)
     // ========================================
 

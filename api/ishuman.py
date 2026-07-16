@@ -2877,12 +2877,18 @@ def _link_receive_key(transfer_id: str) -> str:
 @ishuman_bp.route("/api/wallet/link-receive", methods=["POST"])
 @cross_origin()
 def wallet_link_receive():
-    """Short-lived relay for pull-based device linking.
+    """Short-lived relay for device linking (pull and push).
 
-    Receiver (PC) displays a QR encoding ``/link/send#…`` with a transient
-    X25519 public key. Sender (phone) scans with any camera app, confirms with
-    passkey, seals wallet + isHuman bundle to that key, and deposits here.
-    Receiver polls ``claim`` to open the sealed payload locally.
+    Pull (empty device shows QR):
+      Receiver displays ``/link/send#…`` with a transient X25519 public key.
+      Sender deposits a sealed person-root bundle; receiver claims once.
+
+    Push (manager creates QR / transfer link):
+      ``offer`` — unlocked wallet creates a transfer slot + confirm code
+        (QR/link carry only ``transfer_id``, never secrets).
+      ``register`` — empty device binds its ephemeral pubkey (first writer wins).
+      ``status`` — sender polls until register, then confirms codes match.
+      ``deposit`` / ``claim`` — same sealed-bundle handoff as pull.
 
     Body (deposit): ``{ action, wallet_id, transfer_id, recv_pubkey, bundle,
     wallet_assertion }``
@@ -2894,6 +2900,92 @@ def wallet_link_receive():
 
     body = request.get_json(silent=True) or {}
     action = (body.get("action") or "").strip().lower()
+
+    if action == "offer":
+        wallet_id = (body.get("wallet_id") or "").strip()
+        transfer_id = (body.get("transfer_id") or "").strip()
+        confirm_code = (body.get("confirm_code") or "").strip()
+        if not wallet_id or not transfer_id or not confirm_code:
+            return jsonify({"success": False, "error": "missing_transfer_fields"}), 400
+        if len(transfer_id) < 16:
+            return jsonify({"success": False, "error": "weak_transfer_id"}), 400
+        if not confirm_code.isdigit() or len(confirm_code) != 6:
+            return jsonify({"success": False, "error": "invalid_confirm_code"}), 400
+        if redis_get(_link_receive_key(transfer_id)):
+            return jsonify({"success": False, "error": "transfer_exists"}), 409
+
+        err, _wid = _require_wallet_assertion(
+            body, field_names=["transfer_id", "confirm_code"]
+        )
+        if err:
+            return err
+
+        redis_store(
+            _link_receive_key(transfer_id),
+            {
+                "mode": "push",
+                "status": "waiting",
+                "wallet_id": wallet_id,
+                "confirm_code": confirm_code,
+            },
+            ttl_seconds=_LINK_RECEIVE_TTL_SECONDS,
+        )
+        return jsonify({"success": True, "expires_in": _LINK_RECEIVE_TTL_SECONDS})
+
+    if action == "register":
+        transfer_id = (body.get("transfer_id") or "").strip()
+        recv_pubkey = (body.get("recv_pubkey") or "").strip()
+        if not transfer_id or not recv_pubkey:
+            return jsonify({"success": False, "error": "missing_transfer_fields"}), 400
+        if len(transfer_id) < 16:
+            return jsonify({"success": False, "error": "weak_transfer_id"}), 400
+
+        entry = redis_get(_link_receive_key(transfer_id))
+        if not entry:
+            return jsonify({"success": False, "error": "transfer_not_found"}), 404
+        if entry.get("bundle"):
+            return jsonify({"success": False, "error": "transfer_already_deposited"}), 409
+        existing_pub = (entry.get("recv_pubkey") or "").strip()
+        if existing_pub:
+            if existing_pub == recv_pubkey:
+                return jsonify({
+                    "success": True,
+                    "confirm_code": entry.get("confirm_code"),
+                    "status": "registered",
+                    "expires_in": _LINK_RECEIVE_TTL_SECONDS,
+                })
+            return jsonify({"success": False, "error": "transfer_already_registered"}), 409
+        if entry.get("mode") != "push" or entry.get("status") != "waiting":
+            return jsonify({"success": False, "error": "transfer_not_offer"}), 409
+
+        entry["recv_pubkey"] = recv_pubkey
+        entry["status"] = "registered"
+        redis_store(
+            _link_receive_key(transfer_id),
+            entry,
+            ttl_seconds=_LINK_RECEIVE_TTL_SECONDS,
+        )
+        return jsonify({
+            "success": True,
+            "confirm_code": entry.get("confirm_code"),
+            "status": "registered",
+            "expires_in": _LINK_RECEIVE_TTL_SECONDS,
+        })
+
+    if action == "status":
+        transfer_id = (body.get("transfer_id") or "").strip()
+        if not transfer_id:
+            return jsonify({"success": False, "error": "transfer_id required"}), 400
+        entry = redis_get(_link_receive_key(transfer_id))
+        if not entry:
+            return jsonify({"success": False, "error": "transfer_not_found"}), 404
+        return jsonify({
+            "success": True,
+            "status": entry.get("status") or ("deposited" if entry.get("bundle") else "waiting"),
+            "confirm_code": entry.get("confirm_code"),
+            "recv_pubkey": entry.get("recv_pubkey") or None,
+            "has_bundle": bool(entry.get("bundle")),
+        })
 
     if action == "deposit":
         wallet_id = (body.get("wallet_id") or "").strip()
@@ -2919,11 +3011,27 @@ def wallet_link_receive():
         if not bundle.get("sealed_link_payload") and not has_person_root:
             return jsonify({"success": False, "error": "bundle_required"}), 400
 
+        existing = redis_get(_link_receive_key(transfer_id))
+        if existing:
+            if existing.get("bundle"):
+                return jsonify({"success": False, "error": "transfer_already_deposited"}), 409
+            if existing.get("mode") == "push":
+                if existing.get("wallet_id") and existing.get("wallet_id") != wallet_id:
+                    return jsonify({"success": False, "error": "wallet_mismatch"}), 403
+                offered_pub = (existing.get("recv_pubkey") or "").strip()
+                if not offered_pub:
+                    return jsonify({"success": False, "error": "receiver_not_registered"}), 409
+                if offered_pub != recv_pubkey:
+                    return jsonify({"success": False, "error": "pubkey_mismatch"}), 409
+
         redis_store(
             _link_receive_key(transfer_id),
             {
+                "mode": (existing or {}).get("mode") or "pull",
+                "status": "deposited",
                 "wallet_id": wallet_id,
                 "recv_pubkey": recv_pubkey,
+                "confirm_code": (existing or {}).get("confirm_code"),
                 "bundle": bundle,
             },
             ttl_seconds=_LINK_RECEIVE_TTL_SECONDS,
@@ -2935,7 +3043,7 @@ def wallet_link_receive():
         if not transfer_id:
             return jsonify({"success": False, "error": "transfer_id required"}), 400
         entry = redis_get(_link_receive_key(transfer_id))
-        if not entry:
+        if not entry or not entry.get("bundle"):
             return jsonify({"success": False, "error": "transfer_not_found"}), 404
         if not redis_delete(_link_receive_key(transfer_id)):
             return jsonify({"success": False, "error": "transfer_already_claimed"}), 409

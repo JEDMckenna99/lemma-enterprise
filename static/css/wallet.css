@@ -430,6 +430,56 @@
     padding: 10px 16px !important;
 }
 
+.add-device-divider {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin: 20px 0 16px;
+    color: #94a3b8;
+    font-size: 0.8rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+.add-device-divider::before,
+.add-device-divider::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--wallet-line);
+}
+
+.push-confirm-banner {
+    margin: 16px auto 0;
+    max-width: 280px;
+    padding: 14px 16px;
+    border-radius: 12px;
+    background: #f0f9ff;
+    border: 1px solid #0ea5e9;
+    text-align: center;
+}
+.push-confirm-label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #0369a1;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+}
+.push-confirm-code {
+    margin-top: 6px;
+    font-size: 1.75rem;
+    font-weight: 700;
+    letter-spacing: 0.18em;
+    color: #0c4a6e;
+    font-variant-numeric: tabular-nums;
+}
+.push-confirm-help {
+    margin: 8px 0 0;
+    font-size: 0.8rem;
+    color: #0369a1;
+    line-height: 1.4;
+}
+
 .link-input {
     width: 100%;
     padding: 12px;

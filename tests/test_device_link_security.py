@@ -35,6 +35,19 @@ def test_pull_send_uses_person_root_seeds_only():
 
 
 @pytest.mark.unit
+def test_push_transfer_uses_offer_register_not_secret_in_url():
+    source = WALLET_JS.read_text(encoding="utf-8")
+    assert "async beginLinkPush" in source
+    assert "async acceptLinkPushOffer" in source
+    assert "async confirmLinkPushDeposit" in source
+    idx = source.index("async beginLinkPush")
+    chunk = source[idx:idx + 3500]
+    assert "mode: 'push'" in chunk or 'mode: "push"' in chunk
+    assert "walletSecret" not in chunk
+    assert "confirm_code" in chunk or "confirmCode" in chunk
+
+
+@pytest.mark.unit
 def test_server_has_no_legacy_link_store_route():
     api_root = ROOT / "api"
     routes_text = "\n".join(p.read_text(encoding="utf-8") for p in api_root.rglob("*.py"))

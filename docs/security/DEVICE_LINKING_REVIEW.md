@@ -1,21 +1,44 @@
-# Device linking security review (Phase F)
+# Device linking security review
 
-## Current production UI path
+## Production paths (current)
 
-`LemmaWallet.generateLinkCode()` (`static/js/lemma-wallet.js`) encrypts `walletSecret` with a fresh passkey-derived AES key and places ciphertext in QR URL (`/link#...`). **Raw secret never appears in QR plaintext**, but possession of QR + passkey on receiving device recovers the full secret.
+### 1. Pull (recommended primary)
 
-Templates: `templates/wallet_link.html`, `templates/wallet_simple.html`
+Empty device opens `/link` → **Show QR Code** → `beginLinkReceive()`.
 
-## Preferred future path (SDK only today)
+- QR encodes `/link/send#…` with ephemeral X25519 pubkey + `transfer_id` only.
+- Phone with lemma.id scans via native Camera → `/link/send` → fresh passkey →
+  seals person-root seeds → `POST /api/wallet/link-receive` deposit.
+- Empty device claims once, then `registerPasskey()`.
 
-`beginDeviceTransfer()` / `depositDeviceTransfer()` / `claimDeviceTransfer()` relay **person-root seeds** via Redis (`POST /api/wallet/sync-device`, 60s TTL) without embedding `walletSecret` in QR.
+**Why strongest:** stealing the receive QR does not help without the sender’s passkey.
 
-- Backend: `api/ishuman.py`
-- Tests: `tests/test_wallet_sync_device.py`
-- **Gap:** No production template calls the server-relay flow; UI still uses `generateLinkCode`.
+### 2. Push from manager (convenience)
 
-## Recommendations
+Unlocked `/app` → **Generate QR Code** / **Send Transfer Link** → `beginLinkPush()`.
 
-1. Migrate “Add device” UI from `generateLinkCode` to server-relay transfer when UX parity is validated.
-2. Keep QR TTL short; instruct users to scan only on trusted devices.
-3. Document residual risk in GA materials: device linking is UX-driven secret transfer, not hardware-bound multi-device keys.
+- QR/link carry only `{ v:2, mode:push, transfer_id }` — never secrets.
+- Empty device opens link → `acceptLinkPushOffer` registers its pubkey.
+- Both screens show the same **6-digit confirmation code**.
+- Sender confirms codes match → fresh passkey → `confirmLinkPushDeposit`.
+- Receiver claims once, then `registerPasskey()`.
+
+**Why confirm code stays:** passkey proves the *sender*; the code binds the *receiver*
+so a stolen transfer link cannot race-register and receive the deposit.
+
+### 3. Seed transfer tab on `/link`
+
+`beginDeviceTransfer` / `depositDeviceTransfer` / `claimDeviceTransfer` via
+`POST /api/wallet/sync-device` (60s TTL). Person-root seeds only; no raw wallet secret in QR.
+
+## Explicitly removed (do not restore)
+
+`generateLinkCode` / `linkDevice` / `_decryptLinkQR` — embedded ciphertext + AES key
+in `/link#…`. Possession of the URL recovered the identity. Guarded by
+`tests/test_device_link_security.py`.
+
+## Residual risk
+
+Device linking is UX-driven sealed secret transfer, not hardware-bound multi-device keys.
+Keep TTLs short; instruct users to scan/open only on trusted devices; never share
+push transfer links in public channels without matching the confirm code.

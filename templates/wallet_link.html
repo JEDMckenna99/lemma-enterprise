@@ -81,24 +81,48 @@
 <div class="link-container">
     <header class="link-header">
         <h1>Add Device</h1>
-        <p>Connect this device to your Lemma ID</p>
+        <p>Receive lemma.id on this empty device</p>
     </header>
 
     <div id="status" class="status-box info hidden"></div>
 
-    <div class="mode-tabs">
-        <button type="button" class="mode-tab active" id="mode-pull">Scan with phone</button>
+    <!-- PUSH: opened transfer link / scanned manager QR -->
+    <div id="push-content" class="hidden">
+        <div class="card">
+            <h2 style="margin: 0 0 12px; font-size: 1.1rem;">Receive from transfer link</h2>
+            <p style="color: #6b7280; margin: 0 0 16px; font-size: 0.95rem;">
+                You opened a transfer from a device that already has lemma.id.
+                Match the confirmation code on both screens before they send.
+            </p>
+            <div id="push-confirm-display" class="status-box info hidden" style="font-size: 1.4rem; font-weight: 700; letter-spacing: 0.12em;"></div>
+            <div id="push-wait-status" class="status-box info" style="margin-top: 16px;">
+                Joining transfer...
+            </div>
+            <div id="push-complete-actions" class="hidden" style="margin-top: 16px;">
+                <button type="button" class="btn btn-primary" onclick="window.location.href='/app'">
+                    Go to lemma.id
+                </button>
+            </div>
+        </div>
+        <div class="security-note">
+            <strong>Confirm before they send</strong>
+            If the code on this screen does not match the other device, close this page and start again.
+        </div>
+    </div>
+
+    <div class="mode-tabs" id="link-mode-tabs">
+        <button type="button" class="mode-tab active" id="mode-pull">Recommended</button>
         <button type="button" class="mode-tab" id="mode-sync">Seed transfer</button>
     </div>
 
     <!-- PULL: receiver shows QR, phone camera sends -->
     <div id="pull-content">
         <div class="card">
-            <h2 style="margin: 0 0 12px; font-size: 1.1rem;">Receive on this device</h2>
+            <h2 style="margin: 0 0 12px; font-size: 1.1rem;">Recommended: receive on this device</h2>
             <p style="color: #6b7280; margin: 0 0 16px; font-size: 0.95rem;">
-                Show this QR on your computer or tablet. On your phone, open any QR scanner
-                (Camera app) and scan it — no lemma.id scanner needed.
-                Your phone will ask for your passkey before sending your lemma.id.
+                Show this QR on your computer or tablet. On the phone that already has lemma.id,
+                open the Camera app and scan it. That phone will ask for a passkey before sending.
+                After it arrives here, this device creates its own passkey.
             </p>
             <button type="button" class="btn btn-primary" id="show-receive-qr-btn">Show QR Code</button>
             <div id="receive-qr-display" class="hidden">
@@ -158,14 +182,18 @@ let receiveQrTimer = null;
 let syncQrTimer = null;
 let receivePollAbort = false;
 let syncPollAbort = false;
+let pushPollAbort = false;
 
 function setLinkMode(mode) {
     const pull = mode === 'pull';
     const sync = mode === 'sync';
-    document.getElementById('mode-pull').classList.toggle('active', pull);
-    document.getElementById('mode-sync').classList.toggle('active', sync);
-    document.getElementById('pull-content').classList.toggle('hidden', !pull);
-    document.getElementById('sync-content').classList.toggle('hidden', !sync);
+    const push = mode === 'push';
+    document.getElementById('mode-pull')?.classList.toggle('active', pull);
+    document.getElementById('mode-sync')?.classList.toggle('active', sync);
+    document.getElementById('pull-content')?.classList.toggle('hidden', !pull);
+    document.getElementById('sync-content')?.classList.toggle('hidden', !sync);
+    document.getElementById('push-content')?.classList.toggle('hidden', !push);
+    document.getElementById('link-mode-tabs')?.classList.toggle('hidden', push);
     if (!pull) hideReceiveQr();
     if (!sync) hideSyncQr();
 }
@@ -369,6 +397,44 @@ async function finishSyncSuccess(result, statusEl) {
     document.getElementById('sync-complete-actions')?.classList.remove('hidden');
 }
 
+async function startPushFromHash() {
+    const hash = (window.location.hash || '').replace(/^#/, '').trim();
+    if (!hash) return false;
+    let parsed = null;
+    try {
+        parsed = wallet._parsePushTransferPayload(hash);
+    } catch (_) {
+        return false;
+    }
+    setLinkMode('push');
+    const waitEl = document.getElementById('push-wait-status');
+    const codeEl = document.getElementById('push-confirm-display');
+    pushPollAbort = false;
+    try {
+        const joined = await wallet.acceptLinkPushOffer(hash);
+        codeEl.textContent = joined.confirmCode || '------';
+        codeEl.classList.remove('hidden');
+        waitEl.textContent = 'Waiting for the other device to confirm and send...';
+        waitEl.className = 'status-box info';
+        history.replaceState({}, document.title, window.location.pathname + window.location.search);
+
+        while (!pushPollAbort) {
+            const result = await wallet.tryClaimLinkReceive(joined.transferId);
+            if (result.ready) {
+                pushPollAbort = true;
+                await finishLinkSuccess(result, waitEl, 'push');
+                document.getElementById('push-complete-actions')?.classList.remove('hidden');
+                return true;
+            }
+            await new Promise((r) => setTimeout(r, 2000));
+        }
+    } catch (e) {
+        waitEl.textContent = e.message || 'Transfer failed';
+        waitEl.className = 'status-box error';
+    }
+    return true;
+}
+
 document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('mode-pull').addEventListener('click', () => setLinkMode('pull'));
     document.getElementById('mode-sync').addEventListener('click', () => setLinkMode('sync'));
@@ -377,6 +443,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     try {
         await initWallet();
+        const startedPush = await startPushFromHash();
+        if (startedPush) return;
+
         const info = await wallet.getWalletInfo();
         const statusEl = document.getElementById('status');
         if (info.hasWalletSecret && info.hasPasskey) {

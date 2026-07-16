@@ -6,12 +6,12 @@
 {% block preload_scripts %}
 <link rel="preload" href="{{ url_for('static', filename='js/lemma-keys.js') }}?v=8" as="script">
 <link rel="preload" href="{{ url_for('static', filename='js/wallet-at-rest-crypto.js') }}?v=2" as="script">
-<link rel="preload" href="{{ url_for('static', filename='js/lemma-wallet.js') }}?v=2677" as="script">
+<link rel="preload" href="{{ url_for('static', filename='js/lemma-wallet.js') }}?v=2678" as="script">
 <link rel="preload" href="{{ url_for('static', filename='js/lemma-credential-utils.js') }}?v=2" as="script">
 {% endblock %}
 
 {% block head %}
-<link rel="stylesheet" href="{{ url_for('static', filename='css/wallet.css') }}?v=7">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/wallet.css') }}?v=9">
 {% endblock %}
 
 {% block content %}
@@ -89,18 +89,48 @@
             </p>
         </div>
 
-        <!-- ADD DEVICE -->
+        <!-- ADD DEVICE: pull (recommended) + optional push from this device -->
         <div class="card">
             <h2>Add another device or browser</h2>
 
             <p class="card-intro">
-                On your new device, open <strong>lemma.id/link</strong> and tap <strong>Show QR Code</strong>.
-                Then scan that QR with this phone's Camera app. You'll confirm with your passkey to send your lemma.id.
-                Your wallet is encrypted to the new device only; lemma.id never sees your secret.
+                <strong>Recommended:</strong> on the <em>new</em> device, open
+                <a href="/link">lemma.id/link</a> and tap <strong>Show QR Code</strong>.
+                Scan that QR with this phone's Camera app. You'll confirm with your passkey to send —
+                your wallet is encrypted to the new device only.
             </p>
             <a href="/link" class="btn btn-primary btn-full" style="text-align: center; text-decoration: none; display: block;">
                 Open add-device page
             </a>
+
+            <div class="add-device-divider" aria-hidden="true">or send from here</div>
+
+            <p class="card-intro" style="margin-top: 0;">
+                Generate a QR or transfer link on <strong>this</strong> device. Open it on the empty browser,
+                match the confirmation code on both screens, then passkey to send.
+            </p>
+            <button id="show-qr-btn" type="button" class="btn btn-secondary btn-full">Generate QR Code</button>
+            <button id="show-link-btn" type="button" class="btn btn-secondary btn-full" style="margin-top: 10px;">
+                Send Transfer Link
+            </button>
+
+            <div id="qr-display" class="qr-display hidden">
+                <div id="qr-box" class="qr-box">
+                    <div id="qr-container"></div>
+                </div>
+                <div id="push-confirm-banner" class="push-confirm-banner hidden">
+                    <div class="push-confirm-label">Confirmation code</div>
+                    <div id="push-confirm-code-display" class="push-confirm-code"></div>
+                    <p class="push-confirm-help">The other device must show this same code before you send.</p>
+                </div>
+                <div id="qr-timer" class="qr-timer">Expires in 5:00</div>
+                <div id="link-options" class="hidden"></div>
+                <div id="push-wait-status" class="card-help" style="margin-top: 12px;"></div>
+                <button id="confirm-push-btn" type="button" class="btn btn-primary btn-full hidden" style="margin-top: 12px;">
+                    Codes match — send with passkey
+                </button>
+                <button id="hide-qr-btn" type="button" class="btn btn-secondary" style="margin-top: 12px;">Cancel</button>
+            </div>
         </div>
 
         <!-- SETTINGS -->
@@ -1144,6 +1174,229 @@ async function handleRedirectReturn(returnUrl) {
     window.location.href = url.toString();
 }
 
+// ============================================================
+// Push transfer — QR / link from manager (device that HAS lemma.id)
+// ============================================================
+let qrTimerInterval = null;
+let pushPollAbort = false;
+let activePushOffer = null;
+
+async function generateTransferForDisplay() {
+    await initWallet();
+    return wallet.beginLinkPush();
+}
+
+function startTransferTimer(result) {
+    let timeLeft = result.expiresIn || 300;
+    const timerEl = document.getElementById('qr-timer');
+    const formatTime = (s) => {
+        const m = Math.floor(s / 60);
+        const sec = s % 60;
+        return m > 0 ? `${m}:${String(sec).padStart(2, '0')}` : `${sec}s`;
+    };
+    if (qrTimerInterval) clearInterval(qrTimerInterval);
+    timerEl.textContent = `Expires in ${formatTime(timeLeft)}`;
+    timerEl.classList.toggle('expiring', false);
+    qrTimerInterval = setInterval(() => {
+        timeLeft--;
+        timerEl.textContent = `Expires in ${formatTime(timeLeft)}`;
+        timerEl.classList.toggle('expiring', timeLeft <= 30);
+        if (timeLeft <= 0) hideQR();
+    }, 1000);
+}
+
+function showPushConfirmCode(code) {
+    const banner = document.getElementById('push-confirm-banner');
+    const codeEl = document.getElementById('push-confirm-code-display');
+    if (codeEl) codeEl.textContent = code || '------';
+    banner?.classList.remove('hidden');
+}
+
+function renderTransferLink(result, { showQr }) {
+    const linkOptionsEl = document.getElementById('link-options');
+    if (!linkOptionsEl) return;
+    const label = showQr ? 'Or copy link:' : 'Transfer link:';
+    const instruction = showQr
+        ? 'Scan with the empty device Camera app, or copy the link below.'
+        : 'Open this link on the empty browser. It expires soon.';
+    linkOptionsEl.innerHTML = `
+        <p class="qr-instruction">${instruction}</p>
+        <div class="link-copy-section">
+            <p class="link-copy-label">${label}</p>
+            <div class="link-copy-row">
+                <input type="text" id="link-url" value="${escapeHtml(result.qrUrl)}" readonly class="link-url-input">
+                <button id="copy-link-url-btn" type="button" class="btn btn-secondary btn-copy">Copy</button>
+            </div>
+        </div>
+    `;
+    linkOptionsEl.classList.remove('hidden');
+    document.getElementById('copy-link-url-btn')?.addEventListener('click', async () => {
+        const input = document.getElementById('link-url');
+        try {
+            await navigator.clipboard.writeText(input.value);
+            const btn = document.getElementById('copy-link-url-btn');
+            if (btn) {
+                const prev = btn.textContent;
+                btn.textContent = 'Copied';
+                setTimeout(() => { btn.textContent = prev; }, 1500);
+            }
+        } catch (_) {
+            input.select();
+            document.execCommand('copy');
+        }
+    });
+}
+
+function showTransferDisplay(result, { showQr }) {
+    document.getElementById('qr-display').classList.remove('hidden');
+    document.getElementById('show-qr-btn').classList.add('hidden');
+    document.getElementById('show-link-btn').classList.add('hidden');
+    document.getElementById('confirm-push-btn').classList.add('hidden');
+    showPushConfirmCode(result.confirmCode);
+    renderTransferLink(result, { showQr });
+    startTransferTimer(result);
+    const waitEl = document.getElementById('push-wait-status');
+    waitEl.textContent = 'Waiting for the other device to open the link or scan the QR...';
+    pollPushRegistration(result);
+}
+
+async function pollPushRegistration(result) {
+    pushPollAbort = false;
+    activePushOffer = result;
+    const waitEl = document.getElementById('push-wait-status');
+    const confirmBtn = document.getElementById('confirm-push-btn');
+    try {
+        while (!pushPollAbort) {
+            const status = await wallet.getLinkPushStatus(result.transferId);
+            if (status.ready) {
+                const code = status.confirmCode || result.confirmCode;
+                showPushConfirmCode(code);
+                waitEl.innerHTML =
+                    'Other device joined. If it shows <strong>' +
+                    escapeHtml(code) +
+                    '</strong>, tap below to send with your passkey. If not, cancel and start over.';
+                confirmBtn.classList.remove('hidden');
+                activePushOffer = {
+                    ...result,
+                    recvPubkey: status.recvPubkey,
+                    confirmCode: code,
+                };
+                return;
+            }
+            if (status.status === 'missing') {
+                waitEl.textContent = 'Transfer expired. Generate a new QR or link.';
+                return;
+            }
+            await new Promise((r) => setTimeout(r, 2000));
+        }
+    } catch (e) {
+        if (!pushPollAbort) {
+            waitEl.textContent = e.message || 'Transfer status failed';
+        }
+    }
+}
+
+async function showQR() {
+    try {
+        const result = await generateTransferForDisplay();
+        const qrBox = document.getElementById('qr-box');
+        const qrContainer = document.getElementById('qr-container');
+        qrBox.classList.remove('hidden');
+        qrContainer.innerHTML = '';
+        if (typeof QRCode !== 'undefined') {
+            try {
+                new QRCode(qrContainer, {
+                    text: result.qrUrl,
+                    width: 220,
+                    height: 220,
+                    colorDark: '#000000',
+                    colorLight: '#ffffff',
+                    correctLevel: QRCode.CorrectLevel ? QRCode.CorrectLevel.M : 0,
+                });
+            } catch (qrError) {
+                console.warn('QR render failed:', qrError);
+                qrContainer.innerHTML =
+                    '<p style="color: #dc2626;">QR could not render. Use the link below.</p>';
+            }
+        } else {
+            qrContainer.innerHTML = '<p style="color: #dc2626;">QR library not loaded</p>';
+        }
+        showTransferDisplay(result, { showQr: true });
+    } catch (e) {
+        console.error('QR generation failed:', e);
+        alert('Failed to generate QR code: ' + (e.message || e));
+    }
+}
+
+async function showTransferLink() {
+    try {
+        const result = await generateTransferForDisplay();
+        document.getElementById('qr-box').classList.add('hidden');
+        document.getElementById('qr-container').innerHTML = '';
+        showTransferDisplay(result, { showQr: false });
+    } catch (e) {
+        console.error('Transfer link generation failed:', e);
+        alert('Failed to generate transfer link: ' + (e.message || e));
+    }
+}
+
+async function confirmPushSend() {
+    const btn = document.getElementById('confirm-push-btn');
+    const waitEl = document.getElementById('push-wait-status');
+    if (!activePushOffer?.transferId || !activePushOffer?.recvPubkey) {
+        alert('Other device has not joined yet');
+        return;
+    }
+    const orig = btn.textContent;
+    try {
+        btn.disabled = true;
+        btn.textContent = 'Sending...';
+        await wallet.confirmLinkPushDeposit({
+            transferId: activePushOffer.transferId,
+            recvPubkey: activePushOffer.recvPubkey,
+        });
+        waitEl.textContent = 'Sent. Finish setup on the other device.';
+        waitEl.style.color = '#065f46';
+        btn.classList.add('hidden');
+        pushPollAbort = true;
+    } catch (e) {
+        console.error('Push send failed:', e);
+        waitEl.textContent = e.message || 'Send failed';
+        alert('Failed to send: ' + (e.message || e));
+    } finally {
+        btn.disabled = false;
+        btn.textContent = orig;
+    }
+}
+
+function hideQR() {
+    pushPollAbort = true;
+    activePushOffer = null;
+    document.getElementById('qr-display').classList.add('hidden');
+    document.getElementById('show-qr-btn').classList.remove('hidden');
+    document.getElementById('show-link-btn').classList.remove('hidden');
+    document.getElementById('confirm-push-btn').classList.add('hidden');
+    document.getElementById('push-confirm-banner')?.classList.add('hidden');
+    const codeEl = document.getElementById('push-confirm-code-display');
+    if (codeEl) codeEl.textContent = '';
+    document.getElementById('qr-box').classList.remove('hidden');
+    document.getElementById('qr-container').innerHTML = '';
+    const linkOptions = document.getElementById('link-options');
+    if (linkOptions) {
+        linkOptions.innerHTML = '';
+        linkOptions.classList.add('hidden');
+    }
+    const waitEl = document.getElementById('push-wait-status');
+    if (waitEl) {
+        waitEl.textContent = '';
+        waitEl.style.color = '';
+    }
+    if (qrTimerInterval) {
+        clearInterval(qrTimerInterval);
+        qrTimerInterval = null;
+    }
+}
+
 async function encryptWalletData(data, keyBase64) {
     const keyBytes = base64ToArrayBuffer(keyBase64);
     const key = await crypto.subtle.importKey('raw', keyBytes, { name: 'AES-GCM' }, false, ['encrypt']);
@@ -1252,8 +1505,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('clear-wallet-btn').addEventListener('click', clearWallet);
     document.getElementById('return-passkey-btn')?.addEventListener('click', returnWithExistingPasskey);
     document.getElementById('session-duration-select').addEventListener('change', () => applySessionDuration());
+    document.getElementById('show-qr-btn')?.addEventListener('click', showQR);
+    document.getElementById('show-link-btn')?.addEventListener('click', showTransferLink);
+    document.getElementById('hide-qr-btn')?.addEventListener('click', hideQR);
+    document.getElementById('confirm-push-btn')?.addEventListener('click', confirmPushSend);
 });
 </script>
+<script src="/static/js/qrcode.min.js" nonce="{{ csp_nonce }}"></script>
 {% endblock %}
 
 {% block wallet_auto_init %}

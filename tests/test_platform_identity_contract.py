@@ -228,4 +228,6 @@ def test_device_link_bundles_ishuman_credentials_and_unlock_token(wallet_js_sour
     assert "humanProofRestored" in wallet_js_source
     assert "beginLinkReceive" in wallet_js_source
     assert "sendLinkDepositFromScan" in wallet_js_source
+    assert "beginLinkPush" in wallet_js_source
+    assert "confirmLinkPushDeposit" in wallet_js_source
     assert "2.74.0" in wallet_js_source
