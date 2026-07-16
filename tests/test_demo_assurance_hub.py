@@ -44,8 +44,9 @@ def test_demo_hub_template_has_three_concept_lifecycle():
     assert "ih-simulate-rotation-btn" not in html
     assert "assurance-only" in html
     assert 'data-quick-act="3"' in html
-    assert "Enforce site decisions" in html
-    assert "Developer view: signed presentations" in html
+    assert "ih-enforce-rows" in html
+    assert "Doubt presence" in html
+    assert "Set assurance level (presale)" in html
 
 
 def test_demo_hub_css_supports_lifecycle_and_inspector():

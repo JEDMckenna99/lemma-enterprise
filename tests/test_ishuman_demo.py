@@ -47,10 +47,15 @@ def test_ishuman_demo_page_loads_expected_assets(ishuman_demo_client):
     assert "Developer view: operator tools &amp; integrator reference" in body
     assert "Create your lemma.id" in body
     assert "Verify on demo sites" in body
-    assert "Enforce site decisions" in body
-    assert "Set assurance level" in body
-    assert "Challenge with doubt" in body
-    assert "Ban on ticketing" in body
+    assert "Enforce" in body
+    assert "ih-enforce-rows" in body
+    assert "ih-enforce-trials-ppid" in body
+    assert "Doubt presence" in body
+    assert "Doubt human proof" in body
+    assert "Set assurance level (presale)" in body
+    assert "Enforce site decisions" not in body
+    assert "Set assurance level</h3>" not in body
+    assert "Challenge with doubt" not in body
     assert "Escalate to human proof" not in body
     assert "Doubt and site revocation" not in body
     assert "ih-human-cta" not in body
@@ -61,15 +66,17 @@ def test_ishuman_demo_page_loads_expected_assets(ishuman_demo_client):
     assert "ih-wallet-slots" in body
     assert "ih-abuse-block-btn" in body
     assert "ih-tickets-ishuman-toggle" in body
+    assert "ih-trials-ban-btn" in body
     assert "ih-unblock-tickets-btn" in body
     assert "ih-create-doubt-btn" in body
     assert "ih-resolve-doubt-btn" in body
+    assert "ih-resolve-trials-doubt-btn" in body
     assert "demo-seg-toggle" in body
     assert ">Passkey</button>" in body
     assert ">Human proof</button>" in body
     assert ">Ban</button>" in body
     assert ">Unblock</button>" in body
-    assert "/static/css/demo/ishuman-demo.css?v=43" in body
+    assert "/static/css/demo/ishuman-demo.css?v=45" in body
     assert "ih-raise-tickets-policy-btn" not in body
     assert "ih-policy-toggle-card" not in body
     assert "ih-complete-human-main-btn" in body
@@ -133,9 +140,7 @@ def test_ishuman_demo_page_loads_expected_assets(ishuman_demo_client):
     assert "/sdk/ishuman-verifier.js" in body
     assert "/static/js/demo/ishuman-demo.js" in body
     assert "/static/css/demo/ishuman-demo.css" in body
-    assert "/static/js/demo/ishuman-demo.js?v=66" in body
-    assert 'data-seg="unblock"' in body
-    assert body.index('id="ih-unblock-tickets-btn"') < body.index('id="ih-abuse-block-btn"')
+    assert "/static/js/demo/ishuman-demo.js?v=68" in body
     js = (ROOT / "static/js/demo/ishuman-demo.js").read_text(encoding="utf-8")
     assert "blockToggleBusy" in js
     assert "reason: 'unblocked'" in js or 'reason: "unblocked"' in js

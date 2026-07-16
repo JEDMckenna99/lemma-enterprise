@@ -6,7 +6,7 @@
 
 {% block head %}
 {{ super() }}
-<link rel="stylesheet" href="/static/css/demo/ishuman-demo.css?v=43">
+<link rel="stylesheet" href="/static/css/demo/ishuman-demo.css?v=45">
 {% endblock %}
 
 {% block content %}
@@ -31,6 +31,7 @@
 
   <header class="demo-hero">
     <div class="demo-hero-copy">
+      <img class="demo-hero-logo" src="/static/img/lemma_logo.svg" alt="lemma.id" width="56" height="56">
       <p class="demo-eyebrow">lemma.id demo</p>
       <h1 class="demo-title">One lemma.id. A different private ID on every site.</h1>
       <p class="demo-lead" id="ih-intro-lead">Three concepts: <strong>Create</strong> a passkey-protected lemma.id on your device, <strong>Verify</strong> it on demo sites to mint unlinkable private IDs, then <strong>Enforce</strong> site policy — set assurance, doubt a user, or ban a PPID. Credentials stay on your device; sites verify proofs offline.</p>
@@ -424,45 +425,78 @@
       <div class="workflow-body" id="ih-abuse-panel">
         <div class="workflow-head">
           <div>
-            <h2 id="ih-block-step-title">Enforce site decisions</h2>
-            <p class="demo-muted">Sites decide what a proof is worth: raise the assurance bar, challenge with temporary doubt, or ban a PPID. Enforcement is site-scoped — trials stays independent throughout.</p>
+            <h2 id="ih-block-step-title">Enforce</h2>
+            <p class="demo-muted">Each site decides on its private ID — doubt for a fresh proof, or ban. Scoped per site: action on presale does not affect SaaS trial.</p>
           </div>
         </div>
 
-        <div class="enforce-lever" id="ih-step-human">
-          <div class="enforce-lever-head" id="ih-human-proof-panel">
-            <h3 id="ih-human-step-title">Set assurance level</h3>
-            <p class="demo-muted">Require human proof on ticketing. A valid passkey presentation becomes insufficient; after IDV the <strong>same PPID</strong> returns with stronger assurance.</p>
-          </div>
-          <div class="block-grid">
-            <div class="block-card">
-              <h4>Ticketing assurance policy</h4>
+        <div class="enforce-rows" id="ih-enforce-rows">
+          <article class="enforce-row" id="ih-enforce-row-tickets" data-site="tickets">
+            <div class="enforce-row-main">
+              <span class="enforce-row-label">Presale</span>
+              <code class="enforce-row-ppid" id="ih-enforce-tickets-ppid">—</code>
+              <span class="demo-pill enforce-row-status" id="ih-enforce-tickets-status">Not verified</span>
+            </div>
+            <div class="enforce-row-actions">
+              <button type="button" class="enforce-chip" id="ih-doubt-tickets-presence-btn">Doubt presence</button>
+              <button type="button" class="enforce-chip" id="ih-doubt-tickets-human-btn">Doubt human proof</button>
+              <button type="button" class="enforce-chip enforce-chip--quiet" id="ih-resolve-doubt-btn" hidden>Resolve</button>
+              <button type="button" class="enforce-chip enforce-chip--danger" id="ih-abuse-block-btn">Ban</button>
+            </div>
+          </article>
+          <article class="enforce-row" id="ih-enforce-row-trials" data-site="trials">
+            <div class="enforce-row-main">
+              <span class="enforce-row-label">SaaS trial</span>
+              <code class="enforce-row-ppid" id="ih-enforce-trials-ppid">—</code>
+              <span class="demo-pill enforce-row-status" id="ih-enforce-trials-status">Not verified</span>
+            </div>
+            <div class="enforce-row-actions">
+              <button type="button" class="enforce-chip" id="ih-doubt-trials-presence-btn">Doubt presence</button>
+              <button type="button" class="enforce-chip" id="ih-doubt-trials-human-btn">Doubt human proof</button>
+              <button type="button" class="enforce-chip enforce-chip--quiet" id="ih-resolve-trials-doubt-btn" hidden>Resolve</button>
+              <button type="button" class="enforce-chip enforce-chip--danger" id="ih-trials-ban-btn">Ban</button>
+            </div>
+          </article>
+        </div>
+        <p class="demo-muted enforce-footnote" id="ih-doubt-status">Verify both sites above, then enforce on a row.</p>
+
+        <table class="demo-results-table demo-results-table--compat" id="ih-block-results-table" hidden aria-hidden="true">
+          <tbody>
+            <tr>
+              <td id="ih-block-result-tickets">—</td>
+              <td id="ih-block-reason-tickets">—</td>
+            </tr>
+            <tr>
+              <td id="ih-block-result-trials">—</td>
+              <td id="ih-block-reason-trials">—</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <details class="enforce-assurance-details assurance-only" id="ih-enforce-assurance-details">
+          <summary>Set assurance level (presale)</summary>
+          <div class="enforce-assurance-body" id="ih-step-human">
+            <p class="demo-muted">Require human proof on presale. Same PPID after step-up — only the assurance tier changes.</p>
+            <div class="enforce-assurance-controls">
               <div class="demo-seg-toggle" id="ih-tickets-assurance-seg" role="group" aria-label="Ticketing assurance policy">
                 <span class="demo-seg-toggle-thumb" aria-hidden="true"></span>
                 <button class="demo-seg-toggle-btn is-active" id="ih-tickets-passkey-btn" type="button" data-assurance="passkey" aria-pressed="true">Passkey</button>
                 <button class="demo-seg-toggle-btn" id="ih-tickets-ishuman-toggle" type="button" data-assurance="ishuman" aria-pressed="false">Human proof</button>
               </div>
-              <button class="demo-btn demo-btn-secondary" id="ih-escalation-recheck-btn" type="button" style="margin-top:12px">Re-check ticketing under new policy</button>
+              <button class="demo-btn demo-btn-secondary demo-btn-quiet" id="ih-escalation-recheck-btn" type="button">Re-check</button>
+              <button class="demo-btn demo-btn-secondary demo-btn-quiet" id="ih-complete-human-main-btn" type="button">Complete human proof</button>
+              <button class="demo-btn demo-btn-secondary demo-btn-quiet" id="ih-reverify-human-main-btn" type="button">Re-verify presale</button>
             </div>
-            <div class="block-card">
-              <h4>Complete human proof step-up</h4>
-              <p class="demo-muted">One identity check in the Lemma popup. Site-private IDs stay the same.</p>
-              <button class="demo-btn demo-btn-primary" id="ih-complete-human-main-btn" type="button">Complete human proof verification</button>
-              <button class="demo-btn demo-btn-secondary" id="ih-reverify-human-main-btn" type="button">Re-verify ticketing (human proof)</button>
+            <div class="policy-deny-grid" id="ih-policy-deny-grid" hidden>
+              <div class="policy-deny-card">
+                <h4>Passkey only</h4>
+                <span class="demo-pill deny" id="ih-policy-deny-yours">Would deny</span>
+              </div>
+              <div class="policy-deny-card">
+                <h4>After human proof</h4>
+                <span class="demo-pill ok" id="ih-policy-deny-abuser">Would accept</span>
+              </div>
             </div>
-          </div>
-          <div class="policy-deny-grid" id="ih-policy-deny-grid" hidden>
-            <div class="policy-deny-card">
-              <h4>Passkey only</h4>
-              <p class="demo-muted">Valid presentation, but policy now requires a human proof.</p>
-              <span class="demo-pill deny" id="ih-policy-deny-yours">Would deny</span>
-            </div>
-            <div class="policy-deny-card">
-              <h4>After human proof</h4>
-              <p class="demo-muted">Same PPID, stronger assurance.</p>
-              <span class="demo-pill ok" id="ih-policy-deny-abuser">Would accept</span>
-            </div>
-          </div>
           <div class="ppid-stepup-compare" id="ih-stepup-compare" hidden>
             <p class="ppid-compare-title">Same site-private ID after step-up</p>
             <div class="ppid-compare-grid">
@@ -478,61 +512,20 @@
             </div>
             <p class="demo-muted" id="ih-assurance-flip">Assurance: —</p>
           </div>
-          <div class="demo-outcome-banner" id="ih-human-outcome-banner" hidden aria-live="polite">
-            <img src="/static/img/lemma_logo.svg" alt="" width="22" height="22" class="demo-outcome-banner-logo">
-            <div>
-              <strong>Assurance changes; the PPID does not</strong>
-              <span id="ih-human-outcome-text">Same private ID, stronger tier. Enforcement can now bind to one verified human.</span>
+            <div class="demo-outcome-banner" id="ih-human-outcome-banner" hidden aria-live="polite">
+              <img src="/static/img/lemma_logo.svg" alt="" width="22" height="22" class="demo-outcome-banner-logo">
+              <div>
+                <strong>Assurance changes; the PPID does not</strong>
+                <span id="ih-human-outcome-text">Same private ID, stronger tier.</span>
+              </div>
             </div>
           </div>
-        </div>
+        </details>
 
-        <div class="enforce-lever">
-          <h3>Challenge with doubt</h3>
-          <p class="demo-muted">Temporary fresh-proof challenge — whether the user only has passkey presence or already completed a human proof. Next verify returns <code>doubt_required</code>; resolve with a deliberate fresh proof.</p>
-          <div class="action-row">
-            <button class="demo-btn demo-btn-secondary" id="ih-create-doubt-btn" type="button">Mark ticketing PPID doubtful</button>
-            <button class="demo-btn demo-btn-primary" id="ih-resolve-doubt-btn" type="button">Resolve with fresh proof</button>
-          </div>
-          <p class="demo-muted" id="ih-doubt-status">No active doubt on ticketing.</p>
-        </div>
-
-        <div class="enforce-lever">
-          <h3>Ban on ticketing</h3>
-          <p class="demo-muted">Persistent site block. Fresh verification does not clear <code>site_blocked</code>.</p>
-          <div class="demo-seg-toggle" id="ih-block-seg" role="group" aria-label="Ticketing block state" data-active="0">
-            <span class="demo-seg-toggle-thumb" aria-hidden="true"></span>
-            <button class="demo-seg-toggle-btn is-active" id="ih-unblock-tickets-btn" type="button" data-seg="unblock" aria-pressed="true">Unblock</button>
-            <button class="demo-seg-toggle-btn" id="ih-abuse-block-btn" type="button" data-seg="block" aria-pressed="false">Ban</button>
-          </div>
-        </div>
-
-        <div class="enforce-lever">
-          <h3>Check both sites</h3>
-          <p class="demo-muted">Confirm ticketing enforcement is site-scoped and trials remains valid.</p>
-          <button class="demo-btn demo-btn-secondary" id="ih-abuse-recheck-btn" type="button">Check both sites</button>
-          <table class="demo-results-table" id="ih-block-results-table">
-            <thead>
-              <tr>
-                <th scope="col">Site</th>
-                <th scope="col">Result</th>
-                <th scope="col">Reason</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td>Ticketing</td>
-                <td id="ih-block-result-tickets">—</td>
-                <td id="ih-block-reason-tickets">—</td>
-              </tr>
-              <tr>
-                <td>Trials</td>
-                <td id="ih-block-result-trials">—</td>
-                <td id="ih-block-reason-trials">—</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
+        <button type="button" class="demo-btn demo-btn-quiet" id="ih-unblock-tickets-btn" hidden aria-hidden="true">Unblock</button>
+        <button type="button" class="demo-btn demo-btn-quiet" id="ih-create-doubt-btn" hidden aria-hidden="true">Legacy doubt</button>
+        <div class="demo-seg-toggle" id="ih-block-seg" hidden aria-hidden="true" data-active="0"></div>
+        <button type="button" class="demo-btn demo-btn-quiet" id="ih-abuse-recheck-btn" hidden aria-hidden="true">Recheck</button>
 
         <div class="demo-outcome-banner" id="ih-control-outcome-banner" hidden aria-live="polite">
           <img src="/static/img/lemma_logo.svg" alt="" width="22" height="22" class="demo-outcome-banner-logo">
@@ -715,5 +708,5 @@ const { ok, ppid, assurance, presentation } = await new IsHumanVerifier({
 <script src="/static/js/lemma-keys.js?v=5" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
 <script nonce="{{ csp_nonce }}">window.LEMMA_ISHUMAN_USE_PERSON_ROOT_SEEDS = {{ 'true' if ishuman_use_person_root_seeds else 'false' }};</script>
 <script src="/sdk/ishuman-verifier.js?v={{ ishuman_verifier_sdk_version }}" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
-<script src="/static/js/demo/ishuman-demo.js?v=66" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
+<script src="/static/js/demo/ishuman-demo.js?v=68" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
 {% endblock %}
