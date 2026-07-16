@@ -2,7 +2,7 @@
 {% set is_public_page = true %}
 
 {% block title %}isHuman | Stop repeat abusers from coming back as new accounts{% endblock %}
-{% block description %}isHuman lets your site require one verified human per account without running KYC yourself. It's built on lemma.id, a proof wallet your users hold, with a private pairwise ID per site and verification that happens on your own backend.{% endblock %}
+{% block description %}One integration, three levels of proof: lemma.id continuity, presence proof, and human proof. Require one verified human per account without running KYC yourself — with a private pairwise ID per site and verification on your own backend.{% endblock %}
 
 {% block head %}
     {{ super() }}
@@ -234,30 +234,30 @@
         </p>
         <div class="home-example">
             <p style="margin: 0 0 10px 0; font-size: var(--font-size-sm); font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--primary);">Example</p>
-            <p style="margin: 0; font-size: var(--font-size-base); color: var(--gray-700); line-height: 1.65;">A scalper creates 500 accounts. You ban 200. Tomorrow they're back with new emails, SIMs, and proxies. Passkeys recognize a returning wallet — they don't stop someone from making another. Require a human proof, and coming back means identity verification again.</p>
+            <p style="margin: 0; font-size: var(--font-size-base); color: var(--gray-700); line-height: 1.65;">A scalper creates 500 accounts. You ban 200. Tomorrow they're back with new emails, SIMs, and proxies. Recognizing the same lemma.id helps with continuity — it doesn't stop someone from making another. Require a human proof, and coming back means identity verification again.</p>
         </div>
     </div>
 </section>
 
-<!-- Assurance levels -->
+<!-- Proof levels -->
 <section class="section" id="assurance-levels" style="background: var(--gray-100);">
     <div class="container">
         <div class="home-section-head">
-            <p class="eyebrow">Assurance levels</p>
-            <h2>One integration, three levels</h2>
-            <p class="text-gray">Start with passkey continuity. Verify a signed proof on your backend where it matters. Step up to isHuman only for accounts and actions where one person must mean one account.</p>
+            <p class="eyebrow">Proof levels</p>
+            <h2>One integration, three levels of proof</h2>
+            <p class="text-gray">Start with lemma.id continuity. Add a presence proof when you need the holder at the device. Step up to a human proof only where one person must mean one account.</p>
         </div>
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 24px; max-width: 960px; margin: 0 auto;">
             <div class="card">
-                <h3 class="card-title">Passkey continuity</h3>
-                <p>Recognize the same returning wallet with a stable, site-private PPID. Good for trying the integration — but anyone can mint another wallet, so this tier alone won't stop repeat abusers.</p>
+                <h3 class="card-title">lemma.id</h3>
+                <p>The continuous thing. Recognize the same returning lemma.id with a stable, site-private PPID. Good for trying the integration — but anyone can create another lemma.id, so this alone won't stop repeat abusers.</p>
             </div>
             <div class="card">
-                <h3 class="card-title">Signed presentation</h3>
-                <p>Before signup or a risky action, your backend checks a signed proof from the user's wallet. Something you can trust server-side, with no KYC data on your servers.</p>
+                <h3 class="card-title">Presence proof</h3>
+                <p>A fresh passkey at presentation signing shows the holder is at the device right now. Your backend gets a signed proof it can trust, with no KYC data on your servers.</p>
             </div>
             <div class="card" style="border-color: var(--primary);">
-                <h3 class="card-title">isHuman</h3>
+                <h3 class="card-title">Human proof</h3>
                 <p>One account per verified human. A ban actually costs the abuser something. Use this when new-account rotation is the attack you're fighting.</p>
             </div>
         </div>
@@ -270,7 +270,7 @@
         <div style="max-width: 640px; margin: 0 auto; text-align: center;">
             <p class="eyebrow" style="font-size: var(--font-size-sm); font-weight: 700; text-transform: uppercase; letter-spacing: 2px; color: var(--primary); margin-bottom: 12px;">For your real users</p>
             <h2>Already verified? No ceremony on your site.</h2>
-            <p style="font-size: var(--font-size-lg); color: var(--gray-700); line-height: 1.65; margin: 16px 0 0;">A user who completed isHuman anywhere on the network clears your gate instantly — no ID check, no upload. Most fraud tools cost conversion; this one can improve it for returning verified users.</p>
+            <p style="font-size: var(--font-size-lg); color: var(--gray-700); line-height: 1.65; margin: 16px 0 0;">A user who already has a human proof anywhere on the network clears your gate instantly — no ID check, no upload. Most fraud tools cost conversion; this one can improve it for returning verified users.</p>
         </div>
     </div>
 </section>
@@ -340,7 +340,7 @@
             <div style="padding: 24px;">
                 <div class="home-step-num">1</div>
                 <h3 style="font-size: var(--font-size-lg); margin-bottom: 8px;">Bind</h3>
-                <p style="color: var(--gray-600); font-size: var(--font-size-sm); margin: 0;">Tie the user to a site-private PPID. Passkey tier means “same wallet.” Human proof means “same verified person.”</p>
+                <p style="color: var(--gray-600); font-size: var(--font-size-sm); margin: 0;">Tie the user to a site-private PPID. lemma.id means “same identity object.” Human proof means “same verified person.”</p>
             </div>
             <div style="padding: 24px;">
                 <div class="home-step-num">2</div>
@@ -404,7 +404,7 @@
         <div class="home-section-head">
             <p class="eyebrow">Developer integration</p>
             <h2>Verify a signed presentation on your backend</h2>
-            <p class="text-gray">Most users stay on the passkey tier. Where you need one human per account, ask for isHuman. Your backend verifies the presentation and never touches KYC data.</p>
+            <p class="text-gray">Most users stay on lemma.id continuity, with a presence proof when you need the holder at the device. Where you need one human per account, require a human proof. Your backend verifies the presentation and never touches KYC data.</p>
         </div>
 
         <div class="home-code">

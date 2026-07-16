@@ -79,7 +79,7 @@
         <div style="max-width: 860px; margin: 0 auto; text-align: center;">
             <p style="font-size: var(--font-size-sm); font-weight: 600; text-transform: uppercase; letter-spacing: 2px; color: var(--primary); margin-bottom: 16px;">Trust &amp; transparency</p>
             <h1 style="font-size: clamp(2.5rem, 5vw, 3.5rem); line-height: 1.1; margin-bottom: 24px;">Enforcement-grade assurance<br>without identity-grade liability.</h1>
-            <p style="font-size: var(--font-size-xl); font-weight: 500; margin-bottom: var(--space-4); color: var(--gray-700);">This page is a plain accounting of who holds what. The short version: your site gets a private PPID that means "same returning wallet," or "same verified human" if you require human proofs. Other sites get different PPIDs they can't link to yours. And nobody in the chain learns the user's name, document, selfie, or date of birth.</p>
+            <p style="font-size: var(--font-size-xl); font-weight: 500; margin-bottom: var(--space-4); color: var(--gray-700);">This page is a plain accounting of who holds what. The short version: your site gets a private PPID that means "same lemma.id," or "same verified human" if you require a human proof. Other sites get different PPIDs they can't link to yours. And nobody in the chain learns the user's name, document, selfie, or date of birth.</p>
             <div style="display: flex; gap: 16px; justify-content: center; flex-wrap: wrap; margin-top: 28px;">
                 <a href="/docs" class="btn btn-primary">Integration docs</a>
                 <a href="/privacy" class="btn btn-secondary">Privacy policy</a>
@@ -101,7 +101,7 @@
                 <span class="trust-badge trust-badge--good">Your site</span>
                 <div class="trust-footprint-size">~80 chars</div>
                 <h3>Verdict + site-private PPID</h3>
-                <p style="color: var(--gray-600); font-size: var(--font-size-sm); margin: 0;">A proof verdict and an opaque per-site identifier like <code>did:lemma:ppid_…</code>. At the <code>passkey</code> tier it means "same returning wallet"; at <code>ishuman</code>, "same verified human." Either way, no ID document, selfie, legal name, or date of birth ever touches your servers.</p>
+                <p style="color: var(--gray-600); font-size: var(--font-size-sm); margin: 0;">A proof verdict and an opaque per-site identifier like <code>did:lemma:ppid_…</code>. With lemma.id continuity it means "same lemma.id"; with a human proof, "same verified human." Either way, no ID document, selfie, legal name, or date of birth ever touches your servers.</p>
             </div>
             <div class="trust-footprint-item" style="border-color: var(--primary);">
                 <span class="trust-badge trust-badge--neutral">lemma.id</span>
@@ -174,8 +174,8 @@
                         <td>Government ID data exposed</td>
                     </tr>
                     <tr>
-                        <td><strong>Enforcement durability</strong><br><span style="font-weight:400;color:var(--gray-600);">passkey: same wallet · isHuman: same human</span></td>
-                        <td class="trust-col-lemma">Passkey: wallet continuity. isHuman: person-root binding, so bans survive email and SIM rotation</td>
+                        <td><strong>Enforcement durability</strong><br><span style="font-weight:400;color:var(--gray-600);">lemma.id: same identity · human proof: same human</span></td>
+                        <td class="trust-col-lemma">lemma.id continuity for return visits. Human proof: person-root binding, so bans survive email and SIM rotation</td>
                         <td>Attacker rotates email or creates new OAuth account</td>
                         <td>Strong if you keep artifacts; expensive to operate</td>
                     </tr>
@@ -226,7 +226,7 @@
                 <h2>Why &ldquo;lemma.id&rdquo;</h2>
             </div>
             <div style="background: var(--white); border: 1px solid var(--gray-200); border-radius: 14px; padding: 32px;">
-                <p>In mathematics, a lemma is an intermediate result you prove once and then lean on to prove bigger things. That's exactly the job here. Your lemma.id is one user-held anchor where verified claims accumulate: continuity on a site, signed presentations, a human proof when a site needs to know there's one person behind the account.</p>
+                <p>In mathematics, a lemma is an intermediate result you prove once and then lean on to prove bigger things. That's exactly the job here. Your lemma.id is the continuous identity object where proofs accumulate: continuity on a site, a presence proof when the holder must be at the device, a human proof when a site needs one person behind the account.</p>
 
                 <p style="font-size: var(--font-size-lg); color: var(--gray-700); line-height: 1.7; margin-bottom: 20px;">Each proof is a signed credential in your browser wallet. When a site asks, it gets an answer to the specific claim it asked about, bound to its own private PPID. Not your profile, not your history, just that claim. Return visits verify locally, with no callback and no reusable ID crossing site boundaries.</p>
 
@@ -250,7 +250,7 @@
             </div>
             <div class="card">
                 <h3 class="card-title">For integrators</h3>
-                <p>You get returning-user continuity, and human-proof assurance where you need it, without building a KYC stack or holding a single document image. If your database leaks, the attacker gets opaque PPIDs. Not passport scans.</p>
+                <p>You get lemma.id continuity, and human proof where you need it, without building a KYC stack or holding a single document image. If your database leaks, the attacker gets opaque PPIDs. Not passport scans.</p>
             </div>
             <div class="card">
                 <h3 class="card-title">For the public web</h3>

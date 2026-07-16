@@ -2,14 +2,19 @@
 {% set active_product = 'ishuman' %}
 {% set active_page = 'ishuman' %}
 {% set hero_title = 'isHuman + lemma.id for developers' %}
-{% set hero_subtitle = 'Everything you need to require one verified human per account: the browser SDK, site-private PPIDs, offline backend verification, and the passkey and isHuman assurance tiers.' %}
-{% set page_description = 'isHuman developer docs: integrate IDV-backed human assurance and lemma.id private proofs with the browser SDK, site-private PPIDs, and signed backend presentations.' %}
+{% set hero_subtitle = 'Everything you need to require one verified human per account: the browser SDK, site-private PPIDs, offline backend verification, and three levels of proof — lemma.id, presence proof, and human proof.' %}
+{% set page_description = 'lemma.id developer docs: integrate three levels of proof (lemma.id continuity, presence proof, human proof) with the browser SDK, site-private PPIDs, and signed backend presentations.' %}
 
 {% block docs_content %}
 <div class="docs-section" id="quickstart">
     <h2>What lemma.id gives your site</h2>
-    <p><strong>isHuman</strong> is the IDV-backed assurance tier: one verified human per account. <strong>lemma.id</strong> is the user-held proof wallet underneath it. Your site gets a stable, site-private PPID bound to your user record. That PPID is not a legal identity, an email, a document number, or an ID that works anywhere else.</p>
-    <p>Use <strong>passkey assurance</strong> when you just need to recognize the same returning wallet. It's low friction and good for onboarding, but keep in mind it isn't Sybil-resistant on its own. Require <strong>isHuman assurance</strong> when your policy needs one verified human behind the account: free-trial abuse, ticketing, rewards, voting, recovery after a ban, and any other flow where the attacker's cheapest move is making a new account.</p>
+    <p><strong>lemma.id</strong> is the continuous identity object your users hold. Your site gets a stable, site-private PPID bound to your user record — not a legal identity, email, document number, or ID that works anywhere else.</p>
+    <p><strong>One integration, three levels of proof:</strong></p>
+    <ul style="line-height: 1.8; color: var(--gray-700); padding-left: 24px; margin-bottom: 16px;">
+        <li><strong>lemma.id</strong> (<code>requiredAssurance: 'passkey'</code>) — same returning lemma.id / PPID continuity. Low friction; not Sybil-resistant alone.</li>
+        <li><strong>Presence proof</strong> — fresh passkey when the presentation is signed, so the holder is at the device. Delivery is still a signed presentation.</li>
+        <li><strong>Human proof</strong> (<code>requiredAssurance: 'ishuman'</code>) — one verified human per account. Use for free-trial abuse, ticketing, rewards, voting, recovery after a ban — anywhere the attacker's cheapest move is a new account.</li>
+    </ul>
     <div class="callout callout--info">
         <div class="callout-title">Why this exists</div>
         <p>Login proves control of an account. Bot detection flags suspicious behavior. Neither can tell you the person you banned yesterday just signed up again. lemma.id gives your backend a durable handle on the person, so a new email, SIM, device, or OAuth account doesn't reset the slate.</p>
@@ -130,7 +135,7 @@
         <li><strong>Passkey wallet</strong> — create an empty lemma.id (provisional person root, no IDV yet).</li>
         <li><strong>Passkey proof on two sites</strong> — derive distinct PPIDs with <code>assurance: passkey</code> via <code>verifyForBackend({ requiredAssurance: 'passkey' })</code>.</li>
         <li><strong>Demo relying sites</strong> — stamp actions and verify server-side with <code>verifyStamp</code> (see <a href="https://lemma-demo-tickets-1d3d7411af33.herokuapp.com" rel="noopener">ticketing demo</a> and <a href="https://lemma-demo-trials-7090f46cae0d.herokuapp.com" rel="noopener">trials demo</a>).</li>
-        <li><strong>Site-local block</strong> — block the ticketing PPID; trials remains valid with passkey assurance.</li>
+        <li><strong>Site-local block</strong> — block the ticketing PPID; trials remains valid with lemma.id continuity.</li>
         <li><strong>isHuman step-up</strong> — site escalates to IDV; re-verify with <code>requiredAssurance: 'ishuman'</code> and note the <em>same PPID</em> comes back with stronger assurance.</li>
     </ol>
     <p>See also the <a href="/docs/integration/ISHUMAN_AGENT_INTEGRATION.md">agent integration guide</a> assurance table and <a href="/docs/demo/README.md">demo recording checklist</a>.</p>
@@ -313,15 +318,15 @@ def checkout():
 </div>
 
 <div class="docs-section">
-    <h2>What are lemma.id and isHuman?</h2>
-    <p><strong>isHuman</strong> is the IDV-backed assurance tier: one verified human per account, and your site never learns who that human legally is. <strong>lemma.id</strong> is the user-held proof wallet and relying-site integration that issues site-private PPIDs and signed presentations. Passkey assurance handles continuity; isHuman handles Sybil resistance.</p>
+    <h2>What are lemma.id and human proof?</h2>
+    <p><strong>lemma.id</strong> is the continuous identity object — user-held credentials, site-private PPIDs, and signed presentations. <strong>Human proof</strong> is the IDV-backed level: one verified human per account, without your site learning who that human legally is. Presence proof is the fresh-passkey ceremony at presentation signing. lemma.id continuity handles return visits; human proof handles Sybil resistance.</p>
     <div class="callout callout--info">
-        <div class="callout-title">Assurance tiers</div>
-        <p><strong>Passkey assurance</strong> can issue site credentials without IDV when <code>LEMMA_PASSKEY_ASSURANCE_ENABLED</code> and the one-PPID model are enabled — good for continuity and low-friction signup. <strong>isHuman assurance</strong> always requires live IDV (liveness + document-to-selfie matching). A bot or stolen ID image cannot get isHuman credentials because a live human must match a genuine government document at issuance.</p>
+        <div class="callout-title">Three levels of proof</div>
+        <p><strong>lemma.id</strong> (<code>passkey</code>) can issue site credentials without IDV when <code>LEMMA_PASSKEY_ASSURANCE_ENABLED</code> and the one-PPID model are enabled — continuity and low-friction signup. <strong>Presence proof</strong> is the fresh-passkey ceremony when a presentation is signed. <strong>Human proof</strong> (<code>ishuman</code>) always requires live IDV (liveness + document-to-selfie matching). A bot or stolen ID image cannot get a human proof because a live human must match a genuine government document at issuance.</p>
     </div>
     <div class="callout callout--info">
         <div class="callout-title">Core model</div>
-        <p>When isHuman is required, the credential is rooted in a <strong>verified-person root</strong> derived from the IDV result. A master credential is issued for <code>lemma.id</code>; on your site, a Lemma-hosted popup derives a site-specific credential (a per-site PPID) on first request and caches it for later checks. Because the binding is to the person root rather than to an email, device, or OAuth account, resetting those cheap identifiers does not mint a fresh, clean identity.</p>
+        <p>When a human proof is required, the credential is rooted in a <strong>verified-person root</strong> derived from the IDV result. A master credential is issued for <code>lemma.id</code>; on your site, a Lemma-hosted popup derives a site-specific credential (a per-site PPID) on first request and caches it for later checks. Because the binding is to the person root rather than to an email, device, or OAuth account, resetting those cheap identifiers does not mint a fresh, clean identity.</p>
     </div>
     <div class="callout callout--info">
         <div class="callout-title">What your servers store: no KYC fields</div>
@@ -331,15 +336,15 @@ def checkout():
 
 <div class="docs-section" id="integration-flow">
     <h2>Integration flow (your site)</h2>
-    <p>This is the path a relying-site developer implements. Platform-side IDV webhooks are handled by lemma.id and are not part of your integration. With passkey assurance enabled, first-time users can get a passkey wallet and site proof <strong>without IDV</strong>; isHuman is a deliberate step-up when your policy requires Sybil resistance.</p>
+    <p>This is the path a relying-site developer implements. Platform-side IDV webhooks are handled by lemma.id and are not part of your integration. With lemma.id continuity (<code>passkey</code>) enabled, first-time users can get a lemma.id and site proof <strong>without IDV</strong>; a human proof is a deliberate step-up when your policy requires Sybil resistance.</p>
     <table class="docs-table">
         <thead>
             <tr><th>Step</th><th>Where</th><th>What happens</th></tr>
         </thead>
         <tbody>
             <tr><td>1</td><td>Your page</td><td>You call <code>verifyForBackend({ autoProvision: true, requiredAssurance })</code> before a protected action. Use <code>passkey</code> for continuity; <code>ishuman</code> when one verified human per account is required.</td></tr>
-            <tr><td>2</td><td>Lemma popup</td><td>If no proof exists: passkey path unlocks wallet and issues passkey assurance (no IDV). isHuman path runs live IDV at Didit after wallet unlock.</td></tr>
-            <tr><td>3</td><td>lemma.id</td><td>Issues master + site-bound credential for your <code>siteId</code>. Step-up from passkey to isHuman on the same wallet returns the <strong>same PPID</strong> with stronger assurance.</td></tr>
+            <tr><td>2</td><td>Lemma popup</td><td>If no proof exists: lemma.id path unlocks with passkey and issues continuity credentials (no IDV). Human-proof path runs live IDV at Didit after unlock.</td></tr>
+            <tr><td>3</td><td>lemma.id</td><td>Issues master + site-bound credential for your <code>siteId</code>. Step-up from lemma.id continuity to human proof on the same lemma.id returns the <strong>same PPID</strong> with a stronger proof level.</td></tr>
             <tr><td>4</td><td>Your page</td><td>SDK validates signature, expiry, and global revocation locally, then returns <code>{ ok, presentation, ppid, assurance }</code> (via <code>verifyForBackend</code>) or <code>{ human, ppid, assurance, reason }</code> (via <code>verify</code>).</td></tr>
             <tr><td>5</td><td>Your backend</td><td>Verify <code>presentation</code> or action stamp cryptographically on your server. Apply site-policy checks (blocks/doubts) — site blocks are not in the global Bloom filter. No lemma.id webhook is required.</td></tr>
         </tbody>

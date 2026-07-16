@@ -204,7 +204,7 @@
         <div class="workflow-head">
           <div>
             <h2 id="ih-step1-title">1. Create your lemma.id</h2>
-            <p class="demo-muted" id="ih-step1-desc">A passkey-protected proof wallet. This proves continuity with this wallet — not a unique human. Sites ask it for signed presentations at whatever assurance level their policy requires.</p>
+            <p class="demo-muted" id="ih-step1-desc">Your lemma.id is passkey-protected on this device. Continuity means the same lemma.id is back — not a unique human. Sites ask it for signed presentations at whatever proof level their policy requires.</p>
           </div>
         </div>
 
@@ -460,13 +460,13 @@
         </div>
         <div class="policy-deny-grid" id="ih-policy-deny-grid" hidden>
           <div class="policy-deny-card">
-            <h4>Passkey-only wallet</h4>
-            <p class="demo-muted">Valid presentation, but policy now requires human proof.</p>
+            <h4>lemma.id only (no human proof)</h4>
+            <p class="demo-muted">Valid presentation, but policy now requires a human proof.</p>
             <span class="demo-pill deny" id="ih-policy-deny-yours">Would deny</span>
           </div>
           <div class="policy-deny-card">
             <h4>After human proof</h4>
-            <p class="demo-muted">Same PPID, stronger assurance tier.</p>
+            <p class="demo-muted">Same PPID, stronger proof level.</p>
             <span class="demo-pill ok" id="ih-policy-deny-abuser">Would accept</span>
           </div>
         </div>
@@ -666,22 +666,30 @@
       </details>
 
       <section class="demo-advanced-section">
-        <h3>Assurance tiers</h3>
+        <h3>Three levels of proof</h3>
         <div class="compare-grid">
           <div class="compare-box good">
-            <h4><code>passkey</code></h4>
+            <h4>lemma.id <code>passkey</code></h4>
             <ul>
-              <li>Continuity tier; not Sybil-resistant alone.</li>
+              <li>Continuity: same lemma.id, site-private PPID.</li>
               <li>Fast unlock; no IDV required.</li>
-              <li>Site verifies a signed presentation offline.</li>
+              <li>Not Sybil-resistant alone — anyone can create another lemma.id.</li>
             </ul>
           </div>
           <div class="compare-box good">
-            <h4>Human proofs <code>ishuman</code></h4>
+            <h4>Presence proof</h4>
             <ul>
-              <li>Enforcement tier: one verified human per account.</li>
-              <li>Same PPID. The assurance tier changes, not the account.</li>
-              <li>Completed via IDV when the site policy demands it.</li>
+              <li>Fresh passkey when the presentation is signed.</li>
+              <li>Shows the holder is at the device right now.</li>
+              <li>Still not “one human” — use a human proof for that.</li>
+            </ul>
+          </div>
+          <div class="compare-box good">
+            <h4>Human proof <code>ishuman</code></h4>
+            <ul>
+              <li>Enforcement: one verified human per account.</li>
+              <li>Same PPID. The proof level changes, not the account.</li>
+              <li>Completed via IDV when site policy demands it.</li>
             </ul>
           </div>
         </div>
@@ -689,7 +697,7 @@
 
       <section class="demo-advanced-section">
         <h3>Integration snippet</h3>
-        <p class="demo-muted">Start with passkey assurance for private continuity; raise to human proofs only when your site policy requires one verified human.</p>
+        <p class="demo-muted">Start with lemma.id continuity; raise to a human proof only when your site policy requires one verified human. Presence is the fresh-passkey ceremony on the presentation.</p>
         <div class="code-block">&lt;script src="https://lemma.id/sdk/ishuman-verifier.js"&gt;&lt;/script&gt;
 const { ok, ppid, assurance, presentation } = await new IsHumanVerifier({
   siteId: 'tickets-demo.lemma.id',

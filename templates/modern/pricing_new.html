@@ -324,7 +324,7 @@
         <div class="lemma-price-card featured">
             <h3>Proof binding, verification included</h3>
             <p class="price">$0.50 / user · one-time</p>
-            <p>Covers the user's first credential for your site. If your policy requires a human proof, the document and liveness check is part of this price, not a separate IDV line item. The credential lives in the user's own wallet, and the same wallet presents the same PPID every time it comes back.</p>
+            <p>Covers the user's first credential for your site. If your policy requires a human proof, the document and liveness check is part of this price, not a separate IDV line item. The credential lives with the user's lemma.id, and the same lemma.id presents the same PPID every time it comes back.</p>
         </div>
         <div class="lemma-price-card featured">
             <h3>Monthly active user</h3>
@@ -346,10 +346,10 @@
     <div class="pricing-rules">
         <h3>Billing rules</h3>
         <ol>
-            <li><strong>Proof binding ($0.50, verification included):</strong> one-time fee for the user's first credential on your site, with the wallet secured by a passkey on first use. If your policy requires human proofs, the identity check is included in the fifty cents. There is no separate IDV charge and no markup hiding in it.</li>
+            <li><strong>Proof binding ($0.50, verification included):</strong> one-time fee for the user's first credential on your site, with the lemma.id secured by a passkey on first use. If your policy requires a human proof, the identity check is included in the fifty cents. There is no separate IDV charge and no markup hiding in it.</li>
             <li><strong>MAU ($0.03):</strong> billed for each calendar month a user renews after the month they bound. The binding month itself is never billed as an MAU.</li>
             <li><strong>What counts as active:</strong> a user whose credential is re-issued that month, which normally happens when the old one expires after about 30 days and they complete the renewal popup. Daily local checks never count toward this.</li>
-            <li><strong>Same wallet, same PPID:</strong> renewals issue a fresh credential with the same site-private PPID, so routine continuity never triggers repeat verification. If a user steps up to a human proof later, the PPID stays stable through that too.</li>
+            <li><strong>Same lemma.id, same PPID:</strong> renewals issue a fresh credential with the same site-private PPID, so routine continuity never triggers repeat verification. If a user steps up to a human proof later, the PPID stays stable through that too.</li>
             <li><strong>Doubt re-entry ($0.33):</strong> billed only when a doubted user passes fresh IDV after a site-doubt challenge. If they fail or abandon, you pay nothing for that attempt.</li>
             <li><strong>Local checks:</strong> unlimited presentations and verifications on your own infrastructure between renewals, never metered.</li>
             <li><strong>Per site:</strong> each relying site is billed for its own users. PPIDs are pairwise, so there's nothing to correlate between sites.</li>
@@ -382,7 +382,7 @@
         </div>
         <div class="feature-item">
             <div class="feature-check">✓</div>
-            <div class="feature-text"><strong>A ban that holds.</strong> The same wallet always presents the same PPID, and with human proofs that PPID is backed by the same verified person. Routine visits never trigger repeat verification.</div>
+            <div class="feature-text"><strong>A ban that holds.</strong> The same lemma.id always presents the same PPID, and with a human proof that PPID is backed by the same verified person. Routine visits never trigger repeat verification.</div>
         </div>
         <div class="feature-item">
             <div class="feature-check">✓</div>
@@ -398,7 +398,7 @@
         </div>
         <div class="feature-item">
             <div class="feature-check">✓</div>
-            <div class="feature-text"><strong>User-held wallet.</strong> The credential belongs to the person, secured by a passkey from first use. You're never its custodian.</div>
+            <div class="feature-text"><strong>User-held lemma.id.</strong> The credential belongs to the person, secured by a passkey from first use. You're never its custodian.</div>
         </div>
         <div class="feature-item">
             <div class="feature-check">✓</div>

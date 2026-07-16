@@ -2,7 +2,7 @@
 {% set is_public_page = true %}
 
 {% block title %}About - lemma.id{% endblock %}
-{% block description %}Lemma is building private proof infrastructure for the open web. Users hold one lemma.id wallet, each site sees its own private ID, and sites can require a human proof when one account has to mean one person. No central identity database watching it all.{% endblock %}
+{% block description %}Lemma is building private proof infrastructure for the open web. Users hold one lemma.id, each site sees its own private ID, and sites can require lemma.id continuity, a presence proof, or a human proof when one account has to mean one person. No central identity database watching it all.{% endblock %}
 
 {% block content %}
 
@@ -30,7 +30,7 @@
             <div style="font-size: var(--font-size-lg); color: var(--gray-700); line-height: 1.7;">
                 <p style="margin-bottom: 24px;">Trust and safety teams have had good signal for years. Device fingerprints, velocity checks, behavioral models. Detection isn't the hard part anymore. The hard part is that a ban is only as strong as the cost of the next account, and right now that cost is close to zero. A fresh email, a new SIM, a residential proxy, and the person you banned yesterday is a brand new user today.</p>
 
-                <p style="margin-bottom: 24px;">The one thing an attacker can't cheaply rotate is a real, verified identity. That's the lever. With lemma.id, a site starts with private continuity through a stable PPID, and when it requires human proofs, that PPID is backed by an actual verified person. A blocked user can't get a clean account by swapping infrastructure. We're not trying to make a new identity impossible, just expensive enough that the abuse stops paying for itself. For most abuse, that's all it takes.</p>
+                <p style="margin-bottom: 24px;">The one thing an attacker can't cheaply rotate is a real, verified identity. That's the lever. With lemma.id, a site starts with private continuity through a stable PPID — the same lemma.id coming back. When it requires a human proof, that PPID is backed by an actual verified person. A blocked user can't get a clean account by swapping infrastructure. We're not trying to make a new identity impossible, just expensive enough that the abuse stops paying for itself. For most abuse, that's all it takes.</p>
 
                 <p>The usual objection is that this requires surveillance, and it's a fair worry. Government digital ID, federated SSO, on-chain identity: they all create a new place where someone can watch who you are and where you go. Lemma is built so that doesn't happen. Sites only ever see site-private pseudonymous IDs, never one global identifier. The web has been stuck choosing between no real accountability and centralized identity surveillance. You don't have to pick either.</p>
             </div>
@@ -50,7 +50,7 @@
             <div style="background: var(--white); border: 1px solid var(--gray-200); border-radius: 14px; padding: 32px;">
                 <p style="font-size: var(--font-size-lg); color: var(--gray-700); line-height: 1.7; margin-bottom: 20px;">A driver's license works because it's verified locally. When you show it at a bar, the bartender checks the hologram and the photo on the spot. The DMV doesn't get a notification. The license sits in your wallet, and you decide when to pull it out.</p>
 
-                <p style="font-size: var(--font-size-lg); color: var(--gray-700); line-height: 1.7; margin-bottom: 20px;">Lemma applies that model to the web. You create a lemma.id wallet once. Each site asks for the assurance it needs, gets its own private PPID, and checks proofs locally using Ed25519 signatures and cached revocation data. When a site requires human proofs, those proofs are rooted in a verified person, so the site can block an abuser and know that returning means passing verification again, not just grabbing a new email.</p>
+                <p style="font-size: var(--font-size-lg); color: var(--gray-700); line-height: 1.7; margin-bottom: 20px;">Lemma applies that model to the web. You create a lemma.id once. Each site asks for the proof level it needs — lemma.id continuity, a presence proof, or a human proof — gets its own private PPID, and checks proofs locally using Ed25519 signatures and cached revocation data. When a site requires a human proof, those proofs are rooted in a verified person, so the site can block an abuser and know that returning means passing verification again, not just grabbing a new email.</p>
 
                 <p style="font-size: var(--font-size-lg); color: var(--gray-700); line-height: 1.7;">To be clear about what this doesn't do: issuance, revocation, recovery, and first-time setup for a site still need infrastructure. The control plane doesn't disappear. The privacy win is narrower and more practical than that. Routine access checks don't phone home to the identity verification provider, and no credential carries a stable identifier that follows you across sites.</p>
             </div>
@@ -122,7 +122,7 @@
             <div style="font-size: var(--font-size-lg); color: var(--gray-700); line-height: 1.7;">
                 <p style="margin-bottom: 24px;">The web needs identity infrastructure that AI-driven abuse can't cheaply farm, that doesn't route every login through a provider who can watch it, and that doesn't ask every website to become a regulated KYC operator. Nothing that exists today manages all three.</p>
 
-                <p style="margin-bottom: 24px;">That's what we're building. One user-held lemma.id wallet, a private PPID for every site, and human proof assurance available wherever one account genuinely has to mean one person. The same primitive, working the same way, everywhere on the web.</p>
+                <p style="margin-bottom: 24px;">That's what we're building. One user-held lemma.id, a private PPID for every site, and three levels of proof — lemma.id continuity, presence, and human proof — wherever one account genuinely has to mean one person. The same primitive, working the same way, everywhere on the web.</p>
 
                 <p>The verification itself currently runs through Didit. Lemma's job is everything around it: the reusable credentials, the wallet, the SDK, and revocation. A site adds the SDK and gets human-grade signal without ever holding an identity document. A user verifies once and carries it with them, and no site ever sees more than its own private proof.</p>
             </div>
@@ -141,12 +141,12 @@
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 20px; max-width: 980px; margin: 0 auto;">
             <div style="background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 28px;">
                 <h3 style="color: var(--white); font-size: var(--font-size-lg); margin-bottom: 8px;">Verify yourself</h3>
-                <p style="color: var(--gray-400); margin-bottom: 20px; font-size: var(--font-size-sm);">Create a lemma.id wallet and use it on any site that supports it. If a site requires isHuman, you verify once and you're set.</p>
+                <p style="color: var(--gray-400); margin-bottom: 20px; font-size: var(--font-size-sm);">Create a lemma.id and use it on any site that supports it. If a site requires a human proof, you verify once and you're set.</p>
                 <a href="/app" class="btn btn-primary" style="font-size: var(--font-size-sm); padding: 10px 20px;">Get verified</a>
             </div>
             <div style="background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 28px;">
                 <h3 style="color: var(--white); font-size: var(--font-size-lg); margin-bottom: 8px;">Add lemma.id to your site</h3>
-                <p style="color: var(--gray-400); margin-bottom: 20px; font-size: var(--font-size-sm);">A script tag and a backend check. Add private continuity now, and require human proofs later if abuse shows up.</p>
+                <p style="color: var(--gray-400); margin-bottom: 20px; font-size: var(--font-size-sm);">A script tag and a backend check. Add lemma.id continuity now, and require a human proof later if abuse shows up.</p>
                 <a href="/docs" class="btn btn-primary" style="font-size: var(--font-size-sm); padding: 10px 20px;">View docs</a>
             </div>
             <div style="background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 28px;">
