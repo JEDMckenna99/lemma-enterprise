@@ -6,6 +6,7 @@ import importlib.util
 import sys
 import time
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -69,6 +70,75 @@ def test_is_spki_public_key_detects_browser_exports():
 
     assert _is_spki_public_key(b"\x30\x82\x01\x22") is True
     assert _is_spki_public_key(b"\xa5\x01\x02\x03") is False
+
+
+@pytest.mark.unit
+def test_extract_cose_public_key_accepts_parsed_authenticator_data(monkeypatch):
+    from webauthn.helpers import bytes_to_base64url
+
+    from api.fresh_passkey_attestation import extract_cose_public_key_b64
+
+    attestation_parser = importlib.import_module(
+        "webauthn.helpers.parse_attestation_object",
+    )
+    auth_data_parser = importlib.import_module(
+        "webauthn.helpers.parse_authenticator_data",
+    )
+    credential_public_key = b"\xa5\x01\x02\x03"
+    auth_data = SimpleNamespace(
+        attested_credential_data=SimpleNamespace(
+            credential_public_key=credential_public_key,
+        ),
+    )
+    monkeypatch.setattr(
+        attestation_parser,
+        "parse_attestation_object",
+        lambda _raw: SimpleNamespace(auth_data=auth_data),
+    )
+    monkeypatch.setattr(
+        auth_data_parser,
+        "parse_authenticator_data",
+        lambda _raw: pytest.fail("parsed authenticator data must not be parsed again"),
+    )
+
+    result = extract_cose_public_key_b64(bytes_to_base64url(b"attestation"))
+
+    assert result == bytes_to_base64url(credential_public_key)
+
+
+@pytest.mark.unit
+def test_extract_cose_public_key_accepts_raw_authenticator_data(monkeypatch):
+    from webauthn.helpers import bytes_to_base64url
+
+    from api.fresh_passkey_attestation import extract_cose_public_key_b64
+
+    attestation_parser = importlib.import_module(
+        "webauthn.helpers.parse_attestation_object",
+    )
+    auth_data_parser = importlib.import_module(
+        "webauthn.helpers.parse_authenticator_data",
+    )
+    raw_auth_data = b"raw-authenticator-data"
+    credential_public_key = b"\xa5\x01\x02\x03"
+    parsed_auth_data = SimpleNamespace(
+        attested_credential_data=SimpleNamespace(
+            credential_public_key=credential_public_key,
+        ),
+    )
+    monkeypatch.setattr(
+        attestation_parser,
+        "parse_attestation_object",
+        lambda _raw: SimpleNamespace(auth_data=raw_auth_data),
+    )
+    monkeypatch.setattr(
+        auth_data_parser,
+        "parse_authenticator_data",
+        lambda raw: parsed_auth_data if raw == raw_auth_data else None,
+    )
+
+    result = extract_cose_public_key_b64(bytes_to_base64url(b"attestation"))
+
+    assert result == bytes_to_base64url(credential_public_key)
 
 
 @pytest.mark.unit

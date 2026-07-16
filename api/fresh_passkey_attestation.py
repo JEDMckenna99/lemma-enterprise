@@ -248,7 +248,9 @@ def extract_cose_public_key_b64(attestation_object_b64: str) -> str:
 
     raw = _decode_public_key(str(attestation_object_b64 or "").strip())
     att_obj = parse_attestation_object(raw)
-    auth_data = parse_authenticator_data(att_obj.auth_data)
+    auth_data = att_obj.auth_data
+    if isinstance(auth_data, (bytes, bytearray)):
+        auth_data = parse_authenticator_data(bytes(auth_data))
     if not auth_data.attested_credential_data:
         raise ValueError("no_attested_credential_data")
     return bytes_to_base64url(auth_data.attested_credential_data.credential_public_key)
