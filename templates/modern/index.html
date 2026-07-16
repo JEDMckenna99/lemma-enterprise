@@ -12,6 +12,13 @@
         .home-hero {
             padding: 72px 0 88px;
         }
+        .home-hero-logo {
+            display: block;
+            width: 64px;
+            height: 64px;
+            margin: 0 auto 20px;
+            color: var(--primary-light);
+        }
         .home-hero .home-hero-lede {
             font-size: var(--font-size-xl);
             font-weight: 400;
@@ -214,6 +221,14 @@
 <section class="hero home-hero">
     <div class="container" style="position: relative; z-index: 1;">
         <div style="max-width: 780px; margin: 0 auto; text-align: center;">
+            <svg class="home-hero-logo" xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 120 120" role="img" aria-label="lemma.id">
+                <g stroke="currentColor" stroke-width="6" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                    <ellipse cx="60" cy="60" rx="38" ry="14"/>
+                    <ellipse cx="60" cy="60" rx="38" ry="14" transform="rotate(90 60 60)"/>
+                    <ellipse cx="60" cy="60" rx="38" ry="14" transform="rotate(45 60 60)"/>
+                    <ellipse cx="60" cy="60" rx="38" ry="14" transform="rotate(-45 60 60)"/>
+                </g>
+            </svg>
             <p style="font-size: var(--font-size-sm); font-weight: 600; text-transform: uppercase; letter-spacing: 2px; color: var(--primary-light); margin-bottom: 16px;">isHuman by lemma.id</p>
             <h1 style="font-size: clamp(2.5rem, 5vw, 3.5rem); line-height: 1.1; margin-bottom: 20px;">Stop the same abuser<br>from coming back as a new account.</h1>
             <p class="home-hero-lede">Require one verified human behind high-risk accounts — without storing ID documents or running KYC yourself.</p>
