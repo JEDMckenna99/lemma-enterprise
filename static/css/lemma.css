@@ -170,6 +170,12 @@ a:hover {
     width: 36px;
     height: 36px;
     flex-shrink: 0; /* Prevents shrinking */
+    color: var(--primary, #4E3D8F);
+    transition: color 0.2s ease;
+}
+
+.nav-logo.is-unlocked .nav-logo-icon {
+    color: var(--success, #1F7A4C);
 }
 
 .nav-center {

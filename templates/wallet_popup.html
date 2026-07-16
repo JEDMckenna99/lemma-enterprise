@@ -44,9 +44,11 @@
             height: 80px;
             margin: 0 auto 24px;
         }
+        .logo img,
         .logo svg {
             width: 80px;
             height: 80px;
+            display: block;
         }
         h1 {
             font-size: 1.5rem;
@@ -116,20 +118,7 @@
 <body>
     <div class="card">
         <div class="logo">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120">
-                <defs>
-                    <linearGradient id="logoGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                        <stop offset="0%" stop-color="#667eea"/>
-                        <stop offset="100%" stop-color="#764ba2"/>
-                    </linearGradient>
-                </defs>
-                <g stroke="url(#logoGrad)" stroke-width="6" fill="none" stroke-linecap="round" stroke-linejoin="round">
-                    <ellipse cx="60" cy="60" rx="38" ry="14" />
-                    <ellipse cx="60" cy="60" rx="38" ry="14" transform="rotate(90 60 60)" />
-                    <ellipse cx="60" cy="60" rx="38" ry="14" transform="rotate(45 60 60)" />
-                    <ellipse cx="60" cy="60" rx="38" ry="14" transform="rotate(-45 60 60)" />
-                </g>
-            </svg>
+            <img src="/static/img/lemma_logo.svg" alt="lemma.id" width="80" height="80">
         </div>
         <h1>Unlock Your Wallet</h1>
         

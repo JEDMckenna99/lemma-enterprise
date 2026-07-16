@@ -208,11 +208,22 @@
             }
         }
 
+        function setNavLogoUnlocked(unlocked) {
+            const logo = document.getElementById('nav-logo') || document.querySelector('.nav-logo');
+            if (!logo) return;
+            const on = !!unlocked;
+            logo.classList.toggle('is-unlocked', on);
+            logo.setAttribute('data-unlocked', on ? 'true' : 'false');
+            logo.title = on ? 'lemma.id unlocked' : 'lemma.id';
+        }
+
         function applyNavAuthButtons(state) {
             const authButtons = document.getElementById('auth-buttons');
             const signInLink = document.getElementById('nav-sign-in-link');
             const getStartedLink = document.getElementById('nav-get-started-link');
             const unlockButton = document.getElementById('nav-unlock-link');
+            const unlocked = state.mode === 'ready_signin' || state.mode === 'get_started';
+            setNavLogoUnlocked(unlocked);
             if (!authButtons) return;
 
             if (signInLink) signInLink.style.display = 'none';
@@ -263,6 +274,7 @@
                 applyNavAuthButtons(state);
 
                 if (state.mode === 'ready_signin') {
+                    setNavLogoUnlocked(true);
                     await signInPlatformWallet(wallet, { redirect: false });
                     const publicDashboard = document.getElementById('public-dashboard-link');
                     const authButtons = document.getElementById('auth-buttons');
@@ -311,8 +323,10 @@
             signIn: signInPlatformWallet,
             unlock: unlockPlatformWallet,
             applyNavButtons: applyNavAuthButtons,
+            setNavLogoUnlocked: setNavLogoUnlocked,
             initNav: initNavPlatformAuthCta,
         };
+        window.setNavLogoUnlocked = setNavLogoUnlocked;
 
         if (document.getElementById('auth-buttons')) {
             if (document.readyState === 'loading') {
