@@ -11,7 +11,14 @@
 {% endblock %}
 
 {% block head %}
-<link rel="stylesheet" href="{{ url_for('static', filename='css/wallet.css') }}?v=9">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/wallet.css') }}?v=10">
+<style nonce="{{ csp_nonce }}">
+/* Manager logos stay jewel violet; never green when unlocked */
+.wallet-logo,
+.wallet-logo.is-unlocked { color: #4E3D8F !important; }
+#nav-logo.is-unlocked .nav-logo-icon,
+.nav-logo.is-unlocked .nav-logo-icon { color: #4E3D8F !important; }
+</style>
 {% endblock %}
 
 {% block content %}
@@ -172,6 +179,17 @@
 <script nonce="{{ csp_nonce }}">
 let wallet = null;
 
+// Manager page: keep logos purple even if shared layout scripts try to tint them green.
+window.setNavLogoUnlocked = function keepManagerLogosPurple() {
+    document.getElementById('wallet-logo')?.classList.remove('is-unlocked');
+    const navLogo = document.getElementById('nav-logo');
+    if (navLogo) {
+        navLogo.classList.remove('is-unlocked');
+        navLogo.setAttribute('data-unlocked', 'false');
+        navLogo.title = 'lemma.id';
+    }
+};
+
 function escapeHtml(value) {
     return String(value)
         .replace(/&/g, '&amp;')
@@ -247,30 +265,34 @@ async function initWallet() {
     return wallet;
 }
 
-// Update status display
+// Update status display (locked/loading only — unlocked green banner is not shown)
 function updateStatusDisplay(isUnlocked, message, submessage) {
     const statusEl = document.getElementById('wallet-status');
     const iconEl = statusEl.querySelector('.status-icon');
     const titleEl = statusEl.querySelector('h3');
     const subtitleEl = statusEl.querySelector('p');
-    
-    statusEl.className = `wallet-status ${isUnlocked ? 'status-unlocked' : 'status-locked'}`;
-    iconEl.textContent = isUnlocked ? '🔓' : '🔒';
-    titleEl.textContent = message;
-    subtitleEl.textContent = submessage;
 
-    const pageLogo = document.getElementById('wallet-logo');
-    if (pageLogo) {
-        pageLogo.classList.toggle('is-unlocked', !!isUnlocked);
-    }
+    // Manager logo stays jewel violet whether locked or unlocked.
+    document.getElementById('wallet-logo')?.classList.remove('is-unlocked');
     const navLogo = document.getElementById('nav-logo');
     if (navLogo) {
-        navLogo.classList.toggle('is-unlocked', !!isUnlocked);
-        navLogo.setAttribute('data-unlocked', isUnlocked ? 'true' : 'false');
-        navLogo.title = isUnlocked ? 'lemma.id unlocked' : 'lemma.id';
+        navLogo.classList.remove('is-unlocked');
+        navLogo.setAttribute('data-unlocked', 'false');
+        navLogo.title = 'lemma.id';
     } else if (typeof window.setNavLogoUnlocked === 'function') {
-        window.setNavLogoUnlocked(!!isUnlocked);
+        window.setNavLogoUnlocked(false);
     }
+
+    if (isUnlocked) {
+        statusEl.classList.add('hidden');
+        return;
+    }
+
+    statusEl.classList.remove('hidden');
+    statusEl.className = 'wallet-status status-locked';
+    iconEl.textContent = '🔒';
+    titleEl.textContent = message;
+    subtitleEl.textContent = submessage;
 }
 
 // Show/hide views
@@ -282,6 +304,7 @@ function showLockedView() {
 function showUnlockedView() {
     document.getElementById('locked-view').classList.add('hidden');
     document.getElementById('unlocked-view').classList.remove('hidden');
+    document.getElementById('wallet-status')?.classList.add('hidden');
 }
 
 // Track if we've ever had a valid global session (for cross-device lock detection)
