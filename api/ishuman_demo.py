@@ -206,6 +206,15 @@ def ishuman_idv_popup():
     from api.config import one_ppid_assurance_model_enabled, passkey_assurance_enabled
 
     ctx = _demo_page_context()
+    headers = {
+        "Cache-Control": "no-cache, no-store, must-revalidate",
+        "Pragma": "no-cache",
+        "Expires": "0",
+    }
+    if request.args.get("preview_type"):
+        # The design-QA gallery embeds only inert preview-mode renders. Keep the
+        # live ceremony unframeable while allowing these same-origin previews.
+        headers["X-Frame-Options"] = "SAMEORIGIN"
     return render_template(
         "wallet_ishuman_idv.html",
         demo_test_verify_enabled=ctx["demo_test_verify_enabled"],
@@ -217,7 +226,13 @@ def ishuman_idv_popup():
             or one_ppid_assurance_model_enabled()
             or _demo_enabled()
         ),
-    ), 200, {
+    ), 200, headers
+
+
+@ishuman_demo_bp.route("/demo/ishuman/ui-states")
+def ishuman_ui_states_page():
+    """Design-QA gallery for every production popup and redirect state."""
+    return render_template("ishuman_ui_states.html"), 200, {
         "Cache-Control": "no-cache, no-store, must-revalidate",
         "Pragma": "no-cache",
         "Expires": "0",

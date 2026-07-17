@@ -6,93 +6,123 @@
     <meta name="referrer" content="no-referrer">
     <meta name="cloudflare-no-rocket-loader" content="true">
     <title>Confirm you're human | Lemma.id</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style nonce="{{ csp_nonce }}">
+        :root {
+            --lemma-primary: #4E3D8F;
+            --lemma-primary-dark: #3A2D6E;
+            --lemma-primary-soft: #F2F0F8;
+            --lemma-primary-line: #C9C2E0;
+            --lemma-ink: #12121A;
+            --lemma-text: #1A1A24;
+            --lemma-muted: #5E5E70;
+            --lemma-line: #E8E8EE;
+            --lemma-surface: #FFFFFF;
+            --lemma-canvas: #F4F4F7;
+            --lemma-success: #1F7A4C;
+            --lemma-warning: #B45309;
+            --lemma-error: #C0392B;
+        }
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: #0f172a;
+            font-family: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+            background: var(--lemma-canvas);
             min-height: 100vh;
             display: flex;
             align-items: center;
             justify-content: center;
             padding: 20px;
-            color: #e2e8f0;
+            color: var(--lemma-text);
         }
         .card {
-            background: #fff;
-            color: #0f172a;
-            border-radius: 20px;
+            background: var(--lemma-surface);
+            color: var(--lemma-text);
+            border: 1px solid var(--lemma-line);
+            border-radius: 8px;
             padding: 32px 28px;
             max-width: 420px;
             width: 100%;
-            box-shadow: 0 20px 60px rgba(0,0,0,0.35);
+            box-shadow: 0 8px 24px rgba(18, 18, 26, 0.1);
         }
         .brand-mark {
             display: flex;
             justify-content: center;
-            margin-bottom: 12px;
-            color: #4E3D8F;
+            margin-bottom: 16px;
+            color: var(--lemma-primary);
             transition: color 0.2s ease;
         }
         .brand-mark.is-unlocked {
-            color: #1F7A4C;
+            color: var(--lemma-success);
+        }
+        .brand-mark.is-blocked {
+            color: var(--lemma-error);
+        }
+        .brand-mark.is-caution {
+            color: #D4A017;
+        }
+        .brand-mark.is-working .atom-orbit {
+            animation: lemma-orbit-working 1.8s ease-in-out infinite;
+            transform-origin: 60px 60px;
+            will-change: transform;
+        }
+        .brand-mark.is-working .atom-orbit:nth-child(2) { animation-delay: -0.45s; }
+        .brand-mark.is-working .atom-orbit:nth-child(3) { animation-delay: -0.9s; }
+        .brand-mark.is-working .atom-orbit:nth-child(4) { animation-delay: -1.35s; }
+        @keyframes lemma-orbit-working {
+            0%, 100% { transform: scale(0.94); }
+            50% { transform: scale(1.08); }
+        }
+        @media (prefers-reduced-motion: reduce) {
+            .brand-mark.is-working .atom-orbit { animation: none; }
         }
         .brand-mark img,
         .brand-mark svg {
-            width: 100px;
-            height: 100px;
+            width: 124px;
+            height: 124px;
             display: block;
         }
-        .eyebrow {
-            font-size: 11px;
-            font-weight: 800;
-            letter-spacing: 1.4px;
-            text-transform: uppercase;
-            text-align: center;
-            color: #4f46e5;
-            margin-bottom: 10px;
-        }
-        h1 { font-size: 1.35rem; margin-bottom: 8px; line-height: 1.25; }
-        p { color: #64748b; font-size: 0.92rem; line-height: 1.55; margin-bottom: 18px; }
-        .site-chip {
-            display: inline-block;
-            background: #eff6ff;
-            border: 1px solid #bfdbfe;
-            color: #1e40af;
-            border-radius: 999px;
-            padding: 4px 10px;
-            font-size: 12px;
-            font-weight: 700;
-            margin-bottom: 14px;
-        }
+        p { color: var(--lemma-muted); font-size: 0.92rem; line-height: 1.55; margin-bottom: 18px; }
         .status {
             padding: 14px;
-            border-radius: 12px;
+            border: 1px solid transparent;
+            border-radius: 6px;
             margin-bottom: 16px;
             font-size: 0.88rem;
             line-height: 1.45;
         }
-        .status.loading { background: #fef9c3; color: #854d0e; }
-        .status.success { background: #dcfce7; color: #166534; }
-        .status.error { background: #fee2e2; color: #991b1b; }
-        .status.info { background: #eff6ff; color: #1e40af; }
+        .status.loading { display: none; }
+        .status.success { background: #ECFDF3; border-color: #A7F3D0; color: var(--lemma-success); }
+        .status.error { background: #FEF2F2; border-color: #FECACA; color: var(--lemma-error); }
+        .status.info { display: none; }
         .btn {
             display: block;
             width: 100%;
             padding: 14px 18px;
-            border: none;
-            border-radius: 12px;
+            border: 1px solid transparent;
+            border-radius: 6px;
             font-size: 0.95rem;
-            font-weight: 700;
+            font-weight: 600;
             cursor: pointer;
             margin-bottom: 10px;
+            transition: background 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
         }
-        .btn-primary { background: #4f46e5; color: #fff; }
-        .btn-secondary { background: #f1f5f9; color: #334155; }
+        .btn-primary { background: var(--lemma-primary); color: #fff; }
+        .btn-primary:hover:not(:disabled) {
+            background: var(--lemma-primary-dark);
+            box-shadow: 0 2px 8px rgba(78, 61, 143, 0.24);
+        }
+        .btn-secondary {
+            background: var(--lemma-surface);
+            border-color: var(--lemma-line);
+            color: var(--lemma-text);
+        }
+        .btn-secondary:hover:not(:disabled) { background: var(--lemma-canvas); }
         .btn:disabled { opacity: 0.65; cursor: not-allowed; }
-        .steps { margin: 14px 0 10px; padding-left: 18px; color: #475569; font-size: 0.85rem; line-height: 1.55; }
+        .steps { margin: 14px 0 10px; padding-left: 18px; color: var(--lemma-muted); font-size: 0.85rem; line-height: 1.55; }
         .privacy-line {
-            color: #64748b;
+            color: var(--lemma-muted);
             font-size: 0.8rem;
             line-height: 1.45;
             margin-bottom: 16px;
@@ -102,9 +132,9 @@
             display: inline-block;
             padding: 4px 10px;
             border-radius: 999px;
-            background: #fef3c7;
-            border: 1px solid #fde68a;
-            color: #92400e;
+            background: #FFF7ED;
+            border: 1px solid #FED7AA;
+            color: var(--lemma-warning);
             font-size: 11px;
             font-weight: 800;
             letter-spacing: 1px;
@@ -130,13 +160,13 @@
         .qr-code-box {
             display: inline-block;
             padding: 12px;
-            border: 1px solid #e2e8f0;
-            border-radius: 12px;
-            background: #fff;
+            border: 1px solid var(--lemma-line);
+            border-radius: 6px;
+            background: var(--lemma-surface);
         }
         .qr-timer {
             font-weight: 800;
-            color: #0f172a;
+            color: var(--lemma-ink);
         }
     </style>
 </head>
@@ -150,26 +180,17 @@
         <div class="brand-mark" id="brand-mark" aria-hidden="true">
             <svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 120 120" focusable="false">
                 <g stroke="currentColor" stroke-width="6" fill="none" stroke-linecap="round" stroke-linejoin="round">
-                    <ellipse cx="60" cy="60" rx="38" ry="14"/>
-                    <ellipse cx="60" cy="60" rx="38" ry="14" transform="rotate(90 60 60)"/>
-                    <ellipse cx="60" cy="60" rx="38" ry="14" transform="rotate(45 60 60)"/>
-                    <ellipse cx="60" cy="60" rx="38" ry="14" transform="rotate(-45 60 60)"/>
+                    <g class="atom-orbit"><ellipse cx="60" cy="60" rx="38" ry="14"/></g>
+                    <g class="atom-orbit"><ellipse cx="60" cy="60" rx="38" ry="14" transform="rotate(90 60 60)"/></g>
+                    <g class="atom-orbit"><ellipse cx="60" cy="60" rx="38" ry="14" transform="rotate(45 60 60)"/></g>
+                    <g class="atom-orbit"><ellipse cx="60" cy="60" rx="38" ry="14" transform="rotate(-45 60 60)"/></g>
                 </g>
             </svg>
         </div>
         <div class="demo-tag-wrap hidden" id="demo-tag-wrap">
             <span class="demo-tag" id="demo-tag">Demo</span>
         </div>
-        <p class="eyebrow" id="eyebrow-copy">Lemma.id</p>
-        <h1 id="headline-copy">Prove you're human once</h1>
-        <p id="intro-copy">Create your lemma.id to prove you're a real person without sharing your ID with this site. Your lemma.id is stored privately in your browser, so you can skip repeat checks on other sites that use Lemma.id.</p>
-        <div class="site-chip" id="site-chip">Requesting site</div>
-        <ol class="steps" id="steps-list">
-            <li>Secure this device with Face ID, Touch ID, or your passkey</li>
-            <li>Complete a one-time identity check, usually under a minute</li>
-            <li>Return to the site. They see a private proof, not your documents</li>
-        </ol>
-        <p class="privacy-line" id="privacy-copy">Your ID documents are used only to create your human proof. After your proof is created, your documents and photos are removed from the verification provider. Lemma.id only stores your human proof, not your ID. Lemma does not use your verification data for advertising.</p>
+        <p class="privacy-line" id="privacy-copy">Your documents stay private and are deleted after verification. This site receives only your human proof.</p>
         <div id="status" class="status info">Takes about a minute. You can stop anytime.</div>
         <div id="qr-demo-panel" class="qr-demo-panel hidden">
             <p id="qr-demo-copy">Scan with your phone to finish the demo identity check. No Didit involved. Expires in <span class="qr-timer" id="qr-demo-timer">15:00</span>.</p>
@@ -185,7 +206,7 @@
         </div>
     </div>
 
-    <script src="/static/js/demo/ishuman-idv-preview-scenes.js?v=10" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
+    <script src="/static/js/demo/ishuman-idv-preview-scenes.js?v=20" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
     <script src="/static/js/lemma-keys.js?v=8" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
     <script src="/static/js/wallet-at-rest-crypto.js?v=2" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
     <script nonce="{{ csp_nonce }}">window.LEMMA_ISHUMAN_USE_PERSON_ROOT_SEEDS = {{ 'true' if ishuman_use_person_root_seeds else 'false' }};</script>
@@ -297,10 +318,11 @@
             const headline = document.getElementById('headline-copy');
             const privacy = document.getElementById('privacy-copy');
             const stepsList = document.getElementById('steps-list');
-            if (eyebrow) eyebrow.textContent = options.eyebrow || copy.eyebrow || eyebrow.textContent;
+            if (eyebrow) eyebrow.textContent = copy.eyebrow || 'lemma.id';
             if (headline) headline.textContent = options.headline || copy.headline || headline.textContent;
+            if (headline) headline.classList.toggle('hidden', !!options.hideHeadline);
             if (privacy && !options.hidePrivacy) {
-                privacy.textContent = copy.privacy || privacy.textContent;
+                privacy.textContent = options.privacy || copy.privacy || privacy.textContent;
             }
             const introEl = document.getElementById('intro-copy');
             if (introEl && options.intro) {
@@ -357,6 +379,7 @@
                 headline: copy.headlineUnlock || 'Unlock your lemma.id',
                 documentTitle: copy.documentTitleUnlock,
                 introKey: 'unlockOnly',
+                hideHeadline: true,
                 hideSteps: true,
                 hidePrivacy: true,
             });
@@ -370,6 +393,7 @@
                     headline: copy.headlineSiteContinuity || 'Unlock to continue',
                     documentTitle: copy.documentTitleSiteContinuity,
                     introKey: 'siteProofPasskey',
+                    hideHeadline: true,
                     useContinuitySteps: true,
                     hidePrivacy: true,
                 });
@@ -378,6 +402,7 @@
             applyConsumerShell({
                 eyebrow: 'Human proof required',
                 introKey: 'siteProof',
+                hideHeadline: true,
             });
         }
 
@@ -391,12 +416,28 @@
                 headline: copy.headlineFreshHuman || 'Verify your humanity again',
                 documentTitle: copy.documentTitleFreshHuman,
                 intro,
+                privacy: copy.privacyFreshDoubt || 'Your humanity has been doubted. Please prove you\u2019re human to continue.',
                 hideSteps: false,
             });
+            document.getElementById('brand-mark')?.classList.add('is-caution');
         }
 
         function applyActionSignShell() {
             const copy = consumerCopy();
+            if (requireFreshPasskey && requiredAssurance === 'ishuman') {
+                const intro = copy.intro?.freshPasskey
+                    ? copy.intro.freshPasskey(requestingSite, actionName || 'continue')
+                    : '';
+                applyConsumerShell({
+                    eyebrow: 'Fresh human proof required',
+                    headline: copy.headlineFreshPasskey || 'Confirm presence',
+                    documentTitle: copy.documentTitleFreshPasskey,
+                    intro,
+                    hideSteps: true,
+                    hidePrivacy: true,
+                });
+                return;
+            }
             const intro = copy.intro?.actionSign
                 ? copy.intro.actionSign(requestingSite, actionName || 'this action', requiredAssurance)
                 : '';
@@ -408,6 +449,22 @@
                 hideSteps: true,
                 hidePrivacy: true,
             });
+        }
+
+        function applyBlockedShell() {
+            const copy = consumerCopy();
+            const intro = copy.intro?.blocked
+                ? copy.intro.blocked(requestingSite)
+                : '';
+            applyConsumerShell({
+                eyebrow: 'Site access denied',
+                headline: copy.headlineBlocked || 'Access blocked',
+                documentTitle: copy.documentTitleBlocked,
+                intro,
+                hideSteps: true,
+                hidePrivacy: true,
+            });
+            document.getElementById('brand-mark')?.classList.add('is-blocked');
         }
 
         function getWalletInstance() {
@@ -450,7 +507,8 @@
             localStorage.removeItem(SESSION_KEY);
         }
 
-        document.getElementById('site-chip').textContent = formatSiteLabel(requestingSite);
+        const siteChip = document.getElementById('site-chip');
+        if (siteChip) siteChip.textContent = formatSiteLabel(requestingSite);
         if (isPasskeySetup) {
             applyPasskeySetupShell();
         } else if (isUnlockOnly) {
@@ -462,7 +520,7 @@
         } else if (isSiteProofIssue) {
             applySiteProofShell();
         } else {
-            applyConsumerShell({ eyebrow: 'Human proof setup' });
+            applyConsumerShell({ eyebrow: 'Human proof setup', hideHeadline: true });
         }
 
         function setBrandLogoUnlocked(unlocked) {
@@ -474,8 +532,11 @@
             const el = document.getElementById('status');
             el.textContent = message;
             el.className = 'status ' + (tone || 'info');
+            document.getElementById('brand-mark')?.classList.toggle('is-working', tone === 'loading');
             if (tone === 'success') {
+                document.getElementById('brand-mark')?.classList.remove('is-caution');
                 setBrandLogoUnlocked(true);
+                document.getElementById('privacy-copy')?.classList.add('hidden');
             } else if (tone === 'error' || tone === 'loading') {
                 // Keep green if wallet already unlocked; otherwise stay brand violet.
                 try {
@@ -499,10 +560,11 @@
                     shell: () => applyConsumerShell({
                         eyebrow: 'Human proof required',
                         introKey: 'siteProof',
+                        hideHeadline: true,
                     }),
                     ready: copy.status?.siteProofPending || 'One quick identity check, then we\u2019ll confirm you\u2019re human here.',
                     working: copy.status?.openingIdv || 'Opening secure identity check\u2026',
-                    success: copy.status?.siteProofSuccess || 'You\u2019re verified for this site.',
+                    success: copy.status?.firstHumanSuccess || 'You\u2019re a human',
                     primary: copy.primary?.verifyIdentity || 'Verify identity',
                 },
                 passkey: {
@@ -511,6 +573,7 @@
                         headline: copy.headlineSiteContinuity || 'Unlock to continue',
                         documentTitle: copy.documentTitleSiteContinuity,
                         introKey: 'siteProofPasskey',
+                        hideHeadline: true,
                         useContinuitySteps: true,
                         hidePrivacy: true,
                     }),
@@ -523,8 +586,32 @@
                     shell: applyFreshIdvShell,
                     ready: copy.status?.freshStarting || 'Starting a fresh verification\u2026',
                     working: copy.status?.openingIdv || 'Opening secure identity check\u2026',
-                    success: copy.status?.freshSuccess || 'You\u2019re verified again.',
+                    success: copy.status?.freshSuccess || 'You\u2019re a human',
                     primary: copy.primary?.verifyIdentity || 'Verify identity',
+                },
+                fresh_passkey: {
+                    shell: () => {
+                        const intro = copy.intro?.freshPasskey
+                            ? copy.intro.freshPasskey(requestingSite, actionName || 'continue')
+                            : '';
+                        applyConsumerShell({
+                            eyebrow: 'Fresh human proof required',
+                            headline: copy.headlineFreshPasskey || 'Confirm presence',
+                            documentTitle: copy.documentTitleFreshPasskey,
+                            intro,
+                            hideSteps: true,
+                            hidePrivacy: true,
+                        });
+                    },
+                    ready: copy.status?.freshPasskeyReady || 'Use your passkey to confirm your presence.',
+                    working: copy.status?.freshPasskeyWorking || 'Confirming your presence\u2026',
+                    success: copy.status?.freshPasskeySuccess || 'Presence confirmed.',
+                    primary: copy.primary?.confirmPresence || 'Confirm presence',
+                },
+                blocked: {
+                    shell: applyBlockedShell,
+                    blocked: copy.status?.blocked || 'This PPID is blocked on this site.',
+                    terminal: true,
                 },
                 action: {
                     shell: applyActionSignShell,
@@ -558,7 +645,10 @@
             cancel.classList.remove('hidden');
             cancel.textContent = copy.cancel || 'Not now';
 
-            if (previewState === 'working') {
+            if (scene.terminal || previewState === 'blocked') {
+                setStatus(scene.blocked || copy.status?.blocked || 'This PPID is blocked on this site.', 'error');
+                cancel.textContent = copy.primary?.closeTab || 'Close';
+            } else if (previewState === 'working') {
                 setStatus(scene.working, 'loading');
                 primary.textContent = scene.primary;
                 primary.disabled = true;
@@ -1307,7 +1397,7 @@
             const privacy = document.getElementById('privacy-copy');
             const stepsList = document.getElementById('steps-list');
             const siteChip = document.getElementById('site-chip');
-            if (eyebrow) eyebrow.textContent = 'Lemma.id demo';
+            if (eyebrow) eyebrow.textContent = 'lemma.id';
             if (headline) headline.textContent = 'Create your demo lemma.id';
             if (intro) {
                 intro.textContent = 'Unlock this browser, scan the QR with your phone, and finish a short demo identity check. Your demo credential expires in about 15 minutes.';
@@ -1886,7 +1976,10 @@
                 requiredAssurance,
             });
 
-            setStatus(consumerCopy().status?.siteProofSuccess || 'You\u2019re verified for this site.', 'success');
+            const proofSuccess = siteProofUsesContinuityOnly()
+                ? (consumerCopy().status?.siteProofSuccess || 'You\u2019re verified for this site.')
+                : (consumerCopy().status?.firstHumanSuccess || 'You\u2019re a human');
+            setStatus(proofSuccess, 'success');
             setTimeout(() => closeWith('ISHUMAN_SITE_PROOF_ISSUED', {
                 credential: pkg.credential,
                 session_assertion: pkg.session_assertion,
@@ -1968,14 +2061,26 @@
                 console.warn('[isHuman IDV] action sign auto-issue skipped:', err?.message || err);
             }
 
+            const isFreshHumanPasskey = requireFreshPasskey && requiredAssurance === 'ishuman';
             btn.textContent = requireFreshPasskey
-                ? (consumerCopy().primary?.confirmPasskey || 'Confirm with passkey')
+                ? (
+                    isFreshHumanPasskey
+                        ? (consumerCopy().primary?.confirmPresence || 'Confirm presence')
+                        : (consumerCopy().primary?.confirmPasskey || 'Confirm with passkey')
+                )
                 : (consumerCopy().primary?.signAction || 'Sign action');
             btn.disabled = false;
             btn.classList.remove('hidden');
             setStatus(
                 requireFreshPasskey
-                    ? 'Tap confirm, Face ID / Touch ID / Windows Hello unlocks this action.'
+                    ? (
+                        isFreshHumanPasskey
+                            ? (
+                                consumerCopy().status?.freshPasskeyReady
+                                || 'Use Face ID, Touch ID, Windows Hello, or your passkey to confirm your presence.'
+                            )
+                            : 'Tap confirm, Face ID / Touch ID / Windows Hello unlocks this action.'
+                    )
                     : 'Tap to sign this action.',
                 'info',
             );
@@ -2055,7 +2160,7 @@
                 issueMode: 'fresh_idv',
             });
 
-            setStatus(consumerCopy().status?.freshSuccess || 'You\u2019re verified again.', 'success');
+            setStatus(consumerCopy().status?.freshSuccess || 'You\u2019re a human', 'success');
             setTimeout(() => closeWith('ISHUMAN_SITE_PROOF_ISSUED', {
                 credential: pkg.credential,
                 session_assertion: pkg.session_assertion,

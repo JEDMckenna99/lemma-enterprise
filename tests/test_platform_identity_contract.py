@@ -90,6 +90,8 @@ def test_idv_popup_supports_unlock_mode():
     assert "isUnlockOnly = issueMode === 'unlock'" in idv
     assert "prepareUnlockOnlyUi" in idv
     assert "LEMMA_UNLOCK_SUCCESS" in idv
+    assert "headline.classList.toggle('hidden', !!options.hideHeadline)" in idv
+    assert idv.count("hideHeadline: true") >= 3
 
 
 @pytest.mark.unit
@@ -98,6 +100,43 @@ def test_idv_action_sign_uses_passkey_continuity_unlock():
     assert "(isSiteProofIssue || isActionSign) && !isFreshIdv" in idv
     assert "prepareActionSignUi" in idv
     assert "skipFreshPasskeyPreflight: true" in idv
+
+
+@pytest.mark.unit
+def test_idv_fresh_passkey_confirms_holder_presence():
+    idv = (ROOT / "templates" / "wallet_ishuman_idv.html").read_text(encoding="utf-8")
+    copy = (ROOT / "static" / "js" / "demo" / "ishuman-idv-preview-scenes.js").read_text(
+        encoding="utf-8"
+    )
+
+    assert "requireFreshPasskey && requiredAssurance === 'ishuman'" in idv
+    assert "headlineFreshPasskey" in idv
+    assert "headlineFreshPasskey: 'Confirm presence'" in copy
+    assert "confirmPresence: 'Confirm presence'" in copy
+    assert "freshPasskeySuccess: 'Presence confirmed.'" in copy
+    assert "Prove I'm human" not in copy
+    assert "\\u2014" not in copy
+    assert "—" not in copy
+    assert ".brand-mark.is-caution" in idv
+    assert "classList.add('is-caution')" in idv
+    assert "Your humanity has been doubted." in copy
+    assert "firstHumanSuccess: 'You\\u2019re a human'" in copy
+    assert "freshSuccess: 'You\\u2019re a human'" in copy
+
+
+@pytest.mark.unit
+def test_idv_preview_includes_terminal_ppid_blocked_state():
+    idv = (ROOT / "templates" / "wallet_ishuman_idv.html").read_text(encoding="utf-8")
+    copy = (ROOT / "static" / "js" / "demo" / "ishuman-idv-preview-scenes.js").read_text(
+        encoding="utf-8"
+    )
+
+    assert "applyBlockedShell" in idv
+    assert "blocked: {" in idv
+    assert "scene.terminal || previewState === 'blocked'" in idv
+    assert ".brand-mark.is-blocked" in idv
+    assert "classList.add('is-blocked')" in idv
+    assert "This PPID is blocked on this site." in copy
 
 
 @pytest.mark.unit

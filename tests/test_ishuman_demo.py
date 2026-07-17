@@ -303,13 +303,58 @@ def test_ishuman_idv_popup_page_loads(ishuman_demo_client):
     body = resp.get_data(as_text=True)
 
     assert resp.status_code == 200
-    assert "Prove you're human" in body or "Verify once" in body
+    assert "Your documents stay private" in body
     assert "ishuman-idv-preview-scenes.js" in body
     assert "LemmaIdvConsumerCopy" in body
     assert "lemma-keys.js" in body
     assert "wallet-at-rest-crypto.js" in body
     assert "lemma-wallet.js" in body
     assert "ISHUMAN_IDV_COMPLETE" in body
+    assert '<ol class="steps"' not in body
+    assert "Your documents stay private and are deleted after verification." in body
+    assert "This site receives only your human proof." in body
+    assert "Your ID documents are used only" not in body
+    assert ".status.info { display: none; }" in body
+    assert ".status.loading { display: none; }" in body
+    assert "@keyframes lemma-orbit-working" in body
+    assert body.count('class="atom-orbit"') == 4
+    assert "prefers-reduced-motion: reduce" in body
+    assert "classList.toggle('is-working', tone === 'loading')" in body
+    assert 'id="eyebrow-copy"' not in body
+    assert 'id="headline-copy"' not in body
+    assert 'id="site-chip"' not in body
+    assert 'id="intro-copy"' not in body
+    assert 'id="privacy-copy"' in body
+
+
+def test_ishuman_ui_states_gallery_loads_all_preview_scenes(ishuman_demo_client):
+    resp = ishuman_demo_client.get("/demo/ishuman/ui-states")
+    body = resp.get_data(as_text=True)
+
+    assert resp.status_code == 200
+    assert "Verification popup and redirect states" in body
+    assert "fresh_passkey" in body
+    assert "label: 'Fresh passkey'" in body
+    assert "Fresh passkey human proof" not in body
+    assert "PPID blocked" in body
+    assert "data-state=\"blocked\"" in body
+    assert "data-surface=\"popup\"" in body
+    assert "data-surface=\"redirect\"" in body
+    assert "preview_state" in body
+    assert "${surface.label} action:" in body
+    assert "Attaches the fresh-passkey attestation" in body
+    assert "Stops verification and does not issue a human proof" in body
+    assert resp.headers["Cache-Control"] == "no-cache, no-store, must-revalidate"
+
+
+def test_ishuman_idv_preview_allows_only_same_origin_framing(ishuman_demo_client):
+    preview = ishuman_demo_client.get(
+        "/wallet/ishuman-idv?preview_type=fresh_passkey&preview_state=ready"
+    )
+    live = ishuman_demo_client.get("/wallet/ishuman-idv")
+
+    assert preview.headers["X-Frame-Options"] == "SAMEORIGIN"
+    assert "X-Frame-Options" not in live.headers
 
 
 def test_ishuman_idv_popup_does_not_enable_test_verify_on_production(

@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="referrer" content="no-referrer">
+    <title>Verification UI states | Lemma.id</title>
+    <style nonce="{{ csp_nonce }}">
+        :root {
+            color-scheme: dark;
+            font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            background: #020617;
+            color: #e2e8f0;
+        }
+        * { box-sizing: border-box; }
+        body { margin: 0; min-width: 320px; }
+        header {
+            position: sticky;
+            top: 0;
+            z-index: 2;
+            padding: 20px clamp(16px, 3vw, 40px);
+            border-bottom: 1px solid #1e293b;
+            background: rgba(2, 6, 23, 0.94);
+            backdrop-filter: blur(14px);
+        }
+        .header-row {
+            display: flex;
+            align-items: flex-end;
+            justify-content: space-between;
+            gap: 24px;
+            max-width: 1800px;
+            margin: 0 auto;
+        }
+        .eyebrow {
+            margin: 0 0 6px;
+            color: #818cf8;
+            font-size: 12px;
+            font-weight: 800;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+        }
+        h1 { margin: 0; font-size: clamp(24px, 3vw, 38px); }
+        .lede { max-width: 760px; margin: 8px 0 0; color: #94a3b8; line-height: 1.5; }
+        .controls { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
+        button {
+            border: 1px solid #334155;
+            border-radius: 999px;
+            padding: 9px 13px;
+            background: #0f172a;
+            color: #cbd5e1;
+            font: inherit;
+            font-size: 13px;
+            font-weight: 700;
+            cursor: pointer;
+        }
+        button:hover { border-color: #818cf8; }
+        button[aria-pressed="true"] {
+            border-color: #6366f1;
+            background: #4f46e5;
+            color: #fff;
+        }
+        main {
+            max-width: 1800px;
+            margin: 0 auto;
+            padding: 28px clamp(16px, 3vw, 40px) 64px;
+        }
+        .summary {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            margin-bottom: 18px;
+            color: #94a3b8;
+            font-size: 14px;
+        }
+        .legend { display: flex; flex-wrap: wrap; gap: 12px; }
+        .legend span::before {
+            content: "";
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            margin-right: 6px;
+            border-radius: 50%;
+            background: var(--tone);
+        }
+        .gallery {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(min(100%, 480px), 1fr));
+            gap: 24px;
+            align-items: start;
+        }
+        article {
+            min-width: 0;
+            overflow: hidden;
+            border: 1px solid #1e293b;
+            border-radius: 18px;
+            background: #0f172a;
+            box-shadow: 0 18px 50px rgba(0, 0, 0, 0.22);
+        }
+        .card-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            padding: 14px 16px;
+            border-bottom: 1px solid #1e293b;
+        }
+        .card-head h2 { margin: 0; font-size: 15px; }
+        .card-head p { margin: 4px 0 0; color: #64748b; font-size: 12px; }
+        .card-head .action-label {
+            max-width: 520px;
+            margin-top: 8px;
+            color: #cbd5e1;
+            line-height: 1.45;
+        }
+        .action-label strong { color: #a5b4fc; }
+        .card-head a { color: #a5b4fc; font-size: 13px; font-weight: 700; text-decoration: none; }
+        .card-head a:hover { text-decoration: underline; }
+        .frame-wrap {
+            min-height: var(--frame-height);
+            overflow: auto;
+            background:
+                linear-gradient(45deg, #111827 25%, transparent 25%),
+                linear-gradient(-45deg, #111827 25%, transparent 25%),
+                linear-gradient(45deg, transparent 75%, #111827 75%),
+                linear-gradient(-45deg, transparent 75%, #111827 75%);
+            background-position: 0 0, 0 8px, 8px -8px, -8px 0;
+            background-size: 16px 16px;
+            text-align: center;
+        }
+        iframe {
+            display: block;
+            width: var(--frame-width);
+            height: var(--frame-height);
+            max-width: 100%;
+            margin: 0 auto;
+            border: 0;
+            background: #0f172a;
+        }
+        .empty { color: #94a3b8; padding: 48px 0; }
+        @media (max-width: 900px) {
+            .header-row { align-items: flex-start; flex-direction: column; }
+            .controls { justify-content: flex-start; }
+            header { position: static; }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="header-row">
+            <div>
+                <p class="eyebrow">Design QA</p>
+                <h1>Verification popup and redirect states</h1>
+                <p class="lede">Every card renders the production verification page in preview mode and labels the operation being performed. Review exact wording, status colors, button labels, and responsive behavior without starting a real passkey or identity check.</p>
+            </div>
+            <div class="controls" aria-label="Preview controls">
+                <button type="button" data-surface="popup" aria-pressed="true">Popup · 480×720</button>
+                <button type="button" data-surface="redirect" aria-pressed="false">Redirect · 390×844</button>
+                <button type="button" data-state="all" aria-pressed="true">All states</button>
+                <button type="button" data-state="ready" aria-pressed="false">Ready</button>
+                <button type="button" data-state="working" aria-pressed="false">Working</button>
+                <button type="button" data-state="success" aria-pressed="false">Success</button>
+                <button type="button" data-state="error" aria-pressed="false">Error</button>
+                <button type="button" data-state="blocked" aria-pressed="false">Blocked</button>
+            </div>
+        </div>
+    </header>
+    <main>
+        <div class="summary">
+            <span id="result-count" aria-live="polite"></span>
+            <div class="legend" aria-label="Status color legend">
+                <span style="--tone:#60a5fa">Ready</span>
+                <span style="--tone:#facc15">Working</span>
+                <span style="--tone:#4ade80">Success</span>
+                <span style="--tone:#f87171">Error</span>
+                <span style="--tone:#C0392B">Blocked</span>
+            </div>
+        </div>
+        <section class="gallery" id="gallery" aria-label="Verification UI previews"></section>
+    </main>
+    <script nonce="{{ csp_nonce }}">
+        const scenes = [
+            {
+                id: 'ishuman',
+                label: 'First human proof',
+                detail: 'Identity check required',
+                actions: {
+                    ready: 'Waits for the holder to start the one-time identity check.',
+                    working: 'Opens the identity provider and waits for verification to finish.',
+                    success: 'Stores the master human proof and issues a site-private human proof.',
+                    error: 'Stops proof issuance and offers the holder a safe retry.',
+                },
+            },
+            {
+                id: 'passkey',
+                label: 'Returning holder',
+                detail: 'Passkey continuity proof',
+                actions: {
+                    ready: 'Waits for the holder to unlock their existing lemma.id with a passkey.',
+                    working: 'Unlocks the wallet and derives a site-private continuity proof.',
+                    success: 'Finishes the site proof without running another identity check.',
+                    error: 'Stops continuity proof issuance and offers a passkey retry.',
+                },
+            },
+            {
+                id: 'fresh_ishuman',
+                label: 'Fresh identity check',
+                detail: 'Human proof must be re-verified',
+                actions: {
+                    ready: 'Waits for the holder to begin a required fresh identity check.',
+                    working: 'Runs the identity provider again and refreshes the master proof.',
+                    success: 'Stores the refreshed human proof and issues a new site proof.',
+                    error: 'Keeps the previous result unusable and offers a fresh-check retry.',
+                },
+            },
+            {
+                id: 'fresh_passkey',
+                label: 'Fresh passkey',
+                detail: 'Existing human proof plus fresh holder presence',
+                actions: {
+                    ready: 'Waits for a fresh Face ID, Touch ID, Windows Hello, or passkey gesture.',
+                    working: 'Verifies fresh holder presence and signs the human-proof action.',
+                    success: 'Attaches the fresh-passkey attestation to the signed human proof.',
+                    error: 'Does not sign the action and offers another fresh passkey attempt.',
+                },
+            },
+            {
+                id: 'action',
+                label: 'Action confirmation',
+                detail: 'Passkey-bound high-risk action',
+                actions: {
+                    ready: 'Waits for the holder to review and approve the requested action.',
+                    working: 'Signs the action details with the site-bound wallet credential.',
+                    success: 'Produces a short-lived signed action presentation.',
+                    error: 'Leaves the action unsigned and offers a confirmation retry.',
+                },
+            },
+            {
+                id: 'blocked',
+                label: 'PPID blocked',
+                detail: 'Site-level access denial',
+                states: ['blocked'],
+                actions: {
+                    blocked: 'Stops verification and does not issue a human proof for this site.',
+                },
+            },
+            {
+                id: 'unlock',
+                label: 'Wallet unlock',
+                detail: 'Unlock only, no site proof',
+                actions: {
+                    ready: 'Waits for the holder to unlock the wallet with their passkey.',
+                    working: 'Decrypts the wallet and restores the local wallet session.',
+                    success: 'Synchronizes the unlocked session with the requesting page.',
+                    error: 'Keeps the wallet locked and offers another unlock attempt.',
+                },
+            },
+            {
+                id: 'passkey_setup',
+                label: 'Passkey setup',
+                detail: 'Create a wallet on this device',
+                actions: {
+                    ready: 'Waits for the holder to start passkey creation on this device.',
+                    working: 'Creates the passkey and encrypts the new local wallet.',
+                    success: 'Marks the wallet ready for future proof and unlock flows.',
+                    error: 'Leaves setup incomplete and offers another creation attempt.',
+                },
+            },
+        ];
+        const states = ['ready', 'working', 'success', 'error'];
+        const surfaces = {
+            popup: { width: '480px', height: '720px', label: 'Popup' },
+            redirect: { width: '390px', height: '844px', label: 'Redirect' },
+        };
+        let activeSurface = 'popup';
+        let activeState = 'all';
+
+        function previewUrl(scene, state) {
+            const url = new URL('/wallet/ishuman-idv', window.location.origin);
+            url.searchParams.set('preview_type', scene.id);
+            url.searchParams.set('preview_state', state);
+            url.searchParams.set('site_id', 'example.com');
+            url.searchParams.set('origin', window.location.origin);
+
+            if (scene.id === 'passkey') {
+                url.searchParams.set('issue_mode', 'site_proof');
+                url.searchParams.set('required_assurance', 'passkey');
+                url.searchParams.set('session_nonce', 'preview-session');
+            } else if (scene.id === 'fresh_ishuman') {
+                url.searchParams.set('issue_mode', 'fresh_idv');
+                url.searchParams.set('session_nonce', 'preview-session');
+            } else if (scene.id === 'fresh_passkey' || scene.id === 'action') {
+                url.searchParams.set('issue_mode', 'action_sign');
+                url.searchParams.set('action', 'complete this action');
+                url.searchParams.set('body_hash', 'preview-body-hash');
+                url.searchParams.set('action_nonce', 'preview-action-nonce');
+                url.searchParams.set('required_assurance', 'ishuman');
+                if (scene.id === 'fresh_passkey') {
+                    url.searchParams.set('require_fresh_passkey', '1');
+                }
+            } else if (scene.id === 'unlock' || scene.id === 'passkey_setup') {
+                url.searchParams.set('issue_mode', scene.id);
+            } else {
+                url.searchParams.set('issue_mode', 'site_proof');
+                url.searchParams.set('required_assurance', 'ishuman');
+                url.searchParams.set('session_nonce', 'preview-session');
+            }
+
+            if (activeSurface === 'redirect') {
+                url.searchParams.set('flow_mode', 'redirect');
+                url.searchParams.set('redirect_return', `${window.location.origin}/demo`);
+            }
+            return url.toString();
+        }
+
+        function render() {
+            const gallery = document.getElementById('gallery');
+            const surface = surfaces[activeSurface];
+            gallery.style.setProperty('--frame-width', surface.width);
+            gallery.style.setProperty('--frame-height', surface.height);
+            gallery.replaceChildren();
+
+            let count = 0;
+            scenes.forEach((scene) => {
+                const sceneStates = scene.states || states;
+                const visibleStates = activeState === 'all'
+                    ? sceneStates
+                    : sceneStates.filter((state) => state === activeState);
+                visibleStates.forEach((state) => {
+                    const url = previewUrl(scene, state);
+                    const surfaceAction = state === 'blocked'
+                        ? (
+                            activeSurface === 'popup'
+                                ? 'The popup shows the denial and only allows closing.'
+                                : 'The redirect shows the denial and does not return a proof.'
+                        )
+                        : state === 'success'
+                        ? (
+                            activeSurface === 'popup'
+                                ? 'The popup sends completion to its opener and closes.'
+                                : 'The redirect deposits a one-time result and returns to the site.'
+                        )
+                        : (
+                            activeSurface === 'popup'
+                                ? 'The popup remains open while this state is active.'
+                                : 'The redirect remains in the current tab while this state is active.'
+                        );
+                    const card = document.createElement('article');
+                    card.innerHTML = `
+                        <div class="card-head">
+                            <div>
+                                <h2>${scene.label} · ${state}</h2>
+                                <p>${surface.label} · ${scene.detail}</p>
+                                <p class="action-label"><strong>${surface.label} action:</strong> ${scene.actions[state]} ${surfaceAction}</p>
+                            </div>
+                            <a href="${url}" target="_blank" rel="noopener">Open</a>
+                        </div>
+                        <div class="frame-wrap">
+                            <iframe loading="lazy" src="${url}" title="${scene.label}, ${state} state, ${surface.label} view"></iframe>
+                        </div>
+                    `;
+                    gallery.appendChild(card);
+                    count += 1;
+                });
+            });
+
+            document.getElementById('result-count').textContent = `${count} production-rendered preview${count === 1 ? '' : 's'}`;
+        }
+
+        document.querySelectorAll('[data-surface]').forEach((button) => {
+            button.addEventListener('click', () => {
+                activeSurface = button.dataset.surface;
+                document.querySelectorAll('[data-surface]').forEach((item) => {
+                    item.setAttribute('aria-pressed', String(item === button));
+                });
+                render();
+            });
+        });
+        document.querySelectorAll('[data-state]').forEach((button) => {
+            button.addEventListener('click', () => {
+                activeState = button.dataset.state;
+                document.querySelectorAll('[data-state]').forEach((item) => {
+                    item.setAttribute('aria-pressed', String(item === button));
+                });
+                render();
+            });
+        });
+        render();
+    </script>
+</body>
+</html>
