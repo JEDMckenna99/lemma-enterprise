@@ -62,9 +62,9 @@
             <span>HTML + JavaScript</span>
             <button class="copy-btn">Copy</button>
         </div>
-        <code>&lt;script src="https://lemma.id/sdk/ishuman-verifier.js"&gt;&lt;/script&gt;
+        <code>&lt;script src="https://lemma.id/sdk/proof-verifier.js"&gt;&lt;/script&gt;
 &lt;script&gt;
-  const verifier = new IsHumanVerifier({ siteId: 'app.example.com' });
+  const verifier = new ProofVerifier({ siteId: 'app.example.com' });
 
   document.getElementById('signup-form').addEventListener('submit', async (e) =&gt; {
     e.preventDefault();
@@ -268,7 +268,7 @@ def checkout():
     <p>Site blocks are <strong>not</strong> in the global Bloom filter. Mirror blocks on your backend and expose them to the SDK through <code>isBlockedLocally</code>, call <strong>your own policy endpoint</strong>, never lemma.id directly from the browser (API keys are server-only).</p>
     <div class="code-block">
         <div class="code-header"><span>SDK constructor</span><button class="copy-btn">Copy</button></div>
-        <code>const verifier = new IsHumanVerifier({
+        <code>const verifier = new ProofVerifier({
   siteId: 'app.example.com',
   isBlockedLocally: async (ppid) => {
     const res = await fetch('/api/policy/check?ppid=' + encodeURIComponent(ppid));
@@ -308,7 +308,7 @@ def checkout():
             <tr><th>You (relying site)</th><th>lemma.id (platform)</th></tr>
         </thead>
         <tbody>
-            <tr><td>Embed <code>ishuman-verifier.js</code> and call <code>verify()</code></td><td>Hosts the wallet + IDV popup and issues signed credentials</td></tr>
+            <tr><td>Embed <code>proof-verifier.js</code> and call <code>verify()</code></td><td>Hosts the wallet + IDV popup and issues signed credentials</td></tr>
             <tr><td>Set <code>siteId</code> to your hostname</td><td>Derives a per-site PPID bound to that hostname</td></tr>
             <tr><td>Store <code>ppid</code> on your user record</td><td>Does not receive your app&apos;s business data or audit logs</td></tr>
             <tr><td>API key, only for <code>site-block</code>, <code>site-unblock</code>, etc.</td><td>Operates upstream IDV (Didit by default) and platform webhooks internally</td></tr>
@@ -359,9 +359,9 @@ def checkout():
             <span>HTML + JavaScript</span>
             <button class="copy-btn">Copy</button>
         </div>
-        <code>&lt;script src="https://lemma.id/sdk/ishuman-verifier.js"&gt;&lt;/script&gt;
+        <code>&lt;script src="https://lemma.id/sdk/proof-verifier.js"&gt;&lt;/script&gt;
 &lt;script&gt;
-  const verifier = new IsHumanVerifier({ siteId: 'app.example.com' });
+  const verifier = new ProofVerifier({ siteId: 'app.example.com' });
 
   async function requireHuman() {
     const result = await verifier.verify({ autoProvision: true });
@@ -476,7 +476,7 @@ def checkout():
             <span>JavaScript</span>
             <button class="copy-btn">Copy</button>
         </div>
-        <code>const ih = new IsHumanVerifier({ siteId: 'app.example.com' });
+        <code>const ih = new ProofVerifier({ siteId: 'app.example.com' });
 
 // 1) Verify once at an entry point (may open a popup on first visit).
 await ih.verify({ autoProvision: true });
@@ -592,7 +592,7 @@ if not check.ok:
             <tr><td><strong>PHP</strong></td><td>Script tag + fetch to your API</td><td>Python helper or port verify logic</td></tr>
         </tbody>
     </table>
-    <p style="color: var(--gray-600); font-size: 14px;">For SSR frameworks, keep <code>IsHumanVerifier</code> in <strong>client components only</strong>, it uses <code>window</code>, popups, and browser crypto.</p>
+    <p style="color: var(--gray-600); font-size: 14px;">For SSR frameworks, keep <code>ProofVerifier</code> in <strong>client components only</strong>, it uses <code>window</code>, popups, and browser crypto.</p>
 </div>
 
 <div class="docs-section">

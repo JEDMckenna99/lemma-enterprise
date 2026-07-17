@@ -669,8 +669,8 @@
       <section class="demo-advanced-section">
         <h3>Integration snippet</h3>
         <p class="demo-muted">Start with lemma.id continuity; raise to a human proof only when your site policy requires one verified human. Presence is the fresh-passkey ceremony on the presentation.</p>
-        <div class="code-block">&lt;script src="https://lemma.id/sdk/ishuman-verifier.js"&gt;&lt;/script&gt;
-const { ok, ppid, assurance, presentation } = await new IsHumanVerifier({
+        <div class="code-block">&lt;script src="https://lemma.id/sdk/proof-verifier.js"&gt;&lt;/script&gt;
+const { ok, ppid, assurance, presentation } = await new ProofVerifier({
   siteId: 'tickets-demo.lemma.id',
   autoProvision: true,
   requiredAssurance: 'passkey',
@@ -707,6 +707,7 @@ const { ok, ppid, assurance, presentation } = await new IsHumanVerifier({
 {{ super() }}
 <script src="/static/js/lemma-keys.js?v=5" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
 <script nonce="{{ csp_nonce }}">window.LEMMA_ISHUMAN_USE_PERSON_ROOT_SEEDS = {{ 'true' if ishuman_use_person_root_seeds else 'false' }};</script>
-<script src="/sdk/ishuman-verifier.js?v={{ ishuman_verifier_sdk_version }}" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
+<!-- Legacy SDK alias remains available at /sdk/ishuman-verifier.js. -->
+<script src="/sdk/proof-verifier.js?v={{ proof_verifier_sdk_version }}" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
 <script src="/static/js/demo/ishuman-demo.js?v=68" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
 {% endblock %}

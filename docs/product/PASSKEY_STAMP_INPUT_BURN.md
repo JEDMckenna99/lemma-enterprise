@@ -62,7 +62,7 @@ Store locally:
 ## SDK integration
 
 ```javascript
-const verifier = new IsHumanVerifier({
+const verifier = new ProofVerifier({
   siteId: 'app.example.com',
   requiredAssurance: 'passkey', // or 'ishuman' (default)
 });

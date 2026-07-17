@@ -88,3 +88,12 @@ def test_verifier_sdk_contract_source_patterns():
     assert "NETWORK_REVOCATION" not in src
     assert "return { blocked: true, doubtRequired: false };" in src
     assert "this.siteId = this._canonicalizeSiteId(rawSiteId);" in src
+
+
+@pytest.mark.unit
+def test_browser_verifier_exports_current_and_legacy_names():
+    src = VERIFIER_JS.read_text(encoding="utf-8")
+    assert "class ProofVerifier {" in src
+    assert "window.ProofVerifier = ProofVerifier;" in src
+    assert "window.IsHumanVerifier = ProofVerifier;" in src
+    assert "module.exports = ProofVerifier;" in src

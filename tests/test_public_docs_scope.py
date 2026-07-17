@@ -112,7 +112,27 @@ def test_llms_txt_is_served(monkeypatch):
         response = client.get("/llms.txt")
         assert response.status_code == 200
         assert b"ISHUMAN_AGENT_INTEGRATION.md" in response.data
+        assert b"proof-verifier.js" in response.data
         assert b"ishuman-verifier.js" in response.data
+
+
+@pytest.mark.integration
+def test_browser_verifier_current_and_legacy_urls_match(monkeypatch):
+    monkeypatch.setenv("DATABASE_URL", "sqlite:///:memory:")
+    monkeypatch.setenv("SESSION_SECRET", "test-session-secret")
+
+    from app import create_app
+
+    app = create_app()
+    app.config["TESTING"] = True
+    with app.test_client() as client:
+        current = client.get("/sdk/proof-verifier.js")
+        legacy = client.get("/sdk/ishuman-verifier.js")
+
+    assert current.status_code == 200
+    assert legacy.status_code == 200
+    assert current.data == legacy.data
+    assert current.headers["X-SDK-Version"] == legacy.headers["X-SDK-Version"]
 
 
 def test_public_doc_path_normalization_unit():

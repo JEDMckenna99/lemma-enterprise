@@ -5,7 +5,7 @@ These tiny Flask apps simulate real third-party relying sites for the isHuman de
 Each app serves one page that loads:
 
 ```html
-<script src="https://lemma.id/sdk/ishuman-verifier.js"></script>
+<script src="https://lemma.id/sdk/proof-verifier.js"></script>
 ```
 
 ## Expected Heroku Apps

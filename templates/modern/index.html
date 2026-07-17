@@ -424,9 +424,9 @@
 
         <div class="home-code">
             <div class="home-code-label">Signup gate when one-person-one-account matters</div>
-            <pre><code>&lt;script src="https://lemma.id/sdk/ishuman-verifier.js"&gt;&lt;/script&gt;
+            <pre><code>&lt;script src="https://lemma.id/sdk/proof-verifier.js"&gt;&lt;/script&gt;
 &lt;script&gt;
-  const verifier = new IsHumanVerifier({ siteId: 'app.example.com' });
+  const verifier = new ProofVerifier({ siteId: 'app.example.com' });
   const { ok, presentation } = await verifier.verifyForBackend({
     autoProvision: true,
     requiredAssurance: 'ishuman',

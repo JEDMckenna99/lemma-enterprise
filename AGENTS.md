@@ -18,7 +18,7 @@ Or locally: `llms.txt`
 
 ## Product scope
 
-- **In scope:** Browser SDK (`ishuman-verifier.js`), site-private PPIDs, local backend verification, optional site API keys for abuse controls.
+- **In scope:** Browser SDK (`proof-verifier.js`), site-private PPIDs, local backend verification, optional site API keys for abuse controls.
 - **Out of scope:** Agent Ops (lemma-cli, Lemma Firewall, runtime control plane), operator-only, not for relying-site integration.
 
 ## Hard rules
@@ -31,14 +31,17 @@ Or locally: `llms.txt`
 ## Quick integration
 
 ```html
-<script src="https://lemma.id/sdk/ishuman-verifier.js"></script>
+<script src="https://lemma.id/sdk/proof-verifier.js"></script>
 <script>
-  const verifier = new IsHumanVerifier({ siteId: 'app.example.com' });
+  const verifier = new ProofVerifier({ siteId: 'app.example.com' });
   const { ok, presentation } = await verifier.verifyForBackend({ autoProvision: true });
   if (!ok) throw new Error('not_verified');
   await fetch('/api/signup', { method: 'POST', body: JSON.stringify({ presentation }) });
 </script>
 ```
+
+The legacy `ishuman-verifier.js` URL and `IsHumanVerifier` class remain supported
+as compatibility aliases.
 
 Verify on the server with `@lemma/ishuman-verify` or `lemma_ishuman_verify.py`.
 

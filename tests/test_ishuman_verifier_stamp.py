@@ -81,7 +81,7 @@ def test_sdk_version_bumped_in_lockstep():
     version = ISHUMAN_VERIFIER_SDK_VERSION
     assert f"@version {version}" in verifier
     assert "ISHUMAN_VERIFIER_SDK_VERSION" in app
-    assert f"ishuman_verifier_sdk_version" in demo
+    assert "proof_verifier_sdk_version" in demo
     assert f"ISHUMAN_VERIFIER_SDK_VERSION" in relying
 
 

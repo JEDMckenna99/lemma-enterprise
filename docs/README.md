@@ -86,7 +86,7 @@ Internal product proposals, **not shipped**. Do not link from integrator-facing 
 | Live platform | https://lemma.id |
 | Developer hub | https://lemma.id/developer |
 | Live demo | https://lemma.id/demo |
-| Browser SDK | https://lemma.id/sdk/ishuman-verifier.js |
+| Browser SDK | https://lemma.id/sdk/proof-verifier.js |
 
 ## Support
 

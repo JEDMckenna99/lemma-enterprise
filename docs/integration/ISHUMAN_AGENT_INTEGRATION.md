@@ -10,7 +10,7 @@
 |----------|-----|
 | Human-readable docs | https://lemma.id/docs |
 | This guide (machine-oriented) | https://lemma.id/docs/integration/ISHUMAN_AGENT_INTEGRATION.md |
-| Browser SDK | https://lemma.id/sdk/ishuman-verifier.js |
+| Browser SDK | https://lemma.id/sdk/proof-verifier.js |
 | JS verifier (backend) | https://lemma.id/sdk/lemma-ishuman-verify.mjs |
 | Python verifier (backend) | https://lemma.id/sdk/lemma_ishuman_verify.py |
 | Live demo | https://lemma.id/demo |
@@ -23,7 +23,7 @@
 
 ## What you are building
 
-1. **Browser:** Load `ishuman-verifier.js`, create `IsHumanVerifier({ siteId })`, call `verify({ autoProvision: true })` before protected actions.
+1. **Browser:** Load `proof-verifier.js`, create `ProofVerifier({ siteId })`, call `verify({ autoProvision: true })` before protected actions.
 2. **Account binding:** Store the returned site-private `ppid` as the platform's durable enforcement handle for that user.
 3. **Backend:** Accept a signed presentation or stamp from the client and verify locally with `@lemma/ishuman-verify` or `lemma_ishuman_verify.py`.
 4. **Assurance policy:** Start with `passkey` for continuity when that is enough (not Sybil-resistant alone). Require `ishuman` when the action needs one verified human behind the account, signup, trials, ticketing, payouts, or ban enforcement.
@@ -72,7 +72,7 @@ Work through these in order. Stop and ask the developer if hostname or trust tie
 
 - [ ] **1. Identify protected actions**: signup, posting, checkout, voting, account recovery, etc.
 - [ ] **2. Set `siteId`**: canonical hostname for each environment.
-- [ ] **3. Add browser SDK**: script tag or bundler import from `https://lemma.id/sdk/ishuman-verifier.js`.
+- [ ] **3. Add browser SDK**: script tag or bundler import from `https://lemma.id/sdk/proof-verifier.js`.
 - [ ] **4. Gate entry points**: `await verifier.verify({ autoProvision: true })` on first-touch flows; fail closed.
 - [ ] **5. Choose backend trust tier** (see below), default to **T2 (verifyStamp)** for signup.
 - [ ] **6. Bind `ppid` to account**: store on user row after server verification.
@@ -83,12 +83,15 @@ Work through these in order. Stop and ask the developer if hostname or trust tie
 
 ## Browser integration
 
+`ProofVerifier` is the primary browser class. The legacy `IsHumanVerifier` class
+and `/sdk/ishuman-verifier.js` URL remain supported as compatibility aliases.
+
 ### Minimal gate (low-risk UX only)
 
 ```html
-<script src="https://lemma.id/sdk/ishuman-verifier.js"></script>
+<script src="https://lemma.id/sdk/proof-verifier.js"></script>
 <script>
-  const verifier = new IsHumanVerifier({ siteId: 'app.example.com' });
+  const verifier = new ProofVerifier({ siteId: 'app.example.com' });
 
   async function requireHuman() {
     const result = await verifier.verify({ autoProvision: true });
@@ -105,9 +108,9 @@ PPID from the **verified server result** (`result.ppid`), never from the paralle
 `ppid` field alone.
 
 ```html
-<script src="https://lemma.id/sdk/ishuman-verifier.js"></script>
+<script src="https://lemma.id/sdk/proof-verifier.js"></script>
 <script>
-  const verifier = new IsHumanVerifier({
+  const verifier = new ProofVerifier({
     siteId: 'app.example.com',
     isBlockedLocally: async (ppid) => {
       const res = await fetch('/api/policy/check?ppid=' + encodeURIComponent(ppid));
@@ -138,9 +141,9 @@ payouts). The PPID stays stable when upgrading from passkey to isHuman on the sa
 ### Sybil-resistant signup (T2: isHuman)
 
 ```html
-<script src="https://lemma.id/sdk/ishuman-verifier.js"></script>
+<script src="https://lemma.id/sdk/proof-verifier.js"></script>
 <script>
-  const verifier = new IsHumanVerifier({ siteId: 'app.example.com' });
+  const verifier = new ProofVerifier({ siteId: 'app.example.com' });
 
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -514,7 +517,7 @@ Adapt the same pattern; do not change the crypto contract.
 | Django | Template script or JS bundle | View + `VerificationContext` |
 | PHP | Script tag + fetch to your API | Include Python helper or port verify logic |
 
-For SSR frameworks, keep `IsHumanVerifier` in **client components only**: it uses `window`, popups, and browser crypto.
+For SSR frameworks, keep `ProofVerifier` in **client components only**: it uses `window`, popups, and browser crypto.
 
 ---
 

@@ -10,9 +10,10 @@ lemma.id is a private proof layer for web platforms: site-private PPIDs, signed 
 
 ## Browser SDK
 
-- isHuman verifier: https://lemma.id/sdk/ishuman-verifier.js
-- Create: `new IsHumanVerifier({ siteId: 'app.example.com' })`
+- Proof verifier: https://lemma.id/sdk/proof-verifier.js
+- Create: `new ProofVerifier({ siteId: 'app.example.com' })`
 - Signup/server verify: `await verifier.verifyForBackend({ autoProvision: true })`
+- Compatibility: `ishuman-verifier.js` and `IsHumanVerifier` remain supported aliases
 
 ## Backend verifiers (local-first)
 

@@ -22,14 +22,17 @@ Fraud is an economic problem, not a tech one. The industry can already detect ab
 ### Quick integration
 
 ```html
-<script src="https://lemma.id/sdk/ishuman-verifier.js"></script>
+<script src="https://lemma.id/sdk/proof-verifier.js"></script>
 <script>
-  const verifier = new IsHumanVerifier({ siteId: 'app.example.com' });
+  const verifier = new ProofVerifier({ siteId: 'app.example.com' });
   const { ok, presentation } = await verifier.verifyForBackend({ autoProvision: true });
   if (!ok) throw new Error('not_verified');
   await fetch('/api/signup', { method: 'POST', body: JSON.stringify({ presentation }) });
 </script>
 ```
+
+The legacy `ishuman-verifier.js` URL and `IsHumanVerifier` class remain supported
+as compatibility aliases.
 
 Verify on the server with `@lemma/ishuman-verify` (Node) or `lemma_ishuman_verify.py` (Python). For signup and account creation, always verify the signed `presentation` server-side, never trust a bare client `ppid`.
 

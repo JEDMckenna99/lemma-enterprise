@@ -1,9 +1,9 @@
 /**
- * isHuman Verifier SDK
- * ====================
+ * Proof Verifier SDK
+ * ==================
  *
- * Lightweight client-side SDK for sites integrating with the Lemma isHuman
- * proof-of-humanity network.
+ * Lightweight client-side SDK for sites integrating with the lemma.id private
+ * proof layer, including passkey continuity and optional isHuman assurance.
  *
  * How it works:
  *   1. Serves cached per-site session presentations locally (Ed25519 + expiry + Bloom revocation)
@@ -12,10 +12,10 @@
  *   4. Returns a simple result: { human: true/false, ppid: "..." }
  *
  * Integration (two lines):
- *   <script src="https://lemma.id/sdk/ishuman-verifier.js"></script>
+ *   <script src="https://lemma.id/sdk/proof-verifier.js"></script>
  *   <script>
- *     const ih = new IsHumanVerifier({ siteId: 'your-site-id' });
- *     ih.verify().then(r => console.log(r.human, r.ppid));
+ *     const verifier = new ProofVerifier({ siteId: 'your-site-id' });
+ *     verifier.verify().then(r => console.log(r.human, r.ppid));
  *   </script>
  *
  * Zero server calls on the verification hot path after initial Bloom sync.
@@ -26,10 +26,10 @@
  * and complete IDV when no master isHuman proof is present yet.
  *
  * Attach the verified identity to your own logs:
- *   const ih = new IsHumanVerifier({ siteId: 'your-site-id' });
- *   await ih.verify({ autoProvision: true });        // once, at an entry point
+ *   const verifier = new ProofVerifier({ siteId: 'your-site-id' });
+ *   await verifier.verify({ autoProvision: true }); // once, at an entry point
  *   // Recommended for audit logs: store the bare VC (durable, offline-verifiable).
- *   const event = await ih.stamp({ action: 'post_comment' }, { includeCredential: true });
+ *   const event = await verifier.stamp({ action: 'post_comment' }, { includeCredential: true });
  *   // -> { action: 'post_comment', lemma: { ppid, verified, ..., credential } }
  *   // POST `event` to YOUR backend. Lemma stores none of it.
  *
@@ -39,7 +39,10 @@
 (function () {
 'use strict';
 
-if (typeof window !== 'undefined' && window.IsHumanVerifier) {
+if (typeof window !== 'undefined' && (window.ProofVerifier || window.IsHumanVerifier)) {
+    const ExistingVerifier = window.ProofVerifier || window.IsHumanVerifier;
+    window.ProofVerifier = ExistingVerifier;
+    window.IsHumanVerifier = ExistingVerifier;
     return;
 }
 
@@ -683,10 +686,10 @@ async function verifyEd25519(publicKeyBytes, messageBytes, signatureBytes) {
 }
 
 // ========================================================================
-// IsHumanVerifier
+// ProofVerifier
 // ========================================================================
 
-class IsHumanVerifier {
+class ProofVerifier {
     /**
      * @param {Object} config
      * @param {string}  config.siteId, your registered site identifier
@@ -2218,10 +2221,12 @@ class IsHumanVerifier {
 // Export
 // ========================================================================
 
-window.IsHumanVerifier = IsHumanVerifier;
+window.ProofVerifier = ProofVerifier;
+// Backward compatibility for integrations using the original isHuman-tier name.
+window.IsHumanVerifier = ProofVerifier;
 
 if (typeof module !== 'undefined' && module.exports) {
-    module.exports = IsHumanVerifier;
+    module.exports = ProofVerifier;
 }
 
 })();

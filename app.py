@@ -170,7 +170,11 @@ def create_app():
     @app.context_processor
     def inject_sdk_versions():
         from api.sdk_versions import ISHUMAN_VERIFIER_SDK_VERSION
-        return {'ishuman_verifier_sdk_version': ISHUMAN_VERIFIER_SDK_VERSION}
+        return {
+            'proof_verifier_sdk_version': ISHUMAN_VERIFIER_SDK_VERSION,
+            # Backward compatibility for templates using the original name.
+            'ishuman_verifier_sdk_version': ISHUMAN_VERIFIER_SDK_VERSION,
+        }
 
     # ================================================================================
     # SECURITY HEADERS - Industry standard protection
@@ -915,9 +919,10 @@ def create_app():
         response.headers['Access-Control-Allow-Origin'] = '*'
         return response
 
+    @app.route('/sdk/proof-verifier.js')
     @app.route('/sdk/ishuman-verifier.js')
-    def ishuman_verifier_sdk():
-        """Serve the isHuman verifier SDK with short shared-cache headers."""
+    def proof_verifier_sdk():
+        """Serve the browser proof verifier under current and legacy URLs."""
         from api.sdk_versions import ISHUMAN_VERIFIER_SDK_VERSION
         from flask import send_from_directory
         response = send_from_directory('static/js', 'ishuman-verifier.js', mimetype='application/javascript')
