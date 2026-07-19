@@ -1002,8 +1002,9 @@ def clear_session():
         'global_session_cleared': global_cleared
     })
     response.headers.update(_cors_headers(origin))
-    response.delete_cookie(SESSION_COOKIE_NAME, path='/')
-    response.delete_cookie(CSRF_COOKIE_NAME, path='/')
+    # Must match set_cookie flags (Secure + SameSite=None) or Safari/iOS won't clear them.
+    response.delete_cookie(SESSION_COOKIE_NAME, path='/', secure=True, samesite='None')
+    response.delete_cookie(CSRF_COOKIE_NAME, path='/', secure=True, samesite='None')
     return response
 
 
@@ -1704,6 +1705,58 @@ def wallet_register_signing_key():
             "code": result.code,
         }), 403
     response = jsonify({"success": True, "registered": True})
+    response.headers.update(_cors_headers(request.headers.get("Origin")))
+    return response
+
+
+@wallet_session_sync_bp.route("/api/wallet/devices", methods=["POST", "OPTIONS"])
+@cross_origin()
+def wallet_list_devices():
+    """List enrolled devices for a wallet (authority metadata only).
+
+    Requires an authorized wallet assertion from an active device. Returns
+    device_id, optional label, timestamps, and revoke status — never wallet
+    secrets or client storage locations.
+    """
+    if request.method == "OPTIONS":
+        response = make_response()
+        response.headers.update(_cors_headers(request.headers.get("Origin")))
+        return response
+
+    from api.wallet_authn import (
+        assertion_error_response,
+        list_wallet_devices,
+        verify_assertion_from_body,
+    )
+
+    body = request.get_json(silent=True) or {}
+    wallet_id = str(body.get("wallet_id") or "").strip()
+    if not wallet_id:
+        return jsonify({"success": False, "error": "wallet_id required"}), 400
+
+    verify_result, fields = verify_assertion_from_body(
+        body,
+        wallet_id=wallet_id,
+        field_names=["wallet_id", "device_id"],
+    )
+    if not verify_result.ok:
+        return assertion_error_response(verify_result)
+
+    include_revoked = bool(body.get("include_revoked"))
+    acting_device_id = str(fields.get("device_id") or body.get("device_id") or "").strip()
+    devices = list_wallet_devices(wallet_id, include_revoked=include_revoked)
+    for device in devices:
+        device["is_current"] = bool(
+            acting_device_id and device.get("device_id") == acting_device_id
+        )
+
+    response = jsonify({
+        "success": True,
+        "wallet_id": wallet_id,
+        "acting_device_id": acting_device_id,
+        "devices": devices,
+        "active_count": sum(1 for d in devices if d.get("status") == "active"),
+    })
     response.headers.update(_cors_headers(request.headers.get("Origin")))
     return response
 

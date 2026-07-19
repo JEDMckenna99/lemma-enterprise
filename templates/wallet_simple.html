@@ -6,12 +6,12 @@
 {% block preload_scripts %}
 <link rel="preload" href="{{ url_for('static', filename='js/lemma-keys.js') }}?v=8" as="script">
 <link rel="preload" href="{{ url_for('static', filename='js/wallet-at-rest-crypto.js') }}?v=2" as="script">
-<link rel="preload" href="{{ url_for('static', filename='js/lemma-wallet.js') }}?v=2687" as="script">
+<link rel="preload" href="{{ url_for('static', filename='js/lemma-wallet.js') }}?v=2689" as="script">
 <link rel="preload" href="{{ url_for('static', filename='js/lemma-credential-utils.js') }}?v=2" as="script">
 {% endblock %}
 
 {% block head %}
-<link rel="stylesheet" href="{{ url_for('static', filename='css/wallet.css') }}?v=10">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/wallet.css') }}?v=11">
 <style nonce="{{ csp_nonce }}">
 /* Manager logos stay jewel violet; never green when unlocked */
 .wallet-logo,
@@ -140,6 +140,18 @@
             </div>
         </div>
 
+        <!-- DEVICES -->
+        <div class="card" id="devices-card">
+            <h2>Your devices</h2>
+            <p class="card-intro">
+                Devices that can unlock this lemma.id. Revoking a device stops it from unlocking or signing again; it does not erase files already on that device.
+            </p>
+            <div id="devices-list" class="devices-list" aria-live="polite">
+                <p class="devices-loading">Loading devices...</p>
+            </div>
+            <p id="devices-status" class="card-help hidden" role="status"></p>
+        </div>
+
         <!-- SETTINGS -->
         <div class="card">
             <h2>Settings</h2>
@@ -166,7 +178,7 @@
         <!-- DANGER ZONE -->
         <div class="card card-danger">
             <h2 class="danger-title">Remove from this device</h2>
-            <button id="clear-wallet-btn" class="btn btn-secondary btn-full btn-danger-outline">
+            <button id="clear-wallet-btn" class="btn btn-secondary btn-full btn-danger-outline" type="button">
                 Remove lemma.id
             </button>
             <p class="card-help">
@@ -452,6 +464,11 @@ function showUnlockedStateFast(submessage = 'Your lemma.id is ready') {
     if (container) {
         container.innerHTML = '<p class="proofs-loading">Loading...</p>';
     }
+    const devices = document.getElementById('devices-list');
+    if (devices) {
+        devices.innerHTML = '<p class="devices-loading">Loading devices...</p>';
+    }
+    setDevicesStatus('');
 }
 
 let proofCheckGeneration = 0;
@@ -469,10 +486,135 @@ async function deferUnlockedProofCheck(submessage = 'Your lemma.id is ready') {
         }
         if (gen !== proofCheckGeneration) return;
         await loadProofSummary();
+        if (gen !== proofCheckGeneration) return;
+        await loadDevicesList();
     } catch (e) {
         console.warn('[Manager] Deferred proof check failed:', e?.message || e);
         if (gen === proofCheckGeneration) {
             loadProofSummary().catch(() => {});
+            loadDevicesList().catch(() => {});
+        }
+    }
+}
+
+function setDevicesStatus(message, { isError = false } = {}) {
+    const el = document.getElementById('devices-status');
+    if (!el) return;
+    const text = String(message || '').trim();
+    if (!text) {
+        el.textContent = '';
+        el.classList.add('hidden');
+        el.classList.remove('devices-status-error');
+        return;
+    }
+    el.textContent = text;
+    el.classList.remove('hidden');
+    el.classList.toggle('devices-status-error', !!isError);
+}
+
+function formatDeviceWhen(iso) {
+    if (!iso) return '';
+    const dt = new Date(iso);
+    if (Number.isNaN(dt.getTime())) return '';
+    try {
+        return dt.toLocaleString(undefined, {
+            month: 'short',
+            day: 'numeric',
+            hour: 'numeric',
+            minute: '2-digit',
+        });
+    } catch (_) {
+        return dt.toISOString();
+    }
+}
+
+function deviceDisplayLabel(device) {
+    if (device?.label) return String(device.label);
+    if (window.LemmaWallet?.friendlyDeviceLabel) {
+        return LemmaWallet.friendlyDeviceLabel(device?.device_name || '', { fallback: 'Device' });
+    }
+    return String(device?.device_name || 'Device');
+}
+
+async function loadDevicesList() {
+    const container = document.getElementById('devices-list');
+    if (!container || !wallet) return;
+    try {
+        if (!wallet.isUnlocked || !wallet.isUnlocked()) {
+            container.innerHTML = '<p class="devices-empty">Unlock to see your devices.</p>';
+            return;
+        }
+        const result = await wallet.listDevices();
+        const devices = (result.devices || []).filter((d) => d.status !== 'revoked');
+        if (!devices.length) {
+            container.innerHTML = '<p class="devices-empty">Only this browser is enrolled so far.</p>';
+            return;
+        }
+        container.innerHTML = devices.map((device) => {
+            const label = escapeHtml(deviceDisplayLabel(device));
+            const when = formatDeviceWhen(device.last_used_at || device.created_at);
+            const meta = device.is_current
+                ? 'This device'
+                : (when ? `Last used ${escapeHtml(when)}` : 'Enrolled device');
+            const badge = device.is_current
+                ? '<span class="device-badge">This device</span>'
+                : '';
+            const action = device.is_current
+                ? '<span class="device-action-note">Use Remove below to clear this browser</span>'
+                : `<button type="button" class="btn btn-secondary btn-sm device-revoke-btn" data-device-id="${escapeHtml(device.device_id)}">Revoke</button>`;
+            return `
+                <div class="device-row${device.is_current ? ' is-current' : ''}" data-device-id="${escapeHtml(device.device_id)}">
+                    <div class="device-info">
+                        <div class="device-name">${label}${badge}</div>
+                        <div class="device-meta">${meta}</div>
+                    </div>
+                    <div class="device-actions">${action}</div>
+                </div>
+            `;
+        }).join('');
+        container.querySelectorAll('.device-revoke-btn').forEach((btn) => {
+            btn.addEventListener('click', () => revokeOtherDevice(btn.getAttribute('data-device-id'), btn));
+        });
+    } catch (e) {
+        console.warn('[Manager] Device list failed:', e?.message || e);
+        container.innerHTML = '<p class="devices-empty">Could not load devices right now.</p>';
+        setDevicesStatus(e?.message || 'Could not load devices', { isError: true });
+    }
+}
+
+async function revokeOtherDevice(deviceId, button) {
+    const targetId = String(deviceId || '').trim();
+    if (!targetId || !wallet) return;
+    const row = Array.from(document.querySelectorAll('.device-row')).find(
+        (el) => el.getAttribute('data-device-id') === targetId
+    );
+    const labelNode = row?.querySelector('.device-name');
+    const label = labelNode ? labelNode.textContent.replace(/This device/i, '').trim() : 'this device';
+    if (!confirm(`Revoke ${label}? It will no longer be able to unlock or sign for this lemma.id.`)) {
+        return;
+    }
+    const original = button?.textContent;
+    if (button) {
+        button.disabled = true;
+        button.textContent = 'Confirm passkey...';
+    }
+    setDevicesStatus('Confirm with your passkey to revoke the other device.');
+    try {
+        await wallet.revokeDevice(targetId);
+        setDevicesStatus('Device revoked. It can no longer unlock this lemma.id.');
+        await loadDevicesList();
+    } catch (e) {
+        console.warn('[Manager] Revoke device failed:', e?.message || e);
+        if (e?.code === 'use_remove_from_this_device') {
+            setDevicesStatus('To clear this browser, use Remove lemma.id below.', { isError: true });
+        } else if (/cancel/i.test(String(e?.message || ''))) {
+            setDevicesStatus('Revoke cancelled.');
+        } else {
+            setDevicesStatus(e?.message || 'Could not revoke device', { isError: true });
+        }
+        if (button) {
+            button.disabled = false;
+            button.textContent = original || 'Revoke';
         }
     }
 }
@@ -775,11 +917,14 @@ function anchorWalletIdentity(event) {
     createWallet(event?.currentTarget || document.getElementById('anchor-wallet-btn'));
 }
 
-// Clear all lemma.id data from this device
-async function clearWallet() {
+// Clear all lemma.id data from this device (Safari/iOS-safe: never abort on IDB blocked)
+async function clearWallet(event) {
     if (!confirm('Remove lemma.id from this device? This clears your wallet, human proof, passkey binding, and all lemma.id data stored here. You can verify again later from another device.')) {
         return;
     }
+
+    const btn = event?.currentTarget || document.getElementById('clear-wallet-btn');
+    if (btn) btn.disabled = true;
 
     try {
         disconnectCrossDeviceSSE();
@@ -813,20 +958,36 @@ async function clearWallet() {
                     instance._initialized = false;
                 }
             }
-            await new Promise((resolve, reject) => {
-                const req = indexedDB.deleteDatabase('LemmaWallet');
-                req.onsuccess = resolve;
-                req.onerror = reject;
-                req.onblocked = () => reject(new Error(
-                    'Wallet removal is blocked by another lemma.id tab. Close the other tab and try again.',
-                ));
+            await new Promise((resolve) => setTimeout(resolve, 75));
+            const deleteDb = (name) => new Promise((resolve) => {
+                let settled = false;
+                const finish = () => {
+                    if (settled) return;
+                    settled = true;
+                    clearTimeout(timer);
+                    resolve();
+                };
+                const timer = setTimeout(finish, 2500);
+                try {
+                    const req = indexedDB.deleteDatabase(name);
+                    req.onsuccess = finish;
+                    req.onerror = finish;
+                    req.onblocked = () => {};
+                } catch (_) {
+                    finish();
+                }
             });
+            await deleteDb('LemmaWallet');
+            await deleteDb('LemmaWalletWrap');
             localStorage.clear();
             sessionStorage.clear();
         }
 
-        document.cookie = 'lemma_wallet_session=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
-        document.cookie = 'lemma_wallet_csrf=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
+        // Match Secure; SameSite=None attributes used when cookies were set (Safari).
+        const expire = 'expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/; Secure; SameSite=None';
+        document.cookie = `lemma_wallet_session=; ${expire}`;
+        document.cookie = `lemma_wallet_csrf=; ${expire}`;
+        document.cookie = `lemma_csrf_token=; ${expire}`;
 
         wallet = null;
         delete window.globalLemmaWallet;
@@ -838,6 +999,7 @@ async function clearWallet() {
         window.location.replace('/?removed=1');
     } catch (e) {
         console.error('Clear failed:', e);
+        if (btn) btn.disabled = false;
         alert('Failed to clear wallet: ' + e.message);
     }
 }
@@ -1522,6 +1684,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('show-link-btn')?.addEventListener('click', showTransferLink);
     document.getElementById('hide-qr-btn')?.addEventListener('click', hideQR);
     document.getElementById('confirm-push-btn')?.addEventListener('click', confirmPushSend);
+    // Devices list loads with deferred proof check after unlock.
 });
 </script>
 <script src="/static/js/qrcode.min.js" nonce="{{ csp_nonce }}"></script>

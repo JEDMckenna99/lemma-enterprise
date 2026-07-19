@@ -483,6 +483,78 @@ def count_active_wallet_devices(wallet_id: str, *, exclude_device_id: str = "") 
         db.close()
 
 
+def _iso_utc(value) -> str | None:
+    if value is None:
+        return None
+    try:
+        return value.isoformat() + ("Z" if getattr(value, "tzinfo", None) is None else "")
+    except Exception:
+        return str(value)
+
+
+def list_wallet_devices(wallet_id: str, *, include_revoked: bool = False) -> list[dict]:
+    """Return enrollment metadata for devices authorized on a wallet.
+
+    Does not expose wallet secrets or storage locations — only authority
+    records (device_id, optional label, timestamps, revoke status).
+    """
+    from api.database import SessionLocal, WalletPasskey, WalletSigningKey
+
+    wallet_id = (wallet_id or "").strip()
+    if not wallet_id:
+        return []
+
+    db = SessionLocal()
+    try:
+        keys = db.query(WalletSigningKey).filter_by(wallet_id=wallet_id).all()
+        passkeys = db.query(WalletPasskey).filter_by(wallet_id=wallet_id).all()
+        passkey_by_device = {}
+        for pk in passkeys:
+            if getattr(pk, "revoked_at", None):
+                continue
+            device_id = str(pk.device_id or "").strip()
+            if not device_id:
+                continue
+            # Prefer the most recently used passkey row per device.
+            existing = passkey_by_device.get(device_id)
+            if existing is None or (pk.last_used_at or pk.created_at or datetime.min) >= (
+                existing.last_used_at or existing.created_at or datetime.min
+            ):
+                passkey_by_device[device_id] = pk
+
+        devices = []
+        for row in keys:
+            revoked_at = getattr(row, "revoked_at", None)
+            if revoked_at and not include_revoked:
+                continue
+            device_id = str(row.device_id or "").strip() or "legacy"
+            pk = passkey_by_device.get(device_id)
+            device_name = (
+                str(row.device_name or "").strip()
+                or (str(pk.device_name or "").strip() if pk else "")
+                or None
+            )
+            devices.append(
+                {
+                    "device_id": device_id,
+                    "device_name": device_name,
+                    "created_at": _iso_utc(row.created_at),
+                    "last_used_at": _iso_utc(row.last_used_at),
+                    "revoked_at": _iso_utc(revoked_at),
+                    "status": "revoked" if revoked_at else "active",
+                    "has_passkey": pk is not None,
+                }
+            )
+
+        active = [d for d in devices if d.get("status") == "active"]
+        revoked = [d for d in devices if d.get("status") != "active"]
+        active.sort(key=lambda d: d.get("last_used_at") or d.get("created_at") or "", reverse=True)
+        revoked.sort(key=lambda d: d.get("revoked_at") or d.get("last_used_at") or "", reverse=True)
+        return active + revoked
+    finally:
+        db.close()
+
+
 def _parse_assertion(body: dict) -> tuple[Result, str, str, dict]:
     assertion = body.get("wallet_assertion")
     if not isinstance(assertion, dict):

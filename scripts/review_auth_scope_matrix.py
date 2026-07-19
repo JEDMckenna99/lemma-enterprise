@@ -163,6 +163,7 @@ IN_HANDLER_AUTH_ALLOWLIST = {
     "/api/wallet/lost-device-recovery/authorize",
     "/api/wallet/lost-device-recovery/begin",
     "/api/wallet/lost-device-recovery/complete",
+    "/api/wallet/devices",
     "/api/wallet/device-revoke/begin",
     "/api/wallet/revoke-device",
     "/api/wallet/session-unlock/begin",

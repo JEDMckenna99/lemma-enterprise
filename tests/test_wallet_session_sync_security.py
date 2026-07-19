@@ -221,6 +221,12 @@ def test_clear_session_requires_bound_session_and_csrf(monkeypatch):
     )
     assert valid.status_code == 200
     assert valid.get_json()["session_cleared"] is True
+    # Safari/iOS only clears cookies when Secure + SameSite match the set flags.
+    set_cookie_headers = valid.headers.getlist("Set-Cookie")
+    joined = " ".join(set_cookie_headers).lower()
+    assert "lemma_wallet_session=" in joined
+    assert "secure" in joined
+    assert "samesite=none" in joined
 
 
 def _client():
@@ -405,6 +411,70 @@ def test_device_enroll_complete_registers_signing_key_and_passkey(
         headers={"Origin": "https://lemma.id"},
     )
     assert replay.status_code == 401
+
+
+def test_list_devices_requires_wallet_assertion(
+    fake_ishuman_db_session_factory,
+    monkeypatch,
+):
+    from api.wallet_authn import (
+        issue_device_enrollment_grant,
+        issue_wallet_challenge,
+        register_wallet_signing_key,
+    )
+    from api.wallet_keys import build_wallet_assertion, register_self_signature
+
+    monkeypatch.setattr(
+        "api.database.SessionLocal",
+        fake_ishuman_db_session_factory.session_local,
+    )
+    wallet_id = "wallet_list_devices"
+    secret = "33" * 32
+    pub, sig = register_self_signature(wallet_id, secret)
+    assert register_wallet_signing_key(
+        wallet_id=wallet_id,
+        device_id="dev_phone",
+        device_name="iPhone",
+        pubkey_b64=pub,
+        signature_b64=sig,
+        enrollment_grant=issue_device_enrollment_grant(wallet_id=wallet_id, source="test"),
+    ).ok
+
+    denied = _client().post(
+        "/api/wallet/devices",
+        json={"wallet_id": wallet_id},
+        headers={"Origin": "https://lemma.id"},
+    )
+    assert denied.status_code == 403
+
+    challenge = issue_wallet_challenge(wallet_id=wallet_id, device_id="dev_phone")
+    assertion = build_wallet_assertion(
+        wallet_id=wallet_id,
+        wallet_secret=secret,
+        field_names=["wallet_id", "device_id"],
+        field_values={"wallet_id": wallet_id, "device_id": "dev_phone"},
+        nonce_b64=challenge["nonce"],
+    )
+    ok = _client().post(
+        "/api/wallet/devices",
+        json={
+            "wallet_id": wallet_id,
+            "device_id": "dev_phone",
+            "wallet_assertion": {
+                "nonce": assertion.nonce,
+                "signature": assertion.signature,
+                "device_id": "dev_phone",
+            },
+        },
+        headers={"Origin": "https://lemma.id"},
+    )
+    assert ok.status_code == 200, ok.get_json()
+    payload = ok.get_json()
+    assert payload["success"] is True
+    assert payload["active_count"] == 1
+    assert payload["devices"][0]["device_id"] == "dev_phone"
+    assert payload["devices"][0]["is_current"] is True
+    assert payload["devices"][0]["device_name"] == "iPhone"
 
 
 def test_cross_device_revoke_requires_fresh_webauthn(

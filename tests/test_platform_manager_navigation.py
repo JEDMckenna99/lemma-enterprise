@@ -70,11 +70,23 @@ def test_brand_and_manager_creation_use_canonical_routes():
     assert "Create a lemma.id" in manager
     assert "window.location.replace('/app')" in wallet_auto
     assert "walletInfo.hasWallet" in wallet_auto
-    assert "req.onblocked = () => reject" in manager
+    assert "req.onblocked = () => {}" in manager or "purgeAllDeviceData" in manager
     assert "instance?.db?.close?.()" in manager
     assert "localStorage.clear()" in manager
     assert "window.location.replace('/?removed=1')" in manager
     assert "LemmaWallet.purgeAllDeviceData" in manager
+    assert "SameSite=None" in manager
     assert "returnWithExistingPasskey" in manager
     assert "removed-notice" in manager
-    assert "LemmaWalletWrap" in manager or "purgeAllDeviceData" in (ROOT / "static" / "js" / "lemma-wallet.js").read_text(encoding="utf-8")
+    assert 'id="devices-card"' in manager
+    assert 'id="devices-list"' in manager
+    assert "Your devices" in manager
+    assert "loadDevicesList" in manager
+    assert "revokeOtherDevice" in manager
+    wallet_js = (ROOT / "static" / "js" / "lemma-wallet.js").read_text(encoding="utf-8")
+    assert "LemmaWalletWrap" in manager or "purgeAllDeviceData" in wallet_js
+    assert "async listDevices(" in wallet_js
+    assert "async revokeDevice(" in wallet_js
+    assert "static VERSION = '2.78.0'" in wallet_js
+    assert "Never call instance.lock()" in wallet_js
+    assert "Safari/iOS-safe" in wallet_js

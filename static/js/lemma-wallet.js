@@ -91,7 +91,7 @@ const AUTH_STATE = {
 class LemmaWallet {
     // SDK version - check with LemmaWallet.VERSION
     // v2.32.0: Redirect-only architecture - removed popup flow for simpler, consistent UX
-    static VERSION = '2.76.0';  // v2.76: first-device WebAuthn enrollment + cross-device revoke
+    static VERSION = '2.78.0';  // v2.78: iOS-safe Remove lemma.id (no lock race / blocked IDB)
 
     static DEVICE_IDB_NAMES = ['LemmaWallet', 'LemmaWalletWrap'];
 
@@ -115,21 +115,52 @@ class LemmaWallet {
         'lemma_register_error_v1',
     ];
 
-    static async deleteIndexedDbDatabase(dbName) {
-        return new Promise((resolve, reject) => {
-            const req = indexedDB.deleteDatabase(dbName);
-            req.onsuccess = () => resolve(true);
-            req.onerror = () => reject(req.error || new Error(`delete_failed:${dbName}`));
-            req.onblocked = () => reject(new Error(
-                'Wallet removal is blocked by another lemma.id tab. Close the other tab and try again.',
-            ));
+    /**
+     * Delete an IndexedDB database with Safari/iOS-safe best-effort semantics.
+     * Mobile Safari often fires onblocked when a connection just closed; rejecting
+     * there left "Remove lemma.id" stuck on iPhone. Prefer continuing the wipe.
+     */
+    static async deleteIndexedDbDatabase(dbName, options = {}) {
+        const timeoutMs = Number.isFinite(options.timeoutMs) ? options.timeoutMs : 2500;
+        return new Promise((resolve) => {
+            let settled = false;
+            const finish = () => {
+                if (settled) return;
+                settled = true;
+                clearTimeout(timer);
+                resolve(true);
+            };
+            const timer = setTimeout(finish, timeoutMs);
+            try {
+                const req = indexedDB.deleteDatabase(dbName);
+                req.onsuccess = finish;
+                // Continue wipe even if delete reports an error; storage clear + redirect still help.
+                req.onerror = finish;
+                // onblocked: keep waiting for onsuccess/timeout after other connections drop.
+                req.onblocked = () => {};
+            } catch (_) {
+                finish();
+            }
         });
     }
 
     static _resetWalletInstance(instance) {
         if (!instance) return;
+        // Never call instance.lock() here: lock() is async, keeps IndexedDB open for
+        // _delete/clear-session, and blocks deleteDatabase on Safari/iOS.
         try { instance.stopSessionHeartbeat?.(); } catch (_) {}
-        try { instance.lock?.(); } catch (_) {}
+        try {
+            if (instance._visibilityHandler) {
+                document.removeEventListener('visibilitychange', instance._visibilityHandler);
+                instance._visibilityHandler = null;
+            }
+        } catch (_) {}
+        try {
+            if (instance._focusHandler) {
+                window.removeEventListener('focus', instance._focusHandler);
+                instance._focusHandler = null;
+            }
+        } catch (_) {}
         try { instance.db?.close?.(); } catch (_) {}
         instance.db = null;
         instance._initialized = false;
@@ -152,6 +183,9 @@ class LemmaWallet {
         for (const instance of instances) {
             LemmaWallet._resetWalletInstance(instance);
         }
+
+        // Give Safari a tick to release IDB connections after close().
+        await new Promise((resolve) => setTimeout(resolve, 75));
 
         const dbNames = new Set(LemmaWallet.DEVICE_IDB_NAMES);
         if (typeof indexedDB.databases === 'function') {
@@ -2050,6 +2084,7 @@ class LemmaWallet {
             prfExtensions = await mod.buildRegistrationPrfExtensions(walletId.value, rpId);
         }
 
+        const deviceLabel = await this._getStoredDeviceName().catch(() => this.constructor.friendlyDeviceLabel());
         const enrollBeginResponse = await fetch('/api/wallet/device-enroll/begin', {
             method: 'POST',
             credentials: 'include',
@@ -2057,6 +2092,7 @@ class LemmaWallet {
             body: JSON.stringify({
                 wallet_id: walletId.value,
                 device_id: deviceId,
+                device_name: deviceLabel || null,
                 enrollment_grant: this._pendingEnrollmentGrant || null,
             }),
         });
@@ -2179,6 +2215,7 @@ class LemmaWallet {
                 credential: this._serializeCredential(credential),
                 wallet_id: walletId.value,
                 device_id: deviceId,
+                device_name: deviceLabel || null,
                 pubkey: pubkeyB64,
                 signature: keys.base64urlEncode(signature),
                 enrollment_grant: this._pendingEnrollmentGrant || null,
@@ -2227,6 +2264,40 @@ class LemmaWallet {
         return window.LemmaKeys;
     }
 
+    static friendlyDeviceLabel(raw = '', { fallback = 'Browser' } = {}) {
+        const source = String(raw || (typeof navigator !== 'undefined' ? navigator.userAgent : '') || '').trim();
+        if (!source) return fallback;
+        if (/iPhone/i.test(source)) return 'iPhone';
+        if (/iPad/i.test(source)) return 'iPad';
+        if (/Android/i.test(source)) return 'Android';
+        const browser =
+            /Edg\//i.test(source) ? 'Edge'
+                : /Chrome\//i.test(source) && !/Chromium/i.test(source) ? 'Chrome'
+                    : /Firefox\//i.test(source) ? 'Firefox'
+                        : /Safari\//i.test(source) && !/Chrome|Chromium|Edg/i.test(source) ? 'Safari'
+                            : null;
+        const os =
+            /Windows/i.test(source) ? 'Windows'
+                : /Mac OS X|Macintosh/i.test(source) ? 'macOS'
+                    : /Linux/i.test(source) ? 'Linux'
+                        : null;
+        if (browser && os) return `${browser} on ${os}`;
+        if (browser) return browser;
+        if (os) return os;
+        // Already a short human label (not a full UA).
+        if (source.length <= 48 && !/\(.*\)/.test(source)) return source;
+        return fallback;
+    }
+
+    async _getStoredDeviceName() {
+        let record = await this._getRaw('secrets', 'device_meta').catch(() => null);
+        if (!record) {
+            record = await this._get('secrets', 'device_meta').catch(() => null);
+        }
+        const stored = String(record?.deviceName || '').trim();
+        return this.constructor.friendlyDeviceLabel(stored);
+    }
+
     async _getOrCreateDeviceId() {
         // device_meta has no CryptoKey; raw read avoids envelope decrypt noise.
         let record = await this._getRaw('secrets', 'device_meta').catch(() => null);
@@ -2240,7 +2311,7 @@ class LemmaWallet {
         await this._putRaw('secrets', {
             id: 'device_meta',
             deviceId,
-            deviceName: (typeof navigator !== 'undefined' && navigator.userAgent) ? navigator.userAgent.slice(0, 120) : 'browser',
+            deviceName: this.constructor.friendlyDeviceLabel(),
             createdAt: Date.now(),
         });
         return deviceId;
@@ -2625,6 +2696,141 @@ class LemmaWallet {
             nonce: challenge.nonce,
             signature: keys.base64urlEncode(signature),
             device_id: deviceId,
+        };
+    }
+
+    /**
+     * List enrolled devices for this wallet (manager UI).
+     * Requires an unlocked wallet with a registered signing key.
+     */
+    async listDevices({ includeRevoked = false } = {}) {
+        if (!this.isUnlocked || !this.isUnlocked()) {
+            throw new Error('Wallet must be unlocked to list devices');
+        }
+        const walletId = this.session?.walletId;
+        if (!walletId) throw new Error('wallet_id unavailable');
+        const deviceId = this._deviceId || await this._getOrCreateDeviceId();
+        const walletAssertion = await this.buildWalletAssertion(
+            ['wallet_id', 'device_id'],
+            { wallet_id: walletId, device_id: deviceId },
+        );
+        const response = await fetch('/api/wallet/devices', {
+            method: 'POST',
+            credentials: 'include',
+            headers: this._getSecureHeaders(),
+            body: JSON.stringify({
+                wallet_id: walletId,
+                device_id: deviceId,
+                include_revoked: !!includeRevoked,
+                wallet_assertion: walletAssertion,
+            }),
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok || data.success === false) {
+            throw new Error(data.error || `list devices failed (${response.status})`);
+        }
+        const devices = Array.isArray(data.devices) ? data.devices : [];
+        return {
+            devices: devices.map((device) => ({
+                ...device,
+                label: this.constructor.friendlyDeviceLabel(
+                    device.device_name || '',
+                    { fallback: 'Device' },
+                ),
+                is_current: !!(device.is_current || device.device_id === deviceId),
+            })),
+            currentDeviceId: deviceId,
+            activeCount: Number(data.active_count || 0),
+        };
+    }
+
+    /**
+     * Revoke another enrolled device after fresh WebAuthn on this device.
+     * Does not erase local storage on the target device — only server authority.
+     */
+    async revokeDevice(targetDeviceId) {
+        if (!this.isUnlocked || !this.isUnlocked()) {
+            throw new Error('Wallet must be unlocked to revoke a device');
+        }
+        if (!this._isLemmaDomain || !this._isLemmaDomain()) {
+            throw new Error('Device revoke is only available on lemma.id');
+        }
+        const walletId = this.session?.walletId;
+        if (!walletId) throw new Error('wallet_id unavailable');
+        const actingDeviceId = this._deviceId || await this._getOrCreateDeviceId();
+        const targetId = String(targetDeviceId || '').trim();
+        if (!targetId) throw new Error('target_device_id required');
+        if (targetId === actingDeviceId) {
+            const err = new Error('Use Remove lemma.id to clear this device');
+            err.code = 'use_remove_from_this_device';
+            throw err;
+        }
+
+        const passkeyRecord = await this._get('passkey', 'primary').catch(() => null);
+        if (!passkeyRecord?.credentialId) {
+            throw new Error('Passkey required to revoke another device');
+        }
+
+        const beginResponse = await fetch('/api/wallet/device-revoke/begin', {
+            method: 'POST',
+            credentials: 'include',
+            headers: this._getSecureHeaders(),
+            body: JSON.stringify({
+                wallet_id: walletId,
+                acting_device_id: actingDeviceId,
+                target_device_id: targetId,
+                credential_id: passkeyRecord.credentialId,
+            }),
+        });
+        const begin = await beginResponse.json().catch(() => ({}));
+        if (!beginResponse.ok || !begin.challenge_key || !begin.challenge) {
+            throw new Error(begin.error || `device revoke begin failed (${beginResponse.status})`);
+        }
+
+        const rpId = begin.rp_id || this._getRpIdForWebAuthn();
+        const getOptions = await this._publicKeyOptionsWithPrf({
+            challenge: this._base64urlToBuffer(begin.challenge),
+            rpId,
+            allowCredentials: [{
+                id: this._base64urlToBuffer(passkeyRecord.credentialId),
+                type: 'public-key',
+            }],
+            userVerification: 'required',
+            timeout: 60000,
+        }, passkeyRecord.prfWalletId || walletId);
+        const credential = await navigator.credentials.get({ publicKey: getOptions });
+        if (!credential) throw new Error('Passkey authentication cancelled');
+
+        const walletAssertion = await this.buildWalletAssertion(
+            ['wallet_id', 'device_id', 'target_device_id'],
+            {
+                wallet_id: walletId,
+                device_id: actingDeviceId,
+                target_device_id: targetId,
+            },
+        );
+        const revokeResponse = await fetch('/api/wallet/revoke-device', {
+            method: 'POST',
+            credentials: 'include',
+            headers: this._getSecureHeaders(),
+            body: JSON.stringify({
+                wallet_id: walletId,
+                device_id: targetId,
+                acting_device_id: actingDeviceId,
+                target_device_id: targetId,
+                challenge_key: begin.challenge_key,
+                credential: this._serializeCredential(credential),
+                wallet_assertion: walletAssertion,
+            }),
+        });
+        const revoked = await revokeResponse.json().catch(() => ({}));
+        if (!revokeResponse.ok || revoked.success === false) {
+            throw new Error(revoked.error || `revoke device failed (${revokeResponse.status})`);
+        }
+        return {
+            revoked: true,
+            deviceId: targetId,
+            crossDevice: !!revoked.cross_device,
         };
     }
 

@@ -415,6 +415,51 @@ def test_revoke_device_marks_key_revoked(
     assert count_active_wallet_devices(wallet_fixture["wallet_id"]) == 0
 
 
+def test_list_wallet_devices_returns_active_and_optional_revoked(
+    wallet_fixture,
+    fake_ishuman_db_session_factory,
+    monkeypatch,
+):
+    from api.wallet_authn import (
+        issue_device_enrollment_grant,
+        list_wallet_devices,
+        register_wallet_signing_key,
+        revoke_wallet_device,
+    )
+    from api.wallet_keys import register_self_signature
+
+    monkeypatch.setattr("api.database.SessionLocal", fake_ishuman_db_session_factory.session_local)
+    wallet_id = wallet_fixture["wallet_id"]
+    pub_a, sig_a = register_self_signature(wallet_id, wallet_fixture["wallet_secret"])
+    assert register_wallet_signing_key(
+        wallet_id=wallet_id,
+        device_id="dev_phone",
+        device_name="iPhone",
+        pubkey_b64=pub_a,
+        signature_b64=sig_a,
+        enrollment_grant=issue_device_enrollment_grant(wallet_id=wallet_id, source="test"),
+    ).ok
+    pub_b, sig_b = register_self_signature(wallet_id, "ab" * 32)
+    assert register_wallet_signing_key(
+        wallet_id=wallet_id,
+        device_id="dev_laptop",
+        device_name="Chrome on Windows",
+        pubkey_b64=pub_b,
+        signature_b64=sig_b,
+        enrollment_grant=issue_device_enrollment_grant(wallet_id=wallet_id, source="test"),
+    ).ok
+    assert revoke_wallet_device(wallet_id=wallet_id, device_id="dev_laptop").ok
+
+    active_only = list_wallet_devices(wallet_id)
+    assert [d["device_id"] for d in active_only] == ["dev_phone"]
+    assert active_only[0]["device_name"] == "iPhone"
+    assert active_only[0]["status"] == "active"
+
+    with_revoked = list_wallet_devices(wallet_id, include_revoked=True)
+    assert [d["device_id"] for d in with_revoked] == ["dev_phone", "dev_laptop"]
+    assert with_revoked[1]["status"] == "revoked"
+
+
 def test_assertion_with_device_id_matches_wallet_sdk_binding(
     wallet_fixture,
     fake_ishuman_db_session_factory,

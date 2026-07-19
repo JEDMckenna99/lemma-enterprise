@@ -207,6 +207,80 @@
     font-size: 1.05rem;
     padding: 16px 24px;
 }
+.wallet-container .btn-sm {
+    font-size: 0.85rem;
+    padding: 8px 14px;
+    border-radius: 10px;
+}
+
+/* Devices */
+.devices-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+}
+.devices-loading,
+.devices-empty {
+    font-size: 0.86rem;
+    color: var(--wallet-muted);
+    margin: 0;
+    line-height: 1.5;
+}
+.device-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 14px 0;
+    border-bottom: 1px solid #f1f5f9;
+}
+.device-row:last-child {
+    border-bottom: none;
+    padding-bottom: 0;
+}
+.device-row:first-child {
+    padding-top: 0;
+}
+.device-name {
+    font-size: 0.98rem;
+    font-weight: 700;
+    color: var(--wallet-ink);
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+}
+.device-meta {
+    font-size: 0.82rem;
+    color: var(--wallet-muted);
+    margin-top: 4px;
+    line-height: 1.4;
+}
+.device-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: var(--wallet-brand-soft);
+    color: var(--wallet-brand);
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+}
+.device-actions {
+    flex-shrink: 0;
+}
+.device-action-note {
+    display: block;
+    max-width: 9.5rem;
+    text-align: right;
+    font-size: 0.75rem;
+    color: var(--wallet-muted);
+    line-height: 1.35;
+}
+#devices-status.devices-status-error {
+    color: #b91c1c;
+}
 
 /* Saved info summary */
 .proofs-summary {
