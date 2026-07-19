@@ -12,23 +12,26 @@ LEMMA_DEPLOY_WAIT=1 python scripts/run_section2_staging_matrix.py
 
 ## Deploy the branch to staging
 
-From a machine with Heroku access (this cloud agent does not have the Heroku CLI):
+Staging app: **`lemma-staging`**.
+
+From a machine with Heroku auth (or a Cloud Agent with `HEROKU_API_KEY` set):
 
 ```bash
 git fetch origin cursor/human-auth-production-checklist-1658
 git checkout cursor/human-auth-production-checklist-1658
 
 # one-time remote
-heroku git:remote -a <staging-app> -r staging
+heroku git:remote -a lemma-staging -r staging
 
 # deploy feature branch tip to staging
 git push staging HEAD:main --force
-# or, if staging tracks a dedicated branch:
-# git push staging HEAD:staging --force
 
-LEMMA_BASE_URL=https://<staging-app>.herokuapp.com \
-  python scripts/wait_for_deploy_health.py
+export LEMMA_STAGING_BASE_URL=https://lemma-staging.herokuapp.com
+LEMMA_BASE_URL="$LEMMA_STAGING_BASE_URL" python scripts/wait_for_deploy_health.py
+LEMMA_DEPLOY_WAIT=1 python scripts/run_section2_staging_matrix.py
 ```
+
+If the app uses a custom domain, set `LEMMA_STAGING_BASE_URL` to that HTTPS origin instead.
 
 Confirm staging is **not** production:
 
