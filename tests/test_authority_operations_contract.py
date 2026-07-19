@@ -47,7 +47,14 @@ def test_wallet_id_only_session_paths_are_closed():
 def test_signing_key_enrollment_requires_existing_authority():
     operation = _operation("wallet.device.register_signing_key")
     assert operation["compliance"] == "compliant"
-    assert "unbound_first_device_or_existing_device_transfer_or_verified_recovery" in operation["required_auth"]
+    assert "webauthn_first_device_or_existing_device_transfer_or_verified_recovery" in operation["required_auth"]
+
+    enroll = _operation("wallet.device.enroll_webauthn")
+    assert enroll["compliance"] == "compliant"
+    assert "webauthn_registration_ceremony" in enroll["required_auth"]
+
+    revoke = _operation("wallet.device.revoke")
+    assert "fresh_webauthn_for_cross_device_revoke" in revoke["required_auth"]
 
 
 def test_site_proof_requires_assurance_and_canonical_site_binding():

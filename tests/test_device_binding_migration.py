@@ -75,10 +75,9 @@ def test_reissue_requires_second_factor_when_other_devices_exist(
     wallet_id = "wallet_reissue_2fa"
     for device_id in ("legacy", "dev_other"):
         pubkey_b64, sig_b64 = register_self_signature(wallet_id, "ab" * 32 if device_id == "legacy" else "cd" * 32)
-        enrollment_grant = (
-            issue_device_enrollment_grant(wallet_id=wallet_id, source="test_transfer")
-            if device_id != "legacy"
-            else ""
+        enrollment_grant = issue_device_enrollment_grant(
+            wallet_id=wallet_id,
+            source="test_transfer" if device_id != "legacy" else "test_first_device",
         )
         assert register_wallet_signing_key(
             wallet_id=wallet_id,

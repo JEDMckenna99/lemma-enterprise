@@ -26,7 +26,7 @@ def wallet_fixture():
     }
 
 
-def _register(wallet_fixture):
+def _register(wallet_fixture, *, device_id: str = "legacy"):
     pubkey_b64, sig_b64 = register_self_signature(
         wallet_fixture["wallet_id"],
         wallet_fixture["wallet_secret"],
@@ -35,6 +35,11 @@ def _register(wallet_fixture):
         wallet_id=wallet_fixture["wallet_id"],
         pubkey_b64=pubkey_b64,
         signature_b64=sig_b64,
+        device_id=device_id,
+        enrollment_grant=issue_device_enrollment_grant(
+            wallet_id=wallet_fixture["wallet_id"],
+            source="test_wallet_authn",
+        ),
     )
     assert result.ok
     return pubkey_b64
@@ -189,6 +194,10 @@ def test_register_idempotent_for_same_pubkey(
         wallet_id=wallet_fixture["wallet_id"],
         pubkey_b64=pubkey_b64,
         signature_b64=sig_b64,
+        enrollment_grant=issue_device_enrollment_grant(
+            wallet_id=wallet_fixture["wallet_id"],
+            source="test_idempotent",
+        ),
     )
     second = register_wallet_signing_key(
         wallet_id=wallet_fixture["wallet_id"],
@@ -236,6 +245,10 @@ def test_register_concurrent_insert_is_idempotent(
         wallet_id=wallet_fixture["wallet_id"],
         pubkey_b64=pubkey_b64,
         signature_b64=sig_b64,
+        enrollment_grant=issue_device_enrollment_grant(
+            wallet_id=wallet_fixture["wallet_id"],
+            source="test_concurrent",
+        ),
     )
 
     assert result.ok, (result.code, result.error)
@@ -359,6 +372,33 @@ def test_established_identity_cannot_bootstrap_signing_key_without_recovery(
     assert result.code == "device_enrollment_authorization_required"
 
 
+def test_unbound_first_device_requires_webauthn_enrollment(
+    wallet_fixture,
+    fake_ishuman_db_session_factory,
+    monkeypatch,
+):
+    monkeypatch.setattr("api.database.SessionLocal", fake_ishuman_db_session_factory.session_local)
+    pubkey_b64, sig_b64 = register_self_signature(
+        wallet_fixture["wallet_id"],
+        wallet_fixture["wallet_secret"],
+    )
+    denied = register_wallet_signing_key(
+        wallet_id=wallet_fixture["wallet_id"],
+        pubkey_b64=pubkey_b64,
+        signature_b64=sig_b64,
+    )
+    assert not denied.ok
+    assert denied.code == "first_device_webauthn_enrollment_required"
+
+    allowed = register_wallet_signing_key(
+        wallet_id=wallet_fixture["wallet_id"],
+        pubkey_b64=pubkey_b64,
+        signature_b64=sig_b64,
+        allow_first_device_bootstrap=True,
+    )
+    assert allowed.ok
+
+
 def test_revoke_device_marks_key_revoked(
     wallet_fixture,
     fake_ishuman_db_session_factory,
@@ -391,6 +431,10 @@ def test_assertion_with_device_id_matches_wallet_sdk_binding(
         pubkey_b64=pubkey_b64,
         signature_b64=sig_b64,
         device_id="dev_browser",
+        enrollment_grant=issue_device_enrollment_grant(
+            wallet_id=wallet_fixture["wallet_id"],
+            source="test_device_binding",
+        ),
     )
     assert result.ok
 

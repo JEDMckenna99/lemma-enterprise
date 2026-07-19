@@ -91,7 +91,7 @@ const AUTH_STATE = {
 class LemmaWallet {
     // SDK version - check with LemmaWallet.VERSION
     // v2.32.0: Redirect-only architecture - removed popup flow for simpler, consistent UX
-    static VERSION = '2.75.0';  // v2.75: asserted sessions + authorized device enrollment
+    static VERSION = '2.76.0';  // v2.76: first-device WebAuthn enrollment + cross-device revoke
 
     static DEVICE_IDB_NAMES = ['LemmaWallet', 'LemmaWalletWrap'];
 
@@ -2035,15 +2035,14 @@ class LemmaWallet {
         }
 
         // ============================================================
-        // LOCAL-ONLY PASSKEY REGISTRATION
+        // SERVER-BOUND FIRST-DEVICE PASSKEY REGISTRATION
         // ============================================================
-        // The passkey is created and verified 100% locally.
-        // Server only tracks lock/unlock state for cross-device sync.
-        // Security comes from HSM-signed lemmas, not passkey verification.
+        // Create the passkey against a server challenge, then enroll the
+        // device signing key + wallet passkey in one verified ceremony.
         // ============================================================
-        
-        console.log('[Lemma] Creating local passkey (privacy-preserving design)');
-        const challenge = crypto.getRandomValues(new Uint8Array(32));
+
+        console.log('[Lemma] Creating passkey via server-verified device enrollment');
+        const deviceId = this._deviceId || await this._getOrCreateDeviceId();
         const rpId = this._getRpIdForWebAuthn();
         const mod = this._walletAtRest();
         let prfExtensions = {};
@@ -2051,34 +2050,47 @@ class LemmaWallet {
             prfExtensions = await mod.buildRegistrationPrfExtensions(walletId.value, rpId);
         }
 
-        const credential = await navigator.credentials.create({
-            publicKey: {
-                challenge: challenge,
-                rp: {
-                    name: 'Lemma Wallet',
-                    id: rpId
-                },
-                user: {
-                    id: new TextEncoder().encode(walletId.value),
-                    name: 'Wallet User',
-                    displayName: 'Lemma Wallet'
-                },
-                pubKeyCredParams: [
-                    { alg: -7, type: 'public-key' },   // ES256
-                    { alg: -257, type: 'public-key' }  // RS256
-                ],
-                authenticatorSelection: {
-                    userVerification: 'required',
-                    residentKey: 'preferred'
-                },
-                extensions: prfExtensions,
-                timeout: 60000
-            }
+        const enrollBeginResponse = await fetch('/api/wallet/device-enroll/begin', {
+            method: 'POST',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                wallet_id: walletId.value,
+                device_id: deviceId,
+                enrollment_grant: this._pendingEnrollmentGrant || null,
+            }),
         });
+        const enrollBegin = await enrollBeginResponse.json().catch(() => ({}));
+        if (!enrollBeginResponse.ok || !enrollBegin.challenge_key || !enrollBegin.challenge) {
+            throw new Error(enrollBegin.error || `device-enroll begin failed (${enrollBeginResponse.status})`);
+        }
 
-        // Extract and store public key locally (never sent to server)
+        const createOptions = {
+            challenge: this._base64urlToBuffer(enrollBegin.challenge),
+            rp: {
+                name: 'Lemma Wallet',
+                id: enrollBegin.rp_id || rpId,
+            },
+            user: {
+                id: new TextEncoder().encode(walletId.value),
+                name: 'Wallet User',
+                displayName: 'Lemma Wallet',
+            },
+            pubKeyCredParams: [
+                { alg: -7, type: 'public-key' },
+                { alg: -257, type: 'public-key' },
+            ],
+            authenticatorSelection: {
+                userVerification: 'required',
+                residentKey: 'preferred',
+            },
+            extensions: prfExtensions,
+            timeout: 60000,
+        };
+        const credential = await navigator.credentials.create({ publicKey: createOptions });
+        if (!credential) throw new Error('Passkey registration cancelled');
+
         const publicKeyData = this._extractPublicKey(credential.response);
-        
         const prfBound = await this._bindAtRestKeyFromCredential(credential, walletId.value);
         const passkeyRecord = {
             id: 'primary',
@@ -2095,7 +2107,7 @@ class LemmaWallet {
         };
 
         await this._put('passkey', passkeyRecord);
-        console.log('[Lemma]  Passkey created locally');
+        console.log('[Lemma] Passkey created locally');
         if (prfBound) {
             await this._migratePlaintextStores();
         }
@@ -2153,12 +2165,32 @@ class LemmaWallet {
         await this._put('session', { id: 'current', ...this.session });
         console.log(' Wallet created and auto-unlocked after passkey registration');
 
-        await this._registerSigningKeyIfNeeded();
-        try {
-            await this._registerDevicePasskeyIfPossible(passkeyRecord, walletId.value);
-        } catch (err) {
-            console.warn('[Lemma] Wallet passkey server binding skipped:', err?.message || err);
+        const keys = this._getLemmaKeys();
+        const keypair = await this._deriveWalletSigningKey();
+        const pubkeyB64 = keys.base64urlEncode(keypair.publicKey);
+        const registerPayload = keys.buildRegisterPayload({ walletId: walletId.value, pubkeyB64 });
+        const signature = await keypair.sign(registerPayload);
+        const enrollCompleteResponse = await fetch('/api/wallet/device-enroll/complete', {
+            method: 'POST',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                challenge_key: enrollBegin.challenge_key,
+                credential: this._serializeCredential(credential),
+                wallet_id: walletId.value,
+                device_id: deviceId,
+                pubkey: pubkeyB64,
+                signature: keys.base64urlEncode(signature),
+                enrollment_grant: this._pendingEnrollmentGrant || null,
+            }),
+        });
+        const enrollComplete = await enrollCompleteResponse.json().catch(() => ({}));
+        if (!enrollCompleteResponse.ok || enrollComplete.success === false) {
+            throw new Error(enrollComplete.error || `device-enroll complete failed (${enrollCompleteResponse.status})`);
         }
+        this._signingKeyRegistered = true;
+        this._pendingEnrollmentGrant = null;
+        this._deviceId = deviceId;
 
         // Establish the first trusted server session with server-verified
         // WebAuthn. This is deliberately separate from local wallet creation.

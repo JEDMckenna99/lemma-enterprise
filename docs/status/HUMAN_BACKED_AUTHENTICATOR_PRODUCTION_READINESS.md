@@ -51,7 +51,7 @@ The assurance boundaries must remain explicit:
 | Workstream | Priority | Status | Owner | Evidence |
 |---|---|---|---|---|
 | 1. Security contract and threat model | P0 | `BLOCKED` | Security + Platform | Independent reviewer sign-off pending |
-| 2. Wallet authority boundaries | P0 | `IN_PROGRESS` | Auth | Asserted sessions and transfer-authorized device enrollment implemented |
+| 2. Wallet authority boundaries | P0 | `IN_PROGRESS` | Auth | WebAuthn first-device enroll + cross-device revoke shipped; recovery/SameSite evidence remain |
 | 3. Tenant and site ownership | P0 | `NOT_STARTED` |  |  |
 | 4. Cryptographic trust chain | P0 | `NOT_STARTED` |  |  |
 | 5. Revocation and replay protection | P0 | `NOT_STARTED` |  |  |
@@ -116,7 +116,7 @@ Exit criteria:
 
 Validation baseline:
 
-- `check_authority_operations.py`: PASS, 33 operations / 45 routes / 10
+- `check_authority_operations.py`: PASS, 34 operations / 47 routes / 10
   declared implementation gaps.
 - `check_ishuman_protocol_registry.py`: PASS, 14 registered artifacts.
 - Contract tests: PASS, 11 tests.
@@ -144,7 +144,8 @@ Blocking approval:
   - `api/wallet_session_sync.py`
   - `api/wallet_authn.py`
   - `auth/redis_store.py`
-  - `static/js/lemma-wallet.js` 2.75.0
+  - `static/js/lemma-wallet.js` 2.76.0
+  - `docs/security/WALLET_COOKIE_SAMESITE.md`
   - `tests/test_wallet_session_sync_security.py`
   - `tests/test_wallet_authn.py`
   - `tests/test_wallet_sync_device.py`
@@ -152,7 +153,7 @@ Blocking approval:
 
 - [x] Remove wallet-ID-only authorization from `init-first-session` and
       `signal-unlock`, or disable those routes until secure replacements exist.
-- [ ] Require verified WebAuthn before creating the first trusted wallet
+- [x] Require verified WebAuthn before creating the first trusted wallet
       session.
 - [x] Require an existing authorized device signature, verified WebAuthn
       ceremony, or completed human-recovery ceremony before enrolling another
@@ -160,19 +161,19 @@ Blocking approval:
 - [x] Never treat `wallet_id`, a client timestamp, or an `Origin` header as
       proof of wallet control.
 - [ ] Define separate, auditable ceremonies for:
-  - [ ] First-device enrollment
-  - [ ] Daily passkey unlock
+  - [x] First-device enrollment
+  - [x] Daily passkey unlock
   - [x] Additional-device enrollment
-  - [ ] Device revocation
+  - [x] Device revocation
   - [ ] Lost-device recovery
-- [ ] Bind every challenge to wallet, device, origin, purpose, nonce, and
+- [x] Bind every challenge to wallet, device, origin, purpose, nonce, and
       expiration.
 - [x] Prevent attacker-enrolled devices from satisfying multi-device recovery
       or master-reissue policy.
 - [x] Correct hostname suffix checks so only the exact domain or a real
       subdomain is accepted.
-- [ ] Require CSRF protection on cookie-authenticated wallet mutations.
-- [ ] Review and minimize `SameSite=None` cookies.
+- [x] Require CSRF protection on cookie-authenticated wallet mutations.
+- [x] Review and minimize `SameSite=None` cookies.
 - [x] Add negative tests for forged Origin, known wallet ID, unapproved device,
       replayed challenge, and cross-site mutation attempts.
 
@@ -182,23 +183,25 @@ Exit criteria:
       master credential, derive a site proof, or revoke credentials.
 - [ ] First-device, additional-device, and recovery ceremonies pass adversarial
       tests.
-- [ ] No wallet mutation relies solely on ambient cookies without CSRF defense.
+- [x] No wallet mutation relies solely on ambient cookies without CSRF defense.
 
 Validation baseline:
 
-- Adversarial wallet authority suite: PASS, 44 tests.
-- Wallet SDK, cache, and mirror suite: PASS, 73 tests.
-- Full non-live CI Regression: PASS, 1,113 tests with 4 skips.
-- Authority contract: PASS, 33 operations / 45 routes / 10 declared gaps.
+- Adversarial wallet authority and WebAuthn session suite: updated in this
+  revision (first-device enroll + cross-device revoke coverage).
+- Wallet SDK 2.76.0 / cache 2687 and CDN mirror synchronized.
+- Authority inventory includes `wallet.device.enroll_webauthn` and hardened
+  revoke auth.
+- Full non-live CI Regression: rerun required after this revision.
 
 Remaining blockers:
 
-- Daily and first trusted server sessions still require a server-verified
-  WebAuthn ceremony rather than only the locally unlocked device assertion.
-- Device revocation and lost-device recovery ceremonies require additional
-  authorization design and adversarial evidence.
-- Cookie-authenticated wallet mutations need complete CSRF coverage and
-  `SameSite=None` minimization.
+- Lost-device recovery ceremony still needs fresh IDV + replacement passkey +
+  atomic enrollment grant evidence (shared with Section 6).
+- Browser matrix evidence for enroll → unlock → transfer → revoke on lemma.id
+  and one relying-site origin.
+- Auth owner marks Section 2 `PASS` only after recovery ceremony evidence and
+  browser matrix are attached.
 
 ---
 

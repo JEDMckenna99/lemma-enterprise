@@ -179,8 +179,15 @@ def register_wallet_signing_key(
     device_id: str = "legacy",
     device_name: str = "",
     enrollment_grant: str = "",
+    allow_first_device_bootstrap: bool = False,
 ) -> Result:
-    """Register a wallet key after self-signature and enrollment authority."""
+    """Register a wallet key after self-signature and enrollment authority.
+
+    New device keys require a one-time enrollment grant (transfer or recovery)
+    unless ``allow_first_device_bootstrap`` is set by the verified first-device
+    WebAuthn enrollment ceremony. Idempotent re-registration of the same
+    device key does not consume a grant.
+    """
     from api.database import SessionLocal, WalletSigningKey
 
     wallet_id = (wallet_id or "").strip()
@@ -230,7 +237,14 @@ def register_wallet_signing_key(
             WalletSigningKey.device_id != device_id,
         ).first()
         established_identity = _wallet_has_established_identity(db, wallet_id)
-        if other_active is not None or established_identity:
+        first_unbound_device = other_active is None and not established_identity
+        if not allow_first_device_bootstrap:
+            if first_unbound_device and not str(enrollment_grant or "").strip():
+                return Result(
+                    False,
+                    "first_device_webauthn_enrollment_required",
+                    "first-device enrollment requires verified WebAuthn registration",
+                )
             grant_result = _consume_device_enrollment_grant(
                 grant=enrollment_grant,
                 wallet_id=wallet_id,
@@ -278,12 +292,71 @@ def register_wallet_signing_key(
         db.close()
 
 
+def bind_wallet_passkey(
+    *,
+    wallet_id: str,
+    device_id: str,
+    credential_id: str,
+    public_key: str,
+    attestation_format: str | None = None,
+    device_name: str | None = None,
+    sign_count: int = 0,
+) -> Result:
+    """Persist a wallet-bound WebAuthn credential after ceremony verification."""
+    from api.database import SessionLocal, WalletPasskey
+
+    wallet_id = (wallet_id or "").strip()
+    device_id = (device_id or "").strip()
+    credential_id = (credential_id or "").strip()
+    public_key = (public_key or "").strip()
+    if not wallet_id or not device_id or not credential_id or not public_key:
+        return Result(False, "wallet_passkey_malformed", "wallet_id, device_id, credential_id, and public_key required")
+
+    db = SessionLocal()
+    try:
+        existing = db.query(WalletPasskey).filter_by(credential_id=credential_id).first()
+        if existing and existing.revoked_at:
+            return Result(False, "passkey_revoked", "passkey revoked")
+        if existing:
+            if str(existing.wallet_id or "") != wallet_id or str(existing.device_id or "") != device_id:
+                return Result(False, "passkey_wallet_mismatch", "passkey already bound to another wallet device")
+            existing.public_key = public_key
+            existing.sign_count = int(sign_count or existing.sign_count or 0)
+            existing.last_used_at = datetime.utcnow()
+            if attestation_format:
+                existing.attestation_format = attestation_format
+            if device_name:
+                existing.device_name = device_name
+        else:
+            db.add(
+                WalletPasskey(
+                    wallet_id=wallet_id,
+                    device_id=device_id,
+                    credential_id=credential_id,
+                    public_key=public_key,
+                    sign_count=int(sign_count or 0),
+                    attestation_format=attestation_format,
+                    device_name=device_name,
+                    created_at=datetime.utcnow(),
+                    last_used_at=datetime.utcnow(),
+                )
+            )
+        db.commit()
+        return Result(True)
+    except Exception:
+        db.rollback()
+        raise
+    finally:
+        db.close()
+
+
 def revoke_wallet_device(
     *,
     wallet_id: str,
     device_id: str,
+    revoke_passkeys: bool = True,
 ) -> Result:
-    from api.database import SessionLocal, WalletSigningKey
+    from api.database import SessionLocal, WalletPasskey, WalletSigningKey
 
     wallet_id = (wallet_id or "").strip()
     device_id = (device_id or "").strip()
@@ -299,6 +372,13 @@ def revoke_wallet_device(
         if not row or row.revoked_at:
             return Result(False, "device_not_found", "device signing key not found")
         row.revoked_at = datetime.utcnow()
+        if revoke_passkeys:
+            for passkey in db.query(WalletPasskey).filter_by(
+                wallet_id=wallet_id,
+                device_id=device_id,
+            ).all():
+                if not passkey.revoked_at:
+                    passkey.revoked_at = datetime.utcnow()
         db.commit()
         return Result(True)
     except Exception:

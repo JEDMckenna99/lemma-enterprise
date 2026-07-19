@@ -65,21 +65,17 @@ def attach_wallet_assertion(wallet_seed):
         wid = (wallet_id or body.get("wallet_id") or wallet_seed["wallet_id"]).strip()
         secret = (wallet_secret or body.get("wallet_secret") or wallet_seed["wallet_secret"]).strip()
         pubkey_b64, sig_b64 = register_self_signature(wid, secret)
+        # Idempotent same-key re-register skips the grant. New device keys need
+        # a one-time enrollment grant (WebAuthn enroll, transfer, or recovery).
         reg = register_wallet_signing_key(
             wallet_id=wid,
             pubkey_b64=pubkey_b64,
             signature_b64=sig_b64,
-        )
-        if reg.code == "device_enrollment_authorization_required":
-            reg = register_wallet_signing_key(
+            enrollment_grant=issue_device_enrollment_grant(
                 wallet_id=wid,
-                pubkey_b64=pubkey_b64,
-                signature_b64=sig_b64,
-                enrollment_grant=issue_device_enrollment_grant(
-                    wallet_id=wid,
-                    source="test_fixture_recovery",
-                ),
-            )
+                source="test_fixture_enrollment",
+            ),
+        )
         assert reg.ok, reg.error
 
         challenge = issue_wallet_challenge(wallet_id=wid)

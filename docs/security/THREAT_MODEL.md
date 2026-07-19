@@ -124,10 +124,15 @@ session-only claim path (deprecated, logged).
   arbitrary HTTP headers outside a browser.
 - **Current controls:** wallet IDs contain sufficient random entropy; many
   sensitive issuance routes require wallet assertions.
-- **Known gaps:** `init-first-session` and `signal-unlock` convert
-  `wallet_id` plus an Origin check into server-trusted session state.
-  `register-signing-key` accepts a self-signature by the new key without proof
-  from an existing authorized device.
+- **Known gaps (historical):** `init-first-session` and wallet-id-only
+  `signal-unlock` converted `wallet_id` plus an Origin check into server-trusted
+  session state. Bare `register-signing-key` accepted a self-signature by the
+  new key for unbound first devices.
+- **Current controls (Section 2 in progress):** first trusted sessions require
+  `session-unlock` WebAuthn; first-device enrollment requires
+  `device-enroll` WebAuthn registration; additional devices require a one-time
+  transfer/recovery grant; cross-device revoke requires fresh WebAuthn from the
+  acting device.
 - **Required controls:** a wallet ID remains public metadata. First-session and
   device-enrollment authority require verified WebAuthn, an existing authorized
   device assertion, or a completed human-recovery ceremony.

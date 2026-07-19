@@ -194,12 +194,12 @@
     {
       "operation_id": "wallet.device.register_signing_key",
       "authority_class": "wallet",
-      "mutates": "Enrolls a device signing key with wallet assertion authority.",
+      "mutates": "Enrolls a device signing key after transfer/recovery grant or idempotent same-key refresh.",
       "routes": [
         {"method": "POST", "path": "/api/wallet/register-signing-key", "module": "api/wallet_session_sync.py"}
       ],
-      "current_auth": ["unbound_first_device_self_signature_or_one_time_transfer_grant"],
-      "required_auth": ["unbound_first_device_or_existing_device_transfer_or_verified_recovery"],
+      "current_auth": ["one_time_enrollment_grant_or_idempotent_same_key"],
+      "required_auth": ["webauthn_first_device_or_existing_device_transfer_or_verified_recovery"],
       "required_scope": "none",
       "site_binding": "wallet_id_match",
       "risk_tier": "critical",
@@ -207,17 +207,37 @@
       "compliance": "compliant",
       "threat_tags": ["leaked_wallet_id", "unauthorized_device_enrollment"],
       "checklist_sections": [1, 2],
-      "test_refs": ["tests/test_wallet_authn.py"]
+      "test_refs": ["tests/test_wallet_authn.py", "tests/test_wallet_session_sync_security.py"]
+    },
+    {
+      "operation_id": "wallet.device.enroll_webauthn",
+      "authority_class": "wallet",
+      "mutates": "Verifies WebAuthn registration and enrolls first-device signing key plus wallet passkey.",
+      "routes": [
+        {"method": "POST", "path": "/api/wallet/device-enroll/begin", "module": "api/wallet_session_sync.py"},
+        {"method": "POST", "path": "/api/wallet/device-enroll/complete", "module": "api/wallet_session_sync.py"}
+      ],
+      "current_auth": ["webauthn_registration_ceremony", "optional_one_time_enrollment_grant_for_additional_device"],
+      "required_auth": ["webauthn_registration_ceremony", "optional_one_time_enrollment_grant_for_additional_device"],
+      "required_scope": "none",
+      "site_binding": "wallet_id_match",
+      "risk_tier": "critical",
+      "enforcement_layer": "in_handler",
+      "compliance": "compliant",
+      "threat_tags": ["leaked_wallet_id", "unauthorized_device_enrollment", "rp_origin_mismatch"],
+      "checklist_sections": [1, 2],
+      "test_refs": ["tests/test_wallet_session_sync_security.py"]
     },
     {
       "operation_id": "wallet.device.revoke",
       "authority_class": "wallet",
-      "mutates": "Revokes an enrolled wallet device key.",
+      "mutates": "Revokes an enrolled wallet device key and bound passkeys.",
       "routes": [
+        {"method": "POST", "path": "/api/wallet/device-revoke/begin", "module": "api/wallet_session_sync.py"},
         {"method": "POST", "path": "/api/wallet/revoke-device", "module": "api/wallet_session_sync.py"}
       ],
-      "current_auth": ["authorized_wallet_assertion"],
-      "required_auth": ["authorized_wallet_assertion"],
+      "current_auth": ["authorized_wallet_assertion", "fresh_webauthn_for_cross_device_revoke"],
+      "required_auth": ["authorized_wallet_assertion", "fresh_webauthn_for_cross_device_revoke"],
       "required_scope": "none",
       "site_binding": "wallet_id_match",
       "risk_tier": "high",
@@ -225,16 +245,16 @@
       "compliance": "compliant",
       "threat_tags": ["device_revocation", "replay"],
       "checklist_sections": [1, 2],
-      "test_refs": ["tests/test_wallet_authn.py"]
+      "test_refs": ["tests/test_wallet_authn.py", "tests/test_wallet_session_sync_security.py"]
     },
     {
       "operation_id": "wallet.device.register_passkey",
       "authority_class": "wallet",
-      "mutates": "Binds a server-verified WebAuthn credential to a wallet device.",
+      "mutates": "Binds a WebAuthn credential to an already enrolled wallet device.",
       "routes": [
         {"method": "POST", "path": "/api/wallet/register-device-passkey", "module": "api/wallet_session_sync.py"}
       ],
-      "current_auth": ["webauthn_registration_ceremony"],
+      "current_auth": ["authorized_wallet_assertion"],
       "required_auth": ["webauthn_registration_ceremony", "authorized_wallet_binding"],
       "required_scope": "none",
       "site_binding": "wallet_id_match",
@@ -243,7 +263,7 @@
       "compliance": "review_required",
       "threat_tags": ["unauthorized_device_enrollment", "rp_origin_mismatch"],
       "checklist_sections": [1, 2],
-      "test_refs": []
+      "test_refs": ["tests/test_wallet_session_sync_security.py"]
     },
     {
       "operation_id": "identity.idv.start",
