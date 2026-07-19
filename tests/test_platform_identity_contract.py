@@ -136,6 +136,12 @@ def test_idv_preview_includes_terminal_ppid_blocked_state():
     assert "scene.terminal || previewState === 'blocked'" in idv
     assert ".brand-mark.is-blocked" in idv
     assert "classList.add('is-blocked')" in idv
+    assert "function isBlockedStatusMessage(message)" in idv
+    assert "function presentBlockedState(message)" in idv
+    assert "const blockedError = tone === 'error' && isBlockedStatusMessage(message)" in idv
+    assert "mark?.classList.toggle('is-blocked', blockedError)" in idv
+    assert "ppid.{0,40}blocked" in idv
+    assert "site_ppid_blocked" in idv
     assert "This PPID is blocked on this site." in copy
 
 
