@@ -195,7 +195,7 @@ def test_relying_site_index_exposes_presale_defense_and_tour_ui(relying_site_cli
     assert "renderGateChips" in body
     assert "redactFreshPasskeyAttestation" in body
     assert "resumeAfterLemmaRedirect" in body
-    assert "lemma_presale_session_v1" in body
+    assert "lemma_presale_session_v2" in body
     assert "pendingAction" in body
 
 

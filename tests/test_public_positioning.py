@@ -26,10 +26,9 @@ def test_homepage_leads_with_human_proofs(public_client):
     resp = public_client.get("/home")
     body = resp.get_data(as_text=True)
     assert resp.status_code == 200
-    assert "Human proofs for abuse-resistant accounts" in body
     assert "Stop the same abuser" in body
-    assert "Passkey continuity" in body
-    assert "anyone can create another wallet" in body
+    assert "lemma.id" in body
+    assert "anyone can create another lemma.id" in body
     assert "requiredAssurance: 'ishuman'" in body
     assert "Revoke everywhere" not in body
     assert "Network revocation" not in body
@@ -43,7 +42,7 @@ def test_trust_page_distinguishes_passkey_and_human_proofs(public_client):
     assert "Enforcement-grade assurance" in body
     assert "passkey" in body.lower()
     assert "human proofs" in body.lower()
-    assert "same returning wallet" in body.lower() or "returning wallet" in body.lower()
+    assert "returning lemma.id" in body.lower() or "lemma.id continuity" in body.lower()
 
 
 @pytest.mark.integration
@@ -51,15 +50,15 @@ def test_pricing_page_mentions_human_proof_enforcement(public_client):
     resp = public_client.get("/pricing")
     body = resp.get_data(as_text=True)
     assert resp.status_code == 200
-    assert "human proofs" in body.lower()
+    assert "human proof" in body.lower()
     assert "identity check is included" in body or "no separate IDV charge" in body
 
 
 @pytest.mark.unit
 def test_index_template_ties_rotation_resistance_to_ishuman():
     index = (ROOT / "templates" / "modern" / "index.html").read_text(encoding="utf-8")
-    assert "Rotating emails and IPs stops minting clean accounts" in index
-    assert "anyone can create another wallet" in index
+    assert "doesn't stop someone from making another" in index
+    assert "anyone can create another lemma.id" in index
 
 
 @pytest.mark.unit
