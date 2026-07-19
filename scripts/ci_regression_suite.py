@@ -32,6 +32,7 @@ def main() -> int:
 
     _run([sys.executable, "-m", "pytest", "tests/test_csp_security.py", "-q"], env=test_env)
     _run([sys.executable, "scripts/generate_auth_scope_matrix.py"], env=test_env)
+    _run([sys.executable, "scripts/check_authority_operations.py"], env=test_env)
     _run(
         [
             sys.executable,
