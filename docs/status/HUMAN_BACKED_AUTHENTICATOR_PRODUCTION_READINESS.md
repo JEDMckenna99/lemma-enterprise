@@ -124,6 +124,11 @@ Validation baseline:
 - Strict generated scope review: PASS after classifying the action-sign
   redirect deposit and one-time claim as in-handler ceremony routes. Their
   current and required policies remain explicit in the authority inventory.
+- Full non-live CI Regression: BLOCKED on the current repository baseline after
+  1,098 passes and 5 skips. Ten failures remain outside the Section 1 contract
+  changes: one local native `lemma_crypto` dependency failure and nine stale
+  demo, cache-bust, navigation, or public-copy assertions. These must be
+  reconciled before the final production gate can pass.
 
 Blocking approval:
 
