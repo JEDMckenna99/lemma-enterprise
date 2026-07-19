@@ -54,9 +54,10 @@ import hashlib
 import json
 import threading
 import time
+import urllib.parse
 import urllib.request
 from dataclasses import dataclass
-from typing import Optional
+from typing import Optional, Tuple
 
 from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
@@ -77,6 +78,115 @@ FRESH_PASSKEY_SCHEMA = "fresh_passkey_attestation.v1"
 DEFAULT_FRESH_PASSKEY_MAX_AGE_SECONDS = 120
 NONCE_STORE_MODE_OPTIONAL = "optional"
 NONCE_STORE_MODE_REQUIRED = "required"
+BROWSER_CANONICAL_V2 = "browser_canonical_v2"
+DEFAULT_NETWORK_ROOT_PUBKEYS_HEX: list[str] = [
+    "3782cf10beea1dcc9a88127a5dbb71c6cba30c1c8c63327a83b8f09867d6a6c2",
+]
+
+
+def _normalize_pubkey_hex(value: str) -> Optional[str]:
+    candidate = str(value or "").strip().lower()
+    if len(candidate) != 64:
+        return None
+    if not all(ch in "0123456789abcdef" for ch in candidate):
+        return None
+    return candidate
+
+
+def resolve_network_root_pubkeys(override: Optional[list[str]] = None) -> list[str]:
+    if override:
+        return [
+            normalized
+            for item in override
+            if (normalized := _normalize_pubkey_hex(str(item)))
+        ]
+    env_raw = (__import__("os").getenv("LEMMA_NETWORK_ROOT_PUBKEYS") or "").strip()
+    if env_raw:
+        return [
+            normalized
+            for part in env_raw.split(",")
+            if (normalized := _normalize_pubkey_hex(part))
+        ]
+    return list(DEFAULT_NETWORK_ROOT_PUBKEYS_HEX)
+
+
+def allow_unpinned_trust_root() -> bool:
+    if __import__("os").getenv("LEMMA_ALLOW_UNPINNED_TRUST_ROOT", "").strip() == "1":
+        return True
+    try:
+        from api.config import is_production
+
+        return not is_production()
+    except ImportError:
+        return True
+
+
+def signer_pubkey_is_pinned(signer_pubkey: str, network_root_pubkeys: Optional[list[str]] = None) -> bool:
+    normalized = _normalize_pubkey_hex(signer_pubkey)
+    if not normalized:
+        return False
+    pins = resolve_network_root_pubkeys(network_root_pubkeys)
+    if not pins:
+        return allow_unpinned_trust_root()
+    return normalized in pins
+
+
+def assurance_meets_policy(actual: Optional[str], required: str) -> bool:
+    if not actual:
+        return False
+    policy = (required or "ishuman").strip().lower()
+    normalized = str(actual).strip().lower()
+    if policy == "passkey":
+        return normalized in ("passkey", "ishuman")
+    return normalized == "ishuman"
+
+
+class SiteHostnameError(ValueError):
+    """Raised when a hostname cannot be canonicalized for site binding."""
+
+
+def _canonicalize_rp_id(rp_id: Optional[str]) -> str:
+    """Mirror api.ppid.canonicalize_rp_id for zero-install usage."""
+    value = (rp_id or "").strip().lower()
+    if not value:
+        return "unknown"
+    if "://" in value:
+        parsed = urllib.parse.urlparse(value)
+        if parsed.hostname:
+            value = parsed.hostname.lower()
+        else:
+            value = value.split("://", 1)[-1]
+    host = value.split("/")[0]
+    if ":" in host and not host.startswith("["):
+        host = host.rsplit(":", 1)[0]
+    if host.startswith("www."):
+        host = host[4:]
+    return host or "unknown"
+
+
+def canonicalize_site_hostname(value: Optional[str]) -> str:
+    """Normalize integrator hostname input (mirrors api.site_hostname)."""
+    try:
+        from api.site_hostname import canonicalize_site_hostname as _api_canonicalize
+
+        return _api_canonicalize(value)
+    except ImportError:
+        raw = (value or "").strip()
+        if not raw:
+            raise SiteHostnameError("hostname_required")
+        if raw.lower().startswith("site_"):
+            raise SiteHostnameError("internal_site_id_not_allowed")
+        canonical = _canonicalize_rp_id(raw)
+        if not canonical or canonical == "unknown":
+            raise SiteHostnameError("invalid_hostname")
+        return canonical
+
+
+def try_canonicalize_site_hostname(value: Optional[str]) -> Tuple[Optional[str], Optional[str]]:
+    try:
+        return canonicalize_site_hostname(value), None
+    except SiteHostnameError as exc:
+        return None, str(exc)
 
 
 def _import_enforce_site_policy():
@@ -122,11 +232,60 @@ def browser_canonical_message(credential: dict) -> bytes:
         "subject": credential.get("subject"),
         "claims": sorted_claims,
     }
+    credential_id = str(credential.get("id") or "").strip()
+    if credential_id:
+        payload["id"] = credential_id
     if credential.get("issuedAt") is not None:
         payload["issuedAt"] = credential["issuedAt"]
     if credential.get("expiresAt") is not None:
         payload["expiresAt"] = credential["expiresAt"]
     return json.dumps(payload, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+
+
+def browser_canonical_message_version(credential: dict) -> str:
+    return BROWSER_CANONICAL_V2 if str(credential.get("id") or "").strip() else "browser_canonical_v1"
+
+
+def _extract_credential_assurance(claims: dict) -> Optional[str]:
+    raw = claims.get("assurance")
+    if raw:
+        return str(raw).strip().lower()
+    if claims.get("isHuman") in (True, "true", "True", 1, "1"):
+        return "ishuman"
+    return None
+
+
+def validate_credential_required_fields(credential: dict) -> Optional[str]:
+    if not isinstance(credential, dict):
+        return "credential_missing"
+    if not str(credential.get("id") or "").strip():
+        return "credential_id_missing"
+    if not str(credential.get("issuer") or "").strip():
+        return "credential_issuer_missing"
+    if not str(credential.get("subject") or "").strip():
+        return "credential_subject_missing"
+    claims = credential.get("claims") or credential.get("credentialSubject") or {}
+    bound_site = (
+        claims.get("siteId")
+        or claims.get("site_id")
+        or claims.get("siteDomain")
+        or claims.get("site_domain")
+        or ""
+    )
+    if not str(bound_site or "").strip():
+        return "credential_site_binding_missing"
+    issued_at = claims.get("issuedAt", credential.get("issuedAt"))
+    expires_at = claims.get("expiresAt", credential.get("expiresAt"))
+    if issued_at in (None, ""):
+        return "credential_issued_at_missing"
+    if expires_at in (None, ""):
+        return "credential_expires_at_missing"
+    if not _extract_credential_assurance(claims):
+        return "credential_assurance_missing"
+    sig_hex = str((credential.get("proof") or {}).get("signatureValueWeb") or "").strip()
+    if not sig_hex:
+        return "browser_signature_missing"
+    return None
 
 
 def build_convergence_canonical_message(artifact: dict) -> bytes:
@@ -317,7 +476,12 @@ def _normalize_trust_list_entry(raw: dict) -> dict | None:
     }
 
 
-def _verify_signed_trust_list_payload(payload: dict, *, now_unix: int | None = None) -> dict[str, TrustedIssuer]:
+def _verify_signed_trust_list_payload(
+    payload: dict,
+    *,
+    now_unix: int | None = None,
+    network_root_pubkeys: Optional[list[str]] = None,
+) -> dict[str, TrustedIssuer]:
     if not isinstance(payload, dict):
         raise RuntimeError("trust_list_missing")
 
@@ -333,6 +497,9 @@ def _verify_signed_trust_list_payload(payload: dict, *, now_unix: int | None = N
     for key in required:
         if payload.get(key) in (None, ""):
             raise RuntimeError(f"trust_list_{key}_missing")
+
+    if not signer_pubkey_is_pinned(str(payload["signer_pubkey"]), network_root_pubkeys):
+        raise RuntimeError("trust_list_signer_not_pinned")
 
     now = int(now_unix if now_unix is not None else time.time())
     if now + TIME_SKEW_SECONDS < int(payload["generated_at_unix"]):
@@ -441,7 +608,7 @@ def build_action_commitment(
     path: str = "",
     body_hash: str = "",
 ) -> str:
-    """Opaque action binding, lemma.id never receives action details."""
+    """Opaque action binding; lemma.id never receives action details."""
     lines = [
         ACTION_COMMITMENT_PREFIX,
         str(server_nonce or "").strip(),
@@ -712,8 +879,9 @@ class VerificationContext:
         max_action_age_seconds: int = DEFAULT_MAX_ACTION_AGE_SECONDS,
         nonce_store_mode: str = NONCE_STORE_MODE_OPTIONAL,
         fresh_passkey_max_age_seconds: int = DEFAULT_FRESH_PASSKEY_MAX_AGE_SECONDS,
+        network_root_pubkeys: Optional[list[str]] = None,
     ) -> None:
-        self.site_id = site_id
+        self.site_id = canonicalize_site_hostname(site_id)
         self.lemma_origin = lemma_origin.rstrip("/")
         self.max_session_age_seconds = max_session_age_seconds
         self.refresh_seconds = refresh_seconds
@@ -722,24 +890,17 @@ class VerificationContext:
         self.max_action_age_seconds = max_action_age_seconds
         self.nonce_store_mode = (nonce_store_mode or NONCE_STORE_MODE_OPTIONAL).strip().lower()
         self.fresh_passkey_max_age_seconds = fresh_passkey_max_age_seconds
+        self.network_root_pubkeys = network_root_pubkeys
         self._lock = threading.Lock()
         self._snapshot: Optional[_Snapshot] = None
 
     @staticmethod
     def _credential_assurance(claims: dict) -> Optional[str]:
-        raw = claims.get("assurance")
-        if raw:
-            return str(raw).strip().lower()
-        if claims.get("isHuman") in (True, "true", "True", 1, "1"):
-            return "ishuman"
-        return None
+        return _extract_credential_assurance(claims)
 
     @staticmethod
     def _assurance_meets_policy(actual: Optional[str], required: str) -> bool:
-        if not actual:
-            return False
-        required = (required or "ishuman").strip().lower()
-        return actual.strip().lower() == required
+        return assurance_meets_policy(actual, required)
 
     def _fetch_signed_bundle(self) -> _Snapshot:
         url = f"{self.lemma_origin}/api/revocation/bloom-filter"
@@ -766,7 +927,10 @@ class VerificationContext:
         )
 
     def _verify_trust_list(self, trust_list: dict) -> dict[str, TrustedIssuer]:
-        return _verify_signed_trust_list_payload(trust_list)
+        return _verify_signed_trust_list_payload(
+            trust_list,
+            network_root_pubkeys=self.network_root_pubkeys,
+        )
 
     def _verify_bloom_snapshot(
         self,
@@ -843,10 +1007,12 @@ class VerificationContext:
         if not isinstance(credential, dict):
             return self.Result(False, "credential_missing")
 
+        required_err = validate_credential_required_fields(credential)
+        if required_err:
+            return self.Result(False, required_err)
+
         proof = credential.get("proof") or {}
         signature_hex = (proof.get("signatureValueWeb") or "").strip()
-        if not signature_hex:
-            return self.Result(False, "browser_signature_missing")
 
         issuer_did = (credential.get("issuer") or "").strip()
         snapshot = self._ensure_fresh_snapshot()
@@ -881,11 +1047,12 @@ class VerificationContext:
             return self.Result(False, "invalid_assurance")
         if not self._assurance_meets_policy(assurance, self.required_assurance):
             return self.Result(False, "assurance_insufficient", assurance=assurance)
-        bound_site = (
+        bound_site_raw = (
             claims.get("siteId") or claims.get("site_id") or claims.get("siteDomain") or ""
         )
-        if bound_site != self.site_id:
-            return self.Result(False, "site_id_mismatch", bound_site_id=bound_site)
+        bound_site, bound_err = try_canonicalize_site_hostname(bound_site_raw)
+        if bound_err or bound_site != self.site_id:
+            return self.Result(False, "site_id_mismatch", bound_site_id=bound_site_raw)
         try:
             expires_at = int(claims.get("expiresAt") or 0)
         except (TypeError, ValueError):
@@ -927,7 +1094,10 @@ class VerificationContext:
                     return self.Result(False, "session_too_old")
             except (TypeError, ValueError, KeyError):
                 return self.Result(False, "session_timestamps_invalid")
-            if str(assertion.get("site_id") or "") != self.site_id:
+            session_site, session_site_err = try_canonicalize_site_hostname(
+                assertion.get("site_id") or ""
+            )
+            if session_site_err or session_site != self.site_id:
                 return self.Result(False, "session_site_id_mismatch")
         elif self.require_session_assertion and site_pubkey_b64:
             return self.Result(False, "session_assertion_required")
@@ -1078,7 +1248,8 @@ class VerificationContext:
             return self.Result(False, "action_method_mismatch")
         if str(assertion.get("path") or "").strip() != expected_path:
             return self.Result(False, "action_path_mismatch")
-        if str(assertion.get("site_id") or "").strip() != self.site_id:
+        action_site, action_site_err = try_canonicalize_site_hostname(assertion.get("site_id") or "")
+        if action_site_err or action_site != self.site_id:
             return self.Result(False, "action_site_id_mismatch")
 
         try:

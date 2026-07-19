@@ -13,6 +13,7 @@ def _patch_signing_material(monkeypatch):
         return private_key, public_key, "did:lemma:" + ("b" * 64)
 
     monkeypatch.setattr("api.bloom_snapshot._issuer_signing_material", _material)
+    monkeypatch.setenv("LEMMA_ALLOW_UNPINNED_TRUST_ROOT", "1")
 
 
 @pytest.mark.unit
@@ -44,3 +45,19 @@ def test_verify_signed_trust_list_rejects_tamper():
     ok, reason = verify_signed_trust_list(payload)
     assert not ok
     assert reason == "trust_list_content_hash_mismatch"
+
+
+@pytest.mark.unit
+def test_verify_signed_trust_list_rejects_unpinned_self_signed(monkeypatch):
+    from api.issuer_trust_list import build_signed_trust_list, verify_signed_trust_list
+
+    monkeypatch.delenv("LEMMA_ALLOW_UNPINNED_TRUST_ROOT", raising=False)
+    monkeypatch.setenv("LEMMA_NETWORK_ROOT_PUBKEYS", "cc" * 32)
+
+    payload = build_signed_trust_list()
+    payload["signer_pubkey"] = "aa" * 32
+    payload["signature"] = "AAAA"
+
+    ok, reason = verify_signed_trust_list(payload)
+    assert not ok
+    assert reason == "trust_list_signer_not_pinned"

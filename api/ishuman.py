@@ -140,7 +140,7 @@ def _browser_canonical_message(credential: dict) -> bytes:
     """Build the exact canonical message format used by ishuman-verifier.js.
 
     Mirrors `canonicalMessage(credential)` in static/js/ishuman-verifier.js:
-    JSON.stringify({issuer, subject, claims: sorted, issuedAt, expiresAt})
+    JSON.stringify({issuer, subject, claims: sorted, optional id, issuedAt, expiresAt})
     with JSON.stringify default separators and undefined-key omission.
     """
     claims = credential.get("claims") or credential.get("credentialSubject") or {}
@@ -161,16 +161,25 @@ def _browser_canonical_message(credential: dict) -> bytes:
         "subject": credential.get("subject"),
         "claims": sorted_claims,
     }
-    # JS canonicalMessage references credential.issuedAt / credential.expiresAt
-    # (top-level). The Rust serializer renames these to issuanceDate /
-    # expirationDate, so the legacy JS keys are typically absent and omitted
-    # by JSON.stringify. Match that behaviour: only include when present.
+    credential_id = str(credential.get("id") or "").strip()
+    if credential_id:
+        payload["id"] = credential_id
     if credential.get("issuedAt") is not None:
         payload["issuedAt"] = credential["issuedAt"]
     if credential.get("expiresAt") is not None:
         payload["expiresAt"] = credential["expiresAt"]
 
     return json.dumps(payload, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+
+
+def _assurance_meets_policy(actual: str | None, required: str) -> bool:
+    if not actual:
+        return False
+    policy = (required or "ishuman").strip().lower()
+    normalized = str(actual).strip().lower()
+    if policy == "passkey":
+        return normalized in ("passkey", "ishuman")
+    return normalized == "ishuman"
 
 
 def _sign_with_issuer_for_browser(credential: dict, issuer) -> str:
@@ -3570,7 +3579,7 @@ def verify_presentation():
         return jsonify({"success": False, "error": "not_ishuman"}), 400
 
     required_assurance = (body.get("required_assurance") or "ishuman").strip().lower()
-    if assurance != required_assurance:
+    if not _assurance_meets_policy(assurance, required_assurance):
         return jsonify({"success": False, "error": "assurance_insufficient"}), 400
     from api.site_hostname import normalize_runtime_site_binding
 

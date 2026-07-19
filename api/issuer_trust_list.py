@@ -210,6 +210,7 @@ def build_signed_trust_list(*, generated_at_unix: int | None = None) -> dict[str
 def verify_signed_trust_list(payload: dict[str, Any], *, now_unix: int | None = None) -> tuple[bool, str]:
     from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
     from api.bloom_snapshot import _decode_signature
+    from api.network_roots import signer_pubkey_is_pinned
 
     if not isinstance(payload, dict):
         return False, "trust_list_missing"
@@ -225,6 +226,9 @@ def verify_signed_trust_list(payload: dict[str, Any], *, now_unix: int | None = 
     ):
         if payload.get(key) in (None, ""):
             return False, f"trust_list_{key}_missing"
+
+    if not signer_pubkey_is_pinned(str(payload["signer_pubkey"])):
+        return False, "trust_list_signer_not_pinned"
 
     # Clock-skew tolerance (seconds). Mirrors the browser verifier
     # (ishuman-verifier.js TIME_SKEW_SECONDS = 300): client/server clocks

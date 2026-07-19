@@ -64,6 +64,11 @@ const TRUST_LIST_STORAGE_KEY = 'ishuman_trust_list';
 // in the future. 300 s (5 min) is the conventional window for signed time
 // windows in identity / OAuth specs.
 const TIME_SKEW_SECONDS = 300;
+const BROWSER_CANONICAL_V2 = 'browser_canonical_v2';
+/** Sync with docs/cryptographic/NETWORK_ROOT_PUBKEYS.json */
+const DEFAULT_NETWORK_ROOT_PUBKEYS_HEX = [
+    '3782cf10beea1dcc9a88127a5dbb71c6cba30c1c8c63327a83b8f09867d6a6c2',
+];
 const IDV_POPUP_PATH = '/wallet/ishuman-idv';
 const UNLOCK_POPUP_PATH = '/wallet/popup';
 const IDV_POPUP_TIMEOUT_MS = 10 * 60 * 1000;
@@ -193,6 +198,21 @@ async function buildActionCommitment({
     return sha256HexText(lines.join('\n'));
 }
 
+function resolveNetworkRootPubkeys(override) {
+    if (Array.isArray(override) && override.length) {
+        return override.map((p) => String(p).trim().toLowerCase()).filter((p) => p.length === 64);
+    }
+    return DEFAULT_NETWORK_ROOT_PUBKEYS_HEX.slice();
+}
+
+function signerPubkeyIsPinned(signerPubkey, networkRootPubkeys) {
+    const normalized = String(signerPubkey || '').trim().toLowerCase();
+    if (!normalized || normalized.length !== 64) return false;
+    const pins = resolveNetworkRootPubkeys(networkRootPubkeys);
+    if (!pins.length) return true;
+    return pins.includes(normalized);
+}
+
 function canonicalMessage(credential) {
     const claims = credential.claims || credential.credentialSubject || {};
     const sorted = {};
@@ -208,13 +228,20 @@ function canonicalMessage(credential) {
             sorted[k] = value;
         }
     });
-    return JSON.stringify({
+    const payload = {
         issuer: credential.issuer,
         subject: credential.subject,
         claims: sorted,
-        issuedAt: credential.issuedAt,
-        expiresAt: credential.expiresAt,
-    });
+    };
+    const credentialId = String(credential.id || '').trim();
+    if (credentialId) payload.id = credentialId;
+    if (credential.issuedAt !== undefined && credential.issuedAt !== null) {
+        payload.issuedAt = credential.issuedAt;
+    }
+    if (credential.expiresAt !== undefined && credential.expiresAt !== null) {
+        payload.expiresAt = credential.expiresAt;
+    }
+    return JSON.stringify(payload);
 }
 
 function buildSessionPresentationPayload({
@@ -359,7 +386,7 @@ function computeTrustListContentHash(issuers) {
     return sha256HexText(canonical);
 }
 
-async function verifySignedTrustList(trustList) {
+async function verifySignedTrustList(trustList, networkRootPubkeys) {
     if (!trustList || typeof trustList !== 'object') {
         return { ok: false, reason: 'trust_list_missing', issuers: new Map() };
     }
@@ -376,6 +403,9 @@ async function verifySignedTrustList(trustList) {
         if (trustList[key] === undefined || trustList[key] === null || trustList[key] === '') {
             return { ok: false, reason: `trust_list_${key}_missing`, issuers: new Map() };
         }
+    }
+    if (!signerPubkeyIsPinned(trustList.signer_pubkey, networkRootPubkeys)) {
+        return { ok: false, reason: 'trust_list_signer_not_pinned', issuers: new Map() };
     }
     const nowSec = Math.floor(Date.now() / 1000);
     if (nowSec + TIME_SKEW_SECONDS < Number(trustList.generated_at_unix)) {
@@ -710,6 +740,7 @@ class ProofVerifier {
         this.isBlockedLocally = config.isBlockedLocally || null;
         this.autoProvision = !!config.autoProvision;
         this.requiredAssurance = (config.requiredAssurance || 'ishuman').toLowerCase();
+        this.networkRootPubkeys = config.networkRootPubkeys || null;
         this.idvPopupPath = config.idvPopupPath || IDV_POPUP_PATH;
         this.sessionTtlSec = Math.min(
             MAX_SESSION_TTL_SECONDS,
@@ -754,7 +785,8 @@ class ProofVerifier {
         const required = String(requiredAssurance || 'ishuman').toLowerCase();
         const actual = String(assurance || '').toLowerCase();
         if (!actual) return false;
-        return actual === required;
+        if (required === 'passkey') return actual === 'passkey' || actual === 'ishuman';
+        return actual === 'ishuman';
     }
 
     _canonicalizeSiteDomain(siteDomain) {
@@ -1534,7 +1566,7 @@ class ProofVerifier {
                 snapshot.max_staleness_seconds || DEFAULT_MAX_BLOOM_STALENESS_SECONDS,
             );
             if (!generatedAt || nowSec - generatedAt >= maxStaleness) return false;
-            const trustListResult = await verifySignedTrustList(trustCached.trust_list);
+            const trustListResult = await verifySignedTrustList(trustCached.trust_list, this.networkRootPubkeys);
             if (!trustListResult.ok) return false;
             const bloomCheck = await verifyBloomSnapshot(
                 snapshot,
@@ -1884,7 +1916,7 @@ class ProofVerifier {
             const hashedIds = Array.isArray(data.hashed_revoked_ids) ? data.hashed_revoked_ids : [];
 
             if (data.success && hashedIds.length >= 0 && snapshot.signature) {
-                const trustListResult = await verifySignedTrustList(trustList);
+                const trustListResult = await verifySignedTrustList(trustList, this.networkRootPubkeys);
                 if (!trustListResult.ok) {
                     this._bloomTrusted = false;
                     this._trustListTrusted = false;
@@ -1938,7 +1970,7 @@ class ProofVerifier {
                 const cached = JSON.parse(localStorage.getItem('ishuman_bloom') || '{}');
                 const trustCached = JSON.parse(localStorage.getItem(TRUST_LIST_STORAGE_KEY) || '{}');
                 if (cached.ids && cached.snapshot && trustCached.trust_list) {
-                    const trustListResult = await verifySignedTrustList(trustCached.trust_list);
+                    const trustListResult = await verifySignedTrustList(trustCached.trust_list, this.networkRootPubkeys);
                     if (trustListResult.ok) {
                         const trust = await verifyBloomSnapshot(
                             cached.snapshot,

@@ -44,15 +44,17 @@
     },
     {
       "artifact_id": "ishuman_credential",
-      "version": "browser_canonical_v1",
+      "version": "browser_canonical_v2",
       "wire_marker": "proof.signatureValueWeb",
       "marker_type": "shape_discriminator",
-      "status": "implicit_legacy",
+      "status": "explicit_with_legacy_v1",
       "canonical_section": "## 4. isHuman credential",
       "migration_class": "signed_artifact",
+      "overlap_version": "browser_canonical_v1",
       "source_assertions": [
         {"path": "api/ishuman.py", "contains": "proof[\"signatureValueWeb\"] = browser_sig_hex"},
-        {"path": "packages/ishuman-verify-py/lemma_ishuman_verify.py", "contains": "def browser_canonical_message(credential: dict) -> bytes:"}
+        {"path": "packages/ishuman-verify-py/lemma_ishuman_verify.py", "contains": "BROWSER_CANONICAL_V2 = \"browser_canonical_v2\""},
+        {"path": "packages/ishuman-verify-js/index.mjs", "contains": "const BROWSER_CANONICAL_V2 = \"browser_canonical_v2\""}
       ]
     },
     {

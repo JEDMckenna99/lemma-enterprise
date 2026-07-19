@@ -41,6 +41,7 @@ def patch_bloom_issuer_signing(monkeypatch, bloom_signing_keypair):
         return private_key, public_key, "did:lemma:" + ("a" * 64)
 
     monkeypatch.setattr("api.bloom_snapshot._issuer_signing_material", _material)
+    monkeypatch.setenv("LEMMA_ALLOW_UNPINNED_TRUST_ROOT", "1")
 
 
 @pytest.mark.unit

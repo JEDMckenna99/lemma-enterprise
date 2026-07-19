@@ -145,6 +145,6 @@ def test_python_verifier_strict_assurance_match():
     ctx = mod.VerificationContext
     assert ctx._assurance_meets_policy("passkey", "passkey") is True
     assert ctx._assurance_meets_policy("ishuman", "ishuman") is True
-    assert ctx._assurance_meets_policy("ishuman", "passkey") is False
+    assert ctx._assurance_meets_policy("ishuman", "passkey") is True
     assert ctx._assurance_meets_policy("passkey", "ishuman") is False
 

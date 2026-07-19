@@ -140,6 +140,32 @@ def test_didit_document_root_canonicalization_is_stable(monkeypatch):
 
 
 @pytest.mark.unit
+def test_browser_canonical_v2_message_byte_pin():
+    """browser_canonical_v2 includes credential.id in the signed payload."""
+    from api.ishuman import _browser_canonical_message
+
+    credential = {
+        "id": "ishuman_site_invariant_v2",
+        "issuer": "did:lemma:issuer:test",
+        "subject": "did:lemma:ppid_abc",
+        "claims": {
+            "assurance": "ishuman",
+            "isHuman": True,
+            "siteId": "example.com",
+            "issuedAt": "1700000000",
+            "expiresAt": "4102444800",
+        },
+    }
+    expected = (
+        b'{"issuer":"did:lemma:issuer:test","subject":"did:lemma:ppid_abc",'
+        b'"claims":{"assurance":"ishuman","expiresAt":"4102444800","isHuman":"true",'
+        b'"issuedAt":"1700000000","siteId":"example.com"},'
+        b'"id":"ishuman_site_invariant_v2"}'
+    )
+    assert _browser_canonical_message(credential) == expected
+
+
+@pytest.mark.unit
 def test_browser_canonical_message_byte_pin():
     """Python _browser_canonical_message must match the JS canonicalMessage()."""
     from api.ishuman import _browser_canonical_message

@@ -246,10 +246,13 @@ session-only claim path (deprecated, logged).
 - **Attacker capability:** obtains an issuer private key, controls a signing
   service, or replaces the trust-list distribution response.
 - **Current controls:** production KMS boundaries, signed trust lists and Bloom
-  snapshots, issuer status and validity windows, and cached local verification.
-- **Known gaps:** the trust-list signing key is delivered inside the same
-  response it authenticates; Node does not verify the trust-list signature.
-  Issuer-to-site authorization and emergency rotation evidence are incomplete.
+  snapshots, issuer status and validity windows, cached local verification, and
+  pinned network-root pubkeys (`LEMMA_NETWORK_ROOT_PUBKEYS` /
+  `docs/cryptographic/NETWORK_ROOT_PUBKEYS.json`) checked before trust-list
+  signature verification in Browser, Python, Node, and server paths.
+- **Known gaps:** emergency issuer reissue evidence and physical offline-root
+  ceremony remain operational follow-ups; rotation overlap is documented in
+  [`NETWORK_ROOT_ROTATION.md`](NETWORK_ROOT_ROTATION.md).
 - **Required controls:** independently pin an offline/network root, bind issuers
   to allowed credential classes and sites, support overlapping root and issuer
   rotation, and maintain an emergency reissue and revocation procedure.

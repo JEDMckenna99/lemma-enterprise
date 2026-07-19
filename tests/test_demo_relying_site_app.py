@@ -573,6 +573,7 @@ def test_demo_verifier_accepts_platform_signed_trust_bundle(monkeypatch):
         return private_key, public_key, "did:lemma:" + ("b" * 64)
 
     monkeypatch.setattr("api.bloom_snapshot._issuer_signing_material", _material)
+    monkeypatch.setenv("LEMMA_ALLOW_UNPINNED_TRUST_ROOT", "1")
 
     demo_path = str(DEMO_SITES)
     if demo_path not in sys.path:

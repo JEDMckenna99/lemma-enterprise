@@ -262,35 +262,40 @@ Validation baseline:
 ## 4. Stabilize the cryptographic trust chain
 
 - Priority: `P0`
-- Status: `NOT_STARTED`
+- Status: `PASS`
 - Owner:
 - Evidence:
+  - Node trust-list / Bloom / convergence parity: `packages/ishuman-verify-js/index.mjs`
+  - Network root pin + rotation: `api/network_roots.py`, `docs/cryptographic/NETWORK_ROOT_PUBKEYS.json`, `docs/security/NETWORK_ROOT_ROTATION.md`
+  - Credential `browser_canonical_v2`: `api/ishuman.py`, `static/js/ishuman-verifier.js`, verifier packages
+  - Monotonic assurance: Browser / Python / Node / `api/ishuman.py`
+  - Cross-verifier fixtures: `tests/test_protocol_fixtures_section4.py`, `tests/protocol_fixtures/`
 
-- [ ] Establish an offline or independently controlled network root key.
-- [ ] Pin the root public key in Browser, Python, and Node verifiers.
-- [ ] Define normal rotation, overlapping trust, emergency rollover, and
+- [x] Establish an offline or independently controlled network root key.
+- [x] Pin the root public key in Browser, Python, and Node verifiers.
+- [x] Define normal rotation, overlapping trust, emergency rollover, and
       compromise response.
-- [ ] Include the revocation identifier in the signed credential message.
-- [ ] Require credential ID, issuer, subject, site binding, issuance time,
+- [x] Include the revocation identifier in the signed credential message.
+- [x] Require credential ID, issuer, subject, site binding, issuance time,
       expiration, assurance, and proof fields.
-- [ ] Define canonical bytes for every signed artifact.
-- [ ] Repair Node trust-list parsing and signature verification.
-- [ ] Repair Node Bloom content hashing, signature message construction, and
+- [x] Define canonical bytes for every signed artifact.
+- [x] Repair Node trust-list parsing and signature verification.
+- [x] Repair Node Bloom content hashing, signature message construction, and
       signature decoding.
-- [ ] Repair Node PPID-convergence trusted-key iteration.
-- [ ] Make assurance ordering identical across Browser, Python, and Node.
-- [ ] Generate shared positive and negative protocol test vectors.
-- [ ] Verify real server-generated artifacts with every supported verifier.
-- [ ] Define immutable protocol fixtures so wire-format drift fails CI.
+- [x] Repair Node PPID-convergence trusted-key iteration.
+- [x] Make assurance ordering identical across Browser, Python, and Node.
+- [x] Generate shared positive and negative protocol test vectors.
+- [x] Verify real server-generated artifacts with every supported verifier.
+- [x] Define immutable protocol fixtures so wire-format drift fails CI.
 
 Exit criteria:
 
-- [ ] Browser, Python, and Node produce identical decisions for every shared
+- [x] Browser, Python, and Node produce identical decisions for every shared
       test vector.
-- [ ] Replacing a trust-list response with an attacker self-signed list fails.
-- [ ] A modified credential identifier, site binding, subject, expiry, or
+- [x] Replacing a trust-list response with an attacker self-signed list fails.
+- [x] A modified credential identifier, site binding, subject, expiry, or
       assurance fails verification.
-- [ ] Root rotation succeeds under documented overlap and emergency scenarios.
+- [x] Root rotation succeeds under documented overlap and emergency scenarios.
 
 ---
 

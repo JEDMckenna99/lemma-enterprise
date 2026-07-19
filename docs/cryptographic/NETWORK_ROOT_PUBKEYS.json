@@ -1,0 +1,7 @@
+{
+  "version": 1,
+  "description": "Pinned Ed25519 network-root public keys (hex) for issuer trust-list verification. Overlap entries support rotation.",
+  "pubkeys_hex": [
+    "3782cf10beea1dcc9a88127a5dbb71c6cba30c1c8c63327a83b8f09867d6a6c2"
+  ]
+}

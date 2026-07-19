@@ -53,6 +53,16 @@ const FRESH_PASSKEY_SCHEMA = "fresh_passkey_attestation.v1";
 const DEFAULT_FRESH_PASSKEY_MAX_AGE_S = 120;
 const NONCE_STORE_MODE_OPTIONAL = "optional";
 const NONCE_STORE_MODE_REQUIRED = "required";
+const BLOOM_SNAPSHOT_PREFIX = "lemma:bloom-snapshot:v1";
+const TRUST_LIST_PREFIX = "lemma:issuer-trust-list:v1";
+const TIME_SKEW_SECONDS = 300;
+const DEFAULT_MAX_BLOOM_STALENESS_SECONDS = 900;
+const BROWSER_CANONICAL_V2 = "browser_canonical_v2";
+
+/** Sync with docs/cryptographic/NETWORK_ROOT_PUBKEYS.json for Browser embed. */
+const DEFAULT_NETWORK_ROOT_PUBKEYS_HEX = [
+  "3782cf10beea1dcc9a88127a5dbb71c6cba30c1c8c63327a83b8f09867d6a6c2",
+];
 
 // ---------------------------------------------------------------------------
 // Site hostname canonicalization (mirrors api/site_hostname.py)
@@ -138,6 +148,120 @@ async function sha256Bytes(input) {
   return new Uint8Array(digest);
 }
 
+async function sha256HexText(text) {
+  return bytesToHex(await sha256Bytes(new TextEncoder().encode(String(text))));
+}
+
+function normalizeDid(did) {
+  return String(did || "")
+    .trim()
+    .split("#", 1)[0]
+    .split("?", 1)[0]
+    .replace(/\/+$/, "")
+    .toLowerCase();
+}
+
+function parseIssuerPubkeyHex(snapshot) {
+  const direct = String(snapshot?.issuer_pubkey || "").trim().toLowerCase();
+  if (direct.length === 64) return direct;
+  const did = String(snapshot?.issuer_did || "");
+  const fromDid = did.replace("did:lemma:", "").substring(0, 64).toLowerCase();
+  return fromDid.length === 64 ? fromDid : "";
+}
+
+function resolveNetworkRootPubkeys(override) {
+  if (Array.isArray(override) && override.length) {
+    return override.map((p) => String(p).trim().toLowerCase()).filter((p) => p.length === 64);
+  }
+  const env = typeof process !== "undefined" ? process.env?.LEMMA_NETWORK_ROOT_PUBKEYS : "";
+  if (env) {
+    return String(env)
+      .split(",")
+      .map((p) => p.trim().toLowerCase())
+      .filter((p) => p.length === 64);
+  }
+  return DEFAULT_NETWORK_ROOT_PUBKEYS_HEX.slice();
+}
+
+function signerPubkeyIsPinned(signerPubkey, networkRootPubkeys) {
+  const normalized = String(signerPubkey || "").trim().toLowerCase();
+  if (!normalized || normalized.length !== 64) return false;
+  const pins = resolveNetworkRootPubkeys(networkRootPubkeys);
+  if (!pins.length) {
+    return typeof process !== "undefined"
+      && process.env?.LEMMA_ALLOW_UNPINNED_TRUST_ROOT === "1";
+  }
+  return pins.includes(normalized);
+}
+
+async function computeTrustListContentHash(issuers) {
+  const canonicalEntries = (Array.isArray(issuers) ? issuers : []).map((row) => ({
+    did: String(row?.did || row?.issuer_did || "").trim(),
+    pubkey: String(row?.pubkey || row?.public_key || row?.publicKey || "").trim().toLowerCase(),
+    key_id: String(row?.key_id || "").trim(),
+    status: String(row?.status || "active").trim().toLowerCase(),
+    valid_from_unix: Number(row?.valid_from_unix || 0),
+    valid_until_unix: Number(row?.valid_until_unix || 0),
+    priority: Number(row?.priority || 0),
+  }));
+  const canonical = JSON.stringify(
+    canonicalEntries.map((entry) => {
+      const sorted = {};
+      for (const key of Object.keys(entry).sort()) sorted[key] = entry[key];
+      return sorted;
+    }),
+  );
+  return sha256HexText(canonical);
+}
+
+function buildBloomSignatureMessage(snapshot) {
+  return new TextEncoder().encode([
+    BLOOM_SNAPSHOT_PREFIX,
+    String(snapshot.sequence_number || ""),
+    String(snapshot.content_hash || ""),
+    String(snapshot.generated_at_unix || ""),
+    String(snapshot.valid_until_unix || ""),
+  ].join("\n"));
+}
+
+function buildTrustListSignatureMessage(trustList) {
+  return new TextEncoder().encode([
+    TRUST_LIST_PREFIX,
+    String(trustList.version || ""),
+    String(trustList.content_hash || ""),
+    String(trustList.generated_at_unix || ""),
+    String(trustList.valid_until_unix || ""),
+  ].join("\n"));
+}
+
+function flattenTrustedIssuerPubkeys(issuers) {
+  const out = [];
+  if (issuers instanceof Map) {
+    for (const keySet of issuers.values()) {
+      if (keySet instanceof Set) {
+        for (const pubkey of keySet) out.push(String(pubkey).toLowerCase());
+      }
+    }
+  } else if (issuers && typeof issuers === "object") {
+    for (const value of Object.values(issuers)) {
+      if (value instanceof Set) {
+        for (const pubkey of value) out.push(String(pubkey).toLowerCase());
+      } else if (value && typeof value === "object" && value.pubkeys_hex) {
+        for (const pubkey of value.pubkeys_hex) out.push(String(pubkey).toLowerCase());
+      }
+    }
+  }
+  return out;
+}
+
+export function assuranceMeetsPolicy(actual, required) {
+  if (!actual) return false;
+  const policy = String(required || "ishuman").toLowerCase();
+  const normalized = String(actual).toLowerCase();
+  if (policy === "passkey") return normalized === "passkey" || normalized === "ishuman";
+  return normalized === "ishuman";
+}
+
 async function verifyEd25519(pubkeyBytes, message, signature) {
   // WebCrypto Ed25519 (Node 22+, browsers/Deno modern). Fall back to noble
   // when subtle.importKey rejects "Ed25519".
@@ -201,6 +325,8 @@ export function browserCanonicalMessage(credential) {
     subject: credential.subject,
     claims: sorted,
   };
+  const credentialId = String(credential.id || "").trim();
+  if (credentialId) payload.id = credentialId;
   if (credential.issuedAt !== undefined && credential.issuedAt !== null) {
     payload.issuedAt = credential.issuedAt;
   }
@@ -208,6 +334,38 @@ export function browserCanonicalMessage(credential) {
     payload.expiresAt = credential.expiresAt;
   }
   return new TextEncoder().encode(JSON.stringify(payload));
+}
+
+export function browserCanonicalMessageVersion(credential) {
+  return String(credential?.id || "").trim() ? BROWSER_CANONICAL_V2 : "browser_canonical_v1";
+}
+
+function extractCredentialAssurance(claims) {
+  if (claims?.assurance) return String(claims.assurance).toLowerCase();
+  if (claims?.isHuman === true || claims?.isHuman === "true") return "ishuman";
+  return null;
+}
+
+export function validateCredentialRequiredFields(credential) {
+  if (!credential || typeof credential !== "object") return "credential_missing";
+  if (!String(credential.id || "").trim()) return "credential_id_missing";
+  if (!String(credential.issuer || "").trim()) return "credential_issuer_missing";
+  if (!String(credential.subject || "").trim()) return "credential_subject_missing";
+  const claims = credential.claims || credential.credentialSubject || {};
+  const boundSite = claims.siteId || claims.site_id || claims.siteDomain || claims.site_domain || "";
+  if (!String(boundSite || "").trim()) return "credential_site_binding_missing";
+  const issuedAt = claims.issuedAt ?? credential.issuedAt;
+  const expiresAt = claims.expiresAt ?? credential.expiresAt;
+  if (issuedAt === undefined || issuedAt === null || issuedAt === "") {
+    return "credential_issued_at_missing";
+  }
+  if (expiresAt === undefined || expiresAt === null || expiresAt === "") {
+    return "credential_expires_at_missing";
+  }
+  if (!extractCredentialAssurance(claims)) return "credential_assurance_missing";
+  const sigHex = String((credential.proof || {}).signatureValueWeb || "").trim();
+  if (!sigHex) return "browser_signature_missing";
+  return null;
 }
 
 function buildConvergenceCanonicalMessage(artifact) {
@@ -582,65 +740,134 @@ export class RedisNonceStore {
 // Cached signed bundle (trust list + Bloom snapshot) refresh
 // ---------------------------------------------------------------------------
 
-async function verifyTrustList(trustList) {
-  // Minimal: extract active issuers. Production should also verify trustList
-  // signature against a hard-coded network-root pubkey.
-  const issuers = new Map();
-  for (const entry of (trustList?.issuers || [])) {
-    const did = String(entry.did || "").trim();
-    const pubkeyHex = String(entry.public_key || entry.publicKey || "").trim().toLowerCase();
-    const status = String(entry.status || "active").toLowerCase();
-    if (!did || !pubkeyHex || status !== "active") continue;
-    const existing = issuers.get(did);
-    if (existing) existing.add(pubkeyHex);
-    else issuers.set(did, new Set([pubkeyHex]));
+async function verifyTrustList(trustList, networkRootPubkeys) {
+  if (!trustList || typeof trustList !== "object") {
+    throw new Error("trust_list_missing");
   }
-  if (issuers.size === 0) throw new Error("trust_list_empty");
+  const required = [
+    "version",
+    "generated_at_unix",
+    "valid_until_unix",
+    "content_hash",
+    "signer_pubkey",
+    "signature",
+    "issuers",
+  ];
+  for (const key of required) {
+    if (trustList[key] === undefined || trustList[key] === null || trustList[key] === "") {
+      throw new Error(`trust_list_${key}_missing`);
+    }
+  }
+  if (!signerPubkeyIsPinned(trustList.signer_pubkey, networkRootPubkeys)) {
+    throw new Error("trust_list_signer_not_pinned");
+  }
+
+  const nowSec = Math.floor(Date.now() / 1000);
+  if (nowSec + TIME_SKEW_SECONDS < Number(trustList.generated_at_unix)) {
+    throw new Error("trust_list_not_yet_valid");
+  }
+  if (nowSec - TIME_SKEW_SECONDS > Number(trustList.valid_until_unix)) {
+    throw new Error("trust_list_expired");
+  }
+  if (!Array.isArray(trustList.issuers) || trustList.issuers.length === 0) {
+    throw new Error("trust_list_issuers_missing");
+  }
+
+  const expectedHash = await computeTrustListContentHash(trustList.issuers);
+  if (expectedHash !== String(trustList.content_hash || "")) {
+    throw new Error("trust_list_content_hash_mismatch");
+  }
+
+  const trustValid = await verifyEd25519(
+    hexToBytes(String(trustList.signer_pubkey || "").toLowerCase()),
+    await sha256Bytes(buildTrustListSignatureMessage(trustList)),
+    base64urlToBytes(String(trustList.signature || "")),
+  );
+  if (!trustValid) throw new Error("trust_list_invalid_signature");
+
+  const issuers = new Map();
+  for (const row of trustList.issuers) {
+    const did = normalizeDid(row?.did || row?.issuer_did || "");
+    const pubkey = String(row?.pubkey || row?.public_key || row?.publicKey || "").trim().toLowerCase();
+    const status = String(row?.status || "active").toLowerCase();
+    const validFrom = Number(row?.valid_from_unix || 0);
+    const validUntil = Number(row?.valid_until_unix || 0);
+    if (!did || pubkey.length !== 64 || !/^[0-9a-f]+$/.test(pubkey)) continue;
+    if (status === "revoked") continue;
+    if (validFrom && (nowSec + TIME_SKEW_SECONDS) < validFrom) continue;
+    if (validUntil && (nowSec - TIME_SKEW_SECONDS) > validUntil) continue;
+    if (!issuers.has(did)) issuers.set(did, new Set());
+    issuers.get(did).add(pubkey);
+  }
+  if (!issuers.size) throw new Error("trust_list_no_active_issuers");
   return issuers;
 }
 
-async function verifyBloomSnapshot(snapshot, hashedRevokedIds, issuers) {
-  const expectedHash = await sha256Bytes(new TextEncoder().encode(
-    JSON.stringify(
-      { hashed_revoked_ids: hashedRevokedIds, count: hashedRevokedIds.length },
-    ),
-  ));
-  // Note: Python uses sort_keys=True. JS keys are already in stable order
-  // because the object only has two keys defined in this order. Match exactly.
-  const expectedHex = bytesToHex(expectedHash);
-  if (expectedHex !== snapshot.content_hash) {
+async function verifyBloomSnapshot(snapshot, hashedRevokedIds, trustedIssuers) {
+  if (!snapshot || typeof snapshot !== "object") {
+    throw new Error("bloom_snapshot_missing");
+  }
+  const required = ["sequence_number", "generated_at_unix", "valid_until_unix", "content_hash", "signature"];
+  for (const key of required) {
+    if (snapshot[key] === undefined || snapshot[key] === null || snapshot[key] === "") {
+      throw new Error(`bloom_snapshot_${key}_missing`);
+    }
+  }
+
+  const nowSec = Math.floor(Date.now() / 1000);
+  const generatedAt = Number(snapshot.generated_at_unix);
+  const validUntil = Number(snapshot.valid_until_unix);
+  const maxStale = Number(snapshot.max_staleness_seconds || DEFAULT_MAX_BLOOM_STALENESS_SECONDS);
+  if (nowSec + TIME_SKEW_SECONDS < generatedAt) throw new Error("bloom_snapshot_not_yet_valid");
+  if (nowSec - TIME_SKEW_SECONDS > validUntil) throw new Error("bloom_snapshot_expired");
+  if (nowSec - generatedAt > maxStale + TIME_SKEW_SECONDS) throw new Error("bloom_snapshot_stale");
+
+  const canonicalBody = JSON.stringify({
+    count: hashedRevokedIds.length,
+    hashed_revoked_ids: hashedRevokedIds,
+  });
+  const expectedHash = await sha256HexText(canonicalBody);
+  if (expectedHash !== String(snapshot.content_hash || "")) {
     throw new Error("bloom_snapshot_content_hash_mismatch");
   }
-  const issuerDid = String(snapshot.issuer_did || "").trim();
-  const trusted = issuers.get(issuerDid);
-  if (!trusted) throw new Error(`bloom_snapshot_untrusted_issuer:${issuerDid}`);
-  const envelope = { ...snapshot };
-  delete envelope.signature;
-  const sortedKeys = Object.keys(envelope).sort();
-  const envelopeSorted = {};
-  for (const k of sortedKeys) envelopeSorted[k] = envelope[k];
-  const message = new TextEncoder().encode(JSON.stringify(envelopeSorted));
-  const signature = hexToBytes(snapshot.signature);
-  for (const pubkeyHex of trusted) {
-    if (await verifyEd25519(hexToBytes(pubkeyHex), message, signature)) return;
+  if (snapshot.count === undefined || snapshot.count === null) {
+    throw new Error("bloom_snapshot_count_missing");
   }
-  throw new Error("bloom_snapshot_invalid_signature");
+  if (Number(snapshot.count) !== hashedRevokedIds.length) {
+    throw new Error("bloom_snapshot_count_mismatch");
+  }
+
+  const pubHex = parseIssuerPubkeyHex(snapshot);
+  if (!pubHex) throw new Error("bloom_snapshot_issuer_pubkey_missing");
+  const issuerDid = normalizeDid(snapshot.issuer_did || "");
+  const trustedKeys = trustedIssuers?.get(issuerDid);
+  if (!issuerDid || !trustedKeys || !trustedKeys.has(pubHex.toLowerCase())) {
+    throw new Error("bloom_snapshot_issuer_untrusted");
+  }
+
+  const messageHash = await sha256Bytes(buildBloomSignatureMessage(snapshot));
+  const valid = await verifyEd25519(
+    hexToBytes(pubHex),
+    messageHash,
+    base64urlToBytes(String(snapshot.signature || "")),
+  );
+  if (!valid) throw new Error("bloom_snapshot_invalid_signature");
 }
 
-async function fetchSignedBundle(lemmaOrigin, fetchImpl) {
+async function fetchSignedBundle(lemmaOrigin, fetchImpl, networkRootPubkeys) {
   const url = `${lemmaOrigin.replace(/\/$/, "")}/api/revocation/bloom-filter`;
   const res = await (fetchImpl || globalThis.fetch)(url);
   if (!res.ok) throw new Error(`bloom_fetch_${res.status}`);
   const data = await res.json();
   if (!data.success) throw new Error("bloom_fetch_failed");
-  const issuers = await verifyTrustList(data.trust_list || {});
+  const issuers = await verifyTrustList(data.trust_list || {}, networkRootPubkeys);
   await verifyBloomSnapshot(data.snapshot || {}, data.hashed_revoked_ids || [], issuers);
   return {
     sequenceNumber: Number(data.snapshot?.sequence_number || 0),
     revokedHashSet: new Set(data.hashed_revoked_ids || []),
     validUntilUnix: Number(data.snapshot?.valid_until_unix || 0),
     fetchedAtMs: Date.now(),
-    maxStalenessSeconds: Number(data.snapshot?.max_staleness_seconds || 900),
+    maxStalenessSeconds: Number(data.snapshot?.max_staleness_seconds || DEFAULT_MAX_BLOOM_STALENESS_SECONDS),
     issuers,
   };
 }
@@ -668,6 +895,7 @@ export function createVerifier({
   maxActionAgeSeconds = DEFAULT_MAX_ACTION_AGE_S,
   nonceStoreMode = NONCE_STORE_MODE_OPTIONAL,
   freshPasskeyMaxAgeSeconds = DEFAULT_FRESH_PASSKEY_MAX_AGE_S,
+  networkRootPubkeys = null,
   fetch: fetchImpl,
 } = {}) {
   if (!siteId) throw new Error("siteId required");
@@ -676,16 +904,7 @@ export function createVerifier({
   let inflight = null;
 
   function credentialAssurance(claims) {
-    if (claims?.assurance) return String(claims.assurance).toLowerCase();
-    if (claims?.isHuman === true || claims?.isHuman === "true") return "ishuman";
-    return null;
-  }
-
-  function assuranceMeetsPolicy(actual, required) {
-    if (!actual) return false;
-    const policy = String(required || "ishuman").toLowerCase();
-    if (policy === "passkey") return actual === "passkey" || actual === "ishuman";
-    return actual === "ishuman";
+    return extractCredentialAssurance(claims);
   }
 
   async function ensureFresh() {
@@ -694,7 +913,7 @@ export function createVerifier({
       || now - snapshot.fetchedAtMs > Math.min(refreshMs, snapshot.maxStalenessSeconds * 1000);
     if (!stale) return snapshot;
     if (inflight) return inflight;
-    inflight = fetchSignedBundle(lemmaOrigin, fetchImpl)
+    inflight = fetchSignedBundle(lemmaOrigin, fetchImpl, networkRootPubkeys)
       .then((next) => {
         snapshot = next;
         return snapshot;
@@ -710,9 +929,10 @@ export function createVerifier({
     if (!credential || typeof credential !== "object") {
       return { ok: false, reason: "credential_missing" };
     }
+    const requiredErr = validateCredentialRequiredFields(credential);
+    if (requiredErr) return { ok: false, reason: requiredErr };
     const proof = credential.proof || {};
     const sigHex = String(proof.signatureValueWeb || "").trim();
-    if (!sigHex) return { ok: false, reason: "browser_signature_missing" };
 
     const issuerDid = String(credential.issuer || "").trim();
     let bundle;
@@ -806,10 +1026,7 @@ export function createVerifier({
     let legacyPpid = null;
     const convergence = presentation.ppid_convergence;
     if (convergence) {
-      const trustedPubkeys = [];
-      for (const issuer of Object.values(bundle.issuers)) {
-        for (const pubkey of issuer.pubkeysHex || []) trustedPubkeys.push(pubkey);
-      }
+      const trustedPubkeys = flattenTrustedIssuerPubkeys(bundle.issuers);
       const conv = await verifyPpidConvergenceArtifact(convergence, {
         siteId: canonicalSiteId,
         canonicalPpid: credential.subject || "",

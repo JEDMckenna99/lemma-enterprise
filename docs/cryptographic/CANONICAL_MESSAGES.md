@@ -50,18 +50,35 @@ compact separators (`,` and `:`) with no insignificant whitespace.
 
 ## 4. isHuman credential `signatureValueWeb` (browser-canonical message)
 
-- **Inputs:** credential dict (`issuer`, `subject`, `claims`, optional `issuedAt`/`expiresAt`).
+- **Versions:**
+  - `browser_canonical_v1` — legacy payload `{issuer, subject, claims, issuedAt?, expiresAt?}`.
+  - `browser_canonical_v2` (current issuance) — same as v1 plus **`id`** (revocation
+    identifier) when present on the credential object.
+- **Assurance policy (monotonic):** `requiredAssurance: passkey` accepts credentials
+  with `assurance` of `passkey` **or** `ishuman`; `requiredAssurance: ishuman`
+  accepts only `ishuman`.
+- **Required credential fields (fail-closed):** `id`, `issuer`, `subject`, site
+  binding (`siteId` / `siteDomain`), `issuedAt`, `expiresAt`, `assurance`, and
+  `proof.signatureValueWeb`.
+- **Network root pin:** trust-list `signer_pubkey` must appear in
+  `LEMMA_NETWORK_ROOT_PUBKEYS` or [`NETWORK_ROOT_PUBKEYS.json`](NETWORK_ROOT_PUBKEYS.json).
+  See [`../security/NETWORK_ROOT_ROTATION.md`](../security/NETWORK_ROOT_ROTATION.md).
+- **Inputs:** credential dict (`issuer`, `subject`, `claims`, optional `id`,
+  `issuedAt`/`expiresAt`).
 - **Canonicalization** (mirrors `static/js/ishuman-verifier.js::canonicalMessage`):
   1. Sort `claims` by key.
   2. Booleans become the **strings** `"true"`/`"false"`; arrays/objects become compact JSON strings; other scalars pass through.
-  3. `payload = {issuer, subject, claims: sorted_claims}` (+ `issuedAt`/`expiresAt` only when present).
+  3. `payload = {issuer, subject, claims: sorted_claims}` (+ `id` when present; `issuedAt`/`expiresAt` only when present).
   4. `message = JSON.stringify(payload)` with compact separators, UTF-8 encoded.
   5. Signature is Ed25519 over `SHA256(message)`.
 - **Reference:** `api/ishuman.py::_browser_canonical_message` + `_sign_with_issuer_for_browser`;
   Python verifier `packages/ishuman-verify-py/lemma_ishuman_verify.py::browser_canonical_message`.
-- **Test vector:**
+- **Test vector (v1, no `id`):**
   - input `{issuer:"did:lemma:issuer:test", subject:"did:lemma:ppid_abc", claims:{isHuman:true, siteId:"example.com", expiresAt:"4102444800"}}`
   - => `{"issuer":"did:lemma:issuer:test","subject":"did:lemma:ppid_abc","claims":{"expiresAt":"4102444800","isHuman":"true","siteId":"example.com"}}`
+- **Test vector (v2):**
+  - same claims as v1 plus top-level `"id":"ishuman_site_invariant_v2"` after the
+    `claims` object (JSON key order: `issuer`, `subject`, `claims`, `id`).
 
 ## 5. Session presentation payload
 

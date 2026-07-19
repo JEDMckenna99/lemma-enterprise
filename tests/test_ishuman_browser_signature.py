@@ -168,6 +168,7 @@ def test_verify_presentation_endpoint_round_trip(monkeypatch):
         "issuer": issuer_did,
         "subject": "did:lemma:ppid_demo",
         "claims": {
+            "assurance": "ishuman",
             "isHuman": True,
             "siteId": "tickets-demo.lemma.id",
             "issuedAt": "1700000000",
@@ -176,6 +177,7 @@ def test_verify_presentation_endpoint_round_trip(monkeypatch):
             "verificationMethod": "stripe_identity",
         },
         "credentialSubject": {
+            "assurance": "ishuman",
             "isHuman": True,
             "siteId": "tickets-demo.lemma.id",
             "issuedAt": "1700000000",
@@ -189,9 +191,11 @@ def test_verify_presentation_endpoint_round_trip(monkeypatch):
             "verificationMethod": issuer_did,
             "signatureValueWeb": _sign_with_issuer_for_browser(
                 {
+                    "id": "ishuman_site_test123",
                     "issuer": issuer_did,
                     "subject": "did:lemma:ppid_demo",
                     "claims": {
+                        "assurance": "ishuman",
                         "isHuman": True,
                         "siteId": "tickets-demo.lemma.id",
                         "issuedAt": "1700000000",
@@ -246,6 +250,7 @@ def test_verify_presentation_endpoint_round_trip(monkeypatch):
     passkey_credential["credentialSubject"] = dict(passkey_credential["claims"])
     passkey_credential["proof"]["signatureValueWeb"] = _sign_with_issuer_for_browser(
         {
+            "id": passkey_credential["id"],
             "issuer": issuer_did,
             "subject": "did:lemma:ppid_demo",
             "claims": passkey_credential["claims"],
@@ -273,8 +278,8 @@ def test_verify_presentation_endpoint_round_trip(monkeypatch):
             "required_assurance": "passkey",
         },
     )
-    assert ishuman_with_passkey_policy.status_code == 400, ishuman_with_passkey_policy.get_json()
-    assert ishuman_with_passkey_policy.get_json()["error"] == "assurance_insufficient"
+    assert ishuman_with_passkey_policy.status_code == 200, ishuman_with_passkey_policy.get_json()
+    assert ishuman_with_passkey_policy.get_json()["success"] is True
 
     passkey_only_resp = client.post(
         "/api/ishuman/verify-presentation",
