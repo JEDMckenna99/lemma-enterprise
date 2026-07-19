@@ -96,9 +96,16 @@ toolchain) are provided by the VM snapshot, not the update script.
   update script; also listed in `scripts/ci_install_test_deps.sh`), not in
   `requirements.txt`.
 - **isHuman credential issuance requires AWS KMS** (`api/issuer_management.py`
-  fails closed without it); it cannot run locally. Verification does not need KMS.
-  To exercise the core backend verify path (`POST /api/ishuman/verify-presentation`)
-  locally, mint a credential with a dev `lemma_crypto.PyMinimalIssuer.from_seed`
-  and trust its DID via `TRUSTED_ISSUER_DIDS` (see `api/trusted_issuers.py`); the
-  demo/skeleton IDV rails (`/api/demo/ishuman/*`) also depend on the KMS-backed
-  issuer.
+  fails closed without it). Provide `LEMMA_KMS_KEY_ID` (KMS key ARN) plus
+  `AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY` as VM secrets to enable it. Gotcha:
+  `api/kms_manager.py` defaults `AWS_REGION` to `us-east-1`, so if the key ARN is
+  in another region you must set `AWS_REGION` to match (derive it from the ARN,
+  e.g. `arn:aws:kms:<region>:...`) or KMS calls fail. With those set, the full
+  flow works end to end: `POST /api/demo/ishuman/skeleton-idv-flow`
+  (`X-Demo-Test-Token`) issues a real KMS-signed master credential, and
+  `POST /api/ishuman/verify-presentation` verifies it (the federated issuer is
+  auto-trusted, see `api/trusted_issuers.py`).
+- **Verification alone does not need KMS.** To exercise
+  `POST /api/ishuman/verify-presentation` without KMS, mint a credential with a
+  dev `lemma_crypto.PyMinimalIssuer.from_seed` and trust its DID via
+  `TRUSTED_ISSUER_DIDS`.
