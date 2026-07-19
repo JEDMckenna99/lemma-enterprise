@@ -65,7 +65,7 @@ def test_wallet_skips_empty_site_before_canonicalization(wallet_js_source):
 
 @pytest.mark.unit
 def test_wallet_version_bumped_for_platform_identity(wallet_js_source):
-    assert "static VERSION = '2.74.0'" in wallet_js_source
+    assert "static VERSION = '2.75.0'" in wallet_js_source
 
 
 @pytest.mark.unit
@@ -269,4 +269,4 @@ def test_device_link_bundles_ishuman_credentials_and_unlock_token(wallet_js_sour
     assert "sendLinkDepositFromScan" in wallet_js_source
     assert "beginLinkPush" in wallet_js_source
     assert "confirmLinkPushDeposit" in wallet_js_source
-    assert "2.74.0" in wallet_js_source
+    assert "2.75.0" in wallet_js_source
