@@ -2237,6 +2237,10 @@
   margin-bottom: 14px;
 }
 
+.demo-wallet-slots.is-single {
+  grid-template-columns: 1fr;
+}
+
 .demo-wallet-slot {
   display: flex;
   align-items: center;

@@ -6,7 +6,7 @@
 
 {% block head %}
 {{ super() }}
-<link rel="stylesheet" href="/static/css/demo/ishuman-demo.css?v=45">
+<link rel="stylesheet" href="/static/css/demo/ishuman-demo.css?v=46">
 {% endblock %}
 
 {% block content %}
@@ -230,7 +230,7 @@
               </div>
               <span class="demo-pill" id="ih-wallet-slot-passkey-pill">Not created</span>
             </div>
-            <div class="demo-wallet-slot demo-wallet-slot--human" id="ih-wallet-slot-human">
+            <div class="demo-wallet-slot demo-wallet-slot--human" id="ih-wallet-slot-human" hidden>
               <span class="demo-wallet-slot-icon" aria-hidden="true">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
                   <path d="M12 2.5 19.5 6v5.5c0 4.8-3.2 8-7.5 10-4.3-2-7.5-5.2-7.5-10V6L12 2.5Z" stroke="#4E3D8F" stroke-width="1.8" stroke-linejoin="round"/>
@@ -240,20 +240,9 @@
               </span>
               <div class="demo-wallet-slot-body">
                 <strong>Human proof</strong>
-                <span class="demo-muted">Added when a site requires it</span>
+                <span class="demo-muted">Verified on this lemma.id</span>
               </div>
-              <span class="demo-pill" id="ih-wallet-slot-human-pill">Available</span>
-            </div>
-          </div>
-
-          <div class="demo-wallet-meta demo-wallet-status-row">
-            <div class="demo-wallet-meta-item">
-              <span class="result-label">Status</span>
-              <span class="demo-pill" id="ih-lemma-status">Checking…</span>
-            </div>
-            <div class="demo-wallet-meta-item assurance-only" id="ih-person-status-card" hidden>
-              <span class="result-label">Person root</span>
-              <span class="demo-pill" id="ih-person-status">, </span>
+              <span class="demo-pill" id="ih-wallet-slot-human-pill">Verified</span>
             </div>
           </div>
 

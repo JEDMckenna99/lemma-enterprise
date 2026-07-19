@@ -85,15 +85,18 @@
 
   function setPill(id, label, tone) {
     const el = $(id);
-    if (!el) return;
     const display = id === 'ih-lemma-status' ? formatLemmaStatus(label) : label;
-    el.textContent = display;
-    el.className = `demo-pill${tone ? ` ${tone}` : ''}`;
+    const className = `demo-pill${tone ? ` ${tone}` : ''}`;
+    if (el) {
+      el.textContent = display;
+      el.className = className;
+    }
+    // Session status may only live in the topbar after the step-1 meta row was removed.
     if (id === 'ih-lemma-status') {
       const top = $('ih-topbar-status');
       if (top) {
         top.textContent = display;
-        top.className = el.className;
+        top.className = className;
       }
       renderStep1Action();
     }
@@ -608,14 +611,30 @@
     if (trialsStep2 && urls.trials) {
       trialsStep2.href = `${urls.trials}${trialsDemoQuery}`;
     }
-    const personCard = $('ih-person-status-card');
-    if (personCard) personCard.hidden = !on;
     renderWalletSlots();
     renderStep1Action();
     updateStepLocks();
   }
 
+  function hasHumanProofInWallet() {
+    // Only show the human-proof card when this lemma.id actually holds one.
+    // A stale localStorage master id alone is not enough.
+    if (state.masterCredential) {
+      const claims = state.masterCredential.claims
+        || state.masterCredential.credentialSubject
+        || {};
+      if (claims.isHuman) return true;
+    }
+    if (stepUpComplete()) return true;
+    const assurance = state.assuranceStatus;
+    if (assurance && !assurance.provisional && (assurance.anchored || assurance.person_bound)) {
+      return true;
+    }
+    return false;
+  }
+
   function renderWalletSlots() {
+    const slots = $('ih-wallet-slots');
     const passkeySlot = $('ih-wallet-slot-passkey');
     const humanSlot = $('ih-wallet-slot-human');
     const passkeyPill = $('ih-wallet-slot-passkey-pill');
@@ -624,19 +643,21 @@
     if (!passkeySlot || !humanSlot) return;
 
     const unlocked = isWalletUnlocked();
-    const hasHuman = isMasterReady() || stepUpComplete();
+    const hasHuman = hasHumanProofInWallet();
 
     passkeySlot.classList.toggle('is-filled', unlocked);
+    humanSlot.hidden = !hasHuman;
     humanSlot.classList.toggle('is-filled', hasHuman);
     humanSlot.classList.toggle('is-empty', !hasHuman);
+    if (slots) slots.classList.toggle('is-single', !hasHuman);
 
     if (passkeyPill) {
       passkeyPill.textContent = unlocked ? 'Ready' : 'Not created';
       passkeyPill.className = `demo-pill${unlocked ? ' ok' : ''}`;
     }
-    if (humanPill) {
-      humanPill.textContent = hasHuman ? 'Verified' : 'Available';
-      humanPill.className = `demo-pill${hasHuman ? ' ok' : ' warn'}`;
+    if (humanPill && hasHuman) {
+      humanPill.textContent = 'Verified';
+      humanPill.className = 'demo-pill ok';
     }
     if (passkeyLabel) {
       passkeyLabel.textContent = unlocked ? 'On this device' : 'Create your lemma.id to fill';
@@ -912,6 +933,7 @@
       setPill('ih-lemma-status', 'NONE', 'warn');
       log('Wallet status check skipped', err.message);
     } finally {
+      renderWalletSlots();
       renderStep1Action();
       updateStepLocks();
     }
@@ -1517,15 +1539,7 @@
       `/api/demo/ishuman/assurance-status?wallet_id=${encodeURIComponent(state.walletId)}`,
     );
     state.assuranceStatus = payload;
-    if (payload.provisional) {
-      setPill('ih-person-status', 'Provisional', 'warn');
-    } else if (payload.anchored) {
-      setPill('ih-person-status', 'Anchored (IDV)', 'ok');
-    } else if (payload.person_bound) {
-      setPill('ih-person-status', payload.person_status || 'Bound', 'ok');
-    } else {
-      setPill('ih-person-status', 'Unbound', 'warn');
-    }
+    renderWalletSlots();
     return payload;
   }
 
@@ -1677,7 +1691,7 @@
     if (wid) wid.textContent = '-';
     renderStep1Action();
     setPill('ih-lemma-status', 'CLEARED', 'warn');
-    setPill('ih-person-status', 'Not available', '');
+    state.assuranceStatus = null;
     setDemoMode('live');
     setWorkflowHighlight(1);
     for (const slug of SITE_SLUGS) {
@@ -1808,6 +1822,7 @@
       });
     }
     setPill('ih-lemma-status', 'READY', 'ok');
+    renderWalletSlots();
     renderStep1Action();
     updateStepLocks();
   }
