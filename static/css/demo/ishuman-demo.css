@@ -2252,6 +2252,11 @@
   transition: border-color 0.2s ease, background 0.2s ease;
 }
 
+/* display:flex above overrides the UA [hidden] rule without this. */
+.demo-wallet-slot[hidden] {
+  display: none !important;
+}
+
 .demo-wallet-slot.is-filled {
   border-style: solid;
   border-color: var(--demo-brand-line);
