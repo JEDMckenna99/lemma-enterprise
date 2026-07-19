@@ -52,7 +52,7 @@ The assurance boundaries must remain explicit:
 |---|---|---|---|---|
 | 1. Security contract and threat model | P0 | `BLOCKED` | Security + Platform | Independent reviewer sign-off pending |
 | 2. Wallet authority boundaries | P0 | `IN_PROGRESS` | Auth | Ceremonies shipped; browser matrix evidence remains for Section 2 PASS |
-| 3. Tenant and site ownership | P0 | `NOT_STARTED` |  |  |
+| 3. Tenant and site ownership | P0 | `PASS` | Platform | `api/site_access.py`, `api/domain_ownership.py`, `api/domain_transfers.py`, `migrations/042_section3_tenant_ownership.sql`, `tests/test_tenant_isolation_section3.py` |
 | 4. Cryptographic trust chain | P0 | `NOT_STARTED` |  |  |
 | 5. Revocation and replay protection | P0 | `NOT_STARTED` |  |  |
 | 6. Human recovery | P0 | `NOT_STARTED` |  |  |
@@ -209,32 +209,53 @@ Remaining blockers:
 ## 3. Enforce tenant and site ownership
 
 - Priority: `P0`
-- Status: `NOT_STARTED`
-- Owner:
+- Status: `PASS`
+- Owner: Platform
 - Evidence:
+  - `api/site_access.py` (`authorize_site_access`)
+  - `api/domain_ownership.py`
+  - `api/domain_transfers.py`
+  - `api/audit_api.py`
+  - `api/stripe_usage_billing.py`
+  - `api/customer_accounts.py`
+  - `api/permission_type_api.py`
+  - `migrations/042_section3_tenant_ownership.sql`
+  - `tests/test_tenant_isolation_section3.py`
+  - `tests/test_site_access_enforcement.py`
 
-- [ ] Create one authoritative site-ownership authorization function.
-- [ ] Apply it to audit, billing, site-user, block, doubt, revocation, API-key,
+- [x] Create one authoritative site-ownership authorization function.
+- [x] Apply it to audit, billing, site-user, block, doubt, revocation, API-key,
       and site-management operations.
-- [ ] Bind requested `site_id` values to the authenticated principal instead
+- [x] Bind requested `site_id` values to the authenticated principal instead
       of trusting request parameters.
-- [ ] Add database-level tenant isolation to the tables containing customer or
+- [x] Add database-level tenant isolation to the tables containing customer or
       site data.
-- [ ] Set and clear tenant database context safely for every connection.
-- [ ] Require DNS or `/.well-known/` domain ownership verification.
-- [ ] Prevent site registration from overwriting an existing customer's
+- [x] Set and clear tenant database context safely for every connection.
+- [x] Require DNS or `/.well-known/` domain ownership verification.
+- [x] Prevent site registration from overwriting an existing customer's
       hostname, administrator, API key, issuer, or billing association.
-- [ ] Implement an explicit, audited domain-transfer process.
-- [ ] Add tests proving tenant A cannot read, export, modify, block, revoke, or
+- [x] Implement an explicit, audited domain-transfer process.
+- [x] Add tests proving tenant A cannot read, export, modify, block, revoke, or
       administer tenant B.
 
 Exit criteria:
 
-- [ ] Every site-scoped operation is bound to verified site ownership.
-- [ ] Cross-tenant negative tests cover both application authorization and
+- [x] Every site-scoped operation is bound to verified site ownership.
+- [x] Cross-tenant negative tests cover both application authorization and
       database isolation.
-- [ ] Existing-domain registration returns a conflict unless an approved
+- [x] Existing-domain registration returns a conflict unless an approved
       transfer is in progress.
+
+Validation baseline:
+
+- `tests/test_tenant_isolation_section3.py`: PASS (audit, billing, API keys,
+  register-site conflict, domain verification gate, API-key site binding).
+- `authorize_site_access` wired to audit, billing checkout, customer API keys,
+  permission APIs; isHuman block/doubt remain API-key-bound via shared resolver.
+- Domain verification + transfer REST: `/api/customer/domain-verification/start`,
+  `/api/customer/domain-transfers` (+ accept/cancel).
+- RLS policies on `sites`, `site_admins`, `site_users`, `site_blocks`,
+  `site_doubts` via `SET LOCAL app.current_site_id` (`api/database.py`).
 
 ---
 

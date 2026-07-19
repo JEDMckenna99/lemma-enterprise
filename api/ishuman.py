@@ -285,50 +285,9 @@ def _issue_ishuman_credential(
 
 def _resolve_site_from_request_api_key():
     """Resolve Site from X-API-Key: legacy sites.api_key or customer-issued keys."""
-    api_key = request.headers.get("X-API-Key") or request.args.get("api_key")
-    if not api_key:
-        return None
+    from api.site_access import resolve_site_from_api_key
 
-    from api.database import SessionLocal, Site
-    from api.site_hostname import try_canonicalize_site_hostname
-
-    db = SessionLocal()
-    try:
-        site = db.query(Site).filter_by(api_key=api_key).first()
-        if site:
-            _, domain_err = try_canonicalize_site_hostname(getattr(site, "site_domain", ""))
-            if domain_err:
-                return None
-            return site
-
-        from api.customer_accounts import customer_manager
-
-        validation = customer_manager.validate_api_key(api_key)
-        if not validation.get("valid"):
-            return None
-
-        site_id = validation.get("site_id")
-        if not site_id:
-            return None
-
-        site = db.query(Site).filter_by(site_id=site_id).first()
-        if not site:
-            return None
-
-        _, domain_err = try_canonicalize_site_hostname(getattr(site, "site_domain", ""))
-        if domain_err:
-            return None
-
-        if site.api_key != api_key:
-            try:
-                site.api_key = api_key
-                db.commit()
-            except Exception:
-                db.rollback()
-
-        return site
-    finally:
-        db.close()
+    return resolve_site_from_api_key()
 
 
 def _require_site_api_key():

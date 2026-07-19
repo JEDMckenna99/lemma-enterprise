@@ -9,6 +9,7 @@ from datetime import datetime, timedelta
 import logging
 
 from auth.decorators import require_api_key, require_site_admin
+from api.site_access import authorize_site_access, resolved_site_id
 from .audit_logger import (
     get_audit_logs,
     export_audit_logs,
@@ -46,7 +47,12 @@ def query_audit_logs():
         site_id = request.args.get('site_id')
         if not site_id:
             return jsonify({'error': 'site_id is required'}), 400
-        
+
+        site, denied = authorize_site_access(site_id, allow_platform_admin=True)
+        if denied:
+            return denied
+        site_id = resolved_site_id(site) or site_id
+
         user_email = request.args.get('user_email')
         event_types_param = request.args.get('event_type')
         start_date_str = request.args.get('start_date')
@@ -140,7 +146,12 @@ def export_audit_logs_endpoint():
         site_id = request.args.get('site_id')
         if not site_id:
             return jsonify({'error': 'site_id is required'}), 400
-        
+
+        site, denied = authorize_site_access(site_id, allow_platform_admin=True)
+        if denied:
+            return denied
+        site_id = resolved_site_id(site) or site_id
+
         format_type = request.args.get('format', 'csv').lower()
         if format_type not in ['csv', 'json']:
             return jsonify({'error': 'format must be csv or json'}), 400
@@ -223,7 +234,12 @@ def audit_stats():
         site_id = request.args.get('site_id')
         if not site_id:
             return jsonify({'error': 'site_id is required'}), 400
-        
+
+        site, denied = authorize_site_access(site_id, allow_platform_admin=True)
+        if denied:
+            return denied
+        site_id = resolved_site_id(site) or site_id
+
         days = int(request.args.get('days', 30))
         start_date = datetime.now() - timedelta(days=days)
         

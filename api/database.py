@@ -5,10 +5,11 @@ Database setup and models for Lemma.id platform
 import os
 import logging
 import threading
+from contextlib import contextmanager
 import psycopg2
 from psycopg2 import pool as pg_pool
 from datetime import datetime
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, Iterator
 from sqlalchemy import (
     create_engine,
     Column,
@@ -228,7 +229,7 @@ def get_db_connection(site_id=None):
     try:
         cursor = conn.cursor()
         if site_id:
-            cursor.execute("SET app.current_site_id = %s", (site_id,))
+            cursor.execute("SET LOCAL app.current_site_id = %s", (site_id,))
         else:
             try:
                 cursor.execute("RESET app.current_site_id")
@@ -243,6 +244,37 @@ def get_db_connection(site_id=None):
         raise
 
     return conn
+
+
+def _supports_pg_rls() -> bool:
+    url = DATABASE_URL or ""
+    return url.startswith("postgresql") or url.startswith("postgres://")
+
+
+def apply_tenant_context(session: Session, site_id: Optional[str]) -> None:
+    """Apply PostgreSQL RLS tenant GUC for the current transaction."""
+    if not site_id or not _supports_pg_rls():
+        return
+    session.execute(text("SET LOCAL app.current_site_id = :site_id"), {"site_id": site_id})
+
+
+@contextmanager
+def tenant_local_site_context(site_id: Optional[str]) -> Iterator[None]:
+    """Open a short-lived session scope with tenant GUC applied."""
+    if not site_id or not _supports_pg_rls():
+        yield
+        return
+
+    db = SessionLocal()
+    try:
+        apply_tenant_context(db, site_id)
+        yield
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+    finally:
+        db.close()
 
 
 def reset_db_pools_for_tests():
@@ -1110,6 +1142,43 @@ class PersonConvergenceEvent(Base):
     status = Column(String(32), nullable=False, default='pending')
     created_at = Column(DateTime, default=datetime.utcnow)
     completed_at = Column(DateTime)
+
+
+class DomainVerificationChallenge(Base):
+    """Pending DNS/well-known verification for site registration."""
+    __tablename__ = 'domain_verification_challenges'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    domain = Column(String, nullable=False, index=True)
+    token = Column(String, nullable=False)
+    customer_id = Column(String, nullable=False, index=True)
+    actor_ppid = Column(String, nullable=False)
+    purpose = Column(String, nullable=False, default='site_registration')
+    verified = Column(Boolean, default=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    expires_at = Column(DateTime, nullable=False)
+
+
+class DomainTransfer(Base):
+    """Audited hostname transfer between customer accounts."""
+    __tablename__ = 'domain_transfers'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    transfer_id = Column(String(64), unique=True, nullable=False, index=True)
+    site_id = Column(String, nullable=False, index=True)
+    site_domain = Column(String, nullable=False)
+    status = Column(String(32), nullable=False, default='pending')
+    from_customer_id = Column(String, nullable=False, index=True)
+    to_customer_id = Column(String, index=True)
+    initiated_by_ppid = Column(String, nullable=False)
+    accepted_by_ppid = Column(String)
+    verification_method = Column(String(32), nullable=False, default='well-known')
+    verification_token = Column(String(64), nullable=False)
+    audit_metadata = Column(JSON, default=dict)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow)
+    completed_at = Column(DateTime)
+    cancelled_at = Column(DateTime)
 
 
 class PpidConvergenceIssued(Base):

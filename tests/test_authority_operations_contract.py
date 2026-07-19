@@ -56,6 +56,10 @@ def test_signing_key_enrollment_requires_existing_authority():
     revoke = _operation("wallet.device.revoke")
     assert "fresh_webauthn_for_cross_device_revoke" in revoke["required_auth"]
 
+    device_list = _operation("wallet.device.list")
+    assert device_list["compliance"] == "compliant"
+    assert "authorized_wallet_assertion" in device_list["required_auth"]
+
     recovery = _operation("wallet.device.lost_device_recovery")
     assert recovery["compliance"] == "compliant"
     assert "verified_idv_session" in recovery["required_auth"]
@@ -70,7 +74,7 @@ def test_site_proof_requires_assurance_and_canonical_site_binding():
 
 def test_site_registration_requires_domain_ownership():
     operation = _operation("tenant.site.register")
-    assert operation["compliance"] == "gap"
+    assert operation["compliance"] == "compliant"
     assert "domain_ownership_proof" in operation["required_auth"]
     assert "existing_owner_conflict_check" in operation["required_auth"]
 

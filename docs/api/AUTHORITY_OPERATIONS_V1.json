@@ -267,6 +267,24 @@
       "test_refs": ["tests/test_wallet_session_sync_security.py", "tests/test_wallet_authn.py"]
     },
     {
+      "operation_id": "wallet.device.list",
+      "authority_class": "wallet",
+      "mutates": "None. Lists enrolled wallet device authority metadata for the manager UI.",
+      "routes": [
+        {"method": "POST", "path": "/api/wallet/devices", "module": "api/wallet_session_sync.py"}
+      ],
+      "current_auth": ["authorized_wallet_assertion"],
+      "required_auth": ["authorized_wallet_assertion"],
+      "required_scope": "none",
+      "site_binding": "wallet_id_match",
+      "risk_tier": "medium",
+      "enforcement_layer": "in_handler",
+      "compliance": "compliant",
+      "threat_tags": ["device_enumeration"],
+      "checklist_sections": [1, 2],
+      "test_refs": ["tests/test_wallet_session_sync_security.py"]
+    },
+    {
       "operation_id": "wallet.device.revoke",
       "authority_class": "wallet",
       "mutates": "Revokes an enrolled wallet device key and bound passkeys.",
@@ -389,10 +407,10 @@
       "site_binding": "api_key_owned_site",
       "risk_tier": "high",
       "enforcement_layer": "in_handler",
-      "compliance": "gap",
+      "compliance": "compliant",
       "threat_tags": ["cross_tenant", "revoked_api_key"],
       "checklist_sections": [1, 3, 7],
-      "test_refs": ["tests/test_site_user_block_unblock.py"]
+      "test_refs": ["tests/test_site_user_block_unblock.py", "tests/test_tenant_isolation_section3.py"]
     },
     {
       "operation_id": "identity.site_policy.doubt",
@@ -408,10 +426,10 @@
       "site_binding": "api_key_owned_site",
       "risk_tier": "high",
       "enforcement_layer": "in_handler",
-      "compliance": "gap",
+      "compliance": "compliant",
       "threat_tags": ["cross_tenant", "revoked_api_key"],
       "checklist_sections": [1, 3, 7],
-      "test_refs": []
+      "test_refs": ["tests/test_tenant_isolation_section3.py"]
     },
     {
       "operation_id": "identity.network_revoke",
@@ -646,16 +664,16 @@
         {"method": "DELETE", "path": "/api/customer/api-keys", "module": "api/customer_accounts.py"},
         {"method": "POST", "path": "/api/customer/api-keys/rotate", "module": "api/customer_accounts.py"}
       ],
-      "current_auth": ["customer_or_admin_credential"],
+      "current_auth": ["customer_or_admin_credential", "site_ownership_check"],
       "required_auth": ["verified_customer_admin_credential", "fresh_proof_for_rotation_or_revocation"],
       "required_scope": "admin",
       "site_binding": "customer_owned_site",
       "risk_tier": "critical",
       "enforcement_layer": "decorator_and_handler",
-      "compliance": "gap",
+      "compliance": "review_required",
       "threat_tags": ["cross_tenant", "api_key_theft", "revoked_api_key"],
       "checklist_sections": [1, 3, 7],
-      "test_refs": ["tests/test_security_fixes.py"]
+      "test_refs": ["tests/test_security_fixes.py", "tests/test_tenant_isolation_section3.py"]
     },
     {
       "operation_id": "tenant.site.register",
@@ -664,16 +682,16 @@
       "routes": [
         {"method": "POST", "path": "/api/customer/register-site", "module": "api/customer_accounts.py"}
       ],
-      "current_auth": ["customer_or_admin_credential", "customer_ppid_match"],
+      "current_auth": ["customer_or_admin_credential", "customer_ppid_match", "domain_ownership_proof", "existing_owner_conflict_check"],
       "required_auth": ["verified_customer_admin_credential", "customer_ppid_match", "domain_ownership_proof", "existing_owner_conflict_check"],
       "required_scope": "admin",
       "site_binding": "verified_domain_ownership",
       "risk_tier": "critical",
       "enforcement_layer": "decorator_and_handler",
-      "compliance": "gap",
+      "compliance": "compliant",
       "threat_tags": ["cross_tenant", "domain_takeover", "issuer_takeover"],
       "checklist_sections": [1, 3],
-      "test_refs": ["tests/test_register_site_wallet_first.py"]
+      "test_refs": ["tests/test_register_site_wallet_first.py", "tests/test_tenant_isolation_section3.py"]
     },
     {
       "operation_id": "billing.usage_checkout",
@@ -682,7 +700,7 @@
       "routes": [
         {"method": "POST", "path": "/api/billing/usage-checkout", "module": "api/stripe_usage_billing.py"}
       ],
-      "current_auth": ["customer_or_admin_credential"],
+      "current_auth": ["customer_or_admin_credential", "site_ownership_check"],
       "required_auth": ["verified_customer_admin_credential"],
       "required_scope": "billing_admin",
       "site_binding": "customer_owned_site",

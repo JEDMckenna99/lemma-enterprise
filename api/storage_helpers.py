@@ -30,29 +30,37 @@ def get_pg_connection():
 
 def upsert_site_to_postgres(site_id: str, site_domain: str, customer_id: str,
                             company_name: str = '', admin_email: str = '',
-                            environment: str = 'production', site_label: str = ''):
+                            environment: str = 'production', site_label: str = '',
+                            allow_customer_reassign: bool = False):
     """
     Insert or update a site in the PostgreSQL sites table.
     This is the normalized storage - eventually will replace customers.sites JSON.
+
+    customer_id is only updated when allow_customer_reassign=True (domain transfer).
     """
     conn = None
     try:
         conn = get_pg_connection()
         cursor = conn.cursor()
-        
-        cursor.execute("""
-            INSERT INTO sites (site_id, site_domain, customer_id, company_name, 
+
+        if allow_customer_reassign:
+            customer_clause = "customer_id = EXCLUDED.customer_id,"
+        else:
+            customer_clause = "customer_id = sites.customer_id,"
+
+        cursor.execute(f"""
+            INSERT INTO sites (site_id, site_domain, customer_id, company_name,
                              admin_email, environment, site_label, status, created_at)
             VALUES (%s, %s, %s, %s, %s, %s, %s, 'active', NOW())
             ON CONFLICT (site_id) DO UPDATE SET
                 site_domain = EXCLUDED.site_domain,
-                customer_id = EXCLUDED.customer_id,
+                {customer_clause}
                 company_name = EXCLUDED.company_name,
                 admin_email = EXCLUDED.admin_email,
                 environment = EXCLUDED.environment,
                 site_label = EXCLUDED.site_label,
                 updated_at = NOW()
-        """, (site_id, site_domain, customer_id, company_name, admin_email, 
+        """, (site_id, site_domain, customer_id, company_name, admin_email,
               environment, site_label))
         
         conn.commit()

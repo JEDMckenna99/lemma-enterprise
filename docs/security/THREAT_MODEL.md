@@ -187,11 +187,11 @@ session-only claim path (deprecated, logged).
 - **Attacker capability:** controls one legitimate customer, site credential,
   wallet session, or site API key and supplies another site's identifiers.
 - **Current controls:** canonical hostname binding, pairwise PPIDs,
-  `require_site_ownership` on selected developer routes, and site-scoped block
-  storage.
-- **Known gaps:** ownership enforcement is not universal. Audit, revocation,
-  site registration, and legacy API-key paths can trust caller-supplied site
-  identifiers or conflicting stores.
+  `authorize_site_access` on site-scoped platform routes, API-key-to-site
+  binding for isHuman policy mutations, domain ownership proof on registration,
+  conflict checks with audited domain transfer, and RLS on high-value site tables.
+- **Known gaps:** Section 7 API-key storage consolidation and fresh-proof rotation
+  remain open. Full-schema RLS is not yet applied to every historical table.
 - **Required controls:** every site operation binds authenticated principal,
   canonical hostname, internal ownership record, and requested resource.
   Domain creation requires ownership proof and cannot overwrite an existing

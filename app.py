@@ -287,6 +287,8 @@ def create_app():
     try:
         from api.customer_accounts import customer_accounts_bp
         app.register_blueprint(customer_accounts_bp)
+        from api.domain_transfers import domain_transfers_bp
+        app.register_blueprint(domain_transfers_bp)
         logger.info("✅ Customer Accounts registered")
     except Exception as e:
         logger.error(f"❌ Failed to register Customer Accounts: {e}")

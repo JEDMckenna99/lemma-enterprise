@@ -36,52 +36,14 @@ def _verify_site_access(site_id: str) -> bool:
 
     Uses verified credentials (X-Lemma-Credential) or validated API keys only.
     """
-    from auth.request_principal import resolve_admin_principal
+    from api.site_access import authorize_site_access
 
-    principal, _admin_error = resolve_admin_principal()
-    if principal:
-        return True
-
-    from api.site_access import verify_site_ownership, get_authenticated_ppid
-    from auth.decorators import extract_authenticated_ppid_from_request
-    from api.authz_engine import extract_user_lemma_principal
-
-    principal, _error = extract_user_lemma_principal(request.headers)
-    if principal and principal.ppid:
-        if verify_site_ownership(site_id, principal.ppid):
-            return True
-        if principal.permission_id in ("admin_access", "super_admin"):
-            return True
-
-    ppid = get_authenticated_ppid() or extract_authenticated_ppid_from_request()
-    if ppid and verify_site_ownership(site_id, ppid):
-        return True
-
-    auth_header = request.headers.get("Authorization", "")
-    if not auth_header.startswith("Bearer "):
-        return False
-
-    token = auth_header.replace("Bearer ", "").strip()
-    if not (token.startswith("lemma_") or token.startswith("lm_")):
-        return False
-
-    from api.customer_accounts import customer_manager
-
-    validation = customer_manager.validate_api_key(token)
-    if validation.get("valid") and validation.get("site_id") == site_id:
-        return True
-
-    from api.database import SessionLocal, Site
-
-    db = SessionLocal()
-    try:
-        row = db.query(Site).filter(Site.site_id == site_id, Site.api_key == token).first()
-        return row is not None
-    except Exception as exc:
-        logger.warning("Site access check failed: %s", exc)
-        return False
-    finally:
-        db.close()
+    _, denied = authorize_site_access(
+        site_id,
+        allow_site_api_key=True,
+        allow_platform_admin=True,
+    )
+    return denied is None
 
 
 @permission_type_api.route('/api/v1/sites/<site_id>/permission-types', methods=['GET'])

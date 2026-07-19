@@ -37,6 +37,7 @@ def fixture_register_env(fake_ishuman_db_session_factory, monkeypatch):
     monkeypatch.setattr("api.database.SessionLocal", fake_ishuman_db_session_factory.session_local)
     monkeypatch.setattr("api.real_iam_manager.RealIAMSubnetManager", _FakeManager)
     monkeypatch.setattr("api.storage_helpers.upsert_site_to_postgres", lambda *args, **kwargs: True)
+    monkeypatch.setenv("LEMMA_DOMAIN_OWNERSHIP_ENFORCE", "0")
 
     wallet_ppid = "did:lemma:ppid_" + ("e" * 64)
     customer = SimpleNamespace(
@@ -97,7 +98,7 @@ def test_register_site_requires_wallet_ppid(register_env):
 
 
 @pytest.mark.unit
-def test_register_site_issues_admin_to_wallet_and_creates_site_row(register_env):
+def test_register_site_issues_admin_to_wallet_and_creates_site_row(register_env, monkeypatch):
     from api.customer_accounts import register_customer_site
     from api.database import Site, SiteAdmin
 
@@ -106,9 +107,12 @@ def test_register_site_issues_admin_to_wallet_and_creates_site_row(register_env)
     with app.test_request_context(
         "/api/customer/register-site",
         method="POST",
-        json={"site_domain": "https://WWW.App.Example.com/login"},
+        json={"site_domain": "https://WWW.App.Example.com/login", "verification_token": "test-token"},
     ):
         g.ppid = wallet_ppid
+        import api.domain_ownership as domain_ownership
+
+        monkeypatch.setattr(domain_ownership, "consume_verified_domain_proof", lambda *args, **kwargs: True)
         resp = handler()
         if isinstance(resp, tuple):
             status = resp[1]

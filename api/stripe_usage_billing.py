@@ -75,16 +75,20 @@ def _resolve_site_for_checkout(
     """
     Resolve a registered site for Stripe Checkout metadata.
 
-    Mirrors developer site catalog resolution: explicit site_id, customer JSON,
-    admin_email linkage, then wallet PPID ownership (SiteAdmin / grants).
+    Explicit site_id requires verified site ownership. Otherwise falls back to
+    customer-owned sites and wallet PPID ownership.
     """
     from api.database import Site
+    from api.site_access import verify_site_ownership
 
     normalized_site_id = (site_id or "").strip()
     if normalized_site_id:
+        if ppid and not verify_site_ownership(normalized_site_id, ppid):
+            return None
         site = db.query(Site).filter_by(site_id=normalized_site_id).first()
         if site:
             return _site_info_from_row(site)
+        return None
 
     if customer:
         sites = list(getattr(customer, "sites", None) or [])

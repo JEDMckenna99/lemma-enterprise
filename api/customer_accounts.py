@@ -2023,6 +2023,8 @@ def get_customer_info():
 @require_customer_or_admin
 def manage_api_keys():
     """Manage customer API keys (session-free)"""
+    from api.site_access import authorize_site_access, resolved_site_id
+
     customer_id = _extract_customer_id_from_request()
     if not customer_id:
         return jsonify({'error': 'Authentication required'}), 401
@@ -2062,6 +2064,12 @@ def manage_api_keys():
         data = request.get_json() or {}
         key_name = data.get('name', 'API Key')
         site_id = data.get('site_id')
+        if not site_id:
+            return jsonify({'error': 'site_id is required'}), 400
+
+        _, denied = authorize_site_access(site_id)
+        if denied:
+            return denied
         
         result = customer_manager.generate_additional_api_key(customer_id, key_name, site_id=site_id)
         return jsonify(result)
@@ -2072,6 +2080,11 @@ def manage_api_keys():
         api_key = data.get('api_key')
         site_id = data.get('site_id')
         key_hint = data.get('key_hint')
+
+        if site_id:
+            _, denied = authorize_site_access(site_id)
+            if denied:
+                return denied
         
         if api_key:
             # Legacy: revoke by full key
@@ -2113,6 +2126,12 @@ def rotate_api_key():
     
     if not site_id or not key_hint:
         return jsonify({'error': 'site_id and key_hint are required'}), 400
+
+    from api.site_access import authorize_site_access
+
+    _, denied = authorize_site_access(site_id)
+    if denied:
+        return denied
     
     result = customer_manager.rotate_api_key(customer_id, site_id, key_hint)
     
@@ -2198,12 +2217,16 @@ def _ensure_site_row_for_registration(
     admin_email: str,
     company_name: str,
     api_key: Optional[str] = None,
+    caller_ppid: Optional[str] = None,
 ):
-    """Ensure SQLAlchemy Site row exists with canonical domain and primary API key."""
+    """Ensure SQLAlchemy Site row exists without overwriting another owner's site."""
     from api.database import Site
+    from api.site_access import verify_site_ownership
 
     site = db.query(Site).filter_by(site_id=site_id).first()
     if site:
+        if caller_ppid and not verify_site_ownership(site_id, caller_ppid):
+            raise PermissionError("site_domain_conflict")
         site.site_domain = site_domain
         if api_key:
             site.api_key = api_key
@@ -2283,6 +2306,45 @@ def register_customer_site():
         
         # Generate site_id (deterministic from canonical domain)
         site_id = f"site_{hashlib.sha256(site_domain.encode()).hexdigest()[:12]}"
+
+        verification_token = (data.get('verification_token') or '').strip()
+        verification_method = (
+            data.get('verification_method') or data.get('method') or 'well-known'
+        ).strip().lower()
+        import os as _os
+        enforce_domain = _os.getenv('LEMMA_DOMAIN_OWNERSHIP_ENFORCE', '1') != '0'
+        if enforce_domain:
+            if not verification_token:
+                return jsonify({
+                    'error': 'domain_verification_required',
+                    'code': 'DOMAIN_VERIFICATION_REQUIRED',
+                    'message': 'Verify domain ownership via POST /api/customer/domain-verification/start',
+                }), 400
+            from api.domain_ownership import consume_verified_domain_proof
+            if not consume_verified_domain_proof(site_domain, verification_token, verification_method):
+                return jsonify({
+                    'error': 'domain_verification_failed',
+                    'code': 'DOMAIN_VERIFICATION_FAILED',
+                }), 403
+
+        from api.site_access import site_has_existing_owner
+        from api.domain_transfers import pending_transfer_allows_registration
+        from api.database import SessionLocal as _SessionLocal
+
+        if site_has_existing_owner(site_id, site_domain, str(wallet_ppid)):
+            conflict_db = _SessionLocal()
+            try:
+                if not pending_transfer_allows_registration(conflict_db, site_id, customer_id):
+                    return jsonify({
+                        'error': 'site_domain_conflict',
+                        'code': 'SITE_DOMAIN_CONFLICT',
+                        'message': (
+                            'This domain is already registered to another account. '
+                            'Use POST /api/customer/domain-transfers for an approved transfer.'
+                        ),
+                    }), 409
+            finally:
+                conflict_db.close()
         
         # Create site with IAM system (generates Ed25519 keypair)
         try:
@@ -2417,6 +2479,7 @@ def register_customer_site():
                     admin_email=contact_email or user_email,
                     company_name=company_name,
                     api_key=raw_api_key,
+                    caller_ppid=str(wallet_ppid),
                 )
                 _upsert_site_admin_for_registration(
                     site_db,
@@ -2588,8 +2651,8 @@ def logout():
     # Note: can't use / because smart router checks cookies we just deleted
     # and would serve the marketing page instead of wallet_simple.html.
     response = make_response(redirect('/app?logged_out=1'))
-    response.delete_cookie('lemma_wallet_session', path='/')
-    response.delete_cookie('lemma_wallet_csrf', path='/')
+    response.delete_cookie('lemma_wallet_session', path='/', secure=True, samesite='None')
+    response.delete_cookie('lemma_wallet_csrf', path='/', secure=True, samesite='None')
     return response
 
 # Export the manager for use in other modules
