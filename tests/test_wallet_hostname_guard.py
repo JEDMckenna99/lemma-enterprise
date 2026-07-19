@@ -74,6 +74,10 @@ def test_lemma_wallet_purge_clears_wrap_database(wallet_js_source):
     assert "LemmaWalletWrap" in wallet_js_source
     assert "LEMMA_STORAGE_PREFIXES" in wallet_js_source
     assert "deleteIndexedDbDatabase" in wallet_js_source
+    # iPhone/Safari: do not reject onblocked or call async lock() during purge.
+    assert "Never call instance.lock()" in wallet_js_source
+    assert "req.onblocked = () => {}" in wallet_js_source
+    assert "instance.lock?.()" not in wallet_js_source
 
 
 @pytest.mark.unit
