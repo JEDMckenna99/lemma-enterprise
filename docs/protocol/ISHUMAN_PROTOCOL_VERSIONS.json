@@ -77,7 +77,7 @@
       "canonical_section": "## 6. Wallet assertion payload",
       "migration_class": "signed_artifact",
       "source_assertions": [
-        {"path": "api/wallet_authn.py", "contains": "def build_assertion_payload("}
+        {"path": "api/wallet_keys.py", "contains": "def build_assertion_payload("}
       ]
     },
     {
