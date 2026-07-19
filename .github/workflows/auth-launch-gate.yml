@@ -42,7 +42,9 @@ jobs:
           python -m pytest tests/test_csp_security.py -q
           python scripts/generate_auth_scope_matrix.py
           python scripts/check_authority_operations.py
+          python scripts/check_ishuman_protocol_registry.py
           python -m pytest tests/test_authority_operations_contract.py -q
+          python -m pytest tests/test_ishuman_protocol_registry.py tests/test_cryptographic_invariants.py -q
           python scripts/review_auth_scope_matrix.py --strict-state-changing
 
       - name: Wait for production deploy readiness
