@@ -187,12 +187,12 @@ Exit criteria:
 
 Validation baseline:
 
-- Adversarial wallet authority and WebAuthn session suite: updated in this
-  revision (first-device enroll + cross-device revoke coverage).
+- Adversarial wallet authority and WebAuthn session suite: PASS with
+  first-device enroll + cross-device revoke coverage.
 - Wallet SDK 2.76.0 / cache 2687 and CDN mirror synchronized.
-- Authority inventory includes `wallet.device.enroll_webauthn` and hardened
-  revoke auth.
-- Full non-live CI Regression: rerun required after this revision.
+- Authority contract: PASS, 36 operations / 51 routes / 10 declared gaps.
+- Strict generated scope review: PASS.
+- Full non-live CI Regression: PASS, 1,121 tests with 4 skips.
 
 Remaining blockers:
 
