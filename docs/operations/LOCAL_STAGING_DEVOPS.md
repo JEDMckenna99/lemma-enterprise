@@ -163,3 +163,20 @@ powershell -ExecutionPolicy Bypass -File scripts/post_deploy_launch_gate.ps1 -Ba
 | Auth scope / CSP | `CI Regression`, `Auth Launch Gate` |, | `Auth Launch Gate` |
 
 Staging platform smoke requires GitHub secret `LEMMA_STAGING_BASE_URL` only. Staging DB must include wallet device-key migration (`migrations/040_wallet_device_keys.sql`) so `register-signing-key` works.
+
+### Section 2 wallet authority staging
+
+After deploying the human-auth wallet-authority branch:
+
+```bash
+export LEMMA_STAGING_BASE_URL=https://<staging-app>.herokuapp.com
+LEMMA_DEPLOY_WAIT=1 python scripts/run_section2_staging_matrix.py
+```
+
+Then complete the browser matrix in `docs/status/SECTION2_STAGING_BROWSER_MATRIX.md`.
+
+API live smokes may use the staging-only helper
+`POST /api/wallet/test/enrollment-grant` when
+`LEMMA_ISHUMAN_DEMO_ALLOW_TEST_VERIFY=true` and
+`LEMMA_STAGING_DEMO_TEST_TOKEN` matches the app token. That route is forbidden
+in production; browser WebAuthn remains required for real first-device enroll.

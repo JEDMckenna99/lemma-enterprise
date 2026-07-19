@@ -192,6 +192,24 @@
       "test_refs": []
     },
     {
+      "operation_id": "wallet.device.staging_test_enrollment_grant",
+      "authority_class": "wallet",
+      "mutates": "Issues a one-time enrollment grant for non-production API live tests only.",
+      "routes": [
+        {"method": "POST", "path": "/api/wallet/test/enrollment-grant", "module": "api/wallet_session_sync.py"}
+      ],
+      "current_auth": ["non_production", "demo_test_verify_enabled", "demo_test_token"],
+      "required_auth": ["non_production", "demo_test_verify_enabled", "demo_test_token"],
+      "required_scope": "none",
+      "site_binding": "wallet_id_match",
+      "risk_tier": "high",
+      "enforcement_layer": "in_handler",
+      "compliance": "compliant",
+      "threat_tags": ["unauthorized_device_enrollment"],
+      "checklist_sections": [2],
+      "test_refs": ["tests/test_wallet_session_sync_security.py"]
+    },
+    {
       "operation_id": "wallet.device.register_signing_key",
       "authority_class": "wallet",
       "mutates": "Enrolls a device signing key after transfer/recovery grant or idempotent same-key refresh.",

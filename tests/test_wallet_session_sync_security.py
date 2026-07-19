@@ -659,3 +659,27 @@ def test_lost_device_recovery_rejects_wallet_id_without_idv(
         headers={"Origin": "https://lemma.id"},
     )
     assert response.status_code == 403
+
+
+def test_staging_enrollment_grant_forbidden_in_production(monkeypatch):
+    monkeypatch.setattr("api.config.is_production", lambda: True)
+    response = _client().post(
+        "/api/wallet/test/enrollment-grant",
+        json={"wallet_id": "wallet_test"},
+        headers={"Origin": "https://lemma.id", "X-Demo-Test-Token": "tok"},
+    )
+    assert response.status_code == 403
+    assert response.get_json()["error"] == "prod_test_enrollment_forbidden"
+
+
+def test_staging_enrollment_grant_issues_with_demo_token(monkeypatch):
+    monkeypatch.setattr("api.config.is_production", lambda: False)
+    monkeypatch.setenv("LEMMA_ISHUMAN_DEMO_ALLOW_TEST_VERIFY", "true")
+    monkeypatch.setenv("LEMMA_ISHUMAN_DEMO_TEST_TOKEN", "staging-token")
+    response = _client().post(
+        "/api/wallet/test/enrollment-grant",
+        json={"wallet_id": "wallet_test"},
+        headers={"Origin": "https://lemma.id", "X-Demo-Test-Token": "staging-token"},
+    )
+    assert response.status_code == 200, response.get_json()
+    assert response.get_json()["enrollment_grant"].startswith("weg_")

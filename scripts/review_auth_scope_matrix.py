@@ -156,6 +156,7 @@ IN_HANDLER_AUTH_ALLOWLIST = {
     "/api/wallet/cli-link/approve",
     "/api/wallet/firewall/runtimes/<runtime_id>/authorize",
     "/api/wallet/register-signing-key",
+    "/api/wallet/test/enrollment-grant",
     "/api/wallet/register-device-passkey",
     "/api/wallet/device-enroll/begin",
     "/api/wallet/device-enroll/complete",

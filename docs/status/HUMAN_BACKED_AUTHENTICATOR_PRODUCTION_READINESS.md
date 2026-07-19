@@ -196,11 +196,13 @@ Validation baseline:
 
 Remaining blockers:
 
-- Browser matrix evidence for enroll → unlock → transfer → revoke → recovery
-  on lemma.id and one relying-site origin.
+- Staging deploy + browser matrix evidence:
+  `docs/status/SECTION2_STAGING_BROWSER_MATRIX.md`
+  and `scripts/run_section2_staging_matrix.py`.
 - Section 6 still owns broader IDV binding, notification, and emergency
   suspension hardening beyond the wallet recovery ceremony.
 - Auth owner marks Section 2 `PASS` after browser matrix evidence is attached.
+  Keep Section 1 `BLOCKED` until independent threat-model sign-off.
 
 ---
 

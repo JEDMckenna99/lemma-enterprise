@@ -1149,6 +1149,43 @@ def wallet_challenge():
     return response
 
 
+@wallet_session_sync_bp.route("/api/wallet/test/enrollment-grant", methods=["POST"])
+@cross_origin()
+def wallet_test_enrollment_grant():
+    """Staging-only helper: issue a one-time enrollment grant for API live tests.
+
+    Disabled in production. Requires demo test-verify enablement and
+    ``X-Demo-Test-Token``. Browser WebAuthn remains required in production.
+    """
+    from api.config import is_production
+    from api.wallet_authn import issue_device_enrollment_grant
+
+    if is_production():
+        return jsonify({"success": False, "error": "prod_test_enrollment_forbidden"}), 403
+    if os.getenv("LEMMA_ISHUMAN_DEMO_ALLOW_TEST_VERIFY", "").lower() != "true":
+        return jsonify({"success": False, "error": "test_enrollment_disabled"}), 403
+    expected = os.getenv("LEMMA_ISHUMAN_DEMO_TEST_TOKEN") or ""
+    provided = request.headers.get("X-Demo-Test-Token") or ""
+    if not expected or provided != expected:
+        return jsonify({"success": False, "error": "demo_test_token_required"}), 403
+
+    body = request.get_json(silent=True) or {}
+    wallet_id = str(body.get("wallet_id") or "").strip()
+    if not wallet_id:
+        return jsonify({"success": False, "error": "wallet_id required"}), 400
+    try:
+        grant = issue_device_enrollment_grant(
+            wallet_id=wallet_id,
+            source="staging_test_enrollment",
+        )
+    except Exception as exc:
+        logger.warning("Staging enrollment grant failed: %s", exc)
+        return jsonify({"success": False, "error": "enrollment_grant_unavailable"}), 503
+    response = jsonify({"success": True, "enrollment_grant": grant})
+    response.headers.update(_cors_headers(request.headers.get("Origin")))
+    return response
+
+
 @wallet_session_sync_bp.route("/api/wallet/device-enroll/begin", methods=["POST", "OPTIONS"])
 @cross_origin()
 def wallet_device_enroll_begin():
