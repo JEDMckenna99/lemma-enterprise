@@ -10,6 +10,14 @@ https://lemma.id/docs/integration/ISHUMAN_AGENT_INTEGRATION.md
 
 Or locally: `docs/integration/ISHUMAN_AGENT_INTEGRATION.md`
 
+**Human-auth security contract:**
+
+`docs/security/HUMAN_AUTH_SECURITY_CONTRACT.md`
+
+**Production readiness checklist:**
+
+`docs/status/HUMAN_BACKED_AUTHENTICATOR_PRODUCTION_READINESS.md`
+
 **Human-readable docs:** https://lemma.id/docs
 
 **Pointer file:** https://lemma.id/llms.txt

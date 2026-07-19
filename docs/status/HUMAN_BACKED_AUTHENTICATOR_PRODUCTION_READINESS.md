@@ -8,7 +8,9 @@ This checklist complements:
 - `docs/status/GA_GATE_STATUS.md`
 - `docs/status/GA_LAUNCH_READINESS_CHECKLIST.md`
 - `docs/security/SECURITY_CHECKLIST.md`
+- `docs/security/HUMAN_AUTH_SECURITY_CONTRACT.md`
 - `docs/integration/ISHUMAN_AGENT_INTEGRATION.md`
+- `docs/status/P0_HUMAN_AUTH_FEATURE_FREEZE.md`
 
 It does not replace those launch controls. The canonical relying-site contract
 remains `docs/integration/ISHUMAN_AGENT_INTEGRATION.md`.
