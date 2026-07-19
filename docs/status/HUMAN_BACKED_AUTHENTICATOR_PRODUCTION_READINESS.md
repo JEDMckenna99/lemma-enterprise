@@ -50,7 +50,7 @@ The assurance boundaries must remain explicit:
 
 | Workstream | Priority | Status | Owner | Evidence |
 |---|---|---|---|---|
-| 1. Security contract and threat model | P0 | `NOT_STARTED` |  |  |
+| 1. Security contract and threat model | P0 | `BLOCKED` | Security + Platform | Independent reviewer sign-off pending |
 | 2. Wallet authority boundaries | P0 | `NOT_STARTED` |  |  |
 | 3. Tenant and site ownership | P0 | `NOT_STARTED` |  |  |
 | 4. Cryptographic trust chain | P0 | `NOT_STARTED` |  |  |
@@ -68,39 +68,68 @@ The assurance boundaries must remain explicit:
 ## 1. Freeze the security contract
 
 - Priority: `P0`
-- Status: `NOT_STARTED`
-- Owner:
+- Status: `BLOCKED`
+- Owner: Security + Platform
 - Evidence:
+  - `docs/status/P0_HUMAN_AUTH_FEATURE_FREEZE.md`
+  - `docs/security/HUMAN_AUTH_SECURITY_CONTRACT.md`
+  - `docs/api/AUTHORITY_OPERATIONS_V1.json`
+  - `docs/security/THREAT_MODEL.md`
+  - `docs/security/HUMAN_AUTH_THREAT_MODEL_SIGNOFF.md`
+  - `docs/protocol/ISHUMAN_PROTOCOL_VERSIONS.json`
+  - `docs/protocol/ISHUMAN_PROTOCOL_MIGRATION_POLICY.md`
+  - `scripts/check_authority_operations.py`
+  - `scripts/check_ishuman_protocol_registry.py`
+  - `tests/test_authority_operations_contract.py`
+  - `tests/test_ishuman_protocol_registry.py`
+  - `tests/test_cryptographic_invariants.py`
 
-- [ ] Freeze nonessential product features until the P0 trust-boundary work is
+- [x] Freeze nonessential product features until the P0 trust-boundary work is
       complete.
-- [ ] Document what passkey, isHuman, PPID, session, action stamp, and recovery
+- [x] Document what passkey, isHuman, PPID, session, action stamp, and recovery
       proofs each establish.
-- [ ] Inventory every operation that creates or changes wallet, identity,
+- [x] Inventory every operation that creates or changes wallet, identity,
       tenant, billing, or recovery authority.
-- [ ] Assign a required authentication method and authorization policy to each
+- [x] Assign a required authentication method and authorization policy to each
       operation.
-- [ ] Publish a threat model covering:
-  - [ ] Leaked wallet identifiers
-  - [ ] Lost or stolen devices
-  - [ ] Compromised passkeys
-  - [ ] Malicious relying sites
-  - [ ] Account sharing
-  - [ ] Cross-tenant attacks
-  - [ ] Replay and race conditions
-  - [ ] Database, Redis, KMS, IDV, and network outages
-  - [ ] Issuer and root-key compromise
-- [ ] Version every signed credential, presentation, convergence, revocation,
+- [x] Publish a threat model covering:
+  - [x] Leaked wallet identifiers
+  - [x] Lost or stolen devices
+  - [x] Compromised passkeys
+  - [x] Malicious relying sites
+  - [x] Account sharing
+  - [x] Cross-tenant attacks
+  - [x] Replay and race conditions
+  - [x] Database, Redis, KMS, IDV, and network outages
+  - [x] Issuer and root-key compromise
+- [x] Version every signed credential, presentation, convergence, revocation,
       and fresh-passkey protocol.
-- [ ] Define backward compatibility and credential migration rules before
+- [x] Define backward compatibility and credential migration rules before
       changing signed formats.
 
 Exit criteria:
 
-- [ ] Every sensitive route has an explicit authentication and authorization
-      requirement.
+- [x] Every inventoried human-auth authority route has an explicit current and
+      required authentication and authorization policy.
 - [ ] Threat-model reviewers have signed off.
-- [ ] Protocol migration behavior is documented and tested.
+- [x] Protocol migration behavior is documented and contract-tested.
+
+Validation baseline:
+
+- `check_authority_operations.py`: PASS, 33 operations / 45 routes / 13
+  declared implementation gaps.
+- `check_ishuman_protocol_registry.py`: PASS, 14 registered artifacts.
+- Contract tests: PASS, 11 tests.
+- Cryptographic invariants: PASS, 8 tests.
+- Strict generated scope review: PASS after classifying the action-sign
+  redirect deposit and one-time claim as in-handler ceremony routes. Their
+  current and required policies remain explicit in the authority inventory.
+
+Blocking approval:
+
+- `docs/security/HUMAN_AUTH_THREAT_MODEL_SIGNOFF.md` requires a named,
+  independent reviewer and an `APPROVED` decision. Section 1 must not be marked
+  `PASS` before that record is complete.
 
 ---
 

@@ -130,6 +130,8 @@ IN_HANDLER_AUTH_ALLOWLIST = {
     "/api/demo/verify",
     "/api/ishuman/approve-revocation",
     "/api/ishuman/action-commitment",
+    "/api/ishuman/action-sign-redirect/claim",
+    "/api/ishuman/action-sign-redirect/deposit",
     "/api/ishuman/derive-site-proof",
     "/api/ishuman/erase",
     "/api/ishuman/fresh-passkey/begin",
