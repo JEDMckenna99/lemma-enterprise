@@ -58,3 +58,47 @@ Platform operators use the **same wallet + isHuman flow** as all users. Admin/op
 - Skip empty site fields before strict canonicalization; sparse master credentials are valid.
 
 Contract doc: `docs/product/LEMMA_ID_PRESENTATION_MODEL.md`
+
+## Cursor Cloud specific instructions
+
+Python deps live in a venv at `/workspace/venv` (gitignored). Prefix commands with
+`./venv/bin/...`. The startup update script keeps this venv installed (see
+`requirements.txt` + `pytest`). System deps (PostgreSQL 16, Redis, gcc, Rust
+toolchain) are provided by the VM snapshot, not the update script.
+
+- **Rust toolchain**: the native `lemma-crypto` extension pins `base64ct` which
+  requires Cargo `edition2024` (Rust >= 1.85). The default `rustup` stable is set
+  accordingly; do not downgrade below 1.85 or `pip install -r requirements.txt`
+  (which builds the extension) will fail.
+- **Services are not auto-started on boot** (no systemd). Start them before
+  running the app or the DB-backed tests:
+  - Postgres: `sudo pg_ctlcluster 16 main start`
+  - Redis: `sudo redis-server --daemonize yes`
+  - Dev role/DB (idempotent): role `lemma`/pw `lemma`, database `lemma`
+    (`postgresql://lemma:lemma@localhost:5432/lemma`).
+- **Env vars are NOT auto-loaded** (the app reads `os.environ` directly; nothing
+  calls `load_dotenv`). Export them before running, e.g. `set -a && . ./.env.local
+  && set +a`. `.env.local` is a gitignored dev file; in development
+  (`FLASK_ENV=development`) `api/config.py` auto-generates all required secrets, so
+  only `DATABASE_URL`/`REDIS_URL` really matter.
+- **Schema creation**: for a fresh dev DB use SQLAlchemy models, not the numbered
+  SQL migrations. Run `python -c "from api.database import init_database;
+  init_database()"` (creates all ~45 tables). `migrations/run_migration.py`
+  assumes the base `sites` table already exists and fails on an empty DB at
+  migration 002.
+- **Run the app (dev)**: `python app.py` serves on `0.0.0.0:5000` (`/health`
+  returns `{"status":"healthy"}` only when Postgres is reachable). Prod uses
+  `gunicorn app:app ...` per `Procfile`.
+- **Tests**: designed to run against in-memory SQLite. Use
+  `python scripts/ci_regression_suite.py`, or run pytest directly with the CI env
+  from `.github/workflows/ci-regression.yml` (`DATABASE_URL=sqlite:///:memory:`
+  plus the `LEMMA_*` test secrets). `pytest` is a test-only dep (installed by the
+  update script; also listed in `scripts/ci_install_test_deps.sh`), not in
+  `requirements.txt`.
+- **isHuman credential issuance requires AWS KMS** (`api/issuer_management.py`
+  fails closed without it); it cannot run locally. Verification does not need KMS.
+  To exercise the core backend verify path (`POST /api/ishuman/verify-presentation`)
+  locally, mint a credential with a dev `lemma_crypto.PyMinimalIssuer.from_seed`
+  and trust its DID via `TRUSTED_ISSUER_DIDS` (see `api/trusted_issuers.py`); the
+  demo/skeleton IDV rails (`/api/demo/ishuman/*`) also depend on the KMS-backed
+  issuer.
