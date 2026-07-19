@@ -273,7 +273,7 @@ def _validate_csrf() -> bool:
     """Validate CSRF token from cookie matches header."""
     from auth.session_manager import validate_csrf
     csrf_cookie = request.cookies.get(CSRF_COOKIE_NAME)
-    csrf_header = request.headers.get('X-Lemma-CSRF')
+    csrf_header = request.headers.get('X-Lemma-CSRF') or request.form.get('csrf_token')
     return validate_csrf(csrf_cookie, csrf_header)
 
 
@@ -320,7 +320,7 @@ def wallet_cli_link_start():
         return jsonify({'success': False, 'error': 'cli_link_start_failed'}), 500
 
 
-@wallet_session_sync_bp.route('/api/wallet/cli-link/approve', methods=['GET'])
+@wallet_session_sync_bp.route('/api/wallet/cli-link/approve', methods=['GET', 'POST'])
 def wallet_cli_link_approve():
     """Approve pending CLI link from unlocked browser wallet session."""
     state = str(request.args.get('state') or '').strip()
@@ -344,6 +344,24 @@ def wallet_cli_link_approve():
         </body></html>
         """
         return make_response(html, 401)
+
+    if request.method == 'GET':
+        csrf_token = request.cookies.get(CSRF_COOKIE_NAME) or ''
+        action_url = f"/api/wallet/cli-link/approve?state={quote(state, safe='')}"
+        html = f"""
+        <html><body>
+          <h3>Approve CLI Link</h3>
+          <p>Approve this terminal to use your currently unlocked wallet session?</p>
+          <form method="post" action="{escape(action_url)}">
+            <input type="hidden" name="csrf_token" value="{escape(csrf_token)}">
+            <button type="submit">Approve CLI Link</button>
+          </form>
+        </body></html>
+        """
+        return make_response(html, 200)
+
+    if not _validate_csrf():
+        return make_response("CSRF validation failed.", 403)
 
     unlocked_at = int(session_data.get('unlocked_at') or int(time.time()))
     expires_at = int(time.time()) + min(300, UNLOCK_TOKEN_TTL)

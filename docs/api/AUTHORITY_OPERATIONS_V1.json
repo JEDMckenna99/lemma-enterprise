@@ -29,6 +29,24 @@
       "test_refs": []
     },
     {
+      "operation_id": "wallet.cli_link.approve",
+      "authority_class": "wallet",
+      "mutates": "Approves a one-time CLI unlock token from an existing wallet session.",
+      "routes": [
+        {"method": "POST", "path": "/api/wallet/cli-link/approve", "module": "api/wallet_session_sync.py"}
+      ],
+      "current_auth": ["wallet_session", "csrf_token", "one_time_cli_state"],
+      "required_auth": ["wallet_session", "csrf_token", "one_time_cli_state"],
+      "required_scope": "wallet_link",
+      "site_binding": "wallet_session_match",
+      "risk_tier": "high",
+      "enforcement_layer": "in_handler",
+      "compliance": "compliant",
+      "threat_tags": ["csrf", "token_theft", "replay"],
+      "checklist_sections": [1, 2],
+      "test_refs": ["tests/test_wallet_session_sync_security.py"]
+    },
+    {
       "operation_id": "wallet.session.sync",
       "authority_class": "wallet",
       "mutates": "Creates or refreshes cross-device wallet session state.",

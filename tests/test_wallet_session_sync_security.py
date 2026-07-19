@@ -253,7 +253,15 @@ def test_cli_link_approve_then_poll_returns_unlock_token_once(monkeypatch):
     monkeypatch.setattr(wallet_session_sync, "generate_unlock_token", lambda *_args: "lm_unlock_demo")
 
     client.set_cookie(wallet_session_sync.SESSION_COOKIE_NAME, "session_cookie_value")
-    approve = client.get(f"/api/wallet/cli-link/approve?state={state}")
+    client.set_cookie(wallet_session_sync.CSRF_COOKIE_NAME, "csrf")
+    confirmation = client.get(f"/api/wallet/cli-link/approve?state={state}")
+    assert confirmation.status_code == 200
+    assert b"Approve CLI Link" in confirmation.data
+
+    approve = client.post(
+        f"/api/wallet/cli-link/approve?state={state}",
+        data={"csrf_token": "csrf"},
+    )
     assert approve.status_code == 200
     assert b"CLI Link Approved" in approve.data
 
@@ -279,6 +287,21 @@ def test_cli_link_approve_without_session_points_to_unlock_return(monkeypatch):
     body = approve.data.decode("utf-8", errors="replace")
     assert "/unlock?return_url=" in body
     assert f"state%3D{state}" in body
+
+
+def test_cli_link_approval_post_requires_csrf(monkeypatch):
+    client = _client()
+    start = client.post("/api/wallet/cli-link/start", json={"requested_scope": "wallet:revoke"}).get_json()
+    state = start["state"]
+    monkeypatch.setattr(
+        wallet_session_sync,
+        "validate_session_token",
+        lambda _token: {"wallet_id": "wallet_demo", "unlocked_at": 1700000000},
+    )
+    client.set_cookie(wallet_session_sync.SESSION_COOKIE_NAME, "session_cookie_value")
+    client.set_cookie(wallet_session_sync.CSRF_COOKIE_NAME, "csrf")
+    denied = client.post(f"/api/wallet/cli-link/approve?state={state}")
+    assert denied.status_code == 403
 
 
 def test_cli_link_start_normalizes_duplicated_base_url(monkeypatch):
