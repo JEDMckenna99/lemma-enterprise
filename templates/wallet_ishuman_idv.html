@@ -528,12 +528,39 @@
             if (mark) mark.classList.toggle('is-unlocked', !!unlocked);
         }
 
+        function isBlockedStatusMessage(message) {
+            return /site_ppid_blocked|site_blocked|ppid.{0,40}blocked|site[_\s-]*blocked/i
+                .test(String(message || ''));
+        }
+
+        function presentBlockedState(message) {
+            const copy = consumerCopy();
+            applyBlockedShell();
+            setStatus(
+                message && !/^site_ppid_blocked$|^site_blocked$/i.test(String(message))
+                    ? message
+                    : (copy.status?.blocked || 'This PPID is blocked on this site.'),
+                'error',
+            );
+            const primary = document.getElementById('primary-btn');
+            const returnBtn = document.getElementById('return-btn');
+            const cancel = document.getElementById('cancel-btn');
+            primary?.classList.add('hidden');
+            returnBtn?.classList.add('hidden');
+            if (cancel) {
+                cancel.classList.remove('hidden');
+                cancel.textContent = copy.primary?.closeTab || copy.primary?.cancel || 'Close';
+            }
+        }
+
         function setStatus(message, tone) {
             const el = document.getElementById('status');
             el.textContent = message;
             el.className = 'status ' + (tone || 'info');
             const mark = document.getElementById('brand-mark');
+            const blockedError = tone === 'error' && isBlockedStatusMessage(message);
             mark?.classList.toggle('is-working', tone === 'loading');
+            mark?.classList.toggle('is-blocked', blockedError);
             setBrandLogoUnlocked(tone === 'success');
             if (tone === 'loading') {
                 mark?.classList.remove('is-caution', 'is-blocked');
@@ -1739,6 +1766,11 @@
                     return;
                 }
             } catch (err) {
+                const detail = err?.message || err?.toString() || '';
+                if (isBlockedStatusMessage(detail)) {
+                    presentBlockedState(detail);
+                    return;
+                }
                 console.warn('[isHuman IDV] site proof auto-issue skipped:', err?.message || err);
             }
 
@@ -2252,6 +2284,10 @@
             } catch (err) {
                 console.error('[isHuman IDV] primary action failed:', err);
                 const detail = err?.message || err?.toString() || 'Verification failed';
+                if (isBlockedStatusMessage(detail)) {
+                    presentBlockedState(detail);
+                    return;
+                }
                 if (detail.includes('wallet_id') || detail.includes('challenge')) {
                     setStatus('Wallet session mismatch. Close other lemma.id tabs and retry.', 'error');
                 } else if (detail.includes('envelope_invalid') || detail.includes('encrypted')) {
