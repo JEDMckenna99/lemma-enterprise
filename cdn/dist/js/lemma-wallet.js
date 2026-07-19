@@ -4767,24 +4767,9 @@ class LemmaWallet {
                 console.warn('[Lemma] Failed to clear global session:', e.message);
             }
         } else {
-            // Third-party sites cannot directly manage lemma.id cookies reliably.
-            // Phase 2.1: the bridge was removed, so make a best-effort direct call
-            // to lemma.id (may be blocked by CORS) so cross-device signoff can propagate.
-            try {
-                const directResp = await fetch('https://lemma.id/api/wallet/clear-session', {
-                    method: 'POST',
-                    credentials: 'include',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(walletId ? { wallet_id: walletId } : {})
-                });
-                if (directResp.ok) {
-                    console.log('[Lemma]  Direct lock call succeeded');
-                } else {
-                    console.warn('[Lemma] Direct lock returned', directResp.status);
-                }
-            } catch (directErr) {
-                console.warn('[Lemma] Direct lock failed:', directErr.message);
-            }
+            // Third-party origins cannot read lemma.id's CSRF cookie. Lock the
+            // local wallet only; central session removal must occur on lemma.id.
+            console.log('[Lemma] Local wallet locked; central session unchanged');
         }
     }
 

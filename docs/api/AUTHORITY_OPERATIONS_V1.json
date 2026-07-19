@@ -144,13 +144,13 @@
       "routes": [
         {"method": "POST", "path": "/api/wallet/clear-session", "module": "api/wallet_session_sync.py"}
       ],
-      "current_auth": ["wallet_id_or_session_cookie"],
-      "required_auth": ["wallet_session_or_authorized_wallet_assertion"],
+      "current_auth": ["wallet_session", "csrf_token", "wallet_id_match"],
+      "required_auth": ["wallet_session", "csrf_token", "wallet_id_match"],
       "required_scope": "none",
       "site_binding": "wallet_id_match",
       "risk_tier": "medium",
       "enforcement_layer": "in_handler",
-      "compliance": "review_required",
+      "compliance": "compliant",
       "threat_tags": ["csrf", "denial_of_service"],
       "checklist_sections": [1, 2],
       "test_refs": []

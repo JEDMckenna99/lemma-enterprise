@@ -938,17 +938,22 @@ def clear_session():
     
     origin = request.headers.get('Origin')
     data = request.get_json() or {}
-    wallet_id = data.get('wallet_id')
-    # Fallback: derive wallet_id from signed session cookie if client did not send it.
-    if not wallet_id:
-        try:
-            session_token = request.cookies.get(SESSION_COOKIE_NAME)
-            session_data = validate_session_token(session_token) if session_token else None
-            wallet_id = session_data.get('wallet_id') if session_data else None
-            if wallet_id:
-                logger.info(f"Clear-session: derived wallet_id from session cookie ({wallet_id[:8]}...)")
-        except Exception as e:
-            logger.warning(f"Clear-session: failed to derive wallet_id from cookie: {e}")
+    session_token = request.cookies.get(SESSION_COOKIE_NAME)
+    session_data = validate_session_token(session_token) if session_token else None
+    if not session_data:
+        response = jsonify({'success': False, 'error': 'valid_session_required'})
+        response.headers.update(_cors_headers(origin))
+        return response, 401
+    if not _validate_csrf():
+        response = jsonify({'success': False, 'error': 'csrf_validation_failed'})
+        response.headers.update(_cors_headers(origin))
+        return response, 403
+    wallet_id = str(session_data.get('wallet_id') or '').strip()
+    requested_wallet_id = str(data.get('wallet_id') or '').strip()
+    if requested_wallet_id and requested_wallet_id != wallet_id:
+        response = jsonify({'success': False, 'error': 'wallet_session_mismatch'})
+        response.headers.update(_cors_headers(origin))
+        return response, 403
     
     # Clear global session if wallet_id provided
     # This ensures other devices detect the lock
@@ -961,10 +966,6 @@ def clear_session():
         # so stolen/cached tokens are rejected even before cookie expiry
         from auth.session_manager import revoke_wallet_sessions
         revoke_wallet_sessions(wallet_id)
-    else:
-        logger.warning("Clear-session: no wallet_id available (request or cookie)")
-        global_cleared = False
-    
     response = jsonify({
         'success': True, 
         'session_cleared': True,

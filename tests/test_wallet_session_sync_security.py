@@ -189,6 +189,40 @@ def test_server_webauthn_unlock_issues_session_once(
     assert replay.get_json()["error"] == "wallet_unlock_challenge_expired"
 
 
+def test_clear_session_requires_bound_session_and_csrf(monkeypatch):
+    unauthenticated = _client().post(
+        "/api/wallet/clear-session",
+        json={"wallet_id": "wallet_victim"},
+        headers={"Origin": "https://lemma.id"},
+    )
+    assert unauthenticated.status_code == 401
+
+    monkeypatch.setattr(
+        wallet_session_sync,
+        "validate_session_token",
+        lambda _token: {"wallet_id": "wallet_owner"},
+    )
+    client = _client()
+    client.set_cookie(wallet_session_sync.SESSION_COOKIE_NAME, "session")
+    client.set_cookie(wallet_session_sync.CSRF_COOKIE_NAME, "csrf")
+
+    mismatch = client.post(
+        "/api/wallet/clear-session",
+        json={"wallet_id": "wallet_victim"},
+        headers={"Origin": "https://lemma.id", "X-Lemma-CSRF": "csrf"},
+    )
+    assert mismatch.status_code == 403
+    assert mismatch.get_json()["error"] == "wallet_session_mismatch"
+
+    valid = client.post(
+        "/api/wallet/clear-session",
+        json={"wallet_id": "wallet_owner"},
+        headers={"Origin": "https://lemma.id", "X-Lemma-CSRF": "csrf"},
+    )
+    assert valid.status_code == 200
+    assert valid.get_json()["session_cleared"] is True
+
+
 def _client():
     app = Flask(__name__)
     app.register_blueprint(wallet_session_sync.wallet_session_sync_bp)

@@ -6,7 +6,7 @@
 {% block preload_scripts %}
 <link rel="preload" href="{{ url_for('static', filename='js/lemma-keys.js') }}?v=8" as="script">
 <link rel="preload" href="{{ url_for('static', filename='js/wallet-at-rest-crypto.js') }}?v=2" as="script">
-<link rel="preload" href="{{ url_for('static', filename='js/lemma-wallet.js') }}?v=2684" as="script">
+<link rel="preload" href="{{ url_for('static', filename='js/lemma-wallet.js') }}?v=2685" as="script">
 <link rel="preload" href="{{ url_for('static', filename='js/lemma-credential-utils.js') }}?v=2" as="script">
 {% endblock %}
 
@@ -794,7 +794,7 @@ async function clearWallet() {
             await fetch('/api/wallet/clear-session', {
                 method: 'POST',
                 credentials: 'include',
-                headers: { 'Content-Type': 'application/json' },
+                headers: wallet?._getSecureHeaders?.() || { 'Content-Type': 'application/json' },
                 body: JSON.stringify(walletId ? { wallet_id: walletId } : {}),
             });
         } catch (err) {
