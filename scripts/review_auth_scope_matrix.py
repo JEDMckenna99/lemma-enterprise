@@ -153,6 +153,7 @@ IN_HANDLER_AUTH_ALLOWLIST = {
     "/api/v1/iam/admin/platform-bootstrap/auto-issue",
     "/api/v1/iam/admin/platform-bootstrap/status",
     "/api/wallet/challenge",
+    "/api/wallet/cli-link/approve",
     "/api/wallet/firewall/runtimes/<runtime_id>/authorize",
     "/api/wallet/register-signing-key",
     "/api/wallet/register-device-passkey",
