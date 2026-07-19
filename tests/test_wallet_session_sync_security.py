@@ -55,18 +55,26 @@ def test_signal_unlock_rejects_wallet_id_without_assertion():
         headers={"Origin": "https://lemma.id"},
     )
     assert response.status_code == 403
-    assert response.get_json()["code"] == "wallet_assertion_required"
+    assert response.get_json()["code"] == "fresh_webauthn_session_required"
 
 
 def test_signal_unlock_accepts_verified_wallet_assertion(monkeypatch):
     from api.wallet_authn import Result
 
     monkeypatch.setattr(
+        wallet_session_sync,
+        "validate_session_token",
+        lambda _token: {"wallet_id": "wallet_verified"},
+    )
+    monkeypatch.setattr(
         "api.wallet_authn.verify_assertion_from_body",
         lambda *_args, **_kwargs: (Result(True), {}),
     )
+    client = _client()
+    client.set_cookie(wallet_session_sync.SESSION_COOKIE_NAME, "session")
+    client.set_cookie(wallet_session_sync.CSRF_COOKIE_NAME, "csrf")
     now_ms = int(time.time() * 1000)
-    response = _client().post(
+    response = client.post(
         "/api/wallet/signal-unlock",
         json={
             "wallet_id": "wallet_verified",
@@ -76,11 +84,109 @@ def test_signal_unlock_accepts_verified_wallet_assertion(monkeypatch):
             "profile_name": "Personal",
             "wallet_assertion": {"nonce": "nonce", "signature": "signature"},
         },
-        headers={"Origin": "https://lemma.id"},
+        headers={"Origin": "https://lemma.id", "X-Lemma-CSRF": "csrf"},
     )
     assert response.status_code == 200
     assert response.get_json()["success"] is True
     assert wallet_session_sync.SESSION_COOKIE_NAME in response.headers.getlist("Set-Cookie")[0]
+
+
+def test_signal_unlock_refresh_requires_csrf(monkeypatch):
+    monkeypatch.setattr(
+        wallet_session_sync,
+        "validate_session_token",
+        lambda _token: {"wallet_id": "wallet_verified"},
+    )
+    client = _client()
+    client.set_cookie(wallet_session_sync.SESSION_COOKIE_NAME, "session")
+    client.set_cookie(wallet_session_sync.CSRF_COOKIE_NAME, "csrf")
+    response = client.post(
+        "/api/wallet/signal-unlock",
+        json={
+            "wallet_id": "wallet_verified",
+            "unlocked_at": int(time.time() * 1000),
+            "expires_at": int(time.time()) + 3600,
+            "profile_id": "default",
+            "profile_name": "Personal",
+            "wallet_assertion": {"nonce": "nonce", "signature": "signature"},
+        },
+        headers={"Origin": "https://lemma.id"},
+    )
+    assert response.status_code == 403
+    assert response.get_json()["error"] == "csrf_validation_failed"
+
+
+def test_server_webauthn_unlock_issues_session_once(
+    fake_ishuman_db_session_factory,
+    monkeypatch,
+):
+    from api.database import WalletPasskey
+
+    monkeypatch.setattr(
+        "api.database.SessionLocal",
+        fake_ishuman_db_session_factory.session_local,
+    )
+    db = fake_ishuman_db_session_factory.session_local()
+    db.add(
+        WalletPasskey(
+            wallet_id="wallet_webauthn",
+            device_id="dev_browser",
+            credential_id="credential_1",
+            public_key="public_key_1",
+            sign_count=0,
+        )
+    )
+    db.commit()
+    db.close()
+
+    client = _client()
+    begin = client.post(
+        "/api/wallet/session-unlock/begin",
+        json={
+            "wallet_id": "wallet_webauthn",
+            "device_id": "dev_browser",
+            "credential_id": "credential_1",
+        },
+        headers={"Origin": "https://lemma.id"},
+    )
+    assert begin.status_code == 200
+    challenge_key = begin.get_json()["challenge_key"]
+
+    monkeypatch.setattr(
+        "api.fresh_passkey_attestation.verify_wallet_webauthn_assertion",
+        lambda **_kwargs: (True, "valid", 1),
+    )
+    monkeypatch.setattr(
+        "api.fresh_passkey_attestation.update_wallet_passkey_sign_count",
+        lambda *_args, **_kwargs: None,
+    )
+    complete = client.post(
+        "/api/wallet/session-unlock/complete",
+        json={
+            "challenge_key": challenge_key,
+            "credential": {"id": "credential_1", "response": {}},
+            "profile_id": "default",
+            "profile_name": "Personal",
+        },
+        headers={"Origin": "https://lemma.id"},
+    )
+    assert complete.status_code == 200
+    assert complete.get_json()["auth_method"] == "webauthn"
+    assert any(
+        wallet_session_sync.SESSION_COOKIE_NAME in value
+        for value in complete.headers.getlist("Set-Cookie")
+    )
+
+    replay = client.post(
+        "/api/wallet/session-unlock/complete",
+        json={
+            "challenge_key": challenge_key,
+            "credential": {"id": "credential_1", "response": {}},
+        },
+        headers={"Origin": "https://lemma.id"},
+    )
+    assert replay.status_code == 401
+    assert replay.get_json()["error"] == "wallet_unlock_challenge_expired"
 
 
 def _client():

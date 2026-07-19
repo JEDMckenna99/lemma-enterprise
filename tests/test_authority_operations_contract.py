@@ -34,9 +34,14 @@ def test_wallet_id_only_session_paths_are_closed():
     assert init_first["compliance"] == "compliant"
 
     signal_unlock = _operation("wallet.session.signal_unlock")
-    assert signal_unlock["current_auth"] == ["authorized_wallet_assertion"]
-    assert signal_unlock["required_auth"] == ["verified_webauthn_assertion"]
-    assert signal_unlock["compliance"] == "review_required"
+    assert "existing_webauthn_session" in signal_unlock["required_auth"]
+    assert "authorized_wallet_assertion" in signal_unlock["required_auth"]
+    assert "csrf_token" in signal_unlock["required_auth"]
+    assert signal_unlock["compliance"] == "compliant"
+
+    webauthn_unlock = _operation("wallet.session.webauthn_unlock")
+    assert "verified_webauthn_assertion" in webauthn_unlock["required_auth"]
+    assert webauthn_unlock["compliance"] == "compliant"
 
 
 def test_signing_key_enrollment_requires_existing_authority():

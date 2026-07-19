@@ -2160,14 +2160,17 @@ class LemmaWallet {
             console.warn('[Lemma] Wallet passkey server binding skipped:', err?.message || err);
         }
 
-        // Establish server session from the enrolled device assertion.
+        // Establish the first trusted server session with server-verified
+        // WebAuthn. This is deliberately separate from local wallet creation.
         if (this._isLemmaDomain()) {
             try {
-                console.log('[Lemma] Signaling new wallet unlock to server...');
-                await this._signalServerUnlock();
-                console.log('[Lemma] Server session established');
+                console.log('[Lemma] Verifying new wallet passkey with server...');
+                await this._performServerWebAuthnUnlock(passkeyRecord, walletId.value);
+                this.session.serverSessionActive = true;
+                await this._put('session', { id: 'current', ...this.session });
+                console.log('[Lemma] Server-verified wallet session established');
             } catch (e) {
-                console.warn('[Lemma] Could not signal to server:', e.message);
+                console.warn('[Lemma] Could not establish server session:', e.message);
             }
         }
 
@@ -2474,7 +2477,7 @@ class LemmaWallet {
         const response = await fetch('/api/wallet/signal-unlock', {
             method: 'POST',
             credentials: 'include',
-            headers: { 'Content-Type': 'application/json' },
+            headers: this._getSecureHeaders(),
             body: JSON.stringify(body),
         });
         const data = await response.json().catch(() => ({}));
@@ -2484,6 +2487,59 @@ class LemmaWallet {
         this.session.serverSessionActive = true;
         await this._put('session', { id: 'current', ...this.session });
         return data;
+    }
+
+    async _performServerWebAuthnUnlock(passkeyRecord, walletId, profile = null) {
+        if (!this._isLemmaDomain()) {
+            throw new Error('Server WebAuthn unlock is only available on lemma.id');
+        }
+        const deviceId = this._deviceId || await this._getOrCreateDeviceId();
+        const beginResponse = await fetch('/api/wallet/session-unlock/begin', {
+            method: 'POST',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                wallet_id: walletId,
+                device_id: deviceId,
+                credential_id: passkeyRecord.credentialId,
+            }),
+        });
+        const begin = await beginResponse.json().catch(() => ({}));
+        if (!beginResponse.ok || !begin.challenge_key || !begin.challenge) {
+            throw new Error(begin.error || `wallet WebAuthn begin failed (${beginResponse.status})`);
+        }
+
+        const rpId = begin.rp_id || this._getRpIdForWebAuthn();
+        const getOptions = await this._publicKeyOptionsWithPrf({
+            challenge: this._base64urlToBuffer(begin.challenge),
+            rpId,
+            allowCredentials: [{
+                id: this._base64urlToBuffer(passkeyRecord.credentialId),
+                type: 'public-key',
+            }],
+            userVerification: 'required',
+            timeout: 60000,
+        }, passkeyRecord.prfWalletId || walletId);
+        const credential = await navigator.credentials.get({ publicKey: getOptions });
+        if (!credential) throw new Error('Passkey authentication cancelled');
+
+        const activeProfile = profile || await this.getActiveProfile();
+        const completeResponse = await fetch('/api/wallet/session-unlock/complete', {
+            method: 'POST',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                challenge_key: begin.challenge_key,
+                credential: this._serializeCredential(credential),
+                profile_id: activeProfile?.id || DEFAULT_PROFILE_ID,
+                profile_name: activeProfile?.name || 'Personal',
+            }),
+        });
+        const complete = await completeResponse.json().catch(() => ({}));
+        if (!completeResponse.ok || complete.success === false) {
+            throw new Error(complete.error || `wallet WebAuthn complete failed (${completeResponse.status})`);
+        }
+        return { credential, session: complete };
     }
 
     async requestWalletChallenge() {
@@ -2946,7 +3002,7 @@ class LemmaWallet {
                 const tokenRes = await fetch('/api/wallet/link-unlock-token', {
                     method: 'POST',
                     credentials: 'include',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: this._getSecureHeaders(),
                 });
                 if (tokenRes.ok) {
                     const tokenData = await tokenRes.json();
@@ -3178,7 +3234,7 @@ class LemmaWallet {
                 const tokenRes = await fetch('/api/wallet/link-unlock-token', {
                     method: 'POST',
                     credentials: 'include',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: this._getSecureHeaders(),
                 });
                 if (tokenRes.ok) {
                     const tokenData = await tokenRes.json();
@@ -4593,13 +4649,17 @@ class LemmaWallet {
 
         console.log(' Wallet unlocked successfully (local passkey verification)');
 
-        // Establish server state from an enrolled device assertion.
+        // Establish trusted server state with a server-generated WebAuthn
+        // challenge. The local ceremony above continues to unlock encrypted
+        // storage; this ceremony authorizes the server cookie.
         if (this._isLemmaDomain()) {
             try {
-                await this._signalServerUnlock();
-                console.log('[Lemma] Server session established');
+                await this._performServerWebAuthnUnlock(passkey, walletId);
+                this.session.serverSessionActive = true;
+                await this._put('session', { id: 'current', ...this.session });
+                console.log('[Lemma] Server-verified session established');
             } catch (e) {
-                console.warn('[Lemma] Could not signal unlock:', e.message);
+                console.warn('[Lemma] Could not establish server session:', e.message);
                 // Non-fatal: the local wallet remains unlocked, but no
                 // server-authorized session is created.
             }

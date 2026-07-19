@@ -101,19 +101,38 @@
       "test_refs": ["tests/test_security_next_batch.py"]
     },
     {
+      "operation_id": "wallet.session.webauthn_unlock",
+      "authority_class": "wallet",
+      "mutates": "Creates the first trusted server wallet session after server-verified WebAuthn.",
+      "routes": [
+        {"method": "POST", "path": "/api/wallet/session-unlock/begin", "module": "api/wallet_session_sync.py"},
+        {"method": "POST", "path": "/api/wallet/session-unlock/complete", "module": "api/wallet_session_sync.py"}
+      ],
+      "current_auth": ["server_challenge", "registered_wallet_passkey", "verified_webauthn_assertion"],
+      "required_auth": ["server_challenge", "registered_wallet_passkey", "verified_webauthn_assertion"],
+      "required_scope": "none",
+      "site_binding": "wallet_and_device_match",
+      "risk_tier": "critical",
+      "enforcement_layer": "in_handler",
+      "compliance": "compliant",
+      "threat_tags": ["leaked_wallet_id", "session_forgery", "replay", "origin_spoofing"],
+      "checklist_sections": [1, 2],
+      "test_refs": ["tests/test_wallet_session_sync_security.py"]
+    },
+    {
       "operation_id": "wallet.session.signal_unlock",
       "authority_class": "wallet",
       "mutates": "Creates server-trusted unlock state and a wallet session cookie.",
       "routes": [
         {"method": "POST", "path": "/api/wallet/signal-unlock", "module": "api/wallet_session_sync.py"}
       ],
-      "current_auth": ["authorized_wallet_assertion"],
-      "required_auth": ["verified_webauthn_assertion"],
+      "current_auth": ["existing_webauthn_session", "authorized_wallet_assertion", "csrf_token"],
+      "required_auth": ["existing_webauthn_session", "authorized_wallet_assertion", "csrf_token"],
       "required_scope": "none",
       "site_binding": "wallet_id_match",
       "risk_tier": "critical",
       "enforcement_layer": "in_handler",
-      "compliance": "review_required",
+      "compliance": "compliant",
       "threat_tags": ["leaked_wallet_id", "session_forgery", "origin_spoofing"],
       "checklist_sections": [1, 2],
       "test_refs": ["tests/test_security_next_batch.py"]

@@ -157,6 +157,8 @@ IN_HANDLER_AUTH_ALLOWLIST = {
     "/api/wallet/register-signing-key",
     "/api/wallet/register-device-passkey",
     "/api/wallet/revoke-device",
+    "/api/wallet/session-unlock/begin",
+    "/api/wallet/session-unlock/complete",
     "/api/wallet/sync-device",
     "/api/wallet/link-receive",
     "/api/webhooks/didit-identity",

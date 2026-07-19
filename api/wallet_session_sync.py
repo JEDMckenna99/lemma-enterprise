@@ -29,6 +29,7 @@ What lemma.id CANNOT see:
 
 from flask import Blueprint, request, jsonify, make_response
 from flask_cors import cross_origin
+import base64
 import time
 import os
 import secrets
@@ -57,13 +58,20 @@ logger = logging.getLogger(__name__)
 
 wallet_session_sync_bp = Blueprint('wallet_session_sync', __name__)
 CLI_LINK_TTL_SECONDS = 300
+WALLET_WEBAUTHN_TTL_SECONDS = 120
 
 try:
-    from auth.redis_store import store as redis_store, get as redis_get, delete as redis_delete
+    from auth.redis_store import (
+        consume as redis_consume,
+        delete as redis_delete,
+        get as redis_get,
+        store as redis_store,
+    )
 except Exception:  # pragma: no cover
     redis_store = None
     redis_get = None
     redis_delete = None
+    redis_consume = None
 
 
 def _cli_link_key(state: str) -> str:
@@ -87,6 +95,58 @@ def _delete_cli_link(state: str) -> None:
         redis_delete(_cli_link_key(state))
         return
     _storage.delete_session(_cli_link_key(state))
+
+
+def _wallet_webauthn_key(challenge_key: str) -> str:
+    return f"wallet:webauthn-session:{challenge_key}"
+
+
+def _issue_wallet_session_response(
+    *,
+    wallet_id: str,
+    profile_id: str = "default",
+    profile_name: str = "Personal",
+    extra_payload: dict | None = None,
+):
+    """Issue a server-trusted wallet cookie after a verified ceremony."""
+    unlocked_at = int(time.time() * 1000)
+    expires_at = int(time.time()) + SESSION_DURATION
+    _store_global_session(
+        wallet_id=wallet_id,
+        unlocked_at=unlocked_at,
+        expires_at=expires_at,
+        profile_id=profile_id,
+        profile_name=profile_name,
+    )
+    payload = {
+        "success": True,
+        "wallet_id": wallet_id,
+        "unlocked_at": unlocked_at,
+        "expires_at": expires_at,
+        **(extra_payload or {}),
+    }
+    response = make_response(jsonify(payload))
+    response.set_cookie(
+        SESSION_COOKIE_NAME,
+        generate_session_token(wallet_id, unlocked_at),
+        max_age=SESSION_DURATION,
+        httponly=True,
+        secure=True,
+        samesite="None",
+        path="/",
+    )
+    response.set_cookie(
+        CSRF_COOKIE_NAME,
+        generate_csrf_token(),
+        max_age=SESSION_DURATION,
+        httponly=False,
+        secure=True,
+        samesite="None",
+        path="/",
+    )
+    response.headers.update(_cors_headers(request.headers.get("Origin")))
+    return response
+
 
 _ALLOWED_ORIGINS = {
     origin.strip().lower()
@@ -436,6 +496,11 @@ def get_link_unlock_token():
         return response
     
     origin = request.headers.get('Origin')
+
+    if not _validate_csrf():
+        response = jsonify({'success': False, 'error': 'csrf_validation_failed'})
+        response.headers.update(_cors_headers(origin))
+        return response, 403
     
     # Verify existing session
     session_token = request.cookies.get(SESSION_COOKIE_NAME)
@@ -577,12 +642,128 @@ def set_session():
     return response
 
 
+@wallet_session_sync_bp.route('/api/wallet/session-unlock/begin', methods=['POST', 'OPTIONS'])
+def wallet_session_unlock_begin():
+    """Issue a server challenge for a wallet-bound WebAuthn assertion."""
+    if request.method == 'OPTIONS':
+        response = make_response()
+        response.headers.update(_cors_headers(request.headers.get('Origin')))
+        return response
+    origin = request.headers.get('Origin')
+    if not _lemma_origin_allowed(origin):
+        response = jsonify({'success': False, 'error': 'origin_not_allowed'})
+        response.headers.update(_cors_headers(origin))
+        return response, 403
+
+    body = request.get_json(silent=True) or {}
+    wallet_id = str(body.get('wallet_id') or '').strip()
+    device_id = str(body.get('device_id') or '').strip()
+    credential_id = str(body.get('credential_id') or '').strip()
+    if not wallet_id or not device_id or not credential_id:
+        return jsonify({'success': False, 'error': 'wallet_id, device_id, and credential_id required'}), 400
+
+    from api.database import SessionLocal, WalletPasskey
+
+    db = SessionLocal()
+    try:
+        passkey = db.query(WalletPasskey).filter_by(
+            wallet_id=wallet_id,
+            device_id=device_id,
+            credential_id=credential_id,
+        ).first()
+        if not passkey or passkey.revoked_at:
+            return jsonify({'success': False, 'error': 'wallet_passkey_not_registered'}), 403
+    finally:
+        db.close()
+
+    from api.passkey_auth import RP_ID
+
+    challenge = secrets.token_bytes(32)
+    challenge_key = f"wus_{secrets.token_urlsafe(24)}"
+    redis_store(
+        _wallet_webauthn_key(challenge_key),
+        {
+            'challenge': base64.urlsafe_b64encode(challenge).decode('ascii'),
+            'wallet_id': wallet_id,
+            'device_id': device_id,
+            'credential_id': credential_id,
+        },
+        ttl_seconds=WALLET_WEBAUTHN_TTL_SECONDS,
+    )
+    response = jsonify({
+        'success': True,
+        'challenge_key': challenge_key,
+        'challenge': base64.urlsafe_b64encode(challenge).decode('ascii').rstrip('='),
+        'rp_id': RP_ID,
+        'expires_in': WALLET_WEBAUTHN_TTL_SECONDS,
+    })
+    response.headers.update(_cors_headers(origin))
+    return response
+
+
+@wallet_session_sync_bp.route('/api/wallet/session-unlock/complete', methods=['POST', 'OPTIONS'])
+def wallet_session_unlock_complete():
+    """Verify wallet WebAuthn and issue the first trusted server session."""
+    if request.method == 'OPTIONS':
+        response = make_response()
+        response.headers.update(_cors_headers(request.headers.get('Origin')))
+        return response
+    origin = request.headers.get('Origin')
+    if not _lemma_origin_allowed(origin):
+        response = jsonify({'success': False, 'error': 'origin_not_allowed'})
+        response.headers.update(_cors_headers(origin))
+        return response, 403
+
+    body = request.get_json(silent=True) or {}
+    challenge_key = str(body.get('challenge_key') or '').strip()
+    credential = body.get('credential')
+    if not challenge_key or not isinstance(credential, dict):
+        return jsonify({'success': False, 'error': 'challenge_key and credential required'}), 400
+    stored = redis_consume(_wallet_webauthn_key(challenge_key)) if redis_consume else None
+    if not stored:
+        return jsonify({'success': False, 'error': 'wallet_unlock_challenge_expired'}), 401
+
+    credential_id = str(credential.get('id') or '').strip()
+    if credential_id != str(stored.get('credential_id') or ''):
+        return jsonify({'success': False, 'error': 'credential_id_mismatch'}), 403
+
+    from api.fresh_passkey_attestation import (
+        allowed_fresh_passkey_origins,
+        lookup_wallet_passkey_public_key,
+        update_wallet_passkey_sign_count,
+        verify_wallet_webauthn_assertion,
+    )
+    from api.passkey_auth import RP_ID
+
+    public_key, sign_count = lookup_wallet_passkey_public_key(credential_id)
+    if not public_key:
+        return jsonify({'success': False, 'error': 'wallet_passkey_not_registered'}), 403
+    ok, reason, new_sign_count = verify_wallet_webauthn_assertion(
+        credential=credential,
+        expected_challenge=base64.urlsafe_b64decode(stored['challenge']),
+        rp_id=RP_ID,
+        origin=allowed_fresh_passkey_origins(),
+        public_key_b64=public_key,
+        sign_count=sign_count,
+    )
+    if not ok:
+        return jsonify({'success': False, 'error': reason}), 403
+
+    update_wallet_passkey_sign_count(credential_id, new_sign_count)
+    return _issue_wallet_session_response(
+        wallet_id=str(stored['wallet_id']),
+        profile_id=str(body.get('profile_id') or 'default'),
+        profile_name=str(body.get('profile_name') or 'Personal'),
+        extra_payload={'auth_method': 'webauthn'},
+    )
+
+
 @wallet_session_sync_bp.route('/api/wallet/init-first-session', methods=['POST', 'OPTIONS'])
 def init_first_session():
     """Retired wallet-id-only bootstrap.
 
-    New wallets register a signing key and establish a session through
-    ``signal-unlock`` with a purpose-bound wallet assertion.
+    New wallets bind a passkey and establish a trusted session through the
+    server-verified ``session-unlock`` WebAuthn ceremony.
     """
     # Handle CORS preflight
     if request.method == 'OPTIONS':
@@ -605,7 +786,7 @@ def init_first_session():
     response = jsonify({
         'success': False,
         'error': 'first_session_route_retired',
-        'message': 'Register the wallet signing key, then use signal-unlock with a wallet assertion.',
+        'message': 'Use the server-verified wallet session-unlock WebAuthn ceremony.',
     })
     response.headers.update(_cors_headers(origin))
     return response, 410
@@ -643,6 +824,22 @@ def signal_unlock():
         response = jsonify({'success': False, 'error': 'wallet_id required'})
         response.headers.update(_cors_headers(origin))
         return response, 400
+
+    session_token = request.cookies.get(SESSION_COOKIE_NAME)
+    session_data = validate_session_token(session_token) if session_token else None
+    if not session_data or str(session_data.get('wallet_id') or '') != wallet_id:
+        response = jsonify({
+            'success': False,
+            'error': 'fresh_webauthn_session_required',
+            'code': 'fresh_webauthn_session_required',
+        })
+        response.headers.update(_cors_headers(origin))
+        return response, 403
+
+    if not _validate_csrf():
+        response = jsonify({'success': False, 'error': 'csrf_validation_failed'})
+        response.headers.update(_cors_headers(origin))
+        return response, 403
 
     from api.wallet_authn import verify_assertion_from_body
 
