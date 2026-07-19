@@ -720,6 +720,17 @@ async function unlockWallet() {
 
     } catch (e) {
         console.error('Unlock failed:', e);
+        if (e?.code === 'device_revoked' || e?.purged) {
+            wallet = null;
+            delete window.globalLemmaWallet;
+            showRemovedDeviceNotice();
+            updateStatusDisplay(
+                false,
+                'Device revoked',
+                'This device was revoked. lemma.id was cleared here.',
+            );
+            return;
+        }
         updateStatusDisplay(false, 'Unlock Failed', e.message);
     } finally {
         btn.textContent = origText;

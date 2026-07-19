@@ -90,3 +90,8 @@ def test_brand_and_manager_creation_use_canonical_routes():
     assert "static VERSION = '2.78.0'" in wallet_js
     assert "Never call instance.lock()" in wallet_js
     assert "Safari/iOS-safe" in wallet_js
+    assert "_handleDeviceRevoked" in wallet_js
+    assert "isDeviceRevokedError" in wallet_js
+    assert "rolling back local unlock" in wallet_js
+    assert "Device revoked" in manager
+    assert "e?.code === 'device_revoked'" in manager

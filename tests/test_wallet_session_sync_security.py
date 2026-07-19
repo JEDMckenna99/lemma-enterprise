@@ -413,6 +413,98 @@ def test_device_enroll_complete_registers_signing_key_and_passkey(
     assert replay.status_code == 401
 
 
+def test_session_unlock_begin_returns_device_revoked_when_passkey_revoked(
+    fake_ishuman_db_session_factory,
+    monkeypatch,
+):
+    from datetime import datetime
+
+    from api.database import WalletPasskey, WalletSigningKey
+    from api.wallet_authn import issue_device_enrollment_grant, register_wallet_signing_key
+    from api.wallet_keys import register_self_signature
+
+    monkeypatch.setattr(
+        "api.database.SessionLocal",
+        fake_ishuman_db_session_factory.session_local,
+    )
+    wallet_id = "wallet_revoked_unlock"
+    secret = "44" * 32
+    pub, sig = register_self_signature(wallet_id, secret)
+    assert register_wallet_signing_key(
+        wallet_id=wallet_id,
+        device_id="dev_phone",
+        pubkey_b64=pub,
+        signature_b64=sig,
+        enrollment_grant=issue_device_enrollment_grant(wallet_id=wallet_id, source="test"),
+    ).ok
+
+    db = fake_ishuman_db_session_factory.session_local()
+    db.add(
+        WalletPasskey(
+            wallet_id=wallet_id,
+            device_id="dev_phone",
+            credential_id="cred_revoked",
+            public_key="pk_revoked",
+            sign_count=0,
+            revoked_at=datetime.utcnow(),
+        )
+    )
+    db.commit()
+    db.close()
+
+    response = _client().post(
+        "/api/wallet/session-unlock/begin",
+        json={
+            "wallet_id": wallet_id,
+            "device_id": "dev_phone",
+            "credential_id": "cred_revoked",
+        },
+        headers={"Origin": "https://lemma.id"},
+    )
+    assert response.status_code == 403
+    payload = response.get_json()
+    assert payload["code"] == "device_revoked"
+    assert payload["error"] == "wallet device has been revoked"
+
+    # Signing-key revoke alone also blocks unlock (passkey still active).
+    pub2, sig2 = register_self_signature(wallet_id, "55" * 32)
+    assert register_wallet_signing_key(
+        wallet_id=wallet_id,
+        device_id="dev_laptop",
+        pubkey_b64=pub2,
+        signature_b64=sig2,
+        enrollment_grant=issue_device_enrollment_grant(wallet_id=wallet_id, source="test"),
+    ).ok
+    db = fake_ishuman_db_session_factory.session_local()
+    db.add(
+        WalletPasskey(
+            wallet_id=wallet_id,
+            device_id="dev_laptop",
+            credential_id="cred_active_pk",
+            public_key="pk_active",
+            sign_count=0,
+        )
+    )
+    row = db.query(WalletSigningKey).filter_by(
+        wallet_id=wallet_id, device_id="dev_laptop"
+    ).first()
+    row.revoked_at = datetime.utcnow()
+    db.commit()
+    db.close()
+
+    blocked = _client().post(
+        "/api/wallet/session-unlock/begin",
+        json={
+            "wallet_id": wallet_id,
+            "device_id": "dev_laptop",
+            "credential_id": "cred_active_pk",
+        },
+        headers={"Origin": "https://lemma.id"},
+    )
+    assert blocked.status_code == 403
+    assert blocked.get_json()["code"] == "device_revoked"
+
+
 def test_list_devices_requires_wallet_assertion(
     fake_ishuman_db_session_factory,
     monkeypatch,

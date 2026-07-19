@@ -91,7 +91,7 @@ const AUTH_STATE = {
 class LemmaWallet {
     // SDK version - check with LemmaWallet.VERSION
     // v2.32.0: Redirect-only architecture - removed popup flow for simpler, consistent UX
-    static VERSION = '2.78.0';  // v2.78: iOS-safe Remove lemma.id (no lock race / blocked IDB)
+    static VERSION = '2.78.0';  // v2.78: iOS-safe remove + fail-closed unlock purge on device_revoked
 
     static DEVICE_IDB_NAMES = ['LemmaWallet', 'LemmaWalletWrap'];
 
@@ -243,6 +243,20 @@ class LemmaWallet {
         }
 
         return { success: true, clearedDatabases: [...dbNames] };
+    }
+
+    static isDeviceRevokedPayload(payload) {
+        const code = String(payload?.code || payload?.error || '').trim();
+        return code === 'device_revoked' || code === 'passkey_revoked';
+    }
+
+    static isDeviceRevokedError(error) {
+        if (!error) return false;
+        if (error.code === 'device_revoked' || error.code === 'passkey_revoked') return true;
+        return LemmaWallet.isDeviceRevokedPayload({
+            code: error.code,
+            error: error.message || error.error,
+        });
     }
     
     constructor(options = {}) {
@@ -2592,6 +2606,67 @@ class LemmaWallet {
         return data;
     }
 
+    _throwWalletApiError(payload, fallbackMessage) {
+        const err = new Error(
+            String(payload?.error || payload?.message || fallbackMessage || 'wallet_api_failed')
+        );
+        err.code = String(payload?.code || payload?.error || '').trim() || undefined;
+        err.payload = payload || null;
+        throw err;
+    }
+
+    async _clearLocalUnlockState() {
+        this.session = {
+            isUnlocked: false,
+            unlockedAt: null,
+            expiresAt: null,
+            walletSecret: null,
+            walletId: null,
+            serverSessionActive: false,
+        };
+        try {
+            await this._delete('session', 'current');
+        } catch (_) {}
+    }
+
+    async _handleDeviceRevoked(source = 'server') {
+        console.warn('[Lemma] Device revoked — clearing local lemma.id data', source);
+        try {
+            await this._clearLocalUnlockState();
+        } catch (_) {}
+        try {
+            await LemmaWallet.purgeAllDeviceData({ instances: [this] });
+        } catch (purgeErr) {
+            console.warn('[Lemma] purge after device_revoked failed:', purgeErr?.message || purgeErr);
+        }
+        const err = new Error('This device was revoked. lemma.id was cleared here.');
+        err.code = 'device_revoked';
+        err.purged = true;
+        throw err;
+    }
+
+    /**
+     * When a session was restored from IndexedDB, confirm this device is still
+     * authorized before treating the wallet as unlocked on lemma.id.
+     */
+    async _assertActiveDeviceOrPurge() {
+        if (!this._isLemmaDomain()) return true;
+        if (!this.isUnlocked || !this.isUnlocked()) return false;
+        const walletId = this.session?.walletId;
+        if (!walletId) return false;
+        try {
+            await this.listDevices();
+            return true;
+        } catch (e) {
+            if (LemmaWallet.isDeviceRevokedError(e)) {
+                await this._handleDeviceRevoked('device_authority_check');
+            }
+            // Soft-fail for transient/network errors so restored sessions still work offline.
+            console.warn('[Lemma] Device authority check skipped:', e?.message || e);
+            return true;
+        }
+    }
+
     async _performServerWebAuthnUnlock(passkeyRecord, walletId, profile = null) {
         if (!this._isLemmaDomain()) {
             throw new Error('Server WebAuthn unlock is only available on lemma.id');
@@ -2609,7 +2684,10 @@ class LemmaWallet {
         });
         const begin = await beginResponse.json().catch(() => ({}));
         if (!beginResponse.ok || !begin.challenge_key || !begin.challenge) {
-            throw new Error(begin.error || `wallet WebAuthn begin failed (${beginResponse.status})`);
+            this._throwWalletApiError(
+                begin,
+                `wallet WebAuthn begin failed (${beginResponse.status})`,
+            );
         }
 
         const rpId = begin.rp_id || this._getRpIdForWebAuthn();
@@ -2640,7 +2718,10 @@ class LemmaWallet {
         });
         const complete = await completeResponse.json().catch(() => ({}));
         if (!completeResponse.ok || complete.success === false) {
-            throw new Error(complete.error || `wallet WebAuthn complete failed (${completeResponse.status})`);
+            this._throwWalletApiError(
+                complete,
+                `wallet WebAuthn complete failed (${completeResponse.status})`,
+            );
         }
         return { credential, session: complete };
     }
@@ -2727,7 +2808,7 @@ class LemmaWallet {
         });
         const data = await response.json().catch(() => ({}));
         if (!response.ok || data.success === false) {
-            throw new Error(data.error || `list devices failed (${response.status})`);
+            this._throwWalletApiError(data, `list devices failed (${response.status})`);
         }
         const devices = Array.isArray(data.devices) ? data.devices : [];
         return {
@@ -4676,6 +4757,7 @@ class LemmaWallet {
             if (this.isIsHumanLockValid()) {
                 await this._restoreIsHumanLockBundleIfValid();
                 if (this.isUnlocked && this.isUnlocked()) {
+                    await this._assertActiveDeviceOrPurge();
                     return {
                         success: true,
                         method: 'daily_unlock_bundle',
@@ -4698,6 +4780,9 @@ class LemmaWallet {
             const needsAtRestKey = await this._encryptedStorageNeedsAtRestKey();
             if (!needsAtRestKey || this._atRestKey) {
                 console.log('[Lemma] unlock(): reusing valid restored session, skipping passkey prompt');
+                if (this._isLemmaDomain()) {
+                    await this._assertActiveDeviceOrPurge();
+                }
                 return {
                     success: true,
                     method: 'restored_session',
@@ -4887,9 +4972,9 @@ class LemmaWallet {
 
         console.log(' Wallet unlocked successfully (local passkey verification)');
 
-        // Establish trusted server state with a server-generated WebAuthn
-        // challenge. The local ceremony above continues to unlock encrypted
-        // storage; this ceremony authorizes the server cookie.
+        // On lemma.id, server-verified session-unlock is required. Local
+        // passkey only decrypts at-rest storage; authority still comes from
+        // an enrolled non-revoked device. device_revoked clears local data.
         if (this._isLemmaDomain()) {
             try {
                 await this._performServerWebAuthnUnlock(passkey, walletId);
@@ -4897,9 +4982,12 @@ class LemmaWallet {
                 await this._put('session', { id: 'current', ...this.session });
                 console.log('[Lemma] Server-verified session established');
             } catch (e) {
-                console.warn('[Lemma] Could not establish server session:', e.message);
-                // Non-fatal: the local wallet remains unlocked, but no
-                // server-authorized session is created.
+                if (LemmaWallet.isDeviceRevokedError(e)) {
+                    await this._handleDeviceRevoked('session_unlock');
+                }
+                console.warn('[Lemma] Server session unlock failed — rolling back local unlock:', e.message);
+                await this._clearLocalUnlockState();
+                throw e;
             }
         }
 
@@ -4918,9 +5006,8 @@ class LemmaWallet {
             walletSecret: walletSecretRecord.secret
         };
     }
-    // NOTE: unlockWithServerSession() has been REMOVED
-    // Passkeys are now verified 100% locally. Server only stores lock/unlock state.
-    // Security comes from HSM-signed lemmas, not server passkey verification.
+    // NOTE: On lemma.id, unlock requires server session-unlock after local
+    // passkey verification. Revoked devices receive device_revoked and purge.
 
     /**
      * Lock the wallet (clear session locally and on server)

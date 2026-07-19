@@ -98,11 +98,66 @@ def _load_registered_pubkey(
                 WalletSigningKey.last_used_at.desc().nullslast(),
                 WalletSigningKey.created_at.desc(),
             ).first()
-        if not row or row.revoked_at:
+        if not row:
             return Result(False, "wallet_not_registered", "wallet signing key not registered"), None, None
+        if row.revoked_at:
+            return Result(False, "device_revoked", "wallet device has been revoked"), None, None
         if not row.pubkey:
             return Result(False, "wallet_not_registered", "wallet signing key missing"), None, None
         return Result(True), bytes(row.pubkey), str(row.device_id or "legacy")
+    finally:
+        db.close()
+
+
+def device_authority_status(
+    *,
+    wallet_id: str,
+    device_id: str,
+    credential_id: str = "",
+) -> Result:
+    """Classify whether a device may still unlock / assert for a wallet."""
+    from api.database import SessionLocal, WalletPasskey, WalletSigningKey
+
+    wallet_id = (wallet_id or "").strip()
+    device_id = (device_id or "").strip()
+    credential_id = (credential_id or "").strip()
+    if not wallet_id or not device_id:
+        return Result(False, "wallet_assertion_malformed", "wallet_id and device_id required")
+
+    db = SessionLocal()
+    try:
+        signing_key = db.query(WalletSigningKey).filter_by(
+            wallet_id=wallet_id,
+            device_id=device_id,
+        ).first()
+        if signing_key and signing_key.revoked_at:
+            return Result(False, "device_revoked", "wallet device has been revoked")
+
+        passkey = None
+        if credential_id:
+            passkey = db.query(WalletPasskey).filter_by(
+                wallet_id=wallet_id,
+                device_id=device_id,
+                credential_id=credential_id,
+            ).first()
+        else:
+            passkey = (
+                db.query(WalletPasskey)
+                .filter_by(wallet_id=wallet_id, device_id=device_id)
+                .order_by(WalletPasskey.last_used_at.desc().nullslast())
+                .first()
+            )
+
+        if passkey and passkey.revoked_at:
+            return Result(False, "device_revoked", "wallet device has been revoked")
+
+        if credential_id and not passkey:
+            return Result(False, "wallet_passkey_not_registered", "wallet passkey not registered")
+
+        if signing_key or passkey:
+            return Result(True)
+
+        return Result(False, "wallet_passkey_not_registered", "wallet device not registered")
     finally:
         db.close()
 

@@ -415,6 +415,92 @@ def test_revoke_device_marks_key_revoked(
     assert count_active_wallet_devices(wallet_fixture["wallet_id"]) == 0
 
 
+def test_device_authority_status_reports_device_revoked(
+    wallet_fixture,
+    fake_ishuman_db_session_factory,
+    monkeypatch,
+):
+    from datetime import datetime
+
+    from api.database import WalletPasskey
+    from api.wallet_authn import (
+        device_authority_status,
+        issue_device_enrollment_grant,
+        register_wallet_signing_key,
+        revoke_wallet_device,
+    )
+    from api.wallet_keys import register_self_signature
+
+    monkeypatch.setattr("api.database.SessionLocal", fake_ishuman_db_session_factory.session_local)
+    wallet_id = wallet_fixture["wallet_id"]
+    pub, sig = register_self_signature(wallet_id, wallet_fixture["wallet_secret"])
+    assert register_wallet_signing_key(
+        wallet_id=wallet_id,
+        device_id="dev_phone",
+        pubkey_b64=pub,
+        signature_b64=sig,
+        enrollment_grant=issue_device_enrollment_grant(wallet_id=wallet_id, source="test"),
+    ).ok
+    db = fake_ishuman_db_session_factory.session_local()
+    db.add(
+        WalletPasskey(
+            wallet_id=wallet_id,
+            device_id="dev_phone",
+            credential_id="cred_phone",
+            public_key="pk",
+            sign_count=0,
+        )
+    )
+    db.commit()
+    db.close()
+
+    ok = device_authority_status(
+        wallet_id=wallet_id,
+        device_id="dev_phone",
+        credential_id="cred_phone",
+    )
+    assert ok.ok
+
+    assert revoke_wallet_device(wallet_id=wallet_id, device_id="dev_phone").ok
+    revoked = device_authority_status(
+        wallet_id=wallet_id,
+        device_id="dev_phone",
+        credential_id="cred_phone",
+    )
+    assert not revoked.ok
+    assert revoked.code == "device_revoked"
+
+    # Passkey-only revoke (signing key still active) also reports device_revoked.
+    pub2, sig2 = register_self_signature(wallet_id, "cd" * 32)
+    assert register_wallet_signing_key(
+        wallet_id=wallet_id,
+        device_id="dev_tablet",
+        pubkey_b64=pub2,
+        signature_b64=sig2,
+        enrollment_grant=issue_device_enrollment_grant(wallet_id=wallet_id, source="test"),
+    ).ok
+    db = fake_ishuman_db_session_factory.session_local()
+    db.add(
+        WalletPasskey(
+            wallet_id=wallet_id,
+            device_id="dev_tablet",
+            credential_id="cred_tablet",
+            public_key="pk2",
+            sign_count=0,
+            revoked_at=datetime.utcnow(),
+        )
+    )
+    db.commit()
+    db.close()
+    pk_revoked = device_authority_status(
+        wallet_id=wallet_id,
+        device_id="dev_tablet",
+        credential_id="cred_tablet",
+    )
+    assert not pk_revoked.ok
+    assert pk_revoked.code == "device_revoked"
+
+
 def test_list_wallet_devices_returns_active_and_optional_revoked(
     wallet_fixture,
     fake_ishuman_db_session_factory,

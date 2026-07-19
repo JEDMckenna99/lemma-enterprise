@@ -692,19 +692,19 @@ def wallet_session_unlock_begin():
     if not wallet_id or not device_id or not credential_id:
         return jsonify({'success': False, 'error': 'wallet_id, device_id, and credential_id required'}), 400
 
-    from api.database import SessionLocal, WalletPasskey
+    from api.wallet_authn import device_authority_status
 
-    db = SessionLocal()
-    try:
-        passkey = db.query(WalletPasskey).filter_by(
-            wallet_id=wallet_id,
-            device_id=device_id,
-            credential_id=credential_id,
-        ).first()
-        if not passkey or passkey.revoked_at:
-            return jsonify({'success': False, 'error': 'wallet_passkey_not_registered'}), 403
-    finally:
-        db.close()
+    authority = device_authority_status(
+        wallet_id=wallet_id,
+        device_id=device_id,
+        credential_id=credential_id,
+    )
+    if not authority.ok:
+        return jsonify({
+            'success': False,
+            'error': authority.error,
+            'code': authority.code,
+        }), 403
 
     from api.passkey_auth import RP_ID
 
@@ -765,9 +765,27 @@ def wallet_session_unlock_complete():
     )
     from api.passkey_auth import RP_ID
 
+    from api.wallet_authn import device_authority_status
+
+    authority = device_authority_status(
+        wallet_id=str(stored.get('wallet_id') or ''),
+        device_id=str(stored.get('device_id') or ''),
+        credential_id=credential_id,
+    )
+    if not authority.ok:
+        return jsonify({
+            'success': False,
+            'error': authority.error,
+            'code': authority.code,
+        }), 403
+
     public_key, sign_count = lookup_wallet_passkey_public_key(credential_id)
     if not public_key:
-        return jsonify({'success': False, 'error': 'wallet_passkey_not_registered'}), 403
+        return jsonify({
+            'success': False,
+            'error': 'wallet_passkey_not_registered',
+            'code': 'wallet_passkey_not_registered',
+        }), 403
     ok, reason, new_sign_count = verify_wallet_webauthn_assertion(
         credential=credential,
         expected_challenge=base64.urlsafe_b64decode(stored['challenge']),
