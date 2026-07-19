@@ -51,7 +51,7 @@ The assurance boundaries must remain explicit:
 | Workstream | Priority | Status | Owner | Evidence |
 |---|---|---|---|---|
 | 1. Security contract and threat model | P0 | `BLOCKED` | Security + Platform | Independent reviewer sign-off pending |
-| 2. Wallet authority boundaries | P0 | `NOT_STARTED` |  |  |
+| 2. Wallet authority boundaries | P0 | `IN_PROGRESS` | Auth | Asserted sessions and transfer-authorized device enrollment implemented |
 | 3. Tenant and site ownership | P0 | `NOT_STARTED` |  |  |
 | 4. Cryptographic trust chain | P0 | `NOT_STARTED` |  |  |
 | 5. Revocation and replay protection | P0 | `NOT_STARTED` |  |  |
@@ -116,7 +116,7 @@ Exit criteria:
 
 Validation baseline:
 
-- `check_authority_operations.py`: PASS, 33 operations / 45 routes / 13
+- `check_authority_operations.py`: PASS, 33 operations / 45 routes / 10
   declared implementation gaps.
 - `check_ishuman_protocol_registry.py`: PASS, 14 registered artifacts.
 - Contract tests: PASS, 11 tests.
@@ -124,12 +124,8 @@ Validation baseline:
 - Strict generated scope review: PASS after classifying the action-sign
   redirect deposit and one-time claim as in-handler ceremony routes. Their
   current and required policies remain explicit in the authority inventory.
-- Full non-live CI Regression: BLOCKED on the current repository baseline after
-  1,100 passes and 4 skips. The native `lemma_crypto` package builds and loads
-  with Rust 1.97.1. Nine stale demo, cache-bust, navigation, or public-copy
-  assertions remain outside the Section 1 contract changes. Local results and
-  the feature-branch CI run match. These failures must be reconciled before the
-  final production gate can pass.
+- Full non-live CI Regression: PASS locally, 1,113 passed and 4 skipped. The
+  native `lemma_crypto` package builds and loads with Rust 1.97.1.
 
 Blocking approval:
 
@@ -142,43 +138,67 @@ Blocking approval:
 ## 2. Rebuild wallet authority boundaries
 
 - Priority: `P0`
-- Status: `NOT_STARTED`
-- Owner:
+- Status: `IN_PROGRESS`
+- Owner: Auth
 - Evidence:
+  - `api/wallet_session_sync.py`
+  - `api/wallet_authn.py`
+  - `auth/redis_store.py`
+  - `static/js/lemma-wallet.js` 2.75.0
+  - `tests/test_wallet_session_sync_security.py`
+  - `tests/test_wallet_authn.py`
+  - `tests/test_wallet_sync_device.py`
+  - `tests/test_wallet_link_receive.py`
 
-- [ ] Remove wallet-ID-only authorization from `init-first-session` and
+- [x] Remove wallet-ID-only authorization from `init-first-session` and
       `signal-unlock`, or disable those routes until secure replacements exist.
 - [ ] Require verified WebAuthn before creating the first trusted wallet
       session.
-- [ ] Require an existing authorized device signature, verified WebAuthn
+- [x] Require an existing authorized device signature, verified WebAuthn
       ceremony, or completed human-recovery ceremony before enrolling another
       signing key.
-- [ ] Never treat `wallet_id`, a client timestamp, or an `Origin` header as
+- [x] Never treat `wallet_id`, a client timestamp, or an `Origin` header as
       proof of wallet control.
 - [ ] Define separate, auditable ceremonies for:
   - [ ] First-device enrollment
   - [ ] Daily passkey unlock
-  - [ ] Additional-device enrollment
+  - [x] Additional-device enrollment
   - [ ] Device revocation
   - [ ] Lost-device recovery
 - [ ] Bind every challenge to wallet, device, origin, purpose, nonce, and
       expiration.
-- [ ] Prevent attacker-enrolled devices from satisfying multi-device recovery
+- [x] Prevent attacker-enrolled devices from satisfying multi-device recovery
       or master-reissue policy.
-- [ ] Correct hostname suffix checks so only the exact domain or a real
+- [x] Correct hostname suffix checks so only the exact domain or a real
       subdomain is accepted.
 - [ ] Require CSRF protection on cookie-authenticated wallet mutations.
 - [ ] Review and minimize `SameSite=None` cookies.
-- [ ] Add negative tests for forged Origin, known wallet ID, unapproved device,
+- [x] Add negative tests for forged Origin, known wallet ID, unapproved device,
       replayed challenge, and cross-site mutation attempts.
 
 Exit criteria:
 
-- [ ] Knowing a wallet ID cannot create a session, enroll a device, reissue a
+- [x] Knowing a wallet ID cannot create a session, enroll a device, reissue a
       master credential, derive a site proof, or revoke credentials.
 - [ ] First-device, additional-device, and recovery ceremonies pass adversarial
       tests.
 - [ ] No wallet mutation relies solely on ambient cookies without CSRF defense.
+
+Validation baseline:
+
+- Adversarial wallet authority suite: PASS, 44 tests.
+- Wallet SDK, cache, and mirror suite: PASS, 73 tests.
+- Full non-live CI Regression: PASS, 1,113 tests with 4 skips.
+- Authority contract: PASS, 33 operations / 45 routes / 10 declared gaps.
+
+Remaining blockers:
+
+- Daily and first trusted server sessions still require a server-verified
+  WebAuthn ceremony rather than only the locally unlocked device assertion.
+- Device revocation and lost-device recovery ceremonies require additional
+  authorization design and adversarial evidence.
+- Cookie-authenticated wallet mutations need complete CSRF coverage and
+  `SameSite=None` minimization.
 
 ---
 
