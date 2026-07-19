@@ -77,6 +77,39 @@ def store(key: str, value: dict, ttl_seconds: int = 300) -> bool:
     return True
 
 
+def store_nx(key: str, value: dict, ttl_seconds: int = 300) -> bool:
+    """Store a value only if the key does not already exist.
+
+    Returns True when this caller created the key, False when it already
+    existed or the write failed closed.
+    """
+    full_key = f"lemma:{key}"
+    payload = json.dumps(value)
+
+    redis_client = get_redis_client()
+    if redis_client:
+        try:
+            created = redis_client.set(full_key, payload, nx=True, ex=ttl_seconds)
+            return bool(created)
+        except Exception as e:
+            logger.error(f"Redis store_nx failed: {e}")
+            return False
+
+    with _memory_lock:
+        entry = _memory_store.get(full_key)
+        if entry:
+            expires_at = datetime.fromisoformat(entry["expires_at"])
+            if datetime.now(timezone.utc) <= expires_at:
+                return False
+            del _memory_store[full_key]
+        expires_at = datetime.now(timezone.utc) + timedelta(seconds=ttl_seconds)
+        _memory_store[full_key] = {
+            "value": value,
+            "expires_at": expires_at.isoformat(),
+        }
+    return True
+
+
 def get(key: str) -> Optional[dict]:
     """
     Retrieve a stored value.

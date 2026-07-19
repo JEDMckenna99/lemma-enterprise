@@ -545,3 +545,117 @@ def test_cross_device_revoke_requires_fresh_webauthn(
     )
     assert authorized.status_code == 200, authorized.get_json()
     assert authorized.get_json()["cross_device"] is True
+
+
+def test_lost_device_recovery_complete_enrolls_and_revokes_prior_devices(
+    fake_ishuman_db_session_factory,
+    monkeypatch,
+):
+    from api.database import IsHumanVerification, LemmaWalletBinding, WalletSigningKey
+    from api.wallet_authn import (
+        issue_device_enrollment_grant,
+        issue_lost_device_recovery_authorization,
+        register_wallet_signing_key,
+    )
+    from api.wallet_keys import register_self_signature
+
+    monkeypatch.setattr(
+        "api.database.SessionLocal",
+        fake_ishuman_db_session_factory.session_local,
+    )
+    wallet_id = "wallet_lost_recover"
+    db = fake_ishuman_db_session_factory.session_local()
+    db.add(
+        LemmaWalletBinding(
+            wallet_id=wallet_id,
+            lemma_person_id="person_lost",
+            binding_status="active",
+        )
+    )
+    db.add(
+        IsHumanVerification(
+            session_id="idv_lost_1",
+            wallet_id=wallet_id,
+            status="verified",
+        )
+    )
+    db.commit()
+    db.close()
+
+    old_pub, old_sig = register_self_signature(wallet_id, "aa" * 32)
+    assert register_wallet_signing_key(
+        wallet_id=wallet_id,
+        device_id="dev_old",
+        pubkey_b64=old_pub,
+        signature_b64=old_sig,
+        enrollment_grant=issue_device_enrollment_grant(wallet_id=wallet_id, source="test"),
+    ).ok
+
+    auth_result, recovery_auth = issue_lost_device_recovery_authorization(
+        wallet_id=wallet_id,
+        idv_session_id="idv_lost_1",
+    )
+    assert auth_result.ok
+
+    class _Verification:
+        credential_id = b"recovery-cred"
+        credential_public_key = b"\x02" * 32
+        sign_count = 0
+        fmt = "none"
+
+    monkeypatch.setattr(
+        "webauthn.verify_registration_response",
+        lambda **_kwargs: _Verification(),
+    )
+
+    client = _client()
+    begin = client.post(
+        "/api/wallet/lost-device-recovery/begin",
+        json={
+            "wallet_id": wallet_id,
+            "device_id": "dev_new",
+            "recovery_authorization": recovery_auth,
+        },
+        headers={"Origin": "https://lemma.id"},
+    )
+    assert begin.status_code == 200, begin.get_json()
+    challenge_key = begin.get_json()["challenge_key"]
+
+    new_pub, new_sig = register_self_signature(wallet_id, "bb" * 32)
+    complete = client.post(
+        "/api/wallet/lost-device-recovery/complete",
+        json={
+            "challenge_key": challenge_key,
+            "credential": {"id": "recovery-cred", "response": {}},
+            "pubkey": new_pub,
+            "signature": new_sig,
+        },
+        headers={"Origin": "https://lemma.id"},
+    )
+    assert complete.status_code == 200, complete.get_json()
+    payload = complete.get_json()
+    assert payload["ceremony"] == "lost_device_recovery"
+    assert "dev_old" in payload["revoked_devices"]
+
+    db = fake_ishuman_db_session_factory.session_local()
+    old = db.query(WalletSigningKey).filter_by(wallet_id=wallet_id, device_id="dev_old").first()
+    new = db.query(WalletSigningKey).filter_by(wallet_id=wallet_id, device_id="dev_new").first()
+    assert old.revoked_at is not None
+    assert new is not None and new.revoked_at is None
+    db.close()
+
+
+def test_lost_device_recovery_rejects_wallet_id_without_idv(
+    fake_ishuman_db_session_factory,
+    monkeypatch,
+):
+    monkeypatch.setattr(
+        "api.database.SessionLocal",
+        fake_ishuman_db_session_factory.session_local,
+    )
+    response = _client().post(
+        "/api/wallet/lost-device-recovery/authorize",
+        json={"wallet_id": "wallet_unknown", "session_id": "idv_missing"},
+        headers={"Origin": "https://lemma.id"},
+    )
+    assert response.status_code == 403

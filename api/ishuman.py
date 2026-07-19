@@ -1223,14 +1223,31 @@ def start_verification_for_body(body: dict) -> tuple[dict, int]:
         if is_ishuman_idv_handoff_strict_claim_enabled() and not handoff_mk_fingerprint:
             return {"success": False, "error": "missing_handoff_mk_fingerprint"}, 400
 
-    assertion_fields = ["return_url"]
-    if handoff_id:
-        assertion_fields.append("handoff_id")
-    if handoff_mk_fingerprint:
-        assertion_fields.append("handoff_mk_fingerprint")
-    err, _wid = _require_wallet_assertion(body, field_names=assertion_fields)
-    if err:
-        return err[0].get_json(), err[1]
+    purpose = str(body.get("purpose") or "").strip()
+    lost_device_recovery = purpose == "lost_device_recovery"
+    if lost_device_recovery:
+        from api.database import SessionLocal
+        from api.wallet_authn import _wallet_has_established_identity
+
+        db = SessionLocal()
+        try:
+            if not _wallet_has_established_identity(db, str(wallet_id).strip()):
+                return {
+                    "success": False,
+                    "error": "recovery_identity_required",
+                    "code": "recovery_identity_required",
+                }, 403
+        finally:
+            db.close()
+    else:
+        assertion_fields = ["return_url"]
+        if handoff_id:
+            assertion_fields.append("handoff_id")
+        if handoff_mk_fingerprint:
+            assertion_fields.append("handoff_mk_fingerprint")
+        err, _wid = _require_wallet_assertion(body, field_names=assertion_fields)
+        if err:
+            return err[0].get_json(), err[1]
 
     from api.database import SessionLocal, IsHumanVerification
     db = SessionLocal()
@@ -1275,6 +1292,8 @@ def start_verification_for_body(body: dict) -> tuple[dict, int]:
         # pubkey so the server can seal person-root seed envelopes at IDV
         # completion. Stored as metadata; ignored unless the feature is enabled.
         verification_metadata = {"return_url": return_url}
+        if lost_device_recovery:
+            verification_metadata["purpose"] = "lost_device_recovery"
         return_params = dict(parse_qsl(urlparse(return_url).query, keep_blank_values=True))
         if return_params.get("issue_mode") == "fresh_idv":
             from api.ppid import canonicalize_rp_id

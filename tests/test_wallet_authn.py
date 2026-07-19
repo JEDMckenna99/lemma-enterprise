@@ -520,3 +520,51 @@ def test_legacy_register_defaults_device_id_and_asserts_without_device_id(
     assert ok_result.ok
     assert fields.get("device_id") == "legacy"
 
+
+
+def test_lost_device_recovery_authorization_is_one_time(
+    wallet_fixture,
+    fake_ishuman_db_session_factory,
+    monkeypatch,
+):
+    from api.database import IsHumanVerification, LemmaWalletBinding
+    from api.wallet_authn import issue_lost_device_recovery_authorization
+
+    monkeypatch.setattr("api.database.SessionLocal", fake_ishuman_db_session_factory.session_local)
+    db = fake_ishuman_db_session_factory.session_local()
+    db.add(
+        LemmaWalletBinding(
+            wallet_id=wallet_fixture["wallet_id"],
+            lemma_person_id="person_recovery",
+            binding_status="active",
+        )
+    )
+    db.add(
+        IsHumanVerification(
+            session_id="idv_recovery_1",
+            wallet_id=wallet_fixture["wallet_id"],
+            status="verified",
+        )
+    )
+    db.commit()
+    db.close()
+
+    denied = issue_lost_device_recovery_authorization(
+        wallet_id=wallet_fixture["wallet_id"],
+        idv_session_id="idv_unknown",
+    )
+    assert not denied[0].ok
+
+    first = issue_lost_device_recovery_authorization(
+        wallet_id=wallet_fixture["wallet_id"],
+        idv_session_id="idv_recovery_1",
+    )
+    assert first[0].ok
+    assert first[1].startswith("wra_")
+
+    replay = issue_lost_device_recovery_authorization(
+        wallet_id=wallet_fixture["wallet_id"],
+        idv_session_id="idv_recovery_1",
+    )
+    assert not replay[0].ok
+    assert replay[0].code == "idv_recovery_already_consumed"

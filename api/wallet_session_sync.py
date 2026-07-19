@@ -109,6 +109,10 @@ def _wallet_device_revoke_key(challenge_key: str) -> str:
     return f"wallet:webauthn-revoke:{challenge_key}"
 
 
+def _wallet_lost_device_recovery_key(challenge_key: str) -> str:
+    return f"wallet:webauthn-lost-device-recovery:{challenge_key}"
+
+
 def _issue_wallet_session_response(
     *,
     wallet_id: str,
@@ -1361,6 +1365,281 @@ def wallet_device_enroll_complete():
         "device_id": device_id,
         "credential_id": credential_id,
         "ceremony": "first_device" if first_unbound else "additional_device",
+    })
+    response.headers.update(_cors_headers(origin))
+    return response
+
+
+@wallet_session_sync_bp.route("/api/wallet/lost-device-recovery/authorize", methods=["POST", "OPTIONS"])
+@cross_origin()
+def wallet_lost_device_recovery_authorize():
+    """Exchange a verified IDV session for one-time lost-device recovery auth."""
+    if request.method == "OPTIONS":
+        response = make_response()
+        response.headers.update(_cors_headers(request.headers.get("Origin")))
+        return response
+
+    origin = request.headers.get("Origin")
+    if not _lemma_origin_allowed(origin):
+        response = jsonify({"success": False, "error": "origin_not_allowed"})
+        response.headers.update(_cors_headers(origin))
+        return response, 403
+
+    body = request.get_json(silent=True) or {}
+    from api.wallet_authn import issue_lost_device_recovery_authorization
+
+    result, token = issue_lost_device_recovery_authorization(
+        wallet_id=str(body.get("wallet_id") or "").strip(),
+        idv_session_id=str(body.get("idv_session_id") or body.get("session_id") or "").strip(),
+    )
+    if not result.ok:
+        return jsonify({
+            "success": False,
+            "error": result.error,
+            "code": result.code,
+        }), 403
+    response = jsonify({
+        "success": True,
+        "recovery_authorization": token,
+        "expires_in": 600,
+    })
+    response.headers.update(_cors_headers(origin))
+    return response
+
+
+@wallet_session_sync_bp.route("/api/wallet/lost-device-recovery/begin", methods=["POST", "OPTIONS"])
+@cross_origin()
+def wallet_lost_device_recovery_begin():
+    """Begin replacement-device WebAuthn registration after verified recovery auth."""
+    if request.method == "OPTIONS":
+        response = make_response()
+        response.headers.update(_cors_headers(request.headers.get("Origin")))
+        return response
+
+    origin = request.headers.get("Origin")
+    if not _lemma_origin_allowed(origin):
+        response = jsonify({"success": False, "error": "origin_not_allowed"})
+        response.headers.update(_cors_headers(origin))
+        return response, 403
+
+    body = request.get_json(silent=True) or {}
+    wallet_id = str(body.get("wallet_id") or "").strip()
+    device_id = str(body.get("device_id") or "").strip()
+    recovery_authorization = str(body.get("recovery_authorization") or "").strip()
+    device_name = str(body.get("device_name") or "").strip()
+    if not wallet_id or not device_id or not recovery_authorization:
+        return jsonify({
+            "success": False,
+            "error": "wallet_id, device_id, and recovery_authorization required",
+        }), 400
+
+    from api.passkey_auth import RP_ID, RP_NAME
+    from api.wallet_authn import _lost_device_recovery_auth_key
+    from auth.redis_store import get as redis_get
+    from webauthn import generate_registration_options, options_to_json
+    from webauthn.helpers.structs import (
+        AuthenticatorSelectionCriteria,
+        ResidentKeyRequirement,
+        UserVerificationRequirement,
+    )
+    import json as _json
+
+    # Begin peeks the recovery auth; complete atomically consumes it.
+
+    auth_payload = redis_get(_lost_device_recovery_auth_key(recovery_authorization))
+    if (
+        not auth_payload
+        or str(auth_payload.get("wallet_id") or "") != wallet_id
+        or str(auth_payload.get("purpose") or "") != "lost_device_recovery"
+    ):
+        return jsonify({
+            "success": False,
+            "error": "recovery_authorization_invalid",
+            "code": "recovery_authorization_invalid",
+        }), 403
+
+    options = generate_registration_options(
+        rp_id=RP_ID,
+        rp_name=RP_NAME,
+        user_id=wallet_id.encode("utf-8")[:64],
+        user_name=f"wallet:{wallet_id[:16]}",
+        user_display_name="Lemma Wallet",
+        authenticator_selection=AuthenticatorSelectionCriteria(
+            resident_key=ResidentKeyRequirement.PREFERRED,
+            user_verification=UserVerificationRequirement.REQUIRED,
+        ),
+        timeout=60000,
+    )
+    challenge_key = f"wlr_{secrets.token_urlsafe(24)}"
+    if not redis_store or not redis_store(
+        _wallet_lost_device_recovery_key(challenge_key),
+        {
+            "challenge": base64.urlsafe_b64encode(options.challenge).decode("ascii"),
+            "wallet_id": wallet_id,
+            "device_id": device_id,
+            "device_name": device_name,
+            "recovery_authorization": recovery_authorization,
+            "purpose": "lost_device_recovery",
+        },
+        ttl_seconds=WALLET_WEBAUTHN_TTL_SECONDS,
+    ):
+        return jsonify({"success": False, "error": "recovery_challenge_unavailable"}), 503
+
+    options_dict = _json.loads(options_to_json(options))
+    response = jsonify({
+        "success": True,
+        "challenge_key": challenge_key,
+        "challenge": base64.urlsafe_b64encode(options.challenge).decode("ascii").rstrip("="),
+        "rp_id": RP_ID,
+        "options": options_dict,
+        "expires_in": WALLET_WEBAUTHN_TTL_SECONDS,
+    })
+    response.headers.update(_cors_headers(origin))
+    return response
+
+
+@wallet_session_sync_bp.route("/api/wallet/lost-device-recovery/complete", methods=["POST", "OPTIONS"])
+@cross_origin()
+def wallet_lost_device_recovery_complete():
+    """Verify replacement passkey and enroll a recovery device signing key."""
+    if request.method == "OPTIONS":
+        response = make_response()
+        response.headers.update(_cors_headers(request.headers.get("Origin")))
+        return response
+
+    origin = request.headers.get("Origin")
+    if not _lemma_origin_allowed(origin):
+        response = jsonify({"success": False, "error": "origin_not_allowed"})
+        response.headers.update(_cors_headers(origin))
+        return response, 403
+
+    body = request.get_json(silent=True) or {}
+    challenge_key = str(body.get("challenge_key") or "").strip()
+    credential = body.get("credential")
+    pubkey_b64 = str(body.get("pubkey") or "").strip()
+    signature_b64 = str(body.get("signature") or "").strip()
+    if not challenge_key or not isinstance(credential, dict) or not pubkey_b64 or not signature_b64:
+        return jsonify({
+            "success": False,
+            "error": "challenge_key, credential, pubkey, and signature required",
+        }), 400
+
+    stored = redis_consume(_wallet_lost_device_recovery_key(challenge_key)) if redis_consume else None
+    if not stored or str(stored.get("purpose") or "") != "lost_device_recovery":
+        return jsonify({"success": False, "error": "recovery_challenge_expired"}), 401
+
+    wallet_id = str(stored.get("wallet_id") or "").strip()
+    device_id = str(stored.get("device_id") or "").strip()
+    device_name = str(body.get("device_name") or stored.get("device_name") or "").strip()
+    recovery_authorization = str(stored.get("recovery_authorization") or "").strip()
+
+    from api.fresh_passkey_attestation import allowed_fresh_passkey_origins
+    from api.passkey_auth import RP_ID
+    from api.wallet_authn import (
+        bind_wallet_passkey,
+        consume_lost_device_recovery_authorization,
+        issue_device_enrollment_grant,
+        register_wallet_signing_key,
+        revoke_wallet_device,
+        count_active_wallet_devices,
+    )
+    from api.wallet_keys import b64url_encode
+    from webauthn import verify_registration_response
+    from webauthn.helpers import bytes_to_base64url
+    from api.database import SessionLocal, WalletSigningKey
+
+    auth_result = consume_lost_device_recovery_authorization(
+        token=recovery_authorization,
+        wallet_id=wallet_id,
+    )
+    if not auth_result.ok:
+        return jsonify({
+            "success": False,
+            "error": auth_result.error,
+            "code": auth_result.code,
+        }), 403
+
+    try:
+        verification = verify_registration_response(
+            credential=credential,
+            expected_challenge=base64.urlsafe_b64decode(stored["challenge"]),
+            expected_rp_id=RP_ID,
+            expected_origin=allowed_fresh_passkey_origins(),
+            require_user_verification=True,
+        )
+    except Exception as exc:
+        logger.warning("Lost-device recovery WebAuthn verification failed: %s", exc)
+        return jsonify({"success": False, "error": "webauthn_registration_invalid"}), 403
+
+    credential_id = bytes_to_base64url(verification.credential_id)
+    public_key = b64url_encode(verification.credential_public_key)
+
+    # Snapshot prior devices before enrollment so recovery cannot revoke the
+    # replacement authenticator just registered below.
+    revoked = []
+    db = SessionLocal()
+    try:
+        others = db.query(WalletSigningKey).filter(
+            WalletSigningKey.wallet_id == wallet_id,
+            WalletSigningKey.revoked_at.is_(None),
+        ).all()
+        other_ids = [
+            str(row.device_id or "")
+            for row in others
+            if row.device_id and str(row.device_id) != device_id
+        ]
+    finally:
+        db.close()
+
+    grant = issue_device_enrollment_grant(
+        wallet_id=wallet_id,
+        source="verified_human_recovery",
+    )
+    key_result = register_wallet_signing_key(
+        wallet_id=wallet_id,
+        device_id=device_id,
+        device_name=device_name,
+        pubkey_b64=pubkey_b64,
+        signature_b64=signature_b64,
+        enrollment_grant=grant,
+    )
+    if not key_result.ok:
+        return jsonify({
+            "success": False,
+            "error": key_result.error,
+            "code": key_result.code,
+        }), 403
+
+    passkey_result = bind_wallet_passkey(
+        wallet_id=wallet_id,
+        device_id=device_id,
+        credential_id=credential_id,
+        public_key=public_key,
+        attestation_format=getattr(verification, "fmt", None),
+        device_name=device_name or None,
+        sign_count=int(getattr(verification, "sign_count", 0) or 0),
+    )
+    if not passkey_result.ok:
+        return jsonify({
+            "success": False,
+            "error": passkey_result.error,
+            "code": passkey_result.code,
+        }), 403
+
+    for other_id in other_ids:
+        revoke_result = revoke_wallet_device(wallet_id=wallet_id, device_id=other_id)
+        if revoke_result.ok:
+            revoked.append(other_id)
+
+    response = jsonify({
+        "success": True,
+        "registered": True,
+        "wallet_id": wallet_id,
+        "device_id": device_id,
+        "credential_id": credential_id,
+        "ceremony": "lost_device_recovery",
+        "revoked_devices": revoked,
+        "active_devices": count_active_wallet_devices(wallet_id),
     })
     response.headers.update(_cors_headers(origin))
     return response

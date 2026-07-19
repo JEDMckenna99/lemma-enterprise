@@ -56,6 +56,11 @@ def test_signing_key_enrollment_requires_existing_authority():
     revoke = _operation("wallet.device.revoke")
     assert "fresh_webauthn_for_cross_device_revoke" in revoke["required_auth"]
 
+    recovery = _operation("wallet.device.lost_device_recovery")
+    assert recovery["compliance"] == "compliant"
+    assert "verified_idv_session" in recovery["required_auth"]
+    assert "webauthn_registration_ceremony" in recovery["required_auth"]
+
 
 def test_site_proof_requires_assurance_and_canonical_site_binding():
     operation = _operation("identity.site_proof.derive")

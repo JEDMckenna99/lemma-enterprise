@@ -229,6 +229,26 @@
       "test_refs": ["tests/test_wallet_session_sync_security.py"]
     },
     {
+      "operation_id": "wallet.device.lost_device_recovery",
+      "authority_class": "recovery",
+      "mutates": "Authorizes lost-device recovery from verified IDV, binds a replacement passkey, enrolls a replacement signing key, and revokes prior devices.",
+      "routes": [
+        {"method": "POST", "path": "/api/wallet/lost-device-recovery/authorize", "module": "api/wallet_session_sync.py"},
+        {"method": "POST", "path": "/api/wallet/lost-device-recovery/begin", "module": "api/wallet_session_sync.py"},
+        {"method": "POST", "path": "/api/wallet/lost-device-recovery/complete", "module": "api/wallet_session_sync.py"}
+      ],
+      "current_auth": ["verified_idv_session", "atomic_idv_recovery_consume", "webauthn_registration_ceremony", "one_time_enrollment_grant"],
+      "required_auth": ["verified_idv_session", "atomic_idv_recovery_consume", "webauthn_registration_ceremony", "one_time_enrollment_grant"],
+      "required_scope": "none",
+      "site_binding": "wallet_person_binding",
+      "risk_tier": "critical",
+      "enforcement_layer": "in_handler",
+      "compliance": "compliant",
+      "threat_tags": ["account_takeover", "replay", "unauthorized_device_enrollment", "lost_device"],
+      "checklist_sections": [1, 2, 6],
+      "test_refs": ["tests/test_wallet_session_sync_security.py", "tests/test_wallet_authn.py"]
+    },
+    {
       "operation_id": "wallet.device.revoke",
       "authority_class": "wallet",
       "mutates": "Revokes an enrolled wallet device key and bound passkeys.",

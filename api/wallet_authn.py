@@ -18,6 +18,7 @@ from sqlalchemy.exc import IntegrityError
 from auth.redis_store import delete as redis_delete
 from auth.redis_store import get as redis_get
 from auth.redis_store import store as redis_store
+from auth.redis_store import store_nx as redis_store_nx
 from auth.redis_store import consume as redis_consume
 from api.wallet_keys import (
     CHALLENGE_TTL_SECONDS,
@@ -118,11 +119,22 @@ def _ensure_provisional_person_after_register(db, wallet_id: str) -> None:
 
 
 DEVICE_ENROLLMENT_GRANT_TTL_SECONDS = 300
+LOST_DEVICE_RECOVERY_AUTH_TTL_SECONDS = 600
 
 
 def _device_enrollment_grant_key(grant: str) -> str:
     digest = hashlib.sha256(str(grant or "").encode("utf-8")).hexdigest()
     return f"wallet:device-enrollment-grant:{digest}"
+
+
+def _lost_device_recovery_auth_key(token: str) -> str:
+    digest = hashlib.sha256(str(token or "").encode("utf-8")).hexdigest()
+    return f"wallet:lost-device-recovery-auth:{digest}"
+
+
+def _idv_recovery_consume_key(session_id: str) -> str:
+    digest = hashlib.sha256(str(session_id or "").encode("utf-8")).hexdigest()
+    return f"wallet:idv-recovery-consumed:{digest}"
 
 
 def issue_device_enrollment_grant(*, wallet_id: str, source: str) -> str:
@@ -152,6 +164,74 @@ def _consume_device_enrollment_grant(*, grant: str, wallet_id: str) -> Result:
         return Result(False, "device_enrollment_grant_invalid", "enrollment grant invalid or expired")
     if str(payload.get("wallet_id") or "").strip() != wallet_id:
         return Result(False, "device_enrollment_grant_mismatch", "enrollment grant wallet mismatch")
+    return Result(True)
+
+
+def issue_lost_device_recovery_authorization(
+    *,
+    wallet_id: str,
+    idv_session_id: str,
+) -> tuple[Result, str]:
+    """Issue a one-time recovery auth after a verified IDV session for the wallet.
+
+    The IDV session may authorize recovery only once. The returned token is
+    required by the lost-device WebAuthn enrollment ceremony.
+    """
+    from api.database import SessionLocal, IsHumanVerification
+
+    wallet_id = str(wallet_id or "").strip()
+    idv_session_id = str(idv_session_id or "").strip()
+    if not wallet_id or not idv_session_id:
+        return Result(False, "recovery_authorization_malformed", "wallet_id and idv_session_id required"), ""
+
+    db = SessionLocal()
+    try:
+        if not _wallet_has_established_identity(db, wallet_id):
+            return Result(False, "recovery_identity_required", "wallet has no established identity"), ""
+        record = db.query(IsHumanVerification).filter_by(session_id=idv_session_id).first()
+        if not record or str(record.wallet_id or "") != wallet_id:
+            return Result(False, "recovery_idv_not_found", "verified IDV session not found for wallet"), ""
+        if str(record.status or "") != "verified":
+            return Result(False, "recovery_idv_not_verified", "IDV session is not verified"), ""
+    finally:
+        db.close()
+
+    # Atomically claim the IDV session for recovery before issuing auth.
+    claimed = redis_store_nx(
+        _idv_recovery_consume_key(idv_session_id),
+        {"wallet_id": wallet_id, "consumed_at": _utcnow().isoformat()},
+        ttl_seconds=86400,
+    )
+    if not claimed:
+        return Result(False, "idv_recovery_already_consumed", "IDV session already used for recovery"), ""
+
+    token = f"wra_{secrets.token_urlsafe(32)}"
+    if not redis_store(
+        _lost_device_recovery_auth_key(token),
+        {
+            "wallet_id": wallet_id,
+            "idv_session_id": idv_session_id,
+            "purpose": "lost_device_recovery",
+        },
+        ttl_seconds=LOST_DEVICE_RECOVERY_AUTH_TTL_SECONDS,
+    ):
+        redis_delete(_idv_recovery_consume_key(idv_session_id))
+        return Result(False, "recovery_authorization_unavailable", "could not issue recovery auth"), ""
+    return Result(True), token
+
+
+def consume_lost_device_recovery_authorization(*, token: str, wallet_id: str) -> Result:
+    token = str(token or "").strip()
+    wallet_id = str(wallet_id or "").strip()
+    if not token:
+        return Result(False, "recovery_authorization_required", "lost-device recovery authorization required")
+    payload = redis_consume(_lost_device_recovery_auth_key(token))
+    if not payload:
+        return Result(False, "recovery_authorization_invalid", "recovery authorization invalid or expired")
+    if str(payload.get("wallet_id") or "").strip() != wallet_id:
+        return Result(False, "recovery_authorization_mismatch", "recovery authorization wallet mismatch")
+    if str(payload.get("purpose") or "") != "lost_device_recovery":
+        return Result(False, "recovery_authorization_invalid", "recovery authorization purpose mismatch")
     return Result(True)
 
 

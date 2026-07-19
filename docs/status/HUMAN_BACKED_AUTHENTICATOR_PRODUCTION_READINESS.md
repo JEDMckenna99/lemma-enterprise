@@ -51,7 +51,7 @@ The assurance boundaries must remain explicit:
 | Workstream | Priority | Status | Owner | Evidence |
 |---|---|---|---|---|
 | 1. Security contract and threat model | P0 | `BLOCKED` | Security + Platform | Independent reviewer sign-off pending |
-| 2. Wallet authority boundaries | P0 | `IN_PROGRESS` | Auth | WebAuthn first-device enroll + cross-device revoke shipped; recovery/SameSite evidence remain |
+| 2. Wallet authority boundaries | P0 | `IN_PROGRESS` | Auth | Ceremonies shipped; browser matrix evidence remains for Section 2 PASS |
 | 3. Tenant and site ownership | P0 | `NOT_STARTED` |  |  |
 | 4. Cryptographic trust chain | P0 | `NOT_STARTED` |  |  |
 | 5. Revocation and replay protection | P0 | `NOT_STARTED` |  |  |
@@ -160,12 +160,12 @@ Blocking approval:
       signing key.
 - [x] Never treat `wallet_id`, a client timestamp, or an `Origin` header as
       proof of wallet control.
-- [ ] Define separate, auditable ceremonies for:
+- [x] Define separate, auditable ceremonies for:
   - [x] First-device enrollment
   - [x] Daily passkey unlock
   - [x] Additional-device enrollment
   - [x] Device revocation
-  - [ ] Lost-device recovery
+  - [x] Lost-device recovery
 - [x] Bind every challenge to wallet, device, origin, purpose, nonce, and
       expiration.
 - [x] Prevent attacker-enrolled devices from satisfying multi-device recovery
@@ -181,27 +181,26 @@ Exit criteria:
 
 - [x] Knowing a wallet ID cannot create a session, enroll a device, reissue a
       master credential, derive a site proof, or revoke credentials.
-- [ ] First-device, additional-device, and recovery ceremonies pass adversarial
+- [x] First-device, additional-device, and recovery ceremonies pass adversarial
       tests.
 - [x] No wallet mutation relies solely on ambient cookies without CSRF defense.
 
 Validation baseline:
 
-- Adversarial wallet authority and WebAuthn session suite: PASS with
-  first-device enroll + cross-device revoke coverage.
+- Adversarial wallet authority suite: PASS with first-device enroll,
+  cross-device revoke, and lost-device recovery coverage.
 - Wallet SDK 2.76.0 / cache 2687 and CDN mirror synchronized.
-- Authority contract: PASS, 36 operations / 51 routes / 10 declared gaps.
-- Strict generated scope review: PASS.
-- Full non-live CI Regression: PASS, 1,121 tests with 4 skips.
+- Authority contract includes `wallet.device.lost_device_recovery`.
+- Strict generated scope review: PASS after classifying recovery routes.
+- Full non-live CI Regression: PASS, 1,124 tests with 4 skips.
 
 Remaining blockers:
 
-- Lost-device recovery ceremony still needs fresh IDV + replacement passkey +
-  atomic enrollment grant evidence (shared with Section 6).
-- Browser matrix evidence for enroll → unlock → transfer → revoke on lemma.id
-  and one relying-site origin.
-- Auth owner marks Section 2 `PASS` only after recovery ceremony evidence and
-  browser matrix are attached.
+- Browser matrix evidence for enroll → unlock → transfer → revoke → recovery
+  on lemma.id and one relying-site origin.
+- Section 6 still owns broader IDV binding, notification, and emergency
+  suspension hardening beyond the wallet recovery ceremony.
+- Auth owner marks Section 2 `PASS` after browser matrix evidence is attached.
 
 ---
 
