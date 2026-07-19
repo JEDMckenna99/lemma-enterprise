@@ -55,7 +55,11 @@ def attach_wallet_assertion(wallet_seed):
     """Attach a valid wallet_assertion to an API request body."""
 
     def _attach(body: dict, field_names: list[str], *, wallet_id: str | None = None, wallet_secret: str | None = None):
-        from api.wallet_authn import issue_wallet_challenge, register_wallet_signing_key
+        from api.wallet_authn import (
+            issue_device_enrollment_grant,
+            issue_wallet_challenge,
+            register_wallet_signing_key,
+        )
         from api.wallet_keys import build_wallet_assertion, register_self_signature
 
         wid = (wallet_id or body.get("wallet_id") or wallet_seed["wallet_id"]).strip()
@@ -66,6 +70,16 @@ def attach_wallet_assertion(wallet_seed):
             pubkey_b64=pubkey_b64,
             signature_b64=sig_b64,
         )
+        if reg.code == "device_enrollment_authorization_required":
+            reg = register_wallet_signing_key(
+                wallet_id=wid,
+                pubkey_b64=pubkey_b64,
+                signature_b64=sig_b64,
+                enrollment_grant=issue_device_enrollment_grant(
+                    wallet_id=wid,
+                    source="test_fixture_recovery",
+                ),
+            )
         assert reg.ok, reg.error
 
         challenge = issue_wallet_challenge(wallet_id=wid)
