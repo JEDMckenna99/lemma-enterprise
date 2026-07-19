@@ -532,19 +532,15 @@
             const el = document.getElementById('status');
             el.textContent = message;
             el.className = 'status ' + (tone || 'info');
-            document.getElementById('brand-mark')?.classList.toggle('is-working', tone === 'loading');
+            const mark = document.getElementById('brand-mark');
+            mark?.classList.toggle('is-working', tone === 'loading');
+            setBrandLogoUnlocked(tone === 'success');
+            if (tone === 'loading') {
+                mark?.classList.remove('is-caution', 'is-blocked');
+            }
             if (tone === 'success') {
-                document.getElementById('brand-mark')?.classList.remove('is-caution');
-                setBrandLogoUnlocked(true);
+                mark?.classList.remove('is-caution', 'is-blocked');
                 document.getElementById('privacy-copy')?.classList.add('hidden');
-            } else if (tone === 'error' || tone === 'loading') {
-                // Keep green if wallet already unlocked; otherwise stay brand violet.
-                try {
-                    const unlocked = !!(wallet && wallet.isUnlocked && wallet.isUnlocked());
-                    setBrandLogoUnlocked(unlocked);
-                } catch (_) {
-                    setBrandLogoUnlocked(false);
-                }
             }
         }
 

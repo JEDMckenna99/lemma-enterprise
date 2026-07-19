@@ -319,7 +319,13 @@ def test_ishuman_idv_popup_page_loads(ishuman_demo_client):
     assert "@keyframes lemma-orbit-working" in body
     assert body.count('class="atom-orbit"') == 4
     assert "prefers-reduced-motion: reduce" in body
-    assert "classList.toggle('is-working', tone === 'loading')" in body
+    assert "mark?.classList.toggle('is-working', tone === 'loading')" in body
+    assert "setBrandLogoUnlocked(tone === 'success')" in body
+    status_logic = body.split("function setStatus(message, tone) {", 1)[1].split(
+        "function renderPopupPreview()", 1
+    )[0]
+    assert "wallet.isUnlocked" not in status_logic
+    assert "mark?.classList.remove('is-caution', 'is-blocked')" in status_logic
     assert 'id="eyebrow-copy"' not in body
     assert 'id="headline-copy"' not in body
     assert 'id="site-chip"' not in body
