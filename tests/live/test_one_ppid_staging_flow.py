@@ -19,7 +19,7 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey,
 from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat  # noqa: E402
 
 from api.ishuman import _browser_canonical_message  # noqa: E402
-from api.wallet_keys import b64url_encode, build_wallet_assertion, register_self_signature  # noqa: E402
+from api.wallet_keys import b64url_encode, build_wallet_assertion  # noqa: E402
 from tests.live.live_test_helpers import require_staging_env, wallet_challenge  # noqa: E402
 
 pytestmark = pytest.mark.live
@@ -63,12 +63,9 @@ def test_live_staging_passkey_then_ishuman_same_ppid():
     target_site = f"one-ppid-e2e-{secrets.token_hex(4)}.example.com"
     session = requests.Session()
 
-    pub_b64, sig_b64 = register_self_signature(wallet_id, wallet_secret)
-    reg = session.post(
-        f"{base}/api/wallet/register-signing-key",
-        json={"wallet_id": wallet_id, "pubkey": pub_b64, "signature": sig_b64},
-    )
-    assert reg.ok and reg.json().get("success"), reg.text
+    from tests.live.live_test_helpers import register_wallet_signing_key
+
+    register_wallet_signing_key(session, base, wallet_id, wallet_secret)
 
     site_priv = Ed25519PrivateKey.generate()
     site_pub_b64 = b64url_encode(site_priv.public_key().public_bytes(Encoding.Raw, PublicFormat.Raw))

@@ -62,7 +62,7 @@ def test_reissue_requires_second_factor_when_other_devices_exist(
 
     from api import ishuman as ishuman_mod
     from api.database import IsHumanVerification, WalletSigningKey
-    from api.wallet_authn import register_wallet_signing_key
+    from api.wallet_authn import issue_device_enrollment_grant, register_wallet_signing_key
     from api.wallet_keys import register_self_signature
 
     monkeypatch.setattr("api.database.SessionLocal", fake_ishuman_db_session_factory.session_local)
@@ -75,11 +75,16 @@ def test_reissue_requires_second_factor_when_other_devices_exist(
     wallet_id = "wallet_reissue_2fa"
     for device_id in ("legacy", "dev_other"):
         pubkey_b64, sig_b64 = register_self_signature(wallet_id, "ab" * 32 if device_id == "legacy" else "cd" * 32)
+        enrollment_grant = issue_device_enrollment_grant(
+            wallet_id=wallet_id,
+            source="test_transfer" if device_id != "legacy" else "test_first_device",
+        )
         assert register_wallet_signing_key(
             wallet_id=wallet_id,
             device_id=device_id,
             pubkey_b64=pubkey_b64,
             signature_b64=sig_b64,
+            enrollment_grant=enrollment_grant,
         ).ok
 
     db = fake_ishuman_db_session_factory.session_local()

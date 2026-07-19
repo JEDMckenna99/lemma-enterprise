@@ -3,6 +3,7 @@ from __future__ import annotations
 import pytest
 
 from api.wallet_authn import (
+    issue_device_enrollment_grant,
     issue_wallet_challenge,
     register_wallet_signing_key,
     verify_assertion_from_body,
@@ -25,7 +26,7 @@ def wallet_fixture():
     }
 
 
-def _register(wallet_fixture):
+def _register(wallet_fixture, *, device_id: str = "legacy"):
     pubkey_b64, sig_b64 = register_self_signature(
         wallet_fixture["wallet_id"],
         wallet_fixture["wallet_secret"],
@@ -34,6 +35,11 @@ def _register(wallet_fixture):
         wallet_id=wallet_fixture["wallet_id"],
         pubkey_b64=pubkey_b64,
         signature_b64=sig_b64,
+        device_id=device_id,
+        enrollment_grant=issue_device_enrollment_grant(
+            wallet_id=wallet_fixture["wallet_id"],
+            source="test_wallet_authn",
+        ),
     )
     assert result.ok
     return pubkey_b64
@@ -188,6 +194,10 @@ def test_register_idempotent_for_same_pubkey(
         wallet_id=wallet_fixture["wallet_id"],
         pubkey_b64=pubkey_b64,
         signature_b64=sig_b64,
+        enrollment_grant=issue_device_enrollment_grant(
+            wallet_id=wallet_fixture["wallet_id"],
+            source="test_idempotent",
+        ),
     )
     second = register_wallet_signing_key(
         wallet_id=wallet_fixture["wallet_id"],
@@ -235,6 +245,10 @@ def test_register_concurrent_insert_is_idempotent(
         wallet_id=wallet_fixture["wallet_id"],
         pubkey_b64=pubkey_b64,
         signature_b64=sig_b64,
+        enrollment_grant=issue_device_enrollment_grant(
+            wallet_id=wallet_fixture["wallet_id"],
+            source="test_concurrent",
+        ),
     )
 
     assert result.ok, (result.code, result.error)
@@ -270,7 +284,7 @@ def test_register_replace_pubkey_blocked_for_same_device(
     assert result.code == "wallet_pubkey_mismatch"
 
 
-def test_register_allows_multiple_devices(
+def test_register_additional_device_requires_transfer_grant(
     wallet_fixture,
     fake_ishuman_db_session_factory,
     monkeypatch,
@@ -287,13 +301,102 @@ def test_register_allows_multiple_devices(
         pubkey_b64=other_pubkey,
     )
     sig = sign_message(_priv, payload)
-    result = register_wallet_signing_key(
+    denied = register_wallet_signing_key(
         wallet_id=wallet_fixture["wallet_id"],
         device_id="dev_phone",
         pubkey_b64=other_pubkey,
         signature_b64=b64url_encode(sig),
     )
+    assert not denied.ok
+    assert denied.code == "device_enrollment_authorization_required"
+
+    grant = issue_device_enrollment_grant(
+        wallet_id=wallet_fixture["wallet_id"],
+        source="test_transfer",
+    )
+    result = register_wallet_signing_key(
+        wallet_id=wallet_fixture["wallet_id"],
+        device_id="dev_phone",
+        pubkey_b64=other_pubkey,
+        signature_b64=b64url_encode(sig),
+        enrollment_grant=grant,
+    )
     assert result.ok
+
+    third_priv, third_pub = derive_wallet_signing_keypair("12" * 32)
+    third_pubkey = pubkey_to_b64url(third_pub)
+    third_payload = build_register_payload(
+        wallet_id=wallet_fixture["wallet_id"],
+        pubkey_b64=third_pubkey,
+    )
+    replayed = register_wallet_signing_key(
+        wallet_id=wallet_fixture["wallet_id"],
+        device_id="dev_tablet",
+        pubkey_b64=third_pubkey,
+        signature_b64=b64url_encode(sign_message(third_priv, third_payload)),
+        enrollment_grant=grant,
+    )
+    assert not replayed.ok
+    assert replayed.code == "device_enrollment_grant_invalid"
+
+
+def test_established_identity_cannot_bootstrap_signing_key_without_recovery(
+    wallet_fixture,
+    fake_ishuman_db_session_factory,
+    monkeypatch,
+):
+    from api.database import LemmaWalletBinding
+
+    monkeypatch.setattr("api.database.SessionLocal", fake_ishuman_db_session_factory.session_local)
+    db = fake_ishuman_db_session_factory.session_local()
+    db.add(
+        LemmaWalletBinding(
+            wallet_id=wallet_fixture["wallet_id"],
+            lemma_person_id="person_existing",
+            binding_status="active",
+        )
+    )
+    db.commit()
+    db.close()
+
+    pubkey_b64, sig_b64 = register_self_signature(
+        wallet_fixture["wallet_id"],
+        wallet_fixture["wallet_secret"],
+    )
+    result = register_wallet_signing_key(
+        wallet_id=wallet_fixture["wallet_id"],
+        pubkey_b64=pubkey_b64,
+        signature_b64=sig_b64,
+    )
+    assert not result.ok
+    assert result.code == "device_enrollment_authorization_required"
+
+
+def test_unbound_first_device_requires_webauthn_enrollment(
+    wallet_fixture,
+    fake_ishuman_db_session_factory,
+    monkeypatch,
+):
+    monkeypatch.setattr("api.database.SessionLocal", fake_ishuman_db_session_factory.session_local)
+    pubkey_b64, sig_b64 = register_self_signature(
+        wallet_fixture["wallet_id"],
+        wallet_fixture["wallet_secret"],
+    )
+    denied = register_wallet_signing_key(
+        wallet_id=wallet_fixture["wallet_id"],
+        pubkey_b64=pubkey_b64,
+        signature_b64=sig_b64,
+    )
+    assert not denied.ok
+    assert denied.code == "first_device_webauthn_enrollment_required"
+
+    allowed = register_wallet_signing_key(
+        wallet_id=wallet_fixture["wallet_id"],
+        pubkey_b64=pubkey_b64,
+        signature_b64=sig_b64,
+        allow_first_device_bootstrap=True,
+    )
+    assert allowed.ok
 
 
 def test_revoke_device_marks_key_revoked(
@@ -328,6 +431,10 @@ def test_assertion_with_device_id_matches_wallet_sdk_binding(
         pubkey_b64=pubkey_b64,
         signature_b64=sig_b64,
         device_id="dev_browser",
+        enrollment_grant=issue_device_enrollment_grant(
+            wallet_id=wallet_fixture["wallet_id"],
+            source="test_device_binding",
+        ),
     )
     assert result.ok
 
@@ -413,3 +520,51 @@ def test_legacy_register_defaults_device_id_and_asserts_without_device_id(
     assert ok_result.ok
     assert fields.get("device_id") == "legacy"
 
+
+
+def test_lost_device_recovery_authorization_is_one_time(
+    wallet_fixture,
+    fake_ishuman_db_session_factory,
+    monkeypatch,
+):
+    from api.database import IsHumanVerification, LemmaWalletBinding
+    from api.wallet_authn import issue_lost_device_recovery_authorization
+
+    monkeypatch.setattr("api.database.SessionLocal", fake_ishuman_db_session_factory.session_local)
+    db = fake_ishuman_db_session_factory.session_local()
+    db.add(
+        LemmaWalletBinding(
+            wallet_id=wallet_fixture["wallet_id"],
+            lemma_person_id="person_recovery",
+            binding_status="active",
+        )
+    )
+    db.add(
+        IsHumanVerification(
+            session_id="idv_recovery_1",
+            wallet_id=wallet_fixture["wallet_id"],
+            status="verified",
+        )
+    )
+    db.commit()
+    db.close()
+
+    denied = issue_lost_device_recovery_authorization(
+        wallet_id=wallet_fixture["wallet_id"],
+        idv_session_id="idv_unknown",
+    )
+    assert not denied[0].ok
+
+    first = issue_lost_device_recovery_authorization(
+        wallet_id=wallet_fixture["wallet_id"],
+        idv_session_id="idv_recovery_1",
+    )
+    assert first[0].ok
+    assert first[1].startswith("wra_")
+
+    replay = issue_lost_device_recovery_authorization(
+        wallet_id=wallet_fixture["wallet_id"],
+        idv_session_id="idv_recovery_1",
+    )
+    assert not replay[0].ok
+    assert replay[0].code == "idv_recovery_already_consumed"

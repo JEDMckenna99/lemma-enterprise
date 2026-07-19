@@ -65,7 +65,7 @@ def test_wallet_skips_empty_site_before_canonicalization(wallet_js_source):
 
 @pytest.mark.unit
 def test_wallet_version_bumped_for_platform_identity(wallet_js_source):
-    assert "static VERSION = '2.74.0'" in wallet_js_source
+    assert "static VERSION = '2.76.0'" in wallet_js_source
 
 
 @pytest.mark.unit
@@ -190,11 +190,11 @@ def test_templates_use_shared_platform_helpers():
 @pytest.mark.unit
 def test_sdk_cache_bust_bumped_in_templates():
     expected_versions = {
-        "templates/modern/layout.html": "2677",
-        "templates/wallet_unlock.html": "2677",
-        "templates/wallet_popup.html": "2677",
-        "templates/wallet_ishuman_idv.html": "2682",
-        "templates/recover_complete.html": "2677",
+        "templates/modern/layout.html": "2687",
+        "templates/wallet_unlock.html": "2687",
+        "templates/wallet_popup.html": "2687",
+        "templates/wallet_ishuman_idv.html": "2687",
+        "templates/recover_complete.html": "2687",
     }
     for rel, version in expected_versions.items():
         text = (ROOT / rel).read_text(encoding="utf-8")
@@ -275,4 +275,4 @@ def test_device_link_bundles_ishuman_credentials_and_unlock_token(wallet_js_sour
     assert "sendLinkDepositFromScan" in wallet_js_source
     assert "beginLinkPush" in wallet_js_source
     assert "confirmLinkPushDeposit" in wallet_js_source
-    assert "2.74.0" in wallet_js_source
+    assert "2.76.0" in wallet_js_source

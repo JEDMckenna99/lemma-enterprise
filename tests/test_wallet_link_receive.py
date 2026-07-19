@@ -41,6 +41,7 @@ def test_link_receive_deposit_then_claim(
     assert claim.status_code == 200, payload
     assert payload["wallet_id"] == "wallet_pull_001"
     assert payload["bundle"]["sealed_link_payload"] == SEALED
+    assert payload["enrollment_grant"].startswith("weg_")
 
     again = ishuman_client.post(
         "/api/wallet/link-receive",
@@ -165,6 +166,7 @@ def test_link_push_offer_register_deposit_claim(
     assert claim.status_code == 200, payload
     assert payload["wallet_id"] == "wallet_push_001"
     assert payload["bundle"]["sealed_wallet_seed"] == "c2VlZA=="
+    assert payload["enrollment_grant"].startswith("weg_")
 
 
 @pytest.mark.integration

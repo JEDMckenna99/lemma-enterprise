@@ -1,0 +1,747 @@
+{
+  "version": "1.0.0",
+  "contract": "docs/security/HUMAN_AUTH_SECURITY_CONTRACT.md",
+  "description": "Authoritative inventory of operations that create or change human-auth wallet, identity, tenant, billing, or recovery authority.",
+  "covered_modules": [
+    "api/wallet_session_sync.py",
+    "api/ishuman.py",
+    "api/account_recovery.py",
+    "api/customer_accounts.py",
+    "api/stripe_usage_billing.py"
+  ],
+  "operations": [
+    {
+      "operation_id": "wallet.cli_link.start",
+      "authority_class": "wallet",
+      "mutates": "Creates a CLI-to-wallet link request.",
+      "routes": [
+        {"method": "POST", "path": "/api/wallet/cli-link/start", "module": "api/wallet_session_sync.py"}
+      ],
+      "current_auth": ["server_nonce_ceremony"],
+      "required_auth": ["purpose_bound_one_time_link_ceremony"],
+      "required_scope": "none",
+      "site_binding": "none",
+      "risk_tier": "high",
+      "enforcement_layer": "in_handler",
+      "compliance": "review_required",
+      "threat_tags": ["replay", "wallet_link_hijack"],
+      "checklist_sections": [1, 2],
+      "test_refs": []
+    },
+    {
+      "operation_id": "wallet.cli_link.approve",
+      "authority_class": "wallet",
+      "mutates": "Approves a one-time CLI unlock token from an existing wallet session.",
+      "routes": [
+        {"method": "POST", "path": "/api/wallet/cli-link/approve", "module": "api/wallet_session_sync.py"}
+      ],
+      "current_auth": ["wallet_session", "csrf_token", "one_time_cli_state"],
+      "required_auth": ["wallet_session", "csrf_token", "one_time_cli_state"],
+      "required_scope": "wallet_link",
+      "site_binding": "wallet_session_match",
+      "risk_tier": "high",
+      "enforcement_layer": "in_handler",
+      "compliance": "compliant",
+      "threat_tags": ["csrf", "token_theft", "replay"],
+      "checklist_sections": [1, 2],
+      "test_refs": ["tests/test_wallet_session_sync_security.py"]
+    },
+    {
+      "operation_id": "wallet.session.sync",
+      "authority_class": "wallet",
+      "mutates": "Creates or refreshes cross-device wallet session state.",
+      "routes": [
+        {"method": "POST", "path": "/api/wallet/session-sync", "module": "api/wallet_session_sync.py"}
+      ],
+      "current_auth": ["wallet_session_or_unlock_token"],
+      "required_auth": ["authorized_wallet_assertion"],
+      "required_scope": "none",
+      "site_binding": "wallet_id_match",
+      "risk_tier": "critical",
+      "enforcement_layer": "in_handler",
+      "compliance": "gap",
+      "threat_tags": ["leaked_wallet_id", "session_forgery", "replay"],
+      "checklist_sections": [1, 2],
+      "test_refs": []
+    },
+    {
+      "operation_id": "wallet.session.link_unlock_token",
+      "authority_class": "wallet",
+      "mutates": "Links an unlock token to wallet session state.",
+      "routes": [
+        {"method": "POST", "path": "/api/wallet/link-unlock-token", "module": "api/wallet_session_sync.py"}
+      ],
+      "current_auth": ["unlock_token"],
+      "required_auth": ["purpose_bound_unlock_token", "wallet_id_match"],
+      "required_scope": "none",
+      "site_binding": "wallet_id_match",
+      "risk_tier": "high",
+      "enforcement_layer": "in_handler",
+      "compliance": "review_required",
+      "threat_tags": ["token_theft", "replay"],
+      "checklist_sections": [1, 2],
+      "test_refs": []
+    },
+    {
+      "operation_id": "wallet.session.set",
+      "authority_class": "wallet",
+      "mutates": "Issues an authenticated wallet session cookie.",
+      "routes": [
+        {"method": "POST", "path": "/api/wallet/set-session", "module": "api/wallet_session_sync.py"}
+      ],
+      "current_auth": ["unlock_token"],
+      "required_auth": ["purpose_bound_unlock_token", "wallet_id_match"],
+      "required_scope": "none",
+      "site_binding": "wallet_id_match",
+      "risk_tier": "critical",
+      "enforcement_layer": "in_handler",
+      "compliance": "review_required",
+      "threat_tags": ["session_forgery", "token_theft", "csrf"],
+      "checklist_sections": [1, 2],
+      "test_refs": []
+    },
+    {
+      "operation_id": "wallet.session.init_first",
+      "authority_class": "wallet",
+      "mutates": "Retired endpoint; creates no authority.",
+      "routes": [
+        {"method": "POST", "path": "/api/wallet/init-first-session", "module": "api/wallet_session_sync.py"}
+      ],
+      "current_auth": ["retired_http_410"],
+      "required_auth": ["retired_http_410"],
+      "required_scope": "none",
+      "site_binding": "wallet_id_match",
+      "risk_tier": "critical",
+      "enforcement_layer": "in_handler",
+      "compliance": "compliant",
+      "threat_tags": ["leaked_wallet_id", "session_forgery", "origin_spoofing"],
+      "checklist_sections": [1, 2],
+      "test_refs": ["tests/test_security_next_batch.py"]
+    },
+    {
+      "operation_id": "wallet.session.webauthn_unlock",
+      "authority_class": "wallet",
+      "mutates": "Creates the first trusted server wallet session after server-verified WebAuthn.",
+      "routes": [
+        {"method": "POST", "path": "/api/wallet/session-unlock/begin", "module": "api/wallet_session_sync.py"},
+        {"method": "POST", "path": "/api/wallet/session-unlock/complete", "module": "api/wallet_session_sync.py"}
+      ],
+      "current_auth": ["server_challenge", "registered_wallet_passkey", "verified_webauthn_assertion"],
+      "required_auth": ["server_challenge", "registered_wallet_passkey", "verified_webauthn_assertion"],
+      "required_scope": "none",
+      "site_binding": "wallet_and_device_match",
+      "risk_tier": "critical",
+      "enforcement_layer": "in_handler",
+      "compliance": "compliant",
+      "threat_tags": ["leaked_wallet_id", "session_forgery", "replay", "origin_spoofing"],
+      "checklist_sections": [1, 2],
+      "test_refs": ["tests/test_wallet_session_sync_security.py"]
+    },
+    {
+      "operation_id": "wallet.session.signal_unlock",
+      "authority_class": "wallet",
+      "mutates": "Creates server-trusted unlock state and a wallet session cookie.",
+      "routes": [
+        {"method": "POST", "path": "/api/wallet/signal-unlock", "module": "api/wallet_session_sync.py"}
+      ],
+      "current_auth": ["existing_webauthn_session", "authorized_wallet_assertion", "csrf_token"],
+      "required_auth": ["existing_webauthn_session", "authorized_wallet_assertion", "csrf_token"],
+      "required_scope": "none",
+      "site_binding": "wallet_id_match",
+      "risk_tier": "critical",
+      "enforcement_layer": "in_handler",
+      "compliance": "compliant",
+      "threat_tags": ["leaked_wallet_id", "session_forgery", "origin_spoofing"],
+      "checklist_sections": [1, 2],
+      "test_refs": ["tests/test_security_next_batch.py"]
+    },
+    {
+      "operation_id": "wallet.session.clear",
+      "authority_class": "wallet",
+      "mutates": "Clears wallet session state.",
+      "routes": [
+        {"method": "POST", "path": "/api/wallet/clear-session", "module": "api/wallet_session_sync.py"}
+      ],
+      "current_auth": ["wallet_session", "csrf_token", "wallet_id_match"],
+      "required_auth": ["wallet_session", "csrf_token", "wallet_id_match"],
+      "required_scope": "none",
+      "site_binding": "wallet_id_match",
+      "risk_tier": "medium",
+      "enforcement_layer": "in_handler",
+      "compliance": "compliant",
+      "threat_tags": ["csrf", "denial_of_service"],
+      "checklist_sections": [1, 2],
+      "test_refs": []
+    },
+    {
+      "operation_id": "wallet.session.global",
+      "authority_class": "wallet",
+      "mutates": "Reads or updates legacy global wallet session state.",
+      "routes": [
+        {"method": "POST", "path": "/api/wallet/global-session", "module": "api/wallet_session_sync.py"}
+      ],
+      "current_auth": ["wallet_id_or_session_token"],
+      "required_auth": ["authorized_wallet_assertion"],
+      "required_scope": "none",
+      "site_binding": "wallet_id_match",
+      "risk_tier": "high",
+      "enforcement_layer": "in_handler",
+      "compliance": "gap",
+      "threat_tags": ["leaked_wallet_id", "session_forgery"],
+      "checklist_sections": [1, 2],
+      "test_refs": []
+    },
+    {
+      "operation_id": "wallet.device.staging_test_enrollment_grant",
+      "authority_class": "wallet",
+      "mutates": "Issues a one-time enrollment grant for non-production API live tests only.",
+      "routes": [
+        {"method": "POST", "path": "/api/wallet/test/enrollment-grant", "module": "api/wallet_session_sync.py"}
+      ],
+      "current_auth": ["non_production", "demo_test_verify_enabled", "demo_test_token"],
+      "required_auth": ["non_production", "demo_test_verify_enabled", "demo_test_token"],
+      "required_scope": "none",
+      "site_binding": "wallet_id_match",
+      "risk_tier": "high",
+      "enforcement_layer": "in_handler",
+      "compliance": "compliant",
+      "threat_tags": ["unauthorized_device_enrollment"],
+      "checklist_sections": [2],
+      "test_refs": ["tests/test_wallet_session_sync_security.py"]
+    },
+    {
+      "operation_id": "wallet.device.register_signing_key",
+      "authority_class": "wallet",
+      "mutates": "Enrolls a device signing key after transfer/recovery grant or idempotent same-key refresh.",
+      "routes": [
+        {"method": "POST", "path": "/api/wallet/register-signing-key", "module": "api/wallet_session_sync.py"}
+      ],
+      "current_auth": ["one_time_enrollment_grant_or_idempotent_same_key"],
+      "required_auth": ["webauthn_first_device_or_existing_device_transfer_or_verified_recovery"],
+      "required_scope": "none",
+      "site_binding": "wallet_id_match",
+      "risk_tier": "critical",
+      "enforcement_layer": "in_handler",
+      "compliance": "compliant",
+      "threat_tags": ["leaked_wallet_id", "unauthorized_device_enrollment"],
+      "checklist_sections": [1, 2],
+      "test_refs": ["tests/test_wallet_authn.py", "tests/test_wallet_session_sync_security.py"]
+    },
+    {
+      "operation_id": "wallet.device.enroll_webauthn",
+      "authority_class": "wallet",
+      "mutates": "Verifies WebAuthn registration and enrolls first-device signing key plus wallet passkey.",
+      "routes": [
+        {"method": "POST", "path": "/api/wallet/device-enroll/begin", "module": "api/wallet_session_sync.py"},
+        {"method": "POST", "path": "/api/wallet/device-enroll/complete", "module": "api/wallet_session_sync.py"}
+      ],
+      "current_auth": ["webauthn_registration_ceremony", "optional_one_time_enrollment_grant_for_additional_device"],
+      "required_auth": ["webauthn_registration_ceremony", "optional_one_time_enrollment_grant_for_additional_device"],
+      "required_scope": "none",
+      "site_binding": "wallet_id_match",
+      "risk_tier": "critical",
+      "enforcement_layer": "in_handler",
+      "compliance": "compliant",
+      "threat_tags": ["leaked_wallet_id", "unauthorized_device_enrollment", "rp_origin_mismatch"],
+      "checklist_sections": [1, 2],
+      "test_refs": ["tests/test_wallet_session_sync_security.py"]
+    },
+    {
+      "operation_id": "wallet.device.lost_device_recovery",
+      "authority_class": "recovery",
+      "mutates": "Authorizes lost-device recovery from verified IDV, binds a replacement passkey, enrolls a replacement signing key, and revokes prior devices.",
+      "routes": [
+        {"method": "POST", "path": "/api/wallet/lost-device-recovery/authorize", "module": "api/wallet_session_sync.py"},
+        {"method": "POST", "path": "/api/wallet/lost-device-recovery/begin", "module": "api/wallet_session_sync.py"},
+        {"method": "POST", "path": "/api/wallet/lost-device-recovery/complete", "module": "api/wallet_session_sync.py"}
+      ],
+      "current_auth": ["verified_idv_session", "atomic_idv_recovery_consume", "webauthn_registration_ceremony", "one_time_enrollment_grant"],
+      "required_auth": ["verified_idv_session", "atomic_idv_recovery_consume", "webauthn_registration_ceremony", "one_time_enrollment_grant"],
+      "required_scope": "none",
+      "site_binding": "wallet_person_binding",
+      "risk_tier": "critical",
+      "enforcement_layer": "in_handler",
+      "compliance": "compliant",
+      "threat_tags": ["account_takeover", "replay", "unauthorized_device_enrollment", "lost_device"],
+      "checklist_sections": [1, 2, 6],
+      "test_refs": ["tests/test_wallet_session_sync_security.py", "tests/test_wallet_authn.py"]
+    },
+    {
+      "operation_id": "wallet.device.revoke",
+      "authority_class": "wallet",
+      "mutates": "Revokes an enrolled wallet device key and bound passkeys.",
+      "routes": [
+        {"method": "POST", "path": "/api/wallet/device-revoke/begin", "module": "api/wallet_session_sync.py"},
+        {"method": "POST", "path": "/api/wallet/revoke-device", "module": "api/wallet_session_sync.py"}
+      ],
+      "current_auth": ["authorized_wallet_assertion", "fresh_webauthn_for_cross_device_revoke"],
+      "required_auth": ["authorized_wallet_assertion", "fresh_webauthn_for_cross_device_revoke"],
+      "required_scope": "none",
+      "site_binding": "wallet_id_match",
+      "risk_tier": "high",
+      "enforcement_layer": "in_handler",
+      "compliance": "compliant",
+      "threat_tags": ["device_revocation", "replay"],
+      "checklist_sections": [1, 2],
+      "test_refs": ["tests/test_wallet_authn.py", "tests/test_wallet_session_sync_security.py"]
+    },
+    {
+      "operation_id": "wallet.device.register_passkey",
+      "authority_class": "wallet",
+      "mutates": "Binds a WebAuthn credential to an already enrolled wallet device.",
+      "routes": [
+        {"method": "POST", "path": "/api/wallet/register-device-passkey", "module": "api/wallet_session_sync.py"}
+      ],
+      "current_auth": ["authorized_wallet_assertion"],
+      "required_auth": ["webauthn_registration_ceremony", "authorized_wallet_binding"],
+      "required_scope": "none",
+      "site_binding": "wallet_id_match",
+      "risk_tier": "critical",
+      "enforcement_layer": "in_handler",
+      "compliance": "review_required",
+      "threat_tags": ["unauthorized_device_enrollment", "rp_origin_mismatch"],
+      "checklist_sections": [1, 2],
+      "test_refs": ["tests/test_wallet_session_sync_security.py"]
+    },
+    {
+      "operation_id": "identity.idv.start",
+      "authority_class": "identity",
+      "mutates": "Creates an IDV attempt bound to a wallet.",
+      "routes": [
+        {"method": "POST", "path": "/api/ishuman/start-verification", "module": "api/ishuman.py"}
+      ],
+      "current_auth": ["authorized_wallet_assertion"],
+      "required_auth": ["authorized_wallet_assertion"],
+      "required_scope": "none",
+      "site_binding": "wallet_id_match",
+      "risk_tier": "high",
+      "enforcement_layer": "in_handler",
+      "compliance": "compliant",
+      "threat_tags": ["idv_session_hijack", "replay"],
+      "checklist_sections": [1, 6],
+      "test_refs": ["tests/test_ishuman_network_regressions.py"]
+    },
+    {
+      "operation_id": "identity.idv.webhook_complete",
+      "authority_class": "identity",
+      "mutates": "Completes IDV and may create a person root, wallet binding, and credential.",
+      "routes": [
+        {"method": "POST", "path": "/api/webhooks/didit-identity", "module": "api/ishuman.py"}
+      ],
+      "current_auth": ["didit_webhook_signature"],
+      "required_auth": ["didit_webhook_signature", "idempotent_server_session_binding"],
+      "required_scope": "none",
+      "site_binding": "idv_session_match",
+      "risk_tier": "critical",
+      "enforcement_layer": "in_handler",
+      "compliance": "review_required",
+      "threat_tags": ["webhook_forgery", "idv_session_hijack", "replay"],
+      "checklist_sections": [1, 6],
+      "test_refs": ["tests/test_didit_webhook_signature.py"]
+    },
+    {
+      "operation_id": "identity.idv.claim",
+      "authority_class": "identity",
+      "mutates": "Claims a completed IDV result for a wallet.",
+      "routes": [
+        {"method": "POST", "path": "/api/ishuman/verification-status/<session_id>/claim", "module": "api/ishuman.py"}
+      ],
+      "current_auth": ["authorized_wallet_assertion"],
+      "required_auth": ["authorized_wallet_assertion", "one_time_idv_session_binding"],
+      "required_scope": "none",
+      "site_binding": "wallet_and_session_match",
+      "risk_tier": "critical",
+      "enforcement_layer": "in_handler",
+      "compliance": "review_required",
+      "threat_tags": ["idv_session_hijack", "replay"],
+      "checklist_sections": [1, 6],
+      "test_refs": ["tests/test_ishuman_idv_mobile_handoff.py"]
+    },
+    {
+      "operation_id": "identity.erase",
+      "authority_class": "identity",
+      "mutates": "Erases or unlinks human identity state.",
+      "routes": [
+        {"method": "POST", "path": "/api/ishuman/erase", "module": "api/ishuman.py"}
+      ],
+      "current_auth": ["authorized_wallet_assertion"],
+      "required_auth": ["fresh_authorized_wallet_assertion"],
+      "required_scope": "none",
+      "site_binding": "wallet_id_match",
+      "risk_tier": "critical",
+      "enforcement_layer": "in_handler",
+      "compliance": "review_required",
+      "threat_tags": ["account_destruction", "replay"],
+      "checklist_sections": [1, 6, 9],
+      "test_refs": ["tests/test_ishuman_design_hardening.py"]
+    },
+    {
+      "operation_id": "identity.site_policy.block",
+      "authority_class": "tenant",
+      "mutates": "Creates or removes a site-scoped PPID block.",
+      "routes": [
+        {"method": "POST", "path": "/api/ishuman/site-block", "module": "api/ishuman.py"},
+        {"method": "POST", "path": "/api/ishuman/site-unblock", "module": "api/ishuman.py"}
+      ],
+      "current_auth": ["site_api_key"],
+      "required_auth": ["active_site_api_key"],
+      "required_scope": "site_policy_admin",
+      "site_binding": "api_key_owned_site",
+      "risk_tier": "high",
+      "enforcement_layer": "in_handler",
+      "compliance": "gap",
+      "threat_tags": ["cross_tenant", "revoked_api_key"],
+      "checklist_sections": [1, 3, 7],
+      "test_refs": ["tests/test_site_user_block_unblock.py"]
+    },
+    {
+      "operation_id": "identity.site_policy.doubt",
+      "authority_class": "tenant",
+      "mutates": "Creates or clears a site-scoped fresh-IDV requirement.",
+      "routes": [
+        {"method": "POST", "path": "/api/ishuman/site-doubt", "module": "api/ishuman.py"},
+        {"method": "POST", "path": "/api/ishuman/site-doubt-clear", "module": "api/ishuman.py"}
+      ],
+      "current_auth": ["site_api_key"],
+      "required_auth": ["active_site_api_key"],
+      "required_scope": "site_policy_admin",
+      "site_binding": "api_key_owned_site",
+      "risk_tier": "high",
+      "enforcement_layer": "in_handler",
+      "compliance": "gap",
+      "threat_tags": ["cross_tenant", "revoked_api_key"],
+      "checklist_sections": [1, 3, 7],
+      "test_refs": []
+    },
+    {
+      "operation_id": "identity.network_revoke",
+      "authority_class": "identity",
+      "mutates": "Requests a network-level identity or credential revocation.",
+      "routes": [
+        {"method": "POST", "path": "/api/ishuman/network-revoke", "module": "api/ishuman.py"},
+        {"method": "POST", "path": "/api/ishuman/approve-revocation", "module": "api/ishuman.py"}
+      ],
+      "current_auth": ["site_api_key_or_internal_approval"],
+      "required_auth": ["governance_approved_network_revocation"],
+      "required_scope": "network_revocation_admin",
+      "site_binding": "governance_record",
+      "risk_tier": "critical",
+      "enforcement_layer": "in_handler",
+      "compliance": "review_required",
+      "threat_tags": ["global_denial_of_service", "cross_tenant"],
+      "checklist_sections": [1, 5],
+      "test_refs": ["tests/test_site_ppid_revocation.py"]
+    },
+    {
+      "operation_id": "identity.site_proof.derive",
+      "authority_class": "identity",
+      "mutates": "Issues and stores a site-bound credential and PPID continuity proof.",
+      "routes": [
+        {"method": "POST", "path": "/api/ishuman/derive-site-proof", "module": "api/ishuman.py"}
+      ],
+      "current_auth": ["authorized_wallet_assertion", "verified_person_or_enabled_passkey_tier"],
+      "required_auth": ["authorized_wallet_assertion", "required_assurance", "canonical_site_binding"],
+      "required_scope": "none",
+      "site_binding": "canonical_hostname",
+      "risk_tier": "critical",
+      "enforcement_layer": "in_handler",
+      "compliance": "review_required",
+      "threat_tags": ["site_binding_confusion", "unauthorized_issuance", "billing_bypass"],
+      "checklist_sections": [1, 4, 8],
+      "test_refs": ["tests/test_derive_site_proof.py"]
+    },
+    {
+      "operation_id": "identity.master.reissue",
+      "authority_class": "identity",
+      "mutates": "Reissues master human identity authority to a wallet.",
+      "routes": [
+        {"method": "POST", "path": "/api/ishuman/reissue-master", "module": "api/ishuman.py"}
+      ],
+      "current_auth": ["authorized_wallet_assertion", "device_count_policy"],
+      "required_auth": ["fresh_passkey_or_verified_human_recovery"],
+      "required_scope": "none",
+      "site_binding": "wallet_person_binding",
+      "risk_tier": "critical",
+      "enforcement_layer": "in_handler",
+      "compliance": "gap",
+      "threat_tags": ["unauthorized_device_enrollment", "account_takeover"],
+      "checklist_sections": [1, 2, 6],
+      "test_refs": ["tests/test_ishuman_reissue_master.py"]
+    },
+    {
+      "operation_id": "identity.seed_or_device_transfer",
+      "authority_class": "wallet",
+      "mutates": "Transfers encrypted person-root or wallet authority material between devices.",
+      "routes": [
+        {"method": "POST", "path": "/api/ishuman/seed-envelope", "module": "api/ishuman.py"},
+        {"method": "POST", "path": "/api/wallet/sync-device", "module": "api/ishuman.py"},
+        {"method": "POST", "path": "/api/wallet/link-receive", "module": "api/ishuman.py"}
+      ],
+      "current_auth": ["existing_device_assertion", "recipient_key_binding", "atomic_one_time_transfer", "one_time_enrollment_grant"],
+      "required_auth": ["existing_device_assertion", "recipient_key_binding", "atomic_one_time_transfer", "one_time_enrollment_grant"],
+      "required_scope": "none",
+      "site_binding": "wallet_id_match",
+      "risk_tier": "critical",
+      "enforcement_layer": "in_handler",
+      "compliance": "compliant",
+      "threat_tags": ["wallet_secret_exfiltration", "replay", "unauthorized_device_enrollment"],
+      "checklist_sections": [1, 2, 6],
+      "test_refs": ["tests/test_wallet_sync_device.py", "tests/test_wallet_link_receive.py"]
+    },
+    {
+      "operation_id": "identity.idv_mobile_handoff",
+      "authority_class": "recovery",
+      "mutates": "Deposits and claims a one-time encrypted mobile IDV wallet handoff.",
+      "routes": [
+        {"method": "POST", "path": "/api/ishuman/idv-mobile-handoff/deposit", "module": "api/ishuman.py"},
+        {"method": "POST", "path": "/api/ishuman/idv-mobile-handoff/claim", "module": "api/ishuman.py"}
+      ],
+      "current_auth": ["wallet_assertion_on_deposit", "handoff_key_and_session_on_claim"],
+      "required_auth": ["wallet_assertion_on_deposit", "one_time_handoff_key_and_exact_session_on_claim"],
+      "required_scope": "none",
+      "site_binding": "wallet_and_idv_session_match",
+      "risk_tier": "critical",
+      "enforcement_layer": "in_handler",
+      "compliance": "review_required",
+      "threat_tags": ["handoff_url_theft", "replay", "wallet_secret_exfiltration"],
+      "checklist_sections": [1, 2, 6],
+      "test_refs": ["tests/test_ishuman_idv_mobile_handoff.py"]
+    },
+    {
+      "operation_id": "identity.site_proof_redirect",
+      "authority_class": "identity",
+      "mutates": "Deposits and claims a one-time site-proof redirect artifact.",
+      "routes": [
+        {"method": "POST", "path": "/api/ishuman/site-proof-redirect/deposit", "module": "api/ishuman.py"},
+        {"method": "POST", "path": "/api/ishuman/site-proof-redirect/claim", "module": "api/ishuman.py"}
+      ],
+      "current_auth": ["wallet_assertion_on_deposit", "one_time_nonce_on_claim"],
+      "required_auth": ["wallet_assertion_on_deposit", "one_time_nonce_and_exact_request_binding_on_claim"],
+      "required_scope": "none",
+      "site_binding": "canonical_hostname",
+      "risk_tier": "high",
+      "enforcement_layer": "in_handler",
+      "compliance": "review_required",
+      "threat_tags": ["artifact_theft", "replay", "site_binding_confusion"],
+      "checklist_sections": [1, 4, 5],
+      "test_refs": []
+    },
+    {
+      "operation_id": "identity.action_sign_redirect",
+      "authority_class": "identity",
+      "mutates": "Deposits and claims an action-signing redirect artifact.",
+      "routes": [
+        {"method": "POST", "path": "/api/ishuman/action-sign-redirect/deposit", "module": "api/ishuman.py"},
+        {"method": "POST", "path": "/api/ishuman/action-sign-redirect/claim", "module": "api/ishuman.py"}
+      ],
+      "current_auth": ["wallet_assertion_on_deposit", "one_time_nonce_on_claim"],
+      "required_auth": ["wallet_assertion_on_deposit", "one_time_nonce_and_action_binding_on_claim"],
+      "required_scope": "none",
+      "site_binding": "canonical_hostname",
+      "risk_tier": "high",
+      "enforcement_layer": "in_handler",
+      "compliance": "review_required",
+      "threat_tags": ["artifact_theft", "replay", "action_substitution"],
+      "checklist_sections": [1, 5],
+      "test_refs": []
+    },
+    {
+      "operation_id": "recovery.initiate",
+      "authority_class": "recovery",
+      "mutates": "Creates and sends an administrator recovery token.",
+      "routes": [
+        {"method": "POST", "path": "/api/recovery/initiate", "module": "api/account_recovery.py"}
+      ],
+      "current_auth": ["site_api_key", "stored_admin_email"],
+      "required_auth": ["active_site_api_key", "stored_admin_email", "rate_limit"],
+      "required_scope": "site_recovery_admin",
+      "site_binding": "api_key_owned_site",
+      "risk_tier": "critical",
+      "enforcement_layer": "in_handler",
+      "compliance": "gap",
+      "threat_tags": ["revoked_api_key", "cross_tenant", "email_compromise"],
+      "checklist_sections": [1, 6, 7],
+      "test_refs": []
+    },
+    {
+      "operation_id": "recovery.validate",
+      "authority_class": "recovery",
+      "mutates": "Validates recovery state without issuing authority.",
+      "routes": [
+        {"method": "POST", "path": "/api/recovery/validate", "module": "api/account_recovery.py"}
+      ],
+      "current_auth": ["recovery_token"],
+      "required_auth": ["one_time_recovery_token"],
+      "required_scope": "none",
+      "site_binding": "token_bound_site",
+      "risk_tier": "medium",
+      "enforcement_layer": "in_handler",
+      "compliance": "review_required",
+      "threat_tags": ["token_theft", "replay"],
+      "checklist_sections": [1, 6],
+      "test_refs": []
+    },
+    {
+      "operation_id": "recovery.complete",
+      "authority_class": "recovery",
+      "mutates": "Issues administrator authority and may replace the bound administrator PPID.",
+      "routes": [
+        {"method": "POST", "path": "/api/recovery/complete", "module": "api/account_recovery.py"},
+        {"method": "POST", "path": "/api/recovery/complete-wallet", "module": "api/account_recovery.py"},
+        {"method": "POST", "path": "/api/recovery/issue-admin-proof", "module": "api/account_recovery.py"}
+      ],
+      "current_auth": ["email_recovery_token_or_recovery_session", "optional_client_ppid"],
+      "required_auth": ["atomically_consumed_recovery_token", "replacement_passkey_proof", "verified_human_recovery", "exact_admin_record_binding"],
+      "required_scope": "site_recovery_admin",
+      "site_binding": "token_and_admin_record_site",
+      "risk_tier": "critical",
+      "enforcement_layer": "in_handler",
+      "compliance": "gap",
+      "threat_tags": ["email_compromise", "token_replay", "wrong_admin_rebinding", "account_takeover"],
+      "checklist_sections": [1, 6],
+      "test_refs": ["tests/test_security_next_batch.py"]
+    },
+    {
+      "operation_id": "tenant.customer.register_wallet_developer",
+      "authority_class": "tenant",
+      "mutates": "Creates a developer customer bound to a verified wallet.",
+      "routes": [
+        {"method": "POST", "path": "/api/customer/register-wallet-developer", "module": "api/customer_accounts.py"}
+      ],
+      "current_auth": ["platform_wallet_identity_enforcement"],
+      "required_auth": ["verified_platform_wallet_identity"],
+      "required_scope": "developer_access",
+      "site_binding": "lemma.id",
+      "risk_tier": "high",
+      "enforcement_layer": "in_handler",
+      "compliance": "review_required",
+      "threat_tags": ["customer_identity_spoofing"],
+      "checklist_sections": [1, 3],
+      "test_refs": ["tests/test_wallet_developer_registration.py"]
+    },
+    {
+      "operation_id": "tenant.customer.register_secure",
+      "authority_class": "tenant",
+      "mutates": "Creates a customer record and identity binding.",
+      "routes": [
+        {"method": "POST", "path": "/api/customer/register-secure", "module": "api/customer_accounts.py"}
+      ],
+      "current_auth": ["custom_registration_proof"],
+      "required_auth": ["verified_platform_wallet_identity"],
+      "required_scope": "developer_access",
+      "site_binding": "lemma.id",
+      "risk_tier": "critical",
+      "enforcement_layer": "in_handler",
+      "compliance": "review_required",
+      "threat_tags": ["customer_identity_spoofing", "duplicate_account"],
+      "checklist_sections": [1, 3],
+      "test_refs": []
+    },
+    {
+      "operation_id": "tenant.api_key.manage",
+      "authority_class": "tenant",
+      "mutates": "Creates, revokes, or rotates customer site API keys.",
+      "routes": [
+        {"method": "POST", "path": "/api/customer/api-keys", "module": "api/customer_accounts.py"},
+        {"method": "DELETE", "path": "/api/customer/api-keys", "module": "api/customer_accounts.py"},
+        {"method": "POST", "path": "/api/customer/api-keys/rotate", "module": "api/customer_accounts.py"}
+      ],
+      "current_auth": ["customer_or_admin_credential"],
+      "required_auth": ["verified_customer_admin_credential", "fresh_proof_for_rotation_or_revocation"],
+      "required_scope": "admin",
+      "site_binding": "customer_owned_site",
+      "risk_tier": "critical",
+      "enforcement_layer": "decorator_and_handler",
+      "compliance": "gap",
+      "threat_tags": ["cross_tenant", "api_key_theft", "revoked_api_key"],
+      "checklist_sections": [1, 3, 7],
+      "test_refs": ["tests/test_security_fixes.py"]
+    },
+    {
+      "operation_id": "tenant.site.register",
+      "authority_class": "tenant",
+      "mutates": "Creates or updates site ownership, issuer, API key, billing association, and administrator authority.",
+      "routes": [
+        {"method": "POST", "path": "/api/customer/register-site", "module": "api/customer_accounts.py"}
+      ],
+      "current_auth": ["customer_or_admin_credential", "customer_ppid_match"],
+      "required_auth": ["verified_customer_admin_credential", "customer_ppid_match", "domain_ownership_proof", "existing_owner_conflict_check"],
+      "required_scope": "admin",
+      "site_binding": "verified_domain_ownership",
+      "risk_tier": "critical",
+      "enforcement_layer": "decorator_and_handler",
+      "compliance": "gap",
+      "threat_tags": ["cross_tenant", "domain_takeover", "issuer_takeover"],
+      "checklist_sections": [1, 3],
+      "test_refs": ["tests/test_register_site_wallet_first.py"]
+    },
+    {
+      "operation_id": "billing.usage_checkout",
+      "authority_class": "billing",
+      "mutates": "Creates a Stripe Checkout session for a customer's usage subscription.",
+      "routes": [
+        {"method": "POST", "path": "/api/billing/usage-checkout", "module": "api/stripe_usage_billing.py"}
+      ],
+      "current_auth": ["customer_or_admin_credential"],
+      "required_auth": ["verified_customer_admin_credential"],
+      "required_scope": "billing_admin",
+      "site_binding": "customer_owned_site",
+      "risk_tier": "high",
+      "enforcement_layer": "decorator_and_handler",
+      "compliance": "review_required",
+      "threat_tags": ["cross_tenant", "billing_account_confusion"],
+      "checklist_sections": [1, 8],
+      "test_refs": ["tests/test_stripe_usage_billing.py"]
+    },
+    {
+      "operation_id": "billing.stripe_webhook",
+      "authority_class": "billing",
+      "mutates": "Changes subscription and entitlement state from Stripe events.",
+      "routes": [
+        {"method": "POST", "path": "/api/webhooks/stripe-billing", "module": "api/stripe_usage_billing.py"}
+      ],
+      "current_auth": ["stripe_webhook_signature"],
+      "required_auth": ["stripe_webhook_signature", "transactional_event_idempotency"],
+      "required_scope": "none",
+      "site_binding": "stripe_customer_mapping",
+      "risk_tier": "critical",
+      "enforcement_layer": "in_handler",
+      "compliance": "gap",
+      "threat_tags": ["webhook_forgery", "replay", "billing_account_confusion"],
+      "checklist_sections": [1, 8],
+      "test_refs": ["tests/test_stripe_usage_billing.py"]
+    }
+  ],
+  "exemptions": [
+    {
+      "method": "POST",
+      "path": "/api/wallet/create-redirect-token",
+      "module": "api/wallet_session_sync.py",
+      "reason": "Retired endpoint returns HTTP 410 and creates no authority."
+    },
+    {
+      "method": "POST",
+      "path": "/api/wallet/exchange-redirect-token",
+      "module": "api/wallet_session_sync.py",
+      "reason": "Retired endpoint returns HTTP 410 and creates no authority."
+    },
+    {
+      "method": "POST",
+      "path": "/api/wallet/challenge",
+      "module": "api/wallet_session_sync.py",
+      "reason": "Public ceremony endpoint creates only a short-lived purpose-bound challenge."
+    },
+    {
+      "method": "POST",
+      "path": "/api/ishuman/verify-presentation",
+      "module": "api/ishuman.py",
+      "reason": "Stateless verification endpoint does not create or change authority."
+    },
+    {
+      "method": "POST",
+      "path": "/api/validate-key",
+      "module": "api/customer_accounts.py",
+      "reason": "Validation endpoint does not create or change authority."
+    }
+  ]
+}

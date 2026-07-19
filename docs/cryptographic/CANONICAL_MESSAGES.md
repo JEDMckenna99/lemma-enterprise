@@ -27,8 +27,10 @@ compact separators (`,` and `:`) with no insignificant whitespace.
 
 ## 2. Document root hash
 
-- **Inputs:** `StripeIdentityRootMaterial` (country, document_type, document_number,
-  date_of_birth, optional id_number_type/last4).
+- **Current schema:** `lemma.identity.document-root.v2`. Legacy v1 records
+  remain versioned recovery inputs; do not reinterpret them as v2.
+- **Inputs:** verified identity root material (country, document type, document
+  number, date of birth, and optional issuing subdivision).
 - **Canonicalization:**
   1. Build claim dict (normalize country/type/number; fixed `schema` + `provider`).
   2. `canonical_json_bytes(claims)` = JSON with **sorted keys**, compact separators.
@@ -36,9 +38,9 @@ compact separators (`,` and `:`) with no insignificant whitespace.
 - **Reference:** `api/identity_roots.py::build_document_root_claims` +
   `derive_document_root_hash`.
 - **Test vector** (pepper = `b"invariant_test_pepper_0123456789"`):
-  - material `US / driving_license / D1234567 / 1985-03-12`
-  - claims => `{"country":"US","date_of_birth":"1985-03-12","document_number":"D1234567","document_type":"driving_license","provider":"stripe_identity","schema":"lemma.identity.document-root.v1"}`
-  - digest => `f8ee8a3db8d5c71eecf17096d8133dfe5c9a2927a885817d15c3c755a1209321`
+  - material `US / driving_license / D1234567 / 1985-03-12 / CA`
+  - claims => `{"country":"US","date_of_birth":"1985-03-12","document_number":"D1234567","document_type":"driving_license","issuing_subdivision":"CA","provider":"stripe_identity","schema":"lemma.identity.document-root.v2"}`
+  - digest => `f95534fe22f9972bda81fbcda454ae5b45013d52680428beafedc87a4d7ecbbc`
 
 ## 3. Person root (server-only, never leaves)
 
@@ -101,7 +103,7 @@ compact separators (`,` and `:`) with no insignificant whitespace.
 - **Test vector** (root key = `b"invariant_root_ppid_key_01234567"`, wallet_secret = `"ab"*32`):
   - => `c060ff2951a71f8ba8094bdef0329e2bc83e9445ff5a0bcd9b486148c3fce24d`
 
-## 8. Bloom snapshot + trust list envelopes
+## 8. Bloom snapshot and issuer trust list envelopes
 
 - **Bloom snapshot:** `api/bloom_snapshot.py::build_signature_message`, prefix
   `lemma:bloom-snapshot:v1`, includes the monotonic `sequence_number`. SDK rejects
@@ -133,10 +135,6 @@ compact separators (`,` and `:`) with no insignificant whitespace.
   1700003600
   ```
 
-> Third-party SDKs that only need to verify (not issue) must implement sections
-> 1, 4, 5, 8, 9, and 10 when handling provisional-to-known-person convergence
-> or fresh-passkey action policies.
-
 ## 10. Fresh-passkey attestation (`fresh_passkey_attestation.v1`)
 
 - **When issued:** only after lemma.id verifies a new WebAuthn assertion for a
@@ -152,3 +150,55 @@ compact separators (`,` and `:`) with no insignificant whitespace.
   stringified). SHA-256 digest is Ed25519-signed by the Lemma isHuman issuer key.
 - **Reference:** `api/fresh_passkey_attestation.py`; Python verifier
   `verify_fresh_passkey_attestation`; JS verifier `verifyFreshPasskeyAttestation`.
+
+## 11. Action stamp (`action_stamp_v1`)
+
+- **Purpose:** bind a site credential and site signing key to one action,
+  method, path, request body hash, nonce, and validity window.
+- **Inputs:** `version`, `site_id`, `credential_id`, `subject`, `assurance`,
+  `action`, `method`, `path`, `body_hash`, `nonce`, `issued_at_unix`,
+  `expires_at_unix`.
+- **Canonicalization:** newline-joined (`\n`) lines in the order below,
+  prefixed by `lemma:site-action-presentation:v1`. Values are stripped;
+  `method` is uppercase. The SHA-256 digest of the message is Ed25519-signed by
+  the per-site signing key.
+- **Reference:** wallet `signSiteActionPresentation`; Python verifier
+  `_build_action_message`; Node verifier `buildActionPresentationMessage`.
+- **Test vector:**
+  ```
+  lemma:site-action-presentation:v1
+  action_stamp_v1
+  example.com
+  ishuman_site_1
+  did:lemma:ppid_abc
+  ishuman
+  checkout
+  POST
+  /api/checkout
+  aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+  nonce_1
+  1700000000
+  1700000060
+  ```
+
+Nonce consumption is not part of signature canonicalization, but it is part of
+verification policy. Production verification validates the complete signature
+and binding before atomically consuming the nonce in a durable store.
+
+## 12. Presentation envelope (`presentation_v1`)
+
+The presentation envelope is currently an implicit v1 composite shape rather
+than a separately signed outer object:
+
+- required `credential`: signed isHuman site credential;
+- optional `session_assertion` plus `session_signature`;
+- optional `ppid_convergence` signed artifact.
+
+Each signed child uses its own registered version. The envelope is accepted only
+when the credential is valid and every supplied optional artifact verifies and
+binds to the same site, credential, and subject. Adding a top-level protocol
+version or changing required members follows
+`docs/protocol/ISHUMAN_PROTOCOL_MIGRATION_POLICY.md`.
+
+> Third-party SDKs that only verify must implement sections 1, 4, 5, 8, 9,
+> 10, 11, and 12 for all enabled policies.

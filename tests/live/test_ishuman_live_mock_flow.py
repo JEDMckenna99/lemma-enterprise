@@ -32,7 +32,6 @@ from api.ishuman import _browser_canonical_message  # noqa: E402
 from api.wallet_keys import (  # noqa: E402
     b64url_encode,
     build_wallet_assertion,
-    register_self_signature,
 )
 from tests.live.live_test_helpers import (  # noqa: E402
     require_staging_env,
@@ -55,11 +54,10 @@ def test_live_staging_mock_idv_end_to_end():
     wallet_secret = "ab" * 32
     s = requests.Session()
 
-    # 1. Register the wallet signing key.
-    pub_b64, sig_b64 = register_self_signature(wallet_id, wallet_secret)
-    reg = s.post(f"{base}/api/wallet/register-signing-key",
-                 json={"wallet_id": wallet_id, "pubkey": pub_b64, "signature": sig_b64})
-    assert reg.ok and reg.json().get("success"), reg.text
+    # 1. Register the wallet signing key via staging test enrollment grant.
+    from tests.live.live_test_helpers import register_wallet_signing_key
+
+    register_wallet_signing_key(s, base, wallet_id, wallet_secret)
 
     # 2. Mock IDV -> real master credential (start-verification needs a START assertion).
     return_url = f"{base}/demo/ishuman"

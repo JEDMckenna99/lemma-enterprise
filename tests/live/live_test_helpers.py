@@ -141,23 +141,67 @@ def wallet_challenge(session: requests.Session, base_url: str, wallet_id: str) -
     return nonce
 
 
+def _staging_enrollment_grant(
+    session: requests.Session,
+    base_url: str,
+    wallet_id: str,
+) -> str | None:
+    """Fetch a staging-only enrollment grant when the demo test token is set."""
+    token = (os.getenv("LEMMA_STAGING_DEMO_TEST_TOKEN") or "").strip()
+    if not token:
+        return None
+    resp = session.post(
+        f"{base_url}/api/wallet/test/enrollment-grant",
+        json={"wallet_id": wallet_id},
+        headers={"X-Demo-Test-Token": token},
+        timeout=30,
+    )
+    if resp.status_code != 200:
+        return None
+    data = get_json_or_raise(resp)
+    grant = str(data.get("enrollment_grant") or "").strip()
+    return grant or None
+
+
 def register_wallet_signing_key(
     session: requests.Session,
     base_url: str,
     wallet_id: str,
     wallet_secret: str,
+    *,
+    device_id: str = "legacy",
 ) -> None:
+    """Register a wallet signing key for live/staging API tests.
+
+    Production first-device enroll requires WebAuthn. Staging live tests may use
+    ``/api/wallet/test/enrollment-grant`` when ``LEMMA_STAGING_DEMO_TEST_TOKEN``
+    is configured.
+    """
     pubkey_b64, sig_b64 = register_self_signature(wallet_id, wallet_secret)
+    body = {
+        "wallet_id": wallet_id,
+        "device_id": device_id,
+        "pubkey": pubkey_b64,
+        "signature": sig_b64,
+    }
+    grant = _staging_enrollment_grant(session, base_url, wallet_id)
+    if grant:
+        body["enrollment_grant"] = grant
     resp = session.post(
         f"{base_url}/api/wallet/register-signing-key",
-        json={"wallet_id": wallet_id, "pubkey": pubkey_b64, "signature": sig_b64},
+        json=body,
         timeout=30,
     )
     data = get_json_or_raise(resp)
-    if resp.status_code not in (200, 403):
-        raise AssertionError(f"register-signing-key failed: HTTP {resp.status_code} {data}")
     if resp.status_code == 200:
         assert data.get("success"), data
+        return
+    if data.get("code") == "first_device_webauthn_enrollment_required":
+        raise AssertionError(
+            "register-signing-key requires WebAuthn enroll or staging test grant; "
+            "set LEMMA_STAGING_DEMO_TEST_TOKEN for API live smokes"
+        )
+    raise AssertionError(f"register-signing-key failed: HTTP {resp.status_code} {data}")
 
 
 def build_assertion_payload(

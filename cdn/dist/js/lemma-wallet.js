@@ -91,7 +91,7 @@ const AUTH_STATE = {
 class LemmaWallet {
     // SDK version - check with LemmaWallet.VERSION
     // v2.32.0: Redirect-only architecture - removed popup flow for simpler, consistent UX
-    static VERSION = '2.74.0';  // v2.74: device-bound signing keys + person-root link transfer
+    static VERSION = '2.76.0';  // v2.76: first-device WebAuthn enrollment + cross-device revoke
 
     static DEVICE_IDB_NAMES = ['LemmaWallet', 'LemmaWalletWrap'];
 
@@ -473,7 +473,7 @@ class LemmaWallet {
         
         return `<div class="${className}" style="margin-top: 12px; text-align: center; font-size: 0.85rem;">
     <span style="color: #6b7280;">${text}</span>
-    <a href="${url}" target="_blank" rel="noopener" style="color: #667eea; margin-left: 4px; text-decoration: none; font-weight: 500;">
+    <a href="${url}" target="_blank" rel="noopener" style="color: #4f46e5; margin-left: 4px; text-decoration: none; font-weight: 500;">
          ${linkText}
     </a>
 </div>`;
@@ -1155,7 +1155,7 @@ class LemmaWallet {
             overlay.id = 'lemma-redirect-overlay';
             overlay.setAttribute('style',
                 'position:fixed;top:0;left:0;width:100%;height:100%;' +
-                'background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);' +
+                'background:#4f46e5;' +
                 'z-index:2147483647;display:flex;flex-direction:column;' +
                 'align-items:center;justify-content:center;opacity:0;' +
                 'transition:opacity 200ms ease-in;'
@@ -2035,15 +2035,14 @@ class LemmaWallet {
         }
 
         // ============================================================
-        // LOCAL-ONLY PASSKEY REGISTRATION
+        // SERVER-BOUND FIRST-DEVICE PASSKEY REGISTRATION
         // ============================================================
-        // The passkey is created and verified 100% locally.
-        // Server only tracks lock/unlock state for cross-device sync.
-        // Security comes from HSM-signed lemmas, not passkey verification.
+        // Create the passkey against a server challenge, then enroll the
+        // device signing key + wallet passkey in one verified ceremony.
         // ============================================================
-        
-        console.log('[Lemma] Creating local passkey (privacy-preserving design)');
-        const challenge = crypto.getRandomValues(new Uint8Array(32));
+
+        console.log('[Lemma] Creating passkey via server-verified device enrollment');
+        const deviceId = this._deviceId || await this._getOrCreateDeviceId();
         const rpId = this._getRpIdForWebAuthn();
         const mod = this._walletAtRest();
         let prfExtensions = {};
@@ -2051,40 +2050,56 @@ class LemmaWallet {
             prfExtensions = await mod.buildRegistrationPrfExtensions(walletId.value, rpId);
         }
 
-        const credential = await navigator.credentials.create({
-            publicKey: {
-                challenge: challenge,
-                rp: {
-                    name: 'Lemma Wallet',
-                    id: rpId
-                },
-                user: {
-                    id: new TextEncoder().encode(walletId.value),
-                    name: 'Wallet User',
-                    displayName: 'Lemma Wallet'
-                },
-                pubKeyCredParams: [
-                    { alg: -7, type: 'public-key' },   // ES256
-                    { alg: -257, type: 'public-key' }  // RS256
-                ],
-                authenticatorSelection: {
-                    userVerification: 'required',
-                    residentKey: 'preferred'
-                },
-                extensions: prfExtensions,
-                timeout: 60000
-            }
+        const enrollBeginResponse = await fetch('/api/wallet/device-enroll/begin', {
+            method: 'POST',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                wallet_id: walletId.value,
+                device_id: deviceId,
+                enrollment_grant: this._pendingEnrollmentGrant || null,
+            }),
         });
+        const enrollBegin = await enrollBeginResponse.json().catch(() => ({}));
+        if (!enrollBeginResponse.ok || !enrollBegin.challenge_key || !enrollBegin.challenge) {
+            throw new Error(enrollBegin.error || `device-enroll begin failed (${enrollBeginResponse.status})`);
+        }
 
-        // Extract and store public key locally (never sent to server)
+        const createOptions = {
+            challenge: this._base64urlToBuffer(enrollBegin.challenge),
+            rp: {
+                name: 'Lemma Wallet',
+                id: enrollBegin.rp_id || rpId,
+            },
+            user: {
+                id: new TextEncoder().encode(walletId.value),
+                name: 'Wallet User',
+                displayName: 'Lemma Wallet',
+            },
+            pubKeyCredParams: [
+                { alg: -7, type: 'public-key' },
+                { alg: -257, type: 'public-key' },
+            ],
+            authenticatorSelection: {
+                userVerification: 'required',
+                residentKey: 'preferred',
+            },
+            extensions: prfExtensions,
+            timeout: 60000,
+        };
+        const credential = await navigator.credentials.create({ publicKey: createOptions });
+        if (!credential) throw new Error('Passkey registration cancelled');
+
         const publicKeyData = this._extractPublicKey(credential.response);
-        
         const prfBound = await this._bindAtRestKeyFromCredential(credential, walletId.value);
         const passkeyRecord = {
             id: 'primary',
             credentialId: this._bufferToBase64url(credential.rawId),
             publicKey: publicKeyData.publicKey,
             algorithm: publicKeyData.algorithm,
+            attestationObject: credential.response.attestationObject
+                ? this._bufferToBase64url(credential.response.attestationObject)
+                : null,
             createdAt: Date.now(),
             prfEnabled: prfBound,
             prfSaltRpId: rpId,
@@ -2092,12 +2107,7 @@ class LemmaWallet {
         };
 
         await this._put('passkey', passkeyRecord);
-        console.log('[Lemma]  Passkey created locally');
-        try {
-            await this._registerDevicePasskeyIfPossible(passkeyRecord, walletId.value);
-        } catch (err) {
-            console.warn('[Lemma] Wallet passkey server binding skipped:', err?.message || err);
-        }
+        console.log('[Lemma] Passkey created locally');
         if (prfBound) {
             await this._migratePlaintextStores();
         }
@@ -2155,38 +2165,46 @@ class LemmaWallet {
         await this._put('session', { id: 'current', ...this.session });
         console.log(' Wallet created and auto-unlocked after passkey registration');
 
-        // Signal to server for cross-device sync (simple state update)
+        const keys = this._getLemmaKeys();
+        const keypair = await this._deriveWalletSigningKey();
+        const pubkeyB64 = keys.base64urlEncode(keypair.publicKey);
+        const registerPayload = keys.buildRegisterPayload({ walletId: walletId.value, pubkeyB64 });
+        const signature = await keypair.sign(registerPayload);
+        const enrollCompleteResponse = await fetch('/api/wallet/device-enroll/complete', {
+            method: 'POST',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                challenge_key: enrollBegin.challenge_key,
+                credential: this._serializeCredential(credential),
+                wallet_id: walletId.value,
+                device_id: deviceId,
+                pubkey: pubkeyB64,
+                signature: keys.base64urlEncode(signature),
+                enrollment_grant: this._pendingEnrollmentGrant || null,
+            }),
+        });
+        const enrollComplete = await enrollCompleteResponse.json().catch(() => ({}));
+        if (!enrollCompleteResponse.ok || enrollComplete.success === false) {
+            throw new Error(enrollComplete.error || `device-enroll complete failed (${enrollCompleteResponse.status})`);
+        }
+        this._signingKeyRegistered = true;
+        this._pendingEnrollmentGrant = null;
+        this._deviceId = deviceId;
+
+        // Establish the first trusted server session with server-verified
+        // WebAuthn. This is deliberately separate from local wallet creation.
         if (this._isLemmaDomain()) {
-                try {
-                    const activeProfile = await this.getActiveProfile();
-                console.log('[Lemma] Signaling new wallet unlock to server...');
-                const signalResponse = await fetch('/api/wallet/signal-unlock', {
-                        method: 'POST',
-                        credentials: 'include',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            wallet_id: walletId.value,
-                            unlocked_at: this.session.unlockedAt,
-                        expires_at: Math.floor(this.session.expiresAt / 1000),
-                            profile_id: activeProfile.id,
-                        profile_name: activeProfile.name
-                        })
-                    });
-                if (signalResponse.ok) {
-                    console.log('[Lemma]  Server notified - cross-device sync enabled');
-                    this.session.serverSessionActive = true;
-                    await this._put('session', { id: 'current', ...this.session });
-                    } else {
-                    console.warn('[Lemma] Could not signal to server:', signalResponse.status);
-                    }
-                } catch (e) {
-                console.warn('[Lemma] Could not signal to server:', e.message);
+            try {
+                console.log('[Lemma] Verifying new wallet passkey with server...');
+                await this._performServerWebAuthnUnlock(passkeyRecord, walletId.value);
+                this.session.serverSessionActive = true;
+                await this._put('session', { id: 'current', ...this.session });
+                console.log('[Lemma] Server-verified wallet session established');
+            } catch (e) {
+                console.warn('[Lemma] Could not establish server session:', e.message);
             }
         }
-
-        this._registerSigningKeyIfNeeded().catch((err) => {
-            console.warn('[Lemma] Wallet signing key registration skipped:', err?.message || err);
-        });
 
         await this._finalizeIsHumanIssuance(options);
 
@@ -2311,6 +2329,7 @@ class LemmaWallet {
 
     async ensureDeviceEnrollmentAfterSeedTransfer(result) {
         await this.init();
+        this._pendingEnrollmentGrant = result?.enrollmentGrant || this._pendingEnrollmentGrant || null;
         if (!this.session?.walletLocalSeed || !this.session?.personRootProxy) {
             throw new Error('Seed transfer incomplete');
         }
@@ -2361,6 +2380,7 @@ class LemmaWallet {
                 device_id: deviceId,
                 credential_id: passkeyRecord.credentialId,
                 public_key: passkeyRecord.publicKey,
+                attestation_object: passkeyRecord.attestationObject || null,
                 attestation_format: passkeyRecord.attestationFormat || 'none',
                 device_name: passkeyRecord.deviceName || null,
                 wallet_assertion: walletAssertion,
@@ -2434,21 +2454,6 @@ class LemmaWallet {
         this.session.walletId = replacementWalletId;
         await this._put('session', { id: 'current', ...this.session });
         this._signingKeyRegistered = false;
-
-        try {
-            await fetch('/api/wallet/signal-unlock', {
-                method: 'POST',
-                credentials: 'include',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    wallet_id: replacementWalletId,
-                    unlocked_at: this.session.unlockedAt || Date.now(),
-                    expires_at: Math.floor((this.session.expiresAt || Date.now()) / 1000),
-                }),
-            });
-        } catch (_) {
-            // Local recovery remains valid; global-session sync is best effort.
-        }
         return replacementWalletId;
     }
 
@@ -2469,6 +2474,7 @@ class LemmaWallet {
                 device_id: deviceId,
                 pubkey: pubkeyB64,
                 signature: keys.base64urlEncode(signature),
+                enrollment_grant: this._pendingEnrollmentGrant || null,
             }),
         });
         const data = await response.json().catch(() => ({}));
@@ -2478,7 +2484,94 @@ class LemmaWallet {
             throw error;
         }
         this._signingKeyRegistered = true;
+        this._pendingEnrollmentGrant = null;
         return data;
+    }
+
+    async _signalServerUnlock(profile = null) {
+        if (!this._isLemmaDomain()) return { success: false, skipped: true };
+        if (!this.isUnlocked || !this.isUnlocked()) {
+            throw new Error('Wallet must be unlocked to establish a server session');
+        }
+        await this._registerSigningKeyIfNeeded();
+        const activeProfile = profile || await this.getActiveProfile();
+        const body = {
+            wallet_id: this.session.walletId,
+            unlocked_at: this.session.unlockedAt || Date.now(),
+            expires_at: Math.floor((this.session.expiresAt || Date.now()) / 1000),
+            profile_id: activeProfile?.id || DEFAULT_PROFILE_ID,
+            profile_name: activeProfile?.name || 'Personal',
+        };
+        body.wallet_assertion = await this.buildWalletAssertion(
+            ['unlocked_at', 'expires_at', 'profile_id', 'profile_name'],
+            body,
+        );
+        const response = await fetch('/api/wallet/signal-unlock', {
+            method: 'POST',
+            credentials: 'include',
+            headers: this._getSecureHeaders(),
+            body: JSON.stringify(body),
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok || data.success === false) {
+            throw new Error(data.error || `signal-unlock failed (${response.status})`);
+        }
+        this.session.serverSessionActive = true;
+        await this._put('session', { id: 'current', ...this.session });
+        return data;
+    }
+
+    async _performServerWebAuthnUnlock(passkeyRecord, walletId, profile = null) {
+        if (!this._isLemmaDomain()) {
+            throw new Error('Server WebAuthn unlock is only available on lemma.id');
+        }
+        const deviceId = this._deviceId || await this._getOrCreateDeviceId();
+        const beginResponse = await fetch('/api/wallet/session-unlock/begin', {
+            method: 'POST',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                wallet_id: walletId,
+                device_id: deviceId,
+                credential_id: passkeyRecord.credentialId,
+            }),
+        });
+        const begin = await beginResponse.json().catch(() => ({}));
+        if (!beginResponse.ok || !begin.challenge_key || !begin.challenge) {
+            throw new Error(begin.error || `wallet WebAuthn begin failed (${beginResponse.status})`);
+        }
+
+        const rpId = begin.rp_id || this._getRpIdForWebAuthn();
+        const getOptions = await this._publicKeyOptionsWithPrf({
+            challenge: this._base64urlToBuffer(begin.challenge),
+            rpId,
+            allowCredentials: [{
+                id: this._base64urlToBuffer(passkeyRecord.credentialId),
+                type: 'public-key',
+            }],
+            userVerification: 'required',
+            timeout: 60000,
+        }, passkeyRecord.prfWalletId || walletId);
+        const credential = await navigator.credentials.get({ publicKey: getOptions });
+        if (!credential) throw new Error('Passkey authentication cancelled');
+
+        const activeProfile = profile || await this.getActiveProfile();
+        const completeResponse = await fetch('/api/wallet/session-unlock/complete', {
+            method: 'POST',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                challenge_key: begin.challenge_key,
+                credential: this._serializeCredential(credential),
+                profile_id: activeProfile?.id || DEFAULT_PROFILE_ID,
+                profile_name: activeProfile?.name || 'Personal',
+            }),
+        });
+        const complete = await completeResponse.json().catch(() => ({}));
+        if (!completeResponse.ok || complete.success === false) {
+            throw new Error(complete.error || `wallet WebAuthn complete failed (${completeResponse.status})`);
+        }
+        return { credential, session: complete };
     }
 
     async requestWalletChallenge() {
@@ -2744,6 +2837,7 @@ class LemmaWallet {
             throw new Error(`device transfer claim failed: ${err.error || res.status}`);
         }
         const data = await res.json();
+        this._pendingEnrollmentGrant = data.enrollment_grant || null;
         const bundle = data.bundle || {};
         const keys = this._getLemmaKeys();
         const toHex = (bytes) => Array.from(bytes).map((b) => b.toString(16).padStart(2, '0')).join('');
@@ -2762,6 +2856,7 @@ class LemmaWallet {
             ok: true,
             walletId: data.wallet_id,
             masterCredentialId: bundle.master_credential_id || null,
+            enrollmentGrant: data.enrollment_grant || null,
         };
     }
 
@@ -2850,6 +2945,7 @@ class LemmaWallet {
             throw new Error(err.error || `link receive claim failed (${res.status})`);
         }
         const data = await res.json();
+        this._pendingEnrollmentGrant = data.enrollment_grant || null;
         const bundle = data.bundle || {};
         const keys = this._getLemmaKeys();
         let payload;
@@ -2938,7 +3034,7 @@ class LemmaWallet {
                 const tokenRes = await fetch('/api/wallet/link-unlock-token', {
                     method: 'POST',
                     credentials: 'include',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: this._getSecureHeaders(),
                 });
                 if (tokenRes.ok) {
                     const tokenData = await tokenRes.json();
@@ -2995,6 +3091,275 @@ class LemmaWallet {
             throw new Error(err.error || `link send failed (${res.status})`);
         }
         return { success: true, transferId: parsed.transfer_id };
+    }
+
+    // ========================================
+    // Push-based device link, manager QR / transfer link
+    // ========================================
+
+    _parsePushTransferPayload(raw) {
+        let data = String(raw || '').trim();
+        if (!data) throw new Error('Invalid transfer link');
+        if (/^https?:\/\//i.test(data)) {
+            try {
+                const url = new URL(data);
+                if (url.hash && url.hash.length > 1) {
+                    data = url.hash.substring(1);
+                }
+            } catch (_) { /* fall through */ }
+        }
+        if (data[0] !== '{') {
+            let base64 = data.replace(/-/g, '+').replace(/_/g, '/');
+            while (base64.length % 4) base64 += '=';
+            data = atob(base64);
+        }
+        const parsed = JSON.parse(data);
+        if (parsed.v !== 2 || parsed.mode !== 'push' || !parsed.transfer_id) {
+            throw new Error('Invalid transfer link, open the link or scan the QR from your other lemma.id');
+        }
+        return parsed;
+    }
+
+    _randomConfirmCode() {
+        const n = crypto.getRandomValues(new Uint32Array(1))[0] % 1000000;
+        return String(n).padStart(6, '0');
+    }
+
+    /**
+     * SENDER (manager): create a push offer. QR/link carry only transfer_id.
+     * Requires a fresh passkey. Receiver must register before confirmLinkPushDeposit.
+     */
+    async beginLinkPush() {
+        await this.init();
+        await this._requireFreshPasskeyAuth({
+            reason: 'Verify to create a transfer link for another device',
+        });
+        if (!this.isUnlocked()) {
+            await this.unlock({ force: true, isHumanIssuance: false });
+        }
+
+        const walletIdRec = await this._get('passkey', 'walletId');
+        const walletId = walletIdRec?.value || this.session?.walletId || null;
+        if (!walletId) throw new Error('No wallet on this device');
+
+        const keys = this._getLemmaKeys();
+        const idBytes = crypto.getRandomValues(new Uint8Array(24));
+        const transferId = 'linkpush_' + keys.base64urlEncode(idBytes);
+        const confirmCode = this._randomConfirmCode();
+        const LINK_TTL_SEC = 300;
+
+        const body = {
+            action: 'offer',
+            wallet_id: walletId,
+            transfer_id: transferId,
+            confirm_code: confirmCode,
+        };
+        body.wallet_assertion = await this.buildWalletAssertion(
+            ['transfer_id', 'confirm_code'],
+            { transfer_id: transferId, confirm_code: confirmCode },
+        );
+
+        const res = await fetch('/api/wallet/link-receive', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify(body),
+        });
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            throw new Error(err.error || `transfer offer failed (${res.status})`);
+        }
+
+        const payload = { v: 2, mode: 'push', transfer_id: transferId };
+        const payloadB64 = btoa(JSON.stringify(payload))
+            .replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+        const origin = (typeof window !== 'undefined' && window.location?.origin)
+            ? window.location.origin
+            : 'https://lemma.id';
+        const qrUrl = `${origin}/link#${payloadB64}`;
+
+        this._pendingLinkPush = {
+            transferId,
+            confirmCode,
+            startedAt: Date.now(),
+            expiresAt: Date.now() + LINK_TTL_SEC * 1000,
+        };
+
+        return {
+            transferId,
+            confirmCode,
+            qrUrl,
+            qrPayload: JSON.stringify(payload),
+            expiresIn: LINK_TTL_SEC,
+            expiresAt: Date.now() + LINK_TTL_SEC * 1000,
+        };
+    }
+
+    /** SENDER: poll whether the other device has registered its key. */
+    async getLinkPushStatus(transferId) {
+        const id = transferId || this._pendingLinkPush?.transferId;
+        if (!id) throw new Error('No active transfer offer');
+        const res = await fetch('/api/wallet/link-receive', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ action: 'status', transfer_id: id }),
+        });
+        if (res.status === 404) {
+            return { ready: false, status: 'missing' };
+        }
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            throw new Error(err.error || `transfer status failed (${res.status})`);
+        }
+        const data = await res.json();
+        return {
+            ready: data.status === 'registered' && !!data.recv_pubkey,
+            status: data.status,
+            confirmCode: data.confirm_code || null,
+            recvPubkey: data.recv_pubkey || null,
+            hasBundle: !!data.has_bundle,
+        };
+    }
+
+    /**
+     * SENDER: after codes match, seal person-root seeds to the registered device and deposit.
+     */
+    async confirmLinkPushDeposit({ transferId, recvPubkey } = {}) {
+        await this.init();
+        const id = transferId || this._pendingLinkPush?.transferId;
+        let pubkey = recvPubkey;
+        if (!pubkey) {
+            const status = await this.getLinkPushStatus(id);
+            if (!status.ready || !status.recvPubkey) {
+                throw new Error('Other device has not joined yet');
+            }
+            pubkey = status.recvPubkey;
+        }
+        if (!id || !pubkey) throw new Error('transferId and recvPubkey required');
+
+        await this._requireFreshPasskeyAuth({
+            reason: 'Confirm sending your lemma.id to the other device',
+        });
+        if (!this.isUnlocked()) {
+            await this.unlock({ force: true, isHumanIssuance: false });
+        }
+
+        const profile = await this.getActiveProfile();
+        if (!profile?.secret && !this.session?.walletLocalSeed) {
+            throw new Error('No wallet found on this device');
+        }
+
+        const walletIdRec = await this._get('passkey', 'walletId');
+        const walletId = walletIdRec?.value || this.session?.walletId || null;
+
+        await this.fetchAndStoreSeedEnvelopes();
+        const seedHex = this.session?.walletLocalSeed;
+        const proxyHex = this.session?.personRootProxy;
+        if (!seedHex || !proxyHex) {
+            throw new Error('Person-root seeds unavailable; complete IDV or use seed transfer');
+        }
+
+        let unlockToken = null;
+        if (this._isLemmaDomain()) {
+            try {
+                const tokenRes = await fetch('/api/wallet/link-unlock-token', {
+                    method: 'POST',
+                    credentials: 'include',
+                    headers: this._getSecureHeaders(),
+                });
+                if (tokenRes.ok) {
+                    const tokenData = await tokenRes.json();
+                    unlockToken = tokenData.unlock_token || null;
+                }
+            } catch (e) {
+                console.warn('[Lemma] link-unlock-token unavailable for push send:', e.message);
+            }
+        }
+
+        let ishumanCredentials = [];
+        try {
+            await this.syncIsHumanCacheFromWallet();
+            ishumanCredentials = await this.exportIsHumanCredentialsForBridge();
+        } catch (e) {
+            console.warn('[Lemma] Could not export isHuman credentials for push send:', e.message);
+        }
+
+        const LINK_TTL_MS = 300000;
+        const keys = this._getLemmaKeys();
+        const recipientPub = keys.base64urlDecode(pubkey);
+        const sealedSeed = await keys.sealEnvelope(recipientPub, keys.hexToBytes(seedHex));
+        const sealedProxy = await keys.sealEnvelope(recipientPub, keys.hexToBytes(proxyHex));
+
+        const body = {
+            action: 'deposit',
+            wallet_id: walletId,
+            transfer_id: id,
+            recv_pubkey: pubkey,
+            bundle: {
+                sealed_wallet_seed: keys.base64urlEncode(sealedSeed),
+                sealed_person_root_proxy: keys.base64urlEncode(sealedProxy),
+                wallet_id: walletId,
+                profile_id: profile?.id || DEFAULT_PROFILE_ID,
+                profile_name: profile?.name || 'Personal',
+                ishuman_credentials: ishumanCredentials,
+                unlock_token: unlockToken,
+                expires_at: Date.now() + LINK_TTL_MS,
+            },
+        };
+        body.wallet_assertion = await this.buildWalletAssertion(
+            ['transfer_id', 'recv_pubkey'],
+            { transfer_id: id, recv_pubkey: pubkey },
+        );
+
+        const res = await fetch('/api/wallet/link-receive', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify(body),
+        });
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            throw new Error(err.error || `transfer send failed (${res.status})`);
+        }
+        this._pendingLinkPush = null;
+        return { success: true, transferId: id };
+    }
+
+    /**
+     * RECEIVER (empty device): open a push transfer link/QR, bind ephemeral key, await deposit.
+     */
+    async acceptLinkPushOffer(scanInput) {
+        const parsed = this._parsePushTransferPayload(scanInput);
+        const keys = this._getLemmaKeys();
+        const { privateKey, publicKey } = await keys.generateEncryptionKeypair();
+        const recvPubkey = keys.base64urlEncode(publicKey);
+
+        const res = await fetch('/api/wallet/link-receive', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({
+                action: 'register',
+                transfer_id: parsed.transfer_id,
+                recv_pubkey: recvPubkey,
+            }),
+        });
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            throw new Error(err.error || `Could not join transfer (${res.status})`);
+        }
+        const data = await res.json();
+        this._pendingLinkReceive = {
+            transferId: parsed.transfer_id,
+            privateKey,
+            startedAt: Date.now(),
+        };
+        return {
+            transferId: parsed.transfer_id,
+            confirmCode: data.confirm_code || null,
+            expiresIn: data.expires_in || 300,
+        };
     }
 
     // ========================================
@@ -3533,8 +3898,11 @@ class LemmaWallet {
         return !this._siteCredentialLocallyVerifiable(credential);
     }
 
-    async findIsHumanSiteCredential(targetSite) {
+    async findIsHumanSiteCredential(targetSite, options = {}) {
         const canonicalSite = this._canonicalizeSiteDomainForProof(targetSite);
+        const requiredAssurance = String(
+            options.assurance || options.requiredAssurance || '',
+        ).trim().toLowerCase();
         const allCreds = await this.exportIsHumanCredentialsForBridge();
         const matches = allCreds.filter((credential) => {
             const cl = credential.claims || credential.credentialSubject || {};
@@ -3543,7 +3911,22 @@ class LemmaWallet {
                 && this._siteCredentialHasSigningKey(credential);
         });
         if (!matches.length) return null;
+        if (requiredAssurance === 'passkey' || requiredAssurance === 'ishuman') {
+            const tierMatches = matches.filter(
+                (credential) => this._credentialRecordAssurance(credential) === requiredAssurance,
+            );
+            if (!tierMatches.length) return null;
+            return this._sortCredentialsNewestFirst(tierMatches)[0];
+        }
         return this._sortCredentialsNewestFirst(matches)[0];
+    }
+
+    _credentialRecordAssurance(credential) {
+        const claims = credential?.claims || credential?.credentialSubject || {};
+        const raw = String(claims.assurance || '').trim().toLowerCase();
+        if (raw === 'passkey' || raw === 'ishuman') return raw;
+        if (claims.isHuman === true || claims.isHuman === 'true') return 'ishuman';
+        return null;
     }
 
     async findIsHumanMasterCredential() {
@@ -3577,14 +3960,23 @@ class LemmaWallet {
     }
 
     async deriveAndStoreSiteProof(targetSite, options = {}) {
-        await this.ensureIsHumanIssuanceReady({ isHumanIssuance: true });
+        if (!options.skipIssuanceReady) {
+            await this.ensureIsHumanIssuanceReady({
+                isHumanIssuance: options.isHumanIssuance !== false,
+            });
+        }
         await this.reconcileSessionWalletIdForIssuance();
         const canonicalSite = this._canonicalizeSiteDomainForProof(targetSite);
         const issueMode = (options.issueMode || 'site_proof').trim().toLowerCase();
         const forceServerDerive = issueMode === 'fresh_idv' || !!options.forceServerDerive;
+        const requiredAssurance = issueMode === 'fresh_idv'
+            ? 'ishuman'
+            : String(options.requiredAssurance || options.assurance || '').trim().toLowerCase();
 
         if (!forceServerDerive) {
-            const existing = await this.findIsHumanSiteCredential(canonicalSite);
+            const existing = await this.findIsHumanSiteCredential(canonicalSite, {
+                requiredAssurance: requiredAssurance || undefined,
+            });
             if (existing && this._siteCredentialLocallyVerifiable(existing)) {
                 return existing;
             }
@@ -3618,6 +4010,11 @@ class LemmaWallet {
         if (masterId) {
             assertionFieldValues.master_credential_id = masterId;
         }
+        if (requiredAssurance === 'passkey') {
+            assertionFieldNames.push('required_assurance');
+            assertionFieldValues.required_assurance = 'passkey';
+        }
+
         const walletAssertion = await this.buildWalletAssertion(
             assertionFieldNames,
             assertionFieldValues,
@@ -3633,6 +4030,9 @@ class LemmaWallet {
         if (masterId) {
             deriveBody.master_credential_id = masterId;
         }
+        if (requiredAssurance === 'passkey') {
+            deriveBody.required_assurance = 'passkey';
+        }
 
         const deriveRes = await fetch('/api/ishuman/derive-site-proof', {
             method: 'POST',
@@ -3647,6 +4047,9 @@ class LemmaWallet {
 
         const derived = deriveData.credential;
         derived.packageType = derived.packageType || 'identity';
+        if (deriveData.ppid_convergence) {
+            derived.ppidConvergence = deriveData.ppid_convergence;
+        }
         await this.storeCredential(derived);
         await this._putIsHumanCacheRecord(derived);
         await this._finalizeIsHumanIssuance({ isHumanIssuance: true });
@@ -3753,21 +4156,31 @@ class LemmaWallet {
         bloomSequence,
         sessionTtlSec,
         issueMode,
+        requiredAssurance,
     }) {
+        const normalizedIssueMode = (issueMode || 'site_proof').trim().toLowerCase();
+        const tierAssurance = normalizedIssueMode === 'fresh_idv'
+            ? 'ishuman'
+            : String(requiredAssurance || '').trim().toLowerCase();
         // Popup handoffs must always re-derive from the server so the credential
         // is signed by the current federated issuer and includes signatureValueWeb.
         // Reusing a wallet-local copy caused untrusted_issuer after issuer rotation.
         const credential = await this.deriveAndStoreSiteProof(siteId, {
-            issueMode: issueMode || 'site_proof',
+            issueMode: normalizedIssueMode,
             forceServerDerive: true,
+            requiredAssurance: tierAssurance || undefined,
         });
-        return this.signSiteSessionPresentation({
+        const pkg = await this.signSiteSessionPresentation({
             credential,
             siteId,
             sessionNonce,
             bloomSequence,
             sessionTtlSec,
         });
+        if (credential?.ppidConvergence) {
+            pkg.ppid_convergence = credential.ppidConvergence;
+        }
+        return pkg;
     }
 
     async hashActionBody(body) {
@@ -3785,6 +4198,10 @@ class LemmaWallet {
         bodyHash = null,
         nonce,
         ttlSec = 60,
+        requireFreshPasskey = false,
+        serverNonce = '',
+        actionCommitment = '',
+        skipFreshPasskeyPreflight = false,
     }) {
         const ACTION_PRESENTATION_PREFIX = 'lemma:site-action-presentation:v1';
         const ACTION_STAMP_VERSION = 'action_stamp_v1';
@@ -3845,11 +4262,139 @@ class LemmaWallet {
             String(assertion.expires_at_unix ?? ''),
         ].join('\n'));
         const signature = await siteKeys.keypair.sign(payloadBytes);
+        let freshPasskeyAttestation = null;
+        if (requireFreshPasskey) {
+            freshPasskeyAttestation = await this.obtainFreshPasskeyAttestation({
+                siteId: canonicalSite,
+                credential,
+                actionCommitment: actionCommitment || await this._buildActionCommitment({
+                    serverNonce,
+                    siteId: canonicalSite,
+                    action,
+                    method,
+                    path,
+                    bodyHash: resolvedBodyHash,
+                }),
+                skipLocalPreflight: skipFreshPasskeyPreflight,
+            });
+        }
         return {
             action_assertion: assertion,
             action_signature: keys.base64urlEncode(signature),
             bodyHash: resolvedBodyHash,
+            fresh_passkey_attestation: freshPasskeyAttestation,
         };
+    }
+
+    async _buildActionCommitment({
+        serverNonce,
+        siteId,
+        action,
+        method = 'POST',
+        path = '',
+        bodyHash = '',
+    }) {
+        const keys = this._getLemmaKeys();
+        const lines = [
+            'lemma:action-commitment:v1',
+            String(serverNonce || '').trim(),
+            String(siteId || '').trim(),
+            String(action || '').trim(),
+            String(method || 'POST').trim().toUpperCase(),
+            String(path || '').trim(),
+            String(bodyHash || '').trim().toLowerCase(),
+        ];
+        const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(lines.join('\n')));
+        return keys.bytesToHex(new Uint8Array(digest));
+    }
+
+    async obtainFreshPasskeyAttestation({
+        siteId,
+        credential,
+        actionCommitment,
+        skipLocalPreflight = false,
+    }) {
+        await this.init();
+        if (!skipLocalPreflight) {
+            await this._requireFreshPasskeyAuth({ reason: 'Confirm this action' });
+        }
+        const passkey = await this._get('passkey', 'primary');
+        const walletIdRecord = await this._get('passkey', 'walletId');
+        const walletId = walletIdRecord?.value || this.session?.walletId || '';
+        const credentialId = credential?.id || '';
+        const passkeyCredentialId = passkey?.credentialId || '';
+        const subject = credential?.subject || '';
+        if (!siteId || !actionCommitment || !credentialId || !subject || !passkeyCredentialId) {
+            throw new Error('fresh_passkey_inputs_missing');
+        }
+
+        // Backfill wallet_passkeys for wallets created before server binding
+        // or when initial register-device-passkey was skipped during setup.
+        if (this._isLemmaDomain()) {
+            if (!passkey?.publicKey) {
+                throw new Error('passkey_public_key_missing');
+            }
+            await this._registerDevicePasskeyIfPossible(passkey, walletId);
+        }
+
+        const beginRes = await fetch('/api/ishuman/fresh-passkey/begin', {
+            method: 'POST',
+            headers: this._getSecureHeaders(),
+            credentials: 'include',
+            body: JSON.stringify({
+                site_id: siteId,
+                action_commitment: actionCommitment,
+                credential_id: credentialId,
+                passkey_credential_id: passkeyCredentialId,
+                subject,
+                wallet_id: walletId,
+            }),
+        });
+        const beginData = await beginRes.json().catch(() => ({}));
+        if (!beginRes.ok || !beginData.success) {
+            throw new Error(beginData.error || 'fresh_passkey_begin_failed');
+        }
+
+        const challengeBytes = this._base64urlToBuffer(beginData.challenge);
+        const getOptions = await this._publicKeyOptionsWithPrf({
+            challenge: challengeBytes,
+            rpId: this._getRpIdForWebAuthn(),
+            allowCredentials: [{
+                id: this._base64urlToBuffer(passkey.credentialId),
+                type: 'public-key',
+            }],
+            userVerification: 'required',
+            timeout: 60000,
+        }, passkey.prfWalletId || walletId);
+
+        const webauthnCredential = await navigator.credentials.get({ publicKey: getOptions });
+        if (!webauthnCredential) {
+            throw new Error('fresh_passkey_cancelled');
+        }
+
+        const completeRes = await fetch('/api/ishuman/fresh-passkey/complete', {
+            method: 'POST',
+            headers: this._getSecureHeaders(),
+            credentials: 'include',
+            body: JSON.stringify({
+                challenge_key: beginData.challenge_key,
+                credential: {
+                    id: webauthnCredential.id,
+                    rawId: this._bufferToBase64url(webauthnCredential.rawId),
+                    type: webauthnCredential.type,
+                    response: {
+                        authenticatorData: this._bufferToBase64url(webauthnCredential.response.authenticatorData),
+                        clientDataJSON: this._bufferToBase64url(webauthnCredential.response.clientDataJSON),
+                        signature: this._bufferToBase64url(webauthnCredential.response.signature),
+                    },
+                },
+            }),
+        });
+        const completeData = await completeRes.json().catch(() => ({}));
+        if (!completeRes.ok || !completeData.success) {
+            throw new Error(completeData.error || 'fresh_passkey_complete_failed');
+        }
+        return completeData.fresh_passkey_attestation || null;
     }
 
     async ensureIsHumanIssuanceReady(options = {}) {
@@ -4136,37 +4681,19 @@ class LemmaWallet {
 
         console.log(' Wallet unlocked successfully (local passkey verification)');
 
-        // Signal to server that wallet is unlocked (for cross-device sync)
-        // This is a simple state update - no cryptographic verification needed
-        // Security comes from HSM-signed lemmas, not this signal
+        // Establish trusted server state with a server-generated WebAuthn
+        // challenge. The local ceremony above continues to unlock encrypted
+        // storage; this ceremony authorizes the server cookie.
         if (this._isLemmaDomain()) {
             try {
-                const activeProfile = await this.getActiveProfile();
-                console.log('[Lemma] Signaling unlock to server for cross-device sync...');
-                const signalResponse = await fetch('/api/wallet/signal-unlock', {
-                    method: 'POST',
-                    credentials: 'include',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        wallet_id: walletId,
-                        unlocked_at: this.session.unlockedAt,
-                        expires_at: Math.floor(this.session.expiresAt / 1000),
-                        profile_id: activeProfile.id,
-                        profile_name: activeProfile.name
-                    })
-                });
-                if (signalResponse.ok) {
-                    const result = await signalResponse.json();
-                    console.log(`[Lemma]  Server notified of unlock - cross-device sync enabled`);
-                    // Store that we have a server session for this wallet
-                    this.session.serverSessionActive = true;
-                    await this._put('session', { id: 'current', ...this.session });
-                } else {
-                    console.warn('[Lemma] Could not signal unlock to server:', signalResponse.status);
-                }
+                await this._performServerWebAuthnUnlock(passkey, walletId);
+                this.session.serverSessionActive = true;
+                await this._put('session', { id: 'current', ...this.session });
+                console.log('[Lemma] Server-verified session established');
             } catch (e) {
-                console.warn('[Lemma] Could not signal unlock:', e.message);
-                // Non-fatal - local unlock still works, just no cross-device sync
+                console.warn('[Lemma] Could not establish server session:', e.message);
+                // Non-fatal: the local wallet remains unlocked, but no
+                // server-authorized session is created.
             }
         }
 
@@ -4174,10 +4701,6 @@ class LemmaWallet {
         if (!this._isLemmaDomain()) {
             this.startSessionHeartbeat(300000); // 5 minute backup (primary is tab focus)
         }
-
-        this._registerSigningKeyIfNeeded().catch((err) => {
-            console.warn('[Lemma] Wallet signing key registration skipped:', err?.message || err);
-        });
 
         await this._finalizeIsHumanIssuance(options);
 
@@ -4276,24 +4799,9 @@ class LemmaWallet {
                 console.warn('[Lemma] Failed to clear global session:', e.message);
             }
         } else {
-            // Third-party sites cannot directly manage lemma.id cookies reliably.
-            // Phase 2.1: the bridge was removed, so make a best-effort direct call
-            // to lemma.id (may be blocked by CORS) so cross-device signoff can propagate.
-            try {
-                const directResp = await fetch('https://lemma.id/api/wallet/clear-session', {
-                    method: 'POST',
-                    credentials: 'include',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(walletId ? { wallet_id: walletId } : {})
-                });
-                if (directResp.ok) {
-                    console.log('[Lemma]  Direct lock call succeeded');
-                } else {
-                    console.warn('[Lemma] Direct lock returned', directResp.status);
-                }
-            } catch (directErr) {
-                console.warn('[Lemma] Direct lock failed:', directErr.message);
-            }
+            // Third-party origins cannot read lemma.id's CSRF cookie. Lock the
+            // local wallet only; central session removal must occur on lemma.id.
+            console.log('[Lemma] Local wallet locked; central session unchanged');
         }
     }
 
@@ -6954,19 +7462,7 @@ class LemmaWallet {
         // Update server session with new profile (if unlocked on lemma.id)
         if (this.isUnlocked() && this._isLemmaDomain()) {
             try {
-                const walletId = await this._get('passkey', 'walletId');
-                await fetch('/api/wallet/signal-unlock', {
-                    method: 'POST',
-                    credentials: 'include',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        wallet_id: walletId?.value || this.session.walletId,
-                        unlocked_at: this.session.unlockedAt,
-                        expires_at: Math.floor(this.session.expiresAt / 1000),
-                        profile_id: profile.id,
-                        profile_name: profile.name
-                    })
-                });
+                await this._signalServerUnlock(profile);
                 console.log(`[Lemma] Server session updated for profile: ${profile.name}`);
             } catch (e) {
                 console.warn('[Lemma] Could not update server session:', e.message);
@@ -7674,24 +8170,10 @@ class LemmaWallet {
 
             if (!serverSessionSet) {
                 try {
-                    console.log('[Lemma] Signaling unlock to server after device link...');
-                    const signalResponse = await fetch('/api/wallet/signal-unlock', {
-                        method: 'POST',
-                        credentials: 'include',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            wallet_id: payload.walletId,
-                            unlocked_at: this.session.unlockedAt,
-                            expires_at: Math.floor(this.session.expiresAt / 1000),
-                            profile_id: profileId,
-                            profile_name: profileName
-                        })
-                    });
-                    if (signalResponse.ok) {
-                        console.log('[Lemma]  Server notified of linked device unlock');
-                        serverSessionSet = true;
-                        sessionError = null;
-                    }
+                    await this._signalServerUnlock({ id: profileId, name: profileName });
+                    console.log('[Lemma] Server session established for linked device');
+                    serverSessionSet = true;
+                    sessionError = null;
                 } catch (e) {
                     console.warn('[Lemma] Could not signal unlock:', e.message);
                     if (!sessionError) sessionError = e.message;

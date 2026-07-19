@@ -46,6 +46,13 @@ A **permission proof** grants scoped access on a site.
 
 A **presentation** is the signed credential (or derived session artifact) sent to relying parties and APIs.
 
+The security meaning and limitations of passkeys, isHuman credentials, PPIDs,
+wallet assertions, wallet sessions, action stamps, fresh-passkey attestations,
+recovery proofs, and permission credentials are defined in
+`docs/security/HUMAN_AUTH_SECURITY_CONTRACT.md`. In particular, a PPID is an
+account-continuity handle, not an authentication secret, and a wallet session
+does not replace a required wallet-held proof for a protected mutation.
+
 ### Browser headers (platform/admin flows)
 
 Protected platform routes expect:
@@ -86,6 +93,7 @@ Frontend helpers (`lemma-credential-utils.js`):
 ## Related docs
 
 - Integration guide: `docs/integration/ISHUMAN_AGENT_INTEGRATION.md`
+- Human-auth security contract: `docs/security/HUMAN_AUTH_SECURITY_CONTRACT.md`
 - Trust core spec: `docs/architecture/LEMMA_TRUST_CORE_SPEC.md`
 - Agent guardrails: `AGENTS.md` (repo root) and `docs/integration/ISHUMAN_AGENT_INTEGRATION.md`
 

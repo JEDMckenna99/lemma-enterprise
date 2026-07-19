@@ -12,6 +12,7 @@ verifier (Go/Rust/Python). Treat a diff here as a protocol-breaking change.
 
 from __future__ import annotations
 
+import hashlib
 import importlib.util
 import os
 import sys
@@ -186,6 +187,83 @@ def test_session_presentation_payload_format():
     )
     assert mod._build_session_message(assertion) == expected
     assert mod.SESSION_PRESENTATION_PREFIX == "lemma:site-session-presentation:v1"
+
+
+@pytest.mark.unit
+def test_action_stamp_payload_format():
+    """The v1 action-stamp message must remain byte-exact."""
+    pkg_path = REPO_ROOT / "packages" / "ishuman-verify-py" / "lemma_ishuman_verify.py"
+    spec = importlib.util.spec_from_file_location("lemma_ishuman_verify_action_pin", pkg_path)
+    mod = importlib.util.module_from_spec(spec)
+    sys.modules["lemma_ishuman_verify_action_pin"] = mod
+    spec.loader.exec_module(mod)
+
+    assertion = {
+        "version": "action_stamp_v1",
+        "site_id": "example.com",
+        "credential_id": "ishuman_site_1",
+        "subject": "did:lemma:ppid_abc",
+        "assurance": "ishuman",
+        "action": "checkout",
+        "method": "POST",
+        "path": "/api/checkout",
+        "body_hash": "a" * 64,
+        "nonce": "nonce_1",
+        "issued_at_unix": 1700000000,
+        "expires_at_unix": 1700000060,
+    }
+    expected = (
+        b"lemma:site-action-presentation:v1\naction_stamp_v1\nexample.com\n"
+        b"ishuman_site_1\ndid:lemma:ppid_abc\nishuman\ncheckout\nPOST\n"
+        b"/api/checkout\n"
+        + (b"a" * 64)
+        + b"\nnonce_1\n1700000000\n1700000060"
+    )
+
+    assert mod._build_action_message(assertion) == expected
+    assert mod.ACTION_STAMP_VERSION == "action_stamp_v1"
+
+
+@pytest.mark.unit
+def test_fresh_passkey_payload_formats():
+    """Action commitments and fresh-passkey attestations are byte-pinned."""
+    from api.fresh_passkey_attestation import (
+        build_action_commitment,
+        build_fresh_passkey_canonical_message,
+    )
+
+    commitment = build_action_commitment(
+        server_nonce="server_nonce_1",
+        site_id="example.com",
+        action="checkout",
+        method="post",
+        path="/api/checkout",
+        body_hash="b" * 64,
+    )
+    commitment_input = (
+        b"lemma:action-commitment:v1\nserver_nonce_1\nexample.com\ncheckout\n"
+        b"POST\n/api/checkout\n"
+        + (b"b" * 64)
+    )
+    assert commitment == hashlib.sha256(commitment_input).hexdigest()
+
+    artifact = {
+        "schema": "fresh_passkey_attestation.v1",
+        "site_id": "example.com",
+        "credential_id": "ishuman_site_1",
+        "subject": "did:lemma:ppid_abc",
+        "action_commitment": commitment,
+        "attestation_id": "fpa_1",
+        "issued_at_unix": 1700000000,
+        "expires_at_unix": 1700000120,
+    }
+    expected = (
+        b"lemma:fresh-passkey-attestation:v1\nfresh_passkey_attestation.v1\n"
+        b"example.com\nishuman_site_1\ndid:lemma:ppid_abc\n"
+        + commitment.encode("ascii")
+        + b"\nfpa_1\n1700000000\n1700000120"
+    )
+    assert build_fresh_passkey_canonical_message(artifact) == expected
 
 
 @pytest.mark.unit

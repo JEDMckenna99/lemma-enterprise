@@ -25,13 +25,13 @@ def test_root_is_home_and_app_is_manager(monkeypatch):
         product = client.get("/home")
 
     assert root.status_code == 200
-    assert b"Human proofs for abuse-resistant accounts" in root.data
+    assert b"Stop the same abuser" in root.data
     assert b"assurance-levels" in root.data
     assert manager.status_code == 200
     assert b'id="create-wallet-btn"' in manager.data
     assert b"Create my lemma.id" in manager.data
     assert product.status_code == 200
-    assert b"Human proofs for abuse-resistant accounts" in product.data
+    assert b"Stop the same abuser" in product.data
     assert b"assurance-levels" in product.data
 
 
@@ -48,7 +48,8 @@ def test_brand_and_manager_creation_use_canonical_routes():
     assert 'stroke="currentColor"' in layout
     assert 'id="wallet-logo"' in manager
     assert 'stroke="currentColor"' in manager
-    assert 'wallet-logo.is-unlocked' in (ROOT / "static" / "css" / "wallet.css").read_text(encoding="utf-8")
+    assert ".wallet-logo.is-unlocked" in manager
+    assert "#4E3D8F" in manager
     assert '<a href="/home" class="nav-link" id="nav-product">' in layout
     assert "new URL('/wallet/ishuman-idv', window.location.origin)" in manager
     assert "popupUrl.searchParams.set('site_id', 'lemma.id')" in manager

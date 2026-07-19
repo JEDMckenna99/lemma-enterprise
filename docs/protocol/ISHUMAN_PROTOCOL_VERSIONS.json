@@ -1,0 +1,186 @@
+{
+  "registry_version": "1.0.0",
+  "current_epoch": "human-auth-v1",
+  "unknown_version_policy": "fail_closed",
+  "migration_policy": "docs/protocol/ISHUMAN_PROTOCOL_MIGRATION_POLICY.md",
+  "canonical_messages": "docs/cryptographic/CANONICAL_MESSAGES.md",
+  "artifacts": [
+    {
+      "artifact_id": "site_ppid",
+      "version": "v1",
+      "wire_marker": "lemma.id/site-ppid/v1",
+      "marker_type": "derivation_prefix",
+      "status": "explicit",
+      "canonical_section": "## 1. Pairwise PPID",
+      "migration_class": "derived_identifier",
+      "source_assertions": [
+        {"path": "api/identity_roots.py", "contains": "SITE_PPID_MSG_PREFIX = \"lemma.id/site-ppid/v1\""}
+      ]
+    },
+    {
+      "artifact_id": "document_root",
+      "version": "v2",
+      "wire_marker": "lemma.identity.document-root.v2",
+      "marker_type": "schema",
+      "status": "explicit_with_legacy_v1",
+      "canonical_section": "## 2. Document root hash",
+      "migration_class": "root_material",
+      "source_assertions": [
+        {"path": "api/identity_roots.py", "contains": "DOCUMENT_ROOT_SCHEMA_V2 = \"lemma.identity.document-root.v2\""},
+        {"path": "api/identity_roots.py", "contains": "DOCUMENT_ROOT_SCHEMA = \"lemma.identity.document-root.v1\""}
+      ]
+    },
+    {
+      "artifact_id": "person_root",
+      "version": "v1",
+      "wire_marker": "lemma.id/person-root/v1",
+      "marker_type": "hkdf_info",
+      "status": "explicit",
+      "canonical_section": "## 3. Person root",
+      "migration_class": "root_material",
+      "source_assertions": [
+        {"path": "api/identity_roots.py", "contains": "PERSON_ROOT_HKDF_INFO = b\"lemma.id/person-root/v1\""}
+      ]
+    },
+    {
+      "artifact_id": "ishuman_credential",
+      "version": "browser_canonical_v1",
+      "wire_marker": "proof.signatureValueWeb",
+      "marker_type": "shape_discriminator",
+      "status": "implicit_legacy",
+      "canonical_section": "## 4. isHuman credential",
+      "migration_class": "signed_artifact",
+      "source_assertions": [
+        {"path": "api/ishuman.py", "contains": "proof[\"signatureValueWeb\"] = browser_sig_hex"},
+        {"path": "packages/ishuman-verify-py/lemma_ishuman_verify.py", "contains": "def browser_canonical_message(credential: dict) -> bytes:"}
+      ]
+    },
+    {
+      "artifact_id": "site_session_presentation",
+      "version": "v1",
+      "wire_marker": "lemma:site-session-presentation:v1",
+      "marker_type": "canonical_prefix",
+      "status": "explicit",
+      "canonical_section": "## 5. Session presentation payload",
+      "migration_class": "signed_artifact",
+      "source_assertions": [
+        {"path": "packages/ishuman-verify-py/lemma_ishuman_verify.py", "contains": "SESSION_PRESENTATION_PREFIX = \"lemma:site-session-presentation:v1\""},
+        {"path": "packages/ishuman-verify-js/index.mjs", "contains": "const SESSION_PRESENTATION_PREFIX = \"lemma:site-session-presentation:v1\";"}
+      ]
+    },
+    {
+      "artifact_id": "wallet_assertion",
+      "version": "v1",
+      "wire_marker": "build_assertion_payload",
+      "marker_type": "registered_canonical_function",
+      "status": "implicit_legacy",
+      "canonical_section": "## 6. Wallet assertion payload",
+      "migration_class": "signed_artifact",
+      "source_assertions": [
+        {"path": "api/wallet_keys.py", "contains": "def build_assertion_payload("}
+      ]
+    },
+    {
+      "artifact_id": "wallet_master_secret",
+      "version": "v1",
+      "wire_marker": "LEMMA_PPID_ROOT_KEY",
+      "marker_type": "registered_derivation",
+      "status": "implicit_legacy",
+      "canonical_section": "## 7. Wallet master secret derivation",
+      "migration_class": "root_material",
+      "source_assertions": [
+        {"path": "api/ppid.py", "contains": "def derive_master_secret_from_wallet_secret("}
+      ]
+    },
+    {
+      "artifact_id": "bloom_snapshot",
+      "version": "v1",
+      "wire_marker": "lemma:bloom-snapshot:v1",
+      "marker_type": "canonical_prefix",
+      "status": "explicit",
+      "canonical_section": "## 8. Bloom snapshot and issuer trust list envelopes",
+      "migration_class": "signed_envelope",
+      "source_assertions": [
+        {"path": "api/bloom_snapshot.py", "contains": "BLOOM_SNAPSHOT_PREFIX = \"lemma:bloom-snapshot:v1\""},
+        {"path": "packages/ishuman-verify-py/lemma_ishuman_verify.py", "contains": "BLOOM_SNAPSHOT_PREFIX = \"lemma:bloom-snapshot:v1\""}
+      ]
+    },
+    {
+      "artifact_id": "issuer_trust_list",
+      "version": "v1",
+      "wire_marker": "lemma:issuer-trust-list:v1",
+      "marker_type": "canonical_prefix",
+      "status": "explicit",
+      "canonical_section": "## 8. Bloom snapshot and issuer trust list envelopes",
+      "migration_class": "signed_envelope",
+      "source_assertions": [
+        {"path": "api/issuer_trust_list.py", "contains": "TRUST_LIST_PREFIX = \"lemma:issuer-trust-list:v1\""},
+        {"path": "packages/ishuman-verify-py/lemma_ishuman_verify.py", "contains": "TRUST_LIST_PREFIX = \"lemma:issuer-trust-list:v1\""}
+      ]
+    },
+    {
+      "artifact_id": "ppid_convergence",
+      "version": "v1",
+      "wire_marker": "ppid_convergence.v1",
+      "marker_type": "schema_and_canonical_prefix",
+      "status": "explicit",
+      "canonical_section": "## 9. PPID convergence artifact",
+      "migration_class": "signed_artifact",
+      "source_assertions": [
+        {"path": "api/ppid_convergence.py", "contains": "CONVERGENCE_SCHEMA = \"ppid_convergence.v1\""},
+        {"path": "api/ppid_convergence.py", "contains": "CONVERGENCE_PREFIX = \"lemma:ppid-convergence:v1\""}
+      ]
+    },
+    {
+      "artifact_id": "action_commitment",
+      "version": "v1",
+      "wire_marker": "lemma:action-commitment:v1",
+      "marker_type": "canonical_prefix",
+      "status": "explicit",
+      "canonical_section": "## 10. Fresh-passkey attestation",
+      "migration_class": "derived_identifier",
+      "source_assertions": [
+        {"path": "api/fresh_passkey_attestation.py", "contains": "ACTION_COMMITMENT_PREFIX = \"lemma:action-commitment:v1\""}
+      ]
+    },
+    {
+      "artifact_id": "fresh_passkey_attestation",
+      "version": "v1",
+      "wire_marker": "fresh_passkey_attestation.v1",
+      "marker_type": "schema_and_canonical_prefix",
+      "status": "explicit",
+      "canonical_section": "## 10. Fresh-passkey attestation",
+      "migration_class": "signed_artifact",
+      "source_assertions": [
+        {"path": "api/fresh_passkey_attestation.py", "contains": "FRESH_PASSKEY_SCHEMA = \"fresh_passkey_attestation.v1\""},
+        {"path": "api/fresh_passkey_attestation.py", "contains": "FRESH_PASSKEY_PREFIX = \"lemma:fresh-passkey-attestation:v1\""}
+      ]
+    },
+    {
+      "artifact_id": "action_stamp",
+      "version": "v1",
+      "wire_marker": "action_stamp_v1",
+      "marker_type": "schema_and_canonical_prefix",
+      "status": "explicit",
+      "canonical_section": "## 11. Action stamp",
+      "migration_class": "signed_artifact",
+      "source_assertions": [
+        {"path": "packages/ishuman-verify-py/lemma_ishuman_verify.py", "contains": "ACTION_STAMP_VERSION = \"action_stamp_v1\""},
+        {"path": "packages/ishuman-verify-py/lemma_ishuman_verify.py", "contains": "ACTION_PRESENTATION_PREFIX = \"lemma:site-action-presentation:v1\""},
+        {"path": "packages/ishuman-verify-js/index.mjs", "contains": "const ACTION_STAMP_VERSION = \"action_stamp_v1\";"}
+      ]
+    },
+    {
+      "artifact_id": "presentation_envelope",
+      "version": "presentation_v1",
+      "wire_marker": "credential",
+      "marker_type": "registered_shape",
+      "status": "implicit_legacy",
+      "canonical_section": "## 12. Presentation envelope",
+      "migration_class": "composite_envelope",
+      "source_assertions": [
+        {"path": "packages/ishuman-verify-py/lemma_ishuman_verify.py", "contains": "credential = (presentation or {}).get(\"credential\")"}
+      ]
+    }
+  ]
+}

@@ -6,7 +6,7 @@
 {% block preload_scripts %}
 <link rel="preload" href="{{ url_for('static', filename='js/lemma-keys.js') }}?v=8" as="script">
 <link rel="preload" href="{{ url_for('static', filename='js/wallet-at-rest-crypto.js') }}?v=2" as="script">
-<link rel="preload" href="{{ url_for('static', filename='js/lemma-wallet.js') }}?v=2678" as="script">
+<link rel="preload" href="{{ url_for('static', filename='js/lemma-wallet.js') }}?v=2687" as="script">
 <link rel="preload" href="{{ url_for('static', filename='js/lemma-credential-utils.js') }}?v=2" as="script">
 {% endblock %}
 
@@ -794,7 +794,7 @@ async function clearWallet() {
             await fetch('/api/wallet/clear-session', {
                 method: 'POST',
                 credentials: 'include',
-                headers: { 'Content-Type': 'application/json' },
+                headers: wallet?._getSecureHeaders?.() || { 'Content-Type': 'application/json' },
                 body: JSON.stringify(walletId ? { wallet_id: walletId } : {}),
             });
         } catch (err) {
@@ -873,20 +873,10 @@ async function applySessionDuration(options = {}) {
     wallet.session.expiresAt = unlockedAt + sessionMs;
     await wallet._put('session', { id: 'current', ...wallet.session });
 
-    const info = await wallet.getWalletInfo();
     const onLemmaId = /^(www\.)?lemma\.id$/i.test(window.location.hostname.replace(/^www\./i, ''));
-    if (info.walletId && onLemmaId) {
+    if (onLemmaId) {
         try {
-            await fetch('/api/wallet/signal-unlock', {
-                method: 'POST',
-                credentials: 'include',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    wallet_id: info.walletId,
-                    unlocked_at: unlockedAt,
-                    expires_at: Math.floor(wallet.session.expiresAt / 1000)
-                })
-            });
+            await wallet._signalServerUnlock();
         } catch (e) {
             console.warn('[Settings] Could not sync unlock duration to server:', e.message);
         }

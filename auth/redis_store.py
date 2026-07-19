@@ -77,6 +77,39 @@ def store(key: str, value: dict, ttl_seconds: int = 300) -> bool:
     return True
 
 
+def store_nx(key: str, value: dict, ttl_seconds: int = 300) -> bool:
+    """Store a value only if the key does not already exist.
+
+    Returns True when this caller created the key, False when it already
+    existed or the write failed closed.
+    """
+    full_key = f"lemma:{key}"
+    payload = json.dumps(value)
+
+    redis_client = get_redis_client()
+    if redis_client:
+        try:
+            created = redis_client.set(full_key, payload, nx=True, ex=ttl_seconds)
+            return bool(created)
+        except Exception as e:
+            logger.error(f"Redis store_nx failed: {e}")
+            return False
+
+    with _memory_lock:
+        entry = _memory_store.get(full_key)
+        if entry:
+            expires_at = datetime.fromisoformat(entry["expires_at"])
+            if datetime.now(timezone.utc) <= expires_at:
+                return False
+            del _memory_store[full_key]
+        expires_at = datetime.now(timezone.utc) + timedelta(seconds=ttl_seconds)
+        _memory_store[full_key] = {
+            "value": value,
+            "expires_at": expires_at.isoformat(),
+        }
+    return True
+
+
 def get(key: str) -> Optional[dict]:
     """
     Retrieve a stored value.
@@ -142,6 +175,35 @@ def delete(key: str) -> bool:
             del _memory_store[full_key]
             return True
         return False
+
+
+def consume(key: str) -> Optional[dict]:
+    """Atomically retrieve and delete one-time state.
+
+    Redis ``GETDEL`` provides the production atomicity guarantee. The
+    in-memory fallback performs the same operation under the module lock for
+    development and tests. Redis errors fail closed rather than falling
+    through to a different store that may contain stale state.
+    """
+    full_key = f"lemma:{key}"
+
+    redis_client = get_redis_client()
+    if redis_client:
+        try:
+            data = redis_client.getdel(full_key)
+            return json.loads(data) if data else None
+        except Exception as e:
+            logger.error(f"Redis consume failed: {e}")
+            return None
+
+    with _memory_lock:
+        entry = _memory_store.pop(full_key, None)
+        if not entry:
+            return None
+        expires_at = datetime.fromisoformat(entry['expires_at'])
+        if datetime.now(timezone.utc) > expires_at:
+            return None
+        return entry['value']
 
 
 def cleanup_expired() -> int:
