@@ -91,7 +91,7 @@ const AUTH_STATE = {
 class LemmaWallet {
     // SDK version - check with LemmaWallet.VERSION
     // v2.32.0: Redirect-only architecture - removed popup flow for simpler, consistent UX
-    static VERSION = '2.74.0';  // v2.74: device-bound signing keys + person-root link transfer
+    static VERSION = '2.75.0';  // v2.75: asserted sessions + authorized device enrollment
 
     static DEVICE_IDB_NAMES = ['LemmaWallet', 'LemmaWalletWrap'];
 
@@ -2096,11 +2096,6 @@ class LemmaWallet {
 
         await this._put('passkey', passkeyRecord);
         console.log('[Lemma]  Passkey created locally');
-        try {
-            await this._registerDevicePasskeyIfPossible(passkeyRecord, walletId.value);
-        } catch (err) {
-            console.warn('[Lemma] Wallet passkey server binding skipped:', err?.message || err);
-        }
         if (prfBound) {
             await this._migratePlaintextStores();
         }
@@ -2158,38 +2153,23 @@ class LemmaWallet {
         await this._put('session', { id: 'current', ...this.session });
         console.log(' Wallet created and auto-unlocked after passkey registration');
 
-        // Signal to server for cross-device sync (simple state update)
+        await this._registerSigningKeyIfNeeded();
+        try {
+            await this._registerDevicePasskeyIfPossible(passkeyRecord, walletId.value);
+        } catch (err) {
+            console.warn('[Lemma] Wallet passkey server binding skipped:', err?.message || err);
+        }
+
+        // Establish server session from the enrolled device assertion.
         if (this._isLemmaDomain()) {
-                try {
-                    const activeProfile = await this.getActiveProfile();
+            try {
                 console.log('[Lemma] Signaling new wallet unlock to server...');
-                const signalResponse = await fetch('/api/wallet/signal-unlock', {
-                        method: 'POST',
-                        credentials: 'include',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            wallet_id: walletId.value,
-                            unlocked_at: this.session.unlockedAt,
-                        expires_at: Math.floor(this.session.expiresAt / 1000),
-                            profile_id: activeProfile.id,
-                        profile_name: activeProfile.name
-                        })
-                    });
-                if (signalResponse.ok) {
-                    console.log('[Lemma]  Server notified - cross-device sync enabled');
-                    this.session.serverSessionActive = true;
-                    await this._put('session', { id: 'current', ...this.session });
-                    } else {
-                    console.warn('[Lemma] Could not signal to server:', signalResponse.status);
-                    }
-                } catch (e) {
+                await this._signalServerUnlock();
+                console.log('[Lemma] Server session established');
+            } catch (e) {
                 console.warn('[Lemma] Could not signal to server:', e.message);
             }
         }
-
-        this._registerSigningKeyIfNeeded().catch((err) => {
-            console.warn('[Lemma] Wallet signing key registration skipped:', err?.message || err);
-        });
 
         await this._finalizeIsHumanIssuance(options);
 
@@ -2314,6 +2294,7 @@ class LemmaWallet {
 
     async ensureDeviceEnrollmentAfterSeedTransfer(result) {
         await this.init();
+        this._pendingEnrollmentGrant = result?.enrollmentGrant || this._pendingEnrollmentGrant || null;
         if (!this.session?.walletLocalSeed || !this.session?.personRootProxy) {
             throw new Error('Seed transfer incomplete');
         }
@@ -2438,21 +2419,6 @@ class LemmaWallet {
         this.session.walletId = replacementWalletId;
         await this._put('session', { id: 'current', ...this.session });
         this._signingKeyRegistered = false;
-
-        try {
-            await fetch('/api/wallet/signal-unlock', {
-                method: 'POST',
-                credentials: 'include',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    wallet_id: replacementWalletId,
-                    unlocked_at: this.session.unlockedAt || Date.now(),
-                    expires_at: Math.floor((this.session.expiresAt || Date.now()) / 1000),
-                }),
-            });
-        } catch (_) {
-            // Local recovery remains valid; global-session sync is best effort.
-        }
         return replacementWalletId;
     }
 
@@ -2473,6 +2439,7 @@ class LemmaWallet {
                 device_id: deviceId,
                 pubkey: pubkeyB64,
                 signature: keys.base64urlEncode(signature),
+                enrollment_grant: this._pendingEnrollmentGrant || null,
             }),
         });
         const data = await response.json().catch(() => ({}));
@@ -2482,6 +2449,40 @@ class LemmaWallet {
             throw error;
         }
         this._signingKeyRegistered = true;
+        this._pendingEnrollmentGrant = null;
+        return data;
+    }
+
+    async _signalServerUnlock(profile = null) {
+        if (!this._isLemmaDomain()) return { success: false, skipped: true };
+        if (!this.isUnlocked || !this.isUnlocked()) {
+            throw new Error('Wallet must be unlocked to establish a server session');
+        }
+        await this._registerSigningKeyIfNeeded();
+        const activeProfile = profile || await this.getActiveProfile();
+        const body = {
+            wallet_id: this.session.walletId,
+            unlocked_at: this.session.unlockedAt || Date.now(),
+            expires_at: Math.floor((this.session.expiresAt || Date.now()) / 1000),
+            profile_id: activeProfile?.id || DEFAULT_PROFILE_ID,
+            profile_name: activeProfile?.name || 'Personal',
+        };
+        body.wallet_assertion = await this.buildWalletAssertion(
+            ['unlocked_at', 'expires_at', 'profile_id', 'profile_name'],
+            body,
+        );
+        const response = await fetch('/api/wallet/signal-unlock', {
+            method: 'POST',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok || data.success === false) {
+            throw new Error(data.error || `signal-unlock failed (${response.status})`);
+        }
+        this.session.serverSessionActive = true;
+        await this._put('session', { id: 'current', ...this.session });
         return data;
     }
 
@@ -2748,6 +2749,7 @@ class LemmaWallet {
             throw new Error(`device transfer claim failed: ${err.error || res.status}`);
         }
         const data = await res.json();
+        this._pendingEnrollmentGrant = data.enrollment_grant || null;
         const bundle = data.bundle || {};
         const keys = this._getLemmaKeys();
         const toHex = (bytes) => Array.from(bytes).map((b) => b.toString(16).padStart(2, '0')).join('');
@@ -2766,6 +2768,7 @@ class LemmaWallet {
             ok: true,
             walletId: data.wallet_id,
             masterCredentialId: bundle.master_credential_id || null,
+            enrollmentGrant: data.enrollment_grant || null,
         };
     }
 
@@ -2854,6 +2857,7 @@ class LemmaWallet {
             throw new Error(err.error || `link receive claim failed (${res.status})`);
         }
         const data = await res.json();
+        this._pendingEnrollmentGrant = data.enrollment_grant || null;
         const bundle = data.bundle || {};
         const keys = this._getLemmaKeys();
         let payload;
@@ -4589,37 +4593,15 @@ class LemmaWallet {
 
         console.log(' Wallet unlocked successfully (local passkey verification)');
 
-        // Signal to server that wallet is unlocked (for cross-device sync)
-        // This is a simple state update - no cryptographic verification needed
-        // Security comes from HSM-signed lemmas, not this signal
+        // Establish server state from an enrolled device assertion.
         if (this._isLemmaDomain()) {
             try {
-                const activeProfile = await this.getActiveProfile();
-                console.log('[Lemma] Signaling unlock to server for cross-device sync...');
-                const signalResponse = await fetch('/api/wallet/signal-unlock', {
-                    method: 'POST',
-                    credentials: 'include',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        wallet_id: walletId,
-                        unlocked_at: this.session.unlockedAt,
-                        expires_at: Math.floor(this.session.expiresAt / 1000),
-                        profile_id: activeProfile.id,
-                        profile_name: activeProfile.name
-                    })
-                });
-                if (signalResponse.ok) {
-                    const result = await signalResponse.json();
-                    console.log(`[Lemma]  Server notified of unlock - cross-device sync enabled`);
-                    // Store that we have a server session for this wallet
-                    this.session.serverSessionActive = true;
-                    await this._put('session', { id: 'current', ...this.session });
-                } else {
-                    console.warn('[Lemma] Could not signal unlock to server:', signalResponse.status);
-                }
+                await this._signalServerUnlock();
+                console.log('[Lemma] Server session established');
             } catch (e) {
                 console.warn('[Lemma] Could not signal unlock:', e.message);
-                // Non-fatal - local unlock still works, just no cross-device sync
+                // Non-fatal: the local wallet remains unlocked, but no
+                // server-authorized session is created.
             }
         }
 
@@ -4627,10 +4609,6 @@ class LemmaWallet {
         if (!this._isLemmaDomain()) {
             this.startSessionHeartbeat(300000); // 5 minute backup (primary is tab focus)
         }
-
-        this._registerSigningKeyIfNeeded().catch((err) => {
-            console.warn('[Lemma] Wallet signing key registration skipped:', err?.message || err);
-        });
 
         await this._finalizeIsHumanIssuance(options);
 
@@ -7407,19 +7385,7 @@ class LemmaWallet {
         // Update server session with new profile (if unlocked on lemma.id)
         if (this.isUnlocked() && this._isLemmaDomain()) {
             try {
-                const walletId = await this._get('passkey', 'walletId');
-                await fetch('/api/wallet/signal-unlock', {
-                    method: 'POST',
-                    credentials: 'include',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        wallet_id: walletId?.value || this.session.walletId,
-                        unlocked_at: this.session.unlockedAt,
-                        expires_at: Math.floor(this.session.expiresAt / 1000),
-                        profile_id: profile.id,
-                        profile_name: profile.name
-                    })
-                });
+                await this._signalServerUnlock(profile);
                 console.log(`[Lemma] Server session updated for profile: ${profile.name}`);
             } catch (e) {
                 console.warn('[Lemma] Could not update server session:', e.message);
@@ -8127,24 +8093,10 @@ class LemmaWallet {
 
             if (!serverSessionSet) {
                 try {
-                    console.log('[Lemma] Signaling unlock to server after device link...');
-                    const signalResponse = await fetch('/api/wallet/signal-unlock', {
-                        method: 'POST',
-                        credentials: 'include',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            wallet_id: payload.walletId,
-                            unlocked_at: this.session.unlockedAt,
-                            expires_at: Math.floor(this.session.expiresAt / 1000),
-                            profile_id: profileId,
-                            profile_name: profileName
-                        })
-                    });
-                    if (signalResponse.ok) {
-                        console.log('[Lemma]  Server notified of linked device unlock');
-                        serverSessionSet = true;
-                        sessionError = null;
-                    }
+                    await this._signalServerUnlock({ id: profileId, name: profileName });
+                    console.log('[Lemma] Server session established for linked device');
+                    serverSessionSet = true;
+                    sessionError = null;
                 } catch (e) {
                     console.warn('[Lemma] Could not signal unlock:', e.message);
                     if (!sessionError) sessionError = e.message;

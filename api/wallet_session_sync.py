@@ -579,24 +579,10 @@ def set_session():
 
 @wallet_session_sync_bp.route('/api/wallet/init-first-session', methods=['POST', 'OPTIONS'])
 def init_first_session():
-    """
-    Initialize first session for a NEW wallet (no prior session exists).
-    
-    This is called after local passkey creation on lemma.id when there's no
-    existing server session. It creates the initial session and returns an
-    unlock_token for cross-device SSO.
-    
-    SECURITY:
-    - Only works if NO session exists for this wallet_id yet
-    - Only allowed from lemma.id origin
-    - Rate limited to prevent abuse
-    
-    Request body:
-        - wallet_id: The newly created wallet's ID
-    
-    Returns:
-        - unlock_token: Token for set-session calls
-        - success: true if session created
+    """Retired wallet-id-only bootstrap.
+
+    New wallets register a signing key and establish a session through
+    ``signal-unlock`` with a purpose-bound wallet assertion.
     """
     # Handle CORS preflight
     if request.method == 'OPTIONS':
@@ -616,112 +602,18 @@ def init_first_session():
         response.headers.update(_cors_headers(origin))
         return response, 403
     
-    data = request.get_json() or {}
-    wallet_id = data.get('wallet_id')
-    
-    if not wallet_id:
-        response = jsonify({'success': False, 'error': 'wallet_id required'})
-        response.headers.update(_cors_headers(origin))
-        return response, 400
-    
-    # SECURITY: Check if session already exists for this wallet
-    existing_session = _get_global_session(wallet_id)
-    if existing_session:
-        # Wallet already has a session - don't override
-        # User should use normal unlock flow
-        response = jsonify({
-            'success': False,
-            'error': 'session_exists',
-            'message': 'Wallet already has a session. Use normal unlock flow.'
-        })
-        response.headers.update(_cors_headers(origin))
-        return response, 409  # Conflict
-    
-    # Create new session for this wallet
-    unlocked_at = int(time.time() * 1000)
-    expires_at = int(time.time()) + SESSION_DURATION
-    
-    # Generate unlock_token
-    unlock_token = generate_unlock_token(
-        wallet_id=wallet_id,
-        unlocked_at=unlocked_at,
-        expires_at=expires_at
-    )
-    
-    # Store global session
-    global_stored = _store_global_session(
-        wallet_id=wallet_id,
-        unlocked_at=unlocked_at,
-        expires_at=expires_at,
-        profile_id='default',
-        profile_name='Personal'
-    )
-    
-    # Generate session token for cookie
-    session_token = generate_session_token(wallet_id, unlocked_at)
-    csrf_token = secrets.token_urlsafe(32)
-    
-    logger.info(f"✅ First session initialized for new wallet {wallet_id[:8]}...")
-    
     response = jsonify({
-        'success': True,
-        'wallet_id': wallet_id,
-        'unlock_token': unlock_token,
-        'expires_at': expires_at,
-        'global_session_stored': global_stored
+        'success': False,
+        'error': 'first_session_route_retired',
+        'message': 'Register the wallet signing key, then use signal-unlock with a wallet assertion.',
     })
-    
     response.headers.update(_cors_headers(origin))
-    
-    # Set session cookie
-    response.set_cookie(
-        SESSION_COOKIE_NAME,
-        session_token,
-        max_age=SESSION_DURATION,
-        httponly=True,
-        secure=True,
-        samesite='None',
-        path='/'
-    )
-    response.set_cookie(
-        CSRF_COOKIE_NAME,
-        csrf_token,
-        max_age=SESSION_DURATION,
-        httponly=False,
-        secure=True,
-        samesite='None',
-        path='/'
-    )
-    
-    return response
+    return response, 410
 
 
 @wallet_session_sync_bp.route('/api/wallet/signal-unlock', methods=['POST', 'OPTIONS'])
 def signal_unlock():
-    """
-    Signal that a wallet has been unlocked via local passkey verification.
-    
-    This is a SIMPLE endpoint that just stores unlock state for cross-device sync.
-    NO cryptographic verification is done here - that's intentional!
-    
-    Security model:
-    - The passkey protects ACCESS to the wallet secret (local verification)
-    - HSM-signed lemmas provide the actual authorization/security
-    - This endpoint just enables cross-device convenience ("one passkey per day")
-    
-    A malicious client could call this without actually verifying a passkey,
-    but that's harmless because:
-    1. They still can't get the wallet secret (stored locally, protected by passkey)
-    2. They still can't forge lemmas (requires HSM signature)
-    3. They can only set unlock state for wallet IDs they know
-    
-    Request body:
-        - wallet_id: The wallet that was unlocked
-        - unlocked_at: Timestamp of unlock (ms)
-        - expires_at: When session expires (seconds)
-        - profile_id: Active profile ID (optional)
-        - profile_name: Active profile name (optional)
-    """
+    """Create server wallet-session state from an enrolled device assertion."""
     # Handle CORS preflight
     if request.method == 'OPTIONS':
         response = make_response()
@@ -741,16 +633,46 @@ def signal_unlock():
         return response, 403
     
     data = request.get_json() or {}
-    wallet_id = data.get('wallet_id')
-    unlocked_at = data.get('unlocked_at', int(time.time() * 1000))
-    expires_at = data.get('expires_at', int(time.time()) + SESSION_DURATION)
-    profile_id = data.get('profile_id', 'default')
-    profile_name = data.get('profile_name', 'Personal')
+    wallet_id = str(data.get('wallet_id') or '').strip()
+    requested_unlocked_at = int(data.get('unlocked_at') or int(time.time() * 1000))
+    requested_expires_at = int(data.get('expires_at') or int(time.time()) + SESSION_DURATION)
+    profile_id = str(data.get('profile_id') or 'default')
+    profile_name = str(data.get('profile_name') or 'Personal')
     
     if not wallet_id:
         response = jsonify({'success': False, 'error': 'wallet_id required'})
         response.headers.update(_cors_headers(origin))
         return response, 400
+
+    from api.wallet_authn import verify_assertion_from_body
+
+    verify_result, _verified_fields = verify_assertion_from_body(
+        data,
+        wallet_id=wallet_id,
+        field_names=['unlocked_at', 'expires_at', 'profile_id', 'profile_name'],
+    )
+    if not verify_result.ok:
+        response = jsonify({
+            'success': False,
+            'error': verify_result.error or 'wallet_assertion_required',
+            'code': verify_result.code or 'wallet_assertion_required',
+        })
+        response.headers.update(_cors_headers(origin))
+        return response, 403
+
+    now_ms = int(time.time() * 1000)
+    if abs(requested_unlocked_at - now_ms) > 300_000:
+        response = jsonify({'success': False, 'error': 'unlock_timestamp_invalid'})
+        response.headers.update(_cors_headers(origin))
+        return response, 400
+
+    # Use server time and cap the caller's signed duration to the configured
+    # session maximum.
+    unlocked_at = now_ms
+    expires_at = min(
+        max(int(time.time()) + 1, requested_expires_at),
+        int(time.time()) + SESSION_DURATION,
+    )
     
     # Store global session for cross-device sync
     logger.info(f"Signal-unlock: storing session for wallet {wallet_id[:8]}...")
@@ -1012,6 +934,7 @@ def wallet_register_signing_key():
         device_name=(body.get("device_name") or "").strip(),
         pubkey_b64=(body.get("pubkey") or "").strip(),
         signature_b64=(body.get("signature") or "").strip(),
+        enrollment_grant=(body.get("enrollment_grant") or "").strip(),
     )
     if not result.ok:
         return jsonify({

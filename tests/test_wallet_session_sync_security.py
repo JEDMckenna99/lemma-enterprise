@@ -1,4 +1,5 @@
 import os
+import time
 
 os.environ.setdefault("SESSION_SECRET", "test-session-secret-for-unit-tests")
 
@@ -28,6 +29,58 @@ def test_lemma_origin_allowed_rejects_substring_spoof(monkeypatch):
     assert wallet_session_sync._lemma_origin_allowed("https://lemma.id") is True
     assert wallet_session_sync._lemma_origin_allowed("https://wallet.lemma.id") is True
     assert wallet_session_sync._lemma_origin_allowed("https://lemma.id.attacker.com") is False
+
+
+def test_init_first_session_is_retired():
+    response = _client().post(
+        "/api/wallet/init-first-session",
+        json={"wallet_id": "wallet_known"},
+        headers={"Origin": "https://lemma.id"},
+    )
+    assert response.status_code == 410
+    assert response.get_json()["error"] == "first_session_route_retired"
+
+
+def test_signal_unlock_rejects_wallet_id_without_assertion():
+    now_ms = int(time.time() * 1000)
+    response = _client().post(
+        "/api/wallet/signal-unlock",
+        json={
+            "wallet_id": "wallet_known",
+            "unlocked_at": now_ms,
+            "expires_at": int(time.time()) + 3600,
+            "profile_id": "default",
+            "profile_name": "Personal",
+        },
+        headers={"Origin": "https://lemma.id"},
+    )
+    assert response.status_code == 403
+    assert response.get_json()["code"] == "wallet_assertion_required"
+
+
+def test_signal_unlock_accepts_verified_wallet_assertion(monkeypatch):
+    from api.wallet_authn import Result
+
+    monkeypatch.setattr(
+        "api.wallet_authn.verify_assertion_from_body",
+        lambda *_args, **_kwargs: (Result(True), {}),
+    )
+    now_ms = int(time.time() * 1000)
+    response = _client().post(
+        "/api/wallet/signal-unlock",
+        json={
+            "wallet_id": "wallet_verified",
+            "unlocked_at": now_ms,
+            "expires_at": int(time.time()) + 3600,
+            "profile_id": "default",
+            "profile_name": "Personal",
+            "wallet_assertion": {"nonce": "nonce", "signature": "signature"},
+        },
+        headers={"Origin": "https://lemma.id"},
+    )
+    assert response.status_code == 200
+    assert response.get_json()["success"] is True
+    assert wallet_session_sync.SESSION_COOKIE_NAME in response.headers.getlist("Set-Cookie")[0]
 
 
 def _client():

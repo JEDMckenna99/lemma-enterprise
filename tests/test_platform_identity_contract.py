@@ -184,11 +184,11 @@ def test_templates_use_shared_platform_helpers():
 @pytest.mark.unit
 def test_sdk_cache_bust_bumped_in_templates():
     expected_versions = {
-        "templates/modern/layout.html": "2678",
-        "templates/wallet_unlock.html": "2677",
-        "templates/wallet_popup.html": "2677",
-        "templates/wallet_ishuman_idv.html": "2682",
-        "templates/recover_complete.html": "2677",
+        "templates/modern/layout.html": "2683",
+        "templates/wallet_unlock.html": "2683",
+        "templates/wallet_popup.html": "2683",
+        "templates/wallet_ishuman_idv.html": "2683",
+        "templates/recover_complete.html": "2683",
     }
     for rel, version in expected_versions.items():
         text = (ROOT / rel).read_text(encoding="utf-8")

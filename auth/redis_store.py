@@ -144,6 +144,35 @@ def delete(key: str) -> bool:
         return False
 
 
+def consume(key: str) -> Optional[dict]:
+    """Atomically retrieve and delete one-time state.
+
+    Redis ``GETDEL`` provides the production atomicity guarantee. The
+    in-memory fallback performs the same operation under the module lock for
+    development and tests. Redis errors fail closed rather than falling
+    through to a different store that may contain stale state.
+    """
+    full_key = f"lemma:{key}"
+
+    redis_client = get_redis_client()
+    if redis_client:
+        try:
+            data = redis_client.getdel(full_key)
+            return json.loads(data) if data else None
+        except Exception as e:
+            logger.error(f"Redis consume failed: {e}")
+            return None
+
+    with _memory_lock:
+        entry = _memory_store.pop(full_key, None)
+        if not entry:
+            return None
+        expires_at = datetime.fromisoformat(entry['expires_at'])
+        if datetime.now(timezone.utc) > expires_at:
+            return None
+        return entry['value']
+
+
 def cleanup_expired() -> int:
     """
     Clean up expired entries from in-memory storage.

@@ -85,17 +85,17 @@
     {
       "operation_id": "wallet.session.init_first",
       "authority_class": "wallet",
-      "mutates": "Creates the first server-trusted wallet session and unlock token.",
+      "mutates": "Retired endpoint; creates no authority.",
       "routes": [
         {"method": "POST", "path": "/api/wallet/init-first-session", "module": "api/wallet_session_sync.py"}
       ],
-      "current_auth": ["origin_header", "wallet_id"],
-      "required_auth": ["verified_webauthn_registration_or_assertion"],
+      "current_auth": ["retired_http_410"],
+      "required_auth": ["retired_http_410"],
       "required_scope": "none",
       "site_binding": "wallet_id_match",
       "risk_tier": "critical",
       "enforcement_layer": "in_handler",
-      "compliance": "gap",
+      "compliance": "compliant",
       "threat_tags": ["leaked_wallet_id", "session_forgery", "origin_spoofing"],
       "checklist_sections": [1, 2],
       "test_refs": ["tests/test_security_next_batch.py"]
@@ -107,13 +107,13 @@
       "routes": [
         {"method": "POST", "path": "/api/wallet/signal-unlock", "module": "api/wallet_session_sync.py"}
       ],
-      "current_auth": ["origin_header", "wallet_id"],
+      "current_auth": ["authorized_wallet_assertion"],
       "required_auth": ["verified_webauthn_assertion"],
       "required_scope": "none",
       "site_binding": "wallet_id_match",
       "risk_tier": "critical",
       "enforcement_layer": "in_handler",
-      "compliance": "gap",
+      "compliance": "review_required",
       "threat_tags": ["leaked_wallet_id", "session_forgery", "origin_spoofing"],
       "checklist_sections": [1, 2],
       "test_refs": ["tests/test_security_next_batch.py"]
@@ -161,13 +161,13 @@
       "routes": [
         {"method": "POST", "path": "/api/wallet/register-signing-key", "module": "api/wallet_session_sync.py"}
       ],
-      "current_auth": ["new_key_self_signature", "wallet_id"],
-      "required_auth": ["existing_device_assertion_or_verified_recovery"],
+      "current_auth": ["unbound_first_device_self_signature_or_one_time_transfer_grant"],
+      "required_auth": ["unbound_first_device_or_existing_device_transfer_or_verified_recovery"],
       "required_scope": "none",
       "site_binding": "wallet_id_match",
       "risk_tier": "critical",
       "enforcement_layer": "in_handler",
-      "compliance": "gap",
+      "compliance": "compliant",
       "threat_tags": ["leaked_wallet_id", "unauthorized_device_enrollment"],
       "checklist_sections": [1, 2],
       "test_refs": ["tests/test_wallet_authn.py"]
@@ -382,13 +382,13 @@
         {"method": "POST", "path": "/api/wallet/sync-device", "module": "api/ishuman.py"},
         {"method": "POST", "path": "/api/wallet/link-receive", "module": "api/ishuman.py"}
       ],
-      "current_auth": ["wallet_assertion_or_link_ceremony"],
-      "required_auth": ["existing_device_assertion", "recipient_key_binding", "one_time_transfer"],
+      "current_auth": ["existing_device_assertion", "recipient_key_binding", "atomic_one_time_transfer", "one_time_enrollment_grant"],
+      "required_auth": ["existing_device_assertion", "recipient_key_binding", "atomic_one_time_transfer", "one_time_enrollment_grant"],
       "required_scope": "none",
       "site_binding": "wallet_id_match",
       "risk_tier": "critical",
       "enforcement_layer": "in_handler",
-      "compliance": "review_required",
+      "compliance": "compliant",
       "threat_tags": ["wallet_secret_exfiltration", "replay", "unauthorized_device_enrollment"],
       "checklist_sections": [1, 2, 6],
       "test_refs": ["tests/test_wallet_sync_device.py", "tests/test_wallet_link_receive.py"]

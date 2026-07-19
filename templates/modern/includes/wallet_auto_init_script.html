@@ -45,9 +45,6 @@
             }
 
             const isPublicPage = document.body.dataset.publicPage === 'true';
-            const SESSION_MS = (typeof getSessionDurationMs === 'function')
-                ? getSessionDurationMs()
-                : (10 * 60 * 60 * 1000);
 
             function setLoggedOutUI() {
                 const userDropdown = document.getElementById('user-dropdown');
@@ -97,38 +94,8 @@
             async function ensureServerWalletSession(walletInstance, options) {
                 const opts = options || {};
                 try {
-                    let walletId = null;
-                    if (typeof walletInstance.getWalletInfo === 'function') {
-                        const info = await walletInstance.getWalletInfo();
-                        walletId = info?.walletId || null;
-                    }
-                    if (!walletId && typeof walletInstance._resolveCurrentWalletId === 'function') {
-                        walletId = await walletInstance._resolveCurrentWalletId();
-                    }
-                    if (!walletId && walletInstance.session?.walletId) {
-                        walletId = walletInstance.session.walletId;
-                    }
-                    if (!walletId) return false;
-
-                    const nowMs = Date.now();
-                    const expiresAt = Math.floor((nowMs + SESSION_MS) / 1000);
-                    const response = await window.__lemmaRawFetch('/api/wallet/signal-unlock', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        credentials: 'include',
-                        body: JSON.stringify({
-                            wallet_id: walletId,
-                            unlocked_at: nowMs,
-                            expires_at: expiresAt
-                        })
-                    });
-
-                    if (!response.ok) {
-                        if (opts.debug) {
-                            console.warn('Wallet session sync failed', response.status);
-                        }
-                        return false;
-                    }
+                    if (typeof walletInstance._signalServerUnlock !== 'function') return false;
+                    await walletInstance._signalServerUnlock();
                     return true;
                 } catch (e) {
                     if (opts.debug) {

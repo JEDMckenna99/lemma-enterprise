@@ -3,6 +3,7 @@ from __future__ import annotations
 import pytest
 
 from api.wallet_authn import (
+    issue_device_enrollment_grant,
     issue_wallet_challenge,
     register_wallet_signing_key,
     verify_assertion_from_body,
@@ -270,7 +271,7 @@ def test_register_replace_pubkey_blocked_for_same_device(
     assert result.code == "wallet_pubkey_mismatch"
 
 
-def test_register_allows_multiple_devices(
+def test_register_additional_device_requires_transfer_grant(
     wallet_fixture,
     fake_ishuman_db_session_factory,
     monkeypatch,
@@ -287,13 +288,75 @@ def test_register_allows_multiple_devices(
         pubkey_b64=other_pubkey,
     )
     sig = sign_message(_priv, payload)
-    result = register_wallet_signing_key(
+    denied = register_wallet_signing_key(
         wallet_id=wallet_fixture["wallet_id"],
         device_id="dev_phone",
         pubkey_b64=other_pubkey,
         signature_b64=b64url_encode(sig),
     )
+    assert not denied.ok
+    assert denied.code == "device_enrollment_authorization_required"
+
+    grant = issue_device_enrollment_grant(
+        wallet_id=wallet_fixture["wallet_id"],
+        source="test_transfer",
+    )
+    result = register_wallet_signing_key(
+        wallet_id=wallet_fixture["wallet_id"],
+        device_id="dev_phone",
+        pubkey_b64=other_pubkey,
+        signature_b64=b64url_encode(sig),
+        enrollment_grant=grant,
+    )
     assert result.ok
+
+    third_priv, third_pub = derive_wallet_signing_keypair("12" * 32)
+    third_pubkey = pubkey_to_b64url(third_pub)
+    third_payload = build_register_payload(
+        wallet_id=wallet_fixture["wallet_id"],
+        pubkey_b64=third_pubkey,
+    )
+    replayed = register_wallet_signing_key(
+        wallet_id=wallet_fixture["wallet_id"],
+        device_id="dev_tablet",
+        pubkey_b64=third_pubkey,
+        signature_b64=b64url_encode(sign_message(third_priv, third_payload)),
+        enrollment_grant=grant,
+    )
+    assert not replayed.ok
+    assert replayed.code == "device_enrollment_grant_invalid"
+
+
+def test_established_identity_cannot_bootstrap_signing_key_without_recovery(
+    wallet_fixture,
+    fake_ishuman_db_session_factory,
+    monkeypatch,
+):
+    from api.database import LemmaWalletBinding
+
+    monkeypatch.setattr("api.database.SessionLocal", fake_ishuman_db_session_factory.session_local)
+    db = fake_ishuman_db_session_factory.session_local()
+    db.add(
+        LemmaWalletBinding(
+            wallet_id=wallet_fixture["wallet_id"],
+            lemma_person_id="person_existing",
+            binding_status="active",
+        )
+    )
+    db.commit()
+    db.close()
+
+    pubkey_b64, sig_b64 = register_self_signature(
+        wallet_fixture["wallet_id"],
+        wallet_fixture["wallet_secret"],
+    )
+    result = register_wallet_signing_key(
+        wallet_id=wallet_fixture["wallet_id"],
+        pubkey_b64=pubkey_b64,
+        signature_b64=sig_b64,
+    )
+    assert not result.ok
+    assert result.code == "device_enrollment_authorization_required"
 
 
 def test_revoke_device_marks_key_revoked(

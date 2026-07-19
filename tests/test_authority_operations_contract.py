@@ -28,20 +28,21 @@ def test_authority_operation_contract_is_complete():
     assert validate_contract(_contract()) == []
 
 
-def test_wallet_id_only_session_paths_are_declared_security_gaps():
-    for operation_id in ("wallet.session.init_first", "wallet.session.signal_unlock"):
-        operation = _operation(operation_id)
-        assert operation["risk_tier"] == "critical"
-        assert operation["compliance"] == "gap"
-        assert operation["required_auth"] == ["verified_webauthn_assertion"] or (
-            operation["required_auth"] == ["verified_webauthn_registration_or_assertion"]
-        )
+def test_wallet_id_only_session_paths_are_closed():
+    init_first = _operation("wallet.session.init_first")
+    assert init_first["current_auth"] == ["retired_http_410"]
+    assert init_first["compliance"] == "compliant"
+
+    signal_unlock = _operation("wallet.session.signal_unlock")
+    assert signal_unlock["current_auth"] == ["authorized_wallet_assertion"]
+    assert signal_unlock["required_auth"] == ["verified_webauthn_assertion"]
+    assert signal_unlock["compliance"] == "review_required"
 
 
 def test_signing_key_enrollment_requires_existing_authority():
     operation = _operation("wallet.device.register_signing_key")
-    assert operation["compliance"] == "gap"
-    assert "existing_device_assertion_or_verified_recovery" in operation["required_auth"]
+    assert operation["compliance"] == "compliant"
+    assert "unbound_first_device_or_existing_device_transfer_or_verified_recovery" in operation["required_auth"]
 
 
 def test_site_proof_requires_assurance_and_canonical_site_binding():

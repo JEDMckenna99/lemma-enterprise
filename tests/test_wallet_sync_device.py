@@ -52,6 +52,7 @@ def test_deposit_then_claim_round_trips_bundle(
     assert claim.status_code == 200, payload
     assert payload["wallet_id"] == "wallet_xfer_001"
     assert payload["bundle"] == BUNDLE
+    assert payload["enrollment_grant"].startswith("weg_")
 
     # One-time: a second claim must fail.
     again = ishuman_client.post(

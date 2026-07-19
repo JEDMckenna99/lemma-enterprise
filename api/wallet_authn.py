@@ -18,6 +18,7 @@ from sqlalchemy.exc import IntegrityError
 from auth.redis_store import delete as redis_delete
 from auth.redis_store import get as redis_get
 from auth.redis_store import store as redis_store
+from auth.redis_store import consume as redis_consume
 from api.wallet_keys import (
     CHALLENGE_TTL_SECONDS,
     build_assertion_payload,
@@ -116,6 +117,60 @@ def _ensure_provisional_person_after_register(db, wallet_id: str) -> None:
     ensure_provisional_person_for_wallet(db, wallet_id=wallet_id)
 
 
+DEVICE_ENROLLMENT_GRANT_TTL_SECONDS = 300
+
+
+def _device_enrollment_grant_key(grant: str) -> str:
+    digest = hashlib.sha256(str(grant or "").encode("utf-8")).hexdigest()
+    return f"wallet:device-enrollment-grant:{digest}"
+
+
+def issue_device_enrollment_grant(*, wallet_id: str, source: str) -> str:
+    """Issue a short-lived one-time grant after an authorized device transfer."""
+    wallet_id = str(wallet_id or "").strip()
+    source = str(source or "").strip()
+    if not wallet_id or not source:
+        raise ValueError("wallet_id and source required")
+    grant = f"weg_{secrets.token_urlsafe(32)}"
+    stored = redis_store(
+        _device_enrollment_grant_key(grant),
+        {"wallet_id": wallet_id, "source": source},
+        ttl_seconds=DEVICE_ENROLLMENT_GRANT_TTL_SECONDS,
+    )
+    if not stored:
+        raise RuntimeError("device_enrollment_grant_unavailable")
+    return grant
+
+
+def _consume_device_enrollment_grant(*, grant: str, wallet_id: str) -> Result:
+    grant = str(grant or "").strip()
+    wallet_id = str(wallet_id or "").strip()
+    if not grant:
+        return Result(False, "device_enrollment_authorization_required", "enrollment grant required")
+    payload = redis_consume(_device_enrollment_grant_key(grant))
+    if not payload:
+        return Result(False, "device_enrollment_grant_invalid", "enrollment grant invalid or expired")
+    if str(payload.get("wallet_id") or "").strip() != wallet_id:
+        return Result(False, "device_enrollment_grant_mismatch", "enrollment grant wallet mismatch")
+    return Result(True)
+
+
+def _wallet_has_established_identity(db, wallet_id: str) -> bool:
+    """Return whether wallet_id already carries person or verification authority."""
+    from api.database import IsHumanVerification, LemmaWalletBinding
+
+    binding = db.query(LemmaWalletBinding).filter(
+        LemmaWalletBinding.wallet_id == wallet_id,
+        LemmaWalletBinding.binding_status == "active",
+    ).first()
+    if binding:
+        return True
+    verification = db.query(IsHumanVerification).filter(
+        IsHumanVerification.wallet_id == wallet_id,
+    ).first()
+    return verification is not None
+
+
 def register_wallet_signing_key(
     *,
     wallet_id: str,
@@ -123,8 +178,9 @@ def register_wallet_signing_key(
     signature_b64: str,
     device_id: str = "legacy",
     device_name: str = "",
+    enrollment_grant: str = "",
 ) -> Result:
-    """Register wallet Ed25519 public key after self-signature proof."""
+    """Register a wallet key after self-signature and enrollment authority."""
     from api.database import SessionLocal, WalletSigningKey
 
     wallet_id = (wallet_id or "").strip()
@@ -167,6 +223,20 @@ def register_wallet_signing_key(
                 "wallet_pubkey_mismatch",
                 "device already registered with a different public key",
             )
+
+        other_active = db.query(WalletSigningKey).filter(
+            WalletSigningKey.wallet_id == wallet_id,
+            WalletSigningKey.revoked_at.is_(None),
+            WalletSigningKey.device_id != device_id,
+        ).first()
+        established_identity = _wallet_has_established_identity(db, wallet_id)
+        if other_active is not None or established_identity:
+            grant_result = _consume_device_enrollment_grant(
+                grant=enrollment_grant,
+                wallet_id=wallet_id,
+            )
+            if not grant_result.ok:
+                return grant_result
 
         db.add(
             WalletSigningKey(

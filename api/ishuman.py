@@ -2806,7 +2806,7 @@ def wallet_sync_device():
     bundle, wallet_assertion }``
     Body (claim):   ``{ action, transfer_id }``
     """
-    from auth.redis_store import delete as redis_delete
+    from auth.redis_store import consume as redis_consume
     from auth.redis_store import get as redis_get
     from auth.redis_store import store as redis_store
 
@@ -2848,16 +2848,20 @@ def wallet_sync_device():
         transfer_id = (body.get("transfer_id") or "").strip()
         if not transfer_id:
             return jsonify({"success": False, "error": "transfer_id required"}), 400
-        entry = redis_get(_device_transfer_key(transfer_id))
+        entry = redis_consume(_device_transfer_key(transfer_id))
         if not entry:
             return jsonify({"success": False, "error": "transfer_not_found"}), 404
-        # One-time: burn before returning so a replay cannot re-claim.
-        if not redis_delete(_device_transfer_key(transfer_id)):
-            return jsonify({"success": False, "error": "transfer_already_claimed"}), 409
+        from api.wallet_authn import issue_device_enrollment_grant
+
+        enrollment_grant = issue_device_enrollment_grant(
+            wallet_id=entry.get("wallet_id"),
+            source="device_transfer_claim",
+        )
         return jsonify({
             "success": True,
             "wallet_id": entry.get("wallet_id"),
             "bundle": entry.get("bundle"),
+            "enrollment_grant": enrollment_grant,
         })
 
     return jsonify({"success": False, "error": "unknown_action"}), 400
@@ -2894,7 +2898,7 @@ def wallet_link_receive():
     wallet_assertion }``
     Body (claim):   ``{ action, transfer_id }``
     """
-    from auth.redis_store import delete as redis_delete
+    from auth.redis_store import consume as redis_consume
     from auth.redis_store import get as redis_get
     from auth.redis_store import store as redis_store
 
@@ -3042,15 +3046,20 @@ def wallet_link_receive():
         transfer_id = (body.get("transfer_id") or "").strip()
         if not transfer_id:
             return jsonify({"success": False, "error": "transfer_id required"}), 400
-        entry = redis_get(_link_receive_key(transfer_id))
+        entry = redis_consume(_link_receive_key(transfer_id))
         if not entry or not entry.get("bundle"):
             return jsonify({"success": False, "error": "transfer_not_found"}), 404
-        if not redis_delete(_link_receive_key(transfer_id)):
-            return jsonify({"success": False, "error": "transfer_already_claimed"}), 409
+        from api.wallet_authn import issue_device_enrollment_grant
+
+        enrollment_grant = issue_device_enrollment_grant(
+            wallet_id=entry.get("wallet_id"),
+            source="link_receive_claim",
+        )
         return jsonify({
             "success": True,
             "wallet_id": entry.get("wallet_id"),
             "bundle": entry.get("bundle"),
+            "enrollment_grant": enrollment_grant,
         })
 
     return jsonify({"success": False, "error": "unknown_action"}), 400
