@@ -345,14 +345,14 @@ Validation baseline:
 - Owner:
 - Evidence: `tests/test_revocation_fail_closed_section5.py`; bloom/list `503` on DB/hash errors (`api/revocation_api.py`); tri-state `check_credential_revocation()` + verify-presentation/`/ready` gates (`api/revocation_verifier.py`, `api/ishuman.py`, `app.py`); Py/Node/Browser revocation candidate parity (`credential.id`, `subject`, `wallet_id`); action-stamp signature-before-nonce + async `RedisNonceStore.consume` (`lemma-ishuman-verify.mjs`, `lemma_ishuman_verify.py`).
 
-**Production evidence (2026-07-20, Heroku v2470+):**
+**Production evidence (2026-07-20, Heroku v2472):**
 
 | Check | Result |
 | ----- | ------ |
-| `python scripts/section5_prod_smoke.py` | PASS (bloom seq 235, 117 hashed revocations, signed snapshot self-check ok) |
+| `python scripts/section5_prod_smoke.py` | PASS (all 8 checks) |
 | `python scripts/section4_prod_smoke.py` | PASS (regression) |
-| `GET /api/revocation/bloom-filter` | `200`, SHA-256 `hashed_revoked_ids` only (no plaintext fallback) |
-| `GET /ready` | exposes `checks.revocation`; green after eager Bloom init (v2471+) |
+| `GET /api/revocation/bloom-filter` | `200`, seq 235, 117 SHA-256 hashes, signed snapshot crypto self-check ok |
+| `GET /ready` | `200`, `ready: true`, `checks.revocation: true` |
 | Node/Python SDK on lemma.id | `revocationCandidates` + async `RedisNonceStore.consume` deployed |
 
 - [x] Return an unavailable response when revocation data cannot be read.
