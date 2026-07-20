@@ -647,7 +647,7 @@ def create_app():
     @app.route('/ready')
     def ready_check():
         """Readiness check - detailed system status"""
-        checks = {'database': False, 'crypto': False}
+        checks = {'database': False, 'crypto': False, 'revocation': False}
         
         try:
             from api.database import engine
@@ -664,6 +664,16 @@ def create_app():
             checks['crypto'] = True
         except Exception as e:
             logger.warning(f"Crypto check failed: {e}")
+
+        try:
+            from api.revocation_verifier import revocation_service_ready
+
+            ready, reason = revocation_service_ready()
+            checks['revocation'] = ready
+            if not ready:
+                logger.warning("Revocation readiness check failed: %s", reason)
+        except Exception as e:
+            logger.warning(f"Revocation check failed: {e}")
         
         all_healthy = all(checks.values())
         return jsonify({

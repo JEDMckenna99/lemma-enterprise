@@ -189,19 +189,17 @@ def _decode_signature(value: str) -> bytes:
 
 def fetch_revocation_sequence_number() -> int:
     """Monotonic sequence from revocation_list primary key."""
-    try:
-        from api.database import get_db_connection
+    from api.database import get_db_connection
 
-        conn = get_db_connection()
-        cursor = conn.cursor()
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
         cursor.execute("SELECT COALESCE(MAX(id), 0) FROM revocation_list")
         row = cursor.fetchone()
+        return int(row[0] or 0)
+    finally:
         cursor.close()
         conn.close()
-        return int(row[0] or 0)
-    except Exception as exc:
-        logger.warning("Bloom sequence lookup failed, using timestamp fallback: %s", exc)
-        return int(time.time())
 
 
 def invalidate_bloom_filter_cache() -> None:

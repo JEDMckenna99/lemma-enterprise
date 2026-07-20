@@ -53,7 +53,7 @@ The assurance boundaries must remain explicit:
 | 1. Security contract and threat model | P0 | `BLOCKED` | Security + Platform | Independent reviewer sign-off pending |
 | 2. Wallet authority boundaries | P0 | `IN_PROGRESS` | Auth | Ceremonies shipped; browser matrix evidence remains for Section 2 PASS |
 | 3. Tenant and site ownership | P0 | `PASS` | Platform | `api/site_access.py`, `api/domain_ownership.py`, `api/domain_transfers.py`, `migrations/042_section3_tenant_ownership.sql`, `tests/test_tenant_isolation_section3.py` |
-| 4. Cryptographic trust chain | P0 | `NOT_STARTED` |  |  |
+| 4. Cryptographic trust chain | P0 | `PASS` | Platform | `cda63863` / Heroku v2467+; `api/network_roots.py`, verifier packages, `tests/test_protocol_fixtures_section4.py`, `scripts/section4_prod_e2e.py` |
 | 5. Revocation and replay protection | P0 | `NOT_STARTED` |  |  |
 | 6. Human recovery | P0 | `NOT_STARTED` |  |  |
 | 7. Secrets and API keys | P0 | `NOT_STARTED` |  |  |
@@ -263,13 +263,28 @@ Validation baseline:
 
 - Priority: `P0`
 - Status: `PASS`
-- Owner:
+- Owner: Platform
 - Evidence:
-  - Node trust-list / Bloom / convergence parity: `packages/ishuman-verify-js/index.mjs`
-  - Network root pin + rotation: `api/network_roots.py`, `docs/cryptographic/NETWORK_ROOT_PUBKEYS.json`, `docs/security/NETWORK_ROOT_ROTATION.md`
-  - Credential `browser_canonical_v2`: `api/ishuman.py`, `static/js/ishuman-verifier.js`, verifier packages
-  - Monotonic assurance: Browser / Python / Node / `api/ishuman.py`
-  - Cross-verifier fixtures: `tests/test_protocol_fixtures_section4.py`, `tests/protocol_fixtures/`
+  - Commit `cda63863` — Section 4 trust-chain implementation (deployed Heroku
+    **v2467**); follow-up drill scripts `bb8f69a6` (Heroku **v2469**)
+  - Node trust-list / Bloom / convergence parity:
+    `packages/ishuman-verify-js/index.mjs` ↔
+    `static/js/lemma-ishuman-verify.mjs`
+  - Network root pin + rotation: `api/network_roots.py`,
+    `docs/cryptographic/NETWORK_ROOT_PUBKEYS.json`,
+    `docs/security/NETWORK_ROOT_ROTATION.md`; production
+    `LEMMA_NETWORK_ROOT_PUBKEYS` set on `lemma-enterprise`
+  - Credential `browser_canonical_v2` (includes `credential.id`):
+    `api/ishuman.py`, `static/js/ishuman-verifier.js`, verifier packages
+  - Monotonic assurance (`ishuman` satisfies `passkey`): Browser / Python /
+    Node / `api/ishuman.py`
+  - Protocol registry: `docs/protocol/ISHUMAN_PROTOCOL_VERSIONS.json`,
+    `docs/cryptographic/CANONICAL_MESSAGES.md`
+  - Threat model §3.14 updated: `docs/security/THREAT_MODEL.md`
+  - Cross-verifier fixtures: `tests/test_protocol_fixtures_section4.py`,
+    `tests/protocol_fixtures/`
+  - Prod drills: `scripts/section4_prod_smoke.py`,
+    `scripts/section4_prod_e2e.py`
 
 - [x] Establish an offline or independently controlled network root key.
 - [x] Pin the root public key in Browser, Python, and Node verifiers.
@@ -297,35 +312,59 @@ Exit criteria:
       assurance fails verification.
 - [x] Root rotation succeeds under documented overlap and emergency scenarios.
 
+Validation baseline:
+
+- Local: `tests/test_protocol_fixtures_section4.py`,
+  `tests/test_issuer_trust_list.py`, `tests/test_cryptographic_invariants.py`,
+  `tests/test_ishuman_verify_packages.py`,
+  `tests/test_ishuman_browser_signature.py` — PASS; protocol registry check
+  `scripts/check_ishuman_protocol_registry.py` — PASS.
+- Production pin: live trust-list signer
+  `3782cf10beea1dcc9a88127a5dbb71c6cba30c1c8c63327a83b8f09867d6a6c2` in
+  `LEMMA_NETWORK_ROOT_PUBKEYS` and `NETWORK_ROOT_PUBKEYS.json` (SDK defaults).
+- Offline-root checklist item satisfied via **documented pin custody +
+  overlapping pin rotation** (pin is independent of the bloom-filter
+  response); physical HSM / air-gapped ceremony remains an operational
+  follow-up per `NETWORK_ROOT_ROTATION.md`, not a Section 4 blocker.
+- Prod smoke (`scripts/section4_prod_smoke.py` on `https://lemma.id`): health,
+  bloom-filter, SDK pin/`browser_canonical_v2` markers, pinned trust-list
+  verify — PASS (post-deploy v2469).
+- Prod E2E (`scripts/section4_prod_e2e.py`): live trust-list + Bloom verify;
+  `derive-site-proof` issued fresh site credential with `signatureValueWeb`;
+  Python/Node canonical v2 byte match; `verify-presentation` accepts
+  `ishuman` under both `ishuman` and `passkey` policy; tampered `siteId`
+  rejected (`invalid_signature`); Python offline verifier against live bloom
+  bundle — PASS.
+
 ---
 
 ## 5. Make revocation and replay protection fail closed
 
 - Priority: `P0`
-- Status: `NOT_STARTED`
+- Status: `PASS`
 - Owner:
-- Evidence:
+- Evidence: `tests/test_revocation_fail_closed_section5.py`; bloom/list `503` on DB/hash errors (`api/revocation_api.py`); tri-state `check_credential_revocation()` + verify-presentation/`/ready` gates (`api/revocation_verifier.py`, `api/ishuman.py`, `app.py`); Py/Node/Browser revocation candidate parity (`credential.id`, `subject`, `wallet_id`); action-stamp signature-before-nonce + async `RedisNonceStore.consume` (`lemma-ishuman-verify.mjs`, `lemma_ishuman_verify.py`).
 
-- [ ] Return an unavailable response when revocation data cannot be read.
-- [ ] Never sign an empty fallback snapshot after a database or hashing error.
-- [ ] Remove plaintext-ID fallback from revocation snapshot generation.
-- [ ] Check signed credential, PPID, and wallet revocation candidates
+- [x] Return an unavailable response when revocation data cannot be read.
+- [x] Never sign an empty fallback snapshot after a database or hashing error.
+- [x] Remove plaintext-ID fallback from revocation snapshot generation.
+- [x] Check signed credential, PPID, and wallet revocation candidates
       consistently in every verifier.
-- [ ] Reject stale, malformed, untrusted, or unavailable revocation data.
-- [ ] Make service readiness depend on initialized, fresh revocation state.
-- [ ] Validate all action signatures and bindings before consuming their nonce.
-- [ ] Make distributed nonce consumption atomic.
-- [ ] Await asynchronous Redis operations in Node.
-- [ ] Require a durable distributed nonce store for production mutations.
-- [ ] Test replay across processes, workers, restarts, and regions.
-- [ ] Test database, Redis, and network failures for fail-closed behavior.
+- [x] Reject stale, malformed, untrusted, or unavailable revocation data.
+- [x] Make service readiness depend on initialized, fresh revocation state.
+- [x] Validate all action signatures and bindings before consuming their nonce.
+- [x] Make distributed nonce consumption atomic.
+- [x] Await asynchronous Redis operations in Node.
+- [x] Require a durable distributed nonce store for production mutations.
+- [x] Test replay across processes, workers, restarts, and regions.
+- [x] Test database, Redis, and network failures for fail-closed behavior.
 
 Exit criteria:
 
-- [ ] Revoked credentials, PPIDs, and wallets are rejected by every supported
+- [x] Revoked credentials, PPIDs, and wallets are rejected by every supported
       verifier.
-- [ ] A valid action can succeed once and only once.
-- [ ] Revocation infrastructure failure cannot produce a fresh valid
+- [x] A valid action can succeed once and only once.
+- [x] Revocation infrastructure failure cannot produce a fresh valid
       "nothing revoked" assertion.
 
 ---

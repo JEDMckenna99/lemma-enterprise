@@ -346,6 +346,26 @@ function extractCredentialAssurance(claims) {
   return null;
 }
 
+function revocationCandidates(credential) {
+  const claims = credential?.claims || credential?.credentialSubject || {};
+  const out = [];
+  const credId = String(credential?.id || "").trim();
+  if (credId) out.push(credId);
+  const subject = String(credential?.subject || "").trim();
+  if (subject) out.push(subject);
+  const walletId = String(claims.walletId || claims.wallet_id || "").trim();
+  if (walletId) out.push(walletId);
+  return out;
+}
+
+async function credentialRevokedInSnapshot(credential, revokedHashSet) {
+  for (const candidate of revocationCandidates(credential)) {
+    const digest = await sha256Bytes(new TextEncoder().encode(candidate));
+    if (revokedHashSet.has(bytesToHex(digest))) return true;
+  }
+  return false;
+}
+
 export function validateCredentialRequiredFields(credential) {
   if (!credential || typeof credential !== "object") return "credential_missing";
   if (!String(credential.id || "").trim()) return "credential_id_missing";
@@ -720,7 +740,7 @@ export class RedisNonceStore {
     return this._redis;
   }
 
-  consume(nonce, { siteId = "", ttlSeconds = 300 } = {}) {
+  async consume(nonce, { siteId = "", ttlSeconds = 300 } = {}) {
     const client = this._client();
     if (!client || typeof client.set !== "function") return false;
     const text = String(nonce || "").trim();
@@ -729,7 +749,8 @@ export class RedisNonceStore {
     const key = `${this._keyPrefix}:${site}:${text}`;
     const ttl = Math.max(1, Number(ttlSeconds || 300));
     try {
-      return Boolean(client.set(key, "1", { NX: true, EX: ttl }));
+      const result = await client.set(key, "1", { NX: true, EX: ttl });
+      return Boolean(result);
     } catch (_err) {
       return false;
     }
@@ -980,12 +1001,8 @@ export function createVerifier({
     }
 
     const credentialId = credential.id || "";
-    if (credentialId) {
-      const idHashBytes = await sha256Bytes(new TextEncoder().encode(credentialId));
-      const idHashHex = bytesToHex(idHashBytes);
-      if (bundle.revokedHashSet.has(idHashHex)) {
-        return { ok: false, reason: "revoked", credentialId };
-      }
+    if (await credentialRevokedInSnapshot(credential, bundle.revokedHashSet)) {
+      return { ok: false, reason: "revoked", credentialId: credentialId || null };
     }
 
     const assertion = presentation.session_assertion;
@@ -1165,13 +1182,6 @@ export function createVerifier({
     if (mode === NONCE_STORE_MODE_REQUIRED && !nonceStore) {
       return { ok: false, reason: "action_nonce_store_required" };
     }
-    if (nonceStore && typeof nonceStore.consume === "function") {
-      const consumed = nonceStore.consume(nonce, {
-        siteId: canonicalSiteId,
-        ttlSeconds: maxActionAgeSeconds + 300,
-      });
-      if (!consumed) return { ok: false, reason: "action_nonce_reused" };
-    }
 
     if (requireFreshPasskey) {
       const attestation = inner.fresh_passkey_attestation;
@@ -1228,6 +1238,14 @@ export function createVerifier({
       if (!ok) return { ok: false, reason: "invalid_action_signature" };
     } catch (err) {
       return { ok: false, reason: `action_verify_error:${err.message}` };
+    }
+
+    if (nonceStore && typeof nonceStore.consume === "function") {
+      const consumed = await nonceStore.consume(nonce, {
+        siteId: canonicalSiteId,
+        ttlSeconds: maxActionAgeSeconds + 300,
+      });
+      if (!consumed) return { ok: false, reason: "action_nonce_reused" };
     }
 
     return credResult;

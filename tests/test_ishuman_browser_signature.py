@@ -216,7 +216,10 @@ def test_verify_presentation_endpoint_round_trip(monkeypatch):
         raising=False,
     )
     import sys, types
-    fake_rev = types.SimpleNamespace(is_credential_revoked=lambda _cid: False)
+    fake_rev = types.SimpleNamespace(
+        is_credential_revoked=lambda _cid: False,
+        check_credential_revocation=lambda _cred: "ok",
+    )
     monkeypatch.setitem(sys.modules, "api.revocation_verifier", fake_rev)
 
     app = Flask(__name__)

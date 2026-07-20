@@ -73,6 +73,9 @@ def get_global_verifier():
         # Do INITIAL sync of existing revocations
         try:
             sync_revocations_to_bloom()
+            from api.revocation_verifier import mark_revocation_sync_ready
+
+            mark_revocation_sync_ready()
             logger.info("✅ Initial bloom filter sync complete")
         except Exception as e:
             logger.warning(f"⚠️ Initial bloom filter sync failed: {e}")

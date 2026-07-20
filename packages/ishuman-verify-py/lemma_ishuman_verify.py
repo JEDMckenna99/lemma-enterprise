@@ -255,6 +255,29 @@ def _extract_credential_assurance(claims: dict) -> Optional[str]:
     return None
 
 
+def revocation_candidates(credential: dict) -> list[str]:
+    claims = credential.get("claims") or credential.get("credentialSubject") or {}
+    out: list[str] = []
+    cred_id = str(credential.get("id") or "").strip()
+    if cred_id:
+        out.append(cred_id)
+    subject = str(credential.get("subject") or "").strip()
+    if subject:
+        out.append(subject)
+    wallet_id = str(claims.get("walletId") or claims.get("wallet_id") or "").strip()
+    if wallet_id:
+        out.append(wallet_id)
+    return out
+
+
+def credential_revoked_in_snapshot(credential: dict, revoked_hash_set: set[str]) -> bool:
+    for candidate in revocation_candidates(credential):
+        digest = hashlib.sha256(candidate.encode("utf-8")).hexdigest()
+        if digest in revoked_hash_set:
+            return True
+    return False
+
+
 def validate_credential_required_fields(credential: dict) -> Optional[str]:
     if not isinstance(credential, dict):
         return "credential_missing"
@@ -1060,12 +1083,10 @@ class VerificationContext:
         if expires_at and expires_at < int(time.time()):
             return self.Result(False, "expired")
 
-        # 3. Local Bloom revocation check (SHA-256 of credential id)
-        credential_id = credential.get("id") or ""
-        if credential_id:
-            id_hash = hashlib.sha256(credential_id.encode("utf-8")).hexdigest()
-            if id_hash in snapshot.revoked_hash_set:
-                return self.Result(False, "revoked", credential_id=credential_id)
+        # 3. Local Bloom revocation check (credential id, subject/PPID, wallet id)
+        credential_id = str(credential.get("id") or "").strip()
+        if credential_revoked_in_snapshot(credential, snapshot.revoked_hash_set):
+            return self.Result(False, "revoked", credential_id=credential_id or None)
 
         # 4. Verify the site-bound session assertion (proof of possession)
         assertion = (presentation or {}).get("session_assertion")
@@ -1270,13 +1291,6 @@ class VerificationContext:
         mode = (nonce_store_mode or self.nonce_store_mode or NONCE_STORE_MODE_OPTIONAL).strip().lower()
         if mode == NONCE_STORE_MODE_REQUIRED and nonce_store is None:
             return self.Result(False, "action_nonce_store_required")
-        if nonce_store is not None:
-            consume = getattr(nonce_store, "consume", None)
-            if not callable(consume):
-                return self.Result(False, "action_nonce_store_invalid")
-            consumed = consume(nonce, site_id=self.site_id, ttl_seconds=self.max_action_age_seconds + 300)
-            if not consumed:
-                return self.Result(False, "action_nonce_reused")
 
         if require_fresh_passkey:
             attestation = inner.get("fresh_passkey_attestation")
@@ -1332,6 +1346,14 @@ class VerificationContext:
             )
         except (InvalidSignature, ValueError, KeyError):
             return self.Result(False, "invalid_action_signature")
+
+        if nonce_store is not None:
+            consume = getattr(nonce_store, "consume", None)
+            if not callable(consume):
+                return self.Result(False, "action_nonce_store_invalid")
+            consumed = consume(nonce, site_id=self.site_id, ttl_seconds=self.max_action_age_seconds + 300)
+            if not consumed:
+                return self.Result(False, "action_nonce_reused")
 
         return cred_result
 

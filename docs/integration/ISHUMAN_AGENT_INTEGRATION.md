@@ -26,7 +26,7 @@
 1. **Browser:** Load `proof-verifier.js`, create `ProofVerifier({ siteId })`, call `verify({ autoProvision: true })` before protected actions.
 2. **Account binding:** Store the returned site-private `ppid` as the platform's durable enforcement handle for that user.
 3. **Backend:** Accept a signed presentation or stamp from the client and verify locally with `@lemma/ishuman-verify` or `lemma_ishuman_verify.py`.
-4. **Assurance policy:** Start with `passkey` for continuity when that is enough (not Sybil-resistant alone). Require `ishuman` when the action needs one verified human behind the account, signup, trials, ticketing, payouts, or ban enforcement.
+4. **Assurance policy:** Use `passkey` for continuity when that is enough (not Sybil-resistant alone). Require `ishuman` when the action needs one verified human behind the account, such as Sybil-resistant signup, trials, ticketing, payouts, or recovery after abuse.
 5. **Optional:** Register a site API key only when the developer needs server-side PPID blocks.
 
 lemma.id runs wallet unlock, proof issuance, and IDV step-up (Didit by default) in a Lemma-hosted popup. **The relying site does not configure webhooks, Didit, or Stripe Identity.**
@@ -101,7 +101,7 @@ and `/sdk/ishuman-verifier.js` URL remain supported as compatibility aliases.
 </script>
 ```
 
-### Recommended account-binding flow (T2: passkey base, server verify)
+### Low-friction account-binding flow (T2: passkey continuity, server verify)
 
 Use **passkey assurance** for low-friction signup and continuity. Extract the account
 PPID from the **verified server result** (`result.ppid`), never from the parallel client
@@ -218,6 +218,26 @@ Pass the same canonical hostname to `VerificationContext(site_id=...)` or `creat
 | **T2** (recommended) | `presentation` from `verifyForBackend()` or `stamp(..., { includeCredential: true })` | Local `verify()` / `verifyStamp()` | **Signup**, account creation, moderate trust |
 | **T2+** | `stampAction(...)` envelope with `action_assertion` + `action_signature` | Local `verifyActionStamp()` / `verify_action_stamp()` + nonce replay store | **Mutations only**: checkout, withdrawals, posting, other fraud-sensitive server actions |
 | **T3** | Full presentation + session assertion | Local verify with `requireSessionAssertion: true`, or `POST /api/ishuman/verify-presentation` | High-trust / financial actions needing live session proof |
+
+### Install a backend verifier
+
+Node.js, Deno, Bun, and Workers:
+
+```bash
+npm install @lemma/ishuman-verify
+```
+
+Python:
+
+```bash
+pip install lemma-ishuman-verify
+# Or use the hosted single-file verifier:
+curl -O https://lemma.id/sdk/lemma_ishuman_verify.py
+```
+
+Choose assurance independently from the transport tier: T2 means the backend
+verifies a signed presentation. Set its policy to `passkey` for continuity or
+`ishuman` when the endpoint must enforce one verified human per account.
 
 ### Python backend (T2 + site policy)
 
@@ -382,11 +402,12 @@ result = ctx.verify_action_stamp(
 )
 ```
 
-**Replay protection:** configure `nonce_store_mode: required` in production and use
+**Replay protection:** configure `nonceStoreMode: 'required'` in production and use
 `InMemoryNonceStore` only for tests. For multi-process deployments, inject
-`RedisNonceStore` from `lemma_ishuman_nonce_store`.
+`RedisNonceStore` from `lemma_ishuman_nonce_store` and **await**
+`nonceStore.consume(...)` — the Redis store is async and uses atomic `SET NX`.
 
-**Live presale reference:** The tickets demo at [tickets-demo.lemma.id/?tour=presale](https://tickets-demo.lemma.id/?tour=presale) walks through challenge → `stampAction` register → fresh-passkey claim with a site-local one-code-per-PPID ledger. Source: `demo-sites/relying_site_app.py` and `docs/demo/PRESALE_DEMO_SCRIPT.md`.
+**Live presale reference:** The tickets demo at [tickets-demo.lemma.id/?tour=presale](https://tickets-demo.lemma.id/?tour=presale) walks through challenge → `stampAction` register → fresh-passkey claim with a site-local one-code-per-PPID ledger. See the [public demo walkthrough](https://lemma.id/docs/demo/PRESALE_DEMO_SCRIPT.md).
 
 ---
 
@@ -528,7 +549,7 @@ One **stable PPID** per site subject; proof strength is **assurance**, not a sec
 | Policy | SDK | Backend verifier |
 |--------|-----|------------------|
 | Low-friction signup | `requiredAssurance: 'passkey'` | `required_assurance='passkey'` |
-| Sybil-resistant / post-burn | `requiredAssurance: 'ishuman'` (default) | `required_assurance='ishuman'` |
+| Sybil-resistant signup / post-burn recovery | `requiredAssurance: 'ishuman'` | `required_assurance='ishuman'` |
 
 ```javascript
 const { ok, ppid, assurance, presentation } = await verifier.verifyForBackend({
@@ -548,7 +569,9 @@ await fetch('/api/signup', { method: 'POST', body: JSON.stringify({ presentation
 | User completes IDV step-up | Update the **same** account row; PPID unchanged |
 | User recovers on new device after IDV | Match on PPID/presentation; rebind session |
 
-Requires platform flags: `LEMMA_ONE_PPID_ASSURANCE_MODEL=1` and `LEMMA_PASSKEY_ASSURANCE_ENABLED=1`. Without them, behavior remains isHuman-first (`wallet_not_verified` until IDV).
+These are lemma.id platform capabilities. A relying site does not configure
+platform rollout flags; it explicitly requests the assurance its endpoint
+requires and fails closed if that assurance is unavailable.
 
 ### PPID convergence (provisional → known person)
 
@@ -570,10 +593,10 @@ presentation and receives `legacy_ppid` + canonical `ppid`.
 
 Ordinary first IDV on the same wallet preserves PPID and emits **no** convergence artifact.
 
-Enable with `LEMMA_PPID_CONVERGENCE_ENABLED=1` (requires one-PPID model). See
-`docs/cryptographic/CANONICAL_MESSAGES.md` §9.
-
-See `docs/product/PASSKEY_STAMP_INPUT_BURN.md` for the full contract.
+When convergence is present, the backend verifier validates its signed artifact;
+the relying site does not call wallet-internal derivation endpoints directly.
+See [One PPID, assurance tiers, and site-local input burn](https://lemma.id/docs/product/PASSKEY_STAMP_INPUT_BURN.md)
+for the relying-site contract.
 
 **Reference implementation:** [lemma.id integration demo](https://lemma.id/demo), passkey wallet → distinct site PPIDs → Heroku demo sites with `verifyStamp` → optional isHuman step-up (same PPID) → site-scoped revocation. Enable flags on staging before recording.
 

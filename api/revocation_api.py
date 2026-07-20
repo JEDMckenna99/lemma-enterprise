@@ -87,15 +87,13 @@ def get_revocation_list():
             'timestamp': int(time.time() * 1000),
             'ttl_ms': 3600000  # 1 hour cache
         }), 200
-        
+
     except Exception as e:
         logger.error(f"Revocation list error: {e}")
         return jsonify({
-            'success': True,
-            'revocations': [],
-            'count': 0,
-            'timestamp': int(time.time() * 1000)
-        }), 200  # Return empty list on error (fail-safe)
+            'success': False,
+            'error': 'revocation_unavailable',
+        }), 503
 
 _BLOOM_CACHE = {
     "built_at": 0.0,
@@ -164,7 +162,11 @@ def get_bloom_filter():
         )
         from api.issuer_trust_list import build_signed_trust_list
 
-        sequence_number = fetch_revocation_sequence_number()
+        try:
+            sequence_number = fetch_revocation_sequence_number()
+        except Exception as exc:
+            logger.error("Bloom sequence lookup failed: %s", exc)
+            return jsonify({"success": False, "error": "revocation_unavailable"}), 503
         cache_ttl_seconds = int(os.getenv("LEMMA_REVOCATION_FILTER_CACHE_TTL_SECONDS", "60"))
         etag = _bloom_etag(sequence_number)
 
@@ -185,31 +187,20 @@ def get_bloom_filter():
             ), 200
 
         # Query database for ALL revoked credentials AND PPIDs (global)
+        from api.database import get_db_connection
+
         try:
-            from api.database import get_db_connection
-            
             conn = get_db_connection()
             cursor = conn.cursor()
-            
+
             # Get ALL revoked credential IDs across all sites
-            # Privacy guaranteed by:
-            # 1. Wallet selective disclosure: Sites only receive credentials for their domain
-            # 2. SHA256 hashing: Credential IDs hashed before revocation check
-            # 3. Zero-knowledge: Sites cannot correlate revocations to other sites
-            # Note: Table uses both 'credential_id' and 'lemma_id' columns for compatibility
             cursor.execute("""
                 SELECT COALESCE(credential_id, lemma_id) as credential_id
                 FROM revocation_list
             """)
-            
+
             revoked_ids = [row[0] for row in cursor.fetchall()]
-            
-            # User-level (PPID) revocations are SITE-SCOPED. Site A blocking
-            # a PPID must not cause Site B's verifier to reject the same human.
-            # Only PPIDs from rows WITHOUT a site_id (i.e. network-wide PPID
-            # kills, rare and governance-approved) belong in the global Bloom.
-            # Per-site PPID blocks are queried separately via the site_blocks
-            # endpoint or the SDK's isBlockedLocally callback.
+
             cursor.execute("""
                 SELECT DISTINCT ppid
                 FROM revocation_list
@@ -219,53 +210,48 @@ def get_bloom_filter():
             """)
 
             revoked_ppids = [row[0] for row in cursor.fetchall()]
-            
-            # ALSO get revoked wallet_ids for global revocation (all sites, all devices)
-            # When a wallet_id is in the bloom filter, ALL credentials for that wallet are revoked
+
             cursor.execute("""
                 SELECT DISTINCT wallet_id
                 FROM revocation_list
                 WHERE wallet_id IS NOT NULL AND revocation_type = 'wallet'
             """)
-            
+
             revoked_wallets = [row[0] for row in cursor.fetchall()]
-            
-            # Combine credential IDs, PPIDs, and wallet_ids in the bloom filter
-            # Client checks: is credential.id OR credential.subject(ppid) OR wallet_id in bloom?
+
             all_revoked = revoked_ids + revoked_ppids + revoked_wallets
-            
+
             cursor.close()
             conn.close()
-            
-            logger.info(f"📊 Global Bloom filter: {len(revoked_ids)} creds + {len(revoked_ppids)} PPIDs + {len(revoked_wallets)} wallets = {len(all_revoked)} total")
-            
-            # Replace revoked_ids with combined list for downstream processing
+
+            logger.info(
+                "Global Bloom filter: %s creds + %s PPIDs + %s wallets = %s total",
+                len(revoked_ids),
+                len(revoked_ppids),
+                len(revoked_wallets),
+                len(all_revoked),
+            )
+
             revoked_ids = all_revoked
-            
+
         except Exception as e:
-            logger.error(f"❌ Failed to query revocations: {e}")
-            revoked_ids = []  # Fail safe - return empty list
-        
+            logger.error("Failed to query revocations: %s", e)
+            return jsonify({"success": False, "error": "revocation_unavailable"}), 503
+
         valid_until = datetime.now() + timedelta(days=7)
-        
-        # Hash revoked IDs with SHA-256 (client will hash credential IDs locally to check)
-        # This provides strong privacy: server cannot reverse SHA-256 to get credential IDs
+
         hashed_revoked_ids = []
         try:
-            import hashlib
-            
             for cred_id in revoked_ids:
-                # SHA-256 hash of credential ID (one-way function)
-                cred_id_str = cred_id if isinstance(cred_id, str) else cred_id.decode('utf-8')
-                hash_digest = hashlib.sha256(cred_id_str.encode('utf-8')).hexdigest()
+                cred_id_str = cred_id if isinstance(cred_id, str) else cred_id.decode("utf-8")
+                hash_digest = hashlib.sha256(cred_id_str.encode("utf-8")).hexdigest()
                 hashed_revoked_ids.append(hash_digest)
-            
-            logger.info(f"✅ Hashed {len(hashed_revoked_ids)} revoked IDs with SHA-256")
-            
+
+            logger.info("Hashed %s revoked IDs with SHA-256", len(hashed_revoked_ids))
+
         except Exception as e:
-            logger.warning(f"⚠️ Failed to hash revoked IDs: {e}", exc_info=True)
-            # Fallback to plain IDs
-            hashed_revoked_ids = revoked_ids
+            logger.error("Failed to hash revoked IDs: %s", e, exc_info=True)
+            return jsonify({"success": False, "error": "bloom_hash_failed"}), 500
 
         # Build a REAL Bloom filter payload (compact bitset) for scalable distribution
         bloom_enabled = os.getenv("LEMMA_ENABLE_BLOOM_REVOCATION", "1") != "0"

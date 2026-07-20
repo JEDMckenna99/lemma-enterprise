@@ -228,9 +228,9 @@ session-only claim path (deprecated, logged).
 - **Current controls:** local-first presentation verification, KMS production
   requirements for person roots and issuer keys, database readiness checks,
   cached signed revocation state, and billing outbox rows.
-- **Known gaps:** revocation database errors can produce a newly signed empty
-  snapshot; some Redis rate-limit paths degrade; billing dry-run can acknowledge
-  undelivered events; readiness does not cover every required dependency.
+- **Known gaps:** some Redis rate-limit paths degrade; billing dry-run can acknowledge
+  undelivered events; multi-region Redis topology certification remains operational
+  follow-up.
 - **Required controls:** fail closed for authority, revocation, replay,
   recovery, and billing entitlement. Preserve the last trusted snapshot within
   its validity window, return unavailable rather than minting empty state, and
@@ -273,7 +273,7 @@ session-only claim path (deprecated, logged).
 | Reissue beyond per-day cap                 | closed     | `reissue_rate_limited` 429 (Phase 1.3).                          |
 | Mobile IDV handoff claim without `mk` proof | closed     | `handoff_id_session_id_mk_required` 400 / `handoff_mk_mismatch` 403. |
 | Mobile IDV handoff claim with wrong session | closed     | `handoff_session_invalid` 403, blob not consumed.               |
-| Revocation database unavailable            | **target: closed** | Return unavailable; never sign a fresh empty snapshot. Current implementation gap is tracked in Section 5. |
+| Revocation database unavailable            | closed     | Bloom/list endpoints return `503`; verify-presentation and `/ready` fail closed; never sign empty-from-error snapshots (Section 5). |
 | Distributed nonce store unavailable        | closed     | Sensitive action cannot proceed without durable replay protection. |
 | KMS unavailable for production signing/root access | closed | Do not generate replacement trust material implicitly. |
 | IDV provider unavailable                   | closed for new/step-up IDV | Existing locally verifiable credentials remain subject to expiry and revocation policy. |
