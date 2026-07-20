@@ -614,6 +614,15 @@ def create_app():
     except Exception as e:
         logger.warning(f"⚠️ Could not initialize Revocation Event Bus: {e}")
 
+    # Eager-init in-process Bloom verifier so /ready reflects revocation sync state.
+    try:
+        from api.permission_verification import get_global_verifier
+
+        get_global_verifier()
+        logger.info("✅ Global Bloom verifier initialized for readiness checks")
+    except Exception as e:
+        logger.warning(f"⚠️ Global Bloom verifier init failed: {e}")
+
     # Session-free architecture: No server-side sessions needed!
     # Authentication is handled via client-side credential verification
     # with smart caching (5-minute TTL) and event-driven invalidation

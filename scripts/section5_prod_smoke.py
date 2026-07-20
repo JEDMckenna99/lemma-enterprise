@@ -77,14 +77,30 @@ def main() -> int:
         checks.append(("bloom-filter-signed-hashes-only", False, str(exc)))
 
     try:
-        code, ready_raw = get(f"{ORIGIN}/ready")
-        ready_body = ready_raw if isinstance(ready_raw, dict) else {}
+        req = urllib.request.Request(f"{ORIGIN}/ready", headers={"User-Agent": UA})
+        try:
+            with urllib.request.urlopen(req, timeout=45) as resp:
+                code = resp.status
+                ready_body = json.loads(resp.read().decode("utf-8"))
+        except urllib.error.HTTPError as exc:
+            code = exc.code
+            ready_body = json.loads(exc.read().decode("utf-8", errors="replace"))
         checks_dict = ready_body.get("checks") or {}
-        ok = code in (200, 503) and "revocation" in checks_dict
         checks.append(
             (
                 "ready-includes-revocation-check",
-                ok,
+                "revocation" in checks_dict,
+                {
+                    "http": code,
+                    "ready": ready_body.get("ready"),
+                    "checks": checks_dict,
+                },
+            )
+        )
+        checks.append(
+            (
+                "ready-revocation-green",
+                checks_dict.get("revocation") is True and ready_body.get("ready") is True,
                 {
                     "http": code,
                     "ready": ready_body.get("ready"),
@@ -94,6 +110,7 @@ def main() -> int:
         )
     except Exception as exc:
         checks.append(("ready-includes-revocation-check", False, str(exc)))
+        checks.append(("ready-revocation-green", False, str(exc)))
 
     try:
         code, list_raw = get(f"{ORIGIN}/api/v1/revocation/list")
