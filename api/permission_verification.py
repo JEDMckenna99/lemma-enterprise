@@ -68,7 +68,7 @@ def get_global_verifier():
     # Create verifier if needed
     if _global_verifier is None:
         logger.info("🔐 Initializing global OptimizedVerifier with Bloom filter...")
-        _global_verifier = PyOptimizedVerifier.new()
+        _global_verifier = PyOptimizedVerifier()
         
         # Do INITIAL sync of existing revocations
         try:
