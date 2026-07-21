@@ -147,7 +147,7 @@ def _collect_site_api_key_metadata(site_id: str) -> list[dict]:
 
 
 def _replace_site_api_key(site_id: str, name: str = 'API Key') -> dict:
-    """Revoke existing site keys and issue one new hash-stored key."""
+    """Issue a new hash-stored key and grace-expire existing active site keys."""
     from api.customer_accounts import customer_manager
 
     customer_id = _resolve_customer_id_for_site(site_id)
@@ -158,16 +158,20 @@ def _replace_site_api_key(site_id: str, name: str = 'API Key') -> dict:
     if not customer:
         return {'success': False, 'error': 'Customer not found for site'}
 
+    active_hints = []
     for key_data in list(customer.api_keys or []):
         if key_data.get('site_id') != site_id or key_data.get('status') != 'active':
             continue
         hint = key_data.get('key_hint')
         if hint:
-            customer_manager.revoke_api_key_by_hint(customer_id, site_id, hint)
+            active_hints.append(hint)
 
     result = customer_manager.generate_additional_api_key(customer_id, name, site_id=site_id)
     if not result.get('success'):
         return result
+
+    for hint in active_hints:
+        customer_manager.mark_api_key_rotation_pending(customer_id, site_id, hint)
 
     try:
         from api.storage_helpers import clear_site_legacy_api_key
@@ -704,14 +708,17 @@ def create_developer_site():
             
             # STEP 1: Create the site record in database FIRST
             # (KMS key storage requires site to exist)
+            from api.oauth_client_secret_crypto import provision_oauth_client_credentials
+
+            oauth_client_id, oauth_stored = provision_oauth_client_credentials(site_id)
             new_site = Site(
                 site_id=site_id,
                 site_domain=domain,
                 company_name=name or domain,
                 admin_email=ppid or '',  # Will be updated from wallet profile
-                api_key=f"lm_{secrets.token_urlsafe(32)}",  # Auto-generate API key
-                oauth_client_id=f"oc_{secrets.token_urlsafe(16)}",
-                oauth_client_secret=secrets.token_urlsafe(32),
+                api_key=f"__hash_only__{secrets.token_hex(12)}",
+                oauth_client_id=oauth_client_id,
+                oauth_client_secret=oauth_stored,
                 created_at=datetime.utcnow()
             )
             db.add(new_site)

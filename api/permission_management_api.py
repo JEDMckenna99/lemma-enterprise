@@ -37,6 +37,9 @@ permission_api = Blueprint('permission_api', __name__)
 
 def _create_site_record(data: dict) -> Site:
     site_id = f"site_{uuid.uuid4().hex[:8]}"
+    from api.oauth_client_secret_crypto import provision_oauth_client_credentials
+
+    oauth_client_id, oauth_stored = provision_oauth_client_credentials(site_id)
     db = get_db()
     try:
         site = Site(
@@ -45,9 +48,9 @@ def _create_site_record(data: dict) -> Site:
             company_name=data['company_name'],
             admin_email=data['admin_email'].strip().lower(),
             plan=data.get('plan', 'starter'),
-            api_key=f"lemma_api_{uuid.uuid4().hex[:16]}",
-            oauth_client_id=f"lemma_oauth_{site_id}",
-            oauth_client_secret=f"secret_{secrets.token_hex(16)}",
+            api_key=f"__hash_only__{secrets.token_hex(12)}",
+            oauth_client_id=oauth_client_id,
+            oauth_client_secret=oauth_stored,
         )
         db.add(site)
         db.commit()
@@ -196,14 +199,13 @@ def register_site():
         return jsonify({
             'success': True,
             'site_id': site.site_id,
-            'api_key': site.api_key,
             'oauth_client_id': site.oauth_client_id,
-            'oauth_client_secret': site.oauth_client_secret,
             'issuer_did': manager.issuer_did,
             'crypto_engine': 'rust_ed25519_bloom',
             'site_isolation': 'unique_keys_and_revocation_per_site',
             'integration_guide': f"https://docs.lemma.id/integration/{site.site_id}",
-            'dashboard_url': f"https://lemma.id/dashboard/{site.site_id}"
+            'dashboard_url': f"https://lemma.id/dashboard/{site.site_id}",
+            'message': 'Site API keys and OAuth client secrets are not returned after registration.',
         }), 201
         
     except Exception as e:

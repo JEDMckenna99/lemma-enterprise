@@ -64,7 +64,7 @@ def _lookup_api_key_binding(api_key: str, requested_site_id: str | None = None) 
                 LEFT JOIN sites s ON s.site_id = ak.site_id
                 LEFT JOIN customers c ON c.customer_id = ak.customer_id
                 WHERE ak.key_hash = %s
-                  AND ak.status = 'active'
+                  AND ak.status IN ('active', 'rotation_pending')
                 LIMIT 1
                 """,
                 (key_hash,)
@@ -87,19 +87,7 @@ def _lookup_api_key_binding(api_key: str, requested_site_id: str | None = None) 
                 )
                 row = cursor.fetchone()
 
-            # Path C (legacy): sites.api_key may contain raw key or hash.
-            if not row:
-                cursor.execute(
-                    """
-                    SELECT s.customer_id, s.site_id, s.site_domain, c.email, c.billing_email, s.admin_email
-                    FROM sites s
-                    LEFT JOIN customers c ON c.customer_id = s.customer_id
-                    WHERE s.api_key = %s OR s.api_key = %s
-                    LIMIT 1
-                    """,
-                    (api_key, key_hash)
-                )
-                row = cursor.fetchone()
+            # Path C removed: legacy sites.api_key plaintext/hash matching is not authoritative.
 
             if not row:
                 return None

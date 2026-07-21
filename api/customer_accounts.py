@@ -452,7 +452,7 @@ def _collect_developer_site_catalog(
                     }
 
                 api_key = (site.api_key or "").strip()
-                if not api_key:
+                if not api_key or api_key.startswith("__hash_only__"):
                     continue
                 hint = api_key[-8:] if len(api_key) >= 8 else api_key
                 hint_key = (site_id, hint)
@@ -536,7 +536,7 @@ class CustomerAccountManager:
                 db_customers = db.query(DBCustomer.customer_id, DBCustomer.api_keys).all()
                 for customer_id, api_keys in db_customers:
                     for key_data in api_keys or []:
-                        if key_data.get('status') != 'active':
+                        if key_data.get('status') not in ('active', 'rotation_pending'):
                             continue
                         key_hash = key_data.get('key_hash')
                         if key_hash:
@@ -548,7 +548,7 @@ class CustomerAccountManager:
         else:
             for customer_id, customer in self.customers.items():
                 for key_data in customer.api_keys or []:
-                    if key_data.get('status') != 'active':
+                    if key_data.get('status') not in ('active', 'rotation_pending'):
                         continue
                     key_hash = key_data.get('key_hash')
                     if key_hash:
@@ -1289,32 +1289,137 @@ class CustomerAccountManager:
             if not old_key_found:
                 return {'success': False, 'error': 'Active API key not found for rotation'}
         
-        # Generate the new key first (so we have it before revoking old one)
+        # Issue the new key first, then mark the old key rotation_pending for grace overlap.
         new_key_name = f"{old_key_name} (rotated {datetime.utcnow().strftime('%Y-%m-%d')})"
         new_key_result = self.generate_additional_api_key(customer_id, new_key_name, site_id)
         
         if not new_key_result.get('success'):
             return {'success': False, 'error': 'Failed to generate new key during rotation'}
         
-        # Now revoke the old key
-        revoke_result = self.revoke_api_key_by_hint(customer_id, site_id, key_hint)
+        pending_result = self.mark_api_key_rotation_pending(customer_id, site_id, key_hint)
         
-        if not revoke_result.get('success'):
-            # Log but don't fail - new key is already created
-            logger.warning(f"Failed to revoke old key during rotation for {customer_id}, site {site_id}")
+        if not pending_result.get('success'):
+            logger.warning(
+                "Failed to mark old key rotation_pending for %s, site %s",
+                customer_id,
+                site_id,
+            )
         
         logger.info(f"Rotated API key for customer {customer_id}, site {site_id}")
         
         return {
             'success': True,
-            'message': 'API key rotated successfully. The old key has been revoked.',
+            'message': (
+                'API key rotated successfully. The previous key remains valid during the '
+                f'{self._rotation_grace_hours()} hour grace window.'
+            ),
             'new_api_key': new_key_result.get('api_key'),
             'new_key_data': new_key_result.get('key_data'),
-            'old_key_revoked': revoke_result.get('success', False)
+            'old_key_grace_until': pending_result.get('grace_expires_at'),
+            'old_key_status': 'rotation_pending' if pending_result.get('success') else 'active',
         }
+    
+    def _rotation_grace_hours(self) -> int:
+        from api.api_key_rotation import rotation_grace_hours
+
+        return rotation_grace_hours()
+
+    def mark_api_key_rotation_pending(
+        self,
+        customer_id: str,
+        site_id: str,
+        key_hint: str,
+    ) -> Dict[str, Any]:
+        """Mark an active key rotation_pending with a bounded grace window."""
+        from api.api_key_rotation import grace_expires_at
+
+        expires = grace_expires_at()
+        expires_iso = expires.replace(tzinfo=None).isoformat()
+        marked = False
+        key_hash = None
+
+        if self.db_available:
+            db = None
+            try:
+                db = get_db()
+                db_customer = db.query(DBCustomer).filter(DBCustomer.customer_id == customer_id).first()
+                if not db_customer:
+                    return {'success': False, 'error': 'Customer not found'}
+
+                keys = list(db_customer.api_keys or [])
+                for key_data in keys:
+                    stored_hint = key_data.get('key_hint') or (
+                        (key_data.get('key') or '')[-8:] if key_data.get('key') else ''
+                    )
+                    if (
+                        key_data.get('site_id') == site_id
+                        and stored_hint == key_hint
+                        and key_data.get('status') == 'active'
+                    ):
+                        key_data['status'] = 'rotation_pending'
+                        key_data['grace_expires_at'] = expires_iso
+                        key_hash = key_data.get('key_hash')
+                        marked = True
+                        break
+
+                if not marked:
+                    return {'success': False, 'error': 'Active API key not found'}
+
+                db_customer.api_keys = keys
+                from sqlalchemy.orm.attributes import flag_modified
+                flag_modified(db_customer, 'api_keys')
+                db.commit()
+            except Exception as exc:
+                logger.error("Failed to mark rotation_pending for %s: %s", customer_id, exc)
+                if db is not None:
+                    db.rollback()
+                return {'success': False, 'error': 'Failed to mark key rotation_pending'}
+            finally:
+                if db is not None:
+                    db.close()
+        else:
+            customer = self.get_customer(customer_id)
+            if not customer:
+                return {'success': False, 'error': 'Customer not found'}
+            for key_data in customer.api_keys:
+                stored_hint = key_data.get('key_hint') or (
+                    (key_data.get('key') or '')[-8:] if key_data.get('key') else ''
+                )
+                if (
+                    key_data.get('site_id') == site_id
+                    and stored_hint == key_hint
+                    and key_data.get('status') == 'active'
+                ):
+                    key_data['status'] = 'rotation_pending'
+                    key_data['grace_expires_at'] = expires_iso
+                    key_hash = key_data.get('key_hash')
+                    marked = True
+                    break
+            if not marked:
+                return {'success': False, 'error': 'Active API key not found'}
+            self._store_customer_in_memory(customer)
+
+        if key_hash:
+            try:
+                from api.storage_helpers import mark_api_key_rotation_pending_in_postgres
+
+                mark_api_key_rotation_pending_in_postgres(key_hash, expires.replace(tzinfo=None))
+            except Exception as exc:
+                logger.warning("Postgres rotation_pending update failed: %s", exc)
+
+        return {'success': True, 'grace_expires_at': expires_iso}
     
     def validate_api_key(self, api_key: str) -> Dict[str, Any]:
         """Validate an API key and return customer info (hash-only)."""
+        from api.api_key_rotation import api_key_status_is_valid
+
+        try:
+            from api.storage_helpers import expire_rotation_pending_api_keys
+
+            expire_rotation_pending_api_keys()
+        except Exception:
+            pass
+
         customer = self.get_customer_by_api_key(api_key)
         if not customer:
             return {'valid': False, 'error': 'Invalid API key'}
@@ -1325,7 +1430,7 @@ class CustomerAccountManager:
         incoming_hash = self.hash_api_key(api_key)
         
         for key_data in customer.api_keys:
-            if key_data.get('status') != 'active':
+            if not api_key_status_is_valid(key_data.get('status'), key_data.get('grace_expires_at')):
                 continue
                 
             if key_data.get('key_hash') == incoming_hash:
@@ -2216,14 +2321,17 @@ def _ensure_site_row_for_registration(
             site.company_name = company_name
         return site
 
+    from api.oauth_client_secret_crypto import provision_oauth_client_credentials
+
+    oauth_client_id, oauth_stored = provision_oauth_client_credentials(site_id)
     site = Site(
         site_id=site_id,
         site_domain=site_domain,
         company_name=company_name or site_domain,
         admin_email=admin_email or "",
         api_key=f"__hash_only__{secrets.token_hex(12)}",
-        oauth_client_id=f"oc_{secrets.token_urlsafe(16)}",
-        oauth_client_secret=secrets.token_urlsafe(32),
+        oauth_client_id=oauth_client_id,
+        oauth_client_secret=oauth_stored,
         created_at=datetime.utcnow(),
     )
     db.add(site)

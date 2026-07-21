@@ -226,15 +226,18 @@ def revoke_api_key_in_postgres(key_hash: str) -> bool:
 
 def validate_api_key_hash_in_postgres(key_hash: str) -> dict | None:
     """Return active customer/site binding for a key hash, or None."""
+    from api.api_key_rotation import api_key_status_is_valid
+
     conn = None
     try:
         conn = get_pg_connection()
         cursor = conn.cursor()
         cursor.execute(
             """
-            SELECT customer_id, site_id
+            SELECT customer_id, site_id, status, grace_expires_at
             FROM api_keys
-            WHERE key_hash = %s AND status = 'active'
+            WHERE key_hash = %s
+              AND status IN ('active', 'rotation_pending')
             LIMIT 1
             """,
             (key_hash,),
@@ -243,6 +246,9 @@ def validate_api_key_hash_in_postgres(key_hash: str) -> dict | None:
         cursor.close()
         if not row:
             return None
+        grace_value = row[3].isoformat() if row[3] else None
+        if not api_key_status_is_valid(row[2], grace_value):
+            return None
         return {
             "customer_id": row[0],
             "site_id": row[1],
@@ -250,6 +256,65 @@ def validate_api_key_hash_in_postgres(key_hash: str) -> dict | None:
     except Exception as e:
         logger.debug(f"Postgres api_keys lookup failed: {e}")
         return None
+    finally:
+        if conn:
+            conn.close()
+
+
+def mark_api_key_rotation_pending_in_postgres(key_hash: str, grace_expires_at) -> bool:
+    """Move an api_keys row into rotation_pending with a grace cutoff."""
+    conn = None
+    try:
+        conn = get_pg_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            UPDATE api_keys
+            SET status = 'rotation_pending',
+                grace_expires_at = %s
+            WHERE key_hash = %s AND status = 'active'
+            """,
+            (grace_expires_at, key_hash),
+        )
+        updated = cursor.rowcount > 0
+        conn.commit()
+        cursor.close()
+        return updated
+    except Exception as e:
+        logger.warning(f"Could not mark api_keys row rotation_pending: {e}")
+        if conn:
+            conn.rollback()
+        return False
+    finally:
+        if conn:
+            conn.close()
+
+
+def expire_rotation_pending_api_keys() -> int:
+    """Revoke api_keys rows whose rotation grace window has elapsed."""
+    conn = None
+    try:
+        conn = get_pg_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            UPDATE api_keys
+            SET status = 'revoked',
+                revoked_at = NOW()
+            WHERE status = 'rotation_pending'
+              AND grace_expires_at IS NOT NULL
+              AND grace_expires_at <= NOW()
+            """
+        )
+        updated = cursor.rowcount or 0
+        conn.commit()
+        cursor.close()
+        return updated
+    except Exception as e:
+        logger.debug(f"Could not expire rotation_pending api_keys rows: {e}")
+        if conn:
+            conn.rollback()
+        return 0
     finally:
         if conn:
             conn.close()

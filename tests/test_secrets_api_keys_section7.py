@@ -209,3 +209,53 @@ def test_create_app_uses_config_secret_not_dev_default(monkeypatch):
     app = create_app()
     assert app.config["SECRET_KEY"] == "unit-test-secret-key-32chars-minimum!!"
     assert app.config["SECRET_KEY"] != "dev-secret-key-for-testing"
+
+
+def test_oauth_client_secret_encrypted_in_dev(monkeypatch):
+    monkeypatch.setenv("FLASK_ENV", "development")
+    from api.oauth_client_secret_crypto import (
+        decrypt_oauth_client_secret,
+        encrypt_oauth_client_secret,
+        is_encrypted_oauth_client_secret,
+    )
+
+    stored = encrypt_oauth_client_secret("example.com", "oauth-secret-value")
+    assert is_encrypted_oauth_client_secret(stored)
+    assert decrypt_oauth_client_secret("example.com", stored) == "oauth-secret-value"
+
+
+def test_rotation_pending_key_still_validates(monkeypatch):
+    from api.customer_accounts import CustomerAccountManager
+    from types import SimpleNamespace
+
+    raw_key = "lm_rotation_pending_key"
+    key_hash = hashlib.sha256(raw_key.encode()).hexdigest()
+    customer = SimpleNamespace(
+        customer_id="cus_rotate",
+        status="active",
+        name="Test",
+        company="Co",
+        subscription_status="none",
+        api_keys=[{
+            "key_hash": key_hash,
+            "key_hint": raw_key[-8:],
+            "site_id": "example.com",
+            "status": "rotation_pending",
+            "grace_expires_at": "2099-01-01T00:00:00",
+        }],
+    )
+
+    manager = CustomerAccountManager.__new__(CustomerAccountManager)
+    manager.db_available = False
+    manager.api_key_to_customer = {key_hash: "cus_rotate"}
+    manager.customers = {"cus_rotate": customer}
+    manager.get_customer = lambda customer_id: manager.customers.get(customer_id)
+    manager.get_customer_by_api_key = CustomerAccountManager.get_customer_by_api_key.__get__(manager)
+    manager.hash_api_key = CustomerAccountManager.hash_api_key.__get__(manager)
+    monkeypatch.setattr(
+        "api.storage_helpers.expire_rotation_pending_api_keys",
+        lambda: 0,
+    )
+
+    validation = manager.validate_api_key(raw_key)
+    assert validation["valid"] is True

@@ -309,6 +309,48 @@ class LemmaKMSManager:
             logger.error(f"❌ Failed to get key info: {e}")
             return None
 
+    def get_rotation_status(self) -> Optional[dict]:
+        """Return AWS KMS automatic rotation status for the master CMK."""
+        if not self.is_enabled():
+            return None
+        try:
+            response = self.kms.get_key_rotation_status(KeyId=self.master_key_id)
+            return {
+                "key_id": self.master_key_id,
+                "rotation_enabled": bool(response.get("KeyRotationEnabled")),
+            }
+        except ClientError as e:
+            logger.error(f"❌ Failed to get key rotation status: {e}")
+            return None
+
+    def verify_identity_encryption_context(
+        self,
+        *,
+        key_type: str,
+        purpose: str,
+        context_id: str,
+        version: str = "1",
+    ) -> bool:
+        """Round-trip encrypt/decrypt to verify purpose-bound KMS context."""
+        if not self.is_enabled():
+            return False
+        probe = b"lemma-kms-policy-probe"
+        encrypted, _key_id = self.encrypt_identity_secret(
+            probe,
+            key_type=key_type,
+            purpose=purpose,
+            context_id=context_id,
+            version=version,
+        )
+        decrypted = self.decrypt_identity_secret(
+            encrypted,
+            key_type=key_type,
+            purpose=purpose,
+            context_id=context_id,
+            version=version,
+        )
+        return decrypted == probe
+
 
 # Global KMS manager instance (singleton)
 _kms_manager: Optional[LemmaKMSManager] = None

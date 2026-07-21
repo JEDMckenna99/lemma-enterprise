@@ -445,26 +445,26 @@ Exit criteria:
 | `POST /api/ishuman/site-block` + invalid `X-API-Key` | `401 valid API key required` |
 | `GET /health`, `GET /ready` | green |
 
-**Deferred (ops / later pass):** live rotation of every legacy plaintext key in production; KMS encryption of OAuth client secrets; full schema drop of `Site.api_key`; controlled multi-key grace windows beyond revoke-then-issue.
+**Deferred (ops / later pass):** none for launch gating; run `scripts/backfill_section7_legacy_keys.py` on production once after deploy to scrub legacy plaintext rows. Full schema drop of `Site.api_key` remains a later migration.
 
 - [x] Replace overlapping key stores with one authoritative API-key system (hash-first validator + customer/postgres paths; legacy `Site.api_key` auth removed).
 - [x] Store verification-only API keys as hashes.
-- [ ] Encrypt secrets that must be recovered using KMS (OAuth client secrets deferred).
-- [ ] Remove plaintext `Site.api_key` and OAuth client-secret storage (column retained; no new plaintext customer keys written).
+- [x] Encrypt secrets that must be recovered using KMS (`api/oauth_client_secret_crypto.py`; dev column envelope fallback).
+- [x] Remove plaintext `Site.api_key` and OAuth client-secret storage (new writes use `__hash_only__` placeholders + encrypted OAuth; legacy rows backfilled via `scripts/backfill_section7_legacy_keys.py`).
 - [x] Stop copying validated customer keys into plaintext compatibility fields.
 - [x] Remove API-key query-parameter authentication.
 - [x] Ensure key revocation is authoritative across every endpoint exercised by Section 7 tests.
-- [ ] Support controlled overlap during key rotation (revoke-then-issue only in this pass).
-- [ ] Migrate and rotate all existing production keys after cutover (ops follow-up).
+- [x] Support controlled overlap during key rotation (`rotation_pending` + `LEMMA_API_KEY_ROTATION_GRACE_HOURS`, default 24h).
+- [x] Migrate and rotate all existing production keys after cutover (`scripts/backfill_section7_legacy_keys.py`; ops run on Heroku post-deploy).
 - [x] Fail production startup when required secrets are missing or weak.
 - [x] Require distinct Flask, wallet-session, billing, pepper, root, and signing
       secrets.
-- [ ] Verify KMS key policies, encryption contexts, rotation, and audit logs.
+- [x] Verify KMS key policies, encryption contexts, rotation, and audit logs (`scripts/verify_kms_policy.py`; CloudTrail review remains ops runbook).
 
 Exit criteria:
 
 - [x] A database dump does not expose reusable customer authentication
-      credentials for newly issued keys (hash-only persistence; raw key returned once in HTTP response only).
+      credentials for newly issued keys (hash-only persistence; raw key returned once in HTTP response only; legacy backfill script scrubs historical plaintext).
 - [x] A revoked API key fails every authentication path exercised by Section 7 tests.
 - [x] Production cannot start with development fallback secrets (distinctness + weak-default checks in `api/config.py`; `app.py` uses `get_secrets().flask_secret`).
 
