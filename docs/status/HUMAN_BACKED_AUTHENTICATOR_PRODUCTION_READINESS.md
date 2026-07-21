@@ -54,8 +54,8 @@ The assurance boundaries must remain explicit:
 | 2. Wallet authority boundaries | P0 | `IN_PROGRESS` | Auth | Ceremonies shipped; browser matrix evidence remains for Section 2 PASS |
 | 3. Tenant and site ownership | P0 | `PASS` | Platform | `api/site_access.py`, `api/domain_ownership.py`, `api/domain_transfers.py`, `migrations/042_section3_tenant_ownership.sql`, `tests/test_tenant_isolation_section3.py` |
 | 4. Cryptographic trust chain | P0 | `PASS` | Platform | `cda63863` / Heroku v2467+; `api/network_roots.py`, verifier packages, `tests/test_protocol_fixtures_section4.py`, `scripts/section4_prod_e2e.py` |
-| 5. Revocation and replay protection | P0 | `NOT_STARTED` |  |  |
-| 6. Human recovery | P0 | `PASS` |  | `tests/test_recovery_section6.py` |
+| 5. Revocation and replay protection | P0 | `PASS` |  | `tests/test_revocation_fail_closed_section5.py` / v2472 |
+| 6. Human recovery | P0 | `PASS` |  | `tests/test_recovery_section6.py` / v2474 |
 | 7. Secrets and API keys | P0 | `NOT_STARTED` |  |  |
 | 8. Billing integrity | P0 | `NOT_STARTED` |  |  |
 | 9. Operational reliability | P0 | `NOT_STARTED` |  |  |
@@ -385,6 +385,16 @@ Exit criteria:
 - Status: `PASS`
 - Owner:
 - Evidence: `tests/test_recovery_section6.py`; `scripts/section6_prod_smoke.py`; developer recovery atomic token + passkey required (`api/account_recovery.py`); exact admin binding (no owner fallback); `complete-wallet` disabled; lost-device IDV purpose gate (`api/wallet_authn.py`); wallet lost-device tests updated (`tests/test_wallet_authn.py`, `tests/test_wallet_session_sync_security.py`).
+
+**Production evidence (2026-07-21, Heroku v2474):**
+
+| Check | Result |
+| ----- | ------ |
+| `python scripts/section6_prod_smoke.py` | PASS (5/5) |
+| `python scripts/section5_prod_smoke.py` | PASS (regression) |
+| `POST /api/recovery/complete` (token only) | `400 replacement_ppid_required` |
+| `POST /api/recovery/complete-wallet` | `403 recovery_wallet_path_disabled` |
+| `/recover/complete` UI | passkey ceremony before complete |
 
 - [x] Bind IDV completion to the initiating wallet, site, API key, user, and
       one-time server record (wallet lost-device + IDV claim paths; developer
