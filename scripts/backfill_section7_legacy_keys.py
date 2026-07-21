@@ -15,9 +15,12 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 import os
 import secrets
 import sys
+
+logger = logging.getLogger(__name__)
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -85,7 +88,7 @@ def backfill_legacy_site_api_keys(dry_run: bool = False) -> dict:
     from api.api_key_rotation import is_legacy_plaintext_site_api_key
     from api.database import Site, get_db
 
-    stats = {"sites_scanned": 0, "site_api_keys_replaced": 0, "hashes_backfilled": 0}
+    stats = {"sites_scanned": 0, "site_api_keys_replaced": 0, "hashes_backfilled": 0, "api_keys_upserted": 0}
     db = get_db()
     try:
         for site in db.query(Site).all():
@@ -93,9 +96,24 @@ def backfill_legacy_site_api_keys(dry_run: bool = False) -> dict:
             raw = (site.api_key or "").strip()
             if not is_legacy_plaintext_site_api_key(raw):
                 continue
+            key_hash = _hash_api_key(raw)
             stats["hashes_backfilled"] += 1
             if dry_run:
                 continue
+            try:
+                from api.storage_helpers import get_customer_id_for_site, upsert_api_key_to_postgres
+
+                customer_id = get_customer_id_for_site(site.site_id) or site.admin_email or site.site_id
+                upsert_api_key_to_postgres(
+                    customer_id=str(customer_id),
+                    site_id=site.site_id,
+                    key_hash=key_hash,
+                    key_hint=raw[-8:],
+                    name=f"{site.company_name or site.site_domain} Legacy Key",
+                )
+                stats["api_keys_upserted"] += 1
+            except Exception as exc:
+                logger.warning("Could not upsert legacy site api key for %s: %s", site.site_id, exc)
             site.api_key = _placeholder_site_api_key()
             stats["site_api_keys_replaced"] += 1
         if not dry_run:

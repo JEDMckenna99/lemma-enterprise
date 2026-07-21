@@ -92,7 +92,6 @@ def main() -> int:
             passed += 1
 
     print(f"\nSection 7 prod smoke: {passed}/{len(checks)} passed")
-    print("Note: full production key rotation remains an ops follow-up after deploy.")
     return 0 if passed == len(checks) else 1
 
 
