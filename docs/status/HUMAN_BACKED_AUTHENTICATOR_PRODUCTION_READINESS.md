@@ -489,7 +489,8 @@ Exit criteria:
 | `python scripts/section7_prod_smoke.py` | PASS (4/4 regression) |
 | `python scripts/section5_prod_smoke.py` | PASS (regression) |
 | `python scripts/section6_prod_smoke.py` | PASS (regression) |
-| `heroku run python scripts/reconcile_billing.py` | 1 stale pending outbox (legacy demo row; worker retry in progress) |
+| `heroku run python scripts/reconcile_billing.py` | PASS (`ok=True`, post demo outbox cleanup v2482) |
+| `heroku run python scripts/cleanup_demo_billing_outbox.py --apply` | 25 demo pending rows → `dead_letter` (`demo_legacy_not_billable`) |
 | `LEMMA_BILLING_ENFORCEMENT` | **off** — flip only after reconcile clean + controlled go-live |
 
 - [x] Require registered, ownership-verified production sites (enforcement blocks unregistered hostnames via `billing_site_unregistered`; registration path = Section 3 site row).
