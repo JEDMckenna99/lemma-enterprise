@@ -142,7 +142,8 @@ def ensure_migration_ledger(conn):
 
 def _migration_checksum(migration_file):
     data = Path(migration_file).read_bytes()
-    return hashlib.sha256(data).hexdigest()
+    normalized = data.replace(b"\r\n", b"\n")
+    return hashlib.sha256(normalized).hexdigest()
 
 
 def _verify_recorded_checksum(conn, migration_file) -> bool:
