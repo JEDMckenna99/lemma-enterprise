@@ -12,6 +12,16 @@ import secrets as secrets_module
 
 logger = logging.getLogger(__name__)
 
+_KNOWN_WEAK_DEFAULTS = frozenset({
+    'dev-secret-key-for-testing',
+    'lemma_platform_production_key_2024',
+    'lemma_platform_internal_key_2024',
+    'admin123',
+    'secret',
+    'changeme',
+    'test',
+})
+
 # ============================================
 # ENVIRONMENT DETECTION
 # ============================================
@@ -145,6 +155,7 @@ class LemmaSecrets:
         logger.info("✅ Secrets loaded successfully")
         if is_development():
             logger.warning("⚠️ Running in DEVELOPMENT mode - some secrets may be auto-generated")
+        enforce_production_secret_distinctness(self)
     
     def validate_production_readiness(self) -> dict:
         """Check if all production secrets are properly configured"""
@@ -172,6 +183,38 @@ class LemmaSecrets:
             'issues': issues,
             'environment': 'production' if is_production() else 'development'
         }
+
+
+def enforce_production_secret_distinctness(secrets: LemmaSecrets) -> None:
+    """Fail production startup on weak, missing, or duplicated core secrets."""
+    if not is_production():
+        return
+
+    tracked = {
+        'SECRET_KEY': secrets.flask_secret,
+        'LEMMA_OAUTH_JWT_SECRET': secrets.oauth_jwt_secret,
+        'LEMMA_NETWORK_AUTH_KEY': secrets.network_auth_key,
+        'LEMMA_PPID_ROOT_KEY': secrets.ppid_root_key,
+        'LEMMA_IDENTITY_ROOT_PEPPER_V1': secrets.identity_root_pepper,
+        'LEMMA_PERSON_ROOT_SALT_V1': secrets.person_root_salt,
+        'LEMMA_BILLING_HMAC_SECRET': secrets.billing_hmac_secret,
+        'LEMMA_HPKE_SERVER_KEY': secrets.hpke_server_key,
+        'LEMMA_WALLET_SALT': secrets.wallet_salt,
+    }
+
+    seen_values: dict[str, str] = {}
+    for name, value in tracked.items():
+        if not value:
+            raise RuntimeError(f"CRITICAL: Required secret {name} not set in production!")
+        if value in _KNOWN_WEAK_DEFAULTS or value.startswith('DEV_ONLY_'):
+            raise RuntimeError(f"CRITICAL: Secret {name} uses a known weak/default value in production!")
+        if len(value) < 16:
+            raise RuntimeError(f"CRITICAL: Secret {name} too short for production!")
+        if value in seen_values:
+            raise RuntimeError(
+                f"CRITICAL: Secret {name} must be distinct from {seen_values[value]} in production!"
+            )
+        seen_values[value] = name
 
 
 # Global secrets instance

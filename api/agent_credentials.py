@@ -1417,11 +1417,12 @@ def hash_token(plaintext_token):
 def _extract_api_key_from_request():
     """
     Extract API key from supported locations.
-    Preferred order: X-API-Key header, api_key query param, Authorization Bearer token.
+    Preferred order: X-API-Key header, Authorization Bearer token.
+    Query-parameter API keys are never accepted.
     """
-    api_key = request.headers.get('X-API-Key') or request.args.get('api_key')
+    api_key = request.headers.get('X-API-Key')
     if api_key:
-        return api_key
+        return api_key.strip()
 
     auth_header = request.headers.get('Authorization', '')
     if auth_header.startswith('Bearer '):
@@ -1674,25 +1675,27 @@ def _resolve_monitor_identity():
 def _validate_request_api_key(api_key: str):
     """
     Validate API key for generic request auth paths.
-    Accepts platform env keys and customer keys stored in database.
+    Accepts platform env keys and hash-validated customer keys.
     Returns (is_valid, metadata_dict).
     """
     if not api_key:
         return False, {}
 
-    platform_key = os.getenv('LEMMA_API_KEY') or os.getenv('LEMMA_PLATFORM_API_KEY')
-    if platform_key and api_key == platform_key:
-        return True, {'type': 'platform'}
-
     try:
-        from api.customer_accounts import customer_manager
-        validation = customer_manager.validate_api_key(api_key)
-        if validation.get('valid'):
-            return True, {
-                'type': 'customer',
-                'customer_id': validation.get('customer_id'),
-                'site_id': validation.get('site_id'),
-            }
+        from api.site_access import validate_site_api_key
+
+        validation = validate_site_api_key(api_key)
+        if not validation.get('valid'):
+            return False, {}
+
+        if validation.get('type') == 'platform':
+            return True, {'type': 'platform'}
+
+        return True, {
+            'type': 'customer',
+            'customer_id': validation.get('customer_id'),
+            'site_id': validation.get('site_id'),
+        }
     except Exception as e:
         logger.warning(f"API key validation failed in agent auth decorator: {e}")
 

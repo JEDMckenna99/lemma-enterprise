@@ -97,7 +97,9 @@ def create_app():
     require_column_encryption_in_production()
 
     # Configuration
-    app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev-secret-key-for-testing')
+    from api.config import get_secrets
+
+    app.config['SECRET_KEY'] = get_secrets().flask_secret
     app.config['DEBUG'] = os.environ.get('FLASK_ENV') == 'development'
     
     # CRITICAL: Disable template caching (fixes stale HTML on Heroku)

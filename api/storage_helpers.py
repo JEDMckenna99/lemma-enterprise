@@ -196,6 +196,138 @@ def get_customer_api_keys_from_postgres(customer_id: str) -> list:
             conn.close()
 
 
+def revoke_api_key_in_postgres(key_hash: str) -> bool:
+    """Mark an api_keys row revoked so hash lookup fails immediately."""
+    conn = None
+    try:
+        conn = get_pg_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            UPDATE api_keys
+            SET status = 'revoked', revoked_at = NOW()
+            WHERE key_hash = %s AND status = 'active'
+            """,
+            (key_hash,),
+        )
+        updated = cursor.rowcount > 0
+        conn.commit()
+        cursor.close()
+        return updated
+    except Exception as e:
+        logger.warning(f"Could not revoke api_keys row for hash prefix {key_hash[:8]}: {e}")
+        if conn:
+            conn.rollback()
+        return False
+    finally:
+        if conn:
+            conn.close()
+
+
+def validate_api_key_hash_in_postgres(key_hash: str) -> dict | None:
+    """Return active customer/site binding for a key hash, or None."""
+    conn = None
+    try:
+        conn = get_pg_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            SELECT customer_id, site_id
+            FROM api_keys
+            WHERE key_hash = %s AND status = 'active'
+            LIMIT 1
+            """,
+            (key_hash,),
+        )
+        row = cursor.fetchone()
+        cursor.close()
+        if not row:
+            return None
+        return {
+            "customer_id": row[0],
+            "site_id": row[1],
+        }
+    except Exception as e:
+        logger.debug(f"Postgres api_keys lookup failed: {e}")
+        return None
+    finally:
+        if conn:
+            conn.close()
+
+
+def get_customer_id_for_site(site_id: str) -> str | None:
+    """Resolve owning customer_id from normalized sites table when available."""
+    conn = None
+    try:
+        conn = get_pg_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            SELECT customer_id
+            FROM sites
+            WHERE site_id = %s AND status = 'active'
+            LIMIT 1
+            """,
+            (site_id,),
+        )
+        row = cursor.fetchone()
+        cursor.close()
+        return row[0] if row else None
+    except Exception as e:
+        logger.debug(f"Could not resolve customer for site {site_id}: {e}")
+        return None
+    finally:
+        if conn:
+            conn.close()
+
+
+def clear_site_legacy_api_key(site_id: str) -> bool:
+    """Clear legacy plaintext Site.api_key so revoked keys cannot authenticate."""
+    import secrets as secrets_module
+
+    conn = None
+    try:
+        conn = get_pg_connection()
+        cursor = conn.cursor()
+        placeholder = f"__hash_only__{secrets_module.token_hex(12)}"
+        cursor.execute(
+            """
+            UPDATE sites
+            SET api_key = %s, updated_at = NOW()
+            WHERE site_id = %s
+            """,
+            (placeholder, site_id),
+        )
+        updated = cursor.rowcount > 0
+        conn.commit()
+        cursor.close()
+        return updated
+    except Exception as e:
+        logger.debug(f"Normalized sites.api_key clear skipped for {site_id}: {e}")
+        if conn:
+            conn.rollback()
+    finally:
+        if conn:
+            conn.close()
+
+    try:
+        from api.database import SessionLocal, Site
+
+        db = SessionLocal()
+        try:
+            site = db.query(Site).filter(Site.site_id == site_id).first()
+            if not site:
+                return False
+            site.api_key = f"__hash_only__{secrets_module.token_hex(12)}"
+            db.commit()
+            return True
+        finally:
+            db.close()
+    except Exception as exc:
+        logger.warning(f"Could not clear legacy Site.api_key for {site_id}: {exc}")
+        return False
+
+
 def get_sites_for_customer_from_postgres(customer_id: str) -> list:
     """
     Get sites for a customer - tries PostgreSQL first, then falls back to JSON lookup.

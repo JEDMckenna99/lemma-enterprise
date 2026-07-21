@@ -52,7 +52,7 @@ def fixture_site_key_client(fake_ishuman_db_session_factory, monkeypatch):
 
 
 @pytest.mark.unit
-def test_site_block_accepts_legacy_sites_api_key(site_key_client, monkeypatch):
+def test_site_block_rejects_legacy_sites_api_key(site_key_client, monkeypatch):
     client, _factory = site_key_client
     monkeypatch.setattr(
         "api.site_ppid_revocation.revoke_site_bound_ppid",
@@ -64,8 +64,7 @@ def test_site_block_accepts_legacy_sites_api_key(site_key_client, monkeypatch):
         headers={"X-API-Key": "lm_legacy_direct_key", "Content-Type": "application/json"},
         json={"ppid": "did:lemma:ppid_" + ("a" * 64), "reason": "test"},
     )
-    assert resp.status_code == 200
-    assert resp.get_json()["success"] is True
+    assert resp.status_code == 401
 
 
 @pytest.mark.unit
@@ -87,7 +86,7 @@ def test_site_block_accepts_customer_issued_api_key(site_key_client, monkeypatch
     assert resp.get_json()["success"] is True
 
     site = factory.store.data[Site.__name__][1]
-    assert site.api_key == "lm_customer_issued_key"
+    assert site.api_key != "lm_customer_issued_key"
 
 
 @pytest.mark.unit

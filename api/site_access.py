@@ -7,7 +7,10 @@ site ownership (PPID admin), site API keys, or explicit platform-operator access
 
 from __future__ import annotations
 
+import hashlib
+import hmac
 import logging
+import os
 from contextlib import contextmanager
 from typing import Any, Dict, Optional, Tuple, Union
 
@@ -50,6 +53,52 @@ def _deny(
     return jsonify(payload), status
 
 
+def hash_api_key(api_key: str) -> str:
+    """SHA-256 hash for customer/site API key validation."""
+    return hashlib.sha256(api_key.encode()).hexdigest()
+
+
+def query_param_api_key_present() -> bool:
+    """True when the client supplied ?api_key= (always rejected for auth)."""
+    return bool((request.args.get("api_key") or "").strip())
+
+
+def reject_query_param_api_key() -> Optional[Tuple[Any, int]]:
+    """Fail closed when API keys are supplied only via query string."""
+    if not query_param_api_key_present():
+        return None
+    has_header = bool((request.headers.get("X-API-Key") or "").strip())
+    auth_header = (request.headers.get("Authorization") or "").strip()
+    has_bearer = auth_header.startswith("Bearer ") and auth_header[7:].strip()
+    if has_header or has_bearer or getattr(g, "api_key", None):
+        return None
+    return _deny(
+        status=401,
+        code="QUERY_PARAM_API_KEY_REJECTED",
+        error="API keys in query parameters are not accepted",
+        message="Use X-API-Key header or Authorization: Bearer <key>.",
+    )
+
+
+def _platform_api_keys() -> Tuple[str, ...]:
+    keys = []
+    for name in ("LEMMA_API_KEY", "LEMMA_PLATFORM_API_KEY"):
+        value = os.environ.get(name)
+        if value:
+            keys.append(value)
+    return tuple(keys)
+
+
+def is_platform_api_key(api_key: str) -> bool:
+    """True when the key matches a configured platform operator key."""
+    if not api_key:
+        return False
+    for platform_key in _platform_api_keys():
+        if hmac.compare_digest(api_key, platform_key):
+            return True
+    return False
+
+
 def _extract_request_api_key() -> Optional[str]:
     api_key = getattr(g, "api_key", None)
     if api_key:
@@ -61,16 +110,68 @@ def _extract_request_api_key() -> Optional[str]:
         if token.startswith("lemma_") or token.startswith("lm_"):
             return token
 
-    header_key = request.headers.get("X-API-Key") or request.args.get("api_key")
+    header_key = request.headers.get("X-API-Key")
     if header_key:
         return str(header_key).strip()
     return None
 
 
-def resolve_site_from_api_key(api_key: Optional[str] = None) -> Optional[SiteLike]:
-    """Resolve Site from legacy sites.api_key or customer-issued keys."""
+def validate_site_api_key(api_key: Optional[str] = None) -> Dict[str, Any]:
+    """
+    Hash-first API key validation for site-bound and platform keys.
+
+    Platform keys authenticate via env compare_digest. Customer/site keys
+    authenticate via customer_manager hash validation with optional postgres
+    api_keys fallback. Plaintext Site.api_key matching is not used.
+    """
     key = (api_key or _extract_request_api_key() or "").strip()
     if not key:
+        return {"valid": False, "error": "missing_api_key", "code": "AUTH_REQUIRED"}
+
+    if is_platform_api_key(key):
+        return {"valid": True, "type": "platform", "site_id": None}
+
+    from api.customer_accounts import customer_manager
+
+    validation = customer_manager.validate_api_key(key)
+    if validation.get("valid"):
+        return {
+            **validation,
+            "type": "customer",
+        }
+
+    try:
+        from api.storage_helpers import validate_api_key_hash_in_postgres
+
+        pg_result = validate_api_key_hash_in_postgres(hash_api_key(key))
+        if pg_result:
+            return {
+                "valid": True,
+                "type": "customer",
+                **pg_result,
+            }
+    except Exception as exc:
+        logger.debug("Postgres api_keys fallback unavailable: %s", exc)
+
+    return {
+        "valid": False,
+        "error": validation.get("error", "Invalid API key"),
+        "code": "INVALID_API_KEY",
+    }
+
+
+def resolve_site_from_api_key(api_key: Optional[str] = None) -> Optional[SiteLike]:
+    """Resolve Site from hash-validated customer-issued keys only."""
+    key = (api_key or _extract_request_api_key() or "").strip()
+    if not key:
+        return None
+
+    validation = validate_site_api_key(key)
+    if not validation.get("valid") or validation.get("type") != "customer":
+        return None
+
+    site_id = validation.get("site_id")
+    if not site_id:
         return None
 
     from api.database import SessionLocal, Site
@@ -78,23 +179,6 @@ def resolve_site_from_api_key(api_key: Optional[str] = None) -> Optional[SiteLik
 
     db = SessionLocal()
     try:
-        site = db.query(Site).filter_by(api_key=key).first()
-        if site:
-            _, domain_err = try_canonicalize_site_hostname(getattr(site, "site_domain", ""))
-            if domain_err:
-                return None
-            return site
-
-        from api.customer_accounts import customer_manager
-
-        validation = customer_manager.validate_api_key(key)
-        if not validation.get("valid"):
-            return None
-
-        site_id = validation.get("site_id")
-        if not site_id:
-            return None
-
         site = db.query(Site).filter_by(site_id=site_id).first()
         if not site:
             return None
@@ -184,6 +268,10 @@ def authorize_site_access(
     normalized_requested = (requested_site_id or "").strip() or None
 
     if allow_site_api_key:
+        query_reject = reject_query_param_api_key()
+        if query_reject:
+            return None, query_reject
+
         api_key = _extract_request_api_key()
         if api_key:
             site = resolve_site_from_api_key(api_key)

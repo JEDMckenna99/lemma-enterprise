@@ -49,6 +49,136 @@ from api.site_access import (
 from api.forensic_audit import capture_action_proof
 
 
+def _resolve_customer_id_for_site(site_id: str) -> str | None:
+    """Find owning customer for a site via normalized storage or customer JSON."""
+    try:
+        from api.storage_helpers import get_customer_id_for_site
+
+        customer_id = get_customer_id_for_site(site_id)
+        if customer_id:
+            return customer_id
+    except Exception:
+        pass
+
+    try:
+        from api.customer_accounts import customer_manager
+
+        if not customer_manager.db_available:
+            for customer in customer_manager.customers.values():
+                for site_entry in customer.sites or []:
+                    if site_entry.get('site_id') == site_id:
+                        return customer.customer_id
+                for key_data in customer.api_keys or []:
+                    if key_data.get('site_id') == site_id:
+                        return customer.customer_id
+            return None
+
+        from api.database import get_db, Customer as DBCustomer
+
+        db = get_db()
+        try:
+            rows = db.query(DBCustomer.customer_id, DBCustomer.sites, DBCustomer.api_keys).all()
+            for customer_id, sites_json, keys_json in rows:
+                for site_entry in sites_json or []:
+                    if site_entry.get('site_id') == site_id:
+                        return customer_id
+                for key_data in keys_json or []:
+                    if key_data.get('site_id') == site_id:
+                        return customer_id
+        finally:
+            db.close()
+    except Exception as exc:
+        logger.debug("Customer lookup for site %s failed: %s", site_id, exc)
+    return None
+
+
+def _collect_site_api_key_metadata(site_id: str) -> list[dict]:
+    """Return non-secret API key metadata for a site."""
+    customer_id = _resolve_customer_id_for_site(site_id)
+    keys: list[dict] = []
+    if not customer_id:
+        return keys
+
+    try:
+        from api.storage_helpers import get_customer_api_keys_from_postgres
+
+        for index, key_data in enumerate(get_customer_api_keys_from_postgres(customer_id), start=1):
+            if key_data.get('site_id') != site_id:
+                continue
+            keys.append({
+                'id': index,
+                'name': key_data.get('name') or 'API Key',
+                'key_prefix': f"lm_...{key_data.get('key_hint', '')}",
+                'type': 'live',
+                'is_active': key_data.get('status') == 'active',
+                'created_at': key_data.get('created_at'),
+                'last_used': key_data.get('last_used'),
+                'expires_at': None,
+                'permissions': ['read', 'write'],
+            })
+    except Exception as exc:
+        logger.debug("Postgres key metadata lookup failed for %s: %s", site_id, exc)
+
+    if keys:
+        return keys
+
+    from api.customer_accounts import customer_manager
+
+    customer = customer_manager.get_customer(customer_id)
+    if not customer:
+        return keys
+
+    for index, key_data in enumerate(customer.api_keys or [], start=1):
+        if key_data.get('site_id') != site_id or key_data.get('status') != 'active':
+            continue
+        hint = key_data.get('key_hint') or '........'
+        keys.append({
+            'id': index,
+            'name': key_data.get('name') or 'API Key',
+            'key_prefix': f"lm_...{hint}",
+            'type': 'live',
+            'is_active': True,
+            'created_at': key_data.get('created_at'),
+            'last_used': key_data.get('last_used'),
+            'expires_at': None,
+            'permissions': ['read', 'write'],
+        })
+    return keys
+
+
+def _replace_site_api_key(site_id: str, name: str = 'API Key') -> dict:
+    """Revoke existing site keys and issue one new hash-stored key."""
+    from api.customer_accounts import customer_manager
+
+    customer_id = _resolve_customer_id_for_site(site_id)
+    if not customer_id:
+        return {'success': False, 'error': 'Customer not found for site'}
+
+    customer = customer_manager.get_customer(customer_id)
+    if not customer:
+        return {'success': False, 'error': 'Customer not found for site'}
+
+    for key_data in list(customer.api_keys or []):
+        if key_data.get('site_id') != site_id or key_data.get('status') != 'active':
+            continue
+        hint = key_data.get('key_hint')
+        if hint:
+            customer_manager.revoke_api_key_by_hint(customer_id, site_id, hint)
+
+    result = customer_manager.generate_additional_api_key(customer_id, name, site_id=site_id)
+    if not result.get('success'):
+        return result
+
+    try:
+        from api.storage_helpers import clear_site_legacy_api_key
+
+        clear_site_legacy_api_key(site_id)
+    except Exception as exc:
+        logger.warning("Could not clear legacy Site.api_key for %s: %s", site_id, exc)
+
+    return result
+
+
 def _get_site_bootstrap_status(db, site_id: str, caller_ppid: str):
     """
     Determine whether caller can bootstrap admin permission for this site.
@@ -1382,39 +1512,7 @@ def get_site_keys(site_id):
         return auth_error
     
     try:
-        from api.database import SessionLocal, Site
-        
-        keys = []
-        
-        try:
-            db = SessionLocal()
-            site = db.query(Site).filter(Site.site_id == site_id).first()
-            
-            if not site:
-                db.close()
-                return jsonify({
-                    'success': False,
-                    'error': 'Site not found'
-                }), 404
-            
-            if site.api_key:
-                # Site has a primary API key - only show prefix for security
-                keys.append({
-                    'id': 0,  # Default key has ID 0
-                    'name': 'Primary API Key',
-                    'key_prefix': (site.api_key[:12] + '...') if site.api_key else 'lm_...',
-                    'type': 'live',
-                    'is_active': True,
-                    'created_at': site.created_at.isoformat() if site.created_at else None,
-                    'last_used': None,
-                    'expires_at': None,
-                    'permissions': ['read', 'write']
-                })
-            
-            db.close()
-            
-        except Exception as e:
-            logger.warning(f"Could not load API keys: {e}")
+        keys = _collect_site_api_key_metadata(site_id)
         
         return jsonify({
             'success': True,
@@ -1447,40 +1545,16 @@ def create_site_key(site_id):
         data = request.get_json() or {}
         name = data.get('name', 'API Key')
         
-        # Generate new API key
-        key = f"lm_{secrets.token_urlsafe(32)}"
-        
-        from api.database import SessionLocal, Site
-        
-        try:
-            db = SessionLocal()
-            site = db.query(Site).filter(Site.site_id == site_id).first()
-            
-            if not site:
-                db.close()
-                return jsonify({
-                    'success': False,
-                    'error': 'Site not found'
-                }), 404
-            
-            site.api_key = key
-            db.commit()
-            db.close()
-            
-            logger.info(f"SECURITY: API key regenerated for site {site_id} by {_get_authenticated_ppid()[:30] if _get_authenticated_ppid() else 'api_key'}...")
-            
-        except Exception as e:
-            logger.error(f"Could not store API key: {e}")
-            return jsonify({
-                'success': False,
-                'error': 'Failed to store API key'
-            }), 500
-        
+        result = _replace_site_api_key(site_id, name)
+        if not result.get('success'):
+            return jsonify(result), 400
+
+        logger.info(f"SECURITY: API key regenerated for site {site_id} by {_get_authenticated_ppid()[:30] if _get_authenticated_ppid() else 'api_key'}...")
         capture_action_proof(action="site_key.create", site_id=site_id)
         return jsonify({
             'success': True,
             'key_id': 'primary',
-            'key': key,  # Only shown once - store it securely!
+            'key': result.get('api_key'),
             'name': name,
             'warning': 'This key is shown only once. Store it securely.'
         })
@@ -1507,30 +1581,16 @@ def rotate_site_key(site_id, key_id):
         return auth_error
     
     try:
-        from api.database import SessionLocal, Site
-        
-        db = SessionLocal()
-        site = db.query(Site).filter(Site.site_id == site_id).first()
-        
-        if not site:
-            db.close()
-            return jsonify({
-                'success': False,
-                'error': 'Site not found'
-            }), 404
-        
-        # Generate new API key (invalidates old one)
-        new_key = f"lm_{secrets.token_urlsafe(32)}"
-        site.api_key = new_key
-        db.commit()
-        db.close()
-        
+        result = _replace_site_api_key(site_id, 'Rotated API Key')
+        if not result.get('success'):
+            return jsonify(result), 400
+
         logger.info(f"SECURITY: API key rotated for site {site_id} by {_get_authenticated_ppid()[:30] if _get_authenticated_ppid() else 'unknown'}...")
         capture_action_proof(action="site_key.rotate", site_id=site_id, resource=str(key_id))
         return jsonify({
             'success': True,
             'key_id': key_id,
-            'key': new_key,  # Only shown once!
+            'key': result.get('api_key'),
             'warning': 'This key is shown only once. Store it securely.'
         })
         
@@ -1557,37 +1617,36 @@ def revoke_site_key(site_id, key_id):
         return auth_error
     
     try:
-        from api.database import SessionLocal, Site
-        
-        try:
-            db = SessionLocal()
-            site = db.query(Site).filter(Site.site_id == site_id).first()
-            
-            if not site:
-                db.close()
-                return jsonify({
-                    'success': False,
-                    'error': 'Site not found'
-                }), 404
-            
-            # Generate new key (effectively revoking old one)
-            site.api_key = f"lm_{secrets.token_urlsafe(32)}"
-            db.commit()
-            db.close()
-            
-            logger.info(f"SECURITY: API key revoked for site {site_id} by {_get_authenticated_ppid()[:30] if _get_authenticated_ppid() else 'api_key'}...")
-            capture_action_proof(action="site_key.revoke", site_id=site_id, resource=str(key_id))
-        except Exception as e:
-            logger.error(f"Could not revoke API key: {e}")
-            return jsonify({
-                'success': False,
-                'error': 'Failed to revoke API key'
-            }), 500
-        
+        from api.customer_accounts import customer_manager
+
+        customer_id = _resolve_customer_id_for_site(site_id)
+        if not customer_id:
+            return jsonify({'success': False, 'error': 'Customer not found for site'}), 404
+
+        customer = customer_manager.get_customer(customer_id)
+        if not customer:
+            return jsonify({'success': False, 'error': 'Customer not found for site'}), 404
+
+        revoked_any = False
+        for key_data in list(customer.api_keys or []):
+            if key_data.get('site_id') != site_id or key_data.get('status') != 'active':
+                continue
+            hint = key_data.get('key_hint')
+            if not hint:
+                continue
+            revoke_result = customer_manager.revoke_api_key_by_hint(customer_id, site_id, hint)
+            revoked_any = revoked_any or revoke_result.get('success', False)
+
+        if not revoked_any:
+            return jsonify({'success': False, 'error': 'No active API key found for site'}), 404
+
+        logger.info(f"SECURITY: API key revoked for site {site_id} by {_get_authenticated_ppid()[:30] if _get_authenticated_ppid() else 'api_key'}...")
+        capture_action_proof(action="site_key.revoke", site_id=site_id, resource=str(key_id))
+
         return jsonify({
             'success': True,
             'revoked': True,
-            'message': 'API key revoked. A new key has been generated - retrieve it via GET /keys.'
+            'message': 'API key revoked. Generate a new key via POST /keys when ready.',
         })
         
     except Exception as e:

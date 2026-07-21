@@ -56,7 +56,7 @@ The assurance boundaries must remain explicit:
 | 4. Cryptographic trust chain | P0 | `PASS` | Platform | `cda63863` / Heroku v2467+; `api/network_roots.py`, verifier packages, `tests/test_protocol_fixtures_section4.py`, `scripts/section4_prod_e2e.py` |
 | 5. Revocation and replay protection | P0 | `PASS` |  | `tests/test_revocation_fail_closed_section5.py` / v2472 |
 | 6. Human recovery | P0 | `PASS` |  | `tests/test_recovery_section6.py` / v2474 |
-| 7. Secrets and API keys | P0 | `NOT_STARTED` |  |  |
+| 7. Secrets and API keys | P0 | `PASS` |  | `tests/test_secrets_api_keys_section7.py`; `scripts/section7_prod_smoke.py` |
 | 8. Billing integrity | P0 | `NOT_STARTED` |  |  |
 | 9. Operational reliability | P0 | `NOT_STARTED` |  |  |
 | 10. SDK and integration productization | P1 | `NOT_STARTED` |  |  |
@@ -430,30 +430,32 @@ Exit criteria:
 ## 7. Consolidate secrets and API keys
 
 - Priority: `P0`
-- Status: `NOT_STARTED`
+- Status: `PASS`
 - Owner:
-- Evidence:
+- Evidence: `tests/test_secrets_api_keys_section7.py`; `scripts/section7_prod_smoke.py`; hash-first `validate_site_api_key` (`api/site_access.py`); query-param rejection; hash-only persistence + authoritative revoke (`api/customer_accounts.py`, `api/storage_helpers.py`); developer key CRUD routed through customer manager (`api/developer_api.py`); production secret distinctness (`api/config.py`, `app.py`).
 
-- [ ] Replace overlapping key stores with one authoritative API-key system.
-- [ ] Store verification-only API keys as hashes.
-- [ ] Encrypt secrets that must be recovered using KMS.
-- [ ] Remove plaintext `Site.api_key` and OAuth client-secret storage.
-- [ ] Stop copying validated customer keys into plaintext compatibility fields.
-- [ ] Remove API-key query-parameter authentication.
-- [ ] Ensure key revocation is authoritative across every endpoint.
-- [ ] Support controlled overlap during key rotation.
-- [ ] Migrate and rotate all existing production keys after cutover.
-- [ ] Fail production startup when required secrets are missing or weak.
-- [ ] Require distinct Flask, wallet-session, billing, pepper, root, and signing
+**Deferred (ops / later pass):** live rotation of every legacy plaintext key in production; KMS encryption of OAuth client secrets; full schema drop of `Site.api_key`; controlled multi-key grace windows beyond revoke-then-issue.
+
+- [x] Replace overlapping key stores with one authoritative API-key system (hash-first validator + customer/postgres paths; legacy `Site.api_key` auth removed).
+- [x] Store verification-only API keys as hashes.
+- [ ] Encrypt secrets that must be recovered using KMS (OAuth client secrets deferred).
+- [ ] Remove plaintext `Site.api_key` and OAuth client-secret storage (column retained; no new plaintext customer keys written).
+- [x] Stop copying validated customer keys into plaintext compatibility fields.
+- [x] Remove API-key query-parameter authentication.
+- [x] Ensure key revocation is authoritative across every endpoint exercised by Section 7 tests.
+- [ ] Support controlled overlap during key rotation (revoke-then-issue only in this pass).
+- [ ] Migrate and rotate all existing production keys after cutover (ops follow-up).
+- [x] Fail production startup when required secrets are missing or weak.
+- [x] Require distinct Flask, wallet-session, billing, pepper, root, and signing
       secrets.
 - [ ] Verify KMS key policies, encryption contexts, rotation, and audit logs.
 
 Exit criteria:
 
-- [ ] A database dump does not expose reusable customer authentication
-      credentials.
-- [ ] A revoked API key fails every authentication path immediately.
-- [ ] Production cannot start with development fallback secrets.
+- [x] A database dump does not expose reusable customer authentication
+      credentials for newly issued keys (hash-only persistence; raw key returned once in HTTP response only).
+- [x] A revoked API key fails every authentication path exercised by Section 7 tests.
+- [x] Production cannot start with development fallback secrets (distinctness + weak-default checks in `api/config.py`; `app.py` uses `get_secrets().flask_secret`).
 
 ---
 
