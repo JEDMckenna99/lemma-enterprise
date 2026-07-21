@@ -1,7 +1,7 @@
 """
 Report lemma.id credential billing events to Stripe Billing Meters.
 
-When Stripe is unavailable (tests, missing key), events are logged only.
+Dry-run and reporting-disabled modes return ``skipped`` — never ``reported``.
 """
 
 from __future__ import annotations
@@ -9,6 +9,7 @@ from __future__ import annotations
 import logging
 import os
 import time
+from dataclasses import dataclass
 
 from billing.stripe_catalog import METER_EVENTS
 
@@ -24,6 +25,21 @@ try:
     _stripe_available = True
 except ImportError:
     pass
+
+
+OUTCOME_REPORTED = "reported"
+OUTCOME_SKIPPED = "skipped"
+OUTCOME_FAILED = "failed"
+
+
+@dataclass(frozen=True)
+class MeterReportResult:
+    outcome: str
+    detail: str = ""
+
+    @property
+    def reported(self) -> bool:
+        return self.outcome == OUTCOME_REPORTED
 
 
 def stripe_meter_reporting_enabled() -> bool:
@@ -43,6 +59,19 @@ def _configure_stripe() -> bool:
     return True
 
 
+def _is_duplicate_meter_identifier(exc: Exception) -> bool:
+    if not _stripe_available:
+        return False
+    if isinstance(exc, _stripe.error.InvalidRequestError):
+        code = (getattr(exc, "code", None) or "").strip().lower()
+        if code in {"resource_already_exists", "idempotency_key_in_use"}:
+            return True
+        message = (getattr(exc, "user_message", None) or str(exc)).lower()
+        if "already exists" in message and "identifier" in message:
+            return True
+    return False
+
+
 def report_meter_event(
     *,
     event_type: str,
@@ -51,16 +80,16 @@ def report_meter_event(
     month: str,
     event_id: str,
     unit_count: int = 1,
-) -> bool:
+) -> MeterReportResult:
     """
     Emit one Stripe Billing Meter event.
 
-    Returns True when reported (or accepted in dry-run log mode), False on skip/error.
+    Returns ``reported`` only when Stripe accepted the event (or duplicate identifier).
     """
     event_name = METER_EVENTS.get(event_type)
     if not event_name:
         logger.warning("Unknown billing event_type=%s, not reported", event_type)
-        return False
+        return MeterReportResult(OUTCOME_FAILED, "unknown_event_type")
 
     if not stripe_customer_id:
         logger.info(
@@ -69,7 +98,7 @@ def report_meter_event(
             site_id,
             month,
         )
-        return False
+        return MeterReportResult(OUTCOME_SKIPPED, "missing_stripe_customer")
 
     identifier = event_id
 
@@ -82,11 +111,11 @@ def report_meter_event(
     }
     if not stripe_meter_reporting_enabled():
         logger.info("Billing meter (dry-run): %s id=%s", event_name, identifier)
-        return True
+        return MeterReportResult(OUTCOME_SKIPPED, "reporting_disabled")
 
     if not _configure_stripe():
         logger.info("Billing meter (no Stripe key): %s id=%s", event_name, identifier)
-        return False
+        return MeterReportResult(OUTCOME_SKIPPED, "stripe_not_configured")
 
     try:
         _stripe.billing.MeterEvent.create(
@@ -96,7 +125,14 @@ def report_meter_event(
             timestamp=int(time.time()),
         )
         logger.info("Reported Stripe meter event %s for site=%s", event_name, site_id)
-        return True
+        return MeterReportResult(OUTCOME_REPORTED, "stripe_accepted")
     except Exception as exc:
+        if _is_duplicate_meter_identifier(exc):
+            logger.info(
+                "Stripe meter duplicate identifier accepted id=%s site=%s",
+                identifier,
+                site_id,
+            )
+            return MeterReportResult(OUTCOME_REPORTED, "duplicate_identifier")
         logger.error("Failed to report Stripe meter event %s: %s", event_name, exc)
-        return False
+        return MeterReportResult(OUTCOME_FAILED, str(exc)[:500])

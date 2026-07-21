@@ -189,6 +189,7 @@ class _FakeQuery:
     def __init__(self, rows: list[Any]):
         self._rows = rows
         self._filters: dict[str, Any] = {}
+        self._limit: int | None = None
 
     def filter_by(self, **kwargs):
         self._filters.update(kwargs)
@@ -201,20 +202,33 @@ class _FakeQuery:
         return None
 
     def all(self):
-        return [
+        rows = [
             row
             for row in self._rows
             if all(getattr(row, key, None) == value for key, value in self._filters.items())
         ]
+        if self._limit is not None:
+            rows = rows[: self._limit]
+        return rows
+
+    def one(self):
+        rows = self.all()
+        if len(rows) != 1:
+            raise AssertionError(f"Expected one row, found {len(rows)}")
+        return rows[0]
+
+    def limit(self, value):
+        self._limit = value
+        return self
+
+    def order_by(self, *_args, **_kwargs):
+        return self
 
     def filter(self, *_args, **_kwargs):
         return self
 
     def count(self):
         return len(self.all())
-
-    def order_by(self, *_args, **_kwargs):
-        return self
 
 
 class _FakeDbSession:
@@ -229,6 +243,17 @@ class _FakeDbSession:
         self._store.data[obj.__class__.__name__].append(obj)
 
     def flush(self):
+        from sqlalchemy.exc import IntegrityError
+
+        webhook_rows = self._store.data.get("StripeWebhookEvent", [])
+        seen: set[str] = set()
+        for row in webhook_rows:
+            event_id = getattr(row, "event_id", None)
+            if not event_id:
+                continue
+            if event_id in seen:
+                raise IntegrityError("duplicate stripe webhook event_id", None, None)
+            seen.add(event_id)
         return None
 
     def commit(self):

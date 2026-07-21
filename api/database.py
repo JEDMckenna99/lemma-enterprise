@@ -1081,8 +1081,21 @@ class IsHumanBillingOutbox(Base):
     status = Column(String(24), nullable=False, default='pending', index=True)
     attempts = Column(Integer, nullable=False, default=0)
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    next_attempt_at = Column(DateTime)
     reported_at = Column(DateTime)
     last_error = Column(Text)
+
+
+class StripeWebhookEvent(Base):
+    """Processed Stripe webhook event IDs for transactional idempotency."""
+    __tablename__ = 'stripe_webhook_events'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    event_id = Column(String(255), unique=True, nullable=False, index=True)
+    event_type = Column(String(128), nullable=False, index=True)
+    status = Column(String(32), nullable=False, default='processed')
+    received_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    processed_at = Column(DateTime)
 
 
 class SiteDoubt(Base):

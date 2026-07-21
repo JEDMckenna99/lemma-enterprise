@@ -57,6 +57,7 @@ def _apply_customer_billing_update(
     stripe_customer_id: Optional[str] = None,
     subscription_status: Optional[str] = None,
     stripe_subscription_id: Optional[str] = None,
+    commit: bool = True,
 ) -> None:
     if stripe_customer_id:
         customer.stripe_customer_id = stripe_customer_id
@@ -66,10 +67,11 @@ def _apply_customer_billing_update(
         usage = dict(getattr(customer, "monthly_usage", None) or {})
         usage["stripe_subscription_id"] = stripe_subscription_id
         customer.monthly_usage = usage
-    db.commit()
+    if commit:
+        db.commit()
 
 
-def handle_checkout_session_completed(db, session_obj: Dict[str, Any]) -> bool:
+def handle_checkout_session_completed(db, session_obj: Dict[str, Any], *, commit: bool = True) -> bool:
     stripe_customer_id = session_obj.get("customer")
     email = session_obj.get("customer_email") or session_obj.get("customer_details", {}).get("email")
     metadata = session_obj.get("metadata") or {}
@@ -103,6 +105,7 @@ def handle_checkout_session_completed(db, session_obj: Dict[str, Any]) -> bool:
         stripe_customer_id=stripe_customer_id or customer.stripe_customer_id,
         subscription_status="active",
         stripe_subscription_id=subscription_id,
+        commit=commit,
     )
     logger.info(
         "Billing checkout linked customer=%s site=%s subscription=%s",
@@ -113,7 +116,7 @@ def handle_checkout_session_completed(db, session_obj: Dict[str, Any]) -> bool:
     return True
 
 
-def handle_invoice_paid(db, invoice_obj: Dict[str, Any]) -> bool:
+def handle_invoice_paid(db, invoice_obj: Dict[str, Any], *, commit: bool = True) -> bool:
     stripe_customer_id = invoice_obj.get("customer")
     subscription_id = invoice_obj.get("subscription")
     customer = _find_customer(db, stripe_customer_id=stripe_customer_id)
@@ -127,11 +130,12 @@ def handle_invoice_paid(db, invoice_obj: Dict[str, Any]) -> bool:
         stripe_customer_id=stripe_customer_id,
         subscription_status="active",
         stripe_subscription_id=subscription_id,
+        commit=commit,
     )
     return True
 
 
-def handle_invoice_payment_failed(db, invoice_obj: Dict[str, Any]) -> bool:
+def handle_invoice_payment_failed(db, invoice_obj: Dict[str, Any], *, commit: bool = True) -> bool:
     stripe_customer_id = invoice_obj.get("customer")
     customer = _find_customer(db, stripe_customer_id=stripe_customer_id)
     if not customer:
@@ -143,12 +147,13 @@ def handle_invoice_payment_failed(db, invoice_obj: Dict[str, Any]) -> bool:
         customer,
         stripe_customer_id=stripe_customer_id,
         subscription_status="past_due",
+        commit=commit,
     )
     logger.info("Billing past_due for customer=%s", customer.customer_id)
     return True
 
 
-def handle_subscription_updated(db, subscription_obj: Dict[str, Any]) -> bool:
+def handle_subscription_updated(db, subscription_obj: Dict[str, Any], *, commit: bool = True) -> bool:
     stripe_customer_id = subscription_obj.get("customer")
     subscription_id = subscription_obj.get("id")
     status = map_stripe_subscription_status(subscription_obj.get("status"))
@@ -164,11 +169,12 @@ def handle_subscription_updated(db, subscription_obj: Dict[str, Any]) -> bool:
         stripe_customer_id=stripe_customer_id,
         subscription_status=status,
         stripe_subscription_id=subscription_id,
+        commit=commit,
     )
     return True
 
 
-def handle_subscription_deleted(db, subscription_obj: Dict[str, Any]) -> bool:
+def handle_subscription_deleted(db, subscription_obj: Dict[str, Any], *, commit: bool = True) -> bool:
     stripe_customer_id = subscription_obj.get("customer")
     customer = _find_customer(db, stripe_customer_id=stripe_customer_id)
     if not customer:
@@ -179,26 +185,27 @@ def handle_subscription_deleted(db, subscription_obj: Dict[str, Any]) -> bool:
         customer,
         stripe_customer_id=stripe_customer_id,
         subscription_status="canceled",
+        commit=commit,
     )
     logger.info("Billing canceled for customer=%s", customer.customer_id)
     return True
 
 
-def dispatch_stripe_billing_event(db, event: Dict[str, Any]) -> bool:
+def dispatch_stripe_billing_event(db, event: Dict[str, Any], *, commit: bool = True) -> bool:
     """Route a verified Stripe event dict to the appropriate handler."""
     event_type = event.get("type")
     data_obj = (event.get("data") or {}).get("object") or {}
 
     if event_type == "checkout.session.completed":
-        return handle_checkout_session_completed(db, data_obj)
+        return handle_checkout_session_completed(db, data_obj, commit=commit)
     if event_type == "invoice.paid":
-        return handle_invoice_paid(db, data_obj)
+        return handle_invoice_paid(db, data_obj, commit=commit)
     if event_type == "invoice.payment_failed":
-        return handle_invoice_payment_failed(db, data_obj)
+        return handle_invoice_payment_failed(db, data_obj, commit=commit)
     if event_type == "customer.subscription.updated":
-        return handle_subscription_updated(db, data_obj)
+        return handle_subscription_updated(db, data_obj, commit=commit)
     if event_type == "customer.subscription.deleted":
-        return handle_subscription_deleted(db, data_obj)
+        return handle_subscription_deleted(db, data_obj, commit=commit)
 
     logger.debug("Unhandled Stripe billing event type: %s", event_type)
     return True

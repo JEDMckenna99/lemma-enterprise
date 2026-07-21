@@ -13,9 +13,9 @@ def main() -> int:
     db = SessionLocal()
     try:
         result = retry_pending_billing_outbox(db, limit=args.limit)
-        for key in ("selected", "reported", "failed"):
-            print(f"{key}={result[key]}")
-        return 0 if result["failed"] == 0 else 1
+        for key in ("selected", "reported", "failed", "dead_letter", "skipped_not_due"):
+            print(f"{key}={result.get(key, 0)}")
+        return 0 if result.get("failed", 0) == 0 else 1
     finally:
         db.close()
 

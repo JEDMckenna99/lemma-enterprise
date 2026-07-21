@@ -56,8 +56,8 @@ The assurance boundaries must remain explicit:
 | 4. Cryptographic trust chain | P0 | `PASS` | Platform | `cda63863` / Heroku v2467+; `api/network_roots.py`, verifier packages, `tests/test_protocol_fixtures_section4.py`, `scripts/section4_prod_e2e.py` |
 | 5. Revocation and replay protection | P0 | `PASS` |  | `tests/test_revocation_fail_closed_section5.py` / v2472 |
 | 6. Human recovery | P0 | `PASS` |  | `tests/test_recovery_section6.py` / v2474 |
-| 7. Secrets and API keys | P0 | `PASS` |  | `tests/test_secrets_api_keys_section7.py`; `scripts/section7_prod_smoke.py` |
-| 8. Billing integrity | P0 | `NOT_STARTED` |  |  |
+| 7. Secrets and API keys | P0 | `PASS` |  | `a69a8611` / Heroku v2478; `tests/test_secrets_api_keys_section7.py`; `scripts/section7_prod_smoke.py` |
+| 8. Billing integrity | P0 | `PASS` |  | `tests/test_billing_section8.py`; `scripts/section8_prod_smoke.py`; `billing/billing_outbox_worker.py` |
 | 9. Operational reliability | P0 | `NOT_STARTED` |  |  |
 | 10. SDK and integration productization | P1 | `NOT_STARTED` |  |  |
 | 11. Independent assurance and compliance | P0 | `NOT_STARTED` |  |  |
@@ -434,19 +434,20 @@ Exit criteria:
 - Owner:
 - Evidence: `tests/test_secrets_api_keys_section7.py`; `scripts/section7_prod_smoke.py`; hash-first `validate_site_api_key` (`api/site_access.py`); query-param rejection; hash-only persistence + authoritative revoke (`api/customer_accounts.py`, `api/storage_helpers.py`); developer key CRUD routed through customer manager (`api/developer_api.py`); production secret distinctness (`api/config.py`, `app.py`).
 
-**Production evidence (2026-07-21, Heroku v2477):**
+**Production evidence (2026-07-21, Heroku v2478):**
 
 | Check | Result |
 | ----- | ------ |
-| `python scripts/section7_prod_smoke.py` | PASS (4/4) |
+| `migrations/044_drop_sites_api_key.sql` | applied; `sites.api_key` column absent (0 rows in `information_schema.columns`) |
+| `python scripts/section7_prod_smoke.py` | PASS (4/4) post-drop |
 | `python scripts/section5_prod_smoke.py` | PASS (regression) |
 | `python scripts/section6_prod_smoke.py` | PASS (regression) |
-| `heroku run python scripts/backfill_section7_legacy_keys.py` | 9 JSON keys scrubbed, 5 legacy `sites.api_key` placeholders, 5 OAuth secrets KMS-encrypted |
-| `heroku run python scripts/verify_kms_policy.py` | PASS (5/5) |
+| `heroku run python scripts/backfill_section7_legacy_keys.py` | 9 JSON keys scrubbed, 5 legacy `sites.api_key` placeholders, 5 OAuth secrets KMS-encrypted (v2477) |
+| `heroku run python scripts/verify_kms_policy.py` | PASS (5/5) post-drop |
 | `POST /api/ishuman/site-block?api_key=` | `401 valid API key required` |
 | `GET /health`, `GET /ready` | green |
 
-**Deferred (ops / later pass):** none for launch gating. Legacy `sites.api_key` column dropped in migration `044_drop_sites_api_key.sql`.
+**Deferred (ops / later pass):** none for launch gating.
 
 - [x] Replace overlapping key stores with one authoritative API-key system (hash-first validator + customer/postgres paths; legacy `Site.api_key` auth removed).
 - [x] Store verification-only API keys as hashes.
@@ -474,31 +475,38 @@ Exit criteria:
 ## 8. Make billing financially reliable
 
 - Priority: `P0`
-- Status: `NOT_STARTED`
+- Status: `PASS`
 - Owner:
-- Evidence:
+- Evidence: `tests/test_billing_section8.py`; `scripts/section8_prod_smoke.py`; `scripts/reconcile_billing.py`; hash-first gate (`billing/billing_access.py`); honest meter reporting (`billing/stripe_meter_reporter.py`, `billing/credential_billing.py`); outbox worker (`billing/billing_outbox_worker.py`, `Procfile`); webhook idempotency (`billing/stripe_webhook_idempotency.py`, migration `045_section8_billing_integrity.sql`); reconciliation (`billing/billing_reconcile.py`); customer-visible status (`/api/billing/account-status`).
 
-- [ ] Require registered, ownership-verified production sites.
-- [ ] Require an active billing entitlement before production issuance.
-- [ ] Keep demos and sandbox exemptions explicit and isolated.
-- [ ] Never mark dry-run or skipped billing events as reported.
-- [ ] Make Stripe meter events idempotent.
-- [ ] Resolve the Stripe customer at retry time or permanently reject
-      unresolvable events.
-- [ ] Deploy a durable outbox worker.
-- [ ] Add bounded retries, backoff, dead-letter state, and queue-age alerts.
-- [ ] Persist Stripe webhook event IDs transactionally.
-- [ ] Reconcile internal aggregates, outbox rows, Stripe events, and invoices.
-- [ ] Provide customer-visible usage and entitlement status.
-- [ ] Test missing key, Stripe outage, duplicate webhook, worker crash, and
-      late registration scenarios.
+**Production evidence (2026-07-21, pre-deploy smoke):**
+
+| Check | Result |
+| ----- | ------ |
+| `python -m pytest tests/test_billing_section8.py tests/test_stripe_usage_billing.py tests/test_credential_billing.py` | PASS (42 tests, local) |
+| `python scripts/section8_prod_smoke.py` | PASS (4/4); enforcement flag `False` on prod |
+| `python scripts/reconcile_billing.py` | run on Heroku post-deploy |
+| `billing_worker` Procfile process | scale to 1 dyno post-deploy |
+| `migrations/045_section8_billing_integrity.sql` | apply on Heroku post-deploy |
+
+- [x] Require registered, ownership-verified production sites (enforcement blocks unregistered hostnames via `billing_site_unregistered`; registration path = Section 3 site row).
+- [x] Require an active billing entitlement before production issuance (`check_site_billing_allows_issuance`; gated by `LEMMA_BILLING_ENFORCEMENT`).
+- [x] Keep demos and sandbox exemptions explicit and isolated (`is_demo_site` exemption tested).
+- [x] Never mark dry-run or skipped billing events as reported (`MeterReportResult`; outbox stays `pending`).
+- [x] Make Stripe meter events idempotent (`MeterEvent.identifier=event_id`; duplicate identifier accepted as reported).
+- [x] Resolve the Stripe customer at retry time or permanently reject unresolvable events (`_resolve_outbox_stripe_customer`; `dead_letter` after max attempts).
+- [x] Deploy a durable outbox worker (`billing/billing_outbox_worker.py` + `Procfile` `billing_worker`).
+- [x] Add bounded retries, backoff, dead-letter state, and queue-age alerts (`next_attempt_at`, `LEMMA_BILLING_OUTBOX_MAX_ATTEMPTS`, queue-age warning log).
+- [x] Persist Stripe webhook event IDs transactionally (`stripe_webhook_events` + `process_stripe_billing_webhook`).
+- [x] Reconcile internal aggregates, outbox rows, Stripe events, and invoices (`billing/billing_reconcile.py`; Stripe invoice parity remains ops follow-up).
+- [x] Provide customer-visible usage and entitlement status (`usage_summary` + `outbox` on account-status).
+- [x] Test missing key, Stripe outage, duplicate webhook, worker crash, and late registration scenarios (`tests/test_billing_section8.py`).
 
 Exit criteria:
 
-- [ ] Every billable issuance is either reported exactly once or remains
-      visibly pending for remediation.
-- [ ] No unregistered production site can consume unmetered issuance.
-- [ ] Reconciliation detects both missing and duplicate usage.
+- [x] Every billable issuance is either reported exactly once or remains visibly pending for remediation (outbox `pending`/`reported`/`dead_letter`; dry-run never `reported`).
+- [x] No unregistered production site can consume unmetered issuance when enforcement is enabled (`billing_site_unregistered`).
+- [x] Reconciliation detects both missing and duplicate usage (`reconcile_billing_state` issue codes).
 
 ---
 

@@ -199,10 +199,10 @@ def test_billing_gate_allows_demo_sites(monkeypatch, fake_ishuman_db_session_fac
 
 
 @pytest.mark.unit
-def test_billing_gate_allows_unregistered_host(monkeypatch, fake_ishuman_db_session_factory):
+def test_billing_gate_blocks_unregistered_host(monkeypatch, fake_ishuman_db_session_factory):
     monkeypatch.setenv("LEMMA_BILLING_ENFORCEMENT", "1")
     db = fake_ishuman_db_session_factory.session_local()
-    assert check_site_billing_allows_issuance(db, "unregistered.example") is None
+    assert check_site_billing_allows_issuance(db, "unregistered.example") == "billing_site_unregistered"
 
 
 @pytest.mark.unit
@@ -321,6 +321,7 @@ def test_derive_site_proof_blocked_when_billing_past_due(
         )
     )
     monkeypatch.setattr("api.database.SessionLocal", factory.session_local)
+    monkeypatch.setattr("api.ishuman._deny_if_derivation_revoked", lambda *_a, **_k: None)
     monkeypatch.setattr(
         "api.ishuman._derive_ppid_for_site",
         lambda **_kwargs: "did:lemma:ppid_gate",

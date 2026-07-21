@@ -718,16 +718,16 @@
       "routes": [
         {"method": "POST", "path": "/api/webhooks/stripe-billing", "module": "api/stripe_usage_billing.py"}
       ],
-      "current_auth": ["stripe_webhook_signature"],
+      "current_auth": ["stripe_webhook_signature", "transactional_event_idempotency"],
       "required_auth": ["stripe_webhook_signature", "transactional_event_idempotency"],
       "required_scope": "none",
       "site_binding": "stripe_customer_mapping",
       "risk_tier": "critical",
       "enforcement_layer": "in_handler",
-      "compliance": "gap",
+      "compliance": "compliant",
       "threat_tags": ["webhook_forgery", "replay", "billing_account_confusion"],
       "checklist_sections": [1, 8],
-      "test_refs": ["tests/test_stripe_usage_billing.py"]
+      "test_refs": ["tests/test_stripe_usage_billing.py", "tests/test_billing_section8.py"]
     }
   ],
   "exemptions": [

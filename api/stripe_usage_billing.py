@@ -276,14 +276,16 @@ def billing_account_status():
             onboarding["next_step"] = "ready"
 
     db = SessionLocal()
+    usage_summary = None
+    outbox_stats = None
     try:
         if customer:
+            from api.database import Site
+
             email = (
                 getattr(customer, "billing_email", None) or getattr(customer, "email", None) or ""
             ).strip().lower()
             if email:
-                from api.database import Site
-
                 linked_site = db.query(Site).filter(Site.admin_email.ilike(email)).first()
                 if linked_site:
                     onboarding["has_site"] = True
@@ -308,6 +310,19 @@ def billing_account_status():
                     "site_domain": ctx.get("site_domain"),
                     "subscription_status": ctx.get("subscription_status"),
                 }
+
+        usage_summary = None
+        outbox_stats = None
+        if customer and merged_sites:
+            first_site = merged_sites[0]
+            site_scope = first_site.get("site_id") or first_site.get("site_domain") or ""
+            if site_scope:
+                from billing.billing_reconcile import get_customer_usage_summary
+
+                usage_summary = get_customer_usage_summary(db, site_scope=site_scope)
+        from billing.credential_billing import get_outbox_queue_stats
+
+        outbox_stats = get_outbox_queue_stats(db)
     finally:
         db.close()
 
@@ -330,6 +345,8 @@ def billing_account_status():
             "stripe_subscription_id": usage.get("stripe_subscription_id"),
             "enforcement_enabled": os.getenv("LEMMA_BILLING_ENFORCEMENT", "0").strip().lower()
             in ("1", "true", "yes", "on"),
+            "usage_summary": usage_summary,
+            "outbox": outbox_stats,
         },
         "onboarding": onboarding,
         "sites": merged_sites,
@@ -358,18 +375,16 @@ def stripe_billing_webhook():
         return jsonify({"error": "invalid_signature"}), 400
 
     from api.database import SessionLocal
-    from billing.stripe_webhook_handlers import dispatch_stripe_billing_event
+    from billing.stripe_webhook_idempotency import process_stripe_billing_webhook
 
     db = SessionLocal()
     try:
-        handled = dispatch_stripe_billing_event(db, event)
-        if not handled:
+        ok, detail = process_stripe_billing_webhook(db, event)
+        if not ok:
+            return jsonify({"error": detail}), 500
+        if detail == "unmatched":
             return jsonify({"received": True, "matched": False}), 200
-        return jsonify({"received": True}), 200
-    except Exception:
-        db.rollback()
-        logger.exception("Stripe billing webhook handler failed")
-        return jsonify({"error": "handler_failed"}), 500
+        return jsonify({"received": True, "detail": detail}), 200
     finally:
         db.close()
 

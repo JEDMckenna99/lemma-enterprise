@@ -103,7 +103,7 @@ def test_stripe_meter_payload_contains_only_aggregate_safe_fields(monkeypatch):
         month="2026-06",
         event_id="bevt_random",
         unit_count=1,
-    ) is True
+    ).reported is True
     payload = captured[0]["payload"]
     assert set(payload) == {
         "stripe_customer_id", "value", "site_id", "month", "event_type",

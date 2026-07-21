@@ -23,16 +23,16 @@ def check_site_billing_allows_issuance(db, target_site: str) -> Optional[str]:
     """
     Return an error code when new credential issuance must be blocked, else None.
 
-    Unregistered hostnames (no sites row) are allowed, demo and first integration.
-    Registered relying sites require an active metered subscription when enforcement
-    is enabled. Managed isHuman demo sites are always exempt so public demos keep working.
+    When enforcement is enabled, only registered sites (Section 3 registration path)
+    with an active metered subscription may issue billable credentials. Unregistered
+    hostnames are blocked. Managed isHuman demo sites are always exempt.
     """
     if not billing_enforcement_enabled():
         return None
 
     ctx = get_registered_site_billing_context(db, target_site)
     if not ctx.get("is_registered_site"):
-        return None
+        return "billing_site_unregistered"
 
     from api.platform_sites import is_demo_site
 

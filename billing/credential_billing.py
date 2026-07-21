@@ -15,7 +15,7 @@ from typing import Optional
 
 from api.usage_tracking import _hash_ppid_for_mau
 from billing.stripe_catalog import METER_EVENTS, UNIT_AMOUNTS_CENTS
-from billing.stripe_meter_reporter import report_meter_event
+from billing.stripe_meter_reporter import OUTCOME_REPORTED, MeterReportResult, report_meter_event
 
 logger = logging.getLogger(__name__)
 
@@ -214,22 +214,8 @@ def record_credential_billing_event(
 
     reported = False
     if outbox is not None:
-        reported = report_meter_event(
-            event_type=event_type,
-            stripe_customer_id=stripe_customer_id or "",
-            site_id=site_scope,
-            month=current_month,
-            event_id=outbox.event_id,
-            unit_count=1,
-        )
-        outbox.attempts = int(outbox.attempts or 0) + 1
-        if reported:
-            outbox.status = "reported"
-            outbox.reported_at = datetime.utcnow()
-            outbox.last_error = None
-        else:
-            outbox.last_error = "stripe_report_failed"
-        db.commit()
+        result = _attempt_outbox_report(db, outbox, stripe_customer_id=stripe_customer_id)
+        reported = result.reported
 
     return BillingEventResult(
         event_type=event_type,
@@ -253,36 +239,117 @@ def purge_monthly_subject_usage(db, *, now: Optional[datetime] = None) -> int:
     return int(deleted or 0)
 
 
+def _resolve_outbox_stripe_customer(db, row) -> str:
+    existing = (getattr(row, "stripe_customer_id", None) or "").strip()
+    if existing:
+        return existing
+    resolved = resolve_stripe_customer_id_for_site(db, row.site_scope) or ""
+    if resolved:
+        row.stripe_customer_id = resolved
+    return resolved
+
+
+def _apply_outbox_report_result(row, result: MeterReportResult, *, now: datetime | None = None) -> None:
+    from billing.billing_outbox_policy import (
+        billing_outbox_max_attempts,
+        compute_next_attempt_at,
+    )
+
+    current = now or datetime.utcnow()
+    row.attempts = int(row.attempts or 0) + 1
+    if result.outcome == OUTCOME_REPORTED:
+        row.status = "reported"
+        row.reported_at = current
+        row.last_error = None
+        row.next_attempt_at = None
+        return
+
+    row.status = "pending"
+    row.last_error = result.detail or (
+        "skipped" if result.outcome == "skipped" else "stripe_report_failed"
+    )
+    if row.attempts >= billing_outbox_max_attempts() and not (row.stripe_customer_id or "").strip():
+        row.status = "dead_letter"
+        row.last_error = "unresolvable_stripe_customer"
+        row.next_attempt_at = None
+        return
+    if row.attempts >= billing_outbox_max_attempts():
+        row.status = "dead_letter"
+        row.last_error = result.detail or "max_attempts_exceeded"
+        row.next_attempt_at = None
+        return
+    row.next_attempt_at = compute_next_attempt_at(attempts=row.attempts, now=current)
+
+
+def _attempt_outbox_report(db, row, *, stripe_customer_id: Optional[str] = None) -> MeterReportResult:
+    customer_id = (stripe_customer_id or _resolve_outbox_stripe_customer(db, row) or "").strip()
+    result = report_meter_event(
+        event_type=row.event_type,
+        stripe_customer_id=customer_id,
+        site_id=row.site_scope,
+        month=row.month,
+        event_id=row.event_id,
+        unit_count=row.unit_count,
+    )
+    _apply_outbox_report_result(row, result)
+    db.commit()
+    return result
+
+
 def retry_pending_billing_outbox(db, *, limit: int = 100) -> dict[str, int]:
     """Retry aggregate-safe Stripe events without reconstructing user state."""
     from api.database import IsHumanBillingOutbox
+    from billing.billing_outbox_policy import outbox_ready_for_retry
 
+    now = datetime.utcnow()
     rows = (
         db.query(IsHumanBillingOutbox)
-        .filter_by(status="pending")
+        .filter(IsHumanBillingOutbox.status == "pending")
         .order_by(IsHumanBillingOutbox.created_at.asc())
         .limit(max(1, min(int(limit), 1000)))
         .all()
     )
     reported = 0
     failed = 0
+    dead_letter = 0
+    skipped_not_due = 0
     for row in rows:
-        ok = report_meter_event(
-            event_type=row.event_type,
-            stripe_customer_id=row.stripe_customer_id or "",
-            site_id=row.site_scope,
-            month=row.month,
-            event_id=row.event_id,
-            unit_count=row.unit_count,
-        )
-        row.attempts = int(row.attempts or 0) + 1
-        if ok:
-            row.status = "reported"
-            row.reported_at = datetime.utcnow()
-            row.last_error = None
+        if not outbox_ready_for_retry(row, now=now):
+            skipped_not_due += 1
+            continue
+        result = _attempt_outbox_report(db, row)
+        if result.reported:
             reported += 1
+        elif row.status == "dead_letter":
+            dead_letter += 1
         else:
-            row.last_error = "stripe_report_failed"
             failed += 1
-    db.commit()
-    return {"selected": len(rows), "reported": reported, "failed": failed}
+    return {
+        "selected": len(rows),
+        "reported": reported,
+        "failed": failed,
+        "dead_letter": dead_letter,
+        "skipped_not_due": skipped_not_due,
+    }
+
+
+def get_outbox_queue_stats(db) -> dict[str, int | float | None]:
+    """Return pending/dead-letter counts and oldest pending queue age."""
+    from api.database import IsHumanBillingOutbox
+
+    pending_count = db.query(IsHumanBillingOutbox).filter_by(status="pending").count()
+    dead_letter_count = db.query(IsHumanBillingOutbox).filter_by(status="dead_letter").count()
+    oldest = (
+        db.query(IsHumanBillingOutbox.created_at)
+        .filter_by(status="pending")
+        .order_by(IsHumanBillingOutbox.created_at.asc())
+        .first()
+    )
+    queue_age_seconds = None
+    if oldest and oldest[0]:
+        queue_age_seconds = max(0.0, (datetime.utcnow() - oldest[0]).total_seconds())
+    return {
+        "pending_count": int(pending_count or 0),
+        "dead_letter_count": int(dead_letter_count or 0),
+        "queue_age_seconds": queue_age_seconds,
+    }

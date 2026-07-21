@@ -13,6 +13,7 @@ from billing.credential_billing import (
     classify_billing_event,
     record_credential_billing_event,
 )
+from billing.stripe_meter_reporter import OUTCOME_REPORTED, MeterReportResult
 from tests.wallet_test_helpers import SITE_SIGNING_PUBKEY_B64
 
 
@@ -44,7 +45,7 @@ def test_record_initial_issuance_reports_meter(monkeypatch, fake_ishuman_db_sess
 
     def _capture(**kwargs):
         reported.append(kwargs)
-        return True
+        return MeterReportResult(OUTCOME_REPORTED)
 
     monkeypatch.setattr("billing.credential_billing.report_meter_event", _capture)
     monkeypatch.setattr(
@@ -95,7 +96,7 @@ def test_record_mau_requires_redis_dedup(monkeypatch, fake_ishuman_db_session_fa
 
     monkeypatch.setattr(
         "billing.credential_billing.report_meter_event",
-        lambda **kwargs: reported.append(kwargs) or True,
+        lambda **kwargs: reported.append(kwargs) or MeterReportResult(OUTCOME_REPORTED),
     )
     monkeypatch.setattr(
         "billing.credential_billing.resolve_stripe_customer_id_for_site",
@@ -145,7 +146,7 @@ def test_record_mau_skipped_when_already_counted(monkeypatch, fake_ishuman_db_se
     reported: list[dict] = []
     monkeypatch.setattr(
         "billing.credential_billing.report_meter_event",
-        lambda **kwargs: reported.append(kwargs) or True,
+        lambda **kwargs: reported.append(kwargs) or MeterReportResult(OUTCOME_REPORTED),
     )
     monkeypatch.setattr(
         "billing.credential_billing.resolve_stripe_customer_id_for_site",
@@ -190,7 +191,7 @@ def test_record_doubt_reentry_after_block(monkeypatch, fake_ishuman_db_session_f
     reported: list[dict] = []
     monkeypatch.setattr(
         "billing.credential_billing.report_meter_event",
-        lambda **kwargs: reported.append(kwargs) or True,
+        lambda **kwargs: reported.append(kwargs) or MeterReportResult(OUTCOME_REPORTED),
     )
     monkeypatch.setattr(
         "billing.credential_billing.resolve_stripe_customer_id_for_site",
@@ -259,9 +260,9 @@ def test_stripe_meter_reporter_dry_run_without_key(monkeypatch):
     monkeypatch.delenv("STRIPE_SECRET_KEY", raising=False)
     monkeypatch.setenv("LEMMA_STRIPE_METER_REPORTING", "1")
 
-    from billing.stripe_meter_reporter import report_meter_event
+    from billing.stripe_meter_reporter import OUTCOME_SKIPPED, report_meter_event
 
-    ok = report_meter_event(
+    result = report_meter_event(
         event_type="initial_issuance",
         stripe_customer_id="cus_test",
         site_id="site_abc",
@@ -269,7 +270,8 @@ def test_stripe_meter_reporter_dry_run_without_key(monkeypatch):
         event_id="bevt_random",
         unit_count=1,
     )
-    assert ok is True
+    assert result.outcome == OUTCOME_SKIPPED
+    assert result.reported is False
 
 
 @pytest.mark.unit
@@ -294,6 +296,7 @@ def test_derive_site_proof_records_initial_issuance(
         )
     )
     monkeypatch.setattr("api.database.SessionLocal", factory.session_local)
+    monkeypatch.setattr("api.ishuman._deny_if_derivation_revoked", lambda *_a, **_k: None)
     monkeypatch.setattr("api.ishuman._bill_site_credential_event", _capture)
     monkeypatch.setattr(
         "api.ishuman._derive_ppid_for_site",

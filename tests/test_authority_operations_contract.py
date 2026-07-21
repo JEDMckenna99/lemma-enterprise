@@ -82,7 +82,7 @@ def test_site_registration_requires_domain_ownership():
 def test_billing_webhook_requires_transactional_idempotency():
     operation = _operation("billing.stripe_webhook")
     assert "transactional_event_idempotency" in operation["required_auth"]
-    assert operation["compliance"] == "gap"
+    assert operation["compliance"] == "compliant"
 
 
 def test_recovery_completion_requires_human_and_replacement_passkey_proofs():
