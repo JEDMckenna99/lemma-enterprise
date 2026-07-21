@@ -4,16 +4,30 @@ Database Migration Runner for Lemma IAM
 Run this to apply database migrations
 """
 
+import glob
+import hashlib
+import logging
 import os
 import sys
-import psycopg2
-from psycopg2 import sql
-import logging
+import time
 from pathlib import Path
-import hashlib
+
+import psycopg2
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+# Stable advisory lock key for production migration runs (Section 9).
+MIGRATION_ADVISORY_LOCK_KEY = 20260721001
+MIGRATION_LOCK_TIMEOUT_SECONDS = 120
+
+
+class MigrationChecksumDriftError(RuntimeError):
+    """Raised when an applied migration file checksum no longer matches the ledger."""
+
+
+class MigrationLockTimeoutError(RuntimeError):
+    """Raised when the migration advisory lock cannot be acquired in time."""
 
 
 def _table_exists(cursor, table_name):
@@ -97,7 +111,7 @@ def ensure_base_schema(conn):
         return True
     except Exception as exc:
         conn.rollback()
-        logger.error(f"❌ Base schema bootstrap failed: {exc}")
+        logger.error("❌ Base schema bootstrap failed: %s", exc)
         return False
     finally:
         cur.close()
@@ -120,7 +134,7 @@ def ensure_migration_ledger(conn):
         return True
     except Exception as exc:
         conn.rollback()
-        logger.error(f"❌ Failed to initialize schema_migrations table: {exc}")
+        logger.error("❌ Failed to initialize schema_migrations table: %s", exc)
         return False
     finally:
         cur.close()
@@ -131,7 +145,8 @@ def _migration_checksum(migration_file):
     return hashlib.sha256(data).hexdigest()
 
 
-def migration_already_applied(conn, migration_file):
+def _verify_recorded_checksum(conn, migration_file) -> bool:
+    """Return True if migration is recorded with a matching checksum."""
     cur = conn.cursor()
     try:
         cur.execute(
@@ -145,14 +160,17 @@ def migration_already_applied(conn, migration_file):
         recorded_checksum = row[0]
         current_checksum = _migration_checksum(migration_file)
         if recorded_checksum != current_checksum:
-            logger.warning(
-                "⚠️ Migration '%s' already recorded but checksum changed. "
-                "Keeping recorded state and skipping re-run.",
-                migration_file,
+            raise MigrationChecksumDriftError(
+                f"Migration '{migration_file}' checksum drift: "
+                f"recorded={recorded_checksum} current={current_checksum}"
             )
         return True
     finally:
         cur.close()
+
+
+def migration_already_applied(conn, migration_file):
+    return _verify_recorded_checksum(conn, migration_file)
 
 
 def record_migration_applied(conn, migration_file):
@@ -171,120 +189,169 @@ def record_migration_applied(conn, migration_file):
         return True
     except Exception as exc:
         conn.rollback()
-        logger.error(f"❌ Failed to record migration '{migration_file}': {exc}")
+        logger.error("❌ Failed to record migration '%s': %s", migration_file, exc)
         return False
     finally:
         cur.close()
 
+
 def get_database_url():
     """Get database URL from environment"""
-    return os.getenv('DATABASE_URL') or os.getenv('HEROKU_POSTGRESQL_JADE_URL')
+    return os.getenv("DATABASE_URL") or os.getenv("HEROKU_POSTGRESQL_JADE_URL")
+
+
+def acquire_migration_lock(conn, *, timeout_seconds: int = MIGRATION_LOCK_TIMEOUT_SECONDS) -> bool:
+    """Acquire session-level advisory lock; fail closed on timeout."""
+    cur = conn.cursor()
+    deadline = time.time() + max(1, timeout_seconds)
+    try:
+        while time.time() < deadline:
+            cur.execute(
+                "SELECT pg_try_advisory_lock(%s)",
+                (MIGRATION_ADVISORY_LOCK_KEY,),
+            )
+            acquired = bool(cur.fetchone()[0])
+            if acquired:
+                logger.info("🔒 Acquired migration advisory lock")
+                return True
+            time.sleep(1.0)
+        return False
+    finally:
+        cur.close()
+
+
+def release_migration_lock(conn) -> None:
+    cur = conn.cursor()
+    try:
+        cur.execute("SELECT pg_advisory_unlock(%s)", (MIGRATION_ADVISORY_LOCK_KEY,))
+        released = bool(cur.fetchone()[0])
+        if released:
+            logger.info("🔓 Released migration advisory lock")
+    finally:
+        cur.close()
+
+
+def run_migration_sql(conn, migration_file):
+    """Execute one migration file on an existing connection."""
+    migration_sql = Path(migration_file).read_text(encoding="utf-8")
+    logger.info("📝 Running migration: %s", migration_file)
+    cur = conn.cursor()
+    try:
+        cur.execute(migration_sql)
+        conn.commit()
+        logger.info("✅ Migration completed successfully")
+        return True
+    except Exception as exc:
+        conn.rollback()
+        logger.error("❌ Migration failed: %s", exc)
+        return False
+    finally:
+        cur.close()
+
 
 def run_migration(migration_file):
     """
     Run a SQL migration file
-    
+
     Usage:
         python migrations/run_migration.py migrations/001_create_audit_logs.sql
     """
     database_url = get_database_url()
-    
+
     if not database_url:
         logger.error("❌ DATABASE_URL not set")
-        logger.error("   Set DATABASE_URL environment variable")
-        return False
-    
-    try:
-        # Read migration file
-        with open(migration_file, 'r') as f:
-            migration_sql = f.read()
-        
-        logger.info(f"📝 Running migration: {migration_file}")
-        
-        # Connect to database
-        conn = psycopg2.connect(database_url)
-        cur = conn.cursor()
-        
-        # Execute migration
-        cur.execute(migration_sql)
-        conn.commit()
-        
-        logger.info(f"✅ Migration completed successfully")
-        
-        # Close connection
-        cur.close()
-        conn.close()
-        
-        return True
-        
-    except FileNotFoundError:
-        logger.error(f"❌ Migration file not found: {migration_file}")
-        return False
-        
-    except Exception as e:
-        logger.error(f"❌ Migration failed: {e}")
         return False
 
-def run_all_migrations():
-    """Run all pending migrations in order"""
-    import glob
-    
-    migration_files = sorted(glob.glob('migrations/*.sql'))
-    
-    if not migration_files:
-        logger.warning("⚠️ No migration files found")
-        return
-
-    database_url = get_database_url()
-    if not database_url:
-        logger.error("❌ DATABASE_URL not set")
-        logger.error("   Set DATABASE_URL environment variable")
+    if not Path(migration_file).is_file():
+        logger.error("❌ Migration file not found: %s", migration_file)
         return False
-
-    try:
-        conn = psycopg2.connect(database_url)
-        if not ensure_base_schema(conn):
-            conn.close()
-            return False
-        if not ensure_migration_ledger(conn):
-            conn.close()
-            return False
-        conn.close()
-    except Exception as exc:
-        logger.error(f"❌ Failed to connect for schema bootstrap: {exc}")
-        return False
-    
-    logger.info(f"Found {len(migration_files)} migration files")
 
     conn = None
     try:
         conn = psycopg2.connect(database_url)
+        if not ensure_migration_ledger(conn):
+            return False
+        if not acquire_migration_lock(conn):
+            logger.error("❌ Could not acquire migration advisory lock")
+            return False
+        if migration_already_applied(conn, migration_file):
+            logger.info("⏭️ Skipping already-applied migration: %s", migration_file)
+            return True
+        if not run_migration_sql(conn, migration_file):
+            return False
+        return record_migration_applied(conn, migration_file)
+    except MigrationChecksumDriftError as exc:
+        logger.error("❌ %s", exc)
+        return False
+    finally:
+        if conn is not None:
+            try:
+                release_migration_lock(conn)
+            finally:
+                conn.close()
+
+
+def run_all_migrations():
+    """Run all pending migrations in order under one advisory lock."""
+    migration_files = sorted(glob.glob("migrations/*.sql"))
+
+    if not migration_files:
+        logger.warning("⚠️ No migration files found")
+        return True
+
+    database_url = get_database_url()
+    if not database_url:
+        logger.error("❌ DATABASE_URL not set")
+        return False
+
+    conn = None
+    try:
+        conn = psycopg2.connect(database_url)
+        if not ensure_base_schema(conn):
+            return False
+        if not ensure_migration_ledger(conn):
+            return False
+        if not acquire_migration_lock(conn):
+            raise MigrationLockTimeoutError(
+                f"Could not acquire migration lock within {MIGRATION_LOCK_TIMEOUT_SECONDS}s"
+            )
+
+        logger.info("Found %s migration files", len(migration_files))
         for migration_file in migration_files:
             if migration_already_applied(conn, migration_file):
-                logger.info(f"⏭️ Skipping already-applied migration: {migration_file}")
+                logger.info("⏭️ Skipping already-applied migration: %s", migration_file)
                 continue
 
-            success = run_migration(migration_file)
-            if not success:
-                logger.error(f"❌ Migration failed, stopping: {migration_file}")
+            if not run_migration_sql(conn, migration_file):
+                logger.error("❌ Migration failed, stopping: %s", migration_file)
                 return False
 
             if not record_migration_applied(conn, migration_file):
-                logger.error(f"❌ Could not record migration, stopping: {migration_file}")
+                logger.error("❌ Could not record migration, stopping: %s", migration_file)
                 return False
+
+        logger.info("✅ All migrations completed successfully")
+        return True
+    except MigrationChecksumDriftError as exc:
+        logger.error("❌ %s", exc)
+        return False
+    except MigrationLockTimeoutError as exc:
+        logger.error("❌ %s", exc)
+        return False
+    except Exception as exc:
+        logger.error("❌ Migration runner failed: %s", exc)
+        return False
     finally:
-        if conn:
-            conn.close()
-    
-    logger.info("✅ All migrations completed successfully")
-    return True
+        if conn is not None:
+            try:
+                release_migration_lock(conn)
+            finally:
+                conn.close()
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     if len(sys.argv) > 1:
-        # Run specific migration
-        migration_file = sys.argv[1]
-        run_migration(migration_file)
+        ok = run_migration(sys.argv[1])
     else:
-        # Run all migrations
-        run_all_migrations()
-
+        ok = run_all_migrations()
+    raise SystemExit(0 if ok else 1)

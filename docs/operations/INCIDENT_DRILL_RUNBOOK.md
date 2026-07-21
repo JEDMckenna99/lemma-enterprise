@@ -20,6 +20,27 @@ This runbook defines repeatable production-readiness drills for Lemma.id.
 - Communications Lead: drafts stakeholder/customer updates.
 - Observer: records timestamps and evidence.
 
+## On-call escalation ladder
+
+| Level | Condition | Who | Target response |
+|---|---|---|---|
+| L1 | `/health` down or single dyno crash | Primary on-call | 15 minutes |
+| L2 | `/ready` failing or auth error spike | Primary + IC | 10 minutes |
+| L3 | Data loss risk, KMS compromise, cross-tenant leak | IC + Security Lead | Immediate |
+| L4 | Sustained customer-visible outage | IC + Communications Lead | Customer notice within 30 minutes |
+
+Escalation contacts live in the secure operator roster (not in git). Alert routing rules: [`ALERT_CATALOG.md`](ALERT_CATALOG.md).
+
+## Customer incident notification
+
+When L2+ impact is customer-visible:
+
+1. Communications Lead posts to `https://status.lemma.id` (investigating → identified → monitoring → resolved).
+2. Email template in [`ALERT_CATALOG.md`](ALERT_CATALOG.md) for affected enterprise customers when contractually required.
+3. Record customer impact class (`NONE` / `LOW` / `MEDIUM` / `HIGH`) in drill evidence.
+
+Do not disclose exploit details or tenant-specific data in public status updates.
+
 ## Required Inputs
 
 - Production base URL: `https://lemma.id`

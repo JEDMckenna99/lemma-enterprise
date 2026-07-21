@@ -636,61 +636,18 @@ def create_app():
 
     @app.route('/health')
     def simple_health():
-        """Simple health check endpoint for uptime monitoring"""
-        try:
-            # Check database connectivity
-            from api.database import engine
-            from sqlalchemy import text
-            with engine.connect() as conn:
-                conn.execute(text('SELECT 1'))
-            
-            return jsonify({
-                'status': 'healthy',
-                'timestamp': datetime.now().isoformat()
-            }), 200
-        except Exception as e:
-            logger.error(f"Health check failed: {e}")
-            return jsonify({
-                'status': 'unhealthy',
-                'error': str(e)
-            }), 500
+        """Process liveness probe — no dependency checks."""
+        from api.operational_readiness import liveness_payload
+
+        return jsonify(liveness_payload()), 200
 
     @app.route('/ready')
     def ready_check():
-        """Readiness check - detailed system status"""
-        checks = {'database': False, 'crypto': False, 'revocation': False}
-        
-        try:
-            from api.database import engine
-            from sqlalchemy import text
-            with engine.connect() as conn:
-                conn.execute(text('SELECT 1'))
-            checks['database'] = True
-        except Exception as e:
-            logger.warning(f"Database check failed: {e}")
-        
-        try:
-            from lemma_crypto import PyMinimalVerifier
-            PyMinimalVerifier()
-            checks['crypto'] = True
-        except Exception as e:
-            logger.warning(f"Crypto check failed: {e}")
+        """Dependency-aware readiness probe."""
+        from api.operational_readiness import readiness_report
 
-        try:
-            from api.revocation_verifier import revocation_service_ready
-
-            ready, reason = revocation_service_ready()
-            checks['revocation'] = ready
-            if not ready:
-                logger.warning("Revocation readiness check failed: %s", reason)
-        except Exception as e:
-            logger.warning(f"Revocation check failed: {e}")
-        
-        all_healthy = all(checks.values())
-        return jsonify({
-            'ready': all_healthy,
-            'checks': checks
-        }), 200 if all_healthy else 503
+        payload, status_code = readiness_report()
+        return jsonify(payload), status_code
 
     # ================================================================================
     # ESSENTIAL ROUTES ONLY
