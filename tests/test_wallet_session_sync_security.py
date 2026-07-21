@@ -739,6 +739,7 @@ def test_lost_device_recovery_complete_enrolls_and_revokes_prior_devices(
             session_id="idv_lost_1",
             wallet_id=wallet_id,
             status="verified",
+            metadata_json={"purpose": "lost_device_recovery"},
         )
     )
     db.commit()

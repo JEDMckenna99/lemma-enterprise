@@ -248,6 +248,10 @@ def issue_lost_device_recovery_authorization(
             return Result(False, "recovery_idv_not_found", "verified IDV session not found for wallet"), ""
         if str(record.status or "") != "verified":
             return Result(False, "recovery_idv_not_verified", "IDV session is not verified"), ""
+        meta = record.metadata_json or {}
+        purpose = str(meta.get("purpose") or "").strip()
+        if purpose != "lost_device_recovery":
+            return Result(False, "recovery_idv_purpose_mismatch", "IDV session not started for lost-device recovery"), ""
     finally:
         db.close()
 

@@ -68,10 +68,27 @@ Content-Type: application/json
 
 > Note: The response is intentionally vague to prevent information leakage about valid site IDs or API keys.
 
-### Rate Limits
+### Complete Recovery
 
-- 5 recovery attempts per hour per IP address
-- Exceeding the limit returns HTTP 429
+After opening the email link, register or unlock a **replacement passkey** in the
+browser. The completion call must include the wallet-derived PPID and passkey
+credential id — email token alone is not sufficient.
+
+```bash
+POST https://lemma.id/api/recovery/complete
+Content-Type: application/json
+
+{
+  "token": "<token from email link>",
+  "ppid": "did:lemma:ppid_...",
+  "passkey_credential_id": "<base64url credential id from WebAuthn>"
+}
+```
+
+**Errors:** `replacement_passkey_required`, `replacement_ppid_required`,
+`Invalid, expired, or already used token`, `admin_record_not_found`.
+
+The legacy `/api/recovery/complete-wallet` path is disabled; use passkey recovery.
 
 ## Best Practices
 

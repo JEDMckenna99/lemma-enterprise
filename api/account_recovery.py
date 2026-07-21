@@ -8,6 +8,7 @@ import secrets
 import hashlib
 import json
 import os
+import threading
 from datetime import datetime, timezone, timedelta
 from flask import Blueprint, request, jsonify, render_template, redirect, url_for
 from flask_cors import cross_origin
@@ -33,9 +34,50 @@ except Exception as e:
 
 # In-memory fallback (for local dev only)
 recovery_tokens_memory = {}
+_recovery_memory_lock = threading.Lock()
 
 RECOVERY_TOKEN_PREFIX = "lemma:recovery:"
 RECOVERY_TOKEN_TTL = 900  # 15 minutes in seconds
+
+
+def recovery_token_store_required() -> bool:
+    """Production recovery completion requires durable Redis token storage."""
+    try:
+        from api.config import is_production
+
+        return is_production()
+    except ImportError:
+        return False
+
+
+def consume_recovery_token(token_hash: str) -> dict | None:
+    """Atomically consume a one-time recovery token (GETDEL / pop)."""
+    token_data = None
+    redis_key = f"{RECOVERY_TOKEN_PREFIX}{token_hash}"
+
+    if redis_client:
+        try:
+            raw = redis_client.getdel(redis_key)
+            if raw:
+                token_data = json.loads(raw)
+        except Exception as exc:
+            logger.error("Redis recovery token consume failed: %s", exc)
+            return None
+    else:
+        with _recovery_memory_lock:
+            token_data = recovery_tokens_memory.pop(token_hash, None)
+
+    if not token_data:
+        return None
+
+    expires_at = token_data.get("expires_at")
+    if isinstance(expires_at, str):
+        expires_at = datetime.fromisoformat(expires_at.replace("Z", "+00:00"))
+    if not expires_at or expires_at < datetime.now(timezone.utc):
+        return None
+    if token_data.get("used"):
+        return None
+    return token_data
 
 
 def store_recovery_token(token_hash: str, data: dict):
@@ -75,7 +117,7 @@ def get_recovery_token(token_hash: str) -> dict:
 
 
 def mark_token_used(token_hash: str):
-    """Mark token as used in Redis (or memory fallback)"""
+    """Deprecated: prefer consume_recovery_token() for atomic single-use semantics."""
     token_data = get_recovery_token(token_hash)
     if token_data:
         token_data['used'] = True
@@ -92,7 +134,21 @@ def mark_token_used(token_hash: str):
             except Exception as e:
                 logger.error(f"Redis mark used failed: {e}")
         else:
-            recovery_tokens_memory[token_hash] = token_data
+            with _recovery_memory_lock:
+                recovery_tokens_memory[token_hash] = token_data
+
+
+def _validate_replacement_passkey_proof(data: dict) -> tuple[bool, str, str, str]:
+    """Require replacement wallet PPID + passkey credential id before issuing authority."""
+    ppid = str(data.get("ppid") or "").strip()
+    passkey_credential_id = str(
+        data.get("passkey_credential_id") or data.get("passkeyCredentialId") or ""
+    ).strip()
+    if not ppid.startswith("did:lemma:ppid_"):
+        return False, "replacement_ppid_required", ppid, passkey_credential_id
+    if not passkey_credential_id:
+        return False, "replacement_passkey_required", ppid, passkey_credential_id
+    return True, "ok", ppid, passkey_credential_id
 
 
 def clean_expired_tokens():
@@ -430,57 +486,43 @@ def validate_recovery_token():
 @cross_origin()
 def complete_recovery():
     """
-    Complete account recovery - issue admin lemma directly.
-    
-    Identity is already proven by two factors:
-      1. API key (proves site ownership)
-      2. Email confirmation (proves they control the admin email)
-    
-    No passkey is required. The passkey only affects wallet lock/unlock state.
-    This endpoint issues the admin proof and returns it for wallet storage.
-    
-    Optionally accepts a wallet PPID to bind the credential to and update site_admins.
-    If no PPID provided, issues to an email-derived DID.
+    Complete account recovery after email token + replacement passkey ceremony.
+
+    Requires:
+      1. API key + email token (initiate step)
+      2. Atomically consumed one-time recovery token
+      3. Replacement passkey credential id + wallet-derived PPID from the new device
     """
     try:
         data = request.get_json() or {}
         token = data.get('token', '').strip()
-        ppid = data.get('ppid', '').strip()  # Optional: wallet PPID if wallet is unlocked
-        
+
         if not token:
             return jsonify({'success': False, 'error': 'Token required'}), 400
-        
+
+        if recovery_token_store_required() and not redis_client:
+            return jsonify({'success': False, 'error': 'recovery_unavailable'}), 503
+
+        ok_proof, proof_err, ppid, passkey_credential_id = _validate_replacement_passkey_proof(data)
+        if not ok_proof:
+            return jsonify({'success': False, 'error': proof_err}), 400
+
         token_hash = hashlib.sha256(token.encode()).hexdigest()
-        
-        # Get token from Redis
-        token_data = get_recovery_token(token_hash)
-        
+        token_data = consume_recovery_token(token_hash)
         if not token_data:
-            return jsonify({'success': False, 'error': 'Invalid or expired token'}), 400
-        
-        if token_data.get('used'):
-            return jsonify({'success': False, 'error': 'Token already used'}), 400
-        
-        expires_at = token_data['expires_at']
-        if isinstance(expires_at, str):
-            expires_at = datetime.fromisoformat(expires_at.replace('Z', '+00:00'))
-        
-        if expires_at < datetime.now(timezone.utc):
-            return jsonify({'success': False, 'error': 'Token expired'}), 400
-        
+            return jsonify({'success': False, 'error': 'Invalid, expired, or already used token'}), 400
+
         site_id = token_data['site_id']
         admin_email = token_data['admin_email']
 
-        if ppid and ppid.startswith('did:lemma:ppid_'):
-            from api.platform_owner import enforce_platform_admin_ppid, is_platform_site
+        from api.platform_owner import enforce_platform_admin_ppid, is_platform_site
 
-            site_id_norm = str(site_id or '').strip().lower()
-            if is_platform_site(site_id_norm):
-                denied = enforce_platform_admin_ppid(ppid, site_id_norm)
-                if denied:
-                    return jsonify(denied[0]), denied[1]
-        
-        # Look up site details
+        site_id_norm = str(site_id or '').strip().lower()
+        if is_platform_site(site_id_norm):
+            denied = enforce_platform_admin_ppid(ppid, site_id_norm)
+            if denied:
+                return jsonify(denied[0]), denied[1]
+
         from api.database import SessionLocal, Site
         db = SessionLocal()
         try:
@@ -490,40 +532,41 @@ def complete_recovery():
             site_domain = site.site_domain or site_id
         finally:
             db.close()
-        
-        # Issue the admin lemma - identity is already proven by API key + email
+
+        recovery_method = 'passkey_signin' if data.get('passkey_signin') else 'passkey_register'
         credential = _issue_site_admin_proof(
             site_id=site_id,
             site_domain=site_domain,
             admin_email=admin_email,
-            user_ppid=ppid if ppid and ppid.startswith('did:lemma:ppid_') else None,
-            recovery_method='email_verified'
+            user_ppid=ppid,
+            recovery_method=recovery_method,
         )
-        
+
         if not credential:
             return jsonify({
                 'success': False,
                 'error': 'Failed to issue admin proof'
             }), 500
-        
-        # Update site_admins if a wallet PPID was provided
-        if ppid and ppid.startswith('did:lemma:ppid_'):
-            _update_site_admin_ppid(site_id, admin_email, ppid)
-            _update_all_admin_sites(admin_email, ppid, exclude_site_id=site_id)
-        
-        # Store recovery context in session (for dashboard access)
+
+        if not _update_site_admin_ppid(site_id, admin_email, ppid):
+            return jsonify({'success': False, 'error': 'admin_record_not_found'}), 403
+
+        other_sites_updated = _update_all_admin_sites(admin_email, ppid, exclude_site_id=site_id)
+
         from flask import session as flask_session
         flask_session['recovery_complete'] = True
         flask_session['recovery_site_id'] = site_id
         flask_session['recovery_email'] = admin_email
         flask_session['customer_email'] = admin_email
         flask_session['user_email'] = admin_email
-        
-        # Mark token as used ONLY after everything succeeded
-        mark_token_used(token_hash)
-        
-        logger.info(f"Recovery complete - admin lemma issued for site {site_id} to {admin_email[:3]}***")
-        
+
+        logger.info(
+            "Recovery complete - admin lemma issued for site %s to %s (passkey=%s...)",
+            site_id,
+            admin_email[:3] + "***",
+            passkey_credential_id[:12],
+        )
+
         return jsonify({
             'success': True,
             'message': 'Admin access restored',
@@ -531,9 +574,10 @@ def complete_recovery():
             'site_domain': site_domain,
             'credential': credential,
             'credential_id': credential.get('id'),
+            'other_sites_updated': other_sites_updated,
             'redirect': '/developer'
         })
-        
+
     except Exception as e:
         logger.error(f"Recovery completion failed: {e}")
         return jsonify({'success': False, 'error': 'Recovery failed'}), 500
@@ -638,86 +682,79 @@ def _issue_site_admin_proof(site_id: str, site_domain: str, admin_email: str,
         return None
 
 
-def _update_site_admin_ppid(site_id: str, admin_email: str, new_ppid: str):
+def _update_site_admin_ppid(site_id: str, admin_email: str, new_ppid: str) -> bool:
     """
-    Update the site_admins table to associate the new PPID with the site.
-    
-    During recovery, the developer may have a new wallet/passkey which generates
-    a different PPID. This ensures they still have admin access to their site.
-    
-    Lookup order:
-    1. Check if new PPID already has access (no-op)
-    2. Find existing record by email
-    3. Find existing record by owner role (covers cases where admin_email was stored as '')
-    4. Fall back to creating a new record
+    Update the exact site_admins row for this recovery token's admin email.
+
+    Returns True when an existing row was updated or a new row was created for a
+    site whose admin_email matches the token. Never falls back to owner role.
     """
     try:
-        from api.database import SessionLocal, SiteAdmin
-        
+        from api.database import SessionLocal, Site, SiteAdmin
+
         db = SessionLocal()
         try:
-            # Check if there's already an admin record with this PPID
             existing = db.query(SiteAdmin).filter(
                 SiteAdmin.site_id == site_id,
                 SiteAdmin.admin_did == new_ppid,
                 SiteAdmin.is_active == True
             ).first()
-            
+
             if existing:
-                # Already has access - just update the email if it was empty
-                if not existing.admin_email and admin_email:
+                if admin_email and not existing.admin_email:
                     existing.admin_email = admin_email
                     db.commit()
-                logger.info(f"Site admin record already exists for PPID {new_ppid[:30]}... on site {site_id}")
-                return
-            
-            # Try to find existing record to update (by email first, then by owner role)
+                logger.info("Site admin record already exists for PPID %s... on site %s", new_ppid[:30], site_id)
+                return True
+
             existing_admin = None
-            
-            # Method 1: Match by email
             if admin_email:
                 existing_admin = db.query(SiteAdmin).filter(
                     SiteAdmin.site_id == site_id,
                     SiteAdmin.admin_email == admin_email,
                     SiteAdmin.is_active == True
                 ).first()
-            
-            # Method 2: Match by owner role (handles cases where admin_email was '')
-            if not existing_admin:
-                existing_admin = db.query(SiteAdmin).filter(
-                    SiteAdmin.site_id == site_id,
-                    SiteAdmin.admin_role == 'owner',
-                    SiteAdmin.is_active == True
-                ).first()
-            
+
             if existing_admin:
-                # Update existing record with new PPID and email
                 old_ppid = existing_admin.admin_did
                 existing_admin.admin_did = new_ppid
-                if admin_email:
-                    existing_admin.admin_email = admin_email
                 existing_admin.last_activity = datetime.utcnow()
                 db.commit()
-                logger.info(f"Updated site admin PPID on site {site_id}: {old_ppid[:20]}... -> {new_ppid[:20]}...")
-            else:
-                # No existing record found - create new
-                new_admin = SiteAdmin(
+                logger.info(
+                    "Updated site admin PPID on site %s: %s... -> %s...",
+                    site_id,
+                    (old_ppid or "")[:20],
+                    new_ppid[:20],
+                )
+                return True
+
+            site_row = db.query(Site).filter(Site.site_id == site_id).first()
+            if site_row and admin_email and site_row.admin_email == admin_email:
+                db.add(SiteAdmin(
                     site_id=site_id,
                     admin_did=new_ppid,
                     admin_email=admin_email,
                     admin_role='owner',
                     is_active=True,
                     added_by='account_recovery'
-                )
-                db.add(new_admin)
+                ))
                 db.commit()
-                logger.info(f"Created new site admin record for {admin_email} on site {site_id} (recovery)")
-                
+                logger.info("Created site admin record for %s on site %s (recovery)", admin_email, site_id)
+                return True
+
+            logger.warning(
+                "Recovery admin update refused: no matching admin record for %s on site %s",
+                admin_email,
+                site_id,
+            )
+            return False
+
         finally:
             db.close()
-            
+
     except Exception as e:
         logger.error(f"Failed to update site admin PPID: {e}")
+        return False
 
 
 def _update_all_admin_sites(admin_email: str, new_ppid: str, exclude_site_id: str = None) -> list:
@@ -757,37 +794,30 @@ def _update_all_admin_sites(admin_email: str, new_ppid: str, exclude_site_id: st
                 ).first()
                 
                 if existing:
-                    continue  # Already up to date
-                
-                # Find the existing owner/admin record to update
+                    continue
+
                 old_admin = db.query(SiteAdmin).filter(
                     SiteAdmin.site_id == site.site_id,
+                    SiteAdmin.admin_email == admin_email,
                     SiteAdmin.is_active == True
-                ).order_by(
-                    # Prefer owner records
-                    SiteAdmin.admin_role.desc()
                 ).first()
-                
+
                 if old_admin:
                     old_admin.admin_did = new_ppid
-                    if admin_email:
-                        old_admin.admin_email = admin_email
                     old_admin.last_activity = datetime.utcnow()
                     updated_sites.append(site.site_id)
-                    logger.info(f"Updated PPID for additional site {site.site_id} during recovery")
-                else:
-                    # No admin record exists - create one
-                    new_admin = SiteAdmin(
+                    logger.info("Updated PPID for additional site %s during recovery", site.site_id)
+                elif site.admin_email == admin_email:
+                    db.add(SiteAdmin(
                         site_id=site.site_id,
                         admin_did=new_ppid,
                         admin_email=admin_email,
                         admin_role='owner',
                         is_active=True,
                         added_by='account_recovery'
-                    )
-                    db.add(new_admin)
+                    ))
                     updated_sites.append(site.site_id)
-                    logger.info(f"Created admin record for additional site {site.site_id} during recovery")
+                    logger.info("Created admin record for additional site %s during recovery", site.site_id)
             
             if updated_sites:
                 db.commit()
@@ -916,106 +946,11 @@ def issue_recovery_admin_proof():
 @cross_origin()
 def complete_recovery_wallet():
     """
-    Complete account recovery by restoring to active wallet session
-    
-    This is used when the user's wallet is already unlocked via session sync,
-    allowing them to recover without registering a new passkey.
+    Deprecated: wallet-session recovery without replacement passkey is disabled.
+    Use /api/recovery/complete with passkey + PPID after email token validation.
     """
-    try:
-        from flask import session
-        
-        data = request.get_json() or {}
-        token = data.get('token', '').strip()
-        restore_method = data.get('restore_method', 'wallet_session')
-        
-        if not token:
-            return jsonify({'success': False, 'error': 'Token required'}), 400
-        
-        # Verify wallet session is active
-        wallet_id = session.get('wallet_id')
-        auth_method = session.get('auth_method')
-        
-        if not wallet_id:
-            return jsonify({
-                'success': False, 
-                'error': 'No active wallet session. Please use passkey recovery instead.'
-            }), 400
-        
-        token_hash = hashlib.sha256(token.encode()).hexdigest()
-        
-        # Get token from Redis
-        token_data = get_recovery_token(token_hash)
-        
-        if not token_data:
-            return jsonify({'success': False, 'error': 'Invalid or expired token'}), 400
-        
-        if token_data.get('used'):
-            return jsonify({'success': False, 'error': 'Token already used'}), 400
-        
-        expires_at = token_data['expires_at']
-        if isinstance(expires_at, str):
-            expires_at = datetime.fromisoformat(expires_at.replace('Z', '+00:00'))
-        
-        if expires_at < datetime.now(timezone.utc):
-            return jsonify({'success': False, 'error': 'Token expired'}), 400
-        
-        site_id = token_data['site_id']
-        admin_email = token_data['admin_email']
-        
-        # Get existing developer credentials for this site
-        credentials_to_restore = []
-        
-        try:
-            from api.database import SessionLocal, Site
-            
-            db = SessionLocal()
-            try:
-                site = db.query(Site).filter(Site.site_id == site_id).first()
-                
-                if site:
-                    # Issue proper admin permission lemma for the site
-                    credential = _issue_site_admin_proof(
-                        site_id=site_id,
-                        site_domain=site.site_domain or site_id,
-                        admin_email=admin_email,
-                        recovery_method=restore_method
-                    )
-                    
-                    if credential:
-                        credentials_to_restore.append(credential)
-                        logger.info(f"Created admin permission lemma for wallet restore: {credential.get('id')}")
-                    
-                    # Update site_admins with wallet PPID if available
-                    if wallet_id:
-                        _update_site_admin_ppid(site_id, admin_email, wallet_id)
-                    
-            finally:
-                db.close()
-                
-        except Exception as e:
-            logger.error(f"Failed to create recovery credential: {e}")
-            # Continue without credential - session restore still works
-        
-        # Update session to grant developer access
-        session['customer_email'] = admin_email
-        session['recovered_site_id'] = site_id
-        session['recovery_complete'] = True
-        session['recovery_timestamp'] = datetime.now(timezone.utc).isoformat()
-        
-        # Mark token as used ONLY after all work succeeded
-        mark_token_used(token_hash)
-        
-        logger.info(f"Wallet recovery complete for site {site_id} - restored to wallet {wallet_id}")
-        
-        return jsonify({
-            'success': True,
-            'message': 'Account restored to wallet successfully',
-            'site_id': site_id,
-            'wallet_id': wallet_id,
-            'credentials': credentials_to_restore,
-            'redirect': '/developer'
-        })
-        
-    except Exception as e:
-        logger.error(f"Wallet recovery failed: {e}")
-        return jsonify({'success': False, 'error': 'Wallet recovery failed'}), 500
+    return jsonify({
+        'success': False,
+        'error': 'recovery_wallet_path_disabled',
+        'message': 'Register or unlock a replacement passkey, then call /api/recovery/complete.',
+    }), 403

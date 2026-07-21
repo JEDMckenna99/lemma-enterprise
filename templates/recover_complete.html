@@ -313,35 +313,48 @@
             }
         }
         
-        // Step 2: Complete recovery - issue admin lemma
+        // Step 2: Complete recovery - register/unlock passkey, then issue admin lemma
         async function restoreAccess() {
             const btn = document.getElementById('restore-btn');
             btn.disabled = true;
             btn.textContent = 'Restoring...';
-            
+
             try {
-                // Try to get wallet PPID if wallet is unlocked (optional)
-                let ppid = null;
-                try {
-                    if (wallet) {
-                        const authState = await wallet.getAuthState();
-                        if (authState.isUnlocked || (wallet.session && wallet.session.isUnlocked)) {
-                            ppid = await wallet.derivePPID('lemma.id');
-                            console.log('[Recovery] Wallet PPID:', ppid?.substring(0, 30) + '...');
-                        }
-                    }
-                } catch (e) {
-                    console.log('[Recovery] PPID derivation skipped:', e.message);
+                if (!wallet) {
+                    throw new Error('Wallet SDK unavailable. Use a passkey-capable browser.');
                 }
-                
-                // Call complete recovery - issues admin lemma directly
+
+                let ppid = null;
+                let passkeyCredentialId = null;
+                let passkeySignIn = false;
+
+                const authState = await wallet.getAuthState();
+                if (authState.isUnlocked || (wallet.session && wallet.session.isUnlocked)) {
+                    ppid = await wallet.derivePPID('lemma.id');
+                    passkeyCredentialId = authState.passkeyCredentialId
+                        || (wallet.session && wallet.session.passkeyCredentialId)
+                        || '';
+                    passkeySignIn = true;
+                } else {
+                    await wallet.registerPasskey();
+                    const unlocked = await wallet.getAuthState();
+                    ppid = await wallet.derivePPID('lemma.id');
+                    passkeyCredentialId = unlocked.passkeyCredentialId || '';
+                }
+
+                if (!ppid || !passkeyCredentialId) {
+                    throw new Error('Replacement passkey and wallet PPID are required to complete recovery.');
+                }
+
                 const response = await fetch('/api/recovery/complete', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     credentials: 'include',
                     body: JSON.stringify({
                         token: token,
-                        ppid: ppid || ''
+                        ppid: ppid,
+                        passkey_credential_id: passkeyCredentialId,
+                        passkey_signin: passkeySignIn,
                     })
                 });
                 

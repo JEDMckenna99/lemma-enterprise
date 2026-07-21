@@ -675,6 +675,7 @@ def test_lost_device_recovery_authorization_is_one_time(
             session_id="idv_recovery_1",
             wallet_id=wallet_fixture["wallet_id"],
             status="verified",
+            metadata_json={"purpose": "lost_device_recovery"},
         )
     )
     db.commit()

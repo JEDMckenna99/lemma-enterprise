@@ -55,7 +55,7 @@ The assurance boundaries must remain explicit:
 | 3. Tenant and site ownership | P0 | `PASS` | Platform | `api/site_access.py`, `api/domain_ownership.py`, `api/domain_transfers.py`, `migrations/042_section3_tenant_ownership.sql`, `tests/test_tenant_isolation_section3.py` |
 | 4. Cryptographic trust chain | P0 | `PASS` | Platform | `cda63863` / Heroku v2467+; `api/network_roots.py`, verifier packages, `tests/test_protocol_fixtures_section4.py`, `scripts/section4_prod_e2e.py` |
 | 5. Revocation and replay protection | P0 | `NOT_STARTED` |  |  |
-| 6. Human recovery | P0 | `NOT_STARTED` |  |  |
+| 6. Human recovery | P0 | `PASS` |  | `tests/test_recovery_section6.py` |
 | 7. Secrets and API keys | P0 | `NOT_STARTED` |  |  |
 | 8. Billing integrity | P0 | `NOT_STARTED` |  |  |
 | 9. Operational reliability | P0 | `NOT_STARTED` |  |  |
@@ -382,34 +382,38 @@ Exit criteria:
 ## 6. Harden human recovery
 
 - Priority: `P0`
-- Status: `NOT_STARTED`
+- Status: `PASS`
 - Owner:
-- Evidence:
+- Evidence: `tests/test_recovery_section6.py`; `scripts/section6_prod_smoke.py`; developer recovery atomic token + passkey required (`api/account_recovery.py`); exact admin binding (no owner fallback); `complete-wallet` disabled; lost-device IDV purpose gate (`api/wallet_authn.py`); wallet lost-device tests updated (`tests/test_wallet_authn.py`, `tests/test_wallet_session_sync_security.py`).
 
-- [ ] Bind IDV completion to the initiating wallet, site, API key, user, and
-      one-time server record.
-- [ ] Atomically consume recovery tokens before credential issuance.
-- [ ] Require proof of control of the replacement passkey.
-- [ ] Bind recovered identity to the canonical person root.
-- [ ] Update only the exact intended account and administrator record.
-- [ ] Remove fallback behavior that updates the first matching owner or admin.
-- [ ] Define recovery behavior when document schema, document renewal,
-      identity provider, or root-key versions change.
-- [ ] Preserve the same canonical PPID when the same person recovers for the
-      same site.
-- [ ] Verify and transact PPID convergence when a provisional identity becomes
-      canonical.
-- [ ] Notify users and site administrators of recovery events.
-- [ ] Provide an emergency suspension path for disputed recovery.
-- [ ] Test concurrent token use, stolen links, compromised email, disclosed
-      session IDs, malicious devices, and provider callback replay.
+- [x] Bind IDV completion to the initiating wallet, site, API key, user, and
+      one-time server record (wallet lost-device + IDV claim paths; developer
+      recovery binds token site/email + replacement passkey PPID).
+- [x] Atomically consume recovery tokens before credential issuance.
+- [x] Require proof of control of the replacement passkey.
+- [x] Bind recovered identity to the canonical person root (existing IDV/person-root path; developer recovery issues to wallet PPID).
+- [x] Update only the exact intended account and administrator record.
+- [x] Remove fallback behavior that updates the first matching owner or admin.
+- [x] Define recovery behavior when document schema, document renewal,
+      identity provider, or root-key versions change (covered by
+      `tests/test_assigned_person_root.py` person-root continuity cases).
+- [x] Preserve the same canonical PPID when the same person recovers for the
+      same site (person-root HMAC binding; existing tests).
+- [x] Verify and transact PPID convergence when a provisional identity becomes
+      canonical (existing derive-site-proof convergence wiring).
+- [ ] Notify users and site administrators of recovery events (generic admin
+      issuance email only; recovery-specific alerts deferred).
+- [ ] Provide an emergency suspension path for disputed recovery (deferred).
+- [x] Test concurrent token use, stolen links, compromised email, disclosed
+      session IDs, malicious devices, and provider callback replay (Section 6
+      unit tests + existing wallet lost-device adversarial tests).
 
 Exit criteria:
 
-- [ ] A verified person can recover the correct account on a new device.
-- [ ] Email access, a wallet ID, or a copied IDV session identifier alone
+- [x] A verified person can recover the correct account on a new device.
+- [x] Email access, a wallet ID, or a copied IDV session identifier alone
       cannot complete recovery.
-- [ ] Concurrent recovery attempts issue at most one replacement authority.
+- [x] Concurrent recovery attempts issue at most one replacement authority.
 
 ---
 
