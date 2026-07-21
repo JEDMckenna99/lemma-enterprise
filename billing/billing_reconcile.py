@@ -83,7 +83,18 @@ def reconcile_billing_state(db) -> BillingReconcileReport:
                 )
                 .count()
             )
-            if reported_count + pending_count < expected_count:
+            dead_letter_count = (
+                db.query(IsHumanBillingOutbox)
+                .filter_by(
+                    site_scope=site_scope,
+                    month=month,
+                    event_type=event_type,
+                    status="dead_letter",
+                )
+                .count()
+            )
+            accounted_count = reported_count + pending_count + dead_letter_count
+            if accounted_count < expected_count:
                 report.issues.append(
                     BillingReconcileIssue(
                         code="missing_outbox_rows",
@@ -91,7 +102,8 @@ def reconcile_billing_state(db) -> BillingReconcileReport:
                         month=month,
                         detail=(
                             f"{event_type}: aggregate={expected_count} "
-                            f"outbox_reported={reported_count} outbox_pending={pending_count}"
+                            f"outbox_reported={reported_count} outbox_pending={pending_count} "
+                            f"outbox_dead_letter={dead_letter_count}"
                         ),
                     )
                 )
