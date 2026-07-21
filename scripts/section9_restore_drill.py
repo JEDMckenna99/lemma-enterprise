@@ -5,6 +5,7 @@ import argparse
 import datetime as dt
 import json
 import os
+import shutil
 import subprocess
 import sys
 import time
@@ -25,6 +26,11 @@ def iso(ts: dt.datetime) -> str:
 
 
 def run_cmd(args: list[str]) -> tuple[int, str]:
+    if args and args[0] == "heroku":
+        heroku_bin = shutil.which("heroku")
+        if not heroku_bin:
+            return 127, "heroku CLI not found in PATH"
+        args = [heroku_bin, *args[1:]]
     proc = subprocess.run(args, capture_output=True, text=True, check=False)
     out = (proc.stdout or "") + (proc.stderr or "")
     return proc.returncode, out.strip()

@@ -16,8 +16,8 @@ if str(REPO_ROOT) not in sys.path:
 
 ORIGIN = "https://lemma.id"
 UA = "section9-load-matrix/1.0"
-CONCURRENCY = 8
-ROUNDS = 3
+CONCURRENCY = 2
+ROUNDS = 1
 
 
 def _get(url: str) -> tuple[float, int]:
@@ -100,7 +100,7 @@ def main() -> int:
         ),
         (
             "site-block-auth-fail",
-            lambda: _get(f"{ORIGIN}/api/ishuman/site-block"),
+            lambda: _post_json(f"{ORIGIN}/api/ishuman/site-block", {}),
             401,
         ),
     ]

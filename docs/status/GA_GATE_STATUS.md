@@ -40,7 +40,7 @@ Reconciled conflicts:
 | P0-4 Revocation Data Path Completeness | IN_PROGRESS | Backend Lead | `ops/evidence/launch/2026-03-18-212437-revoke-to-deny-evidence.md` (historical PASS), `ops/evidence/launch/2026-06-08-security-hardening-deploy-summary.md` | v2186 deployed; new list/bloom smoke blocked `ppid_not_linked`; historical deny-path PASS on 2026-03-18 |
 | P0-5 Passkey Algorithm Handling Correctness | IN_PROGRESS | Auth Lead | `ops/evidence/launch/2026-06-08-passkey-browser-matrix.md` | Fill Chrome/Firefox/Safari matrix with screenshots |
 | P0-6 Independent Security Assessment | BLOCKED | Security Lead | `ops/evidence/launch/2026-06-08-external-pentest-scope.md` | Vendor report + remediation tracker not attached |
-| P0-7 Operational Readiness | IN_PROGRESS | SRE Lead | `ops/evidence/launch/2026-06-08-incident-drill-csp-alert.md`, `ops/evidence/launch/2026-03-04-114534-incident-drill-auth-control-plane.md` | Attach Sentry event id from CSP drill; auth control-plane drill already present |
+| P0-7 Operational Readiness | PASS | SRE Lead | `ops/evidence/launch/2026-07-21-185850-section9-restore-drill.md`, `scripts/section9_prod_smoke.py`, `docs/operations/ALERT_CATALOG.md`, `docs/operations/SECTION9_OPERATIONAL_RELIABILITY.md` | Section 9 PASS on v2487; Sentry token drill remains operator-run per ALERT_CATALOG |
 
 ## P1 Gates (Risk-Acceptable for GA only with documented exception)
 
