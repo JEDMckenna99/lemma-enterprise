@@ -346,53 +346,6 @@ def get_customer_id_for_site(site_id: str) -> str | None:
             conn.close()
 
 
-def clear_site_legacy_api_key(site_id: str) -> bool:
-    """Clear legacy plaintext Site.api_key so revoked keys cannot authenticate."""
-    import secrets as secrets_module
-
-    conn = None
-    try:
-        conn = get_pg_connection()
-        cursor = conn.cursor()
-        placeholder = f"__hash_only__{secrets_module.token_hex(12)}"
-        cursor.execute(
-            """
-            UPDATE sites
-            SET api_key = %s, updated_at = NOW()
-            WHERE site_id = %s
-            """,
-            (placeholder, site_id),
-        )
-        updated = cursor.rowcount > 0
-        conn.commit()
-        cursor.close()
-        return updated
-    except Exception as e:
-        logger.debug(f"Normalized sites.api_key clear skipped for {site_id}: {e}")
-        if conn:
-            conn.rollback()
-    finally:
-        if conn:
-            conn.close()
-
-    try:
-        from api.database import SessionLocal, Site
-
-        db = SessionLocal()
-        try:
-            site = db.query(Site).filter(Site.site_id == site_id).first()
-            if not site:
-                return False
-            site.api_key = f"__hash_only__{secrets_module.token_hex(12)}"
-            db.commit()
-            return True
-        finally:
-            db.close()
-    except Exception as exc:
-        logger.warning(f"Could not clear legacy Site.api_key for {site_id}: {exc}")
-        return False
-
-
 def get_sites_for_customer_from_postgres(customer_id: str) -> list:
     """
     Get sites for a customer - tries PostgreSQL first, then falls back to JSON lookup.

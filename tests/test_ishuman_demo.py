@@ -876,7 +876,6 @@ def test_require_ishuman_creates_site_doubt(
             site_domain="tickets-demo.lemma.id",
             company_name="Demo Tickets",
             admin_email="demo@lemma.id",
-            api_key="test",
         )
     ]
     resp = ishuman_demo_client.post(
@@ -916,7 +915,6 @@ def test_site_doubt_creates_temporary_challenge(
             site_domain="tickets-demo.lemma.id",
             company_name="Demo Tickets",
             admin_email="demo@lemma.id",
-            api_key="test",
         )
     ]
     ppid = "did:lemma:ppid_demo_doubt"
@@ -949,7 +947,6 @@ def test_clear_site_doubt_clears_only_matching_doubt(
             site_domain="tickets-demo.lemma.id",
             company_name="Demo Tickets",
             admin_email="demo@lemma.id",
-            api_key="test",
         )
     ]
     ppid = "did:lemma:ppid_demo_clear"
@@ -984,7 +981,6 @@ def test_status_includes_site_doubts(
             site_domain="tickets-demo.lemma.id",
             company_name="Demo Tickets",
             admin_email="demo@lemma.id",
-            api_key="test",
         )
     ]
     ppid = "did:lemma:ppid_status_doubt"

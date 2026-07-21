@@ -48,7 +48,6 @@ def _create_site_record(data: dict) -> Site:
             company_name=data['company_name'],
             admin_email=data['admin_email'].strip().lower(),
             plan=data.get('plan', 'starter'),
-            api_key=f"__hash_only__{secrets.token_hex(12)}",
             oauth_client_id=oauth_client_id,
             oauth_client_secret=oauth_stored,
         )

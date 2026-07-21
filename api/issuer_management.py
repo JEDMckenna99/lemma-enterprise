@@ -136,14 +136,16 @@ class LemmaIssuerManager:
             # Create or update site in database
             if not site:
                 import secrets
+                from api.oauth_client_secret_crypto import provision_oauth_client_credentials
+
+                oauth_client_id, oauth_stored = provision_oauth_client_credentials(site_id)
                 site = Site(
                     site_id=site_id,
                     company_name=issuer_name,
                     site_domain='lemma.id',
                     admin_email='admin@lemma.id',
-                    api_key=f"lm_{secrets.token_urlsafe(32)}",
-                    oauth_client_id=f"client_{secrets.token_urlsafe(16)}",
-                    oauth_client_secret=secrets.token_urlsafe(32),
+                    oauth_client_id=oauth_client_id,
+                    oauth_client_secret=oauth_stored,
                     created_at=datetime.utcnow()
                 )
                 db.add(site)
@@ -227,15 +229,18 @@ class LemmaIssuerManager:
                     platform_candidates[0] if platform_candidates else None,
                 )
                 if not site:
-                    import secrets
+                    from api.oauth_client_secret_crypto import provision_oauth_client_credentials
+
+                    oauth_client_id, oauth_stored = provision_oauth_client_credentials(
+                        _PLATFORM_CANONICAL_SITE_ID
+                    )
                     site = Site(
                         site_id=_PLATFORM_CANONICAL_SITE_ID,
                         company_name='Lemma Platform',
                         site_domain=_PLATFORM_CANONICAL_DOMAIN,
                         admin_email='admin@lemma.id',
-                        api_key=f"lm_{secrets.token_urlsafe(32)}",
-                        oauth_client_id=f"client_{secrets.token_urlsafe(16)}",
-                        oauth_client_secret=secrets.token_urlsafe(32),
+                        oauth_client_id=oauth_client_id,
+                        oauth_client_secret=oauth_stored,
                         created_at=datetime.utcnow()
                     )
                     db.add(site)

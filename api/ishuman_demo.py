@@ -73,7 +73,6 @@ def ensure_demo_sites() -> list[dict]:
                     site_domain=spec["site_domain"],
                     company_name=spec["company_name"],
                     admin_email=spec["admin_email"],
-                    api_key=_demo_api_key(spec["site_id"]),
                     oauth_client_id=f"client_demo_{slug}",
                     oauth_client_secret=secrets.token_urlsafe(24),
                     plan="demo",
@@ -83,8 +82,6 @@ def ensure_demo_sites() -> list[dict]:
                 site.site_domain = spec["site_domain"]
                 site.company_name = spec["company_name"]
                 site.admin_email = spec["admin_email"]
-                if not site.api_key:
-                    site.api_key = _demo_api_key(spec["site_id"])
                 if not site.oauth_client_id:
                     site.oauth_client_id = f"client_demo_{slug}"
                 if not site.oauth_client_secret:

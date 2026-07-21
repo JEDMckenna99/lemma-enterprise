@@ -130,8 +130,6 @@ def test_register_site_issues_admin_to_wallet_and_creates_site_row(register_env,
     sites = factory.store.data[Site.__name__]
     assert len(sites) == 1
     assert sites[0].site_domain == "app.example.com"
-    assert not sites[0].api_key.startswith("lm_")
-    assert sites[0].api_key.startswith("__hash_only__")
 
     admins = factory.store.data[SiteAdmin.__name__]
     assert len(admins) == 1

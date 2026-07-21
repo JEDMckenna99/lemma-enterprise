@@ -446,7 +446,7 @@ Exit criteria:
 | `POST /api/ishuman/site-block?api_key=` | `401 valid API key required` |
 | `GET /health`, `GET /ready` | green |
 
-**Deferred (ops / later pass):** none for launch gating; run `scripts/backfill_section7_legacy_keys.py` on production once after deploy to scrub legacy plaintext rows. Full schema drop of `Site.api_key` remains a later migration.
+**Deferred (ops / later pass):** none for launch gating. Legacy `sites.api_key` column dropped in migration `044_drop_sites_api_key.sql`.
 
 - [x] Replace overlapping key stores with one authoritative API-key system (hash-first validator + customer/postgres paths; legacy `Site.api_key` auth removed).
 - [x] Store verification-only API keys as hashes.

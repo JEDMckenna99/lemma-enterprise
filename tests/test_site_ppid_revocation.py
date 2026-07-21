@@ -7,7 +7,25 @@ import pytest
 from tests.wallet_test_helpers import DERIVE_ASSERTION_FIELDS, SITE_SIGNING_PUBKEY_B64
 
 
-def _seed_site(db_factory, *, site_id="site_test_001", domain="example.com", api_key="test_api_key"):
+@pytest.fixture(autouse=True)
+def _stub_test_site_api_key(monkeypatch):
+    """Site rows no longer store API keys; stub hash-first validation for unit tests."""
+    import api.site_access as site_access
+
+    def _validate(api_key=None):
+        key = (api_key or "").strip()
+        if key == "test_api_key":
+            return {
+                "valid": True,
+                "type": "customer",
+                "site_id": "site_test_001",
+            }
+        return {"valid": False, "error": "Invalid API key", "code": "INVALID_API_KEY"}
+
+    monkeypatch.setattr(site_access, "validate_site_api_key", _validate)
+
+
+def _seed_site(db_factory, *, site_id="site_test_001", domain="example.com"):
     from api.database import Site
 
     site = Site(
@@ -15,7 +33,6 @@ def _seed_site(db_factory, *, site_id="site_test_001", domain="example.com", api
         site_domain=domain,
         company_name="Test Site",
         admin_email="admin@example.com",
-        api_key=api_key,
         oauth_client_id="oauth_test",
         oauth_client_secret="secret_test",
     )
@@ -120,7 +137,7 @@ def test_derive_site_proof_denies_active_site_block(
         "api.ishuman._derive_ppid_for_site",
         lambda **_kwargs: "did:lemma:ppid_blocked_site",
     )
-    monkeypatch.setattr("api.revocation_verifier.is_credential_revoked", lambda _cid: False)
+    monkeypatch.setattr("api.revocation_verifier.check_revocation_candidate", lambda _candidate: "active")
 
     resp = ishuman_client.post(
         "/api/ishuman/derive-site-proof",
@@ -163,10 +180,10 @@ def test_derive_site_proof_denies_master_credential_bloom_revocation(
         lambda **_kwargs: "did:lemma:ppid_ok",
     )
 
-    def _is_revoked(credential_id):
-        return credential_id == "ishuman_master_bloom_001"
+    def _revocation_status(candidate):
+        return "revoked" if candidate == "ishuman_master_bloom_001" else "active"
 
-    monkeypatch.setattr("api.revocation_verifier.is_credential_revoked", _is_revoked)
+    monkeypatch.setattr("api.revocation_verifier.check_revocation_candidate", _revocation_status)
 
     resp = ishuman_client.post(
         "/api/ishuman/derive-site-proof",
@@ -210,10 +227,10 @@ def test_derive_site_proof_denies_site_ppid_bloom_revocation(
         lambda **_kwargs: "did:lemma:ppid_site_revoked",
     )
 
-    def _is_revoked(credential_id):
-        return credential_id == "did:lemma:ppid_site_revoked"
+    def _revocation_status(candidate):
+        return "revoked" if candidate == "did:lemma:ppid_site_revoked" else "active"
 
-    monkeypatch.setattr("api.revocation_verifier.is_credential_revoked", _is_revoked)
+    monkeypatch.setattr("api.revocation_verifier.check_revocation_candidate", _revocation_status)
 
     resp = ishuman_client.post(
         "/api/ishuman/derive-site-proof",
@@ -361,7 +378,7 @@ def test_check_ppid_reports_site_ppid_revoked_from_revocation_list(
         )
     )
     monkeypatch.setattr("api.database.SessionLocal", db.session_local)
-    monkeypatch.setattr("api.revocation_verifier.is_credential_revoked", lambda _cid: False)
+    monkeypatch.setattr("api.revocation_verifier.check_revocation_candidate", lambda _candidate: "active")
 
     resp = ishuman_client.get(
         f"/api/ishuman/check?ppid={ppid}&site_id=site_test_001",

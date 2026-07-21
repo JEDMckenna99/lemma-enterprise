@@ -54,6 +54,32 @@ def test_public_doc_allowlist_serves_approved_markdown(monkeypatch):
 
 
 @pytest.mark.integration
+def test_public_developer_docs_use_current_safe_integration_contract(monkeypatch):
+    monkeypatch.setenv("DATABASE_URL", "sqlite:///:memory:")
+    monkeypatch.setenv("SESSION_SECRET", "test-session-secret")
+
+    from app import create_app
+
+    app = create_app()
+    app.config["TESTING"] = True
+    with app.test_client() as client:
+        error_reference = client.get("/docs/ERROR_CODES.md")
+        docs_home = client.get("/docs")
+
+    assert error_reference.status_code == 200
+    assert b"ProofVerifier" in error_reference.data
+    assert b"verifyForBackend" in error_reference.data
+    assert b"LemmaAuth" not in error_reference.data
+    assert b"sendLoginEmail" not in error_reference.data
+    assert b"90-day" not in error_reference.data
+    assert b"bare client PPID" in error_reference.data
+
+    assert docs_home.status_code == 200
+    assert b"signed <code>presentation</code>" in docs_home.data
+    assert b"client sends you the <code>ppid</code>" not in docs_home.data
+
+
+@pytest.mark.integration
 def test_public_doc_allowlist_denies_internal_paths(monkeypatch):
     monkeypatch.setenv("DATABASE_URL", "sqlite:///:memory:")
     monkeypatch.setenv("SESSION_SECRET", "test-session-secret")

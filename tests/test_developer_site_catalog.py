@@ -55,7 +55,6 @@ def catalog_module(monkeypatch):
             site_domain="lemma.id",
             company_name="Lemma Platform",
             admin_email="owner@lemma.id",
-            api_key="lm_live_abc1234567890",
             key_status="active",
             created_at=datetime(2026, 1, 1),
             key_last_used=None,
@@ -65,7 +64,6 @@ def catalog_module(monkeypatch):
             site_domain="tickets-demo.lemma.id",
             company_name="Tickets Demo",
             admin_email="owner@lemma.id",
-            api_key="lm_live_demo9876543210",
             key_status="active",
             created_at=datetime(2026, 2, 1),
             key_last_used=None,
@@ -87,7 +85,7 @@ def catalog_module(monkeypatch):
     return mod
 
 
-def test_collect_developer_site_catalog_merges_registry_sites_and_keys(catalog_module):
+def test_collect_developer_site_catalog_merges_registry_sites(catalog_module):
     customer = FakeCustomer(sites=[], api_keys=[])
     ppid = "did:lemma:ppid_" + ("a" * 64)
 
@@ -97,10 +95,7 @@ def test_collect_developer_site_catalog_merges_registry_sites_and_keys(catalog_m
     domains = {s["site_domain"] for s in sites}
     assert "lemma.id" in domains
     assert "tickets-demo.lemma.id" in domains
-
-    assert len(keys) == 2
-    assert {k["site_id"] for k in keys} == {"lemma.id", "tickets-demo.lemma.id"}
-    assert all(k.get("key_hint") for k in keys)
+    assert keys == []
 
 
 def test_collect_developer_site_catalog_dedupes_customer_and_registry(catalog_module):

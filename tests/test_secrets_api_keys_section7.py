@@ -136,7 +136,6 @@ def test_resolve_site_from_api_key_ignores_legacy_site_column(monkeypatch):
                 site_domain="legacy.example.com",
                 company_name="Legacy",
                 admin_email="ops@legacy.example.com",
-                api_key="lm_legacy_direct_key",
                 oauth_client_id="oc_legacy",
                 oauth_client_secret="secret",
             )

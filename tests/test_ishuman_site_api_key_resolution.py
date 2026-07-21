@@ -20,7 +20,6 @@ def fixture_site_key_client(fake_ishuman_db_session_factory, monkeypatch):
             site_domain="legacy.example.com",
             company_name="Legacy",
             admin_email="ops@legacy.example.com",
-            api_key="lm_legacy_direct_key",
             oauth_client_id="oc_legacy",
             oauth_client_secret="secret",
         )
@@ -31,7 +30,6 @@ def fixture_site_key_client(fake_ishuman_db_session_factory, monkeypatch):
             site_domain="customer.example.com",
             company_name="Customer",
             admin_email="ops@customer.example.com",
-            api_key="lm_old_unused_key",
             oauth_client_id="oc_customer",
             oauth_client_secret="secret",
         )
@@ -84,9 +82,6 @@ def test_site_block_accepts_customer_issued_api_key(site_key_client, monkeypatch
     )
     assert resp.status_code == 200
     assert resp.get_json()["success"] is True
-
-    site = factory.store.data[Site.__name__][1]
-    assert site.api_key != "lm_customer_issued_key"
 
 
 @pytest.mark.unit

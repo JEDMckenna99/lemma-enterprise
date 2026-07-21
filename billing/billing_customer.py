@@ -209,15 +209,17 @@ def link_customer_to_site(
         if normalized_email:
             existing.admin_email = normalized_email
     else:
+        from api.oauth_client_secret_crypto import provision_oauth_client_credentials
+
+        oauth_client_id, oauth_stored = provision_oauth_client_credentials(site_id)
         db.add(
             Site(
                 site_id=site_id,
                 site_domain=site_domain,
                 company_name=company_name,
                 admin_email=normalized_email or "billing@lemma.id",
-                api_key=f"lm_{secrets.token_urlsafe(32)}",
-                oauth_client_id=f"oc_{secrets.token_urlsafe(16)}",
-                oauth_client_secret=secrets.token_urlsafe(32),
+                oauth_client_id=oauth_client_id,
+                oauth_client_secret=oauth_stored,
             )
         )
     db.commit()

@@ -116,7 +116,6 @@ def test_enforce_site_policy_not_configured():
 def test_lemma_check_policy_store_fail_closed_on_error():
     store = LemmaCheckPolicyStore(
         site_id="example.com",
-        api_key="test_key",
         lemma_origin="https://lemma.id",
         fail_closed=True,
     )
@@ -131,7 +130,6 @@ def test_lemma_check_policy_store_fail_closed_on_error():
 def test_lemma_check_policy_store_parses_block_response():
     store = LemmaCheckPolicyStore(
         site_id="example.com",
-        api_key="test_key",
         lemma_origin="https://lemma.id",
     )
     payload = json.dumps(

@@ -173,13 +173,6 @@ def _replace_site_api_key(site_id: str, name: str = 'API Key') -> dict:
     for hint in active_hints:
         customer_manager.mark_api_key_rotation_pending(customer_id, site_id, hint)
 
-    try:
-        from api.storage_helpers import clear_site_legacy_api_key
-
-        clear_site_legacy_api_key(site_id)
-    except Exception as exc:
-        logger.warning("Could not clear legacy Site.api_key for %s: %s", site_id, exc)
-
     return result
 
 
@@ -716,7 +709,6 @@ def create_developer_site():
                 site_domain=domain,
                 company_name=name or domain,
                 admin_email=ppid or '',  # Will be updated from wallet profile
-                api_key=f"__hash_only__{secrets.token_hex(12)}",
                 oauth_client_id=oauth_client_id,
                 oauth_client_secret=oauth_stored,
                 created_at=datetime.utcnow()

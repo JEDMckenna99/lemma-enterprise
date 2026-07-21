@@ -151,7 +151,6 @@ def main() -> int:
     dry_run = "--dry-run" in sys.argv
     print("Section 7 legacy backfill", "(dry-run)" if dry_run else "")
     print("customer keys:", json.dumps(backfill_customer_json_keys(dry_run=dry_run), indent=2))
-    print("site api_key:", json.dumps(backfill_legacy_site_api_keys(dry_run=dry_run), indent=2))
     print("oauth secrets:", json.dumps(backfill_oauth_client_secrets(dry_run=dry_run), indent=2))
     return 0
 

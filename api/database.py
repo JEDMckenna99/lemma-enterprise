@@ -376,7 +376,6 @@ class Site(Base):
     company_name = Column(String, nullable=False)
     admin_email = Column(String, nullable=False)
     plan = Column(String, default='starter')
-    api_key = Column(String, nullable=False)
     oauth_client_id = Column(String, nullable=False)
     oauth_client_secret = Column(String, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)

@@ -20,7 +20,6 @@ def fixture_binding_client(fake_ishuman_db_session_factory, monkeypatch):
             site_domain="app.example.com",
             company_name="Example",
             admin_email="ops@example.com",
-            api_key="lm_test_binding_key",
             oauth_client_id="oc_test",
             oauth_client_secret="secret",
         )

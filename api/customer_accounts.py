@@ -451,24 +451,6 @@ def _collect_developer_site_catalog(
                         "source": "site_registry",
                     }
 
-                api_key = (site.api_key or "").strip()
-                if not api_key or api_key.startswith("__hash_only__"):
-                    continue
-                hint = api_key[-8:] if len(api_key) >= 8 else api_key
-                hint_key = (site_id, hint)
-                if hint_key in existing_hints:
-                    continue
-                existing_hints.add(hint_key)
-                keys.append({
-                    "name": f"{site.company_name or site.site_domain} Key",
-                    "site_id": site_id,
-                    "key_hint": hint,
-                    "created_at": site.created_at.isoformat() if site.created_at else None,
-                    "last_used": site.key_last_used.isoformat() if site.key_last_used else None,
-                    "usage_count": 0,
-                    "status": site.key_status or "active",
-                    "source": "site_registry",
-                })
         finally:
             db.close()
     except Exception as exc:
@@ -1071,17 +1053,13 @@ class CustomerAccountManager:
         }
     
     def _apply_api_key_revocation(self, key_data: dict) -> None:
-        """Revoke key across postgres api_keys and legacy Site.api_key stores."""
+        """Revoke key across postgres api_keys stores."""
         key_hash = key_data.get('key_hash')
-        site_id = key_data.get('site_id')
 
         if key_hash:
             self.api_key_to_customer.pop(key_hash, None)
             try:
-                from api.storage_helpers import (
-                    clear_site_legacy_api_key,
-                    revoke_api_key_in_postgres,
-                )
+                from api.storage_helpers import revoke_api_key_in_postgres
 
                 revoke_api_key_in_postgres(key_hash)
             except Exception as exc:
@@ -1090,14 +1068,6 @@ class CustomerAccountManager:
         legacy_key = key_data.get('key')
         if legacy_key:
             self.api_key_to_customer.pop(legacy_key, None)
-
-        if site_id:
-            try:
-                from api.storage_helpers import clear_site_legacy_api_key
-
-                clear_site_legacy_api_key(site_id)
-            except Exception as exc:
-                logger.warning("Legacy Site.api_key clear failed for %s: %s", site_id, exc)
     
     def revoke_api_key(self, customer_id: str, api_key: str) -> Dict[str, Any]:
         """Revoke an API key"""
@@ -2329,7 +2299,6 @@ def _ensure_site_row_for_registration(
         site_domain=site_domain,
         company_name=company_name or site_domain,
         admin_email=admin_email or "",
-        api_key=f"__hash_only__{secrets.token_hex(12)}",
         oauth_client_id=oauth_client_id,
         oauth_client_secret=oauth_stored,
         created_at=datetime.utcnow(),

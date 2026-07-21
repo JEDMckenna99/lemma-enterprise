@@ -134,7 +134,6 @@ def test_billing_gate_blocks_past_due(monkeypatch, fake_ishuman_db_session_facto
             site_domain="blocked.example",
             company_name="Blocked Co",
             admin_email="billing@example.com",
-            api_key="key_test",
             oauth_client_id="oauth_test",
             oauth_client_secret="secret_test",
         )
@@ -168,7 +167,6 @@ def test_billing_gate_blocks_unprovisioned_customer(monkeypatch, fake_ishuman_db
             site_domain="new.example",
             company_name="New Co",
             admin_email="newdev@example.com",
-            api_key="key_test",
             oauth_client_id="oauth_test",
             oauth_client_secret="secret_test",
         )
@@ -191,7 +189,6 @@ def test_billing_gate_allows_demo_sites(monkeypatch, fake_ishuman_db_session_fac
             site_domain="tickets-demo.lemma.id",
             company_name="Ticketing Demo",
             admin_email="demo+tickets@lemma.id",
-            api_key="key_test",
             oauth_client_id="oauth_test",
             oauth_client_secret="secret_test",
         )
@@ -221,7 +218,6 @@ def test_billing_gate_allows_active(monkeypatch, fake_ishuman_db_session_factory
             site_domain="ok.example",
             company_name="OK Co",
             admin_email="active@example.com",
-            api_key="key_test",
             oauth_client_id="oauth_test",
             oauth_client_secret="secret_test",
         )
@@ -257,7 +253,6 @@ def test_resolve_site_for_checkout_uses_ppid_owned_sites(monkeypatch, fake_ishum
             site_domain="lemma.id",
             company_name="Lemma Platform",
             admin_email="platform@lemma.id",
-            api_key="key_test",
             oauth_client_id="oauth_test",
             oauth_client_secret="secret_test",
             created_at=datetime.utcnow(),
@@ -310,7 +305,6 @@ def test_derive_site_proof_blocked_when_billing_past_due(
             site_domain="gate.example",
             company_name="Gate Co",
             admin_email="pastdue@example.com",
-            api_key="key_test",
             oauth_client_id="oauth_test",
             oauth_client_secret="secret_test",
         )

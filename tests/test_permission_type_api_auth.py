@@ -68,7 +68,6 @@ def test_verify_site_access_accepts_customer_api_key(monkeypatch, fake_ishuman_d
             site_domain="perm.example.com",
             company_name="Perm",
             admin_email="ops@perm.example.com",
-            api_key="lm_perm_site_key",
             oauth_client_id="oc_perm",
             oauth_client_secret="secret",
         )

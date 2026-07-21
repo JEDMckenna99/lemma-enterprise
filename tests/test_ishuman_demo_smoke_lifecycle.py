@@ -41,14 +41,12 @@ def test_demo_lifecycle_site_block_unblock_and_escalation(
             site_domain="tickets-demo.lemma.id",
             company_name="Demo Tickets",
             admin_email="demo@lemma.id",
-            api_key="test",
         ),
         Site(
             site_id="site_demo_trials",
             site_domain="trials-demo.lemma.id",
             company_name="Demo Trials",
             admin_email="demo@lemma.id",
-            api_key="test",
         ),
     ]
 
