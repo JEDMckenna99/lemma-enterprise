@@ -26,12 +26,28 @@ def get(url: str) -> tuple[int, dict | str]:
             return resp.status, text
 
 
-def request_expect(url: str, *, headers: dict | None = None, expected: int) -> tuple[bool, object]:
-    req = urllib.request.Request(url, headers={"User-Agent": UA, **(headers or {})})
+def post_expect(
+    url: str,
+    *,
+    headers: dict | None = None,
+    body: dict | None = None,
+    expected: int,
+) -> tuple[bool, object]:
+    payload = json.dumps(body or {"ppid": "did:lemma:ppid_" + ("f" * 64), "reason": "section7-smoke"}).encode("utf-8")
+    req = urllib.request.Request(
+        url,
+        data=payload,
+        method="POST",
+        headers={
+            "User-Agent": UA,
+            "Content-Type": "application/json",
+            **(headers or {}),
+        },
+    )
     try:
         with urllib.request.urlopen(req, timeout=45) as resp:
-            body = resp.read().decode("utf-8", errors="replace")
-            return resp.status == expected, {"status": resp.status, "body_prefix": body[:160]}
+            text = resp.read().decode("utf-8", errors="replace")
+            return resp.status == expected, {"status": resp.status, "body_prefix": text[:160]}
     except urllib.error.HTTPError as exc:
         detail = exc.read().decode("utf-8", errors="replace")
         return exc.code == expected, {"status": exc.code, "body_prefix": detail[:160]}
@@ -55,14 +71,13 @@ def main() -> int:
     except Exception as exc:
         checks.append(("ready", False, str(exc)))
 
-    ok, detail = request_expect(
+    ok, detail = post_expect(
         f"{ORIGIN}/api/ishuman/site-block?api_key=lm_query_param_smoke_test",
         expected=401,
-        headers={"Content-Type": "application/json"},
     )
     checks.append(("query-param-api-key-rejected", ok, detail))
 
-    ok_header, header_detail = request_expect(
+    ok_header, header_detail = post_expect(
         f"{ORIGIN}/api/ishuman/site-block",
         expected=401,
         headers={"X-API-Key": "lm_invalid_section7_smoke_key"},

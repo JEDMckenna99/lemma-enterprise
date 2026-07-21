@@ -434,6 +434,17 @@ Exit criteria:
 - Owner:
 - Evidence: `tests/test_secrets_api_keys_section7.py`; `scripts/section7_prod_smoke.py`; hash-first `validate_site_api_key` (`api/site_access.py`); query-param rejection; hash-only persistence + authoritative revoke (`api/customer_accounts.py`, `api/storage_helpers.py`); developer key CRUD routed through customer manager (`api/developer_api.py`); production secret distinctness (`api/config.py`, `app.py`).
 
+**Production evidence (2026-07-21, Heroku v2476):**
+
+| Check | Result |
+| ----- | ------ |
+| `python scripts/section7_prod_smoke.py` | PASS (4/4) |
+| `python scripts/section5_prod_smoke.py` | PASS (regression) |
+| `python scripts/section6_prod_smoke.py` | PASS (regression) |
+| `POST /api/ishuman/site-block?api_key=` | `401 valid API key required` |
+| `POST /api/ishuman/site-block` + invalid `X-API-Key` | `401 valid API key required` |
+| `GET /health`, `GET /ready` | green |
+
 **Deferred (ops / later pass):** live rotation of every legacy plaintext key in production; KMS encryption of OAuth client secrets; full schema drop of `Site.api_key`; controlled multi-key grace windows beyond revoke-then-issue.
 
 - [x] Replace overlapping key stores with one authoritative API-key system (hash-first validator + customer/postgres paths; legacy `Site.api_key` auth removed).
