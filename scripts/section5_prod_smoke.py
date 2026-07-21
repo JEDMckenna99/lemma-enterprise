@@ -97,10 +97,12 @@ def main() -> int:
                 },
             )
         )
+        rev = checks_dict.get("revocation")
+        rev_ok = rev is True or (isinstance(rev, dict) and rev.get("ok") is True)
         checks.append(
             (
                 "ready-revocation-green",
-                checks_dict.get("revocation") is True and ready_body.get("ready") is True,
+                rev_ok and ready_body.get("ready") is True,
                 {
                     "http": code,
                     "ready": ready_body.get("ready"),
