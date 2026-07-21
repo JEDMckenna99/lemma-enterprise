@@ -57,7 +57,7 @@ The assurance boundaries must remain explicit:
 | 5. Revocation and replay protection | P0 | `PASS` |  | `tests/test_revocation_fail_closed_section5.py` / v2472 |
 | 6. Human recovery | P0 | `PASS` |  | `tests/test_recovery_section6.py` / v2474 |
 | 7. Secrets and API keys | P0 | `PASS` |  | `a69a8611` / Heroku v2478; `tests/test_secrets_api_keys_section7.py`; `scripts/section7_prod_smoke.py` |
-| 8. Billing integrity | P0 | `PASS` |  | `tests/test_billing_section8.py`; `scripts/section8_prod_smoke.py`; `billing/billing_outbox_worker.py` |
+| 8. Billing integrity | P0 | `PASS` |  | `d00d744e` / Heroku v2479; `tests/test_billing_section8.py`; `scripts/section8_prod_smoke.py` |
 | 9. Operational reliability | P0 | `NOT_STARTED` |  |  |
 | 10. SDK and integration productization | P1 | `NOT_STARTED` |  |  |
 | 11. Independent assurance and compliance | P0 | `NOT_STARTED` |  |  |
@@ -479,15 +479,18 @@ Exit criteria:
 - Owner:
 - Evidence: `tests/test_billing_section8.py`; `scripts/section8_prod_smoke.py`; `scripts/reconcile_billing.py`; hash-first gate (`billing/billing_access.py`); honest meter reporting (`billing/stripe_meter_reporter.py`, `billing/credential_billing.py`); outbox worker (`billing/billing_outbox_worker.py`, `Procfile`); webhook idempotency (`billing/stripe_webhook_idempotency.py`, migration `045_section8_billing_integrity.sql`); reconciliation (`billing/billing_reconcile.py`); customer-visible status (`/api/billing/account-status`).
 
-**Production evidence (2026-07-21, pre-deploy smoke):**
+**Production evidence (2026-07-21, Heroku v2479):**
 
 | Check | Result |
 | ----- | ------ |
-| `python -m pytest tests/test_billing_section8.py tests/test_stripe_usage_billing.py tests/test_credential_billing.py` | PASS (42 tests, local) |
-| `python scripts/section8_prod_smoke.py` | PASS (4/4); enforcement flag `False` on prod |
-| `python scripts/reconcile_billing.py` | run on Heroku post-deploy |
-| `billing_worker` Procfile process | scale to 1 dyno post-deploy |
-| `migrations/045_section8_billing_integrity.sql` | apply on Heroku post-deploy |
+| `migrations/045_section8_billing_integrity.sql` | applied |
+| `billing_worker` dyno | scaled to 1 (`Standard-1X`) |
+| `python scripts/section8_prod_smoke.py` | PASS (4/4); enforcement `False` |
+| `python scripts/section7_prod_smoke.py` | PASS (4/4 regression) |
+| `python scripts/section5_prod_smoke.py` | PASS (regression) |
+| `python scripts/section6_prod_smoke.py` | PASS (regression) |
+| `heroku run python scripts/reconcile_billing.py` | 1 stale pending outbox (legacy demo row; worker retry in progress) |
+| `LEMMA_BILLING_ENFORCEMENT` | **off** — flip only after reconcile clean + controlled go-live |
 
 - [x] Require registered, ownership-verified production sites (enforcement blocks unregistered hostnames via `billing_site_unregistered`; registration path = Section 3 site row).
 - [x] Require an active billing entitlement before production issuance (`check_site_billing_allows_issuance`; gated by `LEMMA_BILLING_ENFORCEMENT`).
