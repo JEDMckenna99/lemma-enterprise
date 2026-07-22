@@ -14,7 +14,14 @@ ORIGIN = "https://lemma.id"
 UA = "section10-prod-smoke/1.0"
 
 
-def get(url: str) -> tuple[int, dict | str | bytes]:
+def _header(headers: dict, name: str) -> str | None:
+    for key, value in headers.items():
+        if key.lower() == name.lower():
+            return value
+    return None
+
+
+def get(url: str) -> tuple[int, dict | str, dict]:
     req = urllib.request.Request(url, headers={"User-Agent": UA})
     with urllib.request.urlopen(req, timeout=45) as resp:
         raw = resp.read()
@@ -50,7 +57,7 @@ def main() -> int:
             code == 200
             and isinstance(text, str)
             and "ProofVerifier" in text
-            and headers.get("X-SDK-Version") == browser_v
+            and _header(headers, "X-SDK-Version") == browser_v
             and "immutable" in (headers.get("Cache-Control") or "")
         )
         checks.append(("versioned-browser-sdk", ok, {"version": browser_v, "cache": headers.get("Cache-Control")}))
@@ -63,7 +70,7 @@ def main() -> int:
             code == 200
             and isinstance(text, str)
             and "createVerifier" in text
-            and headers.get("X-SDK-Version") == backend_v
+            and _header(headers, "X-SDK-Version") == backend_v
         )
         checks.append(("versioned-backend-sdk", ok, {"version": backend_v}))
     except Exception as exc:

@@ -572,6 +572,16 @@ Exit criteria:
 - Owner:
 - Evidence: `docs/sdk/ISHUMAN_SDK_VERSIONS.json`, `api/sdk_versions.py`, `api/sdk_serving.py`, `docs/sdk/ISHUMAN_SDK_COMPATIBILITY_MATRIX.md`, `docs/sdk/ISHUMAN_SDK_DEPRECATION_POLICY.md`, `docs/api/ISHUMAN_RELYING_SITE.openapi.json`, `docs/operations/ISHUMAN_SDK_RELEASE_CHECKLIST.md`, `.github/workflows/ishuman-verify-release.yml`, `scripts/sync_ishuman_verify_packages.py`, `scripts/section10_prod_smoke.py`, `tests/test_sdk_integration_section10.py`, `examples/*_ishuman_signup/`
 
+**Production evidence (2026-07-22, Heroku v2490):**
+
+| Check | Result |
+| ----- | ------ |
+| `python scripts/section10_prod_smoke.py` | PASS (5/5) |
+| `GET /api/sdk/versions` | manifest `browser_verifier=1.9.2`, `backend_verifier=1.4.0` |
+| `GET /sdk/v1.9.2/proof-verifier.js` | 200, immutable cache, SRI available |
+| `GET /api/sdk/integrity` | includes `proof-verifier.js`, `lemma-ishuman-verify.mjs` |
+| npm/PyPI publish | workflow + checklist ready; live registry publish on tag + secrets |
+
 - [x] Publish tested npm and PyPI verifier packages (packages at 1.4.0; release workflow + checklist; registry publish on tag when secrets set).
 - [x] Provide immutable, versioned browser and backend SDK URLs.
 - [x] Publish integrity hashes for browser assets (SRI includes proof-verifier + backend mjs).
