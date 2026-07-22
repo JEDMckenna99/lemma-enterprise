@@ -35,7 +35,14 @@ def fixture_ishuman_test_app():
 
 
 @pytest.fixture(name="ishuman_client")
-def fixture_ishuman_client(ishuman_test_app):
+def fixture_ishuman_client(ishuman_test_app, monkeypatch):
+    # Section 5 fail-closed Bloom checks: unit tests that are not about
+    # revocation availability should see a ready verifier. Tests that need
+    # unavailable/revoked statuses override this monkeypatch.
+    monkeypatch.setattr(
+        "api.revocation_verifier.check_revocation_candidate",
+        lambda _candidate: "ok",
+    )
     with ishuman_test_app.test_client() as client:
         yield client
 
