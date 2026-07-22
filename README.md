@@ -34,7 +34,7 @@ Fraud is an economic problem, not a tech one. The industry can already detect ab
 The legacy `ishuman-verifier.js` URL and `IsHumanVerifier` class remain supported
 as compatibility aliases.
 
-Verify on the server with `@lemma/ishuman-verify` (Node) or `lemma_ishuman_verify.py` (Python). For signup and account creation, always verify the signed `presentation` server-side, never trust a bare client `ppid`.
+Verify on the server with `@lemma/proof-verifier` (Node) or `lemma_proof_verifier.py` (Python). For signup and account creation, always verify the signed `presentation` server-side, never trust a bare client `ppid`.
 
 ### Assurance tiers
 

@@ -11,7 +11,6 @@ from flask import Flask
 pytestmark = pytest.mark.unit
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-MANIFEST_PATH = REPO_ROOT / "docs" / "sdk" / "ISHUMAN_SDK_VERSIONS.json"
 
 
 @pytest.fixture(name="sdk_app")
@@ -56,25 +55,27 @@ def test_browser_sdk_version_in_source():
 def test_backend_sdk_version_in_source():
     from api.sdk_versions import backend_verifier_version
 
-    source = (REPO_ROOT / "static/js/lemma-ishuman-verify.mjs").read_text(encoding="utf-8")
+    source = (REPO_ROOT / "static/js/proof-verifier.mjs").read_text(encoding="utf-8")
     assert f"@version {backend_verifier_version()}" in source
 
 
 def test_package_versions_match_manifest():
     from api.sdk_versions import npm_package_version, pypi_package_version
 
-    pkg = json.loads((REPO_ROOT / "packages/ishuman-verify-js/package.json").read_text(encoding="utf-8"))
-    pyproject = (REPO_ROOT / "packages/ishuman-verify-py/pyproject.toml").read_text(encoding="utf-8")
+    pkg = json.loads((REPO_ROOT / "packages/proof-verifier-js/package.json").read_text(encoding="utf-8"))
+    pyproject = (REPO_ROOT / "packages/proof-verifier-py/pyproject.toml").read_text(encoding="utf-8")
     assert pkg["version"] == npm_package_version()
     assert f'version = "{pypi_package_version()}"' in pyproject
+    assert pkg["name"] == "@lemma/proof-verifier"
+    assert 'name = "lemma-proof-verifier"' in pyproject
 
 
-def test_sync_ishuman_packages_no_drift():
+def test_sync_proof_verifier_packages_no_drift():
     import importlib.util
 
     spec = importlib.util.spec_from_file_location(
-        "sync_ishuman_verify_packages",
-        REPO_ROOT / "scripts/sync_ishuman_verify_packages.py",
+        "sync_proof_verifier_packages",
+        REPO_ROOT / "scripts/sync_proof_verifier_packages.py",
     )
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
@@ -94,7 +95,7 @@ def test_versioned_browser_sdk_route(sdk_client):
 def test_versioned_backend_sdk_route(sdk_client):
     from api.sdk_versions import backend_verifier_version
 
-    resp = sdk_client.get(f"/sdk/v{backend_verifier_version()}/lemma-ishuman-verify.mjs")
+    resp = sdk_client.get(f"/sdk/v{backend_verifier_version()}/proof-verifier.mjs")
     assert resp.status_code == 200
     assert "createVerifier" in resp.get_data(as_text=True)
     assert resp.headers.get("X-SDK-Version") == backend_verifier_version()
@@ -108,11 +109,11 @@ def test_sdk_versions_api(sdk_client):
     assert payload["manifest"]["browser_verifier"]
 
 
-def test_sri_includes_ishuman_assets():
+def test_sri_includes_proof_verifier_assets():
     from api.sri_hashes import SDK_FILES
 
     assert "proof-verifier.js" in SDK_FILES
-    assert "lemma-ishuman-verify.mjs" in SDK_FILES
+    assert "proof-verifier.mjs" in SDK_FILES
 
 
 def test_flask_signup_example_fail_closed():

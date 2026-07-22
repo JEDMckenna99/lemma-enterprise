@@ -65,7 +65,7 @@ def main() -> int:
         checks.append(("versioned-browser-sdk", False, str(exc)))
 
     try:
-        code, text, headers = get(f"{ORIGIN}/sdk/v{backend_v}/lemma-ishuman-verify.mjs")
+        code, text, headers = get(f"{ORIGIN}/sdk/v{backend_v}/proof-verifier.mjs")
         ok = (
             code == 200
             and isinstance(text, str)
@@ -83,18 +83,18 @@ def main() -> int:
             code == 200
             and isinstance(files, dict)
             and "proof-verifier.js" in files
-            and "lemma-ishuman-verify.mjs" in files
+            and "proof-verifier.mjs" in files
         )
-        checks.append(("sri-includes-ishuman-assets", ok, list(files.keys()) if isinstance(files, dict) else body))
+        checks.append(("sri-includes-proof-verifier-assets", ok, list(files.keys()) if isinstance(files, dict) else body))
     except Exception as exc:
-        checks.append(("sri-includes-ishuman-assets", False, str(exc)))
+        checks.append(("sri-includes-proof-verifier-assets", False, str(exc)))
 
     try:
         import importlib.util
 
         spec = importlib.util.spec_from_file_location(
-            "sync_ishuman_verify_packages",
-            REPO_ROOT / "scripts/sync_ishuman_verify_packages.py",
+            "sync_proof_verifier_packages",
+            REPO_ROOT / "scripts/sync_proof_verifier_packages.py",
         )
         mod = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(mod)

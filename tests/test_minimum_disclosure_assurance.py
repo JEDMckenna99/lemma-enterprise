@@ -135,8 +135,8 @@ def test_python_verifier_strict_assurance_match():
     from pathlib import Path
 
     root = Path(__file__).resolve().parents[1]
-    path = root / "packages" / "ishuman-verify-py" / "lemma_ishuman_verify.py"
-    name = "lemma_ishuman_verify_minimum_disclosure"
+    path = root / "packages" / "proof-verifier-py" / "lemma_proof_verifier.py"
+    name = "lemma_proof_verifier_minimum_disclosure"
     spec = importlib.util.spec_from_file_location(name, path)
     mod = importlib.util.module_from_spec(spec)
     sys.modules[name] = mod

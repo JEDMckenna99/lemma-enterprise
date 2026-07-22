@@ -28,7 +28,7 @@ SDK_FILES = [
     'static/js/lemma-wallet.js',
     'static/js/lemma-shield.js',
     'static/js/ishuman-verifier.js',
-    'static/js/lemma-ishuman-verify.mjs',
+    'static/js/proof-verifier.mjs',
 ]
 
 # Optional CDN files

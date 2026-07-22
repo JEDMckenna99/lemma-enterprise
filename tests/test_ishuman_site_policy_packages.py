@@ -11,8 +11,8 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
-SITE_POLICY_PATH = ROOT / "packages" / "ishuman-verify-py" / "lemma_ishuman_site_policy.py"
-VERIFY_PATH = ROOT / "packages" / "ishuman-verify-py" / "lemma_ishuman_verify.py"
+SITE_POLICY_PATH = ROOT / "packages" / "proof-verifier-py" / "lemma_proof_verifier_site_policy.py"
+VERIFY_PATH = ROOT / "packages" / "proof-verifier-py" / "lemma_proof_verifier.py"
 
 
 def _load_module(name: str, path: Path):
@@ -116,6 +116,7 @@ def test_enforce_site_policy_not_configured():
 def test_lemma_check_policy_store_fail_closed_on_error():
     store = LemmaCheckPolicyStore(
         site_id="example.com",
+        api_key="lemma_test_key",
         lemma_origin="https://lemma.id",
         fail_closed=True,
     )
@@ -130,6 +131,7 @@ def test_lemma_check_policy_store_fail_closed_on_error():
 def test_lemma_check_policy_store_parses_block_response():
     store = LemmaCheckPolicyStore(
         site_id="example.com",
+        api_key="lemma_test_key",
         lemma_origin="https://lemma.id",
     )
     payload = json.dumps(
@@ -155,7 +157,7 @@ def test_lemma_check_policy_store_parses_block_response():
 
 @pytest.mark.unit
 def test_verify_with_policy_blocks_before_business_logic(monkeypatch):
-    verify_mod = _load_module("lemma_ishuman_verify_policy_tests", VERIFY_PATH)
+    verify_mod = _load_module("lemma_proof_verifier_policy_tests", VERIFY_PATH)
     ctx = verify_mod.VerificationContext(site_id="example.com", required_assurance="passkey")
     monkeypatch.setattr(
         ctx,

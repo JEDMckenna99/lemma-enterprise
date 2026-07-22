@@ -129,7 +129,7 @@ def main() -> int:
         checks.append(("legacy-revocation-list-healthy", False, str(exc)))
 
     try:
-        _, sdk_text = get(f"{ORIGIN}/sdk/lemma-ishuman-verify.mjs")
+        _, sdk_text = get(f"{ORIGIN}/sdk/proof-verifier.mjs")
         text = sdk_text if isinstance(sdk_text, str) else ""
         ok = (
             "revocationCandidates" in text
@@ -151,7 +151,7 @@ def main() -> int:
         checks.append(("node-sdk-revocation-and-nonce-order", False, str(exc)))
 
     try:
-        _, py_text = get(f"{ORIGIN}/sdk/lemma_ishuman_verify.py")
+        _, py_text = get(f"{ORIGIN}/sdk/proof-verifier.py")
         text = py_text if isinstance(py_text, str) else ""
         ok = "def revocation_candidates" in text and "def credential_revoked_in_snapshot" in text
         checks.append(("py-sdk-revocation-candidates", ok, len(text)))

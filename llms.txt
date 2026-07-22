@@ -17,8 +17,8 @@ lemma.id is a private proof layer for web platforms: site-private PPIDs, signed 
 
 ## Backend verifiers (local-first)
 
-- Node/Workers: https://lemma.id/sdk/lemma-ishuman-verify.mjs
-- Python: https://lemma.id/sdk/lemma_ishuman_verify.py
+- Node/Workers: https://lemma.id/sdk/proof-verifier.mjs
+- Python: https://lemma.id/sdk/proof-verifier.py
 
 ## Live demo
 

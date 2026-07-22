@@ -16,8 +16,8 @@ import pytest
 pytestmark = pytest.mark.unit
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-JS_MODULE = REPO_ROOT / "static" / "js" / "lemma-ishuman-verify.mjs"
-PY_MODULE = REPO_ROOT / "packages" / "ishuman-verify-py" / "lemma_ishuman_verify.py"
+JS_MODULE = REPO_ROOT / "static" / "js" / "proof-verifier.mjs"
+PY_MODULE = REPO_ROOT / "packages" / "proof-verifier-py" / "lemma_proof_verifier.py"
 
 
 @pytest.fixture(autouse=True)
@@ -27,7 +27,7 @@ def _allow_unpinned_trust_root(monkeypatch):
 
 @pytest.fixture
 def py_verify_module():
-    spec = importlib.util.spec_from_file_location("lemma_ishuman_verify_section4", PY_MODULE)
+    spec = importlib.util.spec_from_file_location("lemma_proof_verifier_section4", PY_MODULE)
     mod = importlib.util.module_from_spec(spec)
     sys.modules[spec.name] = mod
     spec.loader.exec_module(mod)

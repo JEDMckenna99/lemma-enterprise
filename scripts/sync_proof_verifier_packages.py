@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Sync canonical isHuman verifier packages to served and demo mirror paths."""
+"""Sync canonical proof-verifier packages to served and demo mirror paths."""
 
 from __future__ import annotations
 
@@ -10,13 +10,22 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
-SYNC_MAP = {
-    REPO_ROOT / "packages/ishuman-verify-js/index.mjs": REPO_ROOT / "static/js/lemma-ishuman-verify.mjs",
-    REPO_ROOT / "packages/ishuman-verify-py/lemma_ishuman_verify.py": REPO_ROOT / "examples/relying_site_offline_verify.py",
-    REPO_ROOT / "packages/ishuman-verify-py/lemma_ishuman_verify.py": REPO_ROOT / "demo-sites/lemma_ishuman_verify.py",
-    REPO_ROOT / "packages/ishuman-verify-py/lemma_ishuman_site_policy.py": REPO_ROOT / "demo-sites/lemma_ishuman_site_policy.py",
-    REPO_ROOT / "packages/ishuman-verify-py/lemma_ishuman_nonce_store.py": REPO_ROOT / "demo-sites/lemma_ishuman_nonce_store.py",
-}
+_PKG_PY = REPO_ROOT / "packages/proof-verifier-py"
+_MAIN_PY = _PKG_PY / "lemma_proof_verifier.py"
+_SITE_POLICY_PY = _PKG_PY / "lemma_proof_verifier_site_policy.py"
+_NONCE_STORE_PY = _PKG_PY / "lemma_proof_verifier_nonce_store.py"
+_MAIN_MJS = REPO_ROOT / "packages/proof-verifier-js/index.mjs"
+
+SYNC_PAIRS: list[tuple[Path, Path]] = [
+    (_MAIN_MJS, REPO_ROOT / "static/js/proof-verifier.mjs"),
+    (_MAIN_PY, REPO_ROOT / "examples/proof-verifier.py"),
+    (_MAIN_PY, REPO_ROOT / "demo-sites/lemma_proof_verifier.py"),
+    (_SITE_POLICY_PY, REPO_ROOT / "demo-sites/lemma_proof_verifier_site_policy.py"),
+    (_NONCE_STORE_PY, REPO_ROOT / "demo-sites/lemma_proof_verifier_nonce_store.py"),
+    (_MAIN_PY, REPO_ROOT / "demo-sites/lemma_ishuman_verify.py"),
+    (_SITE_POLICY_PY, REPO_ROOT / "demo-sites/lemma_ishuman_site_policy.py"),
+    (_NONCE_STORE_PY, REPO_ROOT / "demo-sites/lemma_ishuman_nonce_store.py"),
+]
 
 
 def _sha256(path: Path) -> str:
@@ -25,7 +34,7 @@ def _sha256(path: Path) -> str:
 
 def sync(*, check_only: bool = False) -> bool:
     ok = True
-    for src, dst in SYNC_MAP.items():
+    for src, dst in SYNC_PAIRS:
         if not src.is_file():
             print(f"MISSING source {src}")
             ok = False

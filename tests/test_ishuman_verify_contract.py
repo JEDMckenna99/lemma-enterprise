@@ -9,8 +9,8 @@ from pathlib import Path
 import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
-PY_SDK_PATH = ROOT / "packages" / "ishuman-verify-py" / "lemma_ishuman_verify.py"
-MJS_PATH = ROOT / "static" / "js" / "lemma-ishuman-verify.mjs"
+PY_SDK_PATH = ROOT / "packages" / "proof-verifier-py" / "lemma_proof_verifier.py"
+MJS_PATH = ROOT / "static" / "js" / "proof-verifier.mjs"
 VERIFIER_JS = ROOT / "static" / "js" / "ishuman-verifier.js"
 
 from tests.test_ishuman_ppid_normalization import SITE_HOSTNAME_VECTORS
@@ -18,7 +18,7 @@ from tests.test_ishuman_ppid_normalization import SITE_HOSTNAME_VECTORS
 
 def _load_py_sdk():
     pytest.importorskip("cryptography")
-    name = "lemma_ishuman_verify_contract"
+    name = "lemma_proof_verifier_contract"
     if name in sys.modules:
         return sys.modules[name]
     spec = importlib.util.spec_from_file_location(name, PY_SDK_PATH)

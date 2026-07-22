@@ -31,7 +31,7 @@
     </ol>
     <div class="callout callout--info">
         <div class="callout-title">No webhooks to configure</div>
-        <p>Relying sites do <strong>not</strong> register webhook URLs with lemma.id. Verification completes in the browser (SDK + Lemma-hosted popup). Your backend learns the outcome when the client sends you the <code>ppid</code> or a stamped audit event. There is no lemma.id callback.</p>
+        <p>Relying sites do <strong>not</strong> register webhook URLs with lemma.id. Verification completes in the browser (SDK + Lemma-hosted popup). For account creation and protected server actions, the client sends your backend a signed <code>presentation</code> or verifiable action stamp. Your backend verifies it locally and reads the trusted PPID from the verification result. There is no lemma.id callback.</p>
     </div>
     <div class="callout callout--info">
         <div class="callout-title">Using an AI coding agent?</div>
@@ -55,8 +55,8 @@
 </div>
 
 <div class="docs-section" id="signup-recipe">
-    <h2>End-to-end recipe: gate signup (recommended)</h2>
-    <p>Verify locally on your backend with a signed presentation. Do not trust a bare <code>ppid</code> from the browser.</p>
+    <h2>End-to-end recipe: low-friction signup continuity</h2>
+    <p>This recipe requests <code>passkey</code> assurance for returning-user continuity. If signup must enforce one verified human per account, change both client and backend policy to <code>ishuman</code>. In either case, verify a signed presentation locally on your backend and do not trust a bare <code>ppid</code> from the browser.</p>
     <div class="code-block">
         <div class="code-header">
             <span>HTML + JavaScript</span>
@@ -85,7 +85,18 @@
   });
 &lt;/script&gt;</code>
     </div>
-    <p>On your server, verify <code>presentation</code> with <code>@lemma/ishuman-verify</code> or <code>lemma_ishuman_verify.py</code> before creating the account. Bind the user to <code>result.ppid</code> from the verified server result, not the parallel client <code>ppid</code> field.</p>
+    <h3>Install a backend verifier</h3>
+    <div class="code-block">
+        <div class="code-header"><span>Node.js</span><button class="copy-btn">Copy</button></div>
+        <code>npm install @lemma/proof-verifier</code>
+    </div>
+    <div class="code-block">
+        <div class="code-header"><span>Python</span><button class="copy-btn">Copy</button></div>
+        <code>pip install lemma-proof-verifier
+# Zero-install alternative:
+curl -O https://lemma.id/sdk/proof-verifier.py</code>
+    </div>
+    <p>On your server, verify <code>presentation</code> before creating the account. Bind the user to <code>result.ppid</code> from the verified server result, not the parallel client <code>ppid</code> field.</p>
 </div>
 
 <div class="docs-section" id="trust-tiers">
@@ -130,7 +141,7 @@
 
 <div class="docs-section" id="assurance-demo">
     <h2>Assurance workflow demo</h2>
-    <p>The live demo at <a href="/demo">/demo</a> walks through the one-PPID assurance model when <code>LEMMA_ONE_PPID_ASSURANCE_MODEL</code> and <code>LEMMA_PASSKEY_ASSURANCE_ENABLED</code> are enabled:</p>
+    <p>The live demo at <a href="/demo">/demo</a> walks through continuity proof followed by an optional human-proof step-up. These are lemma.id platform capabilities; a relying site chooses <code>requiredAssurance</code> and does not configure platform rollout flags:</p>
     <ol style="line-height: 1.8; color: var(--gray-700); padding-left: 24px;">
         <li><strong>Passkey wallet</strong>, create an empty lemma.id (provisional person root, no IDV yet).</li>
         <li><strong>Passkey proof on two sites</strong>, derive distinct PPIDs with <code>assurance: passkey</code> via <code>verifyForBackend({ requiredAssurance: 'passkey' })</code>.</li>
@@ -158,13 +169,13 @@ await fetch('/api/waitlist', {
   body: JSON.stringify({ email, ppid: result.ppid }),
 });</code>
     </div>
-    <h3>T2: recommended signup (signed presentation)</h3>
-    <p>Send a signed presentation from <code>verifyForBackend()</code>, then verify cryptographically on your backend before creating the account. Bind the user to <code>result.ppid</code> from the verified server result, not the parallel client <code>ppid</code> field.</p>
+    <h3>T2: Sybil-resistant signup (signed presentation)</h3>
+    <p>This example requires <code>ishuman</code> assurance for one verified human per account. For a continuity-only signup, use <code>passkey</code> consistently on both client and backend. Send a signed presentation from <code>verifyForBackend()</code>, then verify it cryptographically before creating the account. Bind the user to <code>result.ppid</code> from the verified server result, not the parallel client <code>ppid</code> field.</p>
     <div class="code-block">
         <div class="code-header"><span>Client</span><button class="copy-btn">Copy</button></div>
         <code>const { ok, presentation } = await verifier.verifyForBackend({
   autoProvision: true,
-  requiredAssurance: 'ishuman', // or 'passkey' for low-friction signup
+  requiredAssurance: 'ishuman',
 });
 if (!ok) return;
 await fetch('/api/signup', {
@@ -175,7 +186,7 @@ await fetch('/api/signup', {
     </div>
     <div class="code-block">
         <div class="code-header"><span>Python backend</span><button class="copy-btn">Copy</button></div>
-        <code>from lemma_ishuman_verify import VerificationContext
+        <code>from lemma_proof_verifier import VerificationContext
 
 ctx = VerificationContext(site_id="app.example.com", required_assurance="ishuman")
 
@@ -188,7 +199,7 @@ def signup():
     # create account bound to result.ppid
     ...</code>
     </div>
-    <p style="color: var(--gray-600); font-size: 14px;">See also <code>examples/relying_site_offline_verify.py</code> and <code>static/js/lemma-ishuman-verify.mjs</code> for full verify examples.</p>
+    <p style="color: var(--gray-600); font-size: 14px;">See also <code>examples/proof-verifier.py</code> and <code>static/js/proof-verifier.mjs</code> for full verify examples.</p>
 </div>
 
 <div class="docs-section" id="t2-plus-stamp-action">
@@ -212,7 +223,7 @@ await fetch('/api/checkout', { method: 'POST', body: JSON.stringify(event) });</
     </div>
     <div class="code-block">
         <div class="code-header"><span>Python backend</span><button class="copy-btn">Copy</button></div>
-        <code>from lemma_ishuman_verify import VerificationContext, InMemoryNonceStore
+        <code>from lemma_proof_verifier import VerificationContext, InMemoryNonceStore
 
 ctx = VerificationContext(site_id="app.example.com", required_assurance="passkey")
 nonce_store = InMemoryNonceStore()
@@ -260,7 +271,7 @@ def checkout():
         <li>If not found: create a new account for canonical <code>ppid</code>.</li>
         <li>Reject if convergence is invalid, wrong-site, expired, or tampered, fail closed.</li>
     </ol>
-    <p style="color: var(--gray-600); font-size: 14px;">Ordinary first IDV on the same wallet preserves PPID and emits no convergence artifact. Requires <code>LEMMA_PPID_CONVERGENCE_ENABLED=1</code> (with one-PPID model).</p>
+    <p style="color: var(--gray-600); font-size: 14px;">Ordinary first IDV on the same wallet preserves PPID and emits no convergence artifact. When convergence is available, the backend verifier validates its signed artifact and returns both the legacy and canonical PPIDs needed for a transactional merge.</p>
 </div>
 
 <div class="docs-section" id="site-policy">
@@ -322,7 +333,7 @@ def checkout():
     <p><strong>lemma.id</strong> is the continuous identity object, user-held credentials, site-private PPIDs, and signed presentations. <strong>Human proof</strong> is the IDV-backed level: one verified human per account, without your site learning who that human legally is. Presence proof is the fresh-passkey ceremony at presentation signing. lemma.id continuity handles return visits; human proof handles Sybil resistance.</p>
     <div class="callout callout--info">
         <div class="callout-title">Three levels of proof</div>
-        <p><strong>lemma.id</strong> (<code>passkey</code>) can issue site credentials without IDV when <code>LEMMA_PASSKEY_ASSURANCE_ENABLED</code> and the one-PPID model are enabled, continuity and low-friction signup. <strong>Presence proof</strong> is the fresh-passkey ceremony when a presentation is signed. <strong>Human proof</strong> (<code>ishuman</code>) always requires live IDV (liveness + document-to-selfie matching). A bot or stolen ID image cannot get a human proof because a live human must match a genuine government document at issuance.</p>
+        <p><strong>lemma.id</strong> (<code>passkey</code>) provides continuity and low-friction signup without claiming Sybil resistance. <strong>Presence proof</strong> is the fresh-passkey ceremony when a presentation is signed. <strong>Human proof</strong> (<code>ishuman</code>) requires live IDV (liveness + document-to-selfie matching). Choose the assurance explicitly per protected action; platform feature configuration is managed by lemma.id, not by the relying site.</p>
     </div>
     <div class="callout callout--info">
         <div class="callout-title">Core model</div>
@@ -504,7 +515,7 @@ const ppid = await ih.getPPID();</code>
             <span>Node.js / Deno / Workers</span>
             <button class="copy-btn">Copy</button>
         </div>
-        <code>import { createVerifier } from "https://lemma.id/sdk/lemma-ishuman-verify.mjs";
+        <code>import { createVerifier } from "https://lemma.id/sdk/proof-verifier.mjs";
 
 const verifier = createVerifier({ siteId: "app.example.com" });
 
@@ -518,8 +529,8 @@ if (!check.ok) {
             <span>Python</span>
             <button class="copy-btn">Copy</button>
         </div>
-        <code># curl -O https://lemma.id/sdk/lemma_ishuman_verify.py
-from lemma_ishuman_verify import VerificationContext
+        <code># curl -O https://lemma.id/sdk/proof-verifier.py
+from lemma_proof_verifier import VerificationContext
 
 ctx = VerificationContext(site_id="app.example.com")
 check = ctx.verify_stamp(row["lemma"])
@@ -587,7 +598,7 @@ if not check.ok:
         <tbody>
             <tr><td><strong>React / Next.js</strong></td><td>Load SDK in a client component or <code>useEffect</code>; call <code>verifyForBackend</code> before submit</td><td>Route handler verifies <code>presentation</code></td></tr>
             <tr><td><strong>Vue / Nuxt</strong></td><td>Client-only SDK integration</td><td>Server middleware or API route</td></tr>
-            <tr><td><strong>Rails</strong></td><td>Stimulus or vanilla JS for SDK</td><td>Controller action + <code>lemma_ishuman_verify</code></td></tr>
+            <tr><td><strong>Rails</strong></td><td>Stimulus or vanilla JS for SDK</td><td>Controller action + <code>lemma_proof_verifier</code></td></tr>
             <tr><td><strong>Django</strong></td><td>Template script or JS bundle</td><td>View + <code>VerificationContext</code></td></tr>
             <tr><td><strong>PHP</strong></td><td>Script tag + fetch to your API</td><td>Python helper or port verify logic</td></tr>
         </tbody>

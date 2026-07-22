@@ -1075,8 +1075,8 @@ class ProofVerifier {
      *     session assertion has an expiry + max age). Use it when you forward
      *     proofs between parties or need evidence the holder was live.
      *
-     * Both are re-verifiable entirely on your backend (lemma-ishuman-verify.mjs
-     * / lemma_ishuman_verify.py) with no call back to lemma.id.
+     * Both are re-verifiable entirely on your backend (proof-verifier.mjs
+     * / proof-verifier.py) with no call back to lemma.id.
      *
      * By default this does NOT open a popup. Pass { autoProvision: true } to
      * verify-then-stamp at an entry point in your flow.

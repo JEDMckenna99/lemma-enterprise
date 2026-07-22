@@ -53,8 +53,8 @@
       "overlap_version": "browser_canonical_v1",
       "source_assertions": [
         {"path": "api/ishuman.py", "contains": "proof[\"signatureValueWeb\"] = browser_sig_hex"},
-        {"path": "packages/ishuman-verify-py/lemma_ishuman_verify.py", "contains": "BROWSER_CANONICAL_V2 = \"browser_canonical_v2\""},
-        {"path": "packages/ishuman-verify-js/index.mjs", "contains": "const BROWSER_CANONICAL_V2 = \"browser_canonical_v2\""}
+        {"path": "packages/proof-verifier-py/lemma_proof_verifier.py", "contains": "BROWSER_CANONICAL_V2 = \"browser_canonical_v2\""},
+        {"path": "packages/proof-verifier-js/index.mjs", "contains": "const BROWSER_CANONICAL_V2 = \"browser_canonical_v2\""}
       ]
     },
     {
@@ -66,8 +66,8 @@
       "canonical_section": "## 5. Session presentation payload",
       "migration_class": "signed_artifact",
       "source_assertions": [
-        {"path": "packages/ishuman-verify-py/lemma_ishuman_verify.py", "contains": "SESSION_PRESENTATION_PREFIX = \"lemma:site-session-presentation:v1\""},
-        {"path": "packages/ishuman-verify-js/index.mjs", "contains": "const SESSION_PRESENTATION_PREFIX = \"lemma:site-session-presentation:v1\";"}
+        {"path": "packages/proof-verifier-py/lemma_proof_verifier.py", "contains": "SESSION_PRESENTATION_PREFIX = \"lemma:site-session-presentation:v1\""},
+        {"path": "packages/proof-verifier-js/index.mjs", "contains": "const SESSION_PRESENTATION_PREFIX = \"lemma:site-session-presentation:v1\";"}
       ]
     },
     {
@@ -104,7 +104,7 @@
       "migration_class": "signed_envelope",
       "source_assertions": [
         {"path": "api/bloom_snapshot.py", "contains": "BLOOM_SNAPSHOT_PREFIX = \"lemma:bloom-snapshot:v1\""},
-        {"path": "packages/ishuman-verify-py/lemma_ishuman_verify.py", "contains": "BLOOM_SNAPSHOT_PREFIX = \"lemma:bloom-snapshot:v1\""}
+        {"path": "packages/proof-verifier-py/lemma_proof_verifier.py", "contains": "BLOOM_SNAPSHOT_PREFIX = \"lemma:bloom-snapshot:v1\""}
       ]
     },
     {
@@ -117,7 +117,7 @@
       "migration_class": "signed_envelope",
       "source_assertions": [
         {"path": "api/issuer_trust_list.py", "contains": "TRUST_LIST_PREFIX = \"lemma:issuer-trust-list:v1\""},
-        {"path": "packages/ishuman-verify-py/lemma_ishuman_verify.py", "contains": "TRUST_LIST_PREFIX = \"lemma:issuer-trust-list:v1\""}
+        {"path": "packages/proof-verifier-py/lemma_proof_verifier.py", "contains": "TRUST_LIST_PREFIX = \"lemma:issuer-trust-list:v1\""}
       ]
     },
     {
@@ -167,9 +167,9 @@
       "canonical_section": "## 11. Action stamp",
       "migration_class": "signed_artifact",
       "source_assertions": [
-        {"path": "packages/ishuman-verify-py/lemma_ishuman_verify.py", "contains": "ACTION_STAMP_VERSION = \"action_stamp_v1\""},
-        {"path": "packages/ishuman-verify-py/lemma_ishuman_verify.py", "contains": "ACTION_PRESENTATION_PREFIX = \"lemma:site-action-presentation:v1\""},
-        {"path": "packages/ishuman-verify-js/index.mjs", "contains": "const ACTION_STAMP_VERSION = \"action_stamp_v1\";"}
+        {"path": "packages/proof-verifier-py/lemma_proof_verifier.py", "contains": "ACTION_STAMP_VERSION = \"action_stamp_v1\""},
+        {"path": "packages/proof-verifier-py/lemma_proof_verifier.py", "contains": "ACTION_PRESENTATION_PREFIX = \"lemma:site-action-presentation:v1\""},
+        {"path": "packages/proof-verifier-js/index.mjs", "contains": "const ACTION_STAMP_VERSION = \"action_stamp_v1\";"}
       ]
     },
     {
@@ -181,7 +181,7 @@
       "canonical_section": "## 12. Presentation envelope",
       "migration_class": "composite_envelope",
       "source_assertions": [
-        {"path": "packages/ishuman-verify-py/lemma_ishuman_verify.py", "contains": "credential = (presentation or {}).get(\"credential\")"}
+        {"path": "packages/proof-verifier-py/lemma_proof_verifier.py", "contains": "credential = (presentation or {}).get(\"credential\")"}
       ]
     }
   ]

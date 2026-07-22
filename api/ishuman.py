@@ -3493,7 +3493,7 @@ def verify_presentation():
     purely local verification on the relying site's own backend using the
     signed trust list + Bloom snapshot from ``GET /api/revocation/bloom-filter``
     (cached for up to ``max_bloom_staleness_seconds``). See
-    ``examples/relying_site_offline_verify.py`` for a drop-in implementation.
+    ``examples/proof-verifier.py`` for a drop-in implementation.
 
     Privacy / cost trade-off when this endpoint IS called:
       * lemma.id observes the PPID, site_id, and timing for every request.

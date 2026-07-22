@@ -9,8 +9,8 @@ from pathlib import Path
 import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
-PY_SDK_PATH = ROOT / "packages" / "ishuman-verify-py" / "lemma_ishuman_verify.py"
-MJS_PATH = ROOT / "static" / "js" / "lemma-ishuman-verify.mjs"
+PY_SDK_PATH = ROOT / "packages" / "proof-verifier-py" / "lemma_proof_verifier.py"
+MJS_PATH = ROOT / "static" / "js" / "proof-verifier.mjs"
 VERIFIER_PATH = ROOT / "static" / "js" / "ishuman-verifier.js"
 WALLET_PATH = ROOT / "static" / "js" / "lemma-wallet.js"
 KEYS_PATH = ROOT / "static" / "js" / "lemma-keys.js"
@@ -18,7 +18,7 @@ KEYS_PATH = ROOT / "static" / "js" / "lemma-keys.js"
 
 def _load_py_sdk():
     pytest.importorskip("cryptography")
-    name = "lemma_ishuman_verify_action_tests"
+    name = "lemma_proof_verifier_action_tests"
     if name in sys.modules:
         return sys.modules[name]
     spec = importlib.util.spec_from_file_location(name, PY_SDK_PATH)
@@ -160,8 +160,12 @@ def test_node_sdk_exposes_verify_action_stamp():
 
 
 def test_backend_sdk_version_headers():
-    app = (ROOT / "app.py").read_text(encoding="utf-8")
-    assert app.count("response.headers['X-SDK-Version'] = '1.4.0'") >= 2
+    from api.sdk_versions import backend_verifier_version
+
+    serving = (ROOT / "api" / "sdk_serving.py").read_text(encoding="utf-8")
+    assert 'response.headers["X-SDK-Version"] = version' in serving
+    assert "backend_verifier_version()" in serving
+    assert backend_verifier_version() == "1.4.0"
 
 
 def test_docs_mention_stamp_action():

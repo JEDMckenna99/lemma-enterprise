@@ -17,8 +17,8 @@ from flask import Flask
 pytestmark = pytest.mark.unit
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-PY_MODULE = REPO_ROOT / "packages" / "ishuman-verify-py" / "lemma_ishuman_verify.py"
-JS_MODULE = REPO_ROOT / "static" / "js" / "lemma-ishuman-verify.mjs"
+PY_MODULE = REPO_ROOT / "packages" / "proof-verifier-py" / "lemma_proof_verifier.py"
+JS_MODULE = REPO_ROOT / "static" / "js" / "proof-verifier.mjs"
 
 
 @pytest.fixture(autouse=True)
@@ -45,7 +45,7 @@ def fixture_revocation_client(revocation_test_app):
 @pytest.fixture
 def py_sdk():
     pytest.importorskip("cryptography")
-    name = "lemma_ishuman_verify_section5"
+    name = "lemma_proof_verifier_section5"
     if name in sys.modules:
         return sys.modules[name]
     spec = importlib.util.spec_from_file_location(name, PY_MODULE)

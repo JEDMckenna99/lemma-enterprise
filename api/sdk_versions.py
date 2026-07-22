@@ -45,10 +45,10 @@ def versioned_sdk_url(relative_path: str) -> str:
             return versioned
     if rel.endswith("proof-verifier.js"):
         return f"{base}{browser_verifier_version()}/proof-verifier.js"
-    if rel.endswith("lemma-ishuman-verify.mjs"):
-        return f"{base}{backend_verifier_version()}/lemma-ishuman-verify.mjs"
-    if rel.endswith("lemma_ishuman_verify.py"):
-        return f"{base}{backend_verifier_version()}/lemma_ishuman_verify.py"
+    if rel.endswith("proof-verifier.mjs") or rel.endswith("lemma-ishuman-verify.mjs"):
+        return f"{base}{backend_verifier_version()}/proof-verifier.mjs"
+    if rel.endswith("proof-verifier.py") or rel.endswith("lemma_ishuman_verify.py"):
+        return f"{base}{backend_verifier_version()}/proof-verifier.py"
     return f"/sdk/{rel}"
 
 

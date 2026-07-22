@@ -11,12 +11,12 @@ from types import SimpleNamespace
 import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
-PY_SDK_PATH = ROOT / "packages" / "ishuman-verify-py" / "lemma_ishuman_verify.py"
+PY_SDK_PATH = ROOT / "packages" / "proof-verifier-py" / "lemma_proof_verifier.py"
 
 
 def _load_py_sdk():
     pytest.importorskip("cryptography")
-    name = "lemma_ishuman_verify_fresh_passkey_tests"
+    name = "lemma_proof_verifier_fresh_passkey_tests"
     if name in sys.modules:
         return sys.modules[name]
     spec = importlib.util.spec_from_file_location(name, PY_SDK_PATH)

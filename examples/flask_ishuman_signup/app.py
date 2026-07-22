@@ -9,9 +9,9 @@ from pathlib import Path
 from flask import Flask, jsonify, request
 
 ROOT = Path(__file__).resolve().parents[2]
-sys.path.insert(0, str(ROOT / "packages" / "ishuman-verify-py"))
+sys.path.insert(0, str(ROOT / "packages" / "proof-verifier-py"))
 
-from lemma_ishuman_verify import VerificationContext  # noqa: E402
+from lemma_proof_verifier import VerificationContext  # noqa: E402
 
 app = Flask(__name__)
 SITE_ID = os.getenv("SITE_ID", "app.example.com")

@@ -26,7 +26,9 @@
 
 ## Demo mirrors
 
-`demo-sites/lemma_ishuman_*.py` are **generated mirrors** of `packages/ishuman-verify-py/` for subtree deploys. Run `python scripts/sync_ishuman_verify_packages.py` before demo releases; CI fails on drift (`--check`).
+`demo-sites/lemma_*verify*.py` are **generated mirrors** of `packages/proof-verifier-py/` for subtree deploys. Run `python scripts/sync_proof_verifier_packages.py` before demo releases; CI fails on drift (`--check`).
+
+Legacy `lemma_ishuman_*` mirror filenames remain for subtree compatibility but are deprecated.
 
 ## Breaking change examples (require major bump)
 

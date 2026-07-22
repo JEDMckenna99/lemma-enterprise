@@ -25,18 +25,16 @@ Lemma issues signed credentials and holds wallet ↔ person bindings. **Input bu
 | **passkey** | Wallet registered; provisional person_root assigned | `passkey` | `false` | Not promised (disposable pre-anchor wallet) |
 | **ishuman** | After successful IDV | `ishuman` | `true` | Re-IDV on new device → same person_root → same PPID |
 
-Feature flags (rollout):
-
-- `LEMMA_ONE_PPID_ASSURANCE_MODEL=1`, assign provisional person_root at wallet bind
-- `LEMMA_PASSKEY_ASSURANCE_ENABLED=1`, allow `derive-site-proof` without verified IDV row
-- `LEMMA_PPID_REQUIRE_PERSON_ROOT=1`, canonical PPID from person_root (keep on in production)
+Assurance availability is managed by lemma.id. Relying sites do not configure
+platform rollout flags; they request `passkey` or `ishuman` per protected action
+and fail closed when the requested assurance is unavailable.
 
 ## Lifecycle
 
 ```text
 1. Create passkey wallet → provisional assigned person_root + wallet binding
 2. Derive site PPID from person_root (stable from this point)
-3. Issue passkey-assurance site credential (optional, flag-gated)
+3. Issue passkey-assurance site credential when continuity proof is requested
 4. Site stores ppid + local input fingerprints
 5. On abuse/doubt → site requires ishuman assurance (same ppid after IDV step-up)
 6. After first IDV → person promoted to anchored; recovery preserves PPIDs
@@ -64,7 +62,6 @@ Store locally:
 ```javascript
 const verifier = new ProofVerifier({
   siteId: 'app.example.com',
-  requiredAssurance: 'passkey', // or 'ishuman' (default)
 });
 const { ok, ppid, assurance, presentation } = await verifier.verifyForBackend({
   autoProvision: true,
@@ -72,7 +69,7 @@ const { ok, ppid, assurance, presentation } = await verifier.verifyForBackend({
 });
 ```
 
-Backend: verify presentation with `@lemma/ishuman-verify` / `lemma_ishuman_verify.py` and enforce `required_assurance`.
+Backend: verify presentation with `@lemma/proof-verifier` / `lemma_proof_verifier.py` and enforce `required_assurance`.
 
 ## Non-goals
 
@@ -82,7 +79,5 @@ Backend: verify presentation with `@lemma/ishuman-verify` / `lemma_ishuman_verif
 
 ## Related docs
 
-- `docs/product/LEMMA_ID_PRESENTATION_MODEL.md`
-- `docs/architecture/ASSIGNED_PERSON_ROOT.md`
-- `docs/integration/ISHUMAN_AGENT_INTEGRATION.md`
-- `docs/wallet/RECOVERY.md`
+- [Canonical relying-site integration guide](https://lemma.id/docs/integration/ISHUMAN_AGENT_INTEGRATION.md)
+- [Human-readable developer docs](https://lemma.id/docs)

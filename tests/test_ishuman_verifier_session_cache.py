@@ -100,8 +100,10 @@ def test_verifier_cached_bloom_for_fast_cache_hits_and_no_bridge(verifier_source
 
 @pytest.mark.browser
 def test_verifier_passkey_assurance_respects_required_policy(verifier_source):
-    assert "_assuranceMeetsPolicy(assurance, policy)" in verifier_source
-    assert "return actual === required" in verifier_source
+    assert "_assuranceMeetsPolicy(assurance, requiredAssurance)" in verifier_source
+    # passkey policy accepts ishuman (higher tier); ishuman policy is exact-match.
+    assert "if (required === 'passkey') return actual === 'passkey' || actual === 'ishuman'" in verifier_source
+    assert "return actual === 'ishuman'" in verifier_source
     assert "cached assurance" in verifier_source
     assert "required_assurance" in verifier_source
     assert "_activeRequiredAssurance" in verifier_source

@@ -50,6 +50,6 @@ export default function SignupPage() {
 
 ## Server route (`app/api/signup/route.ts`)
 
-Use `@lemma/ishuman-verify` or call your Python/Node verifier service. Fail closed when `result.ok` is false.
+Use `@lemma/proof-verifier` or call your Python/Node verifier service. Fail closed when `result.ok` is false.
 
 Pin SDK URL from [`ISHUMAN_SDK_VERSIONS.json`](../../docs/sdk/ISHUMAN_SDK_VERSIONS.json).

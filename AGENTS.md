@@ -51,7 +51,7 @@ Or locally: `llms.txt`
 The legacy `ishuman-verifier.js` URL and `IsHumanVerifier` class remain supported
 as compatibility aliases.
 
-Verify on the server with `@lemma/ishuman-verify` or `lemma_ishuman_verify.py`.
+Verify on the server with `@lemma/proof-verifier` or `lemma_proof_verifier.py`.
 
 See the full guide for trust tiers, abuse APIs, anti-patterns, and framework notes.
 

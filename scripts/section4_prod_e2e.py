@@ -38,8 +38,8 @@ from scripts.run_ishuman_prod_revocation_smoke import (  # noqa: E402
 
 
 BASE = os.getenv("ISHUMAN_LIVE_BASE_URL", "https://lemma.id").rstrip("/")
-JS_MODULE = REPO_ROOT / "static" / "js" / "lemma-ishuman-verify.mjs"
-PY_MODULE = REPO_ROOT / "packages" / "ishuman-verify-py" / "lemma_ishuman_verify.py"
+JS_MODULE = REPO_ROOT / "static" / "js" / "proof-verifier.mjs"
+PY_MODULE = REPO_ROOT / "packages" / "proof-verifier-py" / "lemma_proof_verifier.py"
 
 
 def _load_heroku_config(name: str) -> str:
@@ -116,7 +116,7 @@ def _node_eval(script: str) -> subprocess.CompletedProcess[str]:
 
 
 def _load_py_verifier():
-    spec = importlib.util.spec_from_file_location("lemma_ishuman_verify_e2e", PY_MODULE)
+    spec = importlib.util.spec_from_file_location("lemma_proof_verifier_e2e", PY_MODULE)
     mod = importlib.util.module_from_spec(spec)
     sys.modules[spec.name] = mod
     spec.loader.exec_module(mod)

@@ -9,13 +9,13 @@ from flask import Flask, Response, jsonify, request
 
 logger = logging.getLogger(__name__)
 
-from lemma_ishuman_verify import (
+from lemma_proof_verifier import (
     InMemoryNonceStore,
     VerificationContext,
     build_action_commitment,
     hash_action_body,
 )
-from lemma_ishuman_site_policy import InMemorySitePolicyStore, enforce_site_policy
+from lemma_proof_verifier_site_policy import InMemorySitePolicyStore, enforce_site_policy
 
 from presale_allocation import create_presale_stores
 

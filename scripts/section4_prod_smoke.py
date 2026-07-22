@@ -45,7 +45,7 @@ def main() -> int:
 
     try:
         req = urllib.request.Request(
-            "https://lemma.id/sdk/lemma-ishuman-verify.mjs",
+            "https://lemma.id/sdk/proof-verifier.mjs",
             headers={"User-Agent": "section4-prod-smoke/1.0"},
         )
         with urllib.request.urlopen(req, timeout=30) as resp:

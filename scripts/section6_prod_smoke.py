@@ -90,7 +90,7 @@ def main() -> int:
         checks.append(("complete-wallet-disabled", False, str(exc)))
 
     try:
-        _, py_src = get_text(f"{ORIGIN}/sdk/lemma_ishuman_verify.py")
+        _, py_src = get_text(f"{ORIGIN}/sdk/proof-verifier.py")
         checks.append(
             (
                 "py-sdk-present",

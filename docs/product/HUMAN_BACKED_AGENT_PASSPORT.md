@@ -140,7 +140,7 @@ Content-Type: application/json
 | **Whole passport**        | `verifyHumanBackedPassport(passport, context)` | *new thin wrapper*                                  |
 | L1 + L3 chain             | proof-native allow/deny                        | `api/authz/verifier.py` → `evaluate_proof_native()` |
 | L3 PoP                    | request binding                                | `api/authz/replay.py` → `validate_pop_replay()`     |
-| L2 Human                  | site-bound human claim                         | `lemma_ishuman_verify.py` / `@lemma/ishuman-verify` |
+| L2 Human                  | site-bound human claim                         | `lemma_proof_verifier.py` / `@lemma/proof-verifier` |
 | L1 Permission             | signed permission VC                           | existing lemma trust-core verify                    |
 | Revocation                | fail-closed                                    | `GET /api/authz/revocation/delta` + local cache     |
 | Runtime policy (operator) | kill / taint / step-up                         | `POST /api/wallet/runtimes/{id}/authorize`          |

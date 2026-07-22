@@ -39,21 +39,23 @@ def register_sdk_routes(app: Flask) -> None:
         )
         return _attach_sdk_headers(response, version=browser_v, immutable=False)
 
+    @app.route("/sdk/proof-verifier.mjs")
     @app.route("/sdk/lemma-ishuman-verify.mjs")
-    def ishuman_verify_backend_sdk():
+    def proof_verifier_backend_sdk():
         response = send_from_directory(
             str(_REPO_ROOT / "static/js"),
-            "lemma-ishuman-verify.mjs",
+            "proof-verifier.mjs",
             mimetype="application/javascript",
         )
         response.headers["Cache-Control"] = "public, max-age=300"
         return _attach_sdk_headers(response, version=backend_v, immutable=False)
 
+    @app.route("/sdk/proof-verifier.py")
     @app.route("/sdk/lemma_ishuman_verify.py")
-    def ishuman_verify_python_sdk():
+    def proof_verifier_python_sdk():
         response = send_from_directory(
             str(_REPO_ROOT / "examples"),
-            "relying_site_offline_verify.py",
+            "proof-verifier.py",
             mimetype="text/x-python",
         )
         response.headers["Cache-Control"] = "public, max-age=300"
@@ -69,20 +71,22 @@ def register_sdk_routes(app: Flask) -> None:
         )
         return _attach_sdk_headers(response, version=browser_v, immutable=True)
 
+    @app.route(f"/sdk/v{backend_v}/proof-verifier.mjs")
     @app.route(f"/sdk/v{backend_v}/lemma-ishuman-verify.mjs")
-    def ishuman_verify_backend_sdk_versioned():
+    def proof_verifier_backend_sdk_versioned():
         response = send_from_directory(
             str(_REPO_ROOT / "static/js"),
-            "lemma-ishuman-verify.mjs",
+            "proof-verifier.mjs",
             mimetype="application/javascript",
         )
         return _attach_sdk_headers(response, version=backend_v, immutable=True)
 
+    @app.route(f"/sdk/v{backend_v}/proof-verifier.py")
     @app.route(f"/sdk/v{backend_v}/lemma_ishuman_verify.py")
-    def ishuman_verify_python_sdk_versioned():
+    def proof_verifier_python_sdk_versioned():
         response = send_from_directory(
             str(_REPO_ROOT / "examples"),
-            "relying_site_offline_verify.py",
+            "proof-verifier.py",
             mimetype="text/x-python",
         )
         return _attach_sdk_headers(response, version=backend_v, immutable=True)

@@ -3,16 +3,16 @@ requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "lemma-ishuman-verify"
+name = "lemma-proof-verifier"
 version = "1.4.0"
-description = "Local-first isHuman presentation verifier for relying-site backends. Verifies signed VC + site-bound session presentations with no per-request calls to lemma.id."
+description = "Local-first Lemma proof verifier for relying-site backends. Verifies signed presentations, stamps, and site-bound session proofs with no per-request calls to lemma.id."
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "Apache-2.0" }
 authors = [{ name = "Lemma", email = "hello@lemma.id" }]
 keywords = [
   "lemma",
-  "ishuman",
+  "proof-verifier",
   "verifier",
   "ed25519",
   "privacy",
@@ -38,4 +38,4 @@ Documentation = "https://lemma.id/docs"
 Repository = "https://github.com/JEDMckenna99/lemma-enterprise"
 
 [tool.setuptools]
-py-modules = ["lemma_ishuman_verify", "lemma_ishuman_site_policy", "lemma_ishuman_nonce_store"]
+py-modules = ["lemma_proof_verifier", "lemma_proof_verifier_site_policy", "lemma_proof_verifier_nonce_store"]

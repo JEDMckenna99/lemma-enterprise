@@ -18,14 +18,20 @@
       "versioned_url": "/sdk/v1.9.2/proof-verifier.js"
     },
     "backend_verifier_mjs": {
-      "file": "static/js/lemma-ishuman-verify.mjs",
-      "urls": ["/sdk/lemma-ishuman-verify.mjs"],
-      "versioned_url": "/sdk/v1.4.0/lemma-ishuman-verify.mjs"
+      "file": "static/js/proof-verifier.mjs",
+      "urls": [
+        "/sdk/proof-verifier.mjs",
+        "/sdk/lemma-ishuman-verify.mjs"
+      ],
+      "versioned_url": "/sdk/v1.4.0/proof-verifier.mjs"
     },
     "backend_verifier_py": {
-      "file": "examples/relying_site_offline_verify.py",
-      "urls": ["/sdk/lemma_ishuman_verify.py"],
-      "versioned_url": "/sdk/v1.4.0/lemma_ishuman_verify.py"
+      "file": "examples/proof-verifier.py",
+      "urls": [
+        "/sdk/proof-verifier.py",
+        "/sdk/lemma_ishuman_verify.py"
+      ],
+      "versioned_url": "/sdk/v1.4.0/proof-verifier.py"
     }
   }
 }

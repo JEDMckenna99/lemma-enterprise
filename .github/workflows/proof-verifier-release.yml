@@ -1,8 +1,9 @@
-name: ishuman-verify-release
+name: proof-verifier-release
 
 on:
   push:
     tags:
+      - "proof-verifier-v*"
       - "ishuman-verify-v*"
 
 jobs:
@@ -21,7 +22,7 @@ jobs:
           python-version: "3.11"
 
       - name: Sync verifier mirrors
-        run: python scripts/sync_ishuman_verify_packages.py --check
+        run: python scripts/sync_proof_verifier_packages.py --check
 
       - name: Section 10 unit tests
         run: |
@@ -30,12 +31,12 @@ jobs:
           python -m pytest tests/test_sdk_integration_section10.py tests/test_ishuman_verify_packages.py -q
 
       - name: Build Python package
-        working-directory: packages/ishuman-verify-py
+        working-directory: packages/proof-verifier-py
         run: pip install build && python -m build
 
       - name: Publish npm package
         if: ${{ secrets.NPM_TOKEN != '' }}
-        working-directory: packages/ishuman-verify-js
+        working-directory: packages/proof-verifier-js
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: npm publish --access public
@@ -47,7 +48,7 @@ jobs:
           TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
         run: |
           pip install twine
-          twine upload packages/ishuman-verify-py/dist/*
+          twine upload packages/proof-verifier-py/dist/*
 
       - name: Release summary
         run: |

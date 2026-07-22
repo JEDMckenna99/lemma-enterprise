@@ -39,10 +39,10 @@ SDK_FILES = {
         'url': '/sdk/proof-verifier.js',
         'description': 'Browser proof verifier (isHuman / passkey)'
     },
-    'lemma-ishuman-verify.mjs': {
-        'path': 'static/js/lemma-ishuman-verify.mjs',
-        'url': '/sdk/lemma-ishuman-verify.mjs',
-        'description': 'Backend isHuman verifier (Node/Edge)'
+    'proof-verifier.mjs': {
+        'path': 'static/js/proof-verifier.mjs',
+        'url': '/sdk/proof-verifier.mjs',
+        'description': 'Backend proof verifier (Node/Edge)'
     }
 }
 

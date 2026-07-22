@@ -189,10 +189,10 @@ def test_session_presentation_payload_format():
     # Load the reference Python verifier package (its directory name has hyphens,
     # so it must be loaded by path; register in sys.modules so its @dataclass
     # decorators can resolve their own module).
-    pkg_path = REPO_ROOT / "packages" / "ishuman-verify-py" / "lemma_ishuman_verify.py"
-    spec = importlib.util.spec_from_file_location("lemma_ishuman_verify_pin", pkg_path)
+    pkg_path = REPO_ROOT / "packages" / "proof-verifier-py" / "lemma_proof_verifier.py"
+    spec = importlib.util.spec_from_file_location("lemma_proof_verifier_pin", pkg_path)
     mod = importlib.util.module_from_spec(spec)
-    sys.modules["lemma_ishuman_verify_pin"] = mod
+    sys.modules["lemma_proof_verifier_pin"] = mod
     spec.loader.exec_module(mod)
 
     assertion = {
@@ -218,10 +218,10 @@ def test_session_presentation_payload_format():
 @pytest.mark.unit
 def test_action_stamp_payload_format():
     """The v1 action-stamp message must remain byte-exact."""
-    pkg_path = REPO_ROOT / "packages" / "ishuman-verify-py" / "lemma_ishuman_verify.py"
-    spec = importlib.util.spec_from_file_location("lemma_ishuman_verify_action_pin", pkg_path)
+    pkg_path = REPO_ROOT / "packages" / "proof-verifier-py" / "lemma_proof_verifier.py"
+    spec = importlib.util.spec_from_file_location("lemma_proof_verifier_action_pin", pkg_path)
     mod = importlib.util.module_from_spec(spec)
-    sys.modules["lemma_ishuman_verify_action_pin"] = mod
+    sys.modules["lemma_proof_verifier_action_pin"] = mod
     spec.loader.exec_module(mod)
 
     assertion = {

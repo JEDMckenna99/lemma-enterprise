@@ -72,7 +72,7 @@ compact separators (`,` and `:`) with no insignificant whitespace.
   4. `message = JSON.stringify(payload)` with compact separators, UTF-8 encoded.
   5. Signature is Ed25519 over `SHA256(message)`.
 - **Reference:** `api/ishuman.py::_browser_canonical_message` + `_sign_with_issuer_for_browser`;
-  Python verifier `packages/ishuman-verify-py/lemma_ishuman_verify.py::browser_canonical_message`.
+  Python verifier `packages/proof-verifier-py/lemma_proof_verifier.py::browser_canonical_message`.
 - **Test vector (v1, no `id`):**
   - input `{issuer:"did:lemma:issuer:test", subject:"did:lemma:ppid_abc", claims:{isHuman:true, siteId:"example.com", expiresAt:"4102444800"}}`
   - => `{"issuer":"did:lemma:issuer:test","subject":"did:lemma:ppid_abc","claims":{"expiresAt":"4102444800","isHuman":"true","siteId":"example.com"}}`

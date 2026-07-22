@@ -12,8 +12,8 @@
 | This guide (machine-oriented) | https://lemma.id/docs/integration/ISHUMAN_AGENT_INTEGRATION.md |
 | Browser SDK (immutable) | https://lemma.id/sdk/v1.9.2/proof-verifier.js |
 | Browser SDK (rolling) | https://lemma.id/sdk/proof-verifier.js |
-| JS verifier (immutable) | https://lemma.id/sdk/v1.4.0/lemma-ishuman-verify.mjs |
-| Python verifier (immutable) | https://lemma.id/sdk/v1.4.0/lemma_ishuman_verify.py |
+| JS verifier (immutable) | https://lemma.id/sdk/v1.4.0/proof-verifier.mjs |
+| Python verifier (immutable) | https://lemma.id/sdk/v1.4.0/proof-verifier.py |
 | SDK manifest | https://lemma.id/api/sdk/versions |
 | SRI hashes | https://lemma.id/api/sdk/integrity |
 | Live demo | https://lemma.id/demo |
@@ -28,7 +28,7 @@
 
 1. **Browser:** Load `proof-verifier.js`, create `ProofVerifier({ siteId })`, call `verify({ autoProvision: true })` before protected actions.
 2. **Account binding:** Store the returned site-private `ppid` as the platform's durable enforcement handle for that user.
-3. **Backend:** Accept a signed presentation or stamp from the client and verify locally with `@lemma/ishuman-verify` or `lemma_ishuman_verify.py`.
+3. **Backend:** Accept a signed presentation or stamp from the client and verify locally with `@lemma/proof-verifier` or `lemma_proof_verifier.py`.
 4. **Assurance policy:** Use `passkey` for continuity when that is enough (not Sybil-resistant alone). Require `ishuman` when the action needs one verified human behind the account, such as Sybil-resistant signup, trials, ticketing, payouts, or recovery after abuse.
 5. **Optional:** Register a site API key only when the developer needs server-side PPID blocks.
 
@@ -227,15 +227,15 @@ Pass the same canonical hostname to `VerificationContext(site_id=...)` or `creat
 Node.js, Deno, Bun, and Workers:
 
 ```bash
-npm install @lemma/ishuman-verify
+npm install @lemma/proof-verifier
 ```
 
 Python:
 
 ```bash
-pip install lemma-ishuman-verify
+pip install lemma-proof-verifier
 # Or use the hosted single-file verifier:
-curl -O https://lemma.id/sdk/lemma_ishuman_verify.py
+curl -O https://lemma.id/sdk/lemma_proof_verifier.py
 ```
 
 Choose assurance independently from the transport tier: T2 means the backend
@@ -245,8 +245,8 @@ verifies a signed presentation. Set its policy to `passkey` for continuity or
 ### Python backend (T2 + site policy)
 
 ```python
-# pip install lemma-ishuman-verify
-from lemma_ishuman_verify import VerificationContext
+# pip install lemma-proof-verifier
+from lemma_proof_verifier import VerificationContext
 from lemma_ishuman_site_policy import InMemorySitePolicyStore
 
 ctx = VerificationContext(site_id="app.example.com", required_assurance="passkey")
@@ -266,7 +266,7 @@ def signup():
 ### Node / Workers backend (T2 + site policy)
 
 ```javascript
-import { createVerifier, createInMemorySitePolicyStore } from "@lemma/ishuman-verify";
+import { createVerifier, createInMemorySitePolicyStore } from "@lemma/proof-verifier";
 
 const verifier = createVerifier({ siteId: "app.example.com", requiredAssurance: "passkey" });
 const policy = createInMemorySitePolicyStore({ blocked: new Set(["did:lemma:ppid_banned..."]) });
@@ -293,7 +293,7 @@ result = ctx.verify_with_policy(body["presentation"], policy_store=policy)
 ```
 
 ```javascript
-import { createVerifier, createLemmaCheckPolicyStore } from "@lemma/ishuman-verify";
+import { createVerifier, createLemmaCheckPolicyStore } from "@lemma/proof-verifier";
 
 const verifier = createVerifier({ siteId: "app.example.com" });
 const policy = createLemmaCheckPolicyStore({
@@ -309,9 +309,9 @@ Both stores fail closed when the check API is unavailable (`site_policy_unavaila
 ### Python backend (T2)
 
 ```python
-# pip install lemma-ishuman-verify
-# or: curl -O https://lemma.id/sdk/lemma_ishuman_verify.py
-from lemma_ishuman_verify import VerificationContext
+# pip install lemma-proof-verifier
+# or: curl -O https://lemma.id/sdk/lemma_proof_verifier.py
+from lemma_proof_verifier import VerificationContext
 
 ctx = VerificationContext(site_id="app.example.com")
 
@@ -346,7 +346,7 @@ await fetch('/api/checkout', { method: 'POST', body: JSON.stringify(event) });
 ```
 
 ```python
-from lemma_ishuman_verify import VerificationContext, InMemoryNonceStore
+from lemma_proof_verifier import VerificationContext, InMemoryNonceStore
 
 ctx = VerificationContext(site_id="app.example.com", required_assurance="passkey")
 nonce_store = InMemoryNonceStore()
@@ -537,7 +537,7 @@ Adapt the same pattern; do not change the crypto contract.
 |-------|--------|--------|
 | React / Next.js | Load SDK in client component or `useEffect`; call `verifyForBackend` before submit | Route handler verifies `presentation` |
 | Vue / Nuxt | Same, client-only for SDK | Server middleware or API route |
-| Rails | Stimulus/vanilla JS for SDK | Controller action + `lemma_ishuman_verify` |
+| Rails | Stimulus/vanilla JS for SDK | Controller action + `lemma_proof_verifier` |
 | Django | Template script or JS bundle | View + `VerificationContext` |
 | PHP | Script tag + fetch to your API | Include Python helper or port verify logic |
 

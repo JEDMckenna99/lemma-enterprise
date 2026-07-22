@@ -1,5 +1,5 @@
 /**
- * @lemma/ishuman-verify, Local-first isHuman presentation verifier.
+ * @lemma/proof-verifier — Local-first Lemma proof verifier.
  *
  * Drop-in ES module that verifies an `IsHumanVerifier.verify()` result
  * **entirely on your backend** with no per-request calls to lemma.id.
@@ -13,7 +13,7 @@
  * sees an individual verification.
  *
  * @example
- *   import { createVerifier } from "https://lemma.id/sdk/lemma-ishuman-verify.mjs";
+ *   import { createVerifier } from "https://lemma.id/sdk/proof-verifier.mjs";
  *
  *   const verifier = createVerifier({ siteId: "tickets-demo.lemma.id" });
  *
@@ -471,7 +471,7 @@ export function createInMemorySitePolicyStore({ blocked = [], doubted = [] } = {
 
 /**
  * Server-only site block/doubt store backed by GET /api/ishuman/check.
- * Mirrors packages/ishuman-verify-py/lemma_ishuman_site_policy.LemmaCheckPolicyStore.
+ * Mirrors packages/proof-verifier-py/lemma_proof_verifier_site_policy.LemmaCheckPolicyStore.
  */
 export function createLemmaCheckPolicyStore({
   siteId,

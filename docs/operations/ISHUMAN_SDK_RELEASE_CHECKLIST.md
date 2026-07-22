@@ -3,12 +3,12 @@
 ## Pre-release
 
 1. Update [`docs/sdk/ISHUMAN_SDK_VERSIONS.json`](../sdk/ISHUMAN_SDK_VERSIONS.json) (browser + backend semver lines).
-2. Bump `@version` comments in `static/js/ishuman-verifier.js` and `static/js/lemma-ishuman-verify.mjs`.
-3. Align `packages/ishuman-verify-js/package.json` and `packages/ishuman-verify-py/pyproject.toml`.
+2. Bump `@version` comments in `static/js/ishuman-verifier.js` and `static/js/proof-verifier.mjs`.
+3. Align `packages/proof-verifier-js/package.json` and `packages/proof-verifier-py/pyproject.toml`.
 4. Run package sync:
    ```powershell
-   python scripts/sync_ishuman_verify_packages.py
-   python scripts/sync_ishuman_verify_packages.py --check
+   python scripts/sync_proof_verifier_packages.py
+   python scripts/sync_proof_verifier_packages.py --check
    ```
 5. Run tests:
    ```powershell
@@ -19,8 +19,8 @@
 
 ## Publish
 
-1. Tag: `ishuman-verify-v{backend_verifier}` (e.g. `ishuman-verify-v1.4.0`).
-2. Push tag → GitHub Actions `ishuman-verify-release.yml` builds npm + PyPI artifacts.
+1. Tag: `proof-verifier-v{backend_verifier}` (e.g. `proof-verifier-v1.4.0`). Legacy tag `ishuman-verify-v*` still triggers the workflow.
+2. Push tag → GitHub Actions `proof-verifier-release.yml` builds npm + PyPI artifacts.
 3. Deploy lemma.id (versioned routes + `/api/sdk/versions`).
 4. Run prod smoke:
    ```powershell
@@ -29,8 +29,8 @@
 
 ## Registry secrets (GitHub Actions)
 
-- `NPM_TOKEN` — publish `@lemma/ishuman-verify`
-- `PYPI_API_TOKEN` — publish `lemma-ishuman-verify`
+- `NPM_TOKEN` — publish `@lemma/proof-verifier`
+- `PYPI_API_TOKEN` — publish `lemma-proof-verifier`
 
 ## Post-release
 

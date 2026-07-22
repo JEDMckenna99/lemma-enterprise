@@ -8,11 +8,15 @@ def _patch_signing_material(monkeypatch):
     from api.wallet_keys import derive_wallet_signing_keypair
 
     private_key, public_key = derive_wallet_signing_keypair("ef" * 32)
+    pubkey_hex = public_key.public_bytes_raw().hex()
 
     def _material():
         return private_key, public_key, "did:lemma:" + ("b" * 64)
 
     monkeypatch.setattr("api.bloom_snapshot._issuer_signing_material", _material)
+    # Pin the ephemeral test signer so verify() does not fall through to the
+    # production NETWORK_ROOT_PUBKEYS.json pins.
+    monkeypatch.setenv("LEMMA_NETWORK_ROOT_PUBKEYS", pubkey_hex)
     monkeypatch.setenv("LEMMA_ALLOW_UNPINNED_TRUST_ROOT", "1")
 
 

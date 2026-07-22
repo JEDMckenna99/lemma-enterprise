@@ -10,7 +10,7 @@ import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
 DEMO_SITES = ROOT / "demo-sites"
-PY_PKG = ROOT / "packages" / "ishuman-verify-py"
+PY_PKG = ROOT / "packages" / "proof-verifier-py"
 
 
 @pytest.fixture(name="relying_site_client")
@@ -568,26 +568,33 @@ def test_demo_verifier_accepts_platform_signed_trust_bundle(monkeypatch):
     from api.wallet_keys import derive_wallet_signing_keypair
 
     private_key, public_key = derive_wallet_signing_keypair("ef" * 32)
+    pubkey_hex = public_key.public_bytes_raw().hex()
 
     def _material():
         return private_key, public_key, "did:lemma:" + ("b" * 64)
 
     monkeypatch.setattr("api.bloom_snapshot._issuer_signing_material", _material)
     monkeypatch.setenv("LEMMA_ALLOW_UNPINNED_TRUST_ROOT", "1")
+    # Keep production DEFAULT pins for the live bundle fetch below; pin the
+    # ephemeral platform signer only for the local trust-list round-trip.
+    monkeypatch.delenv("LEMMA_NETWORK_ROOT_PUBKEYS", raising=False)
 
     demo_path = str(DEMO_SITES)
     if demo_path not in sys.path:
         sys.path.insert(0, demo_path)
     spec = importlib.util.spec_from_file_location(
         "demo_lemma_ishuman_verify_test",
-        DEMO_SITES / "lemma_ishuman_verify.py",
+        DEMO_SITES / "lemma_proof_verifier.py",
     )
     demo_verify = importlib.util.module_from_spec(spec)
     sys.modules[spec.name] = demo_verify
     spec.loader.exec_module(demo_verify)
 
     trust = build_signed_trust_list()
-    issuers = demo_verify._verify_signed_trust_list_payload(trust)
+    issuers = demo_verify._verify_signed_trust_list_payload(
+        trust,
+        network_root_pubkeys=[pubkey_hex],
+    )
     assert issuers
 
     ctx = demo_verify.VerificationContext(

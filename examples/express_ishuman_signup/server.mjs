@@ -6,7 +6,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const pkgRoot = path.resolve(__dirname, "../../packages/ishuman-verify-js/index.mjs");
+const pkgRoot = path.resolve(__dirname, "../../packages/proof-verifier-js/index.mjs");
 const { createVerifier } = await import(pkgRoot);
 
 const app = express();

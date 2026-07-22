@@ -268,8 +268,8 @@ Validation baseline:
   - Commit `cda63863` — Section 4 trust-chain implementation (deployed Heroku
     **v2467**); follow-up drill scripts `bb8f69a6` (Heroku **v2469**)
   - Node trust-list / Bloom / convergence parity:
-    `packages/ishuman-verify-js/index.mjs` ↔
-    `static/js/lemma-ishuman-verify.mjs`
+    `packages/proof-verifier-js/index.mjs` ↔
+    `static/js/proof-verifier.mjs`
   - Network root pin + rotation: `api/network_roots.py`,
     `docs/cryptographic/NETWORK_ROOT_PUBKEYS.json`,
     `docs/security/NETWORK_ROOT_ROTATION.md`; production
@@ -343,7 +343,7 @@ Validation baseline:
 - Priority: `P0`
 - Status: `PASS`
 - Owner:
-- Evidence: `tests/test_revocation_fail_closed_section5.py`; bloom/list `503` on DB/hash errors (`api/revocation_api.py`); tri-state `check_credential_revocation()` + verify-presentation/`/ready` gates (`api/revocation_verifier.py`, `api/ishuman.py`, `app.py`); Py/Node/Browser revocation candidate parity (`credential.id`, `subject`, `wallet_id`); action-stamp signature-before-nonce + async `RedisNonceStore.consume` (`lemma-ishuman-verify.mjs`, `lemma_ishuman_verify.py`).
+- Evidence: `tests/test_revocation_fail_closed_section5.py`; bloom/list `503` on DB/hash errors (`api/revocation_api.py`); tri-state `check_credential_revocation()` + verify-presentation/`/ready` gates (`api/revocation_verifier.py`, `api/ishuman.py`, `app.py`); Py/Node/Browser revocation candidate parity (`credential.id`, `subject`, `wallet_id`); action-stamp signature-before-nonce + async `RedisNonceStore.consume` (`proof-verifier.mjs`, `lemma_proof_verifier.py`).
 
 **Production evidence (2026-07-20, Heroku v2472):**
 
@@ -570,7 +570,7 @@ Exit criteria:
 - Priority: `P1`
 - Status: `IN_PROGRESS`
 - Owner:
-- Evidence: `docs/sdk/ISHUMAN_SDK_VERSIONS.json`, `api/sdk_versions.py`, `api/sdk_serving.py`, `docs/sdk/ISHUMAN_SDK_COMPATIBILITY_MATRIX.md`, `docs/sdk/ISHUMAN_SDK_DEPRECATION_POLICY.md`, `docs/api/ISHUMAN_RELYING_SITE.openapi.json`, `docs/operations/ISHUMAN_SDK_RELEASE_CHECKLIST.md`, `.github/workflows/ishuman-verify-release.yml`, `scripts/sync_ishuman_verify_packages.py`, `scripts/section10_prod_smoke.py`, `tests/test_sdk_integration_section10.py`, `examples/*_ishuman_signup/`
+- Evidence: `docs/sdk/ISHUMAN_SDK_VERSIONS.json`, `api/sdk_versions.py`, `api/sdk_serving.py`, `docs/sdk/ISHUMAN_SDK_COMPATIBILITY_MATRIX.md`, `docs/sdk/ISHUMAN_SDK_DEPRECATION_POLICY.md`, `docs/api/ISHUMAN_RELYING_SITE.openapi.json`, `docs/operations/ISHUMAN_SDK_RELEASE_CHECKLIST.md`, `.github/workflows/proof-verifier-release.yml`, `scripts/sync_proof_verifier_packages.py`, `scripts/section10_prod_smoke.py`, `tests/test_sdk_integration_section10.py`, `examples/*_ishuman_signup/`
 
 **Production evidence (2026-07-22, Heroku v2490):**
 
@@ -579,7 +579,7 @@ Exit criteria:
 | `python scripts/section10_prod_smoke.py` | PASS (5/5) |
 | `GET /api/sdk/versions` | manifest `browser_verifier=1.9.2`, `backend_verifier=1.4.0` |
 | `GET /sdk/v1.9.2/proof-verifier.js` | 200, immutable cache, SRI available |
-| `GET /api/sdk/integrity` | includes `proof-verifier.js`, `lemma-ishuman-verify.mjs` |
+| `GET /api/sdk/integrity` | includes `proof-verifier.js`, `proof-verifier.mjs` |
 | npm/PyPI publish | workflow + checklist ready; live registry publish on tag + secrets |
 
 - [x] Publish tested npm and PyPI verifier packages (packages at 1.4.0; release workflow + checklist; registry publish on tag when secrets set).
@@ -592,7 +592,7 @@ Exit criteria:
 - [x] Publish accurate OpenAPI contracts for relying-site APIs.
 - [x] Provide production examples using durable policy and nonce stores (`examples/production_redis_signup/`).
 - [x] Remove stale demos, unsafe in-memory production patterns, and conflicting version numbers (sync script + demo default 1.9.2).
-- [x] Automate package publication and release notes (`ishuman-verify-release.yml` + release checklist).
+- [x] Automate package publication and release notes (`proof-verifier-release.yml` + release checklist).
 
 Exit criteria:
 

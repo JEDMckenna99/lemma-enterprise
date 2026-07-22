@@ -15,17 +15,17 @@ from pathlib import Path
 import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
-PY_SDK_PATH = ROOT / "examples" / "relying_site_offline_verify.py"
-MJS_PATH = ROOT / "static" / "js" / "lemma-ishuman-verify.mjs"
+PY_SDK_PATH = ROOT / "examples" / "proof-verifier.py"
+MJS_PATH = ROOT / "static" / "js" / "proof-verifier.mjs"
 APP_PATH = ROOT / "app.py"
 DOCS_PATH = ROOT / "templates" / "docs" / "ishuman.html"
 
 
 def _load_py_sdk():
     pytest.importorskip("cryptography")
-    if "relying_site_offline_verify" in sys.modules:
-        return sys.modules["relying_site_offline_verify"]
-    spec = importlib.util.spec_from_file_location("relying_site_offline_verify", PY_SDK_PATH)
+    if "proof_verifier" in sys.modules:
+        return sys.modules["proof_verifier"]
+    spec = importlib.util.spec_from_file_location("proof_verifier", PY_SDK_PATH)
     mod = importlib.util.module_from_spec(spec)
     # Register before exec so dataclasses with `from __future__ import
     # annotations` (string annotations) can resolve cls.__module__.
@@ -246,8 +246,12 @@ def test_node_sdk_durable_drops_session_assertion():
 
 
 def test_backend_sdk_versions_bumped():
-    app = APP_PATH.read_text(encoding="utf-8")
-    assert app.count("response.headers['X-SDK-Version'] = '1.4.0'") >= 2
+    from api.sdk_versions import backend_verifier_version
+
+    serving = (ROOT / "api" / "sdk_serving.py").read_text(encoding="utf-8")
+    assert 'response.headers["X-SDK-Version"] = version' in serving
+    assert "backend_verifier_version()" in serving
+    assert backend_verifier_version() == "1.4.0"
 
 
 def test_docs_document_backend_verify_stamp():

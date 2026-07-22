@@ -1,6 +1,6 @@
-"""Offline isHuman presentation verification for relying sites.
+"""Offline Lemma proof verification for relying sites.
 
-Drop-in Python helper that verifies an `IsHumanVerifier.verify()` result
+Drop-in Python helper that verifies browser `ProofVerifier` results
 **entirely on the relying site's own backend** with no per-request calls to
 lemma.id. lemma.id is only contacted periodically to refresh the signed
 revocation snapshot + issuer trust list (typically every ~15 minutes, or
@@ -20,7 +20,7 @@ Requirements: ``cryptography>=42`` (standard PyPI package). No other deps.
 
 Example:
 
-    from relying_site_offline_verify import VerificationContext
+    from proof_verifier import VerificationContext
 
     ctx = VerificationContext(
         site_id="tickets-demo.lemma.id",
@@ -192,7 +192,7 @@ def try_canonicalize_site_hostname(value: Optional[str]) -> Tuple[Optional[str],
 def _import_enforce_site_policy():
     """Load site-policy helper from package or sibling zero-install file."""
     try:
-        from lemma_ishuman_site_policy import enforce_site_policy
+        from lemma_proof_verifier_site_policy import enforce_site_policy
 
         return enforce_site_policy
     except ImportError:
@@ -200,12 +200,12 @@ def _import_enforce_site_policy():
         import sys
         from pathlib import Path
 
-        sibling = Path(__file__).resolve().with_name("lemma_ishuman_site_policy.py")
+        sibling = Path(__file__).resolve().with_name("lemma_proof_verifier_site_policy.py")
         if not sibling.exists():
-            raise ImportError("lemma_ishuman_site_policy unavailable") from None
-        spec = importlib.util.spec_from_file_location("lemma_ishuman_site_policy", sibling)
+            raise ImportError("lemma_proof_verifier_site_policy unavailable") from None
+        spec = importlib.util.spec_from_file_location("lemma_proof_verifier_site_policy", sibling)
         if spec is None or spec.loader is None:
-            raise ImportError("lemma_ishuman_site_policy unavailable") from None
+            raise ImportError("lemma_proof_verifier_site_policy unavailable") from None
         mod = importlib.util.module_from_spec(spec)
         sys.modules[spec.name] = mod
         spec.loader.exec_module(mod)
@@ -768,7 +768,7 @@ class InMemoryNonceStore:
 
 def _import_redis_nonce_store():
     try:
-        from lemma_ishuman_nonce_store import RedisNonceStore
+        from lemma_proof_verifier_nonce_store import RedisNonceStore
 
         return RedisNonceStore
     except ImportError:
@@ -776,10 +776,10 @@ def _import_redis_nonce_store():
         import sys
         from pathlib import Path
 
-        sibling = Path(__file__).resolve().with_name("lemma_ishuman_nonce_store.py")
+        sibling = Path(__file__).resolve().with_name("lemma_proof_verifier_nonce_store.py")
         if not sibling.exists():
             return None
-        spec = importlib.util.spec_from_file_location("lemma_ishuman_nonce_store", sibling)
+        spec = importlib.util.spec_from_file_location("lemma_proof_verifier_nonce_store", sibling)
         if spec is None or spec.loader is None:
             return None
         mod = importlib.util.module_from_spec(spec)
@@ -1360,14 +1360,14 @@ class VerificationContext:
 
 # ---------------------------------------------------------------------------
 # Tiny CLI for manual testing:
-#   python relying_site_offline_verify.py <site_id> <presentation.json>
+#   python proof-verifier.py <site_id> <presentation.json>
 # ---------------------------------------------------------------------------
 
 if __name__ == "__main__":
     import sys
 
     if len(sys.argv) != 3:
-        print("usage: relying_site_offline_verify.py <site_id> <presentation.json>")
+        print("usage: proof-verifier.py <site_id> <presentation.json>")
         sys.exit(2)
     site_id = sys.argv[1]
     with open(sys.argv[2], encoding="utf-8") as fh:
