@@ -35,10 +35,13 @@ def test_protocol_registry_covers_all_human_auth_artifact_classes():
 def test_implicit_legacy_formats_are_not_misrepresented_as_explicit_versions():
     registry = load_registry()
     by_id = {artifact["artifact_id"]: artifact for artifact in registry["artifacts"]}
-    for artifact_id in (
-        "ishuman_credential",
-        "wallet_assertion",
-        "wallet_master_secret",
-        "presentation_envelope",
-    ):
-        assert by_id[artifact_id]["status"] == "implicit_legacy"
+    expected = {
+        # Credential shape is now explicit v2 with retained legacy v1 verify path.
+        "ishuman_credential": "explicit_with_legacy_v1",
+        "wallet_assertion": "implicit_legacy",
+        "wallet_master_secret": "implicit_legacy",
+        "presentation_envelope": "implicit_legacy",
+    }
+    for artifact_id, status in expected.items():
+        assert by_id[artifact_id]["status"] == status
+        assert by_id[artifact_id]["status"] != "explicit"

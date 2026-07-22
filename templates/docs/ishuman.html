@@ -31,7 +31,7 @@
     </ol>
     <div class="callout callout--info">
         <div class="callout-title">No webhooks to configure</div>
-        <p>Relying sites do <strong>not</strong> register webhook URLs with lemma.id. Verification completes in the browser (SDK + Lemma-hosted popup). Your backend learns the outcome when the client sends you the <code>ppid</code> or a stamped audit event. There is no lemma.id callback.</p>
+        <p>Relying sites do <strong>not</strong> register webhook URLs with lemma.id. Verification completes in the browser (SDK + Lemma-hosted popup). For account creation and protected server actions, the client sends your backend a signed <code>presentation</code> or verifiable action stamp. Your backend verifies it locally and reads the trusted PPID from the verification result. There is no lemma.id callback.</p>
     </div>
     <div class="callout callout--info">
         <div class="callout-title">Using an AI coding agent?</div>

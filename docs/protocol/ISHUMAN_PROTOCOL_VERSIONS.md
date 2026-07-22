@@ -24,7 +24,7 @@
 | Site PPID derivation | v1 | `lemma.id/site-ppid/v1` | Explicit |
 | Document root | v2 | `lemma.identity.document-root.v2` | Explicit; legacy v1 retained |
 | Person root | v1 | `lemma.id/person-root/v1` | Explicit |
-| isHuman credential | browser-canonical v1 | `proof.signatureValueWeb` shape | Implicit legacy |
+| isHuman credential | browser-canonical v2 | `proof.signatureValueWeb` shape | Explicit; legacy v1 retained |
 | Site session presentation | v1 | `lemma:site-session-presentation:v1` | Explicit |
 | Wallet assertion | v1 | registered `build_assertion_payload` shape | Implicit legacy |
 | Wallet master secret | v1 | `LEMMA_PPID_ROOT_KEY` HMAC derivation | Implicit legacy |

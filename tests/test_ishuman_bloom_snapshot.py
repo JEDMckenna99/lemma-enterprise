@@ -36,11 +36,13 @@ def bloom_signing_keypair():
 def patch_bloom_issuer_signing(monkeypatch, bloom_signing_keypair):
     """Avoid KMS/federated issuer dependency in unit tests."""
     private_key, public_key = bloom_signing_keypair
+    pubkey_hex = public_key.public_bytes_raw().hex()
 
     def _material():
         return private_key, public_key, "did:lemma:" + ("a" * 64)
 
     monkeypatch.setattr("api.bloom_snapshot._issuer_signing_material", _material)
+    monkeypatch.setenv("LEMMA_NETWORK_ROOT_PUBKEYS", pubkey_hex)
     monkeypatch.setenv("LEMMA_ALLOW_UNPINNED_TRUST_ROOT", "1")
 
 

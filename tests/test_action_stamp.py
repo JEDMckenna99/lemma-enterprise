@@ -160,8 +160,12 @@ def test_node_sdk_exposes_verify_action_stamp():
 
 
 def test_backend_sdk_version_headers():
-    app = (ROOT / "app.py").read_text(encoding="utf-8")
-    assert app.count("response.headers['X-SDK-Version'] = '1.4.0'") >= 2
+    from api.sdk_versions import backend_verifier_version
+
+    serving = (ROOT / "api" / "sdk_serving.py").read_text(encoding="utf-8")
+    assert 'response.headers["X-SDK-Version"] = version' in serving
+    assert "backend_verifier_version()" in serving
+    assert backend_verifier_version() == "1.4.0"
 
 
 def test_docs_mention_stamp_action():
