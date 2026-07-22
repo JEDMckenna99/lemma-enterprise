@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 import hashlib
-import shutil
 import sys
 from pathlib import Path
 
@@ -28,8 +27,18 @@ SYNC_PAIRS: list[tuple[Path, Path]] = [
 ]
 
 
+def _normalized_bytes(path: Path) -> bytes:
+    return path.read_bytes().replace(b"\r\n", b"\n")
+
+
 def _sha256(path: Path) -> str:
-    return hashlib.sha256(path.read_bytes()).hexdigest()
+    return hashlib.sha256(_normalized_bytes(path)).hexdigest()
+
+
+def _copy_mirror(src: Path, dst: Path) -> None:
+    dst.parent.mkdir(parents=True, exist_ok=True)
+    text = src.read_text(encoding="utf-8").replace("\r\n", "\n")
+    dst.write_text(text, encoding="utf-8", newline="\n")
 
 
 def sync(*, check_only: bool = False) -> bool:
@@ -44,8 +53,7 @@ def sync(*, check_only: bool = False) -> bool:
                 print(f"DRIFT {src.name}: {src} -> {dst}")
                 ok = False
             continue
-        dst.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(src, dst)
+        _copy_mirror(src, dst)
         print(f"synced {src.relative_to(REPO_ROOT)} -> {dst.relative_to(REPO_ROOT)}")
     return ok
 
