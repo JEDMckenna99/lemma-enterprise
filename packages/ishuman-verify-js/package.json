@@ -1,6 +1,6 @@
 {
   "name": "@lemma/ishuman-verify",
-  "version": "1.0.0",
+  "version": "1.4.0",
   "description": "Local-first isHuman presentation verifier. Verifies signed VC + site-bound session presentations on your backend with no per-request calls to lemma.id.",
   "type": "module",
   "main": "./index.mjs",

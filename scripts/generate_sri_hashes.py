@@ -27,6 +27,8 @@ from datetime import datetime
 SDK_FILES = [
     'static/js/lemma-wallet.js',
     'static/js/lemma-shield.js',
+    'static/js/ishuman-verifier.js',
+    'static/js/lemma-ishuman-verify.mjs',
 ]
 
 # Optional CDN files

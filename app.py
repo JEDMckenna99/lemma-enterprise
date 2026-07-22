@@ -885,6 +885,10 @@ def create_app():
             'verifiedAt': current_time
         })
 
+    from api.sdk_serving import register_sdk_routes
+
+    register_sdk_routes(app)
+
     @app.route('/sdk/lemma-wallet.js')
     def lemma_wallet_sdk_fresh():
         """
@@ -896,49 +900,6 @@ def create_app():
         # Short shared-cache TTL until versioned CDN ships; clients revalidate quickly.
         response.headers['Cache-Control'] = 'public, max-age=60, stale-while-revalidate=300'
         response.headers['X-SDK-Version'] = '2.36.0'
-        response.headers['Access-Control-Allow-Origin'] = '*'
-        return response
-
-    @app.route('/sdk/proof-verifier.js')
-    @app.route('/sdk/ishuman-verifier.js')
-    def proof_verifier_sdk():
-        """Serve the browser proof verifier under current and legacy URLs."""
-        from api.sdk_versions import ISHUMAN_VERIFIER_SDK_VERSION
-        from flask import send_from_directory
-        response = send_from_directory('static/js', 'ishuman-verifier.js', mimetype='application/javascript')
-        response.headers['Cache-Control'] = 'public, max-age=60, stale-while-revalidate=300'
-        response.headers['X-SDK-Version'] = ISHUMAN_VERIFIER_SDK_VERSION
-        response.headers['Access-Control-Allow-Origin'] = '*'
-        return response
-
-    @app.route('/sdk/lemma-ishuman-verify.mjs')
-    def ishuman_verify_backend_sdk():
-        """Serve the relying-site backend verifier (Node.js/Deno/Workers/Bun/browser).
-
-        Usage:
-            import { createVerifier } from "https://lemma.id/sdk/lemma-ishuman-verify.mjs";
-        """
-        from flask import send_from_directory
-        response = send_from_directory('static/js', 'lemma-ishuman-verify.mjs', mimetype='application/javascript')
-        response.headers['Cache-Control'] = 'public, max-age=300'
-        response.headers['X-SDK-Version'] = '1.4.0'
-        response.headers['Access-Control-Allow-Origin'] = '*'
-        return response
-
-    @app.route('/sdk/lemma_ishuman_verify.py')
-    def ishuman_verify_python_sdk():
-        """Serve the relying-site backend verifier for Python.
-
-        Usage:
-            curl -O https://lemma.id/sdk/lemma_ishuman_verify.py
-            from lemma_ishuman_verify import VerificationContext
-        """
-        from flask import send_from_directory
-        response = send_from_directory(
-            'examples', 'relying_site_offline_verify.py', mimetype='text/x-python',
-        )
-        response.headers['Cache-Control'] = 'public, max-age=300'
-        response.headers['X-SDK-Version'] = '1.4.0'
         response.headers['Access-Control-Allow-Origin'] = '*'
         return response
 

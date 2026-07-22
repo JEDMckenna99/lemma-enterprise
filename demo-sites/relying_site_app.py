@@ -35,7 +35,7 @@ PRESALE_CODE_CLAIM_ASSURANCE = os.getenv(
 PRESALE_ESCALATED_ASSURANCE = os.getenv(
     "LEMMA_PRESALE_ESCALATED_ASSURANCE", "ishuman"
 ).strip().lower()
-ISHUMAN_VERIFIER_SDK_VERSION = os.getenv("ISHUMAN_VERIFIER_SDK_VERSION", "1.9.1").strip()
+ISHUMAN_VERIFIER_SDK_VERSION = os.getenv("ISHUMAN_VERIFIER_SDK_VERSION", "1.9.2").strip()
 
 TICKETING_ICON_SVG = """<svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
   <rect x="6.8" y="3.4" width="13.6" height="8.4" rx="1.4" stroke="#d97706" stroke-width="1.6" opacity="0.5" transform="rotate(8 13.6 7.6)"/>

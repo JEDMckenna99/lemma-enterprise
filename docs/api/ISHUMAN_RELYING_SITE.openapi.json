@@ -1,0 +1,113 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "lemma.id isHuman relying-site API subset",
+    "version": "1.4.0",
+    "description": "Optional lemma.id endpoints called by relying-site backends. Most integrations use browser SDK + local verifier packages only."
+  },
+  "servers": [{ "url": "https://lemma.id" }],
+  "paths": {
+    "/api/ishuman/verify-presentation": {
+      "post": {
+        "summary": "Optional server-side presentation re-verify",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/VerifyPresentationRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Verified", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/VerifyPresentationResponse" } } } },
+          "400": { "description": "Invalid presentation" },
+          "401": { "description": "Verification failed / assurance insufficient" }
+        }
+      }
+    },
+    "/api/revocation/bloom-filter": {
+      "get": {
+        "summary": "Signed bloom snapshot for local verifiers",
+        "responses": {
+          "200": { "description": "Signed bloom bundle" },
+          "503": { "description": "Revocation unavailable (fail closed)" }
+        }
+      }
+    },
+    "/api/ishuman/site-block": {
+      "post": {
+        "summary": "Site-scoped PPID ban",
+        "security": [{ "ApiKeyAuth": [] }],
+        "responses": {
+          "200": { "description": "Blocked" },
+          "401": { "description": "Missing or invalid API key" }
+        }
+      }
+    },
+    "/api/ishuman/site-binding-check": {
+      "get": {
+        "summary": "Hostname canonicalization hint for SDK siteId",
+        "parameters": [
+          { "name": "hostname", "in": "query", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Binding hint" }
+        }
+      }
+    },
+    "/api/sdk/versions": {
+      "get": {
+        "summary": "Published SDK version manifest",
+        "responses": {
+          "200": { "description": "Manifest JSON" }
+        }
+      }
+    },
+    "/api/sdk/integrity": {
+      "get": {
+        "summary": "SRI hashes for browser SDK assets",
+        "responses": {
+          "200": { "description": "Integrity bundle" }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "ApiKeyAuth": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-API-Key"
+      }
+    },
+    "schemas": {
+      "VerifyPresentationRequest": {
+        "type": "object",
+        "required": ["presentation"],
+        "properties": {
+          "presentation": { "type": "object", "description": "Signed presentation from browser SDK" },
+          "required_assurance": { "type": "string", "enum": ["passkey", "ishuman"], "default": "ishuman" },
+          "site_id": { "type": "string", "description": "Canonical hostname binding" }
+        }
+      },
+      "VerifyPresentationResponse": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean" },
+          "ppid": { "type": "string" },
+          "assurance": { "type": "string" }
+        }
+      },
+      "RelyingSiteSignupRequest": {
+        "type": "object",
+        "description": "Recommended relying-site signup contract (implemented on customer origin)",
+        "required": ["presentation"],
+        "properties": {
+          "presentation": { "type": "object" },
+          "ppid": { "type": "string", "description": "Informational only; verify cryptographically" },
+          "assurance": { "type": "string" }
+        }
+      }
+    }
+  }
+}

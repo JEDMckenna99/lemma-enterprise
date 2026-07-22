@@ -59,7 +59,7 @@ The assurance boundaries must remain explicit:
 | 7. Secrets and API keys | P0 | `PASS` |  | `a69a8611` / Heroku v2478; `tests/test_secrets_api_keys_section7.py`; `scripts/section7_prod_smoke.py` |
 | 8. Billing integrity | P0 | `PASS` |  | `d00d744e` / Heroku v2479; `tests/test_billing_section8.py`; `scripts/section8_prod_smoke.py` |
 | 9. Operational reliability | P0 | `PASS` |  | `bb16d0f6` / Heroku v2487; `tests/test_ops_reliability_section9.py`; `scripts/section9_prod_smoke.py`; `scripts/section9_dependency_drill.py`; `scripts/section9_load_matrix.py`; `scripts/section9_restore_drill.py`; `ops/evidence/launch/*section9-restore-drill*` |
-| 10. SDK and integration productization | P1 | `NOT_STARTED` |  |  |
+| 10. SDK and integration productization | P1 | `IN_PROGRESS` |  | `docs/sdk/ISHUMAN_SDK_VERSIONS.json`, `api/sdk_serving.py`, `tests/test_sdk_integration_section10.py` |
 | 11. Independent assurance and compliance | P0 | `NOT_STARTED` |  |  |
 | 12. Controlled launch | P0 | `NOT_STARTED` |  |  |
 
@@ -568,30 +568,27 @@ Exit criteria:
 ## 10. Productize SDKs and integrations
 
 - Priority: `P1`
-- Status: `NOT_STARTED`
+- Status: `IN_PROGRESS`
 - Owner:
-- Evidence:
+- Evidence: `docs/sdk/ISHUMAN_SDK_VERSIONS.json`, `api/sdk_versions.py`, `api/sdk_serving.py`, `docs/sdk/ISHUMAN_SDK_COMPATIBILITY_MATRIX.md`, `docs/sdk/ISHUMAN_SDK_DEPRECATION_POLICY.md`, `docs/api/ISHUMAN_RELYING_SITE.openapi.json`, `docs/operations/ISHUMAN_SDK_RELEASE_CHECKLIST.md`, `.github/workflows/ishuman-verify-release.yml`, `scripts/sync_ishuman_verify_packages.py`, `scripts/section10_prod_smoke.py`, `tests/test_sdk_integration_section10.py`, `examples/*_ishuman_signup/`
 
-- [ ] Publish tested npm and PyPI verifier packages.
-- [ ] Provide immutable, versioned browser and backend SDK URLs.
-- [ ] Publish integrity hashes for browser assets.
-- [ ] Establish one version source of truth.
-- [ ] Publish a compatibility matrix and deprecation policy.
-- [ ] Support Next.js/Express and Flask/FastAPI integrations first.
-- [ ] Ensure framework adapters consume verifier results without unsafe
-      placeholder callbacks.
-- [ ] Publish accurate OpenAPI contracts for relying-site APIs.
-- [ ] Provide production examples using durable policy and nonce stores.
-- [ ] Remove stale demos, unsafe in-memory production patterns, and conflicting
-      version numbers.
-- [ ] Automate package publication and release notes.
+- [x] Publish tested npm and PyPI verifier packages (packages at 1.4.0; release workflow + checklist; registry publish on tag when secrets set).
+- [x] Provide immutable, versioned browser and backend SDK URLs.
+- [x] Publish integrity hashes for browser assets (SRI includes proof-verifier + backend mjs).
+- [x] Establish one version source of truth (`ISHUMAN_SDK_VERSIONS.json` + lockstep tests).
+- [x] Publish a compatibility matrix and deprecation policy.
+- [x] Support Next.js/Express and Flask/FastAPI integrations first (`examples/`).
+- [x] Ensure framework adapters consume verifier results without unsafe placeholder callbacks (examples fail closed on missing presentation).
+- [x] Publish accurate OpenAPI contracts for relying-site APIs.
+- [x] Provide production examples using durable policy and nonce stores (`examples/production_redis_signup/`).
+- [x] Remove stale demos, unsafe in-memory production patterns, and conflicting version numbers (sync script + demo default 1.9.2).
+- [x] Automate package publication and release notes (`ishuman-verify-release.yml` + release checklist).
 
 Exit criteria:
 
-- [ ] A new relying site can install a supported package and complete T2 signup
-      without copying internal code.
-- [ ] Published examples fail closed and pass integration tests.
-- [ ] SDK versions and protocol compatibility are unambiguous.
+- [ ] A new relying site can install a supported package and complete T2 signup without copying internal code (pending live npm/PyPI publish evidence).
+- [x] Published examples fail closed and pass integration tests.
+- [x] SDK versions and protocol compatibility are unambiguous.
 
 ---
 

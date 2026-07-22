@@ -1,0 +1,55 @@
+name: ishuman-verify-release
+
+on:
+  push:
+    tags:
+      - "ishuman-verify-v*"
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          registry-url: "https://registry.npmjs.org"
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Sync verifier mirrors
+        run: python scripts/sync_ishuman_verify_packages.py --check
+
+      - name: Section 10 unit tests
+        run: |
+          pip install -r requirements.txt
+          pip install pytest cryptography
+          python -m pytest tests/test_sdk_integration_section10.py tests/test_ishuman_verify_packages.py -q
+
+      - name: Build Python package
+        working-directory: packages/ishuman-verify-py
+        run: pip install build && python -m build
+
+      - name: Publish npm package
+        if: ${{ secrets.NPM_TOKEN != '' }}
+        working-directory: packages/ishuman-verify-js
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: npm publish --access public
+
+      - name: Publish PyPI package
+        if: ${{ secrets.PYPI_API_TOKEN != '' }}
+        env:
+          TWINE_USERNAME: __token__
+          TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
+        run: |
+          pip install twine
+          twine upload packages/ishuman-verify-py/dist/*
+
+      - name: Release summary
+        run: |
+          echo "Tag ${{ github.ref_name }} built."
+          echo "Configure NPM_TOKEN and PYPI_API_TOKEN for live registry publish."

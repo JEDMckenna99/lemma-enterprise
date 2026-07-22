@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "lemma-ishuman-verify"
-version = "1.0.0"
+version = "1.4.0"
 description = "Local-first isHuman presentation verifier for relying-site backends. Verifies signed VC + site-bound session presentations with no per-request calls to lemma.id."
 readme = "README.md"
 requires-python = ">=3.10"

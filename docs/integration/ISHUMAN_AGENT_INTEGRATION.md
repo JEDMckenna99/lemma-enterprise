@@ -10,9 +10,12 @@
 |----------|-----|
 | Human-readable docs | https://lemma.id/docs |
 | This guide (machine-oriented) | https://lemma.id/docs/integration/ISHUMAN_AGENT_INTEGRATION.md |
-| Browser SDK | https://lemma.id/sdk/proof-verifier.js |
-| JS verifier (backend) | https://lemma.id/sdk/lemma-ishuman-verify.mjs |
-| Python verifier (backend) | https://lemma.id/sdk/lemma_ishuman_verify.py |
+| Browser SDK (immutable) | https://lemma.id/sdk/v1.9.2/proof-verifier.js |
+| Browser SDK (rolling) | https://lemma.id/sdk/proof-verifier.js |
+| JS verifier (immutable) | https://lemma.id/sdk/v1.4.0/lemma-ishuman-verify.mjs |
+| Python verifier (immutable) | https://lemma.id/sdk/v1.4.0/lemma_ishuman_verify.py |
+| SDK manifest | https://lemma.id/api/sdk/versions |
+| SRI hashes | https://lemma.id/api/sdk/integrity |
 | Live demo | https://lemma.id/demo |
 | API key manager (abuse only) | https://lemma.id/developer/external-api-keys |
 | Pointer file | https://lemma.id/llms.txt |

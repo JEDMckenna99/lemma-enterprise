@@ -33,6 +33,16 @@ SDK_FILES = {
         'path': 'static/js/lemma-shield.js',
         'url': '/sdk/lemma-shield.js',
         'description': 'Lemma Shield (inline verification)'
+    },
+    'proof-verifier.js': {
+        'path': 'static/js/ishuman-verifier.js',
+        'url': '/sdk/proof-verifier.js',
+        'description': 'Browser proof verifier (isHuman / passkey)'
+    },
+    'lemma-ishuman-verify.mjs': {
+        'path': 'static/js/lemma-ishuman-verify.mjs',
+        'url': '/sdk/lemma-ishuman-verify.mjs',
+        'description': 'Backend isHuman verifier (Node/Edge)'
     }
 }
 
