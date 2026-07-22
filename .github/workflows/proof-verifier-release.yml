@@ -5,6 +5,7 @@ on:
     tags:
       - "proof-verifier-v*"
       - "ishuman-verify-v*"
+  workflow_dispatch:
 
 jobs:
   release:
@@ -35,22 +36,29 @@ jobs:
         run: pip install build && python -m build
 
       - name: Publish npm package
-        if: ${{ secrets.NPM_TOKEN != '' }}
         working-directory: packages/proof-verifier-js
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: npm publish --access public
+        run: |
+          if [ -z "${NODE_AUTH_TOKEN:-}" ]; then
+            echo "NPM_TOKEN secret not configured; skipping npm publish"
+            exit 0
+          fi
+          npm publish --access public
 
       - name: Publish PyPI package
-        if: ${{ secrets.PYPI_API_TOKEN != '' }}
         env:
           TWINE_USERNAME: __token__
           TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
         run: |
+          if [ -z "${TWINE_PASSWORD:-}" ]; then
+            echo "PYPI_API_TOKEN secret not configured; skipping PyPI publish"
+            exit 0
+          fi
           pip install twine
           twine upload packages/proof-verifier-py/dist/*
 
       - name: Release summary
         run: |
-          echo "Tag ${{ github.ref_name }} built."
+          echo "Tag or dispatch: ${{ github.ref_name }}"
           echo "Configure NPM_TOKEN and PYPI_API_TOKEN for live registry publish."

@@ -25,6 +25,8 @@
 4. Run prod smoke:
    ```powershell
    python scripts/section10_prod_smoke.py
+   python scripts/section10_registry_smoke.py
+   python scripts/section10_registry_smoke.py --require-registry
    ```
 
 ## Registry secrets (GitHub Actions)

@@ -570,17 +570,19 @@ Exit criteria:
 - Priority: `P1`
 - Status: `IN_PROGRESS`
 - Owner:
-- Evidence: `docs/sdk/ISHUMAN_SDK_VERSIONS.json`, `api/sdk_versions.py`, `api/sdk_serving.py`, `docs/sdk/ISHUMAN_SDK_COMPATIBILITY_MATRIX.md`, `docs/sdk/ISHUMAN_SDK_DEPRECATION_POLICY.md`, `docs/api/ISHUMAN_RELYING_SITE.openapi.json`, `docs/operations/ISHUMAN_SDK_RELEASE_CHECKLIST.md`, `.github/workflows/proof-verifier-release.yml`, `scripts/sync_proof_verifier_packages.py`, `scripts/section10_prod_smoke.py`, `tests/test_sdk_integration_section10.py`, `examples/*_ishuman_signup/`
+- Evidence: `docs/sdk/ISHUMAN_SDK_VERSIONS.json`, `api/sdk_versions.py`, `api/sdk_serving.py`, `docs/sdk/ISHUMAN_SDK_COMPATIBILITY_MATRIX.md`, `docs/sdk/ISHUMAN_SDK_DEPRECATION_POLICY.md`, `docs/api/ISHUMAN_RELYING_SITE.openapi.json`, `docs/operations/ISHUMAN_SDK_RELEASE_CHECKLIST.md`, `.github/workflows/proof-verifier-release.yml`, `scripts/sync_proof_verifier_packages.py`, `scripts/section10_prod_smoke.py`, `scripts/section10_registry_smoke.py`, `tests/test_sdk_integration_section10.py`, `examples/*_ishuman_signup/`
 
-**Production evidence (2026-07-22, Heroku v2490):**
+**Production evidence (2026-07-22, Heroku v2492):**
 
 | Check | Result |
 | ----- | ------ |
 | `python scripts/section10_prod_smoke.py` | PASS (5/5) |
-| `GET /api/sdk/versions` | manifest `browser_verifier=1.9.2`, `backend_verifier=1.4.0` |
-| `GET /sdk/v1.9.2/proof-verifier.js` | 200, immutable cache, SRI available |
-| `GET /api/sdk/integrity` | includes `proof-verifier.js`, `proof-verifier.mjs` |
-| npm/PyPI publish | workflow + checklist ready; live registry publish on tag + secrets |
+| `python scripts/section10_registry_smoke.py` | PASS zero-install + local PyPI wheel import (5/5 required); npm/PyPI registry 404 until secrets publish |
+| `GET /api/sdk/versions` | manifest `browser_verifier=1.9.2`, `backend_verifier=1.4.0`, canonical `@lemma/proof-verifier` / `lemma-proof-verifier` |
+| `GET /sdk/v1.4.0/proof-verifier.mjs` | 200, immutable cache |
+| `GET /sdk/v1.4.0/proof-verifier.py` | 200 |
+| Legacy aliases | `/sdk/lemma-ishuman-verify.mjs`, `/sdk/lemma_ishuman_verify.py` → 200 |
+| npm/PyPI publish | **Blocked:** `NPM_TOKEN` + `PYPI_API_TOKEN` not in GitHub Actions secrets; tag `proof-verifier-v1.4.0` triggers build-only release |
 
 - [x] Publish tested npm and PyPI verifier packages (packages at 1.4.0; release workflow + checklist; registry publish on tag when secrets set).
 - [x] Provide immutable, versioned browser and backend SDK URLs.
@@ -596,7 +598,9 @@ Exit criteria:
 
 Exit criteria:
 
-- [ ] A new relying site can install a supported package and complete T2 signup without copying internal code (pending live npm/PyPI publish evidence).
+- [ ] A new relying site can install a supported package and complete T2 signup without copying internal code.
+  - **Done:** zero-install `/sdk/v1.4.0/proof-verifier.{mjs,py}` on lemma.id; local PyPI wheel imports `VerificationContext`.
+  - **Pending:** live `npm install @lemma/proof-verifier@1.4.0` and `pip install lemma-proof-verifier==1.4.0` after `NPM_TOKEN` + `PYPI_API_TOKEN` are set and tag `proof-verifier-v1.4.0` release workflow publishes.
 - [x] Published examples fail closed and pass integration tests.
 - [x] SDK versions and protocol compatibility are unambiguous.
 
