@@ -50,8 +50,8 @@ def test_ishuman_demo_page_loads_expected_assets(ishuman_demo_client):
     assert "Enforce" in body
     assert "ih-enforce-rows" in body
     assert "ih-enforce-trials-ppid" in body
-    assert "Doubt presence" in body
-    assert "Doubt human proof" in body
+    assert "Fresh passkey" in body
+    assert "Doubt humanity" in body
     assert "Set assurance level (presale)" in body
     assert "Enforce site decisions" not in body
     assert "Set assurance level</h3>" not in body

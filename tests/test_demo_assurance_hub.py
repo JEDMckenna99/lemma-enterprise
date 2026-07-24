@@ -45,7 +45,8 @@ def test_demo_hub_template_has_three_concept_lifecycle():
     assert "assurance-only" in html
     assert 'data-quick-act="3"' in html
     assert "ih-enforce-rows" in html
-    assert "Doubt presence" in html
+    assert "Fresh passkey" in html
+    assert "Doubt humanity" in html
     assert "Set assurance level (presale)" in html
 
 

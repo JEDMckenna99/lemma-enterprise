@@ -1122,7 +1122,7 @@
       if (resolveBtn) {
         resolveBtn.hidden = !doubted;
         const tier = state.pendingDoubtResolve[slug] || 'passkey';
-        resolveBtn.textContent = tier === 'ishuman' ? 'Resolve (human proof)' : 'Resolve (presence)';
+        resolveBtn.textContent = tier === 'ishuman' ? 'Resolve (human proof)' : 'Resolve (fresh passkey)';
       }
       if (banBtn) {
         const blocked = isSiteBlocked(slug, result);
@@ -2044,7 +2044,7 @@
         ppid: result.ppid,
         reason: tier === 'ishuman'
           ? 'Demo doubt: require fresh human proof'
-          : 'Demo doubt: require fresh presence',
+          : 'Demo doubt: require fresh passkey',
       }),
     });
     state.localDoubts[slug].add(result.ppid);
@@ -2056,7 +2056,7 @@
     scrollToPanel('ih-step-3');
     setQuickInsight(
       'Enforce',
-      `${slug === 'tickets' ? 'Presale' : 'SaaS trial'} returned doubt_required, resolve with ${tier === 'ishuman' ? 'human proof' : 'presence'}.`,
+      `${slug === 'tickets' ? 'Presale' : 'SaaS trial'} returned doubt_required, resolve with ${tier === 'ishuman' ? 'human proof' : 'fresh passkey'}.`,
     );
     updateBlockResultsTable();
   }
@@ -2065,27 +2065,61 @@
     return createSiteDoubt('tickets', state.pendingDoubtResolve.tickets || 'passkey');
   }
 
+  async function runFreshPasskeyChallenge() {
+    await acquireWallet();
+    await state.wallet.init();
+    if (typeof state.wallet._requireFreshPasskeyAuth !== 'function') {
+      throw new Error('Fresh passkey challenge unavailable');
+    }
+    const auth = await state.wallet._requireFreshPasskeyAuth({
+      reason: 'Site requires a fresh passkey',
+    });
+    if (!auth?.success) {
+      throw new Error('fresh_passkey_failed');
+    }
+  }
+
   async function resolveSiteDoubt(slug) {
     const result = state.results[slug] || await verifySite(slug);
     if (!result.ppid) throw new Error(`${slug} PPID unavailable`);
     if (result.reason !== 'doubt_required' && !state.localDoubts[slug].has(result.ppid)) {
       throw new Error(`No active doubt on ${slug}, create one first`);
     }
-    const requiredAssurance = state.pendingDoubtResolve[slug] || demoRequiredAssurance(slug);
-    const verifier = verifierFor(slug);
-    const fresh = await verifier.verifyFreshForBackend({ requiredAssurance });
-    if (!fresh.ok) {
-      throw new Error(fresh.reason || 'fresh_verification_failed');
+    const requiredAssurance = state.pendingDoubtResolve[slug] || 'passkey';
+    const ppid = result.ppid;
+
+    // Suspend local doubt for the deliberate resolve ceremony. The SDK
+    // re-checks isBlockedLocally while applying a fresh proof; leaving the
+    // flag set makes a successful ceremony report doubt_required.
+    state.localDoubts[slug].delete(ppid);
+    try {
+      if (requiredAssurance === 'ishuman') {
+        const verifier = verifierFor(slug, { requiredAssurance: 'ishuman' });
+        const fresh = await verifier.verifyFreshForBackend({ requiredAssurance: 'ishuman' });
+        if (!fresh.ok) {
+          throw new Error(fresh.reason || 'fresh_verification_failed');
+        }
+      } else {
+        await runFreshPasskeyChallenge();
+      }
+      await requestJson('/api/demo/ishuman/clear-site-doubt', {
+        method: 'POST',
+        body: JSON.stringify({ site_slug: slug, ppid }),
+      });
+    } catch (err) {
+      state.localDoubts[slug].add(ppid);
+      throw err;
     }
-    await requestJson('/api/demo/ishuman/clear-site-doubt', {
-      method: 'POST',
-      body: JSON.stringify({ site_slug: slug, ppid: result.ppid }),
-    });
-    state.localDoubts[slug].delete(result.ppid);
+
     clearVerifierCache(slug);
     await verifySite('tickets');
     await verifySite('trials');
-    setQuickInsight('Enforce', 'Fresh proof resolved the doubt. Other sites were unaffected.');
+    setQuickInsight(
+      'Enforce',
+      requiredAssurance === 'ishuman'
+        ? 'Fresh human proof resolved the doubt. Other sites were unaffected.'
+        : 'Fresh passkey resolved the challenge. Other sites were unaffected.',
+    );
     updateBlockResultsTable();
   }
 
