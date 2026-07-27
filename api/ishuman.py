@@ -918,7 +918,11 @@ def _deny_if_derivation_revoked(
 ) -> Optional[str]:
     """Return an error code if derivation must be denied for revocation/block."""
     from api.revocation_verifier import check_revocation_candidate
-    from api.site_ppid_revocation import is_site_ppid_blocked, resolve_site_by_domain
+    from api.site_ppid_revocation import (
+        is_site_ppid_blocked,
+        is_site_user_ppid_revoked,
+        resolve_site_by_domain,
+    )
 
     master_status = check_revocation_candidate(master_credential_id)
     if master_status == "revoked":
@@ -936,15 +940,18 @@ def _deny_if_derivation_revoked(
     except ValueError:
         return "ppid_derivation_failed"
 
-    site_status = check_revocation_candidate(site_ppid)
-    if site_status == "revoked":
-        return "site_ppid_revoked"
-    if site_status == "unavailable":
-        return "revocation_unavailable"
-
+    # Site-bound PPID bans are DB-backed (SiteBlock + user RevocationList).
+    # Do not deny from Bloom alone: Bloom is append-only and stays poisoned
+    # after an authenticated site unban until a process-wide rebuild.
     site = resolve_site_by_domain(db, target_site)
     if site and is_site_ppid_blocked(db, site_id=site.site_id, ppid=site_ppid):
         return "site_ppid_blocked"
+    if is_site_user_ppid_revoked(
+        db,
+        ppid=site_ppid,
+        site_id=site.site_id if site else None,
+    ):
+        return "site_ppid_revoked"
 
     return None
 

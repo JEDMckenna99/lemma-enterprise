@@ -139,6 +139,31 @@ def sync_revocations_to_bloom():
         logger.error(f"❌ Revocation sync failed: {e}")
 
 
+def rebuild_global_verifier_from_db() -> bool:
+    """Recreate the in-process Bloom verifier from current RevocationList rows.
+
+    Bloom filters are append-only. After a site unban deletes a PPID from
+    ``revocation_list``, the live verifier would keep rejecting that PPID until
+    process restart unless we rebuild it from the database.
+    """
+    global _global_verifier
+
+    try:
+        from lemma_crypto import PyOptimizedVerifier
+        from api.revocation_verifier import mark_revocation_sync_ready
+        from api.bloom_snapshot import invalidate_bloom_filter_cache
+
+        _global_verifier = PyOptimizedVerifier()
+        sync_revocations_to_bloom()
+        mark_revocation_sync_ready()
+        invalidate_bloom_filter_cache()
+        logger.info("Rebuilt global Bloom verifier from revocation_list")
+        return True
+    except Exception as exc:
+        logger.error("Failed to rebuild global Bloom verifier: %s", exc)
+        return False
+
+
 def sync_revocation_keys(credential_id: str) -> bool:
     """
     Sync all revocation identifiers for a credential into the in-process Bloom verifier.

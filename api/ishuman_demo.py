@@ -521,7 +521,13 @@ def ishuman_demo_clear_site_doubt():
 
 @ishuman_demo_bp.route("/api/demo/ishuman/status", methods=["GET"])
 def ishuman_demo_status():
-    from api.database import IsHumanVerification, SessionLocal, SiteBlock, SiteDoubt
+    from api.database import (
+        IsHumanVerification,
+        RevocationList,
+        SessionLocal,
+        SiteBlock,
+        SiteDoubt,
+    )
 
     wallet_id = (request.args.get("wallet_id") or "").strip()
     master_credential_id = (request.args.get("master_credential_id") or "").strip()
@@ -544,9 +550,10 @@ def ishuman_demo_status():
         site_doubts = []
         demo_site_ids = [spec["site_id"] for spec in DEMO_SITES.values()]
         requested_ppid = (request.args.get("ppid") or "").strip()
+        # Treat NULL is_active as active (older rows / ORM defaults).
         block_query = db.query(SiteBlock).filter(
             SiteBlock.site_id.in_(demo_site_ids),
-            SiteBlock.is_active.is_(True),
+            SiteBlock.is_active.isnot(False),
         )
         if requested_ppid:
             block_query = block_query.filter(SiteBlock.ppid == requested_ppid)
@@ -555,6 +562,29 @@ def ishuman_demo_status():
                 "site_id": block.site_id,
                 "ppid": block.ppid,
                 "reason": block.reason,
+            })
+
+        # Also surface site-scoped user revocations so Unban can hydrate even
+        # when the SiteBlock row is missing or inactive.
+        revoke_query = db.query(RevocationList).filter(
+            RevocationList.site_id.in_(demo_site_ids),
+            RevocationList.revocation_type == "user",
+        )
+        if requested_ppid:
+            revoke_query = revoke_query.filter(RevocationList.ppid == requested_ppid)
+        seen_block_keys = {(b["site_id"], b["ppid"]) for b in site_blocks}
+        for row in revoke_query.all():
+            ppid = (row.ppid or row.lemma_id or row.credential_id or "").strip()
+            if not ppid or not row.site_id:
+                continue
+            key = (row.site_id, ppid)
+            if key in seen_block_keys:
+                continue
+            seen_block_keys.add(key)
+            site_blocks.append({
+                "site_id": row.site_id,
+                "ppid": ppid,
+                "reason": row.reason or "site_ppid_revoked",
             })
 
         doubt_query = db.query(SiteDoubt).filter(

@@ -163,6 +163,31 @@ def is_site_ppid_blocked(db, *, site_id: str, ppid: str) -> bool:
     return block is not None
 
 
+def is_site_user_ppid_revoked(db, *, ppid: str, site_id: Optional[str] = None) -> bool:
+    """True when a site-scoped user RevocationList row still exists for this PPID.
+
+    Prefer this over the append-only Bloom for site unban decisions: clearing a
+    ban deletes the DB row, but Bloom cannot remove the prior membership.
+    """
+    from api.database import RevocationList
+
+    ppid = (ppid or "").strip()
+    if not ppid:
+        return False
+    rows = db.query(RevocationList).filter_by(revocation_type="user").all()
+    for row in rows:
+        if site_id and getattr(row, "site_id", None) != site_id:
+            continue
+        aliases = {
+            str(getattr(row, "ppid", "") or ""),
+            str(getattr(row, "lemma_id", "") or ""),
+            str(getattr(row, "credential_id", "") or ""),
+        }
+        if ppid in aliases:
+            return True
+    return False
+
+
 def revoke_site_bound_ppid(
     db,
     *,
@@ -216,6 +241,7 @@ def revoke_site_bound_ppid(
             network_revocation_requested=network_revocation_requested,
             network_revocation_status=network_revocation_status,
             is_amnesty_eligible=amnesty_eligible,
+            is_active=True,
         )
         db.add(block)
         block_created = True
@@ -323,26 +349,39 @@ def clear_site_bound_ppid(
     if not site_id:
         raise ValueError("site_id required")
 
-    blocks_deactivated = (
+    blocks = (
         db.query(SiteBlock)
-        .filter(
-            SiteBlock.site_id == site_id,
-            SiteBlock.ppid == ppid,
-            SiteBlock.is_active == True,  # noqa: E712
-        )
-        .update({"is_active": False}, synchronize_session=False)
+        .filter_by(site_id=site_id, ppid=ppid)
+        .all()
     )
+    blocks_deactivated = 0
+    for block in blocks:
+        if block.is_active is False:
+            continue
+        block.is_active = False
+        blocks_deactivated += 1
 
-    revocations_cleared = (
+    # Delete every site-scoped user revocation key for this PPID (ppid /
+    # lemma_id / credential_id aliases) so check/derive and Bloom rebuilds
+    # no longer treat the unbanned PPID as revoked.
+    revoke_rows = (
         db.query(RevocationList)
-        .filter(
-            RevocationList.ppid == ppid,
-            RevocationList.site_id == site_id,
-            RevocationList.revocation_type == "user",
-        )
-        .delete(synchronize_session=False)
+        .filter_by(site_id=site_id, revocation_type="user")
+        .all()
     )
+    revocations_cleared = 0
+    for row in revoke_rows:
+        aliases = {
+            str(getattr(row, "ppid", "") or ""),
+            str(getattr(row, "lemma_id", "") or ""),
+            str(getattr(row, "credential_id", "") or ""),
+        }
+        if ppid not in aliases:
+            continue
+        db.delete(row)
+        revocations_cleared += 1
 
+    bloom_rebuilt = False
     if commit:
         db.commit()
         try:
@@ -351,6 +390,12 @@ def clear_site_bound_ppid(
             invalidate_bloom_filter_cache()
         except Exception:
             pass
+        try:
+            from api.permission_verification import rebuild_global_verifier_from_db
+
+            bloom_rebuilt = bool(rebuild_global_verifier_from_db())
+        except Exception as exc:
+            logger.warning("Bloom rebuild after site unblock failed: %s", exc)
         try:
             from api.revocation_sync import get_event_bus
 
@@ -361,8 +406,8 @@ def clear_site_bound_ppid(
             pass
 
     logger.info(
-        "Site unblock: site=%s ppid=%s blocks=%d revocations=%d by=%s",
-        site_id, ppid[:40], blocks_deactivated, revocations_cleared, cleared_by,
+        "Site unblock: site=%s ppid=%s blocks=%d revocations=%d bloom_rebuilt=%s by=%s",
+        site_id, ppid[:40], blocks_deactivated, revocations_cleared, bloom_rebuilt, cleared_by,
     )
     return {
         "site_id": site_id,
@@ -371,6 +416,7 @@ def clear_site_bound_ppid(
         "reason": "ok",
         "blocks_deactivated": int(blocks_deactivated),
         "revocations_cleared": int(revocations_cleared),
+        "bloom_rebuilt": bloom_rebuilt,
     }
 
 

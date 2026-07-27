@@ -140,7 +140,7 @@ def test_ishuman_demo_page_loads_expected_assets(ishuman_demo_client):
     assert "/sdk/ishuman-verifier.js" in body
     assert "/static/js/demo/ishuman-demo.js" in body
     assert "/static/css/demo/ishuman-demo.css" in body
-    assert "/static/js/demo/ishuman-demo.js?v=71" in body
+    assert "/static/js/demo/ishuman-demo.js?v=73" in body
     js = (ROOT / "static/js/demo/ishuman-demo.js").read_text(encoding="utf-8")
     assert "blockToggleBusy" in js
     assert "SITE_BAN_REASONS" in js
@@ -151,7 +151,13 @@ def test_ishuman_demo_page_loads_expected_assets(ishuman_demo_client):
     assert "challengeSite('tickets', 'ishuman')" in js
     assert "challengeSite('trials', 'passkey')" in js
     assert "challengeSite('trials', 'ishuman')" in js
+    assert "function shouldShowUnban(" in js
+    assert "async function ensureSitePpid(" in js
+    assert "Never gate Ban/Unban on a prior verify" in js
+    assert "forceVerifierBloomRefresh" in js
+    assert "autoProvision: false" in js
     assert "reason: 'unblocked'" in js or 'reason: "unblocked"' in js
+    assert "Verify first" not in js
     assert "tour=presale&from=demo" in js
     assert "Site B" in body
     assert "\U0001f511" not in body

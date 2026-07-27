@@ -39,15 +39,18 @@ def test_clear_site_bound_ppid_signature_and_behavior():
     assert "SiteBlock" in source
     assert "RevocationList" in source
     # Only acts on the site-scoped user revocation for this PPID.
-    assert 'revocation_type == "user"' in source
+    assert 'revocation_type="user"' in source or "revocation_type='user'" in source
     assert "is_amnesty_eligible.is_(False)" not in source
     assert "governance_kill_not_amnesty_eligible" not in source
     # Rebuilds verifier state so the PPID stops being rejected.
     assert "invalidate_bloom_filter_cache" in source
+    assert "rebuild_global_verifier_from_db" in source
+    assert "db.delete(row)" in source
     # Reports what happened to the caller.
     assert '"lifted"' in source
     assert '"blocks_deactivated"' in source
     assert '"revocations_cleared"' in source
+    assert '"bloom_rebuilt"' in source
 
 
 def test_dashboard_revoke_blocks_any_ppid_without_404():

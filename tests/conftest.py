@@ -249,6 +249,13 @@ class _FakeDbSession:
     def add(self, obj):
         self._store.data[obj.__class__.__name__].append(obj)
 
+    def delete(self, obj):
+        rows = self._store.data[obj.__class__.__name__]
+        try:
+            rows.remove(obj)
+        except ValueError:
+            pass
+
     def flush(self):
         from sqlalchemy.exc import IntegrityError
 

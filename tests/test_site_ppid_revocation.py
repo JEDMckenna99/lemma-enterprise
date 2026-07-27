@@ -204,15 +204,18 @@ def test_derive_site_proof_denies_master_credential_bloom_revocation(
 
 
 @pytest.mark.unit
-def test_derive_site_proof_denies_site_ppid_bloom_revocation(
+def test_derive_site_proof_denies_site_ppid_revocation_list(
     ishuman_client,
     fake_ishuman_db_session_factory,
     make_ishuman_verification,
     monkeypatch,
     attach_wallet_assertion,
 ):
+    from api.database import RevocationList
+
     db = fake_ishuman_db_session_factory
     _seed_site(db)
+    ppid = "did:lemma:ppid_site_revoked"
     db.store.data["IsHumanVerification"].append(
         make_ishuman_verification(
             credential_id="ishuman_master_ppid_bloom_001",
@@ -221,16 +224,28 @@ def test_derive_site_proof_denies_site_ppid_bloom_revocation(
             expires_at=datetime.utcnow() + timedelta(days=10),
         )
     )
+    db.store.data[RevocationList.__name__].append(
+        RevocationList(
+            lemma_id=ppid,
+            credential_id=ppid,
+            ppid=ppid,
+            site_id="site_test_001",
+            lemma_type="ishuman",
+            revocation_type="user",
+            revoked_by="test",
+            reason="site ban",
+        )
+    )
     monkeypatch.setattr("api.database.SessionLocal", db.session_local)
     monkeypatch.setattr(
         "api.ishuman._derive_ppid_for_site",
-        lambda **_kwargs: "did:lemma:ppid_site_revoked",
+        lambda **_kwargs: ppid,
     )
-
-    def _revocation_status(candidate):
-        return "revoked" if candidate == "did:lemma:ppid_site_revoked" else "active"
-
-    monkeypatch.setattr("api.revocation_verifier.check_revocation_candidate", _revocation_status)
+    # Stale Bloom membership alone must not deny after unban; DB is authoritative.
+    monkeypatch.setattr(
+        "api.revocation_verifier.check_revocation_candidate",
+        lambda _candidate: "ok",
+    )
 
     resp = ishuman_client.post(
         "/api/ishuman/derive-site-proof",
@@ -248,6 +263,52 @@ def test_derive_site_proof_denies_site_ppid_bloom_revocation(
 
     assert resp.status_code == 403
     assert resp.get_json()["error"] == "site_ppid_revoked"
+
+
+@pytest.mark.unit
+def test_clear_site_bound_ppid_removes_revocation_list_and_rebuilds_bloom(
+    fake_ishuman_db_session_factory,
+    monkeypatch,
+):
+    from api.database import RevocationList, SiteBlock
+    from api.site_ppid_revocation import clear_site_bound_ppid, revoke_site_bound_ppid
+
+    db = fake_ishuman_db_session_factory
+    session = db.session_local()
+    monkeypatch.setattr(
+        "api.revocation_sync.trigger_revocation_sync",
+        lambda credential_id, credential_type="unknown", site_id=None: True,
+    )
+    rebuilt = {"called": False}
+    monkeypatch.setattr(
+        "api.permission_verification.rebuild_global_verifier_from_db",
+        lambda: rebuilt.__setitem__("called", True) or True,
+    )
+
+    revoke_site_bound_ppid(
+        session,
+        site_id="site_test_001",
+        ppid="did:lemma:ppid_clear_001",
+        reason="ban",
+        revoked_by="test",
+    )
+    assert len(db.store.data[RevocationList.__name__]) == 1
+    assert len(db.store.data[SiteBlock.__name__]) == 1
+
+    result = clear_site_bound_ppid(
+        session,
+        site_id="site_test_001",
+        ppid="did:lemma:ppid_clear_001",
+        cleared_by="test",
+    )
+
+    assert result["lifted"] is True
+    assert result["revocations_cleared"] == 1
+    assert result["blocks_deactivated"] == 1
+    assert result["bloom_rebuilt"] is True
+    assert rebuilt["called"] is True
+    assert len(db.store.data[RevocationList.__name__]) == 0
+    assert db.store.data[SiteBlock.__name__][0].is_active is False
 
 
 @pytest.mark.unit
