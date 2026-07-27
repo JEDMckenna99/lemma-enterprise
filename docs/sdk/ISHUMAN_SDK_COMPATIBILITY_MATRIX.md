@@ -7,7 +7,7 @@ Canonical version manifest: [`ISHUMAN_SDK_VERSIONS.json`](ISHUMAN_SDK_VERSIONS.j
 | Surface | Version | Install / URL |
 |---|---|---|
 | Browser verifier (`ProofVerifier`) | 1.9.2 | `https://lemma.id/sdk/v1.9.2/proof-verifier.js` (immutable) or `/sdk/proof-verifier.js` (rolling) |
-| Node backend verifier | 1.4.0 | `npm install @lemma/proof-verifier@1.4.0` or `/sdk/v1.4.0/proof-verifier.mjs` |
+| Node backend verifier | 1.4.0 | `npm install "@lemma.id/proof-verifier@1.4.0"` or `/sdk/v1.4.0/proof-verifier.mjs` |
 | Python backend verifier | 1.4.0 | `pip install lemma-proof-verifier==1.4.0` or `/sdk/v1.4.0/proof-verifier.py` |
 | Protocol epoch | `browser_canonical_v2` | [`ISHUMAN_PROTOCOL_VERSIONS.json`](../protocol/ISHUMAN_PROTOCOL_VERSIONS.json) |
 

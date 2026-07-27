@@ -38,7 +38,7 @@
     },
     intro: {
       passkeySetup:
-        'Create a passkey wallet on this device. No identity check is needed at this step.',
+        'You\u2019ll be asked to create a passkey on this device \u2014 it never leaves your device. No identity check is needed at this step.',
       unlockOnly:
         'Unlock your existing lemma.id wallet with your passkey to continue.',
       verifyOnce(site) {
@@ -98,7 +98,7 @@
       claimReady: 'Almost done. Secure your lemma.id on this device.',
       mobileReady: 'Your lemma.id is ready on this device.',
       returnUnlock: 'Unlock to finish where you left off.',
-      passkeySetupReady: 'Tap below. Windows Hello, Touch ID, or your passkey will ask once.',
+      passkeySetupReady: 'Tap below. Your browser will ask you to create a passkey on this device.',
       unlockReady: 'Enter your passkey to unlock.',
       error: 'Something went wrong. Please try again.',
       returnFailed: 'Couldn\u2019t return to the site. Try again.',

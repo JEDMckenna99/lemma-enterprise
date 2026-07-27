@@ -37,7 +37,7 @@ assurance, reason }`.
 
 ## Local backend verifier reasons
 
-The Node package is `@lemma/proof-verifier`; the Python package is
+The Node package is `@lemma.id/proof-verifier`; the Python package is
 `lemma-proof-verifier`.
 
 | Reason | Meaning | Developer action |

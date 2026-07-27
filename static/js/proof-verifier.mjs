@@ -1,5 +1,5 @@
 /**
- * @lemma/proof-verifier — Local-first Lemma proof verifier.
+ * @lemma.id/proof-verifier — Local-first Lemma proof verifier.
  *
  * Drop-in ES module that verifies an `IsHumanVerifier.verify()` result
  * **entirely on your backend** with no per-request calls to lemma.id.

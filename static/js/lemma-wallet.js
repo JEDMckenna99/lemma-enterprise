@@ -2578,12 +2578,21 @@ class LemmaWallet {
         if (!this.isUnlocked || !this.isUnlocked()) {
             throw new Error('Wallet must be unlocked to establish a server session');
         }
+        // Prefer IndexedDB when in-memory session is missing walletId (multi-tab restore).
+        const walletId = await this._resolveCurrentWalletId();
+        if (!walletId) {
+            throw new Error('wallet_id unavailable');
+        }
         await this._registerSigningKeyIfNeeded();
         const activeProfile = profile || await this.getActiveProfile();
+        // Server rejects unlocked_at skew > 5 minutes. Long-lived local sessions
+        // keep the original unlock time, so always signal "now" (server also
+        // overwrites storage with its own clock after verification).
+        const unlockedAt = Date.now();
         const body = {
-            wallet_id: this.session.walletId,
-            unlocked_at: this.session.unlockedAt || Date.now(),
-            expires_at: Math.floor((this.session.expiresAt || Date.now()) / 1000),
+            wallet_id: walletId,
+            unlocked_at: unlockedAt,
+            expires_at: Math.floor((this.session.expiresAt || unlockedAt) / 1000),
             profile_id: activeProfile?.id || DEFAULT_PROFILE_ID,
             profile_name: activeProfile?.name || 'Personal',
         };

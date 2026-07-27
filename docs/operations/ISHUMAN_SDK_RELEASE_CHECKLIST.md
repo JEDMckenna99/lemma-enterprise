@@ -31,7 +31,7 @@
 
 ## Registry secrets (GitHub Actions)
 
-- `NPM_TOKEN` — publish `@lemma/proof-verifier`
+- `NPM_TOKEN` — publish `@lemma.id/proof-verifier`
 - `PYPI_API_TOKEN` — publish `lemma-proof-verifier`
 
 ## Post-release

@@ -6,7 +6,7 @@
 
 {% block head %}
 {{ super() }}
-<link rel="stylesheet" href="/static/css/demo/ishuman-demo.css?v=48">
+<link rel="stylesheet" href="/static/css/demo/ishuman-demo.css?v=49">
 {% endblock %}
 
 {% block content %}
@@ -15,10 +15,6 @@
   data-server-admin-token="{{ demo_admin_token }}">
 
   <div class="demo-topbar" id="ih-demo-topbar">
-    <a class="demo-topbar-brand" href="/">
-      <img src="/static/img/lemma_logo.svg" alt="" width="28" height="28">
-      <span>lemma.id</span>
-    </a>
     <div class="demo-topbar-actions">
       <div class="demo-topbar-main">
         <span class="demo-topbar-label">Session</span>
@@ -34,7 +30,7 @@
       <img class="demo-hero-logo" src="/static/img/lemma_logo.svg" alt="lemma.id" width="56" height="56">
       <p class="demo-eyebrow">lemma.id demo</p>
       <h1 class="demo-title">One lemma.id. A different private ID on every site.</h1>
-      <p class="demo-lead" id="ih-intro-lead">Three concepts: <strong>Create</strong> a passkey-protected lemma.id on your device, <strong>Verify</strong> it on demo sites to mint unlinkable private IDs, then <strong>Enforce</strong> site policy, set assurance, doubt a user, or ban a PPID. Credentials stay on your device; sites verify proofs offline.</p>
+      <p class="demo-lead" id="ih-intro-lead"><strong>Create</strong> a passkey-protected lemma.id on your device. <strong>Verify</strong> on demo sites to get a different private ID on each one — sites can't link them. <strong>Enforce</strong> policy per site: doubt a user, raise assurance, or ban. Proofs stay on your device; sites verify offline.</p>
       <div class="demo-hero-cta">
         <button class="demo-btn demo-btn-primary" id="ih-get-started" type="button">Get started</button>
         <a class="demo-btn demo-btn-secondary demo-btn-outline" href="/developer">View developer docs</a>
@@ -99,7 +95,7 @@
             </div>
             <p class="demo-diagram-caption demo-diagram-site-caption">
               <strong>Presale site</strong>
-              <span class="demo-diagram-detail">PPID keys code ledger · fresh passkey at unlock</span>
+              <span class="demo-diagram-detail">Private ID for ticket presale</span>
             </p>
           </div>
           <div class="demo-diagram-site demo-diagram-site-chip--saas">
@@ -109,8 +105,8 @@
               </svg>
             </div>
             <p class="demo-diagram-caption demo-diagram-site-caption">
-              <strong>Site B</strong>
-              <span class="demo-diagram-detail">ppid_c91…</span>
+              <strong>SaaS trial site</strong>
+              <span class="demo-diagram-detail">Different private ID than presale</span>
             </p>
           </div>
         </div>
@@ -128,14 +124,14 @@
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
             <path d="M12 4c-3 0-5.5 2.2-5.5 5 0 2.2 1.3 3.6 2.4 4.8-.9.9-1.7 2-2 3.5-.5 2.2 1 4.3 3.2 4.8 2.7.6 5.2-.9 5.8-3.5.4-1.6 0-3.1-.9-4.3 1.1-1.1 2.3-2.6 2.3-5.3C17.5 6.2 15 4 12 4Z" fill="#4E3D8F"/>
           </svg>
-          <span>Each site gets a different PPID</span>
+          <span>Each site gets a different private ID</span>
         </div>
         <div class="demo-diagram-footnote">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
             <path d="M12 2l7 3.5V11c0 5.5-3.5 8.5-7 10.5C8.5 19.5 5 16.5 5 11V5.5L12 2Z" fill="#4E3D8F"/>
             <path d="M9 12l2 2 4-4.5" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
           </svg>
-          <span>Fresh passkey ceremony at presale code unlock</span>
+          <span>High-value actions can require a fresh passkey</span>
         </div>
       </div>
     </aside>
@@ -171,11 +167,11 @@
       </div>
       <div class="demo-lifecycle-item">
         <span class="result-label">Ticketing PPID</span>
-        <span class="demo-lifecycle-value" id="ih-lifecycle-tickets-ppid">, </span>
+        <span class="demo-lifecycle-value" id="ih-lifecycle-tickets-ppid">—</span>
       </div>
       <div class="demo-lifecycle-item">
         <span class="result-label">Trials PPID</span>
-        <span class="demo-lifecycle-value" id="ih-lifecycle-trials-ppid">, </span>
+        <span class="demo-lifecycle-value" id="ih-lifecycle-trials-ppid">—</span>
       </div>
       <div class="demo-lifecycle-item">
         <span class="result-label">Ticketing policy</span>
@@ -183,11 +179,11 @@
       </div>
       <div class="demo-lifecycle-item">
         <span class="result-label">Ticketing verdict</span>
-        <span class="demo-lifecycle-value" id="ih-lifecycle-tickets-verdict">, </span>
+        <span class="demo-lifecycle-value" id="ih-lifecycle-tickets-verdict">—</span>
       </div>
       <div class="demo-lifecycle-item">
         <span class="result-label">Trials verdict</span>
-        <span class="demo-lifecycle-value" id="ih-lifecycle-trials-verdict">, </span>
+        <span class="demo-lifecycle-value" id="ih-lifecycle-trials-verdict">—</span>
       </div>
     </div>
   </aside>
@@ -297,23 +293,22 @@
             </div>
             <div class="site-card-field">
               <span class="result-label">Private site ID</span>
-              <span class="result-value" id="ih-tickets-ppid">ppid_ticketing_••••</span>
+              <span class="result-value" id="ih-tickets-ppid">did:lemma:ppid_ticketing_••••</span>
             </div>
-            <div class="site-card-field assurance-only">
+            <div class="site-card-field assurance-only is-withheld">
               <span class="result-label">Assurance</span>
-              <span class="result-value" id="ih-tickets-assurance">, </span>
+              <span class="result-value" id="ih-tickets-assurance">—</span>
             </div>
-            <div class="site-card-field">
+            <div class="site-card-field is-withheld">
               <span class="result-label">Reason</span>
-              <span class="result-value" id="ih-tickets-reason">, </span>
+              <span class="result-value" id="ih-tickets-reason">—</span>
             </div>
-            <div class="site-card-field">
+            <div class="site-card-field is-withheld">
               <span class="result-label">Latency</span>
-              <span class="result-value" id="ih-tickets-latency">, </span>
+              <span class="result-value" id="ih-tickets-latency">—</span>
             </div>
             <div class="site-card-actions">
               <a class="demo-site-open-link" id="ih-link-tickets-tour" href="#" target="_blank" rel="noopener">Walk presale defenses →</a>
-              <a class="demo-site-open-link" id="ih-link-tickets-step2" href="#" target="_blank" rel="noopener">Open presale demo →</a>
               <button class="demo-btn demo-btn-secondary demo-btn-quiet demo-site-verify-btn" id="ih-verify-tickets-step2" type="button">Verify</button>
             </div>
           </article>
@@ -332,19 +327,19 @@
             </div>
             <div class="site-card-field">
               <span class="result-label">Private site ID</span>
-              <span class="result-value" id="ih-trials-ppid">ppid_trials_••••</span>
+              <span class="result-value" id="ih-trials-ppid">did:lemma:ppid_trials_••••</span>
             </div>
-            <div class="site-card-field assurance-only">
+            <div class="site-card-field assurance-only is-withheld">
               <span class="result-label">Assurance</span>
-              <span class="result-value" id="ih-trials-assurance">, </span>
+              <span class="result-value" id="ih-trials-assurance">—</span>
             </div>
-            <div class="site-card-field">
+            <div class="site-card-field is-withheld">
               <span class="result-label">Reason</span>
-              <span class="result-value" id="ih-trials-reason">, </span>
+              <span class="result-value" id="ih-trials-reason">—</span>
             </div>
-            <div class="site-card-field">
+            <div class="site-card-field is-withheld">
               <span class="result-label">Latency</span>
-              <span class="result-value" id="ih-trials-latency">, </span>
+              <span class="result-value" id="ih-trials-latency">—</span>
             </div>
             <div class="site-card-actions">
               <a class="demo-site-open-link" id="ih-link-trials-step2" href="#" target="_blank" rel="noopener">Open trials demo →</a>
@@ -359,12 +354,12 @@
             <div class="ppid-compare-grid">
               <div class="ppid-slot">
                 <span class="result-label">Ticketing</span>
-                <span class="ppid-val" id="ih-tickets-ppid-compare">, </span>
+                <span class="ppid-val" id="ih-tickets-ppid-compare">—</span>
               </div>
               <div class="ppid-diff" id="ih-ppid-diff">Verify both sites</div>
               <div class="ppid-slot">
                 <span class="result-label">Trials</span>
-                <span class="ppid-val" id="ih-trials-ppid-compare">, </span>
+                <span class="ppid-val" id="ih-trials-ppid-compare">—</span>
               </div>
             </div>
           </div>
@@ -399,10 +394,6 @@
         <div class="demo-moment-cta">
           <button class="demo-btn demo-btn-primary" id="ih-verify-sites-btn" type="button">Verify both sites</button>
         </div>
-        <div class="demo-relying-links">
-          <a class="demo-btn demo-btn-secondary demo-btn-outline" id="ih-link-tickets-main" href="#" target="_blank" rel="noopener">Walk presale code demo</a>
-          <a class="demo-btn demo-btn-secondary demo-btn-outline" id="ih-link-trials-inline" href="#" target="_blank" rel="noopener">Open trials demo site</a>
-        </div>
       </div>
     </section>
 
@@ -423,7 +414,7 @@
           <article class="enforce-row" id="ih-enforce-row-tickets" data-site="tickets">
             <div class="enforce-row-main">
               <span class="enforce-row-label">Presale</span>
-              <code class="enforce-row-ppid" id="ih-enforce-tickets-ppid">, </code>
+              <code class="enforce-row-ppid" id="ih-enforce-tickets-ppid">—</code>
               <span class="demo-pill enforce-row-status" id="ih-enforce-tickets-status">Not verified</span>
             </div>
             <div class="enforce-row-actions">
@@ -436,7 +427,7 @@
           <article class="enforce-row" id="ih-enforce-row-trials" data-site="trials">
             <div class="enforce-row-main">
               <span class="enforce-row-label">SaaS trial</span>
-              <code class="enforce-row-ppid" id="ih-enforce-trials-ppid">, </code>
+              <code class="enforce-row-ppid" id="ih-enforce-trials-ppid">—</code>
               <span class="demo-pill enforce-row-status" id="ih-enforce-trials-status">Not verified</span>
             </div>
             <div class="enforce-row-actions">
@@ -665,7 +656,7 @@ const { ok, ppid, assurance, presentation } = await new ProofVerifier({
   requiredAssurance: 'passkey',
 }).verifyForBackend({ requiredAssurance: 'passkey' });
 // Human proof step-up: requiredAssurance: 'ishuman', same ppid, assurance: ishuman</div>
-        <p class="demo-muted" id="ih-integration-latency">Last verify: , </p>
+        <p class="demo-muted" id="ih-integration-latency">Last verify: —</p>
       </section>
 
       <section class="demo-advanced-section">
@@ -682,7 +673,7 @@ const { ok, ppid, assurance, presentation } = await new ProofVerifier({
           <button class="demo-btn demo-btn-danger" id="ih-force-reverify-btn" type="button">Force fresh verification</button>
         </div>
         <div class="dev-detail-row">
-          <span class="result-label">Server enforcement</span><span class="result-value" id="ih-abuse-derive">, </span>
+          <span class="result-label">Server enforcement</span><span class="result-value" id="ih-abuse-derive">—</span>
         </div>
         <div class="code-block" id="ih-master-json">{}</div>
         <div class="demo-log" id="ih-log"></div>
@@ -698,5 +689,5 @@ const { ok, ppid, assurance, presentation } = await new ProofVerifier({
 <script nonce="{{ csp_nonce }}">window.LEMMA_ISHUMAN_USE_PERSON_ROOT_SEEDS = {{ 'true' if ishuman_use_person_root_seeds else 'false' }};</script>
 <!-- Legacy SDK alias remains available at /sdk/ishuman-verifier.js. -->
 <script src="/sdk/proof-verifier.js?v={{ proof_verifier_sdk_version }}" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
-<script src="/static/js/demo/ishuman-demo.js?v=73" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
+<script src="/static/js/demo/ishuman-demo.js?v=74" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
 {% endblock %}

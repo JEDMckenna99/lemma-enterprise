@@ -1,5 +1,5 @@
 {
-  "name": "@lemma/proof-verifier",
+  "name": "@lemma.id/proof-verifier",
   "version": "1.4.0",
   "description": "Local-first Lemma proof verifier. Verifies signed presentations, stamps, and site-bound session proofs on your backend with no per-request calls to lemma.id.",
   "type": "module",

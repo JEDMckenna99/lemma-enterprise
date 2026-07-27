@@ -11,7 +11,7 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 ORIGIN = "https://lemma.id"
-NPM_PACKAGE = "@lemma/proof-verifier"
+NPM_PACKAGE = "@lemma.id/proof-verifier"
 PYPI_PACKAGE = "lemma-proof-verifier"
 EXPECTED_VERSION = "1.4.0"
 

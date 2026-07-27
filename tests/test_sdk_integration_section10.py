@@ -66,7 +66,7 @@ def test_package_versions_match_manifest():
     pyproject = (REPO_ROOT / "packages/proof-verifier-py/pyproject.toml").read_text(encoding="utf-8")
     assert pkg["version"] == npm_package_version()
     assert f'version = "{pypi_package_version()}"' in pyproject
-    assert pkg["name"] == "@lemma/proof-verifier"
+    assert pkg["name"] == "@lemma.id/proof-verifier"
     assert 'name = "lemma-proof-verifier"' in pyproject
 
 

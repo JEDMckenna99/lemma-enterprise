@@ -76,7 +76,7 @@ def test_ishuman_demo_page_loads_expected_assets(ishuman_demo_client):
     assert ">Human proof</button>" in body
     assert ">Ban</button>" in body
     assert ">Unblock</button>" in body
-    assert "/static/css/demo/ishuman-demo.css?v=48" in body
+    assert "/static/css/demo/ishuman-demo.css?v=49" in body
     assert "ih-raise-tickets-policy-btn" not in body
     assert "ih-policy-toggle-card" not in body
     assert "ih-complete-human-main-btn" in body
@@ -85,13 +85,15 @@ def test_ishuman_demo_page_loads_expected_assets(ishuman_demo_client):
     assert "Passkey-protected on your device" in body
     assert ">Issuer</strong>" in body
     assert "Issues a signed, site-specific ID" in body
-    assert "PPID keys code ledger" in body
-    assert "ppid_c91" in body
+    assert "Private ID for ticket presale" in body
+    assert "SaaS trial site" in body
+    assert "Different private ID than presale" in body
     assert "demo-diagram-stage" in body
     assert "demo-diagram-footnotes" in body
     assert "ih-proof-receipt" in body
-    assert "ih-link-tickets-main" in body
-    assert "ih-link-trials-inline" in body
+    assert "ih-link-tickets-tour" in body
+    assert "ih-link-trials-inline" not in body
+    assert "ih-link-tickets-main" not in body
     assert "Quick demo" not in body
     assert "Integrator demo" not in body
     assert "Step 5, Revoke on one site" not in body
@@ -117,11 +119,10 @@ def test_ishuman_demo_page_loads_expected_assets(ishuman_demo_client):
     assert "ih-verify-trials-btn" in body
     assert "Verify on ticketing site" in body
     assert "ih-verify-sites-btn" in body
-    assert "ih-link-tickets-step2" in body
     assert "ih-link-tickets-tour" in body
+    assert "ih-link-tickets-step2" not in body
     assert "ih-verify-tickets-step2" in body
     assert "ih-verify-trials-step2" in body
-    assert "Open presale demo →" in body
     assert "Walk presale defenses →" in body
     assert "Open trials demo →" in body
     adv_start = body.index('id="ih-advanced-panel"')
@@ -140,7 +141,7 @@ def test_ishuman_demo_page_loads_expected_assets(ishuman_demo_client):
     assert "/sdk/ishuman-verifier.js" in body
     assert "/static/js/demo/ishuman-demo.js" in body
     assert "/static/css/demo/ishuman-demo.css" in body
-    assert "/static/js/demo/ishuman-demo.js?v=73" in body
+    assert "/static/js/demo/ishuman-demo.js?v=74" in body
     js = (ROOT / "static/js/demo/ishuman-demo.js").read_text(encoding="utf-8")
     assert "blockToggleBusy" in js
     assert "SITE_BAN_REASONS" in js
@@ -155,17 +156,21 @@ def test_ishuman_demo_page_loads_expected_assets(ishuman_demo_client):
     assert "async function ensureSitePpid(" in js
     assert "Never gate Ban/Unban on a prior verify" in js
     assert "forceVerifierBloomRefresh" in js
+    assert "REASON_LABELS" in js
+    assert "formatReasonLabel" in js
+    assert "deriveProgressAct" in js
+    assert "renderAllDemoSites" in js
     assert "autoProvision: false" in js
     assert "reason: 'unblocked'" in js or 'reason: "unblocked"' in js
     assert "Verify first" not in js
     assert "tour=presale&from=demo" in js
-    assert "Site B" in body
+    assert "Site B" not in body
     assert "\U0001f511" not in body
     assert "\U0001f6e1" not in body
     assert "site-card-icon" in body
     assert "Presale code demo" in body
     assert "SaaS trial demo site" in body
-    assert "fresh passkey at unlock" in body.lower() or "fresh passkey ceremony at presale code unlock" in body.lower()
+    assert "High-value actions can require a fresh passkey" in body
     assert "ih-simulation-banner" not in body
     assert "Staging simulation only" not in body
     assert "ih-start-simulated-demo" not in body

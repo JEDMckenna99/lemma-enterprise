@@ -1,4 +1,4 @@
-"""Minimal Flask T2 signup example using @lemma/proof-verifier (Section 10)."""
+"""Minimal Flask T2 signup example using @lemma.id/proof-verifier (Section 10)."""
 
 from __future__ import annotations
 

@@ -36,9 +36,37 @@
   let operationsRunning = false;
 
   const PPID_PLACEHOLDER = {
-    tickets: 'ppid_ticketing_••••',
-    trials: 'ppid_trials_••••',
+    tickets: 'did:lemma:ppid_ticketing_••••',
+    trials: 'did:lemma:ppid_trials_••••',
   };
+
+  const REASON_LABELS = {
+    valid: 'Verified locally',
+    session_valid: 'Session valid — verified locally',
+    vc_valid: 'Credential valid',
+    ok: 'Verified',
+    site_proof_required: 'No site proof yet',
+    idv_cancelled: 'Verification popup closed',
+    popup_closed: 'Popup closed before finishing',
+    doubt_required: 'Fresh proof required',
+    site_ppid_revoked: 'Banned by this site',
+    site_ppid_blocked: 'Banned by this site',
+    site_blocked: 'Banned by this site',
+    site_block: 'Banned by this site',
+    revoked: 'Credential revoked',
+    assurance_insufficient: 'Assurance too low for site policy',
+    not_ishuman: 'Human proof required',
+    no_credential: 'No credential on this device',
+    wallet_locked: 'Wallet locked',
+    expired: 'Session expired',
+    untrusted_issuer: 'Issuer not trusted',
+  };
+
+  function formatReasonLabel(reason) {
+    const code = String(reason || '').trim();
+    if (!code) return '—';
+    return REASON_LABELS[code] || code.replace(/_/g, ' ');
+  }
 
   const state = {
     config: null,
@@ -153,11 +181,11 @@
     const lines = slugs
       .map((slug) => {
         const result = state.results[slug];
-        if (!result || !result.reason) return null;
+        if (!result || !isSiteVerified(result)) return null;
         const site = SITE_IDS[slug] || slug;
-        const assurance = result.assurance || 'Not available';
-        const reason = result.reason || 'Not available';
-        const ms = Number.isFinite(result.timeMs) ? `${result.timeMs.toFixed(1)}ms` : 'Not available';
+        const assurance = result.assurance || '—';
+        const reason = formatReasonLabel(result.reason);
+        const ms = Number.isFinite(result.timeMs) ? `${result.timeMs.toFixed(1)}ms` : '—';
         return `<div class="demo-proof-receipt-row"><span class="demo-proof-receipt-site">${site}</span><span class="demo-proof-receipt-assurance">${assurance}</span><span class="demo-proof-receipt-reason">${reason}</span><span class="demo-proof-receipt-ms">${ms}</span></div>`;
       })
       .filter(Boolean);
@@ -489,7 +517,7 @@
 
     if (ready) {
       setQuickInsight('Create', 'lemma.id ready, verify on the two demo sites below.');
-      updateQuickProgress(1);
+      updateQuickProgress(deriveProgressAct());
       return;
     }
 
@@ -504,6 +532,12 @@
 
   function bothSitesVerified() {
     return SITE_SLUGS.every((slug) => isSiteVerified(state.results[slug]));
+  }
+
+  function deriveProgressAct() {
+    if (bothSitesVerified()) return 3;
+    if (isWalletUnlocked() || state.hasLocalWallet || isMasterReady()) return 2;
+    return 1;
   }
 
   function resolveSitePpid(slug) {
@@ -578,7 +612,7 @@
     if (!ppid) return { text: 'Not verified yet', className: '' };
     if (isSiteBanned(slug, result)) return { text: 'Banned', className: 'result-deny' };
     if (result?.reason === 'doubt_required') return { text: 'Doubted', className: 'result-warn' };
-    if (result?.human || isSiteVerified(result)) return { text: 'Still verified', className: 'result-ok' };
+    if (result?.human || isSiteVerified(result)) return { text: 'Verified', className: 'result-ok' };
     if (['assurance_insufficient', 'not_ishuman'].includes(result?.reason)) {
       return { text: 'Insufficient assurance', className: 'result-warn' };
     }
@@ -665,6 +699,7 @@
   }
 
   function hasHumanProofInWallet() {
+    if (!state.hasLocalWallet && !isWalletUnlocked()) return false;
     // Only show the human-proof card when this lemma.id actually holds one.
     // A stale localStorage master id alone is not enough.
     if (state.masterCredential) {
@@ -742,10 +777,19 @@
   }
 
   function maskPpid(slug, ppid) {
-    if (!ppid) return PPID_PLACEHOLDER[slug] || 'Not available';
+    if (!ppid) return PPID_PLACEHOLDER[slug] || '—';
     const text = String(ppid);
-    if (text.length <= 16) return text;
-    return `${text.slice(0, 10)}••••${text.slice(-4)}`;
+    if (text.length <= 24) return text;
+    return `${text.slice(0, 18)}••••${text.slice(-6)}`;
+  }
+
+  function ppidCompareHtml(ppid) {
+    if (!ppid) return null;
+    const text = String(ppid);
+    if (text.length <= 24) return text;
+    const head = text.slice(0, 18);
+    const tail = text.slice(-6);
+    return `${head}••••<span class="ppid-tail-highlight">${tail}</span>`;
   }
 
   function formatLemmaStatus(label) {
@@ -835,9 +879,13 @@
     const ticketsPolicy = state.ticketsRequiresIshuman ? 'ishuman' : 'passkey';
     const tickets = state.results.tickets;
     const trials = state.results.trials;
+    const ticketsPpid = resolveSitePpid('tickets');
+    const trialsPpid = resolveSitePpid('trials');
     let enforcement = 'none';
-    if (tickets && isSiteBlocked('tickets', tickets)) enforcement = 'ticketing revoked';
-    else if (tickets && state.localDoubts.tickets?.size) enforcement = 'ticketing doubt';
+    if (ticketsPpid && isSiteBlocked('tickets', tickets)) enforcement = 'ticketing revoked';
+    else if (ticketsPpid && state.localDoubts.tickets?.has(ticketsPpid)) enforcement = 'ticketing doubt';
+    else if (trialsPpid && isSiteBlocked('trials', trials)) enforcement = 'trials revoked';
+    else if (trialsPpid && state.localDoubts.trials?.has(trialsPpid)) enforcement = 'trials doubt';
     const setText = (id, value) => {
       const el = $(id);
       if (el) el.textContent = value;
@@ -1127,25 +1175,31 @@
     const parts = [];
     if (state.lastVerifyMs.tickets != null) parts.push(`tickets ${state.lastVerifyMs.tickets.toFixed(0)}ms`);
     if (state.lastVerifyMs.trials != null) parts.push(`trials ${state.lastVerifyMs.trials.toFixed(0)}ms`);
-    el.textContent = parts.length ? `Last verify: ${parts.join(' · ')}` : 'Last verify: , ';
+    el.textContent = parts.length ? `Last verify: ${parts.join(' · ')}` : 'Last verify: —';
   }
 
   function updatePpidCompare() {
     const tResult = state.results.tickets;
     const rResult = state.results.trials;
-    const t = tResult?.ppid ? maskPpid('tickets', tResult.ppid) : null;
-    const r = rResult?.ppid ? maskPpid('trials', rResult.ppid) : null;
+    const tPpid = tResult?.ppid || null;
+    const rPpid = rResult?.ppid || null;
     const tCmp = $('ih-tickets-ppid-compare');
     const rCmp = $('ih-trials-ppid-compare');
-    if (tCmp) tCmp.textContent = t || 'Not available';
-    if (rCmp) rCmp.textContent = r || 'Not available';
+    if (tCmp) {
+      if (tPpid) tCmp.innerHTML = ppidCompareHtml(tPpid);
+      else tCmp.textContent = '—';
+    }
+    if (rCmp) {
+      if (rPpid) rCmp.innerHTML = ppidCompareHtml(rPpid);
+      else rCmp.textContent = '—';
+    }
     const diff = $('ih-ppid-diff');
-    if (!diff || !t || !r) {
+    if (!diff || !tPpid || !rPpid) {
       if (diff) diff.textContent = 'Verify both sites';
       return;
     }
-    diff.textContent = t !== r ? 'Result: different site-private IDs' : 'Result: same ID (unexpected)';
-    diff.className = t !== r ? 'ppid-diff' : 'ppid-diff deny';
+    diff.textContent = tPpid !== rPpid ? 'Result: different site-private IDs' : 'Result: same ID (unexpected)';
+    diff.className = tPpid !== rPpid ? 'ppid-diff' : 'ppid-diff deny';
   }
 
   function renderEnforceRows() {
@@ -1197,7 +1251,7 @@
       if (!ticketsPpid && !trialsPpid) {
         doubtStatus.textContent = 'Verify both sites above, then enforce on a row.';
       } else if (state.localDoubts.tickets?.size || state.localDoubts.trials?.size) {
-        doubtStatus.textContent = 'Active doubt, resolve with the tier you challenged for.';
+        doubtStatus.textContent = 'Active doubt — use Resolve on the challenged row.';
       } else if (isSiteBlocked('tickets', state.results.tickets) && isSiteVerified(state.results.trials)) {
         doubtStatus.textContent = 'Presale banned; SaaS trial still verified.';
       } else {
@@ -1649,10 +1703,7 @@
   // sessions. After this the user re-runs "Create my lemma.id" from scratch.
   async function clearLemmaId() {
     const confirmed = window.confirm(
-      'Clear your lemma.id?\n\n'
-      + 'This wipes your passkey wallet and lemma.id caches in this browser. '
-      + 'Demo site tabs (ticketing/trials) keep their own cache, close those tabs '
-      + 'or hard-refresh them before re-running the demo.',
+      'Clear your lemma.id and demo caches in this browser? Close demo site tabs first if you opened them.',
     );
     if (!confirmed) return;
 
@@ -1737,6 +1788,8 @@
     state.verifiers = {};
     state.lastVerifyMs = { tickets: null, trials: null };
     for (const slug of SITE_SLUGS) state.localBlocks[slug].clear();
+    for (const slug of SITE_SLUGS) state.localDoubts[slug].clear();
+    state.pendingDoubtResolve = { tickets: 'passkey', trials: 'passkey' };
 
     const wid = $('ih-wallet-id');
     if (wid) wid.textContent = '-';
@@ -1769,6 +1822,9 @@
       window.LemmaPlatformAuth.applyNavButtons({ mode: 'none' });
     }
     renderWalletSlots();
+    renderLifecyclePanel();
+    setQuickInsight('Create', 'Create your passkey-protected lemma.id to begin.');
+    updateQuickProgress(1);
     scrollToPanel('lemma-demo');
     log('lemma.id cleared', 'click Get started to begin again');
     clearBtns.forEach((btn) => { btn.disabled = false; });
@@ -1888,7 +1944,7 @@
       siteId: SITE_IDS[slug],
       lemmaOrigin: window.location.origin,
       debug: true,
-      autoProvision: true,
+      autoProvision: false,
       requiredAssurance,
       isBlockedLocally: (ppid) => siteDecisionLocally(slug, ppid),
     });
@@ -1974,16 +2030,37 @@
       else if (verified) card.classList.add('is-human');
     }
     const ppidEl = $(`ih-${slug}-ppid`);
-    if (ppidEl) ppidEl.textContent = maskPpid(slug, result.ppid);
+    if (ppidEl) ppidEl.textContent = verified || banned ? maskPpid(slug, result.ppid) : PPID_PLACEHOLDER[slug];
     const assuranceEl = $(`ih-${slug}-assurance`);
-    if (assuranceEl) assuranceEl.textContent = result.assurance || 'Not available';
+    if (assuranceEl) {
+      assuranceEl.textContent = verified || banned ? (result.assurance || '—') : '—';
+      assuranceEl.closest('.site-card-field')?.classList.toggle('is-withheld', !verified && !banned);
+    }
     const reasonEl = $(`ih-${slug}-reason`);
-    if (reasonEl) reasonEl.textContent = result.reason || 'Not available';
+    if (reasonEl) {
+      reasonEl.textContent = verified || banned ? formatReasonLabel(result.reason) : '—';
+      reasonEl.closest('.site-card-field')?.classList.toggle('is-withheld', !verified && !banned);
+    }
     const latEl = $(`ih-${slug}-latency`);
-    if (latEl) latEl.textContent = Number.isFinite(result.timeMs) ? `${result.timeMs.toFixed(1)}ms` : 'Not available';
+    if (latEl) {
+      latEl.textContent = verified && Number.isFinite(result.timeMs)
+        ? `${result.timeMs.toFixed(1)}ms`
+        : '—';
+      latEl.closest('.site-card-field')?.classList.toggle('is-withheld', !verified);
+    }
     updatePpidCompare();
     updateStepLocks();
     updateBlockResultsTable();
+  }
+
+  function renderAllDemoSites() {
+    for (const slug of SITE_SLUGS) {
+      if (state.results[slug]) renderSite(slug, state.results[slug]);
+    }
+    renderProofReceipt();
+    updatePpidCompare();
+    updateBlockResultsTable();
+    renderLifecyclePanel();
   }
 
   async function fetchCheck(ppid, siteId) {
@@ -2794,7 +2871,6 @@
         };
         state.results[slug] = result;
         if (Number.isFinite(result.timeMs)) state.lastVerifyMs[slug] = result.timeMs;
-        renderSite(slug, result);
       } catch (err) {
         log(`Site cache check skipped (${slug})`, err.message);
       }
@@ -3086,10 +3162,10 @@
       await hydrateSiteVerificationFromCache();
       if (state.walletId) await refreshAssuranceStatus().catch(() => {});
       await refreshStatus().catch(() => {});
-      updateBlockResultsTable();
-      updateStepLocks();
-      renderWalletSlots();
-      renderLifecyclePanel();
+      renderAllDemoSites();
+      renderStep1Action();
+      updateQuickProgress(deriveProgressAct());
+      setWorkflowHighlight(deriveProgressAct());
       renderPresentationInspector();
     } catch (err) {
       log('Startup check skipped', err.message);

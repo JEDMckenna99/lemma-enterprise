@@ -28,7 +28,7 @@
 
 1. **Browser:** Load `proof-verifier.js`, create `ProofVerifier({ siteId })`, call `verify({ autoProvision: true })` before protected actions.
 2. **Account binding:** Store the returned site-private `ppid` as the platform's durable enforcement handle for that user.
-3. **Backend:** Accept a signed presentation or stamp from the client and verify locally with `@lemma/proof-verifier` or `lemma_proof_verifier.py`.
+3. **Backend:** Accept a signed presentation or stamp from the client and verify locally with `@lemma.id/proof-verifier` or `lemma_proof_verifier.py`.
 4. **Assurance policy:** Use `passkey` for continuity when that is enough (not Sybil-resistant alone). Require `ishuman` when the action needs one verified human behind the account, such as Sybil-resistant signup, trials, ticketing, payouts, or recovery after abuse.
 5. **Optional:** Register a site API key only when the developer needs server-side PPID blocks.
 
@@ -227,15 +227,17 @@ Pass the same canonical hostname to `VerificationContext(site_id=...)` or `creat
 Node.js, Deno, Bun, and Workers:
 
 ```bash
-npm install @lemma/proof-verifier
+npm install "@lemma.id/proof-verifier@1.4.0"
 ```
+
+On **PowerShell**, keep the quotes around the package name (`@lemma.id` is special syntax otherwise).
 
 Python:
 
 ```bash
 pip install lemma-proof-verifier
 # Or use the hosted single-file verifier:
-curl -O https://lemma.id/sdk/lemma_proof_verifier.py
+curl -O https://lemma.id/sdk/proof-verifier.py
 ```
 
 Choose assurance independently from the transport tier: T2 means the backend
@@ -266,7 +268,7 @@ def signup():
 ### Node / Workers backend (T2 + site policy)
 
 ```javascript
-import { createVerifier, createInMemorySitePolicyStore } from "@lemma/proof-verifier";
+import { createVerifier, createInMemorySitePolicyStore } from "@lemma.id/proof-verifier";
 
 const verifier = createVerifier({ siteId: "app.example.com", requiredAssurance: "passkey" });
 const policy = createInMemorySitePolicyStore({ blocked: new Set(["did:lemma:ppid_banned..."]) });
@@ -293,7 +295,7 @@ result = ctx.verify_with_policy(body["presentation"], policy_store=policy)
 ```
 
 ```javascript
-import { createVerifier, createLemmaCheckPolicyStore } from "@lemma/proof-verifier";
+import { createVerifier, createLemmaCheckPolicyStore } from "@lemma.id/proof-verifier";
 
 const verifier = createVerifier({ siteId: "app.example.com" });
 const policy = createLemmaCheckPolicyStore({
@@ -310,7 +312,7 @@ Both stores fail closed when the check API is unavailable (`site_policy_unavaila
 
 ```python
 # pip install lemma-proof-verifier
-# or: curl -O https://lemma.id/sdk/lemma_proof_verifier.py
+# or: curl -O https://lemma.id/sdk/proof-verifier.py
 from lemma_proof_verifier import VerificationContext
 
 ctx = VerificationContext(site_id="app.example.com")

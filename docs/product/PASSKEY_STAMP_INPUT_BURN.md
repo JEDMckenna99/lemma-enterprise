@@ -69,7 +69,7 @@ const { ok, ppid, assurance, presentation } = await verifier.verifyForBackend({
 });
 ```
 
-Backend: verify presentation with `@lemma/proof-verifier` / `lemma_proof_verifier.py` and enforce `required_assurance`.
+Backend: verify presentation with `@lemma.id/proof-verifier` / `lemma_proof_verifier.py` and enforce `required_assurance`.
 
 ## Non-goals
 

@@ -91,6 +91,39 @@ def test_signal_unlock_accepts_verified_wallet_assertion(monkeypatch):
     assert wallet_session_sync.SESSION_COOKIE_NAME in response.headers.getlist("Set-Cookie")[0]
 
 
+def test_signal_unlock_rejects_stale_unlocked_at(monkeypatch):
+    """Admin nav refreshes signal-unlock on long-lived sessions; skew >5m must 400."""
+    from api.wallet_authn import Result
+
+    monkeypatch.setattr(
+        wallet_session_sync,
+        "validate_session_token",
+        lambda _token: {"wallet_id": "wallet_verified"},
+    )
+    monkeypatch.setattr(
+        "api.wallet_authn.verify_assertion_from_body",
+        lambda *_args, **_kwargs: (Result(True), {}),
+    )
+    client = _client()
+    client.set_cookie(wallet_session_sync.SESSION_COOKIE_NAME, "session")
+    client.set_cookie(wallet_session_sync.CSRF_COOKIE_NAME, "csrf")
+    stale_ms = int(time.time() * 1000) - (6 * 60 * 1000)
+    response = client.post(
+        "/api/wallet/signal-unlock",
+        json={
+            "wallet_id": "wallet_verified",
+            "unlocked_at": stale_ms,
+            "expires_at": int(time.time()) + 3600,
+            "profile_id": "default",
+            "profile_name": "Personal",
+            "wallet_assertion": {"nonce": "nonce", "signature": "signature"},
+        },
+        headers={"Origin": "https://lemma.id", "X-Lemma-CSRF": "csrf"},
+    )
+    assert response.status_code == 400
+    assert response.get_json()["error"] == "unlock_timestamp_invalid"
+
+
 def test_signal_unlock_refresh_requires_csrf(monkeypatch):
     monkeypatch.setattr(
         wallet_session_sync,

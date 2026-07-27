@@ -1,5 +1,5 @@
 /**
- * Minimal Express T2 signup example using @lemma/ishuman-verify (Section 10).
+ * Minimal Express T2 signup example using @lemma.id/proof-verifier (Section 10).
  */
 import express from "express";
 import path from "node:path";

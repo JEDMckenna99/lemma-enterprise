@@ -33,7 +33,7 @@ def test_js_package_index_mirrors_canonical_source():
 
 def test_js_package_manifest_metadata():
     manifest = json.loads((JS_PACKAGE / "package.json").read_text(encoding="utf-8"))
-    assert manifest["name"] == "@lemma/proof-verifier"
+    assert manifest["name"] == "@lemma.id/proof-verifier"
     assert manifest["type"] == "module"
     assert manifest["main"] == "./index.mjs"
 
