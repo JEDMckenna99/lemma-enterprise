@@ -563,11 +563,16 @@
             mark?.classList.toggle('is-blocked', blockedError);
             setBrandLogoUnlocked(tone === 'success');
             if (tone === 'loading') {
-                mark?.classList.remove('is-caution', 'is-blocked');
+                // Fresh humanity-doubt keeps the yellow caution mark until
+                // success/blocked — do not drop is-caution while working.
+                mark?.classList.remove('is-blocked');
+                if (!isFreshIdv) mark?.classList.remove('is-caution');
             }
             if (tone === 'success') {
                 mark?.classList.remove('is-caution', 'is-blocked');
                 document.getElementById('privacy-copy')?.classList.add('hidden');
+            } else if (isFreshIdv && !blockedError) {
+                mark?.classList.add('is-caution');
             }
         }
 

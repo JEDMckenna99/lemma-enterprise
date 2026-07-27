@@ -739,9 +739,16 @@
   box-shadow: 0 0 0 1px rgba(239, 68, 68, 0.18);
 }
 
+.site-card.is-doubt {
+  border-color: #fde68a;
+  border-left-color: #d4a017;
+  box-shadow: 0 0 0 1px rgba(212, 160, 23, 0.22);
+}
+
 .site-card.is-pending {
   border-color: #fde68a;
   border-left-color: #f59e0b;
+  box-shadow: 0 0 0 1px rgba(245, 158, 11, 0.18);
 }
 
 .site-card-top {

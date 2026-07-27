@@ -77,7 +77,7 @@ def test_ishuman_demo_page_loads_expected_assets(ishuman_demo_client):
     assert ">Human proof</button>" in body
     assert ">Ban</button>" in body
     assert ">Unblock</button>" in body
-    assert "/static/css/demo/ishuman-demo.css?v=49" in body
+    assert "/static/css/demo/ishuman-demo.css?v=50" in body
     assert "ih-raise-tickets-policy-btn" not in body
     assert "ih-policy-toggle-card" not in body
     assert "ih-complete-human-main-btn" in body
@@ -142,12 +142,14 @@ def test_ishuman_demo_page_loads_expected_assets(ishuman_demo_client):
     assert "/sdk/ishuman-verifier.js" in body
     assert "/static/js/demo/ishuman-demo.js" in body
     assert "/static/css/demo/ishuman-demo.css" in body
-    assert "/static/js/demo/ishuman-demo.js?v=76" in body
+    assert "/static/js/demo/ishuman-demo.js?v=77" in body
     js = (ROOT / "static/js/demo/ishuman-demo.js").read_text(encoding="utf-8")
     assert "blockToggleBusy" in js
     assert "SITE_BAN_REASONS" in js
     assert "site_ppid_revoked" in js
     assert "if (banned) card.classList.add('is-deny')" in js
+    assert "card.classList.add('is-doubt')" in js
+    assert "Humanity doubted" in js
     assert "async function toggleSiteDoubt(" in js
     assert "async function clearSiteDoubt(" in js
     assert "async function resolveActiveDoubt(" in js
@@ -353,6 +355,8 @@ def test_ishuman_idv_popup_page_loads(ishuman_demo_client):
     )[0]
     assert "wallet.isUnlocked" not in status_logic
     assert "mark?.classList.remove('is-caution', 'is-blocked')" in status_logic
+    assert "if (!isFreshIdv) mark?.classList.remove('is-caution')" in status_logic
+    assert "mark?.classList.add('is-caution')" in status_logic
     assert 'id="eyebrow-copy"' not in body
     assert 'id="headline-copy"' not in body
     assert 'id="site-chip"' not in body

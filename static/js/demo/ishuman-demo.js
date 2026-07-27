@@ -811,6 +811,8 @@
     if (!result) return 'Pending';
     if (slug && isSiteBanned(slug, result)) return 'Banned';
     if (isSiteBanReason(result.reason)) return 'Banned';
+    if (slug && activeDoubtTier(slug) === 'ishuman') return 'Humanity doubted';
+    if (slug && isSiteDoubted(slug)) return 'Fresh presence required';
     if (isSiteVerified(result)) {
       if (result.assurance === 'passkey') return 'Verified, passkey';
       if (result.assurance === 'ishuman') return 'Verified human, ishuman';
@@ -1825,7 +1827,7 @@
       const assuranceEl = $(`ih-${slug}-assurance`);
       if (assuranceEl) assuranceEl.textContent = 'Not available';
       const card = $(`ih-${slug}-card`);
-      if (card) card.classList.remove('is-human', 'is-deny', 'is-pending');
+      if (card) card.classList.remove('is-human', 'is-deny', 'is-pending', 'is-doubt');
     }
     updatePpidCompare();
     updateBlockResultsTable();
@@ -2182,26 +2184,31 @@
 
   function renderSite(slug, result) {
     const banned = isSiteBanned(slug, result);
-    const verified = !banned && isSiteVerified(result);
-    const tone = banned ? 'deny' : (verified ? 'ok' : '');
+    const humanityDoubted = !banned && activeDoubtTier(slug) === 'ishuman';
+    const verified = !banned && !humanityDoubted && isSiteVerified(result);
+    const tone = banned ? 'deny' : (humanityDoubted ? 'warn' : (verified ? 'ok' : ''));
     setPill(`ih-${slug}-pill`, formatSiteStatus(result, slug), tone);
     const card = $(`ih-${slug}-card`);
     if (card) {
-      card.classList.remove('is-human', 'is-deny', 'is-pending');
+      card.classList.remove('is-human', 'is-deny', 'is-pending', 'is-doubt');
       if (banned) card.classList.add('is-deny');
+      else if (humanityDoubted) card.classList.add('is-doubt');
       else if (verified) card.classList.add('is-human');
     }
+    const showFields = verified || banned || humanityDoubted || isSiteDoubted(slug);
     const ppidEl = $(`ih-${slug}-ppid`);
-    if (ppidEl) ppidEl.textContent = verified || banned ? maskPpid(slug, result.ppid) : PPID_PLACEHOLDER[slug];
+    if (ppidEl) ppidEl.textContent = showFields ? maskPpid(slug, result.ppid) : PPID_PLACEHOLDER[slug];
     const assuranceEl = $(`ih-${slug}-assurance`);
     if (assuranceEl) {
-      assuranceEl.textContent = verified || banned ? (result.assurance || '—') : '—';
-      assuranceEl.closest('.site-card-field')?.classList.toggle('is-withheld', !verified && !banned);
+      assuranceEl.textContent = showFields ? (result.assurance || '—') : '—';
+      assuranceEl.closest('.site-card-field')?.classList.toggle('is-withheld', !showFields);
     }
     const reasonEl = $(`ih-${slug}-reason`);
     if (reasonEl) {
-      reasonEl.textContent = verified || banned ? formatReasonLabel(result.reason) : '—';
-      reasonEl.closest('.site-card-field')?.classList.toggle('is-withheld', !verified && !banned);
+      reasonEl.textContent = showFields
+        ? (humanityDoubted ? 'Humanity doubted' : formatReasonLabel(result.reason))
+        : '—';
+      reasonEl.closest('.site-card-field')?.classList.toggle('is-withheld', !showFields);
     }
     const latEl = $(`ih-${slug}-latency`);
     if (latEl) {
