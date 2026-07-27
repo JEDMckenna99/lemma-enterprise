@@ -140,9 +140,11 @@ def test_idv_preview_includes_terminal_ppid_blocked_state():
     assert "function presentBlockedState(message)" in idv
     assert "const blockedError = tone === 'error' && isBlockedStatusMessage(message)" in idv
     assert "mark?.classList.toggle('is-blocked', blockedError)" in idv
-    assert "ppid.{0,40}blocked" in idv
+    assert "ppid.{0,40}(revoked|banned|blocked)" in idv
     assert "site_ppid_blocked" in idv
-    assert "This PPID is blocked on this site." in copy
+    assert "site_ppid_revoked" in idv
+    assert "This PPID is banned on this site." in copy
+    assert idv.index("site_ppid_revoked") < idv.index("site_ppid_blocked")
 
 
 @pytest.mark.unit

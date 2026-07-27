@@ -458,7 +458,7 @@
                 : '';
             applyConsumerShell({
                 eyebrow: 'Site access denied',
-                headline: copy.headlineBlocked || 'Access blocked',
+                headline: copy.headlineBlocked || 'Access banned',
                 documentTitle: copy.documentTitleBlocked,
                 intro,
                 hideSteps: true,
@@ -529,7 +529,7 @@
         }
 
         function isBlockedStatusMessage(message) {
-            return /site_ppid_blocked|site_blocked|ppid.{0,40}blocked|site[_\s-]*blocked/i
+            return /site_ppid_revoked|site_ppid_blocked|site_blocked|ppid.{0,40}(revoked|banned|blocked)|site[_\s-]*(revoked|banned|blocked)/i
                 .test(String(message || ''));
         }
 
@@ -537,9 +537,9 @@
             const copy = consumerCopy();
             applyBlockedShell();
             setStatus(
-                message && !/^site_ppid_blocked$|^site_blocked$/i.test(String(message))
+                message && !/^site_ppid_revoked$|^site_ppid_blocked$|^site_blocked$/i.test(String(message))
                     ? message
-                    : (copy.status?.blocked || 'This PPID is blocked on this site.'),
+                    : (copy.status?.blocked || 'This PPID is banned on this site.'),
                 'error',
             );
             const primary = document.getElementById('primary-btn');
@@ -633,7 +633,7 @@
                 },
                 blocked: {
                     shell: applyBlockedShell,
-                    blocked: copy.status?.blocked || 'This PPID is blocked on this site.',
+                    blocked: copy.status?.blocked || 'This PPID is banned on this site.',
                     terminal: true,
                 },
                 action: {
@@ -669,7 +669,7 @@
             cancel.textContent = copy.cancel || 'Not now';
 
             if (scene.terminal || previewState === 'blocked') {
-                setStatus(scene.blocked || copy.status?.blocked || 'This PPID is blocked on this site.', 'error');
+                setStatus(scene.blocked || copy.status?.blocked || 'This PPID is banned on this site.', 'error');
                 cancel.textContent = copy.primary?.closeTab || 'Close';
             } else if (previewState === 'working') {
                 setStatus(scene.working, 'loading');

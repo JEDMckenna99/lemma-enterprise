@@ -342,7 +342,7 @@ def test_ishuman_ui_states_gallery_loads_all_preview_scenes(ishuman_demo_client)
     assert "fresh_passkey" in body
     assert "label: 'Fresh passkey'" in body
     assert "Fresh passkey human proof" not in body
-    assert "PPID blocked" in body
+    assert "PPID banned" in body
     assert "data-state=\"blocked\"" in body
     assert "data-surface=\"popup\"" in body
     assert "data-surface=\"redirect\"" in body

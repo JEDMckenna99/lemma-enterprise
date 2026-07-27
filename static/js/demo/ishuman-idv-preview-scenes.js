@@ -15,12 +15,12 @@
     headlineUnlock: 'Unlock your lemma.id',
     headlineSiteContinuity: 'Unlock to continue',
     headlineFreshPasskey: 'Confirm presence',
-    headlineBlocked: 'Access blocked',
+    headlineBlocked: 'Access banned',
     documentTitlePasskeySetup: 'Create your lemma.id | Lemma.id',
     documentTitleUnlock: 'Unlock | Lemma.id',
     documentTitleSiteContinuity: 'Unlock to continue | Lemma.id',
     documentTitleFreshPasskey: 'Confirm presence | Lemma.id',
-    documentTitleBlocked: 'Access blocked | Lemma.id',
+    documentTitleBlocked: 'Access banned | Lemma.id',
     privacy:
       'Your documents stay private and are deleted after verification. This site receives only your human proof.',
     privacyFreshDoubt:
@@ -70,7 +70,7 @@
       },
       blocked(site) {
         const s = formatSiteLabel(site);
-        return `${s} has blocked this lemma.id. No human proof will be issued for this site.`;
+        return `${s} has banned this lemma.id. No human proof will be issued for this site.`;
       },
       mobileHandoff:
         'You\u2019re verified. Save your lemma.id on this phone with a passkey.',
@@ -92,7 +92,7 @@
       freshPasskeyReady: 'Use Face ID, Touch ID, Windows Hello, or your passkey to confirm your presence.',
       freshPasskeyWorking: 'Confirming your presence\u2026',
       freshPasskeySuccess: 'Presence confirmed.',
-      blocked: 'This PPID is blocked on this site.',
+      blocked: 'This PPID is banned on this site.',
       stored: 'You\u2019re all set.',
       alreadyVerified: 'You\u2019re already verified.',
       claimReady: 'Almost done. Secure your lemma.id on this device.',
