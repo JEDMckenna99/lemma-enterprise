@@ -721,7 +721,7 @@
 .site-card.is-deny {
   border-color: #fca5a5;
   border-left-color: #ef4444;
-  box-shadow: 0 0 0 1px rgba(239, 68, 68, 0.12);
+  box-shadow: 0 0 0 1px rgba(239, 68, 68, 0.18);
 }
 
 .site-card.is-pending {

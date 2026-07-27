@@ -4,6 +4,14 @@
   const SITE_SLUGS = ['tickets', 'trials'];
   const DEFAULT_DEMO_SITE_ASSURANCE = 'passkey';
   const PASSKEY_OK_REASONS = new Set(['valid', 'session_valid', 'vc_valid']);
+  // Ban state is site_ppid_revoked; keep legacy site_block(ed)/revoked aliases.
+  const SITE_BAN_REASONS = new Set([
+    'site_ppid_revoked',
+    'site_ppid_blocked',
+    'site_blocked',
+    'site_block',
+    'revoked',
+  ]);
   const SITE_IDS = {
     tickets: 'tickets-demo.lemma.id',
     trials: 'trials-demo.lemma.id',
@@ -522,15 +530,20 @@
     return !!(state.localBlocks[slug]?.size);
   }
 
+  function isSiteBanReason(reason) {
+    return SITE_BAN_REASONS.has(String(reason || ''));
+  }
+
+  function isSiteBanned(slug, result = null) {
+    return isSiteBlocked(slug, result) || isSiteBanReason(result?.reason);
+  }
+
   function formatBlockResult(slug, result) {
     const ppid = result?.ppid || resolveSitePpid(slug);
     if (!ppid) return { text: 'Not verified yet', className: '' };
-    if (isSiteBlocked(slug, result)) return { text: 'Blocked', className: 'result-deny' };
+    if (isSiteBanned(slug, result)) return { text: 'Banned', className: 'result-deny' };
     if (result?.reason === 'doubt_required') return { text: 'Doubted', className: 'result-warn' };
     if (result?.human || isSiteVerified(result)) return { text: 'Still verified', className: 'result-ok' };
-    if (result && !result.human && ['site_blocked', 'site_block', 'revoked'].includes(result.reason)) {
-      return { text: 'Blocked', className: 'result-deny' };
-    }
     if (['assurance_insufficient', 'not_ishuman'].includes(result?.reason)) {
       return { text: 'Insufficient assurance', className: 'result-warn' };
     }
@@ -715,14 +728,15 @@
     return map[label] || label;
   }
 
-  function formatSiteStatus(result) {
+  function formatSiteStatus(result, slug = null) {
     if (!result) return 'Pending';
+    if (slug && isSiteBanned(slug, result)) return 'Banned';
+    if (isSiteBanReason(result.reason)) return 'Banned';
     if (isSiteVerified(result)) {
       if (result.assurance === 'passkey') return 'Verified, passkey';
       if (result.assurance === 'ishuman') return 'Verified human, ishuman';
       return result.assurance ? `Verified (${result.assurance})` : 'Verified';
     }
-    if (result.reason === 'site_blocked' || result.reason === 'revoked') return 'Blocked';
     if (result.reason === 'doubt_required') return 'Doubt, fresh proof required';
     if (result.reason === 'assurance_insufficient' || result.reason === 'not_ishuman') {
       return 'Insufficient assurance';
@@ -798,8 +812,8 @@
     setText('ih-lifecycle-tickets-ppid', maskPpid('tickets', tickets?.ppid));
     setText('ih-lifecycle-trials-ppid', maskPpid('trials', trials?.ppid));
     setText('ih-lifecycle-tickets-policy', ticketsPolicy);
-    setText('ih-lifecycle-tickets-verdict', tickets ? formatSiteStatus(tickets) : 'Not available');
-    setText('ih-lifecycle-trials-verdict', trials ? formatSiteStatus(trials) : 'Not available');
+    setText('ih-lifecycle-tickets-verdict', tickets ? formatSiteStatus(tickets, 'tickets') : 'Not available');
+    setText('ih-lifecycle-trials-verdict', trials ? formatSiteStatus(trials, 'trials') : 'Not available');
     setText('ih-lifecycle-enforcement', enforcement);
     const doubtStatus = $('ih-doubt-status');
     if (doubtStatus && !doubtStatus.closest('.enforce-footnote')) {
@@ -1912,16 +1926,15 @@
   }
 
   function renderSite(slug, result) {
-    const verified = isSiteVerified(result);
-    const tone = verified
-      ? 'ok'
-      : (result.reason === 'site_blocked' || result.reason === 'revoked' ? 'deny' : '');
-    setPill(`ih-${slug}-pill`, formatSiteStatus(result), tone);
+    const banned = isSiteBanned(slug, result);
+    const verified = !banned && isSiteVerified(result);
+    const tone = banned ? 'deny' : (verified ? 'ok' : '');
+    setPill(`ih-${slug}-pill`, formatSiteStatus(result, slug), tone);
     const card = $(`ih-${slug}-card`);
     if (card) {
       card.classList.remove('is-human', 'is-deny', 'is-pending');
-      if (verified) card.classList.add('is-human');
-      else if (result.reason === 'site_blocked' || result.reason === 'revoked') card.classList.add('is-deny');
+      if (banned) card.classList.add('is-deny');
+      else if (verified) card.classList.add('is-human');
     }
     const ppidEl = $(`ih-${slug}-ppid`);
     if (ppidEl) ppidEl.textContent = maskPpid(slug, result.ppid);
@@ -2213,7 +2226,7 @@
       if (payload?.unblocked !== false) unblockedAny = true;
       state.localBlocks[slug].delete(ppid);
     }
-    if (state.results[slug] && ['site_blocked', 'site_block', 'revoked'].includes(state.results[slug].reason)) {
+    if (state.results[slug] && isSiteBanReason(state.results[slug].reason)) {
       state.results[slug] = {
         ...state.results[slug],
         human: true,

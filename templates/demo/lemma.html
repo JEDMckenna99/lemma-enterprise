@@ -6,7 +6,7 @@
 
 {% block head %}
 {{ super() }}
-<link rel="stylesheet" href="/static/css/demo/ishuman-demo.css?v=47">
+<link rel="stylesheet" href="/static/css/demo/ishuman-demo.css?v=48">
 {% endblock %}
 
 {% block content %}
@@ -698,5 +698,5 @@ const { ok, ppid, assurance, presentation } = await new ProofVerifier({
 <script nonce="{{ csp_nonce }}">window.LEMMA_ISHUMAN_USE_PERSON_ROOT_SEEDS = {{ 'true' if ishuman_use_person_root_seeds else 'false' }};</script>
 <!-- Legacy SDK alias remains available at /sdk/ishuman-verifier.js. -->
 <script src="/sdk/proof-verifier.js?v={{ proof_verifier_sdk_version }}" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
-<script src="/static/js/demo/ishuman-demo.js?v=69" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
+<script src="/static/js/demo/ishuman-demo.js?v=70" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
 {% endblock %}
