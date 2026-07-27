@@ -13,7 +13,7 @@ SQLAlchemy>=2.0.0
 psycopg2-binary>=2.9.0
 redis>=5.0.0
 Flask-Limiter>=3.5.0
-sentry-sdk[flask]>=1.40.0
+sentry-sdk[flask]>=2.66.1
 
 # AWS KMS for HSM-backed key storage
 boto3>=1.26.0
