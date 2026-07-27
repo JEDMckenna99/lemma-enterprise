@@ -46,15 +46,15 @@ Do **not** force-push this branch to the production Heroku app.
 Record pass/fail, browser + OS, staging URL, commit SHA, and screenshots/logs
 for each row.
 
-| # | Ceremony | Steps | Chrome | Safari | Firefox | Notes |
-|---|---|---|---|---|---|---|
-| 1 | First-device enroll | Open staging unlock/wallet → create new wallet → passkey create succeeds → server `device-enroll` completes → session cookie issued |  |  |  | Confirm network: `/api/wallet/device-enroll/begin` + `/complete`, then `/session-unlock/*` |
-| 2 | Daily unlock | Reload / return next day or clear local unlock bundle → passkey get → `/session-unlock` issues session |  |  |  | Knowing only `wallet_id` must not unlock |
-| 3 | CSRF refresh | With valid session, call refresh/clear without `X-Lemma-CSRF` → denied; with matching CSRF → ok |  |  |  | Use DevTools or SDK paths for signal-unlock / clear-session |
-| 4 | Additional device | From enrolled device, create QR/link transfer → claim on second browser/profile → enroll new signing key with grant |  |  |  | Second device without grant must fail |
-| 5 | Cross-device revoke | From device A, revoke device B → WebAuthn prompt required → B can no longer assert |  |  |  | Self-revoke of current device does not require the cross-device challenge |
-| 6 | Lost-device recovery | Established wallet, no usable device → start IDV with `purpose=lost_device_recovery` → authorize → enroll replacement passkey → prior devices revoked |  |  |  | Staging may use Didit sandbox / demo test-complete |
-| 7 | Relying-site session | From a third-party origin allowed in staging CORS, credentialed session-sync/read paths behave; mutations still CSRF-gated on lemma origin |  |  |  | One demo relying site is enough |
+| # | Ceremony | Steps | Chrome | Safari | Firefox | Android Chrome | iOS Safari | Notes |
+|---|---|---|---|---|---|---|---|---|
+| 1 | First-device enroll | Open staging unlock/wallet → create new wallet → passkey create succeeds → server `device-enroll` completes → session cookie issued |  |  |  |  |  | Confirm network: `/api/wallet/device-enroll/begin` + `/complete`, then `/session-unlock/*` |
+| 2 | Daily unlock | Reload / return next day or clear local unlock bundle → passkey get → `/session-unlock` issues session |  |  |  |  |  | Knowing only `wallet_id` must not unlock |
+| 3 | CSRF refresh | With valid session, call refresh/clear without `X-Lemma-CSRF` → denied; with matching CSRF → ok |  |  |  |  |  | Use DevTools or SDK paths for signal-unlock / clear-session |
+| 4 | Additional device | From enrolled device, create QR/link transfer → claim on second browser/profile → enroll new signing key with grant |  |  |  |  |  | Second device without grant must fail |
+| 5 | Cross-device revoke | From device A, revoke device B → WebAuthn prompt required → B can no longer assert |  |  |  |  |  | Self-revoke of current device does not require the cross-device challenge |
+| 6 | Lost-device recovery | Established wallet, no usable device → start IDV with `purpose=lost_device_recovery` → authorize → enroll replacement passkey → prior devices revoked |  |  |  |  |  | Staging may use Didit sandbox / demo test-complete |
+| 7 | Relying-site session | From a third-party origin allowed in staging CORS, credentialed session-sync/read paths behave; mutations still CSRF-gated on lemma origin |  |  |  |  |  | One demo relying site is enough |
 
 ## Negative checks (any one browser)
 

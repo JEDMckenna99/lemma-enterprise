@@ -62,6 +62,14 @@ def test_index_template_ties_rotation_resistance_to_ishuman():
 
 
 @pytest.mark.unit
+def test_terms_page_avoids_absolute_zero_knowledge_claim():
+    terms = (ROOT / "templates" / "legal" / "terms.html").read_text(encoding="utf-8")
+    assert "Zero-Knowledge Verification" not in terms
+    assert "Local Return-Visit Verification" in terms
+    assert "without per-request calls to Lemma" in terms
+
+
+@pytest.mark.unit
 def test_docs_page_clarifies_human_vs_assurance():
     docs = (ROOT / "templates" / "docs" / "ishuman.html").read_text(encoding="utf-8")
     assert "human</code> vs <code>assurance" in docs

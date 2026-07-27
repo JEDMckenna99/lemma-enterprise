@@ -1,0 +1,108 @@
+name: Section 11 Security Gates
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  dependency-scan:
+    name: Dependency scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install pip-audit
+        run: python -m pip install --upgrade pip pip-audit
+
+      - name: pip-audit (requirements.txt)
+        run: pip-audit -r requirements.txt
+
+      - name: npm audit (proof-verifier-js)
+        working-directory: packages/proof-verifier-js
+        run: |
+          npm i --package-lock-only
+          npm audit --audit-level=high
+
+      - name: npm audit (cdn production deps)
+        working-directory: cdn
+        run: |
+          npm ci --omit=dev || npm install --omit=dev
+          npm audit --omit=dev --audit-level=high
+
+  secret-scan:
+    name: Secret scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  sast:
+    name: SAST (Bandit)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Bandit (high severity only)
+        run: |
+          python -m pip install bandit
+          bandit -r api -lll -c .bandit.yml
+
+  coverage-gate:
+    name: Coverage threshold
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install test dependencies
+        run: bash scripts/ci_install_test_deps.sh
+
+      - name: Install coverage tooling
+        run: python -m pip install pytest-cov
+
+      - name: Run api coverage gate
+        env:
+          SESSION_SECRET: test-session-secret
+          DATABASE_URL: "sqlite:///:memory:"
+          LEMMA_PPID_ROOT_KEY: xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+          LEMMA_IDENTITY_ROOT_PEPPER_V1: yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy
+          LEMMA_PERSON_ROOT_SALT_V1: zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz
+        run: |
+          python -m pytest tests --ignore=tests/live -q \
+            --cov=api \
+            --cov-report=term \
+            --cov-fail-under=40

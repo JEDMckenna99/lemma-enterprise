@@ -60,7 +60,7 @@ The assurance boundaries must remain explicit:
 | 8. Billing integrity | P0 | `PASS` |  | `d00d744e` / Heroku v2479; `tests/test_billing_section8.py`; `scripts/section8_prod_smoke.py` |
 | 9. Operational reliability | P0 | `PASS` |  | `bb16d0f6` / Heroku v2487; `tests/test_ops_reliability_section9.py`; `scripts/section9_prod_smoke.py`; `scripts/section9_dependency_drill.py`; `scripts/section9_load_matrix.py`; `scripts/section9_restore_drill.py`; `ops/evidence/launch/*section9-restore-drill*` |
 | 10. SDK and integration productization | P1 | `IN_PROGRESS` |  | `docs/sdk/ISHUMAN_SDK_VERSIONS.json`, `api/sdk_serving.py`, `tests/test_sdk_integration_section10.py` |
-| 11. Independent assurance and compliance | P0 | `NOT_STARTED` |  |  |
+| 11. Independent assurance and compliance | P0 | `IN_PROGRESS` | Security + Platform | `.github/workflows/section11-security.yml`, `.github/dependabot.yml`, `SECURITY.md`, `docs/legal/*`, `docs/status/SECTION11_CLAIMS_ACCURACY_REVIEW.md`, `ops/evidence/launch/section11-*` |
 | 12. Controlled launch | P0 | `NOT_STARTED` |  |  |
 
 ---
@@ -578,7 +578,7 @@ Exit criteria:
 | ----- | ------ |
 | `python scripts/section10_prod_smoke.py` | PASS (5/5) |
 | `python scripts/section10_registry_smoke.py` | PASS zero-install + local PyPI wheel import (5/5 required); npm/PyPI registry 404 until secrets publish |
-| `GET /api/sdk/versions` | manifest `browser_verifier=1.9.2`, `backend_verifier=1.4.0`, canonical `@lemma/proof-verifier` / `lemma-proof-verifier` |
+| `GET /api/sdk/versions` | manifest `browser_verifier=1.9.2`, `backend_verifier=1.4.0`, canonical `@lemma.id/proof-verifier` / `lemma-proof-verifier` |
 | `GET /sdk/v1.4.0/proof-verifier.mjs` | 200, immutable cache |
 | `GET /sdk/v1.4.0/proof-verifier.py` | 200 |
 | Legacy aliases | `/sdk/lemma-ishuman-verify.mjs`, `/sdk/lemma_ishuman_verify.py` → 200 |
@@ -599,8 +599,8 @@ Exit criteria:
 Exit criteria:
 
 - [ ] A new relying site can install a supported package and complete T2 signup without copying internal code.
-  - **Done:** zero-install `/sdk/v1.4.0/proof-verifier.{mjs,py}` on lemma.id; local PyPI wheel imports `VerificationContext`.
-  - **Pending:** live `npm install @lemma/proof-verifier@1.4.0` and `pip install lemma-proof-verifier==1.4.0` after `NPM_TOKEN` + `PYPI_API_TOKEN` are set and tag `proof-verifier-v1.4.0` release workflow publishes.
+  - **Done:** zero-install `/sdk/v1.4.0/proof-verifier.{mjs,py}` on lemma.id; local PyPI wheel imports `VerificationContext`; npm `@lemma.id/proof-verifier@1.4.0` published.
+  - **Pending:** `pip install lemma-proof-verifier==1.4.0` on PyPI after `PYPI_API_TOKEN` is set and release workflow publishes.
 - [x] Published examples fail closed and pass integration tests.
 - [x] SDK versions and protocol compatibility are unambiguous.
 
@@ -609,9 +609,27 @@ Exit criteria:
 ## 11. Complete independent assurance and compliance
 
 - Priority: `P0`
-- Status: `NOT_STARTED`
-- Owner:
+- Status: `IN_PROGRESS`
+- Owner: Security + Platform
 - Evidence:
+  - `.github/workflows/section11-security.yml` (dependency scan, secret scan, SAST, coverage gate)
+  - `.github/dependabot.yml`
+  - `.bandit.yml`
+  - `SECURITY.md` (vulnerability disclosure program)
+  - `docs/legal/DATA_FLOW_INVENTORY.md`
+  - `docs/legal/DATA_RETENTION_INVENTORY.md`
+  - `docs/legal/DPA_DRAFT.md`
+  - `docs/legal/SUBPROCESSORS.md`
+  - `docs/legal/DELETION_EXPORT_PROCEDURES.md`
+  - `docs/legal/INCIDENT_NOTIFICATION_COMMITMENTS.md`
+  - `docs/legal/SOC2_CONTROL_EVIDENCE_MAP.md`
+  - `docs/status/SECTION11_CLAIMS_ACCURACY_REVIEW.md`
+  - `ops/evidence/launch/section11-findings-tracker.md`
+  - `ops/evidence/launch/section11-crypto-architecture-review-brief.md`
+  - `ops/evidence/launch/2026-06-08-external-pentest-scope.md`
+  - `ops/evidence/launch/2026-06-08-passkey-browser-matrix.md`
+  - `docs/status/SECTION2_STAGING_BROWSER_MATRIX.md`
+  - `.github/workflows/proof-verifier-release.yml` (SBOM + build provenance)
 
 - [ ] Complete an independent cryptographic architecture review.
 - [ ] Complete an external penetration test covering wallet, passkeys,
@@ -620,14 +638,15 @@ Exit criteria:
 - [ ] Record risk acceptance and remediation plans for remaining medium
       findings.
 - [ ] Complete Chrome, Safari, Firefox, Android, and iOS passkey matrices.
-- [ ] Add dependency scanning, secret scanning, SAST, coverage thresholds, and
+- [x] Add dependency scanning, secret scanning, SAST, coverage thresholds, and
       release provenance to required CI.
-- [ ] Establish a vulnerability disclosure or bug-bounty program.
-- [ ] Complete data-flow and data-retention inventories.
-- [ ] Publish a DPA, subprocessor list, deletion/export procedures, and incident
-      notification commitments.
-- [ ] Gather SOC 2 or equivalent control evidence required by target buyers.
-- [ ] Review every privacy, zero-knowledge, uniqueness, recovery, and uptime
+- [x] Establish a vulnerability disclosure or bug-bounty program.
+- [x] Complete data-flow and data-retention inventories.
+- [x] Publish a DPA, subprocessor list, deletion/export procedures, and incident
+      notification commitments (drafts pending counsel review).
+- [x] Gather SOC 2 or equivalent control evidence required by target buyers
+      (control map; formal attestation pending).
+- [x] Review every privacy, zero-knowledge, uniqueness, recovery, and uptime
       claim for technical accuracy.
 
 Exit criteria:
@@ -635,7 +654,24 @@ Exit criteria:
 - [ ] Independent reviewers approve the deployed implementation.
 - [ ] No unresolved critical or high security finding remains.
 - [ ] Procurement and privacy artifacts accurately describe actual data
-      handling.
+      handling (counsel-approved DPA/subprocessors pending).
+
+Validation baseline (2026-07-27):
+
+- `pip-audit -r requirements.txt`: PASS after Flask/python-dotenv bumps
+- `bandit -r api -lll -c .bandit.yml`: PASS (0 high; 24 medium tracked)
+- `npm audit --audit-level=high` (proof-verifier-js): PASS
+- `npm audit --omit=dev --audit-level=high` (cdn): PASS
+- Coverage gate: `--cov-fail-under=40` (measured ~42% on `api/`)
+
+Remaining blockers:
+
+- Independent crypto review and external pentest not yet commissioned
+- Browser/device matrix cells unfilled (templates expanded for Android/iOS)
+- DPA/subprocessor drafts require counsel approval before enterprise use
+- Formal SOC 2 Type I/II report not available
+- Bandit medium findings and cdn devDependency highs accepted per
+  `section11-findings-tracker.md` pending Security Lead sign-off
 
 ---
 

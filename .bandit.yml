@@ -1,0 +1,13 @@
+# Bandit configuration for Section 11 SAST.
+# CI gate fails on high severity (-lll). Medium findings are tracked in
+# ops/evidence/launch/section11-findings-tracker.md until remediated or accepted.
+
+exclude_dirs:
+  - /tests/
+  - /lemma-crypto/
+  - /venv/
+  - /.venv/
+
+skips:
+  # Demo health probes against configured staging URLs (controlled operator URLs).
+  - B310

@@ -308,7 +308,8 @@ All critical vulnerabilities have been remediated. You can state:
 > - WebAuthn/FIDO2 passkey authentication
 > - AES-256-GCM encryption
 >
-> Automated dependency scanning runs continuously via GitHub Dependabot.
+> Automated dependency scanning runs via GitHub Dependabot and the Section 11
+> security workflow (`.github/workflows/section11-security.yml`).
 > A third-party security audit is scheduled for [Q2 2026].
 >
 > For enterprise security requirements, contact security@lemma.id.
@@ -327,5 +328,5 @@ All critical vulnerabilities have been remediated. You can state:
 **Next Steps:**
 1. ~~Fix critical vulnerabilities~~ COMPLETE
 2. Complete OWASP checklist (2-4 hours)
-3. Set up automated scanning (1 hour)
+3. ~~Set up automated scanning (1 hour)~~ COMPLETE — Dependabot + Section 11 CI
 4. Engage penetration testing firm (when budget allows)
