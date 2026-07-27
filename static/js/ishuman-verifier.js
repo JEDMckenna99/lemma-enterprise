@@ -2084,6 +2084,9 @@ class ProofVerifier {
         if (options.refreshReason) {
             popupUrl.searchParams.set('refresh_reason', String(options.refreshReason));
         }
+        if (options.requireFreshPasskey === true) {
+            popupUrl.searchParams.set('require_fresh_passkey', '1');
+        }
         popupUrl.searchParams.set('request_nonce', requestNonce);
         popupUrl.searchParams.set('session_nonce', sessionNonce);
         popupUrl.searchParams.set('bloom_sequence', String(bloomSequence));

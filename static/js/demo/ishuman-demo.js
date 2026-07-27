@@ -1205,36 +1205,30 @@
   function isSiteDoubted(slug) {
     const ppid = resolveSitePpid(slug);
     if (!ppid) return false;
-    return !!(state.localDoubts[slug]?.has(ppid)
-      || state.results[slug]?.reason === 'doubt_required');
+    // Authoritative policy is localDoubts (hydrated from status / set by enforce).
+    // Do not treat a stale doubt_required reason alone as active — that would
+    // re-open the ceremony after Undoubt cleared the server row.
+    return !!state.localDoubts[slug]?.has(ppid);
+  }
+
+  function activeDoubtTier(slug) {
+    if (!isSiteDoubted(slug)) return null;
+    return state.pendingDoubtResolve[slug] === 'ishuman' ? 'ishuman' : 'passkey';
   }
 
   function renderEnforceDoubtButtons(slug) {
     const presenceBtn = $(`ih-doubt-${slug}-presence-btn`);
     const humanBtn = $(`ih-doubt-${slug}-human-btn`);
-    const doubted = isSiteDoubted(slug);
-    const tier = state.pendingDoubtResolve[slug] || 'passkey';
+    const tier = activeDoubtTier(slug);
+    // Keep both actions visible — Fresh presence and Doubt humanity are
+    // separate policies, not one shared Undoubt slot.
     if (presenceBtn) {
-      if (doubted && tier === 'passkey') {
-        presenceBtn.textContent = 'Undoubt';
-        presenceBtn.hidden = false;
-      } else if (doubted) {
-        presenceBtn.hidden = true;
-      } else {
-        presenceBtn.textContent = 'Fresh passkey';
-        presenceBtn.hidden = false;
-      }
+      presenceBtn.hidden = false;
+      presenceBtn.textContent = tier === 'passkey' ? 'Undoubt' : 'Fresh presence';
     }
     if (humanBtn) {
-      if (doubted && tier === 'ishuman') {
-        humanBtn.textContent = 'Undoubt';
-        humanBtn.hidden = false;
-      } else if (doubted) {
-        humanBtn.hidden = true;
-      } else {
-        humanBtn.textContent = 'Doubt humanity';
-        humanBtn.hidden = false;
-      }
+      humanBtn.hidden = false;
+      humanBtn.textContent = tier === 'ishuman' ? 'Undoubt' : 'Doubt humanity';
     }
   }
 
@@ -1277,11 +1271,11 @@
       if (!ticketsPpid && !trialsPpid) {
         doubtStatus.textContent = 'Verify both sites above, then enforce on a row.';
       } else if (state.localDoubts.tickets?.size || state.localDoubts.trials?.size) {
-        doubtStatus.textContent = 'Active doubt — click Undoubt to clear, or re-verify the site with fresh proof.';
+        doubtStatus.textContent = 'Active doubt — Verify opens the matching ceremony (presence or humanity). Undoubt clears without verifying.';
       } else if (isSiteBlocked('tickets', state.results.tickets) && isSiteVerified(state.results.trials)) {
         doubtStatus.textContent = 'Presale banned; SaaS trial still verified.';
       } else {
-        doubtStatus.textContent = 'Doubt challenges fresh proof. Ban persists across re-verify.';
+        doubtStatus.textContent = 'Fresh presence and Doubt humanity are separate. Ban persists across re-verify.';
       }
     }
   }
@@ -1988,8 +1982,150 @@
     return resolveSitePpid(slug);
   }
 
+  async function clearActiveDoubtQuiet(slug) {
+    const ppid = resolveSitePpid(slug);
+    if (!ppid || !isSiteDoubted(slug)) return;
+    try {
+      await requestJson('/api/demo/ishuman/clear-site-doubt', {
+        method: 'POST',
+        body: JSON.stringify({ site_slug: slug, ppid }),
+      });
+    } catch (err) {
+      // fresh_idv billing may already have cleared the server row
+      if (err?.status !== 404 && err?.payload?.error !== 'no_active_doubt') {
+        throw err;
+      }
+    }
+    state.localDoubts[slug].delete(ppid);
+    delete state.pendingDoubtResolve[slug];
+    clearVerifierCache(slug);
+  }
+
+  /**
+   * When a site is doubted, Verify must open the deliberate ceremony — never
+   * treat a cached session as verified. Humanity doubt → fresh_idv popup;
+   * Fresh presence → passkey site_proof popup.
+   */
+  async function resolveActiveDoubt(slug, options = {}) {
+    const tier = activeDoubtTier(slug) || 'passkey';
+    const ppid = resolveSitePpid(slug);
+    const label = slug === 'tickets' ? 'Presale' : 'SaaS trial';
+    const requiredAssurance = tier === 'ishuman' ? 'ishuman' : 'passkey';
+    setQuickInsight(
+      'Verify',
+      tier === 'ishuman'
+        ? `${label} humanity was doubted — complete fresh human proof…`
+        : `${label} requires fresh presence — confirm with passkey…`,
+    );
+
+    const verifier = verifierFor(slug, { requiredAssurance });
+    // Suspend local doubt during apply so a mid-flow status check cannot
+    // fail-closed before we clear the server row.
+    if (ppid) state.localDoubts[slug].delete(ppid);
+
+    let backend = null;
+    try {
+      if (tier === 'ishuman') {
+        backend = await verifier.verifyFreshForBackend({
+          requiredAssurance: 'ishuman',
+          ...options,
+          freshIdv: true,
+        });
+        if (!backend?.ok && !backend?.human) {
+          throw new Error(backend?.reason || 'fresh_human_proof_failed');
+        }
+      } else {
+        const issued = await verifier._issueSiteProofViaPopup({
+          freshIdv: false,
+          requireFreshPasskey: true,
+          refreshReason: 'site_doubt',
+        });
+        if (!issued?.ok) {
+          throw new Error(issued?.reason || 'fresh_presence_cancelled');
+        }
+        const applied = await verifier._applyIssuedSiteProof(
+          { ...(issued.detail || {}), refresh_reason: 'site_doubt' },
+          performance.now(),
+        );
+        if (!applied?.human) {
+          throw new Error(applied?.reason || 'fresh_presence_failed');
+        }
+        backend = {
+          ok: true,
+          human: true,
+          ppid: applied.ppid || ppid,
+          assurance: applied.assurance || 'passkey',
+          presentation: applied.presentation || null,
+          reason: applied.reason || 'valid',
+          timeMs: applied.timeMs || 0,
+        };
+      }
+      await clearActiveDoubtQuiet(slug);
+    } catch (err) {
+      if (ppid) {
+        state.localDoubts[slug].add(ppid);
+        state.pendingDoubtResolve[slug] = tier;
+      }
+      state.results[slug] = {
+        ...(state.results[slug] || {}),
+        human: false,
+        ppid: ppid || resolveSitePpid(slug),
+        reason: 'doubt_required',
+        timeMs: 0,
+      };
+      renderSite(slug, state.results[slug]);
+      updateBlockResultsTable();
+      throw err;
+    }
+
+    const result = {
+      human: true,
+      ppid: backend?.ppid || ppid || resolveSitePpid(slug),
+      assurance: backend?.assurance || requiredAssurance,
+      presentation: backend?.presentation || null,
+      reason: backend?.reason || 'valid',
+      timeMs: backend?.timeMs || 0,
+    };
+    state.results[slug] = result;
+    if (Number.isFinite(result.timeMs)) state.lastVerifyMs[slug] = result.timeMs;
+    if (assuranceDemoMode() && requiredAssurance === 'passkey' && result.ppid) {
+      state.passkeyPpids[slug] = result.ppid;
+    }
+    renderSite(slug, result);
+    renderProofReceipt();
+    renderPresentationInspector(slug);
+    renderLifecyclePanel();
+    updateIntegrationLatency();
+    updatePpidCompare();
+    log(
+      `${SITE_IDS[slug]} doubt resolved`,
+      `${tier} · ${result.reason}${result.assurance ? ` · ${result.assurance}` : ''}`,
+    );
+    await refreshStatus();
+    setQuickInsight(
+      'Verify',
+      tier === 'ishuman'
+        ? `${label} humanity re-proven.`
+        : `${label} presence confirmed.`,
+    );
+    return result;
+  }
+
   async function verifySite(slug, options = {}) {
     if (!window.IsHumanVerifier) throw new Error('IsHumanVerifier SDK not loaded');
+
+    // Active doubt: open the challenge ceremony instead of succeeding from cache.
+    // SDK deliberately omits doubt_required from autoProvision popupReasons —
+    // sites must call verifyFreshForBackend (or a presence popup) on purpose.
+    if (
+      isSiteDoubted(slug)
+      && options.resolveDoubt !== false
+      && options.autoProvision !== false
+      && options.freshIdv !== true
+    ) {
+      return resolveActiveDoubt(slug, options);
+    }
+
     const requiredAssurance = demoRequiredAssurance(slug, options);
     const verifier = verifierFor(slug, { requiredAssurance });
     const backend = await verifier.verifyForBackend({
@@ -2236,15 +2372,18 @@
     };
     renderSite(slug, state.results[slug]);
     if (!options.skipRecheck) {
-      await verifySite('tickets');
-      await verifySite('trials');
+      // Snapshot only — do not open the resolve ceremony when setting doubt.
+      await verifySite('tickets', { autoProvision: false, resolveDoubt: false });
+      await verifySite('trials', { autoProvision: false, resolveDoubt: false });
     }
     setWorkflowHighlight(3);
     scrollToPanel('ih-step-3');
     if (!options.skipInsight) {
       setQuickInsight(
         'Enforce',
-        `${slug === 'tickets' ? 'Presale' : 'SaaS trial'} now requires ${tier === 'ishuman' ? 'fresh human proof' : 'a fresh passkey'}. Click Undoubt to clear.`,
+        `${slug === 'tickets' ? 'Presale' : 'SaaS trial'} now requires ${
+          tier === 'ishuman' ? 'fresh human proof' : 'fresh presence'
+        }. Verify opens that ceremony; Undoubt clears.`,
       );
     }
     updateBlockResultsTable();
@@ -2254,40 +2393,46 @@
     return createSiteDoubt('tickets', state.pendingDoubtResolve.tickets || 'passkey');
   }
 
-  async function clearSiteDoubt(slug) {
+  async function clearSiteDoubt(slug, options = {}) {
     const ppid = resolveSitePpid(slug);
     if (!ppid) throw new Error(`${slug} PPID unavailable`);
     if (!isSiteDoubted(slug)) {
       throw new Error(`No active doubt on ${slug}`);
     }
-    await requestJson('/api/demo/ishuman/clear-site-doubt', {
-      method: 'POST',
-      body: JSON.stringify({ site_slug: slug, ppid }),
-    });
-    state.localDoubts[slug].delete(ppid);
-    delete state.pendingDoubtResolve[slug];
-    clearVerifierCache(slug);
+    await clearActiveDoubtQuiet(slug);
     log(`${slug} doubt cleared`, short(ppid));
-    await verifySite('tickets');
-    await verifySite('trials');
-    const label = slug === 'tickets' ? 'Presale' : 'SaaS trial';
-    setQuickInsight('Enforce', `${label} doubt cleared. Other sites were unaffected.`);
+    if (!options.skipRecheck) {
+      await verifySite('tickets', { resolveDoubt: false });
+      await verifySite('trials', { resolveDoubt: false });
+    }
+    if (!options.skipInsight) {
+      const label = slug === 'tickets' ? 'Presale' : 'SaaS trial';
+      setQuickInsight('Enforce', `${label} doubt cleared. Other sites were unaffected.`);
+    }
     updateBlockResultsTable();
   }
 
   async function toggleSiteDoubt(slug, resolveAssurance = 'passkey') {
-    if (isSiteDoubted(slug)) {
-      return clearSiteDoubt(slug);
-    }
     const tier = resolveAssurance === 'ishuman' ? 'ishuman' : 'passkey';
     const label = slug === 'tickets' ? 'Presale' : 'SaaS trial';
+    const current = activeDoubtTier(slug);
+
+    // Matching button while active → Undoubt (clear only).
+    if (current === tier) {
+      return clearSiteDoubt(slug);
+    }
+    // Other button while a different doubt is active → switch policy, no ceremony yet.
+    if (current) {
+      await clearSiteDoubt(slug, { skipRecheck: true, skipInsight: true });
+    }
+
     setQuickInsight(
       'Enforce',
       tier === 'ishuman'
-        ? `${label}: doubt set — fresh human proof required.`
-        : `${label}: doubt set — fresh passkey required.`,
+        ? `${label}: humanity doubted — next Verify opens fresh human proof.`
+        : `${label}: fresh presence required — next Verify opens passkey presence.`,
     );
-    await createSiteDoubt(slug, tier);
+    await createSiteDoubt(slug, tier, { skipRecheck: true });
   }
 
   async function requireIsHumanOnTickets() {
@@ -2866,7 +3011,11 @@
     }
     for (const doubt of payload.site_doubts || []) {
       const slug = siteIdToSlug[doubt.site_id];
-      if (slug && doubt.ppid) state.localDoubts[slug].add(doubt.ppid);
+      if (slug && doubt.ppid) {
+        state.localDoubts[slug].add(doubt.ppid);
+        const reason = String(doubt.reason || '').toLowerCase();
+        state.pendingDoubtResolve[slug] = reason.includes('human') ? 'ishuman' : 'passkey';
+      }
     }
     const netJson = $('ih-master-json');
     if (netJson) netJson.textContent = pretty(payload);

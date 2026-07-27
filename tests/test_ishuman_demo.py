@@ -50,8 +50,9 @@ def test_ishuman_demo_page_loads_expected_assets(ishuman_demo_client):
     assert "Enforce" in body
     assert "ih-enforce-rows" in body
     assert "ih-enforce-trials-ppid" in body
-    assert "Fresh passkey" in body
+    assert "Fresh presence" in body
     assert "Doubt humanity" in body
+    assert "Fresh passkey" not in body.split("ih-enforce-rows")[1].split("ih-block-results-table")[0]
     assert "Set assurance level (presale)" in body
     assert "Enforce site decisions" not in body
     assert "Set assurance level</h3>" not in body
@@ -141,7 +142,7 @@ def test_ishuman_demo_page_loads_expected_assets(ishuman_demo_client):
     assert "/sdk/ishuman-verifier.js" in body
     assert "/static/js/demo/ishuman-demo.js" in body
     assert "/static/css/demo/ishuman-demo.css" in body
-    assert "/static/js/demo/ishuman-demo.js?v=75" in body
+    assert "/static/js/demo/ishuman-demo.js?v=76" in body
     js = (ROOT / "static/js/demo/ishuman-demo.js").read_text(encoding="utf-8")
     assert "blockToggleBusy" in js
     assert "SITE_BAN_REASONS" in js
@@ -149,6 +150,11 @@ def test_ishuman_demo_page_loads_expected_assets(ishuman_demo_client):
     assert "if (banned) card.classList.add('is-deny')" in js
     assert "async function toggleSiteDoubt(" in js
     assert "async function clearSiteDoubt(" in js
+    assert "async function resolveActiveDoubt(" in js
+    assert "verifyFreshForBackend" in js
+    assert "requireFreshPasskey: true" in js
+    assert "options.resolveDoubt !== false" in js
+    assert "Fresh presence" in js
     assert "toggleSiteDoubt('tickets', 'passkey')" in js
     assert "toggleSiteDoubt('tickets', 'ishuman')" in js
     assert "toggleSiteDoubt('trials', 'passkey')" in js
