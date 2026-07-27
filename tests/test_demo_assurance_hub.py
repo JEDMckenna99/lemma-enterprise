@@ -23,6 +23,8 @@ def test_demo_hub_js_gates_assurance_workflow():
     assert "renderPresentationInspector" in js
     assert "MAIN_WORKFLOW_STEPS" in js
     assert "verifyFreshForBackend" in js
+    assert "async function challengeSite(" in js
+    assert "_issueSiteProofViaPopup" in js
 
 
 def test_demo_hub_template_has_three_concept_lifecycle():
