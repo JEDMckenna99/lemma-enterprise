@@ -22,9 +22,9 @@ def test_demo_hub_js_gates_assurance_workflow():
     assert "renderLifecyclePanel" in js
     assert "renderPresentationInspector" in js
     assert "MAIN_WORKFLOW_STEPS" in js
-    assert "verifyFreshForBackend" in js
-    assert "async function challengeSite(" in js
-    assert "_issueSiteProofViaPopup" in js
+    assert "async function toggleSiteDoubt(" in js
+    assert "async function clearSiteDoubt(" in js
+    assert "Undoubt" in js
 
 
 def test_demo_hub_template_has_three_concept_lifecycle():
@@ -38,7 +38,8 @@ def test_demo_hub_template_has_three_concept_lifecycle():
     assert 'id="ih-presentation-inspector"' in html
     assert 'id="ih-presentation-fields"' in html
     assert 'id="ih-create-doubt-btn"' in html
-    assert 'id="ih-resolve-doubt-btn"' in html
+    assert 'id="ih-resolve-doubt-btn"' not in html
+    assert "Undoubt" not in html  # label is set dynamically in JS
     assert 'id="ih-step-human"' in html
     assert 'id="ih-human-cta"' not in html
     assert 'id="ih-step-rotation"' not in html

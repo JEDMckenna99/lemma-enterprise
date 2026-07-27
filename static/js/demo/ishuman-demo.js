@@ -1202,13 +1202,46 @@
     diff.className = tPpid !== rPpid ? 'ppid-diff' : 'ppid-diff deny';
   }
 
+  function isSiteDoubted(slug) {
+    const ppid = resolveSitePpid(slug);
+    if (!ppid) return false;
+    return !!(state.localDoubts[slug]?.has(ppid)
+      || state.results[slug]?.reason === 'doubt_required');
+  }
+
+  function renderEnforceDoubtButtons(slug) {
+    const presenceBtn = $(`ih-doubt-${slug}-presence-btn`);
+    const humanBtn = $(`ih-doubt-${slug}-human-btn`);
+    const doubted = isSiteDoubted(slug);
+    const tier = state.pendingDoubtResolve[slug] || 'passkey';
+    if (presenceBtn) {
+      if (doubted && tier === 'passkey') {
+        presenceBtn.textContent = 'Undoubt';
+        presenceBtn.hidden = false;
+      } else if (doubted) {
+        presenceBtn.hidden = true;
+      } else {
+        presenceBtn.textContent = 'Fresh passkey';
+        presenceBtn.hidden = false;
+      }
+    }
+    if (humanBtn) {
+      if (doubted && tier === 'ishuman') {
+        humanBtn.textContent = 'Undoubt';
+        humanBtn.hidden = false;
+      } else if (doubted) {
+        humanBtn.hidden = true;
+      } else {
+        humanBtn.textContent = 'Doubt humanity';
+        humanBtn.hidden = false;
+      }
+    }
+  }
+
   function renderEnforceRows() {
     for (const slug of SITE_SLUGS) {
       const ppidEl = $(`ih-enforce-${slug}-ppid`);
       const statusEl = $(`ih-enforce-${slug}-status`);
-      const resolveBtn = slug === 'tickets'
-        ? $('ih-resolve-doubt-btn')
-        : $('ih-resolve-trials-doubt-btn');
       const banBtn = slug === 'tickets' ? $('ih-abuse-block-btn') : $('ih-trials-ban-btn');
       const result = state.results[slug];
       const ppid = resolveSitePpid(slug);
@@ -1220,13 +1253,7 @@
         statusEl.textContent = fmt.text;
         statusEl.className = `demo-pill enforce-row-status${fmt.className ? ` ${fmt.className}` : ''}`;
       }
-      const doubted = ppid && (state.localDoubts[slug]?.has(ppid)
-        || result?.reason === 'doubt_required');
-      if (resolveBtn) {
-        resolveBtn.hidden = !doubted;
-        const tier = state.pendingDoubtResolve[slug] || 'passkey';
-        resolveBtn.textContent = tier === 'ishuman' ? 'Resolve (human proof)' : 'Resolve (fresh passkey)';
-      }
+      renderEnforceDoubtButtons(slug);
       if (banBtn) {
         const showUnban = shouldShowUnban(slug, result);
         banBtn.textContent = showUnban ? 'Unban' : 'Ban';
@@ -1238,7 +1265,6 @@
       const row = $(`ih-enforce-row-${slug}`);
       if (row) {
         row.querySelectorAll('.enforce-chip:not([id$="-ban-btn"]):not(#ih-abuse-block-btn):not(#ih-trials-ban-btn)').forEach((btn) => {
-          if (btn.id.includes('resolve')) return;
           // Enforce chips stay usable even before a site verify snapshot exists.
           btn.disabled = !!state.wizardRunning;
         });
@@ -1251,7 +1277,7 @@
       if (!ticketsPpid && !trialsPpid) {
         doubtStatus.textContent = 'Verify both sites above, then enforce on a row.';
       } else if (state.localDoubts.tickets?.size || state.localDoubts.trials?.size) {
-        doubtStatus.textContent = 'Active doubt — use Resolve on the challenged row.';
+        doubtStatus.textContent = 'Active doubt — click Undoubt to clear, or re-verify the site with fresh proof.';
       } else if (isSiteBlocked('tickets', state.results.tickets) && isSiteVerified(state.results.trials)) {
         doubtStatus.textContent = 'Presale banned; SaaS trial still verified.';
       } else {
@@ -1302,7 +1328,7 @@
         outcomeBanner.hidden = false;
         outcomeBanner.classList.remove('is-warn');
         if (outcomeTitle) outcomeTitle.textContent = 'Doubt is temporary';
-        outcomeText.textContent = 'Ticketing requires a fresh proof. Resolve doubt without affecting trials.';
+        outcomeText.textContent = 'Ticketing requires a fresh proof. Undoubt or re-verify without affecting trials.';
       } else if (ticketsBlocked && trialsBlocked) {
         outcomeBanner.hidden = false;
         outcomeBanner.classList.add('is-warn');
@@ -2218,7 +2244,7 @@
     if (!options.skipInsight) {
       setQuickInsight(
         'Enforce',
-        `${slug === 'tickets' ? 'Presale' : 'SaaS trial'} returned doubt_required, resolve with ${tier === 'ishuman' ? 'human proof' : 'fresh passkey'}.`,
+        `${slug === 'tickets' ? 'Presale' : 'SaaS trial'} now requires ${tier === 'ishuman' ? 'fresh human proof' : 'a fresh passkey'}. Click Undoubt to clear.`,
       );
     }
     updateBlockResultsTable();
@@ -2228,94 +2254,40 @@
     return createSiteDoubt('tickets', state.pendingDoubtResolve.tickets || 'passkey');
   }
 
-  async function runFreshPasskeyChallenge(slug = 'tickets') {
-    const verifier = verifierFor(slug, { requiredAssurance: 'passkey' });
-    // Prefer the lemma popup ceremony so Fresh passkey matches Doubt humanity UX.
-    if (typeof verifier._issueSiteProofViaPopup === 'function') {
-      const issued = await verifier._issueSiteProofViaPopup({
-        freshIdv: false,
-        refreshReason: 'site_doubt',
-      });
-      if (!issued?.ok) {
-        throw new Error(issued?.reason || 'fresh_passkey_cancelled');
-      }
-      if (typeof verifier._applyIssuedSiteProof === 'function' && issued.detail) {
-        await verifier._applyIssuedSiteProof(issued.detail, performance.now());
-      }
-      return;
+  async function clearSiteDoubt(slug) {
+    const ppid = resolveSitePpid(slug);
+    if (!ppid) throw new Error(`${slug} PPID unavailable`);
+    if (!isSiteDoubted(slug)) {
+      throw new Error(`No active doubt on ${slug}`);
     }
-    await acquireWallet();
-    await state.wallet.init();
-    if (typeof state.wallet._requireFreshPasskeyAuth !== 'function') {
-      throw new Error('Fresh passkey challenge unavailable');
-    }
-    const auth = await state.wallet._requireFreshPasskeyAuth({
-      reason: 'Site requires a fresh passkey',
+    await requestJson('/api/demo/ishuman/clear-site-doubt', {
+      method: 'POST',
+      body: JSON.stringify({ site_slug: slug, ppid }),
     });
-    if (!auth?.success) {
-      throw new Error('fresh_passkey_failed');
-    }
-  }
-
-  async function resolveSiteDoubt(slug) {
-    const result = state.results[slug] || await verifySite(slug);
-    if (!result.ppid) throw new Error(`${slug} PPID unavailable`);
-    if (result.reason !== 'doubt_required' && !state.localDoubts[slug].has(result.ppid)) {
-      throw new Error(`No active doubt on ${slug}, create one first`);
-    }
-    const requiredAssurance = state.pendingDoubtResolve[slug] || 'passkey';
-    const ppid = result.ppid;
-
-    // Suspend local doubt for the deliberate resolve ceremony. The SDK
-    // re-checks isBlockedLocally while applying a fresh proof; leaving the
-    // flag set makes a successful ceremony report doubt_required.
     state.localDoubts[slug].delete(ppid);
-    try {
-      if (requiredAssurance === 'ishuman') {
-        const verifier = verifierFor(slug, { requiredAssurance: 'ishuman' });
-        const fresh = await verifier.verifyFreshForBackend({ requiredAssurance: 'ishuman' });
-        if (!fresh.ok) {
-          throw new Error(fresh.reason || 'fresh_verification_failed');
-        }
-      } else {
-        await runFreshPasskeyChallenge(slug);
-      }
-      await requestJson('/api/demo/ishuman/clear-site-doubt', {
-        method: 'POST',
-        body: JSON.stringify({ site_slug: slug, ppid }),
-      });
-    } catch (err) {
-      state.localDoubts[slug].add(ppid);
-      throw err;
-    }
-
+    delete state.pendingDoubtResolve[slug];
     clearVerifierCache(slug);
+    log(`${slug} doubt cleared`, short(ppid));
     await verifySite('tickets');
     await verifySite('trials');
-    setQuickInsight(
-      'Enforce',
-      requiredAssurance === 'ishuman'
-        ? 'Fresh human proof resolved the doubt. Other sites were unaffected.'
-        : 'Fresh passkey resolved the challenge. Other sites were unaffected.',
-    );
+    const label = slug === 'tickets' ? 'Presale' : 'SaaS trial';
+    setQuickInsight('Enforce', `${label} doubt cleared. Other sites were unaffected.`);
     updateBlockResultsTable();
   }
 
-  async function challengeSite(slug, resolveAssurance = 'passkey') {
+  async function toggleSiteDoubt(slug, resolveAssurance = 'passkey') {
+    if (isSiteDoubted(slug)) {
+      return clearSiteDoubt(slug);
+    }
     const tier = resolveAssurance === 'ishuman' ? 'ishuman' : 'passkey';
     const label = slug === 'tickets' ? 'Presale' : 'SaaS trial';
     setQuickInsight(
       'Enforce',
       tier === 'ishuman'
-        ? `${label}: opening fresh human proof…`
-        : `${label}: opening fresh passkey…`,
+        ? `${label}: doubt set — fresh human proof required.`
+        : `${label}: doubt set — fresh passkey required.`,
     );
-    await createSiteDoubt(slug, tier, { skipRecheck: true, skipInsight: true });
-    await resolveSiteDoubt(slug);
-  }
-
-  async function resolveTicketingDoubt() {
-    return resolveSiteDoubt('tickets');
+    await createSiteDoubt(slug, tier);
   }
 
   async function requireIsHumanOnTickets() {
@@ -3058,12 +3030,10 @@
     bind('ih-verify-tickets-btn', () => verifySite('tickets'));
     bind('ih-verify-trials-btn', () => verifySite('trials'));
     bind('ih-abuse-recheck-btn', recheckBothSitesAfterBlock);
-    bind('ih-doubt-tickets-presence-btn', () => challengeSite('tickets', 'passkey'));
-    bind('ih-doubt-tickets-human-btn', () => challengeSite('tickets', 'ishuman'));
-    bind('ih-doubt-trials-presence-btn', () => challengeSite('trials', 'passkey'));
-    bind('ih-doubt-trials-human-btn', () => challengeSite('trials', 'ishuman'));
-    bind('ih-resolve-doubt-btn', () => resolveSiteDoubt('tickets'));
-    bind('ih-resolve-trials-doubt-btn', () => resolveSiteDoubt('trials'));
+    bind('ih-doubt-tickets-presence-btn', () => toggleSiteDoubt('tickets', 'passkey'));
+    bind('ih-doubt-tickets-human-btn', () => toggleSiteDoubt('tickets', 'ishuman'));
+    bind('ih-doubt-trials-presence-btn', () => toggleSiteDoubt('trials', 'passkey'));
+    bind('ih-doubt-trials-human-btn', () => toggleSiteDoubt('trials', 'ishuman'));
     const blockBtn = $('ih-abuse-block-btn');
     const trialsBanBtn = $('ih-trials-ban-btn');
     if (blockBtn) {

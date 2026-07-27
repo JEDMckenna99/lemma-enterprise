@@ -69,8 +69,8 @@ def test_ishuman_demo_page_loads_expected_assets(ishuman_demo_client):
     assert "ih-trials-ban-btn" in body
     assert "ih-unblock-tickets-btn" in body
     assert "ih-create-doubt-btn" in body
-    assert "ih-resolve-doubt-btn" in body
-    assert "ih-resolve-trials-doubt-btn" in body
+    assert "ih-resolve-doubt-btn" not in body
+    assert "ih-resolve-trials-doubt-btn" not in body
     assert "demo-seg-toggle" in body
     assert ">Passkey</button>" in body
     assert ">Human proof</button>" in body
@@ -141,17 +141,19 @@ def test_ishuman_demo_page_loads_expected_assets(ishuman_demo_client):
     assert "/sdk/ishuman-verifier.js" in body
     assert "/static/js/demo/ishuman-demo.js" in body
     assert "/static/css/demo/ishuman-demo.css" in body
-    assert "/static/js/demo/ishuman-demo.js?v=74" in body
+    assert "/static/js/demo/ishuman-demo.js?v=75" in body
     js = (ROOT / "static/js/demo/ishuman-demo.js").read_text(encoding="utf-8")
     assert "blockToggleBusy" in js
     assert "SITE_BAN_REASONS" in js
     assert "site_ppid_revoked" in js
     assert "if (banned) card.classList.add('is-deny')" in js
-    assert "async function challengeSite(" in js
-    assert "challengeSite('tickets', 'passkey')" in js
-    assert "challengeSite('tickets', 'ishuman')" in js
-    assert "challengeSite('trials', 'passkey')" in js
-    assert "challengeSite('trials', 'ishuman')" in js
+    assert "async function toggleSiteDoubt(" in js
+    assert "async function clearSiteDoubt(" in js
+    assert "toggleSiteDoubt('tickets', 'passkey')" in js
+    assert "toggleSiteDoubt('tickets', 'ishuman')" in js
+    assert "toggleSiteDoubt('trials', 'passkey')" in js
+    assert "toggleSiteDoubt('trials', 'ishuman')" in js
+    assert "Undoubt" in js
     assert "function shouldShowUnban(" in js
     assert "async function ensureSitePpid(" in js
     assert "Never gate Ban/Unban on a prior verify" in js

@@ -420,7 +420,6 @@
             <div class="enforce-row-actions">
               <button type="button" class="enforce-chip" id="ih-doubt-tickets-presence-btn">Fresh passkey</button>
               <button type="button" class="enforce-chip" id="ih-doubt-tickets-human-btn">Doubt humanity</button>
-              <button type="button" class="enforce-chip enforce-chip--quiet" id="ih-resolve-doubt-btn" hidden>Resolve</button>
               <button type="button" class="enforce-chip enforce-chip--danger" id="ih-abuse-block-btn">Ban</button>
             </div>
           </article>
@@ -433,7 +432,6 @@
             <div class="enforce-row-actions">
               <button type="button" class="enforce-chip" id="ih-doubt-trials-presence-btn">Fresh passkey</button>
               <button type="button" class="enforce-chip" id="ih-doubt-trials-human-btn">Doubt humanity</button>
-              <button type="button" class="enforce-chip enforce-chip--quiet" id="ih-resolve-trials-doubt-btn" hidden>Resolve</button>
               <button type="button" class="enforce-chip enforce-chip--danger" id="ih-trials-ban-btn">Ban</button>
             </div>
           </article>
@@ -689,5 +687,5 @@ const { ok, ppid, assurance, presentation } = await new ProofVerifier({
 <script nonce="{{ csp_nonce }}">window.LEMMA_ISHUMAN_USE_PERSON_ROOT_SEEDS = {{ 'true' if ishuman_use_person_root_seeds else 'false' }};</script>
 <!-- Legacy SDK alias remains available at /sdk/ishuman-verifier.js. -->
 <script src="/sdk/proof-verifier.js?v={{ proof_verifier_sdk_version }}" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
-<script src="/static/js/demo/ishuman-demo.js?v=74" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
+<script src="/static/js/demo/ishuman-demo.js?v=75" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
 {% endblock %}
