@@ -947,6 +947,42 @@ def test_site_doubt_creates_temporary_challenge(
     assert rows[0].ppid == ppid
 
 
+def test_site_doubt_and_clear_work_in_production(
+    ishuman_demo_client,
+    fake_ishuman_db_session_factory,
+    monkeypatch,
+):
+    """Public /demo enforce chips must work on lemma.id (ENVIRONMENT=production)."""
+    from api.database import Site, SiteDoubt
+
+    monkeypatch.setenv("ENVIRONMENT", "production")
+    fake_ishuman_db_session_factory.store.data[Site.__name__] = [
+        Site(
+            site_id="site_demo_tickets",
+            site_domain="tickets-demo.lemma.id",
+            company_name="Demo Tickets",
+            admin_email="demo@lemma.id",
+        )
+    ]
+    ppid = "did:lemma:ppid_demo_prod_doubt"
+
+    create = ishuman_demo_client.post(
+        "/api/demo/ishuman/site-doubt",
+        json={"site_slug": "tickets", "ppid": ppid, "reason": "Demo doubt: require fresh passkey"},
+    )
+    assert create.status_code == 200, create.get_json()
+    assert create.get_json()["doubt_required"] is True
+
+    clear = ishuman_demo_client.post(
+        "/api/demo/ishuman/clear-site-doubt",
+        json={"site_slug": "tickets", "ppid": ppid},
+    )
+    assert clear.status_code == 200, clear.get_json()
+    assert clear.get_json()["doubt_required"] is False
+    rows = fake_ishuman_db_session_factory.store.data[SiteDoubt.__name__]
+    assert rows[0].is_active is False
+
+
 def test_clear_site_doubt_clears_only_matching_doubt(
     ishuman_demo_client,
     fake_ishuman_db_session_factory,

@@ -429,10 +429,11 @@ def ishuman_demo_require_ishuman():
 
 @ishuman_demo_bp.route("/api/demo/ishuman/site-doubt", methods=["POST"])
 def ishuman_demo_site_doubt():
-    """Demo-only: temporary fresh-proof challenge for one site PPID."""
-    if not _demo_enabled():
-        return jsonify({"success": False, "error": "demo_disabled"}), 403
+    """Temporary fresh-proof challenge for one demo-site PPID.
 
+    Available on the public /demo hub in production (same as site-block /
+    site-unblock). Test-verify rails remain gated by ``_demo_enabled()``.
+    """
     from api.database import SessionLocal, SiteDoubt
 
     body = request.get_json(silent=True) or {}
@@ -477,10 +478,11 @@ def ishuman_demo_site_doubt():
 
 @ishuman_demo_bp.route("/api/demo/ishuman/clear-site-doubt", methods=["POST"])
 def ishuman_demo_clear_site_doubt():
-    """Demo-only: clear a temporary site doubt (blocks remain untouched)."""
-    if not _demo_enabled():
-        return jsonify({"success": False, "error": "demo_disabled"}), 403
+    """Clear a temporary site doubt (blocks remain untouched).
 
+    Available on the public /demo hub in production (same as site-block /
+    site-unblock). Test-verify rails remain gated by ``_demo_enabled()``.
+    """
     from api.database import SessionLocal, SiteDoubt
 
     body = request.get_json(silent=True) or {}
