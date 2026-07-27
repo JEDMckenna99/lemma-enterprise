@@ -91,20 +91,6 @@
                 }
             }
 
-            async function ensureServerWalletSession(walletInstance, options) {
-                const opts = options || {};
-                try {
-                    if (typeof walletInstance._signalServerUnlock !== 'function') return false;
-                    await walletInstance._signalServerUnlock();
-                    return true;
-                } catch (e) {
-                    if (opts.debug) {
-                        console.warn('Wallet session sync error', e);
-                    }
-                    return false;
-                }
-            }
-
             if (!window.__lemmaLockHandlersBound) {
                 window.addEventListener('lemma:session-expired', handleLockedState);
                 window.addEventListener('lemma-wallet-locked', handleLockedState);
@@ -199,14 +185,13 @@
                 if (apiKeysLink) apiKeysLink.style.display = showDeveloperNav ? 'flex' : 'none';
 
                 if (isAdmin) {
+                    // Admin UI only needs the wallet-held admin_access lemma
+                    // (attached as X-Lemma-Credential). Do not signal-unlock here —
+                    // that is cookie/SSO maintenance, not platform auth.
                     const navAdmin = document.getElementById('nav-admin');
                     const adminDropdown = document.getElementById('admin-dropdown-link');
                     if (navAdmin) navAdmin.style.display = 'block';
                     if (adminDropdown) adminDropdown.style.display = 'block';
-
-                    await ensureServerWalletSession(wallet, {
-                        debug: localStorage.getItem('lemma_debug_auth') === 'true'
-                    });
                 }
 
                 const pricingLink = document.getElementById('nav-pricing');
