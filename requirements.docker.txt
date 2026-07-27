@@ -14,5 +14,5 @@ Flask-Limiter>=3.5.0
 sentry-sdk[flask]>=1.40.0
 boto3>=1.26.0
 botocore>=1.29.0
-qrcode[pil]>=7.4.2
+qrcode[pil]>=8.2
 webauthn>=2.0.0
