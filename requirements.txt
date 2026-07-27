@@ -26,7 +26,7 @@ qrcode[pil]>=7.4.2
 webauthn>=2.0.0
 
 # Ed25519 wallet assertions + Bloom envelope signing
-cryptography>=42.0.0
+cryptography>=49.0.0
 
 # Install lemma-crypto directly from the subdirectory
 -e ./lemma-crypto
