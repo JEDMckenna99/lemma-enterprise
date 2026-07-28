@@ -407,7 +407,7 @@
             const copy = consumerCopy();
             if (siteProofUsesContinuityOnly()) {
                 applyConsumerShell({
-                    eyebrow: 'Continuity proof required',
+                    eyebrow: 'Sign in with lemma.id',
                     headline: copy.headlineSiteContinuity || 'Unlock to continue',
                     documentTitle: copy.documentTitleSiteContinuity,
                     introKey: 'siteProofPasskey',
@@ -700,7 +700,7 @@
                 },
                 passkey: {
                     shell: () => applyConsumerShell({
-                        eyebrow: 'Continuity proof required',
+                        eyebrow: 'Sign in with lemma.id',
                         headline: copy.headlineSiteContinuity || 'Unlock to continue',
                         documentTitle: copy.documentTitleSiteContinuity,
                         introKey: 'siteProofPasskey',

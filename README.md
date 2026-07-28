@@ -1,8 +1,8 @@
 # lemma.id
 
-**Stop the same abuser from coming back as a new account.**
+**Passwordless login with no user data to store — and bans that stick.**
 
-lemma.id is a **private proof layer** for web platforms: site-private PPIDs for account continuity, signed backend verification, and **isHuman** assurance when one account must map to one verified human. Bans survive email, SIM, device, and IP rotation, without your site storing ID documents or building a KYC stack.
+lemma.id is **Sign in with lemma.id**: passkey login that gives your site a stable, site-private PPID as the account key, with no usernames, passwords, or email collection and signed local backend verification. The optional **isHuman** step-up tier binds one verified human per account on the same PPID, so bans survive email, SIM, device, and IP rotation — without your site storing ID documents or building a KYC stack.
 
 - **Live:** https://lemma.id · **Docs:** https://lemma.id/docs · **AI integration guide:** [`docs/integration/ISHUMAN_AGENT_INTEGRATION.md`](docs/integration/ISHUMAN_AGENT_INTEGRATION.md)
 

@@ -1,6 +1,8 @@
 # AI agent instructions: lemma.id
 
-You are helping a developer integrate **lemma.id human proofs** into their web platform. **isHuman** is an optional assurance tier sites can require, not the product name.
+You are helping a developer add **Sign in with lemma.id** to their web platform: passwordless login with passkeys and a site-private, stable `ppid` as the account key — no usernames, passwords, or email collection. **isHuman** is an optional step-up assurance tier (one verified human per account, same PPID) that sites can require per action; it is not the product name and not a separate integration.
+
+Default to `requiredAssurance: 'passkey'` for login/continuity. Use `'ishuman'` only when the developer needs Sybil resistance on a specific action.
 
 ## Read this first
 
@@ -36,15 +38,28 @@ Or locally: `llms.txt`
 3. For signup/account creation, verify a signed `presentation` on the server, never trust a bare client `ppid`.
 4. No customer webhooks, no wallet secret on the developer's backend, no KYC field storage.
 
-## Quick integration
+## Quick integration (sign-in, default)
+
+Drop-in button:
+
+```html
+<script src="https://lemma.id/sdk/proof-verifier.js"></script>
+<script src="https://lemma.id/sdk/lemma-signin.js"></script>
+<lemma-signin site-id="app.example.com"></lemma-signin>
+```
+
+SDK directly (always pass `requiredAssurance`; `'passkey'` for login, `'ishuman'` for Sybil-resistant step-up):
 
 ```html
 <script src="https://lemma.id/sdk/proof-verifier.js"></script>
 <script>
   const verifier = new ProofVerifier({ siteId: 'app.example.com' });
-  const { ok, presentation } = await verifier.verifyForBackend({ autoProvision: true });
+  const { ok, presentation } = await verifier.verifyForBackend({
+    autoProvision: true,
+    requiredAssurance: 'passkey',
+  });
   if (!ok) throw new Error('not_verified');
-  await fetch('/api/signup', { method: 'POST', body: JSON.stringify({ presentation }) });
+  await fetch('/api/login', { method: 'POST', body: JSON.stringify({ presentation }) });
 </script>
 ```
 

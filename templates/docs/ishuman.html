@@ -1,12 +1,23 @@
 {% extends "docs/layout.html" %}
 {% set active_product = 'ishuman' %}
 {% set active_page = 'ishuman' %}
-{% set hero_title = 'isHuman + lemma.id for developers' %}
-{% set hero_subtitle = 'Everything you need to require one verified human per account: the browser SDK, site-private PPIDs, offline backend verification, and three levels of proof, lemma.id, presence proof, and human proof.' %}
-{% set page_description = 'lemma.id developer docs: integrate three levels of proof (lemma.id continuity, presence proof, human proof) with the browser SDK, site-private PPIDs, and signed backend presentations.' %}
+{% set hero_title = 'Sign in with lemma.id for developers' %}
+{% set hero_subtitle = 'Passwordless login with passkeys and a site-private PPID as the account key: no usernames, passwords, or emails to store. Step up to presence proof or isHuman (one verified human per account) on the same PPID when an action needs it.' %}
+{% set page_description = 'lemma.id developer docs: add Sign in with lemma.id (passkey login, site-private PPIDs, signed backend presentations), then require presence proof or isHuman step-up per action.' %}
 
 {% block docs_content %}
 <div class="docs-section" id="quickstart">
+    <h2>Add sign-in in one element</h2>
+    <p>The fastest path is the drop-in button plus one backend route. See the <a href="/docs/integration/QUICK_START_SIMPLE_LOGIN.md">sign-in quickstart</a> for the full walkthrough (sessions, testing, localhost).</p>
+    <div class="code-block">
+        <div class="code-header">
+            <span>HTML</span>
+            <button class="copy-btn">Copy</button>
+        </div>
+        <code>&lt;script src="https://lemma.id/sdk/proof-verifier.js"&gt;&lt;/script&gt;
+&lt;script src="https://lemma.id/sdk/lemma-signin.js"&gt;&lt;/script&gt;
+&lt;lemma-signin site-id="app.example.com"&gt;&lt;/lemma-signin&gt;</code>
+    </div>
     <h2>What lemma.id gives your site</h2>
     <p><strong>lemma.id</strong> is the continuous identity object your users hold. Your site gets a stable, site-private PPID bound to your user record, not a legal identity, email, document number, or ID that works anywhere else.</p>
     <p><strong>One integration, three levels of proof:</strong></p>

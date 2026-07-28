@@ -1,8 +1,10 @@
 # isHuman integration guide for AI coding agents
 
-> **Audience:** AI coding agents (Cursor, Copilot, Claude Code, etc.) helping a developer add **isHuman** human assurance and the [lemma.id private proof layer](https://lemma.id/docs) to a web platform.
+> **Audience:** AI coding agents (Cursor, Copilot, Claude Code, etc.) helping a developer add **Sign in with lemma.id** — passwordless passkey login with a site-private PPID — and optionally **isHuman** step-up assurance to a web platform.
 >
-> **Goal:** Give the platform a site-private PPID for account continuity, plus **isHuman** assurance for one-human-per-account enforcement when Sybil resistance matters, without building KYC, without customer webhooks, and without storing government ID data.
+> **Goal:** Give the platform a site-private PPID for login and account continuity, plus **isHuman** assurance for one-human-per-account enforcement when Sybil resistance matters, without building KYC, without customer webhooks, and without storing government ID data.
+>
+> **Just adding login?** Start with the [sign-in quickstart](https://lemma.id/docs/integration/QUICK_START_SIMPLE_LOGIN.md) (`requiredAssurance: 'passkey'`, drop-in `<lemma-signin>` button), then return here for trust tiers, abuse APIs, and step-up policy. This guide remains the canonical contract for both tiers.
 
 ## Start here
 

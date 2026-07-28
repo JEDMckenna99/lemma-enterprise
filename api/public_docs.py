@@ -17,6 +17,9 @@ from typing import FrozenSet, Optional, Tuple
 PUBLIC_DOC_ALLOWLIST: FrozenSet[str] = frozenset(
     {
         "integration/ISHUMAN_AGENT_INTEGRATION.md",
+        "integration/QUICK_START_SIMPLE_LOGIN.md",
+        "integration/SIMPLE_INTEGRATION_GUIDE.md",
+        "integration/BROWSER_SUPPORT.md",
         "ERROR_CODES.md",
         "demo/README.md",
         "demo/PRESALE_DEMO_SCRIPT.md",

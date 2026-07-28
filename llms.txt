@@ -1,26 +1,72 @@
 # lemma.id: relying-site integration pointers for AI agents
 
-lemma.id is a private proof layer for web platforms: site-private PPIDs, signed backend verification, and optional isHuman assurance when one account must map to one verified human.
+lemma.id is **Sign in with lemma.id**: passwordless login with passkeys and a
+site-private, stable `ppid` as the account key. No usernames, passwords, or
+email collection; your backend verifies a signed presentation locally.
+**isHuman** is an optional step-up assurance tier (one verified human per
+account) on the same PPID — request it per action, it is not a separate
+integration.
 
 ## Start here
 
+- Sign-in quickstart: https://lemma.id/docs/integration/QUICK_START_SIMPLE_LOGIN.md
+- Full sign-in guide (sessions, linking, sign-out): https://lemma.id/docs/integration/SIMPLE_INTEGRATION_GUIDE.md
+- Canonical integration contract (machine-oriented, authoritative): https://lemma.id/docs/integration/ISHUMAN_AGENT_INTEGRATION.md
+- Browser support + SDK error codes: https://lemma.id/docs/integration/BROWSER_SUPPORT.md
 - Human-readable docs: https://lemma.id/docs
-- Canonical integration guide (machine-oriented): https://lemma.id/docs/integration/ISHUMAN_AGENT_INTEGRATION.md
 - Repo agent entrypoint (if working in the lemma-enterprise repo): AGENTS.md
 
-## Browser SDK
+## Sign in (default integration)
 
-- Proof verifier: https://lemma.id/sdk/proof-verifier.js
-- Create: `new ProofVerifier({ siteId: 'app.example.com' })`
-- Signup/server verify: `await verifier.verifyForBackend({ autoProvision: true })`
-- Compatibility: `ishuman-verifier.js` and `IsHumanVerifier` remain supported aliases
+Drop-in button:
+
+```html
+<script src="https://lemma.id/sdk/proof-verifier.js"></script>
+<script src="https://lemma.id/sdk/lemma-signin.js"></script>
+<lemma-signin site-id="app.example.com"></lemma-signin>
+<script>
+  document.querySelector('lemma-signin').addEventListener('lemma-signin-success', (e) => {
+    fetch('/api/login', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ presentation: e.detail.presentation }) });
+  });
+</script>
+```
+
+SDK directly (always pass `requiredAssurance` — `'passkey'` for login):
+
+```javascript
+const verifier = new ProofVerifier({ siteId: 'app.example.com' });
+const { ok, presentation } = await verifier.verifyForBackend({
+  autoProvision: true,
+  requiredAssurance: 'passkey',
+});
+```
+
+Backend: verify the presentation locally, find-or-create the user by
+`result.ppid`, issue **your own** session cookie. Login returns `ppid` +
+`assurance` only — no email/name/avatar; collect profile fields yourself on
+first login.
+
+## isHuman step-up (optional, same PPID)
+
+Require one verified human per account for Sybil-sensitive actions (trials,
+ticketing, payouts, post-ban recovery): set `requiredAssurance: 'ishuman'` on
+both client and backend. The PPID does not change when a user upgrades tiers.
 
 ## Backend verifiers (local-first)
 
-- npm: `npm install "@lemma.id/proof-verifier@1.4.0"` (quote on PowerShell)
+- npm: `npm install "@lemma.id/proof-verifier@1.4.0"` (quote on PowerShell); TypeScript types included
 - Node/Workers: https://lemma.id/sdk/proof-verifier.mjs
 - Python: https://lemma.id/sdk/proof-verifier.py
 - PyPI: `pip install lemma-proof-verifier==1.4.0`
+- Offline test helpers (no WebAuthn/lemma.id needed in CI):
+  `@lemma.id/proof-verifier/testing` and `lemma_proof_verifier_testing.py`
+
+## Browser SDK notes
+
+- Create: `new ProofVerifier({ siteId: 'app.example.com' })`
+- Compatibility: `ishuman-verifier.js` and `IsHumanVerifier` remain supported aliases
+- Localhost dev works: `siteId` defaults to the page hostname; all localhost ports share the `localhost` binding
 
 ## Live demo
 
@@ -30,7 +76,7 @@ lemma.id is a private proof layer for web platforms: site-private PPIDs, signed 
 
 1. `siteId` = canonical hostname (`app.example.com`), not internal `site_...` IDs.
 2. Fail closed when `human` is false.
-3. For signup/account creation, verify a signed `presentation` on the server, never trust a bare client `ppid`.
+3. For signup/account creation and login, verify a signed `presentation` on the server, never trust a bare client `ppid`.
 4. No customer webhooks, no wallet secret on the developer's backend, no KYC field storage.
 
 ## Out of scope for relying-site integration

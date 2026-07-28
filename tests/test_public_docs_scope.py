@@ -42,6 +42,9 @@ def test_public_doc_allowlist_serves_approved_markdown(monkeypatch):
     with app.test_client() as client:
         for path in (
             "/docs/integration/ISHUMAN_AGENT_INTEGRATION.md",
+            "/docs/integration/QUICK_START_SIMPLE_LOGIN.md",
+            "/docs/integration/SIMPLE_INTEGRATION_GUIDE.md",
+            "/docs/integration/BROWSER_SUPPORT.md",
             "/docs/ERROR_CODES.md",
             "/docs/demo/README.md",
             "/docs/demo/PRESALE_DEMO_SCRIPT.md",
@@ -94,8 +97,8 @@ def test_public_doc_allowlist_denies_internal_paths(monkeypatch):
             "/docs/security/THREAT_MODEL.md",
             "/docs/product/COMPARTMENTALIZED_PERSONAS.md",
             "/docs/AGENT_OPS_READINESS.md",
-            "/docs/integration/SIMPLE_INTEGRATION_GUIDE.md",
             "/docs/integration/IAM_ONLY_INTEGRATION_GUIDE.md",
+            "/docs/integration/INTEGRATION_GUIDE.md",
             "/docs/operations/INTERNAL_COGS_ESTIMATE.csv",
             "/docs/README.md",
         )
@@ -140,6 +143,11 @@ def test_llms_txt_is_served(monkeypatch):
         assert b"ISHUMAN_AGENT_INTEGRATION.md" in response.data
         assert b"proof-verifier.js" in response.data
         assert b"ishuman-verifier.js" in response.data
+        # Sign-in-first contract: llms.txt must steer agents to passkey login,
+        # not the ishuman default policy.
+        assert b"QUICK_START_SIMPLE_LOGIN.md" in response.data
+        assert b"lemma-signin" in response.data
+        assert b"requiredAssurance: 'passkey'" in response.data
 
 
 @pytest.mark.integration

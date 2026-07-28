@@ -266,6 +266,70 @@ Do these after Phase 6; the first three are the highest-leverage.
 
 - [x] Section 12 in `SIMPLE_INTEGRATION_GUIDE.md`.
 
+## Phase 8 — Sign-in-first docs and public copy restructure
+
+Goal: make "Sign in with lemma.id" the front door of every public surface,
+with isHuman presented as a step-up feature inside it, not a separate
+product. Reframe, do not delete: isHuman is the paid tier, recovery story,
+and abuse escalation — it must remain one click from the sign-in docs.
+
+Constraints:
+
+- Do NOT move or rename `docs/integration/ISHUMAN_AGENT_INTEGRATION.md` —
+  it is the stable canonical URL fetched by AGENTS.md, llms.txt, and
+  external agents. Give it a sign-in-first opening section instead.
+- Do not change hard rules or the security contract; this phase is copy,
+  structure, and allowlisting only.
+- Legacy IAM / permission-lemma / wallet-redirect docs stay in the legacy
+  archive section, out of primary navigation.
+
+### 8.1 llms.txt (actively mis-steering agents today)
+
+- [x] Lead with the sign-in product: `<lemma-signin>` snippet and
+      `verifyForBackend({ autoProvision: true, requiredAssurance: 'passkey' })`.
+- [x] Pointers added: quickstart, SIMPLE_INTEGRATION_GUIDE, BROWSER_SUPPORT,
+      testing helpers; isHuman presented as step-up on the same PPID.
+- [x] Hard rules and canonical-guide pointer unchanged; llms.txt test extended
+      to pin the sign-in-first contract (`tests/test_public_docs_scope.py`).
+
+### 8.2 docs/README.md and public docs hub
+
+- [x] `QUICK_START_SIMPLE_LOGIN.md` + `SIMPLE_INTEGRATION_GUIDE.md` moved out
+      of "Legacy (superseded)" into a new "Sign in with lemma.id (start
+      here)" section.
+- [x] Hub hierarchy restructured: (1) Sign in, (2) isHuman step-up,
+      (3) Reference, (4) Legacy archive (`docs/README.md`).
+- [x] One-line description updated sign-in-first in `docs/README.md`, repo
+      `README.md`, docs hub hero (`templates/docs/ishuman.html`), and llms.txt.
+
+### 8.3 Public docs allowlist
+
+- [x] `api/public_docs.py` allowlist extended with QUICK_START_SIMPLE_LOGIN,
+      SIMPLE_INTEGRATION_GUIDE, BROWSER_SUPPORT.
+- [x] `tests/test_public_docs_scope.py` updated: new paths asserted served;
+      SIMPLE_INTEGRATION_GUIDE removed from denied set (replaced with
+      INTEGRATION_GUIDE.md, still legacy/denied).
+
+### 8.4 AGENTS.md opening frame
+
+- [x] Opening reframed sign-in-first; quick-integration snippet now shows the
+      `<lemma-signin>` button and passes `requiredAssurance: 'passkey'`
+      (previous snippet silently defaulted to the ishuman policy). Hard rules
+      and canonical pointer unchanged.
+- [x] Canonical guide (`ISHUMAN_AGENT_INTEGRATION.md`) opening updated with a
+      sign-in-first audience note and quickstart pointer; URL and contract
+      body unchanged.
+
+### 8.5 Jargon sweep (top-level surfaces only)
+
+- [x] Popup eyebrows "Continuity proof required" → "Sign in with lemma.id"
+      (`templates/wallet_ishuman_idv.html`, both branches); intro copy was
+      already fixed in 7.4.
+- [x] Docs hub hero + lead section sign-in-first with drop-in button snippet
+      (`templates/docs/ishuman.html`); layout meta keywords updated.
+- [x] Repo `README.md` tagline reframed (login-first, bans-that-stick second).
+- [x] Reference docs keep precise vocabulary (unchanged by design).
+
 ## Explicitly out of scope for this launch
 
 - Credential envelope cleanup (single canonicalization, VC `type`, claim
