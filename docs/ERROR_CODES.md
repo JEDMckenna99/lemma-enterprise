@@ -35,6 +35,21 @@ assurance, reason }`.
 | `idv_cancelled` | User closed the popup or cancelled IDV | Keep the action denied and offer a user-initiated retry |
 | `revocation_data_untrusted` | Signed trust or revocation data could not be validated | Fail closed, retry later, and check server or device clock if persistent |
 
+### SDK stable outcomes (Sign in with lemma.id)
+
+`verifyForBackend()` maps internal reasons to these stable values for fallback UX:
+
+| Reason | Meaning | Developer action |
+|--------|---------|------------------|
+| `passkey_unsupported` | WebAuthn / passkeys unavailable in this browser | Direct user to a supported browser or device |
+| `popup_blocked` | Popup was blocked or closed before completion | Show allow-popups guidance; retry from a click handler |
+| `user_cancelled` | User dismissed the lemma.id ceremony | Keep denied; offer retry on explicit button click |
+| `rate_limited` | Site-proof issuance hit platform rate limits | Back off; honor retry timing — not a verification failure |
+
+Browser matrix: [BROWSER_SUPPORT.md](integration/BROWSER_SUPPORT.md).
+
+Legacy internal reasons (`popup_closed`, `idv_cancelled`) may still appear on `verify()`; prefer `verifyForBackend()` for login flows.
+
 ## Local backend verifier reasons
 
 The Node package is `@lemma.id/proof-verifier`; the Python package is

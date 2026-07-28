@@ -39,6 +39,25 @@ def register_sdk_routes(app: Flask) -> None:
         )
         return _attach_sdk_headers(response, version=browser_v, immutable=False)
 
+    @app.route("/sdk/lemma-signin.js")
+    def lemma_signin_sdk():
+        response = send_from_directory(
+            str(_REPO_ROOT / "static/js"),
+            "lemma-signin.js",
+            mimetype="application/javascript",
+        )
+        return _attach_sdk_headers(response, version=browser_v, immutable=False)
+
+    @app.route("/sdk/proof-verifier-testing.mjs")
+    def proof_verifier_testing_sdk():
+        response = send_from_directory(
+            str(_REPO_ROOT / "packages/proof-verifier-js"),
+            "testing.mjs",
+            mimetype="application/javascript",
+        )
+        response.headers["Cache-Control"] = "public, max-age=300"
+        return _attach_sdk_headers(response, version=backend_v, immutable=False)
+
     @app.route("/sdk/proof-verifier.mjs")
     @app.route("/sdk/lemma-ishuman-verify.mjs")
     def proof_verifier_backend_sdk():

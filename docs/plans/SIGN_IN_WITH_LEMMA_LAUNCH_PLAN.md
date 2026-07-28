@@ -17,6 +17,7 @@ flag enablement, and browser E2E remain operator actions.**
 | 4 | Done | Auth.js provider stretch skipped (optional) |
 | 5 | Done (design + safe harden) | Key custody implementation blocked on human approval |
 | 6 | Partial | Regression green; deploy/flags/smoke human |
+| 7 | Done | Sign-in parity backlog (button, test helpers, docs, SDK outcomes) |
 
 **Regression:** `python scripts/ci_regression_suite.py` passed (1268 tests) after implementation.
 
@@ -216,6 +217,54 @@ never-IDV'd wallets and `passkey_assurance_disabled` for verified ones
 - [ ] Smoke-test production with fresh wallet on external hostname + localhost.
       (**HUMAN ACTION**)
 - [ ] Publish rewritten quickstarts at lemma.id/docs (deploy docs). (**HUMAN ACTION**)
+
+## Phase 7 — Sign-in parity backlog (post-launch, ordered)
+
+What developers expect from a sign-in product that lemma does not yet provide.
+Do these after Phase 6; the first three are the highest-leverage.
+
+### 7.1 Drop-in sign-in button
+
+- [x] Ship `<lemma-signin>` web component (`static/js/lemma-signin.js`) + React wrapper
+      (`examples/nextjs_ishuman_signup/components/LemmaSignIn.tsx`); served at
+      `/sdk/lemma-signin.js`. Default path in quickstarts.
+
+### 7.2 Test mode / test credentials
+
+- [x] Python: `packages/proof-verifier-py/lemma_proof_verifier_testing.py`
+      (`mint_test_presentation`, `create_offline_test_context`).
+- [x] Node: `packages/proof-verifier-js/testing.mjs` export + `/sdk/proof-verifier-testing.mjs`.
+- [x] Documented in quickstart ("Testing your integration").
+
+### 7.3 Profile-data expectation (docs pattern)
+
+- [x] Quickstart + integration guide sections: first-login display name keyed to PPID;
+      "you own profile, lemma owns proof."
+
+### 7.4 Popup copy for login
+
+- [x] Passkey site-proof intro: "Sign in to {site} with your lemma.id"
+      (`ishuman-idv-preview-scenes.js`). Headline: "Sign in to continue".
+      isHuman copy unchanged.
+
+### 7.5 Browser support matrix + SDK error codes
+
+- [x] `docs/integration/BROWSER_SUPPORT.md` — browser/PRF matrix.
+- [x] SDK stable outcomes in `verifyForBackend()`: `passkey_unsupported`,
+      `popup_blocked`, `user_cancelled`, `rate_limited`.
+- [x] `docs/ERROR_CODES.md` updated.
+
+### 7.6 Account-linking recipe (docs only)
+
+- [x] Section 10 in `SIMPLE_INTEGRATION_GUIDE.md`.
+
+### 7.7 Sign-out semantics (docs only)
+
+- [x] Section 11 in `SIMPLE_INTEGRATION_GUIDE.md`.
+
+### 7.8 Explicit non-features (docs only)
+
+- [x] Section 12 in `SIMPLE_INTEGRATION_GUIDE.md`.
 
 ## Explicitly out of scope for this launch
 

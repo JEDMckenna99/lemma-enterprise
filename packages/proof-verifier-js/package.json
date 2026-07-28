@@ -11,12 +11,17 @@
       "import": "./index.mjs",
       "require": "./index.mjs",
       "default": "./index.mjs"
+    },
+    "./testing": {
+      "import": "./testing.mjs",
+      "default": "./testing.mjs"
     }
   },
   "types": "./index.d.ts",
   "files": [
     "index.mjs",
     "index.d.ts",
+    "testing.mjs",
     "README.md",
     "LICENSE"
   ],

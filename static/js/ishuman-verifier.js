@@ -770,6 +770,30 @@ class ProofVerifier {
         this._initPromise = this._init();
     }
 
+    /** Whether WebAuthn passkeys are available in this browser context. */
+    static passkeySupported() {
+        return typeof window !== 'undefined'
+            && typeof window.PublicKeyCredential !== 'undefined';
+    }
+
+    /**
+     * Map internal verify reasons to stable developer-facing SDK outcomes.
+     * See docs/ERROR_CODES.md — SDK stable outcomes.
+     */
+    _normalizePublicSdkReason(reason, detail = null) {
+        const code = String(detail?.code || detail?.error || '').trim();
+        if (code === 'derive_site_proof_rate_limited') return 'rate_limited';
+        switch (String(reason || '').trim()) {
+            case 'popup_closed':
+            case 'redirect_started':
+                return 'popup_blocked';
+            case 'idv_cancelled':
+                return 'user_cancelled';
+            default:
+                return reason || 'not_verified';
+        }
+    }
+
     _credentialAssurance(credential) {
         const claims = credential?.claims || credential?.credentialSubject || {};
         if (claims.assurance) {
@@ -991,6 +1015,17 @@ class ProofVerifier {
      */
     async verifyForBackend(options = {}) {
         const requiredAssurance = (options.requiredAssurance || this.requiredAssurance || 'ishuman').toLowerCase();
+        if (requiredAssurance === 'passkey' && !ProofVerifier.passkeySupported()) {
+            return {
+                ok: false,
+                human: false,
+                presentation: null,
+                ppid: null,
+                assurance: null,
+                reason: 'passkey_unsupported',
+                timeMs: 0,
+            };
+        }
         const result = await this.verify({ ...options, requiredAssurance });
         let presentation = result.presentation || null;
         const assurance = result.assurance || null;
@@ -1014,13 +1049,16 @@ class ProofVerifier {
         }
         const meetsPolicy = this._assuranceMeetsPolicy(assurance, requiredAssurance);
         const ok = !!(meetsPolicy && presentation?.credential);
+        const publicReason = ok
+            ? result.reason
+            : this._normalizePublicSdkReason(result.reason, result.detail || null);
         return {
             ok,
             human: ok,
             presentation: ok ? presentation : null,
             ppid: ok ? result.ppid : null,
             assurance,
-            reason: ok ? result.reason : (result.reason || 'assurance_insufficient'),
+            reason: publicReason,
             timeMs: result.timeMs,
         };
     }

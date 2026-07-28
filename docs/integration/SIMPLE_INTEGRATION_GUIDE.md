@@ -25,6 +25,18 @@ lemma.id is not in the hot path after trust-list refresh. Your server verifies s
 
 ## 1. Embed the SDK
 
+**Recommended — drop-in button:**
+
+```html
+<script src="https://lemma.id/sdk/proof-verifier.js"></script>
+<script src="https://lemma.id/sdk/lemma-signin.js"></script>
+<lemma-signin site-id="app.example.com"></lemma-signin>
+```
+
+Listen for `lemma-signin-success` / `lemma-signin-error` events (see [QUICK_START_SIMPLE_LOGIN.md](QUICK_START_SIMPLE_LOGIN.md)).
+
+**Advanced — SDK only:**
+
 ```html
 <script src="https://lemma.id/sdk/proof-verifier.js"></script>
 ```
@@ -140,6 +152,49 @@ requiredAssurance: 'ishuman'
 ```
 
 Use for signup bonuses, payouts, or one-human-per-account policies.
+
+---
+
+## 9. Profile data (you own it)
+
+lemma.id returns **`ppid`** and **`assurance`** — not email, name, or avatar. After first login, collect profile fields in your app and key them to the verified `ppid`. lemma.id proves continuity; your database holds display names, preferences, and entitlements.
+
+---
+
+## 10. Link to an existing password account
+
+When users already have a password account, verify a presentation while they are logged in, then attach the PPID:
+
+1. User signs in with password (existing session).
+2. User clicks "Link lemma.id" → `verifyForBackend({ requiredAssurance: 'passkey' })`.
+3. Backend verifies presentation; `UPDATE users SET lemma_ppid = ? WHERE id = ?` for the current session user.
+4. Future logins can use lemma.id only, or offer both methods.
+
+Never link on a bare client `ppid` without presentation verification.
+
+---
+
+## 11. Sign-out semantics
+
+Two independent layers:
+
+| Layer | Who controls | What it does |
+|-------|--------------|--------------|
+| **Site session** | Your backend | Clear your HttpOnly cookie on `POST /logout`. User is signed out of your app only. |
+| **Wallet site disconnect** | User / wallet | Revocation and bloom snapshot updates can invalidate cached site proofs. SDK polling surfaces "sign out everywhere" style disconnect for that site binding. |
+
+Document both for support: logging out of your site does not delete the user's lemma.id wallet.
+
+---
+
+## 12. What lemma.id does not provide
+
+| Expectation | Reality | Alternative |
+|-------------|---------|-------------|
+| User management dashboard | No — privacy by design | Your DB is the user list; key rows by `ppid` |
+| Webhooks on login/revoke | No — hard product rule | Poll bloom snapshot / use SDK `checkStatus()` for revocation |
+| Email/name from lemma.id | No | Collect after first login in your UI |
+| Site registration for basic login | No | Optional API keys only for abuse APIs |
 
 ---
 

@@ -10,7 +10,7 @@ Canonical contract: [ISHUMAN Agent Integration Guide](ISHUMAN_AGENT_INTEGRATION.
 
 | Step | Where | Action |
 |------|-------|--------|
-| 1 | Browser | Load `proof-verifier.js`, call `verifyForBackend({ autoProvision: true, requiredAssurance: 'passkey' })` |
+| 1 | Browser | Drop in `<lemma-signin>` **or** call `verifyForBackend({ requiredAssurance: 'passkey' })` |
 | 2 | Your API | Verify the presentation with `@lemma.id/proof-verifier` or `lemma_proof_verifier.py` |
 | 3 | Your API | Find/create user by `result.ppid`, set HttpOnly session cookie |
 | 4 | Your API | Protect routes with your session guard; `/logout` clears the cookie |
@@ -19,7 +19,36 @@ No site registration, no API key, and no IDV required for basic login. Require `
 
 ---
 
-## Step 1: Browser sign-in
+## Step 1: Browser sign-in (recommended — drop-in button)
+
+```html
+<script src="https://lemma.id/sdk/proof-verifier.js"></script>
+<script src="https://lemma.id/sdk/lemma-signin.js"></script>
+
+<lemma-signin site-id="app.example.com"></lemma-signin>
+
+<script>
+  document.querySelector('lemma-signin').addEventListener('lemma-signin-success', async (e) => {
+    const resp = await fetch('/api/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ presentation: e.detail.presentation }),
+    });
+    if (resp.ok) window.location.href = '/';
+  });
+
+  document.querySelector('lemma-signin').addEventListener('lemma-signin-error', (e) => {
+    console.error(e.detail.reason);
+  });
+</script>
+```
+
+Attributes: `site-id` (required), `required-assurance` (default `passkey`), `auto-provision` (default `true`), `label` (button text).
+
+**React:** see [`examples/nextjs_ishuman_signup/components/LemmaSignIn.tsx`](../../examples/nextjs_ishuman_signup/components/LemmaSignIn.tsx).
+
+### Advanced: SDK directly
 
 ```html
 <script src="https://lemma.id/sdk/proof-verifier.js"></script>
@@ -136,6 +165,81 @@ Backend: `requiredAssurance: 'ishuman'`.
 
 ---
 
+## What login returns (profile data)
+
+Sign-in returns **`ppid`** + **`assurance`** only — no email, name, or avatar from lemma.id. That is intentional: lemma owns the proof; you own the profile.
+
+**First-login pattern:** after verifying the presentation, show a one-time screen to collect a display name (or avatar URL) and store it in **your** database keyed by `ppid`:
+
+```javascript
+// After successful /api/login
+if (user.is_new) {
+  redirect('/welcome?ask=display_name');
+}
+```
+
+Returning users match on `ppid` alone. Do not expect lemma.id to supply profile fields unless you build wallet-side share (future work).
+
+---
+
+## Testing your integration
+
+Run login-handler unit tests **without** lemma.id or WebAuthn:
+
+**Python** (copy `lemma_proof_verifier_testing.py` from the repo or package):
+
+```python
+from lemma_proof_verifier_testing import (
+    create_offline_test_context,
+    mint_test_issuer,
+    mint_test_presentation,
+)
+
+issuer = mint_test_issuer()
+presentation = mint_test_presentation(
+    site_id="localhost",
+    ppid="did:lemma:ppid_test_user",
+    assurance="passkey",
+    issuer=issuer,
+)
+ctx = create_offline_test_context(
+    site_id="localhost",
+    issuer_did=issuer["did"],
+    issuer_pubkey_hex=issuer["pubkey_hex"],
+    required_assurance="passkey",
+)
+assert ctx.verify(presentation).ok
+```
+
+**Node** (`@lemma.id/proof-verifier/testing`):
+
+```javascript
+import {
+  mintTestIssuer,
+  mintTestPresentation,
+  verifyTestPresentationOffline,
+} from '@lemma.id/proof-verifier/testing';
+
+const issuer = await mintTestIssuer();
+const presentation = await mintTestPresentation({
+  siteId: 'localhost',
+  ppid: 'did:lemma:ppid_test_user',
+  assurance: 'passkey',
+  issuer,
+});
+const result = await verifyTestPresentationOffline({
+  presentation,
+  siteId: 'localhost',
+  requiredAssurance: 'passkey',
+  trustedIssuerPubkeyHex: issuer.pubkeyHex,
+});
+assert(result.ok);
+```
+
+For server paths that read `TRUSTED_ISSUER_DIDS`, set it to the test issuer DID from `mint_test_issuer()`. See [BROWSER_SUPPORT.md](BROWSER_SUPPORT.md) for browser matrix and SDK error codes.
+
+---
+
 ## Examples in this repo
 
 - [`examples/flask_ishuman_signup/`](../../examples/flask_ishuman_signup/) — Flask login + session cookie
@@ -159,5 +263,6 @@ Site API keys are **not** required for login. Register a site and issue keys onl
 | `site_id_mismatch` | Same hostname in browser `siteId` and backend verifier |
 | `assurance_insufficient` | Request `passkey` for login; use `ishuman` only when policy requires it |
 | `derive_site_proof_rate_limited` | Back off; see [ERROR_CODES.md](../ERROR_CODES.md) |
+| `passkey_unsupported`, `popup_blocked`, `user_cancelled`, `rate_limited` | SDK stable outcomes — see [BROWSER_SUPPORT.md](BROWSER_SUPPORT.md) |
 
 Full reference: [ERROR_CODES.md](../ERROR_CODES.md)

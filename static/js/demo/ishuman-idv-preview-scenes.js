@@ -13,12 +13,12 @@
     headline: "Prove you're human once",
     headlinePasskeySetup: 'Create your lemma.id',
     headlineUnlock: 'Unlock your lemma.id',
-    headlineSiteContinuity: 'Unlock to continue',
+    headlineSiteContinuity: 'Sign in to continue',
     headlineFreshPasskey: 'Confirm presence',
     headlineBlocked: 'Access banned',
     documentTitlePasskeySetup: 'Create your lemma.id | Lemma.id',
     documentTitleUnlock: 'Unlock | Lemma.id',
-    documentTitleSiteContinuity: 'Unlock to continue | Lemma.id',
+    documentTitleSiteContinuity: 'Sign in to continue | Lemma.id',
     documentTitleFreshPasskey: 'Confirm presence | Lemma.id',
     documentTitleBlocked: 'Access banned | Lemma.id',
     privacy:
@@ -55,7 +55,7 @@
       },
       siteProofPasskey(site) {
         const s = formatSiteLabel(site);
-        return `${s} needs a continuity proof from your lemma.id wallet. Unlock with your passkey.`;
+        return `Sign in to ${s} with your lemma.id. Confirm with your passkey.`;
       },
       claim:
         'You\u2019re verified. Save your lemma.id on this device with a passkey so you can use it again.',
