@@ -173,6 +173,15 @@
         let wallet = null;
         const params = new URLSearchParams(window.location.search);
         const popupToken = (params.get('popup_token') || '').trim();
+        const openerOriginParam = (params.get('origin') || '').trim();
+        function crossOriginPostMessageTarget() {
+            if (!openerOriginParam) return null;
+            try {
+                return new URL(openerOriginParam).origin;
+            } catch {
+                return null;
+            }
+        }
         const isHumanIssuance = params.get('ishuman') === '1';
         const issuanceOpts = () => (isHumanIssuance ? { isHumanIssuance: true } : {});
         const POPUP_IDLE_MS = 15 * 60 * 1000;
@@ -367,7 +376,10 @@
                 window.opener.postMessage(sameOriginPayload, window.location.origin);
 
                 // Cross-origin completion signal only, no secret, no credentials.
-                window.opener.postMessage({ type: 'LEMMA_UNLOCK_SUCCESS' }, '*');
+                const crossTarget = crossOriginPostMessageTarget();
+                if (crossTarget) {
+                    window.opener.postMessage({ type: 'LEMMA_UNLOCK_SUCCESS' }, crossTarget);
+                }
             }
             window.close();
         }
@@ -376,9 +388,12 @@
             unlockSettled = true;
             clearUnlockIdleTimer();
             if (window.opener) {
-                window.opener.postMessage({
-                    type: 'LEMMA_UNLOCK_CANCELLED'
-                }, '*');
+                const crossTarget = crossOriginPostMessageTarget();
+                if (crossTarget) {
+                    window.opener.postMessage({
+                        type: 'LEMMA_UNLOCK_CANCELLED'
+                    }, crossTarget);
+                }
             }
             window.close();
         }

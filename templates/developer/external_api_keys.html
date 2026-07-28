@@ -6,7 +6,7 @@
     <div class="dev-header-row" style="display:flex; justify-content:space-between; align-items:flex-start; gap:12px; flex-wrap:wrap;">
         <div>
             <h1 class="dev-title">External API Key Manager</h1>
-            <p class="dev-subtitle">Manage customer-site API keys and site registrations for lemma.id integrations.</p>
+            <p class="dev-subtitle">Issue API keys for server-side abuse controls (site-block, site-unblock). Keys are <strong>not</strong> required for basic Sign in with lemma.id login.</p>
         </div>
         <a href="/developer" class="dev-btn dev-btn-secondary dev-btn-sm">Back to Developer hub</a>
     </div>
@@ -83,10 +83,18 @@
                 <label class="panel-field-label" for="reg-contact-email">Contact Email</label>
                 <input id="reg-contact-email" class="focus-ring" type="email" placeholder="ops@example.com" style="width:100%; padding:10px 12px; border:1px solid #e2e8f0; border-radius:6px;">
             </div>
+            <div id="domain-verification-panel" class="panel-field hidden" style="margin-bottom:12px; padding:12px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px;">
+                <p style="margin:0 0 8px; font-size:13px; font-weight:600;">Domain verification</p>
+                <p id="domain-verification-copy" style="margin:0 0 8px; font-size:12px; color:#64748b; line-height:1.45;"></p>
+                <code id="domain-verification-token" style="display:block; word-break:break-all; font-size:12px; padding:8px; background:#fff; border:1px solid #e2e8f0; border-radius:6px;"></code>
+                <p id="domain-verification-well-known" style="margin:8px 0 0; font-size:12px; color:#64748b; word-break:break-all;"></p>
+            </div>
+            <input type="hidden" id="reg-verification-token" value="">
         </form>
     </div>
     <div class="panel-footer">
         <button class="dev-btn dev-btn-secondary" type="button" data-action="close-register-modal">Cancel</button>
+        <button class="dev-btn dev-btn-secondary" type="button" data-action="start-domain-verification">Verify domain</button>
         <button class="dev-btn dev-btn-primary" type="button" data-action="submit-register">Register + Issue Key</button>
     </div>
 </div>
@@ -106,6 +114,7 @@
 <script nonce="{{ csp_nonce }}">
 let externalKeys = [];
 let newExternalKey = '';
+let domainVerificationToken = '';
 
 function authHeaders() {
     const base = (typeof window.getLemmaAuthHeaders === 'function')
@@ -207,6 +216,36 @@ async function loadExternalKeys() {
     }
 }
 
+async function startDomainVerification() {
+    const domainInput = document.getElementById('reg-site-domain');
+    const canonicalDomain = canonicalizeSiteDomainInput(domainInput.value);
+    if (!canonicalDomain) {
+        if (window.showToast) window.showToast('error', 'Enter a site domain first', '');
+        return;
+    }
+    domainInput.value = canonicalDomain;
+    updateSiteDomainHint();
+    const resp = await fetch('/api/customer/domain-verification/start', {
+        method: 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify({ site_domain: canonicalDomain, method: 'well-known' }),
+    });
+    const data = await resp.json();
+    if (!resp.ok || !data.success) throw new Error(data.error || 'Failed to start domain verification');
+    domainVerificationToken = data.verification_token || '';
+    document.getElementById('reg-verification-token').value = domainVerificationToken;
+    const panel = document.getElementById('domain-verification-panel');
+    panel.classList.remove('hidden');
+    document.getElementById('domain-verification-copy').textContent =
+        'Publish the token below, then click Register. Basic login does not require this step.';
+    document.getElementById('domain-verification-token').textContent = domainVerificationToken;
+    const instructions = data.instructions || {};
+    const wellKnown = instructions.well_known_url || instructions.file_url || '';
+    document.getElementById('domain-verification-well-known').textContent = wellKnown
+        ? `Well-known URL: ${wellKnown}`
+        : (instructions.dns_record ? `DNS TXT: ${instructions.dns_record}` : '');
+}
+
 async function submitRegister() {
     const domainInput = document.getElementById('reg-site-domain');
     const canonicalDomain = canonicalizeSiteDomainInput(domainInput.value);
@@ -214,12 +253,19 @@ async function submitRegister() {
         domainInput.value = canonicalDomain;
         updateSiteDomainHint();
     }
+    const verificationToken = (
+        document.getElementById('reg-verification-token').value
+        || domainVerificationToken
+        || ''
+    ).trim();
     const body = {
         site_domain: canonicalDomain || domainInput.value.trim(),
         site_label: document.getElementById('reg-site-label').value.trim(),
         environment: document.getElementById('reg-env').value,
         key_name: document.getElementById('reg-key-name').value.trim(),
-        contact_email: document.getElementById('reg-contact-email').value.trim()
+        contact_email: document.getElementById('reg-contact-email').value.trim(),
+        verification_token: verificationToken,
+        verification_method: 'well-known',
     };
     if (!body.site_domain) {
         if (window.showToast) window.showToast('error', 'Site domain required', '');
@@ -238,6 +284,8 @@ async function submitRegister() {
     document.getElementById('register-overlay').style.display = 'none';
     document.getElementById('register-panel').classList.remove('open');
     document.getElementById('register-form').reset();
+    document.getElementById('domain-verification-panel').classList.add('hidden');
+    domainVerificationToken = '';
 }
 
 async function rotateExternalKey(siteId, keyHint) {
@@ -291,6 +339,8 @@ document.addEventListener('click', async (event) => {
             document.getElementById('register-panel').classList.remove('open');
         } else if (action === 'submit-register') {
             await submitRegister();
+        } else if (action === 'start-domain-verification') {
+            await startDomainVerification();
         } else if (action === 'rotate-key') {
             await rotateExternalKey(target.dataset.siteId || '', target.dataset.keyHint || '');
         } else if (action === 'revoke-key') {

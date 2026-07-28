@@ -2,8 +2,8 @@
   "schema_version": 1,
   "released_at": "2026-07-22",
   "browser_verifier": "1.9.2",
-  "backend_verifier": "1.4.0",
-  "npm_package": "1.4.0",
+  "backend_verifier": "1.4.1",
+  "npm_package": "1.4.1",
   "pypi_package": "1.4.0",
   "protocol_epoch": "browser_canonical_v2",
   "protocol_registry": "docs/protocol/ISHUMAN_PROTOCOL_VERSIONS.json",
@@ -23,7 +23,7 @@
         "/sdk/proof-verifier.mjs",
         "/sdk/lemma-ishuman-verify.mjs"
       ],
-      "versioned_url": "/sdk/v1.4.0/proof-verifier.mjs"
+      "versioned_url": "/sdk/v1.4.1/proof-verifier.mjs"
     },
     "backend_verifier_py": {
       "file": "examples/proof-verifier.py",

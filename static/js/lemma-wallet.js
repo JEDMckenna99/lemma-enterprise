@@ -7144,6 +7144,20 @@ class LemmaWallet {
     }
 
     /**
+     * Export wallet secret for explicit backup flows (requires fresh passkey even
+     * when the daily unlock bundle is valid).
+     */
+    async exportWalletSecret(options = {}) {
+        await this._requireFreshPasskeyAuth({
+            reason: options.reason || 'Verify passkey to export wallet secret',
+        });
+        if (!this.isUnlocked()) {
+            await this.unlock({ force: true, isHumanIssuance: false });
+        }
+        return this.getWalletSecret(options.profileId || null);
+    }
+
+    /**
      * Get passkey credential ID (for server-side PPID derivation fallback)
      */
     async getPasskeyCredentialId() {
@@ -8585,6 +8599,11 @@ class LemmaWallet {
     async _backupWalletData() {
         try {
             const allowSensitiveBackup = localStorage.getItem('lemma_allow_sensitive_local_backup') === 'true';
+            if (allowSensitiveBackup) {
+                await this._requireFreshPasskeyAuth({
+                    reason: 'Confirm passkey before saving a sensitive local backup',
+                });
+            }
             const backup = {
                 timestamp: Date.now(),
                 walletId: await this._get('passkey', 'walletId'),

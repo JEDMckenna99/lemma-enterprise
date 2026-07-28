@@ -6,7 +6,9 @@ Extends the existing permission_management_api.py with type system
 
 from flask import Blueprint, request, jsonify
 from flask_cors import cross_origin
+from functools import wraps
 from auth.decorators import require_site_admin
+from api.site_access import require_site_ownership
 import json
 import logging
 from datetime import datetime, timedelta
@@ -14,6 +16,25 @@ from datetime import datetime, timedelta
 logger = logging.getLogger(__name__)
 
 iam_types_bp = Blueprint('iam_types', __name__)
+
+
+def _require_site_owner(f):
+    """Bind a ``<site_id>`` route to a caller who administers that specific site.
+
+    SECURITY: ``require_site_admin`` only proves the caller holds an admin-scoped
+    lemma for *some* site. Without this per-site check, any site admin could
+    read or mutate another tenant's permission types / grants (cross-tenant
+    IDOR + privilege escalation). Must be stacked BELOW ``require_site_admin``
+    so ``g.ppid`` is already populated by the credential decorator.
+    """
+    @wraps(f)
+    def wrapped(*args, **kwargs):
+        site_id = kwargs.get('site_id')
+        denied = require_site_ownership(site_id, allow_site_api_key=True)
+        if denied:
+            return denied
+        return f(*args, **kwargs)
+    return wrapped
 
 # Valid permission types
 VALID_PERMISSION_TYPES = ['role', 'scope', 'time-bound', 'attribute', 'hierarchical']
@@ -69,6 +90,7 @@ def log_audit_event(site_id, event_type, actor, target=None, details=None, ip_ad
 @iam_types_bp.route('/api/iam/sites/<site_id>/permission-types', methods=['GET'])
 @cross_origin()
 @require_site_admin
+@_require_site_owner
 def list_permission_types(site_id):
     """
     List all permission types for a site
@@ -145,6 +167,7 @@ def list_permission_types(site_id):
 @iam_types_bp.route('/api/iam/sites/<site_id>/permission-types', methods=['POST'])
 @cross_origin()
 @require_site_admin
+@_require_site_owner
 def create_permission_type(site_id):
     """
     Create a new permission type
@@ -240,6 +263,7 @@ def create_permission_type(site_id):
 @iam_types_bp.route('/api/iam/sites/<site_id>/permission-types/<int:type_id>', methods=['PUT'])
 @cross_origin()
 @require_site_admin
+@_require_site_owner
 def update_permission_type(site_id, type_id):
     """
     Update permission type
@@ -320,6 +344,7 @@ def update_permission_type(site_id, type_id):
 @iam_types_bp.route('/api/iam/sites/<site_id>/permissions/grant', methods=['POST'])
 @cross_origin()
 @require_site_admin
+@_require_site_owner
 def grant_permission(site_id):
     """
     Grant permission to a user
@@ -421,6 +446,7 @@ def grant_permission(site_id):
 @iam_types_bp.route('/api/iam/sites/<site_id>/permissions/revoke', methods=['POST'])
 @cross_origin()
 @require_site_admin
+@_require_site_owner
 def revoke_permission(site_id):
     """
     Revoke permission from user
@@ -524,6 +550,7 @@ def revoke_permission(site_id):
 @iam_types_bp.route('/api/iam/sites/<site_id>/users/search', methods=['GET'])
 @cross_origin()
 @require_site_admin
+@_require_site_owner
 def search_users_by_permission(site_id):
     """
     Find all users with specific permission
@@ -598,6 +625,7 @@ def search_users_by_permission(site_id):
 @iam_types_bp.route('/api/iam/sites/<site_id>/stats', methods=['GET'])
 @cross_origin()
 @require_site_admin
+@_require_site_owner
 def get_iam_stats(site_id):
     """Get IAM statistics for dashboard"""
     try:

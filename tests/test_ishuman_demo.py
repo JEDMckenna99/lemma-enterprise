@@ -416,6 +416,46 @@ def test_ishuman_idv_popup_does_not_enable_test_verify_on_production(
     assert 'data-test-verify-enabled="false"' in body
 
 
+def _passkey_site_proof_popup_url():
+    return (
+        "/wallet/ishuman-idv"
+        "?issue_mode=site_proof"
+        "&required_assurance=passkey"
+        "&session_nonce=test-session-nonce"
+        "&origin=https%3A%2F%2Fexample.com"
+        "&site_id=app.example.com"
+    )
+
+
+def test_ishuman_idv_passkey_flag_off_by_default(ishuman_demo_client, monkeypatch):
+    monkeypatch.delenv("LEMMA_ONE_PPID_ASSURANCE_MODEL", raising=False)
+    monkeypatch.delenv("LEMMA_PASSKEY_ASSURANCE_ENABLED", raising=False)
+    monkeypatch.setenv("LEMMA_ISHUMAN_DEMO_ALLOW_TEST_VERIFY", "true")
+
+    resp = ishuman_demo_client.get(_passkey_site_proof_popup_url())
+    body = resp.get_data(as_text=True)
+
+    assert resp.status_code == 200
+    assert 'data-passkey-assurance-enabled="false"' in body
+    assert "function presentPasskeySignInUnavailable()" in body
+    assert "Passkey sign-in is not available yet" in body
+
+
+def test_ishuman_idv_passkey_flag_on_when_both_env_vars_set(ishuman_demo_client, monkeypatch):
+    monkeypatch.setenv("LEMMA_ONE_PPID_ASSURANCE_MODEL", "1")
+    monkeypatch.setenv("LEMMA_PASSKEY_ASSURANCE_ENABLED", "1")
+
+    resp = ishuman_demo_client.get(_passkey_site_proof_popup_url())
+    body = resp.get_data(as_text=True)
+
+    assert resp.status_code == 200
+    assert 'data-passkey-assurance-enabled="true"' in body
+    assert "Create your lemma.id" in body
+    assert "Create a passkey on this device to sign in" in body
+    assert "second-device-nudge" in body
+    assert "finishSiteProofWithOptionalNudge" in body
+
+
 def test_ishuman_demo_config_disables_test_verify_on_production(
     ishuman_demo_client,
     monkeypatch,

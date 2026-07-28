@@ -14,6 +14,7 @@ import logging
 from datetime import datetime, timedelta
 
 from auth.decorators import require_api_key, require_site_admin
+from api.site_access import require_site_ownership
 from billing.usage_logger import log_permission_operation
 from .agent_ops_store import ensure_workspace_context
 from .database import Site, get_db
@@ -229,6 +230,13 @@ def create_permission(site_id):
         "expiry_days": 365
     }
     """
+    # SECURITY: bind admin authority to THIS site. Without this, any holder of
+    # an admin-scoped lemma for any site could mint permissions for arbitrary
+    # sites (cross-tenant privilege escalation).
+    denied = require_site_ownership(site_id, allow_site_api_key=True)
+    if denied:
+        return denied
+
     try:
         data = request.get_json()
         
@@ -299,6 +307,13 @@ def grant_user_permission(site_id, user_did):
         "expiry_days": 30
     }
     """
+    # SECURITY: bind admin authority to THIS site before issuing a signed
+    # permission lemma with the site's own key. Missing this check allowed any
+    # site admin to mint (e.g. admin/'*') credentials for any other tenant.
+    denied = require_site_ownership(site_id, allow_site_api_key=True)
+    if denied:
+        return denied
+
     try:
         data = request.get_json()
         permission_id = data['permission_id']
@@ -391,6 +406,10 @@ def revoke_user_permission_site_specific(site_id, user_did, permission_id):
     IMPORTANT: This ONLY revokes the permission lemma for the specific site and permission.
     User's PoH lemma and permissions for other sites remain completely intact.
     """
+    denied = require_site_ownership(site_id, allow_site_api_key=True)
+    if denied:
+        return denied
+
     try:
         # Create site-specific revocation key (not global)
         revocation_key = f'site_permission:{site_id}:{user_did}:{permission_id}'
@@ -690,6 +709,10 @@ def grant_user_permission_client_side_disabled(site_id, user_did):
 @require_api_key
 def remove_site_user(site_id, user_did):
     """Remove user from site and revoke all their permissions"""
+    denied = require_site_ownership(site_id, allow_site_api_key=True)
+    if denied:
+        return denied
+
     try:
         # In production, this would remove from site's user database
         # and trigger revocation of all permission lemmas for this site

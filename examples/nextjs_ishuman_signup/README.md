@@ -1,55 +1,30 @@
-# Next.js isHuman signup (Section 10)
+# Next.js Sign in with lemma.id
 
-Client-only browser SDK + App Router API route that verifies presentations server-side.
+Runnable App Router example: browser SDK → verify presentation → HttpOnly session cookie.
 
-## Client (`app/signup/page.tsx`)
+## Run
 
-```tsx
-"use client";
-import { useState } from "react";
-
-declare global {
-  interface Window {
-    ProofVerifier: new (opts: { siteId: string }) => {
-      verifyForBackend: (opts: { autoProvision?: boolean; requiredAssurance?: string }) => Promise<{
-        ok: boolean;
-        presentation?: unknown;
-      }>;
-    };
-  }
-}
-
-export default function SignupPage() {
-  const [status, setStatus] = useState("idle");
-  async function onSubmit() {
-    const verifier = new window.ProofVerifier({ siteId: "app.example.com" });
-    const { ok, presentation } = await verifier.verifyForBackend({
-      autoProvision: true,
-      requiredAssurance: "ishuman",
-    });
-    if (!ok) {
-      setStatus("denied");
-      return;
-    }
-    const resp = await fetch("/api/signup", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ presentation }),
-    });
-    setStatus(resp.ok ? "created" : "server_denied");
-  }
-  return (
-    <main>
-      <button type="button" onClick={onSubmit}>Sign up</button>
-      <p>{status}</p>
-      <script src="https://lemma.id/sdk/v1.9.2/proof-verifier.js" crossOrigin="anonymous" />
-    </main>
-  );
-}
+```bash
+cd examples/nextjs_ishuman_signup
+npm install
+npm run dev
 ```
 
-## Server route (`app/api/signup/route.ts`)
+Open http://localhost:5052
 
-Use `@lemma.id/proof-verifier` or call your Python/Node verifier service. Fail closed when `result.ok` is false.
+## Env
 
-Pin SDK URL from [`ISHUMAN_SDK_VERSIONS.json`](../../docs/sdk/ISHUMAN_SDK_VERSIONS.json).
+| Variable | Default |
+|----------|---------|
+| `SITE_ID` / `NEXT_PUBLIC_SITE_ID` | `localhost` |
+| `REQUIRED_ASSURANCE` / `NEXT_PUBLIC_REQUIRED_ASSURANCE` | `passkey` |
+| `SESSION_SECRET` | `dev-change-me` |
+
+## Files
+
+- `app/page.tsx` — client sign-in button + `ProofVerifier`
+- `app/api/login/route.ts` — verify presentation, set session
+- `app/api/me/route.ts` — auth guard demo
+- `lib/verifier.ts` — local `@lemma.id/proof-verifier` wrapper
+
+For isHuman step-up, set `REQUIRED_ASSURANCE=ishuman`.

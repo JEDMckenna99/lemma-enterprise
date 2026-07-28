@@ -168,6 +168,19 @@
             font-weight: 800;
             color: var(--lemma-ink);
         }
+        .second-device-nudge {
+            margin-top: 16px;
+            text-align: center;
+        }
+        .second-device-nudge p {
+            margin: 0 0 12px;
+            color: var(--lemma-ink);
+            font-size: 0.95rem;
+            line-height: 1.45;
+        }
+        .second-device-nudge .btn {
+            margin-bottom: 8px;
+        }
     </style>
 </head>
 <body>
@@ -198,6 +211,11 @@
                 <div id="qr-demo-code" class="qr-code-box" aria-label="QR code for mobile demo verification"></div>
             </div>
             <p id="qr-demo-status" style="margin-bottom:0;">Waiting for phone scan…</p>
+        </div>
+        <div id="second-device-nudge" class="second-device-nudge hidden" aria-live="polite">
+            <p>Add a second device so you never lose this account.</p>
+            <button id="nudge-add-device-btn" class="btn btn-primary" type="button">Add another device</button>
+            <button id="nudge-skip-btn" class="btn btn-secondary" type="button">Skip for now</button>
         </div>
         <div id="actions">
             <button id="primary-btn" class="btn btn-primary hidden" type="button">Continue</button>
@@ -497,6 +515,8 @@
         let walletId = '';
         let walletSecret = '';
         let walletInitPromise = null;
+        let hadWalletAtSessionStart = null;
+        let pendingSiteProofClose = null;
         let sessionId = ishumanSessionParam || localStorage.getItem(SESSION_KEY) || '';
         if (ishumanSessionParam) {
             localStorage.setItem(SESSION_KEY, ishumanSessionParam);
@@ -551,6 +571,89 @@
                 cancel.classList.remove('hidden');
                 cancel.textContent = copy.primary?.closeTab || copy.primary?.cancel || 'Close';
             }
+        }
+
+        function presentPasskeySignInUnavailable() {
+            applyConsumerShell({
+                eyebrow: 'Sign in unavailable',
+                headline: 'Passkey sign-in is not available yet',
+                documentTitle: 'Sign in unavailable — lemma.id',
+                hideHeadline: true,
+                hideSteps: true,
+                hidePrivacy: true,
+            });
+            setStatus(
+                'Passkey sign-in is not available yet. Try again later, or ask the site to require isHuman verification.',
+                'error',
+            );
+            const primary = document.getElementById('primary-btn');
+            const returnBtn = document.getElementById('return-btn');
+            const cancel = document.getElementById('cancel-btn');
+            primary?.classList.add('hidden');
+            returnBtn?.classList.add('hidden');
+            if (cancel) {
+                cancel.classList.remove('hidden');
+                cancel.textContent = consumerCopy().primary?.closeTab || 'Close';
+            }
+        }
+
+        async function isNewWalletUser() {
+            await ensureWalletInitialized();
+            const info = await wallet.getWalletInfo({ lite: true });
+            return !info.hasWallet;
+        }
+
+        async function probeSessionWalletState() {
+            if (hadWalletAtSessionStart !== null) return hadWalletAtSessionStart;
+            await ensureWalletInitialized();
+            const info = await wallet.getWalletInfo({ lite: true });
+            hadWalletAtSessionStart = !!info.hasWallet;
+            return hadWalletAtSessionStart;
+        }
+
+        async function shouldShowSecondDeviceNudge() {
+            if (!siteProofUsesContinuityOnly()) return false;
+            if (await probeSessionWalletState()) return false;
+            if (!wallet || typeof wallet._getWalletMeta !== 'function') return true;
+            const meta = await wallet._getWalletMeta().catch(() => ({}));
+            return !meta?.secondDeviceNudgeShown;
+        }
+
+        async function markSecondDeviceNudgeShown() {
+            if (wallet?._setWalletMeta) {
+                await wallet._setWalletMeta({
+                    secondDeviceNudgeShown: true,
+                    secondDeviceNudgeShownAt: Date.now(),
+                });
+            }
+        }
+
+        function presentSecondDeviceNudge(closeDetail) {
+            pendingSiteProofClose = closeDetail;
+            document.getElementById('actions')?.classList.add('hidden');
+            document.getElementById('second-device-nudge')?.classList.remove('hidden');
+            setStatus(
+                'You\u2019re signed in. Add a backup device so you never lose this account.',
+                'success',
+            );
+        }
+
+        async function dismissSecondDeviceNudge(openLink = false) {
+            await markSecondDeviceNudgeShown();
+            if (openLink) {
+                window.open(`${window.location.origin}/link`, '_blank', 'noopener,noreferrer');
+            }
+            const detail = pendingSiteProofClose;
+            pendingSiteProofClose = null;
+            closeWith('ISHUMAN_SITE_PROOF_ISSUED', detail);
+        }
+
+        async function finishSiteProofWithOptionalNudge(closeDetail) {
+            if (await shouldShowSecondDeviceNudge()) {
+                presentSecondDeviceNudge(closeDetail);
+                return;
+            }
+            setTimeout(() => closeWith('ISHUMAN_SITE_PROOF_ISSUED', closeDetail), 400);
         }
 
         function setStatus(message, tone) {
@@ -1753,6 +1856,13 @@
         async function prepareSiteProofUi() {
             const btn = document.getElementById('primary-btn');
             document.getElementById('cancel-btn').textContent = consumerCopy().primary?.cancel || 'Cancel';
+
+            if (siteProofUsesContinuityOnly() && !passkeyAssuranceEnabled) {
+                presentPasskeySignInUnavailable();
+                return;
+            }
+
+            await probeSessionWalletState();
             warmWalletInit();
 
             try {
@@ -1780,11 +1890,14 @@
             }
 
             if (siteProofUsesContinuityOnly()) {
-                btn.textContent = 'Continue';
+                const isNewUser = await isNewWalletUser();
+                btn.textContent = isNewUser ? 'Create your lemma.id' : 'Continue';
                 btn.disabled = false;
                 btn.classList.remove('hidden');
                 setStatus(
-                    'Tap continue and your passkey unlocks this device for the day.',
+                    isNewUser
+                        ? 'Create a passkey on this device to sign in - no email or password.'
+                        : 'Tap continue and your passkey unlocks this device for the day.',
                     'info',
                 );
                 return;
@@ -2013,7 +2126,7 @@
                 ? (consumerCopy().status?.siteProofSuccess || 'You\u2019re verified for this site.')
                 : (consumerCopy().status?.firstHumanSuccess || 'You\u2019re a human');
             setStatus(proofSuccess, 'success');
-            setTimeout(() => closeWith('ISHUMAN_SITE_PROOF_ISSUED', {
+            await finishSiteProofWithOptionalNudge({
                 credential: pkg.credential,
                 session_assertion: pkg.session_assertion,
                 session_signature: pkg.session_signature,
@@ -2021,7 +2134,7 @@
                 request_nonce: requestNonce,
                 reason: 'site_proof_issued',
                 ppid_convergence: pkg.ppid_convergence || null,
-            }), 400);
+            });
             return true;
             });
         }
@@ -2308,6 +2421,14 @@
             document.getElementById('primary-btn').addEventListener('click', (event) => {
                 event.preventDefault();
                 onPrimaryButtonClick();
+            });
+            document.getElementById('nudge-skip-btn')?.addEventListener('click', (event) => {
+                event.preventDefault();
+                dismissSecondDeviceNudge(false);
+            });
+            document.getElementById('nudge-add-device-btn')?.addEventListener('click', (event) => {
+                event.preventDefault();
+                dismissSecondDeviceNudge(true);
             });
             idvLifecycle.init();
         }

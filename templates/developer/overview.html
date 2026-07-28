@@ -8,8 +8,8 @@
             <h1 class="dev-title">Welcome back{{ ', ' + user_name if user_name else '' }}!</h1>
             <p class="dev-subtitle">Here's an overview of your Lemma integration</p>
         </div>
-        <a href="/developer/sites/new" class="dev-btn dev-btn-primary">
-            + Create New Site
+        <a href="/developer/external-api-keys" class="dev-btn dev-btn-primary">
+            + Register site for API keys
         </a>
     </div>
 </div>
@@ -45,7 +45,7 @@
     </div>
     <div class="dev-card-body">
         <div class="dev-actions">
-            <a href="/developer/sites/new" class="dev-action">
+            <a href="/developer/external-api-keys" class="dev-action">
                 <div class="dev-action-icon">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <circle cx="12" cy="12" r="10"></circle>
@@ -53,9 +53,9 @@
                         <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
                     </svg>
                 </div>
-                <div class="dev-action-title">Register New Site</div>
+                <div class="dev-action-title">Register site (API keys)</div>
             </a>
-            <a href="/developer/sites" class="dev-action">
+            <a href="/developer/external-api-keys" class="dev-action">
                 <div class="dev-action-icon">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"></path>
@@ -97,7 +97,7 @@
             Register your first site to activate developer onboarding. After your first site is added, this section is hidden automatically.
         </p>
         <div class="onboarding-actions">
-            <a href="/developer/sites/new" class="dev-btn dev-btn-primary">Register First Site</a>
+            <a href="/developer/external-api-keys" class="dev-btn dev-btn-primary">Register site (API keys)</a>
             <a href="/docs#quickstart" class="dev-btn dev-btn-secondary" target="_blank">Read Setup Guide</a>
         </div>
     </div>
@@ -107,7 +107,7 @@
 <div class="dev-card">
     <div class="dev-card-header">
         <h2 class="dev-card-title">Your Sites</h2>
-        <a href="/developer/sites" class="dev-btn dev-btn-sm dev-btn-secondary">View All</a>
+        <a href="/developer/external-api-keys" class="dev-btn dev-btn-sm dev-btn-secondary">Manage keys</a>
     </div>
     <div class="dev-card-body" id="sites-container">
         <div class="dev-loading">
@@ -724,7 +724,7 @@ async function loadRecentSites() {
     const container = document.getElementById('sites-container');
     
     try {
-        const response = await fetch('/api/developer/sites', {
+        const response = await fetch('/api/customer/sites', {
             headers: getAuthHeaders()
         });
         if (!response.ok) throw new Error('Failed to load sites');
@@ -737,15 +737,14 @@ async function loadRecentSites() {
             container.innerHTML = `
                 <div class="dev-empty">
                     <div class="dev-empty-icon"></div>
-                    <div class="dev-empty-title">No sites yet</div>
-                    <div class="dev-empty-text">Register your first site to start using Lemma authentication</div>
-                    <a href="/developer/sites/new" class="dev-btn dev-btn-primary">Register Site</a>
+                    <div class="dev-empty-title">No registered sites</div>
+                    <div class="dev-empty-text">Passkey login needs no registration. Register a site only when you need abuse API keys.</div>
+                    <a href="/developer/external-api-keys" class="dev-btn dev-btn-primary">Register site (API keys)</a>
                 </div>
             `;
             return;
         }
         
-        // Show up to 3 recent sites
         const recentSites = sites.slice(0, 3);
         
         container.innerHTML = `
@@ -755,23 +754,13 @@ async function loadRecentSites() {
                         <div class="dev-site-header">
                             <div class="dev-site-icon"></div>
                             <div>
-                                <div class="dev-site-name">${escapeHtml(site.name || site.site_id)}</div>
-                                <div class="dev-site-domain">${escapeHtml(site.domain || site.site_id)}</div>
-                            </div>
-                        </div>
-                        <div class="dev-site-stats">
-                            <div class="dev-site-stat">
-                                <div class="dev-site-stat-value">${formatNumber(site.verification_count || 0)}</div>
-                                <div class="dev-site-stat-label">Verifications</div>
-                            </div>
-                            <div class="dev-site-stat">
-                                <div class="dev-site-stat-value">${formatNumber(site.user_count || 0)}</div>
-                                <div class="dev-site-stat-label">Users</div>
+                                <div class="dev-site-name">${escapeHtml(site.site_label || site.company_name || site.site_id)}</div>
+                                <div class="dev-site-domain">${escapeHtml(site.site_domain || site.site_id)}</div>
                             </div>
                         </div>
                         <div class="dev-site-actions">
-                            <a href="/developer/sites/${site.site_id}" class="dev-btn dev-btn-sm dev-btn-primary">Dashboard</a>
-                            <a href="/developer/sites/${site.site_id}/integration" class="dev-btn dev-btn-sm dev-btn-secondary">Integration</a>
+                            <a href="/developer/external-api-keys" class="dev-btn dev-btn-sm dev-btn-primary">API keys</a>
+                            <a href="/docs/integration/QUICK_START_SIMPLE_LOGIN.md" class="dev-btn dev-btn-sm dev-btn-secondary" target="_blank">Login guide</a>
                         </div>
                     </div>
                 `).join('')}
@@ -784,9 +773,9 @@ async function loadRecentSites() {
         container.innerHTML = `
             <div class="dev-empty">
                 <div class="dev-empty-icon"></div>
-                <div class="dev-empty-title">No sites yet</div>
-                <div class="dev-empty-text">Register your first site to start using Lemma authentication</div>
-                <a href="/developer/sites/new" class="dev-btn dev-btn-primary">Register Site</a>
+                <div class="dev-empty-title">No registered sites</div>
+                <div class="dev-empty-text">Sign in with lemma.id to view registered sites, or register one for abuse API keys.</div>
+                <a href="/developer/external-api-keys" class="dev-btn dev-btn-primary">Register site (API keys)</a>
             </div>
         `;
     }

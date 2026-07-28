@@ -26,6 +26,10 @@ def check_site_billing_allows_issuance(db, target_site: str) -> Optional[str]:
     When enforcement is enabled, only registered sites (Section 3 registration path)
     with an active metered subscription may issue billable credentials. Unregistered
     hostnames are blocked. Managed isHuman demo sites are always exempt.
+
+    Free-tier "Sign in with lemma.id" (passkey login, no site registration) requires
+    ``LEMMA_BILLING_ENFORCEMENT`` to stay off — enabling enforcement blocks issuance
+    for unregistered hostnames and breaks the no-registration login product.
     """
     if not billing_enforcement_enabled():
         return None

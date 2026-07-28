@@ -49,6 +49,50 @@ def _consume_pending_sdk_request(state: str) -> dict | None:
     return pending if isinstance(pending, dict) else None
 
 
+def _resolve_site_allowed_hosts(site: str) -> set[str]:
+    """
+    Resolve the set of hosts a site's SDK return URL may point at.
+
+    ``siteId`` is documented as the site's canonical hostname, so that host is
+    allowed directly. For internal ``site_*`` identifiers (or to pick up the
+    registered domain) we also consult the ``sites`` table. Binding the return
+    URL to the site's own domain prevents the sign-in flow from being used as an
+    open redirect to attacker-controlled destinations.
+    """
+    hosts: set[str] = set()
+    raw = (site or "").strip()
+    if not raw:
+        return hosts
+
+    from api.site_hostname import try_canonicalize_site_hostname
+
+    if not raw.lower().startswith("site_"):
+        canonical, _err = try_canonicalize_site_hostname(raw)
+        if canonical:
+            hosts.add(canonical)
+
+    try:
+        from api.database import SessionLocal, Site
+
+        db = SessionLocal()
+        try:
+            site_row = (
+                db.query(Site).filter_by(site_id=raw).first()
+                or db.query(Site).filter_by(site_domain=raw).first()
+            )
+            domain = getattr(site_row, "site_domain", None) if site_row else None
+            if domain:
+                canonical, _err = try_canonicalize_site_hostname(domain)
+                if canonical:
+                    hosts.add(canonical)
+        finally:
+            db.close()
+    except Exception as exc:  # pragma: no cover - DB optional in some contexts
+        logger.debug("sdk return-url site resolution unavailable: %s", exc)
+
+    return hosts
+
+
 def _normalize_scopes(raw_scopes) -> list[str]:
     """Normalize scope values from claims/request into canonical lowercase list."""
     if raw_scopes is None:
@@ -102,13 +146,20 @@ def sdk_auth_request():
     if not return_url:
         return jsonify({'error': 'Return URL required'}), 400
     
-    # Validate return URL (basic security check)
-    try:
-        parsed = urlparse(return_url)
-        if not parsed.scheme or not parsed.netloc:
-            return jsonify({'error': 'Invalid return URL'}), 400
-    except Exception:
-        return jsonify({'error': 'Invalid return URL'}), 400
+    # Open-redirect guard: the return URL must be an https URL on the requesting
+    # site's own registered domain. Previously any URL with a scheme+netloc was
+    # accepted, so `?return=https://evil.com` turned this post-authentication
+    # redirect into an open redirect usable for phishing.
+    allowed_hosts = _resolve_site_allowed_hosts(site_id)
+    if not allowed_hosts:
+        return jsonify({'error': 'Unknown site', 'message': 'site is not a recognized lemma.id site'}), 400
+
+    from api.url_safety import is_host_allowed_redirect
+    if not is_host_allowed_redirect(return_url, allowed_hosts):
+        return jsonify({
+            'error': 'Invalid return URL',
+            'message': 'return must be an https URL on the site domain',
+        }), 400
     
     # Generate state token for CSRF protection
     state = secrets.token_urlsafe(32)

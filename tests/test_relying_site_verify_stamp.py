@@ -236,7 +236,7 @@ def test_node_sdk_exposes_verify_stamp():
     # Exported from the factory and CommonJS interop.
     assert "return { verify, verifyWithPolicy, verifyStamp, verifyActionStamp, refresh };" in src
     assert "verifyStamp," in src
-    assert "@version 1.4.0" in src
+    assert "@version 1.4.1" in src
 
 
 def test_node_sdk_durable_drops_session_assertion():
@@ -251,7 +251,7 @@ def test_backend_sdk_versions_bumped():
     serving = (ROOT / "api" / "sdk_serving.py").read_text(encoding="utf-8")
     assert 'response.headers["X-SDK-Version"] = version' in serving
     assert "backend_verifier_version()" in serving
-    assert backend_verifier_version() == "1.4.0"
+    assert backend_verifier_version() == "1.4.1"
 
 
 def test_docs_document_backend_verify_stamp():

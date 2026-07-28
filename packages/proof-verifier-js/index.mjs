@@ -35,7 +35,7 @@
  *   // enforced):
  *   const audit = await verifier.verifyStamp(oldRow.lemma, { durable: true });
  *
- * @version 1.4.0
+ * @version 1.4.1
  */
 
 const SESSION_PRESENTATION_PREFIX = "lemma:site-session-presentation:v1";

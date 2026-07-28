@@ -155,7 +155,7 @@ def test_node_sdk_exposes_verify_action_stamp():
     assert "async function verifyActionStamp(" in src
     assert "export async function hashActionBody" in src
     assert "export class InMemoryNonceStore" in src
-    assert "@version 1.4.0" in src
+    assert "@version 1.4.1" in src
     assert "return { verify, verifyWithPolicy, verifyStamp, verifyActionStamp, refresh };" in src
 
 
@@ -165,7 +165,7 @@ def test_backend_sdk_version_headers():
     serving = (ROOT / "api" / "sdk_serving.py").read_text(encoding="utf-8")
     assert 'response.headers["X-SDK-Version"] = version' in serving
     assert "backend_verifier_version()" in serving
-    assert backend_verifier_version() == "1.4.0"
+    assert backend_verifier_version() == "1.4.1"
 
 
 def test_docs_mention_stamp_action():

@@ -127,7 +127,7 @@ def test_flask_signup_example_fail_closed():
     spec.loader.exec_module(mod)
     mod.app.config["TESTING"] = True
     client = mod.app.test_client()
-    resp = client.post("/api/signup", json={})
+    resp = client.post("/api/login", json={})
     assert resp.status_code == 400
 
 

@@ -1,314 +1,152 @@
-> **Superseded** by [ISHUMAN Agent Integration Guide](ISHUMAN_AGENT_INTEGRATION.md). This document is retained for historical reference only.
+# Sign in with lemma.id — integration guide
 
-# Lemma Platform - Integration Guide
+Passwordless login using passkeys and site-private PPIDs. This guide matches the current `ProofVerifier` contract.
 
-## What is Lemma?
+**Canonical source of truth:** [ISHUMAN Agent Integration Guide](ISHUMAN_AGENT_INTEGRATION.md)
 
-Lemma provides **passwordless authentication** with privacy-preserving identifiers:
-
-- **Passkey-protected wallet**: Users authenticate with biometrics (FaceID/TouchID/fingerprint)
-- **Privacy-preserving PPIDs**: Each site gets a unique identifier - no cross-site tracking
-- **Cross-device sync**: Unlock once, stay signed in across all linked devices
-- **Client-side security**: Wallet secrets are designed to stay client-side in standard flows
+For a shorter walkthrough, see [QUICK_START_SIMPLE_LOGIN.md](QUICK_START_SIMPLE_LOGIN.md).
 
 ---
 
-## Quick Start: Add Login (5 minutes)
+## Architecture
 
-### Step 1: Add the SDK
-
-```html
-<script src="https://lemma.id/static/js/lemma-wallet.js"></script>
+```
+Browser (your site)
+  └─ ProofVerifier.verifyForBackend({ requiredAssurance: 'passkey' })
+       └─ Lemma popup → signed presentation
+Your backend
+  └─ Local verifier (npm or Python drop-in)
+       └─ ppid → your user row → your session cookie
 ```
 
-### Step 2: Initialize and Handle Auth
+lemma.id is not in the hot path after trust-list refresh. Your server verifies signatures locally.
+
+---
+
+## 1. Embed the SDK
+
+```html
+<script src="https://lemma.id/sdk/proof-verifier.js"></script>
+```
 
 ```javascript
-const wallet = new LemmaWallet();
-await wallet.init();
-
-// Check if returning from Lemma authentication
-const redirectResult = await wallet.checkRedirectReturn();
-if (redirectResult?.success) {
-    // User just authenticated - send signed lemma to backend
-    const auth = await wallet.getAuthenticatedPPID();
-    await signInUser(auth.lemma);
-    return;
-}
-
-// Check current auth state
-const auth = await wallet.getAuthenticatedPPID();
-
-if (auth.authenticated) {
-    // Already signed in
-    await signInUser(auth.lemma);
-} else {
-    // Show sign-in button
-    showSignInButton();
-}
+const verifier = new ProofVerifier({ siteId: window.location.hostname });
 ```
 
-### Step 3: Add Sign-In Button
+Use the canonical hostname in production (e.g. `app.example.com`). Internal `site_...` database ids are never runtime `siteId` values.
 
-```html
-<button id="lemma-signin">Sign in with Lemma</button>
+---
 
-<script>
-document.getElementById('lemma-signin').addEventListener('click', async () => {
-    const wallet = new LemmaWallet();
-    await wallet.init();
-    
-    // This redirects to lemma.id for passkey authentication
-    // User will return with encrypted wallet data
-    wallet.startRedirectFlow();
+## 2. Sign in (passkey tier)
+
+```javascript
+const { ok, presentation, ppid, assurance, reason } = await verifier.verifyForBackend({
+  autoProvision: true,
+  requiredAssurance: 'passkey',
 });
-</script>
-```
 
-### Step 4: Backend Verification (Recommended)
+if (!ok) {
+  // Fail closed — show retry UI
+  console.error(reason);
+  return;
+}
 
-```javascript
-// Your backend endpoint
-app.post('/api/auth/lemma-verify', async (req, res) => {
-    const encoded = (req.header('X-Lemma-Credential') || '').trim();
-    if (!encoded) return res.status(401).json({ success: false, error: 'missing_lemma_header' });
-
-    const credential = JSON.parse(Buffer.from(encoded, 'base64url').toString('utf8'));
-    const verification = await verifyCredentialWithTrust(credential); // issuer + signature + expiry
-    if (!verification.valid) return res.status(401).json({ success: false, error: 'invalid_lemma' });
-
-    const claims = credential.claims || credential.credentialSubject || {};
-    const ppid = credential.subject || claims.ppid || claims.id;
-    let user = await db.users.findOne({ lemma_ppid: ppid });
-    if (!user) user = await db.users.create({ lemma_ppid: ppid });
-
-    const token = createSessionToken(user.id);
-    res.json({ success: true, token });
+await fetch('/api/login', {
+  method: 'POST',
+  credentials: 'include',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ presentation }),
 });
 ```
 
----
-
-## Complete Working Example
-
-```html
-<!DOCTYPE html>
-<html>
-<head>
-    <title>My App</title>
-</head>
-<body>
-    <div id="app">
-        <div id="loading">Loading...</div>
-        <div id="signed-out" style="display: none;">
-            <h1>Welcome</h1>
-            <button id="signin-btn">Sign in with Lemma</button>
-        </div>
-        <div id="signed-in" style="display: none;">
-            <h1>Welcome back!</h1>
-            <button id="signout-btn">Sign Out</button>
-        </div>
-    </div>
-
-    <script src="https://lemma.id/static/js/lemma-wallet.js"></script>
-    <script>
-    (async function() {
-        const wallet = new LemmaWallet();
-        await wallet.init();
-        
-        // Check for redirect return
-        const redirectResult = await wallet.checkRedirectReturn();
-        if (redirectResult?.success) {
-            const auth = await wallet.getAuthenticatedPPID();
-            await handleSignIn(auth.lemma);
-            return;
-        }
-        
-        // Check existing auth
-        const auth = await wallet.getAuthenticatedPPID();
-        
-        document.getElementById('loading').style.display = 'none';
-        
-        if (auth.authenticated) {
-            await handleSignIn(auth.lemma);
-        } else {
-            document.getElementById('signed-out').style.display = 'block';
-        }
-        
-        // Sign in button
-        document.getElementById('signin-btn').addEventListener('click', () => {
-            wallet.startRedirectFlow();
-        });
-        
-        // Sign out button
-        document.getElementById('signout-btn').addEventListener('click', async () => {
-            await wallet.lock();
-            location.reload();
-        });
-        
-        async function handleSignIn(credential) {
-            // Send to your backend
-            const response = await fetch('/api/auth/lemma-verify', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-Lemma-Credential': btoa(JSON.stringify(credential))
-                        .replace(/\+/g, '-')
-                        .replace(/\//g, '_')
-                        .replace(/=+$/, '')
-                }
-            });
-            
-            if (response.ok) {
-                document.getElementById('signed-in').style.display = 'block';
-            }
-        }
-    })();
-    </script>
-</body>
-</html>
-```
+Call `verifyForBackend` only from user-initiated actions (button click).
 
 ---
 
-## How It Works
+## 3. Verify on your server
 
-### Authentication Flow
+Install the verifier for your stack:
 
-```
-1. User clicks "Sign in with Lemma"
-   ↓
-2. Redirect to lemma.id/wallet/unlock
-   ↓
-3. User authenticates with passkey (biometric)
-   ↓
-4. Redirect back with encrypted wallet data
-   ↓
-5. SDK decrypts locally, derives site-specific PPID
-   ↓
-6. Your backend verifies the signed credential, then creates/finds user from verified PPID
+| Runtime | Package |
+|---------|---------|
+| Node 18+ | `@lemma.id/proof-verifier` (npm) |
+| Python | Copy [`lemma_proof_verifier.py`](https://lemma.id/sdk/proof-verifier.py) until PyPI publish |
+
+```javascript
+// Node
+const verifier = createVerifier({ siteId: 'app.example.com', requiredAssurance: 'passkey' });
+const result = await verifier.verify(presentation);
 ```
 
-### Cross-Device Sync
+```python
+# Python
+ctx = VerificationContext(site_id="app.example.com", required_assurance="passkey")
+result = ctx.verify(presentation)
+```
 
-- User unlocks wallet on **any device**
-- Other devices detect this via background sync
-- No re-authentication needed for 24 hours (configurable)
-- Locking on any device locks all devices
-
-### Privacy Model
-
-- **Wallet secret**: Generated on first device and intended to stay client-side
-- **PPID derivation**: `HMAC(wallet_secret, site_domain)` - computed locally
-- **No tracking**: Each site gets a different PPID
-- **Server storage model**: Wallet secrets stay client-side; apps/platform services may retain PPID and issuance metadata needed for auth and audit
+On success, bind `result.ppid` to your account model and issue your session.
 
 ---
 
-## SDK Reference
+## 4. Session layer (your responsibility)
 
-### Initialization
+Lemma does not issue relying-site session cookies. After verification:
 
-```javascript
-const wallet = new LemmaWallet();
-await wallet.init();
-```
+1. `findOrCreateUser(ppid)`
+2. Set HttpOnly, Secure, SameSite session cookie
+3. Guard protected routes with your middleware
+4. `POST /logout` clears the cookie
 
-### Check Auth State
-
-```javascript
-const auth = await wallet.getAuthenticatedPPID();
-// Returns: { authenticated: boolean, ppid?: string, needsPasskey: boolean }
-```
-
-### Start Authentication
-
-```javascript
-// Redirect to lemma.id for passkey auth
-wallet.startRedirectFlow();
-```
-
-### Handle Redirect Return
-
-```javascript
-const result = await wallet.checkRedirectReturn();
-// Returns: { success: boolean, walletId?: string }
-```
-
-### Derive PPID
-
-```javascript
-const ppid = await wallet.derivePPID();
-// Returns: "did:lemma:ppid_<64-char-hex>"
-
-// Or for a specific site
-const ppid = await wallet.derivePPID('example.com');
-```
-
-### Lock Wallet
-
-```javascript
-await wallet.lock();
-// Clears session locally and globally (all devices)
-```
-
-### Get Wallet Info
-
-```javascript
-const info = await wallet.getWalletInfo();
-// Returns: { hasWallet, hasPasskey, isUnlocked, walletId, ... }
-```
+See runnable examples under [`examples/`](../../examples/).
 
 ---
 
-## Session Duration
+## 5. Localhost workflow
 
-Users can configure session duration (1-24 hours) in wallet settings. Default is 24 hours.
+| Topic | Behavior |
+|-------|----------|
+| `siteId` | Page hostname; `localhost` for all local ports |
+| Popup | Hosted on lemma.id; works with local relying origin |
+| Mismatch | Dev warns if browser/backend hostnames differ |
+
+---
+
+## 6. Recovery policy
+
+- **Passkey login:** best-effort continuity; encourage second device at [lemma.id/link](https://lemma.id/link).
+- **isHuman step-up:** same PPID, stronger recovery assurances.
+
+Do not promise email/password-style recovery for passkey-only accounts.
+
+---
+
+## 7. When to register a site / API key
+
+| Need | Registration |
+|------|----------------|
+| Basic login | None |
+| `POST /api/ishuman/site-block` etc. | Register site + domain verification + API key |
+
+Keys are for abuse controls only, not for the login path itself.
+
+---
+
+## 8. isHuman step-up (paid tier)
+
+Same integration; stricter assurance:
 
 ```javascript
-// SDK respects user's session duration preference
-// Sessions auto-expire based on this setting
+requiredAssurance: 'ishuman'
 ```
 
----
-
-## Bot Shield (Optional)
-
-Add bot protection to forms:
-
-```html
-<script src="https://lemma.id/static/js/lemma-bot-shield-simple.js"></script>
-
-<form data-lemma-protect="true">
-    <input type="email" name="email" required>
-    <button type="submit">Submit</button>
-</form>
-```
+Use for signup bonuses, payouts, or one-human-per-account policies.
 
 ---
 
-## Troubleshooting
+## Do not use (legacy)
 
-### "Redirect not working"
+- `lemma-wallet.js` + `startRedirectFlow()` redirect login
+- Bare client `ppid` without presentation verification
+- `X-Lemma-Credential` as the relying-site login protocol
 
-Ensure your site is served over HTTPS. The redirect flow requires secure context.
-
-### "PPID is undefined"
-
-Make sure to call `checkRedirectReturn()` before `derivePPID()` when returning from authentication.
-
-### "Session expires too quickly"
-
-Users can adjust session duration at `lemma.id/wallet`. Default is 24 hours.
-
-### "Cross-device sync not working"
-
-Ensure both devices have the wallet linked. Use the QR code or copy link feature at `lemma.id/wallet`.
-
----
-
-## Support
-
-- Documentation: https://lemma.id/docs
-- GitHub Issues: https://github.com/lemma-id/sdk/issues
-- Email: support@lemma.id
+These patterns are superseded by presentation verification.

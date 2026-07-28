@@ -2369,6 +2369,14 @@ def derive_site_proof():
     if not target_site or target_site == "unknown":
         return jsonify({"success": False, "error": "invalid target_site"}), 400
 
+    from api.rate_limiter import check_rate_limit
+
+    ip_hash = _client_ip_hash()
+    if not check_rate_limit(f"derive_site_proof:wallet:{wallet_id}", 10, 60):
+        return jsonify({"success": False, "error": "derive_site_proof_rate_limited"}), 429
+    if not check_rate_limit(f"derive_site_proof:ip_host:{ip_hash}:{target_site}", 60, 60):
+        return jsonify({"success": False, "error": "derive_site_proof_rate_limited"}), 429
+
     from api.database import SessionLocal, IsHumanVerification, RevocationList
     db = SessionLocal()
     try:

@@ -218,11 +218,7 @@ def ishuman_idv_popup():
         demo_test_token=ctx["demo_test_token"],
         skeleton_idv_enabled=ctx["skeleton_idv_enabled"],
         qr_demo_idv_enabled=ctx["qr_demo_idv_enabled"],
-        passkey_assurance_enabled=(
-            passkey_assurance_enabled()
-            or one_ppid_assurance_model_enabled()
-            or _demo_enabled()
-        ),
+        passkey_assurance_enabled=passkey_assurance_enabled(),
     ), 200, headers
 
 

@@ -3226,6 +3226,18 @@ def wallet_firewall_decisions_webhook():
     destination_url = str(payload.get('destination_url') or os.getenv('LEMMA_AGENT_OPS_WEBHOOK_URL') or '').strip()
     if not destination_url:
         return jsonify({'success': False, 'error': 'destination_url_required'}), 400
+    # SSRF guard: the destination is client-controlled, so refuse to fetch
+    # internal/loopback/link-local (incl. cloud metadata) or otherwise non-public
+    # targets before issuing the outbound request.
+    from api.url_safety import is_safe_outbound_url
+
+    url_ok, url_reason = is_safe_outbound_url(destination_url)
+    if not url_ok:
+        return jsonify({
+            'success': False,
+            'error': 'destination_url_not_allowed',
+            'reason': url_reason,
+        }), 400
     body = {
         'success': True,
         'org_id': org_id,

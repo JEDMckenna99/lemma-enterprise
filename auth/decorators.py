@@ -182,13 +182,99 @@ def require_credential(
 # ---------------------------------------------------------------------------
 
 def require_site_admin(f):
-    """Admin-scoped credential required."""
+    """Admin-scoped credential required.
+
+    NOTE: This only proves the caller holds an admin-scoped credential for
+    *some* site. It does NOT bind the admin authority to the specific resource
+    being acted on. Site-scoped routes that take a ``site_id`` from the request
+    MUST additionally enforce ``api.site_access.require_site_ownership`` (or an
+    equivalent per-site check); platform-operator routes MUST use
+    ``require_platform_admin`` instead.
+    """
     return require_credential(required_scope="admin")(f)
 
 
 def require_admin(f):
     """Admin-scoped credential required (alias for require_site_admin)."""
     return require_credential(required_scope="admin")(f)
+
+
+def _principal_is_platform_admin(
+    ppid: Optional[str], site_binding: Optional[str] = None
+) -> bool:
+    """Server-authoritative platform-operator check (not client-forgeable).
+
+    A principal counts as a platform operator when ANY of the following hold:
+
+      1. Its verified credential is bound to a platform site
+         (``lemma.id`` / ``lemma_platform``). ``site_binding`` comes from a
+         signature-verified, trusted-issuer credential; a relying-site issuer
+         signs its own ``siteId`` and the platform issuer only mints
+         ``lemma.id``-bound admin credentials for real operators, so a customer
+         cannot forge this.
+      2. It is the env-pinned platform owner PPID (constant-time compared).
+      3. It has an active ``lemma.id`` / ``lemma_platform`` SiteAdmin row.
+
+    Deliberately avoids ``api.site_access.is_platform_operator_ppid`` because
+    its ``_is_lemma_platform_operator`` fallback trusts an UNVERIFIED admin-lemma
+    context parsed straight from request headers/body — which a caller holding
+    only a relying-site admin credential could forge.
+    """
+    try:
+        from api.platform_owner import is_platform_site
+
+        if site_binding and is_platform_site(site_binding):
+            return True
+    except Exception as exc:  # pragma: no cover - defensive
+        logger.warning("platform site-binding check failed: %s", exc)
+
+    if not ppid:
+        return False
+
+    try:
+        from api.platform_owner import is_platform_owner_ppid
+
+        if is_platform_owner_ppid(ppid):
+            return True
+    except Exception as exc:  # pragma: no cover - defensive
+        logger.warning("platform owner check failed: %s", exc)
+
+    try:
+        from api.site_access import verify_site_ownership
+
+        return bool(
+            verify_site_ownership("lemma.id", ppid)
+            or verify_site_ownership("lemma_platform", ppid)
+        )
+    except Exception as exc:  # pragma: no cover - defensive
+        logger.warning("platform operator lookup failed (failing closed): %s", exc)
+        return False
+
+
+def require_platform_admin(f):
+    """Platform-operator admin required (stronger than ``require_site_admin``).
+
+    The caller must (a) present a valid admin-scoped credential AND (b) be a
+    lemma.id platform operator per ``_principal_is_platform_admin``. A customer's
+    admin lemma bound to their own relying site does NOT grant access to
+    platform-operator endpoints, closing the cross-tenant platform-admin
+    escalation. When platform-owner enforcement is enabled, ``require_credential``
+    additionally restricts platform-bound admins to the configured owner.
+    """
+    @wraps(f)
+    def _platform_checked(*args, **kwargs):
+        ppid = getattr(g, "ppid", None)
+        site_binding = getattr(g, "site_binding", None)
+        if not _principal_is_platform_admin(ppid, site_binding):
+            return _auth_error(
+                "platform_admin_required",
+                "This endpoint is restricted to lemma.id platform operators.",
+                status=403,
+                auth_method=getattr(g, "auth_method", "credential"),
+            )
+        return f(*args, **kwargs)
+
+    return require_credential(required_scope="admin")(_platform_checked)
 
 
 def require_wallet_ppid(f):

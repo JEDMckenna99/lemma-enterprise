@@ -162,8 +162,55 @@
     </div>
 </div>
 
+<div class="dev-card" style="margin-top: 24px;">
+    <div class="dev-card-header">
+        <h2 class="dev-card-title">Your sites</h2>
+    </div>
+    <div class="dev-card-body">
+        <p style="margin: 0 0 12px; color: var(--dev-text-muted); font-size: 14px;">
+            Registered sites for abuse API keys. Basic passkey login works without registering a site.
+        </p>
+        <div id="dev-hub-sites-list" style="font-size: 14px; color: var(--dev-text-muted);">Loading sites…</div>
+    </div>
+</div>
+
 <p class="dev-hub-note">
     Full documentation: <a href="/docs">/docs</a>.
     AI agent integration guide: <a href="/docs/integration/ISHUMAN_AGENT_INTEGRATION.md">ISHUMAN_AGENT_INTEGRATION.md</a>.
 </p>
+
+<script nonce="{{ csp_nonce }}">
+(function loadDevHubSites() {
+    const container = document.getElementById('dev-hub-sites-list');
+    if (!container) return;
+    const headers = (typeof window.getLemmaAuthHeaders === 'function')
+        ? window.getLemmaAuthHeaders({ 'Content-Type': 'application/json' })
+        : { 'Content-Type': 'application/json' };
+    fetch('/api/customer/sites', { headers })
+        .then((r) => r.json())
+        .then((data) => {
+            const sites = data.sites || [];
+            if (!sites.length) {
+                container.innerHTML = '<p style="margin:0;">No registered sites yet. <a href="/developer/external-api-keys">Register one</a> when you need abuse API keys.</p>';
+                return;
+            }
+            container.innerHTML = sites.map((site) => {
+                const host = site.site_domain || site.site_id || 'unknown';
+                const snippet = `<script src="https://lemma.id/sdk/proof-verifier.js"><\\/script>
+<script>
+  const verifier = new ProofVerifier({ siteId: '${host}' });
+  // verifyForBackend({ autoProvision: true, requiredAssurance: 'passkey' })
+<\\/script>`;
+                return `<div style="border:1px solid #e2e8f0; border-radius:8px; padding:12px; margin-bottom:10px;">
+                    <div style="font-weight:600;">${host}</div>
+                    <div style="font-size:12px; color:#64748b; margin:4px 0 8px;">site_id: ${site.site_id || 'n/a'}</div>
+                    <pre style="margin:0; font-size:11px; background:#f8fafc; padding:8px; border-radius:6px; overflow:auto;">${snippet.replace(/</g, '&lt;')}</pre>
+                </div>`;
+            }).join('');
+        })
+        .catch(() => {
+            container.textContent = 'Sign in with lemma.id to list your registered sites.';
+        });
+})();
+</script>
 {% endblock %}

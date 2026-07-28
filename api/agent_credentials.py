@@ -4338,10 +4338,15 @@ def create_agent_session():
     # Check for redirect parameter
     redirect_to = request.args.get('redirect')
     if redirect_to:
-        # Validate redirect is to our domain
-        from urllib.parse import urlparse
-        parsed = urlparse(redirect_to)
-        if parsed.netloc in ['', 'lemma.id', 'www.lemma.id'] or redirect_to.startswith('/'):
+        from api.url_safety import is_host_allowed_redirect, is_safe_relative_redirect
+
+        if is_safe_relative_redirect(redirect_to):
+            from flask import redirect
+            return redirect(redirect_to)
+        if is_host_allowed_redirect(
+            redirect_to,
+            ['lemma.id', 'www.lemma.id'],
+        ):
             from flask import redirect
             return redirect(redirect_to)
     

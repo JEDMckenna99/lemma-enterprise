@@ -8,7 +8,7 @@ import os
 from flask import Blueprint, jsonify
 from flask_cors import cross_origin
 
-from auth.decorators import require_site_admin
+from auth.decorators import require_platform_admin as require_site_admin
 
 logger = logging.getLogger(__name__)
 

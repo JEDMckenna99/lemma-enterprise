@@ -103,6 +103,7 @@ status:
 | `404` | Resource is absent or the documentation path is not public | Check the documented relying-site endpoint |
 | `409` | State conflict or replay | Re-read state; do not blindly repeat a mutation |
 | `429` | Rate limit exceeded | Apply bounded backoff and honor `Retry-After` when present |
+| `derive_site_proof_rate_limited` | Too many site-proof issuance requests for this wallet or IP+hostname pair | Back off and retry; do not treat as a verification failure |
 | `500`, `502`, `503` | Temporary service failure | Keep the protected action denied and retry with bounded backoff |
 
 ## Troubleshooting checklist

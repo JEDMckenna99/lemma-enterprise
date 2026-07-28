@@ -30,6 +30,12 @@ _memory_counters = {}
 _memory_lock = threading.Lock()
 
 
+def reset_memory_rate_limit_counters() -> None:
+    """Clear in-process rate limit counters (test isolation)."""
+    with _memory_lock:
+        _memory_counters.clear()
+
+
 def _memory_window_increment(rate_key: str, period: int) -> tuple[int, int]:
     """
     Increment an in-process fixed-window counter.
@@ -418,8 +424,6 @@ def record_violation(ip_address: str, violation_type: str):
     except Exception as e:
         logger.error(f"Failed to record violation: {e}")
 
-
-# Simple rate limit check (non-decorator)
 
 def check_rate_limit(key: str, max_requests: int, window_seconds: int) -> bool:
     """

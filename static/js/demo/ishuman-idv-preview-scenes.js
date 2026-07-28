@@ -38,7 +38,7 @@
     },
     intro: {
       passkeySetup:
-        'You\u2019ll be asked to create a passkey on this device \u2014 it never leaves your device. No identity check is needed at this step.',
+        'You\u2019ll be asked to create a passkey on this device - it never leaves your device. No identity check is needed at this step.',
       unlockOnly:
         'Unlock your existing lemma.id wallet with your passkey to continue.',
       verifyOnce(site) {

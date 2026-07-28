@@ -24,6 +24,15 @@ def _default_test_env() -> None:
     os.environ.setdefault("LEMMA_PERSON_ROOT_SALT_V1", "z" * 32)
 
 
+@pytest.fixture(autouse=True)
+def _reset_in_memory_rate_limits() -> None:
+    from api.rate_limiter import reset_memory_rate_limit_counters
+
+    reset_memory_rate_limit_counters()
+    yield
+    reset_memory_rate_limit_counters()
+
+
 @pytest.fixture(name="ishuman_test_app")
 def fixture_ishuman_test_app():
     from api.ishuman import ishuman_bp

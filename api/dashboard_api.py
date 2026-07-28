@@ -27,7 +27,13 @@ dashboard_bp = Blueprint('dashboard', __name__)
 from .usage_tracking import get_usage_summary, get_monthly_active_users, track_active_user
 
 # Import auth decorators
-from auth.decorators import require_site_admin, require_api_key, require_wallet_ppid, require_customer_or_admin, extract_authenticated_ppid_from_request
+from auth.decorators import (
+    require_platform_admin as require_site_admin,
+    require_api_key,
+    require_wallet_ppid,
+    require_customer_or_admin,
+    extract_authenticated_ppid_from_request,
+)
 
 
 def _to_iso(value):
