@@ -582,14 +582,25 @@
     }
   }
 
+  function knownSitePpids(slug, result = null) {
+    return new Set([
+      result?.ppid,
+      resolveSitePpid(slug),
+      state.results[slug]?.ppid,
+      state.passkeyPpids[slug],
+    ].filter(Boolean));
+  }
+
   function isSiteBlocked(slug, result = null) {
-    // localBlocks (hydrated from demo status / block actions) is the source of
-    // truth for the Ban|Unban control. Do not treat a stale verify reason
-    // alone as blocked, that leaves the toggle stuck after a successful unblock
-    // when the last result still says site_blocked.
-    const ppid = result?.ppid || resolveSitePpid(slug);
-    if (ppid && state.localBlocks[slug]?.has(ppid)) return true;
-    return !!(state.localBlocks[slug]?.size);
+    // Only this session's site PPIDs count. Demo /status returns every active
+    // ban on the shared demo sites — treating localBlocks.size as blocked left
+    // visitors stuck in a red Ban/Unban state from other users' residue.
+    const known = knownSitePpids(slug, result);
+    if (!known.size) return false;
+    for (const ppid of known) {
+      if (state.localBlocks[slug]?.has(ppid)) return true;
+    }
+    return false;
   }
 
   function isSiteBanReason(reason) {
@@ -1255,8 +1266,10 @@
         banBtn.textContent = showUnban ? 'Unban' : 'Ban';
         banBtn.classList.toggle('enforce-chip--danger', !showUnban);
         banBtn.classList.toggle('enforce-chip--quiet', showUnban);
-        // Never gate Ban/Unban on a prior verify — bans must be liftable anytime.
-        banBtn.disabled = !!state.wizardRunning || !!state.blockToggleBusy;
+        // Never gate Ban/Unban on a prior verify or mid-flight busy flag —
+        // a hung bloom/verify refresh used to leave Unban permanently disabled.
+        banBtn.disabled = !!state.wizardRunning;
+        banBtn.setAttribute('aria-busy', state.blockToggleBusy ? 'true' : 'false');
       }
       const row = $(`ih-enforce-row-${slug}`);
       if (row) {
@@ -2328,8 +2341,8 @@
       renderSite(slug, state.results[slug]);
     }
 
-    await verifySite('tickets');
-    await verifySite('trials');
+    await verifySite('tickets', { autoProvision: false, resolveDoubt: false });
+    await verifySite('trials', { autoProvision: false, resolveDoubt: false });
     if (slug === 'tickets') await refreshAbuseChecks();
     if (slug === 'tickets') await probeDerive('tickets');
     setWorkflowHighlight(3);
@@ -2512,38 +2525,47 @@
 
   async function unblockSite(slug) {
     await ensureSitePpid(slug);
+    const known = knownSitePpids(slug);
+    // Clear this session's PPIDs. Also clear any stale localBlocks residue so a
+    // prior shared-demo hydrate cannot keep Unban looping forever.
     const ppids = new Set([
-      resolveSitePpid(slug),
-      state.results[slug]?.ppid,
-      state.passkeyPpids[slug],
+      ...known,
       ...state.localBlocks[slug],
     ].filter(Boolean));
     if (!ppids.size) {
-      throw new Error(`${slug} PPID unavailable`);
+      throw new Error(`${slug} PPID unavailable — Verify the site once, then Unban.`);
     }
 
     let unblockedAny = false;
+    const errors = [];
     for (const ppid of ppids) {
-      const payload = await requestJson('/api/demo/ishuman/site-unblock', {
-        method: 'POST',
-        body: JSON.stringify({ site_slug: slug, ppid }),
-      });
-      if (payload?.unblocked !== false || payload?.lifted || payload?.success) {
-        unblockedAny = true;
+      try {
+        const payload = await requestJson('/api/demo/ishuman/site-unblock', {
+          method: 'POST',
+          body: JSON.stringify({ site_slug: slug, ppid }),
+        });
+        if (payload?.unblocked !== false || payload?.lifted || payload?.success) {
+          unblockedAny = true;
+        }
+        state.localBlocks[slug].delete(ppid);
+      } catch (err) {
+        errors.push(err?.message || String(err));
       }
-      state.localBlocks[slug].delete(ppid);
     }
+    // Drop any remaining non-session residue from the shared demo status feed.
+    state.localBlocks[slug].clear();
     // Clear ban presentation immediately so Unban cannot flip back to Ban
     // while a stale bloom/session reason still says site_ppid_revoked.
     if (state.results[slug]) {
       state.results[slug] = {
         ...state.results[slug],
+        human: false,
         reason: 'unblocked',
       };
       renderSite(slug, state.results[slug]);
     }
     if (window.IsHumanVerifier?.broadcastBlockUpdate) {
-      for (const ppid of ppids) {
+      for (const ppid of known.size ? known : ppids) {
         window.IsHumanVerifier.broadcastBlockUpdate({
           type: 'SITE_BLOCK_UPDATE',
           siteId: SITE_IDS[slug],
@@ -2554,15 +2576,15 @@
     }
 
     const netJson = $('ih-master-json');
-    if (netJson) netJson.textContent = pretty({ unblocked: unblockedAny, ppids: [...ppids] });
+    if (netJson) netJson.textContent = pretty({ unblocked: unblockedAny, ppids: [...ppids], errors });
     log(`${slug} site block removed`, [...ppids].map(short).join(', '));
     try {
       await forceVerifierBloomRefresh('tickets');
       await forceVerifierBloomRefresh('trials');
       await refreshStatus().catch(() => {});
       // Do not auto-open popups during Unban; only refresh local decisions.
-      await verifySite('tickets', { autoProvision: false });
-      await verifySite('trials', { autoProvision: false });
+      await verifySite('tickets', { autoProvision: false, resolveDoubt: false });
+      await verifySite('trials', { autoProvision: false, resolveDoubt: false });
       for (const siteSlug of SITE_SLUGS) {
         if (
           !isSiteBlocked(siteSlug)
@@ -2581,6 +2603,9 @@
       syncBlockSegToggle();
       updateBlockResultsTable();
       updateStepLocks();
+    }
+    if (errors.length && !unblockedAny) {
+      throw new Error(errors[0] || 'Unban failed');
     }
     setQuickInsight('Enforce', unblockedAny
       ? `${slug === 'tickets' ? 'Presale' : 'SaaS trial'} unbanned, ban again anytime to retry.`
@@ -2605,6 +2630,10 @@
       } else {
         await blockSite(slug);
       }
+    } catch (err) {
+      log('Error', err.message);
+      setQuickInsight('Heads up', err.message || 'Ban toggle failed');
+      throw err;
     } finally {
       state.blockToggleBusy = false;
       syncBlockSegToggle();
@@ -3014,15 +3043,22 @@
     const siteIdToSlug = { site_demo_tickets: 'tickets', site_demo_trials: 'trials' };
     for (const block of payload.site_blocks || []) {
       const slug = siteIdToSlug[block.site_id];
-      if (slug && block.ppid) state.localBlocks[slug].add(block.ppid);
+      if (!slug || !block.ppid) continue;
+      const known = knownSitePpids(slug);
+      // Ignore other visitors' bans on the shared demo sites.
+      if (known.size && !known.has(block.ppid)) continue;
+      if (!known.size) continue;
+      state.localBlocks[slug].add(block.ppid);
     }
     for (const doubt of payload.site_doubts || []) {
       const slug = siteIdToSlug[doubt.site_id];
-      if (slug && doubt.ppid) {
-        state.localDoubts[slug].add(doubt.ppid);
-        const reason = String(doubt.reason || '').toLowerCase();
-        state.pendingDoubtResolve[slug] = reason.includes('human') ? 'ishuman' : 'passkey';
-      }
+      if (!slug || !doubt.ppid) continue;
+      const known = knownSitePpids(slug);
+      if (known.size && !known.has(doubt.ppid)) continue;
+      if (!known.size) continue;
+      state.localDoubts[slug].add(doubt.ppid);
+      const reason = String(doubt.reason || '').toLowerCase();
+      state.pendingDoubtResolve[slug] = reason.includes('human') ? 'ishuman' : 'passkey';
     }
     const netJson = $('ih-master-json');
     if (netJson) netJson.textContent = pretty(payload);

@@ -142,9 +142,12 @@ def test_ishuman_demo_page_loads_expected_assets(ishuman_demo_client):
     assert "/sdk/ishuman-verifier.js" in body
     assert "/static/js/demo/ishuman-demo.js" in body
     assert "/static/css/demo/ishuman-demo.css" in body
-    assert "/static/js/demo/ishuman-demo.js?v=77" in body
+    assert "/static/js/demo/ishuman-demo.js?v=78" in body
     js = (ROOT / "static/js/demo/ishuman-demo.js").read_text(encoding="utf-8")
     assert "blockToggleBusy" in js
+    assert "function knownSitePpids(" in js
+    assert "Ignore other visitors' bans on the shared demo sites." in js
+    assert "banBtn.disabled = !!state.wizardRunning;" in js
     assert "SITE_BAN_REASONS" in js
     assert "site_ppid_revoked" in js
     assert "if (banned) card.classList.add('is-deny')" in js
