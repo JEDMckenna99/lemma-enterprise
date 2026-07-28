@@ -708,6 +708,7 @@ def wallet_session_unlock_begin():
 
     from api.passkey_auth import RP_ID
 
+    bootstrap_required = authority.code == "first_device_bootstrap"
     challenge = secrets.token_bytes(32)
     challenge_key = f"wus_{secrets.token_urlsafe(24)}"
     redis_store(
@@ -717,6 +718,7 @@ def wallet_session_unlock_begin():
             'wallet_id': wallet_id,
             'device_id': device_id,
             'credential_id': credential_id,
+            'bootstrap_required': bootstrap_required,
         },
         ttl_seconds=WALLET_WEBAUTHN_TTL_SECONDS,
     )
@@ -726,6 +728,7 @@ def wallet_session_unlock_begin():
         'challenge': base64.urlsafe_b64encode(challenge).decode('ascii').rstrip('='),
         'rp_id': RP_ID,
         'expires_in': WALLET_WEBAUTHN_TTL_SECONDS,
+        'bootstrap_required': bootstrap_required,
     })
     response.headers.update(_cors_headers(origin))
     return response
@@ -759,20 +762,24 @@ def wallet_session_unlock_complete():
 
     from api.fresh_passkey_attestation import (
         allowed_fresh_passkey_origins,
+        extract_cose_public_key_b64,
         lookup_wallet_passkey_public_key,
         update_wallet_passkey_sign_count,
         verify_wallet_webauthn_assertion,
     )
     from api.passkey_auth import RP_ID
+    from api.wallet_authn import bind_wallet_passkey, device_authority_status, register_wallet_signing_key
 
-    from api.wallet_authn import device_authority_status
+    wallet_id = str(stored.get('wallet_id') or '')
+    device_id = str(stored.get('device_id') or '')
+    bootstrap_required = bool(stored.get('bootstrap_required'))
 
     authority = device_authority_status(
-        wallet_id=str(stored.get('wallet_id') or ''),
-        device_id=str(stored.get('device_id') or ''),
+        wallet_id=wallet_id,
+        device_id=device_id,
         credential_id=credential_id,
     )
-    if not authority.ok:
+    if not authority.ok and not bootstrap_required:
         return jsonify({
             'success': False,
             'error': authority.error,
@@ -780,24 +787,94 @@ def wallet_session_unlock_complete():
         }), 403
 
     public_key, sign_count = lookup_wallet_passkey_public_key(credential_id)
-    if not public_key:
+    if not public_key and bootstrap_required:
+        public_key = str(body.get('public_key') or '').strip()
+        attestation_object = str(body.get('attestation_object') or '').strip()
+        pubkey_b64 = str(body.get('pubkey') or '').strip()
+        signature_b64 = str(body.get('signature') or '').strip()
+        if attestation_object:
+            try:
+                public_key = extract_cose_public_key_b64(attestation_object)
+            except Exception as exc:
+                logger.warning("Session unlock bootstrap COSE extraction failed: %s", exc)
+        if not public_key or not pubkey_b64 or not signature_b64:
+            return jsonify({
+                'success': False,
+                'error': 'bootstrap_enrollment_fields_required',
+                'code': 'bootstrap_enrollment_fields_required',
+            }), 400
+        ok, reason, new_sign_count = verify_wallet_webauthn_assertion(
+            credential=credential,
+            expected_challenge=base64.urlsafe_b64decode(stored['challenge']),
+            rp_id=RP_ID,
+            origin=allowed_fresh_passkey_origins(),
+            public_key_b64=public_key,
+            sign_count=0,
+        )
+        if not ok:
+            return jsonify({'success': False, 'error': reason}), 403
+        key_result = register_wallet_signing_key(
+            wallet_id=wallet_id,
+            device_id=device_id,
+            pubkey_b64=pubkey_b64,
+            signature_b64=signature_b64,
+            allow_first_device_bootstrap=True,
+        )
+        if not key_result.ok:
+            return jsonify({
+                'success': False,
+                'error': key_result.error,
+                'code': key_result.code,
+            }), 403
+        passkey_result = bind_wallet_passkey(
+            wallet_id=wallet_id,
+            device_id=device_id,
+            credential_id=credential_id,
+            public_key=public_key,
+            attestation_format=str(body.get('attestation_format') or '').strip() or None,
+            sign_count=int(new_sign_count or 0),
+        )
+        if not passkey_result.ok:
+            return jsonify({
+                'success': False,
+                'error': passkey_result.error,
+                'code': passkey_result.code,
+            }), 403
+        update_wallet_passkey_sign_count(credential_id, new_sign_count)
+    elif not public_key:
         return jsonify({
             'success': False,
             'error': 'wallet_passkey_not_registered',
             'code': 'wallet_passkey_not_registered',
         }), 403
-    ok, reason, new_sign_count = verify_wallet_webauthn_assertion(
-        credential=credential,
-        expected_challenge=base64.urlsafe_b64decode(stored['challenge']),
-        rp_id=RP_ID,
-        origin=allowed_fresh_passkey_origins(),
-        public_key_b64=public_key,
-        sign_count=sign_count,
-    )
-    if not ok:
-        return jsonify({'success': False, 'error': reason}), 403
+    else:
+        ok, reason, new_sign_count = verify_wallet_webauthn_assertion(
+            credential=credential,
+            expected_challenge=base64.urlsafe_b64decode(stored['challenge']),
+            rp_id=RP_ID,
+            origin=allowed_fresh_passkey_origins(),
+            public_key_b64=public_key,
+            sign_count=sign_count,
+        )
+        if not ok:
+            return jsonify({'success': False, 'error': reason}), 403
 
-    update_wallet_passkey_sign_count(credential_id, new_sign_count)
+        update_wallet_passkey_sign_count(credential_id, new_sign_count)
+        # Keep server device_id aligned when the browser rotated device_id locally.
+        from api.database import SessionLocal, WalletPasskey
+
+        db = SessionLocal()
+        try:
+            row = db.query(WalletPasskey).filter_by(credential_id=credential_id).first()
+            if row and str(row.device_id or '') != device_id:
+                row.device_id = device_id
+                row.last_used_at = datetime.utcnow()
+                db.commit()
+        except Exception:
+            db.rollback()
+            raise
+        finally:
+            db.close()
     return _issue_wallet_session_response(
         wallet_id=str(stored['wallet_id']),
         profile_id=str(body.get('profile_id') or 'default'),

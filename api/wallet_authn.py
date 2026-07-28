@@ -140,6 +140,14 @@ def device_authority_status(
                 device_id=device_id,
                 credential_id=credential_id,
             ).first()
+            if not passkey:
+                # Local device_id may have rotated while the passkey row stayed put.
+                passkey = (
+                    db.query(WalletPasskey)
+                    .filter_by(wallet_id=wallet_id, credential_id=credential_id)
+                    .filter(WalletPasskey.revoked_at.is_(None))
+                    .first()
+                )
         else:
             passkey = (
                 db.query(WalletPasskey)
@@ -151,11 +159,18 @@ def device_authority_status(
         if passkey and passkey.revoked_at:
             return Result(False, "device_revoked", "wallet device has been revoked")
 
-        if credential_id and not passkey:
-            return Result(False, "wallet_passkey_not_registered", "wallet passkey not registered")
-
         if signing_key or passkey:
             return Result(True)
+
+        if credential_id:
+            other_active = db.query(WalletSigningKey).filter(
+                WalletSigningKey.wallet_id == wallet_id,
+                WalletSigningKey.revoked_at.is_(None),
+            ).first()
+            established_identity = _wallet_has_established_identity(db, wallet_id)
+            if other_active is None and not established_identity:
+                return Result(True, code="first_device_bootstrap")
+            return Result(False, "wallet_passkey_not_registered", "wallet passkey not registered")
 
         return Result(False, "wallet_passkey_not_registered", "wallet device not registered")
     finally:

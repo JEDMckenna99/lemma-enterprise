@@ -879,3 +879,62 @@ def test_staging_enrollment_grant_issues_with_demo_token(monkeypatch):
     )
     assert response.status_code == 200, response.get_json()
     assert response.get_json()["enrollment_grant"].startswith("weg_")
+
+
+def test_session_unlock_begin_allows_first_device_bootstrap(
+    fake_ishuman_db_session_factory,
+    monkeypatch,
+):
+    monkeypatch.setattr(
+        "api.database.SessionLocal",
+        fake_ishuman_db_session_factory.session_local,
+    )
+    response = _client().post(
+        "/api/wallet/session-unlock/begin",
+        json={
+            "wallet_id": "wallet_bootstrap_only",
+            "device_id": "dev_browser_new",
+            "credential_id": "cred_local_only",
+        },
+        headers={"Origin": "https://lemma.id"},
+    )
+    assert response.status_code == 200, response.get_json()
+    payload = response.get_json()
+    assert payload["bootstrap_required"] is True
+    assert payload["challenge_key"]
+
+
+def test_session_unlock_begin_accepts_passkey_on_different_device_id(
+    fake_ishuman_db_session_factory,
+    monkeypatch,
+):
+    from api.database import WalletPasskey
+
+    monkeypatch.setattr(
+        "api.database.SessionLocal",
+        fake_ishuman_db_session_factory.session_local,
+    )
+    db = fake_ishuman_db_session_factory.session_local()
+    db.add(
+        WalletPasskey(
+            wallet_id="wallet_resync",
+            device_id="dev_old",
+            credential_id="cred_resync",
+            public_key="pk_resync",
+            sign_count=0,
+        )
+    )
+    db.commit()
+    db.close()
+
+    response = _client().post(
+        "/api/wallet/session-unlock/begin",
+        json={
+            "wallet_id": "wallet_resync",
+            "device_id": "dev_new_local",
+            "credential_id": "cred_resync",
+        },
+        headers={"Origin": "https://lemma.id"},
+    )
+    assert response.status_code == 200, response.get_json()
+    assert response.get_json()["bootstrap_required"] is False
