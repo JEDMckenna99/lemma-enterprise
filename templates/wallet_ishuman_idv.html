@@ -228,7 +228,7 @@
     <script src="/static/js/lemma-keys.js?v=8" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
     <script src="/static/js/wallet-at-rest-crypto.js?v=2" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
     <script nonce="{{ csp_nonce }}">window.LEMMA_ISHUMAN_USE_PERSON_ROOT_SEEDS = {{ 'true' if ishuman_use_person_root_seeds else 'false' }};</script>
-    <script src="/sdk/lemma-wallet.js?v=2689" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
+    <script src="/sdk/lemma-wallet.js?v=2690" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
     <script src="/static/js/qrcode.min.js" nonce="{{ csp_nonce }}" data-cfasync="false"></script>
     <script nonce="{{ csp_nonce }}">
         const SESSION_KEY = 'ishuman_idv_popup_session_id';
@@ -553,12 +553,48 @@
                 .test(String(message || ''));
         }
 
-        function presentBlockedState(message) {
+        let pendingBanDetail = null;
+
+        async function resolveRequestingSitePpid() {
+            try {
+                await ensureWalletInitialized();
+                if (wallet && typeof wallet.derivePPID === 'function' && requestingSite) {
+                    return String(await wallet.derivePPID(requestingSite) || '').trim();
+                }
+            } catch (_) { /* optional */ }
+            return '';
+        }
+
+        function notifyOpenerSiteBanned(detail) {
+            if (!window.opener) return;
+            const target = openerOrigin && openerOrigin !== '*' ? openerOrigin : '*';
+            try {
+                window.opener.postMessage({ type: 'ISHUMAN_SITE_BANNED', detail: detail || {} }, target);
+            } catch (_) { /* ignore */ }
+        }
+
+        async function presentBlockedState(message) {
             const copy = consumerCopy();
             applyBlockedShell();
+            const raw = String(message || '').trim();
+            const reason = /^site_ppid_revoked$|^site_ppid_blocked$|^site_blocked$/i.test(raw)
+                ? (raw.toLowerCase() === 'site_blocked' || raw.toLowerCase() === 'site_ppid_blocked'
+                    ? 'site_ppid_revoked'
+                    : raw.toLowerCase())
+                : 'site_ppid_revoked';
+            const ppid = await resolveRequestingSitePpid();
+            pendingBanDetail = {
+                reason,
+                ppid: ppid || null,
+                site_id: requestingSite,
+                message: raw || (copy.status?.blocked || 'This PPID is banned on this site.'),
+            };
+            // Tell the opener immediately so demo Enforce can show Unban + PPID
+            // while this banned screen is still open.
+            notifyOpenerSiteBanned(pendingBanDetail);
             setStatus(
-                message && !/^site_ppid_revoked$|^site_ppid_blocked$|^site_blocked$/i.test(String(message))
-                    ? message
+                raw && !/^site_ppid_revoked$|^site_ppid_blocked$|^site_blocked$/i.test(raw)
+                    ? raw
                     : (copy.status?.blocked || 'This PPID is banned on this site.'),
                 'error',
             );
@@ -1883,7 +1919,7 @@
             } catch (err) {
                 const detail = err?.message || err?.toString() || '';
                 if (isBlockedStatusMessage(detail)) {
-                    presentBlockedState(detail);
+                    await presentBlockedState(detail);
                     return;
                 }
                 console.warn('[isHuman IDV] site proof auto-issue skipped:', err?.message || err);
@@ -2374,6 +2410,15 @@
                     closeWith('LEMMA_WALLET_SETUP_CANCELLED', { reason: 'user_cancelled' });
                     return;
                 }
+                // Preserve ban so the opener does not collapse to idv_cancelled
+                // and lose the PPID / Unban affordance.
+                if (pendingBanDetail?.reason) {
+                    closeWith('ISHUMAN_IDV_CANCELLED', {
+                        ...pendingBanDetail,
+                        reason: pendingBanDetail.reason || 'site_ppid_revoked',
+                    });
+                    return;
+                }
                 closeWith('ISHUMAN_IDV_CANCELLED', { reason: 'user_cancelled' });
             });
         }
@@ -2403,7 +2448,7 @@
                 console.error('[isHuman IDV] primary action failed:', err);
                 const detail = err?.message || err?.toString() || 'Verification failed';
                 if (isBlockedStatusMessage(detail)) {
-                    presentBlockedState(detail);
+                    await presentBlockedState(detail);
                     return;
                 }
                 if (detail.includes('wallet_id') || detail.includes('challenge')) {

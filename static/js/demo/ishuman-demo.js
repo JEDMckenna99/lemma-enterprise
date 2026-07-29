@@ -2181,6 +2181,51 @@
     return result;
   }
 
+  async function ensureDerivedSitePpid(slug) {
+    let ppid = resolveSitePpid(slug);
+    if (ppid) return ppid;
+    try {
+      if (!state.wallet) await initWallet();
+      if (state.wallet?.derivePPID) {
+        ppid = await state.wallet.derivePPID(SITE_IDS[slug]);
+      }
+    } catch (_) { /* optional */ }
+    if (!ppid) return null;
+    state.passkeyPpids[slug] = state.passkeyPpids[slug] || ppid;
+    state.results[slug] = {
+      ...(state.results[slug] || {}),
+      ppid,
+      human: !!(state.results[slug]?.human),
+      reason: state.results[slug]?.reason || 'pending',
+    };
+    return ppid;
+  }
+
+  function applyBannedVerifyResult(slug, ppid, reason, extra = {}) {
+    const banReason = reason === 'site_blocked' || reason === 'site_ppid_blocked'
+      ? 'site_ppid_revoked'
+      : (reason || 'site_ppid_revoked');
+    markSessionBan(slug, ppid, banReason);
+    const result = {
+      human: false,
+      ppid: ppid || resolveSitePpid(slug) || state.sessionBanFlags[slug]?.ppid || null,
+      assurance: extra.assurance || null,
+      presentation: null,
+      reason: banReason,
+      timeMs: extra.timeMs || 0,
+    };
+    state.results[slug] = result;
+    if (result.ppid) state.passkeyPpids[slug] = state.passkeyPpids[slug] || result.ppid;
+    renderSite(slug, result);
+    renderProofReceipt();
+    renderPresentationInspector(slug);
+    renderLifecyclePanel();
+    updateIntegrationLatency();
+    updatePpidCompare();
+    updateBlockResultsTable();
+    return result;
+  }
+
   async function verifySite(slug, options = {}) {
     if (!window.IsHumanVerifier) throw new Error('IsHumanVerifier SDK not loaded');
 
@@ -2199,34 +2244,31 @@
     const requiredAssurance = demoRequiredAssurance(slug, options);
     const verifier = verifierFor(slug, { requiredAssurance });
 
+    // Derive the site PPID up front so Enforce can show Unban even when Verify
+    // only surfaces the banned popup (no successful presentation).
+    const derivedPpid = await ensureDerivedSitePpid(slug);
+    await refreshStatus().catch(() => {});
+    if (derivedPpid && isSiteBlocked(slug)) {
+      const result = applyBannedVerifyResult(slug, derivedPpid, 'site_ppid_revoked');
+      log(`${SITE_IDS[slug]} verifier result`, 'site_ppid_revoked (status hydrate, no popup)');
+      setQuickInsight('Enforce', 'This site PPID is banned — use Unban or Clear my bans.');
+      return result;
+    }
+
     // Probe without popups first. Site bans often surface as `revoked` in the
     // bloom filter; autoProvision would open fresh IDV, and a cancel leaves
     // reason=idv_cancelled while the ban remains — hiding Unban.
     if (options.autoProvision !== false && options.freshIdv !== true) {
       const probe = await verifier.checkStatus({ requiredAssurance }).catch(() => null);
       if (probe && (isSiteBanReason(probe.reason) || probe.reason === 'site_blocked')) {
-        const banReason = probe.reason === 'site_blocked'
-          ? 'site_ppid_revoked'
-          : probe.reason;
-        markSessionBan(slug, probe.ppid, banReason);
-        const result = {
-          human: false,
-          ppid: probe.ppid || resolveSitePpid(slug),
-          assurance: probe.assurance || null,
-          presentation: null,
-          reason: banReason,
-          timeMs: probe.timeMs || 0,
-        };
-        state.results[slug] = result;
-        if (result.ppid) state.passkeyPpids[slug] = state.passkeyPpids[slug] || result.ppid;
-        renderSite(slug, result);
-        renderProofReceipt();
-        renderPresentationInspector(slug);
-        renderLifecyclePanel();
-        updateIntegrationLatency();
-        updatePpidCompare();
+        const result = applyBannedVerifyResult(
+          slug,
+          probe.ppid || derivedPpid,
+          probe.reason,
+          { assurance: probe.assurance, timeMs: probe.timeMs },
+        );
         log(`${SITE_IDS[slug]} verifier result`, `${result.reason} (ban probe, no popup)`);
-        await refreshStatus().catch(() => {});
+        setQuickInsight('Enforce', 'This site PPID is banned — use Unban or Clear my bans.');
         return result;
       }
     }
@@ -2236,17 +2278,37 @@
       requiredAssurance,
       ...options,
     });
-    const ppid = await resolveDisplayedPpid(verifier, backend, slug, options, requiredAssurance);
+    const ppid = backend.ppid
+      || await resolveDisplayedPpid(verifier, backend, slug, options, requiredAssurance)
+      || derivedPpid;
     const verified = !!(backend.ok || backend.human);
     let reason = backend.reason;
     if (!verified && (isSiteBanReason(reason) || reason === 'site_blocked')) {
-      reason = reason === 'site_blocked' ? 'site_ppid_revoked' : reason;
-      markSessionBan(slug, ppid, reason);
-    } else if (verified) {
+      const result = applyBannedVerifyResult(slug, ppid, reason, {
+        assurance: backend.assurance,
+        timeMs: backend.timeMs,
+      });
+      log(
+        `${SITE_IDS[slug]} verifier result`,
+        `${result.reason}${result.assurance ? ` · ${result.assurance}` : ''} in ${(result.timeMs || 0).toFixed(1)}ms`,
+      );
+      setQuickInsight('Enforce', 'This site PPID is banned — use Unban or Clear my bans.');
+      await refreshStatus().catch(() => {});
+      return result;
+    }
+    if (verified) {
       clearSessionBan(slug);
     } else if (state.sessionBanFlags[slug] && !isSiteBanReason(reason)) {
       // Keep sticky ban presentation if a later popup cancel masked it.
       reason = state.sessionBanFlags[slug].reason || 'site_ppid_revoked';
+      const result = applyBannedVerifyResult(
+        slug,
+        ppid || state.sessionBanFlags[slug]?.ppid,
+        reason,
+        { assurance: backend.assurance, timeMs: backend.timeMs },
+      );
+      await refreshStatus().catch(() => {});
+      return result;
     }
     const result = {
       human: verified,

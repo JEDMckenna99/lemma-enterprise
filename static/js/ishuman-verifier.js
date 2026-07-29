@@ -934,7 +934,12 @@ class ProofVerifier {
                 refreshReason: 'site_doubt',
             });
             if (!issued.ok) {
-                return this._result(false, null, issued.reason || 'idv_cancelled', t0);
+                return this._result(
+                    false,
+                    issued.detail?.ppid || null,
+                    issued.reason || 'idv_cancelled',
+                    t0,
+                );
             }
             this._markProvisionedMaster();
             return this._applyIssuedSiteProof(issued.detail, t0);
@@ -991,7 +996,12 @@ class ProofVerifier {
                     result = this._result(false, null, 'popup_closed', t0);
                 }
             } else {
-                result = this._result(false, null, issued.reason || 'idv_cancelled', t0);
+                result = this._result(
+                    false,
+                    issued.detail?.ppid || null,
+                    issued.reason || 'idv_cancelled',
+                    t0,
+                );
             }
         }
 
@@ -1052,11 +1062,22 @@ class ProofVerifier {
         const publicReason = ok
             ? result.reason
             : this._normalizePublicSdkReason(result.reason, result.detail || null);
+        // Keep PPID on ban/deny failures so relying sites (and the demo Unban
+        // control) can act on the same site-private id the ceremony just saw.
+        const banOrPolicyDeny = !ok && (
+            publicReason === 'site_ppid_revoked'
+            || publicReason === 'site_ppid_blocked'
+            || publicReason === 'site_blocked'
+            || publicReason === 'revoked'
+            || publicReason === 'doubt_required'
+            || publicReason === 'assurance_insufficient'
+            || publicReason === 'not_ishuman'
+        );
         return {
             ok,
             human: ok,
             presentation: ok ? presentation : null,
-            ppid: ok ? result.ppid : null,
+            ppid: (ok || banOrPolicyDeny) ? (result.ppid || null) : null,
             assurance,
             reason: publicReason,
             timeMs: result.timeMs,
@@ -2160,9 +2181,36 @@ class ProofVerifier {
                         return;
                     }
                     finish({ ok: true, detail });
+                } else if (event.data?.type === 'ISHUMAN_SITE_BANNED') {
+                    // Ban screen posts immediately (before Close). Prefer this
+                    // over a later generic cancel so callers keep the PPID.
+                    state.gotMessage = true;
+                    const detail = event.data.detail || {};
+                    finish({
+                        ok: false,
+                        reason: detail.reason || 'site_ppid_revoked',
+                        detail,
+                    });
                 } else if (event.data?.type === 'ISHUMAN_IDV_CANCELLED') {
                     state.gotMessage = true;
-                    finish({ ok: false, reason: 'idv_cancelled', detail: event.data.detail || null });
+                    const detail = event.data.detail || {};
+                    const banReason = detail.reason || '';
+                    if (
+                        banReason === 'site_ppid_revoked'
+                        || banReason === 'site_ppid_blocked'
+                        || banReason === 'site_blocked'
+                        || banReason === 'revoked'
+                    ) {
+                        finish({
+                            ok: false,
+                            reason: banReason === 'site_blocked' || banReason === 'site_ppid_blocked'
+                                ? 'site_ppid_revoked'
+                                : banReason,
+                            detail,
+                        });
+                        return;
+                    }
+                    finish({ ok: false, reason: 'idv_cancelled', detail });
                 }
             },
         ).then((result) => {
