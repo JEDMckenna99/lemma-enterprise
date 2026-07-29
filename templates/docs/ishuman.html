@@ -1,22 +1,15 @@
 {% extends "docs/layout.html" %}
 {% set active_product = 'ishuman' %}
-{% set active_page = 'ishuman' %}
-{% set hero_title = 'Sign in with lemma.id for developers' %}
-{% set hero_subtitle = 'Passwordless login with passkeys and a site-private PPID as the account key: no usernames, passwords, or emails to store. Step up to presence proof or isHuman (one verified human per account) on the same PPID when an action needs it.' %}
-{% set page_description = 'lemma.id developer docs: add Sign in with lemma.id (passkey login, site-private PPIDs, signed backend presentations), then require presence proof or isHuman step-up per action.' %}
+{% set active_page = 'human-proofs' %}
+{% set hero_title = 'Human proofs & abuse controls' %}
+{% set hero_subtitle = 'The step-up tier on top of Sign in with lemma.id: one verified human per account, action-bound stamps, site blocks, and doubt challenges. Same integration, same site-private PPID, stronger assurance where your policy needs it.' %}
+{% set page_description = 'isHuman step-up docs: require one verified human per account with requiredAssurance ishuman, verify action-bound stamps, and enforce bans with site blocks and doubt challenges.' %}
 
 {% block docs_content %}
 <div class="docs-section" id="quickstart">
-    <h2>Add sign-in in one element</h2>
-    <p>The fastest path is the drop-in button plus one backend route. See the <a href="/docs/integration/QUICK_START_SIMPLE_LOGIN.md">sign-in quickstart</a> for the full walkthrough (sessions, testing, localhost).</p>
-    <div class="code-block">
-        <div class="code-header">
-            <span>HTML</span>
-            <button class="copy-btn">Copy</button>
-        </div>
-        <code>&lt;script src="https://lemma.id/sdk/proof-verifier.js"&gt;&lt;/script&gt;
-&lt;script src="https://lemma.id/sdk/lemma-signin.js"&gt;&lt;/script&gt;
-&lt;lemma-signin site-id="app.example.com"&gt;&lt;/lemma-signin&gt;</code>
+    <div class="callout callout--info">
+        <div class="callout-title">Just adding login?</div>
+        <p>You don't need this page. <a href="{{ url_for('docs_overview') }}">Sign in with lemma.id</a> covers passwordless login end to end and is free. This page is for sites stepping up to human proofs: one verified human per account, bans that survive new-account rotation, and server-side abuse controls.</p>
     </div>
     <h2>What lemma.id gives your site</h2>
     <p><strong>lemma.id</strong> is the continuous identity object your users hold. Your site gets a stable, site-private PPID bound to your user record, not a legal identity, email, document number, or ID that works anywhere else.</p>

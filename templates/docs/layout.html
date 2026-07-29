@@ -62,30 +62,48 @@
                     <a href="/" class="nav-product-link">lemma.id</a>
                 </div>
 
+                {% if active_page == 'human-proofs' %}
                 <div class="nav-section">
                     <div class="nav-title">On this page</div>
-                    <a href="{{ url_for('docs_overview') }}#quickstart" class="nav-link">Quickstart</a>
-                    <a href="{{ url_for('docs_overview') }}#site-registration" class="nav-link">Site registration</a>
-                    <a href="{{ url_for('docs_overview') }}#signup-recipe" class="nav-link">Signup recipe</a>
-                    <a href="{{ url_for('docs_overview') }}#trust-tiers" class="nav-link">Trust tiers</a>
-                    <a href="{{ url_for('docs_overview') }}#signup-trust-recipes" class="nav-link">Signup by tier</a>
-                    <a href="{{ url_for('docs_overview') }}#t2-plus-stamp-action" class="nav-link">T2+ stampAction</a>
-                    <a href="{{ url_for('docs_overview') }}#ppid-convergence" class="nav-link">PPID convergence</a>
-                    <a href="{{ url_for('docs_overview') }}#site-policy" class="nav-link">Site policy</a>
-                    <a href="{{ url_for('docs_overview') }}#assurance-demo" class="nav-link">Assurance demo</a>
-                    <a href="{{ url_for('docs_overview') }}#integration-flow" class="nav-link">Integration flow</a>
-                    <a href="{{ url_for('docs_overview') }}#sdk-integration" class="nav-link">SDK integration</a>
-                    <a href="{{ url_for('docs_overview') }}#attach-to-your-logs" class="nav-link">Audit stamps</a>
-                    <a href="{{ url_for('docs_overview') }}#api-reference" class="nav-link">API reference</a>
-                    <a href="{{ url_for('docs_overview') }}#revocation" class="nav-link">Revocation</a>
-                    <a href="{{ url_for('docs_overview') }}#framework-notes" class="nav-link">Framework notes</a>
-                    <a href="{{ url_for('docs_overview') }}#troubleshooting" class="nav-link">Troubleshooting</a>
+                    <a href="{{ url_for('docs_human_proofs') }}#quickstart" class="nav-link">Overview</a>
+                    <a href="{{ url_for('docs_human_proofs') }}#site-registration" class="nav-link">Site registration</a>
+                    <a href="{{ url_for('docs_human_proofs') }}#signup-recipe" class="nav-link">Signup recipe</a>
+                    <a href="{{ url_for('docs_human_proofs') }}#trust-tiers" class="nav-link">Trust tiers</a>
+                    <a href="{{ url_for('docs_human_proofs') }}#signup-trust-recipes" class="nav-link">Signup by tier</a>
+                    <a href="{{ url_for('docs_human_proofs') }}#t2-plus-stamp-action" class="nav-link">T2+ stampAction</a>
+                    <a href="{{ url_for('docs_human_proofs') }}#ppid-convergence" class="nav-link">PPID convergence</a>
+                    <a href="{{ url_for('docs_human_proofs') }}#site-policy" class="nav-link">Site policy</a>
+                    <a href="{{ url_for('docs_human_proofs') }}#assurance-demo" class="nav-link">Assurance demo</a>
+                    <a href="{{ url_for('docs_human_proofs') }}#integration-flow" class="nav-link">Integration flow</a>
+                    <a href="{{ url_for('docs_human_proofs') }}#sdk-integration" class="nav-link">SDK integration</a>
+                    <a href="{{ url_for('docs_human_proofs') }}#attach-to-your-logs" class="nav-link">Audit stamps</a>
+                    <a href="{{ url_for('docs_human_proofs') }}#api-reference" class="nav-link">API reference</a>
+                    <a href="{{ url_for('docs_human_proofs') }}#revocation" class="nav-link">Revocation</a>
+                    <a href="{{ url_for('docs_human_proofs') }}#framework-notes" class="nav-link">Framework notes</a>
+                    <a href="{{ url_for('docs_human_proofs') }}#troubleshooting" class="nav-link">Troubleshooting</a>
                 </div>
                 <div class="nav-section">
+                    <div class="nav-title">Sign in with lemma.id</div>
+                    <a href="{{ url_for('docs_overview') }}" class="nav-link">← Back to sign-in docs</a>
+                </div>
+                {% else %}
+                <div class="nav-section">
+                    <div class="nav-title">On this page</div>
+                    <a href="{{ url_for('docs_overview') }}#quickstart" class="nav-link">Add sign-in</a>
+                    <a href="{{ url_for('docs_overview') }}#backend-verify" class="nav-link">Verify on your backend</a>
+                    <a href="{{ url_for('docs_overview') }}#sessions" class="nav-link">Sessions</a>
+                    <a href="{{ url_for('docs_overview') }}#sdk-integration" class="nav-link">SDK directly</a>
+                    <a href="{{ url_for('docs_overview') }}#testing" class="nav-link">Local dev &amp; testing</a>
+                    <a href="{{ url_for('docs_overview') }}#troubleshooting" class="nav-link">Troubleshooting</a>
+                    <a href="{{ url_for('docs_overview') }}#faq" class="nav-link">FAQ</a>
+                    <a href="{{ url_for('docs_overview') }}#step-up" class="nav-link">Step up: human proofs</a>
+                </div>
+                {% endif %}
+                <div class="nav-section">
                     <div class="nav-title">Resources</div>
+                    <a href="/docs/integration/QUICK_START_SIMPLE_LOGIN.md" class="nav-link">Sign-in quickstart (full)</a>
                     <a href="/docs/integration/ISHUMAN_AGENT_INTEGRATION.md" class="nav-link">AI agent integration guide</a>
                     <a href="/developer" class="nav-link">Developer hub</a>
-                    <a href="/developer/external-api-keys" class="nav-link">API key manager</a>
                     <a href="/demo" class="nav-link">Live demo</a>
                     <a href="/llms.txt" class="nav-link">llms.txt</a>
                 </div>
@@ -175,123 +193,130 @@ document.addEventListener('DOMContentLoaded', () => {
     
     const docsIndex = [
         {
-            title: 'lemma.id for developers',
+            title: 'Sign in with lemma.id',
             url: '{{ url_for("docs_overview") }}',
             category: 'integration',
-            keywords: 'sign in with lemma.id passwordless login passkey ppid ishuman assurance site block site doubt local verification ed25519 sdk api autoProvision siteId api key no webhook quickstart',
-            excerpt: 'Integrate lemma.id private proofs with the browser SDK, site-private PPIDs, local verification, and optional API-key abuse controls. isHuman is the stronger assurance tier when your policy needs it.'
+            keywords: 'sign in with lemma.id passwordless login passkey ppid account key no password no email free lemma-signin button quickstart',
+            excerpt: 'Add passwordless login: drop in the button, verify a signed presentation on your backend, use the site-private ppid as the account key.'
         },
         {
-            title: '5-minute quickstart',
+            title: 'Add sign-in in one element',
             url: '{{ url_for("docs_overview") }}#quickstart',
             category: 'integration',
-            keywords: 'quickstart siteId verifyForBackend autoProvision ppid signup presentation',
-            excerpt: 'Set siteId, add the verifier SDK, gate sensitive actions, store ppid, optional API key for site blocks.'
+            keywords: 'lemma-signin button quickstart site-id drop-in element login',
+            excerpt: 'The drop-in button handles the popup, passkey, and proof. One backend route completes login.'
         },
         {
-            title: 'Signup recipe (T2)',
-            url: '{{ url_for("docs_overview") }}#signup-recipe',
+            title: 'Verify on your backend',
+            url: '{{ url_for("docs_overview") }}#backend-verify',
             category: 'integration',
-            keywords: 'signup account creation verifyForBackend presentation server verify passkey ishuman',
-            excerpt: 'Verify locally on your backend with a signed presentation. Do not trust a bare ppid from the browser.'
+            keywords: 'backend verify presentation node python npm pip proof-verifier ppid login route session cookie',
+            excerpt: 'Verify the signed presentation locally with the Node or Python verifier, then issue your own session.'
+        },
+        {
+            title: 'Sessions stay yours',
+            url: '{{ url_for("docs_overview") }}#sessions',
+            category: 'integration',
+            keywords: 'session cookie jwt logout protected routes no oauth token',
+            excerpt: 'After the verified login, issue your own session. lemma.id is not in the request path.'
+        },
+        {
+            title: 'SDK directly (custom button)',
+            url: '{{ url_for("docs_overview") }}#sdk-integration',
+            category: 'integration',
+            keywords: 'ProofVerifier verifyForBackend requiredAssurance passkey autoProvision custom button sdk',
+            excerpt: 'Call verifyForBackend with requiredAssurance passkey for custom sign-in UI.'
+        },
+        {
+            title: 'Local development and testing',
+            url: '{{ url_for("docs_overview") }}#testing',
+            category: 'integration',
+            keywords: 'localhost testing test helpers offline mint presentation browser support webauthn prf',
+            excerpt: 'localhost works against the production popup; test helpers mint valid presentations offline.'
+        },
+        {
+            title: 'Sign-in troubleshooting',
+            url: '{{ url_for("docs_overview") }}#troubleshooting',
+            category: 'integration',
+            keywords: 'troubleshooting siteId mismatch no_credential popup blocked revocation_data_untrusted',
+            excerpt: 'Common fixes for hostname mismatch, no_credential, and popup issues.'
+        },
+        {
+            title: 'Sign-in FAQ',
+            url: '{{ url_for("docs_overview") }}#faq',
+            category: 'integration',
+            keywords: 'faq recovery lost device api key free privacy what lemma.id sees ad profile',
+            excerpt: 'Account recovery, why there is no API key, what lemma.id learns, and whether it is free.'
+        },
+        {
+            title: 'Human proofs & abuse controls',
+            url: '{{ url_for("docs_human_proofs") }}',
+            category: 'integration',
+            keywords: 'ishuman human proof step-up sybil one verified human per account ban idv site block doubt assurance',
+            excerpt: 'Step-up tier: one verified human per account on the same PPID, plus site blocks and doubt challenges.'
         },
         {
             title: 'Backend trust tiers',
-            url: '{{ url_for("docs_overview") }}#trust-tiers',
+            url: '{{ url_for("docs_human_proofs") }}#trust-tiers',
             category: 'integration',
             keywords: 'T1 T2 T2+ T3 trust tier presentation stampAction verifyStamp client ppid',
             excerpt: 'T1 client ppid (low-risk only), T2 signed presentation, T2+ stampAction, T3 fresh session proof.'
         },
         {
-            title: 'Signup recipes by trust tier',
-            url: '{{ url_for("docs_overview") }}#signup-trust-recipes',
-            category: 'integration',
-            keywords: 'signup T1 T2 verifyForBackend requiredAssurance ishuman passkey account creation',
-            excerpt: 'T1 for waitlists only, never account creation. T2 uses verifyForBackend with server-side verify.'
-        },
-        {
             title: 'T2+ stampAction',
-            url: '{{ url_for("docs_overview") }}#t2-plus-stamp-action',
+            url: '{{ url_for("docs_human_proofs") }}#t2-plus-stamp-action',
             category: 'integration',
             keywords: 'stampAction verify_action_stamp checkout presale fresh passkey requireFreshPasskey nonce action_assertion',
             excerpt: 'Action-bound stamps for fraud-sensitive mutations: checkout, withdrawals, presale claims.'
         },
         {
             title: 'PPID convergence',
-            url: '{{ url_for("docs_overview") }}#ppid-convergence',
+            url: '{{ url_for("docs_human_proofs") }}#ppid-convergence',
             category: 'integration',
             keywords: 'ppid convergence legacy_ppid provisional wallet merge account rebind',
             excerpt: 'When a provisional wallet completes IDV, merge accounts using ppid_convergence.v1 artifact.'
         },
         {
             title: 'Site policy and isBlockedLocally',
-            url: '{{ url_for("docs_overview") }}#site-policy',
+            url: '{{ url_for("docs_human_proofs") }}#site-policy',
             category: 'integration',
             keywords: 'isBlockedLocally site-block site-doubt doubt_required verifyFreshForBackend policy check enforcement order',
             excerpt: 'Site blocks are not in the global Bloom. Mirror blocks locally and expose via isBlockedLocally.'
         },
         {
-            title: 'Assurance workflow demo',
-            url: '{{ url_for("docs_overview") }}#assurance-demo',
-            category: 'integration',
-            keywords: 'demo passkey ishuman step-up same ppid site block ticketing trials',
-            excerpt: 'Live demo at /demo: passkey wallet, distinct site PPIDs, site-local block, isHuman step-up.'
-        },
-        {
-            title: 'Integration flow',
-            url: '{{ url_for("docs_overview") }}#integration-flow',
-            category: 'integration',
-            keywords: 'integration flow passkey first IDV step-up popup wallet unlock derive-site-proof',
-            excerpt: 'Passkey-first onboarding with optional isHuman step-up; backend verifies presentation locally.'
-        },
-        {
-            title: 'SDK integration',
-            url: '{{ url_for("docs_overview") }}#sdk-integration',
-            category: 'integration',
-            keywords: 'proof-verifier.js ProofVerifier ishuman-verifier.js verify verifyForBackend verifyFreshForBackend stampAction constructor options human assurance reason',
-            excerpt: 'Browser SDK methods, constructor options, verify() result reasons, human vs assurance.'
-        },
-        {
             title: 'Audit stamps and logging',
-            url: '{{ url_for("docs_overview") }}#attach-to-your-logs',
+            url: '{{ url_for("docs_human_proofs") }}#attach-to-your-logs',
             category: 'integration',
             keywords: 'stamp includeCredential verifyStamp audit log getPPID getVerification',
             excerpt: 'Attach verification to your logs with stamp() and re-verify stored stamps on your backend.'
         },
         {
             title: 'API reference',
-            url: '{{ url_for("docs_overview") }}#api-reference',
+            url: '{{ url_for("docs_human_proofs") }}#api-reference',
             category: 'integration',
             keywords: 'api site-block site-unblock site-doubt check bloom-filter verify-presentation derive-site-proof',
             excerpt: 'HTTP endpoints for moderation, site policy, and revocation Bloom snapshot.'
         },
         {
             title: 'Revocation and abuse controls',
-            url: '{{ url_for("docs_overview") }}#revocation',
+            url: '{{ url_for("docs_human_proofs") }}#revocation',
             category: 'integration',
             keywords: 'revocation site-block bloom filter global revoked isBlockedLocally abuse ban doubt',
             excerpt: 'Site blocks via POST /api/ishuman/site-block; global Bloom via GET /api/revocation/bloom-filter.'
         },
         {
             title: 'Framework notes',
-            url: '{{ url_for("docs_overview") }}#framework-notes',
+            url: '{{ url_for("docs_human_proofs") }}#framework-notes',
             category: 'integration',
             keywords: 'React Next.js Vue Nuxt Rails Django PHP framework SSR client component',
             excerpt: 'Adapt the same pattern per stack; keep ProofVerifier in client components only.'
-        },
-        {
-            title: 'Troubleshooting',
-            url: '{{ url_for("docs_overview") }}#troubleshooting',
-            category: 'integration',
-            keywords: 'troubleshooting siteId mismatch no_credential idv_cancelled revocation_data_untrusted blocks',
-            excerpt: 'Common fixes for hostname mismatch, no_credential, blocks not applying, and popup issues.'
         },
         {
             title: 'AI agent integration guide',
             url: '/docs/integration/ISHUMAN_AGENT_INTEGRATION.md',
             category: 'agents',
             keywords: 'ai agent cursor copilot claude coding assistant integration guide ishuman verifyForBackend verifyStamp siteId guardrails checklist',
-            excerpt: 'Machine-oriented guide for AI coding agents integrating isHuman into a developer platform, guardrails, trust tiers, code patterns, and anti-patterns.'
+            excerpt: 'Machine-oriented guide for AI coding agents integrating lemma.id sign-in and isHuman step-up, guardrails, trust tiers, code patterns, and anti-patterns.'
         }
     ];
     

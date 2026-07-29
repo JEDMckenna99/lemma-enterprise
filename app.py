@@ -926,7 +926,12 @@ def create_app():
     # ==================== DOCUMENTATION ====================
     @app.route('/docs')
     def docs_overview():
-        """Public docs entrypoint, lemma.id private proof layer."""
+        """Public docs entrypoint: Sign in with lemma.id (login only)."""
+        return render_template('docs/signin.html')
+
+    @app.route('/docs/human-proofs')
+    def docs_human_proofs():
+        """Step-up docs: isHuman human proofs, stamps, and abuse controls."""
         return render_template('docs/ishuman.html')
 
     @app.route('/docs/agents')
@@ -971,8 +976,8 @@ def create_app():
 
     @app.route('/docs/ishuman')
     def docs_ishuman():
-        """Legacy alias, canonical docs live at /docs."""
-        return redirect(url_for('docs_overview'), code=301)
+        """Legacy alias, isHuman step-up docs live at /docs/human-proofs."""
+        return redirect(url_for('docs_human_proofs'), code=301)
     
     @app.route('/docs/sdk')
     def docs_sdk_js():

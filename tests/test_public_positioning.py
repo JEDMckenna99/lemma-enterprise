@@ -59,6 +59,31 @@ def test_pricing_page_leads_with_free_sign_in(public_client):
     assert "identity check is included" in body or "no separate IDV charge" in body
 
 
+@pytest.mark.integration
+def test_docs_split_sign_in_first(public_client):
+    """/docs is login-only; step-up material lives at /docs/human-proofs."""
+    docs = public_client.get("/docs")
+    body = docs.get_data(as_text=True)
+    assert docs.status_code == 200
+    assert "Sign in with lemma.id" in body
+    assert "lemma-signin" in body
+    assert "requiredAssurance: 'passkey'" in body
+    # Step-up sections must not render on the sign-in page.
+    assert "Global Bloom revocation" not in body
+    assert "What you configure vs what lemma.id runs" not in body
+
+    step_up = public_client.get("/docs/human-proofs")
+    sbody = step_up.get_data(as_text=True)
+    assert step_up.status_code == 200
+    assert "Human proofs" in sbody
+    assert "requiredAssurance: 'ishuman'" in sbody
+    assert "Global Bloom revocation" in sbody
+
+    legacy = public_client.get("/docs/ishuman", follow_redirects=True)
+    assert legacy.status_code == 200
+    assert legacy.request.path == "/docs/human-proofs"
+
+
 @pytest.mark.unit
 def test_index_template_ties_rotation_resistance_to_ishuman():
     index = (ROOT / "templates" / "modern" / "index.html").read_text(encoding="utf-8")
