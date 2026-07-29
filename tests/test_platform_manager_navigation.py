@@ -25,13 +25,14 @@ def test_root_is_home_and_app_is_manager(monkeypatch):
         product = client.get("/home")
 
     assert root.status_code == 200
-    assert b"Stop the same abuser" in root.data
+    assert b"Sign in with lemma.id" in root.data
+    assert b"Passwordless login" in root.data
     assert b"assurance-levels" in root.data
     assert manager.status_code == 200
     assert b'id="create-wallet-btn"' in manager.data
     assert b"Create my lemma.id" in manager.data
     assert product.status_code == 200
-    assert b"Stop the same abuser" in product.data
+    assert b"Passwordless login" in product.data
     assert b"assurance-levels" in product.data
 
 

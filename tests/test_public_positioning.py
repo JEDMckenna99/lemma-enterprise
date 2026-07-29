@@ -1,4 +1,4 @@
-"""Public marketing pages lead with human proofs; lemma.id is the platform layer."""
+"""Public marketing pages lead with Sign in with lemma.id; human proofs are the step-up."""
 
 from __future__ import annotations
 
@@ -22,14 +22,17 @@ def fixture_public_client(monkeypatch):
 
 
 @pytest.mark.integration
-def test_homepage_leads_with_human_proofs(public_client):
+def test_homepage_leads_with_sign_in(public_client):
     resp = public_client.get("/home")
     body = resp.get_data(as_text=True)
     assert resp.status_code == 200
-    assert "Stop the same abuser" in body
-    assert "lemma.id" in body
+    assert "Sign in with lemma.id" in body
+    assert "Passwordless login" in body
+    assert "No user data to store" in body
+    assert "lemma-signin" in body
+    assert "requiredAssurance: 'passkey'" in body
+    # Honest step-up framing stays: passkey tier alone is not Sybil resistance.
     assert "anyone can create another lemma.id" in body
-    assert "requiredAssurance: 'ishuman'" in body
     assert "Revoke everywhere" not in body
     assert "Network revocation" not in body
 
@@ -46,10 +49,12 @@ def test_trust_page_distinguishes_passkey_and_human_proofs(public_client):
 
 
 @pytest.mark.integration
-def test_pricing_page_mentions_human_proof_enforcement(public_client):
+def test_pricing_page_leads_with_free_sign_in(public_client):
     resp = public_client.get("/pricing")
     body = resp.get_data(as_text=True)
     assert resp.status_code == 200
+    assert "Sign-in is free" in body
+    assert "no card required" in body
     assert "human proof" in body.lower()
     assert "identity check is included" in body or "no separate IDV charge" in body
 
