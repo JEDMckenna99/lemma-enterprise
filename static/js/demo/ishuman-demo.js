@@ -270,13 +270,13 @@
       if (!walletReady) return;
 
       updateQuickProgress(1);
-      setQuickInsight('Verify', 'Minting passkey proof on ticketing demo site…');
+      setQuickInsight('Sign in', 'Signing in on the ticketing demo site…');
       setWorkflowHighlight(2);
       scrollToPanel('ih-step-2');
       await verifySite('tickets');
 
       updateQuickProgress(2);
-      setQuickInsight('Verify', 'Same lemma.id, minting a different private ID on trials…');
+      setQuickInsight('Sign in', 'Same lemma.id, signing in on trials with a different private ID…');
       await verifySite('trials');
 
       updateQuickProgress(3);
@@ -1273,7 +1273,7 @@
     }
     const diff = $('ih-ppid-diff');
     if (!diff || !tPpid || !rPpid) {
-      if (diff) diff.textContent = 'Verify both sites';
+      if (diff) diff.textContent = 'Sign in on both sites';
       return;
     }
     diff.textContent = tPpid !== rPpid ? 'Result: different site-private IDs' : 'Result: same ID (unexpected)';
@@ -1349,9 +1349,9 @@
       const ticketsPpid = resolveSitePpid('tickets');
       const trialsPpid = resolveSitePpid('trials');
       if (!ticketsPpid && !trialsPpid) {
-        doubtStatus.textContent = 'Verify both sites above, then enforce on a row.';
+        doubtStatus.textContent = 'Sign in on both sites above, then enforce on a row.';
       } else if (state.localDoubts.tickets?.size || state.localDoubts.trials?.size) {
-        doubtStatus.textContent = 'Active doubt — Verify opens the matching ceremony (presence or humanity). Undoubt clears without verifying.';
+        doubtStatus.textContent = 'Active doubt — Sign in opens the matching ceremony (presence or humanity). Undoubt clears without verifying.';
       } else if (isSiteBlocked('tickets', state.results.tickets) && isSiteVerified(state.results.trials)) {
         doubtStatus.textContent = 'Presale banned; SaaS trial still verified.';
       } else {
@@ -1699,7 +1699,7 @@
         renderWalletSlots();
         updateStepLocks();
         scrollToPanel('ih-step-2');
-        setQuickInsight('Verify', 'lemma.id ready, verify on the two demo sites below.');
+        setQuickInsight('Sign in', 'lemma.id ready — sign in on the two demo sites below.');
       }
     };
     const onMessage = (event) => {
@@ -2093,7 +2093,7 @@
     const label = slug === 'tickets' ? 'Presale' : 'SaaS trial';
     const requiredAssurance = tier === 'ishuman' ? 'ishuman' : 'passkey';
     setQuickInsight(
-      'Verify',
+      'Sign in',
       tier === 'ishuman'
         ? `${label} humanity was doubted — complete fresh human proof…`
         : `${label} requires fresh presence — confirm with passkey…`,
@@ -2184,7 +2184,7 @@
     );
     await refreshStatus();
     setQuickInsight(
-      'Verify',
+      'Sign in',
       tier === 'ishuman'
         ? `${label} humanity re-proven.`
         : `${label} presence confirmed.`,
@@ -2357,12 +2357,12 @@
   }
 
   async function verifyBothSites() {
-    setQuickInsight('Verify', 'Minting site-private proofs for ticketing and trials…');
+    setQuickInsight('Sign in', 'Signing in on ticketing and trials…');
     updateQuickProgress(2);
     await verifySite('tickets');
     await verifySite('trials');
     if (bothSitesVerified()) {
-      setQuickInsight('Verify', 'Same lemma.id, different private IDs on each site.');
+      setQuickInsight('Sign in', 'Same lemma.id, different private IDs on each site.');
       setWorkflowHighlight(2);
       scrollToPanel('ih-step-2');
     }
@@ -2582,7 +2582,7 @@
         'Enforce',
         `${slug === 'tickets' ? 'Presale' : 'SaaS trial'} now requires ${
           tier === 'ishuman' ? 'fresh human proof' : 'fresh presence'
-        }. Verify opens that ceremony; Undoubt clears.`,
+        }. Sign in opens that ceremony; Undoubt clears.`,
       );
     }
     updateBlockResultsTable();
@@ -2628,8 +2628,8 @@
     setQuickInsight(
       'Enforce',
       tier === 'ishuman'
-        ? `${label}: humanity doubted — next Verify opens fresh human proof.`
-        : `${label}: fresh presence required — next Verify opens passkey presence.`,
+        ? `${label}: humanity doubted — next Sign in opens fresh human proof.`
+        : `${label}: fresh presence required — next Sign in opens passkey presence.`,
     );
     await createSiteDoubt(slug, tier, { skipRecheck: true });
   }
@@ -2706,7 +2706,7 @@
     const ppids = await collectUnbanPpids(slug);
     for (const extra of state.localBlocks[slug]) ppids.add(extra);
     if (!ppids.size) {
-      throw new Error(`${slug} PPID unavailable — Verify the site once, then Unban.`);
+      throw new Error(`${slug} PPID unavailable — Sign in on the site once, then Unban.`);
     }
 
     let unblockedAny = false;
@@ -2807,8 +2807,8 @@
     setQuickInsight(
       'Enforce',
       unblockedAny
-        ? `${slug === 'tickets' ? 'Presale' : 'SaaS trial'} unbanned. Click Verify to mint a fresh site proof.`
-        : `Ban rows cleared for ${slug}. Click Verify to continue.`,
+        ? `${slug === 'tickets' ? 'Presale' : 'SaaS trial'} unbanned. Click Sign in to mint a fresh site proof.`
+        : `Ban rows cleared for ${slug}. Click Sign in to continue.`,
     );
   }
 
@@ -2882,14 +2882,14 @@
     await forceVerifierBloomRefresh('trials');
     updateBlockResultsTable();
     if (!batch?.lifted_any && !allPpids.size) {
-      setQuickInsight('Enforce', 'No active demo bans found. Click Verify to continue.');
+      setQuickInsight('Enforce', 'No active demo bans found. Click Sign in to continue.');
       return;
     }
     setQuickInsight(
       'Enforce',
       batch?.lifted_any
-        ? 'Demo bans cleared on both sites. Click Verify to mint a fresh site proof.'
-        : 'Clear requested, but no matching ban rows were lifted. Try Verify — if still banned, refresh and Clear my bans again.',
+        ? 'Demo bans cleared on both sites. Click Sign in to mint a fresh site proof.'
+        : 'Clear requested, but no matching ban rows were lifted. Try Sign in — if still banned, refresh and Clear my bans again.',
     );
   }
 

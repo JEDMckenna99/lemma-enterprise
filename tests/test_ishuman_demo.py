@@ -46,7 +46,7 @@ def test_ishuman_demo_page_loads_expected_assets(ishuman_demo_client):
     assert 'id="ih-advanced-panel"' in body
     assert "Developer view: operator tools &amp; integrator reference" in body
     assert "Create your lemma.id" in body
-    assert "Verify on demo sites" in body
+    assert "Sign in on the demo sites" in body
     assert "Enforce" in body
     assert "ih-enforce-rows" in body
     assert "ih-enforce-trials-ppid" in body
@@ -203,7 +203,7 @@ def test_ishuman_demo_page_loads_expected_assets(ishuman_demo_client):
     assert 'data-quick-act="4"' not in body
     assert 'data-quick-act="5"' not in body
     assert ">Create</div>" in body
-    assert ">Verify</div>" in body
+    assert ">Sign in</div>" in body
     assert ">Enforce</div>" in body
     human_start = body.index('id="ih-step-human"')
     adv_start = body.index('id="ih-advanced-panel"')

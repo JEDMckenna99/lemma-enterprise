@@ -1,8 +1,8 @@
 {% extends "modern/layout.html" %}
 {% set is_public_page = true %}
 
-{% block title %}lemma.id demo | one lemma.id, a private ID on every site{% endblock %}
-{% block description %}Interactive demo: create a passkey-protected lemma.id, mint private IDs on two demo sites, place site-scoped blocks, and step up to human proofs to see how bans stick to a person instead of an account.{% endblock %}
+{% block title %}lemma.id demo | Sign in with lemma.id in action{% endblock %}
+{% block description %}Interactive demo: sign in with a passkey-protected lemma.id on two demo sites and get a different private ID on each. Then step up to human proofs and site-scoped blocks to see how bans stick to a person instead of an account.{% endblock %}
 
 {% block head %}
 {{ super() }}
@@ -30,7 +30,7 @@
       <img class="demo-hero-logo" src="/static/img/lemma_logo.svg" alt="lemma.id" width="56" height="56">
       <p class="demo-eyebrow">lemma.id demo</p>
       <h1 class="demo-title">One lemma.id. A different private ID on every site.</h1>
-      <p class="demo-lead" id="ih-intro-lead"><strong>Create</strong> a passkey-protected lemma.id on your device. <strong>Verify</strong> on demo sites to get a different private ID on each one — sites can't link them. <strong>Enforce</strong> policy per site: doubt a user, raise assurance, or ban. Proofs stay on your device; sites verify offline.</p>
+      <p class="demo-lead" id="ih-intro-lead"><strong>Create</strong> a passkey-protected lemma.id on your device. <strong>Sign in</strong> on two demo sites and get a different private ID on each one — sites can't link them. <strong>Enforce</strong> is the step-up: doubt a user, require human proof, or ban. Proofs stay on your device; sites verify offline.</p>
       <div class="demo-hero-cta">
         <button class="demo-btn demo-btn-primary" id="ih-get-started" type="button">Get started</button>
         <a class="demo-btn demo-btn-secondary demo-btn-outline" href="/developer">View developer docs</a>
@@ -141,7 +141,7 @@
 
   <nav class="demo-progress" id="ih-quick-progress" aria-label="Demo progress">
     <div class="demo-progress-item is-active" data-quick-act="1">Create</div>
-    <div class="demo-progress-item" data-quick-act="2">Verify</div>
+    <div class="demo-progress-item" data-quick-act="2">Sign in</div>
     <div class="demo-progress-item" data-quick-act="3">Enforce</div>
   </nav>
 
@@ -244,7 +244,7 @@
 
           <div class="demo-step1-action" id="ih-step1-action">
             <div class="demo-ready-banner" id="ih-step1-continue-banner" hidden>
-              <span>Your lemma.id is ready. Verify on the two sites below.</span>
+              <span>Your lemma.id is ready. Sign in on the two sites below.</span>
             </div>
             <button class="demo-btn demo-btn-primary" id="ih-step1-primary-btn" type="button" data-action="create">Create a lemma.id</button>
           </div>
@@ -266,14 +266,14 @@
       <div class="workflow-body">
         <div class="workflow-head" id="ih-demo-cockpit">
           <div>
-            <h2 id="ih-step2-title">Verify on demo sites</h2>
-            <p class="demo-muted" id="ih-step2-desc">Each site declares the assurance it requires. Your lemma.id mints a site-private proof and the site verifies it offline. Same wallet, different private ID on every hostname.</p>
+            <h2 id="ih-step2-title">Sign in on the demo sites</h2>
+            <p class="demo-muted" id="ih-step2-desc">This is what the Sign in with lemma.id button does on a real site: each site declares the assurance it requires, your lemma.id mints a site-private proof, and the site verifies it offline. Same wallet, different private ID on every hostname.</p>
           </div>
         </div>
 
         <div class="step-utility demo-advanced-copy" id="ih-step2-utility" hidden>
           <strong>Why this step</strong>
-          <p>This is the whole integrator loop: the site declares the assurance it requires, your lemma.id mints a site-private proof, and the site verifies it offline. Neither site sees your real identity, and neither can see the other site's ID.</p>
+          <p>This is the whole integrator loop: the site declares the assurance it requires, your lemma.id mints a site-private proof, and the site verifies it offline. Neither site sees your real identity, and neither can see the other site's ID. On a production site this is the drop-in <code>&lt;lemma-signin&gt;</code> element plus one backend verify route.</p>
         </div>
 
         <div class="site-cards">
@@ -309,7 +309,7 @@
             </div>
             <div class="site-card-actions">
               <a class="demo-site-open-link" id="ih-link-tickets-tour" href="#" target="_blank" rel="noopener">Walk presale defenses →</a>
-              <button class="demo-btn demo-btn-secondary demo-btn-quiet demo-site-verify-btn" id="ih-verify-tickets-step2" type="button">Verify</button>
+              <button class="demo-btn demo-btn-secondary demo-btn-quiet demo-site-verify-btn" id="ih-verify-tickets-step2" type="button">Sign in</button>
             </div>
           </article>
 
@@ -343,7 +343,7 @@
             </div>
             <div class="site-card-actions">
               <a class="demo-site-open-link" id="ih-link-trials-step2" href="#" target="_blank" rel="noopener">Open trials demo →</a>
-              <button class="demo-btn demo-btn-secondary demo-btn-quiet demo-site-verify-btn" id="ih-verify-trials-step2" type="button">Verify</button>
+              <button class="demo-btn demo-btn-secondary demo-btn-quiet demo-site-verify-btn" id="ih-verify-trials-step2" type="button">Sign in</button>
             </div>
           </article>
         </div>
@@ -356,7 +356,7 @@
                 <span class="result-label">Ticketing</span>
                 <span class="ppid-val" id="ih-tickets-ppid-compare">—</span>
               </div>
-              <div class="ppid-diff" id="ih-ppid-diff">Verify both sites</div>
+              <div class="ppid-diff" id="ih-ppid-diff">Sign in on both sites</div>
               <div class="ppid-slot">
                 <span class="result-label">Trials</span>
                 <span class="ppid-val" id="ih-trials-ppid-compare">—</span>
@@ -382,7 +382,7 @@
               <button class="demo-presentation-tab" id="ih-presentation-tab-trials" type="button" data-slug="trials" aria-pressed="false">Trials</button>
             </div>
             <div class="demo-presentation-inspector" id="ih-presentation-inspector">
-              <p class="demo-muted" id="ih-presentation-empty">Verify both sites to inspect their presentations here.</p>
+              <p class="demo-muted" id="ih-presentation-empty">Sign in on both sites to inspect their presentations here.</p>
               <dl class="demo-presentation-fields" id="ih-presentation-fields" hidden></dl>
               <details class="demo-presentation-raw" id="ih-presentation-raw-wrap" hidden>
                 <summary>View complete presentation JSON</summary>
@@ -392,7 +392,7 @@
           </details>
 
         <div class="demo-moment-cta">
-          <button class="demo-btn demo-btn-primary" id="ih-verify-sites-btn" type="button">Verify both sites</button>
+          <button class="demo-btn demo-btn-primary" id="ih-verify-sites-btn" type="button">Sign in on both sites</button>
         </div>
       </div>
     </section>
@@ -406,7 +406,7 @@
         <div class="workflow-head">
           <div>
             <h2 id="ih-block-step-title">Enforce</h2>
-            <p class="demo-muted">Each site decides on its private ID, doubt for a fresh proof, or ban. Scoped per site: action on presale does not affect SaaS trial.</p>
+            <p class="demo-muted">The step-up tier on the same private ID: each site decides — doubt for a fresh proof, require human proof, or ban. Scoped per site: action on presale does not affect SaaS trial.</p>
           </div>
         </div>
 
@@ -436,7 +436,7 @@
             </div>
           </article>
         </div>
-        <p class="demo-muted enforce-footnote" id="ih-doubt-status">Verify both sites above, then enforce on a row.</p>
+        <p class="demo-muted enforce-footnote" id="ih-doubt-status">Sign in on both sites above, then enforce on a row.</p>
         <p class="demo-muted enforce-footnote">
           Stuck banned?
           <button type="button" class="enforce-chip enforce-chip--quiet" id="ih-clear-my-bans-btn">Clear my bans</button>
@@ -523,14 +523,14 @@
   <section class="demo-outcome-footer">
     <img src="/static/img/lemma_logo.svg" alt="" width="56" height="56" class="demo-outcome-logo">
     <div class="demo-outcome-footer-body">
-      <h2 class="demo-outcome-footer-title">Create · Verify · Enforce</h2>
+      <h2 class="demo-outcome-footer-title">Create · Sign in · Enforce</h2>
       <div class="demo-outcome-grid">
         <article class="demo-outcome-item">
           <h3>Create</h3>
           <p>A passkey-protected lemma.id on your device. Continuity only at first, not a document vault, not proof of unique humanness.</p>
         </article>
         <article class="demo-outcome-item">
-          <h3>Verify</h3>
+          <h3>Sign in</h3>
           <p>Same lemma.id, different private ID per site. Signed presentations your backend verifies offline, unlinkable across relying parties.</p>
         </article>
         <article class="demo-outcome-item">
