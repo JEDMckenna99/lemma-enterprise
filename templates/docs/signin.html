@@ -146,6 +146,8 @@ def login():
     <h2>FAQ</h2>
     <h3>How do users recover their account?</h3>
     <p>A lemma.id lives with the user, secured by device passkeys. Users should enroll it on more than one device (phone plus laptop); any enrolled device signs them back in. Passkeys synced through iCloud Keychain or Google Password Manager survive a lost device. There is no password reset because there is no password, and no recovery email because you never collected one.</p>
+    <h3>What happens if I change my domain?</h3>
+    <p>Account IDs are derived from your hostname, so <code>app.oldname.com</code> and <code>app.newname.com</code> produce different IDs for the same person. There is deliberately no "remap my users" API: an endpoint like that would let sites correlate users across hostnames, which the per-site privacy design exists to prevent. Pick your canonical hostname before launch and keep it stable. If you do migrate, run both domains for a window and link accounts yourself: the user signs in on the old domain, your site hands them to the new domain with your own short-lived token, they sign in there too, and your backend, now holding both IDs in one authenticated session, links the rows and carries over any bans or roles. See the <a href="/docs/integration/QUICK_START_SIMPLE_LOGIN.md">quickstart</a> for the full recipe.</p>
     <h3>Why is there no API key?</h3>
     <p>Login verification is cryptographic, not permissioned: your backend checks a signed presentation bound to your hostname against a published trust snapshot. An API key would add a secret to leak without adding security. Keys exist only for the optional server-side abuse APIs (PPID blocks), which sign-in doesn't need.</p>
     <h3>What does lemma.id learn about my users?</h3>

@@ -136,6 +136,35 @@ Fail closed when `ok` is false. Never trust a bare client `ppid` on signup/login
 - `siteId` defaults to the page hostname. All `localhost` ports collapse to binding `localhost`.
 - Hostname mismatch between browser SDK and backend verifier is **warn-only** in dev; align both to the same canonical hostname in production.
 - Supported pattern: production lemma.id popup + local relying site (e.g. `http://localhost:5050` with `siteId: 'localhost'`).
+- `localhost` is a **development-only binding**: every localhost app shares the same
+  per-user PPID and accepts each other's presentations, so it provides neither
+  pairwise privacy nor replay isolation. Never ship a product bound to `localhost`;
+  note that `127.0.0.1` is a different binding than `localhost`.
+
+---
+
+## Choosing (and changing) your siteId
+
+Your `siteId` is your account keyspace: PPIDs are derived from it, so pick the
+canonical hostname deliberately before launch (apex vs `app.` subdomain; `www.` is
+stripped) and keep it stable.
+
+**If you later change domains, every user derives a new PPID on the new hostname.**
+There is deliberately no "remap my users" API — such an endpoint would let sites
+correlate users across hostnames, which the pairwise design exists to prevent.
+Migrate by linking accounts yourself during a dual-run window:
+
+1. Keep the old domain serving during the migration window.
+2. User signs in on the old domain (old PPID). Your site issues its own short-lived,
+   signed handoff token and redirects to the new domain.
+3. The new domain accepts the handoff token **and** runs Sign in with lemma.id there
+   (new PPID). Your backend now holds both PPIDs in one authenticated context and
+   links the account rows.
+4. Carry over any site-scoped state (bans, roles) during the link, then retire the
+   old binding once traffic drains.
+
+No lemma.id involvement is needed: the linkage happens inside the one party entitled
+to know both IDs.
 
 ---
 
