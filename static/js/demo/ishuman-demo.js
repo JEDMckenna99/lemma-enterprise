@@ -93,6 +93,9 @@
     presentationSlug: 'tickets',
     lastPopupIssueMode: null,
     pendingDoubtResolve: { tickets: 'passkey', trials: 'passkey' },
+    // Sticky ban flags survive popup-cancel / idv_cancelled so Unban stays available
+    // even when the latest verify reason no longer says site_ppid_revoked.
+    sessionBanFlags: { tickets: null, trials: null },
   };
 
   function $(id) {
@@ -588,13 +591,29 @@
       resolveSitePpid(slug),
       state.results[slug]?.ppid,
       state.passkeyPpids[slug],
+      state.sessionBanFlags[slug]?.ppid,
     ].filter(Boolean));
+  }
+
+  function markSessionBan(slug, ppid, reason) {
+    const banReason = reason === 'site_blocked' ? 'site_ppid_revoked' : (reason || 'site_ppid_revoked');
+    state.sessionBanFlags[slug] = {
+      ppid: ppid || null,
+      reason: banReason,
+      at: Date.now(),
+    };
+    if (ppid) state.localBlocks[slug].add(ppid);
+  }
+
+  function clearSessionBan(slug) {
+    state.sessionBanFlags[slug] = null;
   }
 
   function isSiteBlocked(slug, result = null) {
     // Only this session's site PPIDs count. Demo /status returns every active
     // ban on the shared demo sites — treating localBlocks.size as blocked left
     // visitors stuck in a red Ban/Unban state from other users' residue.
+    if (state.sessionBanFlags[slug]) return true;
     const known = knownSitePpids(slug, result);
     if (!known.size) return false;
     for (const ppid of known) {
@@ -612,10 +631,45 @@
   }
 
   function shouldShowUnban(slug, result = null) {
-    // Button/toggle follow localBlocks first. If local state was lost but the
-    // last verify still reports a ban reason, keep Unban available so the
-    // authenticated clear can run.
-    return isSiteBlocked(slug, result) || isSiteBanReason(result?.reason);
+    // Keep Unban available for sticky session bans, live localBlocks, or the
+    // last verify ban reason — even after a later popup cancel masks the reason.
+    return !!state.sessionBanFlags[slug]
+      || isSiteBlocked(slug, result)
+      || isSiteBanReason(result?.reason);
+  }
+
+  function clearClientBloomCaches() {
+    try { localStorage.removeItem('ishuman_bloom'); } catch (_) { /* ignore */ }
+    try {
+      const keys = [];
+      for (let i = 0; i < localStorage.length; i += 1) {
+        const key = localStorage.key(i);
+        if (key && key.startsWith('lemma:bloom-snapshot:')) keys.push(key);
+      }
+      for (const key of keys) localStorage.removeItem(key);
+    } catch (_) { /* ignore */ }
+  }
+
+  async function collectUnbanPpids(slug) {
+    const ppids = knownSitePpids(slug);
+    try {
+      if (!state.wallet) await initWallet();
+      if (state.wallet?.derivePPID) {
+        const derived = await state.wallet.derivePPID(SITE_IDS[slug]);
+        if (derived) ppids.add(derived);
+      }
+    } catch (_) { /* derive optional */ }
+    try {
+      const probe = await verifierFor(slug).checkStatus({
+        requiredAssurance: demoRequiredAssurance(slug),
+        autoProvision: false,
+      });
+      if (probe?.ppid) ppids.add(probe.ppid);
+      if (isSiteBanReason(probe?.reason) || probe?.reason === 'site_blocked') {
+        markSessionBan(slug, probe.ppid, probe.reason);
+      }
+    } catch (_) { /* probe optional */ }
+    return ppids;
   }
 
   function formatBlockResult(slug, result) {
@@ -1825,6 +1879,7 @@
     for (const slug of SITE_SLUGS) state.localBlocks[slug].clear();
     for (const slug of SITE_SLUGS) state.localDoubts[slug].clear();
     state.pendingDoubtResolve = { tickets: 'passkey', trials: 'passkey' };
+    state.sessionBanFlags = { tickets: null, trials: null };
 
     const wid = $('ih-wallet-id');
     if (wid) wid.textContent = '-';
@@ -2143,6 +2198,39 @@
 
     const requiredAssurance = demoRequiredAssurance(slug, options);
     const verifier = verifierFor(slug, { requiredAssurance });
+
+    // Probe without popups first. Site bans often surface as `revoked` in the
+    // bloom filter; autoProvision would open fresh IDV, and a cancel leaves
+    // reason=idv_cancelled while the ban remains — hiding Unban.
+    if (options.autoProvision !== false && options.freshIdv !== true) {
+      const probe = await verifier.checkStatus({ requiredAssurance }).catch(() => null);
+      if (probe && (isSiteBanReason(probe.reason) || probe.reason === 'site_blocked')) {
+        const banReason = probe.reason === 'site_blocked'
+          ? 'site_ppid_revoked'
+          : probe.reason;
+        markSessionBan(slug, probe.ppid, banReason);
+        const result = {
+          human: false,
+          ppid: probe.ppid || resolveSitePpid(slug),
+          assurance: probe.assurance || null,
+          presentation: null,
+          reason: banReason,
+          timeMs: probe.timeMs || 0,
+        };
+        state.results[slug] = result;
+        if (result.ppid) state.passkeyPpids[slug] = state.passkeyPpids[slug] || result.ppid;
+        renderSite(slug, result);
+        renderProofReceipt();
+        renderPresentationInspector(slug);
+        renderLifecyclePanel();
+        updateIntegrationLatency();
+        updatePpidCompare();
+        log(`${SITE_IDS[slug]} verifier result`, `${result.reason} (ban probe, no popup)`);
+        await refreshStatus().catch(() => {});
+        return result;
+      }
+    }
+
     const backend = await verifier.verifyForBackend({
       autoProvision: true,
       requiredAssurance,
@@ -2150,12 +2238,22 @@
     });
     const ppid = await resolveDisplayedPpid(verifier, backend, slug, options, requiredAssurance);
     const verified = !!(backend.ok || backend.human);
+    let reason = backend.reason;
+    if (!verified && (isSiteBanReason(reason) || reason === 'site_blocked')) {
+      reason = reason === 'site_blocked' ? 'site_ppid_revoked' : reason;
+      markSessionBan(slug, ppid, reason);
+    } else if (verified) {
+      clearSessionBan(slug);
+    } else if (state.sessionBanFlags[slug] && !isSiteBanReason(reason)) {
+      // Keep sticky ban presentation if a later popup cancel masked it.
+      reason = state.sessionBanFlags[slug].reason || 'site_ppid_revoked';
+    }
     const result = {
       human: verified,
-      ppid: ppid || resolveSitePpid(slug),
+      ppid: ppid || resolveSitePpid(slug) || state.sessionBanFlags[slug]?.ppid || null,
       assurance: backend.assurance,
       presentation: backend.presentation,
-      reason: backend.reason,
+      reason,
       timeMs: backend.timeMs || 0,
     };
     state.results[slug] = result;
@@ -2309,7 +2407,7 @@
         reason: `Demo block: automated behavior detected on ${slug}`,
       }),
     });
-    state.localBlocks[slug].add(ppid);
+    markSessionBan(slug, ppid, 'site_ppid_revoked');
     clearVerifierCache(slug);
     if (window.IsHumanVerifier && window.IsHumanVerifier.broadcastBlockUpdate) {
       window.IsHumanVerifier.broadcastBlockUpdate({
@@ -2524,54 +2622,67 @@
   }
 
   async function unblockSite(slug) {
-    await ensureSitePpid(slug);
-    const known = knownSitePpids(slug);
-    // Clear this session's PPIDs. Also clear any stale localBlocks residue so a
-    // prior shared-demo hydrate cannot keep Unban looping forever.
-    const ppids = new Set([
-      ...known,
-      ...state.localBlocks[slug],
-    ].filter(Boolean));
+    const ppids = await collectUnbanPpids(slug);
+    for (const extra of state.localBlocks[slug]) ppids.add(extra);
     if (!ppids.size) {
       throw new Error(`${slug} PPID unavailable — Verify the site once, then Unban.`);
     }
 
     let unblockedAny = false;
     const errors = [];
-    for (const ppid of ppids) {
-      try {
-        const payload = await requestJson('/api/demo/ishuman/site-unblock', {
-          method: 'POST',
-          body: JSON.stringify({ site_slug: slug, ppid }),
-        });
-        if (payload?.unblocked !== false || payload?.lifted || payload?.success) {
-          unblockedAny = true;
+    // One-shot clear across both demo sites for every known PPID so a mismatch
+    // between tickets/trials or sticky bloom rows cannot strand the visitor.
+    try {
+      const batch = await requestJson('/api/demo/ishuman/clear-bans', {
+        method: 'POST',
+        body: JSON.stringify({
+          ppids: [...ppids],
+          site_slugs: SITE_SLUGS,
+        }),
+      });
+      unblockedAny = !!(batch?.lifted_any || (batch?.cleared || []).some((row) => row.lifted));
+    } catch (err) {
+      errors.push(err?.message || String(err));
+      for (const ppid of ppids) {
+        try {
+          const payload = await requestJson('/api/demo/ishuman/site-unblock', {
+            method: 'POST',
+            body: JSON.stringify({ site_slug: slug, ppid }),
+          });
+          if (payload?.unblocked !== false || payload?.lifted || payload?.success) {
+            unblockedAny = true;
+          }
+        } catch (inner) {
+          errors.push(inner?.message || String(inner));
         }
-        state.localBlocks[slug].delete(ppid);
-      } catch (err) {
-        errors.push(err?.message || String(err));
       }
     }
-    // Drop any remaining non-session residue from the shared demo status feed.
-    state.localBlocks[slug].clear();
-    // Clear ban presentation immediately so Unban cannot flip back to Ban
-    // while a stale bloom/session reason still says site_ppid_revoked.
-    if (state.results[slug]) {
-      state.results[slug] = {
-        ...state.results[slug],
-        human: false,
-        reason: 'unblocked',
-      };
-      renderSite(slug, state.results[slug]);
+
+    for (const siteSlug of SITE_SLUGS) {
+      state.localBlocks[siteSlug].clear();
+      clearSessionBan(siteSlug);
+      clearVerifierCache(siteSlug);
+      if (state.results[siteSlug]) {
+        state.results[siteSlug] = {
+          ...state.results[siteSlug],
+          human: false,
+          reason: 'unblocked',
+        };
+        renderSite(siteSlug, state.results[siteSlug]);
+      }
     }
+    clearClientBloomCaches();
+
     if (window.IsHumanVerifier?.broadcastBlockUpdate) {
-      for (const ppid of known.size ? known : ppids) {
-        window.IsHumanVerifier.broadcastBlockUpdate({
-          type: 'SITE_BLOCK_UPDATE',
-          siteId: SITE_IDS[slug],
-          ppid,
-          reason: 'demo_site_unblock',
-        });
+      for (const siteSlug of SITE_SLUGS) {
+        for (const ppid of ppids) {
+          window.IsHumanVerifier.broadcastBlockUpdate({
+            type: 'SITE_BLOCK_UPDATE',
+            siteId: SITE_IDS[siteSlug],
+            ppid,
+            reason: 'demo_site_unblock',
+          });
+        }
       }
     }
 
@@ -2582,7 +2693,6 @@
       await forceVerifierBloomRefresh('tickets');
       await forceVerifierBloomRefresh('trials');
       await refreshStatus().catch(() => {});
-      // Do not auto-open popups during Unban; only refresh local decisions.
       await verifySite('tickets', { autoProvision: false, resolveDoubt: false });
       await verifySite('trials', { autoProvision: false, resolveDoubt: false });
       for (const siteSlug of SITE_SLUGS) {
@@ -2595,6 +2705,7 @@
             ...state.results[siteSlug],
             reason: 'unblocked',
           };
+          clearSessionBan(siteSlug);
           renderSite(siteSlug, state.results[siteSlug]);
         }
       }
@@ -2608,7 +2719,7 @@
       throw new Error(errors[0] || 'Unban failed');
     }
     setQuickInsight('Enforce', unblockedAny
-      ? `${slug === 'tickets' ? 'Presale' : 'SaaS trial'} unbanned, ban again anytime to retry.`
+      ? `${slug === 'tickets' ? 'Presale' : 'SaaS trial'} unbanned (both demo sites cleared).`
       : `No active ban on ${slug}, both sites rechecked.`);
   }
 
@@ -2625,6 +2736,24 @@
     updateBlockResultsTable();
     try {
       await ensureSitePpid(slug);
+      // Re-probe before deciding — a masked idv_cancelled must not re-ban.
+      try {
+        const probe = await verifierFor(slug).checkStatus({
+          requiredAssurance: demoRequiredAssurance(slug),
+        });
+        if (probe && (isSiteBanReason(probe.reason) || probe.reason === 'site_blocked')) {
+          markSessionBan(slug, probe.ppid, probe.reason);
+          if (state.results[slug]) {
+            state.results[slug] = {
+              ...state.results[slug],
+              ppid: probe.ppid || state.results[slug].ppid,
+              human: false,
+              reason: probe.reason === 'site_blocked' ? 'site_ppid_revoked' : probe.reason,
+            };
+          }
+        }
+      } catch (_) { /* probe optional */ }
+      updateBlockResultsTable();
       if (shouldShowUnban(slug, state.results[slug])) {
         await unblockSite(slug);
       } else {
@@ -2639,6 +2768,37 @@
       syncBlockSegToggle();
       updateBlockResultsTable();
     }
+  }
+
+  async function clearMyDemoBans() {
+    setQuickInsight('Enforce', 'Clearing demo bans for your lemma.id…');
+    const allPpids = new Set();
+    for (const slug of SITE_SLUGS) {
+      for (const ppid of await collectUnbanPpids(slug)) allPpids.add(ppid);
+    }
+    if (!allPpids.size) {
+      throw new Error('No site PPID found yet. Verify a demo site once, then clear bans.');
+    }
+    await requestJson('/api/demo/ishuman/clear-bans', {
+      method: 'POST',
+      body: JSON.stringify({ ppids: [...allPpids], site_slugs: SITE_SLUGS }),
+    });
+    clearClientBloomCaches();
+    for (const slug of SITE_SLUGS) {
+      state.localBlocks[slug].clear();
+      clearSessionBan(slug);
+      clearVerifierCache(slug);
+      if (state.results[slug]) {
+        state.results[slug] = { ...state.results[slug], human: false, reason: 'unblocked' };
+        renderSite(slug, state.results[slug]);
+      }
+    }
+    await forceVerifierBloomRefresh('tickets');
+    await forceVerifierBloomRefresh('trials');
+    await verifySite('tickets', { autoProvision: false, resolveDoubt: false });
+    await verifySite('trials', { autoProvision: false, resolveDoubt: false });
+    updateBlockResultsTable();
+    setQuickInsight('Enforce', 'Demo bans cleared for your lemma.id on both sites.');
   }
 
   async function forceFreshIdv() {
@@ -3049,6 +3209,7 @@
       if (known.size && !known.has(block.ppid)) continue;
       if (!known.size) continue;
       state.localBlocks[slug].add(block.ppid);
+      markSessionBan(slug, block.ppid, block.reason || 'site_ppid_revoked');
     }
     for (const doubt of payload.site_doubts || []) {
       const slug = siteIdToSlug[doubt.site_id];
@@ -3226,6 +3387,7 @@
     bind('ih-doubt-tickets-human-btn', () => toggleSiteDoubt('tickets', 'ishuman'));
     bind('ih-doubt-trials-presence-btn', () => toggleSiteDoubt('trials', 'passkey'));
     bind('ih-doubt-trials-human-btn', () => toggleSiteDoubt('trials', 'ishuman'));
+    bind('ih-clear-my-bans-btn', clearMyDemoBans);
     const blockBtn = $('ih-abuse-block-btn');
     const trialsBanBtn = $('ih-trials-ban-btn');
     if (blockBtn) {

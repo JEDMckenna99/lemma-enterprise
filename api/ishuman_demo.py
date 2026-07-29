@@ -692,6 +692,86 @@ def ishuman_demo_site_unblock():
         db.close()
 
 
+@ishuman_demo_bp.route("/api/demo/ishuman/clear-bans", methods=["POST"])
+def ishuman_demo_clear_bans():
+    """Clear SiteBlock + site PPID revocations for one or more demo PPIDs.
+
+    Public demo recovery path (same availability as site-block / site-unblock).
+    Accepts ``ppids`` and optional ``site_slugs`` (defaults to both demo sites).
+    """
+    from api.database import SessionLocal
+    from api.rate_limiter import check_rate_limit
+    from api.site_ppid_revocation import clear_site_bound_ppid
+
+    body = request.get_json(silent=True) or {}
+    raw_ppids = body.get("ppids") or []
+    if isinstance(raw_ppids, str):
+        raw_ppids = [raw_ppids]
+    if not isinstance(raw_ppids, list) or not raw_ppids:
+        single = (body.get("ppid") or "").strip()
+        raw_ppids = [single] if single else []
+    ppids = []
+    seen = set()
+    for item in raw_ppids:
+        ppid = str(item or "").strip()
+        if not ppid or ppid in seen:
+            continue
+        seen.add(ppid)
+        ppids.append(ppid)
+        if len(ppids) >= 20:
+            break
+    if not ppids:
+        return jsonify({"success": False, "error": "ppids required"}), 400
+
+    raw_slugs = body.get("site_slugs") or list(DEMO_SITES.keys())
+    if isinstance(raw_slugs, str):
+        raw_slugs = [raw_slugs]
+    slugs = []
+    for item in raw_slugs:
+        slug = str(item or "").strip().lower()
+        if slug in DEMO_SITES and slug not in slugs:
+            slugs.append(slug)
+
+    ip_key = (request.remote_addr or "unknown").strip()
+    if not check_rate_limit(f"demo_clear_bans:{ip_key}", 30, 3600):
+        return jsonify({"success": False, "error": "rate_limited"}), 429
+
+    ensure_demo_sites()
+    cleared = []
+    db = SessionLocal()
+    try:
+        for slug in slugs:
+            _spec, site = _site_for_slug(slug)
+            if not site:
+                continue
+            for ppid in ppids:
+                result = clear_site_bound_ppid(
+                    db,
+                    site_id=site.site_id,
+                    ppid=ppid,
+                    cleared_by=site.admin_email or "demo",
+                )
+                cleared.append({
+                    "site_slug": slug,
+                    "site_id": site.site_id,
+                    "ppid": ppid,
+                    "lifted": bool(result.get("lifted")),
+                    "blocks_deactivated": result.get("blocks_deactivated", 0),
+                    "revocations_cleared": result.get("revocations_cleared", 0),
+                    "bloom_rebuilt": bool(result.get("bloom_rebuilt")),
+                })
+        return jsonify({
+            "success": True,
+            "cleared": cleared,
+            "lifted_any": any(row.get("lifted") for row in cleared),
+        })
+    except Exception:
+        db.rollback()
+        raise
+    finally:
+        db.close()
+
+
 @ishuman_demo_bp.route("/api/demo/ishuman/rotation-check", methods=["POST"])
 def ishuman_demo_rotation_check():
     """Read-only: check whether demo-site PPIDs are blocked (rotation demo act)."""

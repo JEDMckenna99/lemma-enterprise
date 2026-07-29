@@ -142,10 +142,15 @@ def test_ishuman_demo_page_loads_expected_assets(ishuman_demo_client):
     assert "/sdk/ishuman-verifier.js" in body
     assert "/static/js/demo/ishuman-demo.js" in body
     assert "/static/css/demo/ishuman-demo.css" in body
-    assert "/static/js/demo/ishuman-demo.js?v=78" in body
+    assert "/static/js/demo/ishuman-demo.js?v=79" in body
+    assert "ih-clear-my-bans-btn" in body
+    assert "Clear my bans" in body
     js = (ROOT / "static/js/demo/ishuman-demo.js").read_text(encoding="utf-8")
     assert "blockToggleBusy" in js
     assert "function knownSitePpids(" in js
+    assert "sessionBanFlags" in js
+    assert "async function clearMyDemoBans(" in js
+    assert "/api/demo/ishuman/clear-bans" in js
     assert "Ignore other visitors' bans on the shared demo sites." in js
     assert "banBtn.disabled = !!state.wizardRunning;" in js
     assert "SITE_BAN_REASONS" in js
@@ -513,6 +518,43 @@ def test_ishuman_demo_site_block_is_scoped_to_seeded_demo_site(
     assert len(blocks) == 1
     assert blocks[0].site_id == "site_demo_tickets"
     assert blocks[0].ppid == "did:lemma:ppid_demo_ticket"
+
+
+def test_ishuman_demo_clear_bans_lifts_blocks_on_both_demo_sites(
+    ishuman_demo_client,
+    fake_ishuman_db_session_factory,
+):
+    from api.database import SiteBlock
+
+    ishuman_demo_client.get("/api/demo/ishuman/config")
+    for slug in ("tickets", "trials"):
+        blocked = ishuman_demo_client.post(
+            "/api/demo/ishuman/site-block",
+            json={
+                "site_slug": slug,
+                "ppid": "did:lemma:ppid_demo_clear",
+                "reason": "clear-bans fixture",
+            },
+        )
+        assert blocked.status_code == 200
+
+    resp = ishuman_demo_client.post(
+        "/api/demo/ishuman/clear-bans",
+        json={
+            "ppids": ["did:lemma:ppid_demo_clear"],
+            "site_slugs": ["tickets", "trials"],
+        },
+    )
+    payload = resp.get_json()
+    assert resp.status_code == 200
+    assert payload["success"] is True
+    assert payload["lifted_any"] is True
+    active = [
+        row
+        for row in fake_ishuman_db_session_factory.store.data.get(SiteBlock.__name__, [])
+        if getattr(row, "is_active", False) and row.ppid == "did:lemma:ppid_demo_clear"
+    ]
+    assert active == []
 
 
 def test_ishuman_demo_network_review_request_stays_site_scoped(
