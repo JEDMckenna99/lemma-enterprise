@@ -109,7 +109,8 @@ def test_bloom_filter_endpoint_returns_signed_snapshot(revocation_client, monkey
             return []
 
         def fetchone(self):
-            return (99,)
+            # (max_id, row_count, id_sum) for the bloom sequence query
+            return (99, 0, 0)
 
         def close(self):
             return None
@@ -132,7 +133,8 @@ def test_bloom_filter_endpoint_returns_signed_snapshot(revocation_client, monkey
     assert resp.status_code == 200
     assert data["success"] is True
     assert data["snapshot"]["signature"]
-    assert data["sequence_number"] == 99
+    # Sequence mixes max_id, row_count, and id_sum so deletes also bust caches.
+    assert data["sequence_number"] == 99 * 1_000_003
     from api.bloom_snapshot import verify_bloom_snapshot, verify_snapshot_matches_payload
     from api.issuer_trust_list import verify_signed_trust_list
 

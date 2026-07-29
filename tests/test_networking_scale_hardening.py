@@ -67,7 +67,8 @@ def test_bloom_filter_sets_etag_and_supports_304(monkeypatch):
             return []
 
         def fetchone(self):
-            return (42,)
+            # (max_id, row_count, id_sum) for the bloom sequence query
+            return (42, 0, 0)
 
         def close(self):
             return None
@@ -89,18 +90,19 @@ def test_bloom_filter_sets_etag_and_supports_304(monkeypatch):
     rev_api._BLOOM_CACHE["sequence"] = None
     rev_api._BLOOM_CACHE["built_at"] = 0.0
 
+    expected_etag = f'"bloom-seq-{42 * 1_000_003}"'
     with app.test_client() as client:
         first = client.get("/api/revocation/bloom-filter")
         assert first.status_code == 200
-        assert first.headers.get("ETag") == '"bloom-seq-42"'
+        assert first.headers.get("ETag") == expected_etag
         assert "max-age=" in (first.headers.get("Cache-Control") or "")
 
         second = client.get(
             "/api/revocation/bloom-filter",
-            headers={"If-None-Match": '"bloom-seq-42"'},
+            headers={"If-None-Match": expected_etag},
         )
         assert second.status_code == 304
-        assert second.headers.get("ETag") == '"bloom-seq-42"'
+        assert second.headers.get("ETag") == expected_etag
 
 
 def _fake_bloom_keys():

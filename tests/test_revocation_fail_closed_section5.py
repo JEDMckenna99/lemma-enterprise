@@ -113,7 +113,8 @@ def test_bloom_filter_hash_failure_returns_500_no_plaintext(revocation_client, m
             return [("cred-1",), ("cred-2",)]
 
         def fetchone(self):
-            return (5,)
+            # (max_id, row_count, id_sum) for the bloom sequence query
+            return (5, 0, 0)
 
         def close(self):
             return None
