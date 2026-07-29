@@ -38,12 +38,12 @@
 <div class="dev-header">
     <div class="dev-header-row">
         <div>
-            <h1 class="dev-title">isHuman + lemma.id for developers</h1>
+            <h1 class="dev-title">lemma.id developer dashboard</h1>
             <p class="dev-subtitle">
-                Add isHuman when Sybil resistance matters, on top of lemma.id private proofs, site-private IDs,
-                and offline backend verification. Start with <code>passkey</code> assurance for continuity;
-                require <code>ishuman</code> when your policy needs one verified human. Register a site API key
-                only when you need server-side blocks.
+                Sign in with lemma.id needs nothing from this dashboard: no account, no site registration,
+                no API key. Integrate straight from the docs and verify presentations locally.
+                This dashboard is for the step-up tier — human proofs, abuse APIs, site registration,
+                API keys, and billing.
             </p>
         </div>
         <div style="display:flex; gap:10px; flex-wrap:wrap; flex-shrink:0;">
@@ -55,7 +55,7 @@
 
 <div class="dev-card" style="margin-bottom: 24px;">
     <div class="dev-card-header">
-        <h2 class="dev-card-title">Get started</h2>
+        <h2 class="dev-card-title">Add sign-in (free, nothing to register)</h2>
     </div>
     <div class="dev-card-body">
         <div class="dev-actions">
@@ -77,6 +77,24 @@
                 </div>
                 <div class="dev-action-title">SDK script URL</div>
             </a>
+            <a href="/demo" class="dev-action">
+                <div class="dev-action-icon">
+                    <svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="currentColor" stroke-width="2">
+                        <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                    </svg>
+                </div>
+                <div class="dev-action-title">Interactive demo</div>
+            </a>
+        </div>
+    </div>
+</div>
+
+<div class="dev-card" style="margin-bottom: 24px;">
+    <div class="dev-card-header">
+        <h2 class="dev-card-title">Step up (human proofs &amp; abuse controls)</h2>
+    </div>
+    <div class="dev-card-body">
+        <div class="dev-actions">
             <a href="/developer/external-api-keys" class="dev-action">
                 <div class="dev-action-icon">
                     <svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="currentColor" stroke-width="2">
@@ -94,6 +112,15 @@
                 </div>
                 <div class="dev-action-title">Billing</div>
             </a>
+            <a href="/docs/human-proofs" class="dev-action">
+                <div class="dev-action-icon">
+                    <svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                        <circle cx="12" cy="7" r="4"></circle>
+                    </svg>
+                </div>
+                <div class="dev-action-title">Human-proofs docs</div>
+            </a>
         </div>
     </div>
 </div>
@@ -101,12 +128,12 @@
 <div class="dev-site-grid">
     <div class="dev-card" style="margin-bottom: 0;">
         <div class="dev-card-header">
-            <h2 class="dev-card-title">1) Integrate</h2>
+            <h2 class="dev-card-title">1) Add sign-in — free</h2>
         </div>
         <div class="dev-card-body">
             <p style="margin: 0 0 16px; color: var(--dev-text-muted); font-size: 14px; line-height: 1.55;">
-                Embed the lemma.id verifier SDK and gate actions with <code>verify({ autoProvision: true })</code>.
-                Start with <code>passkey</code> assurance; require <code>ishuman</code> only when your policy needs it.
+                Drop in <code>&lt;lemma-signin&gt;</code> (or the SDK with <code>requiredAssurance: 'passkey'</code>)
+                and verify presentations locally on your backend. No account or API key needed.
             </p>
             <ul class="dev-hub-list">
                 <li>Set <code>siteId</code> to your canonical hostname (for example <code>app.example.com</code>).</li>
@@ -122,12 +149,12 @@
 
     <div class="dev-card" style="margin-bottom: 0;">
         <div class="dev-card-header">
-            <h2 class="dev-card-title">2) Operate</h2>
+            <h2 class="dev-card-title">2) Step up to human proofs</h2>
         </div>
         <div class="dev-card-body">
             <p style="margin: 0 0 16px; color: var(--dev-text-muted); font-size: 14px; line-height: 1.55;">
-                The SDK handles IDV and site-proof derivation in a Lemma-hosted popup.
-                Your server does not receive webhooks for verification completion.
+                When a ban has to stick, require <code>ishuman</code> on that action — same PPID,
+                stronger assurance. The SDK handles IDV in a Lemma-hosted popup; no webhooks.
             </p>
             <ul class="dev-hub-list">
                 <li>First visit may open a popup (wallet unlock + Didit IDV).</li>
@@ -143,12 +170,12 @@
 
     <div class="dev-card" style="margin-bottom: 0;">
         <div class="dev-card-header">
-            <h2 class="dev-card-title">3) Enforce bans</h2>
+            <h2 class="dev-card-title">3) Enforce bans — API key</h2>
         </div>
         <div class="dev-card-body">
             <p style="margin: 0 0 16px; color: var(--dev-text-muted); font-size: 14px; line-height: 1.55;">
-                Use your site API key for server-side abuse response.
-                The API key is not required for human verification itself.
+                API keys exist only for this tier: server-side abuse APIs on registered sites.
+                Neither sign-in nor human verification itself requires one.
             </p>
             <ul class="dev-hub-list">
                 <li><code>POST /api/ishuman/site-block</code>, immediate site-scoped PPID ban.</li>
@@ -168,7 +195,7 @@
     </div>
     <div class="dev-card-body">
         <p style="margin: 0 0 12px; color: var(--dev-text-muted); font-size: 14px;">
-            Registered sites for abuse API keys. Basic passkey login works without registering a site.
+            Registered sites for abuse API keys. Sign in with lemma.id works without registering a site.
         </p>
         <div id="dev-hub-sites-list" style="font-size: 14px; color: var(--dev-text-muted);">Loading sites…</div>
     </div>

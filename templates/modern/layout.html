@@ -102,7 +102,7 @@ h1{color:#1A1A24;font-weight:600;line-height:1.25;margin-bottom:16px;font-size:4
                 <a href="/developer" class="btn btn-secondary" id="public-dashboard-link" style="display:none;">Dashboard</a>
                 <div id="auth-buttons" style="display:flex; gap:12px; align-items:center;">
                     <a href="/login" class="btn btn-secondary" id="nav-sign-in-link" style="display:none;">Sign In</a>
-                    <a href="/register" class="btn btn-primary" id="nav-get-started-link">Get Started</a>
+                    <a href="/docs" class="btn btn-primary" id="nav-get-started-link">Get Started</a>
                     <button type="button" class="btn btn-primary" id="nav-unlock-link" style="display:none;">Unlock lemma.id</button>
                 </div>
                 {% else %}
@@ -168,6 +168,8 @@ h1{color:#1A1A24;font-weight:600;line-height:1.25;margin-bottom:16px;font-size:4
                     <a href="/privacy" style="color: var(--gray-600); text-decoration: none; margin: 0 12px;">Privacy Policy</a>
                     <span style="color: var(--gray-400);">|</span>
                     <a href="/docs" style="color: var(--gray-600); text-decoration: none; margin: 0 12px;">Documentation</a>
+                    <span style="color: var(--gray-400);">|</span>
+                    <a href="/developer" style="color: var(--gray-600); text-decoration: none; margin: 0 12px;">Developer dashboard</a>
                 </p>
             </div>
         </div>
@@ -231,7 +233,7 @@ h1{color:#1A1A24;font-weight:600;line-height:1.25;margin-bottom:16px;font-size:4
     <!-- Wallet Scripts - end of body for non-blocking -->
     <script src="{{ url_for('static', filename='js/lemma-keys.js') }}?v=8" defer data-cfasync="false"></script>
     <script src="{{ url_for('static', filename='js/wallet-at-rest-crypto.js') }}?v=2" defer data-cfasync="false"></script>
-    <script src="{{ url_for('static', filename='js/lemma-wallet.js') }}?v=2689" defer data-cfasync="false"></script>
+    <script src="{{ url_for('static', filename='js/lemma-wallet.js') }}?v=2690" defer data-cfasync="false"></script>
     <script src="{{ url_for('static', filename='js/encrypted-wallet-transparent.js') }}?v=1121" defer data-cfasync="false"></script>
     <script src="{{ url_for('static', filename='js/lemma-session-free-auth.js') }}?v=1121" defer data-cfasync="false"></script>
     <script src="{{ url_for('static', filename='js/lemma-credential-utils.js') }}?v=2" defer data-cfasync="false"></script>

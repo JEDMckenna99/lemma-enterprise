@@ -1925,138 +1925,16 @@ def register_secure():
         }), 500
 
 
-@customer_accounts_bp.route('/login', methods=['GET', 'POST'])
+@customer_accounts_bp.route('/login', methods=['GET'])
 @cross_origin(origins=_public_cors_origins(), supports_credentials=True, allow_headers=['Content-Type', 'Authorization'])
 def login():
-    """Customer login page and handler"""
-    if request.method == 'GET':
-        return render_template('modern/login.html')
-    
-    try:
-        data = request.get_json() if request.is_json else request.form
-        email = data.get('email', '').strip().lower()
-        password = data.get('password', '')
-        
-        if not email:
-            return jsonify({
-                'success': False,
-                'error': 'Email is required'
-            }), 400
-            
-        if not password:
-            return jsonify({
-                'success': False,
-                'error': 'Password is required'
-            }), 400
-        
-        # Find customer
-        customer = customer_manager.get_customer_by_email(email)
-        if not customer:
-            return jsonify({
-                'success': False,
-                'error': 'Invalid email or password'
-            }), 401
-            
-        # Verify password
-        if not customer.password_hash or not customer_manager.verify_password(password, customer.password_hash):
-            return jsonify({
-                'success': False,
-                'error': 'Invalid email or password'
-            }), 401
-        
-        # Update login tracking
-        customer.last_login = datetime.utcnow()
-        customer.login_count += 1
-        
-        # Issue REAL permission lemma using Ed25519 crypto
-        permission_lemma_data = None
-        user_did = None
-        issuer_did = None
-        account_type = 'customer'
-        
-        try:
-            from api.platform_account import is_admin_account_type, resolve_account_type_for_customer
-            from .real_iam_manager import get_or_create_site_manager
-            from .ppid import derive_ppid_did
+    """Platform sign-in page (Sign in with lemma.id ceremony).
 
-            account_type = resolve_account_type_for_customer(customer)
-            
-            # Get platform IAM manager with Ed25519 keypair
-            manager = get_or_create_site_manager('lemma_platform', 'lemma.id')
-            
-            if manager:
-                is_admin = is_admin_account_type(account_type)
-                # Determine permission level based on platform account type
-                permission_id = 'admin_access' if is_admin else 'customer_access'
-                scope = ['platform_admin', 'customer_management', 'site_management', 'billing_access'] if is_admin else ['customer_dashboard', 'api_management']
-
-                from api.platform_owner import platform_owner_enforcement_enabled
-                if is_admin and platform_owner_enforcement_enabled():
-                    permission_id = 'customer_access'
-                    scope = ['customer_dashboard', 'api_management']
-                
-                # Ensure permission type exists
-                if permission_id not in manager.permissions:
-                    manager.add_permission({
-                        'permission_id': permission_id,
-                        'display_name': 'Platform Admin' if is_admin else 'Customer Access',
-                        'scope': scope,
-                        'conditions': [],
-                        'priority': 100 if is_admin else 50
-                    })
-                
-                # Derive user DID from email
-                user_did = derive_ppid_did(email, 'lemma.id')
-                
-                # Issue permission lemma with REAL Ed25519 signature
-                permission_lemma_data = manager.issue_permission_lemma(
-                    user_did,
-                    permission_id,
-                    expiry_days=90,
-                    custom_claims={
-                        'siteId': 'lemma.id',
-                        'accountType': account_type,
-                        'permissionId': permission_id,
-                        'email': email,
-                        'scope': scope
-                    }
-                )
-                
-                # Add W3C type field
-                permission_lemma_data['type'] = ['VerifiableCredential', 'PermissionLemma']
-                permission_lemma_data['packageType'] = 'permission'
-                
-                if 'credentialSubject' in permission_lemma_data:
-                    permission_lemma_data['credentialSubject']['packageType'] = 'permission'
-                if 'claims' in permission_lemma_data:
-                    permission_lemma_data['claims']['packageType'] = 'permission'
-                
-                issuer_did = manager.issuer_did
-                logger.info(f"Issued {permission_id} lemma for {email} with Ed25519 signature")
-                
-        except Exception as e:
-            logger.warning(f"Failed to issue permission lemma for {email}: {e}")
-            # Fallback: still return success but without lemma
-            user_did = f"did:lemma:customer:{customer.customer_id}"
-        
-        return jsonify({
-            'success': True,
-            'customer_id': customer.customer_id,
-            'user_did': user_did,
-            'issuer_did': issuer_did,
-            'permission_lemma_active': permission_lemma_data is not None,
-            'permission_lemma': permission_lemma_data,
-            'role': account_type,
-            'account_type': account_type,
-            'redirect_url': '/dashboard'
-        })
-        
-    except Exception as e:
-        logger.error(f"Login error: {e}")
-        return jsonify({
-            'success': False,
-            'error': 'Login failed'
-        }), 500
+    Email/password login has been removed: the only way to authenticate to
+    the platform is the same passkey presentation flow relying sites use
+    (POST /api/wallet-auth/platform-login from the login page script).
+    """
+    return render_template('modern/login.html')
 
 # Dashboard route moved to app.py - using new permission lemma-based access control
 
@@ -2600,76 +2478,6 @@ def get_customer_sites():
 
 # Note: Admin lemma issuance moved to /api/admin/issue-admin-lemma in dashboard_api.py
 # This keeps all admin-related endpoints in one place
-
-@customer_accounts_bp.route('/create-test-accounts')
-def create_test_accounts():
-    """Create basic test accounts for development - REMOVE IN PRODUCTION"""
-    # SECURITY: This endpoint is unauthenticated and provisions an admin account
-    # with a well-known password (`admin123`) plus a customer account and API
-    # key. It must never be reachable in production.
-    try:
-        from api.config import is_production
-        if is_production():
-            return jsonify({'error': 'not_found'}), 404
-    except Exception:
-        # Fail closed: if environment detection is unavailable, do not expose it.
-        return jsonify({'error': 'not_found'}), 404
-    try:
-        results = []
-        
-        # Create admin account
-        admin_result = customer_manager.create_admin_user(
-            email="admin@lemma.id",
-            name="Lemma Administrator", 
-            company="Lemma Platform"
-        )
-        results.append({
-            'type': 'admin',
-            'email': 'admin@lemma.id',
-            'result': admin_result
-        })
-        
-        # Create test customer account
-        customer_result = customer_manager.create_customer(
-            email="customer@test.com",
-            name="Test Customer",
-            company="Test Company Inc",
-            billing_email="billing@test.com",
-            password="customer123"
-        )
-        results.append({
-            'type': 'customer', 
-            'email': 'customer@test.com',
-            'result': customer_result
-        })
-        
-        return jsonify({
-            'success': True,
-            'message': 'Test accounts created successfully',
-            'accounts': results,
-            'login_info': {
-                'admin': {
-                    'email': 'admin@lemma.id',
-                    'password': 'admin123',
-                    'login_url': '/login',
-                    'dashboard_url': '/admin'
-                },
-                'customer': {
-                    'email': 'customer@test.com',
-                    'password': 'customer123',
-                    'login_url': '/login',
-                    'dashboard_url': '/dashboard',
-                    'api_key': customer_result.get('api_key') if customer_result.get('success') else None
-                }
-            }
-        })
-        
-    except Exception as e:
-        logger.error(f"❌ Failed to create test accounts: {e}")
-        return jsonify({
-            'success': False,
-            'error': str(e)
-        }), 500
 
 @customer_accounts_bp.route('/logout')
 def logout():
