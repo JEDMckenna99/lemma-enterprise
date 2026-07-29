@@ -142,7 +142,7 @@ def test_ishuman_demo_page_loads_expected_assets(ishuman_demo_client):
     assert "/sdk/ishuman-verifier.js" in body
     assert "/static/js/demo/ishuman-demo.js" in body
     assert "/static/css/demo/ishuman-demo.css" in body
-    assert "/static/js/demo/ishuman-demo.js?v=81" in body
+    assert "/static/js/demo/ishuman-demo.js?v=82" in body
     assert "ih-clear-my-bans-btn" in body
     assert "Clear my bans" in body
     js = (ROOT / "static/js/demo/ishuman-demo.js").read_text(encoding="utf-8")
@@ -154,6 +154,7 @@ def test_ishuman_demo_page_loads_expected_assets(ishuman_demo_client):
     assert "function applyBannedVerifyResult(" in js
     assert "async function clearMyDemoBans(" in js
     assert "/api/demo/ishuman/clear-bans" in js
+    assert "clear_all_active_demo_bans: true" in js
     assert "Do NOT" in js and "call verifySite here" in js
     assert "Ignore other visitors' bans on the shared demo sites." in js
     assert "banBtn.disabled = !!state.wizardRunning;" in js
@@ -559,6 +560,45 @@ def test_ishuman_demo_clear_bans_lifts_blocks_on_both_demo_sites(
         row
         for row in fake_ishuman_db_session_factory.store.data.get(SiteBlock.__name__, [])
         if getattr(row, "is_active", False) and row.ppid == "did:lemma:ppid_demo_clear"
+    ]
+    assert active == []
+
+
+def test_ishuman_demo_clear_all_active_demo_bans_without_matching_client_ppid(
+    ishuman_demo_client,
+    fake_ishuman_db_session_factory,
+):
+    from api.database import SiteBlock
+
+    ishuman_demo_client.get("/api/demo/ishuman/config")
+    blocked = ishuman_demo_client.post(
+        "/api/demo/ishuman/site-block",
+        json={
+            "site_slug": "tickets",
+            "ppid": "did:lemma:ppid_orphan_ban",
+            "reason": "orphan ban fixture",
+        },
+    )
+    assert blocked.status_code == 200
+
+    # Client sends a different PPID; nuclear flag must still lift the orphan ban.
+    resp = ishuman_demo_client.post(
+        "/api/demo/ishuman/clear-bans",
+        json={
+            "ppids": ["did:lemma:ppid_wrong_snapshot"],
+            "site_slugs": ["tickets", "trials"],
+            "clear_all_active_demo_bans": True,
+        },
+    )
+    payload = resp.get_json()
+    assert resp.status_code == 200
+    assert payload["success"] is True
+    assert payload["lifted_any"] is True
+    assert payload["clear_all_active_demo_bans"] is True
+    active = [
+        row
+        for row in fake_ishuman_db_session_factory.store.data.get(SiteBlock.__name__, [])
+        if getattr(row, "is_active", False) and row.ppid == "did:lemma:ppid_orphan_ban"
     ]
     assert active == []
 

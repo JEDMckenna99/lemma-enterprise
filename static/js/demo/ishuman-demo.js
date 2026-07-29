@@ -2719,9 +2719,13 @@
         body: JSON.stringify({
           ppids: [...ppids],
           site_slugs: SITE_SLUGS,
+          // Row Unban also sweeps active demo bans so a mismatched derived
+          // PPID cannot leave the real ban row behind.
+          clear_all_active_demo_bans: true,
         }),
       });
       unblockedAny = !!(batch?.lifted_any || (batch?.cleared || []).some((row) => row.lifted));
+      log('unban clear-bans', `lifted_any=${unblockedAny} sent=${ppids.size} server=${batch?.ppid_count ?? '?'}`);
     } catch (err) {
       errors.push(err?.message || String(err));
       for (const ppid of ppids) {
@@ -2842,18 +2846,28 @@
   }
 
   async function clearMyDemoBans() {
-    setQuickInsight('Enforce', 'Clearing demo bans for your lemma.id…');
+    setQuickInsight('Enforce', 'Clearing every active ban on the demo sites…');
     const allPpids = new Set();
     for (const slug of SITE_SLUGS) {
       for (const ppid of await collectUnbanPpids(slug)) allPpids.add(ppid);
     }
-    if (!allPpids.size) {
-      throw new Error('No site PPID found yet. Open Verify once (even if banned), then clear bans.');
-    }
-    await requestJson('/api/demo/ishuman/clear-bans', {
+    // Nuclear demo recovery: clear known PPIDs AND every active ban row on the
+    // shared demo sites. Browser PPID snapshots can disagree with the ban row
+    // (derivation/path drift), which left Unban looking successful while DB bans stayed.
+    const batch = await requestJson('/api/demo/ishuman/clear-bans', {
       method: 'POST',
-      body: JSON.stringify({ ppids: [...allPpids], site_slugs: SITE_SLUGS }),
+      body: JSON.stringify({
+        ppids: [...allPpids],
+        site_slugs: SITE_SLUGS,
+        clear_all_active_demo_bans: true,
+      }),
     });
+    const netJson = $('ih-master-json');
+    if (netJson) netJson.textContent = pretty(batch);
+    log(
+      'clear-bans',
+      `lifted_any=${!!batch?.lifted_any} ppid_count=${batch?.ppid_count ?? allPpids.size}`,
+    );
     clearClientBloomCaches();
     for (const slug of SITE_SLUGS) {
       state.localBlocks[slug].clear();
@@ -2867,7 +2881,16 @@
     await forceVerifierBloomRefresh('tickets');
     await forceVerifierBloomRefresh('trials');
     updateBlockResultsTable();
-    setQuickInsight('Enforce', 'Demo bans cleared. Click Verify to mint a fresh site proof.');
+    if (!batch?.lifted_any && !allPpids.size) {
+      setQuickInsight('Enforce', 'No active demo bans found. Click Verify to continue.');
+      return;
+    }
+    setQuickInsight(
+      'Enforce',
+      batch?.lifted_any
+        ? 'Demo bans cleared on both sites. Click Verify to mint a fresh site proof.'
+        : 'Clear requested, but no matching ban rows were lifted. Try Verify — if still banned, refresh and Clear my bans again.',
+    );
   }
 
   async function forceFreshIdv() {

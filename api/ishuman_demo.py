@@ -694,20 +694,29 @@ def ishuman_demo_site_unblock():
 
 @ishuman_demo_bp.route("/api/demo/ishuman/clear-bans", methods=["POST"])
 def ishuman_demo_clear_bans():
-    """Clear SiteBlock + site PPID revocations for one or more demo PPIDs.
+    """Clear SiteBlock + site PPID revocations for demo PPIDs.
 
     Public demo recovery path (same availability as site-block / site-unblock).
-    Accepts ``ppids`` and optional ``site_slugs`` (defaults to both demo sites).
+
+    Body:
+      - ``ppids``: optional list of site PPIDs to clear
+      - ``site_slugs``: optional subset of demo sites (default both)
+      - ``clear_all_active_demo_bans``: when true, also clear every active
+        SiteBlock / user RevocationList row on the demo sites (nuclear demo
+        recovery when the browser's PPID snapshot does not match the ban row)
     """
-    from api.database import SessionLocal
+    from api.database import RevocationList, SessionLocal, SiteBlock
     from api.rate_limiter import check_rate_limit
     from api.site_ppid_revocation import clear_site_bound_ppid
 
     body = request.get_json(silent=True) or {}
+    clear_all = bool(body.get("clear_all_active_demo_bans"))
     raw_ppids = body.get("ppids") or []
     if isinstance(raw_ppids, str):
         raw_ppids = [raw_ppids]
-    if not isinstance(raw_ppids, list) or not raw_ppids:
+    if not isinstance(raw_ppids, list):
+        raw_ppids = []
+    if not raw_ppids:
         single = (body.get("ppid") or "").strip()
         raw_ppids = [single] if single else []
     ppids = []
@@ -718,10 +727,8 @@ def ishuman_demo_clear_bans():
             continue
         seen.add(ppid)
         ppids.append(ppid)
-        if len(ppids) >= 20:
+        if len(ppids) >= 40:
             break
-    if not ppids:
-        return jsonify({"success": False, "error": "ppids required"}), 400
 
     raw_slugs = body.get("site_slugs") or list(DEMO_SITES.keys())
     if isinstance(raw_slugs, str):
@@ -732,14 +739,44 @@ def ishuman_demo_clear_bans():
         if slug in DEMO_SITES and slug not in slugs:
             slugs.append(slug)
 
+    if not ppids and not clear_all:
+        return jsonify({"success": False, "error": "ppids required"}), 400
+
     ip_key = (request.remote_addr or "unknown").strip()
-    if not check_rate_limit(f"demo_clear_bans:{ip_key}", 30, 3600):
+    limit = 10 if clear_all else 30
+    if not check_rate_limit(f"demo_clear_bans:{ip_key}", limit, 3600):
         return jsonify({"success": False, "error": "rate_limited"}), 429
 
     ensure_demo_sites()
     cleared = []
     db = SessionLocal()
     try:
+        if clear_all:
+            demo_site_ids = [DEMO_SITES[slug]["site_id"] for slug in slugs]
+            for block in (
+                db.query(SiteBlock)
+                .filter(
+                    SiteBlock.site_id.in_(demo_site_ids),
+                    SiteBlock.is_active.isnot(False),
+                )
+                .all()
+            ):
+                if block.ppid and block.ppid not in seen:
+                    seen.add(block.ppid)
+                    ppids.append(block.ppid)
+            for row in (
+                db.query(RevocationList)
+                .filter(
+                    RevocationList.site_id.in_(demo_site_ids),
+                    RevocationList.revocation_type == "user",
+                )
+                .all()
+            ):
+                key = (row.ppid or row.lemma_id or row.credential_id or "").strip()
+                if key and key not in seen:
+                    seen.add(key)
+                    ppids.append(key)
+
         for slug in slugs:
             _spec, site = _site_for_slug(slug)
             if not site:
@@ -764,6 +801,8 @@ def ishuman_demo_clear_bans():
             "success": True,
             "cleared": cleared,
             "lifted_any": any(row.get("lifted") for row in cleared),
+            "clear_all_active_demo_bans": clear_all,
+            "ppid_count": len(ppids),
         })
     except Exception:
         db.rollback()
