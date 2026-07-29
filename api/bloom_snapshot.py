@@ -188,15 +188,35 @@ def _decode_signature(value: str) -> bytes:
 
 
 def fetch_revocation_sequence_number() -> int:
-    """Monotonic sequence from revocation_list primary key."""
+    """Bloom cache-busting sequence for revocation_list.
+
+    ``MAX(id)`` alone does **not** change when a row is deleted. Site Unban
+    deletes the PPID's revocation row, but dynos could keep serving a cached
+    bloom (same sequence / ETag) that still contained the banned PPID — so
+    Verify kept failing and the demo looked stuck banned.
+
+    Mix in ``COUNT(*)`` (and a checksum of ids) so inserts **and** deletes
+    change the sequence on every dyno.
+    """
     from api.database import get_db_connection
 
     conn = get_db_connection()
     cursor = conn.cursor()
     try:
-        cursor.execute("SELECT COALESCE(MAX(id), 0) FROM revocation_list")
-        row = cursor.fetchone()
-        return int(row[0] or 0)
+        cursor.execute(
+            """
+            SELECT COALESCE(MAX(id), 0) AS max_id,
+                   COUNT(*) AS row_count,
+                   COALESCE(SUM(id), 0) AS id_sum
+            FROM revocation_list
+            """
+        )
+        row = cursor.fetchone() or (0, 0, 0)
+        max_id = int(row[0] or 0)
+        row_count = int(row[1] or 0)
+        id_sum = int(row[2] or 0)
+        # Keep in signed 63-bit space for JSON / JS consumers.
+        return ((max_id * 1_000_003) + row_count + (id_sum & 0xFFFF)) & 0x7FFFFFFFFFFFFFFF
     finally:
         cursor.close()
         conn.close()

@@ -201,12 +201,14 @@ def get_bloom_filter():
 
             revoked_ids = [row[0] for row in cursor.fetchall()]
 
+            # Include site-scoped user PPIDs too. Site bans store the PPID in
+            # credential_id/lemma_id (picked up above) AND ppid; keeping this
+            # query unfiltered avoids missing a ban key shape on unban/rebuild.
             cursor.execute("""
                 SELECT DISTINCT ppid
                 FROM revocation_list
                 WHERE ppid IS NOT NULL
                   AND revocation_type = 'user'
-                  AND (site_id IS NULL OR site_id = '')
             """)
 
             revoked_ppids = [row[0] for row in cursor.fetchall()]

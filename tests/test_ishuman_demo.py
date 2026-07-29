@@ -142,17 +142,19 @@ def test_ishuman_demo_page_loads_expected_assets(ishuman_demo_client):
     assert "/sdk/ishuman-verifier.js" in body
     assert "/static/js/demo/ishuman-demo.js" in body
     assert "/static/css/demo/ishuman-demo.css" in body
-    assert "/static/js/demo/ishuman-demo.js?v=80" in body
+    assert "/static/js/demo/ishuman-demo.js?v=81" in body
     assert "ih-clear-my-bans-btn" in body
     assert "Clear my bans" in body
     js = (ROOT / "static/js/demo/ishuman-demo.js").read_text(encoding="utf-8")
     assert "blockToggleBusy" in js
     assert "function knownSitePpids(" in js
     assert "sessionBanFlags" in js
+    assert "function isStickySiteBanReason(" in js
     assert "async function ensureDerivedSitePpid(" in js
     assert "function applyBannedVerifyResult(" in js
     assert "async function clearMyDemoBans(" in js
     assert "/api/demo/ishuman/clear-bans" in js
+    assert "Do NOT" in js and "call verifySite here" in js
     assert "Ignore other visitors' bans on the shared demo sites." in js
     assert "banBtn.disabled = !!state.wizardRunning;" in js
     assert "SITE_BAN_REASONS" in js

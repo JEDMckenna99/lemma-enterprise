@@ -626,6 +626,17 @@
     return SITE_BAN_REASONS.has(String(reason || ''));
   }
 
+  /** Deliberate site-policy bans (Unban target). Not generic bloom `revoked`. */
+  function isStickySiteBanReason(reason) {
+    const code = String(reason || '');
+    return (
+      code === 'site_ppid_revoked'
+      || code === 'site_ppid_blocked'
+      || code === 'site_blocked'
+      || code === 'site_block'
+    );
+  }
+
   function isSiteBanned(slug, result = null) {
     return isSiteBlocked(slug, result) || isSiteBanReason(result?.reason);
   }
@@ -2255,12 +2266,16 @@
       return result;
     }
 
-    // Probe without popups first. Site bans often surface as `revoked` in the
-    // bloom filter; autoProvision would open fresh IDV, and a cancel leaves
-    // reason=idv_cancelled while the ban remains — hiding Unban.
+    // Probe without popups first. Only sticky site-policy reasons (or a known
+    // localBlocks hit) mark Unban — generic bloom `revoked` alone must not
+    // re-ban right after a successful Unban while caches catch up.
     if (options.autoProvision !== false && options.freshIdv !== true) {
       const probe = await verifier.checkStatus({ requiredAssurance }).catch(() => null);
-      if (probe && (isSiteBanReason(probe.reason) || probe.reason === 'site_blocked')) {
+      const probeIsSiteBan = probe && (
+        isStickySiteBanReason(probe.reason)
+        || (isSiteBanReason(probe.reason) && isSiteBlocked(slug))
+      );
+      if (probeIsSiteBan) {
         const result = applyBannedVerifyResult(
           slug,
           probe.ppid || derivedPpid,
@@ -2283,7 +2298,11 @@
       || derivedPpid;
     const verified = !!(backend.ok || backend.human);
     let reason = backend.reason;
-    if (!verified && (isSiteBanReason(reason) || reason === 'site_blocked')) {
+    const backendIsSiteBan = !verified && (
+      isStickySiteBanReason(reason)
+      || (isSiteBanReason(reason) && (isSiteBlocked(slug) || !!state.sessionBanFlags[slug]))
+    );
+    if (backendIsSiteBan) {
       const result = applyBannedVerifyResult(slug, ppid, reason, {
         assurance: backend.assurance,
         timeMs: backend.timeMs,
@@ -2752,26 +2771,27 @@
     if (netJson) netJson.textContent = pretty({ unblocked: unblockedAny, ppids: [...ppids], errors });
     log(`${slug} site block removed`, [...ppids].map(short).join(', '));
     try {
+      // Force a new bloom snapshot (sequence now changes on delete). Do NOT
+      // call verifySite here — a stale bloom `revoked` used to immediately
+      // re-mark the session as banned and make Unban look broken.
+      clearClientBloomCaches();
       await forceVerifierBloomRefresh('tickets');
       await forceVerifierBloomRefresh('trials');
       await refreshStatus().catch(() => {});
-      await verifySite('tickets', { autoProvision: false, resolveDoubt: false });
-      await verifySite('trials', { autoProvision: false, resolveDoubt: false });
       for (const siteSlug of SITE_SLUGS) {
-        if (
-          !isSiteBlocked(siteSlug)
-          && state.results[siteSlug]
-          && isSiteBanReason(state.results[siteSlug].reason)
-        ) {
+        clearSessionBan(siteSlug);
+        state.localBlocks[siteSlug].clear();
+        if (state.results[siteSlug]) {
           state.results[siteSlug] = {
             ...state.results[siteSlug],
+            human: false,
             reason: 'unblocked',
           };
-          clearSessionBan(siteSlug);
           renderSite(siteSlug, state.results[siteSlug]);
         }
       }
-      if (slug === 'tickets') await refreshAbuseChecks();
+      updateBlockResultsTable();
+      if (slug === 'tickets') await refreshAbuseChecks().catch(() => {});
     } finally {
       syncBlockSegToggle();
       updateBlockResultsTable();
@@ -2780,9 +2800,12 @@
     if (errors.length && !unblockedAny) {
       throw new Error(errors[0] || 'Unban failed');
     }
-    setQuickInsight('Enforce', unblockedAny
-      ? `${slug === 'tickets' ? 'Presale' : 'SaaS trial'} unbanned (both demo sites cleared).`
-      : `No active ban on ${slug}, both sites rechecked.`);
+    setQuickInsight(
+      'Enforce',
+      unblockedAny
+        ? `${slug === 'tickets' ? 'Presale' : 'SaaS trial'} unbanned. Click Verify to mint a fresh site proof.`
+        : `Ban rows cleared for ${slug}. Click Verify to continue.`,
+    );
   }
 
   async function unblockTickets() {
@@ -2799,22 +2822,8 @@
     try {
       await ensureSitePpid(slug);
       // Re-probe before deciding — a masked idv_cancelled must not re-ban.
-      try {
-        const probe = await verifierFor(slug).checkStatus({
-          requiredAssurance: demoRequiredAssurance(slug),
-        });
-        if (probe && (isSiteBanReason(probe.reason) || probe.reason === 'site_blocked')) {
-          markSessionBan(slug, probe.ppid, probe.reason);
-          if (state.results[slug]) {
-            state.results[slug] = {
-              ...state.results[slug],
-              ppid: probe.ppid || state.results[slug].ppid,
-              human: false,
-              reason: probe.reason === 'site_blocked' ? 'site_ppid_revoked' : probe.reason,
-            };
-          }
-        }
-      } catch (_) { /* probe optional */ }
+      // Prefer sticky Unban when Enforce already knows a site ban. Do not let a
+      // stale bloom `revoked` flip Unban → Ban mid-click.
       updateBlockResultsTable();
       if (shouldShowUnban(slug, state.results[slug])) {
         await unblockSite(slug);
@@ -2839,7 +2848,7 @@
       for (const ppid of await collectUnbanPpids(slug)) allPpids.add(ppid);
     }
     if (!allPpids.size) {
-      throw new Error('No site PPID found yet. Verify a demo site once, then clear bans.');
+      throw new Error('No site PPID found yet. Open Verify once (even if banned), then clear bans.');
     }
     await requestJson('/api/demo/ishuman/clear-bans', {
       method: 'POST',
@@ -2857,10 +2866,8 @@
     }
     await forceVerifierBloomRefresh('tickets');
     await forceVerifierBloomRefresh('trials');
-    await verifySite('tickets', { autoProvision: false, resolveDoubt: false });
-    await verifySite('trials', { autoProvision: false, resolveDoubt: false });
     updateBlockResultsTable();
-    setQuickInsight('Enforce', 'Demo bans cleared for your lemma.id on both sites.');
+    setQuickInsight('Enforce', 'Demo bans cleared. Click Verify to mint a fresh site proof.');
   }
 
   async function forceFreshIdv() {
