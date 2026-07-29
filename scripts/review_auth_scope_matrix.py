@@ -104,6 +104,7 @@ IN_HANDLER_AUTH_ALLOWLIST = {
     "/api/agent/monitor/log-external",
     "/api/auth/issue-credential",
     "/api/demo/ishuman/approve-network-revocation",
+    "/api/demo/ishuman/clear-bans",
     "/api/demo/ishuman/clear-site-doubt",
     "/api/demo/ishuman/force-reverify",
     "/api/demo/ishuman/network-revoke-request",
