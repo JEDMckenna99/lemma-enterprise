@@ -178,11 +178,11 @@
     box-shadow: none;
 }
 .wallet-container .btn-primary {
-    background: var(--wallet-brand);
+    background: #1A1A24;
     color: white;
 }
 .wallet-container .btn-primary:hover {
-    background: #3A2D6E;
+    background: #32313F;
 }
 .wallet-container .btn-secondary {
     background: #fff;

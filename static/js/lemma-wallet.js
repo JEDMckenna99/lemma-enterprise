@@ -521,7 +521,7 @@ class LemmaWallet {
         
         return `<div class="${className}" style="margin-top: 12px; text-align: center; font-size: 0.85rem;">
     <span style="color: #6b7280;">${text}</span>
-    <a href="${url}" target="_blank" rel="noopener" style="color: #4f46e5; margin-left: 4px; text-decoration: none; font-weight: 500;">
+    <a href="${url}" target="_blank" rel="noopener" style="color: #4E3D8F; margin-left: 4px; text-decoration: none; font-weight: 500;">
          ${linkText}
     </a>
 </div>`;
@@ -1203,7 +1203,7 @@ class LemmaWallet {
             overlay.id = 'lemma-redirect-overlay';
             overlay.setAttribute('style',
                 'position:fixed;top:0;left:0;width:100%;height:100%;' +
-                'background:#4f46e5;' +
+                'background:#1A1A24;' +
                 'z-index:2147483647;display:flex;flex-direction:column;' +
                 'align-items:center;justify-content:center;opacity:0;' +
                 'transition:opacity 200ms ease-in;'

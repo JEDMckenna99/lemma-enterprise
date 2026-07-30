@@ -15,7 +15,7 @@
     <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
     
     <!-- Preload critical resources -->
-    <link rel="preload" href="{{ url_for('static', filename='css/lemma.css') }}?v=20260715b" as="style">
+    <link rel="preload" href="{{ url_for('static', filename='css/lemma.css') }}?v=20260729" as="style">
     {% block preload_scripts %}{% endblock %}
     
     <!-- Critical CSS - minimal for fast LCP -->
@@ -34,7 +34,7 @@ h1{color:#1A1A24;font-weight:600;line-height:1.25;margin-bottom:16px;font-size:4
 .nav-link{color:#454554;text-decoration:none;font-weight:500;font-size:17px;padding:8px 4px}
 .nav-right{display:flex;gap:16px;align-items:center;margin-left:auto}
 .btn{display:inline-flex;align-items:center;justify-content:center;padding:12px 24px;border-radius:6px;font-weight:500;font-size:17px;text-decoration:none;border:none;cursor:pointer}
-.btn-primary{background:#4E3D8F;color:#fff}
+.btn-primary{background:#1A1A24;color:#fff}
 @media(max-width:1180px){.nav-container{padding:0 18px}.nav-center{gap:24px;margin-left:36px}.nav-link{font-size:16px}.nav-right .btn{padding:10px 18px}}
 @media(max-width:1040px){.mobile-menu-toggle{display:flex}.nav-center{position:absolute;top:76px;left:0;right:0;background:#fff;flex-direction:column;padding:16px 24px;gap:0;margin-left:0;border-bottom:1px solid #E8E8EE;box-shadow:0 10px 40px rgba(0,0,0,0.1);display:none;z-index:99}.nav-center.mobile-open{display:flex}.nav-center .nav-link{padding:14px 0;border-bottom:1px solid #E8E8EE;width:100%}.nav-center .nav-link:last-child{border-bottom:none}}
 .container{max-width:1200px;margin:0 auto;padding:0 24px}
@@ -43,7 +43,7 @@ h1{color:#1A1A24;font-weight:600;line-height:1.25;margin-bottom:16px;font-size:4
     </style>
     
     <!-- Full CSS - async load with CSP-compliant approach -->
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/lemma.css') }}?v=20260715b" media="print" id="main-css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/lemma.css') }}?v=20260729" media="print" id="main-css">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/polish.css') }}?v=20260715" media="print" id="polish-css">
     <script nonce="{{ csp_nonce }}">
         document.getElementById('main-css').onload = function() { this.media = 'all'; };
@@ -52,7 +52,7 @@ h1{color:#1A1A24;font-weight:600;line-height:1.25;margin-bottom:16px;font-size:4
         window.LEMMA_ISHUMAN_USE_PERSON_ROOT_SEEDS = {{ 'true' if ishuman_use_person_root_seeds else 'false' }};
     </script>
     <noscript>
-        <link rel="stylesheet" href="{{ url_for('static', filename='css/lemma.css') }}?v=20260715b">
+        <link rel="stylesheet" href="{{ url_for('static', filename='css/lemma.css') }}?v=20260729">
         <link rel="stylesheet" href="{{ url_for('static', filename='css/polish.css') }}?v=20260715">
     </noscript>
     
@@ -99,9 +99,9 @@ h1{color:#1A1A24;font-weight:600;line-height:1.25;margin-bottom:16px;font-size:4
             <div class="nav-right">
                 {% if is_public_page %}
                 <!-- Public marketing pages: no internal dropdown -->
-                <a href="/developer" class="btn btn-secondary" id="public-dashboard-link" style="display:none;">Dashboard</a>
+                <a href="/app" class="btn btn-secondary" id="public-dashboard-link" style="display:none;">My lemma.id</a>
                 <div id="auth-buttons" style="display:flex; gap:12px; align-items:center;">
-                    <a href="/login" class="btn btn-secondary" id="nav-sign-in-link" style="display:none;">Sign In</a>
+                    <a href="/app" class="btn btn-secondary" id="nav-sign-in-link" style="display:none;">Sign In</a>
                     <a href="/docs" class="btn btn-primary" id="nav-get-started-link">Get Started</a>
                     <button type="button" class="btn btn-primary" id="nav-unlock-link" style="display:none;">Unlock lemma.id</button>
                 </div>
@@ -134,8 +134,8 @@ h1{color:#1A1A24;font-weight:600;line-height:1.25;margin-bottom:16px;font-size:4
                     </div>
                 </div>
                 <div id="auth-buttons" style="display:flex; gap:12px; align-items:center;">
-                    <a href="/login" class="btn btn-secondary" id="nav-sign-in-link" style="display:none;">Sign In</a>
-                    <a href="/register" class="btn btn-primary" id="nav-get-started-link">Get Started</a>
+                    <a href="/app" class="btn btn-secondary" id="nav-sign-in-link" style="display:none;">Sign In</a>
+                    <a href="/docs" class="btn btn-primary" id="nav-get-started-link">Get Started</a>
                     <button type="button" class="btn btn-primary" id="nav-unlock-link" style="display:none;">Unlock lemma.id</button>
                 </div>
                 {% endif %}

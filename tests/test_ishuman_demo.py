@@ -77,7 +77,7 @@ def test_ishuman_demo_page_loads_expected_assets(ishuman_demo_client):
     assert ">Human proof</button>" in body
     assert ">Ban</button>" in body
     assert ">Unblock</button>" in body
-    assert "/static/css/demo/ishuman-demo.css?v=50" in body
+    assert "/static/css/demo/ishuman-demo.css?v=51" in body
     assert "ih-raise-tickets-policy-btn" not in body
     assert "ih-policy-toggle-card" not in body
     assert "ih-complete-human-main-btn" in body

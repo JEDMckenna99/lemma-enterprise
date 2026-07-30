@@ -11,7 +11,7 @@
 {% endblock %}
 
 {% block head %}
-<link rel="stylesheet" href="{{ url_for('static', filename='css/wallet.css') }}?v=11">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/wallet.css') }}?v=12">
 <style nonce="{{ csp_nonce }}">
 /* Manager logos stay jewel violet; never green when unlocked */
 .wallet-logo,
@@ -40,7 +40,7 @@
     </header>
 
     <!-- STATUS -->
-    <div id="removed-notice" class="card hidden" style="border-left: 4px solid #4f46e5; margin-bottom: 16px;">
+    <div id="removed-notice" class="card hidden" style="border-left: 4px solid #4E3D8F; margin-bottom: 16px;">
         <p style="margin: 0 0 12px; color: #1e293b; font-size: 0.95rem; line-height: 1.5;">
             <strong>lemma.id was removed from this device.</strong>
             Your passkey may still be saved in your device settings. You don't need a new one unless you want a full security reset.

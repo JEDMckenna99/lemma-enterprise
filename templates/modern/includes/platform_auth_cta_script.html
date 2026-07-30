@@ -125,7 +125,7 @@
             window.__lemmaPlatformSignInInFlight = true;
             try {
             const opts = options || {};
-            const redirectUrl = opts.redirectUrl || '/developer';
+            const redirectUrl = opts.redirectUrl || '/app';
 
             let passkeyCredentialId = null;
             let clientWalletId = null;
@@ -242,6 +242,9 @@
                 return;
             }
 
+            // No wallet yet (or wallet without platform membership): Sign In
+            // opens the lemma.id manager. Get Started stays the docs CTA.
+            if (signInLink) signInLink.style.display = 'inline-flex';
             if (getStartedLink) getStartedLink.style.display = 'inline-flex';
         }
 
@@ -275,7 +278,11 @@
 
                 if (state.mode === 'ready_signin') {
                     setNavLogoUnlocked(true);
-                    await signInPlatformWallet(wallet, { redirect: false });
+                    // Optional platform session for developers who already have
+                    // membership; manager access itself does not require it.
+                    try {
+                        await signInPlatformWallet(wallet, { redirect: false });
+                    } catch (_) {}
                     const publicDashboard = document.getElementById('public-dashboard-link');
                     const authButtons = document.getElementById('auth-buttons');
                     if (authButtons) authButtons.style.display = 'none';
@@ -295,12 +302,10 @@
                         const original = unlockButton.textContent;
                         unlockButton.textContent = 'Unlocking…';
                         try {
-                            const nextState = await unlockPlatformWallet(wallet);
-                            if (nextState.mode === 'ready_signin') {
-                                await signInPlatformWallet(wallet, { redirectUrl: '/developer' });
-                                return;
-                            }
-                            applyNavAuthButtons(nextState);
+                            await unlockPlatformWallet(wallet);
+                            // Manager-only for now: unlock → /app (not developer hub).
+                            window.location.href = '/app';
+                            return;
                         } catch (err) {
                             console.warn('[platform-auth-cta] unlock failed:', err?.message || err);
                             unlockButton.textContent = original;

@@ -1,13 +1,13 @@
 /* Scoped to avoid conflicts with lemma.css .hero / .btn */
 .demo-page {
   --demo-ink: #0f172a;
+  --demo-ink-strong: #1A1A24;
   --demo-muted: #64748b;
   --demo-line: #e2e8f0;
+  /* Single purple accent: links, focus states, small highlights only. */
   --demo-brand: #4E3D8F;
-  --demo-brand-secondary: #3A2D6E;
-  --demo-brand-soft: #F3F0FA;
-  --demo-brand-line: #D4CBEF;
-  --demo-brand-accent: #7B68B8;
+  --demo-label: #334155;
+  --demo-soft: #f8fafc;
   --demo-ok: #166534;
   --demo-ok-bg: #dcfce7;
   --demo-deny: #991b1b;
@@ -115,7 +115,7 @@
   font-weight: 900;
   letter-spacing: 0.4px;
   text-transform: uppercase;
-  color: var(--demo-brand-secondary);
+  color: var(--demo-label);
 }
 
 .step-utility p {
@@ -127,7 +127,7 @@
   font-weight: 800;
   letter-spacing: 1.5px;
   text-transform: uppercase;
-  color: var(--demo-brand);
+  color: var(--demo-muted);
   margin: 0 0 8px;
 }
 
@@ -216,9 +216,9 @@
 }
 
 .demo-progress-item.is-active {
-  color: var(--demo-brand-secondary);
-  background: var(--demo-brand-soft);
-  box-shadow: inset 0 0 0 1px var(--demo-brand-line);
+  color: var(--demo-label);
+  background: var(--demo-soft);
+  box-shadow: inset 0 0 0 1px var(--demo-line);
   transform: translateY(-1px);
   animation: demoProgressPulse 0.45s ease;
 }
@@ -322,8 +322,8 @@
 }
 
 .demo-presentation-tab.is-active {
-  border-color: var(--demo-brand-line);
-  background: var(--demo-brand-soft);
+  border-color: var(--demo-line);
+  background: var(--demo-soft);
   color: #312e81;
 }
 
@@ -388,8 +388,9 @@
   width: 36px;
   height: 36px;
   border-radius: 999px;
-  background: var(--demo-brand);
-  color: #fff;
+  background: #fff;
+  border: 1px solid #cbd5e1;
+  color: var(--demo-ink);
   font-weight: 900;
   font-size: 15px;
   display: flex;
@@ -401,10 +402,15 @@
 
 .workflow-step.is-done .workflow-num {
   background: #22c55e;
+  border-color: #22c55e;
+  color: #fff;
 }
 
 .workflow-step.is-active .workflow-num {
-  box-shadow: 0 0 0 4px rgba(79, 70, 229, 0.2);
+  background: var(--demo-brand);
+  border-color: var(--demo-brand);
+  color: #fff;
+  box-shadow: 0 0 0 4px rgba(78, 61, 143, 0.16);
 }
 
 .workflow-line {
@@ -516,8 +522,8 @@
   margin-bottom: 14px;
   padding: 12px 14px;
   border-radius: 12px;
-  background: var(--demo-brand-soft);
-  border: 1px solid var(--demo-brand-line);
+  background: var(--demo-soft);
+  border: 1px solid var(--demo-line);
 }
 
 .wizard-meta {
@@ -533,7 +539,7 @@
   font-weight: 900;
   letter-spacing: 0.5px;
   text-transform: uppercase;
-  color: var(--demo-brand-secondary);
+  color: var(--demo-label);
 }
 
 .wizard-progress {
@@ -545,7 +551,7 @@
   flex: 1;
   height: 5px;
   border-radius: 999px;
-  background: var(--demo-brand-line);
+  background: var(--demo-line);
   transition: background 0.2s ease;
 }
 
@@ -591,7 +597,11 @@
 }
 
 .status-mono,
-.result-value,
+.result-value {
+  color: var(--demo-ink);
+  font-weight: 800;
+}
+
 .ppid-val .ppid-tail-highlight {
   color: var(--demo-brand);
   font-weight: 800;
@@ -627,8 +637,12 @@
 }
 
 .demo-page .demo-btn-primary {
-  background: var(--demo-brand);
+  background: var(--demo-ink-strong);
   color: #fff;
+}
+
+.demo-page .demo-btn-primary:hover:not(:disabled) {
+  background: #32313F;
 }
 
 .demo-page .demo-btn-secondary {
@@ -962,8 +976,8 @@
   min-width: 168px;
   padding: 3px;
   border-radius: 999px;
-  background: var(--demo-brand-soft);
-  border: 1px solid var(--demo-brand-line);
+  background: var(--demo-soft);
+  border: 1px solid var(--demo-line);
   box-shadow: none;
 }
 
@@ -1297,8 +1311,8 @@
 }
 
 .demo-create-option-primary {
-  border-color: var(--demo-brand-line);
-  background: linear-gradient(180deg, #fff 0%, var(--demo-brand-soft) 100%);
+  border-color: var(--demo-line);
+  background: linear-gradient(180deg, #fff 0%, var(--demo-soft) 100%);
 }
 
 .demo-create-option-head {
@@ -1326,7 +1340,7 @@
 }
 
 .demo-create-option-badge-primary {
-  background: var(--demo-brand-soft);
+  background: var(--demo-soft);
   color: var(--demo-brand);
 }
 
@@ -1383,7 +1397,7 @@
   padding: 16px;
   border-radius: 14px;
   border: 1px solid var(--demo-line);
-  background: var(--demo-brand-soft);
+  background: var(--demo-soft);
 }
 
 .assurance-only[hidden] {
@@ -1800,7 +1814,7 @@
 
 .demo-hero-diagram {
   padding: 18px 16px 16px;
-  border: 1px solid var(--demo-brand-line);
+  border: 1px solid var(--demo-line);
   border-radius: 14px;
   background: #fff;
   box-shadow: 0 2px 10px rgba(79, 70, 229, 0.06);
@@ -1811,7 +1825,7 @@
   margin: 0 0 16px;
   font-size: 13px;
   font-weight: 800;
-  color: var(--demo-brand-secondary);
+  color: var(--demo-label);
   text-align: center;
   line-height: 1.35;
 }
@@ -1881,8 +1895,8 @@
   height: 72px;
   margin: 0 auto 8px;
   border-radius: 16px;
-  background: var(--demo-brand-soft);
-  border: 1px solid var(--demo-brand-line);
+  background: var(--demo-soft);
+  border: 1px solid var(--demo-line);
 }
 
 .demo-diagram-shield {
@@ -1912,9 +1926,9 @@
   width: 72px;
   height: 72px;
   margin: 0 auto 8px;
-  border: 1px solid var(--demo-brand-line);
+  border: 1px solid var(--demo-line);
   border-radius: 16px;
-  background: var(--demo-brand-soft);
+  background: var(--demo-soft);
   box-shadow: 0 2px 8px rgba(79, 70, 229, 0.1);
 }
 
@@ -1927,7 +1941,7 @@
   margin: 0;
   font-size: 10px;
   line-height: 1.35;
-  color: var(--demo-brand-secondary);
+  color: var(--demo-label);
   font-weight: 600;
 }
 
@@ -2280,8 +2294,8 @@
 
 .demo-wallet-slot.is-filled {
   border-style: solid;
-  border-color: var(--demo-brand-line);
-  background: var(--demo-brand-soft);
+  border-color: var(--demo-line);
+  background: var(--demo-soft);
 }
 
 .demo-wallet-slot.is-empty .demo-wallet-slot-icon {
@@ -2318,9 +2332,9 @@
   max-width: 900px;
   margin: 28px auto 8px;
   padding: 24px 26px;
-  border: 1px solid var(--demo-brand);
+  border: 1px solid var(--demo-line);
   border-radius: 18px;
-  background: linear-gradient(180deg, var(--demo-brand-soft), #fff 55%);
+  background: linear-gradient(180deg, var(--demo-soft), #fff 55%);
   box-shadow: 0 4px 18px rgba(99, 102, 241, 0.12);
 }
 
@@ -2407,8 +2421,8 @@ body:has(.demo-page) .nav-header {
   margin: 14px 0 0;
   padding: 10px 12px;
   border-radius: 10px;
-  background: var(--demo-brand-soft);
-  border: 1px solid var(--demo-brand-line);
+  background: var(--demo-soft);
+  border: 1px solid var(--demo-line);
   font-size: 13px;
   line-height: 1.5;
   color: var(--demo-muted);
@@ -2423,9 +2437,9 @@ body:has(.demo-page) .nav-header {
   font-weight: 800;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  color: var(--demo-brand-secondary);
+  color: var(--demo-label);
   background: #fff;
-  border: 1px solid var(--demo-brand-line);
+  border: 1px solid var(--demo-line);
 }
 
 .demo-dev-view {
@@ -2440,7 +2454,7 @@ body:has(.demo-page) .nav-header {
   cursor: pointer;
   font-size: 13px;
   font-weight: 700;
-  color: var(--demo-brand-secondary);
+  color: var(--demo-label);
 }
 
 .enforce-lever {
@@ -2468,7 +2482,7 @@ body:has(.demo-page) .nav-header {
 }
 
 .demo-diagram-wires path {
-  stroke: var(--demo-brand-accent);
+  stroke: #94a3b8;
   animation: demoWireFlow 2.4s linear infinite;
 }
 
@@ -2539,9 +2553,9 @@ body:has(.demo-page) .nav-header {
 .enforce-row-ppid {
   font-family: "IBM Plex Mono", ui-monospace, monospace;
   font-size: 12px;
-  color: var(--demo-brand-secondary);
-  background: var(--demo-brand-soft);
-  border: 1px solid var(--demo-brand-line);
+  color: var(--demo-label);
+  background: var(--demo-soft);
+  border: 1px solid var(--demo-line);
   border-radius: 6px;
   padding: 3px 8px;
   max-width: 100%;
@@ -2565,7 +2579,7 @@ body:has(.demo-page) .nav-header {
   appearance: none;
   border: 1px solid var(--demo-line);
   background: #fff;
-  color: var(--demo-brand-secondary);
+  color: var(--demo-label);
   font-size: 12px;
   font-weight: 600;
   line-height: 1.2;
@@ -2576,8 +2590,8 @@ body:has(.demo-page) .nav-header {
 }
 
 .enforce-chip:hover:not(:disabled) {
-  background: var(--demo-brand-soft);
-  border-color: var(--demo-brand-line);
+  background: var(--demo-soft);
+  border-color: var(--demo-line);
 }
 
 .enforce-chip:disabled {
@@ -2616,7 +2630,7 @@ body:has(.demo-page) .nav-header {
   cursor: pointer;
   font-size: 13px;
   font-weight: 700;
-  color: var(--demo-brand-secondary);
+  color: var(--demo-label);
 }
 
 .enforce-assurance-controls {
