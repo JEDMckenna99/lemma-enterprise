@@ -820,7 +820,7 @@ def _generic_index():
       --ink: #0f172a;
       --muted: #64748b;
       --line: #e2e8f0;
-      --brand: #4f46e5;
+      --brand: #4E3D8F;
       --ok: #166534;
       --deny: #991b1b;
     }}
@@ -871,7 +871,7 @@ def _generic_index():
     button {{
       width: 100%;
       border: 0;
-      background: var(--brand);
+      background: #1A1A24;
       color: #fff;
       border-radius: 10px;
       padding: 14px 16px;
@@ -907,10 +907,10 @@ def _generic_index():
       margin-top: 14px;
       padding: 14px;
       border-radius: 12px;
-      border: 1px solid #c7d2fe;
-      background: #eef2ff;
+      border: 1px solid #cbd5e1;
+      background: #f8fafc;
     }}
-    .server-receipt strong {{ display: block; margin-bottom: 8px; color: #312e81; }}
+    .server-receipt strong {{ display: block; margin-bottom: 8px; color: #334155; }}
     .server-receipt dl {{
       display: grid;
       grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr);
@@ -1273,7 +1273,7 @@ def _presale_index():
       --ink: #0f172a;
       --muted: #64748b;
       --line: #e2e8f0;
-      --brand: #4f46e5;
+      --brand: #4E3D8F;
       --ok: #166534;
       --deny: #991b1b;
     }}
@@ -1337,7 +1337,7 @@ def _presale_index():
     button, .btn-secondary {{
       width: 100%;
       border: 0;
-      background: var(--brand);
+      background: #1A1A24;
       color: #fff;
       border-radius: 10px;
       padding: 14px 16px;
@@ -1348,8 +1348,8 @@ def _presale_index():
     }}
     .btn-secondary {{
       background: #fff;
-      color: var(--brand);
-      border: 1px solid #c7d2fe;
+      color: #334155;
+      border: 1px solid #cbd5e1;
     }}
     .btn-ghost {{
       background: #f8fafc;
@@ -1372,7 +1372,7 @@ def _presale_index():
       color: var(--muted);
       background: #f8fafc;
     }}
-    .step.active {{ border-color: #c7d2fe; background: #eef2ff; color: #312e81; }}
+    .step.active {{ border-color: #cbd5e1; background: #f8fafc; color: #334155; }}
     .step.done {{ border-color: #86efac; background: #dcfce7; color: var(--ok); }}
     .code-display {{
       margin-top: 18px;
@@ -1382,9 +1382,9 @@ def _presale_index():
       text-align: center;
       padding: 16px;
       border-radius: 14px;
-      background: #eef2ff;
-      border: 1px solid #c7d2fe;
-      color: #312e81;
+      background: #f8fafc;
+      border: 1px solid #cbd5e1;
+      color: #334155;
     }}
     .pill {{
       display: inline-block;
@@ -1412,10 +1412,10 @@ def _presale_index():
       margin-top: 14px;
       padding: 14px;
       border-radius: 12px;
-      border: 1px solid #c7d2fe;
-      background: #eef2ff;
+      border: 1px solid #cbd5e1;
+      background: #f8fafc;
     }}
-    .server-receipt strong {{ display: block; margin-bottom: 8px; color: #312e81; }}
+    .server-receipt strong {{ display: block; margin-bottom: 8px; color: #334155; }}
     .server-receipt dl {{
       display: grid;
       grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr);
@@ -1451,7 +1451,7 @@ def _presale_index():
       background: #f8fafc;
       font-size: 11px;
       font-weight: 700;
-      color: #312e81;
+      color: #334155;
     }}
     .defense-item small {{
       display: block;
@@ -1467,14 +1467,14 @@ def _presale_index():
     .tour-banner {{
       margin-bottom: 18px;
       padding: 16px 18px;
-      border: 1px solid #c7d2fe;
+      border: 1px solid #cbd5e1;
       border-radius: 14px;
-      background: #eef2ff;
+      background: #f8fafc;
     }}
     .tour-banner strong {{
       display: block;
       margin-bottom: 10px;
-      color: #312e81;
+      color: #334155;
       font-size: 14px;
     }}
     .tour-checklist {{
@@ -1485,7 +1485,7 @@ def _presale_index():
       color: #334155;
     }}
     .tour-checklist li {{ margin-bottom: 4px; }}
-    .tour-checklist li.active {{ font-weight: 800; color: #312e81; }}
+    .tour-checklist li.active {{ font-weight: 800; color: #334155; }}
     .tour-checklist li.done {{ color: var(--ok); }}
     .tour-impact {{
       margin: 12px 0 0;
